@@ -139,15 +139,34 @@ describe("code intelligence tool specs", () => {
     expect(values).not.toContain("exports");
   });
 
-  it("defines code_find modes without a speculative natural-language mode", () => {
+  it("defines only required code-aware code_find modes", () => {
     const findSchema = CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find as {
       properties?: Record<string, unknown>;
+      required?: string[];
     };
     const modeSchema = findSchema.properties?.mode;
     const values = collectStringValues(modeSchema);
 
-    expect(values).toEqual(expect.arrayContaining(["text", "regex", "ast", "semantic"]));
-    expect(values).not.toContain("natural");
+    expect(values.sort((left, right) => left.localeCompare(right))).toEqual(["ast", "semantic"]);
+    expect(findSchema.required).toContain("mode");
+    expect(Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find, { query: "target" })).toBe(false);
+    expect(Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find, { query: "target", mode: "text" })).toBe(
+      false,
+    );
+    expect(
+      Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find, {
+        query: "target",
+        mode: "semantic",
+        contextLines: 1,
+      }),
+    ).toBe(false);
+    expect(
+      Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find, {
+        query: "target",
+        mode: "semantic",
+        scope: ["src", "src"],
+      }),
+    ).toBe(true);
   });
 
   it("restricts code_find AST kinds to the supported structural vocabulary", () => {

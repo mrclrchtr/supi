@@ -3,6 +3,7 @@ import type { CapabilityWarningReport } from "../../analysis/capability/capabili
 import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import type { InstructionFilesMetadata } from "../../analysis/instruction-files.ts";
 import type { ReadNextItem } from "../../analysis/read-next.ts";
+import type { StructuredScanSummary } from "../../analysis/search/pattern.ts";
 import type { PrioritySignalsSummary } from "../../analysis/signals/project.ts";
 import type { HealthSection, SemanticHealthState } from "../../session/health-types.ts";
 import type { TargetSymbolKind } from "../../session/target-input.ts";
@@ -69,6 +70,8 @@ export interface SearchDetails {
   omittedCount: number;
   evidenceLists?: EvidenceListMetadata[];
   nextQueries: string[];
+  /** Present for AST mode; declares the source-file universe and completeness. */
+  scan?: StructuredScanSummary;
 }
 
 // Canonical disambiguation candidate — re-exported from resolution/types.ts

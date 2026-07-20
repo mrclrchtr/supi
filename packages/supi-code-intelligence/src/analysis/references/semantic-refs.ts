@@ -13,8 +13,9 @@ import {
   renderEvidenceListDisclosure,
 } from "../evidence.ts";
 import { dedupeFileLineRefs, highestConfidence } from "../helpers.ts";
-import { filterOutDeclaration, isInProjectPath, uriToFile } from "../search/ripgrep.ts";
+import { isInProjectPath, uriToFile } from "../search/paths.ts";
 import type { ResolvedTargetData } from "../target/types.ts";
+import { filterOutDeclaration } from "./locations.ts";
 
 export interface FileLineRef {
   file: string;

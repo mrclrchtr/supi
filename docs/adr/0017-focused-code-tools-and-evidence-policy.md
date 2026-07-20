@@ -36,7 +36,9 @@ Target-oriented workflows are LSP-first: concrete file/workspace semantic readin
 
 Schemas encode exact-one objects with one-key cardinality and closed properties. They avoid union/literal constructs that model providers reject. Runtime validation still protects direct calls that bypass PI schema validation.
 
-`code_find` exposes exactly nine AST search kinds: `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, and `enum`. `test` is not an AST kind because the structural-provider contract does not establish test identity. Literal/regex source search and AST `call` remain available without claiming that a match is a test.
+`code_find` is the code-aware search surface. It requires `mode: "ast" | "semantic"`; omitted mode, literal text, regex, and `contextLines` are not accepted or redirected. PI grep owns literal/regex source search. AST mode requires one of exactly nine kinds: `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, and `enum`. `test` is not an AST kind because the structural-provider contract does not establish test identity. AST `call` remains available without claiming that a match is a test or a symbol-identity relationship.
+
+AST mode enumerates an owned deterministic Scan universe rather than invoking `rg --files`. It analyzes Tree-sitter-supported regular files, deduplicates overlapping roots, honors explicitly selected roots, and applies documented hidden/directory/symlink exclusions only below each root. Ignore files are not consulted. Complete scans retain exact match totals; enumeration limits, I/O failures, timeout, or provider failures produce partial evidence with unknown match totals. File limitations remain Scan metadata rather than being counted as omitted Evidence atoms.
 
 `code_graph` exposes only:
 
@@ -67,4 +69,4 @@ Evidence keeps its provider or structural provenance; degraded or unavailable su
 - **Keep flat arguments plus precedence:** allows contradictory calls and hidden ignored input.
 - **Keep graph imports, exports, and tests:** mixes file structure, convention discovery, and symbol relationships.
 - **Probe conventional coverage or unused-code report paths:** couples health output to optional, potentially stale artifacts that the tool did not produce.
-- **Silently fall back between semantic, structural, and text search:** obscures confidence and breaks honest correctness.
+- **Silently redirect between semantic, structural, and PI text search:** obscures confidence and breaks honest correctness.

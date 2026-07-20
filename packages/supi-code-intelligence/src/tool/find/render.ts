@@ -5,65 +5,33 @@ import {
   renderEvidenceListMetadataDisclosure,
 } from "../../analysis/evidence.ts";
 import type { FindResultAssembly } from "../result/find.ts";
-import {
-  renderPatternResults,
-  renderStructuredEmptyState,
-  renderStructuredMatches,
-} from "./markdown.ts";
+import { renderStructuredEmptyState, renderStructuredMatches } from "./markdown.ts";
 
 export function renderFindResult(assembly: FindResultAssembly): string {
   const { outcome } = assembly;
   const evidence = assembly.assembled.evidenceLists[0];
   if (!evidence) return "**Unavailable:** Search evidence metadata was not assembled.";
 
-  const content = (() => {
-    switch (outcome.data.kind) {
-      case "text":
-      case "regex":
-        return renderTextOrRegexResult(assembly, evidence);
-      case "ast":
-        if (outcome.data.result.matches.length === 0) {
-          return renderStructuredEmptyState(
+  const content =
+    outcome.data.kind === "semantic"
+      ? renderSemantic(assembly, evidence)
+      : outcome.data.result.matches.length === 0
+        ? renderStructuredEmptyState({
+            pattern: outcome.query,
+            kind: outcome.data.astKind,
+            relScope: outcome.scopeLabel,
+            result: outcome.data.result,
+            evidenceMetadata: evidence,
+          })
+        : renderStructuredMatches(
             outcome.query,
             outcome.data.astKind,
             outcome.scopeLabel,
-            undefined,
             outcome.data.result,
-          );
-        }
-        return renderStructuredMatches(
-          outcome.query,
-          outcome.data.astKind,
-          outcome.scopeLabel,
-          outcome.data.result,
-          evidence,
-        ).content;
-      case "semantic":
-        return renderSemantic(assembly, evidence);
-    }
-  })();
+            evidence,
+          ).content;
 
   return `**Confidence:** \`${assembly.assembled.confidence}\`\n\n${content}`;
-}
-
-function renderTextOrRegexResult(
-  assembly: FindResultAssembly,
-  evidence: EvidenceListMetadata,
-): string {
-  const { outcome } = assembly;
-  if (outcome.data.kind !== "text" && outcome.data.kind !== "regex") return "";
-  if (outcome.data.matches.length === 0) {
-    const disclosure = renderEvidenceListMetadataDisclosure(evidence);
-    return disclosure
-      ? `No matches were collected for \`${outcome.query}\` in \`${outcome.scopeLabel}\`.\n\n${disclosure}`
-      : `No matches found for \`${outcome.query}\` in \`${outcome.scopeLabel}\`.`;
-  }
-  return renderPatternResults(
-    outcome.query,
-    outcome.scopeLabel,
-    [...outcome.data.matches],
-    evidence,
-  ).content;
 }
 
 function renderSemantic(assembly: FindResultAssembly, evidence: EvidenceListMetadata): string {

@@ -57,7 +57,7 @@ The extension registers exactly eight `code_*` tools:
 - `code_inspect` — inspect exact point facts
 - `code_orientation` — orient around a workspace, module, directory, file, or resolved symbol
 - `code_graph` — collect references, structural callees, and implementations
-- `code_find` — explicit text, regex, AST, or semantic search
+- `code_find` — explicit AST structural or semantic workspace-symbol search
 - `code_health` — report live diagnostics, server status, dirty files, and supplemental Capability Warnings
 - `code_refactor_plan` — preview a precise semantic refactor without mutation
 - `code_refactor_apply` — apply a stored plan after freshness checks
@@ -142,23 +142,30 @@ code_inspect({
 
 Point inspection may include syntax, an enclosing symbol, hover/type facts, definitions, nearby diagnostics, and code-action titles. It does not invent heuristic substitutes when every required substrate is unavailable. Relationship guidance is emitted only from an evidence-backed definition location: resolve that definition first, then use its handle with `code_graph`. Structural-only inspection does not recommend a fresh graph anchor that LSP-first target establishment would reject.
 
-### Search explicitly
+### Search code-aware evidence
 
 ```text
-code_find({ query: "widget" })
-code_find({ query: "widget.*", mode: "regex", scope: ["src"] })
 code_find({ query: "widget", mode: "semantic" })
 code_find({ query: "widget", mode: "ast", kind: "definition" })
+code_find({ query: "@scope/package", mode: "ast", kind: "import", scope: ["src"] })
 ```
 
-Modes never silently fall back:
+`mode` is required and never silently falls back:
 
-- omitted mode / `text` — literal text; rejects `kind`
-- `regex` — ripgrep regex; rejects `kind`
 - `semantic` — workspace symbols; rejects `kind`
-- `ast` — structured search; requires `kind`
+- `ast` — structured source-shape search; requires `kind`
+
+Use PI's `grep` tool for literal or regex source search when it is active. `code_find` does not redirect removed text/regex calls to another tool.
 
 AST `kind` accepts exactly `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, and `enum`. AST `call` finds written call-site names, not symbol identity. Use `code_graph` references on a resolved target for symbol-identity relationships.
+
+#### AST Scan universe
+
+With omitted `scope`, AST mode scans from the workspace cwd. Eligible files are regular files with a Tree-sitter-supported extension. Below each scan root it excludes hidden entries and `.git`, `.pnpm`, `node_modules`, `dist`, `build`, `out`, `.next`, `.nuxt`, `coverage`, `.turbo`, `.cache`, and `__pycache__`. Descendant symlinks are not followed. `.gitignore`, `.ignore`, `.rgignore`, and global Git configuration are not consulted, so visible Git-ignored source remains eligible.
+
+Every explicit scope root is honored before descendant exclusions resume. A supported source file explicitly selected under `node_modules`, for example, is analyzed. Duplicate, nested, and overlapping scopes are canonically deduplicated.
+
+AST Scan details disclose roots, policy exclusions, eligible/analyzed file counts, and runtime limitations. Complete scans retain exact match totals. Unreadable paths, provider failures, the 5,000-file safety cap, or the 10-second deadline produce partial evidence with an unknown match total; skipped file counts are not reported as omitted matches.
 
 ### Check health
 
@@ -208,13 +215,14 @@ Planning never writes files. Application is the sole mutator, acquires sorted pe
 
 `calleeDepth: "direct"` excludes nested function/method/callback scopes; `"deep"` includes them. Structural callees are not callers and are not symbol-identity relationships.
 
-Imports and exports remain available as explicit AST search kinds in `code_find`; they are not graph relation families. Test identity is not inferred: use literal/regex source search or AST `call` when appropriate, neither of which claims that a match is a test.
+Imports and exports remain available as explicit AST search kinds in `code_find`; they are not graph relation families. Test identity is not inferred: use PI grep for literal/regex source search or AST `call` when appropriate, neither of which claims that a match is a test.
 
 ## Honest correctness
 
-- Semantic, structural, and text evidence retain their provenance.
+- Semantic, structural, and filesystem evidence retain their provenance.
 - Required capability failures are explicit; tools do not silently switch substrates.
 - `maxResults` is a display cap. Results disclose shown, total, and omitted evidence when known.
+- AST results declare their Scan universe; interrupted enumeration or analysis never becomes a complete absence claim.
 - Invalid semantic-provider locations are omitted from project/external facts and disclosed separately as partial evidence.
 - `code_health` reports live observations and does not infer analyzer results from conventional report files.
 - Zero matches are successful searches, not tool failures.

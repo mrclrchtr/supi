@@ -3,7 +3,7 @@
 import { existsSync } from "node:fs";
 import { relative } from "node:path";
 import { createEvidenceList } from "../analysis/evidence.ts";
-import { normalizePath } from "../analysis/search/ripgrep.ts";
+import { normalizePath } from "../analysis/search/paths.ts";
 import { gatherNearbyDiagnostics, gatherTreeSitterContext } from "../ui/markdown/gather.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import { parseInspectWorkflowInput } from "./input/workflows.ts";

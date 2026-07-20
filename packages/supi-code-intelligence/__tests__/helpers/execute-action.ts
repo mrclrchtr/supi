@@ -1,6 +1,5 @@
 import { createSessionCache } from "../../src/app/app.ts";
 import type { GraphTargetInput, TargetInput } from "../../src/session/target-input.ts";
-import { executeFindTool } from "../../src/tool/find/execute.ts";
 import type { GraphRelation } from "../../src/tool/graph/execute.ts";
 import { executeGraphTool } from "../../src/tool/graph/execute.ts";
 import { executeOrientationTool } from "../../src/tool/orientation/execute.ts";
@@ -11,7 +10,6 @@ import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../src/types/inde
 export type TestAction =
   | "graph"
   | "context"
-  | "find"
   | "refactor"
   | "apply"
   | "refactor_plan"
@@ -25,12 +23,7 @@ export interface ActionParams {
   line?: number;
   character?: number;
   symbol?: string;
-  pattern?: string;
-  query?: string;
-  regex?: boolean;
-  kind?: string;
   maxResults?: number;
-  contextLines?: number;
   relations?: string[];
   operation?: string;
   range?: {
@@ -44,7 +37,6 @@ export interface ActionParams {
 const SUPPORTED_ACTIONS = [
   "graph",
   "context",
-  "find",
   "refactor",
   "apply",
   "refactor_plan",
@@ -92,17 +84,6 @@ export async function executeAction(
           target: toGraphTarget(rest),
           relations: rest.relations as GraphRelation[] | undefined,
           maxResults: rest.maxResults,
-        },
-        fullCtx,
-      );
-    case "find":
-      return executeFindTool(
-        {
-          query: rest.query ?? rest.pattern ?? "",
-          scope: rest.path ? [rest.path] : undefined,
-          mode: rest.regex ? "regex" : "text",
-          maxResults: rest.maxResults,
-          contextLines: rest.contextLines,
         },
         fullCtx,
       );

@@ -17,7 +17,7 @@ import {
 } from "../analysis/health/diagnostics.ts";
 import { describeStructuralState, maybeRecover } from "../analysis/health/recovery.ts";
 import { collectGitContext, collectServers } from "../analysis/health/signals.ts";
-import { resolveScope } from "../analysis/search/ripgrep.ts";
+import { resolveScope } from "../analysis/search/paths.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import type {
   HealthData,

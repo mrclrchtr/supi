@@ -2,7 +2,7 @@ import * as path from "node:path";
 import type { SemanticProvider as SemanticSubstrate } from "@mrclrchtr/supi-code-runtime/api";
 import { toLspPosition } from "@mrclrchtr/supi-lsp/api";
 import { describe, expect, it, vi } from "vitest";
-import { normalizePath } from "../../../../src/analysis/search/ripgrep.ts";
+import { normalizePath } from "../../../../src/analysis/search/paths.ts";
 import { resolveSymbolTarget } from "../../../../src/analysis/target/symbol.ts";
 
 describe("normalizePath", () => {

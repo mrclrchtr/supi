@@ -7,7 +7,7 @@ import {
 } from "../../analysis/evidence.ts";
 import { compactLineRanges } from "../../analysis/references/semantic-refs.ts";
 import type { ImplementationEntry } from "../../analysis/relations/types.ts";
-import { toDisplayPath } from "../../analysis/search/ripgrep.ts";
+import { toDisplayPath } from "../../analysis/search/paths.ts";
 import { renderInvalidProviderLocations } from "./provider-location-md.ts";
 
 function groupByFile(impls: readonly ImplementationEntry[], cwd: string): Map<string, number[]> {

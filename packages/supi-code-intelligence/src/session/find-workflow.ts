@@ -2,8 +2,8 @@
 
 import type { CodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
+import { resolveScopeSet } from "../analysis/search/paths.ts";
 import { getStructuredPatternMatches } from "../analysis/search/pattern.ts";
-import { resolveScopeSet, runRipgrepDetailed, toDisplayPath } from "../analysis/search/ripgrep.ts";
 import { isCodeFindAstKind } from "../tool/find/ast-kinds.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import type { FindWorkflowInput, FindWorkflowOutcome } from "./find-types.ts";
@@ -25,7 +25,7 @@ export async function runFindWorkflow(
   if (parsed.kind === "invalid-input") return parsed;
   const request = parsed.value;
   const query = request.query;
-  const mode = request.mode ?? "text";
+  const mode = request.mode;
 
   const scope = resolveScopeSet(request.scope ? [...request.scope] : undefined, deps.cwd);
   if (scope.kind === "error") return { kind: "invalid-input", message: scope.reason };
@@ -49,45 +49,15 @@ export async function runFindWorkflow(
       control,
     });
   }
-  if (mode === "ast") {
-    return runAstSearch({
-      query,
-      input: request,
-      scopePaths: scope.paths,
-      scopeLabel,
-      maxResults,
-      deps,
-      control,
-    });
-  }
-
-  const contextLines = request.contextLines ?? 1;
-  const result = await runRipgrepDetailed(query, scope.paths, deps.cwd, {
-    contextLines,
-    literal: mode === "text",
-    filterLowSignal: true,
-    signal: control?.signal,
-  });
-  if (result.error) {
-    return mode === "regex"
-      ? { kind: "invalid-input", message: result.error }
-      : { kind: "unavailable", reason: result.error };
-  }
-  return {
-    kind: "completed",
+  return runAstSearch({
     query,
-    mode,
+    input: request,
+    scopePaths: scope.paths,
     scopeLabel,
     maxResults,
-    data: {
-      kind: mode,
-      matches: result.matches.map((match) => ({
-        ...match,
-        file: toDisplayPath(deps.cwd, match.file),
-      })),
-      partialReason: result.partialReason,
-    },
-  };
+    deps,
+    control,
+  });
 }
 
 async function runSemanticSearch(options: {
@@ -147,21 +117,21 @@ async function runAstSearch(options: {
     return { kind: "unavailable", reason: "No structural provider is active." };
   }
   throwIfAborted(control);
-  const result = await getStructuredPatternMatches(
-    { pattern: query, kind: input.kind },
-    scopePaths,
-    deps.cwd,
-    scopeLabel,
-    provider,
-  );
-  if (typeof result === "string") return { kind: "unavailable", reason: result };
-  if (!result) return { kind: "unavailable", reason: "Structured search returned no result." };
+  const outcome = await getStructuredPatternMatches({
+    params: { pattern: query, kind: input.kind },
+    roots: scopePaths,
+    cwd: deps.cwd,
+    structural: provider,
+    control: { signal: control?.signal },
+  });
+  if (outcome.kind === "invalid-input") return outcome;
+  if (outcome.kind === "unavailable") return outcome;
   return {
     kind: "completed",
     query,
     mode: "ast",
     scopeLabel,
     maxResults,
-    data: { kind: "ast", astKind: input.kind, result },
+    data: { kind: "ast", astKind: input.kind, result: outcome.result },
   };
 }

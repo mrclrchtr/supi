@@ -1,175 +1,252 @@
-import { execFileSync } from "node:child_process";
-import * as path from "node:path";
 import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-code-runtime/api";
-import { getSupportedExtensions } from "@mrclrchtr/supi-tree-sitter/api";
 import type { CodeFindAstKind } from "../../tool/find/ast-kinds.ts";
+import type { EvidencePartialReason } from "../evidence.ts";
+import {
+  type AstScanExclusion,
+  type AstScanLimitation,
+  type AstScanOperations,
+  type AstScanPolicy,
+  DEFAULT_AST_SCAN_MAX_FILES,
+  DEFAULT_AST_SCAN_TIMEOUT_MS,
+  enumerateAstFiles,
+} from "./ast-scan.ts";
 import { callableExpressionForMatching } from "./call-name.ts";
-
-/** Soft file cap — warn when a workspace has more source files than this. */
-const FILE_SOFT_CAP = 5000;
-const STRUCTURED_PATTERN_TIMEOUT_MS = 10_000;
+import { settleByDeadline } from "./deadline.ts";
+import { relativeDisplayPath } from "./paths.ts";
 
 export interface StructuredPatternParams {
-  pattern: string;
-  kind: CodeFindAstKind;
-  regex?: boolean;
+  readonly pattern: string;
+  readonly kind: CodeFindAstKind;
 }
 
 export interface StructuredMatch {
-  file: string;
-  name: string;
-  kind: string;
-  line: number;
-}
-
-export interface StructuredPatternResult {
-  matches: StructuredMatch[];
-  omittedCount: number;
-  partialReason: "file-cap" | "timeout" | null;
-  /** Per-file parse/analysis failures surfaced to the agent. */
-  failures: StructuredFailure[];
+  readonly file: string;
+  readonly name: string;
+  readonly kind: string;
+  readonly line: number;
 }
 
 export interface StructuredFailure {
-  file: string;
-  reason: string;
+  readonly file: string;
+  readonly reason: string;
 }
 
-// biome-ignore lint/complexity/useMaxParams: substrate injection keeps related inputs explicit for readability
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: enumeration-interrupted, cap, timeout, and error branches are each necessary
-export async function getStructuredPatternMatches(
-  params: StructuredPatternParams,
-  scopePath: string | readonly string[],
-  cwd: string,
-  relScope: string,
-  structural: StructuralSubstrate,
-): Promise<StructuredPatternResult | string | null> {
-  const deadline = Date.now() + STRUCTURED_PATTERN_TIMEOUT_MS;
+export type StructuredScanLimitation = AstScanLimitation | ProviderScanLimitation;
 
-  // Enumerate all supported source files via ripgrep (language-agnostic).
-  const enumeration = enumerateSourceFiles(scopePath, cwd);
-  if (enumeration === null) {
-    return `Ripgrep (rg) is not available. Install it for structured pattern search.`;
-  }
-
-  const allFiles = enumeration.files;
-  let omittedCount = 0;
-
-  if (enumeration.interrupted) {
-    // rg was killed before completing the file listing — treat as partial
-    omittedCount = Math.max(1, omittedCount);
-  }
-
-  if (allFiles.length === 0) {
-    return {
-      matches: [],
-      omittedCount,
-      partialReason: enumeration.interrupted ? "timeout" : null,
-      failures: [],
-    };
-  }
-
-  const capped = allFiles.slice(0, FILE_SOFT_CAP);
-  if (allFiles.length > FILE_SOFT_CAP) {
-    omittedCount = allFiles.length - FILE_SOFT_CAP;
-  }
-
-  const matcher = createStructuredMatcher(params.pattern, params.regex ?? false);
-  if (typeof matcher === "string") {
-    return matcher;
-  }
-
-  try {
-    const matches: StructuredMatch[] = [];
-    const failures: StructuredFailure[] = [];
-    let timedOut = false;
-
-    for (const [index, file] of capped.entries()) {
-      if (Date.now() > deadline) {
-        omittedCount += capped.length - index;
-        timedOut = true;
-        break;
-      }
-      const absFile = path.resolve(cwd, file);
-      const relFile = path.relative(cwd, absFile);
-      await collectMatchesForFile(matches, failures, structural, relFile, params.kind, matcher);
-    }
-
-    return {
-      matches,
-      failures,
-      omittedCount: timedOut ? Math.max(1, omittedCount) : omittedCount,
-      partialReason: timedOut ? "timeout" : omittedCount > 0 ? "file-cap" : null,
-    };
-  } catch {
-    return `No structured ${params.kind} search data available in \`${relScope}\`. Try omitting \`kind\` for plain text search.`;
-  }
+export interface ProviderScanLimitation {
+  readonly reason: "provider-failure";
+  readonly pathCount: number;
+  readonly examples: readonly string[];
 }
 
-// ── File enumeration ─────────────────────────────────────────────────
+/** Structured completeness state for the AST source-file scan. */
+export interface StructuredScanSummary {
+  readonly universe: "tree-sitter-supported-files";
+  readonly roots: readonly string[];
+  readonly policy: AstScanPolicy;
+  readonly eligibleFileCount: number | null;
+  readonly analyzedFileCount: number;
+  readonly complete: boolean;
+  readonly exclusions: readonly AstScanExclusion[];
+  readonly limitations: readonly StructuredScanLimitation[];
+}
 
-interface FileEnumeration {
-  files: string[];
-  /** True when rg was terminated before completing the listing. */
-  interrupted: boolean;
+export interface StructuredPatternResult {
+  readonly matches: readonly StructuredMatch[];
+  readonly partialReason: EvidencePartialReason | null;
+  /** Per-file parse/analysis failures surfaced to the agent. */
+  readonly failures: readonly StructuredFailure[];
+  readonly scan: StructuredScanSummary;
+}
+
+export type StructuredPatternOutcome =
+  | { readonly kind: "completed"; readonly result: StructuredPatternResult }
+  | { readonly kind: "invalid-input"; readonly message: string }
+  | { readonly kind: "unavailable"; readonly reason: string };
+
+/** Internal controls for deterministic deadline, filesystem, and cancellation tests. */
+export interface StructuredPatternControl {
+  readonly signal?: AbortSignal;
+  readonly now?: () => number;
+  readonly operations?: AstScanOperations;
+  readonly maxFiles?: number;
+  readonly timeoutMs?: number;
+}
+
+export interface StructuredPatternSearchOptions {
+  readonly params: StructuredPatternParams;
+  readonly roots: string | readonly string[];
+  readonly cwd: string;
+  readonly structural: StructuralSubstrate;
+  readonly control?: StructuredPatternControl;
 }
 
 /**
- * Enumerate all tree-sitter-supported source files in scopePath using rg --files.
- * Returns null if ripgrep is not available.
+ * Enumerate and analyze the declared AST Scan universe.
+ *
+ * Abort propagates to the tool boundary. Deadline, safety-cap, traversal, and
+ * provider limitations instead produce explicit incomplete scan metadata.
  */
-function enumerateSourceFiles(
-  scopePath: string | readonly string[],
-  cwd: string,
-): FileEnumeration | null {
-  const extensions = getSupportedExtensions();
-  // Strip leading dots — ripgrep -g expects ".ext" without the dot prefix
-  const globPattern = `*.{${Array.from(extensions)
-    .map((ext) => ext.replace(/^\./, ""))
-    .join(",")}}`;
+export async function getStructuredPatternMatches(
+  options: StructuredPatternSearchOptions,
+): Promise<StructuredPatternOutcome> {
+  const now = options.control?.now ?? Date.now;
+  const maxFiles = options.control?.maxFiles ?? DEFAULT_AST_SCAN_MAX_FILES;
+  const timeoutMs = options.control?.timeoutMs ?? DEFAULT_AST_SCAN_TIMEOUT_MS;
+  const deadline = now() + timeoutMs;
+  const roots = Array.isArray(options.roots) ? [...options.roots] : [options.roots];
+  options.control?.signal?.throwIfAborted();
 
-  try {
-    const output = execFileSync("rg", ["--files", "-g", globPattern, ...scopePathArgs(scopePath)], {
-      encoding: "utf-8",
-      cwd,
-      timeout: 5000,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+  const enumeration = await enumerateAstFiles({
+    cwd: options.cwd,
+    roots,
+    deadline,
+    maxFiles,
+    timeoutMs,
+    signal: options.control?.signal,
+    now,
+    operations: options.control?.operations,
+  });
+  if (enumeration.kind === "invalid-root") {
     return {
-      files: normalizeEnumeratedFiles(output),
-      interrupted: false,
+      kind: "invalid-input",
+      message: `${enumeration.reason} Scope: \`${enumeration.path}\`.`,
     };
-  } catch (err: unknown) {
-    if (isCodeError(err, "ENOENT")) {
-      return null;
-    }
-    // Non-zero exit (e.g. no matches) is fine — return what we got
-    if (isExecError(err)) {
-      const stdout = typeof err.stdout === "string" ? err.stdout : "";
-      const wasKilled = (err as { killed?: boolean }).killed === true;
-      return {
-        files: normalizeEnumeratedFiles(stdout),
-        interrupted: wasKilled,
-      };
-    }
-    return { files: [], interrupted: false };
   }
+  if (
+    enumeration.files.length === 0 &&
+    enumeration.limitations.some((limitation) => limitation.reason === "unreadable-path")
+  ) {
+    return {
+      kind: "unavailable",
+      reason: "No AST source file could be enumerated because the requested scope was unreadable.",
+    };
+  }
+
+  const analysis = await analyzeStructuredFiles({
+    files: enumeration.files,
+    displayBase: enumeration.displayBase,
+    params: options.params,
+    structural: options.structural,
+    deadline,
+    now,
+    signal: options.control?.signal,
+    initialLimitations: enumeration.limitations,
+  });
+  const complete = enumeration.complete && analysis.limitations.length === 0;
+  return {
+    kind: "completed",
+    result: {
+      matches: analysis.matches,
+      failures: analysis.failures,
+      partialReason: complete ? null : primaryPartialReason(analysis.limitations),
+      scan: {
+        universe: "tree-sitter-supported-files",
+        roots: roots.map((root) => relativeDisplayPath(options.cwd, root)),
+        policy: enumeration.policy,
+        eligibleFileCount: enumeration.eligibleFileCount,
+        analyzedFileCount: analysis.analyzedFileCount,
+        complete,
+        exclusions: enumeration.exclusions,
+        limitations: analysis.limitations,
+      },
+    },
+  };
 }
 
-function scopePathArgs(scopePath: string | readonly string[]): string[] {
-  const paths = Array.isArray(scopePath) ? scopePath : [scopePath];
-  return paths.length > 0 ? [...paths] : ["."];
+interface AnalyzeStructuredFilesOptions {
+  readonly files: readonly string[];
+  readonly displayBase: string;
+  readonly params: StructuredPatternParams;
+  readonly structural: StructuralSubstrate;
+  readonly deadline: number;
+  readonly now: () => number;
+  readonly signal?: AbortSignal;
+  readonly initialLimitations: readonly AstScanLimitation[];
 }
 
-function normalizeEnumeratedFiles(output: string): string[] {
-  return [
-    ...new Set(
-      output
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0),
-    ),
-  ].sort((a, b) => a.localeCompare(b));
+async function analyzeStructuredFiles(options: AnalyzeStructuredFilesOptions): Promise<{
+  matches: StructuredMatch[];
+  failures: StructuredFailure[];
+  limitations: StructuredScanLimitation[];
+  analyzedFileCount: number;
+}> {
+  const matches: StructuredMatch[] = [];
+  const failures: StructuredFailure[] = [];
+  const limitations: StructuredScanLimitation[] = [...options.initialLimitations];
+  const matcher = createStructuredMatcher(options.params.pattern);
+  let analyzedFileCount = 0;
+
+  for (const [index, absoluteFile] of options.files.entries()) {
+    options.signal?.throwIfAborted();
+    if (options.now() > options.deadline) {
+      addAnalysisTimeout(limitations, options.files.slice(index), options.displayBase);
+      break;
+    }
+    const relativeFile = relativeDisplayPath(options.displayBase, absoluteFile);
+    const fileMatches: StructuredMatch[] = [];
+    const fileFailures: StructuredFailure[] = [];
+    const outcome = await settleByDeadline(
+      async () => {
+        try {
+          await collectMatchesForFile(
+            fileMatches,
+            fileFailures,
+            options.structural,
+            relativeFile,
+            options.params.kind,
+            matcher,
+          );
+        } catch (error) {
+          fileFailures.push({ file: relativeFile, reason: errorMessage(error) });
+        }
+      },
+      { deadline: options.deadline, now: options.now, signal: options.signal },
+    );
+    if (outcome.kind === "timeout") {
+      addAnalysisTimeout(limitations, options.files.slice(index), options.displayBase);
+      break;
+    }
+    options.signal?.throwIfAborted();
+    matches.push(...fileMatches);
+    failures.push(...fileFailures);
+    if (fileFailures.length === 0) analyzedFileCount += 1;
+  }
+
+  if (failures.length > 0) {
+    limitations.push({
+      reason: "provider-failure",
+      pathCount: failures.length,
+      examples: failures.slice(0, 5).map((failure) => failure.file),
+    });
+  }
+  return { matches, failures, limitations, analyzedFileCount };
+}
+
+function addAnalysisTimeout(
+  limitations: StructuredScanLimitation[],
+  remainingFiles: readonly string[],
+  cwd: string,
+): void {
+  if (limitations.some((limitation) => limitation.reason === "timeout")) return;
+  limitations.push({
+    reason: "timeout",
+    pathCount: remainingFiles.length,
+    examples: remainingFiles.slice(0, 5).map((file) => relativeDisplayPath(cwd, file)),
+  });
+}
+
+function primaryPartialReason(
+  limitations: readonly StructuredScanLimitation[],
+): EvidencePartialReason {
+  if (limitations.some((limitation) => limitation.reason === "timeout")) return "timeout";
+  if (limitations.some((limitation) => limitation.reason === "safety-limit")) {
+    return "safety-limit";
+  }
+  if (limitations.some((limitation) => limitation.reason === "unreadable-path")) {
+    return "interrupted";
+  }
+  return "provider-limited";
 }
 
 // biome-ignore lint/complexity/useMaxParams: helper takes explicit collection inputs to avoid intermediate objects in the hot path
@@ -188,7 +265,7 @@ async function collectMatchesForFile(
 
   if (kind === "definition") {
     const outline = await structural.outline(relFile);
-    if (!handleStructuralResult(outline, relFile, recordFailure)) return;
+    if (!handleStructuralResult(outline, recordFailure)) return;
     for (const item of outline.data) {
       if (!matcher(item.name)) continue;
       matches.push({ file: relFile, name: item.name, kind: item.kind, line: item.startLine });
@@ -198,7 +275,7 @@ async function collectMatchesForFile(
 
   if (kind === "export") {
     const exportsResult = await structural.exports(relFile);
-    if (!handleStructuralResult(exportsResult, relFile, recordFailure)) return;
+    if (!handleStructuralResult(exportsResult, recordFailure)) return;
     for (const item of exportsResult.data) {
       if (!matcher(item.name)) continue;
       matches.push({ file: relFile, name: item.name, kind: item.kind, line: item.startLine });
@@ -208,7 +285,7 @@ async function collectMatchesForFile(
 
   if (kind === "import") {
     const importsResult = await structural.imports(relFile);
-    if (!handleStructuralResult(importsResult, relFile, recordFailure)) return;
+    if (!handleStructuralResult(importsResult, recordFailure)) return;
     for (const item of importsResult.data) {
       if (!matcher(item.moduleSpecifier)) continue;
       matches.push({
@@ -223,46 +300,29 @@ async function collectMatchesForFile(
 
   if (kind === "call") {
     const callResult = await structural.callSites(relFile);
-    if (!handleStructuralResult(callResult, relFile, recordFailure)) return;
-    for (const cs of callResult.data) {
-      if (!matcher(callableExpressionForMatching(cs.name))) continue;
-      matches.push({ file: relFile, name: cs.name, kind: "call", line: cs.startLine });
+    if (!handleStructuralResult(callResult, recordFailure)) return;
+    for (const call of callResult.data) {
+      if (!matcher(callableExpressionForMatching(call.name))) continue;
+      matches.push({ file: relFile, name: call.name, kind: "call", line: call.startLine });
     }
     return;
   }
 
-  // ── type / interface / class / method / enum — use outline with kind-specific filters ─
-
-  if (
-    kind === "type" ||
-    kind === "interface" ||
-    kind === "class" ||
-    kind === "method" ||
-    kind === "enum"
-  ) {
-    const outline = await structural.outline(relFile);
-    if (!handleStructuralResult(outline, relFile, recordFailure)) return;
-    for (const item of outline.data) {
-      if (kind === "type" && !isTypeLikeKind(item.kind)) continue;
-      if (kind === "interface" && !isInterfaceKind(item.kind)) continue;
-      if (kind === "class" && item.kind.toLowerCase() !== "class") continue;
-      if (kind === "method" && item.kind.toLowerCase() !== "method") continue;
-      if (kind === "enum" && item.kind.toLowerCase() !== "enum") continue;
-      if (!matcher(item.name)) continue;
-      matches.push({ file: relFile, name: item.name, kind: item.kind, line: item.startLine });
-    }
+  const outline = await structural.outline(relFile);
+  if (!handleStructuralResult(outline, recordFailure)) return;
+  for (const item of outline.data) {
+    if (kind === "type" && !TYPE_LIKE_KINDS.has(item.kind.toLowerCase())) continue;
+    if (kind === "interface" && item.kind.toLowerCase() !== "interface") continue;
+    if (kind === "class" && item.kind.toLowerCase() !== "class") continue;
+    if (kind === "method" && item.kind.toLowerCase() !== "method") continue;
+    if (kind === "enum" && item.kind.toLowerCase() !== "enum") continue;
+    if (!matcher(item.name)) continue;
+    matches.push({ file: relFile, name: item.name, kind: item.kind, line: item.startLine });
   }
 }
 
-// ── Result handling ──────────────────────────────────────────────────
-
-/**
- * Handle a structural CodeResult: surface non-success results as failures,
- * return whether the caller should continue processing data.
- */
 function handleStructuralResult<T>(
-  result: { kind: string; message?: string; file?: string },
-  _relFile: string,
+  result: { kind: string; message?: string },
   recordFailure: (reason: string) => void,
 ): result is { kind: "success"; data: T } {
   if (result.kind === "success") return true;
@@ -270,33 +330,10 @@ function handleStructuralResult<T>(
   return false;
 }
 
-/** Outline kind values that represent type declarations (as normalized by the outline extractor). */
 const TYPE_LIKE_KINDS = new Set(["class", "interface", "type", "enum"]);
 
-function isTypeLikeKind(kind: string): boolean {
-  return TYPE_LIKE_KINDS.has(kind.toLowerCase());
-}
-
-function isInterfaceKind(kind: string): boolean {
-  return kind.toLowerCase() === "interface";
-}
-
-function createStructuredMatcher(
-  pattern: string,
-  regex: boolean,
-): ((value: string) => boolean) | string {
+function createStructuredMatcher(pattern: string): (value: string) => boolean {
   const ignoreCase = !/[A-Z]/.test(pattern);
-
-  if (regex) {
-    try {
-      const compiled = new RegExp(pattern, ignoreCase ? "i" : undefined);
-      return (value: string) => compiled.test(value);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Invalid regex";
-      return `**Error:** Invalid regex pattern \`${pattern}\`: ${message}`;
-    }
-  }
-
   const needle = ignoreCase ? pattern.toLowerCase() : pattern;
   return (value: string) => {
     const haystack = ignoreCase ? value.toLowerCase() : value;
@@ -304,21 +341,6 @@ function createStructuredMatcher(
   };
 }
 
-// ── Error helpers ────────────────────────────────────────────────────
-
-function isExecError(err: unknown): err is {
-  status: number;
-  stdout?: unknown;
-  stderr?: unknown;
-} {
-  return typeof err === "object" && err !== null && "status" in err;
-}
-
-function isCodeError(err: unknown, code: string): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code: unknown }).code === code
-  );
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Structural provider failed.";
 }

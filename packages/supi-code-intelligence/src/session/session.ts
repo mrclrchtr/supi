@@ -260,7 +260,7 @@ export class WorkspaceCodeIntelligenceSession {
     );
   }
 
-  /** Search one explicit text, regex, structural, or semantic substrate. */
+  /** Search one explicit structural or semantic substrate. */
   async find(input: FindWorkflowInput, control?: WorkflowControl): Promise<FindWorkflowOutcome> {
     return runFindWorkflow(input, { cwd: this.cwd, capability: this.#capability }, control);
   }

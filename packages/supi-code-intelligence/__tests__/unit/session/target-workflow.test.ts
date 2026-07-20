@@ -351,7 +351,7 @@ describe("target-workflow (deep session seam)", () => {
 
       expect(outcome).toMatchObject({
         kind: "invalid-input",
-        message: expect.stringContaining('code_find` with `mode: "text"'),
+        message: expect.stringContaining("PI read or grep"),
       });
     });
 

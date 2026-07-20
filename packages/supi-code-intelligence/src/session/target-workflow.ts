@@ -6,7 +6,7 @@
  */
 
 import { existsSync } from "node:fs";
-import { normalizePath, resolveScope } from "../analysis/search/ripgrep.ts";
+import { normalizePath, resolveScope } from "../analysis/search/paths.ts";
 import { resolveAnchoredSymbolTarget } from "../analysis/target/anchored.ts";
 import { resolveFileTargetGroup, validateFileTargetDiscovery } from "../analysis/target/file.ts";
 import {

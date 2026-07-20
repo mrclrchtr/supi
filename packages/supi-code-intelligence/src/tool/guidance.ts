@@ -1,9 +1,16 @@
 // Model-facing descriptions and concise sibling-selection guidance.
 
+import {
+  AST_SCAN_EXCLUDED_DIRECTORIES,
+  DEFAULT_AST_SCAN_MAX_FILES,
+  DEFAULT_AST_SCAN_TIMEOUT_MS,
+} from "../analysis/search/ast-scan.ts";
 import type { CodeIntelligenceToolName } from "../types/index.ts";
 import { CODE_FIND_AST_KINDS } from "./find/ast-kinds.ts";
 
 const CODE_FIND_AST_KIND_LIST = CODE_FIND_AST_KINDS.join("/");
+const AST_SCAN_EXCLUDED_DIRECTORY_LIST = AST_SCAN_EXCLUDED_DIRECTORIES.join("/");
+const AST_SCAN_TIMEOUT_SECONDS = DEFAULT_AST_SCAN_TIMEOUT_MS / 1_000;
 
 export interface CodeIntelligenceToolPromptSurface {
   description: string;
@@ -48,10 +55,10 @@ export const CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES: CodeIntelligenceToolPromptS
     promptGuidelines: [],
   },
   code_find: {
-    description: `Search explicit evidence using text literal (default), regex, semantic workspace symbols, or ast structure. scope is a non-empty array of workspace-relative paths. mode:"ast" requires kind (${CODE_FIND_AST_KIND_LIST}); other modes reject kind. Modes never silently fall back. AST call matches written names, not symbol identity.`,
-    promptSnippet: "code_find — explicit text, regex, structural, or semantic search",
+    description: `Search code-aware evidence using required mode "ast" or "semantic". AST requires kind (${CODE_FIND_AST_KIND_LIST}) and matches source shape; semantic searches workspace symbols. scope is an optional non-empty array of workspace-relative paths. Omitted AST scope scans visible regular files with supported Tree-sitter extensions; it prunes ${AST_SCAN_EXCLUDED_DIRECTORY_LIST}, does not read ignore files or follow descendant symlinks, and honors explicitly named roots. Canonical overlapping roots are deduplicated. One ${AST_SCAN_TIMEOUT_SECONDS}-second deadline and ${DEFAULT_AST_SCAN_MAX_FILES}-eligible-file cap cover enumeration plus analysis. An explicitly scoped unsupported file is invalid; a scope where no eligible file can be read is unavailable. Incomplete scans disclose limitations with unknown match totals. Use PI grep for literal/regex text search when active. Modes never silently fall back.`,
+    promptSnippet: "code_find — explicit structural or semantic code search",
     promptGuidelines: [
-      "Use code_find for direct search evidence; use code_graph references for symbol-identity relationships.",
+      "Use code_find for structural or semantic search evidence; use PI grep for literal/regex source search and code_graph references for symbol-identity relationships.",
     ],
   },
   code_health: {

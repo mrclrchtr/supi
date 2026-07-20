@@ -9,7 +9,7 @@ import type {
 import { toLspPosition } from "@mrclrchtr/supi-lsp/api";
 import { applyWorkspaceEdit } from "../analysis/refactor/apply.ts";
 import { validateEdit } from "../analysis/refactor/safety.ts";
-import { normalizePath } from "../analysis/search/ripgrep.ts";
+import { normalizePath } from "../analysis/search/paths.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import {
   parseRefactorApplyWorkflowInput,

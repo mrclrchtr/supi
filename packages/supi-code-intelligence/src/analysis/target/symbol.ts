@@ -14,7 +14,7 @@ import type {
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import type { TargetSymbolKind } from "../../session/target-input.ts";
 import type { AnchorKind } from "../../session/target-store.ts";
-import { normalizePath } from "../search/ripgrep.ts";
+import { normalizePath } from "../search/paths.ts";
 import type { DisambiguationCandidateData, TargetOutcome } from "./types.ts";
 
 const MAX_CANDIDATES = 8; // default fallback when maxResults is not provided

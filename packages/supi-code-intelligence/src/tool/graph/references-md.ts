@@ -3,7 +3,7 @@
 import type { EvidenceList, EvidenceListMetadata } from "../../analysis/evidence.ts";
 import { formatAssembledReferenceList } from "../../analysis/references/semantic-refs.ts";
 import type { ReferenceEntry } from "../../analysis/relations/types.ts";
-import { toDisplayPath } from "../../analysis/search/ripgrep.ts";
+import { toDisplayPath } from "../../analysis/search/paths.ts";
 import { renderInvalidProviderLocations } from "./provider-location-md.ts";
 
 export function renderReferencesResult(options: {

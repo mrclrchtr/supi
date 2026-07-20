@@ -22,6 +22,7 @@ export interface EvidenceListMetadata {
   key: string;
   totalCount: number | null;
   shownCount: number;
+  /** Known collected atoms hidden by presentation; null when not tracked. */
   omittedCount: number | null;
   partialReason: EvidencePartialReason | null;
   /** Unusable semantic-provider locations excluded from valid evidence totals. */
@@ -45,6 +46,8 @@ export interface CreatePartialEvidenceListParams<T> {
   key: string;
   items: T[];
   partialReason: EvidencePartialReason;
+  /** Optional display cap; the overall evidence total remains unknown. */
+  maxResults?: number;
 }
 
 export interface EvidenceListSummary {
@@ -74,14 +77,17 @@ export function createEvidenceList<T>(params: CreateEvidenceListParams<T>): Evid
 export function createPartialEvidenceList<T>(
   params: CreatePartialEvidenceListParams<T>,
 ): EvidenceList<T> {
+  const maxResults = params.maxResults ?? params.items.length;
+  const items = params.items.slice(0, Math.max(0, maxResults));
   return {
     key: params.key,
-    items: [...params.items],
+    items,
     metadata: {
       key: params.key,
       totalCount: null,
-      shownCount: params.items.length,
-      omittedCount: null,
+      shownCount: items.length,
+      omittedCount:
+        params.maxResults === undefined ? null : Math.max(0, params.items.length - items.length),
       partialReason: params.partialReason,
     },
   };
@@ -96,7 +102,9 @@ export function renderEvidenceListMetadataDisclosure(
 ): string | null {
   if (metadata.totalCount === null) {
     if (metadata.partialReason === null) return null;
-    return `_(showing ${metadata.shownCount}; more may exist — ${metadata.partialReason})_`;
+    const omitted = metadata.omittedCount ?? 0;
+    const omittedDisclosure = omitted > 0 ? `; ${omitted} collected omitted` : "";
+    return `_(showing ${metadata.shownCount}${omittedDisclosure}; more may exist — ${metadata.partialReason})_`;
   }
 
   if ((metadata.omittedCount ?? 0) <= 0) return null;

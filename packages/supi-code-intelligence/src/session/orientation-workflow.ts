@@ -9,7 +9,7 @@ import {
   findInstructionFilesForDirectory,
 } from "../analysis/instruction-files.ts";
 import { createStructuralCodeProvider } from "../analysis/provider.ts";
-import { normalizePath } from "../analysis/search/ripgrep.ts";
+import { normalizePath } from "../analysis/search/paths.ts";
 import { loadCodeIntelligenceConfig } from "../config.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import { parseOrientationWorkflowInput } from "./input/workflows.ts";

@@ -10,7 +10,7 @@ import type { CodeFindToolParams } from "./execute.ts";
 
 export function renderFindCall(args: unknown, theme: Theme, _context: unknown): Text {
   const params = (args ?? {}) as CodeFindToolParams;
-  const mode = params.mode ?? "text";
+  const mode = params.mode ?? "mode?";
 
   let content = theme.fg("toolTitle", "code_find");
 

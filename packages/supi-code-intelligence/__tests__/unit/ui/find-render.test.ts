@@ -24,7 +24,7 @@ function render(data: Record<string, unknown>, expanded: boolean, content = ""):
 }
 
 describe("code_find result rendering", () => {
-  it.each(["heuristic", "structural", "semantic"] as const)(
+  it.each(["structural", "semantic"] as const)(
     "exposes %s confidence from structured details",
     (confidence) => {
       expect(render({ candidateCount: 1, omittedCount: 0, confidence }, false)).toContain(
@@ -37,7 +37,7 @@ describe("code_find result rendering", () => {
     {
       label: "known truncation",
       evidence: {
-        key: "find.textMatches",
+        key: "find.astMatches",
         totalCount: 3,
         shownCount: 1,
         omittedCount: 2,
@@ -45,12 +45,12 @@ describe("code_find result rendering", () => {
       },
       markdown: "_(showing 1 of 3; 2 omitted)_",
       renderedMarkdown: "showing 1 of 3; 2 omitted",
-      badge: "1 of 3 matches (2 omitted)",
+      badge: "1 of 3 AST matches (2 omitted)",
     },
     {
       label: "unknown partial evidence",
       evidence: {
-        key: "find.textMatches",
+        key: "find.astMatches",
         totalCount: null,
         shownCount: 1,
         omittedCount: null,
@@ -58,7 +58,20 @@ describe("code_find result rendering", () => {
       },
       markdown: "_(showing 1; more may exist — timeout)_",
       renderedMarkdown: "showing 1; more may exist — timeout",
-      badge: "1 matches (more may exist — timeout)",
+      badge: "1 AST matches (more may exist — timeout)",
+    },
+    {
+      label: "display-capped partial evidence",
+      evidence: {
+        key: "find.astMatches",
+        totalCount: null,
+        shownCount: 1,
+        omittedCount: 2,
+        partialReason: "timeout",
+      },
+      markdown: "_(showing 1; 2 collected omitted; more may exist — timeout)_",
+      renderedMarkdown: "showing 1; 2 collected omitted; more may exist — timeout",
+      badge: "1 AST matches (2 collected omitted; more may exist — timeout)",
     },
   ])(
     "projects $label from serialized evidence in compact and expanded views",
@@ -67,7 +80,7 @@ describe("code_find result rendering", () => {
         const text = render(
           {
             candidateCount: 99,
-            confidence: "heuristic",
+            confidence: "structural",
             evidenceLists: [evidence],
             omittedCount: 98,
           },

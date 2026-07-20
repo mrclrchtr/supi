@@ -1,5 +1,5 @@
 import { renderEvidenceListDisclosure } from "../../analysis/evidence.ts";
-import { toDisplayPath } from "../../analysis/search/ripgrep.ts";
+import { toDisplayPath } from "../../analysis/search/paths.ts";
 import { assembledNextQueries } from "../result/assembly.ts";
 import type {
   RefactorApplyResultAssembly,

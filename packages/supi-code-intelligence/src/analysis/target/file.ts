@@ -16,7 +16,7 @@ import type {
   StructuralProvider as StructuralSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { AnchorKind } from "../../session/target-store.ts";
-import { normalizePath } from "../search/ripgrep.ts";
+import { normalizePath } from "../search/paths.ts";
 import { canonicalDeclarationKind, refineTypeAliasIdentity } from "./identity.ts";
 import type { ResolvedTargetData, ResolvedTargetGroupData } from "./types.ts";
 
@@ -133,7 +133,7 @@ function validateDiscoveryFile(resolvedFile: string, requestedFile: string): str
     return `Cannot access file: \`${requestedFile}\``;
   }
   if (!BINARY_EXTENSIONS.has(path.extname(resolvedFile).toLowerCase())) return null;
-  return `File type not supported for code analysis: \`${requestedFile}\`. Use \`code_find\` with \`mode: "text"\` for explicit text search.`;
+  return `File type not supported for code analysis: \`${requestedFile}\`. Use PI read or grep for explicit filesystem inspection when appropriate.`;
 }
 
 async function discoverSemantic(

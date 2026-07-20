@@ -1,6 +1,6 @@
 /** Session-owned graph workflow: one Target workflow followed by relation collection. */
 
-import { toDisplayPath } from "../analysis/search/ripgrep.ts";
+import { toDisplayPath } from "../analysis/search/paths.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import { collectRelation } from "./graph/collect.ts";
 import type {

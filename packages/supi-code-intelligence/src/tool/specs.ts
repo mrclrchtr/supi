@@ -1,4 +1,8 @@
 import type { TSchema } from "typebox";
+import {
+  DEFAULT_AST_SCAN_MAX_FILES,
+  DEFAULT_AST_SCAN_TIMEOUT_MS,
+} from "../analysis/search/ast-scan.ts";
 import type {
   CodeIntelligenceToolName,
   CodeIntelResult,
@@ -95,11 +99,14 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     label: "Code Find",
     parameters: CodeFindParameters,
     run: (params, ctx) => executeFindTool(params as Parameters<typeof executeFindTool>[0], ctx),
-    purpose: "Search literal text, regex, structural declarations, or semantic symbols explicitly.",
-    schemaDocs:
-      "Requires query; scope is an optional non-empty path array; AST mode requires kind.",
-    substrates: ["semantic", "structural", "search"],
-    nonGoals: ["No natural-language retrieval.", "No silent mode fallback."],
+    purpose: "Search structural source shape or semantic workspace symbols explicitly.",
+    schemaDocs: `Requires query and ast/semantic mode; scope is optional and AST mode requires kind. AST enumeration uses a shared ${DEFAULT_AST_SCAN_TIMEOUT_MS / 1_000}-second deadline, a ${DEFAULT_AST_SCAN_MAX_FILES}-file cap, and canonical scope deduplication.`,
+    substrates: ["semantic", "structural"],
+    nonGoals: [
+      "No literal or regex text search; use PI grep when active.",
+      "No natural-language retrieval.",
+      "No silent mode fallback.",
+    ],
   },
   {
     name: "code_health",

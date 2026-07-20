@@ -52,4 +52,26 @@ describe("evidence lists", () => {
       evidenceLists: [list.metadata],
     });
   });
+
+  it("counts collected evidence hidden by a partial-result display cap", () => {
+    const list = createPartialEvidenceList({
+      key: "find.astMatches",
+      items: ["A", "B", "C", "D"],
+      maxResults: 2,
+      partialReason: "timeout",
+    });
+
+    expect(list.items).toEqual(["A", "B"]);
+    expect(list.metadata).toEqual({
+      key: "find.astMatches",
+      totalCount: null,
+      shownCount: 2,
+      omittedCount: 2,
+      partialReason: "timeout",
+    });
+    expect(renderEvidenceListDisclosure(list)).toBe(
+      "_(showing 2; 2 collected omitted; more may exist — timeout)_",
+    );
+    expect(summarizeEvidenceLists([list]).omittedCount).toBe(2);
+  });
 });

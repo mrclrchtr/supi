@@ -13,19 +13,43 @@ import {
 import { TARGET_SYMBOL_KINDS } from "../../../src/session/target-input.ts";
 
 describe("code_find query validation", () => {
-  it.each(["text", "regex"] as const)("preserves significant whitespace in %s mode", (mode) => {
+  it.each(["ast", "semantic"] as const)("preserves significant whitespace in %s mode", (mode) => {
     const query = " foo ";
-    const outcome = parseFindWorkflowInput({ query, mode });
+    const outcome = parseFindWorkflowInput({
+      query,
+      mode,
+      ...(mode === "ast" ? { kind: "definition" as const } : {}),
+    });
 
     expect(outcome.kind).toBe("valid");
     if (outcome.kind === "valid") expect(outcome.value.query).toBe(query);
   });
 
   it.each(["", "   ", "\t\n"])("rejects an all-whitespace query (%j)", (query) => {
-    expect(parseFindWorkflowInput({ query })).toEqual({
+    expect(parseFindWorkflowInput({ query, mode: "semantic" })).toEqual({
       kind: "invalid-input",
       message: "query must not be empty.",
     });
+  });
+
+  it.each([undefined, "text", "regex"])("rejects removed or omitted mode %j", (mode) => {
+    expect(parseFindWorkflowInput({ query: "Widget", ...(mode ? { mode } : {}) })).toEqual({
+      kind: "invalid-input",
+      message: "mode is required and must be one of ast or semantic.",
+    });
+  });
+
+  it("rejects removed contextLines input", () => {
+    expect(parseFindWorkflowInput({ query: "Widget", mode: "semantic", contextLines: 2 })).toEqual({
+      kind: "invalid-input",
+      message: "code_find input contains unsupported field: `contextLines`.",
+    });
+  });
+
+  it("accepts duplicate scopes for canonical path deduplication", () => {
+    expect(
+      parseFindWorkflowInput({ query: "Widget", mode: "semantic", scope: ["src", "src"] }),
+    ).toMatchObject({ kind: "valid", value: { scope: ["src", "src"] } });
   });
 });
 

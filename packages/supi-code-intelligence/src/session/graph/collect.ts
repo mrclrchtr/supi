@@ -10,7 +10,7 @@ import { collectCallees } from "../../analysis/relations/callees.ts";
 import { collectImplementations } from "../../analysis/relations/implementations.ts";
 import { collectCallers } from "../../analysis/relations/references.ts";
 import type { CallEntry } from "../../analysis/relations/types.ts";
-import { toDisplayPath } from "../../analysis/search/ripgrep.ts";
+import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { GraphRelationKind, GraphSection } from "../graph-types.ts";
 import type { AnchorKind } from "../target-store.ts";
 

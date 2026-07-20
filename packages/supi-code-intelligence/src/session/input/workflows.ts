@@ -1,6 +1,7 @@
 /** Runtime parsers for inspection, Orientation, graph, and find workflows. */
 
 import { type CodeFindAstKind, isCodeFindAstKind } from "../../tool/find/ast-kinds.ts";
+import { CODE_FIND_MODES } from "../../tool/find/modes.ts";
 import type { FindMode, FindWorkflowInput } from "../find-types.ts";
 import type { GraphWorkflowInput, RequestedGraphRelation } from "../graph-types.ts";
 import type { InspectWorkflowInput } from "../inspect-types.ts";
@@ -9,7 +10,6 @@ import type { GraphTargetInput, OrientationTargetInput } from "../target-input.t
 import {
   type InputValidation,
   invalid,
-  optionalNonNegativeInteger,
   optionalPositiveInteger,
   parseSourcePoint,
   parseTargetInput,
@@ -19,7 +19,7 @@ import {
   valid,
 } from "./common.ts";
 
-const FIND_MODES = new Set<FindMode>(["text", "regex", "ast", "semantic"]);
+const FIND_MODES = new Set<FindMode>(CODE_FIND_MODES);
 const GRAPH_RELATIONS = new Set<RequestedGraphRelation>([
   "all",
   "references",
@@ -149,7 +149,7 @@ export function parseFindWorkflowInput(value: unknown): InputValidation<FindWork
   if (record.kind === "invalid-input") return record;
   const keysError = requireOnlyKeys(
     record.value,
-    ["query", "scope", "mode", "kind", "contextLines", "maxResults"],
+    ["query", "scope", "mode", "kind", "maxResults"],
     "code_find input",
   );
   if (keysError) return invalid(keysError);
@@ -163,16 +163,13 @@ export function parseFindWorkflowInput(value: unknown): InputValidation<FindWork
   if (patternKind.kind === "invalid-input") return patternKind;
   const modeError = validateFindModeFields(mode.value, patternKind.value);
   if (modeError) return invalid(modeError);
-  const contextLines = optionalNonNegativeInteger(record.value.contextLines, "contextLines");
-  if (contextLines.kind === "invalid-input") return contextLines;
   const maxResults = optionalPositiveInteger(record.value.maxResults, "maxResults");
   if (maxResults.kind === "invalid-input") return maxResults;
   return valid({
     query: query.value,
     ...(scope.value === undefined ? {} : { scope: scope.value }),
-    ...(mode.value === "text" && record.value.mode === undefined ? {} : { mode: mode.value }),
+    mode: mode.value,
     ...(patternKind.value === undefined ? {} : { kind: patternKind.value }),
-    ...(contextLines.value === undefined ? {} : { contextLines: contextLines.value }),
     ...(maxResults.value === undefined ? {} : { maxResults: maxResults.value }),
   });
 }
@@ -186,17 +183,16 @@ function parseFindScope(value: unknown): InputValidation<readonly string[] | und
   ) {
     return invalid("scope must be a non-empty array of workspace-relative paths.");
   }
-  if (value.some((item) => item.trim().length === 0) || new Set(value).size !== value.length) {
-    return invalid("scope must not contain empty or duplicate paths.");
+  if (value.some((item) => item.trim().length === 0)) {
+    return invalid("scope must not contain empty paths.");
   }
   return valid(value);
 }
 
 function parseFindMode(value: unknown): InputValidation<FindMode> {
-  if (value === undefined) return valid("text");
   return typeof value === "string" && FIND_MODES.has(value as FindMode)
     ? valid(value as FindMode)
-    : invalid("mode must be one of text, regex, ast, or semantic.");
+    : invalid("mode is required and must be one of ast or semantic.");
 }
 
 function parsePatternKind(value: unknown): InputValidation<CodeFindAstKind | undefined> {

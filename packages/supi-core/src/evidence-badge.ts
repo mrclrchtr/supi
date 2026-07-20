@@ -22,14 +22,15 @@ export interface EvidenceBadgeInput {
  * |------------------------------------------------------|---------------------------------------|
  * | shown=12, total=12, omitted=0, label="references"   | `12 references`                       |
  * | shown=8,  total=20, omitted=12, label="symbols"     | `8 of 20 symbols (12 omitted)`        |
- * | shown=5,  total=null, reason="timeout", label="matches" | `5 matches (more may exist — timeout)` |
+ * | shown=5, total=null, omitted=2, reason="timeout" | `5 matches (2 collected omitted; more may exist — timeout)` |
  */
 export function formatEvidenceBadge(input: EvidenceBadgeInput): string {
   const { shownCount, totalCount, omittedCount, partialReason, label } = input;
 
   if (totalCount === null) {
     const reasonSuffix = partialReason ? ` — ${partialReason}` : "";
-    return `${shownCount} ${label} (more may exist${reasonSuffix})`;
+    const omittedPrefix = (omittedCount ?? 0) > 0 ? `${omittedCount} collected omitted; ` : "";
+    return `${shownCount} ${label} (${omittedPrefix}more may exist${reasonSuffix})`;
   }
 
   if (omittedCount !== null && omittedCount > 0) {

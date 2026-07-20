@@ -11,9 +11,8 @@ import { renderFindResult } from "./render.ts";
 export interface CodeFindToolParams {
   query: string;
   scope?: string[];
-  mode?: FindMode;
+  mode: FindMode;
   kind?: CodeFindAstKind;
-  contextLines?: number;
   maxResults?: number;
 }
 

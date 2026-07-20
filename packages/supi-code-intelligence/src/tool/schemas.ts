@@ -3,6 +3,7 @@ import { type TSchema, Type } from "typebox";
 import { TARGET_SYMBOL_KINDS } from "../session/target-input.ts";
 import type { CodeIntelligenceToolName } from "../types/index.ts";
 import { CODE_FIND_AST_KINDS } from "./find/ast-kinds.ts";
+import { CODE_FIND_MODES } from "./find/modes.ts";
 
 const ScopeParam = Type.String({
   description: "Workspace-relative file or directory scope.",
@@ -12,7 +13,6 @@ const FindScopeParam = Type.Array(
   {
     description: "One or more workspace-relative search scopes.",
     minItems: 1,
-    uniqueItems: true,
   },
 );
 const FileParam = Type.String({ description: "Target file path." });
@@ -175,23 +175,18 @@ export const CodeOrientationParameters = Type.Object(
   { additionalProperties: false },
 );
 
-/** Unified literal, regex, structural, and semantic search. */
+/** Unified structural and semantic code search. */
 export const CodeFindParameters = Type.Object(
   {
     query: QueryParam,
     scope: Type.Optional(FindScopeParam),
-    mode: Type.Optional(
-      StringEnum(["text", "regex", "ast", "semantic"], {
-        description: 'Search mode; omit for literal text. mode:"ast" requires `kind`.',
-      }),
-    ),
+    mode: StringEnum(CODE_FIND_MODES, {
+      description: 'Required code-aware search mode. mode:"ast" requires `kind`.',
+    }),
     kind: Type.Optional(
       StringEnum(CODE_FIND_AST_KINDS, {
         description: 'AST kind; only valid with mode:"ast".',
       }),
-    ),
-    contextLines: Type.Optional(
-      Type.Integer({ description: "Context lines around matches.", minimum: 0 }),
     ),
     maxResults: Type.Optional(MaxResultsParam),
   },

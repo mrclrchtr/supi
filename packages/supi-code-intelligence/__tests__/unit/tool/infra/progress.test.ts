@@ -36,18 +36,20 @@ describe("emitToolProgress", () => {
 });
 
 describe("executor onUpdate progress beats", () => {
-  it("code_find emits coarse progress beats (real ripgrep)", async () => {
+  it("code_find emits a coarse semantic-search progress beat", async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "ci-progress-find-"));
     writeFileSync(path.join(dir, "a.ts"), "export function foo() { return 1; }\n");
+    registerMockProvider(dir, { workspaceSymbols: async () => [] });
     const { onUpdate, beats } = captureProgress();
     try {
       await executeFindTool(
-        { query: "foo" },
+        { query: "foo", mode: "semantic" },
         { cwd: dir, onUpdate, session: sessionCache.getOrCreate(dir) },
       );
       expect(beats.length).toBeGreaterThanOrEqual(1);
       expect(beats.some((b) => b.includes("find:"))).toBe(true);
     } finally {
+      clearMockRuntime();
       rmSync(dir, { recursive: true, force: true });
     }
   });

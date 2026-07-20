@@ -45,18 +45,19 @@ describe("code_find tool", () => {
     expect(tool.parameters).toBeDefined();
   });
 
-  it("has query as a required parameter", () => {
+  it("requires a code-aware mode and exposes no text-search fields", () => {
     const tool = getCodeFindTool() as {
       parameters?: { required?: string[]; properties?: Record<string, unknown> };
     };
 
     const props = tool.parameters?.properties;
     expect(props).toBeDefined();
+    expect(tool.parameters?.required).toEqual(expect.arrayContaining(["query", "mode"]));
     expect(props).toHaveProperty("query");
     expect(props).toHaveProperty("scope");
     expect(props).toHaveProperty("mode");
     expect(props).toHaveProperty("kind");
-    expect(props).toHaveProperty("contextLines");
+    expect(props).not.toHaveProperty("contextLines");
     expect(props).toHaveProperty("maxResults");
   });
 
@@ -95,7 +96,7 @@ describe("code_find tool", () => {
 
     const result = (await tool.execute(
       "test-scope-missing",
-      { query: "something", scope: ["nonexistent/dir"] },
+      { query: "something", mode: "semantic", scope: ["nonexistent/dir"] },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
@@ -106,51 +107,48 @@ describe("code_find tool", () => {
   });
 
   describe("strict mode-kind contract", () => {
-    it("returns error text when kind is provided without mode", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;\n");
+    it("returns error text when mode is omitted", async () => {
       const tool = getCodeFindTool();
 
       const result = (await tool.execute(
-        "test-kind-without-mode",
+        "test-mode-omitted",
         { query: "foo", kind: "definition" },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
       )) as TextToolResult;
 
-      expect(result.content[0].text).toContain("kind is not valid");
-      expect(result.content[0].text).toContain('mode "text"');
+      expect(result.content[0].text).toContain("mode is required");
     });
 
-    it("returns error text when kind is provided in text mode", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;\n");
+    it.each(["text", "regex"] as const)("rejects removed %s mode", async (mode) => {
       const tool = getCodeFindTool();
 
       const result = (await tool.execute(
-        "test-kind-in-text-mode",
-        { query: "foo", mode: "text", kind: "definition" },
+        `test-removed-${mode}-mode`,
+        { query: "foo", mode },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
       )) as TextToolResult;
 
-      expect(result.content[0].text).toContain("kind is not valid");
+      expect(result.content[0].text).toContain("mode is required");
+      expect(result.content[0].text).toContain("ast or semantic");
     });
 
-    it("returns error text when kind is provided in regex mode", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "const fooBar = 1;\n");
+    it("rejects the removed contextLines field", async () => {
       const tool = getCodeFindTool();
 
       const result = (await tool.execute(
-        "test-kind-in-regex-mode",
-        { query: "foo[A-Z]", mode: "regex", kind: "definition" },
+        "test-removed-context-lines",
+        { query: "foo", mode: "semantic", contextLines: 1 },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
       )) as TextToolResult;
 
-      expect(result.content[0].text).toContain("kind is not valid");
-      expect(result.content[0].text).toContain('mode "regex"');
+      expect(result.content[0].text).toContain("unsupported field");
+      expect(result.content[0].text).toContain("contextLines");
     });
 
     it("returns error text when kind is provided in semantic mode", async () => {
@@ -203,119 +201,6 @@ describe("code_find tool", () => {
         expect(result.content[0].text).toContain("Unsupported AST kind");
       },
     );
-  });
-
-  describe("mode: text and regex", () => {
-    it("returns literal matches for a default text query", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;\nconst bar = 2;");
-      writeFileSync(path.join(tmpDir, "b.ts"), "const foo = 3;");
-      writeFileSync(path.join(tmpDir, "c.ts"), "const baz = 4;");
-      const tool = getCodeFindTool();
-
-      const result = (await tool.execute(
-        "test-text-mode",
-        { query: "foo" },
-        undefined,
-        undefined,
-        makeCtx({ cwd: tmpDir }),
-      )) as TextToolResult & {
-        details?: { type: "search"; data: { confidence: string } };
-      };
-
-      const text = result.content[0].text;
-      expect(text).toContain("foo");
-      expect(text).toContain("a.ts");
-      expect(text).toContain("b.ts");
-      expect(text).not.toContain("c.ts");
-      expect(text).toContain("**Confidence:** `heuristic`");
-      expect(result.details?.data.confidence).toBe("heuristic");
-    });
-
-    it.each(["text", "regex"] as const)(
-      "preserves significant query whitespace in %s mode",
-      async (mode) => {
-        writeFileSync(path.join(tmpDir, "a.ts"), "foo\n");
-        const tool = getCodeFindTool();
-        const query = " foo ";
-
-        const result = (await tool.execute(
-          `test-${mode}-whitespace-query`,
-          { query, mode },
-          undefined,
-          undefined,
-          makeCtx({ cwd: tmpDir }),
-        )) as TextToolResult & {
-          details?: { type: "search"; data: { confidence: string } };
-        };
-
-        const text = result.content[0].text;
-        expect(text).toContain(`No matches found for \`${query}\``);
-        expect(text).toContain("**Confidence:** `heuristic`");
-        expect(result.details?.data.confidence).toBe("heuristic");
-      },
-    );
-
-    it("discloses truncated text matches in markdown and details", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;\n");
-      writeFileSync(path.join(tmpDir, "b.ts"), "const foo = 2;\n");
-      const tool = getCodeFindTool();
-
-      const result = (await tool.execute(
-        "test-text-truncation",
-        { query: "foo", maxResults: 1 },
-        undefined,
-        undefined,
-        makeCtx({ cwd: tmpDir }),
-      )) as TextToolResult & {
-        details?: {
-          type: "search";
-          data: {
-            omittedCount: number;
-            evidenceLists?: Array<{
-              key: string;
-              totalCount: number | null;
-              shownCount: number;
-              omittedCount: number | null;
-            }>;
-          };
-        };
-      };
-
-      const text = result.content[0].text;
-      // Only one file should appear (the other is truncated), but we can't
-      // guarantee which one ripgrep returns first across test run ordering.
-      const fileHeadings = text.match(/^### (.+)$/gm);
-      expect(fileHeadings).toHaveLength(1);
-      expect(text).toContain("**2 matches**");
-      expect(text).toContain("_(showing 1 of 2; 1 omitted)_");
-      expect(result.details?.data.omittedCount).toBe(1);
-      expect(result.details?.data.evidenceLists).toContainEqual({
-        key: "find.textMatches",
-        totalCount: 2,
-        shownCount: 1,
-        omittedCount: 1,
-        partialReason: null,
-      });
-    });
-
-    it("returns regex matches in regex mode", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "const fooBar = 1;\nconst fooBaz = 2;");
-      writeFileSync(path.join(tmpDir, "b.ts"), "const barOnly = 3;");
-      const tool = getCodeFindTool();
-
-      const result = (await tool.execute(
-        "test-regex-mode",
-        { query: "foo[A-Z]", mode: "regex" },
-        undefined,
-        undefined,
-        makeCtx({ cwd: tmpDir }),
-      )) as TextToolResult;
-
-      const text = result.content[0].text;
-      expect(text).toContain("fooBar");
-      expect(text).toContain("fooBaz");
-      expect(text).not.toContain("barOnly");
-    });
   });
 
   describe("mode: ast", () => {
@@ -519,6 +404,41 @@ describe("code_find tool", () => {
       expect(result.content[0].text).toContain("Foo");
       expect(result.content[0].text).not.toContain("FooId");
       expect(result.content[0].text).toContain("Interfaces");
+    });
+
+    it.each([
+      ["class", "Widget", "class"],
+      ["method", "render", "method"],
+      ["enum", "Status", "enum"],
+    ] as const)("finds %s declarations", async (astKind, name, providerKind) => {
+      writeFileSync(path.join(tmpDir, "a.ts"), `export ${providerKind} ${name} {}\n`);
+      registerMockProvider(tmpDir, {
+        outline: async () => ({
+          kind: "success" as const,
+          data: [
+            {
+              name,
+              kind: providerKind,
+              startLine: 1,
+              startCharacter: 1,
+              endLine: 1,
+              endCharacter: name.length + 1,
+              children: [],
+            },
+          ],
+        }),
+      });
+      const tool = getCodeFindTool();
+
+      const result = (await tool.execute(
+        `test-ast-${astKind}`,
+        { query: name, mode: "ast", kind: astKind },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult;
+
+      expect(result.content[0].text).toContain(`\`${name}\` (${providerKind})`);
     });
 
     it("finds call sites when structural support is available (mocked)", async () => {
@@ -933,70 +853,70 @@ describe("code_find tool", () => {
     });
   });
 
-  describe("mode: scope filtering", () => {
-    it("respects the scope parameter in text mode", async () => {
-      const subDir = path.join(tmpDir, "sub");
-      const { mkdirSync } = await import("node:fs");
-      mkdirSync(subDir, { recursive: true });
-      writeFileSync(path.join(tmpDir, "root.ts"), "const foo = 1;");
-      writeFileSync(path.join(subDir, "nested.ts"), "const bar = 2;");
+  describe("AST Scan scope policy", () => {
+    it("prunes node_modules by default but honors an explicit supported file", async () => {
+      mkdirSync(path.join(tmpDir, "node_modules/pkg"), { recursive: true });
+      writeFileSync(path.join(tmpDir, "workspace.ts"), "export const workspaceTarget = true;\n");
+      writeFileSync(
+        path.join(tmpDir, "node_modules/pkg/index.js"),
+        "export const dependencyTarget = true;\n",
+      );
+      registerMockProvider(tmpDir, {
+        outline: async (file) => ({
+          kind: "success" as const,
+          data: [
+            {
+              name: file.includes("node_modules") ? "dependencyTarget" : "workspaceTarget",
+              kind: "variable",
+              startLine: 1,
+              startCharacter: 14,
+              endLine: 1,
+              endCharacter: 30,
+              children: [],
+            },
+          ],
+        }),
+      });
       const tool = getCodeFindTool();
 
-      const result = (await tool.execute(
-        "test-scope-filter",
-        { query: "bar", scope: ["sub"] },
+      const defaultResult = (await tool.execute(
+        "test-default-prunes-dependencies",
+        { query: "Target", mode: "ast", kind: "definition" },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
-      )) as TextToolResult;
+      )) as TextToolResult & {
+        details?: {
+          type: "search";
+          data: { scan?: { exclusions: Array<{ reason: string; pathCount: number }> } };
+        };
+      };
+      expect(defaultResult.content[0].text).toContain("workspaceTarget");
+      expect(defaultResult.content[0].text).not.toContain("dependencyTarget");
+      expect(defaultResult.details?.data.scan?.exclusions).toContainEqual(
+        expect.objectContaining({ reason: "excluded-directory", pathCount: 1 }),
+      );
 
-      const text = result.content[0].text;
-      expect(text).toContain("bar");
-      expect(text).toContain("nested.ts");
-    });
-
-    it("searches multiple scope paths in text mode", async () => {
-      mkdirSync(path.join(tmpDir, "docs"), { recursive: true });
-      mkdirSync(path.join(tmpDir, "packages"), { recursive: true });
-      mkdirSync(path.join(tmpDir, "other"), { recursive: true });
-      writeFileSync(path.join(tmpDir, "docs/a.md"), "promptSurface docs\n");
-      writeFileSync(path.join(tmpDir, "packages/a.ts"), "const promptSurface = true;\n");
-      writeFileSync(path.join(tmpDir, "other/a.ts"), "const promptSurface = false;\n");
-      const tool = getCodeFindTool();
-
-      const result = (await tool.execute(
-        "test-multiple-scope-filter",
-        { query: "promptSurface", scope: ["docs", "packages"] },
+      const explicitResult = (await tool.execute(
+        "test-explicit-dependency-file",
+        {
+          query: "dependencyTarget",
+          mode: "ast",
+          kind: "definition",
+          scope: ["node_modules/pkg/index.js"],
+        },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
-      )) as TextToolResult & { details?: { type: "search"; data: { scope: string | null } } };
-
-      const text = result.content[0].text;
-      expect(text).toContain("packages/a.ts");
-      expect(text).not.toContain("other/a.ts");
-      expect(result.details?.data.scope).toBe("docs, packages");
-    });
-
-    it("accepts multiple explicit scope paths", async () => {
-      mkdirSync(path.join(tmpDir, "docs"), { recursive: true });
-      mkdirSync(path.join(tmpDir, "packages"), { recursive: true });
-      writeFileSync(path.join(tmpDir, "docs/a.md"), "token budget\n");
-      writeFileSync(path.join(tmpDir, "packages/a.ts"), "const tokenBudget = true;\n");
-      const tool = getCodeFindTool();
-
-      const result = (await tool.execute(
-        "test-delimited-scope-filter",
-        { query: "token", scope: ["docs", "packages"] },
-        undefined,
-        undefined,
-        makeCtx({ cwd: tmpDir }),
-      )) as TextToolResult;
-
-      const text = result.content[0].text;
-      expect(text).toContain("docs/a.md");
-      expect(text).toContain("packages/a.ts");
-      expect(text).not.toContain("Scope accepts a single");
+      )) as TextToolResult & {
+        details?: { type: "search"; data: { scan?: { complete: boolean; roots: string[] } } };
+      };
+      expect(explicitResult.content[0].text).toContain("dependencyTarget");
+      expect(explicitResult.content[0].text).toContain("node_modules/pkg/index.js");
+      expect(explicitResult.details?.data.scan).toMatchObject({
+        complete: true,
+        roots: ["node_modules/pkg/index.js"],
+      });
     });
   });
 });

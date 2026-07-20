@@ -27,7 +27,7 @@ export interface PlannerRoute {
    * The preferred execution strategy for this intent.
    * - `semantic`: use LSP first
    * - `structural`: use tree-sitter first
-   * - `search`: use explicit text or regex search
+   * - `search`: use an explicit code-aware search workflow
    * - `unavailable`: no capability can satisfy this intent
    */
   preferred: "semantic" | "structural" | "search" | "unavailable";

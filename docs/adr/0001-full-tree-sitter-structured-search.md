@@ -1,23 +1,30 @@
-# Full tree-sitter scan for structured pattern search (no ripgrep pre-filter)
+# Owned full Tree-sitter scan for structured pattern search
 
-Structured pattern search (`code_find` with a `kind`) previously used a ripgrep text-match to pre-filter candidate files before running tree-sitter on them. We replaced this with a full tree-sitter scan of all source files, gated only by a 10-second timeout and a 5000-file soft cap.
+## Context
 
-## Why
+Structured `code_find` search must enumerate every eligible source file before asking Tree-sitter for declarations, imports, exports, or call sites. A text-match pre-filter can miss structural evidence whose searchable name differs from its source text. The former `rg --files` enumerator avoided that pre-filter but introduced a different correctness problem: it depended on an unmanaged executable, inherited ripgrep's hidden/ignore universe, could not be cancelled while its synchronous process ran, and could collapse process failures into an empty file set.
 
-The ripgrep pre-filter introduced a false-negative risk: if ripgrep didn't text-match a file, tree-sitter never saw it, even if tree-sitter would have found the structural match (e.g., an export whose name differs from its declaration text). The old 200-file cap also silently truncated results on repos with more than 200 source files.
+`code_find` no longer owns literal or regex search; PI grep owns that capability. Its differentiated role is explicit Structural analysis and Semantic analysis with honest completeness metadata.
 
-Tree-sitter per-file queries (outline, exports, imports, call-sites) are fast enough that a full scan completes within the timeout for most repos. When it doesn't, partial results with an explicit timeout warning are more honest than silent truncation.
+## Decision
 
-## Considered Options
+AST mode uses a package-owned, in-process AST Scan. It enumerates regular files with extensions reported by `getSupportedExtensions()` and canonically deduplicates overlapping scopes. One 10-second deadline covers enumeration plus analysis, and enumeration stops when it observes an eligible file beyond the 5,000-file safety cap. `maxResults` remains a match display cap rather than a file-enumeration cap.
 
-- **Ripgrep pre-filter (removed)**: Fast but lossy — text-match gating can miss structural matches in principle. Favored speed over recall.
-- **Filesystem walk + cap (removed)**: Guaranteed file-level coverage within the cap but truncated silently at 200 files.
-- **Full tree-sitter scan (chosen)**: Guaranteed to see every source file. Fast enough in practice. Timeout as honest backstop.
-- **Hybrid — ripgrep for `call` only**: Would have kept ripgrep for the non-tree-sitter `call` kind. Rejected because `call` was converted to tree-sitter via a new `callSites()` method.
+The default Scan universe starts at cwd and excludes hidden descendants plus `.git`, `.pnpm`, `node_modules`, `dist`, `build`, `out`, `.next`, `.nuxt`, `coverage`, `.turbo`, `.cache`, and `__pycache__`. It does not read `.gitignore`, `.ignore`, `.rgignore`, or global Git configuration and does not follow descendant symlinks. An explicitly selected root is honored before descendant policy resumes, including a supported source file under a normally excluded directory.
+
+Cancellation throws the supplied abort reason. Unreadable traversal, deadline expiry, the safety cap, and per-file structural-provider failures produce an incomplete Scan and partial Evidence-list metadata with an unknown match total. Policy exclusions define the declared universe and are disclosed separately from runtime limitations. Omitted file counts remain Scan metadata; they are not Evidence-atom omission counts.
 
 ## Consequences
 
-- File enumeration uses `rg --files` with a `-g` glob built dynamically from `getSupportedExtensions()` on the TreeSitterService — covers all grammars with vendored WASM, not just TS/JS. Respects `.gitignore` (no manual skip-dir list).
-- Added `callSites(file)` to `StructuralProvider` / `TreeSitterService`, replacing the regex-based `collectCallSitesInFile`.
-- Added `getSupportedExtensions()` to `supi-tree-sitter/api` so callers can enumerate supported file extensions without importing internal maps.
-- Parse failures during the scan are surfaced to the user rather than silently skipped.
+- AST search requires no `rg` executable and has one cancellation-aware enumeration interface.
+- Complete scans retain exact shown/total/omitted match metadata.
+- An incomplete zero-match scan cannot render a complete absence claim.
+- Visible Git-ignored source is eligible by design; hidden or high-volume trees require an explicit root.
+- `callSites(file)` remains the structural source for written call names, so AST `call` does not use regex classification or claim symbol identity.
+
+## Rejected alternatives
+
+- **Ripgrep text pre-filter:** fast but structurally lossy.
+- **`rg --files` enumeration:** fast, but its executable, ignore universe, cancellation, and failure semantics are not owned by Code intelligence.
+- **Reimplement text/regex grep inside `code_find`:** duplicates PI grep without strengthening the code-aware role.
+- **Silent collection caps:** prevent exact completeness claims and violate Truncation disclosure.
