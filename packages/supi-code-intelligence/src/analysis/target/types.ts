@@ -81,6 +81,8 @@ export interface ResolvedTargetData {
   declarationOccurrence: number;
   name: string | null;
   kind: string | null;
+  /** Evidence-backed provider-independent kind used for matching and handle identity. */
+  identityKind?: string;
   confidence: "semantic" | "structural" | "heuristic" | "unavailable";
   /** Provider families that established this declaration, strongest first. */
   provenance: readonly TargetProviderProvenance[];
@@ -115,6 +117,10 @@ export interface ResolvedTargetGroupData {
 export interface DisambiguationCandidateData {
   name: string;
   kind: string | null;
+  /** Evidence-backed provider-independent kind used for handle identity. */
+  identityKind?: string;
+  /** Provider families that established this candidate declaration. */
+  provenance?: readonly TargetProviderProvenance[];
   container: string | null;
   file: string;
   line: number;

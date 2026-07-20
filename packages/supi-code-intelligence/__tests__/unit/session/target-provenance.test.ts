@@ -15,30 +15,31 @@ let store: Map<string, TargetStoreEntry>;
 beforeEach(() => {
   cwd = mkdtempSync(path.join(os.tmpdir(), "target-provenance-"));
   file = path.join(cwd, "sample.ts");
-  writeFileSync(file, "export function sample() {}\n");
+  writeFileSync(file, "export type Sample = string;\n");
   store = new Map();
 });
 
 afterEach(() => rmSync(cwd, { recursive: true, force: true }));
 
 function register(confidence: "semantic" | "structural", provenance: TargetProviderProvenance[]) {
+  const semantic = confidence === "semantic";
   return registerWorkflowTarget(store, cwd, {
     file,
-    position: { line: 0, character: 16 },
-    declarationPosition: { line: 0, character: 7 },
+    position: semantic ? { line: 0, character: 12 } : { line: 0, character: 7 },
+    declarationPosition: semantic ? { line: 0, character: 0 } : { line: 0, character: 7 },
     displayLine: 1,
-    displayCharacter: 17,
-    name: "sample",
-    kind: "Function",
-    identityKind: "function",
+    displayCharacter: semantic ? 13 : 8,
+    name: "Sample",
+    kind: semantic ? "Variable" : "type",
+    identityKind: "type",
     confidence,
     provenance,
-    anchorKind: "name",
+    anchorKind: semantic ? "name" : "declaration",
     container: null,
   });
 }
 
-describe("target provider provenance", () => {
+describe("type-alias target provider provenance", () => {
   it.each([
     ["structural then semantic", ["structural", "semantic"]],
     ["semantic then structural", ["semantic", "structural"]],

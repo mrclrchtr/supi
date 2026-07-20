@@ -18,7 +18,10 @@ import type {
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { AnchorKind } from "../../session/target-store.ts";
 import type { AnchoredResolutionMetadata, AnchoredResolutionSource } from "../../types/index.ts";
-import { canonicalDeclarationKind } from "./identity.ts";
+import {
+  createCodeSymbolIdentityResolver,
+  type DeclarationOccurrenceIdentity,
+} from "./identity.ts";
 import type { DisambiguationCandidateData, ResolvedTargetData, TargetOutcome } from "./types.ts";
 
 /** 1-based symbol anchor position (mirrors the runtime `SymbolAnchor`). */
@@ -154,7 +157,7 @@ function resolvedFromSymbol(
     snapped: boolean;
     requested: Anchor;
     source: AnchoredResolutionSource;
-    declarationOccurrence: number;
+    identity: DeclarationOccurrenceIdentity;
   },
 ): { kind: "resolved"; target: ResolvedTargetData } {
   const a = (s.nameAnchor ?? s.declarationAnchor) as Anchor;
@@ -166,11 +169,12 @@ function resolvedFromSymbol(
       displayLine: a.line,
       displayCharacter: a.character,
       declarationAnchor: { ...s.declarationAnchor },
-      declarationOccurrence: opts.declarationOccurrence,
+      declarationOccurrence: opts.identity.declarationOccurrence,
       name: s.name,
       kind: s.kind,
+      identityKind: opts.identity.identityKind,
       confidence: "semantic",
-      provenance: ["semantic"],
+      provenance: opts.identity.structuralEvidence ? ["semantic", "structural"] : ["semantic"],
       anchorKind: (s.nameAnchor ? "name" : "declaration") as AnchorKind,
       container: s.container ?? null,
       resolution: buildResolution(opts.requested, a, opts.snapped, opts.source),
@@ -178,27 +182,37 @@ function resolvedFromSymbol(
   };
 }
 
-function candidatesFromSymbols(
+async function candidatesFromSymbols(
   file: string,
   matched: CodeSymbol[],
-  allSymbols: readonly CodeSymbol[],
-): { kind: "disambiguation"; candidates: DisambiguationCandidateData[]; omittedCount: number } {
-  const candidates = matched.map((s, idx) => {
-    const a = (s.nameAnchor ?? s.declarationAnchor) as Anchor;
-    const declarationOccurrence = declarationOccurrenceOf(s, allSymbols);
-    return {
-      name: s.name,
-      kind: s.kind,
-      container: s.container ?? null,
-      file,
-      line: a.line,
-      character: a.character,
-      declarationAnchor: { ...s.declarationAnchor },
-      declarationOccurrence,
-      rank: idx + 1,
-      anchorKind: (s.nameAnchor ? "name" : "declaration") as AnchorKind,
-    } satisfies DisambiguationCandidateData;
-  });
+  resolveIdentity: (symbol: CodeSymbol) => Promise<DeclarationOccurrenceIdentity>,
+): Promise<{
+  kind: "disambiguation";
+  candidates: DisambiguationCandidateData[];
+  omittedCount: number;
+}> {
+  const candidates = await Promise.all(
+    matched.map(async (s, idx) => {
+      const a = (s.nameAnchor ?? s.declarationAnchor) as Anchor;
+      const identity = await resolveIdentity(s);
+      return {
+        name: s.name,
+        kind: s.kind,
+        identityKind: identity.identityKind,
+        provenance: identity.structuralEvidence
+          ? (["semantic", "structural"] as const)
+          : (["semantic"] as const),
+        container: s.container ?? null,
+        file,
+        line: a.line,
+        character: a.character,
+        declarationAnchor: { ...s.declarationAnchor },
+        declarationOccurrence: identity.declarationOccurrence,
+        rank: idx + 1,
+        anchorKind: (s.nameAnchor ? "name" : "declaration") as AnchorKind,
+      } satisfies DisambiguationCandidateData;
+    }),
+  );
   return { kind: "disambiguation", candidates, omittedCount: 0 };
 }
 
@@ -225,42 +239,27 @@ async function resolveFromSemantic(
     else if (m === "snap") snap.push(s);
   }
 
+  const structural = provider.nodeAt ? { nodeAt: provider.nodeAt } : undefined;
+  const resolveIdentity = createCodeSymbolIdentityResolver(file, symbols, structural);
   if (exact.length === 1) {
     return resolvedFromSymbol(file, exact[0], {
       snapped: false,
       requested,
       source: "semantic",
-      declarationOccurrence: declarationOccurrenceOf(exact[0], symbols),
+      identity: await resolveIdentity(exact[0]),
     });
   }
-  if (exact.length > 1) return candidatesFromSymbols(file, exact, symbols);
+  if (exact.length > 1) return candidatesFromSymbols(file, exact, resolveIdentity);
   if (snap.length === 1) {
     return resolvedFromSymbol(file, snap[0], {
       snapped: true,
       requested,
       source: "semantic",
-      declarationOccurrence: declarationOccurrenceOf(snap[0], symbols),
+      identity: await resolveIdentity(snap[0]),
     });
   }
-  if (snap.length > 1) return candidatesFromSymbols(file, snap, symbols);
+  if (snap.length > 1) return candidatesFromSymbols(file, snap, resolveIdentity);
   return null;
-}
-
-function declarationOccurrenceOf(symbol: CodeSymbol, allSymbols: readonly CodeSymbol[]): number {
-  const matching = allSymbols
-    .filter(
-      (candidate) =>
-        candidate.name === symbol.name &&
-        canonicalDeclarationKind(candidate.kind) === canonicalDeclarationKind(symbol.kind) &&
-        (candidate.container ?? null) === (symbol.container ?? null) &&
-        candidate.declarationAnchor.line === symbol.declarationAnchor.line,
-    )
-    .sort(
-      (left, right) =>
-        left.declarationAnchor.character - right.declarationAnchor.character ||
-        (left.nameAnchor?.character ?? 0) - (right.nameAnchor?.character ?? 0),
-    );
-  return Math.max(0, matching.indexOf(symbol));
 }
 
 /** Layer 2: classify the coordinate via tree-sitter `nodeAt`. Returns null to fall through. */

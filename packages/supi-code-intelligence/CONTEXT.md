@@ -50,8 +50,12 @@ _Avoid_: member provenance, group confidence, provider availability
 A conservative summary of member confidence: semantic only when every member is semantic, and structural when any member is structural-only. For an empty group, it reflects the strongest successful enumerator.
 _Avoid_: strongest member confidence, provider availability, mixed provenance
 
+**Canonical declaration identity kind**:
+The provider-independent declaration family used only for cross-provider matching and Target-handle identity. It normally normalizes the Provider-reported symbol kind; when that kind cannot express the source construct, exact structural evidence at the declaration's Name anchor may refine it. For example, a TypeScript LSP `Variable` at a Tree-sitter `type_alias_declaration` retains `Variable` for display but uses `type` for identity. This is declaration-specific and does not merge separate type/value namespace declarations.
+_Avoid_: display kind, blanket type-to-value normalization, name-only equivalence, syntax guessing
+
 **Declaration occurrence identity**:
-The provider-independent identity of one declaration within a file: canonical kind, symbolic container, declaration line, and deterministic occurrence among otherwise identical declarations on that line. It distinguishes overloads while remaining stable when semantic evidence replaces structural evidence or a declaration anchor refines to a name anchor.
+The provider-independent identity of one declaration within a file: Canonical declaration identity kind, symbolic container, declaration line, and deterministic occurrence among otherwise identical declarations on that line. It distinguishes overloads and type/value namespace declarations while remaining stable when semantic evidence replaces structural evidence or a declaration anchor refines to a Name anchor.
 _Avoid_: display position identity, raw provider kind, treating all same-name declarations as one target
 
 **Provider-reported symbol kind**:

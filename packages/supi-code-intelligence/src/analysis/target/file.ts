@@ -17,7 +17,7 @@ import type {
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { AnchorKind } from "../../session/target-store.ts";
 import { normalizePath } from "../search/ripgrep.ts";
-import { canonicalDeclarationKind } from "./identity.ts";
+import { canonicalDeclarationKind, refineTypeAliasIdentity } from "./identity.ts";
 import type { ResolvedTargetData, ResolvedTargetGroupData } from "./types.ts";
 
 const BINARY_EXTENSIONS = new Set([
@@ -84,7 +84,7 @@ export async function resolveFileTargetGroup(
   const resolvedFile = validation.file;
 
   const [semantic, structural] = await Promise.all([
-    discoverSemantic(resolvedFile, deps.semantic),
+    discoverSemantic(resolvedFile, deps.semantic, deps.structural),
     discoverStructural(resolvedFile, deps.structural),
   ]);
   if (!semantic.available && !structural.available) {
@@ -139,6 +139,7 @@ function validateDiscoveryFile(resolvedFile: string, requestedFile: string): str
 async function discoverSemantic(
   file: string,
   semantic: SemanticSubstrate | undefined,
+  structural: StructuralSubstrate | undefined,
 ): Promise<DiscoveryResult> {
   if (!semantic) return { available: false, targets: [] };
   try {
@@ -146,7 +147,11 @@ async function discoverSemantic(
     if (symbols === null) return { available: false, targets: [] };
     return {
       available: true,
-      targets: symbols.map((symbol) => targetFromSymbol(file, symbol)),
+      targets: await Promise.all(
+        symbols.map((symbol) =>
+          refineTypeAliasIdentity(targetFromSymbol(file, symbol), structural),
+        ),
+      ),
     };
   } catch {
     return { available: false, targets: [] };
@@ -200,6 +205,7 @@ function flattenOutline(
       declarationOccurrence: 0,
       name: item.name,
       kind: item.kind,
+      identityKind: canonicalDeclarationKind(item.kind),
       confidence: "structural",
       provenance: ["structural"],
       anchorKind: "declaration",
@@ -258,7 +264,7 @@ function sameDeclaration(left: ResolvedTargetData, right: ResolvedTargetData): b
     left.name === right.name &&
     left.container === right.container &&
     left.declarationAnchor.line === right.declarationAnchor.line &&
-    canonicalDeclarationKind(left.kind) === canonicalDeclarationKind(right.kind)
+    declarationIdentityKind(left) === declarationIdentityKind(right)
   );
 }
 
@@ -270,13 +276,17 @@ function assignDeclarationOccurrences(
     const key = [
       target.declarationAnchor.line,
       target.name ?? "",
-      canonicalDeclarationKind(target.kind),
+      declarationIdentityKind(target),
       target.container ?? "",
     ].join("\0");
     const occurrence = occurrences.get(key) ?? 0;
     occurrences.set(key, occurrence + 1);
     return { ...target, declarationOccurrence: occurrence };
   });
+}
+
+function declarationIdentityKind(target: ResolvedTargetData): string {
+  return target.identityKind ?? canonicalDeclarationKind(target.kind);
 }
 
 function compareDeclarations(left: ResolvedTargetData, right: ResolvedTargetData): number {

@@ -9,7 +9,10 @@ import { existsSync } from "node:fs";
 import { normalizePath, resolveScope } from "../analysis/search/ripgrep.ts";
 import { resolveAnchoredSymbolTarget } from "../analysis/target/anchored.ts";
 import { resolveFileTargetGroup, validateFileTargetDiscovery } from "../analysis/target/file.ts";
-import { canonicalDeclarationKind } from "../analysis/target/identity.ts";
+import {
+  canonicalDeclarationKind,
+  refineTargetOutcomeIdentity,
+} from "../analysis/target/identity.ts";
 import { resolveSymbolTarget } from "../analysis/target/symbol.ts";
 import type {
   ResolvedTargetData,
@@ -156,7 +159,15 @@ async function resolveAnchoredWorkflow(
     anchor.character,
     deps.capability.getProvider(deps.cwd),
   );
-  return toWorkflowOutcome(outcome, policy, deps);
+  return toWorkflowOutcome(
+    await refineTargetOutcomeIdentity(
+      outcome,
+      deps.cwd,
+      deps.capability.getStructuralProvider(deps.cwd) ?? undefined,
+    ),
+    policy,
+    deps,
+  );
 }
 
 async function resolveSymbolWorkflow(
@@ -200,7 +211,15 @@ async function resolveSymbolWorkflow(
     kind: symbol.symbolKind,
     maxResults: policy.maxResults,
   });
-  return toWorkflowOutcome(outcome, policy, deps);
+  return toWorkflowOutcome(
+    await refineTargetOutcomeIdentity(
+      outcome,
+      deps.cwd,
+      deps.capability.getStructuralProvider(deps.cwd) ?? undefined,
+    ),
+    policy,
+    deps,
+  );
 }
 
 async function resolveFileOnlyWorkflow(
@@ -332,7 +351,7 @@ function registerFromTargetData(
     displayCharacter: target.displayCharacter,
     name: target.name,
     kind: target.kind,
-    identityKind: canonicalDeclarationKind(target.kind),
+    identityKind: target.identityKind ?? canonicalDeclarationKind(target.kind),
     confidence: target.confidence,
     provenance: target.provenance,
     anchorKind: target.anchorKind,

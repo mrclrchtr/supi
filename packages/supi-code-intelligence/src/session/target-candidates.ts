@@ -38,9 +38,9 @@ export function registerTargetCandidates(
         displayCharacter: candidate.character,
         name: candidate.name,
         kind: candidate.kind,
-        identityKind: canonicalDeclarationKind(candidate.kind),
+        identityKind: candidate.identityKind ?? canonicalDeclarationKind(candidate.kind),
         confidence: "semantic",
-        provenance: ["semantic"],
+        provenance: candidate.provenance ?? ["semantic"],
         anchorKind: candidate.anchorKind,
         container: candidate.container,
       });

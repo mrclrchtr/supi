@@ -32,6 +32,13 @@ function isExactDocumentSymbolMatch(candidate: CodeSymbol, workspaceSymbol: Code
   );
 }
 
+function hasSameDeclarationAnchor(candidate: CodeSymbol, workspaceSymbol: CodeSymbol): boolean {
+  return (
+    candidate.declarationAnchor.line === workspaceSymbol.declarationAnchor.line &&
+    candidate.declarationAnchor.character === workspaceSymbol.declarationAnchor.character
+  );
+}
+
 /**
  * The preferred anchor for resolution/downstream: the name (identifier) anchor
  * when the provider derived it, else the declaration anchor. Strict consumers
@@ -62,11 +69,17 @@ async function refineResolvedSymbolAnchor(
     const exactMatches = documentSymbols.filter((candidate) =>
       isExactDocumentSymbolMatch(candidate, workspaceSymbol),
     );
-    if (exactMatches.length !== 1) {
-      return workspaceSymbol;
-    }
+    const declarationMatches = exactMatches.filter((candidate) =>
+      hasSameDeclarationAnchor(candidate, workspaceSymbol),
+    );
+    const refined =
+      declarationMatches.length === 1
+        ? declarationMatches[0]
+        : exactMatches.length === 1
+          ? exactMatches[0]
+          : undefined;
+    if (!refined) return workspaceSymbol;
 
-    const refined = exactMatches[0];
     const a = anchorOf(refined);
     if (a.line <= 0 && a.character <= 0) {
       return workspaceSymbol;
