@@ -1,6 +1,7 @@
 import { createPiMock, getTool, getTools } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../../src/extension.ts";
+import { CODE_FIND_AST_KINDS } from "../../../src/tool/find/ast-kinds.ts";
 import { CODE_INTELLIGENCE_TOOL_NAMES } from "../../../src/types/index.ts";
 
 function propertiesOf(tool: unknown): Record<string, unknown> {
@@ -64,11 +65,21 @@ describe("focused code intelligence tool registration", () => {
     expect(orientation).not.toHaveProperty("line");
   });
 
-  it("does not translate removed code_health inputs through argument preparation", () => {
+  it("does not translate removed inputs through argument preparation", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
+    expect(getTool(pi, "code_find")).not.toHaveProperty("prepareArguments");
     expect(getTool(pi, "code_health")).not.toHaveProperty("prepareArguments");
+  });
+
+  it("advertises exactly the supported code_find AST kinds", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const description = getTool(pi, "code_find").description ?? "";
+    expect(description).toContain(`(${CODE_FIND_AST_KINDS.join("/")})`);
+    expect(description).not.toContain("enum/test");
   });
 
   it("uses an exact-one nested refactor operation and a plan-only apply input", () => {

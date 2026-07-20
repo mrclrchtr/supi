@@ -1,6 +1,7 @@
 import type { CodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
-import type { StructuredPatternKind, StructuredPatternResult } from "../analysis/search/pattern.ts";
+import type { StructuredPatternResult } from "../analysis/search/pattern.ts";
 import type { RgMatch } from "../analysis/search/ripgrep.ts";
+import type { CodeFindAstKind } from "../tool/find/ast-kinds.ts";
 
 export type FindMode = "text" | "regex" | "ast" | "semantic";
 
@@ -8,7 +9,7 @@ export interface FindWorkflowInput {
   readonly query: string;
   readonly scope?: readonly string[];
   readonly mode?: FindMode;
-  readonly kind?: StructuredPatternKind;
+  readonly kind?: CodeFindAstKind;
   readonly contextLines?: number;
   readonly maxResults?: number;
 }
@@ -22,7 +23,7 @@ export type FindWorkflowData =
     }
   | {
       readonly kind: "ast";
-      readonly astKind: StructuredPatternKind;
+      readonly astKind: CodeFindAstKind;
       readonly result: Readonly<StructuredPatternResult>;
     }
   | { readonly kind: "semantic"; readonly symbols: readonly CodeSymbol[] };

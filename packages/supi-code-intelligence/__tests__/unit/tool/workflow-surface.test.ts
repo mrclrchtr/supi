@@ -1,5 +1,6 @@
 import { Check } from "typebox/value";
 import { describe, expect, it } from "vitest";
+import { CODE_FIND_AST_KINDS } from "../../../src/tool/find/ast-kinds.ts";
 import { CODE_INTELLIGENCE_TOOL_SCHEMAS } from "../../../src/tool/schemas.ts";
 import { CODE_INTELLIGENCE_TOOL_SPECS } from "../../../src/tool/specs.ts";
 import { CODE_INTELLIGENCE_TOOL_NAMES } from "../../../src/types/index.ts";
@@ -147,6 +148,33 @@ describe("code intelligence tool specs", () => {
 
     expect(values).toEqual(expect.arrayContaining(["text", "regex", "ast", "semantic"]));
     expect(values).not.toContain("natural");
+  });
+
+  it("restricts code_find AST kinds to the supported structural vocabulary", () => {
+    const findSchema = CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find as {
+      properties?: Record<string, unknown>;
+    };
+    const kindSchema = findSchema.properties?.kind;
+    const schemaValues = collectStringValues(kindSchema).sort((left, right) =>
+      left.localeCompare(right),
+    );
+
+    expect(CODE_FIND_AST_KINDS).toHaveLength(9);
+    expect(schemaValues).toEqual(
+      [...CODE_FIND_AST_KINDS].sort((left, right) => left.localeCompare(right)),
+    );
+    for (const kind of CODE_FIND_AST_KINDS) {
+      expect(
+        Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find, { query: "target", mode: "ast", kind }),
+      ).toBe(true);
+    }
+    expect(
+      Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find, {
+        query: "target",
+        mode: "ast",
+        kind: "test",
+      }),
+    ).toBe(false);
   });
 
   it("restricts code_health to its live section vocabulary", () => {

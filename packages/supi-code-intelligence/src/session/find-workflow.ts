@@ -2,11 +2,9 @@
 
 import type { CodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
-import {
-  getStructuredPatternMatches,
-  isStructuredPatternKind,
-} from "../analysis/search/pattern.ts";
+import { getStructuredPatternMatches } from "../analysis/search/pattern.ts";
 import { resolveScopeSet, runRipgrepDetailed, toDisplayPath } from "../analysis/search/ripgrep.ts";
+import { isCodeFindAstKind } from "../tool/find/ast-kinds.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import type { FindWorkflowInput, FindWorkflowOutcome } from "./find-types.ts";
 import { parseFindWorkflowInput } from "./input/workflows.ts";
@@ -141,7 +139,7 @@ async function runAstSearch(options: {
   control?: WorkflowControl;
 }): Promise<FindWorkflowOutcome> {
   const { query, input, scopePaths, scopeLabel, maxResults, deps, control } = options;
-  if (!isStructuredPatternKind(input.kind)) {
+  if (!isCodeFindAstKind(input.kind)) {
     return { kind: "invalid-input", message: "Unsupported AST kind." };
   }
   const provider = deps.capability.getStructuralProvider(deps.cwd);

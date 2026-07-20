@@ -158,7 +158,7 @@ Modes never silently fall back:
 - `semantic` — workspace symbols; rejects `kind`
 - `ast` — structured search; requires `kind`
 
-AST `call` finds written call-site names, not symbol identity. Use `code_graph` references on a resolved target for symbol-identity relationships.
+AST `kind` accepts exactly `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, and `enum`. AST `call` finds written call-site names, not symbol identity. Use `code_graph` references on a resolved target for symbol-identity relationships.
 
 ### Check health
 
@@ -208,7 +208,7 @@ Planning never writes files. Application is the sole mutator, acquires sorted pe
 
 `calleeDepth: "direct"` excludes nested function/method/callback scopes; `"deep"` includes them. Structural callees are not callers and are not symbol-identity relationships.
 
-Imports, exports, and tests remain available as explicit AST search kinds in `code_find`; they are not graph relation families.
+Imports and exports remain available as explicit AST search kinds in `code_find`; they are not graph relation families. Test identity is not inferred: use literal/regex source search or AST `call` when appropriate, neither of which claims that a match is a test.
 
 ## Honest correctness
 

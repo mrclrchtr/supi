@@ -1,6 +1,9 @@
 // Model-facing descriptions and concise sibling-selection guidance.
 
 import type { CodeIntelligenceToolName } from "../types/index.ts";
+import { CODE_FIND_AST_KINDS } from "./find/ast-kinds.ts";
+
+const CODE_FIND_AST_KIND_LIST = CODE_FIND_AST_KINDS.join("/");
 
 export interface CodeIntelligenceToolPromptSurface {
   description: string;
@@ -45,8 +48,7 @@ export const CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES: CodeIntelligenceToolPromptS
     promptGuidelines: [],
   },
   code_find: {
-    description:
-      'Search explicit evidence using text literal (default), regex, semantic workspace symbols, or ast structure. scope is a non-empty array of workspace-relative paths. mode:"ast" requires kind (definition/import/export/call/type/interface/class/method/enum/test); other modes reject kind. Modes never silently fall back. AST call matches written names, not symbol identity.',
+    description: `Search explicit evidence using text literal (default), regex, semantic workspace symbols, or ast structure. scope is a non-empty array of workspace-relative paths. mode:"ast" requires kind (${CODE_FIND_AST_KIND_LIST}); other modes reject kind. Modes never silently fall back. AST call matches written names, not symbol identity.`,
     promptSnippet: "code_find — explicit text, regex, structural, or semantic search",
     promptGuidelines: [
       "Use code_find for direct search evidence; use code_graph references for symbol-identity relationships.",

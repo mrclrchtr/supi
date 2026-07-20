@@ -5,20 +5,17 @@ import {
   type EvidenceListMetadata,
   renderEvidenceListMetadataDisclosure,
 } from "../../analysis/evidence.ts";
-import type {
-  StructuredMatch,
-  StructuredPatternKind,
-  StructuredPatternResult,
-} from "../../analysis/search/pattern.ts";
+import type { StructuredMatch, StructuredPatternResult } from "../../analysis/search/pattern.ts";
 import type { RgMatch } from "../../analysis/search/ripgrep.ts";
 import { groupByFile } from "../../analysis/search/ripgrep.ts";
+import { CODE_FIND_AST_KIND_LABELS, type CodeFindAstKind } from "./ast-kinds.ts";
 
 // ── Structured search formatting ─────────────────────────────────────
 
 // biome-ignore lint/complexity/useMaxParams: structured empty-state with optional result parameter keeps partial-warning logic together
 export function renderStructuredEmptyState(
   pattern: string,
-  kind: StructuredPatternKind,
+  kind: CodeFindAstKind,
   relScope: string,
   _structural?: StructuralSubstrate,
   result?: StructuredPatternResult,
@@ -63,7 +60,7 @@ function renderPartialWarning(result?: StructuredPatternResult): string | null {
 // biome-ignore lint/complexity/useMaxParams: structured renderer mirrors the existing public helper shape plus display cap
 export function renderStructuredMatches(
   pattern: string,
-  kind: StructuredPatternKind,
+  kind: CodeFindAstKind,
   relScope: string,
   result: StructuredPatternResult,
   evidenceMetadata: EvidenceListMetadata,
@@ -76,26 +73,7 @@ export function renderStructuredMatches(
     grouped.set(match.file, group);
   }
 
-  const kindLabel =
-    kind === "definition"
-      ? "Definitions"
-      : kind === "export"
-        ? "Exports"
-        : kind === "import"
-          ? "Imports"
-          : kind === "call"
-            ? "Calls"
-            : kind === "type"
-              ? "Types"
-              : kind === "interface"
-                ? "Interfaces"
-                : kind === "class"
-                  ? "Classes"
-                  : kind === "method"
-                    ? "Methods"
-                    : kind === "enum"
-                      ? "Enums"
-                      : "Tests";
+  const kindLabel = CODE_FIND_AST_KIND_LABELS[kind];
   const lines: string[] = [];
   lines.push(`# Pattern ${kindLabel}: \`${pattern}\``);
   lines.push("");

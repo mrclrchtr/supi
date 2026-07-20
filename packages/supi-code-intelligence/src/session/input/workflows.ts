@@ -1,9 +1,6 @@
 /** Runtime parsers for inspection, Orientation, graph, and find workflows. */
 
-import {
-  isStructuredPatternKind,
-  type StructuredPatternKind,
-} from "../../analysis/search/pattern.ts";
+import { type CodeFindAstKind, isCodeFindAstKind } from "../../tool/find/ast-kinds.ts";
 import type { FindMode, FindWorkflowInput } from "../find-types.ts";
 import type { GraphWorkflowInput, RequestedGraphRelation } from "../graph-types.ts";
 import type { InspectWorkflowInput } from "../inspect-types.ts";
@@ -202,16 +199,14 @@ function parseFindMode(value: unknown): InputValidation<FindMode> {
     : invalid("mode must be one of text, regex, ast, or semantic.");
 }
 
-function parsePatternKind(value: unknown): InputValidation<StructuredPatternKind | undefined> {
+function parsePatternKind(value: unknown): InputValidation<CodeFindAstKind | undefined> {
   if (value === undefined) return valid(undefined);
-  return typeof value === "string" && isStructuredPatternKind(value)
-    ? valid(value)
-    : invalid("Unsupported AST kind.");
+  return isCodeFindAstKind(value) ? valid(value) : invalid("Unsupported AST kind.");
 }
 
 function validateFindModeFields(
   mode: FindMode,
-  patternKind: StructuredPatternKind | undefined,
+  patternKind: CodeFindAstKind | undefined,
 ): string | null {
   if (mode === "ast" && patternKind === undefined) return 'mode "ast" requires kind.';
   return mode !== "ast" && patternKind !== undefined

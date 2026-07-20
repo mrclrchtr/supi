@@ -2,6 +2,7 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
 import { TARGET_SYMBOL_KINDS } from "../session/target-input.ts";
 import type { CodeIntelligenceToolName } from "../types/index.ts";
+import { CODE_FIND_AST_KINDS } from "./find/ast-kinds.ts";
 
 const ScopeParam = Type.String({
   description: "Workspace-relative file or directory scope.",
@@ -185,21 +186,9 @@ export const CodeFindParameters = Type.Object(
       }),
     ),
     kind: Type.Optional(
-      StringEnum(
-        [
-          "definition",
-          "import",
-          "export",
-          "call",
-          "type",
-          "interface",
-          "class",
-          "method",
-          "enum",
-          "test",
-        ],
-        { description: 'AST kind; only valid with mode:"ast".' },
-      ),
+      StringEnum(CODE_FIND_AST_KINDS, {
+        description: 'AST kind; only valid with mode:"ast".',
+      }),
     ),
     contextLines: Type.Optional(
       Type.Integer({ description: "Context lines around matches.", minimum: 0 }),

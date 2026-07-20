@@ -1,18 +1,18 @@
 /** Thin Pi adapter for the session-owned code_find workflow. */
 
-import type { StructuredPatternKind } from "../../analysis/search/pattern.ts";
 import type { FindMode, FindWorkflowInput } from "../../session/find-types.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
 import { unavailableSearchDetails } from "../infra/error-results.ts";
 import { toWorkflowControl } from "../infra/workflow-control.ts";
 import { assembleFindWorkflowResult } from "../result/find.ts";
+import type { CodeFindAstKind } from "./ast-kinds.ts";
 import { renderFindResult } from "./render.ts";
 
 export interface CodeFindToolParams {
   query: string;
   scope?: string[];
   mode?: FindMode;
-  kind?: StructuredPatternKind;
+  kind?: CodeFindAstKind;
   contextLines?: number;
   maxResults?: number;
 }

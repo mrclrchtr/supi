@@ -36,6 +36,8 @@ Target-oriented workflows are LSP-first: concrete file/workspace semantic readin
 
 Schemas encode exact-one objects with one-key cardinality and closed properties. They avoid union/literal constructs that model providers reject. Runtime validation still protects direct calls that bypass PI schema validation.
 
+`code_find` exposes exactly nine AST search kinds: `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, and `enum`. `test` is not an AST kind because the structural-provider contract does not establish test identity. Literal/regex source search and AST `call` remain available without claiming that a match is a test.
+
 `code_graph` exposes only:
 
 - provider-backed `references`

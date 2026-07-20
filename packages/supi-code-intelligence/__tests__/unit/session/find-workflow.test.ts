@@ -86,4 +86,13 @@ describe("runFindWorkflow", () => {
       message: "mode must be one of text, regex, ast, or semantic.",
     });
   });
+
+  it("rejects the removed test AST kind before structural execution", async () => {
+    const outcome = await runFindWorkflow(
+      { query: "registerCodeIntelligenceTools", mode: "ast", kind: "test" } as never,
+      deps(),
+    );
+
+    expect(outcome).toEqual({ kind: "invalid-input", message: "Unsupported AST kind." });
+  });
 });

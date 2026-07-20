@@ -2,27 +2,16 @@ import { execFileSync } from "node:child_process";
 import * as path from "node:path";
 import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-code-runtime/api";
 import { getSupportedExtensions } from "@mrclrchtr/supi-tree-sitter/api";
+import type { CodeFindAstKind } from "../../tool/find/ast-kinds.ts";
 import { callableExpressionForMatching } from "./call-name.ts";
 
 /** Soft file cap — warn when a workspace has more source files than this. */
 const FILE_SOFT_CAP = 5000;
 const STRUCTURED_PATTERN_TIMEOUT_MS = 10_000;
 
-export type StructuredPatternKind =
-  | "definition"
-  | "export"
-  | "import"
-  | "call"
-  | "type"
-  | "interface"
-  | "class"
-  | "method"
-  | "enum"
-  | "test";
-
 export interface StructuredPatternParams {
   pattern: string;
-  kind: StructuredPatternKind;
+  kind: CodeFindAstKind;
   regex?: boolean;
 }
 
@@ -44,21 +33,6 @@ export interface StructuredPatternResult {
 export interface StructuredFailure {
   file: string;
   reason: string;
-}
-
-export function isStructuredPatternKind(kind: string | undefined): kind is StructuredPatternKind {
-  return (
-    kind === "definition" ||
-    kind === "export" ||
-    kind === "import" ||
-    kind === "call" ||
-    kind === "type" ||
-    kind === "interface" ||
-    kind === "class" ||
-    kind === "method" ||
-    kind === "enum" ||
-    kind === "test"
-  );
 }
 
 // biome-ignore lint/complexity/useMaxParams: substrate injection keeps related inputs explicit for readability
@@ -205,7 +179,7 @@ async function collectMatchesForFile(
   failures: StructuredFailure[],
   structural: StructuralSubstrate,
   relFile: string,
-  kind: StructuredPatternKind,
+  kind: CodeFindAstKind,
   matcher: (value: string) => boolean,
 ): Promise<void> {
   const recordFailure = (reason: string) => {
@@ -257,15 +231,14 @@ async function collectMatchesForFile(
     return;
   }
 
-  // ── type / interface / class / method / enum / test — use outline with kind-specific filters ─
+  // ── type / interface / class / method / enum — use outline with kind-specific filters ─
 
   if (
     kind === "type" ||
     kind === "interface" ||
     kind === "class" ||
     kind === "method" ||
-    kind === "enum" ||
-    kind === "test"
+    kind === "enum"
   ) {
     const outline = await structural.outline(relFile);
     if (!handleStructuralResult(outline, relFile, recordFailure)) return;
@@ -275,12 +248,6 @@ async function collectMatchesForFile(
       if (kind === "class" && item.kind.toLowerCase() !== "class") continue;
       if (kind === "method" && item.kind.toLowerCase() !== "method") continue;
       if (kind === "enum" && item.kind.toLowerCase() !== "enum") continue;
-      if (kind === "test") {
-        const isTestName =
-          /^(test|it|describe|spec)\b/.test(item.name) ||
-          /\b(test|spec|Test|Spec)\b/.test(item.name);
-        if (!isTestName && !matcher(item.name)) continue;
-      }
       if (!matcher(item.name)) continue;
       matches.push({ file: relFile, name: item.name, kind: item.kind, line: item.startLine });
     }
