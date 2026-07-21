@@ -3,7 +3,7 @@
   "version": "2.5.0",
   "private": true,
   "description": "SuPi (Super Pi) — A curated extension stack for PI. Workspace root.",
-  "packageManager": "pnpm@11.13.1",
+  "packageManager": "pnpm@11.14.0",
   "license": "MIT",
   "repository": {
     "type": "git",
