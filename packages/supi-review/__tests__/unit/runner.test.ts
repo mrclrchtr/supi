@@ -190,6 +190,7 @@ describe("runReviewer", () => {
 
     const callOpts = mockCreateAgentSession.mock.calls[0]?.[0];
     expect(callOpts).toMatchObject({ thinkingLevel: "max" });
+    expect(callOpts).not.toHaveProperty("modelRegistry");
     expect(callOpts.tools).toEqual([
       "read",
       "grep",
