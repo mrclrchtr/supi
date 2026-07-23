@@ -2,7 +2,7 @@
 node = "lts"
 pnpm = "latest"
 hk = "1.52.0"
-pkl = "0.32.0"
+pkl = "0.32.1"
 
 [tasks.hooks]
 description = "Install git hooks (via hk, using mise)"
