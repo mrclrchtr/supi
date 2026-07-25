@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.6.0](https://github.com/mrclrchtr/supi/compare/v2.5.0...v2.6.0) (2026-07-25)
+
+
+### Features
+
+* **supi-review:** add agent-driven review workflow ([fc01b6e](https://github.com/mrclrchtr/supi/commit/fc01b6ed71b9e21d82548429d6c3bdafd9ab2c6d))
+
+
+### Bug Fixes
+
+* **deps:** update actions/checkout action to v7.0.1 ([d54a27d](https://github.com/mrclrchtr/supi/commit/d54a27d5a92f5a38bdb09f3ad2b21169e766a230))
+* **deps:** update dependency @biomejs/biome to v2.5.5 ([6ed6ebd](https://github.com/mrclrchtr/supi/commit/6ed6ebde4cdca03de1f8b363113ddd2d2b53051f))
+* **deps:** update dependency hk to v1.52.0 ([a26c2a8](https://github.com/mrclrchtr/supi/commit/a26c2a8e6c4115cf3ddc0d3b7eee240528ca6728))
+* **deps:** update dependency hk to v1.53.0 ([4573f1f](https://github.com/mrclrchtr/supi/commit/4573f1ff7e527644232226bcb0dcf026758b48d5))
+* **deps:** update dependency pkl to v0.32.1 ([cbdaa82](https://github.com/mrclrchtr/supi/commit/cbdaa823444a166c4ae1cc8da9f76171a9f646e8))
+* **deps:** update pnpm to v11.14.0 ([74df414](https://github.com/mrclrchtr/supi/commit/74df414c4870432d3ad36ac72c7609406bde7d8e))
+* **deps:** update pnpm to v11.15.0 ([8f4cc4c](https://github.com/mrclrchtr/supi/commit/8f4cc4c188eaa487c312cfc2a2f54f4dfd9ff941))
+* **deps:** update pnpm to v11.15.1 ([da63bb2](https://github.com/mrclrchtr/supi/commit/da63bb266b24c09443a2c948ffb4e2d354ede2d5))
+* **supi-review:** allow context overflow recovery ([b087655](https://github.com/mrclrchtr/supi/commit/b087655e84f45c330e77adc414df4a06a88bb4cd))
+
 ## [2.5.0](https://github.com/mrclrchtr/supi/compare/v2.4.1...v2.5.0) (2026-07-19)
 
 
