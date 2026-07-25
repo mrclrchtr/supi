@@ -10,6 +10,9 @@ import type {
 
 const DIFF_EXCERPT_CHAR_BUDGET = 12_000;
 
+/** Version of the brief-synthesis prompt contract retained in evaluation artifacts. */
+export const BRIEF_SYNTHESIS_PROMPT_VERSION = "1";
+
 export interface SynthesizeReviewBriefOptions {
   model: ReviewModelSelection;
   modelRegistry: ModelRegistry;

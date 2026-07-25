@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { describe, expect, it, vi } from "vitest";
+import { createPiMock, getTools } from "@mrclrchtr/supi-test-utils";
+import { describe, expect, it } from "vitest";
 import reviewExtension from "../../src/review.ts";
 import { formatReviewContent } from "../../src/ui/format-content.ts";
 
@@ -103,21 +104,17 @@ describe("formatReviewContent", () => {
   });
 });
 
-describe("/supi-review command registration", () => {
-  it("registers the command and renderer without settings hooks", () => {
-    const pi = {
-      registerCommand: vi.fn(),
-      registerMessageRenderer: vi.fn(),
-      sendMessage: vi.fn(),
-      events: { emit: vi.fn(), on: vi.fn() },
-    } as unknown as ExtensionAPI;
+describe("/supi-review extension registration", () => {
+  it("registers the command, renderer, and two-stage agent tools", () => {
+    const pi = createPiMock();
 
-    reviewExtension(pi);
+    reviewExtension(pi as unknown as ExtensionAPI);
 
-    expect(pi.registerCommand).toHaveBeenCalledWith(
-      "supi-review",
-      expect.objectContaining({ description: expect.any(String) }),
-    );
-    expect(pi.registerMessageRenderer).toHaveBeenCalledWith("supi-review", expect.any(Function));
+    expect(pi.commands.has("supi-review")).toBe(true);
+    expect(pi.renderers.has("supi-review")).toBe(true);
+    expect(getTools(pi).map((tool) => tool.name)).toEqual([
+      "supi_review_prepare",
+      "supi_review_run",
+    ]);
   });
 });

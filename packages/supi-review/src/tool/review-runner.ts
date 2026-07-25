@@ -30,7 +30,7 @@ async function createReviewerSession(
   const resourceLoader = new DefaultResourceLoader({
     cwd: invocation.cwd,
     agentDir: process.env.PI_CODING_AGENT_DIR || "",
-    noExtensions: false,
+    noExtensions: true,
     noSkills: true,
     noPromptTemplates: true,
     noThemes: true,

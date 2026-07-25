@@ -16,3 +16,22 @@ export function getSelectableReviewModels(
 ): ReviewModelSelection[] {
   return getSelectableModels(ctx, enabledModelPatterns) as ReviewModelSelection[];
 }
+
+/** Resolve the current session model for a non-interactive agent-driven review. */
+export function getCurrentReviewModel(
+  ctx: Pick<ExtensionContext, "model">,
+): ReviewModelSelection | undefined {
+  const model = ctx.model;
+  if (!model) return undefined;
+
+  const canonicalId = `${model.provider}/${model.id}`;
+  return {
+    canonicalId,
+    provider: model.provider,
+    id: model.id,
+    model,
+    label: model.name ?? canonicalId,
+    description: canonicalId,
+    isCurrent: true,
+  };
+}

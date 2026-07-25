@@ -4,6 +4,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  checkReviewSnapshotFreshness,
+  fingerprintReviewSnapshot,
   getCommitShow,
   getDiff,
   getLocalBranches,
@@ -12,6 +14,9 @@ import {
   getSnapshotFileContent,
   getSnapshotFileDiff,
   getUncommittedDiff,
+  resolveBranchSnapshot,
+  resolveCommitSnapshot,
+  resolveWorkingTreeSnapshot,
 } from "../../src/git.ts";
 
 const GIT_TEST_TIMEOUT_MS = 15_000;
@@ -134,6 +139,68 @@ describe("git functions", () => {
   );
 
   it(
+    "resolves branch snapshots against HEAD without including dirty worktree files",
+    async () => {
+      fs.writeFileSync(path.join(repo, "base.txt"), "base");
+      execGit("git add . && git commit -m 'base'", repo, true);
+      execGit("git checkout -b feature", repo, true);
+      fs.writeFileSync(path.join(repo, "committed.txt"), "committed");
+      execGit("git add . && git commit -m 'feature'", repo, true);
+      fs.writeFileSync(path.join(repo, "dirty.txt"), "dirty");
+      execGit("git add dirty.txt", repo, true);
+
+      const snapshot = await resolveBranchSnapshot(repo, "main");
+
+      expect(snapshot?.changedFiles).toEqual(["committed.txt"]);
+      expect(snapshot?.diffText).toContain("committed.txt");
+      expect(snapshot?.diffText).not.toContain("dirty.txt");
+    },
+    GIT_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "rejects option-like commit revisions without filesystem side effects",
+    async () => {
+      fs.writeFileSync(path.join(repo, "base.txt"), "base");
+      execGit("git add . && git commit -m 'base'", repo, true);
+      const outputPath = path.join(repo, "option-output.patch");
+
+      const snapshot = await resolveCommitSnapshot(repo, `--output=${outputPath}`);
+
+      expect(snapshot).toBeUndefined();
+      expect(fs.existsSync(outputPath)).toBe(false);
+    },
+    GIT_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "does not resolve hexadecimal branch names as commit object ids",
+    async () => {
+      fs.writeFileSync(path.join(repo, "base.txt"), "base");
+      execGit("git add . && git commit -m 'base'", repo, true);
+      const commitSha = execGit("git rev-parse HEAD", repo).trim();
+      const hexBranch = commitSha.startsWith("deadbee") ? "cafebabe" : "deadbee";
+      execGit(`git branch ${hexBranch}`, repo, true);
+
+      await expect(resolveCommitSnapshot(repo, hexBranch)).resolves.toBeUndefined();
+      const abbreviated = await resolveCommitSnapshot(repo, commitSha.slice(0, 8));
+      expect(abbreviated?.target).toEqual({ kind: "commit", sha: commitSha });
+    },
+    GIT_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "rejects option-like local branch targets",
+    async () => {
+      fs.writeFileSync(path.join(repo, "base.txt"), "base");
+      execGit("git add . && git commit -m 'base'", repo, true);
+
+      await expect(resolveBranchSnapshot(repo, "--all")).resolves.toBeUndefined();
+    },
+    GIT_TEST_TIMEOUT_MS,
+  );
+
+  it(
     "getMergeBase returns undefined for unrelated branch",
     async () => {
       fs.writeFileSync(path.join(repo, "a.txt"), "hello");
@@ -144,6 +211,91 @@ describe("git functions", () => {
 
       const base = await getMergeBase(repo, "main");
       expect(base).toBeUndefined();
+    },
+    GIT_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "detects working-tree drift after a review plan is prepared",
+    async () => {
+      fs.writeFileSync(path.join(repo, "a.txt"), "original");
+      execGit("git add . && git commit -m 'init'", repo, true);
+      fs.writeFileSync(path.join(repo, "a.txt"), "first change");
+
+      const snapshot = await resolveWorkingTreeSnapshot(repo);
+      expect(snapshot).toBeDefined();
+      if (!snapshot) return;
+      const fingerprint = await fingerprintReviewSnapshot(repo, snapshot);
+
+      await expect(checkReviewSnapshotFreshness(repo, snapshot, fingerprint)).resolves.toEqual({
+        fresh: true,
+      });
+
+      fs.writeFileSync(path.join(repo, "a.txt"), "second change");
+      const drift = await checkReviewSnapshotFreshness(repo, snapshot, fingerprint);
+      expect(drift).toMatchObject({ fresh: false });
+    },
+    GIT_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "detects content drift in an untracked file",
+    async () => {
+      fs.writeFileSync(path.join(repo, "untracked.txt"), "first content");
+      const snapshot = await resolveWorkingTreeSnapshot(repo);
+      expect(snapshot).toBeDefined();
+      if (!snapshot) return;
+      const fingerprint = await fingerprintReviewSnapshot(repo, snapshot);
+
+      fs.writeFileSync(path.join(repo, "untracked.txt"), "second content");
+      const drift = await checkReviewSnapshotFreshness(repo, snapshot, fingerprint);
+      expect(drift).toMatchObject({ fresh: false });
+    },
+    GIT_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "fingerprints an untracked symlink by identity instead of target bytes",
+    async () => {
+      const targetsDir = fs.mkdtempSync(path.join(os.tmpdir(), "supi-review-symlink-targets-"));
+      try {
+        const firstTarget = path.join(targetsDir, "first.txt");
+        const secondTarget = path.join(targetsDir, "second.txt");
+        fs.writeFileSync(firstTarget, "same content");
+        fs.writeFileSync(secondTarget, "same content");
+        const linkPath = path.join(repo, "untracked-link.txt");
+        fs.symlinkSync(firstTarget, linkPath);
+
+        const snapshot = await resolveWorkingTreeSnapshot(repo);
+        expect(snapshot).toBeDefined();
+        if (!snapshot) return;
+        const firstFingerprint = await fingerprintReviewSnapshot(repo, snapshot);
+
+        fs.unlinkSync(linkPath);
+        fs.symlinkSync(secondTarget, linkPath);
+        const secondFingerprint = await fingerprintReviewSnapshot(repo, snapshot);
+
+        expect(secondFingerprint).not.toBe(firstFingerprint);
+      } finally {
+        fs.rmSync(targetsDir, { recursive: true, force: true });
+      }
+    },
+    GIT_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    "honors cancellation before hashing untracked content",
+    async () => {
+      fs.writeFileSync(path.join(repo, "untracked.txt"), "content");
+      const snapshot = await resolveWorkingTreeSnapshot(repo);
+      expect(snapshot).toBeDefined();
+      if (!snapshot) return;
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(fingerprintReviewSnapshot(repo, snapshot, controller.signal)).rejects.toBe(
+        controller.signal.reason,
+      );
     },
     GIT_TEST_TIMEOUT_MS,
   );
@@ -262,6 +414,28 @@ describe("git functions", () => {
 
         expect(before).toBeUndefined();
         expect(after).toBe("new file");
+      },
+      GIT_TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "returns link identity for an untracked symlink",
+      async () => {
+        const targetPath = path.join(repo, "target.txt");
+        fs.writeFileSync(targetPath, "target content");
+        const linkPath = path.join(repo, "link.txt");
+        fs.symlinkSync("target.txt", linkPath);
+
+        const snapshot = {
+          target: { kind: "working-tree" as const },
+          title: "Working tree changes",
+          changedFiles: ["link.txt"],
+          diffText: "=== Untracked files ===\nlink.txt",
+          stats: { files: 0, additions: 0, deletions: 0 },
+        };
+
+        const after = await getSnapshotFileContent(repo, snapshot, "link.txt", "after");
+        expect(after).toBe("target.txt");
       },
       GIT_TEST_TIMEOUT_MS,
     );

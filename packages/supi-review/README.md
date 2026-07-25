@@ -8,7 +8,7 @@
 
 # @mrclrchtr/supi-review
 
-Adds an interactive `/supi-review` command to the [pi coding agent](https://github.com/earendil-works/pi) for session-aware code review.
+Adds human-driven and agent-driven Session-Aware Review workflows to the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 
@@ -26,9 +26,13 @@ pi install ./packages/supi-review
 
 ## What you get
 
-After install, pi gets one command:
+After install, pi gets one human-driven command and two agent-facing tools:
 
 - `/supi-review` — launch a guided review flow over a concrete git snapshot
+- `supi_review_prepare` — synthesize a versioned brief and return a session-scoped `planId`
+- `supi_review_run` — accept the main agent's structured brief critique, freshness-check the plan, and run focused reviewers concurrently
+
+The run tool is initially inactive and is dynamically enabled after `supi_review_prepare` returns a plan. This keeps the initial agent-facing prompt surface small.
 
 The reviewer runs in managed child agent sessions:
 
@@ -57,13 +61,34 @@ The reviewer runs in managed child agent sessions:
 8. normalize the submitted review items into a host-derived verdict + structured result
 9. if review items exist, hand off to the main agent so it can ask what to do next with fixed options (`Fix all`, `Fix selected`, `Verify findings`, `Skip`)
 
+## Agent-driven review flow
+
+The agent-facing path deliberately separates preparation from execution:
+
+1. `supi_review_prepare` resolves the target, serializes the active session context, and synthesizes a generated brief.
+2. The main agent compares that brief with the user request, session evidence, and snapshot.
+3. The main agent calls `supi_review_run` with:
+   - the prepared `planId`
+   - an `accept` or `revise` critique
+   - evidence-backed critique findings
+   - at least one evidence-backed finding and a full `revisedBrief` when revision is required
+   - one to four independent reviewer assignments
+4. The host atomically consumes the plan, checks snapshot freshness, and runs reviewer child sessions concurrently.
+5. The tool returns each normalized review result plus a retained brief evaluation artifact.
+
+The evaluation artifact keeps the generated brief, main-agent critique, effective brief, synthesis prompt version, model id, and snapshot fingerprint separate. This makes brief-synthesis prompt regressions inspectable instead of hiding main-agent repairs. The full artifact is stored in tool-result `details`; a summary is also recorded as a `supi-review/brief-critique` SuPi Debug event when debug capture is enabled.
+
+Prepared plans are session-scoped. File or git changes before or during review invalidate the run, so `supi_review_run` should not share a tool batch with mutating tools.
+
 ## Review targets
 
 Current targets:
 
 - working tree
-- branch diff vs a selected local base branch
-- one recent commit
+- branch diff vs a selected local base branch (`merge-base..HEAD`, excluding dirty worktree changes)
+- one commit (recent-commit picker in the command; hexadecimal object id in the agent tool)
+
+Agent-provided branch targets must name an existing local branch. Commit targets must be unique 7–64 character hexadecimal commit-object ids: object-only disambiguation rejects ambiguous prefixes, non-commit objects, and hexadecimal branch/tag fallback. Git revision arguments are option-hardened before execution.
 
 ## Session-aware brief synthesis
 
@@ -104,12 +129,14 @@ The Overview mode uses the same structured packet data that feeds the reviewer p
 
 ## Model selection
 
-Every `/supi-review` run asks you to choose the reviewer model.
+Every `/supi-review` command run asks you to choose the reviewer model.
 
 - the picker only shows **scoped models** from Pi's `enabledModels` configuration
 - the current session model is preselected only when it is inside that scoped set
 - the selected model is used for both brief synthesis and the final review
 - no review model is persisted in settings
+
+Agent-driven tool runs use the current session model for preparation and all focused reviewers. The selected model is retained in the prepared plan so a model change between tool calls cannot silently alter the run.
 
 ## Result shape
 
@@ -155,6 +182,9 @@ When a successful review contains review items, `supi-review` also injects an ag
 - `src/review-result.ts` — review-item normalization, verdict derivation, and summary counts
 - `src/target/review-instruction-blocks.ts` — fixed catalog of host-owned review instruction blocks
 - `src/target/packet.ts` — final reviewer packet builder + shared preview-data derivation for the inspector
+- `src/session/review-plan-store.ts` — session-scoped, one-shot prepared review plans
+- `src/tool/agent-review-tools.ts` — prepare/run tool registration, dynamic activation, progress, and debug artifact recording
+- `src/tool/agent-review-workflow.ts` — preparation, critique validation, freshness checks, and concurrent reviewer fan-out
 - `src/tool/brief-runner.ts` — brief synthesis child session
 - `src/tool/review-runner.ts` — read-only reviewer child session with snapshot-aware tools
 - `src/tool/snapshot-tools.ts` — per-file diff and before/after content tools scoped to the selected snapshot

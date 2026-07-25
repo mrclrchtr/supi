@@ -13,10 +13,15 @@ const mockSession = {
 let capturedCustomTools: Array<{ execute: (...args: unknown[]) => Promise<unknown> }> = [];
 
 const mockCreateAgentSession = vi.hoisted(() => vi.fn());
+const mockResourceLoaderInit = vi.hoisted(() => vi.fn());
 
 vi.mock("@earendil-works/pi-coding-agent", () => ({
   createAgentSession: mockCreateAgentSession,
   DefaultResourceLoader: class MockDefaultResourceLoader {
+    constructor(options: unknown) {
+      mockResourceLoaderInit(options);
+    }
+
     reload = vi.fn().mockResolvedValue(undefined);
   },
   SessionManager: {
@@ -190,6 +195,9 @@ describe("runReviewer", () => {
 
     const callOpts = mockCreateAgentSession.mock.calls[0]?.[0];
     expect(callOpts).toMatchObject({ thinkingLevel: "max" });
+    expect(mockResourceLoaderInit).toHaveBeenCalledWith(
+      expect.objectContaining({ noExtensions: true, noContextFiles: false }),
+    );
     expect(callOpts.tools).toEqual([
       "read",
       "grep",

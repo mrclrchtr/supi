@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getSelectableReviewModels, toCanonicalModelId } from "../../src/model.ts";
+import {
+  getCurrentReviewModel,
+  getSelectableReviewModels,
+  toCanonicalModelId,
+} from "../../src/model.ts";
 
 describe("model selection helpers", () => {
   it("formats canonical model ids", () => {
@@ -70,6 +74,23 @@ describe("model selection helpers", () => {
 
     expect(models.map((model) => model.canonicalId)).toEqual(["openai/gpt-5"]);
     expect(models.some((model) => model.isCurrent)).toBe(false);
+  });
+
+  it("uses the current session model for an agent-driven review", () => {
+    const current = {
+      provider: "anthropic",
+      id: "claude-sonnet-4",
+      name: "Claude Sonnet 4",
+      reasoning: false,
+      contextWindow: 200_000,
+    };
+
+    expect(getCurrentReviewModel({ model: current } as never)).toMatchObject({
+      canonicalId: "anthropic/claude-sonnet-4",
+      model: current,
+      isCurrent: true,
+    });
+    expect(getCurrentReviewModel({ model: undefined })).toBeUndefined();
   });
 
   it("returns no models when no scoped model patterns are configured", () => {

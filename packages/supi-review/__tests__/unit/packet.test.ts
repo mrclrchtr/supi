@@ -252,6 +252,20 @@ describe("buildReviewPacket", () => {
     );
   });
 
+  it("adds one delegated focus without mutating the shared brief", () => {
+    const packet = buildReviewPacket(snapshot, brief, model, {
+      id: "standards",
+      focus: "Check documented repository standards and package conventions.",
+    });
+
+    expect(packet.prompt).toContain("## Delegated reviewer focus");
+    expect(packet.prompt).toContain("Reviewer assignment: standards");
+    expect(packet.prompt).toContain(
+      "Check documented repository standards and package conventions.",
+    );
+    expect(brief.focusAreas).toEqual(["Tool names", "Docs", "User-facing strings"]);
+  });
+
   it("omits the mandatory review instructions section when the brief selects no block ids", () => {
     const packet = buildReviewPacket(
       snapshot,

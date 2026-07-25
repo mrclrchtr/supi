@@ -1,4 +1,5 @@
 import type {
+  ReviewerAssignment,
   ReviewInstructionBlockId,
   ReviewModelSelection,
   ReviewPacket,
@@ -90,6 +91,7 @@ export function buildReviewPacket(
   snapshot: ReviewSnapshot,
   brief: SynthesizedReviewBrief,
   model: ReviewModelSelection,
+  assignment?: ReviewerAssignment,
 ): ReviewPacket {
   const previewData = buildReviewPacketPreviewData(snapshot, brief.reviewInstructionBlockIds);
 
@@ -111,6 +113,18 @@ export function buildReviewPacket(
     "",
     "## Open questions",
     ...toBullets(brief.unresolvedQuestions, "- No unresolved questions identified."),
+  ];
+
+  if (assignment) {
+    parts.push(
+      "",
+      "## Delegated reviewer focus",
+      `Reviewer assignment: ${assignment.id}`,
+      assignment.focus,
+    );
+  }
+
+  parts.push(
     "",
     "## Snapshot under review",
     `Target: ${snapshot.title}`,
@@ -120,7 +134,7 @@ export function buildReviewPacket(
     "",
     "## Changed files manifest",
     ...snapshot.changedFiles.map((file) => `- ${file}`),
-  ];
+  );
 
   if (previewData.reviewInstructionBlocks.length > 0) {
     parts.push(

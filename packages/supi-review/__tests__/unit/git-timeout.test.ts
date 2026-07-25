@@ -32,7 +32,7 @@ describe("git timeout propagation", () => {
     await getMergeBase("/repo", "main");
     expect(execFileMock).toHaveBeenCalledWith(
       "git",
-      ["merge-base", "HEAD", "main"],
+      ["merge-base", "HEAD", "refs/heads/main"],
       expect.objectContaining({ timeout: 30_000 }),
     );
   });
@@ -41,7 +41,7 @@ describe("git timeout propagation", () => {
     await getDiff("/repo", "abc123");
     expect(execFileMock).toHaveBeenCalledWith(
       "git",
-      ["diff", "abc123"],
+      ["diff", "--end-of-options", "abc123", "HEAD"],
       expect.objectContaining({ timeout: 30_000 }),
     );
   });
@@ -78,7 +78,7 @@ describe("git timeout propagation", () => {
     await getCommitShow("/repo", "abc123");
     expect(execFileMock).toHaveBeenCalledWith(
       "git",
-      ["show", "abc123"],
+      ["show", "--end-of-options", "abc123"],
       expect.objectContaining({ timeout: 30_000 }),
     );
   });
@@ -124,7 +124,7 @@ describe("git timeout propagation", () => {
     await getSnapshotFileDiff("/repo", snapshot, "file.txt");
     expect(execFileMock).toHaveBeenCalledWith(
       "git",
-      ["show", "abc123", "--", "file.txt"],
+      ["show", "--end-of-options", "abc123", "--", "file.txt"],
       expect.objectContaining({ timeout: 30_000 }),
     );
   });
@@ -140,7 +140,7 @@ describe("git timeout propagation", () => {
     await getSnapshotFileContent("/repo", snapshot, "file.txt", "before");
     expect(execFileMock).toHaveBeenCalledWith(
       "git",
-      ["show", "HEAD:file.txt"],
+      ["show", "--end-of-options", "HEAD:file.txt"],
       expect.objectContaining({ timeout: 30_000 }),
     );
   });

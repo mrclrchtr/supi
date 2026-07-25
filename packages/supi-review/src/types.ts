@@ -86,6 +86,9 @@ export interface ReviewSnapshot {
   stats: DiffStats;
 }
 
+/** Snapshot metadata safe to retain without duplicating bulk diff text. */
+export type ReviewSnapshotSummary = Omit<ReviewSnapshot, "diffText">;
+
 /** Model picked explicitly for the current review run. */
 export type ReviewModelSelection = import("@mrclrchtr/supi-core/model-selection").ModelSelection;
 
@@ -105,6 +108,107 @@ export interface SynthesizedReviewBrief {
   unresolvedQuestions: string[];
   reviewInstructionBlockIds: ReviewInstructionBlockId[];
   note?: string;
+}
+
+/** Brief field evaluated by the main agent before reviewer sessions run. */
+export type ReviewBriefField =
+  | "summary"
+  | "intendedOutcome"
+  | "constraints"
+  | "focusAreas"
+  | "riskyFiles"
+  | "unresolvedQuestions"
+  | "reviewInstructionBlockIds";
+
+/** Class of defect identified in a generated review brief. */
+export type BriefCritiqueFindingKind =
+  | "omission"
+  | "unsupported-inference"
+  | "misprioritized"
+  | "unclear";
+
+/** One evidence-backed main-agent criticism of a generated review brief. */
+export interface BriefCritiqueFinding {
+  kind: BriefCritiqueFindingKind;
+  field: ReviewBriefField;
+  explanation: string;
+  evidence: string;
+  proposedChange: string;
+}
+
+/** Structured quality gate completed by the main agent before review execution. */
+export interface BriefCritique {
+  verdict: "accept" | "revise";
+  summary: string;
+  findings: BriefCritiqueFinding[];
+}
+
+/** One independent reviewer child-session assignment. */
+export interface ReviewerAssignment {
+  id: string;
+  focus: string;
+}
+
+/** Generated/effective brief pair retained for synthesis-prompt evaluation. */
+export interface BriefEvaluation {
+  planId: string;
+  briefPromptVersion: string;
+  generatedBrief: SynthesizedReviewBrief;
+  critique: BriefCritique;
+  effectiveBrief: SynthesizedReviewBrief;
+  synthesizerModelId: string;
+  snapshotFingerprint: string;
+}
+
+/** Normalized reviewer result without repeated snapshot or brief payloads. */
+export type AgentReviewerResult =
+  | {
+      kind: "success";
+      output: NormalizedReviewOutput;
+      modelId: string;
+    }
+  | {
+      kind: "failed";
+      reason: string;
+      modelId: string;
+      debug?: ReviewFailureDebugInfo;
+    }
+  | {
+      kind: "canceled";
+      modelId: string;
+      debug?: ReviewFailureDebugInfo;
+    }
+  | {
+      kind: "timeout";
+      timeoutMs: number;
+      partialOutput?: string;
+      modelId: string;
+      debug?: ReviewFailureDebugInfo;
+    };
+
+/** One normalized result from a focused reviewer child session. */
+export interface ReviewerAssignmentResult {
+  assignment: ReviewerAssignment;
+  result: AgentReviewerResult;
+}
+
+/** Structured details retained on a completed agent-driven review batch. */
+export interface AgentReviewBatchDetails {
+  kind: "review-batch";
+  evaluation: BriefEvaluation;
+  snapshot: ReviewSnapshotSummary;
+  results: ReviewerAssignmentResult[];
+}
+
+/** Structured details returned when an agent-driven review plan is prepared. */
+export interface PreparedAgentReviewDetails {
+  kind: "review-prepared";
+  planId: string;
+  briefPromptVersion: string;
+  generatedBrief: SynthesizedReviewBrief;
+  snapshot: ReviewSnapshotSummary;
+  snapshotFingerprint: string;
+  modelId: string;
 }
 
 /** Final prompt packet passed to the reviewer child session. */

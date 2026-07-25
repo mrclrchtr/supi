@@ -189,9 +189,9 @@ pi install npm:@mrclrchtr/supi-debug
 
 #### [@mrclrchtr/supi-review](packages/supi-review#readme)
 
-<kbd>Human</kbd> <kbd>Beta</kbd>
+<kbd>Human</kbd> <kbd>Agent</kbd> <kbd>Beta</kbd>
 
-Guided session-aware review over git snapshots with brief synthesis, plan preview, read-only reviewer agents, and structured findings.
+Guided session-aware review over git snapshots plus agent-driven prepare/critique/run tools with inspectable brief evaluation and concurrent read-only reviewers.
 
 ```bash
 pi install npm:@mrclrchtr/supi-review

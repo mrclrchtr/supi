@@ -1,3 +1,4 @@
+import { StringEnum } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { getSnapshotFileContent, getSnapshotFileDiff } from "../git.ts";
@@ -70,7 +71,7 @@ export function createSnapshotFileTool(
       '"after" shows the file after the change. The file must be in the snapshot\'s changed-files list.',
     parameters: Type.Object({
       file: Type.String(),
-      side: Type.Union([Type.Literal("before"), Type.Literal("after")]),
+      side: StringEnum(["before", "after"] as const),
     }),
     execute: async (_toolCallId, args) => {
       const { file, side } = args as { file: string; side: "before" | "after" };

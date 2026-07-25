@@ -12,6 +12,10 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
   defineTool: vi.fn((tool) => tool),
 }));
 
+vi.mock("@earendil-works/pi-ai", () => ({
+  StringEnum: vi.fn((values: string[]) => ({ type: "string", enum: values })),
+}));
+
 vi.mock("typebox", () => ({
   Type: {
     Object: vi.fn((schema: Record<string, unknown>) => schema),
@@ -61,10 +65,15 @@ describe("createSnapshotDiffTool", () => {
 });
 
 describe("createSnapshotFileTool", () => {
-  it("returns a tool definition with the correct name and description", () => {
-    const tool = createSnapshotFileTool(cwd, snapshot);
+  it("returns a provider-compatible side enum", () => {
+    const tool = createSnapshotFileTool(cwd, snapshot) as {
+      name: string;
+      description: string;
+      parameters: { side: unknown };
+    };
     expect(tool.name).toBe("read_snapshot_file");
     expect(tool.description).toBeTruthy();
+    expect(tool.parameters.side).toEqual({ type: "string", enum: ["before", "after"] });
   });
 
   it("returns before content for a valid changed file", async () => {

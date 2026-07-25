@@ -36,6 +36,10 @@ vi.mock("../../src/tool/review-runner.ts", () => ({
   runReviewer: mockFns.runReviewer,
 }));
 
+vi.mock("../../src/tool/agent-review-tools.ts", () => ({
+  registerAgentReviewTools: vi.fn(),
+}));
+
 vi.mock("../../src/ui/flow.ts", () => ({
   selectTarget: mockFns.selectTarget,
   selectModel: mockFns.selectModel,

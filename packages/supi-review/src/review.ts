@@ -6,6 +6,7 @@ import { serializeSessionContext } from "./history/collect.ts";
 import { synthesizeReviewBrief } from "./history/synthesize.ts";
 import { normalizeReviewResult } from "./review-result.ts";
 import { buildReviewPacket } from "./target/packet.ts";
+import { registerAgentReviewTools } from "./tool/agent-review-tools.ts";
 import { runReviewer } from "./tool/review-runner.ts";
 import type {
   BriefSynthesisRunResult,
@@ -23,6 +24,7 @@ type CommandContext = Parameters<Parameters<ExtensionAPI["registerCommand"]>[1][
 
 export default function reviewExtension(pi: ExtensionAPI) {
   registerReviewRenderer(pi);
+  registerAgentReviewTools(pi);
 
   pi.registerCommand("supi-review", {
     description: "Run a structured code review informed by the current session history",

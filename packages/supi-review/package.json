@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-review",
   "version": "2.5.0",
-  "description": "SuPi Review extension — structured code review via /supi-review command",
+  "description": "SuPi Review extension — session-aware review command and agent tools",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -57,6 +57,7 @@
     }
   },
   "devDependencies": {
+    "@mrclrchtr/supi-test-utils": "workspace:*",
     "vitest": "4.1.10"
   },
   "pi": {

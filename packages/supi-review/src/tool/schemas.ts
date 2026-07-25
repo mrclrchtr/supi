@@ -1,40 +1,33 @@
+import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 
-const reviewItemCategorySchema = Type.Union([
-  Type.Literal("correctness"),
-  Type.Literal("security"),
-  Type.Literal("performance"),
-  Type.Literal("api"),
-  Type.Literal("test-gap"),
-  Type.Literal("docs"),
-  Type.Literal("cleanup"),
-  Type.Literal("maintainer"),
-]);
+const reviewItemCategorySchema = StringEnum([
+  "correctness",
+  "security",
+  "performance",
+  "api",
+  "test-gap",
+  "docs",
+  "cleanup",
+  "maintainer",
+] as const);
 
-const reviewItemImpactSchema = Type.Union([
-  Type.Literal("low"),
-  Type.Literal("medium"),
-  Type.Literal("high"),
-]);
+const reviewItemImpactSchema = StringEnum(["low", "medium", "high"] as const);
 
-const reviewItemEffortSchema = Type.Union([
-  Type.Literal("low"),
-  Type.Literal("medium"),
-  Type.Literal("high"),
-]);
+const reviewItemEffortSchema = StringEnum(["low", "medium", "high"] as const);
 
-const reviewItemRecommendedActionSchema = Type.Union([
-  Type.Literal("must-fix"),
-  Type.Literal("should-fix"),
-  Type.Literal("consider"),
-]);
+const reviewItemRecommendedActionSchema = StringEnum([
+  "must-fix",
+  "should-fix",
+  "consider",
+] as const);
 
-const reviewInstructionBlockIdSchema = Type.Union([
-  Type.Literal("public-surface"),
-  Type.Literal("cross-layer"),
-  Type.Literal("schema-widening"),
-  Type.Literal("cleanup"),
-]);
+const reviewInstructionBlockIdSchema = StringEnum([
+  "public-surface",
+  "cross-layer",
+  "schema-widening",
+  "cleanup",
+] as const);
 
 export const reviewItemSchema = Type.Object({
   title: Type.String(),
@@ -63,12 +56,15 @@ export const reviewOutputSchema = Type.Object({
   overall_confidence_score: Type.Number({ minimum: 0, maximum: 1 }),
 });
 
+const briefRequiredTextSchema = Type.String({ minLength: 1, maxLength: 4_000 });
+const briefListItemSchema = Type.String({ minLength: 1, maxLength: 2_000 });
+
 export const reviewBriefSchema = Type.Object({
-  summary: Type.String(),
-  intendedOutcome: Type.String(),
-  constraints: Type.Array(Type.String()),
-  focusAreas: Type.Array(Type.String()),
-  riskyFiles: Type.Array(Type.String()),
-  unresolvedQuestions: Type.Array(Type.String()),
-  reviewInstructionBlockIds: Type.Array(reviewInstructionBlockIdSchema),
+  summary: briefRequiredTextSchema,
+  intendedOutcome: briefRequiredTextSchema,
+  constraints: Type.Array(briefListItemSchema, { maxItems: 50 }),
+  focusAreas: Type.Array(briefListItemSchema, { maxItems: 50 }),
+  riskyFiles: Type.Array(briefListItemSchema, { maxItems: 200 }),
+  unresolvedQuestions: Type.Array(briefListItemSchema, { maxItems: 50 }),
+  reviewInstructionBlockIds: Type.Array(reviewInstructionBlockIdSchema, { maxItems: 4 }),
 });

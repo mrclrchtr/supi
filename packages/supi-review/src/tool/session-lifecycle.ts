@@ -142,7 +142,7 @@ export function runWithLifecycle<TResult>(
 
     // Abort signal handler
     const onAbort = () => {
-      if (state.settled) return;
+      if (state.settled || state.aborting) return;
       state.aborting = true;
       void session
         .abort()
@@ -154,11 +154,15 @@ export function runWithLifecycle<TResult>(
     if (signal) {
       signal.addEventListener("abort", onAbort, { once: true });
       addTeardown(() => signal.removeEventListener("abort", onAbort));
+      if (signal.aborted) {
+        onAbort();
+        return;
+      }
     }
 
     // Timeout handler
     const onTimeoutExpired = () => {
-      if (state.settled) return;
+      if (state.settled || state.aborting) return;
 
       if (onTimeout) {
         onTimeout(ctx);

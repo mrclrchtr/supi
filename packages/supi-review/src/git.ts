@@ -1,12 +1,20 @@
 // biome-ignore lint/style/noExcessiveLinesPerFile: many tightly-coupled git helpers; splitting would create cross-ref overhead
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { lstat, readFile, readlink } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { promisify } from "node:util";
-import type { DiffStats, ReviewSnapshot, ReviewTargetSpec } from "./types.ts";
+import type {
+  DiffStats,
+  ReviewSnapshot,
+  ReviewSnapshotSummary,
+  ReviewTargetSpec,
+} from "./types.ts";
 
 const execFileAsync = promisify(execFile);
 const GIT_TIMEOUT_MS = 30_000;
+const COMMIT_OBJECT_ID_RE = /^[0-9a-f]{7,64}$/i;
 
 function scrubGitEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const next = { ...env };
@@ -52,11 +60,22 @@ export function parseDiffStats(text: string): DiffStats {
   return { files, additions, deletions };
 }
 
+/** Return whether a value is a hexadecimal abbreviated or full Git object id. */
+export function isCommitObjectId(value: string): boolean {
+  return COMMIT_OBJECT_ID_RE.test(value);
+}
+
 export async function getMergeBase(repoPath: string, branch: string): Promise<string | undefined> {
+  const branchRef = `refs/heads/${branch}`;
   try {
+    await execFileAsync(
+      "git",
+      ["show-ref", "--verify", "--quiet", branchRef],
+      gitExecOptions(repoPath),
+    );
     const { stdout } = await execFileAsync(
       "git",
-      ["merge-base", "HEAD", branch],
+      ["merge-base", "HEAD", branchRef],
       gitExecOptions(repoPath),
     );
     return stdout.trim() || undefined;
@@ -66,7 +85,11 @@ export async function getMergeBase(repoPath: string, branch: string): Promise<st
 }
 
 export async function getDiff(repoPath: string, baseSha: string): Promise<string> {
-  const { stdout } = await execFileAsync("git", ["diff", baseSha], gitExecOptions(repoPath));
+  const { stdout } = await execFileAsync(
+    "git",
+    ["diff", "--end-of-options", baseSha, "HEAD"],
+    gitExecOptions(repoPath),
+  );
   return stdout;
 }
 
@@ -132,14 +155,18 @@ export async function getRecentCommits(repoPath: string, limit = 20): Promise<Co
 }
 
 export async function getCommitShow(repoPath: string, sha: string): Promise<string> {
-  const { stdout } = await execFileAsync("git", ["show", sha], gitExecOptions(repoPath));
+  const { stdout } = await execFileAsync(
+    "git",
+    ["show", "--end-of-options", sha],
+    gitExecOptions(repoPath),
+  );
   return stdout;
 }
 
 export async function getDiffFileNames(repoPath: string, baseSha: string): Promise<string[]> {
   const { stdout } = await execFileAsync(
     "git",
-    ["diff", "--name-only", baseSha],
+    ["diff", "--name-only", "--end-of-options", baseSha, "HEAD"],
     gitExecOptions(repoPath),
   );
   return stdout
@@ -192,7 +219,7 @@ export async function getUncommittedFileNames(repoPath: string): Promise<string[
 export async function getCommitFileNames(repoPath: string, sha: string): Promise<string[]> {
   const { stdout } = await execFileAsync(
     "git",
-    ["diff-tree", "--no-commit-id", "--name-only", "-r", sha],
+    ["diff-tree", "--no-commit-id", "--name-only", "-r", "--end-of-options", sha],
     gitExecOptions(repoPath),
   );
   return stdout
@@ -228,6 +255,117 @@ export async function getLocalBranches(repoPath: string): Promise<string[]> {
   const remaining = Array.from(set).sort((a, b) => a.localeCompare(b));
   sorted.push(...remaining);
   return sorted;
+}
+
+/** Resolve any supported review target into a concrete snapshot. */
+export function resolveReviewSnapshot(
+  repoPath: string,
+  target: ReviewTargetSpec,
+): Promise<ReviewSnapshot | undefined> {
+  switch (target.kind) {
+    case "working-tree":
+      return resolveWorkingTreeSnapshot(repoPath);
+    case "branch":
+      return resolveBranchSnapshot(repoPath, target.base);
+    case "commit":
+      return resolveCommitSnapshot(repoPath, target.sha);
+  }
+}
+
+/** Remove bulk diff text before retaining snapshot metadata in tool results. */
+export function summarizeReviewSnapshot(snapshot: ReviewSnapshot): ReviewSnapshotSummary {
+  return {
+    target: snapshot.target,
+    title: snapshot.title,
+    changedFiles: [...snapshot.changedFiles],
+    stats: { ...snapshot.stats },
+  };
+}
+
+/**
+ * Compute an abort-aware deterministic snapshot fingerprint.
+ * Untracked regular files are streamed, symlinks are hashed by link identity,
+ * and special file types are encoded without opening potentially blocking paths.
+ */
+export async function fingerprintReviewSnapshot(
+  repoPath: string,
+  snapshot: ReviewSnapshot,
+  signal?: AbortSignal,
+): Promise<string> {
+  const changedFiles = [...snapshot.changedFiles].sort((left, right) => left.localeCompare(right));
+  const hash = createHash("sha256").update(
+    JSON.stringify({
+      target: snapshot.target,
+      changedFiles,
+      diffText: snapshot.diffText,
+    }),
+  );
+
+  for (const file of extractUntrackedFiles(snapshot)) {
+    signal?.throwIfAborted();
+    const filePath = join(repoPath, file);
+    hash.update(`\nuntracked:${file}\n`);
+    try {
+      const stat = await lstat(filePath);
+      signal?.throwIfAborted();
+      hash.update(`mode:${stat.mode.toString(8)}\n`);
+      if (stat.isSymbolicLink()) {
+        hash.update(`symlink:${await readlink(filePath)}\n`);
+      } else if (stat.isFile()) {
+        for await (const chunk of createReadStream(filePath, { signal })) {
+          hash.update(chunk);
+        }
+      } else {
+        hash.update("[unsupported-file-type]");
+      }
+    } catch {
+      signal?.throwIfAborted();
+      hash.update("[unavailable]");
+    }
+    signal?.throwIfAborted();
+  }
+
+  return hash.digest("hex");
+}
+
+function extractUntrackedFiles(snapshot: ReviewSnapshot): string[] {
+  if (snapshot.target.kind !== "working-tree") return [];
+  const marker = "=== Untracked files ===\n";
+  const markerIndex = snapshot.diffText.indexOf(marker);
+  if (markerIndex < 0) return [];
+  const changedFiles = new Set(snapshot.changedFiles);
+  return snapshot.diffText
+    .slice(markerIndex + marker.length)
+    .split("\n")
+    .map((file) => file.trim())
+    .filter((file) => file.length > 0 && changedFiles.has(file))
+    .sort((left, right) => left.localeCompare(right));
+}
+
+/** Re-resolve a snapshot target and report whether its review evidence has drifted. */
+export async function checkReviewSnapshotFreshness(
+  repoPath: string,
+  snapshot: ReviewSnapshot,
+  expectedFingerprint: string,
+  signal?: AbortSignal,
+): Promise<{ fresh: true } | { fresh: false; reason: string }> {
+  const current = await resolveReviewSnapshot(repoPath, snapshot.target);
+  if (!current) {
+    return {
+      fresh: false,
+      reason: "The prepared review target no longer has reviewable changes.",
+    };
+  }
+
+  if ((await fingerprintReviewSnapshot(repoPath, current, signal)) !== expectedFingerprint) {
+    return {
+      fresh: false,
+      reason:
+        "The review target changed after the brief was prepared. Run supi_review_prepare again.",
+    };
+  }
+
+  return { fresh: true };
 }
 
 /** Resolve the current working tree into a concrete review snapshot. */
@@ -269,19 +407,54 @@ export async function resolveBranchSnapshot(
   };
 }
 
+async function resolveCommitObjectId(
+  repoPath: string,
+  revision: string,
+): Promise<string | undefined> {
+  if (!isCommitObjectId(revision)) return undefined;
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["rev-parse", `--disambiguate=${revision}`],
+      gitExecOptions(repoPath),
+    );
+    const candidates = Array.from(
+      new Set(
+        stdout
+          .split("\n")
+          .map((candidate) => candidate.trim())
+          .filter((candidate) => isCommitObjectId(candidate)),
+      ),
+    );
+    if (candidates.length !== 1) return undefined;
+
+    const candidate = candidates[0];
+    const { stdout: objectType } = await execFileAsync(
+      "git",
+      ["cat-file", "-t", candidate],
+      gitExecOptions(repoPath),
+    );
+    return objectType.trim() === "commit" ? candidate : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Resolve one commit into a concrete review snapshot. */
 export async function resolveCommitSnapshot(
   repoPath: string,
   sha: string,
 ): Promise<ReviewSnapshot | undefined> {
+  const resolvedSha = await resolveCommitObjectId(repoPath, sha);
+  if (!resolvedSha) return undefined;
   const [diffText, changedFiles] = await Promise.all([
-    getCommitShow(repoPath, sha),
-    getCommitFileNames(repoPath, sha),
+    getCommitShow(repoPath, resolvedSha),
+    getCommitFileNames(repoPath, resolvedSha),
   ]);
   if (!diffText.trim() && changedFiles.length === 0) return undefined;
   return {
-    target: { kind: "commit", sha },
-    title: `Commit ${sha.slice(0, 7)}`,
+    target: { kind: "commit", sha: resolvedSha },
+    title: `Commit ${resolvedSha.slice(0, 7)}`,
     changedFiles,
     diffText,
     stats: parseDiffStats(diffText),
@@ -309,7 +482,7 @@ export async function getSnapshotFileDiff(
       if (!baseSha) return "";
       const { stdout } = await execFileAsync(
         "git",
-        ["diff", baseSha, "HEAD", "--", file],
+        ["diff", "--end-of-options", baseSha, "HEAD", "--", file],
         gitExecOptions(repoPath),
       );
       return stdout;
@@ -317,7 +490,7 @@ export async function getSnapshotFileDiff(
     case "commit": {
       const { stdout } = await execFileAsync(
         "git",
-        ["show", target.sha, "--", file],
+        ["show", "--end-of-options", target.sha, "--", file],
         gitExecOptions(repoPath),
       );
       return stdout;
@@ -329,7 +502,7 @@ export async function getSnapshotFileDiff(
 async function showGitBlob(repoPath: string, ref: string, file: string): Promise<string> {
   const { stdout } = await execFileAsync(
     "git",
-    ["show", `${ref}:${file}`],
+    ["show", "--end-of-options", `${ref}:${file}`],
     gitExecOptions(repoPath),
   );
   return stdout;
@@ -348,7 +521,11 @@ async function resolveWorkingTreeContent(
     }
   }
   try {
-    return await readFile(join(repoPath, file), "utf-8");
+    const filePath = join(repoPath, file);
+    const stat = await lstat(filePath);
+    if (stat.isSymbolicLink()) return await readlink(filePath);
+    if (!stat.isFile()) return undefined;
+    return await readFile(filePath, "utf-8");
   } catch {
     return undefined;
   }
