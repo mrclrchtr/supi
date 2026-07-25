@@ -64,7 +64,6 @@ async function handleInteractive(ctx: CommandContext, pi: ExtensionAPI): Promise
     (signal: AbortSignal, onProgress: (p: WidgetProgress) => void) =>
       synthesizeReviewBrief({
         model,
-        modelRegistry: ctx.modelRegistry,
         cwd: ctx.cwd,
         snapshot,
         serializedContext,
@@ -114,7 +113,6 @@ async function handleInteractive(ctx: CommandContext, pi: ExtensionAPI): Promise
       runReviewer({
         prompt: plan.packet.prompt,
         model: plan.model,
-        modelRegistry: ctx.modelRegistry,
         cwd: ctx.cwd,
         signal,
         snapshot: plan.snapshot,

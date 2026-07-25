@@ -1,4 +1,3 @@
-import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import {
   checkReviewSnapshotFreshness,
   fingerprintReviewSnapshot,
@@ -32,7 +31,6 @@ export interface PrepareAgentReviewWorkflowInput {
   note?: string;
   serializedContext: string;
   model: ReviewModelSelection;
-  modelRegistry: ModelRegistry;
   signal?: AbortSignal;
   onProgress?: (progress: ReviewProgress) => void;
   planStore: ReviewPlanStore;
@@ -51,7 +49,6 @@ export interface RunAgentReviewWorkflowInput {
   critique: BriefCritique;
   revisedBrief?: Omit<SynthesizedReviewBrief, "note">;
   reviewers: ReviewerAssignment[];
-  modelRegistry: ModelRegistry;
   signal?: AbortSignal;
   onBriefEvaluation?: (evaluation: BriefEvaluation) => void;
   onReviewerProgress?: (reviewerId: string, progress: ReviewProgress) => void;
@@ -79,7 +76,6 @@ export async function prepareAgentReviewPlan(
 
   const synthesis = await synthesizeReviewBrief({
     model: input.model,
-    modelRegistry: input.modelRegistry,
     cwd: input.cwd,
     snapshot,
     serializedContext: input.serializedContext,
@@ -192,7 +188,6 @@ async function runAssignment(
     const rawResult = await runReviewer({
       prompt: packet.prompt,
       model: plan.model,
-      modelRegistry: input.modelRegistry,
       cwd: input.cwd,
       signal: input.signal,
       snapshot: plan.snapshot,

@@ -1,4 +1,3 @@
-import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import { listReviewInstructionBlocks } from "../target/packet.ts";
 import { runBriefSynthesis } from "../tool/brief-runner.ts";
 import type {
@@ -15,7 +14,6 @@ export const BRIEF_SYNTHESIS_PROMPT_VERSION = "1";
 
 export interface SynthesizeReviewBriefOptions {
   model: ReviewModelSelection;
-  modelRegistry: ModelRegistry;
   cwd: string;
   snapshot: ReviewSnapshot;
   serializedContext: string;
@@ -28,13 +26,11 @@ export interface SynthesizeReviewBriefOptions {
 export function synthesizeReviewBrief(
   options: SynthesizeReviewBriefOptions,
 ): Promise<BriefSynthesisRunResult> {
-  const { model, modelRegistry, cwd, snapshot, serializedContext, note, signal, onProgress } =
-    options;
+  const { model, cwd, snapshot, serializedContext, note, signal, onProgress } = options;
 
   return runBriefSynthesis({
     prompt: buildBriefSynthesisPrompt(snapshot, serializedContext, note),
     model: model.model,
-    modelRegistry,
     cwd,
     signal,
     onProgress,

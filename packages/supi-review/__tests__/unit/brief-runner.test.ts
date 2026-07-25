@@ -112,7 +112,9 @@ describe("runBriefSynthesis", () => {
     });
 
     await vi.advanceTimersByTimeAsync(5);
-    expect(mockCreateAgentSession.mock.calls[0]?.[0]).toMatchObject({ thinkingLevel: "max" });
+    const callOptions = mockCreateAgentSession.mock.calls[0]?.[0];
+    expect(callOptions).toMatchObject({ thinkingLevel: "max" });
+    expect(callOptions).not.toHaveProperty("modelRegistry");
     const submitTool = capturedCustomTools[0];
     expect(submitTool).toBeDefined();
 

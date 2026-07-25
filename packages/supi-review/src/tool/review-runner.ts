@@ -42,7 +42,6 @@ async function createReviewerSession(
   const { session } = await createAgentSession({
     cwd: invocation.cwd,
     model: invocation.model.model,
-    modelRegistry: invocation.modelRegistry,
     thinkingLevel: clampThinkingLevel(invocation.model.model, "max"),
     tools: [
       "read",

@@ -81,7 +81,6 @@ export function registerAgentReviewTools(
           note,
           serializedContext,
           model,
-          modelRegistry: ctx.modelRegistry,
           signal,
           planStore,
           onProgress: (progress) => {
@@ -136,7 +135,6 @@ export function registerAgentReviewTools(
           critique: input.critique,
           revisedBrief: input.revisedBrief,
           reviewers: input.reviewers,
-          modelRegistry: ctx.modelRegistry,
           signal,
           planStore,
           onBriefEvaluation: (evaluation) => {

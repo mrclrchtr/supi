@@ -149,7 +149,6 @@ describe("agent review workflow", () => {
       note: "Preserve compatibility",
       serializedContext: "[User]\nPlease guard null tokens.",
       model,
-      modelRegistry: {} as never,
       planStore: store,
     });
 
@@ -181,7 +180,6 @@ describe("agent review workflow", () => {
         { id: "standards", focus: "Check repository standards." },
         { id: "spec", focus: "Check the requested behavior." },
       ],
-      modelRegistry: {} as never,
       planStore: store,
     });
 
@@ -229,7 +227,6 @@ describe("agent review workflow", () => {
       critique,
       revisedBrief,
       reviewers: [{ id: "tests", focus: "Review regression coverage." }],
-      modelRegistry: {} as never,
       planStore: store,
     });
 
@@ -258,7 +255,6 @@ describe("agent review workflow", () => {
       critique: { ...acceptedCritique, verdict: "revise", findings: [] },
       revisedBrief: generatedBrief,
       reviewers: [{ id: "spec", focus: "Check behavior." }],
-      modelRegistry: {} as never,
       planStore: store,
     });
 
@@ -280,7 +276,6 @@ describe("agent review workflow", () => {
       critique: evidenceBackedRevisionCritique(),
       revisedBrief: { ...generatedBrief, summary: "   " },
       reviewers: [{ id: "spec", focus: "Check behavior." }],
-      modelRegistry: {} as never,
       planStore: store,
     });
 
@@ -302,7 +297,6 @@ describe("agent review workflow", () => {
       critique: evidenceBackedRevisionCritique(),
       revisedBrief: { ...generatedBrief, focusAreas: ["Authentication", " "] },
       reviewers: [{ id: "spec", focus: "Check behavior." }],
-      modelRegistry: {} as never,
       planStore: store,
     });
 
@@ -323,7 +317,6 @@ describe("agent review workflow", () => {
       planId: plan.id,
       critique: { ...acceptedCritique, verdict: "revise" },
       reviewers: [{ id: "spec", focus: "Check behavior." }],
-      modelRegistry: {} as never,
       planStore: store,
     });
 
@@ -350,7 +343,6 @@ describe("agent review workflow", () => {
       planId: plan.id,
       critique: acceptedCritique,
       reviewers: [{ id: "spec", focus: "Check behavior." }],
-      modelRegistry: {} as never,
       planStore: store,
     });
 
@@ -376,7 +368,6 @@ describe("agent review workflow", () => {
       planId: plan.id,
       critique: acceptedCritique,
       reviewers: [{ id: "spec", focus: "Check behavior." }],
-      modelRegistry: {} as never,
       planStore: store,
       onBriefEvaluation,
     });

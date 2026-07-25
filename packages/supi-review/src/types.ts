@@ -1,5 +1,4 @@
 import type { Model } from "@earendil-works/pi-ai";
-import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 
 /** Inclusive 1-based line range reported by the reviewer. */
 export interface ReviewLineRange {
@@ -326,7 +325,6 @@ export interface BriefSynthesisInvocation {
   prompt: string;
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
   model: Model<any>;
-  modelRegistry?: ModelRegistry;
   cwd: string;
   signal?: AbortSignal;
   timeoutMs?: number;
@@ -336,7 +334,6 @@ export interface BriefSynthesisInvocation {
 export interface ReviewInvocation {
   prompt: string;
   model: ReviewModelSelection;
-  modelRegistry?: ModelRegistry;
   cwd: string;
   signal?: AbortSignal;
   snapshot: ReviewSnapshot;
