@@ -77,6 +77,8 @@ export function summarizeSessionEvent(event: AgentSessionEvent): string | undefi
       return "turn:end";
     case "agent_end":
       return `agent:end${event.willRetry ? ":retry" : ""}`;
+    case "agent_settled":
+      return "agent:settled";
     case "auto_retry_start":
       return `retry:start:${event.attempt}/${event.maxAttempts}`;
     case "auto_retry_end":

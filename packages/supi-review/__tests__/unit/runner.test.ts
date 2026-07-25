@@ -189,7 +189,7 @@ describe("runReviewer", () => {
     });
 
     await vi.advanceTimersByTimeAsync(1);
-    listener?.({ type: "agent_end", messages: [] });
+    listener?.({ type: "agent_settled" });
     await vi.advanceTimersByTimeAsync(5);
     await resultPromise;
 
@@ -215,7 +215,7 @@ describe("runReviewer", () => {
 
   it("returns success when submit_review is called with structured review items", async () => {
     mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
-      setTimeout(() => listener({ type: "agent_end", messages: [] }), 10);
+      setTimeout(() => listener({ type: "agent_settled" }), 10);
       return vi.fn();
     });
 
@@ -262,6 +262,49 @@ describe("runReviewer", () => {
     }
   });
 
+  it("survives overflow compaction between agent_end and agent_settled", async () => {
+    let listener: ((event: unknown) => void) | undefined;
+    mockSession.subscribe.mockImplementation((fn: (event: unknown) => void) => {
+      listener = fn;
+      return vi.fn();
+    });
+
+    const resultPromise = runReviewer({
+      prompt: "review this",
+      model,
+      cwd: "/tmp",
+      snapshot,
+      brief,
+    });
+
+    await vi.advanceTimersByTimeAsync(1);
+    const overflowMessage = {
+      role: "assistant",
+      content: [],
+      stopReason: "error",
+      errorMessage:
+        "Codex error: Your input exceeds the context window of this model. Please adjust your input and try again.",
+    };
+    mockSession.messages = [overflowMessage];
+    listener?.({ type: "message_end", message: overflowMessage });
+    listener?.({ type: "agent_end", messages: [overflowMessage] });
+    expect(mockSession.dispose).not.toHaveBeenCalled();
+    listener?.({ type: "compaction_start", reason: "overflow" });
+    listener?.({ type: "compaction_end", reason: "overflow", willRetry: true });
+
+    const submitTool = capturedCustomTools[0];
+    expect(submitTool).toBeDefined();
+    await submitTool.execute("toolcall-after-compaction", {
+      items: [],
+      overall_explanation: "No issues found after compaction.",
+      overall_confidence_score: 0.85,
+    });
+    listener?.({ type: "agent_settled" });
+
+    const result = await resultPromise;
+    expect(result.kind).toBe("success");
+  });
+
   it("attaches debug details when the reviewer never submits a result", async () => {
     mockSession.getSessionStats.mockReturnValue({
       tokens: { input: 120, output: 45, total: 165 },
@@ -277,6 +320,7 @@ describe("runReviewer", () => {
           },
         });
         listener({ type: "agent_end", messages: [] });
+        listener({ type: "agent_settled" });
       }, 10);
       return vi.fn();
     });
@@ -306,7 +350,7 @@ describe("runReviewer", () => {
         turns: 0,
         toolUses: 0,
         tokens: { input: 120, output: 45, total: 165 },
-        recentEvents: ["assistant:end:stop", "agent:end"],
+        recentEvents: ["assistant:end:stop", "agent:end", "agent:settled"],
         lastAssistantText: "I forgot to submit the review.",
         lastAssistantStopReason: "stop",
         lastAssistantErrorMessage: undefined,

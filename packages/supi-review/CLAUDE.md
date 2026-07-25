@@ -142,6 +142,7 @@ The brief synthesizer chooses zero or more block IDs from this catalog and the p
 ## Gotchas
 
 - `ctx.sessionManager` in extension contexts is read-only; use `getBranch()` and derive any extra views yourself
+- Managed child runners must finalize on `agent_settled`, not `agent_end`; Pi may still retry, compact and retry, or deliver queued steering after `agent_end`
 - The session-context serializer operates on the resolved `buildSessionContext(...)` output, so `custom_message` entries, compaction summaries, and branch summaries all appear in the transcript exactly as the LLM would see them
 - `buildBriefSynthesisPrompt()` must include a bounded diff excerpt so the synthesizer can see actual code changes, not just filenames/stats
 - `buildReviewPacket()` stays compact: brief, manifest, overview, mandatory review instructions, and on-demand snapshot inspection instructions. Do not reintroduce bulk diff embedding.

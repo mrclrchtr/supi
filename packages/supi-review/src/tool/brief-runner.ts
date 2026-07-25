@@ -1,7 +1,6 @@
 import { clampThinkingLevel } from "@earendil-works/pi-ai";
 import {
   type AgentSession,
-  type AgentSessionEvent,
   createAgentSession,
   DefaultResourceLoader,
   defineTool,
@@ -88,16 +87,15 @@ function emitBriefProgress(
   invocation.onProgress?.(ctx.progress);
 }
 
-function handleAgentEnd(options: {
-  event: Extract<AgentSessionEvent, { type: "agent_end" }>;
+/** Finalize after retries and compaction recovery, never at the earlier `agent_end` boundary. */
+function handleAgentSettled(options: {
   session: AgentSession;
   brief: SynthesizedReviewBrief | undefined;
   state: { settled: boolean; aborting: boolean };
   cleanup: (result: BriefSynthesisRunResult) => BriefSynthesisRunResult;
 }): BriefSynthesisRunResult | undefined {
-  const { event, session, brief, state, cleanup } = options;
-  const retryAwareEvent = event as typeof event & { willRetry?: boolean };
-  if (retryAwareEvent.willRetry || state.settled || state.aborting) {
+  const { session, brief, state, cleanup } = options;
+  if (state.settled || state.aborting) {
     return undefined;
   }
   if (brief) {
@@ -156,9 +154,8 @@ export async function runBriefSynthesis(
           ctx.progress.currentFocus = undefined;
           emitBriefProgress(ctx, invocation);
           break;
-        case "agent_end": {
-          const result = handleAgentEnd({
-            event,
+        case "agent_settled": {
+          const result = handleAgentSettled({
             session,
             brief: resultHolder.value,
             state: ctx.state,

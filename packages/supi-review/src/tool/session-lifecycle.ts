@@ -17,7 +17,7 @@ export interface LifecycleCtx<TResult> {
   /**
    * Shared lifecycle state.
    * - `settled`: true once cleanup has been called
-   * - `aborting`: true once abort/timeout begins (prevents agent_end from resolving)
+   * - `aborting`: true once abort/timeout begins (prevents agent_settled from resolving)
    */
   state: { settled: boolean; aborting: boolean };
   /** The managed agent session. */

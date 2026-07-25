@@ -101,7 +101,7 @@ describe("runBriefSynthesis", () => {
     expect(reviewBriefSchema).toHaveProperty(reviewInstructionBlockIdsKey);
 
     mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
-      setTimeout(() => listener({ type: "agent_end", messages: [] }), 10);
+      setTimeout(() => listener({ type: "agent_settled" }), 10);
       return vi.fn();
     });
 
@@ -140,7 +140,7 @@ describe("runBriefSynthesis", () => {
 
   it("returns failed when the synthesizer never submits a brief", async () => {
     mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
-      setTimeout(() => listener({ type: "agent_end", messages: [] }), 10);
+      setTimeout(() => listener({ type: "agent_settled" }), 10);
       return vi.fn();
     });
     mockSession.messages = [{ role: "assistant", content: "I forgot to submit the brief." }];
@@ -175,7 +175,7 @@ describe("runBriefSynthesis", () => {
     expect(mockCreateAgentSession).not.toHaveBeenCalled();
   });
 
-  it("does not misclassify cancellation when agent_end arrives during abort", async () => {
+  it("does not misclassify cancellation when agent_settled arrives during abort", async () => {
     vi.useRealTimers();
     const controller = new AbortController();
     let listener: ((event: unknown) => void) | undefined;
@@ -197,14 +197,14 @@ describe("runBriefSynthesis", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 1));
     controller.abort();
-    listener?.({ type: "agent_end", messages: [] });
+    listener?.({ type: "agent_settled" });
 
     const result = await resultPromise;
     expect(result.kind).toBe("canceled");
     vi.useFakeTimers();
   });
 
-  it("does not misclassify timeout when agent_end arrives during abort", async () => {
+  it("does not misclassify timeout when agent_settled arrives during abort", async () => {
     vi.useRealTimers();
     let listener: ((event: unknown) => void) | undefined;
 
@@ -224,7 +224,7 @@ describe("runBriefSynthesis", () => {
     });
 
     await new Promise((resolve) => setTimeout(resolve, 12));
-    listener?.({ type: "agent_end", messages: [] });
+    listener?.({ type: "agent_settled" });
 
     const result = await resultPromise;
     expect(result.kind).toBe("timeout");

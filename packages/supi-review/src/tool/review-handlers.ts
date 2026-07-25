@@ -236,13 +236,12 @@ export function handleMessageEnd(
   ctx.session.steer(STEER_SUBMIT_MESSAGE).catch(() => {});
 }
 
-export function handleAgentEnd(
-  event: Extract<AgentSessionEvent, { type: "agent_end" }>,
-  ctx: RunnerContext,
-): void {
+/**
+ * Finalize only after Pi has no retry, compaction recovery, or queued continuation left.
+ * `agent_end` is a low-level boundary and is not terminal for a managed session.
+ */
+export function handleAgentSettled(ctx: RunnerContext): void {
   if (ctx.state.settled || ctx.state.aborting) return;
-  const retryAwareEvent = event as typeof event & { willRetry?: boolean };
-  if (retryAwareEvent.willRetry) return;
 
   if (ctx.resultHolder.value) {
     ctx.resolve(
@@ -293,8 +292,8 @@ export function handleSessionEvent(event: AgentSessionEvent, ctx: RunnerContext)
       handleMessageEnd(event, ctx);
       break;
     }
-    case "agent_end":
-      handleAgentEnd(event, ctx);
+    case "agent_settled":
+      handleAgentSettled(ctx);
       break;
     default:
       break;
