@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.6.1](https://github.com/mrclrchtr/supi/compare/v2.6.0...v2.6.1) (2026-07-25)
+
+
+### Bug Fixes
+
+* **deps:** lock file maintenance ([1d8912f](https://github.com/mrclrchtr/supi/commit/1d8912f0fb0d6f49598216c3a1da429e38a3cb6f))
+* **deps:** upgrade pi to v0.82.0 ([f6998be](https://github.com/mrclrchtr/supi/commit/f6998be6e831120f422fa8f1630b1a05a68672f9))
+
 ## [2.6.0](https://github.com/mrclrchtr/supi/compare/v2.5.0...v2.6.0) (2026-07-25)
 
 

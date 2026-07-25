@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-review",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "description": "SuPi Review extension — session-aware review command and agent tools",
   "license": "MIT",
   "repository": {
