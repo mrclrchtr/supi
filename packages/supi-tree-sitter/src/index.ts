@@ -11,6 +11,8 @@ export {
   isJsTsGrammar,
   isSupportedFile,
 } from "./language.ts";
+export type { StructuralSearchOperation } from "./operation-support.ts";
+export { getStructuralSearchSupportedExtensions } from "./operation-support.ts";
 // Provider implementation
 export { createTreeSitterProvider } from "./provider/tree-sitter-provider.ts";
 export { TreeSitterRuntime } from "./session/runtime.ts";

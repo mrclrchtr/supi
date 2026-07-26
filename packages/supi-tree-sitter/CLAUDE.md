@@ -35,6 +35,7 @@ src/
   types.ts            # shared type definitions
   coordinates.ts      # 1-based UTF-16 coordinate conversion
   language.ts         # file extension → grammar ID detection and WASM path resolution
+  operation-support.ts # extractor-specific extension support for structural search
   syntax-node.ts      # syntax node interface
   session/
     runtime.ts        # grammar initialization, parser reuse, parse/query services
@@ -61,6 +62,7 @@ src/
 - `src/session/service-registry.ts` — shared session-scoped structural service registry
 - `src/session/session.ts` — runtime-backed service helpers and owned session factory
 - `src/provider/tree-sitter-provider.ts` — StructuralProvider impl consumed by supi-code-intelligence
+- `src/operation-support.ts` — operation-specific language support derived from extractor predicates/query registration
 - `src/tool/call-sites.ts` — call-site extraction (consumed by code_find AST call mode)
 - `scripts/generate-kotlin-wasm.mjs` — builds Kotlin WASM from source
 - `scripts/generate-sql-wasm.mjs` — builds SQL WASM from source
@@ -85,7 +87,7 @@ pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json
 - `declare module "foo"` parses as a string-named `module` node; keep outline shallow and preserve the module name.
 - CRLF input needs normalized line splitting in coordinate helpers and `node_at` bounds to stay LSP-compatible.
 - Outline should stay shallow: top-level declarations plus supported class/interface/enum members, not local function bodies.
-- `outline`, `imports`, and `exports` are currently JavaScript/TypeScript-only; `node_at` and `call-sites` work across all supported grammars. The runtime also exposes a `query()` method on `TreeSitterSession` that works across all grammars.
+- General parser support is broader than extractor support. `outline`, `imports`, and `exports` are currently JavaScript/TypeScript-only. `call-sites` supports only grammars with a registered, contract-tested query (currently every parser grammar except HTML and SQL). `getStructuralSearchSupportedExtensions()` is the authoritative public declaration used by AST Scan eligibility. The runtime also exposes a `query()` method on `TreeSitterSession` that works across all parser grammars.
 - `pnpm peers check` currently reports missing `tree-sitter` peers for `@derekstride/tree-sitter-sql` and `tree-sitter-kotlin`; these grammar packages are dev-only WASM generators, so treat that warning as known workspace noise unless the vendoring strategy changes.
 
 ## Packaging

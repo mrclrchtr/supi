@@ -61,6 +61,13 @@ export function getSupportedExtensions(): string[] {
   return [...SUPPORTED_EXTENSIONS];
 }
 
+/** Internal registry snapshot used to derive operation-specific language support. */
+export function getSupportedExtensionGrammarEntries(): Array<
+  readonly [SupportedExtension, GrammarId]
+> {
+  return Object.entries(EXTENSION_GRAMMAR) as Array<readonly [SupportedExtension, GrammarId]>;
+}
+
 /** Get the file extension if it's supported, otherwise undefined. */
 export function getSupportedExtension(filePath: string): SupportedExtension | undefined {
   const ext = path.extname(filePath).toLowerCase();

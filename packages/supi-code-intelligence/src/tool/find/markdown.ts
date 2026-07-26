@@ -54,6 +54,16 @@ function renderScanLimitations(limitations: readonly StructuredScanLimitation[])
 }
 
 function appendScanAndFailures(lines: string[], result: StructuredPatternResult): void {
+  const operationExclusion = result.scan.exclusions.find(
+    (exclusion) => exclusion.reason === "unsupported-operation",
+  );
+  if (operationExclusion) {
+    const count = operationExclusion.pathCount;
+    lines.push(
+      "",
+      `_AST Scan policy excluded ${count} file${count === 1 ? "" : "s"} because ${result.scan.policy.operation} analysis is not supported for their language._`,
+    );
+  }
   const scanWarning = renderScanLimitations(result.scan.limitations);
   if (scanWarning) lines.push("", scanWarning);
   const failureLines = renderFailureSummary(result.failures);

@@ -30,9 +30,14 @@ const CALL_SITE_QUERIES: Partial<Record<GrammarId, string>> = {
   kotlin:
     "(call_expression . (simple_identifier) @call) (call_expression . (navigation_expression . (simple_identifier) @call))",
   ruby: "(call method: (identifier) @call)",
-  bash: "(command name: (word) @call)",
+  bash: "(command name: (command_name) @call)",
   r: "(call function: (identifier) @call)",
 };
+
+/** Return whether the call-site extractor has a query for one grammar. */
+export function supportsCallSitesGrammar(grammarId: GrammarId): boolean {
+  return CALL_SITE_QUERIES[grammarId] !== undefined;
+}
 
 /**
  * Extract all call-site callee expressions from a file.

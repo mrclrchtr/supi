@@ -161,11 +161,11 @@ AST `kind` accepts exactly `definition`, `import`, `export`, `call`, `type`, `in
 
 #### AST Scan universe
 
-With omitted `scope`, AST mode scans from the workspace cwd. Eligible files are regular files with a Tree-sitter-supported extension. Below each scan root it excludes hidden entries and `.git`, `.pnpm`, `node_modules`, `dist`, `build`, `out`, `.next`, `.nuxt`, `coverage`, `.turbo`, `.cache`, and `__pycache__`. Descendant symlinks are not followed. `.gitignore`, `.ignore`, `.rgignore`, and global Git configuration are not consulted, so visible Git-ignored source remains eligible.
+With omitted `scope`, AST mode scans from the workspace cwd. Eligibility is operation-aware: `definition`, `type`, `interface`, `class`, `method`, and `enum` use outline support; `import` and `export` use their matching extractors; `call` uses call-site support. A grammar being parseable does not imply that every operation supports it. Below each scan root the policy excludes operation-ineligible files, hidden entries, and `.git`, `.pnpm`, `node_modules`, `dist`, `build`, `out`, `.next`, `.nuxt`, `coverage`, `.turbo`, `.cache`, and `__pycache__`. Descendant symlinks are not followed. `.gitignore`, `.ignore`, `.rgignore`, and global Git configuration are not consulted, so visible Git-ignored source remains eligible when the selected operation supports it.
 
-Every explicit scope root is honored before descendant exclusions resume. A supported source file explicitly selected under `node_modules`, for example, is analyzed. Duplicate, nested, and overlapping scopes are canonically deduplicated.
+Every explicit scope root is honored before descendant exclusions resume. An operation-eligible source file explicitly selected under `node_modules`, for example, is analyzed. An exact file whose grammar does not support the selected operation is invalid rather than redirected; a directory containing only operation-ineligible source is unavailable. Mixed scopes remain complete over their declared operation-specific universe and disclose operation exclusions. Duplicate, nested, and overlapping scopes are canonically deduplicated.
 
-AST Scan details disclose roots, policy exclusions, eligible/analyzed file counts, and runtime limitations. Complete scans retain exact match totals. Unreadable paths, provider failures, the 5,000-file safety cap, or the 10-second deadline produce partial evidence with an unknown match total; skipped file counts are not reported as omitted matches.
+AST Scan details disclose the structural operation, supported extensions, roots, policy exclusions, eligible/analyzed file counts, and runtime limitations. Complete scans retain exact match totals. Unreadable paths, provider failures, the 5,000-file safety cap, or the 10-second deadline produce partial evidence with an unknown match total; skipped file counts are not reported as omitted matches.
 
 ### Check health
 

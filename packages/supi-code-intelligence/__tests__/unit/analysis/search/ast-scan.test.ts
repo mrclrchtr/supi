@@ -34,6 +34,7 @@ describe("enumerateAstFiles", () => {
     const gitIgnoredSource = write("src/generated.ts");
     writeFileSync(path.join(tmpDir, ".gitignore"), "src/generated.ts\n");
     write("src/readme.md", "target\n");
+    write("src/python.py", "target()\n");
     write(".hidden.ts");
     write("node_modules/pkg/index.js");
     write("dist/generated.ts");
@@ -41,6 +42,7 @@ describe("enumerateAstFiles", () => {
     const result = await enumerateAstFiles({
       cwd: tmpDir,
       roots: [tmpDir],
+      operation: "outline",
       deadline: Number.POSITIVE_INFINITY,
       maxFiles: 5_000,
     });
@@ -57,6 +59,7 @@ describe("enumerateAstFiles", () => {
         expect.objectContaining({ reason: "hidden-entry" }),
         expect.objectContaining({ reason: "excluded-directory" }),
         expect.objectContaining({ reason: "unsupported-extension" }),
+        expect.objectContaining({ reason: "unsupported-operation" }),
       ]),
     );
   });
@@ -70,6 +73,7 @@ describe("enumerateAstFiles", () => {
     const result = await enumerateAstFiles({
       cwd: tmpDir,
       roots: [path.join(tmpDir, "src"), tmpDir, hidden, path.join(tmpDir, "node_modules")],
+      operation: "outline",
       deadline: Number.POSITIVE_INFINITY,
       maxFiles: 5_000,
       operations: {
@@ -100,6 +104,7 @@ describe("enumerateAstFiles", () => {
       enumerateAstFiles({
         cwd: tmpDir,
         roots: [markdown],
+        operation: "outline",
         deadline: Number.POSITIVE_INFINITY,
         maxFiles: 5_000,
       }),
@@ -107,6 +112,44 @@ describe("enumerateAstFiles", () => {
       kind: "invalid-root",
       path: "README.md",
       reason: "Explicit AST file scope has no supported Tree-sitter grammar.",
+    });
+  });
+
+  it("rejects an exact file whose grammar does not support the requested operation", async () => {
+    const python = write("src/source.py", "target()\n");
+
+    await expect(
+      enumerateAstFiles({
+        cwd: tmpDir,
+        roots: [python],
+        operation: "outline",
+        deadline: Number.POSITIVE_INFINITY,
+        maxFiles: 5_000,
+      }),
+    ).resolves.toEqual({
+      kind: "invalid-root",
+      path: "src/source.py",
+      reason: "Explicit AST file scope does not support the outline operation.",
+    });
+  });
+
+  it("uses operation-specific eligibility instead of general parser support", async () => {
+    const python = write("src/source.py", "target()\n");
+
+    const result = await enumerateAstFiles({
+      cwd: tmpDir,
+      roots: [tmpDir],
+      operation: "call-sites",
+      deadline: Number.POSITIVE_INFINITY,
+      maxFiles: 5_000,
+    });
+
+    expect(result).toMatchObject({
+      kind: "completed",
+      files: [realpathSync(python)],
+      eligibleFileCount: 1,
+      complete: true,
+      policy: { operation: "call-sites", supportedExtensions: expect.arrayContaining([".py"]) },
     });
   });
 
@@ -118,6 +161,7 @@ describe("enumerateAstFiles", () => {
     const result = await enumerateAstFiles({
       cwd: tmpDir,
       roots: [tmpDir],
+      operation: "outline",
       deadline: Number.POSITIVE_INFINITY,
       maxFiles: 5_000,
       operations: {
@@ -150,6 +194,7 @@ describe("enumerateAstFiles", () => {
     const result = await enumerateAstFiles({
       cwd: tmpDir,
       roots: [tmpDir],
+      operation: "outline",
       deadline: Number.POSITIVE_INFINITY,
       maxFiles: 1,
     });
@@ -174,6 +219,7 @@ describe("enumerateAstFiles", () => {
       enumerateAstFiles({
         cwd: tmpDir,
         roots: [tmpDir],
+        operation: "outline",
         deadline: Number.POSITIVE_INFINITY,
         maxFiles: 5_000,
         signal: preAbort.signal,
@@ -186,6 +232,7 @@ describe("enumerateAstFiles", () => {
       enumerateAstFiles({
         cwd: tmpDir,
         roots: [tmpDir],
+        operation: "outline",
         deadline: Number.POSITIVE_INFINITY,
         maxFiles: 5_000,
         signal: midAbort.signal,
@@ -209,6 +256,7 @@ describe("enumerateAstFiles", () => {
     const result = await enumerateAstFiles({
       cwd: tmpDir,
       roots: [tmpDir],
+      operation: "outline",
       deadline: 2,
       maxFiles: 5_000,
       now: () => tick++,

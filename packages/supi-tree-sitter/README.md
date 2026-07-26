@@ -29,6 +29,7 @@ This package provides the parser-backed structural substrate consumed by `@mrclr
 - an owned parsing session API for direct library consumers
 - a `StructuralProvider` adapter published through `./provider/tree-sitter-provider`
 - structural extraction helpers for outline/import/export/node/callee/call-site analysis inside the library surface
+- operation-specific extension discovery through `getStructuralSearchSupportedExtensions()`
 
 It does **not** register pi tools or commands on its own.
 
@@ -48,6 +49,8 @@ Coordinates in the library APIs use **1-based** line and character columns. Char
 - HTML (`.html`, `.htm`, `.xhtml`)
 - R (`.r`)
 - SQL (`.sql`)
+
+Parser support is broader than extractor support. Outline, import, and export collection currently support JavaScript/TypeScript-family grammars. Call-site collection supports every listed family except HTML and SQL. Consumers performing a bulk structural scan should use `getStructuralSearchSupportedExtensions(operation)` rather than treating every parseable extension as eligible.
 
 ## Architecture
 
@@ -101,6 +104,7 @@ if (state.kind === "ready") {
 - `src/index.ts` — re-export surface
 - `src/session/runtime.ts` — parser and query runtime
 - `src/session/session.ts` — runtime-backed service helpers and owned session API
+- `src/operation-support.ts` — authoritative operation-specific extension support
 - `src/session/service-registry.ts` — shared session-scoped structural service registry
 - `src/provider/tree-sitter-provider.ts` — `StructuralProvider` adapter consumed by `@mrclrchtr/supi-code-intelligence`
 - `src/tool/outline.ts`, `src/tool/imports.ts`, `src/tool/exports.ts`, `src/tool/node-at.ts`, `src/tool/callees.ts`, `src/tool/call-sites.ts` — structural analyses exposed through the library surface

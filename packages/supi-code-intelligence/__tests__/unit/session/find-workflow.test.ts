@@ -46,6 +46,7 @@ describe("runFindWorkflow", () => {
   it("collects every AST match before result assembly applies maxResults", async () => {
     writeFileSync(path.join(tmpDir, "alpha.ts"), "export const alpha = 1;\n");
     writeFileSync(path.join(tmpDir, "beta.ts"), "export const beta = 1;\n");
+    writeFileSync(path.join(tmpDir, "gamma.py"), "alpha()\n");
 
     const outcome = await runFindWorkflow(
       { query: "a", mode: "ast", kind: "definition", maxResults: 1 },
@@ -59,6 +60,7 @@ describe("runFindWorkflow", () => {
       eligibleFileCount: 2,
       analyzedFileCount: 2,
       complete: true,
+      exclusions: [{ reason: "unsupported-operation", pathCount: 1, examples: ["gamma.py"] }],
     });
 
     const assembly = assembleFindWorkflowResult(outcome);
@@ -72,6 +74,7 @@ describe("runFindWorkflow", () => {
     expect(assembly.details.omittedCount).toBe(1);
     const rendered = renderFindResult(assembly);
     expect(rendered).toContain("_(showing 1 of 2; 1 omitted)_");
+    expect(rendered).toContain("AST Scan policy excluded 1 file");
     expect(rendered).not.toContain("Duplicate Definitions");
     expect(rendered).not.toContain("beta.ts");
   });
@@ -94,9 +97,10 @@ describe("runFindWorkflow", () => {
           failures: [],
           partialReason: "safety-limit",
           scan: {
-            universe: "tree-sitter-supported-files",
+            universe: "structural-operation-supported-files",
             roots: ["."],
             policy: {
+              operation: "outline",
               supportedExtensions: [".ts"],
               excludedDirectories: ["node_modules"],
               hiddenEntries: "excluded",

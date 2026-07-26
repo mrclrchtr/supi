@@ -171,8 +171,8 @@ A `code_find` scope value containing more than one workspace-relative search roo
 _Avoid_: treating a space-separated search pattern as scope, silently ignoring missing members, widening to the whole workspace when one member is invalid
 
 **AST Scan universe**:
-The declared set of source files eligible for one structural `code_find` request. Policy exclusions define the universe; runtime limitations make its observation incomplete. Match completeness and file-scan completeness are distinct, and omitted files are not omitted Evidence atoms.
-_Avoid_: implicit ignore universe, treating excluded files as searched, counting unprocessed files as omitted matches
+The declared set of source files eligible for one structural `code_find` request. Eligibility depends on the selected AST kind's structural operation, not parser availability alone. Policy exclusions—including languages unsupported by that operation—define the universe; runtime limitations make its observation incomplete. Match completeness and file-scan completeness are distinct, and omitted files are not omitted Evidence atoms.
+_Avoid_: implicit ignore universe, equating parseable with operation-supported, treating excluded files as searched, counting unprocessed files as omitted matches
 
 **Name anchor**:
 The source position of a symbol's identifier token — the offset position-strict substrates (tree-sitter `calleesAt`, hover-at, rename) must resolve against. Best-effort on `CodeSymbol`: present when the provider can derive it (LSP `DocumentSymbol.selectionRange`, or a tree-sitter identifier-snap fallback), absent when neither is available. Distinct from `Declaration anchor`.

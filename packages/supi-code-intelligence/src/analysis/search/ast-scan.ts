@@ -1,6 +1,10 @@
 import { type Dirent, promises as fs, type Stats } from "node:fs";
 import * as path from "node:path";
-import { getSupportedExtensions } from "@mrclrchtr/supi-tree-sitter/api";
+import {
+  getStructuralSearchSupportedExtensions,
+  getSupportedExtensions,
+  type StructuralSearchOperation,
+} from "@mrclrchtr/supi-tree-sitter/api";
 import { type DeadlineOutcome, settleByDeadline } from "./deadline.ts";
 import { relativeDisplayPath } from "./paths.ts";
 
@@ -31,6 +35,7 @@ export type AstScanExclusionReason =
   | "hidden-entry"
   | "excluded-directory"
   | "unsupported-extension"
+  | "unsupported-operation"
   | "symlink"
   | "non-regular";
 
@@ -52,6 +57,7 @@ export interface AstScanLimitation {
 
 /** Declared deterministic policy for one AST Scan. */
 export interface AstScanPolicy {
+  readonly operation: StructuralSearchOperation;
   readonly supportedExtensions: readonly string[];
   readonly excludedDirectories: readonly string[];
   readonly hiddenEntries: "excluded";
@@ -71,6 +77,7 @@ export interface AstScanOperations {
 export interface EnumerateAstFilesOptions {
   readonly cwd: string;
   readonly roots: readonly string[];
+  readonly operation: StructuralSearchOperation;
   readonly deadline: number;
   readonly maxFiles: number;
   readonly timeoutMs?: number;
@@ -93,10 +100,17 @@ export type AstFileEnumeration =
     }
   | { readonly kind: "invalid-root"; readonly path: string; readonly reason: string };
 
-/** Materialize the policy disclosed in structured AST Scan details. */
-export function astScanPolicy(maxFiles: number, timeoutMs: number): AstScanPolicy {
+/** Materialize the operation-aware policy disclosed in structured AST Scan details. */
+export function astScanPolicy(
+  operation: StructuralSearchOperation,
+  maxFiles: number,
+  timeoutMs: number,
+): AstScanPolicy {
   return {
-    supportedExtensions: [...getSupportedExtensions()].sort((a, b) => a.localeCompare(b)),
+    operation,
+    supportedExtensions: getStructuralSearchSupportedExtensions(operation).sort((a, b) =>
+      a.localeCompare(b),
+    ),
     excludedDirectories: [...AST_SCAN_EXCLUDED_DIRECTORIES],
     hiddenEntries: "excluded",
     ignoreFiles: false,
@@ -134,7 +148,8 @@ export async function enumerateAstFiles(
 class AstFileEnumerator {
   readonly #operations: AstScanOperations;
   readonly #now: () => number;
-  readonly #supportedExtensions = new Set(getSupportedExtensions());
+  readonly #grammarExtensions = new Set(getSupportedExtensions());
+  readonly #operationExtensions: ReadonlySet<string>;
   readonly #files = new Set<string>();
   readonly #visitedDirectories = new Set<string>();
   readonly #exclusions = new Map<
@@ -152,6 +167,7 @@ class AstFileEnumerator {
   constructor(readonly options: EnumerateAstFilesOptions) {
     this.#operations = options.operations ?? DEFAULT_OPERATIONS;
     this.#now = options.now ?? Date.now;
+    this.#operationExtensions = new Set(getStructuralSearchSupportedExtensions(options.operation));
     this.#displayBase = path.resolve(options.cwd);
   }
 
@@ -210,14 +226,18 @@ class AstFileEnumerator {
   #processFileRoot(
     canonicalRoot: string,
   ): Extract<AstFileEnumeration, { kind: "invalid-root" }> | null {
-    if (this.#isSupported(canonicalRoot)) {
+    const exclusion = this.#fileExclusion(canonicalRoot);
+    if (exclusion === null) {
       this.#addFile(canonicalRoot);
       return null;
     }
     return {
       kind: "invalid-root",
       path: this.#display(canonicalRoot),
-      reason: "Explicit AST file scope has no supported Tree-sitter grammar.",
+      reason:
+        exclusion === "unsupported-extension"
+          ? "Explicit AST file scope has no supported Tree-sitter grammar."
+          : `Explicit AST file scope does not support the ${this.options.operation} operation.`,
     };
   }
 
@@ -266,7 +286,7 @@ class AstFileEnumerator {
       return EXCLUDED_DIRECTORY_SET.has(entry.name) ? "excluded-directory" : null;
     }
     if (!entry.isFile()) return "non-regular";
-    return this.#isSupported(entry.name) ? null : "unsupported-extension";
+    return this.#fileExclusion(entry.name);
   }
 
   #checkControl(): boolean {
@@ -294,8 +314,12 @@ class AstFileEnumerator {
     this.#interrupted = true;
   }
 
-  #isSupported(filePath: string): boolean {
-    return this.#supportedExtensions.has(path.extname(filePath).toLowerCase());
+  #fileExclusion(
+    filePath: string,
+  ): Extract<AstScanExclusionReason, "unsupported-extension" | "unsupported-operation"> | null {
+    const extension = path.extname(filePath).toLowerCase();
+    if (!this.#grammarExtensions.has(extension)) return "unsupported-extension";
+    return this.#operationExtensions.has(extension) ? null : "unsupported-operation";
   }
 
   #addFile(filePath: string): void {
@@ -337,6 +361,7 @@ class AstFileEnumerator {
       eligibleFileCount: this.#interrupted ? null : ordered.length,
       complete: !this.#interrupted,
       policy: astScanPolicy(
+        this.options.operation,
         this.options.maxFiles,
         this.options.timeoutMs ?? DEFAULT_AST_SCAN_TIMEOUT_MS,
       ),

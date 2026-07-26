@@ -12,6 +12,8 @@ export {
   isJsTsGrammar,
   isSupportedFile,
 } from "./language.ts";
+export type { StructuralSearchOperation } from "./operation-support.ts";
+export { getStructuralSearchSupportedExtensions } from "./operation-support.ts";
 export { TreeSitterRuntime } from "./session/runtime.ts";
 export type {
   TsControllerState,

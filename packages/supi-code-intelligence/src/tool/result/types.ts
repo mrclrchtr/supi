@@ -70,7 +70,7 @@ export interface SearchDetails {
   omittedCount: number;
   evidenceLists?: EvidenceListMetadata[];
   nextQueries: string[];
-  /** Present for AST mode; declares the source-file universe and completeness. */
+  /** Present for AST mode; declares the operation-specific source-file universe and completeness. */
   scan?: StructuredScanSummary;
 }
 

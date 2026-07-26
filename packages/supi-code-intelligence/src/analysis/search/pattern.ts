@@ -1,7 +1,9 @@
 import type {
+  CodeResult,
   OutlineData,
   StructuralProvider as StructuralSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
+import type { StructuralSearchOperation } from "@mrclrchtr/supi-tree-sitter/api";
 import type { CodeFindAstKind } from "../../tool/find/ast-kinds.ts";
 import type { EvidencePartialReason } from "../evidence.ts";
 import {
@@ -29,8 +31,11 @@ export interface StructuredMatch {
   readonly line: number;
 }
 
+export type StructuredFailureKind = Exclude<CodeResult<never>, { kind: "success" }>["kind"];
+
 export interface StructuredFailure {
   readonly file: string;
+  readonly kind: StructuredFailureKind;
   readonly reason: string;
 }
 
@@ -44,7 +49,7 @@ export interface ProviderScanLimitation {
 
 /** Structured completeness state for the AST source-file scan. */
 export interface StructuredScanSummary {
-  readonly universe: "tree-sitter-supported-files";
+  readonly universe: "structural-operation-supported-files";
   readonly roots: readonly string[];
   readonly policy: AstScanPolicy;
   readonly eligibleFileCount: number | null;
@@ -98,11 +103,13 @@ export async function getStructuredPatternMatches(
   const timeoutMs = options.control?.timeoutMs ?? DEFAULT_AST_SCAN_TIMEOUT_MS;
   const deadline = now() + timeoutMs;
   const roots = Array.isArray(options.roots) ? [...options.roots] : [options.roots];
+  const operation = structuralOperationForKind(options.params.kind);
   options.control?.signal?.throwIfAborted();
 
   const enumeration = await enumerateAstFiles({
     cwd: options.cwd,
     roots,
+    operation,
     deadline,
     maxFiles,
     timeoutMs,
@@ -125,6 +132,16 @@ export async function getStructuredPatternMatches(
       reason: "No AST source file could be enumerated because the requested scope was unreadable.",
     };
   }
+  if (
+    enumeration.files.length === 0 &&
+    enumeration.complete &&
+    enumeration.exclusions.some((exclusion) => exclusion.reason === "unsupported-operation")
+  ) {
+    return {
+      kind: "unavailable",
+      reason: `No file in the requested scope supports AST ${options.params.kind} search.`,
+    };
+  }
 
   const analysis = await analyzeStructuredFiles({
     files: enumeration.files,
@@ -136,6 +153,15 @@ export async function getStructuredPatternMatches(
     signal: options.control?.signal,
     initialLimitations: enumeration.limitations,
   });
+  const capabilityMismatches = analysis.failures.filter(
+    (failure) => failure.kind === "unsupported-language",
+  );
+  if (capabilityMismatches.length > 0) {
+    return {
+      kind: "unavailable",
+      reason: `Structural provider rejected ${capabilityMismatches.length} file${capabilityMismatches.length === 1 ? "" : "s"} declared eligible for ${operation} analysis.`,
+    };
+  }
   const complete = enumeration.complete && analysis.limitations.length === 0;
   return {
     kind: "completed",
@@ -144,7 +170,7 @@ export async function getStructuredPatternMatches(
       failures: analysis.failures,
       partialReason: complete ? null : primaryPartialReason(analysis.limitations),
       scan: {
-        universe: "tree-sitter-supported-files",
+        universe: "structural-operation-supported-files",
         roots: roots.map((root) => relativeDisplayPath(options.cwd, root)),
         policy: enumeration.policy,
         eligibleFileCount: enumeration.eligibleFileCount,
@@ -201,7 +227,11 @@ async function analyzeStructuredFiles(options: AnalyzeStructuredFilesOptions): P
             matcher,
           );
         } catch (error) {
-          fileFailures.push({ file: relativeFile, reason: errorMessage(error) });
+          fileFailures.push({
+            file: relativeFile,
+            kind: "runtime-error",
+            reason: errorMessage(error),
+          });
         }
       },
       { deadline: options.deadline, now: options.now, signal: options.signal },
@@ -262,8 +292,8 @@ async function collectMatchesForFile(
   kind: CodeFindAstKind,
   matcher: (value: string) => boolean,
 ): Promise<void> {
-  const recordFailure = (reason: string) => {
-    failures.push({ file: relFile, reason });
+  const recordFailure = (kind: StructuredFailureKind, reason: string) => {
+    failures.push({ file: relFile, kind, reason });
   };
 
   if (kind === "definition") {
@@ -330,15 +360,31 @@ function flattenOutlineItems(items: readonly OutlineData[]): OutlineData[] {
 }
 
 function handleStructuralResult<T>(
-  result: { kind: string; message?: string },
-  recordFailure: (reason: string) => void,
+  result: CodeResult<T>,
+  recordFailure: (kind: StructuredFailureKind, reason: string) => void,
 ): result is { kind: "success"; data: T } {
   if (result.kind === "success") return true;
-  recordFailure(result.message ?? result.kind);
+  recordFailure(result.kind, result.message);
   return false;
 }
 
 const TYPE_LIKE_KINDS = new Set(["class", "interface", "type", "enum"]);
+
+const AST_KIND_OPERATIONS = {
+  definition: "outline",
+  import: "imports",
+  export: "exports",
+  call: "call-sites",
+  type: "outline",
+  interface: "outline",
+  class: "outline",
+  method: "outline",
+  enum: "outline",
+} as const satisfies Record<CodeFindAstKind, StructuralSearchOperation>;
+
+function structuralOperationForKind(kind: CodeFindAstKind): StructuralSearchOperation {
+  return AST_KIND_OPERATIONS[kind];
+}
 
 function createStructuredMatcher(pattern: string): (value: string) => boolean {
   const ignoreCase = !/[A-Z]/.test(pattern);

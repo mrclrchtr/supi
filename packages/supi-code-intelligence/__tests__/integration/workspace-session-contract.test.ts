@@ -74,16 +74,15 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
   it.each(PYTHON_AST_EXPECTATIONS)(
     "records the Python $kind support expectation",
     async ({ kind, supported }) => {
-      const result = astResult(
-        await getWorkspace().session.find({
-          query: "pythonHelper",
-          mode: "ast",
-          kind,
-          scope: [CONTRACT_FIXTURE.python],
-        }),
-      );
+      const outcome = await getWorkspace().session.find({
+        query: "pythonHelper",
+        mode: "ast",
+        kind,
+        scope: [CONTRACT_FIXTURE.python],
+      });
 
       if (supported) {
+        const result = astResult(outcome);
         expect(result.matches).toContainEqual({
           file: CONTRACT_FIXTURE.python,
           name: "pythonHelper",
@@ -94,12 +93,9 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
         return;
       }
 
-      expect(result.matches).toEqual([]);
-      expect(result.partialReason).toBe("provider-limited");
-      expect(result.scan).toMatchObject({
-        complete: false,
-        analyzedFileCount: 0,
-        limitations: [{ reason: "provider-failure", pathCount: 1 }],
+      expect(outcome).toMatchObject({
+        kind: "invalid-input",
+        message: expect.stringContaining("does not support the"),
       });
     },
   );
@@ -144,7 +140,7 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
     ]);
   }, 15_000);
 
-  it("distinguishes completed-empty, partial, unsupported, and unavailable AST outcomes", async () => {
+  it("distinguishes completed-empty, operation-ineligible, unsupported, and unavailable AST outcomes", async () => {
     const session = getWorkspace().session;
     const empty = astResult(
       await session.find({
@@ -158,17 +154,40 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
     expect(empty.partialReason).toBeNull();
     expect(empty.scan.complete).toBe(true);
 
-    const partial = astResult(
-      await session.find({
+    const mixedWorkspace = astResult(
+      await session.find({ query: "AbsentContractClass", mode: "ast", kind: "definition" }),
+    );
+    expect(mixedWorkspace.partialReason).toBeNull();
+    expect(mixedWorkspace.scan).toMatchObject({
+      complete: true,
+      exclusions: expect.arrayContaining([
+        expect.objectContaining({ reason: "unsupported-operation", pathCount: 1 }),
+      ]),
+      limitations: [],
+    });
+
+    const operationIneligible = await session.find({
+      query: "pythonHelper",
+      mode: "ast",
+      kind: "definition",
+      scope: [CONTRACT_FIXTURE.python],
+    });
+    expect(operationIneligible).toMatchObject({
+      kind: "invalid-input",
+      message: expect.stringContaining("does not support the outline operation"),
+    });
+
+    await expect(
+      session.find({
         query: "pythonHelper",
         mode: "ast",
         kind: "definition",
-        scope: [CONTRACT_FIXTURE.python],
+        scope: [CONTRACT_FIXTURE.pythonRoot],
       }),
-    );
-    expect(partial.matches).toEqual([]);
-    expect(partial.partialReason).toBe("provider-limited");
-    expect(partial.scan.complete).toBe(false);
+    ).resolves.toEqual({
+      kind: "unavailable",
+      reason: "No file in the requested scope supports AST definition search.",
+    });
 
     const unsupported = await session.find({
       query: "fixture",

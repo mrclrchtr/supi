@@ -1,6 +1,7 @@
 // Session factory — creates runtime-backed Tree-sitter services and owned sessions.
 
-import { detectGrammar, isJsTsGrammar } from "../language.ts";
+import { detectGrammar } from "../language.ts";
+import { supportsGrammarOperation } from "../operation-support.ts";
 import {
   extractCallSites,
   extractExports,
@@ -45,15 +46,16 @@ export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterS
     },
 
     async outline(file: string): Promise<TreeSitterResult<OutlineItem[]>> {
-      const parseResult = await runtime.parseFile(file);
-      if (parseResult.kind !== "success") return parseResult;
-      if (!isJsTsGrammar(parseResult.data.grammarId)) {
+      const grammarId = detectGrammar(file);
+      if (grammarId && !supportsGrammarOperation(grammarId, "outline")) {
         return {
           kind: "unsupported-language",
           file,
-          message: `outline is not supported for ${parseResult.data.grammarId} files`,
+          message: `outline is not supported for ${grammarId} files`,
         };
       }
+      const parseResult = await runtime.parseFile(file);
+      if (parseResult.kind !== "success") return parseResult;
       const { tree, source } = parseResult.data;
       try {
         const items = extractOutline(tree.rootNode, source);
@@ -65,7 +67,7 @@ export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterS
 
     async imports(file: string): Promise<TreeSitterResult<ImportRecord[]>> {
       const grammarId = detectGrammar(file);
-      if (grammarId && !isJsTsGrammar(grammarId)) {
+      if (grammarId && !supportsGrammarOperation(grammarId, "imports")) {
         return {
           kind: "unsupported-language",
           file,
@@ -77,7 +79,7 @@ export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterS
 
     async exports(file: string): Promise<TreeSitterResult<ExportRecord[]>> {
       const grammarId = detectGrammar(file);
-      if (grammarId && !isJsTsGrammar(grammarId)) {
+      if (grammarId && !supportsGrammarOperation(grammarId, "exports")) {
         return {
           kind: "unsupported-language",
           file,

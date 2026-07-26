@@ -45,5 +45,6 @@ describe("supi-tree-sitter API surface", () => {
     expect(typeof api.lookupCalleesAt).toBe("function");
     expect(typeof api.collectOutline).toBe("function");
     expect(typeof api.detectGrammar).toBe("function");
+    expect(typeof api.getStructuralSearchSupportedExtensions).toBe("function");
   });
 });

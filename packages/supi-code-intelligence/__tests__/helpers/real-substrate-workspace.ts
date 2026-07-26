@@ -15,7 +15,8 @@ const TSSERVER_PATH = resolve(
 export const CONTRACT_FIXTURE = {
   contracts: "src/contracts.ts",
   consumer: "src/consumer.ts",
-  python: "src/contracts.py",
+  pythonRoot: "python",
+  python: "python/contracts.py",
   unsupported: "README.md",
 } as const;
 
@@ -88,6 +89,7 @@ async function cleanupWorkspace(options: {
 function writeContractFixture(cwd: string): void {
   mkdirSync(join(cwd, ".pi", "supi"), { recursive: true });
   mkdirSync(join(cwd, "src"), { recursive: true });
+  mkdirSync(join(cwd, CONTRACT_FIXTURE.pythonRoot), { recursive: true });
   writeFileSync(join(cwd, ".pi", "supi", "config.json"), configuredLspJson());
   writeFileSync(join(cwd, "tsconfig.json"), tsconfigJson());
   writeFileSync(join(cwd, CONTRACT_FIXTURE.contracts), contractsSource());
