@@ -38,7 +38,7 @@ See `pnpm run` for routine build/lint/test. Toolchain versions pinned in `.mise.
 - When both standard and `*:ai` scripts exist, prefer the `*:ai` variant for agent runs — they produce lower-noise, more token-efficient output.
 - Current root examples: `biome:ai`, `typecheck:ai`, `test:ai`, `check:ai`, `verify:ai`.
 - Use the non-`:ai` variant when you specifically want prettier or interactive local output.
-- **After changes, run `pnpm verify:ai`** — typecheck, lint, tests in one pass. Prefer over individual checks.
+- Run `pnpm verify:ai` (typecheck, lint, tests) for code, test, dependency, or package/config changes; skip it for specs, docs, and skill-only changes unless requested.
 
 ## Architecture
 

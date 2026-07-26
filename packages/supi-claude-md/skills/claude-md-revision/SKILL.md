@@ -1,6 +1,6 @@
 ---
 name: claude-md-revision
-description: "Update CLAUDE.md, .claude.local.md, or AGENTS.md files with project-specific context for future agent sessions. Trigger ONLY when the user explicitly mentions CLAUDE.md, .claude.local.md, AGENTS.md, project memory, or agent context files. Also trigger on direct phrases like 'add this to CLAUDE.md', 'remember this for next time', 'update project memory', or 'document this pattern'. Do NOT trigger for general documentation requests, bug reports, session summaries, or user-facing docs — those are unrelated to agent instruction files."
+description: "Record durable, project-specific learnings from the current session in CLAUDE.md, .claude.local.md, or AGENTS.md—not general documentation, session summaries, or repo-wide audits."
 disable-model-invocation: true
 license: MIT
 ---
