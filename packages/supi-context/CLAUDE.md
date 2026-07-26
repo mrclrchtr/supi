@@ -47,6 +47,7 @@ Rendering uses `@mrclrchtr/supi-core/report` helpers for shared themed report pr
 
 ## Gotchas
 
+- Context category estimates for user messages and tool results must use Pi’s `estimateTokens()`; text-only counting omits image cost and diverges from fallback snapshots.
 - `supi-context` caches `event.systemPromptOptions` from `before_agent_start`; when those options are missing or incomplete, `prompt-inference.ts` backfills context files and skills from the current system prompt.
 - System-prompt breakdown separates native instruction files (`AGENTS.md`, `CLAUDE.md`, etc.) from other context files.
 - Auto-compaction settings are read when analysis runs. Its reserve is effective only while auto-compaction is enabled.
