@@ -89,7 +89,7 @@ Badges: <kbd>Agent</kbd> means PI can use the package directly through tools, in
 
 <kbd>Agent</kbd>
 
-Architecture briefs, caller/callee analysis, impact assessment, pattern search, and tool-supported refactorings. Recommended entry point for the full code-understanding stack.
+Workspace orientation, target resolution and inspection, relationship analysis, code-aware search, live health, and semantic refactoring. Recommended entry point for the full code-understanding stack.
 
 ```bash
 pi install npm:@mrclrchtr/supi-code-intelligence

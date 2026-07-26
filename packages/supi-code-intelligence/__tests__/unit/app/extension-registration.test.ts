@@ -23,7 +23,9 @@ describe("focused code intelligence tool registration", () => {
       .map((tool) => tool.name)
       .filter((name) => name.startsWith("code_"));
 
-    expect(codeTools.sort()).toEqual([...CODE_INTELLIGENCE_TOOL_NAMES].sort());
+    expect(codeTools.sort((left, right) => left.localeCompare(right))).toEqual(
+      [...CODE_INTELLIGENCE_TOOL_NAMES].sort((left, right) => left.localeCompare(right)),
+    );
     expect(codeTools).not.toContain("code_impact");
     expect(codeTools).not.toContain("code_relations");
   });

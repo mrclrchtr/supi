@@ -120,7 +120,7 @@ Extensions register config-backed settings via `registerDeclarativeSettings()` f
 - PI sets the terminal title directly on `this.ui.terminal` during startup and on `/name` renames — it never flows through `ctx.ui.setTitle`. Intercepting `ctx.ui.setTitle` to capture PI's title won't work; recompute dynamically with `pi.getSessionName()` and `ctx.cwd` instead.
 - TUI rendering changes (`renderCall`, `renderResult`) require `/reload` — pi loads extensions from the working tree.
 - `renderShell: "self"` on `pi.registerTool` strips pi's Box (background, padding) entirely — the tool must provide its own framing. Avoid unless the tool needs full-screen control.
-- `code_resolve` target IDs are content-hash based (name/kind/container/file-fingerprint, position excluded) — re-resolving the same symbol across reloads produces the same ID.
+- `code_resolve` target IDs are content-hash based (cwd, file, name, canonical kind, container, declaration line/occurrence, and file fingerprint). The refinable display/name-anchor position is excluded, so anchor refinement reuses the same ID.
 
 ### Dependencies & tool behavior
 - Pi core peer deps (`@earendil-works/pi-*`, `typebox`) use `"*"` ranges per Pi package docs; do not tighten them.
