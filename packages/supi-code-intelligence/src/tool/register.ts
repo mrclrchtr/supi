@@ -20,7 +20,7 @@ import { renderResolveCall, renderResolveResult } from "./resolve/tui.ts";
 import { CODE_INTELLIGENCE_TOOL_SPECS, type CodeIntelligenceToolDefinitionSpec } from "./specs.ts";
 
 const TOOL_OUTPUT_CONTRACT =
-  " Output is truncated at 2000 lines or 50KB; full Markdown is saved to a temporary file when truncated.";
+  " Output over 2000 lines or 50KB is truncated, with full Markdown saved to a temporary file.";
 
 interface ToolRenderer {
   // biome-ignore lint/suspicious/noExplicitAny: pi render call/result signatures vary per tool; spread into pi.registerTool where concrete typing handles variance

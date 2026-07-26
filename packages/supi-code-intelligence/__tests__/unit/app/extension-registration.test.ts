@@ -1,7 +1,6 @@
 import { createPiMock, getTool, getTools } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../../src/extension.ts";
-import { CODE_FIND_AST_KINDS } from "../../../src/tool/find/ast-kinds.ts";
 import { CODE_INTELLIGENCE_TOOL_NAMES } from "../../../src/types/index.ts";
 
 function propertiesOf(tool: unknown): Record<string, unknown> {
@@ -75,13 +74,32 @@ describe("focused code intelligence tool registration", () => {
     expect(getTool(pi, "code_health")).not.toHaveProperty("prepareArguments");
   });
 
-  it("advertises exactly the supported code_find AST kinds", () => {
+  it("retains selection-critical guidance in registered descriptions", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    const description = getTool(pi, "code_find").description ?? "";
-    expect(description).toContain(`(${CODE_FIND_AST_KINDS.join("/")})`);
-    expect(description).not.toContain("enum/test");
+    const resolveDescription = getTool(pi, "code_resolve").description ?? "";
+    expect(resolveDescription).toContain("concrete ready LSP client");
+    expect(resolveDescription).toContain("never falls back to text search");
+
+    const findDescription = getTool(pi, "code_find").description ?? "";
+    expect(findDescription).toContain('mode:"ast"');
+    expect(findDescription).toContain("LSP workspace symbols");
+    expect(findDescription).toContain("PI grep for literal/regex source search");
+    expect(findDescription).toContain("Modes never silently fall back");
+    expect(findDescription).toContain("Incomplete scans disclose limitations");
+
+    expect(getTool(pi, "code_graph").description).toContain("not symbol identity");
+    expect(getTool(pi, "code_health").description).toContain("Report live diagnostics");
+    expect(getTool(pi, "code_refactor_plan").description).toContain("without mutating files");
+    expect(getTool(pi, "code_refactor_apply").description).toContain("before mutation");
+
+    for (const name of CODE_INTELLIGENCE_TOOL_NAMES) {
+      const description = getTool(pi, name).description ?? "";
+      expect(description).toContain(
+        "Output over 2000 lines or 50KB is truncated, with full Markdown saved to a temporary file",
+      );
+    }
   });
 
   it("uses an exact-one nested refactor operation and a plan-only apply input", () => {
