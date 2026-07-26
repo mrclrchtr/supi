@@ -112,7 +112,7 @@ export function renderInjectedFilesSection(
       lines: file.lines,
       extra: `turn ${file.turn}`,
     })),
-    total: analysis.totalTokens ?? 0,
+    total: analysis.usedTokens,
     theme,
     width,
   });
@@ -196,6 +196,7 @@ export function renderGuidelinesSection(
   analysis: ContextAnalysis,
   theme: Theme,
   width: number,
+  full: boolean,
 ): string[] {
   const sourceSummary = renderSourceSummaryBar(analysis.guidelineSources);
 
@@ -217,7 +218,7 @@ export function renderGuidelinesSection(
     return lines;
   }
 
-  lines.push(...renderBulletLines(bullets, analysis.full, theme, width));
+  lines.push(...renderBulletLines(bullets, full, theme, width));
   return lines;
 }
 
@@ -225,6 +226,7 @@ export function renderToolDefinitionsSection(
   analysis: ContextAnalysis,
   theme: Theme,
   width: number,
+  full: boolean,
 ): string[] {
   const tools = [...analysis.toolDefinitions.tools].sort((a, b) => b.tokens - a.tokens);
   if (tools.length === 0) return [];
@@ -241,7 +243,7 @@ export function renderToolDefinitionsSection(
     ),
   );
 
-  const previewLimit = analysis.full ? tools.length : Math.min(5, tools.length);
+  const previewLimit = full ? tools.length : Math.min(5, tools.length);
   const nameWidth = Math.max(12, Math.min(18, Math.max(...tools.map((tool) => tool.name.length))));
   const defTokenWidth = 8;
   const snippetTokenWidth = hasSnippetDetails ? 10 : 0;
@@ -253,7 +255,7 @@ export function renderToolDefinitionsSection(
     const tool = tools[i];
     const name = padRight(tool.name, nameWidth);
     const previewDescription =
-      analysis.full || tool.description.length <= 50
+      full || tool.description.length <= 50
         ? tool.description
         : `${tool.description.slice(0, 50)}…`;
     const description = truncateToWidth(previewDescription, descWidth);
@@ -270,7 +272,7 @@ export function renderToolDefinitionsSection(
     );
   }
 
-  if (!analysis.full && tools.length > previewLimit) {
+  if (!full && tools.length > previewLimit) {
     lines.push(
       formatOverflowHint(tools.length - previewLimit, theme, width, {
         hint: "run /supi-context full",
@@ -293,14 +295,8 @@ export function renderCompactionNote(
   theme: Theme,
   width: number,
 ): string[] {
-  if (!analysis.compaction) return [];
-  return [
-    formatDimLine(
-      `↳ ${pluralize(analysis.compaction.summarizedTurns, "older turn", "older turns")} summarized (compaction)`,
-      theme,
-      width,
-    ),
-  ];
+  if (!analysis.compacted) return [];
+  return [formatDimLine("↳ Compaction present on the active branch", theme, width)];
 }
 
 export function renderProviderSections(

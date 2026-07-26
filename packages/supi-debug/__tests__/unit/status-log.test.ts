@@ -24,12 +24,14 @@ describe("supi-debug status log", () => {
 
     const status = appendEntry.mock.calls[0]?.[1] as {
       version: number;
+      phase: string;
       tools: { registered: string[]; active: string[] };
       commands: string[];
       expectedTools?: unknown;
       expectedCommands?: unknown;
     };
     expect(status.version).toBe(2);
+    expect(status.phase).toBe("session_start");
     expect(status.tools.registered).toEqual(["code_impact", "supi_debug"]);
     expect(status.tools.active).toEqual(["supi_debug"]);
     expect(status.commands).toEqual(["supi-debug"]);

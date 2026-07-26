@@ -8,7 +8,7 @@
 
 # @mrclrchtr/supi-context
 
-Adds a `/supi-context` command to the [pi coding agent](https://github.com/earendil-works/pi) so you can inspect how the current session is spending its context window.
+Adds context-capacity observability to the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 
@@ -22,56 +22,58 @@ For local development:
 pi install ./packages/supi-context
 ```
 
-![Context usage report](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-context.png)
+## Two concepts, two surfaces
 
-## What you get
+- A **Context Pressure Snapshot** is a small point-in-time capacity reading for deciding whether a session has room for another operation.
+- A **Context Usage Report** is a diagnostic account of where the session's context is spent.
 
-After install, pi gets one user command and an optional agent-callable tool:
+### Human: Context Usage Report
 
-- `/supi-context` — render a detailed context-usage report for the current session
-- `/supi-context full` — render the same report with the full guideline and tool-definition lists instead of previews
-- `supi_context` — agent-callable tool (disabled by default; see Configuration)
+In interactive TUI mode, pi gets these commands:
 
-The command sends a custom `supi-context` message, and this package registers a dedicated renderer so the report shows up as a structured TUI view instead of plain text.
+- `/supi-context` — render a report with guideline and tool previews
+- `/supi-context full` — render the same report with complete guideline and tool lists
 
-The `supi_context` tool returns the same analysis as JSON, so the agent can inspect context usage programmatically — useful for checking remaining capacity before large operations or after heavy tool results. In the TUI, the tool renders a compact usage summary by default and expands into the same structured report as `/supi-context`.
+The command appends a durable `supi-context` custom entry and uses a dedicated entry renderer. The report remains in the transcript but never enters LLM context.
+
+### Agent: Context Pressure Snapshot
+
+`supi_context` is agent-callable when enabled in configuration. It defaults to a one-line, constant-shape JSON **Context Pressure Snapshot**:
+
+```ts
+interface ContextPressureSnapshot {
+  modelName: string;
+  contextWindow: number | null;
+  usedTokens: number;
+  usagePercent: number | null;
+  compactionEnabled: boolean;
+  reserveTokens: number;
+  headroomTokens: number | null;
+  pressurePercent: number | null;
+  compacted: boolean;
+  approximationNote: string | null;
+}
+```
+
+Use `supi_context({ mode: "full" })` only when diagnostic attribution is needed. Full mode returns compact JSON for the Context Usage Report. If it exceeds Pi's normal tool-output limits, it returns a small valid-JSON envelope with the path to a temporary file containing the complete report.
+
+The tool TUI never shows raw agent JSON: concise results render as a dense snapshot that expands into its metrics; full results expand into the diagnostic report.
 
 ## What the report shows
 
-The report is meant to answer questions like:
+The Context Usage Report includes:
 
-- what is taking up space in the current context window?
-- how much room is left before compaction pressure gets worse?
-- which instruction files, context files, skills, guidelines, or tools are expensive?
-- what extra context was injected by other SuPi extensions?
-
-It includes:
-
-- model name, context-window size, and total token usage
-- approximation or pending-usage notes when exact usage data is not available yet
-- a visual usage bar for system prompt, user messages, assistant messages, tool calls, tool results, other, autocompact buffer, and free space
-- a category breakdown table for the same usage buckets
-- a system-prompt composition breakdown for:
-  - base prompt content
-  - instruction files (`AGENTS.md`, `CLAUDE.md`, etc.)
-  - other context files loaded into the system prompt
-  - active skills
-  - guidelines
-  - tool snippets
-  - append text
-- instruction-file details with token cost, line count, and detected origin (`project` vs `global`)
-- legacy injected subdirectory context files from older `supi-claude-md` sessions, when present
-- active skill names with per-skill token counts
-- guideline bullet previews, plus source attribution for PI defaults, known built-in tools (`read`, `write`, `edit`), and `other`
-- active tool definitions with per-tool definition token counts and snippet-token columns when available
-- a compaction note when older turns were summarized
-- extra provider sections from extensions registered through the shared context-provider registry in `@mrclrchtr/supi-core`
+- model name, context-window size, used tokens, usage percentage, pressure percentage, and **Headroom**
+- the effective **Compaction reserve** and factual presence of compaction on the active branch
+- approximation or pending-usage notes when exact usage is not available
+- a visual usage bar and attribution-category breakdown for system prompt, messages, tool calls, tool results, and other context
+- system-prompt composition, instruction/context files, skills, guideline sources, tool definitions, injected files, and registered provider sections
 
 ## Configuration
 
-No settings are required for the `/supi-context` command.
+The human `/supi-context` command needs no configuration.
 
-To enable the `supi_context` agent tool, set `agentToolEnabled` to `true` in your supi config:
+To enable the agent-callable `supi_context` tool, set `agentToolEnabled` to `true` in your supi config:
 
 ```json
 {
@@ -87,26 +89,18 @@ The tool is disabled by default and requires a `/reload` or restart after toggli
 
 ## Notes
 
-- The command uses the latest cached `systemPromptOptions` captured during `before_agent_start`.
-- If those prompt options are missing or incomplete, the package backfills context files and skills by re-parsing the current system prompt.
-- Exact totals come from pi's current context-usage data when available. Otherwise the report falls back to rough estimates and/or scales estimated category totals to the latest measured total.
-- If no model is selected yet, the report can still render, but the context-window bar cannot show capacity.
+- The extension caches the latest `systemPromptOptions` from `before_agent_start`. If those are missing or incomplete, it backfills context files and skills from the current system prompt.
+- Exact usage comes from Pi's current context-usage data when available. Otherwise the extension estimates usage and preserves an approximation note.
+- The Active Context Limit is the auto-compaction threshold while auto-compaction is enabled, otherwise the raw model context window. Headroom and pressure use that limit.
 
 ## Source
 
-- `src/context.ts` — command registration, agent tool registration, cached prompt-option handling, and renderer wiring
-- `src/config.ts` — config loading with `agentToolEnabled` toggle
-- `src/settings-registration.ts` — `/supi-settings` registration for the agent tool toggle
-- `src/analysis.ts` — token accounting, attribution, and report data assembly
-- `src/format.ts` — report orchestration for the TUI view
-- `src/format-helpers.ts` — shared numeric and category helpers for report rendering
-- `src/format-summary.ts` — summary, usage bar, category, and composition sections
-- `src/format-sections.ts` — instruction file, context file, skill, guideline, tool, compaction, and provider sections
-- `src/prompt-inference.ts` — fallback recovery of context files, skills, and guideline sections from the live system prompt
-- `src/renderer.ts` — custom renderer for `supi-context` messages
-- `src/report-component.ts` — shared width-aware report component for message and tool renderers
-- `src/tool/guidance.ts` — tool description, prompt snippet, and guidelines for the agent tool
-- `src/tool/render.ts` — TUI call/result renderer for the agent tool
-- `src/utils.ts` — token and plural-format helpers
+- `src/context.ts` — surface registration and cached prompt-option handling
+- `src/capacity.ts` — shared capacity analysis and snapshot shape
+- `src/analysis.ts` — diagnostic attribution and report data assembly
+- `src/entry-renderer.ts` — TUI-only custom-entry renderer for the human command
+- `src/format*.ts` and `src/report-component.ts` — Context Usage Report rendering
+- `src/snapshot-component.ts` — compact, width-safe snapshot rendering
+- `src/tool/guidance.ts`, `src/tool/output.ts`, and `src/tool/render.ts` — agent-tool guidance, safe full JSON output, and tool rendering
 
 Tests live under `__tests__/unit/`.

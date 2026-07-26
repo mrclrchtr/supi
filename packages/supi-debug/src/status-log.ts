@@ -24,7 +24,11 @@ function statusLogEnabled(): boolean {
  * stderr is captured by Harbor's `2>&1 | tee pi.txt` command for `--no-session`
  * runs where session entries are not inspectable.
  */
-export function maybeLogLoadStatus(pi: ExtensionAPI, cwd: string): void {
+export function maybeLogLoadStatus(
+  pi: ExtensionAPI,
+  cwd: string,
+  phase: "session_start" | "resources_discover" = "session_start",
+): void {
   if (!statusLogEnabled()) return;
 
   const allTools = typeof pi.getAllTools === "function" ? pi.getAllTools() : [];
@@ -37,7 +41,7 @@ export function maybeLogLoadStatus(pi: ExtensionAPI, cwd: string): void {
   const status = {
     type: "supi_status",
     version: 2,
-    phase: "session_start",
+    phase,
     cwd,
     tools: {
       registered: registeredToolNames,

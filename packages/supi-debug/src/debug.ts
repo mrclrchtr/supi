@@ -279,7 +279,12 @@ export default function debugExtension(pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     clearDebugEvents();
     applyDebugConfig(ctx.cwd);
-    maybeLogLoadStatus(pi, ctx.cwd);
+  });
+
+  // Commands registered during every extension's session_start handler are
+  // available before resource discovery, so this inventory is load-order safe.
+  pi.on("resources_discover", async (_event, ctx) => {
+    maybeLogLoadStatus(pi, ctx.cwd, "resources_discover");
   });
 
   pi.registerCommand("supi-debug", {

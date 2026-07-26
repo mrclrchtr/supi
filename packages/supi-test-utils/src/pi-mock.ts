@@ -10,6 +10,7 @@ export function createPiMock(options: PiMockOptions = {}): PiMock {
   const commands = new Map<string, unknown>();
   const tools: Array<unknown> = [];
   const renderers = new Map<string, unknown>();
+  const entryRenderers = new Map<string, unknown>();
   const entries: Array<{ type: string; data: unknown }> = [];
   const messages: Array<Record<string, unknown>> = [];
   const shortcuts = new Map<string, Array<(ctx: unknown) => unknown>>();
@@ -34,6 +35,10 @@ export function createPiMock(options: PiMockOptions = {}): PiMock {
 
     registerMessageRenderer: vi.fn((type: string, renderer: unknown) => {
       renderers.set(type, renderer);
+    }),
+
+    registerEntryRenderer: vi.fn((type: string, renderer: unknown) => {
+      entryRenderers.set(type, renderer);
     }),
 
     registerShortcut: vi.fn((key: string, opts: { handler: (ctx: unknown) => unknown }) => {
@@ -94,6 +99,7 @@ export function createPiMock(options: PiMockOptions = {}): PiMock {
     commands,
     tools,
     renderers,
+    entryRenderers,
     entries,
     messages,
     shortcuts,
@@ -118,6 +124,7 @@ export interface PiMockOptions {
 
 interface MockHandlerContext {
   cwd: string;
+  mode: "tui" | "rpc" | "json" | "print";
   model: { provider: string; id: string; name: string };
   ui: {
     setStatus: (...args: unknown[]) => unknown;
@@ -147,6 +154,7 @@ interface MockHandlerContext {
     | { tokens: number | null; contextWindow: number; percent: number | null }
     | undefined;
   getSystemPrompt: () => string;
+  isProjectTrusted: () => boolean;
 }
 
 export interface PiMock {
@@ -154,6 +162,7 @@ export interface PiMock {
   registerCommand: (name: string, spec: unknown) => void;
   registerTool: (tool: unknown) => void;
   registerMessageRenderer: (type: string, renderer: unknown) => void;
+  registerEntryRenderer: (type: string, renderer: unknown) => void;
   registerShortcut: (key: string, opts: { handler: (ctx: unknown) => unknown }) => void;
   appendEntry: (type: string, data: unknown) => void;
   sendMessage: (message: Record<string, unknown>) => void;
@@ -174,6 +183,7 @@ export interface PiMock {
   commands: Map<string, unknown>;
   tools: Array<unknown>;
   renderers: Map<string, unknown>;
+  entryRenderers: Map<string, unknown>;
   entries: Array<{ type: string; data: unknown }>;
   messages: Array<Record<string, unknown>>;
   shortcuts: Map<string, Array<(ctx: unknown) => unknown>>;
@@ -197,6 +207,7 @@ export interface PiMock {
 export function makeCtx(overrides: Record<string, unknown> = {}): MockHandlerContext {
   return {
     cwd: "/project",
+    mode: "tui",
     model: { provider: "openai", id: "gpt-4", name: "GPT-4" },
     ui: {
       setStatus: vi.fn(),
@@ -229,6 +240,7 @@ export function makeCtx(overrides: Record<string, unknown> = {}): MockHandlerCon
           | undefined,
     ),
     getSystemPrompt: vi.fn(() => "System"),
+    isProjectTrusted: vi.fn(() => true),
     ...overrides,
   };
 }

@@ -1,13 +1,22 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import type { ContextAnalysis } from "../analysis.ts";
-import { healthColor, pct } from "../format-helpers.ts";
+import { type ContextPressureSnapshot, createContextPressureSnapshot } from "../capacity.ts";
 import { ContextReportComponent } from "../report-component.ts";
-import { formatTokens, pluralize } from "../utils.ts";
+import { ContextPressureComponent } from "../snapshot-component.ts";
 
-export interface ContextToolDetails {
+export interface ContextToolConciseDetails {
+  mode: "concise";
+  snapshot: ContextPressureSnapshot;
+}
+
+export interface ContextToolFullDetails {
+  mode: "full";
   analysis: ContextAnalysis;
 }
+
+/** TUI data mirrors the mode-specific data returned to the agent. */
+export type ContextToolDetails = ContextToolConciseDetails | ContextToolFullDetails;
 
 interface ContextToolResult {
   content: Array<{ type: string; text?: string }>;
@@ -20,8 +29,15 @@ interface ResultOptions {
   isPartial: boolean;
 }
 
-export function renderContextToolCall(_args: unknown, theme: Theme): Text {
-  const content = `${theme.fg("toolTitle", "supi_context")} ${theme.fg("muted", "current session")}`;
+export function renderContextToolCall(args: unknown, theme: Theme): Text {
+  const mode =
+    args &&
+    typeof args === "object" &&
+    "mode" in args &&
+    (args as { mode?: string }).mode === "full"
+      ? "full"
+      : "concise";
+  const content = `${theme.fg("toolTitle", "supi_context")} ${theme.fg("muted", mode)}`;
   return new Text(content, 0, 0);
 }
 
@@ -29,7 +45,7 @@ export function renderContextToolResult(
   result: ContextToolResult | undefined,
   options: ResultOptions,
   theme: Theme,
-): Text | ContextReportComponent {
+): Text | ContextPressureComponent | ContextReportComponent {
   if (options.isPartial) {
     return new Text(theme.fg("warning", "Analyzing context…"), 0, 0);
   }
@@ -38,53 +54,37 @@ export function renderContextToolResult(
     return new Text(theme.fg("error", "supi_context failed"), 0, 0);
   }
 
-  const analysis = extractAnalysis(result?.details);
-  if (!analysis) {
+  const details = extractDetails(result?.details);
+  if (!details) {
     return new Text(theme.fg("dim", "No context analysis data"), 0, 0);
   }
 
-  if (options.expanded) {
-    return new ContextReportComponent(analysis, theme);
+  if (details.mode === "concise") {
+    return new ContextPressureComponent(details.snapshot, theme, options.expanded);
   }
 
-  return new Text(formatCollapsedSummary(analysis, theme), 0, 0);
+  if (options.expanded) {
+    return new ContextReportComponent(details.analysis, theme, "full");
+  }
+
+  return new ContextPressureComponent(
+    createContextPressureSnapshot(details.analysis.modelName, details.analysis),
+    theme,
+    false,
+  );
 }
 
-function extractAnalysis(details: unknown): ContextAnalysis | undefined {
-  if (!details || typeof details !== "object" || !("analysis" in details)) {
+function extractDetails(details: unknown): ContextToolDetails | undefined {
+  if (!details || typeof details !== "object" || !("mode" in details)) {
     return undefined;
   }
-  return (details as ContextToolDetails).analysis;
-}
 
-function formatCollapsedSummary(analysis: ContextAnalysis, theme: Theme): string {
-  const used = analysis.totalTokens ?? 0;
-  const usage =
-    analysis.contextWindow > 0
-      ? `${formatTokens(used)} / ${formatTokens(analysis.contextWindow)} (${pct(used, analysis.contextWindow)})`
-      : `${formatTokens(used)} tokens`;
-  const dot = theme.fg("dim", "·");
-  const parts = [
-    `${theme.fg(healthColor(analysis), "●")} ${theme.fg("dim", "usage")} ${theme.fg("text", theme.bold(usage))}`,
-  ];
-
-  if (analysis.contextWindow > 0) {
-    parts.push(
-      `${theme.fg("dim", "free")} ${theme.fg("muted", formatTokens(analysis.categories.freeSpace))}`,
-    );
+  const mode = (details as { mode?: unknown }).mode;
+  if (mode === "concise" && "snapshot" in details) {
+    return details as ContextToolConciseDetails;
   }
-
-  if (analysis.compaction) {
-    parts.push(
-      `${theme.fg("dim", "compacted")} ${theme.fg("muted", pluralize(analysis.compaction.summarizedTurns, "turn", "turns"))}`,
-    );
+  if (mode === "full" && "analysis" in details) {
+    return details as ContextToolFullDetails;
   }
-
-  parts.push(`${theme.fg("dim", "model")} ${theme.fg("muted", analysis.modelName)}`);
-
-  if (!analysis.approximationNote) {
-    return parts.join(` ${dot} `);
-  }
-
-  return `${parts.join(` ${dot} `)}\n${theme.fg("warning", analysis.approximationNote)}`;
+  return undefined;
 }

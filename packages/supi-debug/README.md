@@ -114,7 +114,7 @@ Defaults come from the shared debug registry:
 
 ## Extra status logging
 
-If `SUPI_LOG_STATUS` is enabled in the environment, the package emits a versioned SuPi load-status marker to stderr on `session_start` and appends the same payload as a session entry. Version 2 reports observed tool and command inventory only; external harnesses decide which resources they require.
+If `SUPI_LOG_STATUS` is enabled in the environment, the package emits a versioned SuPi load-status marker to stderr during `resources_discover` (after session-start registrations) and appends the same payload as a session entry. The payload uses `phase: "resources_discover"`. Version 2 reports observed tool and command inventory only; external harnesses decide which resources they require.
 
 ## Source
 

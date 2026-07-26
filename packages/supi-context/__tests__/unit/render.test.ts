@@ -1,6 +1,8 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 import type { ContextAnalysis } from "../../src/analysis.ts";
+import type { ContextPressureSnapshot } from "../../src/capacity.ts";
 import {
   type ContextToolDetails,
   renderContextToolCall,
@@ -12,14 +14,31 @@ const mockTheme = {
   bold: (text: string) => `**${text}**`,
 } as unknown as Theme;
 
-function makeAnalysis(overrides?: Partial<ContextAnalysis>): ContextAnalysis {
+const plainTheme = {
+  fg: (_color: string, text: string) => text,
+  bold: (text: string) => text,
+} as unknown as Theme;
+
+function makeSnapshot(overrides?: Partial<ContextPressureSnapshot>): ContextPressureSnapshot {
   return {
     modelName: "Test Model",
     contextWindow: 100_000,
-    totalTokens: 50_000,
-    scaled: true,
+    usedTokens: 50_000,
+    usagePercent: 50,
+    compactionEnabled: true,
+    reserveTokens: 16_384,
+    headroomTokens: 33_616,
+    pressurePercent: 59.8,
+    compacted: true,
     approximationNote: null,
-    full: true,
+    ...overrides,
+  };
+}
+
+function makeAnalysis(overrides?: Partial<ContextAnalysis>): ContextAnalysis {
+  return {
+    ...makeSnapshot(),
+    scaled: true,
     categories: {
       systemPrompt: 10_000,
       userMessages: 15_000,
@@ -27,8 +46,6 @@ function makeAnalysis(overrides?: Partial<ContextAnalysis>): ContextAnalysis {
       toolCalls: 2_000,
       toolResults: 3_000,
       other: 0,
-      autocompactBuffer: 16_384,
-      freeSpace: 33_616,
     },
     systemPromptBreakdown: {
       base: 5_000,
@@ -52,26 +69,28 @@ function makeAnalysis(overrides?: Partial<ContextAnalysis>): ContextAnalysis {
       tokens: 500,
       tools: [{ name: "read", description: "Read files", tokens: 500 }],
     },
-    compaction: null,
     providerSections: [],
     ...overrides,
   };
 }
 
-function renderText(component: { render(width: number): string[] }): string {
-  return component.render(160).join("\n");
+function renderText(component: { render(width: number): string[] }, width = 160): string {
+  return component.render(width).join("\n");
 }
 
 describe("supi_context tool rendering", () => {
-  it("renders a compact tool-call header", () => {
-    const output = renderText(renderContextToolCall({}, mockTheme));
+  it("renders the requested mode in a compact tool-call header", () => {
+    const output = renderText(renderContextToolCall({ mode: "concise" }, mockTheme));
 
     expect(output).toContain("supi_context");
-    expect(output).toContain("current session");
+    expect(output).toContain("concise");
   });
 
-  it("renders collapsed summaries from details without leaking raw JSON", () => {
-    const details = { analysis: makeAnalysis() } satisfies ContextToolDetails;
+  it("renders concise details without storing or leaking a diagnostic report", () => {
+    const details = {
+      mode: "concise",
+      snapshot: makeSnapshot(),
+    } satisfies ContextToolDetails;
     const output = renderText(
       renderContextToolResult(
         {
@@ -79,18 +98,51 @@ describe("supi_context tool rendering", () => {
           details,
         },
         { expanded: false, isPartial: false },
-        mockTheme,
+        plainTheme,
       ),
     );
 
-    expect(output).toContain("50.0k / 100.0k");
-    expect(output).toContain("33.6k");
+    expect(output).toContain("headroom");
     expect(output).toContain("Test Model");
     expect(output).not.toContain("agent-facing-json");
+    expect(output).not.toContain("Usage by category");
   });
 
-  it("renders expanded reports from structured details", () => {
-    const details = { analysis: makeAnalysis() } satisfies ContextToolDetails;
+  it("renders every snapshot metric as a narrow, aligned expanded block", () => {
+    const details = {
+      mode: "concise",
+      snapshot: makeSnapshot(),
+    } satisfies ContextToolDetails;
+    const component = renderContextToolResult(
+      { content: [{ type: "text", text: "{}" }], details },
+      { expanded: true, isPartial: false },
+      plainTheme,
+    );
+    const lines = component.render(32);
+    const output = lines.join("\n");
+
+    for (const label of [
+      "Model",
+      "Context window",
+      "Used",
+      "Usage",
+      "Auto-compaction",
+      "Compaction reserve",
+      "Headroom",
+      "Pressure",
+      "Compacted",
+    ]) {
+      expect(output).toContain(label);
+    }
+    expect(output).not.toContain("Usage by category");
+    expect(lines.every((line) => visibleWidth(line) <= 32)).toBe(true);
+  });
+
+  it("renders full details as a diagnostic Context Usage Report", () => {
+    const details = {
+      mode: "full",
+      analysis: makeAnalysis(),
+    } satisfies ContextToolDetails;
     const output = renderText(
       renderContextToolResult(
         { content: [{ type: "text", text: "{}" }], details },

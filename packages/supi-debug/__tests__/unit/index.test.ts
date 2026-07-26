@@ -8,6 +8,7 @@ const mockFns = vi.hoisted(() => ({
   loadSupiConfig: vi.fn(),
   registerDeclarativeSettings: vi.fn(),
   registerContextProvider: vi.fn(),
+  maybeLogLoadStatus: vi.fn(),
 }));
 
 vi.mock("@mrclrchtr/supi-core/config", () => ({
@@ -20,6 +21,10 @@ vi.mock("@mrclrchtr/supi-core/settings", () => ({
 
 vi.mock("@mrclrchtr/supi-core/context", () => ({
   registerContextProvider: mockFns.registerContextProvider,
+}));
+
+vi.mock("../../src/status-log.ts", () => ({
+  maybeLogLoadStatus: mockFns.maybeLogLoadStatus,
 }));
 
 vi.mock("@mrclrchtr/supi-core/debug", () => ({
@@ -64,12 +69,13 @@ describe("supi-debug extension setup", () => {
     vi.clearAllMocks();
   });
 
-  it("registers settings, context provider, command, tool, and session handler", () => {
+  it("registers settings, context provider, command, tool, and lifecycle handlers", () => {
     const pi = setup();
 
     expect(mockFns.registerDeclarativeSettings).toHaveBeenCalledOnce();
     expect(mockFns.registerContextProvider).toHaveBeenCalledOnce();
     expect(pi.handlers.has("session_start")).toBe(true);
+    expect(pi.handlers.has("resources_discover")).toBe(true);
     expect(pi.commands.has("supi-debug")).toBe(true);
     expect(pi.tools.map((tool) => (tool as { name: string }).name)).toEqual(["supi_debug"]);
   });
@@ -109,6 +115,14 @@ describe("supi-debug extension setup", () => {
 
     expect(mockFns.clearDebugEvents).toHaveBeenCalledOnce();
     expect(mockFns.loadSupiConfig).toHaveBeenCalledWith("debug", "/repo", expect.any(Object));
+  });
+
+  it("logs the load inventory after resource discovery", () => {
+    const pi = setup();
+
+    pi.handlers.get("resources_discover")?.[0]?.({}, { cwd: "/repo" });
+
+    expect(mockFns.maybeLogLoadStatus).toHaveBeenCalledWith(pi, "/repo", "resources_discover");
   });
 
   it("context provider returns aggregate summary without event payloads", () => {

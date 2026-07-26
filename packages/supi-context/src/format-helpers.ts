@@ -74,11 +74,9 @@ export function allocateBlocks(values: number[], totalBlocks: number): number[] 
   return counts;
 }
 
-export function healthColor(analysis: ContextAnalysis): ReportColor {
-  if (analysis.contextWindow <= 0) return "dim";
-  const reserved = analysis.totalTokens ?? 0;
-  const pressure =
-    ((reserved + analysis.categories.autocompactBuffer) / analysis.contextWindow) * 100;
+export function healthColor(analysis: Pick<ContextAnalysis, "pressurePercent">): ReportColor {
+  const pressure = analysis.pressurePercent;
+  if (pressure === null) return "dim";
   if (pressure >= 90) return "error";
   if (pressure >= 70) return "warning";
   return "success";

@@ -15,13 +15,27 @@ import {
 } from "./format-helpers.ts";
 import { formatTokens } from "./utils.ts";
 
+function formatPercentage(value: number | null): string {
+  return value === null ? "?" : `${value.toFixed(1)}%`;
+}
+
 export function renderSummary(analysis: ContextAnalysis, theme: Theme, width: number): string[] {
-  const used = analysis.totalTokens ?? 0;
   const health = theme.fg(healthColor(analysis), "●");
   const usage =
-    analysis.contextWindow > 0
-      ? `${formatTokens(used)} / ${formatTokens(analysis.contextWindow)} tokens (${pct(used, analysis.contextWindow)})`
-      : `${formatTokens(used)} tokens`;
+    analysis.contextWindow !== null
+      ? `${formatTokens(analysis.usedTokens)} / ${formatTokens(analysis.contextWindow)} tokens (${formatPercentage(analysis.usagePercent)} usage)`
+      : `${formatTokens(analysis.usedTokens)} tokens`;
+  const capacityParts: string[] = [];
+
+  if (analysis.headroomTokens !== null) {
+    capacityParts.push(`Headroom ${formatTokens(analysis.headroomTokens)}`);
+  }
+  if (analysis.compactionEnabled) {
+    capacityParts.push(`Compaction reserve ${formatTokens(analysis.reserveTokens)}`);
+  }
+  if (analysis.pressurePercent !== null) {
+    capacityParts.push(`Pressure ${formatPercentage(analysis.pressurePercent)}`);
+  }
 
   const lines = [
     truncateToWidth(
@@ -30,6 +44,9 @@ export function renderSummary(analysis: ContextAnalysis, theme: Theme, width: nu
     ),
   ];
 
+  if (capacityParts.length > 0) {
+    lines.push(...wrapReportText(theme.fg("dim", capacityParts.join("  ·  ")), width));
+  }
   if (analysis.approximationNote) {
     lines.push(...wrapReportText(theme.fg("warning", analysis.approximationNote), width));
   }
@@ -38,16 +55,16 @@ export function renderSummary(analysis: ContextAnalysis, theme: Theme, width: nu
 }
 
 export function renderUsageBar(analysis: ContextAnalysis, theme: Theme, width: number): string[] {
-  if (analysis.contextWindow <= 0) {
+  if (analysis.contextWindow === null) {
     return [theme.fg("dim", "No model selected — usage bar unavailable")];
   }
 
-  const percentLabel = pct(analysis.totalTokens ?? 0, analysis.contextWindow);
+  const percentLabel = formatPercentage(analysis.usagePercent);
   const barWidth = Math.max(12, Math.min(48, width - visibleWidth(percentLabel) - 3));
   const values = [
     ...CATEGORY_ORDER.map((key) => analysis.categories[key]),
-    analysis.categories.autocompactBuffer,
-    analysis.categories.freeSpace,
+    analysis.reserveTokens,
+    analysis.headroomTokens ?? 0,
   ];
   const counts = allocateBlocks(values, barWidth);
 
@@ -85,11 +102,11 @@ export function renderUsageBar(analysis: ContextAnalysis, theme: Theme, width: n
     if (analysis.categories[key] <= 0) continue;
     legendParts.push(`${theme.fg(CATEGORY_COLORS[key], "●")} ${CATEGORY_LABELS[key]}`);
   }
-  if (analysis.categories.autocompactBuffer > 0) {
-    legendParts.push(`${theme.fg("warning", "▒")} Autocompact buffer`);
+  if (analysis.reserveTokens > 0) {
+    legendParts.push(`${theme.fg("warning", "▒")} Compaction reserve`);
   }
-  if (analysis.categories.freeSpace > 0) {
-    legendParts.push(`${theme.fg("dim", "░")} Free space`);
+  if (analysis.headroomTokens !== null && analysis.headroomTokens > 0) {
+    legendParts.push(`${theme.fg("dim", "░")} Headroom`);
   }
 
   return [barLine, ...wrapReportText(legendParts.join(theme.fg("dim", "  •  ")), width)];
@@ -107,31 +124,20 @@ export function renderCategoryBreakdown(
     label: string;
     color: Parameters<Theme["fg"]>[0];
     tokens: number;
-  }> = [
-    ...CATEGORY_ORDER.map((key) => ({
-      label: CATEGORY_LABELS[key],
-      color: CATEGORY_COLORS[key],
-      tokens: analysis.categories[key],
-    })),
-    {
-      label: "Autocompact buffer",
-      color: "warning",
-      tokens: analysis.categories.autocompactBuffer,
-    },
-    {
-      label: "Free space",
-      color: "dim",
-      tokens: analysis.categories.freeSpace,
-    },
-  ];
+  }> = CATEGORY_ORDER.map((key) => ({
+    label: CATEGORY_LABELS[key],
+    color: CATEGORY_COLORS[key],
+    tokens: analysis.categories[key],
+  }));
 
   const labelWidth = Math.max(18, Math.min(22, width - 22));
+  const total = analysis.contextWindow ?? 0;
   for (const row of rows) {
-    if (row.tokens <= 0 && row.label !== "Free space") continue;
+    if (row.tokens <= 0) continue;
     const bullet = theme.fg(row.color, "●");
     const label = padRight(row.label, labelWidth);
     const tokens = padLeft(formatTokens(row.tokens), 8);
-    const percentage = padLeft(pct(row.tokens, analysis.contextWindow), 7);
+    const percentage = padLeft(pct(row.tokens, total), 7);
     lines.push(truncateToWidth(`  ${bullet} ${label} ${tokens} ${percentage}`, width));
   }
 

@@ -4,6 +4,8 @@ const mockFns = vi.hoisted(() => ({
   buildSessionContext: vi.fn(),
   estimateTokens: vi.fn(),
   getLatestCompactionEntry: vi.fn(),
+  createSettingsManager: vi.fn(),
+  getCompactionEnabled: vi.fn(() => true),
   getCompactionReserveTokens: vi.fn(() => 16384),
   formatSkillsForPrompt: vi.fn((skills: Array<{ name: string }>) =>
     skills.map((s) => `<skill>${s.name}</skill>`).join("\n"),
@@ -16,9 +18,7 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
   estimateTokens: mockFns.estimateTokens,
   getLatestCompactionEntry: mockFns.getLatestCompactionEntry,
   SettingsManager: {
-    create: () => ({
-      getCompactionReserveTokens: mockFns.getCompactionReserveTokens,
-    }),
+    create: mockFns.createSettingsManager,
   },
   formatSkillsForPrompt: mockFns.formatSkillsForPrompt,
 }));
@@ -28,7 +28,7 @@ vi.mock("@mrclrchtr/supi-core/context", () => ({
 }));
 
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
-import { analyzeContext } from "../../src/analysis.ts";
+import { analyzeContext, analyzeContextPressure } from "../../src/analysis.ts";
 
 function createMockMessage(
   role: "user" | "assistant" | "toolResult",
@@ -78,6 +78,10 @@ describe("analyzeContext", () => {
       return Math.ceil(contentStr.length / 4);
     });
     mockFns.getLatestCompactionEntry.mockReturnValue(null);
+    mockFns.createSettingsManager.mockReturnValue({
+      getCompactionEnabled: mockFns.getCompactionEnabled,
+      getCompactionReserveTokens: mockFns.getCompactionReserveTokens,
+    });
     mockFns.getRegisteredContextProviders.mockReturnValue([]);
   });
 
@@ -143,8 +147,9 @@ describe("analyzeContext", () => {
       createMockMessage("assistant", "B".repeat(400)),
     ];
     mockFns.buildSessionContext.mockReturnValue({ messages });
-    // estimateTokens will return ~100 each = 200 raw total
-    // actual tokens = 400, so scale factor = 2
+    // estimateTokens returns 100 for the user message, matching Pi's text-content estimate.
+    // Actual tokens = 400, so the scale factor is 2.
+    mockFns.estimateTokens.mockReturnValue(100);
 
     const ctx = makeCtx({
       getContextUsage: () => ({ tokens: 400, contextWindow: 8192, percent: 4.9 }),
@@ -156,7 +161,61 @@ describe("analyzeContext", () => {
     expect(result.scaled).toBe(true);
     expect(result.categories.userMessages).toBe(200);
     expect(result.categories.assistantMessages).toBe(200);
-    expect(result.totalTokens).toBe(400);
+    expect(result.usedTokens).toBe(400);
+  });
+
+  it("derives reserve-adjusted capacity from the current session", () => {
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: 50_000, contextWindow: 100_000, percent: 50 }),
+      getSystemPrompt: () => "",
+    });
+    const pi = createPiMock();
+    const result = analyzeContext(ctx as never, pi as never, undefined);
+
+    expect(result.usedTokens).toBe(50_000);
+    expect(result.reserveTokens).toBe(16_384);
+    expect(result.headroomTokens).toBe(33_616);
+    expect(result.usagePercent).toBe(50);
+    expect(result.pressurePercent).toBe(59.8);
+  });
+
+  it("builds a constant-shape snapshot without diagnostic inventories", () => {
+    const getSystemPrompt = vi.fn(() => "");
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: 50_000, contextWindow: 100_000, percent: 50 }),
+      getSystemPrompt,
+    });
+    const snapshot = analyzeContextPressure(ctx as never);
+
+    expect(Object.keys(snapshot)).toEqual([
+      "modelName",
+      "contextWindow",
+      "usedTokens",
+      "usagePercent",
+      "compactionEnabled",
+      "reserveTokens",
+      "headroomTokens",
+      "pressurePercent",
+      "compacted",
+      "approximationNote",
+    ]);
+    expect(snapshot.headroomTokens).toBe(33_616);
+    expect(mockFns.buildSessionContext).not.toHaveBeenCalled();
+    expect(getSystemPrompt).not.toHaveBeenCalled();
+    expect(mockFns.getRegisteredContextProviders).not.toHaveBeenCalled();
+  });
+
+  it("reads compaction settings with the active project trust state", () => {
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: 50_000, contextWindow: 100_000, percent: 50 }),
+      isProjectTrusted: vi.fn(() => false),
+    });
+
+    analyzeContextPressure(ctx as never);
+
+    expect(mockFns.createSettingsManager).toHaveBeenCalledWith("/project", undefined, {
+      projectTrusted: false,
+    });
   });
 
   it("computes system prompt breakdown from cached options", () => {

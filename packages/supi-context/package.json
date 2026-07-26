@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-context",
   "version": "2.6.1",
-  "description": "SuPi Context extension — detailed context usage report via /supi-context command",
+  "description": "SuPi Context extension — agent pressure snapshots and TUI usage reports",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -38,10 +38,14 @@
     "@mrclrchtr/supi-core"
   ],
   "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*"
   },
   "peerDependenciesMeta": {
+    "@earendil-works/pi-ai": {
+      "optional": true
+    },
     "@earendil-works/pi-coding-agent": {
       "optional": true
     },
@@ -56,8 +60,7 @@
   "pi": {
     "extensions": [
       "./src/extension.ts"
-    ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-context.png"
+    ]
   },
   "main": "src/api.ts",
   "exports": {

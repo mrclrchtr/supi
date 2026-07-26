@@ -18,7 +18,13 @@ function makeAnalysis(overrides?: Partial<ContextAnalysis>): ContextAnalysis {
   return {
     modelName: "Test Model",
     contextWindow: 100_000,
-    totalTokens: 50_000,
+    usedTokens: 50_000,
+    usagePercent: 50,
+    compactionEnabled: true,
+    reserveTokens: 16_384,
+    headroomTokens: 33_616,
+    pressurePercent: 59.8,
+    compacted: false,
     scaled: true,
     approximationNote: null,
     categories: {
@@ -28,8 +34,6 @@ function makeAnalysis(overrides?: Partial<ContextAnalysis>): ContextAnalysis {
       toolCalls: 2_000,
       toolResults: 3_000,
       other: 0,
-      autocompactBuffer: 16_384,
-      freeSpace: 33_616,
     },
     systemPromptBreakdown: {
       base: 5_000,
@@ -75,8 +79,6 @@ function makeAnalysis(overrides?: Partial<ContextAnalysis>): ContextAnalysis {
         { name: "search", description: "Search code", tokens: 300 },
       ],
     },
-    full: false,
-    compaction: null,
     providerSections: [],
     ...overrides,
   };
@@ -94,7 +96,7 @@ describe("formatContextReport", () => {
     expect(modelLine).toBeDefined();
   });
 
-  it("renders category breakdown with percentages", () => {
+  it("keeps capacity values out of attribution categories", () => {
     const analysis = makeAnalysis();
     const lines = formatContextReport(analysis, mockTheme);
 
@@ -104,12 +106,13 @@ describe("formatContextReport", () => {
     expect(lines.some((l) => l.includes("System prompt"))).toBe(true);
     expect(lines.some((l) => l.includes("User messages"))).toBe(true);
     expect(lines.some((l) => l.includes("Assistant messages"))).toBe(true);
-    expect(lines.some((l) => l.includes("Autocompact buffer"))).toBe(true);
-    expect(lines.some((l) => l.includes("Free space"))).toBe(true);
-    expect(lines.some((l) => l.includes("[warning]●[/warning] Autocompact buffer"))).toBe(true);
+    expect(lines.some((l) => l.includes("Autocompact buffer"))).toBe(false);
+    expect(lines.some((l) => l.includes("Free space"))).toBe(false);
+    expect(lines.some((l) => l.includes("Compaction reserve"))).toBe(true);
+    expect(lines.some((l) => l.includes("Headroom"))).toBe(true);
   });
 
-  it("renders a compact usage bar with free space and autocompact buffer", () => {
+  it("renders a compact usage bar with Headroom and Compaction reserve", () => {
     const analysis = makeAnalysis();
     const lines = formatContextReport(analysis, mockTheme);
     const barLine = lines.find(
@@ -117,10 +120,10 @@ describe("formatContextReport", () => {
     );
 
     expect(barLine).toBeDefined();
-    expect(lines.some((line) => line.includes("[warning]▒[/warning] Autocompact buffer"))).toBe(
+    expect(lines.some((line) => line.includes("[warning]▒[/warning] Compaction reserve"))).toBe(
       true,
     );
-    expect(lines.some((line) => line.includes("[dim]░[/dim] Free space"))).toBe(true);
+    expect(lines.some((line) => line.includes("[dim]░[/dim] Headroom"))).toBe(true);
   });
 
   it("omits context files section when empty", () => {
@@ -265,10 +268,9 @@ describe("formatContextReport", () => {
       tokens: 100,
     }));
     const analysis = makeAnalysis({
-      full: true,
       toolDefinitions: { count: 8, tokens: 800, tools },
     });
-    const lines = formatContextReport(analysis, mockTheme);
+    const lines = formatContextReport(analysis, mockTheme, 200, "full");
 
     for (const tool of tools) {
       expect(lines.some((l) => l.includes(tool.name))).toBe(true);
@@ -322,8 +324,8 @@ describe("formatContextReport", () => {
 
   it("shows all guideline bullets in full mode", () => {
     const bullets = Array.from({ length: 10 }, (_, i) => `Bullet ${i + 1}`);
-    const analysis = makeAnalysis({ full: true, guidelineBullets: bullets });
-    const lines = formatContextReport(analysis, mockTheme);
+    const analysis = makeAnalysis({ guidelineBullets: bullets });
+    const lines = formatContextReport(analysis, mockTheme, 200, "full");
 
     for (const bullet of bullets) {
       expect(lines.some((l) => l.includes(bullet))).toBe(true);
@@ -331,18 +333,18 @@ describe("formatContextReport", () => {
     expect(lines.some((l) => l.includes("… and"))).toBe(false);
   });
 
-  it("shows compaction note when applicable", () => {
-    const analysis = makeAnalysis({ compaction: { summarizedTurns: 5 } });
+  it("shows factual compaction state when applicable", () => {
+    const analysis = makeAnalysis({ compacted: true });
     const lines = formatContextReport(analysis, mockTheme);
 
-    expect(lines.some((l) => l.includes("5 older turns summarized (compaction)"))).toBe(true);
+    expect(lines.some((l) => l.includes("Compaction present on the active branch"))).toBe(true);
   });
 
-  it("omits compaction note when not applicable", () => {
-    const analysis = makeAnalysis({ compaction: null });
+  it("omits the compaction note when no compaction is present", () => {
+    const analysis = makeAnalysis({ compacted: false });
     const lines = formatContextReport(analysis, mockTheme);
 
-    expect(lines.some((l) => l.includes("summarized (compaction)"))).toBe(false);
+    expect(lines.some((l) => l.includes("Compaction present"))).toBe(false);
   });
 
   it("omits provider sections when empty", () => {

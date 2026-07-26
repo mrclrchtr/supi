@@ -1,8 +1,8 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { ContextAnalysis } from "./analysis.ts";
-import { formatContextReport } from "./format.ts";
+import { type ContextReportMode, formatContextReport } from "./format.ts";
 
-/** Width-aware rendered context report shared by message and tool renderers. */
+/** Width-aware Context Usage Report shared by custom-entry and tool renderers. */
 export class ContextReportComponent {
   private cachedWidth?: number;
   private cachedLines?: string[];
@@ -10,6 +10,7 @@ export class ContextReportComponent {
   constructor(
     private readonly analysis: ContextAnalysis,
     private readonly theme: Theme,
+    private readonly mode: ContextReportMode = "preview",
   ) {}
 
   render(width: number): string[] {
@@ -17,7 +18,7 @@ export class ContextReportComponent {
       return this.cachedLines;
     }
 
-    const lines = formatContextReport(this.analysis, this.theme, width);
+    const lines = formatContextReport(this.analysis, this.theme, width, this.mode);
     this.cachedWidth = width;
     this.cachedLines = lines;
     return lines;

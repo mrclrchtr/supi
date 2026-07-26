@@ -7,6 +7,7 @@ const mockFns = vi.hoisted(() => ({
   buildSessionContext: vi.fn(),
   estimateTokens: vi.fn(() => 0),
   getLatestCompactionEntry: vi.fn(),
+  getCompactionEnabled: vi.fn(() => true),
   getCompactionReserveTokens: vi.fn(() => 16384),
   formatSkillsForPrompt: vi.fn(() => ""),
 }));
@@ -17,6 +18,7 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
   getLatestCompactionEntry: mockFns.getLatestCompactionEntry,
   SettingsManager: {
     create: () => ({
+      getCompactionEnabled: mockFns.getCompactionEnabled,
       getCompactionReserveTokens: mockFns.getCompactionReserveTokens,
     }),
   },
@@ -25,13 +27,16 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
 
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
-import { analyzeContext } from "../../src/analysis.ts";
+import { analyzeContext, analyzeContextPressure } from "../../src/analysis.ts";
 
 describe("analyzeContext edge cases", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFns.buildSessionContext.mockReturnValue({ messages: [] });
+    mockFns.estimateTokens.mockReturnValue(0);
     mockFns.getLatestCompactionEntry.mockReturnValue(null);
+    mockFns.getCompactionEnabled.mockReturnValue(true);
+    mockFns.getCompactionReserveTokens.mockReturnValue(16384);
   });
 
   it("shows pending note when tokens is null", () => {
@@ -44,7 +49,7 @@ describe("analyzeContext edge cases", () => {
 
     expect(result.approximationNote).toBe("Token count pending — send a message to refresh");
     expect(result.scaled).toBe(false);
-    expect(result.totalTokens).toBe(0);
+    expect(result.usedTokens).toBe(0);
   });
 
   it("shows approximate note when getContextUsage returns undefined", () => {
@@ -71,7 +76,7 @@ describe("analyzeContext edge cases", () => {
     expect(result.categories.userMessages).toBe(0);
     expect(result.categories.assistantMessages).toBe(0);
     expect(result.categories.toolResults).toBe(0);
-    expect(result.totalTokens).toBe(0);
+    expect(result.usedTokens).toBe(0);
   });
 
   it("keeps raw estimates when usage tokens is zero", () => {
@@ -85,7 +90,70 @@ describe("analyzeContext edge cases", () => {
     expect(result.scaled).toBe(false);
     expect(result.approximationNote).toBe("Token count pending — send a message to refresh");
     expect(result.categories.systemPrompt).toBe(100);
-    expect(result.totalTokens).toBe(100);
+    expect(result.usedTokens).toBe(100);
+  });
+
+  it("attributes fallback image estimates to user and tool-result categories", () => {
+    const image = {
+      type: "image",
+      source: { type: "base64", mediaType: "image/png", data: "AA==" },
+    };
+    mockFns.buildSessionContext.mockReturnValue({
+      messages: [
+        { role: "user", content: [image], timestamp: 0 },
+        {
+          role: "toolResult",
+          toolCallId: "tool-call",
+          toolName: "read",
+          content: [image],
+          isError: false,
+          timestamp: 0,
+        },
+      ],
+    });
+    mockFns.estimateTokens.mockReturnValue(1_200);
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: null, contextWindow: 100_000, percent: null }),
+      getSystemPrompt: () => "",
+    });
+    const pi = createPiMock();
+
+    const snapshot = analyzeContextPressure(ctx as never);
+    const report = analyzeContext(ctx as never, pi as never, undefined);
+
+    expect(snapshot.usedTokens).toBe(2_400);
+    expect(report.usedTokens).toBe(2_400);
+    expect(report.categories.userMessages).toBe(1_200);
+    expect(report.categories.toolResults).toBe(1_200);
+    expect(Object.values(report.categories).reduce((total, tokens) => total + tokens, 0)).toBe(
+      report.usedTokens,
+    );
+  });
+
+  it("includes summary content in fallback snapshot and report estimates", () => {
+    mockFns.buildSessionContext.mockReturnValue({
+      messages: [
+        {
+          role: "compactionSummary",
+          summary: "S".repeat(400),
+          tokensBefore: 1_000,
+        },
+      ],
+    });
+    mockFns.estimateTokens.mockReturnValue(100);
+    mockFns.getCompactionReserveTokens.mockReturnValue(100);
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: null, contextWindow: 1_000, percent: null }),
+      getSystemPrompt: () => "",
+    });
+    const pi = createPiMock();
+
+    const snapshot = analyzeContextPressure(ctx as never);
+    const report = analyzeContext(ctx as never, pi as never, undefined);
+
+    expect(snapshot.usedTokens).toBe(100);
+    expect(snapshot.headroomTokens).toBe(800);
+    expect(report.categories.other).toBe(100);
   });
 
   it("derives skills and context files from the current system prompt", () => {
@@ -142,7 +210,7 @@ describe("analyzeContext edge cases", () => {
     }
   });
 
-  it("detects compaction and reports summarized turns", () => {
+  it("reports factual compaction state on the active branch", () => {
     const branch = [
       {
         type: "message" as const,
@@ -208,8 +276,7 @@ describe("analyzeContext edge cases", () => {
     const pi = createPiMock();
     const result = analyzeContext(ctx as never, pi as never, undefined);
 
-    expect(result.compaction).not.toBeNull();
-    expect(result.compaction?.summarizedTurns).toBe(2); // 4 messages before compaction = 2 turns
+    expect(result.compacted).toBe(true);
   });
 
   it("handles no model selected", () => {
@@ -221,6 +288,6 @@ describe("analyzeContext edge cases", () => {
     const result = analyzeContext(ctx as never, pi as never, undefined);
 
     expect(result.modelName).toBe("No model selected");
-    expect(result.contextWindow).toBe(0);
+    expect(result.contextWindow).toBeNull();
   });
 });

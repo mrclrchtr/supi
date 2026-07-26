@@ -18,10 +18,14 @@ import {
   renderUsageBar,
 } from "./format-summary.ts";
 
+/** Presentation mode for a Context Usage Report. */
+export type ContextReportMode = "preview" | "full";
+
 export function formatContextReport(
   analysis: ContextAnalysis,
   theme: Theme,
   width = 200,
+  mode: ContextReportMode = "preview",
 ): string[] {
   const safeWidth = clampReportWidth(width);
   const lines: string[] = [];
@@ -41,8 +45,8 @@ export function formatContextReport(
     renderContextFilesSection(analysis, theme, safeWidth),
     renderInjectedFilesSection(analysis, theme, safeWidth),
     renderSkillsSection(analysis, theme, safeWidth),
-    renderGuidelinesSection(analysis, theme, safeWidth),
-    renderToolDefinitionsSection(analysis, theme, safeWidth),
+    renderGuidelinesSection(analysis, theme, safeWidth, mode === "full"),
+    renderToolDefinitionsSection(analysis, theme, safeWidth, mode === "full"),
     renderCompactionNote(analysis, theme, safeWidth),
     renderProviderSections(analysis, theme, safeWidth),
   ].filter((section) => section.length > 0);

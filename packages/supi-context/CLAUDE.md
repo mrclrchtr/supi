@@ -1,49 +1,54 @@
 # supi-context
 
-Detailed context usage report for pi via `/supi-context` and the `supi_context` agent tool.
+Observability for how a pi session occupies and approaches its context-window limit.
 
 ## Scope
 
 - `@mrclrchtr/supi-context/extension` → `src/extension.ts`
 - `@mrclrchtr/supi-context/api` → `src/api.ts`
 
+## Concepts and surfaces
+
+- **Context Pressure Snapshot** — the agent-facing, constant-shape capacity reading. `supi_context({})` defaults to this concise mode; it intentionally excludes diagnostic inventories.
+- **Context Usage Report** — the human-facing diagnostic report. `/supi-context` is registered only in TUI mode and appends a custom entry, so it stays visible in the transcript without entering LLM context.
+
+`mode: "full"` on `supi_context` returns compact diagnostic JSON. It uses Pi's normal output limits only to detect oversized output, then writes the complete valid JSON to a temporary file and returns a valid JSON envelope.
+
 ## Architecture
 
 ```
 src/
-├── context.ts          # Extension entry — registers /supi-context command + supi_context tool
-├── config.ts           # Config loading (agentToolEnabled toggle)
-├── settings-registration.ts  # /supi-settings registration for the agent tool toggle
-├── analysis.ts         # Context token breakdown (system, messages, tools, extensions)
-├── format.ts           # Report orchestration
-├── format-helpers.ts   # Shared local numeric/category helpers for report rendering
-├── format-summary.ts   # Summary, usage bar, category, and composition sections
-├── format-sections.ts  # File, skill, guideline, tool, compaction, and provider sections
-├── prompt-inference.ts # Model-specific context window detection
-├── report-component.ts # Shared width-aware report component for message/tool renderers
-├── renderer.ts         # Custom message renderer for TUI display
+├── context.ts          # Surface registration and cached system-prompt options
+├── capacity.ts         # Shared Active Context Limit, Headroom, and snapshot analysis
+├── analysis.ts         # Diagnostic attribution (system, messages, tools, extensions)
+├── config.ts           # agentToolEnabled configuration
+├── entry-renderer.ts   # TUI renderer for durable human-report entries
+├── settings-registration.ts
+├── format*.ts          # Context Usage Report sections and helpers
+├── report-component.ts # Width-aware diagnostic report component
+├── snapshot-component.ts # Width-safe concise snapshot component
+├── prompt-inference.ts # Fallback recovery of prompt inputs
 ├── tool/
-│   ├── guidance.ts     # Tool description, prompt snippet, and guidelines
-│   └── render.ts       # TUI call/result renderer for the agent tool
-└── utils.ts            # Token formatting helpers
-__tests__/
-├── tsconfig.json
-└── unit/
-    ├── analysis.test.ts
-    ├── analysis-edge.test.ts
-    ├── format.test.ts
-    └── utils.test.ts
+│   ├── guidance.ts
+│   ├── output.ts       # Compact full JSON or temp-file envelope
+│   └── render.ts
+└── utils.ts
+__tests__/unit/
+├── capacity.test.ts
+├── context.test.ts
+├── analysis*.test.ts
+├── format.test.ts
+└── render.test.ts
 ```
 
-On `/supi-context`, analyzes the current system prompt and calculates token usage breakdowns. Results are sent as a `supi-context` custom message with a TUI-visible summary in `content` and detailed analysis in `details`.
+The analysis layer shares capacity fields with both surfaces: `usedTokens`, effective `reserveTokens`, `headroomTokens`, usage/pressure percentages, and factual `compacted` state. Attribution categories never contain capacity-only values.
 
-The `supi_context` agent tool returns the same `ContextAnalysis` data as JSON so the agent can inspect context usage programmatically. Its TUI renderer uses structured `details.analysis` for the collapsed summary and expanded report, so the collapsed view never leaks raw agent-facing JSON. It is gated on the `agentToolEnabled` config flag (default `false`).
-
-Rendering uses the shared `@mrclrchtr/supi-core/report` helpers for common themed report primitives so other SuPi packages can reuse the same header, row, overflow-hint, and wrapped-text behavior.
+Rendering uses `@mrclrchtr/supi-core/report` helpers for shared themed report primitives.
 
 ## Gotchas
 
-- `supi-context` caches `event.systemPromptOptions` from `before_agent_start`; when those options are missing or incomplete, `prompt-inference.ts` backfills `contextFiles` and `skills` from the current system prompt.
-- System-prompt breakdown separates native instruction files (`AGENTS.md`, `CLAUDE.md`, etc.) from other `contextFiles`, so changes to pi's context-file loading directly affect the report.
-- Custom message renderers must explicitly display `warning` for all result states, not just `failed`/`timeout`.
-- The `supi_context` tool reads config at extension load time (`process.cwd()`). Toggling `agentToolEnabled` in `/supi-settings` requires `/reload` or a restart to take effect.
+- `supi-context` caches `event.systemPromptOptions` from `before_agent_start`; when those options are missing or incomplete, `prompt-inference.ts` backfills context files and skills from the current system prompt.
+- System-prompt breakdown separates native instruction files (`AGENTS.md`, `CLAUDE.md`, etc.) from other context files.
+- Auto-compaction settings are read when analysis runs. Its reserve is effective only while auto-compaction is enabled.
+- The human command must use `pi.appendEntry()` plus `pi.registerEntryRenderer()`, never `pi.sendMessage()` or a custom-message renderer.
+- The `supi_context` tool reads `agentToolEnabled` at extension load time (`process.cwd()`). Toggling it in `/supi-settings` requires `/reload` or a restart.

@@ -5,13 +5,18 @@ import {
   buildSessionContext,
   type ExtensionAPI,
   type ExtensionContext,
-  type estimateTokens,
+  estimateTokens,
   formatSkillsForPrompt,
   getLatestCompactionEntry,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { getRegisteredContextProviders } from "@mrclrchtr/supi-core/context";
 
+import {
+  analyzeContextCapacity,
+  type ContextPressureSnapshot,
+  createContextPressureSnapshot,
+} from "./capacity.ts";
 import { deriveOptionsFromSystemPrompt, extractGuidelinesSection } from "./prompt-inference.ts";
 
 type AgentMessage = Parameters<typeof estimateTokens>[0];
@@ -69,17 +74,9 @@ export interface ContextProviderSection {
   data: Record<string, string | number>;
 }
 
-export interface ContextAnalysis {
-  modelName: string;
-  contextWindow: number;
-  totalTokens: number | null;
+export interface ContextAnalysis extends ContextPressureSnapshot {
   scaled: boolean;
-  approximationNote: string | null;
-  full: boolean;
-  categories: CategoryTokens & {
-    autocompactBuffer: number;
-    freeSpace: number;
-  };
+  categories: CategoryTokens;
   systemPromptBreakdown: {
     base: number;
     instructionFiles: ContextFileInfo[];
@@ -98,45 +95,11 @@ export interface ContextAnalysis {
   guidelineSources: GuidelineSourceInfo[];
   toolSnippetDetails: ToolSnippetInfo[];
   toolDefinitions: { count: number; tokens: number; tools: ToolInfo[] };
-  compaction: { summarizedTurns: number } | null;
   providerSections: ContextProviderSection[];
 }
 
 export function estimateTextTokens(text: string): number {
   return Math.ceil(text.length / 4);
-}
-
-function estimateGenericContent(content: unknown): number {
-  if (typeof content === "string") {
-    return estimateTextTokens(content);
-  }
-  if (Array.isArray(content)) {
-    let chars = 0;
-    for (const block of content as Array<{ type?: string; text?: string }>) {
-      if (block.type === "text" && block.text) {
-        chars += block.text.length;
-      }
-    }
-    return Math.ceil(chars / 4);
-  }
-  return 0;
-}
-
-function estimateUserMessage(msg: Extract<AgentMessage, { role: "user" }>): number {
-  const content = msg.content;
-  if (typeof content === "string") {
-    return estimateTextTokens(content);
-  }
-  if (Array.isArray(content)) {
-    let chars = 0;
-    for (const block of content) {
-      if (block.type === "text" && block.text) {
-        chars += block.text.length;
-      }
-    }
-    return Math.ceil(chars / 4);
-  }
-  return 0;
 }
 
 function estimateAssistantMessage(msg: Extract<AgentMessage, { role: "assistant" }>): {
@@ -169,7 +132,7 @@ function estimateMessageByCategory(msg: AgentMessage): {
 } {
   if (msg.role === "user") {
     return {
-      user: estimateUserMessage(msg),
+      user: estimateTokens(msg),
       assistantText: 0,
       toolCalls: 0,
       toolResult: 0,
@@ -185,7 +148,7 @@ function estimateMessageByCategory(msg: AgentMessage): {
       user: 0,
       assistantText: 0,
       toolCalls: 0,
-      toolResult: estimateGenericContent(msg.content),
+      toolResult: estimateTokens(msg),
       other: 0,
     };
   }
@@ -194,8 +157,12 @@ function estimateMessageByCategory(msg: AgentMessage): {
     assistantText: 0,
     toolCalls: 0,
     toolResult: 0,
-    other: estimateGenericContent((msg as unknown as Record<string, unknown>).content),
+    other: estimateTokens(msg),
   };
+}
+
+function estimateMessageTokens(msg: AgentMessage): number {
+  return estimateTokens(msg);
 }
 
 function computeMessageCategories(messages: AgentMessage[]): CategoryTokens {
@@ -220,6 +187,26 @@ function computeMessageCategories(messages: AgentMessage[]): CategoryTokens {
   return categories;
 }
 
+interface ScalingResult {
+  categories: CategoryTokens;
+  scaled: boolean;
+  approximationNote: string | null;
+  usedTokens: number;
+}
+
+type CurrentContextUsage = ReturnType<ExtensionContext["getContextUsage"]>;
+
+function hasMeasuredTokens(tokens: number | null | undefined): tokens is number {
+  return typeof tokens === "number" && tokens > 0;
+}
+
+function getApproximationNote(contextUsage: CurrentContextUsage): string | null {
+  if (contextUsage === undefined) return "Approximate (no usage data available)";
+  return hasMeasuredTokens(contextUsage.tokens)
+    ? null
+    : "Token count pending — send a message to refresh";
+}
+
 function applyScaling(
   categories: CategoryTokens,
   actualTokens: number | null,
@@ -227,20 +214,13 @@ function applyScaling(
   contextUsage:
     | { tokens: number | null; contextWindow: number; percent: number | null }
     | undefined,
-): {
-  categories: CategoryTokens;
-  scaled: boolean;
-  approximationNote: string | null;
-  totalTokens: number;
-} {
+): ScalingResult {
   let scaled = false;
-  let approximationNote: string | null = null;
-  const hasActualTotal = actualTokens !== null && actualTokens > 0;
-  const totalTokens = hasActualTotal ? actualTokens : rawTotal;
+  const hasActualTotal = hasMeasuredTokens(actualTokens);
+  const usedTokens = hasActualTotal ? actualTokens : rawTotal;
+  const approximationNote = getApproximationNote(contextUsage);
 
-  if (contextUsage === undefined) {
-    approximationNote = "Approximate (no usage data available)";
-  } else if (hasActualTotal && rawTotal > 0) {
+  if (hasActualTotal && rawTotal > 0) {
     const scale = actualTokens / rawTotal;
     categories.systemPrompt = Math.round(categories.systemPrompt * scale);
     categories.userMessages = Math.round(categories.userMessages * scale);
@@ -249,11 +229,9 @@ function applyScaling(
     categories.toolResults = Math.round(categories.toolResults * scale);
     categories.other = Math.round(categories.other * scale);
     scaled = true;
-  } else if (actualTokens === null || actualTokens === 0) {
-    approximationNote = "Token count pending — send a message to refresh";
   }
 
-  return { categories, scaled, approximationNote, totalTokens };
+  return { categories, scaled, approximationNote, usedTokens };
 }
 
 /**
@@ -508,18 +486,10 @@ function computeToolDefinitions(pi: ExtensionAPI): {
   };
 }
 
-function detectCompaction(branch: ReturnType<ExtensionContext["sessionManager"]["getBranch"]>): {
-  summarizedTurns: number;
-} | null {
-  const compactionEntry = getLatestCompactionEntry(branch);
-  if (!compactionEntry) return null;
-
-  const index = branch.findIndex((e) => e.id === compactionEntry.id);
-  const messagesBefore = branch
-    .slice(0, Math.max(0, index))
-    .filter((e) => e.type === "message").length;
-  const summarizedTurns = Math.floor(messagesBefore / 2);
-  return { summarizedTurns };
+function hasCompactionOnActiveBranch(
+  branch: ReturnType<ExtensionContext["sessionManager"]["getBranch"]>,
+): boolean {
+  return getLatestCompactionEntry(branch) !== null;
 }
 
 export function extractInjectedContextFiles(messages: AgentMessage[]): InjectedFileInfo[] {
@@ -556,22 +526,93 @@ export function extractInjectedContextFiles(messages: AgentMessage[]): InjectedF
   return Array.from(seen.values()).sort((a, b) => a.turn - b.turn || a.file.localeCompare(b.file));
 }
 
+interface ContextFallback {
+  messages: AgentMessage[];
+  systemPromptText: string;
+}
+
+interface CapacityObservation {
+  branch: ReturnType<ExtensionContext["sessionManager"]["getBranch"]>;
+  contextUsage: CurrentContextUsage;
+  snapshot: ContextPressureSnapshot;
+  fallback?: ContextFallback;
+}
+
+interface ContextObservation extends ContextFallback {
+  scaling: ScalingResult;
+  snapshot: ContextPressureSnapshot;
+}
+
+function estimateContextTokens(fallback: ContextFallback): number {
+  return (
+    estimateTextTokens(fallback.systemPromptText) +
+    fallback.messages.reduce((total, message) => total + estimateMessageTokens(message), 0)
+  );
+}
+
+function collectContextFallback(
+  ctx: ExtensionContext,
+  branch: ReturnType<ExtensionContext["sessionManager"]["getBranch"]>,
+): ContextFallback {
+  return {
+    messages: buildSessionContext(branch).messages,
+    systemPromptText: ctx.getSystemPrompt(),
+  };
+}
+
+/**
+ * Observe the small shared capacity seam. It only walks messages when Pi has
+ * no measured usage total and an aggregate estimate is genuinely necessary.
+ */
+function observeCapacity(ctx: ExtensionContext): CapacityObservation {
+  const branch = ctx.sessionManager.getBranch();
+  const contextUsage = ctx.getContextUsage();
+  let fallback: ContextFallback | undefined;
+  let usedTokens: number;
+  if (hasMeasuredTokens(contextUsage?.tokens)) {
+    usedTokens = contextUsage.tokens;
+  } else {
+    fallback = collectContextFallback(ctx, branch);
+    usedTokens = estimateContextTokens(fallback);
+  }
+  const settings = SettingsManager.create(ctx.cwd, undefined, {
+    projectTrusted: ctx.isProjectTrusted(),
+  });
+  const capacity = analyzeContextCapacity({
+    contextWindow: contextUsage?.contextWindow ?? null,
+    usedTokens,
+    compactionEnabled: settings.getCompactionEnabled(),
+    configuredReserveTokens: settings.getCompactionReserveTokens(),
+    compacted: hasCompactionOnActiveBranch(branch),
+    approximationNote: getApproximationNote(contextUsage),
+  });
+
+  return {
+    branch,
+    contextUsage,
+    fallback,
+    snapshot: createContextPressureSnapshot(
+      ctx.model?.name ?? ctx.model?.id ?? "No model selected",
+      capacity,
+    ),
+  };
+}
+
+/** Return a constant-shape Context Pressure Snapshot without diagnostic attribution. */
+export function analyzeContextPressure(ctx: ExtensionContext): ContextPressureSnapshot {
+  return observeCapacity(ctx).snapshot;
+}
+
+/** Compose a full Context Usage Report from shared capacity and diagnostic attribution. */
 export function analyzeContext(
   ctx: ExtensionContext,
   pi: ExtensionAPI,
   cachedOptions: BuildSystemPromptOptions | undefined,
-  full = false,
 ): ContextAnalysis {
-  const branch = ctx.sessionManager.getBranch();
-  const apiView = buildSessionContext(branch);
-  const contextUsage = ctx.getContextUsage();
-  const contextWindow = contextUsage?.contextWindow ?? 0;
-  const actualTokens = contextUsage?.tokens ?? null;
-
-  const systemPromptText = ctx.getSystemPrompt();
-  const categories = computeMessageCategories(apiView.messages);
-  categories.systemPrompt = estimateTextTokens(systemPromptText);
-
+  const capacity = observeCapacity(ctx);
+  const fallback = capacity.fallback ?? collectContextFallback(ctx, capacity.branch);
+  const categories = computeMessageCategories(fallback.messages);
+  categories.systemPrompt = estimateTextTokens(fallback.systemPromptText);
   const rawTotal =
     categories.systemPrompt +
     categories.userMessages +
@@ -579,45 +620,33 @@ export function analyzeContext(
     categories.toolCalls +
     categories.toolResults +
     categories.other;
-
-  const scaling = applyScaling(categories, actualTokens, rawTotal, contextUsage);
-
-  const autocompactBuffer =
-    contextWindow > 0 ? SettingsManager.create(ctx.cwd).getCompactionReserveTokens() : 0;
-  const used =
-    scaling.categories.systemPrompt +
-    scaling.categories.userMessages +
-    scaling.categories.assistantMessages +
-    scaling.categories.toolCalls +
-    scaling.categories.toolResults +
-    scaling.categories.other;
-  const freeSpace = Math.max(0, contextWindow - used - autocompactBuffer);
-
+  const observation: ContextObservation = {
+    ...fallback,
+    scaling: applyScaling(
+      categories,
+      capacity.contextUsage?.tokens ?? null,
+      rawTotal,
+      capacity.contextUsage,
+    ),
+    snapshot: capacity.snapshot,
+  };
   const promptOptions = deriveOptionsFromSystemPrompt(ctx, cachedOptions);
   const breakdown = computeSystemPromptBreakdown(
     promptOptions,
-    systemPromptText,
-    scaling.categories.systemPrompt,
+    observation.systemPromptText,
+    observation.scaling.categories.systemPrompt,
     ctx.cwd,
   );
-  const injectedFiles = extractInjectedContextFiles(apiView.messages);
+  const injectedFiles = extractInjectedContextFiles(observation.messages);
   const toolDefinitions = computeToolDefinitions(pi);
-  const compaction = detectCompaction(branch);
-
-  const guidelineBullets = extractGuidelineBullets(extractGuidelinesSection(systemPromptText));
+  const guidelineBullets = extractGuidelineBullets(
+    extractGuidelinesSection(observation.systemPromptText),
+  );
 
   return {
-    modelName: ctx.model?.name ?? ctx.model?.id ?? "No model selected",
-    contextWindow,
-    totalTokens: scaling.totalTokens,
-    scaled: scaling.scaled,
-    approximationNote: scaling.approximationNote,
-    full,
-    categories: {
-      ...scaling.categories,
-      autocompactBuffer,
-      freeSpace,
-    },
+    ...observation.snapshot,
+    scaled: observation.scaling.scaled,
+    categories: observation.scaling.categories,
     systemPromptBreakdown: breakdown,
     injectedFiles,
     skills: breakdown.skills,
@@ -626,7 +655,6 @@ export function analyzeContext(
     guidelineSources: breakdown.guidelineSources,
     toolSnippetDetails: breakdown.toolSnippetDetails,
     toolDefinitions,
-    compaction,
     providerSections: collectProviderData(),
   };
 }
