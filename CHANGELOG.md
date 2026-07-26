@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.8.0](https://github.com/mrclrchtr/supi/compare/v2.7.0...v2.8.0) (2026-07-26)
+
+
+### Features
+
+* **supi-review:** configure agent tool model ([d42325a](https://github.com/mrclrchtr/supi/commit/d42325af6dcac1fe1ba016a23d26ea572659067d))
+
 ## [2.7.0](https://github.com/mrclrchtr/supi/compare/v2.6.1...v2.7.0) (2026-07-26)
 
 
