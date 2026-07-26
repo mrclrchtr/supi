@@ -46,6 +46,7 @@ The agent-facing tools follow a **prepare / critique / run** pipeline:
 
 ```text
 src/
+  config.ts             Agent-tool model config + /supi-settings registration
   review.ts             Command registration + orchestration
   review-result.ts      Verdict derivation, item ordering, and summary counts
   types.ts              ReviewSnapshot, ReviewItem, RawReviewResult, ReviewResult, etc.
@@ -88,13 +89,13 @@ __tests__/
 
 ## Key design decisions
 
-- **No review settings surface** — no `/supi-settings` integration, no persisted review model
+- **Agent model settings surface** — `/supi-settings` exposes `Review → Agent tool model`; it defaults to the current session model and can persist a scoped canonical model id
 - **Two-stage agent seam** — preparation and execution are separate tools so the main agent's Brief Critique is explicit and inspectable
 - **Dynamic run-tool activation** — `supi_review_run` stays inactive until preparation succeeds, reducing initial prompt surface
-- **Current model for agent runs** — tool-driven plans capture the current session model; command runs retain explicit user selection
+- **Configured model for agent runs** — `supi_review_prepare` resolves the setting and captures that model in the plan; command runs retain explicit user selection
 - **One-shot freshness-checked plans** — prepared plans are session-local, claimed atomically, and checked before and after concurrent review
 - **Evaluation provenance** — generated and effective briefs are retained separately with prompt version, model id, critique, and snapshot fingerprint
-- **Model selection is mandatory per run** — the user chooses the model every time from Pi's scoped `enabledModels` set
+- **Command model selection is mandatory per run** — `/supi-review` asks the user every time from Pi's scoped `enabledModels` set
 - **No presets/depth UI** — the important input is the current session history, not a generic canned mode
 - **No editable raw prompt step** — the user can inspect the raw prompt in-app, but not edit a prompt blob
 - **In-app preview inspector** — full preview stays inside Pi; no external pager is required for the primary path
@@ -150,6 +151,7 @@ The brief synthesizer chooses zero or more block IDs from this catalog and the p
 - Full preview no longer shells out to `less`; export-to-temp-file is a debugging fallback only.
 - `src/review-result.ts` is the single source of truth for verdict derivation, action/category summary counts, and review-item ordering
 - Agent-driven review plans are in-memory and session-scoped; `/reload`, session replacement, or shutdown clears them
+- The agent-tool model setting is resolved when `supi_review_prepare` starts and the concrete model is retained in the plan; later setting/session-model changes do not affect `supi_review_run`
 - `supi_review_run` must not share a tool batch with edit/write/mutating bash calls; pre/post fingerprints reject detected drift, but avoiding concurrent mutation keeps snapshot-tool reads coherent
 - Agent commit targets accept only 7–64 character hexadecimal object ids, resolve object-only through `rev-parse --disambiguate`, reject ambiguous/non-commit objects via `cat-file`, and never fall back to hexadecimal ref names. Branch targets resolve only exact local `refs/heads/*` names. Git revision arguments use `--end-of-options` where supported.
 - Branch snapshots consistently compare the merge base to `HEAD`; dirty working-tree changes belong only to the working-tree target.

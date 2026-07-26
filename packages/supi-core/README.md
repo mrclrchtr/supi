@@ -43,7 +43,7 @@ Config file locations:
 - `registerSettingsCommand(pi)` — register `/supi-settings` (used by `@mrclrchtr/supi-settings`)
 - `openSettingsOverlay(pi, ctx)` — open the shared settings UI directly
 - `createInputSubmenu()` — helper for simple text-entry submenus
-- `createModelPickerSubmenu()` — helper for scoped model selection submenus
+- `createModelPickerSubmenu()` — helper for scoped model selection submenus, with optional host-owned choices and `disabled` control
 
 The built-in settings UI supports:
 

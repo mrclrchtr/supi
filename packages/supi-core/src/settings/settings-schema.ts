@@ -91,9 +91,23 @@ export interface StringListField extends BaseField {
   kind: "stringList";
 }
 
+/** One non-model choice shown before the scoped models in a model picker. */
+export interface ModelPickerStaticOption {
+  /** Persisted value for the choice. */
+  value: string;
+  /** Human-readable picker label. */
+  label: string;
+  /** Optional explanation shown alongside the label. */
+  description?: string;
+}
+
 /** Model picker backed by the scoped model set. */
 export interface ModelPickerField extends BaseField {
   kind: "modelPicker";
+  /** Additional host-owned choices shown before scoped models. */
+  staticOptions?: ModelPickerStaticOption[];
+  /** Whether to include the built-in `disabled` choice. Defaults to true. */
+  includeDisabled?: boolean;
 }
 
 /**

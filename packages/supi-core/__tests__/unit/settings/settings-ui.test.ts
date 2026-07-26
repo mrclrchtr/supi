@@ -13,7 +13,11 @@ vi.mock("@earendil-works/pi-coding-agent", async () => {
 import type { SettingsSection } from "../../../src/settings/settings-registry.ts";
 import { SUPI_SETTINGS_COLLECT_EVENT } from "../../../src/settings/settings-registry.ts";
 import type { BoolField, ScopedFieldValue } from "../../../src/settings/settings-schema.ts";
-import { createInputSubmenu, openSettingsOverlay } from "../../../src/settings/settings-ui.ts";
+import {
+  createInputSubmenu,
+  createModelPickerSubmenu,
+  openSettingsOverlay,
+} from "../../../src/settings/settings-ui.ts";
 
 const booleanField: BoolField = { kind: "boolean", key: "enabled", label: "Enable" };
 
@@ -87,6 +91,57 @@ describe("createInputSubmenu", () => {
     const lines = submenu.render(80);
     expect(lines[0]).toContain("My Label");
     expect(lines[lines.length - 1]).toContain("enter confirm");
+  });
+});
+
+describe("createModelPickerSubmenu", () => {
+  it("keeps disabled as the default first choice", () => {
+    const done = vi.fn();
+    const submenu = createModelPickerSubmenu("disabled", done);
+
+    submenu.handleInput("\r");
+
+    expect(done).toHaveBeenCalledWith("disabled");
+  });
+
+  it("supports host-owned choices without offering disabled", () => {
+    const done = vi.fn();
+    const submenu = createModelPickerSubmenu("current", done, undefined, {
+      includeDisabled: false,
+      staticOptions: [
+        {
+          value: "current",
+          label: "current session model",
+          description: "Use the active session model",
+        },
+      ],
+    });
+
+    expect(submenu.render(80).join("\n")).toContain("current session model");
+    expect(submenu.render(80).join("\n")).not.toContain("disabled");
+    submenu.handleInput("\r");
+
+    expect(done).toHaveBeenCalledWith("current");
+  });
+
+  it("keeps only the first static option for each persisted value", () => {
+    const done = vi.fn();
+    const submenu = createModelPickerSubmenu("disabled", done, undefined, {
+      staticOptions: [
+        { value: "current", label: "first current" },
+        { value: "current", label: "duplicate current" },
+        { value: "disabled", label: "host disabled" },
+      ],
+    });
+
+    const rendered = submenu.render(80).join("\n");
+    expect(rendered).toContain("first current");
+    expect(rendered).not.toContain("duplicate current");
+    expect(rendered).toContain("host disabled");
+    expect(rendered).not.toContain("No model selected");
+    submenu.handleInput("\r");
+
+    expect(done).toHaveBeenCalledWith("disabled");
   });
 });
 

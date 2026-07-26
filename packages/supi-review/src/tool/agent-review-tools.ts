@@ -10,9 +10,10 @@ import {
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
 import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
+import { loadReviewConfig } from "../config.ts";
 import { isCommitObjectId, summarizeReviewSnapshot } from "../git.ts";
 import { serializeSessionContext } from "../history/collect.ts";
-import { getCurrentReviewModel } from "../model.ts";
+import { CURRENT_SESSION_REVIEW_MODEL, resolveAgentReviewModel } from "../model.ts";
 import { ReviewPlanStore } from "../session/review-plan-store.ts";
 import type {
   BriefEvaluation,
@@ -64,8 +65,16 @@ export function registerAgentReviewTools(
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const input = params as PrepareAgentReviewInput;
-      const model = getCurrentReviewModel(ctx);
-      if (!model) throw new Error("No current session model is available for review preparation.");
+      const configuredModelId = loadReviewConfig(ctx.cwd).agentModel;
+      const model = resolveAgentReviewModel(ctx, configuredModelId);
+      if (!model) {
+        if (configuredModelId === CURRENT_SESSION_REVIEW_MODEL) {
+          throw new Error("No current session model is available for review preparation.");
+        }
+        throw new Error(
+          `Configured agent review model "${configuredModelId}" is not available in Pi's scoped model set. Choose another model in /supi-settings.`,
+        );
+      }
 
       const target = parseTarget(input);
       const sessionContext = buildSessionContext(

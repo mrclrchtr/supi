@@ -134,9 +134,29 @@ Every `/supi-review` command run asks you to choose the reviewer model.
 - the picker only shows **scoped models** from Pi's `enabledModels` configuration
 - the current session model is preselected only when it is inside that scoped set
 - the selected model is used for both brief synthesis and the final review
-- no review model is persisted in settings
+- the command selection is not persisted
 
-Agent-driven tool runs use the current session model for preparation and all focused reviewers. The selected model is retained in the prepared plan so a model change between tool calls cannot silently alter the run.
+Agent-driven tool runs use the **Review → Agent tool model** setting in `/supi-settings` when `@mrclrchtr/supi-settings` is installed:
+
+- `current session model` is the default and preserves the active-session behavior
+- an explicit choice stores a canonical `provider/model-id` from Pi's scoped `enabledModels` set
+- the configured model is used for brief synthesis and every focused reviewer
+- project settings override global settings through the normal SuPi settings scopes
+- a configured model that is no longer scoped or available causes preparation to fail with a corrective error
+
+The resolved model is retained in the prepared plan, so changing the setting or active session model between tool calls cannot silently alter the run.
+
+For a standalone `supi-review` install without `supi-settings`, set the same value directly in the global `~/.pi/agent/supi/config.json` or project `.pi/supi/config.json` file:
+
+```json
+{
+  "review": {
+    "agentModel": "openai/gpt-5"
+  }
+}
+```
+
+Use `"current"` instead of a canonical model id to follow the active session model.
 
 ## Result shape
 
@@ -175,7 +195,8 @@ When a successful review contains review items, `supi-review` also injects an ag
 ## Source
 
 - `src/review.ts` — command orchestration and interactive flow
-- `src/model.ts` — explicit model selection helpers
+- `src/config.ts` — persisted agent-tool model setting and `/supi-settings` registration
+- `src/model.ts` — explicit and configured model selection helpers
 - `src/git.ts` — git snapshot resolution
 - `src/history/collect.ts` — compaction-style session-context serialization
 - `src/history/synthesize.ts` — brief synthesis orchestration

@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   prepareAgentReviewPlan: vi.fn(),
   runAgentReviewBatch: vi.fn(),
   recordDebugEvent: vi.fn(),
+  loadReviewConfig: vi.fn(),
+  resolveAgentReviewModel: vi.fn(),
 }));
 
 vi.mock("../../src/tool/agent-review-workflow.ts", () => ({
@@ -15,6 +17,15 @@ vi.mock("../../src/tool/agent-review-workflow.ts", () => ({
 
 vi.mock("@mrclrchtr/supi-core/debug", () => ({
   recordDebugEvent: mocks.recordDebugEvent,
+}));
+
+vi.mock("../../src/config.ts", () => ({
+  loadReviewConfig: mocks.loadReviewConfig,
+}));
+
+vi.mock("../../src/model.ts", () => ({
+  CURRENT_SESSION_REVIEW_MODEL: "current",
+  resolveAgentReviewModel: mocks.resolveAgentReviewModel,
 }));
 
 import { registerAgentReviewTools } from "../../src/tool/agent-review-tools.ts";
@@ -145,6 +156,8 @@ function batchDetails(): AgentReviewBatchDetails {
 describe("agent review tools", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.loadReviewConfig.mockReturnValue({ agentModel: "current" });
+    mocks.resolveAgentReviewModel.mockReturnValue(model);
     mocks.prepareAgentReviewPlan.mockResolvedValue({ kind: "prepared", plan: preparedPlan() });
     mocks.runAgentReviewBatch.mockImplementation(
       async (input: {
@@ -187,6 +200,12 @@ describe("agent review tools", () => {
     expect(result.content[0]?.text).toContain("src/auth.ts");
     expect(result.content[0]?.text).toContain("## Generated brief");
     expect(result.content[0]?.text).toContain("Critically compare this brief");
+    expect(mocks.loadReviewConfig).toHaveBeenCalledWith("/project");
+    expect(mocks.resolveAgentReviewModel).toHaveBeenCalledWith(
+      expect.objectContaining({ cwd: "/project" }),
+      "current",
+    );
+    expect(mocks.prepareAgentReviewPlan).toHaveBeenCalledWith(expect.objectContaining({ model }));
     expect(pi.getActiveTools()).toEqual(["read", "supi_review_prepare", "supi_review_run"]);
   });
 

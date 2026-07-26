@@ -2,6 +2,9 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getSelectableModels } from "@mrclrchtr/supi-core/model-selection";
 import type { ReviewModelSelection } from "./types.ts";
 
+/** Sentinel that resolves to the model active when review preparation starts. */
+export const CURRENT_SESSION_REVIEW_MODEL = "current";
+
 /** Build the canonical `provider/modelId` string used throughout the review flow. */
 export { toCanonicalModelId } from "@mrclrchtr/supi-core/model-selection";
 
@@ -33,5 +36,35 @@ export function getCurrentReviewModel(
     label: model.name ?? canonicalId,
     description: canonicalId,
     isCurrent: true,
+  };
+}
+
+/**
+ * Resolve the configured model for an agent-driven review.
+ *
+ * `current` preserves the historical behavior. Explicit canonical model ids
+ * must be both available and present in Pi's current scoped model set.
+ */
+export function resolveAgentReviewModel(
+  ctx: Pick<ExtensionContext, "cwd" | "modelRegistry" | "model">,
+  configuredModelId: string,
+  enabledModelPatterns?: string[],
+): ReviewModelSelection | undefined {
+  const modelId = configuredModelId.trim();
+  if (modelId === CURRENT_SESSION_REVIEW_MODEL) {
+    return getCurrentReviewModel(ctx);
+  }
+
+  const selection = getSelectableReviewModels(
+    { cwd: ctx.cwd, modelRegistry: ctx.modelRegistry, model: undefined },
+    enabledModelPatterns,
+  ).find((candidate) => candidate.canonicalId === modelId);
+  if (!selection) return undefined;
+
+  return {
+    ...selection,
+    isCurrent: ctx.model
+      ? `${ctx.model.provider}/${ctx.model.id}` === selection.canonicalId
+      : false,
   };
 }

@@ -1,6 +1,7 @@
 import { buildSessionContext, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { WidgetProgress } from "@mrclrchtr/supi-core/progress-widget";
 import { runWithProgressWidget } from "@mrclrchtr/supi-core/tool-framework";
+import { registerReviewSettings } from "./config.ts";
 import { resolveBranchSnapshot, resolveCommitSnapshot, resolveWorkingTreeSnapshot } from "./git.ts";
 import { serializeSessionContext } from "./history/collect.ts";
 import { synthesizeReviewBrief } from "./history/synthesize.ts";
@@ -29,6 +30,7 @@ type CommandContext = Parameters<Parameters<ExtensionAPI["registerCommand"]>[1][
 
 export default function reviewExtension(pi: ExtensionAPI) {
   registerReviewRenderer(pi);
+  registerReviewSettings(pi);
   registerAgentReviewTools(pi);
 
   pi.registerCommand("supi-review", {

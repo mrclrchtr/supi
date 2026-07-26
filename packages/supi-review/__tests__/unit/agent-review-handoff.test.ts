@@ -42,6 +42,10 @@ vi.mock("@mrclrchtr/supi-core/debug", () => ({
   recordDebugEvent: mocks.recordDebugEvent,
 }));
 
+vi.mock("../../src/config.ts", () => ({
+  loadReviewConfig: () => ({ agentModel: "current" }),
+}));
+
 import { registerAgentReviewTools } from "../../src/tool/agent-review-tools.ts";
 import type { ReviewModelSelection, ReviewSnapshot } from "../../src/types.ts";
 

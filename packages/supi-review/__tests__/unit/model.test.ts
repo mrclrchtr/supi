@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  CURRENT_SESSION_REVIEW_MODEL,
   getCurrentReviewModel,
   getSelectableReviewModels,
+  resolveAgentReviewModel,
   toCanonicalModelId,
 } from "../../src/model.ts";
 
@@ -91,6 +93,104 @@ describe("model selection helpers", () => {
       isCurrent: true,
     });
     expect(getCurrentReviewModel({ model: undefined })).toBeUndefined();
+  });
+
+  it("resolves an explicit agent-review model from the scoped set", () => {
+    const current = {
+      provider: "anthropic",
+      id: "claude-sonnet-4",
+      name: "Claude Sonnet 4",
+      reasoning: false,
+      contextWindow: 200_000,
+    };
+    const configured = {
+      provider: "openai",
+      id: "gpt-5",
+      name: "GPT-5",
+      reasoning: true,
+      contextWindow: 128_000,
+    };
+    const ctx = {
+      cwd: "/project",
+      model: current,
+      modelRegistry: { getAvailable: () => [current, configured] },
+    } as never;
+
+    expect(resolveAgentReviewModel(ctx, "openai/gpt-5", ["claude-*", "gpt-*"])).toMatchObject({
+      canonicalId: "openai/gpt-5",
+      model: configured,
+      isCurrent: false,
+    });
+    expect(resolveAgentReviewModel(ctx, CURRENT_SESSION_REVIEW_MODEL)).toMatchObject({
+      canonicalId: "anthropic/claude-sonnet-4",
+      model: current,
+      isCurrent: true,
+    });
+  });
+
+  it("resolves an explicit current id from the available registry instance", () => {
+    const active = {
+      provider: "openai",
+      id: "gpt-5",
+      name: "Stale active model",
+      reasoning: true,
+      contextWindow: 128_000,
+    };
+    const available = { ...active, name: "Available GPT-5" };
+    const ctx = {
+      cwd: "/project",
+      model: active,
+      modelRegistry: { getAvailable: () => [available] },
+    } as never;
+
+    expect(resolveAgentReviewModel(ctx, "openai/gpt-5", ["gpt-*"])).toMatchObject({
+      canonicalId: "openai/gpt-5",
+      model: available,
+      isCurrent: true,
+    });
+  });
+
+  it("does not treat an unavailable active model as an explicit candidate", () => {
+    const active = {
+      provider: "openai",
+      id: "gpt-5",
+      name: "GPT-5",
+      reasoning: true,
+      contextWindow: 128_000,
+    };
+    const ctx = {
+      cwd: "/project",
+      model: active,
+      modelRegistry: { getAvailable: () => [] },
+    } as never;
+
+    expect(resolveAgentReviewModel(ctx, "openai/gpt-5", ["gpt-*"])).toBeUndefined();
+    expect(resolveAgentReviewModel(ctx, CURRENT_SESSION_REVIEW_MODEL, ["gpt-*"])).toMatchObject({
+      canonicalId: "openai/gpt-5",
+      model: active,
+    });
+  });
+
+  it("rejects an explicitly configured model outside the scoped set", () => {
+    const configured = {
+      provider: "openai",
+      id: "gpt-5",
+      name: "GPT-5",
+      reasoning: true,
+      contextWindow: 128_000,
+    };
+
+    expect(
+      resolveAgentReviewModel(
+        {
+          cwd: "/project",
+          model: undefined,
+          modelRegistry: { getAvailable: () => [configured] },
+        } as never,
+        "openai/gpt-5",
+        ["claude-*"],
+      ),
+    ).toBeUndefined();
   });
 
   it("returns no models when no scoped model patterns are configured", () => {

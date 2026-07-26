@@ -62,6 +62,7 @@ src/
 - `createSessionStateRegistry()` is the shared helper for workspace-keyed session state; substrate packages should keep package-specific state unions and wait semantics local, and share only the normalized-cwd storage plumbing.
 - Call `registerDeclarativeSettings()` during the extension factory function, not async handlers.
 - `settings-schema.ts` owns source resolution (`project`/`global`/`default`), typed parsing, scoped writes, Inherit/Reset deletion, and structured `afterPersist` notifications.
+- `modelPicker` fields include `disabled` by default; use `staticOptions` for host-owned sentinels and `includeDisabled: false` when disabling is not valid.
 - `ScopedFieldValue.displayValue` includes the source badge for rendering; use `editValue` for editor prefills and concrete-choice comparisons. Do not parse the badge back out of display text.
 - Adding a new runtime export to `supi-core/index.ts` requires updating every `vi.mock("@mrclrchtr/supi-core")` factory in downstream test files; missing exports cause cryptic "No X export is defined on the mock" errors.
 - Extensions using custom message renderers should keep display text in `content` and raw model text in `details.promptContent`; `restorePromptContent()` swaps the raw text back before the model sees it.

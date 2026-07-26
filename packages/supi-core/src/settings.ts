@@ -20,6 +20,7 @@ export type {
   DeclarativeSettingsOptions,
   EnumField,
   ModelPickerField,
+  ModelPickerStaticOption,
   NumberField,
   ScopedFieldValue,
   SettingsField,

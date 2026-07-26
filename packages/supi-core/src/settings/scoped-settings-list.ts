@@ -324,6 +324,7 @@ export class ScopedSettingsList {
             this.tui.requestRender();
           },
           this.ctx,
+          row.field.field,
         ),
         onDone: () => {
           this.submenu = null;
