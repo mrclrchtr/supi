@@ -175,6 +175,17 @@ describe("canonical Tool result assembly", () => {
     expect(assembly.assembled.actions[0]?.kind).toBe("query");
   });
 
+  it("keeps no-symbol coordinate errors plain in details and frames markdown once", () => {
+    const message = "No symbol target resolved at `widget.ts:3:3` (on `comment`).";
+    const assembly = assembleResolveResult({ kind: "invalid-input", message }, "/repo");
+    const markdown = renderResolveResult(assembly);
+
+    expect(assembly.details).toMatchObject({ resultKind: "invalid-input", message });
+    expect(assembly.details.message).not.toContain("**Error:**");
+    expect(markdown).toBe(`**Error:** ${message}`);
+    expect(markdown.match(/\*\*Error:\*\*/g)).toHaveLength(1);
+  });
+
   it("renders one note for structural identifier resolution", () => {
     const assembly = assembleResolveResult(
       {

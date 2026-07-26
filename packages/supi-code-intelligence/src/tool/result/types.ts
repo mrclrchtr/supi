@@ -93,6 +93,8 @@ export interface ResolveDetails {
   /** Strict provider kind that produced a near-match result. */
   requestedKind?: TargetSymbolKind;
   confidence: ConfidenceMode;
+  /** Plain workflow failure message, present for invalid-input and unavailable results. */
+  message?: string;
   targetCount: number;
   omittedCount: number;
   evidenceLists?: EvidenceListMetadata[];

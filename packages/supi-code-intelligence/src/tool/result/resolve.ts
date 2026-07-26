@@ -80,7 +80,7 @@ function projectResolveOutcome(outcome: TargetWorkflowOutcome, cwd: string): Res
       return projectCandidateOutcome(outcome);
     case "invalid-input":
     case "unavailable":
-      return projectFailure(outcome.kind);
+      return projectFailure(outcome);
   }
 }
 
@@ -189,7 +189,10 @@ function projectCandidateOutcome(
   };
 }
 
-function projectFailure(kind: "invalid-input" | "unavailable"): ResolveProjection {
+function projectFailure(
+  outcome: Extract<TargetWorkflowOutcome, { kind: "invalid-input" | "unavailable" }>,
+): ResolveProjection {
+  const message = outcome.kind === "invalid-input" ? outcome.message : outcome.reason;
   return {
     key: "resolve.targets",
     title: "Resolved target",
@@ -198,7 +201,8 @@ function projectFailure(kind: "invalid-input" | "unavailable"): ResolveProjectio
     confidence: "unavailable",
     evidence: null,
     details: {
-      resultKind: kind,
+      resultKind: outcome.kind,
+      message,
       confidence: "unavailable",
       targetCount: 0,
       omittedCount: 0,

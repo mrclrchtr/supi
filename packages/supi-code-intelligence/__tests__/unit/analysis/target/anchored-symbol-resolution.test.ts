@@ -309,6 +309,7 @@ describe("resolveAnchoredSymbolTarget — structural fallback", () => {
     expect(result.kind).toBe("error");
     if (result.kind !== "error") return;
     expect(result.message).toContain("code_inspect");
+    expect(result.message).not.toContain("**Error:**");
     teardown();
   });
 });
