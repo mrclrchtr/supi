@@ -1,4 +1,7 @@
-import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-code-runtime/api";
+import type {
+  OutlineData,
+  StructuralProvider as StructuralSubstrate,
+} from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeFindAstKind } from "../../tool/find/ast-kinds.ts";
 import type { EvidencePartialReason } from "../evidence.ts";
 import {
@@ -266,7 +269,7 @@ async function collectMatchesForFile(
   if (kind === "definition") {
     const outline = await structural.outline(relFile);
     if (!handleStructuralResult(outline, recordFailure)) return;
-    for (const item of outline.data) {
+    for (const item of flattenOutlineItems(outline.data)) {
       if (!matcher(item.name)) continue;
       matches.push({ file: relFile, name: item.name, kind: item.kind, line: item.startLine });
     }
@@ -310,7 +313,7 @@ async function collectMatchesForFile(
 
   const outline = await structural.outline(relFile);
   if (!handleStructuralResult(outline, recordFailure)) return;
-  for (const item of outline.data) {
+  for (const item of flattenOutlineItems(outline.data)) {
     if (kind === "type" && !TYPE_LIKE_KINDS.has(item.kind.toLowerCase())) continue;
     if (kind === "interface" && item.kind.toLowerCase() !== "interface") continue;
     if (kind === "class" && item.kind.toLowerCase() !== "class") continue;
@@ -319,6 +322,11 @@ async function collectMatchesForFile(
     if (!matcher(item.name)) continue;
     matches.push({ file: relFile, name: item.name, kind: item.kind, line: item.startLine });
   }
+}
+
+/** Flatten provider outlines so nested class/interface/enum declarations remain searchable. */
+function flattenOutlineItems(items: readonly OutlineData[]): OutlineData[] {
+  return items.flatMap((item) => [item, ...flattenOutlineItems(item.children ?? [])]);
 }
 
 function handleStructuralResult<T>(
