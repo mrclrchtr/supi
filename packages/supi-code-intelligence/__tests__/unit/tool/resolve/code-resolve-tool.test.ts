@@ -1233,6 +1233,25 @@ describe("code_resolve anchored symbol resolution", () => {
     expect(whitespaceRes.details?.data.targets).toEqual([]);
   });
 
+  it("returns Coordinate resolution returned no target message when no symbol resolved", async () => {
+    const file = writeWidget(tmpDir);
+    registerMockProvider(tmpDir, { documentSymbols: async () => [] });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never, sessionCache.getOrCreate);
+    const tool = getTool(pi, "code_resolve");
+
+    const res = (await tool.execute(
+      "unresolved-coord",
+      { file: "src/widget.ts", line: 3, character: 1 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(res.content[0].text).toContain("Coordinate resolution returned no target");
+  });
+
   it("follows up with code_graph callees using a snapped name-anchor targetId", async () => {
     const file = writeWidget(tmpDir);
     registerMockProvider(tmpDir, {

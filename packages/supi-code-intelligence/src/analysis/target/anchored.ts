@@ -342,7 +342,7 @@ function coordinateNotOnSymbolMessage(
   const at = `${path.basename(file)}:${line}:${character}`;
   const reason = detail ? ` (on \`${detail}\`)` : "";
   return (
-    `**Error:** No symbol target resolved at \`${at}\`${reason}. ` +
+    `**Error:** Coordinate resolution returned no target at \`${at}\`${reason}. ` +
     "`code_resolve` resolves real symbol targets from provider-backed evidence; " +
     "use `code_inspect` for point-level facts at this coordinate, or pass the identifier coordinate of a declaration."
   );
