@@ -131,6 +131,7 @@ function projectTargetGroup(
       resultKind: "target-group",
       groupFile: relative(cwd, outcome.file) || outcome.file,
       groupDiscoveryProvenance: [...outcome.discoveryProvenance],
+      groupUnknownNestingCount: outcome.unknownNestingCount,
       confidence: outcome.confidence,
       targetCount: outcome.totalCount,
       omittedCount: evidence.metadata.omittedCount,

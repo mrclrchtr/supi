@@ -100,14 +100,25 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
     },
   );
 
-  it("establishes reusable file, symbol, and anchored targets through initial and warm readiness", async () => {
+  it("prioritizes top-level file targets and reuses them through initial and warm readiness", async () => {
     const session = getWorkspace().session;
     const fileOutcome = await session.resolve({
       target: { file: CONTRACT_FIXTURE.contracts },
-      maxResults: 20,
+      maxResults: 6,
     });
     expect(fileOutcome.kind).toBe("target-group");
     if (fileOutcome.kind !== "target-group") throw new Error("Expected a Target group.");
+    expect(fileOutcome.targets.map((target) => target.name)).toEqual([
+      "ContractAlias",
+      "Contract",
+      "ContractState",
+      "ContractWidget",
+      "helper",
+      "coordinateTarget",
+    ]);
+    expect(fileOutcome.targets.every((target) => target.container === null)).toBe(true);
+    expect(fileOutcome.unknownNestingCount).toBe(0);
+    expect(fileOutcome.omittedCount).toBeGreaterThan(0);
 
     const fileTarget = fileOutcome.targets.find((target) => target.name === "coordinateTarget");
     if (!fileTarget) throw new Error("Expected coordinateTarget in the Target group.");

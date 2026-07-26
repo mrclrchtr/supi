@@ -12,6 +12,7 @@ import type {
   CodePosition,
   CodeResult,
   CodeSymbol,
+  DocumentCodeSymbol,
   ExportData,
   ImportData,
   NodeAtData,
@@ -50,7 +51,7 @@ export type CapabilityState =
 export interface SemanticProvider {
   references(filePath: string, position: CodePosition): Promise<CodeLocation[] | null>;
   implementation(filePath: string, position: CodePosition): Promise<CodeLocation[] | null>;
-  documentSymbols(filePath: string): Promise<CodeSymbol[] | null>;
+  documentSymbols(filePath: string): Promise<DocumentCodeSymbol[] | null>;
   workspaceSymbols(query: string): Promise<CodeSymbol[] | null>;
 
   /**

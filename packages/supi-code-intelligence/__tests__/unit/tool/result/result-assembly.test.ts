@@ -286,6 +286,7 @@ describe("canonical Tool result assembly", () => {
         targets: [makeTarget("one", 1)],
         totalCount: 2,
         omittedCount: 1,
+        unknownNestingCount: 1,
       },
       "/repo",
     );
@@ -295,6 +296,7 @@ describe("canonical Tool result assembly", () => {
       resultKind: "target-group",
       groupFile: "src/a.ts",
       groupDiscoveryProvenance: ["semantic", "structural"],
+      groupUnknownNestingCount: 1,
       targetCount: 2,
       omittedCount: 1,
       targets: [{ targetId: "tg-one" }],
@@ -309,6 +311,7 @@ describe("canonical Tool result assembly", () => {
     expect(markdown).toContain("Targets in `src/a.ts`");
     expect(markdown).toContain("tg-one");
     expect(markdown).toContain("provenance: semantic+structural");
+    expect(markdown).toContain("1 declaration has unknown hierarchy");
     expect(markdown).not.toContain("tg-two");
     expect(markdown).toContain("showing 1 of 2; 1 omitted");
   });

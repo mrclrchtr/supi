@@ -6,6 +6,8 @@ import type {
   CodeLocation,
   CodePosition,
   CodeSymbol,
+  DeclarationNesting,
+  DocumentCodeSymbol,
   RefactorRequest,
   RefactorResult,
   SemanticProvider,
@@ -81,11 +83,14 @@ export function createLspSemanticProvider(lsp: WorkspaceLspRuntime): SemanticPro
       return mapped;
     },
 
-    async documentSymbols(filePath: string): Promise<CodeSymbol[] | null> {
+    async documentSymbols(filePath: string): Promise<DocumentCodeSymbol[] | null> {
       const symbols = await lsp.documentSymbols(filePath);
       if (!symbols) return null;
       const sourceLines = await readSourceLines(filePath);
-      return flattenDocumentSymbols(symbols, filePath, null, sourceLines);
+      return flattenDocumentSymbols(symbols, filePath, null, {
+        sourceLines,
+        nesting: "top-level",
+      });
     },
 
     async workspaceSymbols(query: string): Promise<CodeSymbol[] | null> {
@@ -247,27 +252,35 @@ function symbolKindName(kind: number): string {
 function flattenDocumentSymbols(
   symbols: DocumentSymbol[] | SymbolInformation[],
   filePath: string,
-  container: string | null = null,
-  sourceLines: readonly string[] | null = null,
-): CodeSymbol[] {
-  const result: CodeSymbol[] = [];
+  container: string | null,
+  context: { sourceLines: readonly string[] | null; nesting: DeclarationNesting },
+): DocumentCodeSymbol[] {
+  const result: DocumentCodeSymbol[] = [];
 
   for (const sym of symbols) {
     // DocumentSymbol.range = full defining node (declaration anchor);
     // .selectionRange = identifier token (name anchor). SymbolInformation has
     // only location.range (declaration) and no selectionRange.
-    const ds = sym as DocumentSymbol;
-    const si = sym as SymbolInformation;
-    const declStart = ds.range?.start ?? si.location?.range?.start;
+    let document: DocumentSymbol | null = null;
+    let information: SymbolInformation | null = null;
+    if (isSymbolInformation(sym)) information = sym;
+    else document = sym;
+    const declStart = document?.range.start ?? information?.location.range.start;
     if (!declStart) continue;
-    const nameStart = resolveDocumentSymbolNameStart(ds, sourceLines);
+    const nameStart = document
+      ? resolveDocumentSymbolNameStart(document, context.sourceLines)
+      : null;
+    const reportedContainer = information?.containerName ?? container;
+    // SymbolInformation is flat: containerName remains metadata, not hierarchy evidence.
+    const nesting: DeclarationNesting = information ? "unknown" : context.nesting;
 
-    const symbol: CodeSymbol = {
+    const symbol: DocumentCodeSymbol = {
       name: sym.name,
       kind: symbolKindName(sym.kind),
       file: filePath,
       declarationAnchor: { line: declStart.line + 1, character: declStart.character + 1 },
-      container,
+      container: reportedContainer,
+      nesting,
     };
     if (nameStart) {
       symbol.nameAnchor = { line: nameStart.line + 1, character: nameStart.character + 1 };
@@ -275,12 +288,23 @@ function flattenDocumentSymbols(
 
     result.push(symbol);
 
-    if (Array.isArray(ds.children) && ds.children.length > 0) {
-      result.push(...flattenDocumentSymbols(ds.children, filePath, sym.name, sourceLines));
+    if (document?.children && document.children.length > 0) {
+      result.push(
+        ...flattenDocumentSymbols(document.children, filePath, sym.name, {
+          sourceLines: context.sourceLines,
+          nesting: "nested",
+        }),
+      );
     }
   }
 
   return result;
+}
+
+function isSymbolInformation(
+  symbol: DocumentSymbol | SymbolInformation,
+): symbol is SymbolInformation {
+  return "location" in symbol;
 }
 
 async function readSourceLines(filePath: string): Promise<readonly string[] | null> {

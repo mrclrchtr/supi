@@ -12,6 +12,59 @@ const testTheme = {
 beforeAll(() => initTheme("dark"));
 
 describe("code_resolve result rendering", () => {
+  it("discloses unknown hierarchy in markdown and both TUI views", () => {
+    const target = {
+      targetId: "tg-known",
+      spanId: "sp-known",
+      file: "/repo/src/a.ts",
+      position: { line: 2, character: 9 },
+      displayLine: 3,
+      displayCharacter: 10,
+      name: "knownTop",
+      kind: "Function",
+      container: null,
+      confidence: "semantic" as const,
+      provenance: ["semantic"] as const,
+      anchorKind: "name" as const,
+      fileFingerprint: "fp",
+    };
+    const assembly = assembleResolveResult(
+      {
+        kind: "target-group",
+        file: target.file,
+        confidence: "semantic",
+        discoveryProvenance: ["semantic"],
+        targets: [target],
+        totalCount: 2,
+        omittedCount: 1,
+        unknownNestingCount: 1,
+      },
+      "/repo",
+    );
+    const markdown = renderResolveMarkdown(assembly);
+    const result = {
+      content: [{ type: "text", text: markdown }],
+      details: { type: "resolve", data: assembly.details as unknown as Record<string, unknown> },
+    };
+
+    const compact = renderResolveTui(
+      result,
+      { expanded: false, isPartial: false },
+      testTheme,
+      undefined,
+    );
+    const expanded = renderResolveTui(
+      result,
+      { expanded: true, isPartial: false },
+      testTheme,
+      undefined,
+    );
+
+    expect(markdown).toContain("1 declaration has unknown hierarchy");
+    expect(compact.render(300).join("\n")).toContain("1 hierarchy unknown");
+    expect(expanded.render(300).join("\n")).toContain("hierarchy unknown: 1");
+  });
+
   it("renders a no-symbol coordinate error with one TUI error label", () => {
     const message = "No symbol target resolved at `widget.ts:3:3` (on `comment`).";
     const assembly = assembleResolveResult({ kind: "invalid-input", message }, "/repo");

@@ -23,8 +23,8 @@ afterEach(() => {
 });
 
 describe("file Target group discovery", () => {
-  it("merges all declarations and lets semantic facts win duplicates", async () => {
-    const semantic = semanticProvider([
+  it("merges before deterministic hierarchy ranking across provider order", async () => {
+    const semanticSymbols: NonNullable<Awaited<ReturnType<SemanticProvider["documentSymbols"]>>> = [
       {
         name: "Box",
         kind: "Class",
@@ -32,6 +32,7 @@ describe("file Target group discovery", () => {
         declarationAnchor: { line: 1, character: 1 },
         nameAnchor: { line: 1, character: 14 },
         container: null,
+        nesting: "top-level",
       },
       {
         name: "method",
@@ -40,6 +41,7 @@ describe("file Target group discovery", () => {
         declarationAnchor: { line: 1, character: 20 },
         nameAnchor: { line: 1, character: 20 },
         container: "Box",
+        nesting: "nested",
       },
       {
         name: "helper",
@@ -48,9 +50,10 @@ describe("file Target group discovery", () => {
         declarationAnchor: { line: 2, character: 1 },
         nameAnchor: { line: 2, character: 7 },
         container: null,
+        nesting: "top-level",
       },
-    ]);
-    const structural = structuralProvider([
+    ];
+    const outline = [
       {
         name: "Box",
         kind: "class",
@@ -77,18 +80,22 @@ describe("file Target group discovery", () => {
         endLine: 2,
         endCharacter: 25,
       },
-    ]);
+    ];
 
-    const outcome = await resolveFileTargetGroup(file, cwd, { semantic, structural });
+    const outcome = await resolveFileTargetGroup(file, cwd, {
+      semantic: semanticProvider(semanticSymbols),
+      structural: structuralProvider(outline),
+    });
 
     expect(outcome.kind).toBe("resolved");
     if (outcome.kind !== "resolved") return;
     expect(outcome.group.targets).toHaveLength(3);
     expect(outcome.group.targets.map((target) => [target.name, target.container])).toEqual([
       ["Box", null],
-      ["method", "Box"],
       ["helper", null],
+      ["method", "Box"],
     ]);
+    expect(outcome.group.unknownNestingCount).toBe(0);
     expect(outcome.group.targets[0]).toMatchObject({
       confidence: "semantic",
       anchorKind: "name",
@@ -100,6 +107,81 @@ describe("file Target group discovery", () => {
       anchorKind: "name",
       provenance: ["semantic", "structural"] as const,
     });
+
+    const reversed = await resolveFileTargetGroup(file, cwd, {
+      semantic: semanticProvider([...semanticSymbols].reverse()),
+      structural: structuralProvider([...outline].reverse()),
+    });
+    expect(reversed.kind).toBe("resolved");
+    if (reversed.kind !== "resolved") return;
+    expect(
+      reversed.group.targets.map(({ name, container, provenance }) => ({
+        name,
+        container,
+        provenance,
+      })),
+    ).toEqual(
+      outcome.group.targets.map(({ name, container, provenance }) => ({
+        name,
+        container,
+        provenance,
+      })),
+    );
+    expect(reversed.group.unknownNestingCount).toBe(outcome.group.unknownNestingCount);
+  });
+
+  it("uses known structural nesting to refine a flat semantic observation", async () => {
+    const semantic = semanticProvider([
+      {
+        name: "outer",
+        kind: "Function",
+        file,
+        declarationAnchor: { line: 1, character: 1 },
+        nameAnchor: { line: 1, character: 10 },
+        container: null,
+        nesting: "top-level",
+      },
+      {
+        name: "nested",
+        kind: "Variable",
+        file,
+        declarationAnchor: { line: 1, character: 20 },
+        nameAnchor: { line: 1, character: 26 },
+        container: null,
+        nesting: "unknown",
+      },
+    ]);
+    const structural = structuralProvider([
+      {
+        name: "outer",
+        kind: "function",
+        startLine: 1,
+        startCharacter: 1,
+        endLine: 1,
+        endCharacter: 40,
+        children: [
+          {
+            name: "nested",
+            kind: "variable",
+            startLine: 1,
+            startCharacter: 20,
+            endLine: 1,
+            endCharacter: 35,
+          },
+        ],
+      },
+    ]);
+
+    const outcome = await resolveFileTargetGroup(file, cwd, { semantic, structural });
+
+    expect(outcome.kind).toBe("resolved");
+    if (outcome.kind !== "resolved") return;
+    expect(outcome.group.targets.map((target) => target.name)).toEqual(["outer", "nested"]);
+    expect(outcome.group.targets[1]).toMatchObject({
+      container: "outer",
+      provenance: ["semantic", "structural"] as const,
+    });
+    expect(outcome.group.unknownNestingCount).toBe(0);
   });
 
   it("deduplicates declarations emitted through the real provider adapters", async () => {
@@ -160,9 +242,64 @@ describe("file Target group discovery", () => {
 
     expect(outcome.kind).toBe("resolved");
     if (outcome.kind !== "resolved") return;
-    expect(outcome.group.targets.map((target) => target.name)).toEqual(["Box", "method", "helper"]);
+    expect(outcome.group.targets.map((target) => target.name)).toEqual(["Box", "helper", "method"]);
+    expect(outcome.group.unknownNestingCount).toBe(0);
     expect(outcome.group.targets.every((target) => target.confidence === "semantic")).toBe(true);
     expect(outcome.group.targets.every((target) => target.provenance.length === 2)).toBe(true);
+  });
+
+  it("prioritizes only proven top-level declarations after merging provider evidence", async () => {
+    const semantic = semanticProvider([
+      {
+        name: "nestedEarly",
+        kind: "Variable",
+        file,
+        declarationAnchor: { line: 1, character: 1 },
+        nameAnchor: { line: 1, character: 7 },
+        container: "outer",
+        nesting: "nested",
+      },
+      {
+        name: "unknownMiddle",
+        kind: "Variable",
+        file,
+        declarationAnchor: { line: 2, character: 1 },
+        nameAnchor: { line: 2, character: 7 },
+        container: null,
+        nesting: "unknown",
+      },
+      {
+        name: "laterTopLevel",
+        kind: "Function",
+        file,
+        declarationAnchor: { line: 3, character: 1 },
+        nameAnchor: { line: 3, character: 17 },
+        container: null,
+        nesting: "unknown",
+      },
+    ]);
+    const structural = structuralProvider([
+      {
+        name: "laterTopLevel",
+        kind: "function",
+        startLine: 3,
+        startCharacter: 1,
+        endLine: 3,
+        endCharacter: 30,
+      },
+    ]);
+
+    const outcome = await resolveFileTargetGroup(file, cwd, { semantic, structural });
+
+    expect(outcome.kind).toBe("resolved");
+    if (outcome.kind !== "resolved") return;
+    expect(outcome.group.targets.map((target) => target.name)).toEqual([
+      "laterTopLevel",
+      "nestedEarly",
+      "unknownMiddle",
+    ]);
+    expect(outcome.group.targets[0]?.provenance).toEqual(["semantic", "structural"]);
+    expect(outcome.group.unknownNestingCount).toBe(1);
   });
 
   it("keeps group confidence at the weakest member while retaining discovery provenance", async () => {
@@ -202,6 +339,7 @@ describe("file Target group discovery", () => {
         targets: [],
         confidence: "semantic",
         discoveryProvenance: ["semantic", "structural"],
+        unknownNestingCount: 0,
       },
     });
   });

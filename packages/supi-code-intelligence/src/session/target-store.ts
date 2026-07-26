@@ -56,7 +56,7 @@ export interface TargetStoreEntry {
   /** Which anchor this target carries — drives strict-consumer enforcement (ADR 0003). */
   anchorKind: AnchorKind;
   fileFingerprint: string;
-  /** Symbolic container (class/namespace/module name), or null for top-level. */
+  /** Named symbolic container, or null when no container name was reported. */
   container: string | null;
   /**
    * Resolution provenance — present when the target was resolved from
@@ -89,7 +89,7 @@ export interface TargetRegistrationInput {
   provenance: readonly TargetProviderProvenance[];
   /** Which anchor this target carries — drives strict-consumer enforcement (ADR 0003). */
   anchorKind: AnchorKind;
-  /** Symbolic container (class/namespace/module name), or null for top-level (ADR 0003 — disambiguates same-file collisions in the identity hash). */
+  /** Named symbolic container used to disambiguate same-file identity collisions, or null when unreported (ADR 0003). */
   container: string | null;
   /**
    * Resolution provenance — present when the target was resolved from

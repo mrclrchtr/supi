@@ -8,7 +8,11 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { SemanticProvider, StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
+import type {
+  DeclarationNesting,
+  SemanticProvider,
+  StructuralProvider,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   type CapabilityAdapter,
@@ -82,6 +86,7 @@ function makeTestSemantic(
     nameAnchor?: { line: number; character: number };
     declarationAnchor: { line: number; character: number };
     container?: string | null;
+    nesting?: DeclarationNesting;
   }>,
 ): SemanticProvider {
   return {
@@ -95,6 +100,7 @@ function makeTestSemantic(
           declarationAnchor: s.declarationAnchor,
           nameAnchor: s.nameAnchor,
           container: s.container ?? null,
+          nesting: s.nesting ?? "unknown",
         })),
     workspaceSymbols: async () =>
       symbols.map((s) => ({
@@ -469,19 +475,29 @@ describe("target-workflow (deep session seam)", () => {
       });
     });
 
-    it("reuses a structural member handle when semantic facts appear later", async () => {
-      writeSource("src/mod.ts", "const helper = () => 1;\n");
+    it("retains a structural container and handle when flat semantic facts appear later", async () => {
+      writeSource("src/mod.ts", "function outer() { const helper = 1; }\n");
       const structural = makeTestStructural({
         outline: async () => ({
           kind: "success",
           data: [
             {
-              name: "helper",
+              name: "outer",
               kind: "function",
               startLine: 1,
-              startCharacter: 7,
+              startCharacter: 1,
               endLine: 1,
-              endCharacter: 24,
+              endCharacter: 39,
+              children: [
+                {
+                  name: "helper",
+                  kind: "variable",
+                  startLine: 1,
+                  startCharacter: 20,
+                  endLine: 1,
+                  endCharacter: 36,
+                },
+              ],
             },
           ],
         }),
@@ -493,14 +509,18 @@ describe("target-workflow (deep session seam)", () => {
       );
       expect(first.kind).toBe("target-group");
       if (first.kind !== "target-group") return;
+      const firstHelper = first.targets.find((target) => target.name === "helper");
+      expect(firstHelper?.container).toBe("outer");
 
       const semantic = makeTestSemantic([
         {
           name: "helper",
           kind: "Variable",
           file: path.join(tmpDir, "src/mod.ts"),
-          declarationAnchor: { line: 1, character: 1 },
-          nameAnchor: { line: 1, character: 7 },
+          declarationAnchor: { line: 1, character: 20 },
+          nameAnchor: { line: 1, character: 26 },
+          container: null,
+          nesting: "unknown",
         },
       ]);
       const refined = await resolveTargetWorkflow(
@@ -510,27 +530,141 @@ describe("target-workflow (deep session seam)", () => {
       );
       expect(refined.kind).toBe("target-group");
       if (refined.kind !== "target-group") return;
+      const refinedHelper = refined.targets.find((target) => target.name === "helper");
 
-      expect(refined.targets[0]?.targetId).toBe(first.targets[0]?.targetId);
-      expect(refined.targets[0]).toMatchObject({
+      expect(refinedHelper?.targetId).toBe(firstHelper?.targetId);
+      expect(refinedHelper).toMatchObject({
         kind: "Variable",
+        container: "outer",
         anchorKind: "name",
         confidence: "semantic",
         provenance: ["semantic", "structural"] as const,
       });
     });
 
-    it("registers only bounded group members while retaining exact completeness", async () => {
-      writeSource("src/mod.ts", "const one = 1;\nconst two = 2;\nconst three = 3;\n");
-      const semantic = makeTestSemantic(
-        ["one", "two", "three"].map((name, index) => ({
-          name,
+    it("keeps reconciled hierarchy-conflict handles stable across provider order", async () => {
+      writeSource(
+        "src/mod.ts",
+        "function parent() {}\nfunction same() {}\nfunction laterTop() {}\n",
+      );
+      const semanticSymbols = [
+        {
+          name: "same",
+          kind: "Function",
+          file: path.join(tmpDir, "src/mod.ts"),
+          declarationAnchor: { line: 2, character: 1 },
+          nameAnchor: { line: 2, character: 10 },
+          container: null,
+          nesting: "top-level" as const,
+        },
+        {
+          name: "laterTop",
+          kind: "Function",
+          file: path.join(tmpDir, "src/mod.ts"),
+          declarationAnchor: { line: 3, character: 1 },
+          nameAnchor: { line: 3, character: 10 },
+          container: null,
+          nesting: "top-level" as const,
+        },
+      ];
+      const outline = [
+        {
+          name: "parent",
+          kind: "function",
+          startLine: 1,
+          startCharacter: 1,
+          endLine: 2,
+          endCharacter: 20,
+          children: [
+            {
+              name: "same",
+              kind: "function",
+              startLine: 2,
+              startCharacter: 1,
+              endLine: 2,
+              endCharacter: 20,
+            },
+          ],
+        },
+        {
+          name: "laterTop",
+          kind: "function",
+          startLine: 3,
+          startCharacter: 1,
+          endLine: 3,
+          endCharacter: 20,
+        },
+      ];
+      const resolve = (reverse: boolean) =>
+        resolveTargetWorkflow(
+          { file: "src/mod.ts" },
+          { ...DEFAULT_POLICY, fileLevelAllowed: true },
+          buildDeps(
+            new TestCapabilityAdapter({
+              semantic: makeTestSemantic(
+                reverse ? [...semanticSymbols].reverse() : semanticSymbols,
+              ),
+              structural: makeTestStructural({
+                outline: async () => ({
+                  kind: "success",
+                  data: (reverse ? [...outline].reverse() : outline) as never,
+                }),
+              }),
+            }),
+          ),
+        );
+
+      const first = await resolve(false);
+      const reversed = await resolve(true);
+
+      expect(first.kind).toBe("target-group");
+      expect(reversed.kind).toBe("target-group");
+      if (first.kind !== "target-group" || reversed.kind !== "target-group") return;
+      expect(first.targets.map((target) => target.name)).toEqual(["parent", "laterTop", "same"]);
+      expect(first.unknownNestingCount).toBe(1);
+      expect(first.targets.find((target) => target.name === "same")).toMatchObject({
+        container: null,
+        provenance: ["semantic", "structural"] as const,
+      });
+      expect(reversed.targets.map((target) => target.targetId)).toEqual(
+        first.targets.map((target) => target.targetId),
+      );
+      expect(reversed.unknownNestingCount).toBe(1);
+    });
+
+    it("registers only prioritized bounded members while retaining exact completeness", async () => {
+      writeSource(
+        "src/mod.ts",
+        "function outer() { const nested = 1; }\nconst unknown = 2;\nfunction laterTop() {}\n",
+      );
+      const symbols = [
+        {
+          name: "nested",
           kind: "Variable",
           file: path.join(tmpDir, "src/mod.ts"),
-          declarationAnchor: { line: index + 1, character: 1 },
-          nameAnchor: { line: index + 1, character: 7 },
-        })),
-      );
+          declarationAnchor: { line: 1, character: 20 },
+          nameAnchor: { line: 1, character: 26 },
+          container: "outer",
+          nesting: "nested" as const,
+        },
+        {
+          name: "unknown",
+          kind: "Variable",
+          file: path.join(tmpDir, "src/mod.ts"),
+          declarationAnchor: { line: 2, character: 1 },
+          nameAnchor: { line: 2, character: 7 },
+          nesting: "unknown" as const,
+        },
+        {
+          name: "laterTop",
+          kind: "Function",
+          file: path.join(tmpDir, "src/mod.ts"),
+          declarationAnchor: { line: 3, character: 1 },
+          nameAnchor: { line: 3, character: 10 },
+          nesting: "top-level" as const,
+        },
+      ];
+      const semantic = makeTestSemantic(symbols);
       const outcome = await resolveTargetWorkflow(
         { file: "src/mod.ts" },
         { ...DEFAULT_POLICY, fileLevelAllowed: true, maxResults: 1 },
@@ -539,10 +673,28 @@ describe("target-workflow (deep session seam)", () => {
 
       expect(outcome.kind).toBe("target-group");
       if (outcome.kind !== "target-group") return;
-      expect(outcome.targets).toHaveLength(1);
+      expect(outcome.targets.map((target) => target.name)).toEqual(["laterTop"]);
       expect(store).toHaveLength(1);
       expect(outcome.totalCount).toBe(3);
       expect(outcome.omittedCount).toBe(2);
+      expect(outcome.unknownNestingCount).toBe(1);
+
+      const repeated = await resolveTargetWorkflow(
+        { file: "src/mod.ts" },
+        { ...DEFAULT_POLICY, fileLevelAllowed: true, maxResults: 3 },
+        buildDeps(
+          new TestCapabilityAdapter({ semantic: makeTestSemantic([...symbols].reverse()) }),
+        ),
+      );
+      expect(repeated.kind).toBe("target-group");
+      if (repeated.kind !== "target-group") return;
+      expect(repeated.targets.map((target) => target.name)).toEqual([
+        "laterTop",
+        "nested",
+        "unknown",
+      ]);
+      expect(repeated.targets[0]?.targetId).toBe(outcome.targets[0]?.targetId);
+      expect(repeated).toMatchObject({ totalCount: 3, omittedCount: 0, unknownNestingCount: 1 });
     });
   });
 

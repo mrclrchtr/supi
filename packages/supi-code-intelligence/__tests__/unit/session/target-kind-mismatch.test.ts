@@ -32,6 +32,7 @@ function semanticProvider(): SemanticProvider {
       declarationAnchor: { line: 1, character: 14 },
       nameAnchor: { line: 1, character: 14 },
       container: null,
+      nesting: "top-level" as const,
     },
     {
       name: "Widget",
@@ -40,6 +41,7 @@ function semanticProvider(): SemanticProvider {
       declarationAnchor: { line: 1, character: 18 },
       nameAnchor: { line: 1, character: 18 },
       container: null,
+      nesting: "top-level" as const,
     },
   ];
   return {

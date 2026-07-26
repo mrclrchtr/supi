@@ -54,6 +54,7 @@ export type TargetWorkflowOutcome =
       targets: ReadonlyArray<Readonly<TargetStoreEntry>>;
       totalCount: number;
       omittedCount: number;
+      unknownNestingCount: number;
     }
   | {
       kind: "disambiguation";
@@ -318,6 +319,7 @@ function registerTargetGroup(
     targets: Object.freeze(targets),
     totalCount,
     omittedCount: totalCount - targets.length,
+    unknownNestingCount: group.unknownNestingCount,
   });
 }
 

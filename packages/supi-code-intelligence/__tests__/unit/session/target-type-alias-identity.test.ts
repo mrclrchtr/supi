@@ -175,6 +175,7 @@ function semanticProvider(): SemanticProvider {
     declarationAnchor: { line: 1, character: 1 },
     nameAnchor: { line: 1, character: 13 },
     container: null,
+    nesting: "top-level" as const,
   };
   return {
     documentSymbols: async () => [symbol],
@@ -216,6 +217,7 @@ function collisionSemanticProvider(): SemanticProvider {
       declarationAnchor: { line: 1, character: 1 },
       nameAnchor: { line: 1, character: 13 },
       container: null,
+      nesting: "top-level" as const,
     },
     {
       name: "UserId",
@@ -224,6 +226,7 @@ function collisionSemanticProvider(): SemanticProvider {
       declarationAnchor: { line: 1, character: 41 },
       nameAnchor: { line: 1, character: 41 },
       container: null,
+      nesting: "top-level" as const,
     },
   ];
   return {

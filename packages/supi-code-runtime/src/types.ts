@@ -34,6 +34,9 @@ export interface SymbolAnchor {
   character: number;
 }
 
+/** Provider-backed nesting evidence for a declaration reported within one document. */
+export type DeclarationNesting = "top-level" | "nested" | "unknown";
+
 /**
  * A discovered symbol / declaration.
  *
@@ -51,7 +54,19 @@ export interface CodeSymbol {
   file: string;
   declarationAnchor: SymbolAnchor;
   nameAnchor?: SymbolAnchor;
+  /** Named symbolic container when reported; absence does not prove top-level nesting. */
   container?: string | null;
+}
+
+/**
+ * A document-scoped declaration with explicit hierarchy evidence.
+ *
+ * `unknown` means the provider returned a flat observation without an actual
+ * hierarchy. A reported container name remains metadata and does not promote
+ * a flat observation to known nesting.
+ */
+export interface DocumentCodeSymbol extends CodeSymbol {
+  nesting: DeclarationNesting;
 }
 
 // ── Result types ───────────────────────────────────────────────────────

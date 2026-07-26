@@ -67,15 +67,13 @@ function renderTargetGroup(details: ResolveDetails): string {
     "",
     `- Group confidence: \`${details.confidence}\``,
     `- Discovery provenance: \`${discovery}\``,
-    "",
   ];
+  appendUnknownHierarchyDisclosure(lines, details.groupUnknownNestingCount ?? 0);
+  lines.push("");
   if (details.targets.length === 0) {
     lines.push("No declarations were reported for this file.");
   } else {
-    lines.push(
-      `**${details.targetCount} declaration${details.targetCount === 1 ? "" : "s"} discovered**`,
-      "",
-    );
+    lines.push(declarationCountHeading(details.targetCount), "");
     for (const target of details.targets) {
       const kind = target.kind ? ` (\`${target.kind}\`)` : "";
       const container = target.container ? ` in \`${target.container}\`` : "";
@@ -87,6 +85,18 @@ function renderTargetGroup(details: ResolveDetails): string {
   }
   appendDisclosure(lines, details);
   return lines.join("\n");
+}
+
+function declarationCountHeading(count: number): string {
+  return `**${count} declaration${count === 1 ? "" : "s"} discovered**`;
+}
+
+function appendUnknownHierarchyDisclosure(lines: string[], count: number): void {
+  if (count <= 0) return;
+  const declaration = count === 1 ? "declaration has" : "declarations have";
+  lines.push(
+    `- Hierarchy: ${count} ${declaration} unknown hierarchy; only provider-proven top-level declarations were prioritized.`,
+  );
 }
 
 function renderAnchoredResolutionNote(target: Readonly<TargetStoreEntry>): string | null {

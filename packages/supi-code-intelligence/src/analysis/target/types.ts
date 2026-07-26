@@ -88,7 +88,7 @@ export interface ResolvedTargetData {
   provenance: readonly TargetProviderProvenance[];
   /** Which anchor this target carries — drives strict-consumer enforcement (ADR 0003). */
   anchorKind: AnchorKind;
-  /** Symbolic container (class/namespace/module name), or null for top-level. */
+  /** Named symbolic container, or null when no container name was reported. */
   container: string | null;
   /**
    * Resolution provenance — present when the target was resolved from
@@ -109,6 +109,8 @@ export interface ResolvedTargetGroupData {
   discoveryProvenance: readonly TargetProviderProvenance[];
   /** Conservative confidence across the complete group, before display capping. */
   confidence: "semantic" | "structural" | "heuristic" | "unavailable";
+  /** Complete-group declarations whose provider observations could not establish hierarchy. */
+  unknownNestingCount: number;
 }
 
 /**

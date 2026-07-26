@@ -216,6 +216,14 @@ export function buildSimpleCompact(data: Record<string, unknown> | undefined, th
   const confidence = typeof data.confidence === "string" ? data.confidence : "";
   const dot = theme.fg("dim", "·");
   const segments = badges.map((badge) => theme.fg("success", theme.bold(badge)));
+  const unknownNestingCount = data.groupUnknownNestingCount;
+  if (
+    typeof unknownNestingCount === "number" &&
+    Number.isInteger(unknownNestingCount) &&
+    unknownNestingCount > 0
+  ) {
+    segments.push(theme.fg("warning", `${unknownNestingCount} hierarchy unknown`));
+  }
   if (confidence) {
     segments.push(`${theme.fg("dim", "confidence")} ${theme.fg("muted", confidence)}`);
   }
@@ -248,6 +256,15 @@ function structuredDetailLines(data: Record<string, unknown>): string[] {
   const unavailable = data.unavailableSections;
   if (Array.isArray(unavailable) && unavailable.length > 0) {
     lines.push(`unavailable: ${unavailable.join(", ")}`);
+  }
+
+  const unknownNestingCount = data.groupUnknownNestingCount;
+  if (
+    typeof unknownNestingCount === "number" &&
+    Number.isInteger(unknownNestingCount) &&
+    unknownNestingCount > 0
+  ) {
+    lines.push(`hierarchy unknown: ${unknownNestingCount}`);
   }
 
   const checkNext = data.checkNext;

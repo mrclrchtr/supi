@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { SemanticProvider, StructuralProvider } from "../../src/capability/types.ts";
-import type { CodeLocation, CodePosition, CodeSymbol } from "../../src/types.ts";
+import type {
+  CodeLocation,
+  CodePosition,
+  CodeSymbol,
+  DocumentCodeSymbol,
+} from "../../src/types.ts";
 import { WorkspaceRuntime } from "../../src/workspace/runtime.ts";
 
 describe("capability-broker", () => {
@@ -197,7 +202,7 @@ function createMockSemanticProvider(): SemanticProvider {
     references: async (_file: string, _pos: CodePosition): Promise<CodeLocation[] | null> => null,
     implementation: async (_file: string, _pos: CodePosition): Promise<CodeLocation[] | null> =>
       null,
-    documentSymbols: async (_file: string): Promise<CodeSymbol[] | null> => [],
+    documentSymbols: async (_file: string): Promise<DocumentCodeSymbol[] | null> => [],
     workspaceSymbols: async (_query: string): Promise<CodeSymbol[] | null> => [],
   };
 }

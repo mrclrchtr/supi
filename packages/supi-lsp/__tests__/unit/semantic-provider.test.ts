@@ -137,10 +137,48 @@ describe("LspSemanticProvider", () => {
       const provider = createLspSemanticProvider(lsp);
       const result = await provider.documentSymbols("test.ts");
       expect(result).toHaveLength(2);
-      expect(result?.[0].name).toBe("myClass");
-      expect(result?.[0].kind).toBe("Class");
-      expect(result?.[1].name).toBe("myMethod");
-      expect(result?.[1].container).toBe("myClass");
+      expect(result?.[0]).toMatchObject({
+        name: "myClass",
+        kind: "Class",
+        container: null,
+        nesting: "top-level",
+      });
+      expect(result?.[1]).toMatchObject({
+        name: "myMethod",
+        container: "myClass",
+        nesting: "nested",
+      });
+    });
+
+    it("keeps every flat SymbolInformation observation unknown", async () => {
+      const lsp = createMockLsp({
+        documentSymbols: vi.fn().mockResolvedValue([
+          {
+            name: "unknownRoot",
+            kind: 12,
+            location: {
+              uri: "file:///src/index.ts",
+              range: { start: { line: 1, character: 0 }, end: { line: 1, character: 11 } },
+            },
+          },
+          {
+            name: "knownNested",
+            kind: 6,
+            containerName: "Box",
+            location: {
+              uri: "file:///src/index.ts",
+              range: { start: { line: 2, character: 2 }, end: { line: 2, character: 13 } },
+            },
+          },
+        ]),
+      });
+
+      const result = await createLspSemanticProvider(lsp).documentSymbols("test.ts");
+
+      expect(result).toMatchObject([
+        { name: "unknownRoot", container: null, nesting: "unknown" },
+        { name: "knownNested", container: "Box", nesting: "unknown" },
+      ]);
     });
 
     it("repairs a selection range that starts at the declaration instead of the symbol name", async () => {

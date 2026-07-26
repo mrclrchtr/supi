@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { CodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
+import type { DocumentCodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it, vi } from "vitest";
 import { resolveAnchoredSymbolTarget } from "../../../../src/analysis/target/anchored.ts";
 
@@ -19,7 +19,10 @@ function teardown(): void {
 /** `export function widget() {}` — `export` at 1, `widget` name anchor at 17. */
 const WIDGET_SOURCE = "export function widget() { helper(); }\n";
 
-function docSymbols(file: string, overrides: CodeSymbol[] | null = null): CodeSymbol[] | null {
+function docSymbols(
+  file: string,
+  overrides: DocumentCodeSymbol[] | null = null,
+): DocumentCodeSymbol[] | null {
   if (overrides === null) {
     return [
       {
@@ -29,6 +32,7 @@ function docSymbols(file: string, overrides: CodeSymbol[] | null = null): CodeSy
         declarationAnchor: { line: 1, character: 1 },
         nameAnchor: { line: 1, character: 17 },
         container: null,
+        nesting: "top-level",
       },
     ];
   }
@@ -174,6 +178,7 @@ describe("resolveAnchoredSymbolTarget — ambiguous coordinates", () => {
           declarationAnchor: { line: 1, character: 1 },
           nameAnchor: { line: 1, character: 14 },
           container: null,
+          nesting: "top-level" as const,
         },
         {
           name: "b",
@@ -182,6 +187,7 @@ describe("resolveAnchoredSymbolTarget — ambiguous coordinates", () => {
           declarationAnchor: { line: 2, character: 1 },
           nameAnchor: { line: 2, character: 14 },
           container: null,
+          nesting: "top-level" as const,
         },
       ]),
     };
@@ -210,6 +216,7 @@ describe("resolveAnchoredSymbolTarget — ambiguous coordinates", () => {
           declarationAnchor: { line: 1, character: 1 },
           nameAnchor: { line: 1, character: 17 },
           container: null,
+          nesting: "top-level" as const,
         },
         {
           name: "widget",
@@ -218,6 +225,7 @@ describe("resolveAnchoredSymbolTarget — ambiguous coordinates", () => {
           declarationAnchor: { line: 1, character: 1 },
           nameAnchor: { line: 1, character: 17 },
           container: "Other",
+          nesting: "nested" as const,
         },
       ]),
     };

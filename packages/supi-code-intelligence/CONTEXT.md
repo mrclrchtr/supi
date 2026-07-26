@@ -43,8 +43,12 @@ The monotonic set of provider families—semantic and structural—that establis
 _Avoid_: strongest source, symbol-query provenance, resolution reason
 
 **Target group**:
-A bounded public collection derived from all evidence-backed declarations discovered within one file when no single symbol was selected, including nested declarations. Discovery retains exact total/omitted completeness, but only visible members are materialized as handles. The group is not itself a Resolved target; downstream precise intents select one member.
+A bounded public collection derived from all evidence-backed declarations discovered within one file when no single symbol was selected, including nested declarations. Discovery retains exact total/omitted completeness, but only visible members are materialized as handles. Provider-proven top-level declarations are presented first; every other declaration remains source-ordered. The group is not itself a Resolved target; downstream precise intents select one member.
 _Avoid_: file handle, synthetic target, unbounded handle batch, treating a file coordinate as a symbol
+
+**Declaration nesting evidence**:
+A document-declaration fact with exactly three states: `top-level`, `nested`, or `unknown`. Hierarchical LSP document symbols and structural outline ancestry establish known states. Every flat LSP `SymbolInformation` observation remains `unknown`; `containerName` is retained only as container metadata and never establishes nesting. Equivalent provider observations reconcile nesting before presentation ranking, and a Target group discloses the exact unknown count.
+_Avoid_: nullable container inference, capitalization heuristics, kind-based hierarchy, source-order fallback
 
 **Target group discovery provenance**:
 The provider families that successfully enumerated a selected file, including successful empty observations. It describes the group discovery attempt, not the evidence establishing each member.

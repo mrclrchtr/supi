@@ -78,6 +78,7 @@ function registerBasicSymbolProvider(): void {
         declarationAnchor: { line: 8, character: 1 },
         nameAnchor: { line: 8, character: 17 },
         container: null,
+        nesting: "top-level" as const,
       },
     ],
     hover: async () => ({ contents: "function widget(): number" }),
@@ -297,6 +298,7 @@ describe("code_orientation tool", () => {
           declarationAnchor: { line: 1, character: 1 },
           nameAnchor: { line: 1, character: 17 },
           container: null,
+          nesting: "top-level" as const,
         },
       ],
     });
@@ -345,6 +347,7 @@ describe("code_orientation tool", () => {
           declarationAnchor: { line: 1, character: 1 },
           nameAnchor: { line: 1, character: 17 },
           container: null,
+          nesting: "top-level" as const,
         },
       ],
       hover,
@@ -419,6 +422,7 @@ describe("code_orientation tool", () => {
           declarationAnchor: { line: 1, character: 1 },
           nameAnchor: { line: 1, character: 17 },
           container: null,
+          nesting: "top-level" as const,
         },
       ],
     });

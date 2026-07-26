@@ -15,6 +15,8 @@ export type {
   CodeResult,
   CodeSymbol,
   ConfidenceMode,
+  DeclarationNesting,
+  DocumentCodeSymbol,
   ExportData,
   ImportData,
   NodeAtData,

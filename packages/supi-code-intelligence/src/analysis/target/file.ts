@@ -10,7 +10,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type {
-  CodeSymbol,
+  DeclarationNesting,
+  DocumentCodeSymbol,
   OutlineData,
   SemanticProvider as SemanticSubstrate,
   StructuralProvider as StructuralSubstrate,
@@ -47,9 +48,14 @@ const BINARY_EXTENSIONS = new Set([
   ".node",
 ]);
 
+interface DiscoveredTargetData extends ResolvedTargetData {
+  /** Provider-backed hierarchy used only for file-result presentation ranking. */
+  readonly nesting: DeclarationNesting;
+}
+
 interface DiscoveryResult {
   readonly available: boolean;
-  readonly targets: ResolvedTargetData[];
+  readonly targets: DiscoveredTargetData[];
 }
 
 /** Validated file-discovery input with its normalized absolute path. */
@@ -96,6 +102,7 @@ export async function resolveFileTargetGroup(
   }
 
   const targets = mergeDiscoveries(structural.targets, semantic.targets);
+  const unknownNestingCount = targets.filter((target) => target.nesting === "unknown").length;
   const discoveryProvenance = [
     ...(semantic.available ? (["semantic"] as const) : []),
     ...(structural.available ? (["structural"] as const) : []),
@@ -108,6 +115,7 @@ export async function resolveFileTargetGroup(
       targets,
       discoveryProvenance,
       confidence: targetGroupConfidence(targets, discoveryProvenance),
+      unknownNestingCount,
     },
   };
 }
@@ -148,9 +156,11 @@ async function discoverSemantic(
     return {
       available: true,
       targets: await Promise.all(
-        symbols.map((symbol) =>
-          refineTypeAliasIdentity(targetFromSymbol(file, symbol), structural),
-        ),
+        symbols.map(async (symbol) => {
+          const target = targetFromSymbol(file, symbol);
+          const refined = await refineTypeAliasIdentity(target, structural);
+          return { ...refined, nesting: target.nesting };
+        }),
       ),
     };
   } catch {
@@ -158,7 +168,7 @@ async function discoverSemantic(
   }
 }
 
-function targetFromSymbol(file: string, symbol: CodeSymbol): ResolvedTargetData {
+function targetFromSymbol(file: string, symbol: DocumentCodeSymbol): DiscoveredTargetData {
   const anchor = symbol.nameAnchor ?? symbol.declarationAnchor;
   return {
     file,
@@ -173,7 +183,14 @@ function targetFromSymbol(file: string, symbol: CodeSymbol): ResolvedTargetData 
     provenance: ["semantic"],
     anchorKind: (symbol.nameAnchor ? "name" : "declaration") as AnchorKind,
     container: symbol.container ?? null,
+    nesting: normalizeNesting(symbol.nesting),
   };
+}
+
+/** Normalize process-global or legacy provider observations at the discovery seam. */
+function normalizeNesting(value: unknown): DeclarationNesting {
+  if (value === "top-level" || value === "nested" || value === "unknown") return value;
+  return "unknown";
 }
 
 async function discoverStructural(
@@ -194,9 +211,10 @@ function flattenOutline(
   file: string,
   items: readonly OutlineData[],
   container: string | null = null,
-): ResolvedTargetData[] {
+  nesting: DeclarationNesting = "top-level",
+): DiscoveredTargetData[] {
   return items.flatMap((item) => {
-    const target: ResolvedTargetData = {
+    const target: DiscoveredTargetData = {
       file,
       position: { line: item.startLine - 1, character: item.startCharacter - 1 },
       displayLine: item.startLine,
@@ -210,8 +228,9 @@ function flattenOutline(
       provenance: ["structural"],
       anchorKind: "declaration",
       container,
+      nesting,
     };
-    return [target, ...flattenOutline(file, item.children ?? [], item.name)];
+    return [target, ...flattenOutline(file, item.children ?? [], item.name, "nested")];
   });
 }
 
@@ -220,30 +239,59 @@ function flattenOutline(
  * Semantic facts win a matched pair while retaining both provider sources.
  */
 function mergeDiscoveries(
-  structural: readonly ResolvedTargetData[],
-  semantic: readonly ResolvedTargetData[],
-): ResolvedTargetData[] {
+  structural: readonly DiscoveredTargetData[],
+  semantic: readonly DiscoveredTargetData[],
+): DiscoveredTargetData[] {
   const unmatchedSemantic = new Set(semantic.map((_target, index) => index));
   const mergedStructural = structural.flatMap((structuralTarget) => {
     const semanticIndex = findSemanticMatch(structuralTarget, semantic, unmatchedSemantic);
     if (semanticIndex === null) return [structuralTarget];
     unmatchedSemantic.delete(semanticIndex);
+    const semanticTarget = semantic[semanticIndex];
     return [
       {
-        ...semantic[semanticIndex],
+        ...semanticTarget,
         provenance: ["semantic", "structural"] as const,
+        container: reconcileContainer(semanticTarget, structuralTarget),
+        nesting: reconcileNesting(semanticTarget.nesting, structuralTarget.nesting),
       },
     ];
   });
   const semanticOnly = semantic.filter((_target, index) => unmatchedSemantic.has(index));
-  return assignDeclarationOccurrences(
-    [...mergedStructural, ...semanticOnly].sort(compareDeclarations),
-  );
+  const sourceOrdered = [...mergedStructural, ...semanticOnly].sort(compareDeclarations);
+  const identified = assignDeclarationOccurrences(sourceOrdered);
+  return identified.sort(compareFileOrientationDeclarations);
+}
+
+/** Let provider-backed known hierarchy refine unknown without guessing through a conflict. */
+function reconcileNesting(
+  semantic: DeclarationNesting,
+  structural: DeclarationNesting,
+): DeclarationNesting {
+  if (semantic === structural) return semantic;
+  if (semantic === "unknown") return structural;
+  if (structural === "unknown") return semantic;
+  return "unknown";
+}
+
+/** Preserve known container evidence while clearing explicit provider conflicts. */
+function reconcileContainer(
+  semantic: DiscoveredTargetData,
+  structural: DiscoveredTargetData,
+): string | null {
+  if (semantic.container === structural.container) return semantic.container;
+  if (semantic.nesting === "unknown" && semantic.container === null) {
+    return structural.container;
+  }
+  if (structural.nesting === "unknown" && structural.container === null) {
+    return semantic.container;
+  }
+  return null;
 }
 
 function findSemanticMatch(
-  structural: ResolvedTargetData,
-  semantic: readonly ResolvedTargetData[],
+  structural: DiscoveredTargetData,
+  semantic: readonly DiscoveredTargetData[],
   unmatched: ReadonlySet<number>,
 ): number | null {
   const matches = semantic
@@ -254,23 +302,39 @@ function findSemanticMatch(
         Math.abs(left.target.declarationAnchor.character - structural.declarationAnchor.character) -
           Math.abs(
             right.target.declarationAnchor.character - structural.declarationAnchor.character,
-          ) || left.index - right.index,
+          ) ||
+        left.target.declarationAnchor.character - right.target.declarationAnchor.character ||
+        compareDeclarations(left.target, right.target) ||
+        (left.target.container ?? "").localeCompare(right.target.container ?? "") ||
+        left.target.nesting.localeCompare(right.target.nesting) ||
+        left.index - right.index,
     );
   return matches[0]?.index ?? null;
 }
 
-function sameDeclaration(left: ResolvedTargetData, right: ResolvedTargetData): boolean {
+function sameDeclaration(left: DiscoveredTargetData, right: DiscoveredTargetData): boolean {
   return (
     left.name === right.name &&
-    left.container === right.container &&
+    compatibleContainerEvidence(left, right) &&
     left.declarationAnchor.line === right.declarationAnchor.line &&
     declarationIdentityKind(left) === declarationIdentityKind(right)
   );
 }
 
+/** Container conflicts match only when both providers report the exact declaration anchor. */
+function compatibleContainerEvidence(
+  left: DiscoveredTargetData,
+  right: DiscoveredTargetData,
+): boolean {
+  return (
+    left.container === right.container ||
+    left.declarationAnchor.character === right.declarationAnchor.character
+  );
+}
+
 function assignDeclarationOccurrences(
-  targets: readonly ResolvedTargetData[],
-): ResolvedTargetData[] {
+  targets: readonly DiscoveredTargetData[],
+): DiscoveredTargetData[] {
   const occurrences = new Map<string, number>();
   return targets.map((target) => {
     const key = [
@@ -287,6 +351,17 @@ function assignDeclarationOccurrences(
 
 function declarationIdentityKind(target: ResolvedTargetData): string {
   return target.identityKind ?? canonicalDeclarationKind(target.kind);
+}
+
+function compareFileOrientationDeclarations(
+  left: DiscoveredTargetData,
+  right: DiscoveredTargetData,
+): number {
+  return topLevelRank(left) - topLevelRank(right) || compareDeclarations(left, right);
+}
+
+function topLevelRank(target: DiscoveredTargetData): number {
+  return target.nesting === "top-level" ? 0 : 1;
 }
 
 function compareDeclarations(left: ResolvedTargetData, right: ResolvedTargetData): number {

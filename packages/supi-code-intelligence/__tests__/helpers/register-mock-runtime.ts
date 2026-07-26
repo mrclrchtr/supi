@@ -7,7 +7,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import type { CodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
+import type { DocumentCodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import {
   clearWorkspaceLspRuntime,
@@ -24,12 +24,12 @@ import type { CodeProvider } from "../../src/analysis/provider.ts";
  * without each test spelling out symbols by hand.
  */
 export function fileDocumentSymbolsMock(): NonNullable<CodeProvider["documentSymbols"]> {
-  return async (filePath: string): Promise<CodeSymbol[] | null> => {
+  return async (filePath: string): Promise<DocumentCodeSymbol[] | null> => {
     try {
       if (!existsSync(filePath)) return null;
       const content = readFileSync(filePath, "utf-8");
       const lines = content.split("\n");
-      const symbols: CodeSymbol[] = [];
+      const symbols: DocumentCodeSymbol[] = [];
       const declRe =
         /^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(function|class|interface|enum|type|const|let|var)\s+([A-Za-z_$][\w$]*)/;
       for (let i = 0; i < lines.length; i++) {
@@ -52,6 +52,7 @@ export function fileDocumentSymbolsMock(): NonNullable<CodeProvider["documentSym
           declarationAnchor: { line: i + 1, character: declChar },
           nameAnchor: { line: i + 1, character: nameChar },
           container: null,
+          nesting: "top-level",
         });
       }
       return symbols;

@@ -90,6 +90,8 @@ export interface ResolveDetails {
   groupFile?: string;
   /** Providers that successfully enumerated a file-derived Target group. */
   groupDiscoveryProvenance?: readonly TargetProviderProvenance[];
+  /** Complete-group declarations whose providers could not establish nesting. */
+  groupUnknownNestingCount?: number;
   /** Strict provider kind that produced a near-match result. */
   requestedKind?: TargetSymbolKind;
   confidence: ConfidenceMode;
