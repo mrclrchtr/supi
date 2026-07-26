@@ -284,7 +284,7 @@ importers:
         version: link:../supi-core
       clipboardy:
         specifier: ^5.3.1
-        version: 5.3.1
+        version: 5.3.2
     devDependencies:
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
@@ -1418,10 +1418,6 @@ packages:
     resolution: {integrity: sha512-SWk7FgaXLNFld19peQ/rTe0n97lwR1WbkqxV6JKCAOh7U52AKV/PeMFCyt/8IhBdqyDA8rdyewQMKZqvWT5Akg==}
     engines: {node: '>=20'}
     hasBin: true
-
-  clipboardy@5.3.1:
-    resolution: {integrity: sha512-fPWgBqpp9ctiOQCkE5yjYGzv11ZU55g6ahEgr3COiio6dXdt1mbchCPXQrSR2Y9sZqfi8L7QD3+UosgXVIuPdg==}
-    engines: {node: '>=20'}
 
   clipboardy@5.3.2:
     resolution: {integrity: sha512-R35PENCHFCw6lsd5SjYPuAVV3Zawr74mKc7ogFNzoDPoQsmWDoJgUNNnWCk/czeqdZGZs8Y0M8zkOlVoySfHEQ==}
@@ -3510,15 +3506,6 @@ snapshots:
   clipboard-image@0.1.0:
     dependencies:
       run-jxa: 3.0.0
-
-  clipboardy@5.3.1:
-    dependencies:
-      clipboard-image: 0.1.0
-      execa: 9.6.1
-      is-wayland: 0.1.0
-      is-wsl: 3.1.1
-      is64bit: 2.0.0
-      powershell-utils: 0.2.0
 
   clipboardy@5.3.2:
     dependencies:
