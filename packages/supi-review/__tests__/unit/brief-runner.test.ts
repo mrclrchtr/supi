@@ -137,15 +137,21 @@ describe("runBriefSynthesis", () => {
       expect(
         (result.brief as { reviewInstructionBlockIds?: string[] }).reviewInstructionBlockIds,
       ).toEqual(["public-surface"]);
+      expect("diagnostics" in result).toBe(false);
     }
   });
 
-  it("returns failed when the synthesizer never submits a brief", async () => {
+  it("returns a host-owned failure with lifecycle diagnostics when no brief is submitted", async () => {
     mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
       setTimeout(() => listener({ type: "agent_settled" }), 10);
       return vi.fn();
     });
-    mockSession.messages = [{ role: "assistant", content: "I forgot to submit the brief." }];
+    mockSession.messages = [
+      {
+        role: "assistant",
+        content: "private assistant text that must not enter diagnostics",
+      },
+    ];
 
     const resultPromise = runBriefSynthesis({
       prompt: "synthesize",
@@ -158,8 +164,49 @@ describe("runBriefSynthesis", () => {
 
     expect(result.kind).toBe("failed");
     if (result.kind === "failed") {
-      expect(result.reason).toContain("did not call submit_review_brief");
+      expect(result.failureCode).toBe("missing-structured-output");
+      expect(result.diagnostics?.lifecycleTrace).toEqual({
+        entries: [{ type: "agent_settled" }],
+        droppedCount: 0,
+      });
+      expect(JSON.stringify(result)).not.toContain("private assistant text");
     }
+  });
+
+  it("uses the static session-creation failure code without a trace or caught error", async () => {
+    mockCreateAgentSession.mockRejectedValue(new Error("private creation error"));
+
+    const result = await runBriefSynthesis({
+      prompt: "synthesize",
+      model,
+      cwd: "/tmp",
+    });
+
+    expect(result).toEqual({ kind: "failed", failureCode: "session-creation-failed" });
+    expect(JSON.stringify(result)).not.toContain("private creation error");
+  });
+
+  it("returns prompt-rejected diagnostics without retaining a rejection error", async () => {
+    mockSession.prompt.mockImplementation(async (_prompt, options) => {
+      options?.preflightResult?.(false);
+    });
+
+    const result = await runBriefSynthesis({
+      prompt: "synthesize",
+      model,
+      cwd: "/tmp",
+    });
+
+    expect(result).toMatchObject({
+      kind: "failed",
+      failureCode: "prompt-rejected",
+      diagnostics: {
+        lifecycleTrace: {
+          entries: [{ type: "prompt_rejected" }],
+          droppedCount: 0,
+        },
+      },
+    });
   });
 
   it("returns canceled immediately when the signal is already aborted", async () => {
@@ -174,6 +221,11 @@ describe("runBriefSynthesis", () => {
     });
 
     expect(result.kind).toBe("canceled");
+    if (result.kind === "canceled") {
+      expect(result.diagnostics.lifecycleTrace.entries).toEqual([
+        { type: "abort_requested", reason: "canceled" },
+      ]);
+    }
     expect(mockCreateAgentSession).not.toHaveBeenCalled();
   });
 
@@ -203,6 +255,12 @@ describe("runBriefSynthesis", () => {
 
     const result = await resultPromise;
     expect(result.kind).toBe("canceled");
+    if (result.kind === "canceled") {
+      expect(result.diagnostics.lifecycleTrace.entries).toEqual([
+        { type: "abort_requested", reason: "canceled" },
+        { type: "agent_settled" },
+      ]);
+    }
     vi.useFakeTimers();
   });
 
@@ -230,6 +288,13 @@ describe("runBriefSynthesis", () => {
 
     const result = await resultPromise;
     expect(result.kind).toBe("timeout");
+    if (result.kind === "timeout") {
+      expect(result.diagnostics.lifecycleTrace.entries).toEqual([
+        { type: "timeout_expired" },
+        { type: "abort_requested", reason: "timeout" },
+        { type: "agent_settled" },
+      ]);
+    }
     vi.useFakeTimers();
   });
 });

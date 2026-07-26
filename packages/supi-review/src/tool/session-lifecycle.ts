@@ -1,5 +1,12 @@
 import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
-import type { ReviewProgress } from "../types.ts";
+import type { ChildFailureCode, ChildFailureDiagnostics, ReviewProgress } from "../types.ts";
+import { buildChildFailureDiagnostics } from "./child-failure-diagnostics.ts";
+import {
+  type ChildLifecycleHostMarker,
+  type ChildLifecycleTrace,
+  ChildLifecycleTraceCollector,
+  getRegisteredToolNames,
+} from "./child-lifecycle-trace.ts";
 
 /**
  * Context passed to event handlers, timeout callbacks, and result factories.
@@ -22,6 +29,12 @@ export interface LifecycleCtx<TResult> {
   state: { settled: boolean; aborting: boolean };
   /** The managed agent session. */
   session: AgentSession;
+  /** Snapshot the bounded Child Lifecycle Trace observed so far. */
+  getLifecycleTrace: () => ChildLifecycleTrace;
+  /** Build a safe non-success diagnostic artifact from the observed child run. */
+  getFailureDiagnostics: () => ChildFailureDiagnostics;
+  /** Add one allowlisted runner-control marker to the Child Lifecycle Trace. */
+  recordHostMarker: (marker: ChildLifecycleHostMarker) => void;
   /**
    * Register a teardown function that runs when cleanup is called.
    * Useful for custom timers or resources set up by `onTimeout`.
@@ -55,10 +68,33 @@ export interface RunWithLifecycleConfig<TResult> {
   onTimeout?: (ctx: LifecycleCtx<TResult>) => void;
   /** Factory for the result produced when the abort signal fires. */
   canceledResult: (ctx: LifecycleCtx<TResult>) => TResult;
-  /** Factory for the result produced when `session.prompt()` throws. */
-  failedResult: (reason: string, ctx: LifecycleCtx<TResult>) => TResult;
+  /** Factory for the result produced when prompt preflight or execution fails. */
+  failedResult: (
+    code: Extract<ChildFailureCode, "prompt-rejected" | "unexpected-runner-failure">,
+    ctx: LifecycleCtx<TResult>,
+  ) => TResult;
   /** Factory for the result produced when the timeout expires (default hard abort). */
   timeoutResult: (timeoutMs: number, ctx: LifecycleCtx<TResult>) => TResult;
+}
+
+interface StartPromptOptions {
+  session: AgentSession;
+  prompt: string;
+  onPreflightRejected: () => void;
+  onFulfilled: () => void;
+  onUnexpectedFailure: () => void;
+}
+
+function startPrompt(options: StartPromptOptions): void {
+  const { session, prompt, onPreflightRejected, onFulfilled, onUnexpectedFailure } = options;
+  try {
+    const promptPromise = session.prompt(prompt, {
+      preflightResult: (accepted) => !accepted && onPreflightRejected(),
+    });
+    void promptPromise.then(onFulfilled, onUnexpectedFailure);
+  } catch {
+    onUnexpectedFailure();
+  }
 }
 
 /**
@@ -74,6 +110,7 @@ export interface RunWithLifecycleConfig<TResult> {
  *   it by calling `ctx.resolve(ctx.cleanup(...))` itself)
  * - `session.prompt()` rejects (resolves via `failedResult`)
  */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: lifecycle ownership must remain in one state-machine closure
 export function runWithLifecycle<TResult>(
   config: RunWithLifecycleConfig<TResult>,
 ): Promise<TResult> {
@@ -99,6 +136,7 @@ export function runWithLifecycle<TResult>(
     aborting: false,
   };
   const teardownFns: (() => void)[] = [];
+  const lifecycleTrace = new ChildLifecycleTraceCollector(getRegisteredToolNames(session));
 
   const cancelTeardown = (): void => {
     for (const fn of teardownFns) {
@@ -132,18 +170,53 @@ export function runWithLifecycle<TResult>(
       progress,
       state,
       session,
+      getLifecycleTrace: () => lifecycleTrace.snapshot(),
+      getFailureDiagnostics: () =>
+        buildChildFailureDiagnostics({
+          progress,
+          session,
+          lifecycleTrace: lifecycleTrace.snapshot(),
+          recentActivity: lifecycleTrace.recentActivitySnapshot(),
+        }),
+      recordHostMarker: (marker) => lifecycleTrace.recordHostMarker(marker),
       addTeardown,
       startTime,
     };
 
+    let promptSettled = false;
+    let deferredAgentSettled: Extract<AgentSessionEvent, { type: "agent_settled" }> | undefined;
+
+    const dispatchEvent = (event: AgentSessionEvent): void => {
+      try {
+        onEvent(event, ctx);
+      } catch {
+        if (!state.settled && !state.aborting) {
+          resolve(cleanup(failedResult("unexpected-runner-failure", ctx)));
+        }
+      }
+    };
+
+    const flushDeferredSettlement = (): void => {
+      if (!deferredAgentSettled || state.settled || state.aborting) return;
+      const event = deferredAgentSettled;
+      deferredAgentSettled = undefined;
+      dispatchEvent(event);
+    };
+
     session.subscribe((event: AgentSessionEvent) => {
-      onEvent(event, ctx);
+      lifecycleTrace.observe(event);
+      if (event.type === "agent_settled" && !promptSettled) {
+        deferredAgentSettled = event;
+        return;
+      }
+      dispatchEvent(event);
     });
 
     // Abort signal handler
     const onAbort = () => {
       if (state.settled || state.aborting) return;
       state.aborting = true;
+      ctx.recordHostMarker({ type: "abort_requested", reason: "canceled" });
       void session
         .abort()
         .catch(() => {})
@@ -163,12 +236,18 @@ export function runWithLifecycle<TResult>(
     // Timeout handler
     const onTimeoutExpired = () => {
       if (state.settled || state.aborting) return;
+      ctx.recordHostMarker({ type: "timeout_expired" });
 
       if (onTimeout) {
-        onTimeout(ctx);
+        try {
+          onTimeout(ctx);
+        } catch {
+          resolve(cleanup(failedResult("unexpected-runner-failure", ctx)));
+        }
       } else {
         // Default: hard abort
         state.aborting = true;
+        ctx.recordHostMarker({ type: "abort_requested", reason: "timeout" });
         void session
           .abort()
           .catch(() => {})
@@ -181,11 +260,27 @@ export function runWithLifecycle<TResult>(
     timeoutId.unref?.();
     addTeardown(() => clearTimeout(timeoutId));
 
-    // Start the session
-    session.prompt(prompt).catch((error: unknown) => {
-      if (!state.settled) {
-        resolve(cleanup(failedResult(error instanceof Error ? error.message : String(error), ctx)));
-      }
+    // Start the session. Prompt rejection is a distinct host-owned outcome;
+    // caught provider or runner errors are intentionally never retained.
+    const rejectPrompt = () => {
+      if (state.settled || state.aborting) return;
+      ctx.recordHostMarker({ type: "prompt_rejected" });
+      resolve(cleanup(failedResult("prompt-rejected", ctx)));
+    };
+    const failUnexpectedly = () => {
+      promptSettled = true;
+      if (state.settled || state.aborting) return;
+      resolve(cleanup(failedResult("unexpected-runner-failure", ctx)));
+    };
+    startPrompt({
+      session,
+      prompt,
+      onPreflightRejected: rejectPrompt,
+      onUnexpectedFailure: failUnexpectedly,
+      onFulfilled: () => {
+        promptSettled = true;
+        flushDeferredSettlement();
+      },
     });
   });
 }

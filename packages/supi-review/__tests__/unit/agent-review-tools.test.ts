@@ -69,6 +69,15 @@ const critique: BriefCritique = {
   findings: [],
 };
 
+const childFailureDiagnostics = {
+  turns: 1,
+  toolUses: 0,
+  lifecycleTrace: {
+    entries: [{ type: "agent_settled" as const }],
+    droppedCount: 0,
+  },
+};
+
 function makeToolCtx() {
   return makeCtx({
     model: model.model,
@@ -179,6 +188,66 @@ describe("agent review tools", () => {
     expect(result.content[0]?.text).toContain("## Generated brief");
     expect(result.content[0]?.text).toContain("Critically compare this brief");
     expect(pi.getActiveTools()).toEqual(["read", "supi_review_prepare", "supi_review_run"]);
+  });
+
+  it("retains each failed reviewer trace in details and renders it in batch text", async () => {
+    const pi = createPiMock();
+    registerAgentReviewTools(pi as unknown as ExtensionAPI);
+    const details = batchDetails();
+    details.results[0] = {
+      assignment: { id: "spec", focus: "Check requested behavior." },
+      result: {
+        kind: "failed",
+        failureCode: "missing-structured-output",
+        modelId: model.canonicalId,
+        diagnostics: childFailureDiagnostics,
+      },
+    };
+    mocks.runAgentReviewBatch.mockResolvedValue({ kind: "completed", details });
+    const run = getTool(pi, "supi_review_run");
+
+    const result = (await run.execute(
+      "run-failed",
+      {
+        planId: "review-plan-123",
+        critique,
+        reviewers: [{ id: "spec", focus: "Check requested behavior." }],
+      },
+      undefined,
+      undefined,
+      makeToolCtx(),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details: AgentReviewBatchDetails;
+    };
+
+    expect(result.details.results[0]?.result).toMatchObject({
+      kind: "failed",
+      failureCode: "missing-structured-output",
+      diagnostics: childFailureDiagnostics,
+    });
+    expect(result.content[0]?.text).toContain("Child Lifecycle Trace (observed tail)");
+  });
+
+  it("throws static brief-synthesis failure copy with its compact lifecycle trace", async () => {
+    const pi = createPiMock();
+    registerAgentReviewTools(pi as unknown as ExtensionAPI);
+    mocks.prepareAgentReviewPlan.mockResolvedValue({
+      kind: "synthesis-failed",
+      result: {
+        kind: "failed",
+        failureCode: "missing-structured-output",
+        diagnostics: childFailureDiagnostics,
+      },
+    });
+    const prepare = getTool(pi, "supi_review_prepare");
+
+    await expect(
+      prepare.execute("prepare-failed", {}, undefined, undefined, makeToolCtx()),
+    ).rejects.toThrow(
+      "Brief synthesis ended without the required structured output.\n\n" +
+        "Child Lifecycle Trace (observed tail): agent_settled",
+    );
   });
 
   it("rejects incomplete branch targets before brief synthesis", async () => {

@@ -7,6 +7,7 @@ import { synthesizeReviewBrief } from "./history/synthesize.ts";
 import { normalizeReviewResult } from "./review-result.ts";
 import { buildReviewPacket } from "./target/packet.ts";
 import { registerAgentReviewTools } from "./tool/agent-review-tools.ts";
+import { createUnobservedChildFailureDiagnostics } from "./tool/child-failure-diagnostics.ts";
 import { runReviewer } from "./tool/review-runner.ts";
 import type {
   BriefSynthesisRunResult,
@@ -17,7 +18,11 @@ import type {
   ReviewTargetSpec,
 } from "./types.ts";
 import { collectReviewNote, previewReviewPlan, selectModel, selectTarget } from "./ui/flow.ts";
-import { formatReviewContent } from "./ui/format-content.ts";
+import {
+  formatBriefSynthesisFailureContent,
+  formatBriefSynthesisFailureCopy,
+  formatReviewContent,
+} from "./ui/format-content.ts";
 import { registerReviewRenderer } from "./ui/renderer.ts";
 
 type CommandContext = Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1];
@@ -74,22 +79,21 @@ async function handleInteractive(ctx: CommandContext, pi: ExtensionAPI): Promise
   );
 
   if (!synthesis) {
-    notifyBriefDone(
-      pi,
-      {
-        kind: "failed",
-        reason: "Brief synthesis encountered an unexpected error",
-      } as BriefSynthesisRunResult,
-      snapshot,
-      model.canonicalId,
-    );
-    ctx.ui.notify("Brief synthesis was canceled or failed", "warning");
+    const failure: BriefSynthesisRunResult = {
+      kind: "failed",
+      failureCode: "unexpected-runner-failure",
+      diagnostics: createUnobservedChildFailureDiagnostics(),
+    };
+    notifyBriefDone(pi, failure, snapshot, model.canonicalId);
+    injectBriefSynthesisFailureMessage(pi, failure, snapshot, model.canonicalId);
+    ctx.ui.notify(formatBriefSynthesisFailureCopy(failure), "warning");
     return;
   }
 
   notifyBriefDone(pi, synthesis, snapshot, model.canonicalId);
 
   if (synthesis.kind !== "success") {
+    injectBriefSynthesisFailureMessage(pi, synthesis, snapshot, model.canonicalId);
     notifySynthesisFailure(synthesis, ctx);
     return;
   }
@@ -122,14 +126,17 @@ async function handleInteractive(ctx: CommandContext, pi: ExtensionAPI): Promise
   );
 
   if (!rawResult) {
-    notifyReviewDone(pi, {
+    const failure: ReviewResult = {
       kind: "failed",
-      reason: "Review encountered an unexpected error",
+      failureCode: "unexpected-runner-failure",
+      diagnostics: createUnobservedChildFailureDiagnostics(),
       snapshot,
       brief,
       modelId: model.canonicalId,
-    } as ReviewResult);
-    ctx.ui.notify("Review was canceled or failed", "warning");
+    };
+    notifyReviewDone(pi, failure);
+    injectReviewMessage(pi, failure);
+    ctx.ui.notify("Reviewer ended unexpectedly.", "warning");
     return;
   }
 
@@ -172,20 +179,27 @@ function notifySynthesisFailure(
   result: Exclude<BriefSynthesisRunResult, { kind: "success" }>,
   ctx: CommandContext,
 ): void {
-  switch (result.kind) {
-    case "failed":
-      ctx.ui.notify(result.reason, "error");
-      break;
-    case "timeout":
-      ctx.ui.notify(
-        `Brief synthesis timed out after ${(result.timeoutMs / 1000).toFixed(0)}s`,
-        "warning",
-      );
-      break;
-    case "canceled":
-      ctx.ui.notify("Review canceled", "warning");
-      break;
-  }
+  ctx.ui.notify(
+    formatBriefSynthesisFailureCopy(result),
+    result.kind === "failed" ? "error" : "warning",
+  );
+}
+
+/** Persist a brief-synthesis failure so bounded diagnostics remain inspectable in parent history. */
+function injectBriefSynthesisFailureMessage(
+  pi: ExtensionAPI,
+  result: Exclude<BriefSynthesisRunResult, { kind: "success" }>,
+  snapshot: ReviewSnapshot,
+  modelId: string,
+): void {
+  pi.sendMessage({
+    customType: "supi-review",
+    content: formatBriefSynthesisFailureContent(result),
+    display: true,
+    details: {
+      briefSynthesisFailure: { result, snapshot, modelId },
+    },
+  });
 }
 
 /** Ring the terminal bell so the user knows to check back. */

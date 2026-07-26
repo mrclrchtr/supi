@@ -1,6 +1,10 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import type { PrepareAgentReviewInput, RunAgentReviewInput } from "../tool/agent-review-schemas.ts";
+import {
+  formatChildFailureCopy,
+  formatChildFailureDiagnostics,
+} from "../tool/child-failure-diagnostics.ts";
 import type {
   AgentReviewBatchDetails,
   PreparedAgentReviewDetails,
@@ -150,6 +154,7 @@ export function renderRunReviewResult(
   }
 
   if (expanded) {
+    renderReviewerDiagnostics(container, details, theme);
     container.addChild(new Spacer(1));
     for (const line of formatCritique(details.evaluation.critique)) {
       container.addChild(new Text(theme.fg("dim", line), 0, 0));
@@ -163,6 +168,28 @@ export function renderRunReviewResult(
     }
   }
   return container;
+}
+
+function renderReviewerDiagnostics(
+  container: Container,
+  details: AgentReviewBatchDetails,
+  theme: ReviewTheme,
+): void {
+  if (
+    !details.results.some((entry) => entry.result.kind !== "success" && entry.result.diagnostics)
+  ) {
+    return;
+  }
+
+  container.addChild(new Spacer(1));
+  container.addChild(new Text(theme.fg("accent", "Reviewer diagnostics"), 0, 0));
+  for (const { assignment, result } of details.results) {
+    if (result.kind === "success" || !result.diagnostics) continue;
+    container.addChild(new Text(theme.fg("muted", `${assignment.id}:`), 0, 0));
+    for (const line of formatChildFailureDiagnostics(result.diagnostics)) {
+      container.addChild(new Text(theme.fg("dim", line), 0, 0));
+    }
+  }
 }
 
 function renderProgress(details: AgentReviewProgressDetails, theme: ReviewTheme): Text {
@@ -189,7 +216,11 @@ function summarizeResult(result: AgentReviewBatchDetails["results"][number]["res
         text: `${result.output.items.length} item(s), ${result.output.overall_correctness}`,
       };
     case "failed":
-      return { icon: "✗", color: "error", text: result.reason };
+      return {
+        icon: "✗",
+        color: "error",
+        text: formatChildFailureCopy("reviewer", result.failureCode),
+      };
     case "canceled":
       return { icon: "○", color: "warning", text: "canceled" };
     case "timeout":

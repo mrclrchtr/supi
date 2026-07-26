@@ -1,12 +1,38 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Box, Container, Spacer, Text } from "@earendil-works/pi-tui";
-import type { ReviewFailureDebugInfo, ReviewItem, ReviewResult } from "../types.ts";
-import { formatLevel, formatLocation } from "./format-content.ts";
+import {
+  formatChildFailureCopy,
+  formatChildFailureDiagnostics,
+} from "../tool/child-failure-diagnostics.ts";
+import type {
+  BriefSynthesisRunResult,
+  ChildFailureDiagnostics,
+  ReviewItem,
+  ReviewResult,
+  ReviewSnapshot,
+} from "../types.ts";
+import { formatBriefSynthesisFailureCopy, formatLevel, formatLocation } from "./format-content.ts";
 
 /** Register the custom TUI renderer for `supi-review` messages. */
+interface BriefSynthesisFailureMessage {
+  result: Exclude<BriefSynthesisRunResult, { kind: "success" }>;
+  snapshot: ReviewSnapshot;
+  modelId: string;
+}
+
+interface ReviewMessageDetails {
+  result?: ReviewResult;
+  briefSynthesisFailure?: BriefSynthesisFailureMessage;
+}
+
 export function registerReviewRenderer(pi: ExtensionAPI): void {
   pi.registerMessageRenderer("supi-review", (message, { expanded }, theme) => {
-    const result = (message.details as { result?: ReviewResult } | undefined)?.result;
+    const details = message.details as ReviewMessageDetails | undefined;
+    if (details?.briefSynthesisFailure) {
+      return renderBriefSynthesisFailure(details.briefSynthesisFailure, theme);
+    }
+
+    const result = details?.result;
     if (!result) {
       return new Text(theme.fg("dim", "No review data"), 1, 0);
     }
@@ -24,6 +50,31 @@ export function registerReviewRenderer(pi: ExtensionAPI): void {
         return new Text(theme.fg("dim", "Unknown review state"), 1, 0);
     }
   });
+}
+
+function renderBriefSynthesisFailure(
+  failure: BriefSynthesisFailureMessage,
+  theme: Parameters<Parameters<ExtensionAPI["registerMessageRenderer"]>[1]>[2],
+): Container {
+  const container = new Container();
+  const title =
+    failure.result.kind === "failed"
+      ? "◆ Brief Synthesis Failed"
+      : failure.result.kind === "timeout"
+        ? "◆ Brief Synthesis Timed Out"
+        : "◆ Brief Synthesis Canceled";
+  const color = failure.result.kind === "failed" ? "error" : "warning";
+
+  container.addChild(new Text(theme.fg(color, title), 1, 0));
+  container.addChild(new Spacer(1));
+  container.addChild(new Text(theme.fg("muted", `Model: ${failure.modelId}`), 1, 0));
+  container.addChild(new Text(theme.fg("muted", `Snapshot: ${failure.snapshot.title}`), 1, 0));
+  container.addChild(new Spacer(1));
+  container.addChild(
+    new Text(theme.fg(color, formatBriefSynthesisFailureCopy(failure.result)), 1, 0),
+  );
+  renderChildFailureDiagnostics(container, failure.result.diagnostics, theme);
+  return container;
 }
 
 function renderSuccess(
@@ -160,8 +211,10 @@ function renderFailed(
   container.addChild(new Text(theme.fg("muted", `Model: ${result.modelId}`), 1, 0));
   container.addChild(new Text(theme.fg("muted", `Snapshot: ${result.snapshot.title}`), 1, 0));
   container.addChild(new Spacer(1));
-  container.addChild(new Text(theme.fg("error", result.reason), 1, 0));
-  renderFailureDebug(container, result.debug, theme);
+  container.addChild(
+    new Text(theme.fg("error", formatChildFailureCopy("reviewer", result.failureCode)), 1, 0),
+  );
+  renderChildFailureDiagnostics(container, result.diagnostics, theme);
   return container;
 }
 
@@ -175,19 +228,8 @@ function renderTimeout(
   container.addChild(new Text(theme.fg("muted", `Model: ${result.modelId}`), 1, 0));
   container.addChild(new Text(theme.fg("muted", `Snapshot: ${result.snapshot.title}`), 1, 0));
   container.addChild(new Spacer(1));
-  container.addChild(
-    new Text(
-      theme.fg("warning", `Reviewer exceeded the ${(result.timeoutMs / 1000).toFixed(0)}s timeout`),
-      1,
-      0,
-    ),
-  );
-  if (result.partialOutput) {
-    container.addChild(new Spacer(1));
-    container.addChild(new Text(theme.fg("dim", "Partial output:"), 1, 0));
-    container.addChild(new Text(theme.fg("dim", result.partialOutput.slice(0, 500)), 1, 0));
-  }
-  renderFailureDebug(container, result.debug, theme);
+  container.addChild(new Text(theme.fg("warning", "Reviewer timed out."), 1, 0));
+  renderChildFailureDiagnostics(container, result.diagnostics, theme);
   return container;
 }
 
@@ -197,41 +239,21 @@ function renderCanceled(
 ): Container {
   const container = new Container();
   container.addChild(new Text(theme.fg("warning", "◆ Review Canceled"), 1, 0));
-  renderFailureDebug(container, result.debug, theme);
+  container.addChild(new Text(theme.fg("warning", "Reviewer was canceled."), 1, 0));
+  renderChildFailureDiagnostics(container, result.diagnostics, theme);
   return container;
 }
 
-function renderFailureDebug(
+function renderChildFailureDiagnostics(
   container: Container,
-  debug: ReviewFailureDebugInfo | undefined,
+  diagnostics: ChildFailureDiagnostics | undefined,
   theme: Parameters<Parameters<ExtensionAPI["registerMessageRenderer"]>[1]>[2],
 ): void {
-  if (!debug) return;
-
-  const lines = [
-    `Turns: ${debug.turns} · Tool uses: ${debug.toolUses}`,
-    debug.tokens
-      ? `Tokens: ${debug.tokens.input} in / ${debug.tokens.output} out / ${debug.tokens.total} total`
-      : undefined,
-    debug.recentEvents && debug.recentEvents.length > 0
-      ? `Recent events: ${debug.recentEvents.join(" → ")}`
-      : undefined,
-    debug.lastAssistantStopReason
-      ? `Last assistant stop: ${debug.lastAssistantStopReason}`
-      : undefined,
-    debug.lastAssistantToolCalls && debug.lastAssistantToolCalls.length > 0
-      ? `Last assistant tools: ${debug.lastAssistantToolCalls.join(", ")}`
-      : undefined,
-    debug.lastAssistantErrorMessage
-      ? `Last assistant error: ${debug.lastAssistantErrorMessage}`
-      : undefined,
-  ].filter((line): line is string => !!line);
-
-  if (lines.length === 0) return;
+  if (!diagnostics) return;
 
   container.addChild(new Spacer(1));
-  container.addChild(new Text(theme.fg("dim", "Debug:"), 1, 0));
-  for (const line of lines) {
+  container.addChild(new Text(theme.fg("dim", "Diagnostics:"), 1, 0));
+  for (const line of formatChildFailureDiagnostics(diagnostics)) {
     container.addChild(new Text(theme.fg("dim", line), 1, 0));
   }
 }

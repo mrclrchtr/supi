@@ -60,6 +60,51 @@ describe("agent review tool rendering", () => {
     expect(output).toContain("Regression coverage");
   });
 
+  it("shows each failed reviewer's lifecycle diagnostics in expanded results", () => {
+    const details: AgentReviewBatchDetails = {
+      kind: "review-batch",
+      evaluation: {
+        planId: "review-plan-123",
+        briefPromptVersion: "1",
+        generatedBrief: brief,
+        critique,
+        effectiveBrief: brief,
+        synthesizerModelId: "anthropic/claude-sonnet-4",
+        snapshotFingerprint: "fingerprint",
+      },
+      snapshot: {
+        target: { kind: "working-tree" },
+        title: "Working tree changes",
+        changedFiles: ["src/auth.ts"],
+        stats: { files: 1, additions: 1, deletions: 0 },
+      },
+      results: [
+        {
+          assignment: { id: "spec", focus: "Check behavior." },
+          result: {
+            kind: "failed",
+            failureCode: "missing-structured-output",
+            modelId: "anthropic/claude-sonnet-4",
+            diagnostics: {
+              turns: 1,
+              toolUses: 0,
+              lifecycleTrace: {
+                entries: [{ type: "agent_settled" }],
+                droppedCount: 0,
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    const output = render(renderRunReviewResult({ content: [], details }, true, theme() as never));
+
+    expect(output).toContain("Reviewer diagnostics");
+    expect(output).toContain("spec");
+    expect(output).toContain("Child Lifecycle Trace (observed tail)");
+  });
+
   it("shows the retained critique in expanded completed results", () => {
     const details: AgentReviewBatchDetails = {
       kind: "review-batch",

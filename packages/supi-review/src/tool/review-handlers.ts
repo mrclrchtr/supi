@@ -4,17 +4,13 @@ import {
   defineTool,
 } from "@earendil-works/pi-coding-agent";
 import type {
+  ChildFailureDiagnostics,
   RawReviewResult,
   ReviewInvocation,
   ReviewOutputEvent,
   ReviewProgress,
 } from "../types.ts";
-import {
-  buildFailureDebug,
-  extractLastAssistantDebug,
-  pushRecentEvent,
-  summarizeSessionEvent,
-} from "./review-debug.ts";
+import type { ChildLifecycleHostMarker } from "./child-lifecycle-trace.ts";
 import { buildProgressTokens } from "./runner-helpers.ts";
 import { reviewOutputSchema } from "./schemas.ts";
 
@@ -37,7 +33,8 @@ export interface RunnerContext {
   submitSteered: boolean;
   timeoutSteered: boolean;
   graceTurnsRemaining: number | undefined;
-  debug: { recentEvents: string[] };
+  getFailureDiagnostics: () => ChildFailureDiagnostics;
+  recordHostMarker: (marker: ChildLifecycleHostMarker) => void;
   /** Accumulated per-tool-label execution counts. */
   toolCounts: Record<string, number>;
   /** Set of distinct file paths inspected via read_snapshot_diff / read_snapshot_file. */
@@ -233,6 +230,7 @@ export function handleMessageEnd(
   if (msg.role !== "assistant" || msg.stopReason !== "stop") return;
 
   ctx.submitSteered = true;
+  ctx.recordHostMarker({ type: "steer_requested", reason: "submit" });
   ctx.session.steer(STEER_SUBMIT_MESSAGE).catch(() => {});
 }
 
@@ -256,28 +254,19 @@ export function handleAgentSettled(ctx: RunnerContext): void {
     return;
   }
 
-  const lastText = extractLastAssistantDebug(ctx.session)?.text;
   ctx.resolve(
     ctx.cleanup({
       kind: "failed",
-      reason: lastText
-        ? `Reviewer did not call submit_review. Assistant said: ${truncateText(lastText, 400)}`
-        : "Reviewer did not produce any output.",
+      failureCode: "missing-structured-output",
       snapshot: ctx.invocation.snapshot,
       brief: ctx.invocation.brief,
       modelId: ctx.invocation.model.canonicalId,
-      debug: buildFailureDebug({
-        progress: ctx.progress,
-        session: ctx.session,
-        recentEvents: ctx.debug.recentEvents,
-      }),
+      diagnostics: ctx.getFailureDiagnostics(),
     }),
   );
 }
 
 export function handleSessionEvent(event: AgentSessionEvent, ctx: RunnerContext): void {
-  pushRecentEvent(ctx.debug.recentEvents, summarizeSessionEvent(event));
-
   switch (event.type) {
     case "turn_end":
       handleTurnEnd(ctx);
@@ -300,35 +289,25 @@ export function handleSessionEvent(event: AgentSessionEvent, ctx: RunnerContext)
   }
 }
 
-function truncateText(text: string, maxLen: number): string {
-  if (text.length <= maxLen) return text;
-  return `${text.slice(0, maxLen)}... (${text.length - maxLen} more chars)`;
-}
-
 // ---------------------------------------------------------------------------
 // Hard-abort helper (called from handleTurnEnd when grace turns expire)
 // ---------------------------------------------------------------------------
 
 function doFinalAbort(ctx: RunnerContext): void {
   emitProgress(ctx);
+  ctx.recordHostMarker({ type: "abort_requested", reason: "timeout" });
   void ctx.session
     .abort()
     .catch(() => {})
     .finally(() => {
-      const partialText = extractLastAssistantDebug(ctx.session)?.text;
       ctx.resolve(
         ctx.cleanup({
           kind: "timeout" as const,
           snapshot: ctx.invocation.snapshot,
           timeoutMs: ctx.invocation.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-          partialOutput: partialText,
           brief: ctx.invocation.brief,
           modelId: ctx.invocation.model.canonicalId,
-          debug: buildFailureDebug({
-            progress: ctx.progress,
-            session: ctx.session,
-            recentEvents: ctx.debug.recentEvents,
-          }),
+          diagnostics: ctx.getFailureDiagnostics(),
         }),
       );
     });

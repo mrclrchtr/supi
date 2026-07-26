@@ -66,8 +66,9 @@ src/
     guidance.ts              Agent-facing prompt surfaces
     brief-runner.ts        Brief synthesis child session
     review-runner.ts       Read-only reviewer child session
-    runner-helpers.ts      Shared runner helpers (extractLastAssistantText, etc.)
-    runner-types.ts        Shared runner progress/result types
+    child-lifecycle-trace.ts  Bounded allowlisted Child Lifecycle Trace + Recent Activity collector
+    child-failure-diagnostics.ts  Safe non-success diagnostic builder and parent-copy formatter
+    runner-helpers.ts      Shared assistant-content serialization and progress-token helpers
     schemas.ts             TypeBox schemas for submit_review[_brief]
     snapshot-tools.ts      Snapshot-aware diff/file tools for the reviewer session
   ui/

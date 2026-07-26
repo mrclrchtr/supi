@@ -11,7 +11,8 @@ import type {
   BriefSynthesisRunResult,
   SynthesizedReviewBrief,
 } from "../types.ts";
-import { buildProgressTokens, extractLastAssistantText } from "./runner-helpers.ts";
+import { createEarlyCancellationDiagnostics } from "./child-failure-diagnostics.ts";
+import { buildProgressTokens } from "./runner-helpers.ts";
 import { reviewBriefSchema } from "./schemas.ts";
 import { type LifecycleCtx, runWithLifecycle } from "./session-lifecycle.ts";
 
@@ -88,24 +89,19 @@ function emitBriefProgress(
 
 /** Finalize after retries and compaction recovery, never at the earlier `agent_end` boundary. */
 function handleAgentSettled(options: {
-  session: AgentSession;
   brief: SynthesizedReviewBrief | undefined;
   state: { settled: boolean; aborting: boolean };
   cleanup: (result: BriefSynthesisRunResult) => BriefSynthesisRunResult;
+  getFailureDiagnostics: LifecycleCtx<BriefSynthesisRunResult>["getFailureDiagnostics"];
 }): BriefSynthesisRunResult | undefined {
-  const { session, brief, state, cleanup } = options;
-  if (state.settled || state.aborting) {
-    return undefined;
-  }
-  if (brief) {
-    return cleanup({ kind: "success", brief });
-  }
-  const lastText = extractLastAssistantText(session.messages);
+  const { brief, state, cleanup, getFailureDiagnostics } = options;
+  if (state.settled || state.aborting) return undefined;
+  if (brief) return cleanup({ kind: "success", brief });
+
   return cleanup({
     kind: "failed",
-    reason: lastText
-      ? `Brief synthesizer did not call submit_review_brief. Assistant said: ${lastText}`
-      : "Brief synthesizer did not produce any output.",
+    failureCode: "missing-structured-output",
+    diagnostics: getFailureDiagnostics(),
   });
 }
 
@@ -114,7 +110,7 @@ export async function runBriefSynthesis(
   invocation: BriefSynthesisInvocation,
 ): Promise<BriefSynthesisRunResult> {
   if (invocation.signal?.aborted) {
-    return { kind: "canceled" };
+    return { kind: "canceled", diagnostics: createEarlyCancellationDiagnostics() };
   }
 
   const resultHolder: { value: SynthesizedReviewBrief | undefined } = { value: undefined };
@@ -123,11 +119,8 @@ export async function runBriefSynthesis(
   let session: AgentSession;
   try {
     session = await createBriefSession(invocation, submitBriefTool);
-  } catch (error) {
-    return {
-      kind: "failed",
-      reason: `Failed to create brief synthesis session: ${error instanceof Error ? error.message : String(error)}`,
-    };
+  } catch {
+    return { kind: "failed", failureCode: "session-creation-failed" };
   }
 
   return runWithLifecycle<BriefSynthesisRunResult>({
@@ -155,10 +148,10 @@ export async function runBriefSynthesis(
           break;
         case "agent_settled": {
           const result = handleAgentSettled({
-            session,
             brief: resultHolder.value,
             state: ctx.state,
             cleanup: ctx.cleanup,
+            getFailureDiagnostics: ctx.getFailureDiagnostics,
           });
           if (result) {
             ctx.resolve(result);
@@ -169,11 +162,19 @@ export async function runBriefSynthesis(
           break;
       }
     },
-    canceledResult: () => ({ kind: "canceled" as const }),
-    failedResult: (reason) => ({
-      kind: "failed" as const,
-      reason,
+    canceledResult: (ctx) => ({
+      kind: "canceled" as const,
+      diagnostics: ctx.getFailureDiagnostics(),
     }),
-    timeoutResult: (ms) => ({ kind: "timeout" as const, timeoutMs: ms }),
+    failedResult: (failureCode, ctx) => ({
+      kind: "failed" as const,
+      failureCode,
+      diagnostics: ctx.getFailureDiagnostics(),
+    }),
+    timeoutResult: (ms, ctx) => ({
+      kind: "timeout" as const,
+      timeoutMs: ms,
+      diagnostics: ctx.getFailureDiagnostics(),
+    }),
   });
 }

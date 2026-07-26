@@ -6,7 +6,7 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import type { RawReviewResult, ReviewInvocation, ReviewOutputEvent } from "../types.ts";
-import { buildFailureDebug, extractLastAssistantDebug } from "./review-debug.ts";
+import { createEarlyCancellationDiagnostics } from "./child-failure-diagnostics.ts";
 import {
   createSubmitReviewTool,
   handleSessionEvent,
@@ -69,16 +69,12 @@ function buildTimeoutResult(
   runner: ReviewerRunnerState,
 ): RawReviewResult {
   return {
-    kind: "timeout" as const,
+    kind: "timeout",
     snapshot: runner.invocation.snapshot,
     timeoutMs: runner.invocation.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     brief: runner.invocation.brief,
     modelId: runner.invocation.model.canonicalId,
-    debug: buildFailureDebug({
-      progress: lcCtx.progress,
-      session: lcCtx.session,
-      recentEvents: runner.debug.recentEvents,
-    }),
+    diagnostics: lcCtx.getFailureDiagnostics(),
   };
 }
 
@@ -87,34 +83,26 @@ function buildCanceledResult(
   runner: ReviewerRunnerState,
 ): RawReviewResult {
   return {
-    kind: "canceled" as const,
+    kind: "canceled",
     snapshot: runner.invocation.snapshot,
     brief: runner.invocation.brief,
     modelId: runner.invocation.model.canonicalId,
-    debug: buildFailureDebug({
-      progress: lcCtx.progress,
-      session: lcCtx.session,
-      recentEvents: runner.debug.recentEvents,
-    }),
+    diagnostics: lcCtx.getFailureDiagnostics(),
   };
 }
 
 function buildFailedResult(
-  reason: string,
+  failureCode: "prompt-rejected" | "unexpected-runner-failure",
   lcCtx: LifecycleCtx<RawReviewResult>,
   runner: ReviewerRunnerState,
 ): RawReviewResult {
   return {
-    kind: "failed" as const,
-    reason,
+    kind: "failed",
+    failureCode,
     snapshot: runner.invocation.snapshot,
     brief: runner.invocation.brief,
     modelId: runner.invocation.model.canonicalId,
-    debug: buildFailureDebug({
-      progress: lcCtx.progress,
-      session: lcCtx.session,
-      recentEvents: runner.debug.recentEvents,
-    }),
+    diagnostics: lcCtx.getFailureDiagnostics(),
   };
 }
 
@@ -124,49 +112,43 @@ interface ReviewerRunnerState {
   submitSteered: boolean;
   timeoutSteered: boolean;
   graceTurnsRemaining: number | undefined;
-  debug: { recentEvents: string[] };
 }
 
 // ---------------------------------------------------------------------------
 // Steer / abort helpers
 // ---------------------------------------------------------------------------
 
-/** Abort the session and resolve with a timeout result (from lifecycle context). */
+/** Abort the session and resolve with a timeout result from the lifecycle context. */
 function doFinalAbortFromLifecycle(
   lcCtx: LifecycleCtx<RawReviewResult>,
   runner: ReviewerRunnerState,
 ): void {
+  if (lcCtx.state.settled || lcCtx.state.aborting) return;
+
   lcCtx.state.aborting = true;
+  lcCtx.recordHostMarker({ type: "abort_requested", reason: "timeout" });
   void lcCtx.session
     .abort()
     .catch(() => {})
     .finally(() => {
-      const partialText = extractLastAssistantDebug(lcCtx.session)?.text;
       lcCtx.resolve(
         lcCtx.cleanup({
-          kind: "timeout" as const,
+          kind: "timeout",
           snapshot: runner.invocation.snapshot,
           timeoutMs: runner.invocation.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-          partialOutput: partialText,
           brief: runner.invocation.brief,
           modelId: runner.invocation.model.canonicalId,
-          debug: buildFailureDebug({
-            progress: lcCtx.progress,
-            session: lcCtx.session,
-            recentEvents: runner.debug.recentEvents,
-          }),
+          diagnostics: lcCtx.getFailureDiagnostics(),
         }),
       );
     });
 }
 
 /**
- * Build the custom `onTimeout` handler for the review runner.
+ * Build the custom soft-timeout behavior for reviewer sessions.
  *
- * When the soft timeout fires, the handler:
- * 1. Steers the reviewer session to wrap up
- * 2. Starts a grace timer (hard abort after GRACE_TURNS or HARD_ABORT_GRACE_MS)
- * 3. If steer fails, immediately hard-aborts
+ * The shared lifecycle runner records `timeout_expired`; this runner adds a
+ * timeout steering marker and later records the hard-abort marker if needed.
  */
 function buildReviewTimeoutHandler(
   runner: ReviewerRunnerState,
@@ -174,9 +156,9 @@ function buildReviewTimeoutHandler(
 ): void {
   runner.timeoutSteered = true;
   runner.graceTurnsRemaining = GRACE_TURNS;
+  lcCtx.recordHostMarker({ type: "steer_requested", reason: "timeout" });
 
   const hardAbortTimer = setTimeout(() => {
-    if (lcCtx.state.settled) return;
     doFinalAbortFromLifecycle(lcCtx, runner);
   }, HARD_ABORT_GRACE_MS);
   hardAbortTimer.unref?.();
@@ -199,7 +181,6 @@ function buildRunnerCtx(runner: ReviewerRunnerState): RunnerContext {
   ctx.submitSteered = runner.submitSteered;
   ctx.timeoutSteered = runner.timeoutSteered;
   ctx.graceTurnsRemaining = runner.graceTurnsRemaining;
-  ctx.debug = runner.debug;
   ctx.toolCounts = {};
   ctx.inspectedFiles = new Set();
   return ctx;
@@ -216,6 +197,8 @@ function syncCtxFromLifecycle(
   ctx.cleanup = lcCtx.cleanup;
   ctx.state = lcCtx.state;
   ctx.startTime = lcCtx.startTime;
+  ctx.getFailureDiagnostics = lcCtx.getFailureDiagnostics;
+  ctx.recordHostMarker = lcCtx.recordHostMarker;
   ctx.submitSteered = runner.submitSteered;
   ctx.timeoutSteered = runner.timeoutSteered;
   ctx.graceTurnsRemaining = runner.graceTurnsRemaining;
@@ -239,6 +222,7 @@ export async function runReviewer(invocation: ReviewInvocation): Promise<RawRevi
       snapshot: invocation.snapshot,
       brief: invocation.brief,
       modelId: invocation.model.canonicalId,
+      diagnostics: createEarlyCancellationDiagnostics(),
     };
   }
 
@@ -255,10 +239,10 @@ export async function runReviewer(invocation: ReviewInvocation): Promise<RawRevi
       snapshotDiffTool,
       snapshotFileTool,
     );
-  } catch (error) {
+  } catch {
     return {
       kind: "failed",
-      reason: `Failed to create reviewer session: ${error instanceof Error ? error.message : String(error)}`,
+      failureCode: "session-creation-failed",
       snapshot: invocation.snapshot,
       brief: invocation.brief,
       modelId: invocation.model.canonicalId,
@@ -271,9 +255,7 @@ export async function runReviewer(invocation: ReviewInvocation): Promise<RawRevi
     submitSteered: false,
     timeoutSteered: false,
     graceTurnsRemaining: undefined,
-    debug: { recentEvents: [] },
   };
-
   const ctx = buildRunnerCtx(runner);
 
   return runWithLifecycle<RawReviewResult>({
@@ -288,7 +270,7 @@ export async function runReviewer(invocation: ReviewInvocation): Promise<RawRevi
     },
     onTimeout: (lcCtx) => buildReviewTimeoutHandler(runner, lcCtx),
     canceledResult: (lcCtx) => buildCanceledResult(lcCtx, runner),
-    failedResult: (reason, lcCtx) => buildFailedResult(reason, lcCtx, runner),
+    failedResult: (failureCode, lcCtx) => buildFailedResult(failureCode, lcCtx, runner),
     timeoutResult: (_, lcCtx) => buildTimeoutResult(lcCtx, runner),
   });
 }

@@ -65,42 +65,48 @@ describe("formatReviewContent", () => {
     expect(content).toContain("      Effort: Low");
   });
 
-  it("formats timeout output with partial assistant text", () => {
+  it("formats timeout output with safe lifecycle diagnostics only", () => {
     const content = formatReviewContent({
       kind: "timeout",
       snapshot,
       modelId: "anthropic/claude-sonnet-4",
       timeoutMs: 60_000,
-      partialOutput: "I still need to verify the auth flow.",
-      debug: {
+      diagnostics: {
         turns: 2,
         toolUses: 1,
-        recentEvents: ["tool:start:read_snapshot_diff", "agent:end"],
+        recentActivity: ["tool:start:read_snapshot_diff"],
+        lifecycleTrace: {
+          entries: [{ type: "timeout_expired" }, { type: "abort_requested", reason: "timeout" }],
+          droppedCount: 0,
+        },
       },
     });
 
-    expect(content).toContain("Review timed out");
-    expect(content).toContain("Partial output:");
-    expect(content).toContain("Debug:");
+    expect(content).toContain("Reviewer timed out.");
+    expect(content).toContain("Diagnostics:");
     expect(content).toContain("- Turns: 2");
+    expect(content).toContain("Child Lifecycle Trace (observed tail)");
+    expect(content).not.toContain("Partial output:");
   });
 
-  it("formats failed output with debug details", () => {
+  it("formats host-owned failed output with safe diagnostics", () => {
     const content = formatReviewContent({
       kind: "failed",
-      reason: "Reviewer session error: API rate limit",
+      failureCode: "unexpected-runner-failure",
       snapshot,
       modelId: "anthropic/claude-sonnet-4",
-      debug: {
+      diagnostics: {
         turns: 1,
         toolUses: 0,
+        lifecycleTrace: { entries: [{ type: "agent_settled" }], droppedCount: 0 },
         lastAssistantStopReason: "error",
       },
     });
 
-    expect(content).toContain("Review failed: Reviewer session error: API rate limit");
-    expect(content).toContain("Debug:");
+    expect(content).toContain("Reviewer ended unexpectedly.");
+    expect(content).toContain("Diagnostics:");
     expect(content).toContain("- Last assistant stop: error");
+    expect(content).not.toContain("API rate limit");
   });
 });
 

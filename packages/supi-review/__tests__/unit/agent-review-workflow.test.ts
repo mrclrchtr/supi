@@ -161,6 +161,33 @@ describe("agent review workflow", () => {
     expect(mocks.runReviewer).not.toHaveBeenCalled();
   });
 
+  it("contains an unexpected brief-runner rejection behind static diagnostics", async () => {
+    const store = new ReviewPlanStore();
+    mocks.synthesizeReviewBrief.mockRejectedValue(new Error("private synthesis failure"));
+
+    const outcome = await prepareAgentReviewPlan({
+      cwd: "/project",
+      target: { kind: "working-tree" },
+      serializedContext: "[User]\nReview this change.",
+      model,
+      planStore: store,
+    });
+
+    expect(outcome).toMatchObject({
+      kind: "synthesis-failed",
+      result: {
+        kind: "failed",
+        failureCode: "unexpected-runner-failure",
+        diagnostics: {
+          lifecycleTrace: { entries: [], droppedCount: 0 },
+          turns: 0,
+          toolUses: 0,
+        },
+      },
+    });
+    expect(JSON.stringify(outcome)).not.toContain("private synthesis failure");
+  });
+
   it("runs focused reviewers concurrently and consumes the plan", async () => {
     const store = new ReviewPlanStore();
     const plan = createStoredPlan(store);
@@ -198,6 +225,75 @@ describe("agent review workflow", () => {
     expect(outcome.details.evaluation.effectiveBrief).toEqual(generatedBrief);
     expect(mocks.runReviewer.mock.calls[0]?.[0]?.prompt).toContain("Check repository standards.");
     expect(mocks.runReviewer.mock.calls[1]?.[0]?.prompt).toContain("Check the requested behavior.");
+  });
+
+  it("uses a host-owned fallback when a reviewer runner throws", async () => {
+    const store = new ReviewPlanStore();
+    const plan = createStoredPlan(store);
+    mocks.runReviewer.mockRejectedValue(new Error("private runner error"));
+
+    const outcome = await runAgentReviewBatch({
+      cwd: "/project",
+      planId: plan.id,
+      critique: acceptedCritique,
+      reviewers: [{ id: "spec", focus: "Check behavior." }],
+      planStore: store,
+    });
+
+    expect(outcome.kind).toBe("completed");
+    if (outcome.kind !== "completed") return;
+    expect(outcome.details.results[0]?.result).toMatchObject({
+      kind: "failed",
+      failureCode: "unexpected-runner-failure",
+      diagnostics: {
+        lifecycleTrace: { entries: [], droppedCount: 0 },
+      },
+    });
+    expect(JSON.stringify(outcome)).not.toContain("private runner error");
+  });
+
+  it("retains a failed reviewer's structured lifecycle trace in the assignment result", async () => {
+    const store = new ReviewPlanStore();
+    const plan = createStoredPlan(store);
+    mocks.runReviewer.mockResolvedValue({
+      kind: "failed",
+      failureCode: "missing-structured-output",
+      snapshot,
+      brief: generatedBrief,
+      modelId: model.canonicalId,
+      diagnostics: {
+        turns: 1,
+        toolUses: 0,
+        lifecycleTrace: {
+          entries: [{ type: "agent_settled" }],
+          droppedCount: 0,
+        },
+      },
+    });
+
+    const outcome = await runAgentReviewBatch({
+      cwd: "/project",
+      planId: plan.id,
+      critique: acceptedCritique,
+      reviewers: [{ id: "spec", focus: "Check behavior." }],
+      planStore: store,
+    });
+
+    expect(outcome.kind).toBe("completed");
+    if (outcome.kind !== "completed") return;
+    expect(outcome.details.results[0]?.result).toEqual({
+      kind: "failed",
+      failureCode: "missing-structured-output",
+      modelId: model.canonicalId,
+      diagnostics: {
+        turns: 1,
+        toolUses: 0,
+        lifecycleTrace: {
+          entries: [{ type: "agent_settled" }],
+          droppedCount: 0,
+        },
+      },
+    });
   });
 
   it("preserves generated, critique, and revised briefs as separate evaluation data", async () => {

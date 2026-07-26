@@ -1,4 +1,23 @@
 import type { Model } from "@earendil-works/pi-ai";
+import type { ChildLifecycleTrace } from "./tool/child-lifecycle-trace.ts";
+
+/** Closed, host-owned classification for a managed child failure. */
+export type ChildFailureCode =
+  | "session-creation-failed"
+  | "prompt-rejected"
+  | "missing-structured-output"
+  | "unexpected-runner-failure";
+
+/** Managed child role used for host-owned failure copy. */
+export type ChildStage = "brief-synthesis" | "reviewer";
+
+/** Failed child result fields with diagnostics required exactly when a child was observed. */
+export type ChildFailedResult =
+  | { failureCode: "session-creation-failed"; diagnostics?: never }
+  | {
+      failureCode: Exclude<ChildFailureCode, "session-creation-failed">;
+      diagnostics: ChildFailureDiagnostics;
+    };
 
 /** Inclusive 1-based line range reported by the reviewer. */
 export interface ReviewLineRange {
@@ -166,23 +185,17 @@ export type AgentReviewerResult =
       output: NormalizedReviewOutput;
       modelId: string;
     }
-  | {
-      kind: "failed";
-      reason: string;
-      modelId: string;
-      debug?: ReviewFailureDebugInfo;
-    }
+  | ({ kind: "failed"; modelId: string } & ChildFailedResult)
   | {
       kind: "canceled";
       modelId: string;
-      debug?: ReviewFailureDebugInfo;
+      diagnostics: ChildFailureDiagnostics;
     }
   | {
       kind: "timeout";
       timeoutMs: number;
-      partialOutput?: string;
       modelId: string;
-      debug?: ReviewFailureDebugInfo;
+      diagnostics: ChildFailureDiagnostics;
     };
 
 /** One normalized result from a focused reviewer child session. */
@@ -218,24 +231,6 @@ export interface ReviewPacket {
   charBudget: number;
 }
 
-/** Lightweight diagnostics attached to non-success review runs. */
-export interface ReviewFailureDebugInfo {
-  turns: number;
-  toolUses: number;
-  tokens?: {
-    input: number;
-    output: number;
-    total: number;
-    cacheRead?: number;
-    cacheWrite?: number;
-  };
-  recentEvents?: string[];
-  lastAssistantText?: string;
-  lastAssistantStopReason?: string;
-  lastAssistantErrorMessage?: string;
-  lastAssistantToolCalls?: string[];
-}
-
 /** Fully prepared review run. */
 export interface ReviewPlan {
   model: ReviewModelSelection;
@@ -253,29 +248,26 @@ export type RawReviewResult =
       brief?: SynthesizedReviewBrief;
       modelId: string;
     }
-  | {
+  | ({
       kind: "failed";
-      reason: string;
       snapshot: ReviewSnapshot;
       brief?: SynthesizedReviewBrief;
       modelId: string;
-      debug?: ReviewFailureDebugInfo;
-    }
+    } & ChildFailedResult)
   | {
       kind: "canceled";
       snapshot: ReviewSnapshot;
       brief?: SynthesizedReviewBrief;
       modelId: string;
-      debug?: ReviewFailureDebugInfo;
+      diagnostics: ChildFailureDiagnostics;
     }
   | {
       kind: "timeout";
       snapshot: ReviewSnapshot;
       timeoutMs: number;
-      partialOutput?: string;
       brief?: SynthesizedReviewBrief;
       modelId: string;
-      debug?: ReviewFailureDebugInfo;
+      diagnostics: ChildFailureDiagnostics;
     };
 
 /** Normalized result used by rendering and follow-up logic. */
@@ -288,6 +280,28 @@ export type ReviewResult =
       modelId: string;
     }
   | Extract<RawReviewResult, { kind: "failed" | "canceled" | "timeout" }>;
+
+/**
+ * Safe bounded diagnostics attached only to a non-success managed child run.
+ *
+ * The trace and Recent Activity lane contain only allowlisted control metadata;
+ * no child-generated text, caught error, or raw SDK event is retained.
+ */
+export interface ChildFailureDiagnostics {
+  lifecycleTrace: ChildLifecycleTrace;
+  turns: number;
+  toolUses: number;
+  tokens?: {
+    input: number;
+    output: number;
+    total: number;
+    cacheRead?: number;
+    cacheWrite?: number;
+  };
+  recentActivity?: string[];
+  lastAssistantStopReason?: string;
+  lastAssistantToolCalls?: string[];
+}
 
 /** Progress state exposed by review/synthesis runners for widget integration. */
 export interface ReviewProgress {
@@ -317,9 +331,9 @@ export interface ReviewProgress {
 
 export type BriefSynthesisRunResult =
   | { kind: "success"; brief: SynthesizedReviewBrief }
-  | { kind: "failed"; reason: string }
-  | { kind: "canceled" }
-  | { kind: "timeout"; timeoutMs: number };
+  | ({ kind: "failed" } & ChildFailedResult)
+  | { kind: "canceled"; diagnostics: ChildFailureDiagnostics }
+  | { kind: "timeout"; timeoutMs: number; diagnostics: ChildFailureDiagnostics };
 
 export interface BriefSynthesisInvocation {
   prompt: string;

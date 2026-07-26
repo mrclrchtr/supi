@@ -22,8 +22,8 @@ import type {
   ReviewTargetSpec,
   SynthesizedReviewBrief,
 } from "../types.ts";
+import { createUnobservedChildFailureDiagnostics } from "./child-failure-diagnostics.ts";
 import { runReviewer } from "./review-runner.ts";
-
 /** Inputs required to synthesize and retain one agent-driven review plan. */
 export interface PrepareAgentReviewWorkflowInput {
   cwd: string;
@@ -35,13 +35,11 @@ export interface PrepareAgentReviewWorkflowInput {
   onProgress?: (progress: ReviewProgress) => void;
   planStore: ReviewPlanStore;
 }
-
 /** Typed preparation outcome before any reviewer child session starts. */
 export type PrepareAgentReviewWorkflowOutcome =
   | { kind: "prepared"; plan: StoredAgentReviewPlan }
   | { kind: "no-snapshot"; reason: string }
   | { kind: "synthesis-failed"; result: Exclude<BriefSynthesisRunResult, { kind: "success" }> };
-
 /** Inputs required to critique and execute one prepared review plan. */
 export interface RunAgentReviewWorkflowInput {
   cwd: string;
@@ -55,13 +53,11 @@ export interface RunAgentReviewWorkflowInput {
   onReviewerDone?: (reviewerId: string) => void;
   planStore: ReviewPlanStore;
 }
-
 /** Typed batch outcome after validation and snapshot freshness checks. */
 export type RunAgentReviewWorkflowOutcome =
   | { kind: "completed"; details: AgentReviewBatchDetails }
   | { kind: "invalid"; reason: string }
   | { kind: "stale"; reason: string };
-
 /** Prepare one session-scoped review plan without starting reviewer sessions. */
 export async function prepareAgentReviewPlan(
   input: PrepareAgentReviewWorkflowInput,
@@ -74,15 +70,27 @@ export async function prepareAgentReviewPlan(
     };
   }
 
-  const synthesis = await synthesizeReviewBrief({
-    model: input.model,
-    cwd: input.cwd,
-    snapshot,
-    serializedContext: input.serializedContext,
-    note: input.note,
-    signal: input.signal,
-    onProgress: input.onProgress,
-  });
+  let synthesis: BriefSynthesisRunResult;
+  try {
+    synthesis = await synthesizeReviewBrief({
+      model: input.model,
+      cwd: input.cwd,
+      snapshot,
+      serializedContext: input.serializedContext,
+      note: input.note,
+      signal: input.signal,
+      onProgress: input.onProgress,
+    });
+  } catch {
+    return {
+      kind: "synthesis-failed",
+      result: {
+        kind: "failed",
+        failureCode: "unexpected-runner-failure",
+        diagnostics: createUnobservedChildFailureDiagnostics(),
+      },
+    };
+  }
   if (synthesis.kind !== "success") {
     return { kind: "synthesis-failed", result: synthesis };
   }
@@ -195,13 +203,14 @@ async function runAssignment(
       onProgress: (progress) => input.onReviewerProgress?.(assignment.id, progress),
     });
     return { assignment, result: compactReviewResult(normalizeReviewResult(rawResult)) };
-  } catch (error) {
+  } catch {
     return {
       assignment,
       result: {
         kind: "failed",
-        reason: `Reviewer session failed unexpectedly: ${error instanceof Error ? error.message : String(error)}`,
+        failureCode: "unexpected-runner-failure",
         modelId: plan.model.canonicalId,
+        diagnostics: createUnobservedChildFailureDiagnostics(),
       },
     };
   }
@@ -212,21 +221,30 @@ function compactReviewResult(result: ReviewResult): AgentReviewerResult {
     case "success":
       return { kind: "success", output: result.output, modelId: result.modelId };
     case "failed":
-      return {
-        kind: "failed",
-        reason: result.reason,
-        modelId: result.modelId,
-        debug: result.debug,
-      };
+      return result.failureCode === "session-creation-failed"
+        ? {
+            kind: "failed",
+            failureCode: result.failureCode,
+            modelId: result.modelId,
+          }
+        : {
+            kind: "failed",
+            failureCode: result.failureCode,
+            modelId: result.modelId,
+            diagnostics: result.diagnostics,
+          };
     case "canceled":
-      return { kind: "canceled", modelId: result.modelId, debug: result.debug };
+      return {
+        kind: "canceled",
+        modelId: result.modelId,
+        diagnostics: result.diagnostics,
+      };
     case "timeout":
       return {
         kind: "timeout",
         timeoutMs: result.timeoutMs,
-        partialOutput: result.partialOutput,
         modelId: result.modelId,
-        debug: result.debug,
+        diagnostics: result.diagnostics,
       };
   }
 }

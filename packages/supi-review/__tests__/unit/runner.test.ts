@@ -170,7 +170,56 @@ describe("runReviewer", () => {
     });
 
     expect(result.kind).toBe("canceled");
+    if (result.kind === "canceled") {
+      expect(result.diagnostics.lifecycleTrace.entries).toEqual([
+        { type: "abort_requested", reason: "canceled" },
+      ]);
+    }
     expect(mockCreateAgentSession).not.toHaveBeenCalled();
+  });
+
+  it("uses the static session-creation failure code without a trace or caught error", async () => {
+    mockCreateAgentSession.mockRejectedValue(new Error("private creation error"));
+
+    const result = await runReviewer({
+      prompt: "review this",
+      model,
+      cwd: "/tmp",
+      snapshot,
+      brief,
+    });
+
+    expect(result).toMatchObject({
+      kind: "failed",
+      failureCode: "session-creation-failed",
+    });
+    expect("diagnostics" in result).toBe(false);
+    expect(JSON.stringify(result)).not.toContain("private creation error");
+  });
+
+  it("returns prompt-rejected diagnostics without retaining a rejection error", async () => {
+    mockSession.prompt.mockImplementation(async (_prompt, options) => {
+      options?.preflightResult?.(false);
+    });
+
+    const result = await runReviewer({
+      prompt: "review this",
+      model,
+      cwd: "/tmp",
+      snapshot,
+      brief,
+    });
+
+    expect(result).toMatchObject({
+      kind: "failed",
+      failureCode: "prompt-rejected",
+      diagnostics: {
+        lifecycleTrace: {
+          entries: [{ type: "prompt_rejected" }],
+          droppedCount: 0,
+        },
+      },
+    });
   });
 
   it("creates the reviewer session with read-only tools and snapshot tools", async () => {
@@ -260,6 +309,7 @@ describe("runReviewer", () => {
       expect(result.modelId).toBe(model.canonicalId);
       expect((result.output as unknown as Record<string, unknown>).items).toBeDefined();
       expect((result.output as unknown as Record<string, unknown>).findings).toBeUndefined();
+      expect("diagnostics" in result).toBe(false);
     }
   });
 
@@ -306,7 +356,76 @@ describe("runReviewer", () => {
     expect(result.kind).toBe("success");
   });
 
-  it("attaches debug details when the reviewer never submits a result", async () => {
+  it("retains overflow recovery and retry transitions in their observed order on failure", async () => {
+    let listener: ((event: unknown) => void) | undefined;
+    mockSession.subscribe.mockImplementation((callback: (event: unknown) => void) => {
+      listener = callback;
+      return vi.fn();
+    });
+
+    const resultPromise = runReviewer({
+      prompt: "review this",
+      model,
+      cwd: "/tmp",
+      snapshot,
+      brief,
+    });
+
+    await vi.advanceTimersByTimeAsync(1);
+    listener?.({ type: "agent_start" });
+    listener?.({ type: "agent_end", messages: [], willRetry: true });
+    listener?.({ type: "compaction_start", reason: "overflow" });
+    listener?.({
+      type: "compaction_end",
+      reason: "overflow",
+      aborted: false,
+      willRetry: true,
+      result: undefined,
+      errorMessage: "private compaction error",
+    });
+    listener?.({
+      type: "auto_retry_start",
+      attempt: 2,
+      maxAttempts: 3,
+      delayMs: 50,
+      errorMessage: "private retry error",
+    });
+    listener?.({
+      type: "auto_retry_end",
+      success: false,
+      attempt: 2,
+      finalError: "private final retry error",
+    });
+    listener?.({ type: "agent_settled" });
+
+    const result = await resultPromise;
+
+    expect(result.kind).toBe("failed");
+    if (result.kind !== "failed") return;
+    expect(result.diagnostics?.lifecycleTrace).toEqual({
+      entries: [
+        { type: "agent_start" },
+        { type: "agent_end", willRetry: true },
+        { type: "compaction_start", reason: "overflow" },
+        {
+          type: "compaction_end",
+          reason: "overflow",
+          aborted: false,
+          willRetry: true,
+          hasResult: false,
+          hasError: true,
+        },
+        { type: "auto_retry_start", attempt: 2, maxAttempts: 3, delayMs: 50 },
+        { type: "auto_retry_end", success: false, attempt: 2, hasFinalError: true },
+        { type: "agent_settled" },
+      ],
+      droppedCount: 0,
+    });
+    expect(JSON.stringify(result)).not.toContain("private compaction error");
+    expect(JSON.stringify(result)).not.toContain("private retry error");
+  });
+
+  it("attaches safe lifecycle diagnostics when the reviewer never submits a result", async () => {
     mockSession.getSessionStats.mockReturnValue({
       tokens: { input: 120, output: 45, total: 165 },
     });
@@ -316,11 +435,12 @@ describe("runReviewer", () => {
           type: "message_end",
           message: {
             role: "assistant",
-            content: "I forgot to submit the review.",
+            content: "private assistant text that must not enter diagnostics",
             stopReason: "stop",
+            errorMessage: "private assistant error",
           },
         });
-        listener({ type: "agent_end", messages: [] });
+        listener({ type: "agent_end", messages: [], willRetry: false });
         listener({ type: "agent_settled" });
       }, 10);
       return vi.fn();
@@ -328,8 +448,9 @@ describe("runReviewer", () => {
     mockSession.messages = [
       {
         role: "assistant",
-        content: "I forgot to submit the review.",
+        content: "private assistant text that must not enter diagnostics",
         stopReason: "stop",
+        errorMessage: "private assistant error",
       },
     ];
 
@@ -346,18 +467,50 @@ describe("runReviewer", () => {
 
     expect(result.kind).toBe("failed");
     if (result.kind === "failed") {
-      expect(result.reason).toContain("did not call submit_review");
-      expect(result.debug).toEqual({
+      expect(result.failureCode).toBe("missing-structured-output");
+      expect(result.diagnostics).toMatchObject({
         turns: 0,
         toolUses: 0,
         tokens: { input: 120, output: 45, total: 165 },
-        recentEvents: ["assistant:end:stop", "agent:end", "agent:settled"],
-        lastAssistantText: "I forgot to submit the review.",
+        recentActivity: ["assistant:end:stop"],
+        lifecycleTrace: {
+          entries: [
+            { type: "steer_requested", reason: "submit" },
+            { type: "agent_end", willRetry: false },
+            { type: "agent_settled" },
+          ],
+          droppedCount: 0,
+        },
         lastAssistantStopReason: "stop",
-        lastAssistantErrorMessage: undefined,
-        lastAssistantToolCalls: undefined,
       });
+      expect(JSON.stringify(result)).not.toContain("private assistant text");
+      expect(JSON.stringify(result)).not.toContain("private assistant error");
     }
+  });
+
+  it("records timeout steering and hard abort markers when soft timeout steering fails", async () => {
+    mockSession.steer.mockRejectedValue(new Error("private steer error"));
+
+    const resultPromise = runReviewer({
+      prompt: "review this",
+      model,
+      cwd: "/tmp",
+      snapshot,
+      brief,
+      timeoutMs: 10,
+    });
+
+    await vi.advanceTimersByTimeAsync(10);
+    const result = await resultPromise;
+
+    expect(result.kind).toBe("timeout");
+    if (result.kind !== "timeout") return;
+    expect(result.diagnostics.lifecycleTrace.entries).toEqual([
+      { type: "timeout_expired" },
+      { type: "steer_requested", reason: "timeout" },
+      { type: "abort_requested", reason: "timeout" },
+    ]);
+    expect(JSON.stringify(result)).not.toContain("private steer error");
   });
 
   it("handles abort signals after session creation", async () => {
@@ -378,6 +531,11 @@ describe("runReviewer", () => {
 
     const result = await resultPromise;
     expect(result.kind).toBe("canceled");
+    if (result.kind === "canceled") {
+      expect(result.diagnostics.lifecycleTrace.entries).toEqual([
+        { type: "abort_requested", reason: "canceled" },
+      ]);
+    }
     vi.useFakeTimers();
   });
 });

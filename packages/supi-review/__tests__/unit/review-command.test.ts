@@ -127,6 +127,15 @@ function createRawReviewOutput(items: Array<Record<string, unknown>> = []) {
   };
 }
 
+const childFailureDiagnostics = {
+  turns: 1,
+  toolUses: 0,
+  lifecycleTrace: {
+    entries: [{ type: "agent_settled" as const }],
+    droppedCount: 0,
+  },
+};
+
 function createPi(): ExtensionAPI {
   return {
     registerCommand: vi.fn(),
@@ -225,6 +234,42 @@ describe("/supi-review command", () => {
     );
     expect((pi.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.customType).toBe(
       "supi-review",
+    );
+  });
+
+  it("persists brief-synthesis failures with structured lifecycle diagnostics", async () => {
+    const pi = createPi();
+    reviewExtension(pi);
+    const handler = getHandler(pi);
+    if (!handler) throw new Error("Handler not registered");
+    mockFns.synthesizeReviewBrief.mockResolvedValue({
+      kind: "failed",
+      failureCode: "missing-structured-output",
+      diagnostics: childFailureDiagnostics,
+    });
+    const ctx = makeCtx();
+
+    await expect(handler("", ctx)).resolves.toBeUndefined();
+
+    expect(pi.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customType: "supi-review",
+        display: true,
+        content: expect.stringContaining(
+          "Brief synthesis ended without the required structured output.",
+        ),
+        details: expect.objectContaining({
+          briefSynthesisFailure: expect.objectContaining({
+            result: expect.objectContaining({
+              failureCode: "missing-structured-output",
+              diagnostics: childFailureDiagnostics,
+            }),
+          }),
+        }),
+      }),
+    );
+    expect((ctx.ui.notify as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe(
+      "Brief synthesis ended without the required structured output.",
     );
   });
 

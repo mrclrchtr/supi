@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import type { ReviewResult } from "../../src/types.ts";
+import type { BriefSynthesisRunResult, ReviewResult } from "../../src/types.ts";
 import { registerReviewRenderer } from "../../src/ui/renderer.ts";
 
 const snapshot = {
@@ -98,6 +98,37 @@ function renderReview(result: ReviewResult, expanded = false): string {
   return (output as { render: (width: number) => string[] }).render(100).join("\n");
 }
 
+function renderBriefSynthesisFailure(
+  result: Exclude<BriefSynthesisRunResult, { kind: "success" }>,
+): string {
+  const { pi, renderers } = createPiWithRenderer();
+  registerReviewRenderer(pi);
+
+  const renderer = renderers.get("supi-review");
+  if (!renderer) throw new Error("supi-review renderer was not registered");
+
+  const output = renderer(
+    {
+      role: "custom",
+      customType: "supi-review",
+      content: "summary",
+      display: true,
+      details: {
+        briefSynthesisFailure: {
+          result,
+          snapshot,
+          modelId: "anthropic/claude-sonnet-4",
+        },
+      },
+      timestamp: Date.now(),
+    },
+    { expanded: false },
+    createTheme(),
+  );
+
+  return (output as { render: (width: number) => string[] }).render(100).join("\n");
+}
+
 describe("supi-review renderer", () => {
   it("shows success output with synthesized-brief metadata and the derived verdict", () => {
     const output = renderReview(createSuccessResult());
@@ -172,52 +203,91 @@ describe("supi-review renderer", () => {
     expect(output).toContain("[warning]PATCH HAS ISSUES[/warning]");
   });
 
-  it("shows timeout with partial output", () => {
+  it("renders durable brief-synthesis failure details with the lifecycle trace", () => {
+    const output = renderBriefSynthesisFailure({
+      kind: "failed",
+      failureCode: "missing-structured-output",
+      diagnostics: {
+        turns: 1,
+        toolUses: 0,
+        lifecycleTrace: {
+          entries: [{ type: "agent_settled" }],
+          droppedCount: 0,
+        },
+      },
+    });
+
+    expect(output).toContain("Brief Synthesis Failed");
+    expect(output).toContain("Brief synthesis ended without the required structured output.");
+    expect(output).toContain("Child Lifecycle Trace (observed tail)");
+  });
+
+  it("shows timeout with safe lifecycle diagnostics", () => {
     const output = renderReview({
       kind: "timeout",
       snapshot,
       modelId: "anthropic/claude-sonnet-4",
       timeoutMs: 900_000,
-      partialOutput: "I reviewed the code and found issues with...",
-      debug: {
+      diagnostics: {
         turns: 2,
         toolUses: 1,
-        recentEvents: ["tool:start:read_snapshot_diff", "agent:end"],
+        recentActivity: ["tool:start:read_snapshot_diff"],
+        lifecycleTrace: {
+          entries: [{ type: "timeout_expired" }],
+          droppedCount: 0,
+        },
       },
     });
 
     expect(output).toContain("[warning]◆ Review Timed Out[/warning]");
-    expect(output).toContain("Partial output:");
-    expect(output).toContain("Turns: 2 · Tool uses: 1");
+    expect(output).toContain("Turns: 2");
+    expect(output).toContain("Tool uses: 1");
+    expect(output).toContain("Child Lifecycle Trace (observed tail)");
+    expect(output).not.toContain("Partial output:");
   });
 
-  it("shows failed result details with debug context", () => {
+  it("shows static failed copy with lifecycle diagnostics", () => {
     const output = renderReview({
       kind: "failed",
-      reason: "Reviewer session error: API rate limit",
+      failureCode: "unexpected-runner-failure",
       snapshot,
       modelId: "anthropic/claude-sonnet-4",
-      debug: {
+      diagnostics: {
         turns: 3,
         toolUses: 2,
-        recentEvents: ["tool:start:read", "tool:end:read:error", "agent:end"],
+        recentActivity: ["tool:start:read", "tool:end:read:error"],
+        lifecycleTrace: {
+          entries: [{ type: "agent_settled" }],
+          droppedCount: 0,
+        },
         lastAssistantStopReason: "error",
       },
     });
 
     expect(output).toContain("[error]◆ Review Failed[/error]");
-    expect(output).toContain("API rate limit");
-    expect(output).toContain("Turns: 3 · Tool uses: 2");
+    expect(output).toContain("Reviewer ended unexpectedly.");
+    expect(output).toContain("Turns: 3");
+    expect(output).toContain("Tool uses: 2");
     expect(output).toContain("Last assistant stop: error");
+    expect(output).not.toContain("API rate limit");
   });
 
-  it("shows canceled result", () => {
+  it("shows canceled result with its lifecycle diagnostics", () => {
     const output = renderReview({
       kind: "canceled",
       snapshot,
       modelId: "anthropic/claude-sonnet-4",
+      diagnostics: {
+        turns: 0,
+        toolUses: 0,
+        lifecycleTrace: {
+          entries: [{ type: "abort_requested", reason: "canceled" }],
+          droppedCount: 0,
+        },
+      },
     });
 
     expect(output).toContain("[warning]◆ Review Canceled[/warning]");
+    expect(output).toContain("Child Lifecycle Trace (observed tail)");
   });
 });

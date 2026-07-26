@@ -5,20 +5,6 @@
  * eliminate duplication.
  */
 
-/** Extract the last assistant text from a session's message history. */
-export function extractLastAssistantText(
-  messages: ArrayLike<unknown> | undefined,
-): string | undefined {
-  if (!messages) return undefined;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const message = messages[i] as { role?: string; content?: unknown } | undefined;
-    if (message?.role !== "assistant") continue;
-    const text = extractAssistantText(message.content);
-    if (text) return text;
-  }
-  return undefined;
-}
-
 /** Extract text content from a message content value (string | content-part[]). */
 export function extractAssistantText(content: unknown): string | undefined {
   if (typeof content === "string") {

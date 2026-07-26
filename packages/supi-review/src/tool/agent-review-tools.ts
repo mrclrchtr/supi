@@ -20,6 +20,7 @@ import type {
   ReviewProgress,
   ReviewTargetSpec,
 } from "../types.ts";
+import { formatBriefSynthesisFailureCopy } from "../ui/format-content.ts";
 import { formatAgentReviewBatch, formatPreparedAgentReview } from "../ui/review-tool-format.ts";
 import {
   type AgentReviewProgressDetails,
@@ -35,6 +36,7 @@ import {
   runAgentReviewSchema,
 } from "./agent-review-schemas.ts";
 import { prepareAgentReviewPlan, runAgentReviewBatch } from "./agent-review-workflow.ts";
+import { formatChildLifecycleTrace } from "./child-lifecycle-trace.ts";
 import {
   PREPARE_REVIEW_TOOL_NAME,
   prepareReviewPromptGuidelines,
@@ -228,14 +230,12 @@ function formatPreparationFailure(
   outcome: Exclude<Awaited<ReturnType<typeof prepareAgentReviewPlan>>, { kind: "prepared" }>,
 ): string {
   if (outcome.kind === "no-snapshot") return outcome.reason;
-  switch (outcome.result.kind) {
-    case "failed":
-      return `Brief synthesis failed: ${outcome.result.reason}`;
-    case "canceled":
-      return "Brief synthesis was canceled.";
-    case "timeout":
-      return `Brief synthesis timed out after ${(outcome.result.timeoutMs / 1_000).toFixed(0)}s.`;
-  }
+
+  const { result } = outcome;
+  const trace = result.diagnostics?.lifecycleTrace;
+  return trace
+    ? `${formatBriefSynthesisFailureCopy(result)}\n\n${formatChildLifecycleTrace(trace)}`
+    : formatBriefSynthesisFailureCopy(result);
 }
 
 function activateRunTool(pi: ExtensionAPI): void {

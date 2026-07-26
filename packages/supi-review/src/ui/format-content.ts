@@ -1,4 +1,13 @@
-import type { ReviewFailureDebugInfo, ReviewItem, ReviewResult } from "../types.ts";
+import {
+  formatChildFailureCopy,
+  formatChildFailureDiagnostics,
+} from "../tool/child-failure-diagnostics.ts";
+import type {
+  BriefSynthesisRunResult,
+  ChildFailureDiagnostics,
+  ReviewItem,
+  ReviewResult,
+} from "../types.ts";
 
 /** Format a `impact` or `effort` level value. */
 export function formatLevel(value: ReviewItem["impact"] | ReviewItem["effort"]): string {
@@ -8,6 +17,29 @@ export function formatLevel(value: ReviewItem["impact"] | ReviewItem["effort"]):
 /** Format a code location as a human-readable `file:line` or `file:start-end`. */
 export function formatLocation(file: string, startLine: number, endLine: number): string {
   return `${file}:${startLine === endLine ? startLine : `${startLine}-${endLine}`}`;
+}
+
+/** Format one non-success brief-synthesis result for parent-facing custom-message content. */
+export function formatBriefSynthesisFailureContent(
+  result: Exclude<BriefSynthesisRunResult, { kind: "success" }>,
+): string {
+  const parts = [formatBriefSynthesisFailureCopy(result)];
+  appendChildFailureDiagnostics(parts, result.diagnostics);
+  return parts.join("\n");
+}
+
+/** Generate short static parent-facing copy for a brief-synthesis outcome. */
+export function formatBriefSynthesisFailureCopy(
+  result: Exclude<BriefSynthesisRunResult, { kind: "success" }>,
+): string {
+  switch (result.kind) {
+    case "failed":
+      return formatChildFailureCopy("brief-synthesis", result.failureCode);
+    case "canceled":
+      return "Brief synthesis was canceled.";
+    case "timeout":
+      return "Brief synthesis timed out.";
+  }
 }
 
 /** Format review results for the LLM-visible custom message content. */
@@ -25,24 +57,29 @@ export function formatReviewContent(result: ReviewResult): string {
 }
 
 function formatFailureContent(result: Extract<ReviewResult, { kind: "failed" }>): string {
-  const parts = [`Review failed: ${result.reason}`];
-  appendDebugContent(parts, result.debug);
+  const parts = [formatChildFailureCopy("reviewer", result.failureCode)];
+  appendChildFailureDiagnostics(parts, result.diagnostics);
   return parts.join("\n");
 }
 
 function formatCanceledContent(result: Extract<ReviewResult, { kind: "canceled" }>): string {
-  const parts = ["Review canceled"];
-  appendDebugContent(parts, result.debug);
+  const parts = ["Reviewer was canceled."];
+  appendChildFailureDiagnostics(parts, result.diagnostics);
   return parts.join("\n");
 }
 
 function formatTimeoutContent(result: Extract<ReviewResult, { kind: "timeout" }>): string {
-  const parts = [`Review timed out (exceeded ${(result.timeoutMs / 1000).toFixed(0)}s)`];
-  if (result.partialOutput) {
-    parts.push("", "Partial output:", result.partialOutput);
-  }
-  appendDebugContent(parts, result.debug);
+  const parts = ["Reviewer timed out."];
+  appendChildFailureDiagnostics(parts, result.diagnostics);
   return parts.join("\n");
+}
+
+function appendChildFailureDiagnostics(
+  parts: string[],
+  diagnostics: ChildFailureDiagnostics | undefined,
+): void {
+  if (!diagnostics) return;
+  parts.push("", "Diagnostics:", ...formatChildFailureDiagnostics(diagnostics));
 }
 
 function formatSuccessContent(result: Extract<ReviewResult, { kind: "success" }>): string {
@@ -79,34 +116,6 @@ function formatSuccessContent(result: Extract<ReviewResult, { kind: "success" }>
 
   lines.push("", `Overall: ${output.overall_explanation}`);
   return lines.join("\n");
-}
-
-function appendDebugContent(parts: string[], debug: ReviewFailureDebugInfo | undefined): void {
-  if (!debug) return;
-
-  const lines = [
-    `- Turns: ${debug.turns}`,
-    `- Tool uses: ${debug.toolUses}`,
-    debug.tokens
-      ? `- Tokens: ${debug.tokens.input} in / ${debug.tokens.output} out / ${debug.tokens.total} total`
-      : undefined,
-    debug.recentEvents && debug.recentEvents.length > 0
-      ? `- Recent events: ${debug.recentEvents.join(" → ")}`
-      : undefined,
-    debug.lastAssistantStopReason
-      ? `- Last assistant stop: ${debug.lastAssistantStopReason}`
-      : undefined,
-    debug.lastAssistantToolCalls && debug.lastAssistantToolCalls.length > 0
-      ? `- Last assistant tools: ${debug.lastAssistantToolCalls.join(", ")}`
-      : undefined,
-    debug.lastAssistantErrorMessage
-      ? `- Last assistant error: ${debug.lastAssistantErrorMessage}`
-      : undefined,
-  ].filter((line): line is string => !!line);
-
-  if (lines.length === 0) return;
-
-  parts.push("", "Debug:", ...lines);
 }
 
 function formatReviewItems(items: ReviewItem[]): string[] {
