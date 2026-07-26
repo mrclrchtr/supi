@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.7.0](https://github.com/mrclrchtr/supi/compare/v2.6.1...v2.7.0) (2026-07-26)
+
+
+### Features
+
+* **supi-context:** separate concise snapshots from TUI reports ([c9b2947](https://github.com/mrclrchtr/supi/commit/c9b294783285b9299d2b70c99c9faa65440b0100))
+* **supi-review:** retain child lifecycle traces ([cad02e0](https://github.com/mrclrchtr/supi/commit/cad02e0482956c4e1562196676352ac0461ca05e)), closes [#223](https://github.com/mrclrchtr/supi/issues/223)
+
+
+### Bug Fixes
+
+* **deps:** update dependency clipboardy to v5.3.2 ([2134e71](https://github.com/mrclrchtr/supi/commit/2134e715876f17732cfa61de866b07d19819e716))
+* **deps:** update dependency clipboardy to v5.3.2 ([86f337d](https://github.com/mrclrchtr/supi/commit/86f337d93f85f0442e8933563906711a1fb3ceaf))
+* **deps:** update pnpm to v11.16.0 ([9061ba5](https://github.com/mrclrchtr/supi/commit/9061ba55d9129dc42a75837620f4400e9e6ed1ef))
+
 ## [2.6.1](https://github.com/mrclrchtr/supi/compare/v2.6.0...v2.6.1) (2026-07-25)
 
 
