@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-bash-timeout",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "description": "SuPi bash-timeout extension — injects default timeout on bash tool calls",
   "license": "MIT",
   "repository": {
