@@ -6,6 +6,8 @@
  * It is a library-only package with no pi extension entrypoint.
  */
 
+// Evidence display — re-exported from supi-core
+export { type EvidenceBadgeInput, formatEvidenceBadge } from "@mrclrchtr/supi-core/evidence-badge";
 // Capability interfaces and availability states
 export type {
   CapabilityState,
@@ -13,8 +15,6 @@ export type {
   StructuralProvider,
   StructuralResult,
 } from "./capability/types.ts";
-// Evidence display
-export { type EvidenceBadgeInput, formatEvidenceBadge } from "./evidence-badge.ts";
 // Shared canonical types
 export type {
   CalleeDepth,

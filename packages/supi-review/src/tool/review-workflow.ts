@@ -26,7 +26,14 @@ export interface PrepareReviewInput {
   plannerModel?: ReviewModelSelection;
   planStore: ReviewPlanStore;
   signal?: AbortSignal;
+  onUpdate?: OnUpdate;
 }
+
+/** Tool update callback signature shared across workflow adapters. */
+type OnUpdate = (result: {
+  content: Array<{ type: "text"; text: string }>;
+  details: Record<string, unknown>;
+}) => void;
 
 /** Complete Direct Review request: target, full review input, and reviewer model. */
 export interface DirectRunInput {
@@ -36,6 +43,7 @@ export interface DirectRunInput {
   review: ReviewInput;
   reviewerModel: ReviewModelSelection;
   signal?: AbortSignal;
+  onUpdate?: OnUpdate;
 }
 
 /** One-shot Prepared Review request: plan id, explicit decision, and plan store. */
@@ -46,6 +54,7 @@ export interface PreparedRunInput {
   decision: { kind: "accept-draft" } | { kind: "use-review"; review: ReviewInput };
   planStore: ReviewPlanStore;
   signal?: AbortSignal;
+  onUpdate?: OnUpdate;
 }
 
 /** Discriminated union accepted by `runReview` for both Direct and Prepared paths. */
@@ -112,11 +121,19 @@ function plannerPrompt(snapshot: ReviewSnapshot, context: string): string {
 
 /** Resolve and store a one-shot plan, optionally asking the advisory Planner for tasks. */
 export async function prepareReview(input: PrepareReviewInput) {
+  input.onUpdate?.({
+    content: [{ type: "text", text: "Resolving target…" }],
+    details: {},
+  });
   const snapshot = await resolveReviewSnapshot(input.cwd, input.target);
   if (!snapshot) return { kind: "no-target" as const, reason: "No reviewable changes found." };
   let plannerDraft: PlannerDraft | undefined;
   if (input.planning === "suggest") {
     if (!input.plannerModel) throw new Error("A configured Planner model is required.");
+    input.onUpdate?.({
+      content: [{ type: "text", text: "Running planner…" }],
+      details: {},
+    });
     const result = await runPlanner({
       cwd: input.cwd,
       model: input.plannerModel.model,
@@ -178,8 +195,12 @@ async function execute(
   reviewInput: ReviewInput,
   model: ReviewModelSelection,
   signal?: AbortSignal,
+  onUpdate?: OnUpdate,
 ): Promise<ReviewTaskResult[]> {
   const review = normalizeReviewInput(reviewInput);
+  let completedCount = 0;
+  const totalCount = review.tasks.length;
+
   return Promise.all(
     review.tasks.map(async (task) => {
       const packet = buildReviewPacket(snapshot, review, task, model);
@@ -192,16 +213,36 @@ async function execute(
           model,
           signal,
         });
-        return toTaskResult(task.id, packet.packetHash, result);
+        const taskResult = toTaskResult(task.id, packet.packetHash, result);
+        completedCount++;
+        const verb = taskResult.status === "completed" ? "complete" : taskResult.status;
+        onUpdate?.({
+          content: [
+            { type: "text", text: `Task ${task.id} ${verb} (${completedCount} of ${totalCount})` },
+          ],
+          details: { completedCount, totalCount },
+        });
+        return taskResult;
       } catch {
-        return {
+        const taskResult: ReviewTaskResult = {
           status: "failed",
           taskId: task.id,
           packetHash: packet.packetHash,
           modelId: model.canonicalId,
           failureCode: "unexpected-runner-failure",
           diagnostics: createUnobservedChildFailureDiagnostics(),
-        } satisfies ReviewTaskResult;
+        };
+        completedCount++;
+        onUpdate?.({
+          content: [
+            {
+              type: "text",
+              text: `Task ${task.id} failed (${completedCount} of ${totalCount})`,
+            },
+          ],
+          details: { results: [taskResult], completedCount, totalCount },
+        });
+        return taskResult;
       }
     }),
   );
@@ -262,7 +303,7 @@ export async function runReview(input: RunReviewInput) {
     snapshot: summarizeReviewSnapshot(snapshot),
     review,
     ...(planning ? { planning } : {}),
-    results: await execute(input.cwd, snapshot, review, model, input.signal),
+    results: await execute(input.cwd, snapshot, review, model, input.signal, input.onUpdate),
   };
   return { kind: "completed" as const, details };
 }

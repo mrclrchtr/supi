@@ -1,4 +1,5 @@
 import { buildSessionContext, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Box } from "@earendil-works/pi-tui";
 import { Value } from "typebox/value";
 import { loadReviewConfig, registerReviewSettings } from "./config.ts";
 import { listLocalBranches, listRecentCommits } from "./git.ts";
@@ -9,6 +10,7 @@ import { formatReviewBatch, registerAgentReviewTools } from "./tool/agent-review
 import { pageText } from "./tool/output-page.ts";
 import { normalizeReviewInput, prepareReview, runReview } from "./tool/review-workflow.ts";
 import { reviewInputSchema } from "./tool/schemas.ts";
+import { renderRunResult } from "./tui/run.ts";
 import type { ReviewInput, ReviewModelSelection, ReviewTargetSpec } from "./types.ts";
 
 type CommandContext = Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1];
@@ -159,6 +161,21 @@ export default function reviewExtension(pi: ExtensionAPI): void {
   const planStore = new ReviewPlanStore();
   registerReviewSettings(pi);
   registerAgentReviewTools(pi, planStore);
+
+  // Message renderer for the /supi-review slash command output.
+  // Adapts the sendMessage shape into the shape renderRunResult expects.
+  pi.registerMessageRenderer("supi-review", (message, options, theme) => {
+    const adapted = {
+      content: [{ type: "text" as const, text: message.content as string }],
+      details: message.details,
+      isError: false,
+    };
+    const result = renderRunResult(adapted, { ...options, isPartial: false }, theme);
+    const box = new Box(options.outputPad, 0, undefined);
+    box.addChild(result);
+    return box;
+  });
+
   pi.registerCommand("supi-review", {
     description: "Run one or more caller-defined read-only review tasks",
     handler: async (_args, ctx) => runCommand(ctx, pi, planStore),

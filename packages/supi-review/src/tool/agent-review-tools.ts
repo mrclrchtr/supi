@@ -1,9 +1,12 @@
 import { buildSessionContext, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { StatusSpinner } from "@mrclrchtr/supi-core/status-spinner";
 import { loadReviewConfig } from "../config.ts";
 import { summarizeReviewSnapshot } from "../git.ts";
 import { collectPlannerContext } from "../history/collect.ts";
 import { resolveAgentReviewModel } from "../model.ts";
 import type { ReviewPlanStore } from "../session/review-plan-store.ts";
+import { renderPrepareCall, renderPrepareResult } from "../tui/prepare.ts";
+import { renderRunCall, renderRunResult } from "../tui/run.ts";
 import type { ReviewBatchDetails, ReviewTargetSpec, ReviewTaskResult } from "../types.ts";
 import {
   type PrepareReviewToolInput,
@@ -99,6 +102,83 @@ function resolveModels(ctx: Parameters<Parameters<ExtensionAPI["registerTool"]>[
   return { reviewer, planner, config };
 }
 
+/** Factory for the supi_review_run execute function with animated status-bar spinner. */
+function makeRunReviewExecute(
+  planStore: ReviewPlanStore,
+): NonNullable<Parameters<ExtensionAPI["registerTool"]>[0]["execute"]> {
+  // biome-ignore lint/complexity/useMaxParams: Pi ToolDefinition execute signature
+  return async (_id, params, signal, onUpdate, ctx) => {
+    const input = parseRunReviewToolInput(params);
+
+    // Animated status-bar spinner — renderResult can't animate on its own.
+    // biome-ignore lint/suspicious/noExplicitAny: tool execute ctx has ui but type is narrower than ExtensionContext
+    const statusSpinner = new StatusSpinner(ctx as any, "supi-review");
+    statusSpinner.start("Reviewing…");
+
+    // Wrap onUpdate to also update the status spinner with task progress.
+    let completedCount = 0;
+    let totalCount = 0;
+    const wrappedUpdate = (result: {
+      content: Array<{ type: "text"; text: string }>;
+      details: Record<string, unknown>;
+    }) => {
+      const details = result.details as { completedCount?: number; totalCount?: number };
+      completedCount = details.completedCount ?? completedCount;
+      totalCount = details.totalCount ?? totalCount;
+      const label =
+        totalCount > 0
+          ? `Reviewing… (${completedCount} of ${totalCount} tasks complete)`
+          : "Reviewing…";
+      statusSpinner.update(label);
+      onUpdate?.(result);
+    };
+
+    // Emit immediate progress so the TUI shows a running indicator.
+    // For prepared mode we may not know the task count yet; omit totalCount so
+    // the handler falls back to the plain "Reviewing…" label.
+    const taskCount =
+      input.mode === "direct"
+        ? (input.review?.tasks?.length ?? 1)
+        : input.decision?.kind === "use-review"
+          ? (input.decision.review?.tasks?.length ?? 0)
+          : 0;
+    wrappedUpdate({
+      content: [{ type: "text", text: "Starting review…" }],
+      details: taskCount > 0 ? { completedCount: 0, totalCount: taskCount } : {},
+    });
+
+    try {
+      const outcome =
+        input.mode === "direct"
+          ? await runReview({
+              mode: "direct",
+              cwd: ctx.cwd,
+              target: input.target,
+              review: input.review,
+              reviewerModel: resolveModels(ctx).reviewer,
+              signal,
+              onUpdate: wrappedUpdate,
+            })
+          : await runReview({
+              mode: "prepared",
+              cwd: ctx.cwd,
+              planId: input.planId,
+              decision: input.decision,
+              planStore,
+              signal,
+              onUpdate: wrappedUpdate,
+            });
+      if (outcome.kind !== "completed") throw new Error(outcome.reason);
+      return {
+        content: [{ type: "text", text: pageText(formatReviewBatch(outcome.details)).text }],
+        details: outcome.details,
+      };
+    } finally {
+      statusSpinner.stop();
+    }
+  };
+}
+
 /** Register optional preparation and universal direct/prepared execution tools. */
 export function registerAgentReviewTools(pi: ExtensionAPI, planStore: ReviewPlanStore): void {
   pi.registerTool({
@@ -111,43 +191,69 @@ export function registerAgentReviewTools(pi: ExtensionAPI, planStore: ReviewPlan
       "Use supi_review_run in direct mode when the current skill or agent already knows the review tasks.",
     ],
     parameters: prepareReviewSchema,
+    renderCall: renderPrepareCall,
+    renderResult: renderPrepareResult,
     // biome-ignore lint/complexity/useMaxParams: Pi ToolDefinition execute signature
-    async execute(_id, params, signal, _update, ctx) {
+    async execute(_id, params, signal, onUpdate, ctx) {
       const input = parsePrepareReviewToolInput(params);
       const models = resolveModels(ctx);
       if ((input.planning ?? "none") === "suggest" && !models.planner) {
         throw new Error(`Configured Planner model "${models.config.plannerModel}" is unavailable.`);
       }
-      const session = buildSessionContext(
-        ctx.sessionManager.getEntries(),
-        ctx.sessionManager.getLeafId(),
-      );
-      const outcome = await prepareReview({
-        cwd: ctx.cwd,
-        target: target(input.target),
-        planning: input.planning ?? "none",
-        plannerContext: collectPlannerContext(session.messages),
-        reviewerModel: models.reviewer,
-        plannerModel: models.planner,
-        planStore,
-        signal,
-      });
-      if (outcome.kind !== "prepared")
-        throw new Error(
-          outcome.kind === "no-target" ? outcome.reason : "Planner failed to produce a draft.",
-        );
-      return {
-        content: [{ type: "text", text: pageText(formatPrepared(outcome.plan)).text }],
-        details: {
-          kind: "review-prepared",
-          planId: outcome.plan.id,
-          snapshot: summarizeReviewSnapshot(outcome.plan.snapshot),
-          reviewerModelId: outcome.plan.reviewerModel.canonicalId,
-          plannerDraft: outcome.plan.plannerDraft,
-          plannerModelId: outcome.plan.plannerModelId,
-          plannerPromptVersion: outcome.plan.plannerPromptVersion,
-        },
+
+      // Animated status-bar spinner during planner LLM call.
+      // biome-ignore lint/suspicious/noExplicitAny: tool execute ctx has ui but type is narrower than ExtensionContext
+      const statusSpinner = new StatusSpinner(ctx as any, "supi-review");
+      statusSpinner.start("Preparing review…");
+
+      const wrappedUpdate = (result: {
+        content: Array<{ type: "text"; text: string }>;
+        details: Record<string, unknown>;
+      }) => {
+        const text = result.content?.[0]?.text ?? "";
+        statusSpinner.update(text);
+        onUpdate?.(result);
       };
+
+      try {
+        const session = buildSessionContext(
+          ctx.sessionManager.getEntries(),
+          ctx.sessionManager.getLeafId(),
+        );
+        wrappedUpdate({
+          content: [{ type: "text", text: "Resolving target…" }],
+          details: {},
+        });
+        const outcome = await prepareReview({
+          cwd: ctx.cwd,
+          target: target(input.target),
+          planning: input.planning ?? "none",
+          plannerContext: collectPlannerContext(session.messages),
+          reviewerModel: models.reviewer,
+          plannerModel: models.planner,
+          planStore,
+          signal,
+          onUpdate: wrappedUpdate,
+        });
+        if (outcome.kind !== "prepared")
+          throw new Error(
+            outcome.kind === "no-target" ? outcome.reason : "Planner failed to produce a draft.",
+          );
+        return {
+          content: [{ type: "text", text: pageText(formatPrepared(outcome.plan)).text }],
+          details: {
+            kind: "review-prepared",
+            planId: outcome.plan.id,
+            snapshot: summarizeReviewSnapshot(outcome.plan.snapshot),
+            reviewerModelId: outcome.plan.reviewerModel.canonicalId,
+            plannerDraft: outcome.plan.plannerDraft,
+            plannerModelId: outcome.plan.plannerModelId,
+            plannerPromptVersion: outcome.plan.plannerPromptVersion,
+          },
+        };
+      } finally {
+        statusSpinner.stop();
+      }
     },
   });
 
@@ -161,33 +267,9 @@ export function registerAgentReviewTools(pi: ExtensionAPI, planStore: ReviewPlan
       "Repository stability from invocation through completion is a caller precondition for supi_review_run.",
     ],
     parameters: runReviewSchema,
-    // biome-ignore lint/complexity/useMaxParams: Pi ToolDefinition execute signature
-    async execute(_id, params, signal, _update, ctx) {
-      const input = parseRunReviewToolInput(params);
-      const outcome =
-        input.mode === "direct"
-          ? await runReview({
-              mode: "direct",
-              cwd: ctx.cwd,
-              target: input.target,
-              review: input.review,
-              reviewerModel: resolveModels(ctx).reviewer,
-              signal,
-            })
-          : await runReview({
-              mode: "prepared",
-              cwd: ctx.cwd,
-              planId: input.planId,
-              decision: input.decision,
-              planStore,
-              signal,
-            });
-      if (outcome.kind !== "completed") throw new Error(outcome.reason);
-      return {
-        content: [{ type: "text", text: pageText(formatReviewBatch(outcome.details)).text }],
-        details: outcome.details,
-      };
-    },
+    renderCall: renderRunCall,
+    renderResult: renderRunResult,
+    execute: makeRunReviewExecute(planStore),
   });
 
   pi.on("session_start", () => planStore.clear());
