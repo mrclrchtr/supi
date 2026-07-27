@@ -87,7 +87,7 @@ function truncateDescription(description: string | null): string | null {
 }
 
 /**
- * Detect languages present in the first level of each module directory.
+ * Detect languages present in the first two levels of each module directory.
  *
  * Uses Tree-sitter's extension-to-grammar mapping for conservative,
  * documented detection. Returns short language tags sorted alphabetically.
@@ -95,58 +95,49 @@ function truncateDescription(description: string | null): string | null {
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: language detection with file-system scanning naturally has many branches
 function detectModuleLanguages(modules: readonly { root: string }[]): string[] {
   const detected = new Set<string>();
-  const scanDepth = 1;
 
   for (const mod of modules) {
+    let entries: fs.Dirent[];
     try {
-      const entries = fs.readdirSync(mod.root, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isFile()) continue;
-        const supportedExt = getSupportedExtension(entry.name);
-        if (!supportedExt) continue;
-        // Map extension to grammar, then grammar to language tag.
-        // We use getSupportedExtension which returns the extension with dot.
-        // The grammar is detected from the extension.
-        const grammar = detectGrammarForExtension(supportedExt);
-        const tag = grammar ? GRAMMAR_LANGUAGE_TAGS[grammar] : null;
-        if (tag) detected.add(tag);
-      }
+      entries = fs.readdirSync(mod.root, { withFileTypes: true });
     } catch {
-      // Directory may not be readable — skip.
+      continue;
     }
 
-    if (detected.size > 0) {
-      // Recurse one level deeper for nested source directories.
-      if (scanDepth > 0) {
-        try {
-          const entries = fs.readdirSync(mod.root, { withFileTypes: true });
-          for (const entry of entries) {
-            if (!entry.isDirectory() || entry.name.startsWith(".") || entry.name === "node_modules")
-              continue;
-            try {
-              const subEntries = fs.readdirSync(path.join(mod.root, entry.name), {
-                withFileTypes: true,
-              });
-              for (const subEntry of subEntries) {
-                if (!subEntry.isFile()) continue;
-                const supportedExt = getSupportedExtension(subEntry.name);
-                if (!supportedExt) continue;
-                const grammar = detectGrammarForExtension(supportedExt);
-                const tag = grammar ? GRAMMAR_LANGUAGE_TAGS[grammar] : null;
-                if (tag) detected.add(tag);
-              }
-            } catch {
-              // Skip unreadable subdirectories.
-            }
-          }
-        } catch {
-          // Skip.
+    // Scan top-level files first.
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      scanFileForLanguage(entry.name, detected);
+    }
+
+    // Scan one level deeper for nested source directories (e.g. src/).
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name.startsWith(".") || entry.name === "node_modules")
+        continue;
+      try {
+        const subEntries = fs.readdirSync(path.join(mod.root, entry.name), {
+          withFileTypes: true,
+        });
+        for (const subEntry of subEntries) {
+          if (!subEntry.isFile()) continue;
+          scanFileForLanguage(subEntry.name, detected);
         }
+      } catch {
+        // Skip unreadable subdirectories.
       }
     }
   }
 
   return [...detected].sort();
+}
+
+/** Check a filename for a supported extension and add its language tag if found. */
+function scanFileForLanguage(fileName: string, detected: Set<string>): void {
+  const supportedExt = getSupportedExtension(fileName);
+  if (!supportedExt) return;
+  const grammar = detectGrammarForExtension(supportedExt);
+  const tag = grammar ? GRAMMAR_LANGUAGE_TAGS[grammar] : null;
+  if (tag) detected.add(tag);
 }
 
 /** Map a supported extension (with leading dot) to a grammar ID. */

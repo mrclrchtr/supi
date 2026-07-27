@@ -19,12 +19,6 @@
 import * as path from "node:path";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { LspRuntimeController } from "@mrclrchtr/supi-lsp/api";
-import {
-  type CapabilityWarning,
-  CapabilityWarningState,
-  evaluateCapabilityWarnings,
-  gatherCapabilityWarningInput,
-} from "../analysis/capability/capability-warnings.ts";
 import { type CapabilityAdapter, WorkspaceCapabilityAdapter } from "./capability-adapter.ts";
 import type { FindWorkflowInput, FindWorkflowOutcome } from "./find-types.ts";
 import { runFindWorkflow } from "./find-workflow.ts";
@@ -63,7 +57,6 @@ import { reportProgress, throwIfAborted, type WorkflowControl } from "./workflow
 
 // ── Re-export types consumed by callers ───────────────────────────────
 
-export type { CapabilityWarningState } from "../analysis/capability/capability-warnings.ts";
 export type { CapabilityAdapter } from "./capability-adapter.ts";
 export type {
   FindMode,
@@ -155,9 +148,6 @@ export class WorkspaceCodeIntelligenceSession {
   /** Session-scoped refactor plan storage (planId → plan). */
   readonly #refactorPlans = new Map<string, RefactorPlan>();
 
-  /** Capability Warning state for deduplication and grace-period timing. */
-  readonly #capabilityWarningState = new CapabilityWarningState();
-
   /** Absolute instruction files already loaded by PI's native context-file mechanism. */
   readonly #nativeInstructionPaths = new Set<string>();
 
@@ -201,14 +191,6 @@ export class WorkspaceCodeIntelligenceSession {
     if (this.#hasInjectedOverview) return false;
     this.#hasInjectedOverview = true;
     return true;
-  }
-
-  /** Evaluate and deduplicate Capability Warnings behind the session seam. */
-  pendingCapabilityWarnings(): readonly CapabilityWarning[] {
-    const report = evaluateCapabilityWarnings(
-      gatherCapabilityWarningInput(this.cwd, this.#lspController),
-    );
-    return this.#capabilityWarningState.getPendingWarnings(report);
   }
 
   // ── Target workflow (deep seam) ───────────────────────────────────
@@ -408,7 +390,6 @@ export class WorkspaceCodeIntelligenceSession {
     this.#surfacedInstructionDirs.clear();
     this.#nativeInstructionPaths.clear();
     this.#sentinelSnapshot.clear();
-    this.#capabilityWarningState.reset();
     this.#lspController = null;
   }
 }
