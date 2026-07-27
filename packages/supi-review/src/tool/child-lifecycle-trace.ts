@@ -53,9 +53,16 @@ export type ChildLifecycleTraceEntry =
       willRetry: boolean;
       hasResult: boolean;
       hasError: boolean;
+      errorText?: string;
     }
   | { type: "auto_retry_start"; attempt: number; maxAttempts: number; delayMs: number }
-  | { type: "auto_retry_end"; success: boolean; attempt: number; hasFinalError: boolean }
+  | {
+      type: "auto_retry_end";
+      success: boolean;
+      attempt: number;
+      hasFinalError: boolean;
+      finalErrorText?: string;
+    }
   | {
       type: "summarization_retry_scheduled";
       attempt: number;
@@ -161,6 +168,20 @@ export class ChildLifecycleTraceCollector {
   }
 }
 
+/**
+ * Extract error text from the most recent lifecycle entry that carries an error.
+ * Checks compaction_end.errorText and auto_retry_end.finalErrorText.
+ */
+export function extractLastLifecycleErrorText(trace: ChildLifecycleTrace): string | undefined {
+  // Walk backwards to find the most recent error
+  for (let i = trace.entries.length - 1; i >= 0; i--) {
+    const entry = trace.entries[i];
+    if (entry.type === "compaction_end" && entry.errorText) return entry.errorText;
+    if (entry.type === "auto_retry_end" && entry.finalErrorText) return entry.finalErrorText;
+  }
+  return undefined;
+}
+
 /** Format the complete retained Child Lifecycle Trace for parent-facing diagnostics. */
 export function formatChildLifecycleTrace(trace: ChildLifecycleTrace): string {
   const tail =
@@ -185,11 +206,11 @@ function formatChildLifecycleTraceEntry(entry: ChildLifecycleTraceEntry): string
     case "compaction_start":
       return `compaction_start(reason=${entry.reason})`;
     case "compaction_end":
-      return `compaction_end(reason=${entry.reason}, aborted=${entry.aborted}, willRetry=${entry.willRetry}, hasResult=${entry.hasResult}, hasError=${entry.hasError})`;
+      return `compaction_end(reason=${entry.reason}, aborted=${entry.aborted}, willRetry=${entry.willRetry}, hasResult=${entry.hasResult}, hasError=${entry.hasError}${entry.errorText ? `, error=${JSON.stringify(entry.errorText)}` : ""})`;
     case "auto_retry_start":
       return `auto_retry_start(attempt=${entry.attempt}/${entry.maxAttempts}, delayMs=${entry.delayMs})`;
     case "auto_retry_end":
-      return `auto_retry_end(success=${entry.success}, attempt=${entry.attempt}, hasFinalError=${entry.hasFinalError})`;
+      return `auto_retry_end(success=${entry.success}, attempt=${entry.attempt}, hasFinalError=${entry.hasFinalError}${entry.finalErrorText ? `, error=${JSON.stringify(entry.finalErrorText)}` : ""})`;
     case "summarization_retry_scheduled":
       return `summarization_retry_scheduled(attempt=${entry.attempt}/${entry.maxAttempts}, delayMs=${entry.delayMs})`;
     case "summarization_retry_attempt_start":
@@ -269,6 +290,10 @@ function mapLifecycleEvent(event: AgentSessionEvent): ChildLifecycleTraceEntry |
             willRetry: event.willRetry,
             hasResult: event.result !== undefined,
             hasError: event.errorMessage !== undefined,
+            errorText:
+              typeof event.errorMessage === "string" && event.errorMessage.trim()
+                ? event.errorMessage
+                : undefined,
           }
         : undefined;
     case "auto_retry_start":
@@ -289,6 +314,10 @@ function mapLifecycleEvent(event: AgentSessionEvent): ChildLifecycleTraceEntry |
             success: event.success,
             attempt: event.attempt,
             hasFinalError: event.finalError !== undefined,
+            finalErrorText:
+              typeof event.finalError === "string" && event.finalError.trim()
+                ? event.finalError
+                : undefined,
           }
         : undefined;
     case "summarization_retry_scheduled":

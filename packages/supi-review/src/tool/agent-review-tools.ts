@@ -15,6 +15,7 @@ import {
   prepareReviewSchema,
   runReviewSchema,
 } from "./agent-review-schemas.ts";
+import { formatChildFailureDiagnostics } from "./child-failure-diagnostics.ts";
 import { pageText } from "./output-page.ts";
 import { prepareReview, runReview } from "./review-workflow.ts";
 
@@ -54,10 +55,26 @@ function formatTaskResult(result: ReviewTaskResult): string[] {
     `Model: ${result.modelId}`,
     `Packet SHA-256: ${result.packetHash}`,
   ];
-  if (result.status === "failed") return [...lines, `Status: failed (${result.failureCode})`];
-  if (result.status === "canceled") return [...lines, "Status: canceled"];
+  if (result.status === "failed") {
+    lines.push(`Status: failed (${result.failureCode})`);
+    if (result.diagnostics) {
+      lines.push("", ...formatChildFailureDiagnostics(result.diagnostics));
+    }
+    return lines;
+  }
+  if (result.status === "canceled") {
+    lines.push("Status: canceled");
+    if (result.diagnostics) {
+      lines.push("", ...formatChildFailureDiagnostics(result.diagnostics));
+    }
+    return lines;
+  }
   if (result.status === "timeout") {
-    return [...lines, `Status: timeout (${result.timeoutMs} ms)`];
+    lines.push(`Status: timeout (${result.timeoutMs} ms)`);
+    if (result.diagnostics) {
+      lines.push("", ...formatChildFailureDiagnostics(result.diagnostics));
+    }
+    return lines;
   }
   lines.push(`Verdict: ${result.verdict.toUpperCase()}`, "", result.summary);
   for (const finding of result.findings) {

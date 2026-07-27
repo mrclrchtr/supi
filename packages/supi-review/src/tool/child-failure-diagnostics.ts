@@ -8,6 +8,7 @@ import type {
 import {
   type ChildLifecycleTrace,
   ChildLifecycleTraceCollector,
+  extractLastLifecycleErrorText,
   formatChildLifecycleTrace,
   getRegisteredToolNames,
   toSafeAssistantStopReason,
@@ -40,6 +41,8 @@ export function buildChildFailureDiagnostics(
     recentActivity: input.recentActivity.length > 0 ? [...input.recentActivity] : undefined,
     lastAssistantStopReason: lastAssistant?.stopReason,
     lastAssistantToolCalls: lastAssistant?.toolCalls,
+    lastAssistantErrorText: lastAssistant?.errorText,
+    lastLifecycleErrorText: extractLastLifecycleErrorText(input.lifecycleTrace),
   };
 }
 
@@ -95,6 +98,13 @@ export function formatChildFailureDiagnostics(diagnostics: ChildFailureDiagnosti
     diagnostics.lastAssistantToolCalls && diagnostics.lastAssistantToolCalls.length > 0
       ? `- Last assistant tools: ${diagnostics.lastAssistantToolCalls.join(", ")}`
       : undefined,
+    diagnostics.lastAssistantErrorText
+      ? `- Last assistant error: ${diagnostics.lastAssistantErrorText}`
+      : undefined,
+    diagnostics.lastLifecycleErrorText &&
+    diagnostics.lastLifecycleErrorText !== diagnostics.lastAssistantErrorText
+      ? `- Lifecycle error: ${diagnostics.lastLifecycleErrorText}`
+      : undefined,
     `- ${formatChildLifecycleTrace(diagnostics.lifecycleTrace)}`,
   ];
   return lines.filter((line): line is string => !!line);
@@ -103,6 +113,7 @@ export function formatChildFailureDiagnostics(diagnostics: ChildFailureDiagnosti
 interface LastAssistantMetadata {
   stopReason?: string;
   toolCalls?: string[];
+  errorText?: string;
 }
 
 function extractLastAssistantMetadata(session: AgentSession): LastAssistantMetadata | undefined {
@@ -117,9 +128,11 @@ function extractLastAssistantMetadata(session: AgentSession): LastAssistantMetad
 
       const stopReason = toSafeAssistantStopReason(message.stopReason);
       const toolCalls = extractAssistantToolCalls(message.content, registeredToolNames);
+      const errorText = stopReason === "error" ? extractAssistantErrorText(message) : undefined;
       return {
         stopReason,
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+        errorText,
       };
     }
     return undefined;
@@ -142,4 +155,49 @@ function extractAssistantToolCalls(content: unknown, registeredToolNames: Set<st
         : undefined;
     })
     .filter((name): name is string => !!name);
+}
+
+/** Extract error text from content text parts when the model embeds an error message. */
+function extractContentErrorText(content: unknown): string | undefined {
+  if (!Array.isArray(content)) return undefined;
+  const textParts = content
+    .filter(
+      (part): part is { type: "text"; text: string } =>
+        typeof part === "object" &&
+        part !== null &&
+        (part as { type?: unknown }).type === "text" &&
+        typeof (part as { text?: unknown }).text === "string",
+    )
+    .map((part) => part.text);
+  if (textParts.length === 0) return undefined;
+  const joined = textParts.join("\n").trim();
+  return joined || undefined;
+}
+
+/** Scan enumerable message keys for any error-like string property as a fallback. */
+function scanMessageKeysForError(message: Record<string, unknown>): string | undefined {
+  for (const key of Object.keys(message)) {
+    if (!/error|message|reason/i.test(key)) continue;
+    const value = message[key];
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return undefined;
+}
+
+/** Extract error text from an errored assistant message, trying content text parts first then top-level error fields. */
+function extractAssistantErrorText(message: Record<string, unknown>): string | undefined {
+  // 1. Try content text parts (model may embed error in text)
+  const contentError = extractContentErrorText(message.content);
+  if (contentError) return contentError;
+
+  // 2. Try top-level error message (provider-level error payload)
+  if (typeof message.errorMessage === "string" && message.errorMessage.trim()) {
+    return message.errorMessage;
+  }
+  if (typeof message.error === "string" && message.error.trim()) {
+    return message.error;
+  }
+
+  // 3. Fallback: scan enumerable keys for any error-like string property
+  return scanMessageKeysForError(message);
 }

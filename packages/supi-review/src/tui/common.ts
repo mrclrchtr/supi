@@ -9,6 +9,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { type Container, Spacer, Text } from "@earendil-works/pi-tui";
 import { formatEvidenceBadge } from "@mrclrchtr/supi-core/evidence-badge";
 import type {
+  ChildFailureDiagnostics,
   FindingEffort,
   FindingImpact,
   ReviewFinding,
@@ -118,6 +119,64 @@ function renderFinding(container: Container, finding: ReviewFinding, theme: Them
   container.addChild(new Spacer(1));
 }
 
+/** Build a compact diagnostics section for non-completed (failed/canceled/timeout) task results. */
+function buildNonCompletedSection(
+  container: Container,
+  result: ReviewTaskResult & { status: "failed" | "canceled" | "timeout" },
+  theme: Theme,
+): void {
+  const diagnostics: ChildFailureDiagnostics | undefined =
+    "diagnostics" in result ? result.diagnostics : undefined;
+  if (!diagnostics) return;
+
+  container.addChild(new Spacer(1));
+  container.addChild(
+    new Text(
+      theme.fg("dim", `${diagnostics.turns} turns · ${diagnostics.toolUses} tool uses`),
+      1,
+      0,
+    ),
+  );
+
+  if (diagnostics.lastAssistantStopReason) {
+    container.addChild(
+      new Text(
+        theme.fg(
+          diagnostics.lastAssistantStopReason === "error" ? "error" : "dim",
+          `Last assistant stop: ${diagnostics.lastAssistantStopReason}`,
+        ),
+        1,
+        0,
+      ),
+    );
+  }
+
+  if (diagnostics.lastAssistantErrorText) {
+    const truncated =
+      diagnostics.lastAssistantErrorText.length > 200
+        ? `${diagnostics.lastAssistantErrorText.slice(0, 200)}…`
+        : diagnostics.lastAssistantErrorText;
+    container.addChild(new Text(theme.fg("error", truncated), 1, 0));
+  } else if (diagnostics.lastLifecycleErrorText) {
+    const truncated =
+      diagnostics.lastLifecycleErrorText.length > 200
+        ? `${diagnostics.lastLifecycleErrorText.slice(0, 200)}…`
+        : diagnostics.lastLifecycleErrorText;
+    container.addChild(new Text(theme.fg("error", truncated), 1, 0));
+  } else if (diagnostics.lastAssistantStopReason === "error") {
+    container.addChild(
+      new Text(
+        theme.fg(
+          "dim",
+          "The model produced an error with no further details — check provider quota, auth, or configuration.",
+        ),
+        1,
+        0,
+      ),
+    );
+  }
+}
+
 /** Build an expanded-view section for a single review task result. */
 export function buildTaskSection(
   container: Container,
@@ -159,7 +218,10 @@ export function buildTaskSection(
   container.addChild(new Text(metaParts.join("  "), 1, 0));
 
   // Completed task — show summary and findings
-  if (result.status !== "completed") return;
+  if (result.status !== "completed") {
+    buildNonCompletedSection(container, result, theme);
+    return;
+  }
 
   if (result.summary) {
     container.addChild(new Spacer(1));

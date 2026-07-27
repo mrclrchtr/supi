@@ -109,6 +109,10 @@ export interface ChildFailureDiagnostics {
   recentActivity?: string[];
   lastAssistantStopReason?: string;
   lastAssistantToolCalls?: string[];
+  /** Error text extracted from the last assistant message when stopReason is "error". */
+  lastAssistantErrorText?: string;
+  /** Error text extracted from the most recent lifecycle event (compaction_end, auto_retry_end). */
+  lastLifecycleErrorText?: string;
 }
 
 export type ChildFailedResult =

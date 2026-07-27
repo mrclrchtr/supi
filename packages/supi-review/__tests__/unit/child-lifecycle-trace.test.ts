@@ -23,7 +23,7 @@ describe("ChildLifecycleTraceCollector", () => {
     });
   });
 
-  it("copies compaction facts without retaining the result or error payload", () => {
+  it("copies compaction facts including sanitised error text", () => {
     const collector = new ChildLifecycleTraceCollector();
 
     collector.observe({
@@ -44,6 +44,7 @@ describe("ChildLifecycleTraceCollector", () => {
           willRetry: true,
           hasResult: true,
           hasError: true,
+          errorText: "private provider error",
         },
       ],
       droppedCount: 0,
@@ -94,7 +95,13 @@ describe("ChildLifecycleTraceCollector", () => {
       entries: [
         { type: "compaction_start", reason: "overflow" },
         { type: "auto_retry_start", attempt: 2, maxAttempts: 4, delayMs: 250 },
-        { type: "auto_retry_end", success: false, attempt: 2, hasFinalError: true },
+        {
+          type: "auto_retry_end",
+          success: false,
+          attempt: 2,
+          hasFinalError: true,
+          finalErrorText: "private final error",
+        },
         {
           type: "summarization_retry_scheduled",
           attempt: 1,
