@@ -1,6 +1,7 @@
 import { lstat, readFile, readlink, realpath } from "node:fs/promises";
 import { dirname, posix, relative, resolve, sep, win32 } from "node:path";
 
+/** Verified repository-relative review path that cannot lexically escape the worktree. */
 export interface SafeReviewPath {
   absolute: string;
   path: string;

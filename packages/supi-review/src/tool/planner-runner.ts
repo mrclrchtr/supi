@@ -1,11 +1,11 @@
 import { clampThinkingLevel } from "@earendil-works/pi-ai";
-import { createAgentSession, defineTool, SessionManager } from "@earendil-works/pi-coding-agent";
+import { defineTool } from "@earendil-works/pi-coding-agent";
 import type { PlannerDraft, PlannerInvocation, PlannerRunResult } from "../types.ts";
 import { createEarlyCancellationDiagnostics } from "./child-failure-diagnostics.ts";
-import { createIsolatedChildResources } from "./child-resource-loader.ts";
+import { runIsolatedChild } from "./child-session-runner.ts";
 import { plannerDraftSchema } from "./schemas.ts";
-import { runWithLifecycle } from "./session-lifecycle.ts";
 
+/** Protocol version for Planner prompt structures — keep in sync with review workflow. */
 export const PLANNER_PROMPT_VERSION = "1";
 const PLANNER_TIMEOUT_MS = 5 * 60 * 1_000;
 
@@ -40,51 +40,30 @@ export async function runPlanner(invocation: PlannerInvocation): Promise<Planner
       };
     },
   });
-  const { loader, settingsManager } = createIsolatedChildResources(invocation.cwd, systemPrompt());
-  try {
-    await loader.reload();
-    const { session } = await createAgentSession({
-      cwd: invocation.cwd,
-      model: invocation.model,
-      thinkingLevel: clampThinkingLevel(invocation.model, "low"),
-      tools: [submit.name],
-      customTools: [submit],
-      resourceLoader: loader,
-      settingsManager,
-      sessionManager: SessionManager.inMemory(invocation.cwd),
-    });
-    return runWithLifecycle({
-      session,
-      prompt: invocation.prompt,
-      signal: invocation.signal,
-      timeoutMs: PLANNER_TIMEOUT_MS,
-      onEvent: (event, ctx) => {
-        if (event.type === "turn_end") ctx.progress.turns++;
-        if (event.type === "tool_execution_start") ctx.progress.toolUses++;
-        invocation.onProgress?.(ctx.progress);
-        if (event.type !== "agent_settled") return;
-        const result: PlannerRunResult = holder.value
-          ? { kind: "success", draft: holder.value }
-          : {
-              kind: "failed",
-              failureCode: "missing-structured-output",
-              diagnostics: ctx.getFailureDiagnostics(),
-            };
-        ctx.resolve(ctx.cleanup(result));
-      },
-      canceledResult: (ctx) => ({ kind: "canceled", diagnostics: ctx.getFailureDiagnostics() }),
-      failedResult: (failureCode, ctx) => ({
-        kind: "failed",
-        failureCode,
-        diagnostics: ctx.getFailureDiagnostics(),
-      }),
-      timeoutResult: (timeoutMs, ctx) => ({
-        kind: "timeout",
-        timeoutMs,
-        diagnostics: ctx.getFailureDiagnostics(),
-      }),
-    });
-  } catch {
-    return { kind: "failed", failureCode: "session-creation-failed" };
-  }
+  return runIsolatedChild<PlannerDraft, PlannerRunResult>({
+    cwd: invocation.cwd,
+    protocolPrompt: systemPrompt(),
+    model: invocation.model,
+    thinkingLevel: clampThinkingLevel(invocation.model, "low"),
+    timeoutMs: PLANNER_TIMEOUT_MS,
+    prompt: invocation.prompt,
+    signal: invocation.signal,
+    tools: [submit.name],
+    customTools: [submit],
+    holder,
+    successResult: (draft) => ({ kind: "success", draft }),
+    canceledResult: (diagnostics) => ({ kind: "canceled", diagnostics }),
+    failedResult: (failureCode, diagnostics) => ({
+      kind: "failed",
+      failureCode,
+      diagnostics,
+    }),
+    timeoutResult: (timeoutMs, diagnostics) => ({
+      kind: "timeout",
+      timeoutMs,
+      diagnostics,
+    }),
+    sessionFailedResult: { kind: "failed", failureCode: "session-creation-failed" },
+    onProgress: invocation.onProgress,
+  });
 }

@@ -16,6 +16,7 @@ import { createUnobservedChildFailureDiagnostics } from "./child-failure-diagnos
 import { PLANNER_PROMPT_VERSION, runPlanner } from "./planner-runner.ts";
 import { runReviewer } from "./review-runner.ts";
 
+/** Input required by the prepare workflow: target resolution plus optional Planner run. */
 export interface PrepareReviewInput {
   cwd: string;
   target: ReviewTargetSpec;
@@ -27,6 +28,7 @@ export interface PrepareReviewInput {
   signal?: AbortSignal;
 }
 
+/** Complete Direct Review request: target, full review input, and reviewer model. */
 export interface DirectRunInput {
   mode: "direct";
   cwd: string;
@@ -36,6 +38,7 @@ export interface DirectRunInput {
   signal?: AbortSignal;
 }
 
+/** One-shot Prepared Review request: plan id, explicit decision, and plan store. */
 export interface PreparedRunInput {
   mode: "prepared";
   cwd: string;
@@ -45,6 +48,7 @@ export interface PreparedRunInput {
   signal?: AbortSignal;
 }
 
+/** Discriminated union accepted by `runReview` for both Direct and Prepared paths. */
 export type RunReviewInput = DirectRunInput | PreparedRunInput;
 
 const MAX_PLANNER_FILE_COUNT = 200;

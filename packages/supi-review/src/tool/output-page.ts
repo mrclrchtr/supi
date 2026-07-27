@@ -1,7 +1,11 @@
+/** Default output page size in UTF-16 code units. */
 export const DEFAULT_PAGE_CHARACTERS = 12_000;
+/** Hard ceiling for a single output page. */
 export const MAX_PAGE_CHARACTERS = 12_000;
+/** Line-based cap for a single output page (before continuation metadata). */
 export const MAX_PAGE_LINES = 2_000;
 
+/** One page of paged tool or rendering output with an optional continuation offset. */
 export interface TextPage {
   text: string;
   offset: number;

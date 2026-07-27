@@ -15,6 +15,7 @@ export { toCanonicalModelId } from "@mrclrchtr/supi-core/model-selection";
  */
 export function getSelectableReviewModels(
   ctx: Pick<ExtensionContext, "cwd" | "modelRegistry" | "model">,
+  /** Optional override for Pi's scoped model patterns; omit to use configured defaults. */
   enabledModelPatterns?: string[],
 ): ReviewModelSelection[] {
   return getSelectableModels(ctx, enabledModelPatterns) as ReviewModelSelection[];
@@ -48,6 +49,7 @@ export function getCurrentReviewModel(
 export function resolveAgentReviewModel(
   ctx: Pick<ExtensionContext, "cwd" | "modelRegistry" | "model">,
   configuredModelId: string,
+  /** Optional override for Pi's scoped model patterns; omit to use configured defaults. */
   enabledModelPatterns?: string[],
 ): ReviewModelSelection | undefined {
   const modelId = configuredModelId.trim();

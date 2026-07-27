@@ -1,6 +1,7 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 
+/** TypeBox schema for one caller-defined review task (provider-visible). */
 export const reviewTaskSchema = Type.Object(
   {
     id: Type.String({
@@ -16,6 +17,7 @@ export const reviewTaskSchema = Type.Object(
   { additionalProperties: false },
 );
 
+/** TypeBox schema for the complete review input (provider-visible). */
 export const reviewInputSchema = Type.Object(
   {
     sharedContext: Type.Optional(
@@ -30,6 +32,7 @@ export const reviewInputSchema = Type.Object(
   { additionalProperties: false },
 );
 
+/** TypeBox schema for a single structured finding (provider-visible). */
 export const reviewFindingSchema = Type.Object(
   {
     title: Type.String({ minLength: 1, description: "Concise finding title." }),
@@ -65,6 +68,7 @@ export const reviewFindingSchema = Type.Object(
   { additionalProperties: false },
 );
 
+/** TypeBox schema for the submit_review tool parameters (provider-visible). */
 export const reviewSubmissionSchema = Type.Object(
   {
     summary: Type.String({ minLength: 1, description: "Task-level review summary." }),
@@ -75,4 +79,5 @@ export const reviewSubmissionSchema = Type.Object(
   { additionalProperties: false },
 );
 
+/** Planner Draft uses the same shape as review input (shared context + tasks). */
 export const plannerDraftSchema = reviewInputSchema;

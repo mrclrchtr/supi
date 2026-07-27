@@ -1,5 +1,6 @@
 import { DefaultResourceLoader, SettingsManager } from "@earendil-works/pi-coding-agent";
 
+/** Loader and settings manager preconfigured for an isolated child session. */
 export interface IsolatedChildResources {
   loader: DefaultResourceLoader;
   settingsManager: SettingsManager;

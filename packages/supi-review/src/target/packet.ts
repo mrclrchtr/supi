@@ -8,6 +8,7 @@ import type {
   ReviewTask,
 } from "../types.ts";
 
+/** Protocol version included in every canonical reviewer packet for future evolution. */
 export const REVIEW_PACKET_PROTOCOL_VERSION = "1";
 
 function sha256(value: string): string {
