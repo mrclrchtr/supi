@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-core",
-  "version": "2.8.0",
+  "version": "3.0.0",
   "description": "SuPi core — shared infrastructure for SuPi extensions (XML context tags, config system)",
   "license": "MIT",
   "repository": {
