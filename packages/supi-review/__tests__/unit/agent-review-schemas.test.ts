@@ -55,6 +55,29 @@ describe("agent review schemas", () => {
     expect(() => parseRunReviewToolInput(input)).toThrow();
   });
 
+  it("accepts short commit hashes (7+ hex chars)", () => {
+    expect(
+      parseRunReviewToolInput({
+        mode: "direct",
+        target: { kind: "commit", commit: "9510d68" },
+        review,
+      }),
+    ).toEqual({
+      mode: "direct",
+      target: { kind: "commit", commit: "9510d68" },
+      review,
+    });
+
+    // 40-char hashes still work
+    expect(
+      parseRunReviewToolInput({
+        mode: "direct",
+        target: { kind: "comparison", baseCommit: commit },
+        review,
+      }),
+    ).toBeDefined();
+  });
+
   it("is lenient about extraneous fields on the target", () => {
     // Comparison with both baseCommit and commit — should ignore commit
     expect(

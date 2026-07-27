@@ -17,7 +17,6 @@ import type {
   ReviewTargetSpec,
 } from "./types.ts";
 
-const FULL_COMMIT_ID_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
 const DIFF_FLAGS = ["--no-ext-diff", "--no-textconv", "--binary"] as const;
 
 function parseNullList(text: string): string[] {
@@ -40,17 +39,12 @@ export function parseDiffStats(text: string, fileCount?: number): DiffStats {
   return { files: fileCount ?? files, additions, deletions };
 }
 
-/** Validate the agent-facing full Git object-id syntax before invoking Git. */
-export function isFullCommitId(value: string): boolean {
-  return FULL_COMMIT_ID_RE.test(value);
-}
-
 async function resolveCommit(cwd: string, value: string): Promise<string | undefined> {
-  if (!isFullCommitId(value)) return undefined;
-  const type = (await gitAllowExit(cwd, ["cat-file", "-t", value], [128])).trim();
+  const canonical = (await gitAllowExit(cwd, ["rev-parse", "--verify", value], [1, 128])).trim();
+  if (!canonical) return undefined;
+  const type = (await gitAllowExit(cwd, ["cat-file", "-t", canonical], [128])).trim();
   if (type !== "commit") return undefined;
-  const canonical = (await git(cwd, ["rev-parse", "--verify", value])).trim().toLowerCase();
-  return canonical === value.toLowerCase() ? canonical : undefined;
+  return canonical.toLowerCase();
 }
 
 async function headCommit(cwd: string): Promise<string | undefined> {

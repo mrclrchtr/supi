@@ -5,10 +5,11 @@ import type { ReviewInput, ReviewTargetSpec } from "../types.ts";
 import { reviewInputSchema } from "./schemas.ts";
 
 const commitId = Type.String({
-  minLength: 40,
+  minLength: 7,
   maxLength: 64,
-  pattern: "^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$",
-  description: "Full hexadecimal Git commit object id (40 or 64 characters).",
+  pattern: "^[0-9a-fA-F]{7,64}$",
+  description:
+    "Git commit hash (7-64 hex characters). Short hashes are resolved to full commit ids.",
 });
 const targetSchema = Type.Object(
   {
