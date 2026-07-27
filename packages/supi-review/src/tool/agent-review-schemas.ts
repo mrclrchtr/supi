@@ -1,126 +1,123 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, Type } from "typebox";
-import { reviewBriefSchema } from "./schemas.ts";
+import { Value } from "typebox/value";
+import type { ReviewInput, ReviewTargetSpec } from "../types.ts";
+import { reviewInputSchema } from "./schemas.ts";
 
-const reviewTargetSchema = Type.Object(
+const commitId = Type.String({
+  minLength: 40,
+  maxLength: 64,
+  pattern: "^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$",
+  description: "Full hexadecimal Git commit object id (40 or 64 characters).",
+});
+const targetSchema = Type.Object(
   {
-    kind: StringEnum(["working-tree", "branch", "commit"] as const, {
-      description: 'Review target kind. Defaults to "working-tree" when target is omitted.',
-    }),
-    base: Type.Optional(
-      Type.String({ description: 'Required local base branch when kind is "branch".' }),
-    ),
-    sha: Type.Optional(Type.String({ description: 'Required commit SHA when kind is "commit".' })),
+    kind: StringEnum(["working-tree", "comparison", "commit"] as const),
+    baseCommit: Type.Optional(commitId),
+    commit: Type.Optional(commitId),
   },
-  { additionalProperties: false },
+  { additionalProperties: false, description: "Git change to review." },
 );
 
-const briefFieldSchema = StringEnum(
-  [
-    "summary",
-    "intendedOutcome",
-    "constraints",
-    "focusAreas",
-    "riskyFiles",
-    "unresolvedQuestions",
-    // biome-ignore lint/security/noSecrets: public brief field name, not a secret
-    "reviewInstructionBlockIds",
-  ] as const,
-  { description: "Generated brief field being evaluated." },
-);
-
-const critiqueFindingSchema = Type.Object(
+export const prepareReviewSchema = Type.Object(
   {
-    kind: StringEnum(["omission", "unsupported-inference", "misprioritized", "unclear"] as const, {
-      description: "Class of brief defect.",
-    }),
-    field: briefFieldSchema,
-    explanation: Type.String({
-      minLength: 1,
-      maxLength: 2_000,
-      description: "What is wrong with this part of the generated brief.",
-    }),
-    evidence: Type.String({
-      minLength: 1,
-      maxLength: 2_000,
-      description: "Session or snapshot evidence supporting the criticism.",
-    }),
-    proposedChange: Type.String({
-      minLength: 1,
-      maxLength: 2_000,
-      description: "Concrete change that would improve the brief.",
-    }),
-  },
-  { additionalProperties: false },
-);
-
-const briefCritiqueSchema = Type.Object(
-  {
-    verdict: StringEnum(["accept", "revise"] as const, {
-      description: 'Use "revise" when the generated brief should be changed before review.',
-    }),
-    summary: Type.String({
-      minLength: 1,
-      maxLength: 2_000,
-      description: "Concise assessment of the generated brief.",
-    }),
-    findings: Type.Array(critiqueFindingSchema, {
-      maxItems: 20,
-      description: "Evidence-backed defects; use an empty array when accepting without criticism.",
-    }),
-  },
-  { additionalProperties: false },
-);
-
-const reviewerAssignmentSchema = Type.Object(
-  {
-    id: Type.String({
-      minLength: 1,
-      maxLength: 64,
-      description: 'Stable short label such as "standards" or "spec".',
-    }),
-    focus: Type.String({
-      minLength: 1,
-      maxLength: 2_000,
-      description: "Independent review focus delegated to this reviewer child session.",
-    }),
-  },
-  { additionalProperties: false },
-);
-
-/** Agent-facing schema for preparing a session-aware review plan. */
-export const prepareAgentReviewSchema = Type.Object(
-  {
-    target: Type.Optional(reviewTargetSchema),
-    note: Type.Optional(
-      Type.String({
-        maxLength: 4_000,
-        description: "Optional intent or constraint to emphasize during brief synthesis.",
+    target: Type.Optional(targetSchema),
+    planning: Type.Optional(
+      StringEnum(["none", "suggest"] as const, {
+        default: "none",
+        description: "Whether the advisory Planner should suggest review tasks.",
       }),
     ),
   },
   { additionalProperties: false },
 );
 
-/** Agent-facing schema for critiquing a prepared brief and running focused reviewers. */
-export const runAgentReviewSchema = Type.Object(
+const preparedDecisionSchema = Type.Object(
   {
-    planId: Type.String({
-      minLength: 1,
-      description: "Session-scoped plan id returned by supi_review_prepare.",
-    }),
-    critique: briefCritiqueSchema,
-    revisedBrief: Type.Optional(reviewBriefSchema),
-    reviewers: Type.Array(reviewerAssignmentSchema, {
-      minItems: 1,
-      maxItems: 4,
-      description: "One to four independent reviewer assignments run concurrently.",
-    }),
+    kind: StringEnum(["accept-draft", "use-review"] as const),
+    review: Type.Optional(reviewInputSchema),
   },
-  { additionalProperties: false },
+  { additionalProperties: false, description: "Explicit one-shot Prepared Review decision." },
 );
 
-/** Validated input accepted by `supi_review_prepare`. */
-export type PrepareAgentReviewInput = Static<typeof prepareAgentReviewSchema>;
-/** Validated input accepted by `supi_review_run`. */
-export type RunAgentReviewInput = Static<typeof runAgentReviewSchema>;
+/** Object-rooted provider-compatible schema; semantic mode combinations are parsed at runtime. */
+export const runReviewSchema = Type.Object(
+  {
+    mode: StringEnum(["direct", "prepared"] as const),
+    target: Type.Optional(targetSchema),
+    review: Type.Optional(reviewInputSchema),
+    planId: Type.Optional(Type.String({ minLength: 1, description: "Session-scoped plan id." })),
+    decision: Type.Optional(preparedDecisionSchema),
+  },
+  { additionalProperties: false, description: "Direct or Prepared Review execution request." },
+);
+
+type RawPrepareReviewInput = Static<typeof prepareReviewSchema>;
+type RawRunReviewInput = Static<typeof runReviewSchema>;
+
+export interface PrepareReviewToolInput {
+  target?: ReviewTargetSpec;
+  planning?: "none" | "suggest";
+}
+
+export type RunReviewToolInput =
+  | { mode: "direct"; target: ReviewTargetSpec; review: ReviewInput }
+  | {
+      mode: "prepared";
+      planId: string;
+      decision: { kind: "accept-draft" } | { kind: "use-review"; review: ReviewInput };
+    };
+
+function parseTarget(input: {
+  kind: "working-tree" | "comparison" | "commit";
+  baseCommit?: string;
+  commit?: string;
+}): ReviewTargetSpec {
+  if (input.kind === "working-tree" && !input.baseCommit && !input.commit) {
+    return { kind: "working-tree" };
+  }
+  if (input.kind === "comparison" && input.baseCommit && !input.commit) {
+    return { kind: "comparison", baseCommit: input.baseCommit };
+  }
+  if (input.kind === "commit" && input.commit && !input.baseCommit) {
+    return { kind: "commit", commit: input.commit };
+  }
+  throw new Error(`Target fields do not match target kind "${input.kind}".`);
+}
+
+/** Validate and narrow preparation input after provider-level JSON parsing. */
+export function parsePrepareReviewToolInput(input: unknown): PrepareReviewToolInput {
+  if (!Value.Check(prepareReviewSchema, input))
+    throw new Error("Invalid review preparation input.");
+  const parsed = input as RawPrepareReviewInput;
+  return {
+    ...(parsed.target ? { target: parseTarget(parsed.target) } : {}),
+    ...(parsed.planning ? { planning: parsed.planning } : {}),
+  };
+}
+
+/** Validate and narrow object-rooted parameters into the exact Direct/Prepared contract. */
+export function parseRunReviewToolInput(input: unknown): RunReviewToolInput {
+  if (!Value.Check(runReviewSchema, input)) throw new Error("Invalid review execution input.");
+  const parsed = input as RawRunReviewInput;
+  if (parsed.mode === "direct") {
+    if (!parsed.target || !parsed.review || parsed.planId || parsed.decision) {
+      throw new Error("Direct Review requires only target and review.");
+    }
+    return { mode: "direct", target: parseTarget(parsed.target), review: parsed.review };
+  }
+  if (!parsed.planId || !parsed.decision || parsed.target || parsed.review) {
+    throw new Error("Prepared Review requires only planId and decision.");
+  }
+  if (parsed.decision.kind === "accept-draft" && !parsed.decision.review) {
+    return { mode: "prepared", planId: parsed.planId, decision: { kind: "accept-draft" } };
+  }
+  if (parsed.decision.kind === "use-review" && parsed.decision.review) {
+    return {
+      mode: "prepared",
+      planId: parsed.planId,
+      decision: { kind: "use-review", review: parsed.decision.review },
+    };
+  }
+  throw new Error(`Decision fields do not match decision kind "${parsed.decision.kind}".`);
+}

@@ -1,319 +1,166 @@
 import { buildSessionContext, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { WidgetProgress } from "@mrclrchtr/supi-core/progress-widget";
-import { runWithProgressWidget } from "@mrclrchtr/supi-core/tool-framework";
-import { registerReviewSettings } from "./config.ts";
-import { resolveBranchSnapshot, resolveCommitSnapshot, resolveWorkingTreeSnapshot } from "./git.ts";
-import { serializeSessionContext } from "./history/collect.ts";
-import { synthesizeReviewBrief } from "./history/synthesize.ts";
-import { normalizeReviewResult } from "./review-result.ts";
-import { buildReviewPacket } from "./target/packet.ts";
-import { registerAgentReviewTools } from "./tool/agent-review-tools.ts";
-import { createUnobservedChildFailureDiagnostics } from "./tool/child-failure-diagnostics.ts";
-import { runReviewer } from "./tool/review-runner.ts";
-import type {
-  BriefSynthesisRunResult,
-  RawReviewResult,
-  ReviewPlan,
-  ReviewResult,
-  ReviewSnapshot,
-  ReviewTargetSpec,
-} from "./types.ts";
-import { collectReviewNote, previewReviewPlan, selectModel, selectTarget } from "./ui/flow.ts";
-import {
-  formatBriefSynthesisFailureContent,
-  formatBriefSynthesisFailureCopy,
-  formatReviewContent,
-} from "./ui/format-content.ts";
-import { registerReviewRenderer } from "./ui/renderer.ts";
+import { Value } from "typebox/value";
+import { loadReviewConfig, registerReviewSettings } from "./config.ts";
+import { listLocalBranches, listRecentCommits } from "./git.ts";
+import { collectPlannerContext } from "./history/collect.ts";
+import { getSelectableReviewModels, resolveAgentReviewModel } from "./model.ts";
+import { ReviewPlanStore } from "./session/review-plan-store.ts";
+import { formatReviewBatch, registerAgentReviewTools } from "./tool/agent-review-tools.ts";
+import { pageText } from "./tool/output-page.ts";
+import { normalizeReviewInput, prepareReview, runReview } from "./tool/review-workflow.ts";
+import { reviewInputSchema } from "./tool/schemas.ts";
+import type { ReviewInput, ReviewModelSelection, ReviewTargetSpec } from "./types.ts";
 
 type CommandContext = Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1];
 
-export default function reviewExtension(pi: ExtensionAPI) {
-  registerReviewRenderer(pi);
-  registerReviewSettings(pi);
-  registerAgentReviewTools(pi);
-
-  pi.registerCommand("supi-review", {
-    description: "Run a structured code review informed by the current session history",
-    handler: async (_args, ctx) => {
-      await handleInteractive(ctx, pi);
+const DEFAULT_REVIEW: ReviewInput = {
+  tasks: [
+    {
+      id: "general",
+      instructions: "Review for concrete regressions introduced by this change.",
     },
-  });
+  ],
+};
+
+async function selectTarget(ctx: CommandContext): Promise<ReviewTargetSpec | undefined> {
+  const kind = await ctx.ui.select("Review target", [
+    "Working tree",
+    "Comparison against a base commit",
+    "Single commit",
+  ]);
+  if (!kind) return undefined;
+  if (kind === "Working tree") return { kind: "working-tree" };
+  const choices =
+    kind === "Single commit" ? await listRecentCommits(ctx.cwd) : await listLocalBranches(ctx.cwd);
+  const label = await ctx.ui.select(
+    kind === "Single commit" ? "Commit" : "Base branch",
+    choices.map((choice) => choice.label),
+  );
+  const choice = choices.find((candidate) => candidate.label === label);
+  if (!choice) return undefined;
+  return kind === "Single commit"
+    ? { kind: "commit", commit: choice.commit }
+    : { kind: "comparison", baseCommit: choice.commit };
 }
 
-async function handleInteractive(ctx: CommandContext, pi: ExtensionAPI): Promise<void> {
-  if (!ctx.hasUI) {
-    return;
+async function selectReviewerModel(ctx: CommandContext): Promise<ReviewModelSelection | undefined> {
+  const models = getSelectableReviewModels(ctx);
+  if (models.length === 0) {
+    ctx.ui.notify("No scoped reviewer models are available.", "error");
+    return undefined;
   }
+  const id = await ctx.ui.select(
+    "Reviewer model",
+    models.map((model) => model.canonicalId),
+  );
+  return models.find((model) => model.canonicalId === id);
+}
 
+/** Parse editor JSON through the same structural and semantic contract as agent input. */
+export async function editReview(
+  ctx: CommandContext,
+  review: ReviewInput,
+): Promise<ReviewInput | undefined> {
+  const text = await ctx.ui.editor("Edit review tasks (JSON)", JSON.stringify(review, null, 2));
+  if (text === undefined) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (!Value.Check(reviewInputSchema, parsed)) {
+      ctx.ui.notify("Review tasks do not match the required review schema.", "error");
+      return undefined;
+    }
+    return normalizeReviewInput(parsed);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Review tasks must be valid JSON.";
+    ctx.ui.notify(message, "error");
+    return undefined;
+  }
+}
+
+async function runCommand(
+  ctx: CommandContext,
+  pi: ExtensionAPI,
+  planStore: ReviewPlanStore,
+): Promise<void> {
+  if (!ctx.hasUI) return;
   const target = await selectTarget(ctx);
   if (!target) return;
+  const reviewerModel = await selectReviewerModel(ctx);
+  if (!reviewerModel) return;
+  const planning = await ctx.ui.select("Review planning", ["Write tasks", "Suggest tasks"]);
+  if (!planning) return;
 
-  const model = await selectModel(ctx);
-  if (!model) return;
-
-  const note = await collectReviewNote(ctx);
-  if (note === undefined) return;
-  const normalizedNote = note.trim() || undefined;
-
-  const snapshot = await resolveReviewSnapshot(target, ctx);
-  if (!snapshot) return;
-
-  const sessionContext = buildSessionContext(
-    ctx.sessionManager.getEntries(),
-    ctx.sessionManager.getLeafId(),
-  );
-  const serializedContext = serializeSessionContext(sessionContext.messages);
-  const synthesis = await runWithProgressWidget(
-    pi,
-    ctx,
-    "Synthesizing review brief…",
-    (signal: AbortSignal, onProgress: (p: WidgetProgress) => void) =>
-      synthesizeReviewBrief({
-        model,
-        cwd: ctx.cwd,
-        snapshot,
-        serializedContext,
-        note: normalizedNote,
-        signal,
-        onProgress,
-      }),
-  );
-
-  if (!synthesis) {
-    const failure: BriefSynthesisRunResult = {
-      kind: "failed",
-      failureCode: "unexpected-runner-failure",
-      diagnostics: createUnobservedChildFailureDiagnostics(),
-    };
-    notifyBriefDone(pi, failure, snapshot, model.canonicalId);
-    injectBriefSynthesisFailureMessage(pi, failure, snapshot, model.canonicalId);
-    ctx.ui.notify(formatBriefSynthesisFailureCopy(failure), "warning");
-    return;
+  let review = DEFAULT_REVIEW;
+  let planId: string | undefined;
+  if (planning === "Suggest tasks") {
+    const config = loadReviewConfig(ctx.cwd);
+    const plannerModel = resolveAgentReviewModel(ctx, config.plannerModel);
+    if (!plannerModel) {
+      ctx.ui.notify(`Configured Planner model "${config.plannerModel}" is unavailable.`, "error");
+      return;
+    }
+    const session = buildSessionContext(
+      ctx.sessionManager.getEntries(),
+      ctx.sessionManager.getLeafId(),
+    );
+    const outcome = await prepareReview({
+      cwd: ctx.cwd,
+      target,
+      planning: "suggest",
+      plannerContext: collectPlannerContext(session.messages),
+      reviewerModel,
+      plannerModel,
+      planStore,
+    });
+    if (outcome.kind !== "prepared" || !outcome.plan.plannerDraft) {
+      ctx.ui.notify("Planner did not produce a draft.", "error");
+      return;
+    }
+    review = outcome.plan.plannerDraft;
+    planId = outcome.plan.id;
   }
 
-  notifyBriefDone(pi, synthesis, snapshot, model.canonicalId);
-
-  if (synthesis.kind !== "success") {
-    injectBriefSynthesisFailureMessage(pi, synthesis, snapshot, model.canonicalId);
-    notifySynthesisFailure(synthesis, ctx);
-    return;
-  }
-
-  const brief = {
-    ...synthesis.brief,
-    note: normalizedNote,
-  };
-
-  const packet = buildReviewPacket(snapshot, brief, model);
-  const plan: ReviewPlan = { model, snapshot, brief, packet };
-
-  const approved = await previewReviewPlan(ctx, plan);
+  const edited = await editReview(ctx, review);
+  if (!edited) return;
+  const approved = await ctx.ui.confirm(
+    "Run review?",
+    `${edited.tasks.length} task(s) using ${reviewerModel.canonicalId}`,
+  );
   if (!approved) return;
 
-  const rawResult = await runWithProgressWidget(
-    pi,
-    ctx,
-    "Running code review…",
-    (signal: AbortSignal, onProgress: (p: WidgetProgress) => void) =>
-      runReviewer({
-        prompt: plan.packet.prompt,
-        model: plan.model,
+  const outcome = planId
+    ? await runReview({
+        mode: "prepared",
         cwd: ctx.cwd,
-        signal,
-        snapshot: plan.snapshot,
-        brief: plan.brief,
-        onProgress,
-      }),
-  );
-
-  if (!rawResult) {
-    const failure: ReviewResult = {
-      kind: "failed",
-      failureCode: "unexpected-runner-failure",
-      diagnostics: createUnobservedChildFailureDiagnostics(),
-      snapshot,
-      brief,
-      modelId: model.canonicalId,
-    };
-    notifyReviewDone(pi, failure);
-    injectReviewMessage(pi, failure);
-    ctx.ui.notify("Reviewer ended unexpectedly.", "warning");
+        planId,
+        decision: { kind: "use-review", review: edited },
+        planStore,
+      })
+    : await runReview({
+        mode: "direct",
+        cwd: ctx.cwd,
+        target,
+        review: edited,
+        reviewerModel,
+      });
+  if (outcome.kind !== "completed") {
+    ctx.ui.notify(outcome.reason, "error");
     return;
   }
-
-  const result = normalizeReviewResult(rawResult as RawReviewResult);
-  notifyReviewDone(pi, result);
-  injectReviewMessage(pi, result);
-}
-
-async function resolveReviewSnapshot(
-  target: ReviewTargetSpec,
-  ctx: CommandContext,
-): Promise<ReviewSnapshot | undefined> {
-  const snapshot =
-    target.kind === "working-tree"
-      ? await resolveWorkingTreeSnapshot(ctx.cwd)
-      : target.kind === "branch"
-        ? await resolveBranchSnapshot(ctx.cwd, target.base)
-        : await resolveCommitSnapshot(ctx.cwd, target.sha);
-
-  if (snapshot) {
-    return snapshot;
-  }
-
-  switch (target.kind) {
-    case "working-tree":
-      ctx.ui.notify("No working tree changes found", "warning");
-      break;
-    case "branch":
-      ctx.ui.notify(`No reviewable changes found against ${target.base}`, "warning");
-      break;
-    case "commit":
-      ctx.ui.notify(`Unable to resolve commit ${target.sha}`, "error");
-      break;
-  }
-
-  return undefined;
-}
-
-function notifySynthesisFailure(
-  result: Exclude<BriefSynthesisRunResult, { kind: "success" }>,
-  ctx: CommandContext,
-): void {
-  ctx.ui.notify(
-    formatBriefSynthesisFailureCopy(result),
-    result.kind === "failed" ? "error" : "warning",
-  );
-}
-
-/** Persist a brief-synthesis failure so bounded diagnostics remain inspectable in parent history. */
-function injectBriefSynthesisFailureMessage(
-  pi: ExtensionAPI,
-  result: Exclude<BriefSynthesisRunResult, { kind: "success" }>,
-  snapshot: ReviewSnapshot,
-  modelId: string,
-): void {
   pi.sendMessage({
     customType: "supi-review",
-    content: formatBriefSynthesisFailureContent(result),
+    content: pageText(formatReviewBatch(outcome.details)).text,
     display: true,
-    details: {
-      briefSynthesisFailure: { result, snapshot, modelId },
-    },
+    details: outcome.details,
   });
 }
 
-/** Ring the terminal bell so the user knows to check back. */
-function ringBell(): void {
-  process.stdout.write("\x07");
-}
-
-/**
- * Emit a `supi:review:brief-done` event and ring the terminal bell after
- * brief synthesis completes (success, failure, cancel, or timeout).
- */
-function notifyBriefDone(
-  pi: ExtensionAPI,
-  result: BriefSynthesisRunResult,
-  snapshot: ReviewSnapshot,
-  modelId: string,
-): void {
-  pi.events.emit("supi:review:brief-done", {
-    kind: result.kind,
-    snapshot: snapshot.title,
-    modelId,
-    brief: result.kind === "success" ? result.brief : undefined,
+export default function reviewExtension(pi: ExtensionAPI): void {
+  const planStore = new ReviewPlanStore();
+  registerReviewSettings(pi);
+  registerAgentReviewTools(pi, planStore);
+  pi.registerCommand("supi-review", {
+    description: "Run one or more caller-defined read-only review tasks",
+    handler: async (_args, ctx) => runCommand(ctx, pi, planStore),
   });
-  ringBell();
-}
-
-/**
- * Emit a `supi:review:review-done` event and ring the terminal bell after
- * the review child session completes.
- */
-function notifyReviewDone(pi: ExtensionAPI, result: ReviewResult): void {
-  pi.events.emit("supi:review:review-done", {
-    kind: result.kind,
-    snapshot: result.snapshot.title,
-    modelId: result.modelId,
-    itemCount: result.kind === "success" ? result.output.items.length : 0,
-  });
-  ringBell();
-}
-
-function injectReviewMessage(pi: ExtensionAPI, result: ReviewResult): void {
-  pi.sendMessage({
-    customType: "supi-review",
-    content: formatReviewContent(result),
-    display: true,
-    details: { result },
-  });
-
-  maybeQueueReviewFollowUp(pi, result);
-}
-
-function maybeQueueReviewFollowUp(pi: ExtensionAPI, result: ReviewResult): void {
-  if (result.kind !== "success" || result.output.items.length === 0) {
-    return;
-  }
-
-  pi.sendMessage(
-    {
-      customType: "supi-review-followup",
-      content: buildReviewFollowUpInstruction(result),
-      display: false,
-      details: {
-        itemCount: result.output.items.length,
-        actionSummary: result.output.summary.actions,
-        items: result.output.items.map((item, index) => ({
-          number: index + 1,
-          title: item.title,
-          recommended_action: item.recommended_action,
-        })),
-      },
-    },
-    { triggerTurn: true },
-  );
-}
-
-function buildReviewFollowUpInstruction(
-  result: Extract<ReviewResult, { kind: "success" }>,
-): string {
-  const { items, summary } = result.output;
-  const itemList = items.map(
-    (item, index) => `- #${index + 1}: ${item.title} (${item.recommended_action})`,
-  );
-
-  const header =
-    "A code review just completed and the result is available in the preceding `supi-review` message.";
-  const noFixing = "Do not start fixing code immediately.";
-  const useAskUser = "If the `ask_user` tool is available, use it for this decision.";
-
-  const lines: string[] = [header];
-  lines.push(
-    `Action summary: ${summary.actions.mustFix} must-fix, ${summary.actions.shouldFix} should-fix, ${summary.actions.consider} consider.`,
-  );
-
-  if (summary.actions.mustFix > 0) {
-    lines.push(`${summary.actions.mustFix} must-fix item(s) — fix before merging.`);
-  } else if (summary.actions.shouldFix > 0) {
-    lines.push(
-      `${summary.actions.shouldFix} should-fix item(s) — review carefully before proceeding.`,
-    );
-  } else if (summary.actions.consider > 0) {
-    lines.push(`${summary.actions.consider} consider item(s) — optional follow-ups to review.`);
-  }
-
-  lines.push(noFixing, useAskUser);
-  lines.push("Offer these options: Fix all, Fix selected, Verify findings, Skip.");
-  lines.push(
-    "If the user chooses Fix selected, ask a follow-up question listing the review items by number/title.",
-  );
-  lines.push(
-    "If the user chooses Verify findings, re-read the relevant files and diffs to independently confirm or refute each review item, then present the verified results and ask again.",
-  );
-  lines.push("", "Current review items:", ...itemList);
-
-  return lines.join("\n");
 }

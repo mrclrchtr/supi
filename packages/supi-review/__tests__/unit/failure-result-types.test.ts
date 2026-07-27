@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { BriefSynthesisRunResult, ChildFailureDiagnostics } from "../../src/types.ts";
+import type { ChildFailureDiagnostics, ReviewerRunResult } from "../../src/types.ts";
 
 const diagnostics: ChildFailureDiagnostics = {
   lifecycleTrace: { entries: [], droppedCount: 0 },
@@ -11,21 +11,25 @@ it("encodes the child-failure diagnostics invariant", () => {
   const creationFailure = {
     kind: "failed",
     failureCode: "session-creation-failed",
-  } satisfies BriefSynthesisRunResult;
+    modelId: "provider/model",
+  } satisfies ReviewerRunResult;
   const observedFailure = {
     kind: "failed",
     failureCode: "prompt-rejected",
+    modelId: "provider/model",
     diagnostics,
-  } satisfies BriefSynthesisRunResult;
+  } satisfies ReviewerRunResult;
 
   // @ts-expect-error — observed child failures must carry diagnostics
-  const missingDiagnostics: BriefSynthesisRunResult = {
+  const missingDiagnostics: ReviewerRunResult = {
     kind: "failed",
     failureCode: "prompt-rejected",
+    modelId: "provider/model",
   };
-  const creationDiagnostics: BriefSynthesisRunResult = {
+  const creationDiagnostics: ReviewerRunResult = {
     kind: "failed",
     failureCode: "session-creation-failed",
+    modelId: "provider/model",
     // @ts-expect-error — session creation has no observed child lifecycle
     diagnostics,
   };

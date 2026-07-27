@@ -20,7 +20,7 @@ Whatever the user said is the fixed point — a commit SHA, branch name, tag, `m
 
 Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so the comparison is against the merge-base). Also note the list of commits via `git log <fixed-point>..HEAD --oneline`.
 
-Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here — not inside two parallel sub-agents.
+Before going further, peel and verify the fixed point as a commit (`git rev-parse --verify '<fixed-point>^{commit}'`) and capture that full commit ID. Use the captured ID consistently for the diff and `target.baseCommit`. Confirm the diff is non-empty. A bad/non-commit ref or empty diff should fail here — not inside two parallel tasks.
 
 ### 2. Identify the spec source
 
@@ -55,29 +55,51 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 - **Middle Man** — a class or function that mostly just delegates onward. → cut it, call the real target direct.
 - **Refused Bequest** — a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
 
-### 4. Spawn both sub-agents in parallel
+### 4. Run both tracks through `supi_review_run`
 
-Send a single message with two `Agent` tool calls. Use the `general-purpose` subagent for both.
+Call `supi_review_run` once in Direct mode. Use the full commit id resolved in step 1 as `target.baseCommit` and provide two independent review tasks so the Review Engine runs them concurrently. Do not call `supi_review_prepare`; this skill already owns planning and methodology.
 
-**Standards sub-agent prompt** — include:
+```json
+{
+  "mode": "direct",
+  "target": {
+    "kind": "comparison",
+    "baseCommit": "<resolved full commit id>"
+  },
+  "review": {
+    "sharedContext": "<originating change intent and commit-list context>",
+    "tasks": [
+      {
+        "id": "standards",
+        "instructions": "<Standards task below>"
+      },
+      {
+        "id": "spec",
+        "instructions": "<Spec task below>"
+      }
+    ]
+  }
+}
+```
 
-- The full diff command and commit list.
-- The list of standards-source files you found in step 3, **plus the smell baseline from step 3** pasted in full — the sub-agent has no other access to it.
-- The brief: "Report — per file/hunk where relevant — (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls — documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words."
+**Standards task instructions** — include:
 
-**Spec sub-agent prompt** — include:
+- The list of standards-source files found in step 3.
+- The smell baseline from step 3 pasted in full.
+- The brief: "Report — per file/hunk where relevant — (a) every place the change violates a documented standard: cite the standard (file + rule); and (b) any baseline smell you spot: name it and quote the relevant code. Distinguish hard violations from judgment calls — documented-standard breaches can be hard, but baseline smells are always judgment calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words."
 
-- The diff command and commit list.
+**Spec task instructions** — include:
+
 - The path or fetched contents of the spec.
-- The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the spec line for each finding. Under 400 words."
+- The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behavior in the change that was not asked for (scope creep); (c) requirements that look implemented but where the implementation is wrong. Quote the spec line for each finding. Under 400 words."
 
-If the spec is missing, skip the Spec sub-agent and note this in the final report.
+If the spec is missing, omit the Spec task and note this in the final report. The Review Engine supplies the pinned diff and target-aware read tools, so task instructions do not need to repeat a shell diff command.
 
 ### 5. Aggregate
 
-Present the two reports under `## Standards` and `## Spec` headings, verbatim or lightly cleaned. Do **not** merge or rerank findings — the two axes are deliberately separate (see _Why two axes_).
+Present the separate task results under `## Standards` and `## Spec` headings, verbatim or lightly cleaned. Do **not** merge or rerank findings — the two axes are deliberately separate.
 
-End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes — that's the reranking the separation exists to prevent.
+End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Do not invent a run-level verdict; `supi-review` derives only per-task `pass` or `issues` verdicts.
 
 ## Why two axes
 

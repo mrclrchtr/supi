@@ -1,0 +1,3 @@
+# Review the current filesystem state
+
+A Working-Tree Review compares `HEAD` with the files currently present in the checkout and includes non-ignored untracked files, regardless of staging state. The caller's Git index is not an evidence layer: the Review Engine uses a temporary index seeded from `HEAD`, so staging state and index flags cannot change the result. If a staged change is reversed in the working file, the staged commit candidate is outside this target. Repository stability from preparation or Direct Review invocation through reviewer completion is a caller precondition; the Review Engine does not fingerprint or detect drift.

@@ -1,0 +1,3 @@
+# Separate caller-owned review policy from Review Engine mechanics
+
+Callers define review methodology as one or more Review Tasks containing a stable id and freeform instructions. The Review Engine owns target resolution, target-aware read-only tools, the minimal reviewer protocol, canonical packet construction and hashing, child-session execution, the fixed result grammar, and per-task verdict derivation; callers cannot replace those mechanics. Direct and Prepared Reviews use the same packet compiler, and each task outcome records the SHA-256 of its exact packet bytes. Optional planning produces only an advisory Planner Draft that the caller must explicitly accept or replace.

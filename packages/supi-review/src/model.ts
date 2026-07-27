@@ -2,7 +2,7 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getSelectableModels } from "@mrclrchtr/supi-core/model-selection";
 import type { ReviewModelSelection } from "./types.ts";
 
-/** Sentinel that resolves to the model active when review preparation starts. */
+/** Sentinel that resolves to the model active when an agent review operation starts. */
 export const CURRENT_SESSION_REVIEW_MODEL = "current";
 
 /** Build the canonical `provider/modelId` string used throughout the review flow. */

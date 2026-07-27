@@ -1,10 +1,15 @@
-// biome-ignore lint/style/noExcessiveLinesPerFile: many tightly-coupled git helpers; splitting would create cross-ref overhead
-import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
-import { createReadStream } from "node:fs";
-import { lstat, readFile, readlink } from "node:fs/promises";
-import { basename, join } from "node:path";
-import { promisify } from "node:util";
+import {
+  expectedGitExitOutput as expectedExitOutput,
+  runGit as git,
+  runGitAllowExit as gitAllowExit,
+  literalPathspec,
+  withHeadIndex,
+} from "./git-command.ts";
+import {
+  filterExistingReviewPaths,
+  readWorkingTreeFile,
+  resolveReviewPath,
+} from "./review-path.ts";
 import type {
   DiffStats,
   ReviewSnapshot,
@@ -12,576 +17,372 @@ import type {
   ReviewTargetSpec,
 } from "./types.ts";
 
-const execFileAsync = promisify(execFile);
-const GIT_TIMEOUT_MS = 30_000;
-const COMMIT_OBJECT_ID_RE = /^[0-9a-f]{7,64}$/i;
+const FULL_COMMIT_ID_RE = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i;
+const DIFF_FLAGS = ["--no-ext-diff", "--no-textconv", "--binary"] as const;
 
-function scrubGitEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const next = { ...env };
-  for (const key of Object.keys(next)) {
-    if (key.startsWith("GIT_")) {
-      delete next[key];
-    }
-  }
-  return next;
+function parseNullList(text: string): string[] {
+  return text
+    .split("\0")
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right));
 }
 
-function gitExecOptions(repoPath: string) {
+/** Count patch additions and deletions without interpreting binary payloads. */
+export function parseDiffStats(text: string, fileCount?: number): DiffStats {
+  let additions = 0;
+  let deletions = 0;
+  let files = 0;
+  for (const line of text.split("\n")) {
+    if (line.startsWith("diff --git ")) files++;
+    else if (line.startsWith("+") && !line.startsWith("+++")) additions++;
+    else if (line.startsWith("-") && !line.startsWith("---")) deletions++;
+  }
+  return { files: fileCount ?? files, additions, deletions };
+}
+
+/** Validate the agent-facing full Git object-id syntax before invoking Git. */
+export function isFullCommitId(value: string): boolean {
+  return FULL_COMMIT_ID_RE.test(value);
+}
+
+async function resolveCommit(cwd: string, value: string): Promise<string | undefined> {
+  if (!isFullCommitId(value)) return undefined;
+  const type = (await gitAllowExit(cwd, ["cat-file", "-t", value], [128])).trim();
+  if (type !== "commit") return undefined;
+  const canonical = (await git(cwd, ["rev-parse", "--verify", value])).trim().toLowerCase();
+  return canonical === value.toLowerCase() ? canonical : undefined;
+}
+
+async function headCommit(cwd: string): Promise<string | undefined> {
+  const value = (
+    await gitAllowExit(
+      cwd,
+      [
+        "rev-parse",
+        "--verify",
+        // biome-ignore lint/security/noSecrets: Git revision syntax, not a secret
+        "HEAD^{commit}",
+      ],
+      [1, 128],
+    )
+  ).trim();
+  return value || undefined;
+}
+
+async function commitParent(cwd: string, commit: string): Promise<string | undefined> {
+  const body = await git(cwd, ["cat-file", "-p", commit]);
+  const parent = body.match(/^parent ([0-9a-f]+)$/m)?.[1];
+  if (!parent) return undefined;
+  const type = (await gitAllowExit(cwd, ["cat-file", "-t", parent], [128])).trim();
+  if (type !== "commit") {
+    throw new Error(`First parent ${parent} for ${commit} is unavailable.`);
+  }
+  return parent;
+}
+
+function joinDiffs(parts: string[]): string {
+  return parts
+    .filter(Boolean)
+    .map((part) => (part.endsWith("\n") ? part : `${part}\n`))
+    .join("");
+}
+
+async function diffUntrackedFile(cwd: string, path: string): Promise<string> {
+  const safe = resolveReviewPath(cwd, path);
+  return gitAllowExit(
+    cwd,
+    literalPathspec(["diff", ...DIFF_FLAGS, "--no-index", "--", "/dev/null", safe.path]),
+    [1],
+  );
+}
+
+async function workingTreeSnapshot(cwd: string): Promise<ReviewSnapshot | undefined> {
+  const head = await headCommit(cwd);
+  if (!head) return undefined;
+  return withHeadIndex(cwd, head, async (indexFile) => {
+    const [trackedDiff, tracked, untrackedText] = await Promise.all([
+      git(cwd, ["diff", ...DIFF_FLAGS, "HEAD"], indexFile),
+      git(cwd, ["diff", "--name-only", "-z", "HEAD"], indexFile),
+      git(cwd, ["ls-files", "--others", "--exclude-standard", "-z"], indexFile),
+    ]);
+    const untracked = parseNullList(untrackedText);
+    const changedFiles = Array.from(new Set([...parseNullList(tracked), ...untracked])).sort();
+    if (changedFiles.length === 0) return undefined;
+    const diffText = joinDiffs([
+      trackedDiff,
+      ...(await Promise.all(untracked.map((path) => diffUntrackedFile(cwd, path)))),
+    ]);
+    return {
+      requestedTarget: { kind: "working-tree" },
+      target: { kind: "working-tree", headCommit: head },
+      title: "Working tree changes",
+      changedFiles,
+      diffText,
+      stats: parseDiffStats(diffText, changedFiles.length),
+    };
+  });
+}
+
+async function comparisonSnapshot(
+  cwd: string,
+  requested: Extract<ReviewTargetSpec, { kind: "comparison" }>,
+): Promise<ReviewSnapshot | undefined> {
+  const [base, head] = await Promise.all([
+    resolveCommit(cwd, requested.baseCommit),
+    headCommit(cwd),
+  ]);
+  if (!base || !head) return undefined;
+  const mergeBase = (await gitAllowExit(cwd, ["merge-base", base, head], [1])).trim();
+  if (!mergeBase) return undefined;
+  const [diffText, names] = await Promise.all([
+    git(cwd, ["diff", ...DIFF_FLAGS, mergeBase, head]),
+    git(cwd, ["diff", "--name-only", "-z", mergeBase, head]),
+  ]);
+  const changedFiles = parseNullList(names);
+  if (changedFiles.length === 0) return undefined;
   return {
-    cwd: repoPath,
-    env: scrubGitEnv(process.env),
-    timeout: GIT_TIMEOUT_MS,
+    requestedTarget: requested,
+    target: {
+      kind: "comparison",
+      requestedBaseCommit: base,
+      mergeBaseCommit: mergeBase,
+      headCommit: head,
+    },
+    title: `Changes ${mergeBase.slice(0, 7)}..${head.slice(0, 7)}`,
+    changedFiles,
+    diffText,
+    stats: parseDiffStats(diffText, changedFiles.length),
   };
 }
 
-/** Parse simple git diff statistics from diff/show text. */
-export function parseDiffStats(text: string): DiffStats {
-  let files = 0;
-  let additions = 0;
-  let deletions = 0;
-  let inDiff = false;
-
-  for (const line of text.split("\n")) {
-    if (line.startsWith("diff --git ")) {
-      files++;
-      inDiff = true;
-      continue;
-    }
-
-    if (!inDiff) continue;
-
-    if (line.startsWith("+") && !line.startsWith("+++")) {
-      additions++;
-    } else if (line.startsWith("-") && !line.startsWith("---")) {
-      deletions++;
-    }
-  }
-
-  return { files, additions, deletions };
-}
-
-/** Return whether a value is a hexadecimal abbreviated or full Git object id. */
-export function isCommitObjectId(value: string): boolean {
-  return COMMIT_OBJECT_ID_RE.test(value);
-}
-
-export async function getMergeBase(repoPath: string, branch: string): Promise<string | undefined> {
-  const branchRef = `refs/heads/${branch}`;
-  try {
-    await execFileAsync(
-      "git",
-      ["show-ref", "--verify", "--quiet", branchRef],
-      gitExecOptions(repoPath),
-    );
-    const { stdout } = await execFileAsync(
-      "git",
-      ["merge-base", "HEAD", branchRef],
-      gitExecOptions(repoPath),
-    );
-    return stdout.trim() || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-export async function getDiff(repoPath: string, baseSha: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "git",
-    ["diff", "--end-of-options", baseSha, "HEAD"],
-    gitExecOptions(repoPath),
-  );
-  return stdout;
-}
-
-export async function getUncommittedDiff(repoPath: string): Promise<string> {
-  const [staged, unstaged, untracked] = await Promise.all([
-    execFileAsync("git", ["diff", "--cached"], gitExecOptions(repoPath)).then(
-      (r) => r.stdout,
-      () => "",
-    ),
-    execFileAsync("git", ["diff"], gitExecOptions(repoPath)).then(
-      (r) => r.stdout,
-      () => "",
-    ),
-    execFileAsync(
-      "git",
-      ["ls-files", "--others", "--exclude-standard"],
-      gitExecOptions(repoPath),
-    ).then(
-      (r) => r.stdout,
-      () => "",
-    ),
+async function commitSnapshot(
+  cwd: string,
+  requested: Extract<ReviewTargetSpec, { kind: "commit" }>,
+): Promise<ReviewSnapshot | undefined> {
+  const commit = await resolveCommit(cwd, requested.commit);
+  if (!commit) return undefined;
+  const parent = await commitParent(cwd, commit);
+  const [diffText, names] = await Promise.all([
+    parent
+      ? git(cwd, ["diff", ...DIFF_FLAGS, parent, commit])
+      : git(cwd, ["show", ...DIFF_FLAGS, "--format=", "--root", commit]),
+    parent
+      ? git(cwd, ["diff", "--name-only", "-z", parent, commit])
+      : git(cwd, ["diff-tree", "--root", "--no-commit-id", "--name-only", "-r", "-z", commit]),
   ]);
-
-  let result = "";
-  if (staged.trim()) {
-    result += `=== Staged ===\n${staged}\n`;
-  }
-  if (unstaged.trim()) {
-    result += `=== Unstaged ===\n${unstaged}\n`;
-  }
-  if (untracked.trim()) {
-    const files = untracked
-      .trim()
-      .split("\n")
-      .map((f) => f.trim())
-      .filter((f) => f.length > 0);
-    if (files.length > 0) {
-      result += `=== Untracked files ===\n${files.join("\n")}\n`;
-    }
-  }
-  return result.trimEnd();
+  const changedFiles = parseNullList(names);
+  if (changedFiles.length === 0) return undefined;
+  return {
+    requestedTarget: requested,
+    target: { kind: "commit", commit, ...(parent ? { parentCommit: parent } : {}) },
+    title: `Commit ${commit.slice(0, 7)}`,
+    changedFiles,
+    diffText,
+    stats: parseDiffStats(diffText, changedFiles.length),
+  };
 }
 
-export interface CommitEntry {
-  sha: string;
-  subject: string;
+export interface CommitChoice {
+  commit: string;
+  label: string;
 }
 
-export async function getRecentCommits(repoPath: string, limit = 20): Promise<CommitEntry[]> {
-  const { stdout } = await execFileAsync(
-    "git",
-    ["log", `--max-count=${limit}`, "--pretty=format:%H %s"],
-    gitExecOptions(repoPath),
-  );
-  return stdout
-    .split("\n")
-    .map((line) => {
-      const idx = line.indexOf(" ");
-      if (idx <= 0) return undefined;
-      return { sha: line.slice(0, idx), subject: line.slice(idx + 1) };
-    })
-    .filter((entry): entry is CommitEntry => entry !== undefined);
-}
-
-export async function getCommitShow(repoPath: string, sha: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "git",
-    ["show", "--end-of-options", sha],
-    gitExecOptions(repoPath),
-  );
-  return stdout;
-}
-
-export async function getDiffFileNames(repoPath: string, baseSha: string): Promise<string[]> {
-  const { stdout } = await execFileAsync(
-    "git",
-    ["diff", "--name-only", "--end-of-options", baseSha, "HEAD"],
-    gitExecOptions(repoPath),
-  );
-  return stdout
+/** List local branches with resolved commit ids for the interactive adapter. */
+export async function listLocalBranches(cwd: string): Promise<CommitChoice[]> {
+  const output = await git(cwd, [
+    "for-each-ref",
+    // biome-ignore lint/security/noSecrets: Git format syntax, not a secret
+    "--format=%(objectname)%00%(refname:short)",
+    "refs/heads",
+  ]);
+  return output
     .trim()
     .split("\n")
-    .map((f) => f.trim())
-    .filter((f) => f.length > 0);
+    .flatMap((line) => {
+      const [commit, label] = line.split("\0");
+      return commit && label ? [{ commit, label }] : [];
+    });
 }
 
-export async function getUncommittedFileNames(repoPath: string): Promise<string[]> {
-  const [unstaged, staged, untracked] = await Promise.all([
-    execFileAsync("git", ["diff", "--name-only"], gitExecOptions(repoPath)).then(
-      (r) => r.stdout,
-      () => "",
-    ),
-    execFileAsync("git", ["diff", "--cached", "--name-only"], gitExecOptions(repoPath)).then(
-      (r) => r.stdout,
-      () => "",
-    ),
-    execFileAsync(
-      "git",
-      ["ls-files", "--others", "--exclude-standard"],
-      gitExecOptions(repoPath),
-    ).then(
-      (r) => r.stdout,
-      () => "",
-    ),
+/** List recent commits with resolved ids for the interactive adapter. */
+export async function listRecentCommits(cwd: string, limit = 30): Promise<CommitChoice[]> {
+  const output = await git(cwd, [
+    "log",
+    `--max-count=${limit}`,
+    // biome-ignore lint/security/noSecrets: Git format syntax, not a secret
+    "--format=%H%x00%s",
   ]);
-
-  const set = new Set([
-    ...unstaged
-      .trim()
-      .split("\n")
-      .map((f) => f.trim())
-      .filter((f) => f.length > 0),
-    ...staged
-      .trim()
-      .split("\n")
-      .map((f) => f.trim())
-      .filter((f) => f.length > 0),
-    ...untracked
-      .trim()
-      .split("\n")
-      .map((f) => f.trim())
-      .filter((f) => f.length > 0),
-  ]);
-  return Array.from(set).sort();
-}
-
-export async function getCommitFileNames(repoPath: string, sha: string): Promise<string[]> {
-  const { stdout } = await execFileAsync(
-    "git",
-    ["diff-tree", "--no-commit-id", "--name-only", "-r", "--end-of-options", sha],
-    gitExecOptions(repoPath),
-  );
-  return stdout
+  return output
     .trim()
     .split("\n")
-    .map((f) => f.trim())
-    .filter((f) => f.length > 0);
+    .flatMap((line) => {
+      const [commit, subject] = line.split("\0");
+      return commit && subject ? [{ commit, label: `${commit.slice(0, 7)}  ${subject}` }] : [];
+    });
 }
 
-export async function getLocalBranches(repoPath: string): Promise<string[]> {
-  const [{ stdout: local }, { stdout: current }] = await Promise.all([
-    execFileAsync("git", ["branch", "--format=%(refname:short)"], gitExecOptions(repoPath)),
-    execFileAsync("git", ["branch", "--show-current"], gitExecOptions(repoPath)),
-  ]);
-
-  const names = local
-    .trim()
-    .split("\n")
-    .map((b) => b.trim())
-    .filter((b) => b.length > 0);
-
-  const currentBranch = current.trim();
-  const set = new Set(names);
-  const sorted: string[] = [];
-
-  for (const candidate of ["main", "master", currentBranch]) {
-    if (candidate && set.has(candidate)) {
-      sorted.push(candidate);
-      set.delete(candidate);
-    }
-  }
-
-  const remaining = Array.from(set).sort((a, b) => a.localeCompare(b));
-  sorted.push(...remaining);
-  return sorted;
-}
-
-/** Resolve any supported review target into a concrete snapshot. */
+/** Pin target identities and capture the target's changed files, patch, and stats. */
 export function resolveReviewSnapshot(
-  repoPath: string,
+  cwd: string,
   target: ReviewTargetSpec,
 ): Promise<ReviewSnapshot | undefined> {
   switch (target.kind) {
     case "working-tree":
-      return resolveWorkingTreeSnapshot(repoPath);
-    case "branch":
-      return resolveBranchSnapshot(repoPath, target.base);
+      return workingTreeSnapshot(cwd);
+    case "comparison":
+      return comparisonSnapshot(cwd, target);
     case "commit":
-      return resolveCommitSnapshot(repoPath, target.sha);
+      return commitSnapshot(cwd, target);
   }
 }
 
-/** Remove bulk diff text before retaining snapshot metadata in tool results. */
+/** Remove the potentially large patch while retaining pinned target metadata. */
 export function summarizeReviewSnapshot(snapshot: ReviewSnapshot): ReviewSnapshotSummary {
-  return {
-    target: snapshot.target,
-    title: snapshot.title,
-    changedFiles: [...snapshot.changedFiles],
-    stats: { ...snapshot.stats },
-  };
+  const { diffText: _, ...summary } = snapshot;
+  return summary;
 }
 
-/**
- * Compute an abort-aware deterministic snapshot fingerprint.
- * Untracked regular files are streamed, symlinks are hashed by link identity,
- * and special file types are encoded without opening potentially blocking paths.
- */
-export async function fingerprintReviewSnapshot(
-  repoPath: string,
+async function showBlob(
+  cwd: string,
+  commit: string | undefined,
+  path: string,
+): Promise<string | undefined> {
+  if (!commit) return undefined;
+  try {
+    return await git(cwd, ["show", `${commit}:${path}`]);
+  } catch (error) {
+    if (expectedExitOutput(error, [128]) !== undefined) return undefined;
+    throw error;
+  }
+}
+
+async function isWorkingTreePathAllowed(cwd: string, head: string, path: string): Promise<boolean> {
+  return withHeadIndex(cwd, head, async (indexFile) => {
+    const output = await git(
+      cwd,
+      literalPathspec(["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", path]),
+      indexFile,
+    );
+    return parseNullList(output).includes(path);
+  });
+}
+
+/** Read one before/after file from the target rather than an unrelated live checkout. */
+export async function readReviewFile(
+  cwd: string,
   snapshot: ReviewSnapshot,
-  signal?: AbortSignal,
+  path: string,
+  side: "before" | "after" = "after",
+): Promise<string | undefined> {
+  const safe = resolveReviewPath(cwd, path);
+  const target = snapshot.target;
+  if (target.kind === "working-tree") {
+    if (side === "before") return showBlob(cwd, target.headCommit, safe.path);
+    if (!(await isWorkingTreePathAllowed(cwd, target.headCommit, safe.path))) {
+      throw new Error(`${safe.path} is not part of the selected working-tree target.`);
+    }
+    return readWorkingTreeFile(cwd, safe.path);
+  }
+  if (target.kind === "comparison") {
+    return showBlob(cwd, side === "before" ? target.mergeBaseCommit : target.headCommit, safe.path);
+  }
+  return showBlob(cwd, side === "before" ? target.parentCommit : target.commit, safe.path);
+}
+
+/** Read one changed file's patch from the selected target. */
+export async function readReviewDiff(
+  cwd: string,
+  snapshot: ReviewSnapshot,
+  path: string,
 ): Promise<string> {
-  const changedFiles = [...snapshot.changedFiles].sort((left, right) => left.localeCompare(right));
-  const hash = createHash("sha256").update(
-    JSON.stringify({
-      target: snapshot.target,
-      changedFiles,
-      diffText: snapshot.diffText,
-    }),
-  );
-
-  for (const file of extractUntrackedFiles(snapshot)) {
-    signal?.throwIfAborted();
-    const filePath = join(repoPath, file);
-    hash.update(`\nuntracked:${file}\n`);
-    try {
-      const stat = await lstat(filePath);
-      signal?.throwIfAborted();
-      hash.update(`mode:${stat.mode.toString(8)}\n`);
-      if (stat.isSymbolicLink()) {
-        hash.update(`symlink:${await readlink(filePath)}\n`);
-      } else if (stat.isFile()) {
-        for await (const chunk of createReadStream(filePath, { signal })) {
-          hash.update(chunk);
-        }
-      } else {
-        hash.update("[unsupported-file-type]");
-      }
-    } catch {
-      signal?.throwIfAborted();
-      hash.update("[unavailable]");
-    }
-    signal?.throwIfAborted();
+  const safe = resolveReviewPath(cwd, path);
+  if (!snapshot.changedFiles.includes(safe.path)) {
+    throw new Error(`${safe.path} is not changed by this target.`);
   }
-
-  return hash.digest("hex");
+  const target = snapshot.target;
+  if (target.kind === "working-tree") {
+    return withHeadIndex(cwd, target.headCommit, async (indexFile) => {
+      const tracked = await git(
+        cwd,
+        literalPathspec(["diff", ...DIFF_FLAGS, "HEAD", "--", safe.path]),
+        indexFile,
+      );
+      return tracked || diffUntrackedFile(cwd, safe.path);
+    });
+  }
+  if (target.kind === "comparison") {
+    return git(
+      cwd,
+      literalPathspec([
+        "diff",
+        ...DIFF_FLAGS,
+        target.mergeBaseCommit,
+        target.headCommit,
+        "--",
+        safe.path,
+      ]),
+    );
+  }
+  return target.parentCommit
+    ? git(
+        cwd,
+        literalPathspec([
+          "diff",
+          ...DIFF_FLAGS,
+          target.parentCommit,
+          target.commit,
+          "--",
+          safe.path,
+        ]),
+      )
+    : git(
+        cwd,
+        literalPathspec([
+          "show",
+          ...DIFF_FLAGS,
+          "--format=",
+          "--root",
+          target.commit,
+          "--",
+          safe.path,
+        ]),
+      );
 }
 
-function extractUntrackedFiles(snapshot: ReviewSnapshot): string[] {
-  if (snapshot.target.kind !== "working-tree") return [];
-  const marker = "=== Untracked files ===\n";
-  const markerIndex = snapshot.diffText.indexOf(marker);
-  if (markerIndex < 0) return [];
-  const changedFiles = new Set(snapshot.changedFiles);
-  return snapshot.diffText
-    .slice(markerIndex + marker.length)
-    .split("\n")
-    .map((file) => file.trim())
-    .filter((file) => file.length > 0 && changedFiles.has(file))
-    .sort((left, right) => left.localeCompare(right));
+/** List files present on the target's after side, excluding ignored untracked files. */
+export async function listReviewFiles(cwd: string, snapshot: ReviewSnapshot): Promise<string[]> {
+  const target = snapshot.target;
+  if (target.kind !== "working-tree") {
+    const commit = target.kind === "comparison" ? target.headCommit : target.commit;
+    return parseNullList(await git(cwd, ["ls-tree", "-r", "--name-only", "-z", commit]));
+  }
+  return withHeadIndex(cwd, target.headCommit, async (indexFile) => {
+    const candidates = parseNullList(
+      await git(cwd, ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], indexFile),
+    );
+    return filterExistingReviewPaths(cwd, candidates);
+  });
 }
 
-/** Re-resolve a snapshot target and report whether its review evidence has drifted. */
-export async function checkReviewSnapshotFreshness(
-  repoPath: string,
+/** Search literal text on the target's after side with Git's repository-aware search. */
+export async function searchReviewFiles(
+  cwd: string,
   snapshot: ReviewSnapshot,
-  expectedFingerprint: string,
-  signal?: AbortSignal,
-): Promise<{ fresh: true } | { fresh: false; reason: string }> {
-  const current = await resolveReviewSnapshot(repoPath, snapshot.target);
-  if (!current) {
-    return {
-      fresh: false,
-      reason: "The prepared review target no longer has reviewable changes.",
-    };
-  }
-
-  if ((await fingerprintReviewSnapshot(repoPath, current, signal)) !== expectedFingerprint) {
-    return {
-      fresh: false,
-      reason:
-        "The review target changed after the brief was prepared. Run supi_review_prepare again.",
-    };
-  }
-
-  return { fresh: true };
-}
-
-/** Resolve the current working tree into a concrete review snapshot. */
-export async function resolveWorkingTreeSnapshot(
-  repoPath: string,
-): Promise<ReviewSnapshot | undefined> {
-  const [diffText, changedFiles] = await Promise.all([
-    getUncommittedDiff(repoPath),
-    getUncommittedFileNames(repoPath),
-  ]);
-  if (!diffText.trim() && changedFiles.length === 0) return undefined;
-  return {
-    target: { kind: "working-tree" },
-    title: "Working tree changes",
-    changedFiles,
-    diffText,
-    stats: parseDiffStats(diffText),
-  };
-}
-
-/** Resolve a branch-vs-base diff into a concrete review snapshot. */
-export async function resolveBranchSnapshot(
-  repoPath: string,
-  base: string,
-): Promise<ReviewSnapshot | undefined> {
-  const baseSha = await getMergeBase(repoPath, base);
-  if (!baseSha) return undefined;
-  const [diffText, changedFiles] = await Promise.all([
-    getDiff(repoPath, baseSha),
-    getDiffFileNames(repoPath, baseSha),
-  ]);
-  if (!diffText.trim() && changedFiles.length === 0) return undefined;
-  return {
-    target: { kind: "branch", base },
-    title: `Changes vs ${base}`,
-    changedFiles,
-    diffText,
-    stats: parseDiffStats(diffText),
-  };
-}
-
-async function resolveCommitObjectId(
-  repoPath: string,
-  revision: string,
-): Promise<string | undefined> {
-  if (!isCommitObjectId(revision)) return undefined;
-  try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["rev-parse", `--disambiguate=${revision}`],
-      gitExecOptions(repoPath),
-    );
-    const candidates = Array.from(
-      new Set(
-        stdout
-          .split("\n")
-          .map((candidate) => candidate.trim())
-          .filter((candidate) => isCommitObjectId(candidate)),
-      ),
-    );
-    if (candidates.length !== 1) return undefined;
-
-    const candidate = candidates[0];
-    const { stdout: objectType } = await execFileAsync(
-      "git",
-      ["cat-file", "-t", candidate],
-      gitExecOptions(repoPath),
-    );
-    return objectType.trim() === "commit" ? candidate : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Resolve one commit into a concrete review snapshot. */
-export async function resolveCommitSnapshot(
-  repoPath: string,
-  sha: string,
-): Promise<ReviewSnapshot | undefined> {
-  const resolvedSha = await resolveCommitObjectId(repoPath, sha);
-  if (!resolvedSha) return undefined;
-  const [diffText, changedFiles] = await Promise.all([
-    getCommitShow(repoPath, resolvedSha),
-    getCommitFileNames(repoPath, resolvedSha),
-  ]);
-  if (!diffText.trim() && changedFiles.length === 0) return undefined;
-  return {
-    target: { kind: "commit", sha: resolvedSha },
-    title: `Commit ${resolvedSha.slice(0, 7)}`,
-    changedFiles,
-    diffText,
-    stats: parseDiffStats(diffText),
-  };
-}
-
-/** Get the per-file diff for a single changed file in the snapshot. */
-export async function getSnapshotFileDiff(
-  repoPath: string,
-  snapshot: ReviewSnapshot,
-  file: string,
+  query: string,
+  path?: string,
 ): Promise<string> {
-  const { target } = snapshot;
-  switch (target.kind) {
-    case "working-tree": {
-      const { stdout } = await execFileAsync(
-        "git",
-        ["diff", "HEAD", "--", file],
-        gitExecOptions(repoPath),
-      );
-      return stdout;
-    }
-    case "branch": {
-      const baseSha = await getMergeBase(repoPath, target.base);
-      if (!baseSha) return "";
-      const { stdout } = await execFileAsync(
-        "git",
-        ["diff", "--end-of-options", baseSha, "HEAD", "--", file],
-        gitExecOptions(repoPath),
-      );
-      return stdout;
-    }
-    case "commit": {
-      const { stdout } = await execFileAsync(
-        "git",
-        ["show", "--end-of-options", target.sha, "--", file],
-        gitExecOptions(repoPath),
-      );
-      return stdout;
-    }
+  const pathArgs = path ? ["--", resolveReviewPath(cwd, path).path] : [];
+  const target = snapshot.target;
+  const args = literalPathspec(["grep", "-n", "-F", "--untracked", "-e", query, ...pathArgs]);
+  if (target.kind === "working-tree") {
+    return withHeadIndex(cwd, target.headCommit, (indexFile) =>
+      gitAllowExit(cwd, args, [1], indexFile),
+    );
   }
-}
-
-/** Run `git show <ref>:<file>` and return the blob content. */
-async function showGitBlob(repoPath: string, ref: string, file: string): Promise<string> {
-  const { stdout } = await execFileAsync(
-    "git",
-    ["show", "--end-of-options", `${ref}:${file}`],
-    gitExecOptions(repoPath),
+  const commit = target.kind === "comparison" ? target.headCommit : target.commit;
+  return gitAllowExit(
+    cwd,
+    literalPathspec(["grep", "-n", "-F", "-e", query, commit, ...pathArgs]),
+    [1],
   );
-  return stdout;
-}
-
-async function resolveWorkingTreeContent(
-  repoPath: string,
-  file: string,
-  side: "before" | "after",
-): Promise<string | undefined> {
-  if (side === "before") {
-    try {
-      return await showGitBlob(repoPath, "HEAD", file);
-    } catch {
-      return undefined;
-    }
-  }
-  try {
-    const filePath = join(repoPath, file);
-    const stat = await lstat(filePath);
-    if (stat.isSymbolicLink()) return await readlink(filePath);
-    if (!stat.isFile()) return undefined;
-    return await readFile(filePath, "utf-8");
-  } catch {
-    return undefined;
-  }
-}
-
-async function resolveBranchContent(
-  repoPath: string,
-  target: ReviewTargetSpec & { kind: "branch" },
-  file: string,
-  side: "before" | "after",
-): Promise<string | undefined> {
-  const baseSha = await getMergeBase(repoPath, target.base);
-  if (!baseSha) return undefined;
-  const ref = side === "before" ? baseSha : "HEAD";
-  try {
-    return await showGitBlob(repoPath, ref, file);
-  } catch (err) {
-    if (side === "before") return undefined;
-    throw err;
-  }
-}
-
-async function resolveCommitContent(
-  repoPath: string,
-  target: ReviewTargetSpec & { kind: "commit" },
-  file: string,
-  side: "before" | "after",
-): Promise<string | undefined> {
-  const ref = side === "before" ? `${target.sha}^` : target.sha;
-  try {
-    return await showGitBlob(repoPath, ref, file);
-  } catch (err) {
-    if (side === "before") return undefined;
-    throw err;
-  }
-}
-
-/** Get before or after content for a single changed file in the snapshot. Returns undefined when legitimately unavailable; propagates unexpected errors. */
-export async function getSnapshotFileContent(
-  repoPath: string,
-  snapshot: ReviewSnapshot,
-  file: string,
-  side: "before" | "after",
-): Promise<string | undefined> {
-  const { target } = snapshot;
-  switch (target.kind) {
-    case "working-tree":
-      return resolveWorkingTreeContent(repoPath, file, side);
-    case "branch":
-      return resolveBranchContent(repoPath, target, file, side);
-    case "commit":
-      return resolveCommitContent(repoPath, target, file, side);
-  }
-}
-
-/** Convenience label for one changed file, used in synthesized prompts/UI. */
-export function formatChangedFileLabel(file: string): string {
-  return basename(file) === file ? file : `${basename(file)} (${file})`;
 }

@@ -1,0 +1,57 @@
+import { describe, expect, it } from "vitest";
+import { parseRunReviewToolInput, runReviewSchema } from "../../src/tool/agent-review-schemas.ts";
+
+const commit = "a".repeat(40);
+const review = { tasks: [{ id: "spec", instructions: "Check the spec." }] };
+
+describe("agent review schemas", () => {
+  it("advertises an object-rooted provider-compatible run schema", () => {
+    expect(runReviewSchema.type).toBe("object");
+    expect(runReviewSchema.properties).toHaveProperty("mode");
+    expect(JSON.stringify(runReviewSchema)).not.toContain('"anyOf"');
+    expect(JSON.stringify(runReviewSchema)).not.toContain('"const"');
+  });
+
+  it("narrows valid Direct and Prepared requests", () => {
+    expect(
+      parseRunReviewToolInput({
+        mode: "direct",
+        target: { kind: "comparison", baseCommit: commit },
+        review,
+      }),
+    ).toEqual({
+      mode: "direct",
+      target: { kind: "comparison", baseCommit: commit },
+      review,
+    });
+    expect(
+      parseRunReviewToolInput({
+        mode: "prepared",
+        planId: "plan-1",
+        decision: { kind: "accept-draft" },
+      }),
+    ).toEqual({
+      mode: "prepared",
+      planId: "plan-1",
+      decision: { kind: "accept-draft" },
+    });
+  });
+
+  it.each([
+    { mode: "direct", review },
+    { mode: "direct", target: { kind: "working-tree" }, review, planId: "mixed" },
+    { mode: "prepared", planId: "plan-1" },
+    {
+      mode: "prepared",
+      planId: "plan-1",
+      decision: { kind: "accept-draft", review },
+    },
+    {
+      mode: "direct",
+      target: { kind: "comparison", commit },
+      review,
+    },
+  ])("rejects mismatched mode fields", (input) => {
+    expect(() => parseRunReviewToolInput(input)).toThrow();
+  });
+});

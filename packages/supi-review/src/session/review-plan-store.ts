@@ -1,69 +1,33 @@
-import { createHash } from "node:crypto";
-import type { ReviewModelSelection, ReviewSnapshot, SynthesizedReviewBrief } from "../types.ts";
+import { randomUUID } from "node:crypto";
+import type { PlannerDraft, ReviewModelSelection, ReviewSnapshot } from "../types.ts";
 
-/** Session-scoped state retained between review preparation and execution. */
-export interface StoredAgentReviewPlan {
+/** Session-local resolved target and model choices awaiting one execution decision. */
+export interface StoredReviewPlan {
   id: string;
   snapshot: ReviewSnapshot;
-  snapshotFingerprint: string;
-  generatedBrief: SynthesizedReviewBrief;
-  model: ReviewModelSelection;
-  briefPromptVersion: string;
-  createdAt: number;
+  reviewerModel: ReviewModelSelection;
+  plannerDraft?: PlannerDraft;
+  plannerModelId?: string;
+  plannerPromptVersion?: string;
 }
 
-/** Inputs retained when creating a session-scoped review plan. */
-export interface CreateAgentReviewPlanInput {
-  snapshot: ReviewSnapshot;
-  snapshotFingerprint: string;
-  generatedBrief: SynthesizedReviewBrief;
-  model: ReviewModelSelection;
-  briefPromptVersion: string;
-}
-
-/**
- * Owns prepared review plans for one PI extension session.
- *
- * Plans are claimed atomically before reviewer child sessions start, preventing
- * duplicate runs from concurrent sibling tool calls.
- */
+/** In-memory one-shot store; `take` atomically removes a plan before validation/execution. */
 export class ReviewPlanStore {
-  readonly #plans = new Map<string, StoredAgentReviewPlan>();
-  #sequence = 0;
+  readonly #plans = new Map<string, StoredReviewPlan>();
 
-  /** Create and retain one prepared review plan. */
-  create(input: CreateAgentReviewPlanInput): StoredAgentReviewPlan {
-    const createdAt = Date.now();
-    const id = this.createPlanId(input.snapshotFingerprint, createdAt);
-    const plan: StoredAgentReviewPlan = { id, createdAt, ...input };
-    this.#plans.set(id, plan);
+  create(input: Omit<StoredReviewPlan, "id">): StoredReviewPlan {
+    const plan = { id: `review-plan-${randomUUID()}`, ...input };
+    this.#plans.set(plan.id, plan);
     return plan;
   }
 
-  /** Read a plan without consuming it. */
-  get(id: string): StoredAgentReviewPlan | undefined {
-    return this.#plans.get(id);
-  }
-
-  /** Atomically consume a plan so it can run at most once. */
-  take(id: string): StoredAgentReviewPlan | undefined {
+  take(id: string): StoredReviewPlan | undefined {
     const plan = this.#plans.get(id);
-    if (!plan) return undefined;
-    this.#plans.delete(id);
+    if (plan) this.#plans.delete(id);
     return plan;
   }
 
-  /** Remove all plans when PI replaces or reloads the session. */
   clear(): void {
     this.#plans.clear();
-  }
-
-  private createPlanId(snapshotFingerprint: string, createdAt: number): string {
-    this.#sequence++;
-    const hash = createHash("sha256")
-      .update(`${snapshotFingerprint}:${createdAt}:${this.#sequence}`)
-      .digest("hex")
-      .slice(0, 12);
-    return `review-plan-${hash}`;
   }
 }

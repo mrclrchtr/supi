@@ -65,7 +65,7 @@ export function createEarlyCancellationDiagnostics(): ChildFailureDiagnostics {
 
 /** Generate static parent-facing copy for a host-owned child failure code. */
 export function formatChildFailureCopy(stage: ChildStage, code: ChildFailureCode): string {
-  const label = stage === "brief-synthesis" ? "Brief synthesis" : "Reviewer";
+  const label = stage === "planner" ? "Planner" : "Reviewer";
   switch (code) {
     case "session-creation-failed":
       return `${label} session could not be created.`;

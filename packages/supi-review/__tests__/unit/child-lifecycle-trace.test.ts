@@ -210,7 +210,7 @@ describe("ChildLifecycleTraceCollector", () => {
   });
 
   it("keeps recent activity separate from lifecycle retention", () => {
-    const collector = new ChildLifecycleTraceCollector(new Set(["read_snapshot_diff"]));
+    const collector = new ChildLifecycleTraceCollector(new Set(["read_review_diff"]));
 
     collector.observe({
       type: "message_end",
@@ -224,12 +224,12 @@ describe("ChildLifecycleTraceCollector", () => {
     collector.observe({ type: "turn_start", turnIndex: 1, timestamp: 1 } as AgentSessionEvent);
     collector.observe({
       type: "tool_execution_start",
-      toolName: "read_snapshot_diff",
+      toolName: "read_review_diff",
       args: { file: "private/path.ts" },
     } as AgentSessionEvent);
     collector.observe({
       type: "tool_execution_end",
-      toolName: "read_snapshot_diff",
+      toolName: "read_review_diff",
       args: { file: "private/path.ts" },
       result: { content: "private tool result" },
       isError: true,
@@ -245,8 +245,8 @@ describe("ChildLifecycleTraceCollector", () => {
     expect(collector.recentActivitySnapshot()).toEqual([
       "assistant:end:error",
       "turn:start",
-      "tool:start:read_snapshot_diff",
-      "tool:end:read_snapshot_diff:error",
+      "tool:start:read_review_diff",
+      "tool:end:read_review_diff:error",
       "turn:end",
     ]);
     expect(collector.snapshot().entries).toEqual([{ type: "agent_end", willRetry: true }]);

@@ -1,70 +1,78 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 
-const reviewItemCategorySchema = StringEnum([
-  "correctness",
-  "security",
-  "performance",
-  "api",
-  "test-gap",
-  "docs",
-  "cleanup",
-  "maintainer",
-] as const);
-
-const reviewItemImpactSchema = StringEnum(["low", "medium", "high"] as const);
-
-const reviewItemEffortSchema = StringEnum(["low", "medium", "high"] as const);
-
-const reviewItemRecommendedActionSchema = StringEnum([
-  "must-fix",
-  "should-fix",
-  "consider",
-] as const);
-
-const reviewInstructionBlockIdSchema = StringEnum([
-  "public-surface",
-  "cross-layer",
-  "schema-widening",
-  "cleanup",
-] as const);
-
-export const reviewItemSchema = Type.Object({
-  title: Type.String(),
-  body: Type.String(),
-  category: reviewItemCategorySchema,
-  impact: reviewItemImpactSchema,
-  effort: reviewItemEffortSchema,
-  recommended_action: reviewItemRecommendedActionSchema,
-  confidence_score: Type.Number({ minimum: 0, maximum: 1 }),
-  suggested_fix: Type.String(),
-  verification_hint: Type.String(),
-  code_location: Type.Optional(
-    Type.Object({
-      absolute_file_path: Type.String(),
-      line_range: Type.Object({
-        start: Type.Number(),
-        end: Type.Number(),
-      }),
+export const reviewTaskSchema = Type.Object(
+  {
+    id: Type.String({
+      minLength: 1,
+      maxLength: 64,
+      description: "Stable caller-defined task id, such as standards or spec.",
     }),
-  ),
-});
+    instructions: Type.String({
+      minLength: 1,
+      description: "Complete freeform methodology and acceptance instructions for this task.",
+    }),
+  },
+  { additionalProperties: false },
+);
 
-export const reviewOutputSchema = Type.Object({
-  items: Type.Array(reviewItemSchema),
-  overall_explanation: Type.String(),
-  overall_confidence_score: Type.Number({ minimum: 0, maximum: 1 }),
-});
+export const reviewInputSchema = Type.Object(
+  {
+    sharedContext: Type.Optional(
+      Type.String({ description: "Optional context shared unchanged with every task." }),
+    ),
+    tasks: Type.Array(reviewTaskSchema, {
+      minItems: 1,
+      maxItems: 4,
+      description: "One to four independent tasks executed concurrently in caller order.",
+    }),
+  },
+  { additionalProperties: false },
+);
 
-const briefRequiredTextSchema = Type.String({ minLength: 1, maxLength: 4_000 });
-const briefListItemSchema = Type.String({ minLength: 1, maxLength: 2_000 });
+export const reviewFindingSchema = Type.Object(
+  {
+    title: Type.String({ minLength: 1, description: "Concise finding title." }),
+    description: Type.String({
+      minLength: 1,
+      description: "Concrete evidence-backed explanation of the issue.",
+    }),
+    blocksAcceptance: Type.Boolean({
+      description: "Whether this finding must be corrected before accepting the change.",
+    }),
+    impact: StringEnum(["low", "medium", "high"] as const, {
+      description: "Downside if the issue remains unfixed.",
+    }),
+    effort: StringEnum(["small", "medium", "large"] as const, {
+      description: "Estimated size of the correction.",
+    }),
+    confidence: Type.Number({
+      minimum: 0,
+      maximum: 1,
+      description: "Confidence from 0 through 1; findings are never threshold-filtered.",
+    }),
+    location: Type.Optional(
+      Type.Object(
+        {
+          path: Type.String({ minLength: 1, description: "Repository-relative target path." }),
+          startLine: Type.Integer({ minimum: 1 }),
+          endLine: Type.Integer({ minimum: 1 }),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+  },
+  { additionalProperties: false },
+);
 
-export const reviewBriefSchema = Type.Object({
-  summary: briefRequiredTextSchema,
-  intendedOutcome: briefRequiredTextSchema,
-  constraints: Type.Array(briefListItemSchema, { maxItems: 50 }),
-  focusAreas: Type.Array(briefListItemSchema, { maxItems: 50 }),
-  riskyFiles: Type.Array(briefListItemSchema, { maxItems: 200 }),
-  unresolvedQuestions: Type.Array(briefListItemSchema, { maxItems: 50 }),
-  reviewInstructionBlockIds: Type.Array(reviewInstructionBlockIdSchema, { maxItems: 4 }),
-});
+export const reviewSubmissionSchema = Type.Object(
+  {
+    summary: Type.String({ minLength: 1, description: "Task-level review summary." }),
+    findings: Type.Array(reviewFindingSchema, {
+      description: "Findings in the reviewer's intended order; use an empty array when none exist.",
+    }),
+  },
+  { additionalProperties: false },
+);
+
+export const plannerDraftSchema = reviewInputSchema;

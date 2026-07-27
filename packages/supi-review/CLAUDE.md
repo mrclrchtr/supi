@@ -1,162 +1,71 @@
 # supi-review
 
-Session-aware code review via managed in-process child sessions.
+Caller-defined code review tasks executed in managed, read-only child sessions.
 
-The package exposes a human-driven `/supi-review` command plus the agent-facing `supi_review_prepare` → `supi_review_run` workflow.
+## Product contract
 
-The `/supi-review` command follows a **history-aware** pipeline:
+- Direct Review executes a target plus complete review input in one call.
+- Prepared Review creates a session-scoped, one-shot Review Plan first.
+- Preparation is optional and may request a lightweight Planner Draft.
+- Callers own task methodology through `{ id, instructions }` tasks.
+- The Review Engine owns target resolution, canonical packet construction and hashing, read-only tools, child lifecycle, result grammar, and per-task verdicts.
+- One to four tasks run concurrently using one reviewer model.
+- Results remain separate per task; there is no run-level verdict or host reranking.
 
-1. **Select target** — working tree, branch diff, or commit
-2. **Select model** — explicit every run from Pi's scoped model set; current session model is preselected only when it is scoped
-3. **Collect optional note** — user can steer the generated brief
-4. **Resolve snapshot** — concrete changed files + diff/show text
-5. **Serialize session context** — compaction-style transcript of the active branch's resolved LLM-visible context
-6. **Synthesize brief** — child session turns history + snapshot metadata into a structured brief
-7. **Build review packet** — compact prompt with brief + file metadata + brief-selected mandatory review instructions; no bulk diffs; reviewer fetches diffs on demand
-8. **Preview and confirm** — show the synthesized brief and compact prompt preview; `v` opens the in-app inspector (Overview first, Raw Prompt via `tab`, export via `e`)
-9. **Run reviewer** — read-only child session inspects the code and submits structured review items
-10. **Normalize + render results** — host derives the verdict, sorts review items, computes summary counts, and renders the result
-11. **Main-agent handoff** — if review items exist, inject a hidden follow-up instruction so the main agent asks the user what to do next
+## Targets
 
-The agent-facing tools follow a **prepare / critique / run** pipeline:
+- Working tree: net `HEAD` to current files plus non-ignored untracked files; use a temporary HEAD-seeded index so the caller's real index and index flags are not semantic inputs.
+- Comparison: merge base of caller-supplied full base commit and captured `HEAD` to captured `HEAD`.
+- Commit: first parent or empty tree to the supplied full commit.
+- Agent tools accept full commit object ids only.
+- Repository stability through review completion is a caller precondition. The package intentionally performs no fingerprint or freshness check.
 
-1. `supi_review_prepare` resolves the target, serializes active context, synthesizes a versioned brief, stores a session-scoped plan, and dynamically activates `supi_review_run`
-2. the main agent evaluates the generated brief against the user request, session evidence, and snapshot
-3. `supi_review_run` requires a structured Brief Critique; `revise` also requires at least one evidence-backed finding plus a full replacement brief
-4. the host atomically consumes the plan, re-resolves and fingerprint-checks the snapshot, and runs 1–4 focused reviewer sessions concurrently
-5. the host checks freshness again after review and returns normalized per-reviewer results plus a Brief Evaluation artifact
+## Planner
 
-### Core types
+- Uses the separately configured Planner model at low thinking effort.
+- Receives bounded compaction/branch summaries, recent visible conversation, changed-file names, and target stats.
+- Receives no code, diffs, tool calls/results, context files, or tools.
+- Produces only advisory `{ sharedContext?, tasks }` input.
+- Prepared execution explicitly accepts or replaces a draft.
+- Draft and effective input remain separate in planning provenance.
 
-- `ReviewTargetSpec` — selected git target (`working-tree` | `branch` | `commit`)
-- `ReviewSnapshot` — fully resolved git snapshot (title, changed files, diff text, stats)
-- `SynthesizedReviewBrief` — structured intent inferred from the current session
-- `ReviewItem` — structured reviewer-submitted item (category/impact/effort/recommended action/fix guidance)
-- `ReviewOutputEvent` — raw reviewer submission (`items`, `overall_explanation`, `overall_confidence_score`)
-- `NormalizedReviewOutput` — host-owned review output with derived `overall_correctness` and summary counts
-- `RawReviewResult` — raw child-session result before normalization
-- `ReviewResult` — normalized success / failed / canceled / timeout result for the rendered review run
-- `ReviewPacket` — compact reviewer prompt with brief + file manifest + mandatory review instructions; no inline diffs
-- `ReviewPlan` — model + snapshot + synthesized brief + reviewer packet
-- `BriefCritique` — main-agent accept/revise verdict with evidence-backed field findings
-- `BriefEvaluation` — generated brief + critique + effective brief + prompt/model/snapshot provenance
-- `ReviewerAssignment` — stable id + independent focus for one reviewer child session
+## Reviewer sessions
 
-### Package structure
+Tools are fixed and target-aware:
 
-```text
-src/
-  config.ts             Agent-tool model config + /supi-settings registration
-  review.ts             Command registration + orchestration
-  review-result.ts      Verdict derivation, item ordering, and summary counts
-  types.ts              ReviewSnapshot, ReviewItem, RawReviewResult, ReviewResult, etc.
-  model.ts              Explicit model-selection helpers
-  git.ts                Git diff/commit/branch helpers + snapshot resolution
-  history/
-    collect.ts          Compaction-style session-context serialization
-    synthesize.ts       Brief synthesis prompt builder + runner orchestration
-  target/
-    review-instruction-blocks.ts  Fixed host-owned review instruction block catalog
-    packet.ts                     Compact review packet builder + shared preview-data derivation
-  session/
-    review-plan-store.ts   Session-scoped one-shot plans for agent-driven review
-  tool/
-    agent-review-tools.ts  Prepare/run registration, dynamic activation, progress + debug recording
-    agent-review-workflow.ts  Preparation, critique validation, freshness checks + concurrent fan-out
-    agent-review-schemas.ts   Agent-facing TypeBox schemas
-    guidance.ts              Agent-facing prompt surfaces
-    brief-runner.ts        Brief synthesis child session
-    review-runner.ts       Read-only reviewer child session
-    child-lifecycle-trace.ts  Bounded allowlisted Child Lifecycle Trace + Recent Activity collector
-    child-failure-diagnostics.ts  Safe non-success diagnostic builder and parent-copy formatter
-    runner-helpers.ts      Shared assistant-content serialization and progress-token helpers
-    schemas.ts             TypeBox schemas for submit_review[_brief]
-    snapshot-tools.ts      Snapshot-aware diff/file tools for the reviewer session
-  ui/
-    flow.ts             TUI selection + review flow entry points
-    review-tool-format.ts    Agent-tool model-visible brief/critique/result formatting
-    review-tool-renderer.ts  Compact/expanded prepare + run tool rendering
-    review-plan-inspector.ts
-                         In-app summary/inspector preview with Overview + Raw Prompt modes
-    renderer.ts         Custom message rendering with normalized review items
-    format-content.ts   Plain-text message content for LLM context
-    format-helpers.ts   Shared formatLevel/formatLocation utilities
-    (ProgressWidget migrated to @mrclrchtr/supi-core/progress-widget;
-     runWithProgressWidget lives in @mrclrchtr/supi-core/tool-framework)
-__tests__/
-  unit/
-```
+- `list_review_files`
+- `read_review_diff`
+- `read_review_file`
+- `search_review_files`
+- `submit_review`
 
-## Key design decisions
+Do not reintroduce live-checkout built-in read/search tools for commit-based targets. Reviewer resource loading disables extensions, context files, skills, prompt templates, and themes, explicitly suppresses discovered `SYSTEM.md` / `APPEND_SYSTEM.md` files, and uses in-memory settings with compaction/retries disabled. Inspection outputs are paged; canonical packet bytes are not.
 
-- **Agent model settings surface** — `/supi-settings` exposes `Review → Agent tool model`; it defaults to the current session model and can persist a scoped canonical model id
-- **Two-stage agent seam** — preparation and execution are separate tools so the main agent's Brief Critique is explicit and inspectable
-- **Dynamic run-tool activation** — `supi_review_run` stays inactive until preparation succeeds, reducing initial prompt surface
-- **Configured model for agent runs** — `supi_review_prepare` resolves the setting and captures that model in the plan; command runs retain explicit user selection
-- **One-shot freshness-checked plans** — prepared plans are session-local, claimed atomically, and checked before and after concurrent review
-- **Evaluation provenance** — generated and effective briefs are retained separately with prompt version, model id, critique, and snapshot fingerprint
-- **Command model selection is mandatory per run** — `/supi-review` asks the user every time from Pi's scoped `enabledModels` set
-- **No presets/depth UI** — the important input is the current session history, not a generic canned mode
-- **No editable raw prompt step** — the user can inspect the raw prompt in-app, but not edit a prompt blob
-- **In-app preview inspector** — full preview stays inside Pi; no external pager is required for the primary path
-- **Snapshot first** — review targets are fully resolved before synthesis/review starts; no lazy target hydration
-- **Active branch only** — session-context serialization uses `buildSessionContext(ctx.sessionManager.getEntries(), ctx.sessionManager.getLeafId())` so compaction and branch-summary semantics match the actual LLM-visible context
-- **Read-only review session** — reviewer tools include `read`, `grep`, `find`, `ls`, `submit_review`, and snapshot-aware `read_snapshot_diff` / `read_snapshot_file` for on-demand inspection
-- **Host-owned verdict** — the reviewer submits review items plus explanation/confidence; `src/review-result.ts` derives the final binary verdict from normalized `recommended_action` values
-- **Brief-selected instruction blocks** — `src/target/review-instruction-blocks.ts` defines a fixed host-owned catalog, while the brief synthesizer selects the relevant block IDs for each run
-- **Minimal synthesis session** — brief synthesis uses only `submit_review_brief` and no context files/extensions/skills/themes
+## Result grammar
 
-## Review instruction block catalog
+The reviewer submits a task summary plus findings. Each finding has title, description, `blocksAcceptance`, impact, effort, confidence, and optional target-relative location. The Review Engine derives `pass` when no finding blocks acceptance and `issues` otherwise. It validates confidence only as `0..1`, preserves reviewer order, and applies no category or confidence policy. Every task outcome carries the SHA-256 of its exact canonical packet bytes.
 
-`src/target/review-instruction-blocks.ts` defines a fixed catalog of four review instruction blocks:
+## Main files
 
-1. **Public-surface / rename / merge audit**
-   - sweep source, tests, docs, user-facing strings, and debug/status lists for stale public names
-2. **Cross-layer propagation audit**
-   - verify provider/runtime/orchestration/presentation/test handoffs and look for at least one end-to-end expectation
-3. **Enum / operation / schema widening audit**
-   - audit validation, unavailable paths, aliases, switch coverage, and negative tests
-4. **Cleanup / deletion / orphan audit**
-   - audit orphan files, dead imports or re-exports, stale comments, and outdated expectations
+- `src/review.ts` — command and extension wiring
+- `src/git.ts` — target resolution and target-aware repository access
+- `src/review-path.ts` — repository-relative path and symlink containment boundary
+- `src/target/packet.ts` — canonical reviewer packet
+- `src/tool/review-workflow.ts` — Direct/Prepared orchestration
+- `src/tool/agent-review-tools.ts` — public agent tools
+- `src/tool/planner-runner.ts` — optional lightweight Planner
+- `src/tool/child-resource-loader.ts` — inherited-resource suppression for child sessions
+- `src/tool/review-runner.ts` — managed reviewer child
+- `src/tool/review-tools.ts` — target-aware tool definitions
+- `src/review-result.ts` — per-task verdict derivation
 
-The brief synthesizer chooses zero or more block IDs from this catalog and the packet builder renders them as mandatory review instructions. The host no longer infers block selection from snapshot heuristics.
+## Testing seams
 
-## Child-session design
+Test behavior through:
 
-### Brief synthesis session
+1. Direct/Prepared Review workflow
+2. Git target resolution and target-aware reads/searches
+3. packet compilation and result normalization
+4. extension command/tool registration
 
-- created with `createAgentSession()` + `SessionManager.inMemory()`
-- tools: `submit_review_brief` only
-- resource loader disables extensions, skills, prompt templates, themes, and context files
-- output schema: summary, intendedOutcome, constraints, focusAreas, riskyFiles, unresolvedQuestions, reviewInstructionBlockIds
-- timeout returns `kind: "timeout"`; no graceful wrap-up phase
-
-### Review session
-
-- created with `createAgentSession()` + `SessionManager.inMemory()`
-- tools: `read`, `grep`, `find`, `ls`, `submit_review`, `read_snapshot_diff`, `read_snapshot_file`
-- resource loader disables extensions while keeping project context files enabled, so repo guidance is inherited without extension hooks or tool overrides weakening the read-only guarantee
-- snapshot tools (`read_snapshot_diff`, `read_snapshot_file`) are scoped to the selected snapshot's changed-files list and are the primary way the reviewer inspects per-file diffs
-- the prompt packet may include mandatory review instructions; reviewer instructions treat supplied instructions as required checks for that run
-- live progress comes from `session.subscribe()` events (turns, tool activity, token stats)
-- soft timeout steers the model to finish, then aborts after grace turns if needed
-
-## Gotchas
-
-- `ctx.sessionManager` in extension contexts is read-only; use `getBranch()` and derive any extra views yourself
-- Managed child runners must finalize on `agent_settled`, not `agent_end`; Pi may still retry, compact and retry, or deliver queued steering after `agent_end`
-- The session-context serializer operates on the resolved `buildSessionContext(...)` output, so `custom_message` entries, compaction summaries, and branch summaries all appear in the transcript exactly as the LLM would see them
-- `buildBriefSynthesisPrompt()` must include a bounded diff excerpt so the synthesizer can see actual code changes, not just filenames/stats
-- `buildReviewPacket()` stays compact: brief, manifest, overview, mandatory review instructions, and on-demand snapshot inspection instructions. Do not reintroduce bulk diff embedding.
-- Full preview no longer shells out to `less`; export-to-temp-file is a debugging fallback only.
-- `src/review-result.ts` is the single source of truth for verdict derivation, action/category summary counts, and review-item ordering
-- Agent-driven review plans are in-memory and session-scoped; `/reload`, session replacement, or shutdown clears them
-- The agent-tool model setting is resolved when `supi_review_prepare` starts and the concrete model is retained in the plan; later setting/session-model changes do not affect `supi_review_run`
-- `supi_review_run` must not share a tool batch with edit/write/mutating bash calls; pre/post fingerprints reject detected drift, but avoiding concurrent mutation keeps snapshot-tool reads coherent
-- Agent commit targets accept only 7–64 character hexadecimal object ids, resolve object-only through `rev-parse --disambiguate`, reject ambiguous/non-commit objects via `cat-file`, and never fall back to hexadecimal ref names. Branch targets resolve only exact local `refs/heads/*` names. Git revision arguments use `--end-of-options` where supported.
-- Branch snapshots consistently compare the merge base to `HEAD`; dirty working-tree changes belong only to the working-tree target.
-- When changing the brief synthesis prompt contract, bump `BRIEF_SYNTHESIS_PROMPT_VERSION` so Brief Evaluation artifacts remain comparable
-- Full Brief Evaluation data belongs in tool-result `details`; SuPi Debug receives a sanitized summary plus raw data only through its opt-in raw access path
-- `ReviewResult` success payloads are normalized before rendering; renderers and plain-text formatting should use normalized review items instead of assuming raw reviewer output
-- The visible `supi-review` custom message is followed by a hidden `supi-review-followup` custom message when review items exist; its content instructs the main agent to ask the user what to do next, preferably via `ask_user`, with the fixed options `Fix all`, `Fix selected`, `Verify findings`, `Skip`
-- Keep the final custom message content concise and structured: plain text in `content`, richer data in `details`
+Use package-scoped Vitest plus both source and test TypeScript builds.

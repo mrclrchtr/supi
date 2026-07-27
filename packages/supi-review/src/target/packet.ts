@@ -1,397 +1,73 @@
+import { createHash } from "node:crypto";
 import type {
-  ReviewerAssignment,
-  ReviewInstructionBlockId,
+  ResolvedReviewTarget,
+  ReviewInput,
   ReviewModelSelection,
   ReviewPacket,
   ReviewSnapshot,
-  SynthesizedReviewBrief,
+  ReviewTask,
 } from "../types.ts";
-export interface ReviewInstructionBlock {
-  id: ReviewInstructionBlockId;
-  title: string;
-  instruction: string;
+
+export const REVIEW_PACKET_PROTOCOL_VERSION = "1";
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
-const REVIEW_INSTRUCTION_BLOCKS: readonly ReviewInstructionBlock[] = [
-  {
-    id: "public-surface",
-    title: "Public-surface / rename / merge audit",
-    instruction:
-      "Sweep source, tests, docs, user-facing strings, and debug/status lists for stale public names after renames, removals, or merges.",
-  },
-  {
-    id: "cross-layer",
-    title: "Cross-layer propagation audit",
-    instruction:
-      "Verify every provider/runtime/orchestration/presentation/test handoff and look for at least one end-to-end expectation covering the threaded behavior.",
-  },
-  {
-    id: "schema-widening",
-    title: "Enum / operation / schema widening audit",
-    instruction:
-      "Audit validation, unavailable paths, branch coverage, aliases, and negative tests for widened enums, operations, or schemas.",
-  },
-  {
-    id: "cleanup",
-    title: "Cleanup / deletion / orphan audit",
-    instruction:
-      "Check for orphan files, dead imports or re-exports, stale comments, and outdated expectations after deletions or consumer removals.",
-  },
-];
-
-/** Return the full fixed catalog of review instruction blocks. */
-export function listReviewInstructionBlocks(): readonly ReviewInstructionBlock[] {
-  return REVIEW_INSTRUCTION_BLOCKS;
-}
-
-/** Resolve a brief-selected block ID list into canonical host-owned prompt blocks. */
-export function resolveReviewInstructionBlocks(
-  ids: readonly ReviewInstructionBlockId[],
-): ReviewInstructionBlock[] {
-  const resolved: ReviewInstructionBlock[] = [];
-  const seen = new Set<ReviewInstructionBlockId>();
-
-  for (const id of ids) {
-    if (seen.has(id)) continue;
-    seen.add(id);
-    const block = REVIEW_INSTRUCTION_BLOCKS.find((b) => b.id === id);
-    if (block) resolved.push(block);
+function targetIdentity(target: ResolvedReviewTarget): string {
+  if (target.kind === "working-tree") return `working-tree head=${target.headCommit}`;
+  if (target.kind === "comparison") {
+    return [
+      "comparison",
+      `requested-base=${target.requestedBaseCommit}`,
+      `merge-base=${target.mergeBaseCommit}`,
+      `head=${target.headCommit}`,
+    ].join(" ");
   }
-
-  return resolved;
+  return [
+    "commit",
+    `commit=${target.commit}`,
+    `parent=${target.parentCommit ?? "empty-tree"}`,
+  ].join(" ");
 }
 
-export interface DiffSection {
-  file: string;
-  text: string;
-  additions: number;
-  deletions: number;
-}
-
-export interface ReviewPacketPreviewFileRow {
-  file: string;
-  additions: number | null;
-  deletions: number | null;
-  annotations: string[];
-}
-
-export interface ReviewPacketPreviewData {
-  reviewInstructionBlocks: ReviewInstructionBlock[];
-  fileOverview: ReviewPacketPreviewFileRow[];
-  snapshotNotes?: string;
-}
-
-/** Build a compact review packet for the reviewer child session.
- *
- * The packet contains only the session-derived brief, target metadata, and a
- * changed-file overview. No large inline diffs are included. The reviewer uses
- * read_snapshot_diff and read_snapshot_file tools to inspect diffs on demand.
- */
+/** Build the canonical caller-policy/engine-mechanics reviewer packet. */
 export function buildReviewPacket(
   snapshot: ReviewSnapshot,
-  brief: SynthesizedReviewBrief,
+  review: ReviewInput,
+  task: ReviewTask,
   model: ReviewModelSelection,
-  assignment?: ReviewerAssignment,
 ): ReviewPacket {
-  const previewData = buildReviewPacketPreviewData(snapshot, brief.reviewInstructionBlockIds);
-
-  const parts: string[] = [
+  const parts = [
     "# Review Task",
     "",
-    "## Session-derived intent",
-    `Summary: ${brief.summary}`,
-    `Intended outcome: ${brief.intendedOutcome}`,
-    "",
-    "## Constraints to preserve",
-    ...toBullets(brief.constraints, "- No explicit constraints extracted."),
-    "",
-    "## Focus areas",
-    ...toBullets(brief.focusAreas, "- Review overall correctness and consistency."),
-    "",
-    "## Risky files",
-    ...toBullets(brief.riskyFiles, "- No risky files explicitly called out."),
-    "",
-    "## Open questions",
-    ...toBullets(brief.unresolvedQuestions, "- No unresolved questions identified."),
-  ];
-
-  if (assignment) {
-    parts.push(
-      "",
-      "## Delegated reviewer focus",
-      `Reviewer assignment: ${assignment.id}`,
-      assignment.focus,
-    );
-  }
-
-  parts.push(
-    "",
-    "## Snapshot under review",
+    `Protocol version: ${REVIEW_PACKET_PROTOCOL_VERSION}`,
+    `Task id: ${task.id}`,
     `Target: ${snapshot.title}`,
-    `Files changed: ${snapshot.changedFiles.length}`,
-    `Diff stats: +${snapshot.stats.additions} / -${snapshot.stats.deletions}`,
+    `Target identity: ${targetIdentity(snapshot.target)}`,
+    `Target diff SHA-256: ${sha256(snapshot.diffText)}`,
     `Reviewer model: ${model.canonicalId}`,
-    "",
-    "## Changed files manifest",
-    ...snapshot.changedFiles.map((file) => `- ${file}`),
-  );
-
-  if (previewData.reviewInstructionBlocks.length > 0) {
-    parts.push(
-      "",
-      "## Mandatory review instructions",
-      ...formatReviewInstructionBlocks(previewData.reviewInstructionBlocks),
-    );
+    `Changed files: ${snapshot.changedFiles.length}`,
+    `Diff stats: +${snapshot.stats.additions} / -${snapshot.stats.deletions}`,
+  ];
+  if (review.sharedContext?.trim()) {
+    parts.push("", "## Shared context", review.sharedContext.trim());
   }
-
-  parts.push("", buildFileOverviewTable(previewData.fileOverview));
-
-  if (previewData.snapshotNotes) {
-    parts.push("", "## Snapshot notes", previewData.snapshotNotes);
-  }
-
   parts.push(
     "",
-    "## On-demand snapshot inspection",
-    "Use read_snapshot_diff <file> to see the exact diff for any changed file.",
-    "Use read_snapshot_file <file> before|after to inspect file contents on either side of the change.",
-    "These tools are scoped to the snapshot's changed-files list — request a file from the manifest above.",
+    "## Task instructions",
+    task.instructions.trim(),
     "",
-    "Combine snapshot inspection with read/grep/find/ls for broader codebase context.",
+    "## Changed files",
+    ...snapshot.changedFiles.map((file) => `- ${JSON.stringify(file)}`),
+    "",
+    "## Inspection",
+    "Use list_review_files, read_review_diff, read_review_file, and search_review_files.",
+    "All tools resolve against the selected review target.",
     "",
     "## Delivery",
-    "Call **submit_review** to submit your review.",
+    "Call submit_review exactly once with the task summary and findings.",
   );
-
-  const includedFiles = snapshot.changedFiles.filter((f) => !classifySkipCategory(f));
-  const omittedFiles = snapshot.changedFiles.filter((f) => !!classifySkipCategory(f));
-  const charBudget = getPacketCharBudget(model);
-
-  return { prompt: parts.join("\n"), includedFiles, omittedFiles, charBudget };
-}
-
-/** Derive a conservative prompt budget from the selected model's context window. */
-export function getPacketCharBudget(model: ReviewModelSelection): number {
-  const contextWindow = model.model.contextWindow;
-  if (!contextWindow || contextWindow <= 0) {
-    return 32_000;
-  }
-
-  const tokenBudget = Math.max(512, Math.min(32_000, Math.floor(contextWindow * 0.2)));
-  return tokenBudget * 4;
-}
-
-function countDiffLines(lines: string[]): { additions: number; deletions: number } {
-  let additions = 0;
-  let deletions = 0;
-  for (const line of lines) {
-    // Skip diff header lines (e.g. "--- a/file", "+ + + b/file").
-    // The trailing space ensures we do not skip content lines whose first
-    // characters happen to be "+++" or "---".
-    if (line.startsWith("--- ") || line.startsWith("+++ ")) continue;
-    if (line.startsWith("+")) additions++;
-    else if (line.startsWith("-")) deletions++;
-  }
-  return { additions, deletions };
-}
-
-export function splitDiffSections(text: string): { preamble: string; sections: DiffSection[] } {
-  const lines = text.split("\n");
-  const preamble: string[] = [];
-  const sections: DiffSection[] = [];
-  let current: string[] = [];
-  let currentFile: string | undefined;
-
-  const flush = () => {
-    if (current.length === 0 || !currentFile) {
-      current = [];
-      currentFile = undefined;
-      return;
-    }
-    const stats = countDiffLines(current);
-    sections.push({
-      file: currentFile,
-      text: current.join("\n").trimEnd(),
-      additions: stats.additions,
-      deletions: stats.deletions,
-    });
-    current = [];
-    currentFile = undefined;
-  };
-
-  for (const line of lines) {
-    if (line.startsWith("diff --git ")) {
-      flush();
-      current = [line];
-      currentFile = parseDiffFile(line);
-      continue;
-    }
-
-    if (/^=== .* ===$/.test(line) && current.length > 0) {
-      flush();
-      preamble.push(line);
-      continue;
-    }
-
-    if (current.length > 0) {
-      current.push(line);
-      if (!currentFile && line.startsWith("+++ b/")) {
-        currentFile = line.slice(6).trim();
-      }
-      continue;
-    }
-
-    preamble.push(line);
-  }
-
-  flush();
-  return { preamble: preamble.join("\n").trim(), sections };
-}
-
-function parseDiffFile(line: string): string | undefined {
-  const match = /^diff --git a\/(.+?) b\/(.+)$/.exec(line.trim());
-  if (!match) return undefined;
-  const next = match[2] ?? match[1];
-  return next === "/dev/null" ? match[1] : next;
-}
-
-/** Categorize a file path for skip-list annotation, or undefined if it should be reviewed. */
-export function classifySkipCategory(file: string): string | undefined {
-  const lockfiles = new Set([
-    "package-lock.json",
-    "yarn.lock",
-    "pnpm-lock.yaml",
-    "Gemfile.lock",
-    "Cargo.lock",
-    "poetry.lock",
-    "composer.lock",
-  ]);
-
-  const name = file.split("/").pop() ?? file;
-  if (lockfiles.has(name)) return "lockfile";
-  if (name.startsWith("CHANGELOG") || name.startsWith("CHANGES") || name === "CHANGE_LOG") {
-    return "changelog";
-  }
-
-  if (file.includes("__snapshots__/") || name.endsWith(".snap")) {
-    return "snapshot";
-  }
-
-  if (
-    file.includes("dist/") ||
-    file.includes("build/") ||
-    file.includes(".next/") ||
-    file.includes("__generated__/")
-  ) {
-    return "generated";
-  }
-
-  if (file.includes("vendor/") || file.includes("third_party/")) {
-    return "vendored";
-  }
-
-  if (name.endsWith(".min.js") || name.endsWith(".min.css")) return "generated";
-
-  return undefined;
-}
-
-/** Derive structured preview data shared by the packet builder and inspector UI. */
-export function buildReviewPacketPreviewData(
-  snapshot: ReviewSnapshot,
-  reviewInstructionBlockIds: readonly ReviewInstructionBlockId[] = [],
-): ReviewPacketPreviewData {
-  const { preamble, sections } = splitDiffSections(snapshot.diffText);
-  const { statsMap, binaryFiles } = buildDiffSectionStats(sections);
-
-  return {
-    reviewInstructionBlocks: resolveReviewInstructionBlocks(reviewInstructionBlockIds),
-    fileOverview: snapshot.changedFiles.map((file) =>
-      buildPreviewFileRow(file, statsMap, binaryFiles),
-    ),
-    snapshotNotes: preamble.trim() ? truncate(preamble.trim(), 1_500) : undefined,
-  };
-}
-
-function buildPreviewFileRow(
-  file: string,
-  statsMap: Map<string, { additions: number; deletions: number }>,
-  binaryFiles: Set<string>,
-): ReviewPacketPreviewFileRow {
-  const stats = statsMap.get(file);
-  const skipCategory = classifySkipCategory(file);
-  const annotations: string[] = [];
-
-  if (!stats) {
-    // File in the changed-files manifest but not in the parsed diff sections.
-    // This happens for untracked files in working-tree snapshots, which
-    // have no diff section to parse. Do not guess 0/0 or mark as trivial.
-    if (skipCategory) annotations.push(`skip — ${skipCategory}`);
-    return { file, additions: null, deletions: null, annotations };
-  }
-
-  if (binaryFiles.has(file)) {
-    // Binary diffs have no diffable +/- lines. Show unknown stats.
-    if (skipCategory) annotations.push(`skip — ${skipCategory}`);
-    annotations.push("binary");
-    return { file, additions: null, deletions: null, annotations };
-  }
-
-  const total = stats.additions + stats.deletions;
-  if (total < 5) annotations.push("trivial");
-  if (skipCategory) annotations.push(`skip — ${skipCategory}`);
-  return {
-    file,
-    additions: stats.additions,
-    deletions: stats.deletions,
-    annotations,
-  };
-}
-
-function buildDiffSectionStats(sections: DiffSection[]): {
-  statsMap: Map<string, { additions: number; deletions: number }>;
-  binaryFiles: Set<string>;
-} {
-  const statsMap = new Map<string, { additions: number; deletions: number }>();
-  const binaryFiles = new Set<string>();
-
-  for (const section of sections) {
-    const existing = statsMap.get(section.file);
-    statsMap.set(section.file, {
-      additions: (existing?.additions ?? 0) + section.additions,
-      deletions: (existing?.deletions ?? 0) + section.deletions,
-    });
-    if (section.text.includes("Binary files ")) {
-      binaryFiles.add(section.file);
-    }
-  }
-
-  return { statsMap, binaryFiles };
-}
-
-function formatOverviewRow(row: ReviewPacketPreviewFileRow): string {
-  const annotation = row.annotations.length > 0 ? ` (${row.annotations.join(", ")})` : "";
-  const additions = row.additions === null ? "?" : String(row.additions);
-  const deletions = row.deletions === null ? "?" : String(row.deletions);
-  return `| ${row.file} | ${additions} | ${deletions}${annotation} |`;
-}
-
-function buildFileOverviewTable(rows: ReviewPacketPreviewFileRow[]): string {
-  const header = "| File | +Add | -Del |";
-  const separator = "|---|---|---|";
-  const tableRows = rows.map((row) => formatOverviewRow(row));
-
-  return [`## File overview`, "", header, separator, ...tableRows].join("\n");
-}
-
-function formatReviewInstructionBlocks(blocks: ReviewInstructionBlock[]): string[] {
-  return blocks.map((block) => `- ${block.title}: ${block.instruction}`);
-}
-
-function toBullets(items: string[], fallback: string): string[] {
-  return items.length > 0 ? items.map((item) => `- ${item}`) : [fallback];
-}
-
-function truncate(text: string, maxChars: number): string {
-  if (text.length <= maxChars) return text;
-  return `${text.slice(0, maxChars)}\n[... truncated ...]`;
+  const prompt = parts.join("\n");
+  return { prompt, packetHash: sha256(prompt), taskId: task.id };
 }

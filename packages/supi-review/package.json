@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-review",
   "version": "2.8.0",
-  "description": "SuPi Review extension — session-aware review command and agent tools",
+  "description": "SuPi Review extension — caller-defined read-only review tasks for users and agents",
   "license": "MIT",
   "repository": {
     "type": "git",

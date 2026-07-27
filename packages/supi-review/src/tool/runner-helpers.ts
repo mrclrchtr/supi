@@ -1,12 +1,7 @@
-/**
- * Shared helpers for child-session runners (brief synthesis & review).
- *
- * These were extracted from brief-runner.ts and review-runner.ts to
- * eliminate duplication.
- */
+/** Shared child-session helpers that do not retain model-generated diagnostics. */
 
-/** Extract text content from a message content value (string | content-part[]). */
-export function extractAssistantText(content: unknown): string | undefined {
+/** Extract visible text from a message content value (string or content-part array). */
+export function extractVisibleText(content: unknown): string | undefined {
   if (typeof content === "string") {
     return content || undefined;
   }

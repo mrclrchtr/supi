@@ -8,7 +8,7 @@ It is also my daily PI setup, shared as installable packages so you can use the 
 
 ## What SuPi is trying to achieve
 
-- Make PI stronger in real coding sessions: code understanding, external docs lookup, session-aware review, reporting, diagnostics, and quality-of-life.
+- Make PI stronger in real coding sessions: code understanding, external docs lookup, caller-defined review, reporting, diagnostics, and quality-of-life.
 - Bring IDE-like navigation and tool-supported refactorings into agent workflows.
 - Build with the initial context window in mind: focused tools, concise descriptions, and short guidelines.
 - Make agent-user decisions structured when free-form chat would be ambiguous.
@@ -59,7 +59,7 @@ Packages: [`supi-context`](packages/supi-context#readme), [`supi-cache`](package
 
 ### Review & reporting
 
-Run session-aware review workflows over git snapshots and generate reports from historical PI sessions.
+Run caller-defined review tasks over Git changes and generate reports from historical PI sessions.
 
 Packages: [`supi-review`](packages/supi-review#readme), [`supi-insights`](packages/supi-insights#readme)
 
@@ -191,7 +191,7 @@ pi install npm:@mrclrchtr/supi-debug
 
 <kbd>Human</kbd> <kbd>Agent</kbd> <kbd>Beta</kbd>
 
-Guided session-aware review over git snapshots plus agent-driven prepare/critique/run tools with inspectable brief evaluation and concurrent read-only reviewers.
+Caller-defined Direct or one-shot Prepared review tasks with optional advisory planning, target-aware read-only reviewers, packet hashes, and separate per-task results.
 
 ```bash
 pi install npm:@mrclrchtr/supi-review
