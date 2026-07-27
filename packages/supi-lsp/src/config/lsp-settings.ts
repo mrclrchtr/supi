@@ -10,14 +10,12 @@ import { loadSupiConfig, loadSupiConfigForScope } from "@mrclrchtr/supi-core/con
 
 export interface LspSettings extends Record<string, unknown> {
   enabled: boolean;
-  severity: number;
   active: string[];
   exclude: string[];
 }
 
 export const LSP_DEFAULTS: LspSettings = {
   enabled: true,
-  severity: 1,
   active: [],
   exclude: [],
 };

@@ -3,9 +3,12 @@
 
 import type { OverviewData } from "./types.ts";
 
+/** Soft token budget — log a warning when exceeded. */
+const OVERVIEW_TOKEN_BUDGET = 600;
+
 /**
  * Render the compact architecture overview for first-turn session injection.
- * Targets roughly 500 tokens.
+ * Targets at most 600 estimated tokens; logs a supi_debug warning when exceeded.
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: module-edge overview rendering with multiple formatting paths is clearer as one function
 export function renderOverview(data: OverviewData): string {
@@ -29,16 +32,18 @@ export function renderOverview(data: OverviewData): string {
       data.modules.some((m) => m.name === d || m.shortName === d),
     );
 
+    const entrypointSuffix = mod.entrypoints.length > 0 ? ` [${mod.entrypoints.join(", ")}]` : "";
+
     if (deps.length === 0) {
       lines.push(
-        `- **${mod.shortName}**${mod.isLeaf ? " (leaf)" : ""}${mod.description ? ` — ${mod.description}` : ""}`,
+        `- **${mod.shortName}**${mod.isLeaf ? " (leaf)" : ""}${entrypointSuffix}${mod.description ? ` — ${mod.description}` : ""}`,
       );
     } else {
       const depNames = deps.slice(0, 4).map((d) => d.replace(/^@[^/]+\//, ""));
       const depStr = depNames.join(", ");
       const suffix = deps.length > 4 ? ` +${deps.length - 4} more` : "";
       lines.push(
-        `- **${mod.shortName}** → ${depStr}${suffix}${mod.description ? ` — ${mod.description}` : ""}`,
+        `- **${mod.shortName}** → ${depStr}${suffix}${entrypointSuffix}${mod.description ? ` — ${mod.description}` : ""}`,
       );
     }
   }
@@ -49,11 +54,24 @@ export function renderOverview(data: OverviewData): string {
 
   lines.push("");
 
-  if (data.gitContextOverview) {
-    lines.push(data.gitContextOverview);
+  if (data.detectedLanguages && data.detectedLanguages.length > 0) {
+    lines.push(`**Detected:** ${data.detectedLanguages.join(", ")}`);
+    lines.push("");
   }
 
   lines.push('_For deeper orientation, use `code_orientation({ focus: "..." })`._');
+  lines.push("");
+  lines.push("_(session snapshot)_");
 
-  return lines.join("\n");
+  const output = lines.join("\n");
+
+  return output;
 }
+
+/** Estimated token count using the repository convention. */
+export function estimateTokens(content: string): number {
+  return Math.ceil(content.length / 4);
+}
+
+/** The soft token budget for the overview. */
+export { OVERVIEW_TOKEN_BUDGET };

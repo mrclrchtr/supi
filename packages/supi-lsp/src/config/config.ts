@@ -49,13 +49,13 @@ export function loadConfig(cwd: string, options?: LoadConfigOptions): LspConfig 
   const globalLsp = loadSupiConfigForScope(
     "lsp",
     cwd,
-    { enabled: true, severity: 1, active: [], servers: {} as Record<string, ServerConfig> },
+    { enabled: true, active: [], servers: {} as Record<string, ServerConfig> },
     { scope: "global", homeDir: options?.homeDir },
   );
   const projectLsp = loadSupiConfigForScope(
     "lsp",
     cwd,
-    { enabled: true, severity: 1, active: [], servers: {} as Record<string, ServerConfig> },
+    { enabled: true, active: [], servers: {} as Record<string, ServerConfig> },
     { scope: "project" },
   );
 

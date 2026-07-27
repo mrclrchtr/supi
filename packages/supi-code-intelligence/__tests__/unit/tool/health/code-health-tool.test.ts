@@ -34,6 +34,11 @@ vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
   return {
     ...actual,
     getWorkspaceLspRuntime: mockLspFns.getWorkspaceLspRuntime,
+    syncWorkspaceSentinelSnapshot: vi.fn((_cwd: string, prev: Map<string, number>) => ({
+      snapshot: prev,
+      changes: [],
+    })),
+    isLikelyStaleDiagnostic: vi.fn(() => false),
   };
 });
 
@@ -62,6 +67,11 @@ function mockReadyLsp(
     getWorkspaceDiagnosticSummary: ReturnType<typeof vi.fn>;
     fileDiagnostics: ReturnType<typeof vi.fn>;
     recoverDiagnostics: ReturnType<typeof vi.fn>;
+    pruneMissingFiles: ReturnType<typeof vi.fn>;
+    refreshOpenDiagnostics: ReturnType<typeof vi.fn>;
+    noteWorkspaceChanges: ReturnType<typeof vi.fn>;
+    closeFile: ReturnType<typeof vi.fn>;
+    trackFile: ReturnType<typeof vi.fn>;
   }> = {},
 ) {
   const runtime = {
@@ -79,6 +89,11 @@ function mockReadyLsp(
     getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue([]),
     fileDiagnostics: vi.fn().mockResolvedValue(null),
     recoverDiagnostics: vi.fn().mockResolvedValue({ recovered: false }),
+    pruneMissingFiles: vi.fn().mockReturnValue([]),
+    refreshOpenDiagnostics: vi.fn().mockResolvedValue(undefined),
+    noteWorkspaceChanges: vi.fn(),
+    closeFile: vi.fn(),
+    trackFile: vi.fn().mockResolvedValue(true),
     ...overrides,
   };
 

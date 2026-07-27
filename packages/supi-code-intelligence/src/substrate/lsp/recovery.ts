@@ -1,6 +1,8 @@
-// Workspace recovery handler — tool_result event that recovers LSP state after write/edit.
+// Workspace recovery handler — tool_result event that recovers LSP state after
+// file-mutating tool calls.
 //
-// Notifies the workspace LSP runtime about file changes so diagnostics stay fresh.
+// Notifies the workspace LSP runtime about file changes so diagnostics stay fresh
+// for explicit code_health and semantic tool queries.
 
 import * as nodePath from "node:path";
 import type {
@@ -11,10 +13,14 @@ import type {
 import { clearTsconfigCache } from "@mrclrchtr/supi-lsp/api";
 import type { LspAdapterState } from "./state.ts";
 
+/** Tool names whose successful results should trigger workspace change notifications. */
+const MUTATING_TOOL_NAMES = new Set(["write", "edit", "code_refactor_apply"]);
+
 export function registerWorkspaceRecoveryHandler(pi: ExtensionAPI, state: LspAdapterState): void {
   pi.on("tool_result", async (event: ToolResultEvent, _ctx: ExtensionContext) => {
     const runtime = state.controller?.workspaceRuntime;
     if (!runtime || event.isError) return;
+    if (!MUTATING_TOOL_NAMES.has(event.toolName)) return;
 
     const filePath = getFilePathFromToolResult(event);
     if (!filePath) return;
@@ -30,17 +36,10 @@ export function registerWorkspaceRecoveryHandler(pi: ExtensionAPI, state: LspAda
     }
 
     runtime.noteWorkspaceChanges([{ uri: filePathToUri(resolved), type: 2 }]);
-
-    state.staleSuspected = true;
-    state.lastDiagnosticsFingerprint = null;
-    state.currentContextToken = null;
-    state.lastWorkspaceChangeAt = Date.now();
   });
 }
 
 function getFilePathFromToolResult(event: ToolResultEvent): string | null {
-  if (event.isError) return null;
-  if (event.toolName !== "write" && event.toolName !== "edit") return null;
   const input = (event as { input?: Record<string, unknown> }).input;
   if (!input || typeof input !== "object") return null;
   const pathValue = input.path;

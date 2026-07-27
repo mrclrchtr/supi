@@ -6,9 +6,7 @@ import { buildArchitectureModel } from "./analysis/architecture/discovery.ts";
 import { createCodeIntelligenceApp } from "./app/app.ts";
 import { registerCodeIntelligenceSettings } from "./config.ts";
 import type { WorkspaceCodeIntelligenceSession } from "./session/session.ts";
-import { registerDiagnosticInjectionHandlers } from "./substrate/lsp/diagnostic-injection.ts";
 import { registerLspSessionLifecycle } from "./substrate/lsp/lifecycle.ts";
-import { registerLspAwareToolOverrides } from "./substrate/lsp/overrides.ts";
 import { registerWorkspaceRecoveryHandler } from "./substrate/lsp/recovery.ts";
 import { registerLspSettings } from "./substrate/lsp/settings.ts";
 import { createLspAdapterState } from "./substrate/lsp/state.ts";
@@ -20,7 +18,6 @@ import { registerCodeIntelligenceTools } from "./tool/register.ts";
 import { registerLspFooterContribution } from "./ui/footer.ts";
 import { renderOverview } from "./ui/markdown/overview.ts";
 import { buildOverviewData } from "./ui/markdown/overview-data.ts";
-import { registerLspMessageRenderer } from "./ui/message-renderer.ts";
 import { registerCiStatusCommand } from "./ui/status-command.ts";
 
 const OVERVIEW_CUSTOM_TYPE = "code-intelligence-overview";
@@ -85,8 +82,6 @@ export default function codeIntelligenceExtension(
   registerCodeIntelligenceSettings(pi);
   registerLspSettings(pi);
   registerLspSessionLifecycle(pi, lspState);
-  registerLspAwareToolOverrides(pi, lspState);
-  registerDiagnosticInjectionHandlers(pi, lspState);
   registerWorkspaceRecoveryHandler(pi, lspState);
   registerTsSessionLifecycle(pi, tsState);
 
@@ -95,6 +90,7 @@ export default function codeIntelligenceExtension(
     const session = app.getSession(ctx.cwd);
     if (!session) return;
     session.attachLspController(lspState.controller);
+    session.seedSentinelSnapshot(lspState.sentinelSnapshot);
   });
 
   // ── Tool registration ─────────────────────────────────────────────
@@ -104,7 +100,6 @@ export default function codeIntelligenceExtension(
   );
 
   // ── UI registration ───────────────────────────────────────────────
-  registerLspMessageRenderer(pi);
   registerCiStatusCommand(pi);
   registerLspFooterContribution(lspState);
 
@@ -113,41 +108,6 @@ export default function codeIntelligenceExtension(
     const session = app.getSession(ctx.cwd) ?? app.createSession(ctx.cwd);
     session.captureNativeInstructionPaths(event.systemPromptOptions.contextFiles ?? []);
   });
-
-  // ── Capability Warning emission ──────────────────────────────────
-  pi.on(
-    "before_agent_start",
-    async (_event, ctx): Promise<BeforeAgentStartEventResult | undefined> => {
-      const session = app.getSession(ctx.cwd);
-      if (!session) return;
-
-      const pending = session.pendingCapabilityWarnings();
-      if (pending.length === 0) return;
-
-      const lines = [
-        '<extension-context source="supi-code-intelligence">',
-        "Code intelligence Capability Warnings:",
-      ];
-      for (const w of pending) {
-        const lang = w.language ? `[${w.language}] ` : "";
-        const detail = w.detail ? ` — ${w.detail}` : "";
-        lines.push(`- ${lang}${w.message}${detail}`);
-      }
-      lines.push("</extension-context>");
-      const warningContext = lines.join("\n");
-
-      return {
-        message: {
-          customType: "code-intelligence-capability-warnings",
-          display: true,
-          content: warningContext,
-        },
-        systemPrompt:
-          (await ctx.getSystemPrompt()) +
-          "\n\nThe code intelligence stack reports Capability Warnings. Some code_* tools may return limited or structural-only information. Continue using them, but account for unavailable semantic or structural analysis named by the warnings.",
-      };
-    },
-  );
 
   // ── Overview injection — uses the app-managed session state ────────
   pi.on(
@@ -165,6 +125,16 @@ export default function codeIntelligenceExtension(
 
       const overview = renderOverview(data);
       if (!overview) return;
+
+      const estimatedTokens = Math.ceil(overview.length / 4);
+      if (estimatedTokens > 600) {
+        pi.events.emit("supi:debug", {
+          source: "supi-code-intelligence",
+          level: "warning",
+          category: "overview",
+          message: `Overview exceeds soft token budget: ${estimatedTokens} tokens (budget: 600)`,
+        });
+      }
 
       return {
         message: {

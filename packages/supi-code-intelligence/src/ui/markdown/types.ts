@@ -14,6 +14,8 @@ export interface OverviewModule {
   description: string | null;
   isLeaf: boolean;
   internalDeps: string[];
+  /** Entrypoints from the module manifest. */
+  entrypoints: string[];
 }
 
 export interface OverviewData {
@@ -21,7 +23,8 @@ export interface OverviewData {
   projectDescription: string | null;
   modules: OverviewModule[];
   omittedModuleCount: number;
-  gitContextOverview: string | null;
+  /** Detected source languages (e.g. ["ts", "js", "py"]). */
+  detectedLanguages: string[] | null;
 }
 
 // ── Inspect use-case ─────────────────────────────────────────────────

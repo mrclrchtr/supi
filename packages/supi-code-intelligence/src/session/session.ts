@@ -1,6 +1,7 @@
 /**
  * Workspace code-intelligence session.
  *
+ *
  * Per-workspace module that owns session-scoped state (targets, plans,
  * Capability Warnings) and provides typed workflow methods for all
  * public code_* tools. Tool executors receive this session explicitly
@@ -169,6 +170,9 @@ export class WorkspaceCodeIntelligenceSession {
    */
   #lspController: LspRuntimeController | null = null;
 
+  /** Workspace sentinel snapshot for change detection across explicit queries. */
+  #sentinelSnapshot: Map<string, number> = new Map();
+
   constructor(cwd: string, capability?: CapabilityAdapter) {
     this.cwd = cwd;
     this.#capability = capability ?? new WorkspaceCapabilityAdapter();
@@ -177,6 +181,14 @@ export class WorkspaceCodeIntelligenceSession {
   /** Attach lifecycle-owned LSP state without exposing it to Tool adapters. */
   attachLspController(controller: LspRuntimeController | null): void {
     this.#lspController = controller;
+  }
+
+  /**
+   * Seed the sentinel snapshot from lifecycle-owned state after session start.
+   * Called by the extension entry point after LSP initialization.
+   */
+  seedSentinelSnapshot(snapshot: Map<string, number>): void {
+    this.#sentinelSnapshot = snapshot;
   }
 
   /** Restore overview state from the active session branch. */
@@ -255,6 +267,7 @@ export class WorkspaceCodeIntelligenceSession {
         trackRefresh: () => {
           this.#lastHealthRefresh = Date.now();
         },
+        sentinelSnapshot: this.#sentinelSnapshot,
       },
       control,
     );
@@ -394,6 +407,7 @@ export class WorkspaceCodeIntelligenceSession {
     this.#workflowTargets.clear();
     this.#surfacedInstructionDirs.clear();
     this.#nativeInstructionPaths.clear();
+    this.#sentinelSnapshot.clear();
     this.#capabilityWarningState.reset();
     this.#lspController = null;
   }

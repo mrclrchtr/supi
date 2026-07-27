@@ -55,6 +55,7 @@ async function run(lspState: WorkspaceLspRuntimeState, semantic: CapabilityState
       lspController: { getMissingServers: () => [] } as never,
       lastRefresh: undefined,
       trackRefresh: () => undefined,
+      sentinelSnapshot: new Map(),
     },
   );
 }
@@ -127,6 +128,7 @@ describe("semantic health state", () => {
         lspController: { getMissingServers: () => [] } as never,
         lastRefresh: undefined,
         trackRefresh: () => undefined,
+        sentinelSnapshot: new Map(),
       },
     );
 

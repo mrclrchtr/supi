@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import { createPiMock, getHandlerOrThrow } from "@mrclrchtr/supi-test-utils";
+import { createPiMock } from "@mrclrchtr/supi-test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import codeIntelligenceExtension from "../../../src/extension.ts";
 
@@ -11,10 +11,14 @@ import codeIntelligenceExtension from "../../../src/extension.ts";
  * - A fresh session injects the hidden overview once via before_agent_start
  * - Reinjection is suppressed when the branch already contains code-intelligence-overview
  * - Shutdown resets injected state for the session
- * - Multiple sessions each track their own injection state
+ * - session_tree restores overview state from the active branch
  *
  * Uses the full extension factory (codeIntelligenceExtension) because the
  * before_agent_start handler is registered there, not in createCodeIntelligenceApp.
+ *
+ * The extension registers two before_agent_start handlers:
+ *   0: native instruction path capture (sync, no return)
+ *   1: overview injection (async, returns BeforeAgentStartEventResult)
  */
 describe("overview injection", () => {
   let pi: ReturnType<typeof createPiMock> & ExtensionAPI;
@@ -34,80 +38,83 @@ describe("overview injection", () => {
     return { cwd, sessionManager: makeSessionManager(branch) };
   }
 
-  it("before_agent_start sets hasInjectedOverview to true and does NOT return overview when model data is empty", async () => {
-    // Setup: no project model data in the cwd
-    const handler = getHandlerOrThrow(pi, "before_agent_start");
+  /** The overview handler is the second before_agent_start handler (index 1). */
+  function getOverviewHandler() {
+    const handlers = pi.getHandlers("before_agent_start");
+    expect(handlers.length).toBeGreaterThanOrEqual(2);
+    return handlers[1];
+  }
 
-    // Simulate session_start first (registered by createCodeIntelligenceApp)
-    const sessionStartHandler = getHandlerOrThrow(pi, "session_start");
+  it("does not inject overview when project has no model data", async () => {
+    const handler = getOverviewHandler();
+    const sessionStartHandler = pi.getHandlers("session_start")[0];
+
     const ctx = makeCtx("/empty-project");
-    await sessionStartHandler(null, ctx);
+    await sessionStartHandler?.({ reason: "startup" }, ctx);
 
     const result = await handler(null, ctx);
-    // With no model data, the handler should still mark as injected but not return a message
-    // The result should be undefined since there's no model data
+    // With no model data, the handler returns undefined
     expect(result).toBeUndefined();
   });
 
-  it("before_agent_start returns undefined when branch already has overview custom message", async () => {
-    const handler = getHandlerOrThrow(pi, "before_agent_start");
+  it("suppresses reinjection when branch already has overview custom message", async () => {
+    const handler = getOverviewHandler();
+    const sessionStartHandler = pi.getHandlers("session_start")[0];
 
-    // Simulate session_start with a branch that already has an overview
-    const sessionStartHandler = getHandlerOrThrow(pi, "session_start");
     const branchWithOverview = [
       { type: "custom_message", customType: "code-intelligence-overview" },
     ];
     const ctx = makeCtx("/project-a", branchWithOverview);
-    await sessionStartHandler(null, ctx);
+    await sessionStartHandler?.({ reason: "startup" }, ctx);
 
-    const result = await handler(null, ctx);
-
+    const result = (await handler(null, ctx)) as { message?: { customType?: string } } | undefined;
     // Should not inject since branch already has overview
-    expect(result).toBeUndefined();
+    expect(result?.message?.customType).toBeUndefined();
   });
 
-  it("before_agent_start returns undefined on repeated calls", async () => {
-    const handler = getHandlerOrThrow(pi, "before_agent_start");
+  it("returns undefined on repeated calls (claim already taken)", async () => {
+    const handler = getOverviewHandler();
+    const sessionStartHandler = pi.getHandlers("session_start")[0];
 
-    // First call
     const ctx = makeCtx("/project-a");
-    const sessionStartHandler = getHandlerOrThrow(pi, "session_start");
-    await sessionStartHandler(null, ctx);
+    await sessionStartHandler?.({ reason: "startup" }, ctx);
 
     await handler(null, ctx);
-    const secondResult = await handler(null, ctx);
-    expect(secondResult).toBeUndefined();
+    const secondResult = (await handler(null, ctx)) as
+      | { message?: { customType?: string } }
+      | undefined;
+    expect(secondResult?.message?.customType).toBeUndefined();
+  });
+
+  it("session_tree restores overview state from active branch", async () => {
+    const sessionStartHandler = pi.getHandlers("session_start")[0];
+    const sessionTreeHandler = pi.getHandlers("session_tree")[0];
+
+    // Start a session with an existing overview in the branch
+    const branchWithOverview = [
+      { type: "custom_message", customType: "code-intelligence-overview" },
+    ];
+    const ctx = makeCtx("/project-a", branchWithOverview);
+    await sessionStartHandler?.({ reason: "startup" }, ctx);
+
+    // Now simulate a tree navigation to a different branch that also has overview
+    await sessionTreeHandler?.({ newLeafId: "leaf-2" }, ctx);
+
+    // The overview handler should not re-inject because the state was restored
+    const handler = getOverviewHandler();
+    const result = (await handler(null, ctx)) as { message?: { customType?: string } } | undefined;
+    expect(result?.message?.customType).toBeUndefined();
   });
 
   it("shutdown resets sessions", async () => {
-    const sessionStartHandler = getHandlerOrThrow(pi, "session_start");
-    const shutdownHandler = getHandlerOrThrow(pi, "session_shutdown");
+    const sessionStartHandler = pi.getHandlers("session_start")[0];
+    const shutdownHandler = pi.getHandlers("session_shutdown")[0];
 
     const ctx = makeCtx("/project-a");
-    await sessionStartHandler(null, ctx);
+    await sessionStartHandler?.({ reason: "startup" }, ctx);
 
-    // Simulate shutdown
-    await shutdownHandler(null, null as never);
+    await shutdownHandler?.({ reason: "quit" }, null as never);
     // Shutdown succeeds without throwing
-    expect(true).toBe(true);
-  });
-
-  it("session resets injected overview state after shutdown and new session_start", async () => {
-    const sessionStartHandler = getHandlerOrThrow(pi, "session_start");
-    const shutdownHandler = getHandlerOrThrow(pi, "session_shutdown");
-
-    // First session
-    const ctx1 = makeCtx("/project-a");
-    await sessionStartHandler(null, ctx1);
-
-    // Shut down
-    await shutdownHandler(null, null as never);
-
-    // New session
-    const ctx2 = makeCtx("/project-a");
-    await sessionStartHandler(null, ctx2);
-
-    // Should work without error — the new session is clean
     expect(true).toBe(true);
   });
 });

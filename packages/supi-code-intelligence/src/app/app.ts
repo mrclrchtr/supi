@@ -76,19 +76,13 @@ export function createCodeIntelligenceApp(pi: ExtensionAPI): CodeIntelligenceApp
 
   pi.on("session_start", (_event, ctx) => {
     const session = manager.getOrCreateSession(ctx.cwd);
+    restoreBranchOverviewState(session, ctx.sessionManager.getBranch());
+  });
 
-    // Check if the branch already contains an overview and restore branch-local instruction state.
-    const branch = ctx.sessionManager.getBranch();
-    session.reconstructInstructionState(branch);
-    for (const entry of branch) {
-      if (
-        entry.type === "custom_message" &&
-        (entry as { customType?: string }).customType === OVERVIEW_CUSTOM_TYPE
-      ) {
-        session.restoreOverviewInjection();
-        break;
-      }
-    }
+  pi.on("session_tree", (_event, ctx) => {
+    const session = manager.getSession(ctx.cwd);
+    if (!session) return;
+    restoreBranchOverviewState(session, ctx.sessionManager.getBranch());
   });
 
   pi.on("session_compact", (_event, ctx) => {
@@ -102,6 +96,27 @@ export function createCodeIntelligenceApp(pi: ExtensionAPI): CodeIntelligenceApp
     }
     manager.shutdown();
   });
+
+  /**
+   * Restore overview injection state from a branch.
+   *
+   * Reconstructs instruction-file state and checks whether this branch
+   * already contains a code-intelligence-overview custom message.
+   */
+  function restoreBranchOverviewState(
+    session: WorkspaceCodeIntelligenceSession,
+    branch: unknown[],
+  ): void {
+    session.reconstructInstructionState(
+      branch as Parameters<typeof session.reconstructInstructionState>[0],
+    );
+    for (const entry of branch as Array<{ type?: string; customType?: string }>) {
+      if (entry.type === "custom_message" && entry.customType === OVERVIEW_CUSTOM_TYPE) {
+        session.restoreOverviewInjection();
+        return;
+      }
+    }
+  }
 
   return {
     getSession(cwd: string): WorkspaceCodeIntelligenceSession | undefined {

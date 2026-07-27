@@ -122,10 +122,9 @@ describe("generateOverview", () => {
 
     const model = await buildArchitectureModel(tmpDir);
     const overview = generateOverview(model as NonNullable<typeof model>);
-    expect(overview).toContain("## Git Context");
-    expect(overview).toContain("Branch: `main`");
-    expect(overview).toContain("Working tree clean.");
-    expect(overview).toContain("Last commit: `init`");
+    // Overview no longer includes Git context (removed per #207).
+    expect(overview).toContain("## Modules");
+    expect(overview).toContain("_(session snapshot)_");
   });
 });
 

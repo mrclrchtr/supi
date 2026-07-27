@@ -4,8 +4,7 @@
 // are deprecated and ignored. Per-language disable via
 // `lsp.servers.<language>.enabled: false` is the only supported opt-out.
 //
-// Uses the declarative settings schema with:
-// - severity: number with labeled values
+// Registered fields:
 // - exclude: stringList
 // - disabled_servers: custom submenu that writes per-language disable config
 
@@ -23,7 +22,6 @@ import { type LspSettings, loadConfig } from "@mrclrchtr/supi-lsp/api";
 
 const LSP_DEFAULTS: LspSettings = {
   enabled: true,
-  severity: 1,
   active: [],
   exclude: [],
 };
@@ -138,13 +136,6 @@ export function registerLspSettings(pi: ExtensionAPI): void {
     section: "lsp",
     defaults: LSP_DEFAULTS,
     fields: [
-      {
-        kind: "number" as const,
-        key: "severity",
-        label: "Inline Severity",
-        description: "Minimum diagnostic severity to show inline (1=errors, 4=hints)",
-        values: ["1", "2", "3", "4"],
-      },
       {
         kind: "stringList" as const,
         key: "exclude",

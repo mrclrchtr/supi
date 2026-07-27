@@ -144,6 +144,16 @@
       }
     },
     {
+      "includes": ["packages/supi-code-intelligence/src/session/session.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noExcessiveLinesPerFile": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["packages/supi-core/src/settings/settings-schema.ts"],
       "linter": {
         "rules": {

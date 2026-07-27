@@ -68,9 +68,9 @@ describe("LSP settings UI", () => {
     // Removed items
     expect(keys).not.toContain("enabled");
     expect(keys).not.toContain("active");
+    expect(keys).not.toContain("severity");
 
-    // Added items
-    expect(keys).toContain("severity");
+    // Present items
     expect(keys).toContain("disabled_servers");
     expect(keys).toContain("exclude");
 
@@ -78,10 +78,5 @@ describe("LSP settings UI", () => {
     const disabledServers = fields.find((f) => f.key === "disabled_servers");
     expect(disabledServers?.kind).toBe("custom");
     expect(disabledServers?.submenu).toBeDefined();
-
-    // Severity is a number field with discrete values
-    const severity = fields.find((f) => f.key === "severity");
-    expect(severity?.kind).toBe("number");
-    expect((severity as { values?: string[] })?.values).toEqual(["1", "2", "3", "4"]);
   });
 });

@@ -36,7 +36,7 @@ describe("loadLspSettings (from new lsp-settings module)", () => {
   it("returns defaults when no config exists", () => {
     const tmpDir = makeProjectDir();
     const result = loadLspSettings(tmpDir, tmpDir);
-    expect(result).toEqual({ enabled: true, severity: 1, active: [], exclude: [] });
+    expect(result).toEqual({ enabled: true, active: [], exclude: [] });
   });
 
   it("reads from project .pi/supi config", () => {
@@ -44,12 +44,12 @@ describe("loadLspSettings (from new lsp-settings module)", () => {
     fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, ".pi", "supi", "config.json"),
-      JSON.stringify({ lsp: { enabled: false, severity: 2 } }),
+      JSON.stringify({ lsp: { enabled: false, exclude: ["**/*.test.ts"] } }),
     );
 
     const result = loadLspSettings(tmpDir);
     expect(result.enabled).toBe(false);
-    expect(result.severity).toBe(2);
+    expect(result.exclude).toEqual(["**/*.test.ts"]);
   });
 });
 

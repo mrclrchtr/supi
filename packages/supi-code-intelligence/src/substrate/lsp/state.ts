@@ -15,32 +15,21 @@ export interface LspInspectorState {
  * In-memory state for the umbrella LSP adapter.
  *
  * Wraps the LspRuntimeController and tracks session-level state
- * for diagnostic injection, stale detection, and UI updates.
+ * for sentinel change detection and UI updates.
  */
 export interface LspAdapterState {
   controller: LspRuntimeController | null;
-  inlineSeverity: number;
   inspector: LspInspectorState;
-  lastDiagnosticsFingerprint: string | null;
-  currentContextToken: string | null;
-  contextCounter: number;
   lspActive: boolean;
-  staleSuspected: boolean;
-  lastWorkspaceChangeAt: number;
+  /** Snapshot of workspace sentinel files (package.json, tsconfig, lockfiles) for change detection. */
   sentinelSnapshot: Map<string, number>;
 }
 
 export function createLspAdapterState(): LspAdapterState {
   return {
     controller: null,
-    inlineSeverity: 1,
     inspector: { handle: null, close: null },
-    lastDiagnosticsFingerprint: null,
-    currentContextToken: null,
-    contextCounter: 0,
     lspActive: false,
-    staleSuspected: false,
-    lastWorkspaceChangeAt: 0,
     sentinelSnapshot: new Map(),
   };
 }

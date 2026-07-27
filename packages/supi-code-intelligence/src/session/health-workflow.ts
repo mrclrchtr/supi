@@ -18,6 +18,7 @@ import {
 import { describeStructuralState, maybeRecover } from "../analysis/health/recovery.ts";
 import { collectGitContext, collectServers } from "../analysis/health/signals.ts";
 import { resolveScope } from "../analysis/search/paths.ts";
+import { refreshLspMaintenance } from "../substrate/lsp/maintenance.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import type {
   HealthData,
@@ -38,9 +39,12 @@ export interface HealthWorkflowDeps {
   readonly lspController: LspRuntimeController | null;
   readonly lastRefresh: number | undefined;
   readonly trackRefresh: () => void;
+  /** Workspace sentinel snapshot for change detection. */
+  readonly sentinelSnapshot: Map<string, number>;
 }
 
 /** Collect health facts without rendering a public result. */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: health workflow orchestrates multiple diagnostic/semantic/structural collection paths
 export async function runHealthWorkflow(
   input: HealthWorkflowInput,
   deps: HealthWorkflowDeps,
@@ -62,15 +66,35 @@ export async function runHealthWorkflow(
   const capabilityStates = deps.capability.getCapabilityStates(deps.cwd);
   const runtime = lspState.kind === "ready" ? lspState.runtime : null;
   const serverInventoryAvailable = lspState.kind === "ready" || lspState.kind === "disabled";
-  const refreshAttempted = await prepareDiagnosticRefresh({
-    runtime,
-    request,
-    included,
-    scopeFilter,
-  });
+
+  // When refresh is requested and diagnostics are included, run sentinel-sync,
+  // stale-module resync, prune, and refresh before recovery.
+  const refreshRequested =
+    request.refresh === true && included.includes("diagnostics") && runtime !== null;
+  if (refreshRequested) {
+    reportProgress(control, {
+      intent: "health",
+      phase: "maintenance",
+      message: "Refreshing LSP state and sentinel snapshot",
+    });
+    const nextSnapshot = await refreshLspMaintenance(runtime, deps.cwd, deps.sentinelSnapshot);
+    // Update the caller's snapshot reference.
+    deps.sentinelSnapshot.clear();
+    for (const [key, value] of nextSnapshot) {
+      deps.sentinelSnapshot.set(key, value);
+    }
+    if (isScopedFile(scopeFilter)) {
+      try {
+        await runtime.waitUntilReadyForFile(scopeFilter);
+      } catch {
+        // Recovery still gets a chance to restart a failed routed client.
+      }
+    }
+  }
+
   const recovery = await maybeRecover({
-    service: refreshAttempted ? runtime : null,
-    refresh: refreshAttempted,
+    service: refreshRequested ? runtime : null,
+    refresh: refreshRequested,
     progress: () =>
       reportProgress(control, {
         intent: "health",
@@ -78,7 +102,7 @@ export async function runHealthWorkflow(
         message: "Refreshing diagnostics and recovery state",
       }),
   });
-  if (refreshAttempted) deps.trackRefresh();
+  if (refreshRequested) deps.trackRefresh();
   const semanticState = await establishSemanticHealthState({
     requested: semanticRequested,
     runtime,
@@ -108,7 +132,7 @@ export async function runHealthWorkflow(
   const diagnosticAgeSeconds = getDiagnosticAgeSeconds(
     included,
     deps.lastRefresh,
-    refreshAttempted,
+    refreshRequested,
   );
 
   const data: HealthData = {
@@ -197,24 +221,6 @@ function deriveReadyOwnerWithoutServerState(
     case "ready":
       return { kind: "pending", reason: "No active, ready project servers" };
   }
-}
-
-async function prepareDiagnosticRefresh(options: {
-  runtime: WorkspaceLspRuntime | null;
-  request: HealthWorkflowInput;
-  included: readonly HealthSection[];
-  scopeFilter: string | null;
-}): Promise<boolean> {
-  const requested = options.request.refresh === true && options.included.includes("diagnostics");
-  if (!requested || !options.runtime) return false;
-  if (isScopedFile(options.scopeFilter)) {
-    try {
-      await options.runtime.waitUntilReadyForFile(options.scopeFilter);
-    } catch {
-      // Recovery still gets a chance to restart a failed routed client.
-    }
-  }
-  return true;
 }
 
 async function collectOptionalCodeActions(options: {
