@@ -54,4 +54,32 @@ describe("agent review schemas", () => {
   ])("rejects mismatched mode fields", (input) => {
     expect(() => parseRunReviewToolInput(input)).toThrow();
   });
+
+  it("is lenient about extraneous fields on the target", () => {
+    // Comparison with both baseCommit and commit — should ignore commit
+    expect(
+      parseRunReviewToolInput({
+        mode: "direct",
+        target: { kind: "comparison", baseCommit: commit, commit },
+        review,
+      }),
+    ).toEqual({
+      mode: "direct",
+      target: { kind: "comparison", baseCommit: commit },
+      review,
+    });
+
+    // Commit with both baseCommit and commit — should ignore baseCommit
+    expect(
+      parseRunReviewToolInput({
+        mode: "direct",
+        target: { kind: "commit", commit, baseCommit: commit },
+        review,
+      }),
+    ).toEqual({
+      mode: "direct",
+      target: { kind: "commit", commit },
+      review,
+    });
+  });
 });

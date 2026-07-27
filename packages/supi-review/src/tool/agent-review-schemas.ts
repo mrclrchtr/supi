@@ -73,16 +73,22 @@ function parseTarget(input: {
   baseCommit?: string;
   commit?: string;
 }): ReviewTargetSpec {
-  if (input.kind === "working-tree" && !input.baseCommit && !input.commit) {
+  if (input.kind === "working-tree") {
     return { kind: "working-tree" };
   }
-  if (input.kind === "comparison" && input.baseCommit && !input.commit) {
+  if (input.kind === "comparison") {
+    if (!input.baseCommit) {
+      throw new Error(`Comparison targets require a baseCommit (full 40- or 64-char commit id).`);
+    }
     return { kind: "comparison", baseCommit: input.baseCommit };
   }
-  if (input.kind === "commit" && input.commit && !input.baseCommit) {
+  if (input.kind === "commit") {
+    if (!input.commit) {
+      throw new Error(`Commit targets require a commit field (full 40- or 64-char commit id).`);
+    }
     return { kind: "commit", commit: input.commit };
   }
-  throw new Error(`Target fields do not match target kind "${input.kind}".`);
+  throw new Error(`Unknown target kind "${input.kind}".`);
 }
 
 /** Validate and narrow preparation input after provider-level JSON parsing. */

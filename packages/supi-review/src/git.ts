@@ -131,9 +131,16 @@ async function comparisonSnapshot(
     resolveCommit(cwd, requested.baseCommit),
     headCommit(cwd),
   ]);
-  if (!base || !head) return undefined;
+  if (!base) {
+    throw new Error(`Commit ${requested.baseCommit.slice(0, 7)} not found in this repository.`);
+  }
+  if (!head) {
+    throw new Error("No HEAD commit found in this repository.");
+  }
   const mergeBase = (await gitAllowExit(cwd, ["merge-base", base, head], [1])).trim();
-  if (!mergeBase) return undefined;
+  if (!mergeBase) {
+    throw new Error(`No common ancestor between ${base.slice(0, 7)} and ${head.slice(0, 7)}.`);
+  }
   const [diffText, names] = await Promise.all([
     git(cwd, ["diff", ...DIFF_FLAGS, mergeBase, head]),
     git(cwd, ["diff", "--name-only", "-z", mergeBase, head]),
@@ -160,7 +167,9 @@ async function commitSnapshot(
   requested: Extract<ReviewTargetSpec, { kind: "commit" }>,
 ): Promise<ReviewSnapshot | undefined> {
   const commit = await resolveCommit(cwd, requested.commit);
-  if (!commit) return undefined;
+  if (!commit) {
+    throw new Error(`Commit ${requested.commit.slice(0, 7)} not found in this repository.`);
+  }
   const parent = await commitParent(cwd, commit);
   const [diffText, names] = await Promise.all([
     parent

@@ -119,13 +119,24 @@ function plannerPrompt(snapshot: ReviewSnapshot, context: string): string {
   ].join("\n");
 }
 
+/** Translate a resolveReviewSnapshot error to a no-target reason. */
+function snapshotErrorReason(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return "No reviewable changes found.";
+}
+
 /** Resolve and store a one-shot plan, optionally asking the advisory Planner for tasks. */
 export async function prepareReview(input: PrepareReviewInput) {
   input.onUpdate?.({
     content: [{ type: "text", text: "Resolving target…" }],
     details: {},
   });
-  const snapshot = await resolveReviewSnapshot(input.cwd, input.target);
+  let snapshot: Awaited<ReturnType<typeof resolveReviewSnapshot>>;
+  try {
+    snapshot = await resolveReviewSnapshot(input.cwd, input.target);
+  } catch (error) {
+    return { kind: "no-target" as const, reason: snapshotErrorReason(error) };
+  }
   if (!snapshot) return { kind: "no-target" as const, reason: "No reviewable changes found." };
   let plannerDraft: PlannerDraft | undefined;
   if (input.planning === "suggest") {
@@ -258,7 +269,12 @@ export async function runReview(input: RunReviewInput) {
   let provenance: ReviewBatchDetails["provenance"] = "caller-supplied";
 
   if (input.mode === "direct") {
-    const resolved = await resolveReviewSnapshot(input.cwd, input.target);
+    let resolved: Awaited<ReturnType<typeof resolveReviewSnapshot>>;
+    try {
+      resolved = await resolveReviewSnapshot(input.cwd, input.target);
+    } catch (error) {
+      return { kind: "no-target" as const, reason: snapshotErrorReason(error) };
+    }
     if (!resolved) return { kind: "no-target" as const, reason: "No reviewable changes found." };
     snapshot = resolved;
     review = normalizeReviewInput(input.review);
