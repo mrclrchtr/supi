@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.1.0](https://github.com/mrclrchtr/supi/compare/v3.0.0...v3.1.0) (2026-07-27)
+
+
+### Features
+
+* **supi-review:** replace JSON editor with step-by-step task wizard ([0f686ba](https://github.com/mrclrchtr/supi/commit/0f686ba7cfd55e5bcaf2b83c0cc19a6ff2e0ebb8))
+
+
+### Bug Fixes
+
+* **supi-review:** accept short commit hashes and resolve to full ids ([70d3e1b](https://github.com/mrclrchtr/supi/commit/70d3e1b898a1f2d288dd2f747263ef14284dfb27))
+* **supi-review:** make target parsing lenient and report specific snapshot errors ([a56db12](https://github.com/mrclrchtr/supi/commit/a56db1258aa927a35907abb16e36c2561449aa1d))
+* **supi-review:** surface model error details in failed review diagnostics ([82afc31](https://github.com/mrclrchtr/supi/commit/82afc31c3cde6e342dcc75fcdfe319aed94e039e))
+
 ## [3.0.0](https://github.com/mrclrchtr/supi/compare/v2.8.0...v3.0.0) (2026-07-27)
 
 
