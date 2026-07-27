@@ -1,6 +1,5 @@
 import { buildSessionContext, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Box } from "@earendil-works/pi-tui";
-import { Value } from "typebox/value";
 import { loadReviewConfig, registerReviewSettings } from "./config.ts";
 import { listLocalBranches, listRecentCommits } from "./git.ts";
 import { collectPlannerContext } from "./history/collect.ts";
@@ -8,8 +7,7 @@ import { getSelectableReviewModels, resolveAgentReviewModel } from "./model.ts";
 import { ReviewPlanStore } from "./session/review-plan-store.ts";
 import { formatReviewBatch, registerAgentReviewTools } from "./tool/agent-review-tools.ts";
 import { pageText } from "./tool/output-page.ts";
-import { normalizeReviewInput, prepareReview, runReview } from "./tool/review-workflow.ts";
-import { reviewInputSchema } from "./tool/schemas.ts";
+import { prepareReview, runReview } from "./tool/review-workflow.ts";
 import { renderRunResult } from "./tui/run.ts";
 import type { ReviewInput, ReviewModelSelection, ReviewTargetSpec } from "./types.ts";
 
@@ -58,25 +56,59 @@ async function selectReviewerModel(ctx: CommandContext): Promise<ReviewModelSele
   return models.find((model) => model.canonicalId === id);
 }
 
-/** Parse editor JSON through the same structural and semantic contract as agent input. */
-export async function editReview(
+/** Edit one task's instructions via a focused editor. Returns undefined on cancel. */
+async function editTaskInstructions(
   ctx: CommandContext,
-  review: ReviewInput,
-): Promise<ReviewInput | undefined> {
-  const text = await ctx.ui.editor("Edit review tasks (JSON)", JSON.stringify(review, null, 2));
-  if (text === undefined) return undefined;
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (!Value.Check(reviewInputSchema, parsed)) {
-      ctx.ui.notify("Review tasks do not match the required review schema.", "error");
-      return undefined;
-    }
-    return normalizeReviewInput(parsed);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Review tasks must be valid JSON.";
-    ctx.ui.notify(message, "error");
+  opts: { index: number; taskCount: number; id: string; defaultInstructions: string },
+): Promise<string | undefined> {
+  const { index, taskCount, id, defaultInstructions } = opts;
+  const label = taskCount > 1 ? `Task ${index + 1} of ${taskCount}: ${id}` : `Task: ${id}`;
+  const instructions = await ctx.ui.editor(label, defaultInstructions);
+  if (instructions === undefined) return undefined;
+  if (!instructions.trim()) {
+    ctx.ui.notify("Task instructions must not be blank.", "error");
     return undefined;
   }
+  return instructions.trim();
+}
+
+/** Step-by-step wizard: edit each task's instructions in its own focused editor. */
+async function editReviewInteractive(
+  ctx: CommandContext,
+  review: ReviewInput,
+  { allowResize }: { allowResize: boolean },
+): Promise<ReviewInput | undefined> {
+  let taskCount = review.tasks.length;
+
+  if (allowResize) {
+    const countStr = await ctx.ui.select("How many review tasks?", ["1", "2", "3", "4"]);
+    if (!countStr) return undefined;
+    taskCount = Number(countStr);
+  }
+
+  const tasks: ReviewInput["tasks"] = [];
+  for (let i = 0; i < taskCount; i++) {
+    const existing = review.tasks[i];
+    const id = existing?.id ?? `task-${i + 1}`;
+    const defaultInstructions = existing?.instructions ?? "";
+
+    const instructions = await editTaskInstructions(ctx, {
+      index: i,
+      taskCount,
+      id,
+      defaultInstructions,
+    });
+    if (instructions === undefined) return undefined;
+    tasks.push({ id, instructions });
+  }
+
+  const result: ReviewInput = { tasks };
+  if (review.sharedContext) {
+    const sharedContext = await ctx.ui.editor("Shared context (optional)", review.sharedContext);
+    if (sharedContext === undefined) return undefined;
+    if (sharedContext.trim()) result.sharedContext = sharedContext.trim();
+  }
+  return result;
 }
 
 async function runCommand(
@@ -89,12 +121,15 @@ async function runCommand(
   if (!target) return;
   const reviewerModel = await selectReviewerModel(ctx);
   if (!reviewerModel) return;
-  const planning = await ctx.ui.select("Review planning", ["Write tasks", "Suggest tasks"]);
+  const planning = await ctx.ui.select("Review planning", [
+    "Write my own tasks",
+    "AI suggests tasks",
+  ]);
   if (!planning) return;
 
   let review = DEFAULT_REVIEW;
   let planId: string | undefined;
-  if (planning === "Suggest tasks") {
+  if (planning === "AI suggests tasks") {
     const config = loadReviewConfig(ctx.cwd);
     const plannerModel = resolveAgentReviewModel(ctx, config.plannerModel);
     if (!plannerModel) {
@@ -122,7 +157,9 @@ async function runCommand(
     planId = outcome.plan.id;
   }
 
-  const edited = await editReview(ctx, review);
+  const edited = await editReviewInteractive(ctx, review, {
+    allowResize: planning === "Write my own tasks",
+  });
   if (!edited) return;
   const approved = await ctx.ui.confirm(
     "Run review?",
