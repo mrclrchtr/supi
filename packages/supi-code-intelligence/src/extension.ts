@@ -16,7 +16,7 @@ import {
 } from "./substrate/tree-sitter/lifecycle.ts";
 import { registerCodeIntelligenceTools } from "./tool/register.ts";
 import { registerLspFooterContribution } from "./ui/footer.ts";
-import { renderOverview } from "./ui/markdown/overview.ts";
+import { estimateTokens, OVERVIEW_TOKEN_BUDGET, renderOverview } from "./ui/markdown/overview.ts";
 import { buildOverviewData } from "./ui/markdown/overview-data.ts";
 import { registerCiStatusCommand } from "./ui/status-command.ts";
 
@@ -126,13 +126,13 @@ export default function codeIntelligenceExtension(
       const overview = renderOverview(data);
       if (!overview) return;
 
-      const estimatedTokens = Math.ceil(overview.length / 4);
-      if (estimatedTokens > 600) {
+      const estimatedTokens = estimateTokens(overview);
+      if (estimatedTokens > OVERVIEW_TOKEN_BUDGET) {
         pi.events.emit("supi:debug", {
           source: "supi-code-intelligence",
           level: "warning",
           category: "overview",
-          message: `Overview exceeds soft token budget: ${estimatedTokens} tokens (budget: 600)`,
+          message: `Overview exceeds soft token budget: ${estimatedTokens} tokens (budget: ${OVERVIEW_TOKEN_BUDGET})`,
         });
       }
 

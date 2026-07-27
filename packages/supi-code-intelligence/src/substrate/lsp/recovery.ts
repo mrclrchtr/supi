@@ -17,25 +17,33 @@ import type { LspAdapterState } from "./state.ts";
 const MUTATING_TOOL_NAMES = new Set(["write", "edit", "code_refactor_apply"]);
 
 export function registerWorkspaceRecoveryHandler(pi: ExtensionAPI, state: LspAdapterState): void {
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: handler branches per tool name; extracting helpers would add indirection
   pi.on("tool_result", async (event: ToolResultEvent, _ctx: ExtensionContext) => {
     const runtime = state.controller?.workspaceRuntime;
     if (!runtime || event.isError) return;
     if (!MUTATING_TOOL_NAMES.has(event.toolName)) return;
 
-    const filePath = getFilePathFromToolResult(event);
-    if (!filePath) return;
+    const filePaths =
+      event.toolName === "code_refactor_apply"
+        ? getRefactorApplyPaths(event)
+        : [getFilePathFromToolResult(event)].filter((p): p is string => p !== null);
 
-    // Normalize @-prefixed paths (pi's built-in file tool convention)
-    const normalized = filePath.startsWith("@") ? filePath.slice(1) : filePath;
-    const resolved = nodePath.resolve(state.controller?.cwd ?? "", normalized);
+    if (filePaths.length === 0) return;
 
-    // Invalidate tsconfig cache when config files change
-    const ext = nodePath.extname(resolved).toLowerCase();
-    if (ext === ".json" || ext === ".jsonc") {
-      clearTsconfigCache();
+    const cwd = state.controller?.cwd ?? "";
+    for (const filePath of filePaths) {
+      // Normalize @-prefixed paths (pi's built-in file tool convention)
+      const normalized = filePath.startsWith("@") ? filePath.slice(1) : filePath;
+      const resolved = nodePath.resolve(cwd, normalized);
+
+      // Invalidate tsconfig cache when config files change
+      const ext = nodePath.extname(resolved).toLowerCase();
+      if (ext === ".json" || ext === ".jsonc") {
+        clearTsconfigCache();
+      }
+
+      runtime.noteWorkspaceChanges([{ uri: filePathToUri(resolved), type: 2 }]);
     }
-
-    runtime.noteWorkspaceChanges([{ uri: filePathToUri(resolved), type: 2 }]);
   });
 }
 
@@ -50,4 +58,14 @@ function getFilePathFromToolResult(event: ToolResultEvent): string | null {
 function filePathToUri(filePath: string): string {
   const normalized = filePath.replace(/\\/g, "/");
   return `file://${normalized.startsWith("/") ? "" : "/"}${normalized}`;
+}
+
+/** Extract changed file paths from a code_refactor_apply tool result. */
+function getRefactorApplyPaths(event: ToolResultEvent): string[] {
+  const details = (event as { details?: unknown }).details as
+    | { data?: { plan?: { edits?: { edits?: Array<{ file: string }> } } } }
+    | undefined;
+  const edits = details?.data?.plan?.edits?.edits;
+  if (!edits || edits.length === 0) return [];
+  return [...new Set(edits.map((edit) => edit.file))];
 }
