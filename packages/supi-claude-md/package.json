@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-claude-md",
-  "version": "2.8.0",
+  "version": "3.0.0",
   "description": "SuPi claude-md skills — CLAUDE.md/AGENTS.md maintenance workflows for pi",
   "license": "MIT",
   "repository": {

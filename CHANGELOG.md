@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.0.0](https://github.com/mrclrchtr/supi/compare/v2.8.0...v3.0.0) (2026-07-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **supi-review:** separate review policy from execution
+
+### Features
+
+* **supi-review:** add dual-surface TUI rendering for review tools ([74404a0](https://github.com/mrclrchtr/supi/commit/74404a0eff68795c356106126f66e1bc2f23b48d))
+* **supi-review:** separate review policy from execution ([88976d8](https://github.com/mrclrchtr/supi/commit/88976d89bfe5a8e56133224eae90b0aa5dae9a51))
+
+
+### Bug Fixes
+
+* **deps:** lock file maintenance ([b4d1d90](https://github.com/mrclrchtr/supi/commit/b4d1d906ac46fdf09dfd0d018ba6a11267b72e69))
+* **deps:** update pnpm to v11.17.0 ([a3d8027](https://github.com/mrclrchtr/supi/commit/a3d8027c82b8f6210d187c0b855ab59f52310fe6))
+* **supi-code-intelligence:** prevent test timeouts from slow dynamic imports ([bc05d29](https://github.com/mrclrchtr/supi/commit/bc05d29788b45c1b2d45090277d8ccafc63449d1))
+* **supi-review:** improve spinner lifecycle, error messages, and collapsed labels ([5c466ac](https://github.com/mrclrchtr/supi/commit/5c466ac146de7ac2a7edf36cae3418d6aafda4a7))
+
 ## [2.8.0](https://github.com/mrclrchtr/supi/compare/v2.7.0...v2.8.0) (2026-07-26)
 
 
