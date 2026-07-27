@@ -5,14 +5,26 @@
  * the evaluateCoverageWarnings API contract.
  */
 
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import type {
+  CoverageEvalInput,
+  CoverageWarningState as CoverageWarningStateType,
+} from "../../../../src/analysis/coverage/coverage-warnings.ts";
+
+let evaluateCoverageWarnings: (input: CoverageEvalInput) => {
+  hasWarnings: boolean;
+  warnings: Array<{ type: string; message: string; language?: string }>;
+};
+let CoverageWarningState: typeof CoverageWarningStateType;
 
 describe("evaluateCoverageWarnings", () => {
-  it("returns deprecation warning when lsp.enabled is present in config", async () => {
-    const { evaluateCoverageWarnings } = await import(
-      "../../../../src/analysis/coverage/coverage-warnings.ts"
-    );
+  beforeAll(async () => {
+    const mod = await import("../../../../src/analysis/coverage/coverage-warnings.ts");
+    evaluateCoverageWarnings = mod.evaluateCoverageWarnings;
+    CoverageWarningState = mod.CoverageWarningState;
+  });
 
+  it("returns deprecation warning when lsp.enabled is present in config", () => {
     const result = evaluateCoverageWarnings({
       deprecatedKeys: {
         projectEnabled: true,
@@ -31,11 +43,7 @@ describe("evaluateCoverageWarnings", () => {
     ).toBe(true);
   });
 
-  it("returns deprecation warning when lsp.active is present in config", async () => {
-    const { evaluateCoverageWarnings } = await import(
-      "../../../../src/analysis/coverage/coverage-warnings.ts"
-    );
-
+  it("returns deprecation warning when lsp.active is present in config", () => {
     const result = evaluateCoverageWarnings({
       deprecatedKeys: {
         projectEnabled: false,
@@ -54,11 +62,7 @@ describe("evaluateCoverageWarnings", () => {
     ).toBe(true);
   });
 
-  it("returns language-disabled warning for explicitly disabled language servers", async () => {
-    const { evaluateCoverageWarnings } = await import(
-      "../../../../src/analysis/coverage/coverage-warnings.ts"
-    );
-
+  it("returns language-disabled warning for explicitly disabled language servers", () => {
     const result = evaluateCoverageWarnings({
       deprecatedKeys: {
         projectEnabled: false,
@@ -77,11 +81,7 @@ describe("evaluateCoverageWarnings", () => {
     ).toBe(true);
   });
 
-  it("returns missing-server warning when a server binary is not on PATH", async () => {
-    const { evaluateCoverageWarnings } = await import(
-      "../../../../src/analysis/coverage/coverage-warnings.ts"
-    );
-
+  it("returns missing-server warning when a server binary is not on PATH", () => {
     const result = evaluateCoverageWarnings({
       deprecatedKeys: {
         projectEnabled: false,
@@ -100,11 +100,7 @@ describe("evaluateCoverageWarnings", () => {
     ).toBe(true);
   });
 
-  it("returns structural-unavailable warning when tree-sitter is unavailable", async () => {
-    const { evaluateCoverageWarnings } = await import(
-      "../../../../src/analysis/coverage/coverage-warnings.ts"
-    );
-
+  it("returns structural-unavailable warning when tree-sitter is unavailable", () => {
     const result = evaluateCoverageWarnings({
       deprecatedKeys: {
         projectEnabled: false,
@@ -121,11 +117,7 @@ describe("evaluateCoverageWarnings", () => {
     expect(result.warnings.some((w) => w.type === "structural-unavailable")).toBe(true);
   });
 
-  it("returns empty warnings when everything is healthy", async () => {
-    const { evaluateCoverageWarnings } = await import(
-      "../../../../src/analysis/coverage/coverage-warnings.ts"
-    );
-
+  it("returns empty warnings when everything is healthy", () => {
     const result = evaluateCoverageWarnings({
       deprecatedKeys: {
         projectEnabled: false,
@@ -143,11 +135,7 @@ describe("evaluateCoverageWarnings", () => {
   });
 
   describe("CoverageWarningState", () => {
-    it("respects grace period — no pending warnings before grace expires", async () => {
-      const { CoverageWarningState } = await import(
-        "../../../../src/analysis/coverage/coverage-warnings.ts"
-      );
-
+    it("respects grace period — no pending warnings before grace expires", () => {
       const state = new CoverageWarningState();
       const report = {
         hasWarnings: true,
@@ -159,11 +147,7 @@ describe("evaluateCoverageWarnings", () => {
       expect(pending).toEqual([]);
     });
 
-    it("deduplicates — same warning report not emitted twice", async () => {
-      const { CoverageWarningState } = await import(
-        "../../../../src/analysis/coverage/coverage-warnings.ts"
-      );
-
+    it("deduplicates — same warning report not emitted twice", () => {
       const state = new CoverageWarningState();
       const report = {
         hasWarnings: true,
@@ -174,11 +158,7 @@ describe("evaluateCoverageWarnings", () => {
       expect(state.getPendingWarnings(report, 0)).toEqual([]);
     });
 
-    it("does not consume emission state for an empty report", async () => {
-      const { CoverageWarningState } = await import(
-        "../../../../src/analysis/coverage/coverage-warnings.ts"
-      );
-
+    it("does not consume emission state for an empty report", () => {
       const state = new CoverageWarningState();
       expect(state.getPendingWarnings({ hasWarnings: false, warnings: [] }, 0)).toEqual([]);
       expect(state.hasEmitted).toBe(false);

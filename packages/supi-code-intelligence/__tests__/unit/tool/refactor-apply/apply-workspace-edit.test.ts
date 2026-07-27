@@ -1,10 +1,20 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { WorkspaceEdit } from "@mrclrchtr/supi-code-runtime/api";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+let applyWorkspaceEdit: (
+  edit: WorkspaceEdit,
+) => Promise<{ kind: string; filesChanged?: number; totalEdits?: number; reason?: string }>;
 
 describe("applyWorkspaceEdit", () => {
   let tmpDir: string;
+
+  beforeAll(async () => {
+    const mod = await import("../../../../src/tool/refactor-apply/apply.ts");
+    applyWorkspaceEdit = mod.applyWorkspaceEdit;
+  });
 
   beforeEach(() => {
     tmpDir = mkdtempSync(path.join(os.tmpdir(), "apply-workspace-edit-"));
@@ -27,8 +37,6 @@ describe("applyWorkspaceEdit", () => {
   }
 
   it("applies a single-file single-edit replacement", async () => {
-    const { applyWorkspaceEdit } = await import("../../../../src/tool/refactor-apply/apply.ts");
-
     write("a.ts", "hello old goodbye");
 
     const result = await applyWorkspaceEdit({
@@ -50,8 +58,6 @@ describe("applyWorkspaceEdit", () => {
   });
 
   it("applies multi-file edits atomically", async () => {
-    const { applyWorkspaceEdit } = await import("../../../../src/tool/refactor-apply/apply.ts");
-
     write("a.ts", "apple");
     write("b.ts", "banana");
 
@@ -76,8 +82,6 @@ describe("applyWorkspaceEdit", () => {
   });
 
   it("does not partially commit when a later write fails", async () => {
-    const { applyWorkspaceEdit } = await import("../../../../src/tool/refactor-apply/apply.ts");
-
     write("a.ts", "old-a");
     const lockedDir = absPath("locked");
     mkdirSync(lockedDir, { recursive: true });
@@ -112,8 +116,6 @@ describe("applyWorkspaceEdit", () => {
   });
 
   it("applies edits in descending offset order on the same line", async () => {
-    const { applyWorkspaceEdit } = await import("../../../../src/tool/refactor-apply/apply.ts");
-
     write("a.ts", "foo bar baz");
 
     const result = await applyWorkspaceEdit({
@@ -136,8 +138,6 @@ describe("applyWorkspaceEdit", () => {
   });
 
   it("applies multi-line edits correctly", async () => {
-    const { applyWorkspaceEdit } = await import("../../../../src/tool/refactor-apply/apply.ts");
-
     write("a.ts", "line1\nline2\nline3");
 
     const result = await applyWorkspaceEdit({
@@ -155,8 +155,6 @@ describe("applyWorkspaceEdit", () => {
   });
 
   it("returns error for out-of-range line indices", async () => {
-    const { applyWorkspaceEdit } = await import("../../../../src/tool/refactor-apply/apply.ts");
-
     write("a.ts", "short");
 
     const result = await applyWorkspaceEdit({
@@ -178,8 +176,6 @@ describe("applyWorkspaceEdit", () => {
   });
 
   it("returns error for character positions beyond the actual line length", async () => {
-    const { applyWorkspaceEdit } = await import("../../../../src/tool/refactor-apply/apply.ts");
-
     write("a.ts", "abc\n");
 
     const result = await applyWorkspaceEdit({
@@ -197,8 +193,6 @@ describe("applyWorkspaceEdit", () => {
   });
 
   it("returns error when a source file does not exist", async () => {
-    const { applyWorkspaceEdit } = await import("../../../../src/tool/refactor-apply/apply.ts");
-
     const result = await applyWorkspaceEdit({
       edits: [
         {
@@ -213,8 +207,6 @@ describe("applyWorkspaceEdit", () => {
   });
 
   it("handles nested file paths correctly", async () => {
-    const { applyWorkspaceEdit } = await import("../../../../src/tool/refactor-apply/apply.ts");
-
     const nestedFile = absPath("nested/src/index.ts");
     mkdirSync(path.dirname(nestedFile), { recursive: true });
     writeFileSync(nestedFile, "old content", "utf-8");
