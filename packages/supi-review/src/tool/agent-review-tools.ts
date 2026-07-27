@@ -102,6 +102,58 @@ function resolveModels(ctx: Parameters<Parameters<ExtensionAPI["registerTool"]>[
   return { reviewer, planner, config };
 }
 
+/**
+ * Wraps onUpdate to also update a StatusSpinner with progress counts.
+ * Returns the adapted callback that both updates the spinner and calls onUpdate.
+ */
+function wireSpinnerToProgress(
+  // biome-ignore lint/suspicious/noExplicitAny: tool execute ctx type is narrower than ExtensionContext
+  ctx: any,
+  // biome-ignore lint/suspicious/noExplicitAny: onUpdate callback type varies per tool
+  onUpdate: any,
+  startMessage = "Reviewing…",
+): {
+  statusSpinner: StatusSpinner;
+  wrappedUpdate: (result: {
+    content: Array<{ type: "text"; text: string }>;
+    details: Record<string, unknown>;
+  }) => void;
+} {
+  const statusSpinner = new StatusSpinner(ctx, "supi-review");
+  statusSpinner.start(startMessage);
+
+  let completedCount = 0;
+  let totalCount = 0;
+  const wrappedUpdate = (result: {
+    content: Array<{ type: "text"; text: string }>;
+    details: Record<string, unknown>;
+  }) => {
+    const details = result.details as { completedCount?: number; totalCount?: number };
+    completedCount = details.completedCount ?? completedCount;
+    totalCount = details.totalCount ?? totalCount;
+    const label =
+      totalCount > 0
+        ? `Reviewing… (${completedCount} of ${totalCount} tasks complete)`
+        : "Reviewing…";
+    statusSpinner.update(label);
+    onUpdate?.(result);
+  };
+  return { statusSpinner, wrappedUpdate };
+}
+
+/** Compute the initial task count for the progress indicator. */
+function initialTaskCount(
+  input: ReturnType<typeof parseRunReviewToolInput>,
+  planStore: ReviewPlanStore,
+): number {
+  if (input.mode === "direct") return input.review?.tasks?.length ?? 1;
+  if (input.decision?.kind === "use-review") return input.decision.review?.tasks?.length ?? 0;
+  if (input.decision?.kind === "accept-draft") {
+    return planStore.peek(input.planId)?.plannerDraft?.tasks.length ?? 0;
+  }
+  return 0;
+}
+
 /** Factory for the supi_review_run execute function with animated status-bar spinner. */
 function makeRunReviewExecute(
   planStore: ReviewPlanStore,
@@ -110,38 +162,9 @@ function makeRunReviewExecute(
   return async (_id, params, signal, onUpdate, ctx) => {
     const input = parseRunReviewToolInput(params);
 
-    // Animated status-bar spinner — renderResult can't animate on its own.
-    // biome-ignore lint/suspicious/noExplicitAny: tool execute ctx has ui but type is narrower than ExtensionContext
-    const statusSpinner = new StatusSpinner(ctx as any, "supi-review");
-    statusSpinner.start("Reviewing…");
+    const { statusSpinner, wrappedUpdate } = wireSpinnerToProgress(ctx, onUpdate);
 
-    // Wrap onUpdate to also update the status spinner with task progress.
-    let completedCount = 0;
-    let totalCount = 0;
-    const wrappedUpdate = (result: {
-      content: Array<{ type: "text"; text: string }>;
-      details: Record<string, unknown>;
-    }) => {
-      const details = result.details as { completedCount?: number; totalCount?: number };
-      completedCount = details.completedCount ?? completedCount;
-      totalCount = details.totalCount ?? totalCount;
-      const label =
-        totalCount > 0
-          ? `Reviewing… (${completedCount} of ${totalCount} tasks complete)`
-          : "Reviewing…";
-      statusSpinner.update(label);
-      onUpdate?.(result);
-    };
-
-    // Emit immediate progress so the TUI shows a running indicator.
-    // For prepared mode we may not know the task count yet; omit totalCount so
-    // the handler falls back to the plain "Reviewing…" label.
-    const taskCount =
-      input.mode === "direct"
-        ? (input.review?.tasks?.length ?? 1)
-        : input.decision?.kind === "use-review"
-          ? (input.decision.review?.tasks?.length ?? 0)
-          : 0;
+    const taskCount = initialTaskCount(input, planStore);
     wrappedUpdate({
       content: [{ type: "text", text: "Starting review…" }],
       details: taskCount > 0 ? { completedCount: 0, totalCount: taskCount } : {},
@@ -179,6 +202,22 @@ function makeRunReviewExecute(
   };
 }
 
+/** Throw an actionable error from a non-prepared outcome. */
+function throwPrepareFailure(
+  outcome: { kind: string; reason?: string } & Record<string, unknown>,
+): never {
+  if (outcome.kind === "no-target")
+    throw new Error(outcome.reason ?? "No reviewable changes found.");
+  const result = outcome.result as { kind: string; failureCode?: string; timeoutMs?: number };
+  const diagnostic =
+    result.kind === "failed"
+      ? result.failureCode
+      : result.kind === "timeout"
+        ? `timeout (${result.timeoutMs} ms)`
+        : result.kind;
+  throw new Error(`Planner failed: ${diagnostic}`);
+}
+
 /** Register optional preparation and universal direct/prepared execution tools. */
 export function registerAgentReviewTools(pi: ExtensionAPI, planStore: ReviewPlanStore): void {
   pi.registerTool({
@@ -201,29 +240,17 @@ export function registerAgentReviewTools(pi: ExtensionAPI, planStore: ReviewPlan
         throw new Error(`Configured Planner model "${models.config.plannerModel}" is unavailable.`);
       }
 
-      // Animated status-bar spinner during planner LLM call.
-      // biome-ignore lint/suspicious/noExplicitAny: tool execute ctx has ui but type is narrower than ExtensionContext
-      const statusSpinner = new StatusSpinner(ctx as any, "supi-review");
-      statusSpinner.start("Preparing review…");
-
-      const wrappedUpdate = (result: {
-        content: Array<{ type: "text"; text: string }>;
-        details: Record<string, unknown>;
-      }) => {
-        const text = result.content?.[0]?.text ?? "";
-        statusSpinner.update(text);
-        onUpdate?.(result);
-      };
+      const { statusSpinner, wrappedUpdate } = wireSpinnerToProgress(
+        ctx,
+        onUpdate,
+        "Preparing review…",
+      );
 
       try {
         const session = buildSessionContext(
           ctx.sessionManager.getEntries(),
           ctx.sessionManager.getLeafId(),
         );
-        wrappedUpdate({
-          content: [{ type: "text", text: "Resolving target…" }],
-          details: {},
-        });
         const outcome = await prepareReview({
           cwd: ctx.cwd,
           target: target(input.target),
@@ -235,10 +262,7 @@ export function registerAgentReviewTools(pi: ExtensionAPI, planStore: ReviewPlan
           signal,
           onUpdate: wrappedUpdate,
         });
-        if (outcome.kind !== "prepared")
-          throw new Error(
-            outcome.kind === "no-target" ? outcome.reason : "Planner failed to produce a draft.",
-          );
+        if (outcome.kind !== "prepared") throwPrepareFailure(outcome);
         return {
           content: [{ type: "text", text: pageText(formatPrepared(outcome.plan)).text }],
           details: {

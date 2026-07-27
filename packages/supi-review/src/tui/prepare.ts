@@ -64,11 +64,11 @@ function buildCollapsed(details: PrepareDetails, theme: Theme): Text {
   const hasPlanner = details.plannerDraft !== undefined;
 
   const segments: string[] = [];
-  segments.push(theme.fg("accent", `Plan ${details.planId.slice(0, 8)}…`));
+  segments.push(theme.fg("accent", "Plan ready"));
   segments.push(theme.fg("muted", targetKind));
   segments.push(theme.fg("dim", `${fileCount} file${fileCount !== 1 ? "s" : ""} changed`));
   if (hasPlanner) {
-    segments.push(theme.fg("muted", "planner draft ready"));
+    segments.push(theme.fg("muted", "with draft"));
   }
 
   return new Text(segments.join(` ${theme.fg("dim", "·")} `), 0, 0);

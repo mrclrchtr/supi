@@ -45,10 +45,7 @@ export function renderRunCall(args: unknown, theme: Theme): Text {
   };
   const mode = params.mode ?? "direct";
   const primary = mode;
-  const secondary =
-    mode === "prepared" && params.planId
-      ? `plan ${params.planId.slice(0, 8)}…`
-      : (params.target?.kind ?? undefined);
+  const secondary = mode === "prepared" ? "from plan" : (params.target?.kind ?? undefined);
 
   return renderReviewToolCall("supi_review_run", primary, theme, secondary);
 }

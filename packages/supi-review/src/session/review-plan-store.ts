@@ -27,6 +27,11 @@ export class ReviewPlanStore {
     return plan;
   }
 
+  /** Read a plan without consuming it, for pre-execution task count display. */
+  peek(id: string): StoredReviewPlan | undefined {
+    return this.#plans.get(id);
+  }
+
   clear(): void {
     this.#plans.clear();
   }

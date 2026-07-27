@@ -240,7 +240,7 @@ async function execute(
               text: `Task ${task.id} failed (${completedCount} of ${totalCount})`,
             },
           ],
-          details: { results: [taskResult], completedCount, totalCount },
+          details: { completedCount, totalCount },
         });
         return taskResult;
       }
