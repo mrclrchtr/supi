@@ -1,7 +1,8 @@
 {
   "review": {
     "autoFix": true,
-    "reviewModel": "github-copilot/gpt-5.4"
+    "reviewModel": "github-copilot/gpt-5.4",
+    "agentModel": "opencode/mimo-v2.5-free"
   },
   "debug": {
     "enabled": true,
