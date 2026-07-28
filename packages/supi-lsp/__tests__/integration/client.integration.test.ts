@@ -5,6 +5,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import type { CodeQueryResult } from "@mrclrchtr/supi-code-runtime/api";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LspClient } from "../../src/client/client.ts";
 import type { Diagnostic, ServerConfig } from "../../src/config/types.ts";
@@ -19,6 +20,10 @@ const TSSERVER = path.resolve(
   import.meta.dirname,
   "../../../../node_modules/typescript/lib/tsserver.js",
 );
+
+function queryData<T>(result: CodeQueryResult<T>): T | null {
+  return result.kind === "unavailable" ? null : result.data;
+}
 
 const TS_SERVER_CONFIG: ServerConfig = {
   command: "typescript-language-server",
@@ -126,7 +131,10 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
     // response to be sure indexing has completed.
     const def = await waitFor(
       () => client.definition(refFile, { line: 1, character: 15 }),
-      (definition) => definition !== null && (!Array.isArray(definition) || definition.length > 0),
+      (definition) => {
+        const data = queryData(definition);
+        return data !== null && (!Array.isArray(data) || data.length > 0);
+      },
       { timeoutMs: 5_000, retryDelayMs: 100, label: "definition of 'add' in ref.ts" },
     );
     expect(def).not.toBeNull();
@@ -134,12 +142,13 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
 
   it("returns document symbols", async () => {
     const symbols = await client.documentSymbols(goodFile);
-    expect(symbols).not.toBeNull();
-    expect(Array.isArray(symbols)).toBe(true);
-    expect(symbols?.length).toBeGreaterThan(0);
+    const data = queryData(symbols);
+    expect(data).not.toBeNull();
+    expect(Array.isArray(data)).toBe(true);
+    expect(data?.length).toBeGreaterThan(0);
 
     // Should find the "add" function
-    const text = JSON.stringify(symbols);
+    const text = JSON.stringify(data);
     expect(text).toContain("add");
   }, 10_000);
 
@@ -198,17 +207,19 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
 
   it("returns workspace symbols for exact match", async () => {
     const symbols = await client.workspaceSymbol("add");
-    expect(symbols).not.toBeNull();
-    expect(Array.isArray(symbols)).toBe(true);
-    expect(symbols?.length).toBeGreaterThan(0);
-    const text = JSON.stringify(symbols);
+    const data = queryData(symbols);
+    expect(data).not.toBeNull();
+    expect(Array.isArray(data)).toBe(true);
+    expect(data?.length).toBeGreaterThan(0);
+    const text = JSON.stringify(data);
     expect(text).toContain("add");
   }, 10_000);
 
   it("returns workspace symbols for partial query", async () => {
     const symbols = await client.workspaceSymbol("Cal");
-    expect(symbols).not.toBeNull();
-    expect(Array.isArray(symbols)).toBe(true);
+    const data = queryData(symbols);
+    expect(data).not.toBeNull();
+    expect(Array.isArray(data)).toBe(true);
     // Server-dependent: some LSP servers only support exact/prefix matching
   }, 10_000);
 
@@ -217,10 +228,10 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
     expect(client.openFiles).not.toContain(goodFile);
   });
 
-  it("returns null when workspace symbol provider is not supported", async () => {
+  it("returns unavailable when workspace symbol provider is not supported", async () => {
     const unsupportedClient = new LspClient("none", TS_SERVER_CONFIG, tmpDir);
     const symbols = await unsupportedClient.workspaceSymbol("add");
-    expect(symbols).toBeNull();
+    expect(symbols.kind).toBe("unavailable");
   });
 
   // ADR 0003 — the real LSP must produce CodeSymbols with nameAnchor
@@ -233,10 +244,11 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
 
     const semantic = createLspSemanticProvider(client as unknown as WorkspaceLspRuntime);
     const symbols = await semantic.documentSymbols(goodFile);
-    expect(symbols).not.toBeNull();
-    expect(symbols?.length).toBeGreaterThan(0);
+    const data = queryData(symbols);
+    expect(data).not.toBeNull();
+    expect(data?.length).toBeGreaterThan(0);
 
-    const addFn = symbols?.find((s) => s.name === "add");
+    const addFn = data?.find((symbol) => symbol.name === "add");
     expect(addFn).toBeDefined();
     // Declaration anchor: the `export` keyword (col 1).
     expect(addFn?.declarationAnchor.character).toBe(1);
@@ -252,7 +264,7 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
 
     const semantic = createLspSemanticProvider(client as unknown as WorkspaceLspRuntime);
     const symbols = await semantic.documentSymbols(overloadFile);
-    const overloads = symbols?.filter((symbol) => symbol.name === "liveOverload") ?? [];
+    const overloads = queryData(symbols)?.filter((symbol) => symbol.name === "liveOverload") ?? [];
 
     expect(overloads).toHaveLength(3);
     expect(overloads.map((symbol) => symbol.nameAnchor?.character)).toEqual([17, 17, 17]);

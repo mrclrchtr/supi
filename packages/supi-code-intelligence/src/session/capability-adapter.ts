@@ -8,12 +8,14 @@
  * @mrclrchtr/supi-code-intelligence — internal, not exported via api.ts
  */
 
-import type {
-  CapabilityState,
-  SemanticProvider,
-  StructuralProvider,
+import {
+  type CapabilityState,
+  completedCodeQuery,
+  getDefaultWorkspaceRuntime,
+  type SemanticProvider,
+  type StructuralProvider,
+  unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
-import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { getWorkspaceLspRuntime, type WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import {
   type CodeProvider,
@@ -174,17 +176,17 @@ export class TestCapabilityAdapter implements CapabilityAdapter {
       // Semantic pass-through
       references: this.#semantic?.references
         ? (...args: Parameters<SemanticProvider["references"]>) =>
-            this.#semantic?.references?.(...args)
-        : async () => null,
+            this.#semantic?.references(...args)
+        : async () => unavailableCodeQuery("No test semantic references provider"),
       implementation: this.#semantic?.implementation
-        ? (...args) => this.#semantic?.implementation?.(...args)
-        : async () => null,
+        ? (...args) => this.#semantic?.implementation(...args)
+        : async () => unavailableCodeQuery("No test semantic implementation provider"),
       documentSymbols: this.#semantic?.documentSymbols
-        ? (...args) => this.#semantic?.documentSymbols?.(...args)
-        : async () => [],
+        ? (...args) => this.#semantic?.documentSymbols(...args)
+        : async () => completedCodeQuery([]),
       workspaceSymbols: this.#semantic?.workspaceSymbols
-        ? (...args) => this.#semantic?.workspaceSymbols?.(...args)
-        : async () => [],
+        ? (...args) => this.#semantic?.workspaceSymbols(...args)
+        : async () => completedCodeQuery([]),
       hover: this.#semantic?.hover ? (...args) => this.#semantic?.hover?.(...args) : undefined,
       definition: this.#semantic?.definition
         ? (...args) => this.#semantic?.definition?.(...args)

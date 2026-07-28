@@ -1,14 +1,14 @@
 /** Session-owned point inspection workflow. */
 
-import { existsSync } from "node:fs";
-import { relative } from "node:path";
-import { uriToFile } from "@mrclrchtr/supi-core/path";
-import { normalizePath } from "../analysis/search/paths.ts";
-import { gatherNearbyDiagnostics, gatherTreeSitterContext } from "../ui/markdown/gather.ts";
-import type { CapabilityAdapter } from "./capability-adapter.ts";
+import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
+import type { CapabilityAdapter, ReadinessOutcome } from "./capability-adapter.ts";
 import { parseInspectWorkflowInput } from "./input/workflows.ts";
+import { collectInspectSections } from "./inspect/collect.ts";
+import { validateInspectPoint } from "./inspect/file-point.ts";
 import type {
+  InspectDefinition,
   InspectResultData,
+  InspectSections,
   InspectWorkflowInput,
   InspectWorkflowOutcome,
 } from "./inspect-types.ts";
@@ -28,12 +28,9 @@ export async function runInspectWorkflow(
   const parsed = parseInspectWorkflowInput(input);
   if (parsed.kind === "invalid-input") return parsed;
   const request = parsed.value;
+  const point = validateInspectPoint(request.point, deps.cwd);
+  if (point.kind === "invalid-input") return point;
   throwIfAborted(control);
-  const point = request.point;
-  const resolvedFile = normalizePath(point.file, deps.cwd);
-  if (!existsSync(resolvedFile)) {
-    return { kind: "invalid-input", message: `File not found: \`${point.file}\`` };
-  }
 
   reportProgress(control, {
     intent: "inspect",
@@ -42,47 +39,31 @@ export async function runInspectWorkflow(
   });
   const readiness = await deps.capability.ensureSemanticReadiness(deps.cwd, {
     kind: "file",
-    file: resolvedFile,
+    file: point.value.file,
   });
   throwIfAborted(control);
 
   const semanticReady = readiness.kind === "ready";
-  const provider = semanticReady
-    ? deps.capability.getProvider(deps.cwd)
-    : deps.capability.getStructuralProvider(deps.cwd);
+  const semantic = semanticReady ? deps.capability.getSemanticProvider(deps.cwd) : null;
   const lspState = semanticReady
     ? deps.capability.getLspRuntimeState(deps.cwd)
-    : {
-        kind: "unavailable" as const,
-        reason: readiness.kind === "timeout" ? "Semantic readiness timed out" : readiness.reason,
-      };
-  const relPath = relative(deps.cwd, resolvedFile);
-  const context = await gatherTreeSitterContext(provider, relPath, point.line, point.character);
-  const diagnostics = await gatherNearbyDiagnostics(
-    deps.cwd,
-    relPath,
-    point.line,
-    request.maxResults ?? 5,
+    : unavailableLspState(readiness);
+  const sections = await collectInspectSections({
+    cwd: deps.cwd,
+    file: point.value.file,
+    line: point.value.line,
+    character: point.value.character,
+    lineCount: point.value.lineCount,
+    structural: deps.capability.getStructuralProvider(deps.cwd),
+    semantic,
+    semanticUnavailableReason: semantic
+      ? "Semantic point query unavailable."
+      : semanticReadinessReason(readiness),
     lspState,
-  );
-  const enclosing = context.outline.find(
-    (item) => item.startLine <= point.line && item.endLine >= point.line,
-  );
-  const definitions = mapDefinitions(context.definition, deps.cwd);
-  const unavailableSections = collectUnavailableSections({
-    context,
-    provider,
-    definitions,
-    diagnostics,
-    lspReady: lspState.kind === "ready",
   });
-  const evidence = inspectEvidenceState(
-    context,
-    definitions.length,
-    Boolean(enclosing),
-    diagnostics.length,
-  );
-  if (!evidence.available) {
+  throwIfAborted(control);
+
+  if (everySectionUnavailable(sections)) {
     return {
       kind: "unavailable",
       reason: "No semantic, structural, or diagnostic provider could inspect this point.",
@@ -90,35 +71,30 @@ export async function runInspectWorkflow(
   }
 
   const data: InspectResultData = {
-    relPath,
-    line: point.line,
-    character: point.character,
-    confidence: evidence.confidence,
-    node: context.nodeInfo,
-    enclosingSymbol: enclosing
-      ? {
-          name: enclosing.name,
-          kind: enclosing.kind,
-          startLine: enclosing.startLine,
-          endLine: enclosing.endLine,
-        }
-      : null,
-    hover: context.hover?.contents ?? null,
-    definitions,
-    diagnostics,
-    unavailableSections: [...new Set(unavailableSections)],
+    relPath: point.value.relPath,
+    line: point.value.line,
+    character: point.value.character,
+    maxResults: request.maxResults ?? 5,
+    confidence: inspectConfidence(sections),
+    diagnosticWindow: {
+      startLine: Math.max(1, point.value.line - 2),
+      endLine: Math.min(point.value.lineCount, point.value.line + 2),
+    },
+    sections,
   };
+  const definitions =
+    sections.definition.kind === "unavailable" ? [] : [...sections.definition.data];
 
   return {
     kind: "completed",
     data,
-    nextQueries: Object.freeze(buildInspectNextQueries(relPath, definitions, semanticReady)),
+    nextQueries: Object.freeze(buildInspectNextQueries(data.relPath, definitions, semanticReady)),
   };
 }
 
 function buildInspectNextQueries(
   relPath: string,
-  definitions: InspectResultData["definitions"],
+  definitions: readonly InspectDefinition[],
   semanticReady: boolean,
 ): string[] {
   const queries: string[] = [];
@@ -141,47 +117,41 @@ function buildInspectNextQueries(
   return queries;
 }
 
-function mapDefinitions(
-  definitions: Awaited<ReturnType<typeof gatherTreeSitterContext>>["definition"],
-  cwd: string,
-): InspectResultData["definitions"] {
-  return (definitions ?? []).map((definition) => {
-    const file = uriToFile(definition.uri);
-    return {
-      file: relative(cwd, file),
-      line: definition.range.start.line + 1,
-      character: definition.range.start.character + 1,
-    };
-  });
+function everySectionUnavailable(sections: InspectSections): boolean {
+  return (
+    sections.node.kind === "unavailable" &&
+    sections.enclosingSymbol.kind === "unavailable" &&
+    sections.hover.kind === "unavailable" &&
+    sections.definition.kind === "unavailable" &&
+    sections.diagnostics.kind === "unavailable"
+  );
 }
 
-function collectUnavailableSections(options: {
-  context: Awaited<ReturnType<typeof gatherTreeSitterContext>>;
-  provider: Parameters<typeof gatherTreeSitterContext>[0];
-  definitions: InspectResultData["definitions"];
-  diagnostics: InspectResultData["diagnostics"];
-  lspReady: boolean;
-}): string[] {
-  const { context, provider, definitions, diagnostics, lspReady } = options;
-  const unavailable: string[] = [];
-  if (!context.nodeInfo && context.outline.length === 0) unavailable.push("syntax");
-  if (!context.hover && provider?.hover == null) unavailable.push("hover");
-  if (definitions.length === 0 && provider?.definition == null) unavailable.push("definition");
-  if (diagnostics.length === 0 && !lspReady) unavailable.push("diagnostics");
-  return unavailable;
+function inspectConfidence(sections: InspectSections): InspectResultData["confidence"] {
+  const semanticAvailable =
+    sections.hover.kind !== "unavailable" ||
+    sections.definition.kind !== "unavailable" ||
+    sections.diagnostics.kind !== "unavailable";
+  if (semanticAvailable) return "semantic";
+  const structuralAvailable =
+    sections.node.kind !== "unavailable" || sections.enclosingSymbol.kind !== "unavailable";
+  return structuralAvailable ? "structural" : "unavailable";
 }
 
-function inspectEvidenceState(
-  context: Awaited<ReturnType<typeof gatherTreeSitterContext>>,
-  definitionCount: number,
-  hasEnclosing: boolean,
-  diagnosticCount: number,
-): { available: boolean; confidence: InspectResultData["confidence"] } {
-  const semantic = Boolean(context.hover || definitionCount > 0);
-  const structural = Boolean(context.nodeInfo || hasEnclosing);
-  const diagnostics = diagnosticCount > 0;
+function unavailableLspState(readiness: ReadinessOutcome): WorkspaceLspRuntimeState {
   return {
-    available: semantic || structural || diagnostics,
-    confidence: semantic || diagnostics ? "semantic" : "structural",
+    kind: "unavailable",
+    reason: semanticReadinessReason(readiness),
   };
+}
+
+function semanticReadinessReason(readiness: ReadinessOutcome): string {
+  switch (readiness.kind) {
+    case "ready":
+      return "No semantic provider is active for this file.";
+    case "timeout":
+      return "Semantic readiness timed out.";
+    case "unavailable":
+      return readiness.reason;
+  }
 }

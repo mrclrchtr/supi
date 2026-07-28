@@ -1,5 +1,8 @@
-import type { SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
-import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  getDefaultWorkspaceRuntime,
+  type SemanticProvider,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import {
   clearWorkspaceLspRuntime,
   setWorkspaceLspRuntimeState,
@@ -116,9 +119,9 @@ describe("renderSemanticReadinessTimeout", () => {
 
 function createMockSemanticProvider(): SemanticProvider {
   return {
-    references: async () => null,
-    implementation: async () => null,
-    documentSymbols: async () => null,
-    workspaceSymbols: async () => null,
+    references: async () => unavailableCodeQuery("not configured"),
+    implementation: async () => unavailableCodeQuery("not configured"),
+    documentSymbols: async () => unavailableCodeQuery("not configured"),
+    workspaceSymbols: async () => unavailableCodeQuery("not configured"),
   };
 }

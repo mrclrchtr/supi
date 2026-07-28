@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeGraphTool } from "../../../../src/tool/graph/execute.ts";
 import { executeAction, makeTestCtx } from "../../../helpers/execute-action.ts";
@@ -27,16 +28,17 @@ describe("code_graph workflow", () => {
     writeSource("consumer-a.ts", "foo();\n");
     writeSource("consumer-b.ts", "foo();\n");
     registerMockProvider(tmpDir, {
-      references: async () => [
-        {
-          uri: `file://${tmpDir}/consumer-a.ts`,
-          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
-        },
-        {
-          uri: `file://${tmpDir}/consumer-b.ts`,
-          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
-        },
-      ],
+      references: async () =>
+        completedCodeQuery([
+          {
+            uri: `file://${tmpDir}/consumer-a.ts`,
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
+          },
+          {
+            uri: `file://${tmpDir}/consumer-b.ts`,
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
+          },
+        ]),
     });
 
     const result = await executeGraphTool(
@@ -92,12 +94,13 @@ describe("code_graph workflow", () => {
     writeSource("test.ts", "interface Service { run(): void }\n");
     writeSource("impl.ts", "class A implements Service { run() {} }\n");
     registerMockProvider(tmpDir, {
-      implementation: async () => [
-        {
-          uri: `file://${tmpDir}/impl.ts`,
-          range: { start: { line: 0, character: 6 }, end: { line: 0, character: 7 } },
-        },
-      ],
+      implementation: async () =>
+        completedCodeQuery([
+          {
+            uri: `file://${tmpDir}/impl.ts`,
+            range: { start: { line: 0, character: 6 }, end: { line: 0, character: 7 } },
+          },
+        ]),
     });
 
     const result = await executeGraphTool(
@@ -115,8 +118,8 @@ describe("code_graph workflow", () => {
   it("expands all to exactly references, callees, and implements", async () => {
     writeSource("test.ts", "function foo() { bar(); }\n");
     registerMockProvider(tmpDir, {
-      references: async () => [],
-      implementation: async () => [],
+      references: async () => completedCodeQuery([]),
+      implementation: async () => completedCodeQuery([]),
       calleesAt: async () => ({
         kind: "success",
         data: {

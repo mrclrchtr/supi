@@ -5,14 +5,11 @@
  * noExcessiveLinesPerFile threshold.
  */
 
-import { resolve } from "node:path";
 import type {
   SemanticProvider,
   SourceRange,
   StructuralProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
-import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
-import { diagnosticMessageString } from "../../substrate/lsp/utils.ts";
 
 export type ContextGatherProvider = Pick<
   StructuralProvider,
@@ -101,7 +98,7 @@ export async function gatherTreeSitterContext(
           line: line - 1,
           character: character - 1,
         });
-        if (hoverResult) hover = hoverResult;
+        if (hoverResult.kind !== "unavailable" && hoverResult.data) hover = hoverResult.data;
       } catch {
         // hover failed — continue without it
       }
@@ -114,8 +111,8 @@ export async function gatherTreeSitterContext(
           line: line - 1,
           character: character - 1,
         });
-        if (defResult && defResult.length > 0) {
-          definition = defResult.map((loc) => ({
+        if (defResult.kind !== "unavailable" && defResult.data.length > 0) {
+          definition = defResult.data.map((loc) => ({
             uri: loc.uri,
             range: loc.range,
           }));
@@ -129,36 +126,4 @@ export async function gatherTreeSitterContext(
   }
 
   return { nodeInfo, outline, imports, exports, hover, definition };
-}
-
-export interface NearbyDiagnostic {
-  line: number;
-  severity: number;
-  message: string;
-}
-
-// biome-ignore lint/complexity/useMaxParams: lspRuntime is a DI seam, not a logic parameter
-export async function gatherNearbyDiagnostics(
-  cwd: string,
-  file: string,
-  line: number,
-  maxResults: number,
-  lspRuntime: WorkspaceLspRuntimeState,
-): Promise<NearbyDiagnostic[]> {
-  if (lspRuntime.kind !== "ready") return [];
-
-  try {
-    const diagnostics = await lspRuntime.runtime.fileDiagnostics(resolve(cwd, file), 4);
-    if (!diagnostics || diagnostics.length === 0) return [];
-
-    const nearby = diagnostics.filter((d) => Math.abs(d.range.start.line + 1 - line) <= 2);
-    const chosen = nearby.length > 0 ? nearby : diagnostics;
-    return chosen.slice(0, maxResults).map((d) => ({
-      line: d.range.start.line + 1,
-      severity: d.severity ?? 1,
-      message: diagnosticMessageString(d),
-    }));
-  } catch {
-    return [];
-  }
 }

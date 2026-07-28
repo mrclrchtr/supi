@@ -2,6 +2,11 @@
 // biome-ignore-all lint/style/noExcessiveLinesPerFile: LspManager stays cohesive; recovery and sync helpers are split into manager-*.ts modules.
 import * as fs from "node:fs";
 import * as path from "node:path";
+import {
+  type CodeQueryResult,
+  mapCodeQueryResult,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import * as projectRoots from "@mrclrchtr/supi-core/project";
 import { LspClient } from "../client/client.ts";
 import { getServerForFile } from "../config/config.ts";
@@ -56,8 +61,11 @@ import type {
 } from "./manager-types.ts";
 import { recoverWorkspaceDiagnostics as recoverWorkspaceDiagnosticsImpl } from "./manager-workspace-recovery.ts";
 import {
+  collectWorkspaceSymbols,
   findWorkspaceSymbolWarmTargets,
   getWorkspaceSymbolWarmPosition,
+  type WorkspaceSymbolCollection,
+  workspaceSymbolCollectionResult,
 } from "./manager-workspace-symbol.ts";
 
 type UnavailableReason = "missing-command" | "start-failed" | "runtime-error";
@@ -387,34 +395,40 @@ export class LspManager {
   async syncFileAndGetDiagnostics(
     filePath: string,
     maxSeverity: number = 1,
-  ): Promise<Diagnostic[]> {
+  ): Promise<CodeQueryResult<Diagnostic[]>> {
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
-    return (
-      (await this.syncFileAndGetCascadingDiagnostics(resolvedPath, maxSeverity)).find(
-        (entry) => entry.file === resolvedPath,
-      )?.diagnostics ?? []
+    const result = await this.syncFileAndGetCascadingDiagnostics(resolvedPath, maxSeverity);
+    return mapCodeQueryResult(
+      result,
+      (entries) => entries.find((entry) => entry.file === resolvedPath)?.diagnostics ?? [],
     );
   }
   async syncFileAndGetCascadingDiagnostics(
     filePath: string,
     maxSeverity: number = 1,
-  ): Promise<Array<{ file: string; diagnostics: Diagnostic[] }>> {
+  ): Promise<CodeQueryResult<Array<{ file: string; diagnostics: Diagnostic[] }>>> {
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
     const client = await this.getClientForFile(resolvedPath);
-    if (!client) return [];
+    if (!client) {
+      return unavailableCodeQuery(`No LSP client can collect diagnostics for ${resolvedPath}.`);
+    }
     try {
       const { primary, cascade } = await syncClientFileAndGetCascadingDiagnostics(
         client,
         resolvedPath,
         maxSeverity,
       );
-      return [
-        ...(primary.length > 0 ? [{ file: resolvedPath, diagnostics: primary }] : []),
-        ...mapCascadeDiagnosticsToFiles(cascade),
-      ];
-    } catch {
+      return {
+        kind: "completed",
+        data: [
+          ...(primary.length > 0 ? [{ file: resolvedPath, diagnostics: primary }] : []),
+          ...mapCascadeDiagnosticsToFiles(cascade),
+        ],
+      };
+    } catch (error) {
       this.closeFile(resolvedPath);
-      return [];
+      const detail = error instanceof Error ? error.message : String(error);
+      return unavailableCodeQuery(`Diagnostic collection failed for ${resolvedPath}: ${detail}`);
     }
   }
   /** Close a file across any active LSP clients and clear its cached diagnostics. */
@@ -617,21 +631,21 @@ export class LspManager {
       maxSeverity,
     );
   }
-  async workspaceSymbol(query: string): Promise<(SymbolInformation | WorkspaceSymbol)[] | null> {
-    const helper = await import("./manager-workspace-symbol.ts");
-    const initial = await helper.collectWorkspaceSymbols(this.clients.values(), query);
-    if (!initial.hasSupport) return null;
-    if (initial.results.length > 0) return initial.results;
+  async workspaceSymbol(
+    query: string,
+  ): Promise<CodeQueryResult<(SymbolInformation | WorkspaceSymbol)[]>> {
+    const initial = await collectWorkspaceSymbols(this.clients.values(), query);
+    if (!initial.hasSupport || initial.results.length > 0) {
+      return workspaceSymbolCollectionResult(initial);
+    }
 
     const warmed = await this.warmWorkspaceSymbolProjectsUntilResult(
-      helper.findWorkspaceSymbolWarmTargets,
-      helper.getWorkspaceSymbolWarmPosition,
-      helper.collectWorkspaceSymbols,
+      findWorkspaceSymbolWarmTargets,
+      getWorkspaceSymbolWarmPosition,
+      collectWorkspaceSymbols,
       query,
     );
-    if (warmed.results) return warmed.results;
-
-    return initial.results;
+    return workspaceSymbolCollectionResult(warmed.collection ?? initial);
   }
   async ensureFileOpen(filePath: string): Promise<LspClient | null> {
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
@@ -654,14 +668,11 @@ export class LspManager {
       fileTypes: string[],
     ) => Array<{ projectRoot: string; file: string }>,
     getWarmPosition: (
-      symbols: Awaited<ReturnType<LspClient["documentSymbols"]>>,
+      symbols: import("../config/types.ts").DocumentSymbol[] | SymbolInformation[] | null,
     ) => import("../config/types.ts").Position | null,
-    collect: (
-      clients: Iterable<LspClient>,
-      query: string,
-    ) => Promise<{ results: (SymbolInformation | WorkspaceSymbol)[]; hasSupport: boolean }>,
+    collect: (clients: Iterable<LspClient>, query: string) => Promise<WorkspaceSymbolCollection>,
     query: string,
-  ): Promise<{ warmedAny: boolean; results: (SymbolInformation | WorkspaceSymbol)[] | null }> {
+  ): Promise<{ warmedAny: boolean; collection: WorkspaceSymbolCollection | null }> {
     let warmedAny = false;
 
     for (const client of Array.from(this.clients.values())) {
@@ -691,24 +702,20 @@ export class LspManager {
         this.warmedWorkspaceSymbolProjects.add(projectKey);
         warmedAny = true;
 
-        try {
-          const symbols = await openedClient.documentSymbols(target.file);
-          const hoverPosition = getWarmPosition(symbols);
-          if (hoverPosition) {
-            await openedClient.hover(target.file, hoverPosition);
-          }
-        } catch {
-          // Best-effort warm-up only.
+        const symbols = await openedClient.documentSymbols(target.file);
+        if (symbols.kind !== "unavailable") {
+          const hoverPosition = getWarmPosition(symbols.data);
+          if (hoverPosition) await openedClient.hover(target.file, hoverPosition);
         }
 
         const collected = await collect(this.clients.values(), query);
         if (collected.hasSupport && collected.results.length > 0) {
-          return { warmedAny, results: collected.results };
+          return { warmedAny, collection: collected };
         }
       }
     }
 
-    return { warmedAny, results: null };
+    return { warmedAny, collection: null };
   }
 
   private async warmSemanticProject(
@@ -754,15 +761,10 @@ export class LspManager {
 
     this.warmedSemanticProjects.add(projectKey);
 
-    try {
-      const symbols = await openedClient.documentSymbols(resolvedFile);
-      const hoverPosition = getWorkspaceSymbolWarmPosition(symbols);
-      if (hoverPosition) {
-        await openedClient.hover(resolvedFile, hoverPosition);
-      }
-    } catch {
-      // Best-effort warm-up only.
-    }
+    const symbols = await openedClient.documentSymbols(resolvedFile);
+    if (symbols.kind === "unavailable") return;
+    const hoverPosition = getWorkspaceSymbolWarmPosition(symbols.data);
+    if (hoverPosition) await openedClient.hover(resolvedFile, hoverPosition);
   }
 
   private hasOpenFileInProject(client: LspClient, projectRoot: string): boolean {

@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeGraphTool } from "../../../../src/tool/graph/execute.ts";
 import { sessionCache } from "../../../helpers/execute-action.ts";
@@ -27,12 +28,13 @@ describe("code_graph read-next guidance", () => {
     writeFileSync(path.join(tmpDir, "consumer.ts"), "import { foo } from './index';\nfoo();\n");
 
     registerMockProvider(tmpDir, {
-      references: async () => [
-        {
-          uri: `file://${path.join(tmpDir, "consumer.ts")}`,
-          range: { start: { line: 1, character: 0 }, end: { line: 1, character: 3 } },
-        },
-      ],
+      references: async () =>
+        completedCodeQuery([
+          {
+            uri: `file://${path.join(tmpDir, "consumer.ts")}`,
+            range: { start: { line: 1, character: 0 }, end: { line: 1, character: 3 } },
+          },
+        ]),
       calleesAt: async () => ({
         kind: "success" as const,
         data: {

@@ -32,13 +32,11 @@ async function collectScopedFileDiagnostics(
   service: WorkspaceLspRuntime,
   scopeFilter: string,
 ): Promise<HealthData["diagnostics"]> {
-  const diags = await service.fileDiagnostics(scopeFilter, 4);
-  if (!diags || diags.length === 0) {
-    return [];
-  }
+  const result = await service.fileDiagnostics(scopeFilter, 4);
+  if (result.kind === "unavailable" || result.data.length === 0) return [];
 
-  const errors = diags.filter((d) => (d.severity ?? 1) === 1).length;
-  const warnings = diags.filter((d) => (d.severity ?? 1) === 2).length;
+  const errors = result.data.filter((d) => (d.severity ?? 1) === 1).length;
+  const warnings = result.data.filter((d) => (d.severity ?? 1) === 2).length;
   if (!hasIssueCounts(errors, warnings)) {
     return [];
   }

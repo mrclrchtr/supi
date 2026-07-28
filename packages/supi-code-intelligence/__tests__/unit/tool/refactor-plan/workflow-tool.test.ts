@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import * as os from "node:os";
 import * as path from "node:path";
 import {
+  completedCodeQuery,
   getDefaultWorkspaceRuntime,
   type RefactorResult,
   type SemanticProvider,
@@ -69,20 +70,21 @@ function createSemanticProvider(
   } = {},
 ): SemanticProvider {
   return {
-    references: async () => null,
-    implementation: async () => null,
-    documentSymbols: async (file) => [
-      {
-        name: "oldName",
-        kind: "Function",
-        file,
-        declarationAnchor: { line: 1, character: 1 },
-        nameAnchor: { line: 1, character: 1 },
-        container: null,
-        nesting: "top-level",
-      },
-    ],
-    workspaceSymbols: async () => [],
+    references: async () => completedCodeQuery([]),
+    implementation: async () => completedCodeQuery([]),
+    documentSymbols: async (file) =>
+      completedCodeQuery([
+        {
+          name: "oldName",
+          kind: "Function",
+          file,
+          declarationAnchor: { line: 1, character: 1 },
+          nameAnchor: { line: 1, character: 1 },
+          container: null,
+          nesting: "top-level",
+        },
+      ]),
+    workspaceSymbols: async () => completedCodeQuery([]),
     rename: overrides.rename,
     ...(overrides.refactor ? { refactor: overrides.refactor } : {}),
   } as SemanticProvider;

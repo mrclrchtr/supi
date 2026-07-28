@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LspManager } from "../../src/manager/manager.ts";
 import { findWorkspaceSymbolWarmTargets } from "../../src/manager/manager-workspace-symbol.ts";
@@ -85,20 +86,22 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
       serverCapabilities: { workspaceSymbolProvider: true },
       workspaceSymbol: vi
         .fn()
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([symbol])
-        .mockResolvedValue([symbol]),
-      documentSymbols: vi.fn().mockResolvedValue([
-        {
-          name: "Widget",
-          kind: 12,
-          selectionRange: {
-            start: { line: 0, character: 13 },
-            end: { line: 0, character: 31 },
+        .mockResolvedValueOnce(completedCodeQuery([]))
+        .mockResolvedValueOnce(completedCodeQuery([symbol]))
+        .mockResolvedValue(completedCodeQuery([symbol])),
+      documentSymbols: vi.fn().mockResolvedValue(
+        completedCodeQuery([
+          {
+            name: "Widget",
+            kind: 12,
+            selectionRange: {
+              start: { line: 0, character: 13 },
+              end: { line: 0, character: 31 },
+            },
           },
-        },
-      ]),
-      hover: vi.fn().mockResolvedValue({ contents: "hovered" }),
+        ]),
+      ),
+      hover: vi.fn().mockResolvedValue(completedCodeQuery({ contents: "hovered" })),
     };
 
     getClients(manager).set(`typescript:${root}`, client);
@@ -112,7 +115,7 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
 
     const result = await manager.workspaceSymbol("Widget");
 
-    expect(result).toEqual([symbol]);
+    expect(result).toEqual({ kind: "completed", data: [symbol] });
     expect(ensureFileOpen).toHaveBeenCalledWith(join(root, "src", "index.ts"));
     expect(client.documentSymbols).toHaveBeenCalledWith(join(root, "src", "index.ts"));
     expect(client.hover).toHaveBeenCalledWith(join(root, "src", "index.ts"), {

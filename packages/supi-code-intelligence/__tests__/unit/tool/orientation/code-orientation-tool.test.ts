@@ -1,6 +1,11 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import {
+  type CodeQueryResult,
+  completedCodeQuery,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codeIntelligenceExtension from "../../../../src/extension.ts";
@@ -59,29 +64,42 @@ async function resolveTargetId(
 }
 
 function markLspReady(runtimeOverrides: Record<string, unknown> = {}): void {
+  const { fileDiagnostics: rawFileDiagnostics, ...rest } = runtimeOverrides;
+  const query = rawFileDiagnostics as ((...args: unknown[]) => Promise<unknown>) | undefined;
+  const fileDiagnostics = async (...args: unknown[]): Promise<CodeQueryResult<unknown[]>> => {
+    const value = query ? await query(...args) : [];
+    if (typeof value === "object" && value !== null && "kind" in value) {
+      return value as CodeQueryResult<unknown[]>;
+    }
+    return value === null
+      ? unavailableCodeQuery("diagnostics unavailable")
+      : completedCodeQuery(value as unknown[]);
+  };
   mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
     kind: "ready",
     runtime: {
       waitUntilReadyForFile: vi.fn(async () => ({ kind: "ready" })),
-      ...runtimeOverrides,
+      fileDiagnostics,
+      ...rest,
     },
   });
 }
 
 function registerBasicSymbolProvider(): void {
   registerMockProvider(tmpDir, {
-    documentSymbols: async () => [
-      {
-        name: "widget",
-        kind: "Function",
-        file: path.join(tmpDir, "src/widget.ts"),
-        declarationAnchor: { line: 8, character: 1 },
-        nameAnchor: { line: 8, character: 17 },
-        container: null,
-        nesting: "top-level" as const,
-      },
-    ],
-    hover: async () => ({ contents: "function widget(): number" }),
+    documentSymbols: async () =>
+      completedCodeQuery([
+        {
+          name: "widget",
+          kind: "Function",
+          file: path.join(tmpDir, "src/widget.ts"),
+          declarationAnchor: { line: 8, character: 1 },
+          nameAnchor: { line: 8, character: 17 },
+          container: null,
+          nesting: "top-level" as const,
+        },
+      ]),
+    hover: async () => completedCodeQuery({ contents: "function widget(): number" }),
   });
   markLspReady();
 }
@@ -248,13 +266,15 @@ describe("code_orientation tool", () => {
       kind: "ready",
       runtime: {
         waitUntilReadyForFile: vi.fn(async () => ({ kind: "ready" })),
-        fileDiagnostics: vi.fn(async () => [
-          {
-            severity: 1,
-            message: "Widget diagnostic",
-            range: { start: { line: 7, character: 10 }, end: { line: 7, character: 16 } },
-          },
-        ]),
+        fileDiagnostics: vi.fn(async () =>
+          completedCodeQuery([
+            {
+              severity: 1,
+              message: "Widget diagnostic",
+              range: { start: { line: 7, character: 10 }, end: { line: 7, character: 16 } },
+            },
+          ]),
+        ),
         recoverDiagnostics: vi.fn(async () => ({ recovered: false })),
       },
     });
@@ -289,29 +309,32 @@ describe("code_orientation tool", () => {
   it("does not show unrelated whole-file diagnostics for symbol orientation", async () => {
     writeSource("src/widget.ts", "export function widget() { return 1; }\nconst far = 1;\n");
     registerMockProvider(tmpDir, {
-      documentSymbols: async () => [
-        {
-          name: "widget",
-          kind: "Function",
-          file: path.join(tmpDir, "src/widget.ts"),
-          declarationAnchor: { line: 1, character: 1 },
-          nameAnchor: { line: 1, character: 17 },
-          container: null,
-          nesting: "top-level" as const,
-        },
-      ],
+      documentSymbols: async () =>
+        completedCodeQuery([
+          {
+            name: "widget",
+            kind: "Function",
+            file: path.join(tmpDir, "src/widget.ts"),
+            declarationAnchor: { line: 1, character: 1 },
+            nameAnchor: { line: 1, character: 17 },
+            container: null,
+            nesting: "top-level" as const,
+          },
+        ]),
     });
     mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
       kind: "ready",
       runtime: {
         waitUntilReadyForFile: vi.fn(async () => ({ kind: "ready" })),
-        fileDiagnostics: vi.fn(async () => [
-          {
-            severity: 1,
-            message: "Far diagnostic",
-            range: { start: { line: 20, character: 1 }, end: { line: 20, character: 2 } },
-          },
-        ]),
+        fileDiagnostics: vi.fn(async () =>
+          completedCodeQuery([
+            {
+              severity: 1,
+              message: "Far diagnostic",
+              range: { start: { line: 20, character: 1 }, end: { line: 20, character: 2 } },
+            },
+          ]),
+        ),
         recoverDiagnostics: vi.fn(async () => ({ recovered: false })),
       },
     });
@@ -334,20 +357,21 @@ describe("code_orientation tool", () => {
 
   it("keeps stored-handle Orientation structural when live file readiness is lost", async () => {
     writeSource("src/widget.ts", "export function widget() { return 1; }\n");
-    const hover = vi.fn(async () => ({ contents: "function widget(): number" }));
-    const definition = vi.fn(async () => []);
+    const hover = vi.fn(async () => completedCodeQuery({ contents: "function widget(): number" }));
+    const definition = vi.fn(async () => completedCodeQuery([]));
     registerMockProvider(tmpDir, {
-      documentSymbols: async () => [
-        {
-          name: "widget",
-          kind: "Function",
-          file: path.join(tmpDir, "src/widget.ts"),
-          declarationAnchor: { line: 1, character: 1 },
-          nameAnchor: { line: 1, character: 17 },
-          container: null,
-          nesting: "top-level" as const,
-        },
-      ],
+      documentSymbols: async () =>
+        completedCodeQuery([
+          {
+            name: "widget",
+            kind: "Function",
+            file: path.join(tmpDir, "src/widget.ts"),
+            declarationAnchor: { line: 1, character: 1 },
+            nameAnchor: { line: 1, character: 17 },
+            container: null,
+            nesting: "top-level" as const,
+          },
+        ]),
       hover,
       definition,
       nodeAt: async () => ({
@@ -411,17 +435,18 @@ describe("code_orientation tool", () => {
   it("orients by a handle returned from code_resolve", async () => {
     writeSource("src/widget.ts", "export function widget() { return 1; }\n");
     registerMockProvider(tmpDir, {
-      documentSymbols: async () => [
-        {
-          name: "widget",
-          kind: "Function",
-          file: path.join(tmpDir, "src/widget.ts"),
-          declarationAnchor: { line: 1, character: 1 },
-          nameAnchor: { line: 1, character: 17 },
-          container: null,
-          nesting: "top-level" as const,
-        },
-      ],
+      documentSymbols: async () =>
+        completedCodeQuery([
+          {
+            name: "widget",
+            kind: "Function",
+            file: path.join(tmpDir, "src/widget.ts"),
+            declarationAnchor: { line: 1, character: 1 },
+            nameAnchor: { line: 1, character: 17 },
+            container: null,
+            nesting: "top-level" as const,
+          },
+        ]),
     });
     markLspReady();
 

@@ -113,11 +113,11 @@ export async function enrichDiagnosticContext(
   try {
     if (lspRuntime.kind !== "ready") return { diagnostics: [] };
 
-    const diags = await lspRuntime.runtime.fileDiagnostics(file, 2);
-    if (!diags || diags.length === 0) return { diagnostics: [] };
+    const result = await lspRuntime.runtime.fileDiagnostics(file, 2);
+    if (result.kind === "unavailable" || result.data.length === 0) return { diagnostics: [] };
 
     // Map to our DTO shape (1-based line for display)
-    const mapped: BriefDiagnostic[] = diags.map((d) => ({
+    const mapped: BriefDiagnostic[] = result.data.map((d) => ({
       line: d.range.start.line + 1,
       severity: d.severity ?? 1,
       message: diagnosticMessageString(d),

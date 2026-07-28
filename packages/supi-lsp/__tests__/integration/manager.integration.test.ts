@@ -27,11 +27,12 @@ async function waitForDiagnostics(
   filePath: string,
   maxSeverity: number,
 ): Promise<Diagnostic[]> {
-  return waitFor(
+  const result = await waitFor(
     () => manager.syncFileAndGetDiagnostics(filePath, maxSeverity),
-    (diagnostics) => diagnostics.length > 0,
+    (diagnostics) => diagnostics.kind !== "unavailable" && diagnostics.data.length > 0,
     { timeoutMs: 10_000, retryDelayMs: 200, label: `diagnostics for ${path.basename(filePath)}` },
   );
+  return result.kind === "unavailable" ? [] : result.data;
 }
 
 beforeAll(() => {
@@ -125,7 +126,7 @@ describe.skipIf(!HAS_TS_LSP)("LspManager integration", () => {
   it("returns no error diagnostics for valid file", async () => {
     const validFile = path.join(tmpDir, "valid.ts");
     const diags = await manager.syncFileAndGetDiagnostics(validFile, 1);
-    expect(diags).toHaveLength(0);
+    expect(diags).toEqual({ kind: "completed", data: [] });
   }, 10_000);
 
   it("includes warnings when severity threshold raised", async () => {

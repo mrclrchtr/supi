@@ -98,6 +98,10 @@ _Avoid_: degraded coverage, coverage warning
 Tool evidence obtained by querying an available source during a `code_health` call. A continuously maintained source may expose its current snapshot with freshness limitations disclosed; a batch source must collect during the call, so a precomputed report is not a Live health observation.
 _Avoid_: live/runtime-backed signal, ambient report evidence, undisclosed cached evidence
 
+**Point inspection observation**:
+One independently collected `code_inspect` section—syntax node, enclosing declaration, hover, definition, or nearby diagnostics—with explicit completed, partial, or unavailable state. Completed empty data is an absence fact at the requested point; it is not provider unavailability. The enclosing declaration is the narrowest full provider-reported range containing the point, and nearby diagnostics intersect the documented point-line window.
+_Avoid_: availability inferred from method presence, arbitrary whole-file diagnostic fallback, first-containing outline item, collapsing empty and failed collection
+
 **Honest correctness**:
 The code-intelligence result standard that a tool must either report evidence-backed facts or explicitly say why it cannot. Source limitations stay explicit; heuristic and convention-based inferences are guidance chrome, not Tool evidence. Silent guessing, truncation, scope widening, and fallback to a weaker substrate are incorrect even when they look helpful.
 _Avoid_: best-effort correctness, "probably right", inferred facts, treating a convention as evidence, hiding degraded evidence

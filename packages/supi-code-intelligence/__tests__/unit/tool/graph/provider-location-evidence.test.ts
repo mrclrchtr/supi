@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeGraphTool } from "../../../../src/tool/graph/execute.ts";
 import { makeTestCtx } from "../../../helpers/execute-action.ts";
@@ -23,12 +24,13 @@ describe("code_graph provider location completeness", () => {
     writeSource("consumer-a.ts", "foo();\n");
     writeSource("consumer-b.ts", "foo();\n");
     registerMockProvider(tmpDir, {
-      references: async () => [
-        location(`file://${tmpDir}/consumer-a.ts`),
-        location(`file://${tmpDir}/consumer-b.ts`),
-        location(`file://${tmpDir}/bad%ZZ.ts`),
-        location(""),
-      ],
+      references: async () =>
+        completedCodeQuery([
+          location(`file://${tmpDir}/consumer-a.ts`),
+          location(`file://${tmpDir}/consumer-b.ts`),
+          location(`file://${tmpDir}/bad%ZZ.ts`),
+          location(""),
+        ]),
     });
 
     const result = await executeGraphTool(
@@ -51,11 +53,12 @@ describe("code_graph provider location completeness", () => {
     writeSource("implementation-a.ts", "class A implements Service { run() {} }\n");
     writeSource("implementation-b.ts", "class B implements Service { run() {} }\n");
     registerMockProvider(tmpDir, {
-      implementation: async () => [
-        location(`file://${tmpDir}/implementation-a.ts`, 0, 6),
-        location(`file://${tmpDir}/implementation-b.ts`, 0, 6),
-        location(`file://${tmpDir}/bad%ZZ.ts`, 0, 6),
-      ],
+      implementation: async () =>
+        completedCodeQuery([
+          location(`file://${tmpDir}/implementation-a.ts`, 0, 6),
+          location(`file://${tmpDir}/implementation-b.ts`, 0, 6),
+          location(`file://${tmpDir}/bad%ZZ.ts`, 0, 6),
+        ]),
     });
 
     const result = await executeGraphTool(

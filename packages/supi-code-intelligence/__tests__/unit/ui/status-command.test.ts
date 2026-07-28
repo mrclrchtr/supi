@@ -1,4 +1,4 @@
-import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import { completedCodeQuery, getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { getWorkspaceLspRuntime, type WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -15,10 +15,10 @@ vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
 /** Register a minimal semantic provider so getCodeProvider returns "ready" with the mocked LSP. */
 function registerMinimalSemantic(cwd: string) {
   getDefaultWorkspaceRuntime().registerSemantic(cwd, {
-    references: async () => [],
-    implementation: async () => [],
-    documentSymbols: async () => [],
-    workspaceSymbols: async () => [],
+    references: async () => completedCodeQuery([]),
+    implementation: async () => completedCodeQuery([]),
+    documentSymbols: async () => completedCodeQuery([]),
+    workspaceSymbols: async () => completedCodeQuery([]),
   });
 }
 

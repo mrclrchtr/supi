@@ -28,6 +28,8 @@ export const EVIDENCE_KEY_LABELS: Record<string, string> = {
   "find.semanticSymbols": "symbols",
   "implements.locations": "implementations",
   "imports.modules": "imports",
+  "inspect.definitions": "definitions",
+  "inspect.diagnostics": "nearby diagnostics",
   "references.locations": "references",
   "refactor.edits": "edits",
   "orientation.sections": "sections",
@@ -250,10 +252,7 @@ function structuredDetailLines(data: Record<string, unknown>): string[] {
     lines.push(`target: ${focusTarget}`);
   }
 
-  const unavailable = data.unavailableSections;
-  if (Array.isArray(unavailable) && unavailable.length > 0) {
-    lines.push(`unavailable: ${unavailable.join(", ")}`);
-  }
+  lines.push(...inspectSectionStatusLines(data.sections));
 
   const unknownNestingCount = data.groupUnknownNestingCount;
   if (
@@ -280,6 +279,18 @@ function structuredDetailLines(data: Record<string, unknown>): string[] {
   }
 
   return lines;
+}
+
+function inspectSectionStatusLines(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((section) => {
+    if (typeof section !== "object" || section === null || Array.isArray(section)) return [];
+    const record = section as Record<string, unknown>;
+    if (record.status !== "partial" && record.status !== "unavailable") return [];
+    const title = typeof record.title === "string" ? record.title : "section";
+    const reason = typeof record.reason === "string" ? ` — ${record.reason}` : "";
+    return [`${title.toLowerCase()}: ${record.status}${reason}`];
+  });
 }
 
 export function buildSimpleHeader(

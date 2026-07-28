@@ -1,7 +1,13 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { SemanticProvider, StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  completedCodeQuery,
+  type DocumentCodeSymbol,
+  type SemanticProvider,
+  type StructuralProvider,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import type { DocumentSymbol, WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 import { createLspSemanticProvider } from "@mrclrchtr/supi-lsp/provider/lsp-semantic-provider";
 import type { TreeSitterService } from "@mrclrchtr/supi-tree-sitter/api";
@@ -24,7 +30,7 @@ afterEach(() => {
 
 describe("file Target group discovery", () => {
   it("merges before deterministic hierarchy ranking across provider order", async () => {
-    const semanticSymbols: NonNullable<Awaited<ReturnType<SemanticProvider["documentSymbols"]>>> = [
+    const semanticSymbols: DocumentCodeSymbol[] = [
       {
         name: "Box",
         kind: "Class",
@@ -211,7 +217,7 @@ describe("file Target group discovery", () => {
       },
     ];
     const semantic = createLspSemanticProvider({
-      documentSymbols: async () => documentSymbols,
+      documentSymbols: async () => completedCodeQuery(documentSymbols),
     } as unknown as WorkspaceLspRuntime);
     const structural = createTreeSitterProvider({
       outline: async () => ({
@@ -357,14 +363,13 @@ describe("file Target group discovery", () => {
   });
 });
 
-function semanticProvider(
-  symbols: Awaited<ReturnType<SemanticProvider["documentSymbols"]>>,
-): SemanticProvider {
+function semanticProvider(symbols: DocumentCodeSymbol[] | null): SemanticProvider {
   return {
-    documentSymbols: async () => symbols,
-    workspaceSymbols: async () => [],
-    references: async () => [],
-    implementation: async () => [],
+    documentSymbols: async () =>
+      symbols === null ? unavailableCodeQuery("unavailable") : completedCodeQuery(symbols),
+    workspaceSymbols: async () => completedCodeQuery([]),
+    references: async () => completedCodeQuery([]),
+    implementation: async () => completedCodeQuery([]),
   };
 }
 

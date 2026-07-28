@@ -140,7 +140,7 @@ code_inspect({
 })
 ```
 
-Point inspection may include syntax, an enclosing symbol, hover/type facts, definitions, and nearby diagnostics. It does not invent heuristic substitutes when every required substrate is unavailable. Relationship guidance is emitted only from an evidence-backed definition location: resolve that definition first, then use its handle with `code_graph`. Structural-only inspection does not recommend a fresh graph anchor that LSP-first target establishment would reject.
+Point inspection validates a readable regular file and an in-bounds 1-based UTF-16 point before provider work. It reports syntax, the narrowest provider-reported enclosing declaration, hover/type facts, definitions, and diagnostics whose ranges intersect the point line ±2. Every section distinguishes completed-empty, partial, and unavailable collection; diagnostics are never substituted from elsewhere in the file. Relationship guidance is emitted only from an evidence-backed definition location: resolve that definition first, then use its handle with `code_graph`. Structural-only inspection does not recommend a fresh graph anchor that LSP-first target establishment would reject.
 
 ### Search code-aware evidence
 

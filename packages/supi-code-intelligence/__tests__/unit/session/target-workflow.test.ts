@@ -8,10 +8,11 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type {
-  DeclarationNesting,
-  SemanticProvider,
-  StructuralProvider,
+import {
+  completedCodeQuery,
+  type DeclarationNesting,
+  type SemanticProvider,
+  type StructuralProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -91,28 +92,32 @@ function makeTestSemantic(
 ): SemanticProvider {
   return {
     documentSymbols: async (file: string) =>
-      symbols
-        .filter((s) => s.file === file)
-        .map((s) => ({
+      completedCodeQuery(
+        symbols
+          .filter((s) => s.file === file)
+          .map((s) => ({
+            name: s.name,
+            kind: s.kind,
+            file: s.file,
+            declarationAnchor: s.declarationAnchor,
+            nameAnchor: s.nameAnchor,
+            container: s.container ?? null,
+            nesting: s.nesting ?? "unknown",
+          })),
+      ),
+    workspaceSymbols: async () =>
+      completedCodeQuery(
+        symbols.map((s) => ({
           name: s.name,
           kind: s.kind,
           file: s.file,
           declarationAnchor: s.declarationAnchor,
           nameAnchor: s.nameAnchor,
           container: s.container ?? null,
-          nesting: s.nesting ?? "unknown",
         })),
-    workspaceSymbols: async () =>
-      symbols.map((s) => ({
-        name: s.name,
-        kind: s.kind,
-        file: s.file,
-        declarationAnchor: s.declarationAnchor,
-        nameAnchor: s.nameAnchor,
-        container: s.container ?? null,
-      })),
-    references: async () => [],
-    implementation: async () => [],
+      ),
+    references: async () => completedCodeQuery([]),
+    implementation: async () => completedCodeQuery([]),
   };
 }
 

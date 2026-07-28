@@ -1,4 +1,8 @@
-import { type StructuralProvider, WorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  completedCodeQuery,
+  type StructuralProvider,
+  WorkspaceRuntime,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   markLspCapabilitiesReady,
@@ -106,7 +110,9 @@ describe("LSP runtime registration", () => {
         range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
       },
     ];
-    const service = createMockLspService({ references: vi.fn().mockResolvedValue(mockLocations) });
+    const service = createMockLspService({
+      references: vi.fn().mockResolvedValue(completedCodeQuery(mockLocations)),
+    });
 
     registerLspCapabilities(runtime, "/project", service);
 
@@ -114,7 +120,7 @@ describe("LSP runtime registration", () => {
     expect(ws.semantic.provider).not.toBeNull();
     const provider = ws.semantic.provider as NonNullable<typeof ws.semantic.provider>;
     const result = await provider.references("test.ts", { line: 0, character: 0 });
-    expect(result).toEqual(mockLocations);
+    expect(result).toEqual({ kind: "completed", data: mockLocations });
   });
 
   describe("refactor readiness", () => {
@@ -158,15 +164,15 @@ describe("LSP runtime registration", () => {
 
 function createMockLspService(overrides?: Partial<WorkspaceLspRuntime>): WorkspaceLspRuntime {
   const defaults: Record<string, unknown> = {
-    references: vi.fn().mockResolvedValue(null),
-    implementation: vi.fn().mockResolvedValue(null),
-    documentSymbols: vi.fn().mockResolvedValue(null),
-    workspaceSymbol: vi.fn().mockResolvedValue(null),
-    hover: vi.fn().mockResolvedValue(null),
-    definition: vi.fn().mockResolvedValue(null),
+    references: vi.fn().mockResolvedValue(completedCodeQuery([])),
+    implementation: vi.fn().mockResolvedValue(completedCodeQuery(null)),
+    documentSymbols: vi.fn().mockResolvedValue(completedCodeQuery([])),
+    workspaceSymbol: vi.fn().mockResolvedValue(completedCodeQuery([])),
+    hover: vi.fn().mockResolvedValue(completedCodeQuery(null)),
+    definition: vi.fn().mockResolvedValue(completedCodeQuery(null)),
     rename: vi.fn().mockResolvedValue(null),
     codeActions: vi.fn().mockResolvedValue(null),
-    fileDiagnostics: vi.fn().mockResolvedValue(null),
+    fileDiagnostics: vi.fn().mockResolvedValue(completedCodeQuery([])),
     getProjectServers: vi.fn().mockReturnValue([]),
     isSupportedSourceFile: vi.fn().mockReturnValue(true),
     getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue([]),

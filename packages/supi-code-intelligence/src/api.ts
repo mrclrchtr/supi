@@ -7,6 +7,7 @@ export type {
   CapabilityState,
   CodeLocation,
   CodePosition,
+  CodeQueryResult,
   CodeResult,
   CodeSymbol,
   ConfidenceMode,

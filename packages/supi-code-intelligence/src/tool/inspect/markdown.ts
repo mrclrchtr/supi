@@ -1,106 +1,141 @@
+import { renderEvidenceListDisclosure } from "../../analysis/evidence.ts";
+import type { InspectObservation } from "../../session/inspect-types.ts";
 import type { InspectResultAssembly } from "../result/inspect.ts";
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: inspect rendering keeps section ordering and unavailable-state handling explicit
 export function renderInspectResult(assembly: InspectResultAssembly): string {
   const input = assembly.data;
-  const lines: string[] = [];
-  lines.push(`# Inspect: ${input.relPath}:${input.line}:${input.character}`);
-  lines.push("");
-  lines.push(`**Confidence:** \`${input.confidence}\``);
-  lines.push("");
+  const lines = [
+    `# Inspect: ${input.relPath}:${input.line}:${input.character}`,
+    "",
+    `**Confidence:** \`${input.confidence}\``,
+    "",
+  ];
 
-  if (input.node) {
-    lines.push("## Node");
-    lines.push(
-      `- Type: \`${input.node.type}\` at ${input.relPath}:${input.node.startLine}:${input.node.startCharacter}`,
-    );
-    if (input.node.text) {
-      lines.push("```ts");
-      lines.push(input.node.text);
-      lines.push("```");
-    }
-    const ancestry = normalizeAncestry(input.node.ancestry ?? []);
-    if (ancestry.length > 0) {
-      lines.push("");
-      lines.push("### Ancestry");
-      for (const ancestor of ancestry) {
-        lines.push(`- \`${ancestor}\``);
-      }
-    }
-    lines.push("");
-  }
-
-  if (input.enclosingSymbol) {
-    lines.push("## Enclosing symbol");
-    lines.push(
-      `- \`${input.enclosingSymbol.name}\` (${input.enclosingSymbol.kind}) L${input.enclosingSymbol.startLine}–${input.enclosingSymbol.endLine}`,
-    );
-    lines.push("");
-  }
-
-  if (input.hover) {
-    lines.push("## Hover");
-    lines.push(input.hover);
-    lines.push("");
-  }
-
-  if (input.definitions.length > 0) {
-    lines.push("## Definition");
-    for (const def of input.definitions) {
-      lines.push(`- \`${def.file}:${def.line}:${def.character}\``);
-    }
-    lines.push("");
-  }
-
-  if (input.diagnostics.length > 0) {
-    lines.push("## Diagnostics");
-    for (const diagnostic of input.diagnostics) {
-      lines.push(
-        `- L${diagnostic.line}: ${formatSeverity(diagnostic.severity)}: ${diagnostic.message}`,
-      );
-    }
-    lines.push("");
-  }
-
-  if (input.unavailableSections.length > 0) {
-    lines.push("## Unavailable");
-    for (const section of input.unavailableSections) {
-      lines.push(`- ${section}`);
-    }
-    lines.push("");
-  }
-
+  renderNode(lines, input, input.sections.node);
+  renderEnclosingSymbol(lines, input.sections.enclosingSymbol);
+  renderHover(lines, input.sections.hover);
+  renderDefinitions(lines, assembly);
+  renderDiagnostics(lines, assembly);
   return lines.join("\n");
 }
 
-function normalizeAncestry(
-  ancestry: ReadonlyArray<
-    | string
-    | {
-        type: string;
-        startLine: number;
-        startCharacter: number;
-        endLine?: number;
-        endCharacter?: number;
-      }
-  >,
-): string[] {
-  return ancestry.map((entry) => {
-    if (typeof entry === "string") return entry;
-    const start = `L${entry.startLine}:${entry.startCharacter}`;
-    const end =
-      entry.endLine != null && entry.endCharacter != null
-        ? `–L${entry.endLine}:${entry.endCharacter}`
-        : "";
-    return `${entry.type} ${start}${end}`;
-  });
+function renderNode(
+  lines: string[],
+  input: InspectResultAssembly["data"],
+  observation: InspectResultAssembly["data"]["sections"]["node"],
+): void {
+  lines.push("## Syntax node");
+  if (observation.kind === "unavailable") {
+    appendUnavailable(lines, observation);
+    return;
+  }
+  appendPartial(lines, observation);
+  const node = observation.data;
+  if (!node) {
+    lines.push("_No syntax node at this point._", "");
+    return;
+  }
+  lines.push(
+    `- Type: \`${node.type}\` at ${input.relPath}:${node.startLine}:${node.startCharacter}–${node.endLine}:${node.endCharacter}`,
+  );
+  if (node.text) lines.push("```ts", node.text, "```");
+  if (node.ancestry.length > 0) {
+    lines.push("", "### Ancestry");
+    for (const ancestor of node.ancestry) {
+      lines.push(
+        `- \`${ancestor.type} L${ancestor.startLine}:${ancestor.startCharacter}–L${ancestor.endLine}:${ancestor.endCharacter}\``,
+      );
+    }
+  }
+  lines.push("");
 }
 
-function formatSeverity(severity: number | string): string {
-  if (typeof severity === "string") {
-    return severity.charAt(0).toUpperCase() + severity.slice(1);
+function renderEnclosingSymbol(
+  lines: string[],
+  observation: InspectResultAssembly["data"]["sections"]["enclosingSymbol"],
+): void {
+  lines.push("## Enclosing symbol");
+  if (observation.kind === "unavailable") {
+    appendUnavailable(lines, observation);
+    return;
   }
+  appendPartial(lines, observation);
+  const symbol = observation.data;
+  if (!symbol) {
+    lines.push("_No provider-reported declaration encloses this point._", "");
+    return;
+  }
+  lines.push(
+    `- \`${symbol.name}\` (${symbol.kind}) L${symbol.startLine}:${symbol.startCharacter}–L${symbol.endLine}:${symbol.endCharacter}`,
+    "",
+  );
+}
 
+function renderHover(
+  lines: string[],
+  observation: InspectResultAssembly["data"]["sections"]["hover"],
+): void {
+  lines.push("## Hover");
+  if (observation.kind === "unavailable") {
+    appendUnavailable(lines, observation);
+    return;
+  }
+  appendPartial(lines, observation);
+  lines.push(observation.data ?? "_No hover result at this point._", "");
+}
+
+function renderDefinitions(lines: string[], assembly: InspectResultAssembly): void {
+  const observation = assembly.data.sections.definition;
+  lines.push("## Definition");
+  if (appendUnavailable(lines, observation)) return;
+  appendPartial(lines, observation);
+  if (assembly.displayedDefinitions.length === 0) {
+    lines.push("_No definition result at this point._");
+  } else {
+    for (const definition of assembly.displayedDefinitions) {
+      lines.push(`- \`${definition.file}:${definition.line}:${definition.character}\``);
+    }
+  }
+  const disclosure = assembly.definitionEvidence
+    ? renderEvidenceListDisclosure(assembly.definitionEvidence)
+    : null;
+  if (disclosure) lines.push("", disclosure);
+  lines.push("");
+}
+
+function renderDiagnostics(lines: string[], assembly: InspectResultAssembly): void {
+  const observation = assembly.data.sections.diagnostics;
+  const window = assembly.data.diagnosticWindow;
+  lines.push(`## Diagnostics (L${window.startLine}–L${window.endLine})`);
+  if (appendUnavailable(lines, observation)) return;
+  appendPartial(lines, observation);
+  if (assembly.displayedDiagnostics.length === 0) {
+    lines.push("_No diagnostics intersect the nearby window._");
+  } else {
+    for (const diagnostic of assembly.displayedDiagnostics) {
+      lines.push(
+        `- L${diagnostic.line}:${diagnostic.character}: ${formatSeverity(diagnostic.severity)}: ${diagnostic.message}`,
+      );
+    }
+  }
+  const disclosure = assembly.diagnosticEvidence
+    ? renderEvidenceListDisclosure(assembly.diagnosticEvidence)
+    : null;
+  if (disclosure) lines.push("", disclosure);
+  lines.push("");
+}
+
+function appendUnavailable(lines: string[], observation: InspectObservation<unknown>): boolean {
+  if (observation.kind !== "unavailable") return false;
+  lines.push(`_Unavailable — ${observation.reason}_`, "");
+  return true;
+}
+
+function appendPartial(lines: string[], observation: InspectObservation<unknown>): void {
+  if (observation.kind === "partial") lines.push(`_Partial — ${observation.reason}_`, "");
+}
+
+function formatSeverity(severity: number): string {
   switch (severity) {
     case 1:
       return "Error";

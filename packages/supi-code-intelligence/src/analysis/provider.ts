@@ -14,6 +14,7 @@ import {
   getDefaultWorkspaceRuntime,
   type SemanticProvider,
   type StructuralProvider,
+  unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { getWorkspaceLspRuntime, type WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 
@@ -107,22 +108,35 @@ function createCompositeProvider(
   return {
     // ── Semantic methods ──────────────────────────────────────────────
     async references(...args: Parameters<SemanticProvider["references"]>) {
-      return semantic?.references(...args) ?? null;
+      return (
+        semantic?.references(...args) ?? unavailableCodeQuery("Semantic references unavailable")
+      );
     },
     async implementation(...args: Parameters<SemanticProvider["implementation"]>) {
-      return semantic?.implementation(...args) ?? null;
+      return (
+        semantic?.implementation(...args) ??
+        unavailableCodeQuery("Semantic implementations unavailable")
+      );
     },
     async documentSymbols(...args: Parameters<SemanticProvider["documentSymbols"]>) {
-      return semantic?.documentSymbols(...args) ?? null;
+      return (
+        semantic?.documentSymbols(...args) ??
+        unavailableCodeQuery("Semantic document symbols unavailable")
+      );
     },
     async workspaceSymbols(...args: Parameters<SemanticProvider["workspaceSymbols"]>) {
-      return semantic?.workspaceSymbols(...args) ?? null;
+      return (
+        semantic?.workspaceSymbols(...args) ??
+        unavailableCodeQuery("Semantic workspace symbols unavailable")
+      );
     },
     async hover(...args: Parameters<NonNullable<SemanticProvider["hover"]>>) {
-      return semantic?.hover?.(...args) ?? null;
+      return semantic?.hover?.(...args) ?? unavailableCodeQuery("Semantic hover unavailable");
     },
     async definition(...args: Parameters<NonNullable<SemanticProvider["definition"]>>) {
-      return semantic?.definition?.(...args) ?? null;
+      return (
+        semantic?.definition?.(...args) ?? unavailableCodeQuery("Semantic definition unavailable")
+      );
     },
     async codeActions(...args: Parameters<NonNullable<SemanticProvider["codeActions"]>>) {
       return semantic?.codeActions?.(...args) ?? [];

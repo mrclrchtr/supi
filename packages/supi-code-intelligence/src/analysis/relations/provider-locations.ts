@@ -2,7 +2,7 @@ import * as path from "node:path";
 import { uriToFile } from "@mrclrchtr/supi-core/path";
 
 /** Why a provider-backed relation location could not be included as evidence. */
-export type RelationLocationPartialReason = "invalid-provider-location";
+export type RelationLocationPartialReason = "invalid-provider-location" | "provider-limited";
 
 interface ProviderPositionLike {
   readonly line?: number;

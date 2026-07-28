@@ -8,6 +8,7 @@
 
 - `src/api.ts` — explicit public API surface
 - `src/types.ts` — canonical shared value/result types (includes refactor types: `RefactorOperation`, `RefactorRequest`, `RefactorResult`, `WorkspaceEdit`, `FileEdit`, `DisambiguationCandidate`)
+- `src/query-result.ts` — typed read-query outcomes and constructors (`completed | partial | unavailable`)
 - `src/capability/types.ts` — capability interfaces (`SemanticProvider`, `StructuralProvider`) and availability states (`CapabilityState`)
 - `src/workspace/runtime.ts` — workspace-scoped capability broker; one instance per `Symbol.for` global singleton, manages both semantic (with refactor metadata) and structural slots
 - `src/workspace/context.ts` — typed request context helper for consumers, includes `refactorAvailable` on semantic slot
@@ -17,6 +18,7 @@
 - Keep the API minimal and package-agnostic.
 - Do not add pi tool registration or extension exports here.
 - Capability interfaces should be stable interfaces, not classes.
+- Read-only semantic queries use `CodeQueryResult<T>`; preserve completed empty data separately from partial or unavailable collection.
 - Availability states must distinguish pending, ready, inactive, disabled, and unavailable.
 - When adding new capability types, add them to the registry and context helper.
 - `SemanticProvider` may optionally expose a generic `refactor(request)` method plus lower-level `rename` and `codeActions` helpers. The broker computes `refactorAvailable` automatically from provider method existence — do not introduce a third independent broker slot for refactoring.

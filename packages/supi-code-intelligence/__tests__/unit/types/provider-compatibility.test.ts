@@ -1,14 +1,18 @@
-import type { SemanticProvider, StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type SemanticProvider,
+  type StructuralProvider,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it } from "vitest";
 
 describe("Provider type compatibility", () => {
   it("SemanticProvider and SemanticSubstrate are compatible", () => {
     // Verify that SemanticProvider can be used where SemanticSubstrate is expected
     const provider: SemanticProvider = {
-      references: async () => null,
-      implementation: async () => null,
-      documentSymbols: async () => null,
-      workspaceSymbols: async () => null,
+      references: async () => unavailableCodeQuery("not configured"),
+      implementation: async () => unavailableCodeQuery("not configured"),
+      documentSymbols: async () => unavailableCodeQuery("not configured"),
+      workspaceSymbols: async () => unavailableCodeQuery("not configured"),
     };
     // The code-intelligence SemanticSubstrate has the same shape
     const substrate: import("@mrclrchtr/supi-code-runtime/api").SemanticProvider = provider;

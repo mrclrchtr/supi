@@ -1,3 +1,5 @@
+import type { SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
+
 /**
  * Shared types for the relations analysis modules.
  *
@@ -50,35 +52,8 @@ export interface ImplementationEntry {
 export interface RelationsServiceDeps {
   cwd: string;
   provider: {
-    references?: (
-      file: string,
-      pos: { line: number; character: number },
-    ) => Promise<Array<{
-      uri: string;
-      range: {
-        start: { line: number; character: number };
-        end: { line: number; character: number };
-      };
-    }> | null>;
-    implementation?: (
-      file: string,
-      pos: { line: number; character: number },
-    ) => Promise<Array<{
-      uri?: string;
-      targetUri?: string;
-      range?: {
-        start: { line: number; character: number };
-        end?: { line: number; character: number };
-      };
-      targetSelectionRange?: {
-        start: { line: number; character: number };
-        end?: { line: number; character: number };
-      };
-      targetRange?: {
-        start: { line: number; character: number };
-        end?: { line: number; character: number };
-      };
-    }> | null>;
+    references?: SemanticProvider["references"];
+    implementation?: SemanticProvider["implementation"];
     calleesAt?: (
       file: string,
       line: number,

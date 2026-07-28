@@ -44,8 +44,8 @@ export async function collectImplementations(
     };
   }
 
-  const impls = await deps.provider.implementation(targetFile, targetPosition);
-  if (!impls) {
+  const result = await deps.provider.implementation(targetFile, targetPosition);
+  if (result.kind === "unavailable") {
     return {
       kind: "implementations",
       targetName: targetName ?? "symbol",
@@ -53,11 +53,11 @@ export async function collectImplementations(
       externalCount: 0,
       invalidLocationCount: 0,
       partialReason: null,
-      confidence: "semantic",
+      confidence: "unavailable",
     };
   }
 
-  const normalized = normalizeProviderLocations(impls, deps.cwd);
+  const normalized = normalizeProviderLocations(result.data, deps.cwd);
   const normalizedTargetFile = normalizeTargetFile(targetFile, deps.cwd);
   const project: ImplementationEntry[] = normalized.project
     .filter(
@@ -73,7 +73,8 @@ export async function collectImplementations(
     implementations: project,
     externalCount: normalized.external.length,
     invalidLocationCount: normalized.invalidLocationCount,
-    partialReason: normalized.partialReason,
+    partialReason:
+      normalized.partialReason ?? (result.kind === "partial" ? "provider-limited" : null),
     confidence: "semantic",
   };
 }

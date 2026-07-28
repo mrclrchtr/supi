@@ -5,6 +5,11 @@
 import { type ChildProcess, execSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
+import {
+  type CodeQueryResult,
+  completedCodeQuery,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import type { ProgressToken } from "vscode-languageserver-protocol";
 import { CLIENT_CAPABILITIES } from "../config/capabilities.ts";
@@ -474,8 +479,8 @@ export class LspClient {
   }
 
   // ── LSP Requests ───────────────────────────────────────────────────
-  async hover(filePath: string, position: Position): Promise<Hover | null> {
-    return this.request("textDocument/hover", {
+  async hover(filePath: string, position: Position): Promise<CodeQueryResult<Hover | null>> {
+    return this.query("textDocument/hover", {
       textDocument: { uri: fileToUri(filePath) },
       position,
     });
@@ -484,30 +489,39 @@ export class LspClient {
   async definition(
     filePath: string,
     position: Position,
-  ): Promise<Location | Location[] | LocationLink[] | null> {
-    return this.request("textDocument/definition", {
+  ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>> {
+    return this.query("textDocument/definition", {
       textDocument: { uri: fileToUri(filePath) },
       position,
     });
   }
 
-  async references(filePath: string, position: Position): Promise<Location[] | null> {
-    return this.request("textDocument/references", {
+  async references(
+    filePath: string,
+    position: Position,
+  ): Promise<CodeQueryResult<Location[] | null>> {
+    return this.query("textDocument/references", {
       textDocument: { uri: fileToUri(filePath) },
       position,
       context: { includeDeclaration: true },
     });
   }
 
-  async documentSymbols(filePath: string): Promise<DocumentSymbol[] | SymbolInformation[] | null> {
-    return this.request("textDocument/documentSymbol", {
+  async documentSymbols(
+    filePath: string,
+  ): Promise<CodeQueryResult<DocumentSymbol[] | SymbolInformation[] | null>> {
+    return this.query("textDocument/documentSymbol", {
       textDocument: { uri: fileToUri(filePath) },
     });
   }
 
-  async workspaceSymbol(query: string): Promise<SymbolInformation[] | WorkspaceSymbol[] | null> {
-    if (!this.capabilities?.workspaceSymbolProvider) return null;
-    return this.request("workspace/symbol", { query });
+  async workspaceSymbol(
+    query: string,
+  ): Promise<CodeQueryResult<SymbolInformation[] | WorkspaceSymbol[] | null>> {
+    if (!this.capabilities?.workspaceSymbolProvider) {
+      return unavailableCodeQuery("Workspace-symbol requests are not supported by this server.");
+    }
+    return this.query("workspace/symbol", { query });
   }
 
   async rename(
@@ -537,23 +551,36 @@ export class LspClient {
   async implementation(
     filePath: string,
     position: Position,
-  ): Promise<Location | Location[] | LocationLink[] | null> {
-    if (!this.capabilities?.implementationProvider) return null;
-    return this.request("textDocument/implementation", {
+  ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>> {
+    if (!this.capabilities?.implementationProvider) {
+      return unavailableCodeQuery("Implementation requests are not supported by this server.");
+    }
+    return this.query("textDocument/implementation", {
       textDocument: { uri: fileToUri(filePath) },
       position,
     });
   }
 
   // ── Private ─────────────────────────────────────────────────────────
-  private async request<T>(method: string, params: unknown): Promise<T | null> {
-    if (!this.rpc || this._status !== "running") return null;
+  private async query<T>(method: string, params: unknown): Promise<CodeQueryResult<T | null>> {
+    if (!this.rpc || this._status !== "running") {
+      return unavailableCodeQuery(
+        `LSP request ${method} is unavailable because the client is not running.`,
+      );
+    }
     try {
       await this.getReady();
-      return (await this.rpc.sendRequest(method, params)) as T;
-    } catch {
-      return null;
+      const data = (await this.rpc.sendRequest(method, params)) as T | null | undefined;
+      return completedCodeQuery(data ?? null);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      return unavailableCodeQuery(`LSP request ${method} failed: ${detail}`);
     }
+  }
+
+  private async request<T>(method: string, params: unknown): Promise<T | null> {
+    const result = await this.query<T>(method, params);
+    return result.kind === "unavailable" ? null : result.data;
   }
 
   private handleServerRequest(method: string, params: unknown): unknown {

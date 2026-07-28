@@ -33,8 +33,8 @@ export async function augmentDiagnostics(
 
   const parts: string[] = [];
 
-  if (hoverResult) {
-    const hoverText = formatHoverForDiagnostics(hoverResult);
+  if (hoverResult?.kind !== "unavailable" && hoverResult?.data) {
+    const hoverText = formatHoverForDiagnostics(hoverResult.data);
     if (hoverText) parts.push(`💡 Hover info:\n${hoverText}`);
   }
 

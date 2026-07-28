@@ -4,10 +4,15 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import type { CodeQueryResult } from "@mrclrchtr/supi-code-runtime/api";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LspClient } from "../../src/client/client.ts";
 import type { Diagnostic, ServerConfig } from "../../src/config/types.ts";
 import { hasCommand, waitFor } from "../helpers/integration-utils.ts";
+
+function queryData<T>(result: CodeQueryResult<T>): T | null {
+  return result.kind === "unavailable" ? null : result.data;
+}
 
 const PY_SERVER_CONFIG: ServerConfig = {
   command: "pyright-langserver",
@@ -104,16 +109,16 @@ describe.skipIf(!HAS_PYRIGHT)("LspClient integration (pyright-langserver)", () =
     expect(text).toContain("a");
   }, 10_000);
 
-  it("returns no hover for empty position", async () => {
+  it("returns a completed empty hover for an empty position", async () => {
     const hover = await client.hover(goodFile, { line: 2, character: 0 });
-    expect(hover).toBeNull();
+    expect(hover).toEqual({ kind: "completed", data: null });
   }, 10_000);
 
   it("returns definition location", async () => {
     // "add" is called inside Calculator.sum on line 10, character ~15
     const def = await waitFor(
       () => client.definition(goodFile, { line: 10, character: 15 }),
-      (definition) => definition !== null,
+      (definition) => queryData(definition) !== null,
       { timeoutMs: 5_000, retryDelayMs: 100, label: "definition of 'add' in calc.py" },
     );
     expect(def).not.toBeNull();
@@ -121,11 +126,12 @@ describe.skipIf(!HAS_PYRIGHT)("LspClient integration (pyright-langserver)", () =
 
   it("returns document symbols", async () => {
     const symbols = await client.documentSymbols(goodFile);
-    expect(symbols).not.toBeNull();
-    expect(Array.isArray(symbols)).toBe(true);
-    expect(symbols?.length).toBeGreaterThan(0);
+    const data = queryData(symbols);
+    expect(data).not.toBeNull();
+    expect(Array.isArray(data)).toBe(true);
+    expect(data?.length).toBeGreaterThan(0);
 
-    const text = JSON.stringify(symbols);
+    const text = JSON.stringify(data);
     expect(text).toContain("add");
     expect(text).toContain("greet");
     expect(text).toContain("Calculator");
@@ -171,10 +177,11 @@ describe.skipIf(!HAS_PYRIGHT)("LspClient integration (pyright-langserver)", () =
 
   it("returns workspace symbols", async () => {
     const symbols = await client.workspaceSymbol("add");
-    expect(symbols).not.toBeNull();
-    expect(Array.isArray(symbols)).toBe(true);
-    if (symbols && symbols.length > 0) {
-      const text = JSON.stringify(symbols);
+    const data = queryData(symbols);
+    expect(data).not.toBeNull();
+    expect(Array.isArray(data)).toBe(true);
+    if (data && data.length > 0) {
+      const text = JSON.stringify(data);
       expect(text).toContain("add");
     }
   }, 10_000);

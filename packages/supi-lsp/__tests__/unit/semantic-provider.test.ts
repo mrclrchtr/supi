@@ -1,7 +1,12 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type CodeQueryResult,
+  completedCodeQuery,
+  type SemanticProvider,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it, vi } from "vitest";
 import { createLspSemanticProvider } from "../../src/provider/lsp-semantic-provider.ts";
 import type { WorkspaceLspRuntime } from "../../src/session/runtime-registry.ts";
@@ -33,8 +38,43 @@ describe("LspSemanticProvider", () => {
     };
   }
 
-  function createMockLsp(overrides?: Partial<WorkspaceLspRuntime>): WorkspaceLspRuntime {
-    return { ...defaultMockFields(), ...overrides } as unknown as WorkspaceLspRuntime;
+  function createMockLsp(overrides?: Record<string, unknown>): WorkspaceLspRuntime {
+    const fields = { ...defaultMockFields(), ...overrides };
+    for (const key of [
+      "references",
+      "implementation",
+      "documentSymbols",
+      "workspaceSymbol",
+      "hover",
+      "definition",
+      "fileDiagnostics",
+    ]) {
+      const query = fields[key] as (...args: unknown[]) => Promise<unknown>;
+      fields[key] = async (...args: unknown[]) => {
+        const value = await query(...args);
+        if (isCodeQueryResult(value)) return value;
+        const listQuery = [
+          "references",
+          "documentSymbols",
+          "workspaceSymbol",
+          "fileDiagnostics",
+        ].includes(key);
+        return completedCodeQuery(listQuery && value === null ? [] : value);
+      };
+    }
+    return fields as unknown as WorkspaceLspRuntime;
+  }
+
+  function isCodeQueryResult(value: unknown): value is CodeQueryResult<unknown> {
+    if (typeof value !== "object" || value === null) return false;
+    const kind = (value as { kind?: unknown }).kind;
+    return kind === "completed" || kind === "partial" || kind === "unavailable";
+  }
+
+  function completedData<T>(result: CodeQueryResult<T> | undefined): T {
+    expect(result?.kind).not.toBe("unavailable");
+    if (!result || result.kind === "unavailable") throw new Error("Expected query data");
+    return result.data;
   }
 
   it("creates a SemanticProvider from a WorkspaceLspRuntime", () => {
@@ -47,11 +87,11 @@ describe("LspSemanticProvider", () => {
   });
 
   describe("references", () => {
-    it("returns null when LSP returns null", async () => {
+    it("preserves a completed empty result", async () => {
       const lsp = createMockLsp({ references: vi.fn().mockResolvedValue(null) });
       const provider = createLspSemanticProvider(lsp);
       const result = await provider.references("test.ts", { line: 0, character: 0 });
-      expect(result).toBeNull();
+      expect(result).toEqual({ kind: "completed", data: [] });
     });
 
     it("maps Location[] to CodeLocation[]", async () => {
@@ -65,9 +105,10 @@ describe("LspSemanticProvider", () => {
       });
       const provider = createLspSemanticProvider(lsp);
       const result = await provider.references("test.ts", { line: 0, character: 0 });
-      expect(result).toHaveLength(1);
-      expect(result?.[0].uri).toBe("file:///src/index.ts");
-      expect(result?.[0].range.start.line).toBe(5);
+      const data = completedData(result);
+      expect(data).toHaveLength(1);
+      expect(data[0]?.uri).toBe("file:///src/index.ts");
+      expect(data[0]?.range.start.line).toBe(5);
     });
   });
 
@@ -81,8 +122,9 @@ describe("LspSemanticProvider", () => {
       });
       const provider = createLspSemanticProvider(lsp);
       const result = await provider.implementation("test.ts", { line: 0, character: 0 });
-      expect(result).toHaveLength(1);
-      expect(result?.[0].uri).toBe("file:///src/impl.ts");
+      const data = completedData(result);
+      expect(data).toHaveLength(1);
+      expect(data[0]?.uri).toBe("file:///src/impl.ts");
     });
 
     it("handles multiple Location results", async () => {
@@ -100,16 +142,16 @@ describe("LspSemanticProvider", () => {
       });
       const provider = createLspSemanticProvider(lsp);
       const result = await provider.implementation("test.ts", { line: 0, character: 0 });
-      expect(result).toHaveLength(2);
+      expect(completedData(result)).toHaveLength(2);
     });
   });
 
   describe("documentSymbols", () => {
-    it("returns null when LSP returns null", async () => {
+    it("preserves a completed empty result", async () => {
       const lsp = createMockLsp({ documentSymbols: vi.fn().mockResolvedValue(null) });
       const provider = createLspSemanticProvider(lsp);
       const result = await provider.documentSymbols("test.ts");
-      expect(result).toBeNull();
+      expect(result).toEqual({ kind: "completed", data: [] });
     });
 
     it("flattens DocumentSymbol hierarchy into flat CodeSymbol list", async () => {
@@ -136,14 +178,15 @@ describe("LspSemanticProvider", () => {
       });
       const provider = createLspSemanticProvider(lsp);
       const result = await provider.documentSymbols("test.ts");
-      expect(result).toHaveLength(2);
-      expect(result?.[0]).toMatchObject({
+      const data = completedData(result);
+      expect(data).toHaveLength(2);
+      expect(data[0]).toMatchObject({
         name: "myClass",
         kind: "Class",
         container: null,
         nesting: "top-level",
       });
-      expect(result?.[1]).toMatchObject({
+      expect(data[1]).toMatchObject({
         name: "myMethod",
         container: "myClass",
         nesting: "nested",
@@ -175,7 +218,7 @@ describe("LspSemanticProvider", () => {
 
       const result = await createLspSemanticProvider(lsp).documentSymbols("test.ts");
 
-      expect(result).toMatchObject([
+      expect(completedData(result)).toMatchObject([
         { name: "unknownRoot", container: null, nesting: "unknown" },
         { name: "knownNested", container: "Box", nesting: "unknown" },
       ]);
@@ -201,9 +244,10 @@ describe("LspSemanticProvider", () => {
 
       try {
         const result = await createLspSemanticProvider(lsp).documentSymbols(file);
+        const data = completedData(result);
 
-        expect(result?.[0].declarationAnchor).toEqual({ line: 1, character: 1 });
-        expect(result?.[0].nameAnchor).toEqual({ line: 1, character: 17 });
+        expect(data[0]?.declarationAnchor).toEqual({ line: 1, character: 1 });
+        expect(data[0]?.nameAnchor).toEqual({ line: 1, character: 17 });
       } finally {
         rmSync(tmpDir, { recursive: true, force: true });
       }
@@ -211,11 +255,11 @@ describe("LspSemanticProvider", () => {
   });
 
   describe("workspaceSymbols", () => {
-    it("returns null when LSP returns null", async () => {
+    it("preserves a completed empty result", async () => {
       const lsp = createMockLsp({ workspaceSymbol: vi.fn().mockResolvedValue(null) });
       const provider = createLspSemanticProvider(lsp);
       const result = await provider.workspaceSymbols("foo");
-      expect(result).toBeNull();
+      expect(result).toEqual({ kind: "completed", data: [] });
     });
 
     it("maps SymbolInformation to CodeSymbol", async () => {
@@ -234,21 +278,33 @@ describe("LspSemanticProvider", () => {
       });
       const provider = createLspSemanticProvider(lsp);
       const result = await provider.workspaceSymbols("myFunc");
-      expect(result).toHaveLength(1);
-      expect(result?.[0].name).toBe("myFunc");
-      expect(result?.[0].kind).toBe("Function");
-      expect(result?.[0].file).toBe("/src/index.ts");
-      expect(result?.[0].declarationAnchor.line).toBe(6);
-      expect(result?.[0].container).toBe("moduleA");
+      const data = completedData(result);
+      expect(data).toHaveLength(1);
+      expect(data[0]?.name).toBe("myFunc");
+      expect(data[0]?.kind).toBe("Function");
+      expect(data[0]?.file).toBe("/src/index.ts");
+      expect(data[0]?.declarationAnchor.line).toBe(6);
+      expect(data[0]?.container).toBe("moduleA");
     });
   });
 
   describe("hover", () => {
-    it("returns null when LSP returns null", async () => {
+    it("preserves protocol null as completed empty", async () => {
       const lsp = createMockLsp({ hover: vi.fn().mockResolvedValue(null) });
       const provider = createLspSemanticProvider(lsp);
       const result = await provider.hover?.("test.ts", { line: 0, character: 0 });
-      expect(result).toBeNull();
+      expect(result).toEqual({ kind: "completed", data: null });
+    });
+
+    it("preserves an unavailable provider result", async () => {
+      const lsp = createMockLsp({
+        hover: vi.fn().mockResolvedValue(unavailableCodeQuery("transport failed")),
+      });
+      const provider = createLspSemanticProvider(lsp);
+      await expect(provider.hover?.("test.ts", { line: 0, character: 0 })).resolves.toEqual({
+        kind: "unavailable",
+        reason: "transport failed",
+      });
     });
 
     it("converts MarkupContent hover to simplified shape", async () => {
@@ -260,9 +316,9 @@ describe("LspSemanticProvider", () => {
       });
       const provider = createLspSemanticProvider(lsp);
       const result = await provider.hover?.("test.ts", { line: 5, character: 3 });
-      expect(result).not.toBeNull();
-      expect(result?.contents).toBe("```ts\nconst x: number\n```");
-      expect(result?.range).toBeUndefined();
+      const data = completedData(result);
+      expect(data?.contents).toBe("```ts\nconst x: number\n```");
+      expect(data?.range).toBeUndefined();
     });
 
     it("converts string contents hover", async () => {
@@ -273,7 +329,7 @@ describe("LspSemanticProvider", () => {
       });
       const provider = createLspSemanticProvider(lsp);
       const result = await provider.hover?.("test.ts", { line: 0, character: 0 });
-      expect(result?.contents).toBe("const x: number");
+      expect(completedData(result)?.contents).toBe("const x: number");
     });
 
     it("converts MarkedString array hover", async () => {
@@ -284,7 +340,7 @@ describe("LspSemanticProvider", () => {
       });
       const provider = createLspSemanticProvider(lsp);
       const result = await provider.hover?.("test.ts", { line: 0, character: 0 });
-      expect(result?.contents).toBe("const x: number\ninline docs");
+      expect(completedData(result)?.contents).toBe("const x: number\ninline docs");
     });
 
     it("includes range when present", async () => {
@@ -299,8 +355,9 @@ describe("LspSemanticProvider", () => {
       });
       const provider = createLspSemanticProvider(lsp);
       const result = await provider.hover?.("test.ts", { line: 10, character: 7 });
-      expect(result?.contents).toBe("number");
-      expect(result?.range).toEqual({
+      const data = completedData(result);
+      expect(data?.contents).toBe("number");
+      expect(data?.range).toEqual({
         start: { line: 10, character: 4 },
         end: { line: 10, character: 10 },
       });

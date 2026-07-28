@@ -20,7 +20,7 @@ Surfaces: `./extension` (PI registration) and `./api` (reusable type contracts).
 ## Public tool gotchas
 
 - **`code_orientation`**: omitted `focus` means workspace. Otherwise use exactly one of `focus.path`, `focus.module`, or `focus.target`. Directory focus surfaces configured instruction files once per session branch.
-- **`code_inspect`**: requires `point: { file, line, character }`; it reports local facts and throws when every inspection substrate is unavailable.
+- **`code_inspect`**: requires `point: { file, line, character }`; it validates a readable regular file and UTF-16 bounds before providers, reports only point-local facts, preserves completed-empty/partial/unavailable state per section, selects the narrowest provider-reported enclosing range, and throws only when every inspection substrate is unavailable.
 - **`code_graph`**: accepts exactly one target handle/anchor/symbol. Relations are only `references`, structural `callees`, and `implements`; `all` means exactly those three. Callees are source-shape calls, not symbol identity. Semantic provider locations are canonically normalized before containment, declaration filtering, and deterministic deduplication; invalid locations are disclosed as partial evidence rather than counted as external.
 - **`code_find`**: `mode` is required and exactly `ast | semantic`; literal/regex search belongs to PI grep. AST kinds are exactly `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, and `enum`; test identity is not inferred. AST `call` matches by written name. Modes never silently fall back. `scope`, when present, is a non-empty string array. AST mode uses the owned, operation-aware Scan policy documented in the README: exact operation-ineligible files are invalid, unsupported-only directories are unavailable, mixed scopes disclose policy exclusions without becoming partial, and runtime limitations remain partial.
 - **`code_resolve`**: anchored resolution requires a real symbol. Whitespace/comment coordinates fail and recommend `code_inspect`. File selectors enumerate all declarations but materialize handles only for the bounded visible Target group, never a synthetic file-position handle. Canonical declaration line/occurrence distinguishes overloads; preferred display/name-anchor position is not identity. Exact structural name-anchor evidence may refine an underspecified LSP kind for identity without changing its displayed Provider-reported symbol kind. `symbolKind` is a strict provider-reported LSP kind filter; a valid query with only wrong-kind candidates returns a typed Symbol-kind mismatch with bounded handles.
@@ -56,7 +56,7 @@ Whole-workflow capability unavailable → throw from `execute()` so PI marks a r
 
 ## Provider/runtime contract
 
-`WorkspaceCapabilityAdapter` reads `supi-code-runtime` capability state and the `WorkspaceLspRuntime`. `TestCapabilityAdapter` is the in-memory workflow-test seam. When provider contracts change, update the composite provider and behavior tests together.
+`WorkspaceCapabilityAdapter` reads `supi-code-runtime` capability state and the `WorkspaceLspRuntime`. `TestCapabilityAdapter` is the in-memory workflow-test seam. Read-only semantic providers return `CodeQueryResult<T>`; completed empty data must not be inferred as unavailable. When provider contracts change, update the LSP runtime, composite provider, test adapter, and behavior tests together.
 
 ## Always-on LSP policy
 

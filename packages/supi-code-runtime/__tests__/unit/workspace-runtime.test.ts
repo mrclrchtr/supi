@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { SemanticProvider, StructuralProvider } from "../../src/capability/types.ts";
+import { unavailableCodeQuery } from "../../src/query-result.ts";
 import type {
   CodeLocation,
   CodePosition,
@@ -205,11 +206,14 @@ describe("WorkspaceRuntime", () => {
 
 function createMockSemanticProvider(): SemanticProvider {
   return {
-    references: async (_file: string, _pos: CodePosition): Promise<CodeLocation[] | null> => null,
-    implementation: async (_file: string, _pos: CodePosition): Promise<CodeLocation[] | null> =>
-      null,
-    documentSymbols: async (_file: string): Promise<DocumentCodeSymbol[] | null> => null,
-    workspaceSymbols: async (_query: string): Promise<CodeSymbol[] | null> => null,
+    references: async (_file: string, _pos: CodePosition) =>
+      unavailableCodeQuery<CodeLocation[]>("not configured"),
+    implementation: async (_file: string, _pos: CodePosition) =>
+      unavailableCodeQuery<CodeLocation[]>("not configured"),
+    documentSymbols: async (_file: string) =>
+      unavailableCodeQuery<DocumentCodeSymbol[]>("not configured"),
+    workspaceSymbols: async (_query: string) =>
+      unavailableCodeQuery<CodeSymbol[]>("not configured"),
   };
 }
 

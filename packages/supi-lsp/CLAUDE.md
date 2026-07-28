@@ -39,7 +39,9 @@ Runtime positions are raw 0-based LSP coordinates. Use `toLspPosition()` when st
 
 ## Semantic and refactor behavior
 
-The provider maps semantic requests to `WorkspaceLspRuntime`. Public code-intelligence refactors currently use:
+The provider maps semantic requests to `WorkspaceLspRuntime`. Read-only semantic and diagnostic requests return `CodeQueryResult<T>`: protocol-level empty data is `completed`, multi-client incomplete collection is `partial`, and routing/request/synchronization failure is `unavailable`. Do not collapse these states back to `null` or `[]`.
+
+Public code-intelligence refactors currently use:
 
 - `rename_symbol` → `textDocument/rename`
 - `extract_function` → matching precise code action

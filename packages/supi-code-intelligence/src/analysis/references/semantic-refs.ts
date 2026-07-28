@@ -37,20 +37,21 @@ export async function collectReferences(
   cwd: string,
   semantic: SemanticSubstrate,
 ): Promise<ReferenceCollection> {
-  const locs = await semantic.references(target.file, target.position);
-  if (!locs) {
+  const result = await semantic.references(target.file, target.position);
+  if (result.kind === "unavailable") {
     return { refs: [], confidence: "unavailable", externalCount: 0 };
   }
+  const locations = result.data;
 
   let externalCount = 0;
-  for (const ref of locs) {
+  for (const ref of locations) {
     const filePath = uriToFile(ref.uri);
     if (!isInProjectPath(filePath, cwd)) {
       externalCount++;
     }
   }
 
-  const filtered = filterOutDeclaration(locs, target.file, target.position);
+  const filtered = filterOutDeclaration(locations, target.file, target.position);
   const projectRefs: FileLineRef[] = [];
   for (const ref of filtered) {
     const filePath = uriToFile(ref.uri);

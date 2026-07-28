@@ -5,6 +5,7 @@ import type { InstructionFilesMetadata } from "../../analysis/instruction-files.
 import type { ReadNextItem } from "../../analysis/read-next.ts";
 import type { StructuredScanSummary } from "../../analysis/search/pattern.ts";
 import type { HealthSection, SemanticHealthState } from "../../session/health-types.ts";
+import type { InspectResultData } from "../../session/inspect-types.ts";
 import type { TargetSymbolKind } from "../../session/target-input.ts";
 import type {
   AnchorKind,
@@ -155,11 +156,23 @@ export interface ContextDetails {
   }>;
 }
 
+/** One canonical point-inspection section projected into structured details. */
+export interface InspectSectionDetails {
+  key: keyof InspectResultData["sections"];
+  title: string;
+  status: "complete" | "partial" | "unavailable";
+  reason: string | null;
+  itemCount: number;
+  confidence: ConfidenceMode;
+  provenance: ResultProvenance[];
+}
+
 /** Structured details metadata for code_inspect results. */
 export interface InspectDetails {
   confidence: ConfidenceMode;
   focusTarget: string;
-  unavailableSections: string[];
+  diagnosticWindow: { startLine: number; endLine: number } | null;
+  sections: InspectSectionDetails[];
   evidenceLists?: EvidenceListMetadata[];
   nextQueries: string[];
 }

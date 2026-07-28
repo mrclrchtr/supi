@@ -1,5 +1,9 @@
-import type { SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
-import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  completedCodeQuery,
+  getDefaultWorkspaceRuntime,
+  type SemanticProvider,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getCodeProvider } from "../../../src/analysis/provider.ts";
 import { clearMockRuntime, registerMockProvider } from "../../helpers/register-mock-runtime.ts";
@@ -19,12 +23,13 @@ describe("request-context", () => {
 
   it("returns ready when semantic capability is registered", () => {
     registerMockProvider("/project", {
-      references: async () => [
-        {
-          uri: "file:///a.ts",
-          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
-        },
-      ],
+      references: async () =>
+        completedCodeQuery([
+          {
+            uri: "file:///a.ts",
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+          },
+        ]),
     });
 
     const state = getCodeProvider("/project");
@@ -36,10 +41,10 @@ describe("request-context", () => {
 
   it("returns ready when semantic capability is pending but a provider is registered", () => {
     const noopSemantic: SemanticProvider = {
-      references: async () => [],
-      implementation: async () => null,
-      documentSymbols: async () => null,
-      workspaceSymbols: async () => null,
+      references: async () => completedCodeQuery([]),
+      implementation: async () => unavailableCodeQuery("not configured"),
+      documentSymbols: async () => unavailableCodeQuery("not configured"),
+      workspaceSymbols: async () => unavailableCodeQuery("not configured"),
     };
     getDefaultWorkspaceRuntime().registerSemanticPending("/project", noopSemantic);
 
@@ -59,7 +64,7 @@ describe("request-context", () => {
     expect(state.kind).toBe("ready");
   });
 
-  it("semantic methods return null when only structural is available", async () => {
+  it("semantic methods return unavailable when only structural is available", async () => {
     registerMockProvider("/project", {
       outline: async () => ({ kind: "success" as const, data: [] }),
     });
@@ -68,17 +73,17 @@ describe("request-context", () => {
     expect(state.kind).toBe("ready");
     if (state.kind === "ready") {
       const result = await state.provider.references("test.ts", { line: 0, character: 0 });
-      expect(result).toBeNull();
+      expect(result.kind).toBe("unavailable");
     }
   });
 
   it("structural methods return unavailable when only semantic is available", async () => {
     // Register only semantic via runtime API directly
     const noopSemantic: SemanticProvider = {
-      references: async () => [],
-      implementation: async () => null,
-      documentSymbols: async () => null,
-      workspaceSymbols: async () => null,
+      references: async () => completedCodeQuery([]),
+      implementation: async () => unavailableCodeQuery("not configured"),
+      documentSymbols: async () => unavailableCodeQuery("not configured"),
+      workspaceSymbols: async () => unavailableCodeQuery("not configured"),
     };
     getDefaultWorkspaceRuntime().registerSemantic("/project", noopSemantic);
 

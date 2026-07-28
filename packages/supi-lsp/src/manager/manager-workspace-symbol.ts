@@ -1,5 +1,11 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import {
+  type CodeQueryResult,
+  completedCodeQuery,
+  partialCodeQuery,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { walkProject } from "@mrclrchtr/supi-core/project";
 import type { LspClient } from "../client/client.ts";
 import type {
@@ -39,30 +45,62 @@ export function getWorkspaceSymbolWarmPosition(
   return null;
 }
 
+export interface WorkspaceSymbolCollection {
+  results: WorkspaceSymbolLike[];
+  hasSupport: boolean;
+  completedClientCount: number;
+  failures: string[];
+}
+
 export async function collectWorkspaceSymbols(
   clients: Iterable<LspClient>,
   query: string,
-): Promise<{ results: WorkspaceSymbolLike[]; hasSupport: boolean }> {
+): Promise<WorkspaceSymbolCollection> {
   const results: WorkspaceSymbolLike[] = [];
+  const failures: string[] = [];
   let hasSupport = false;
+  let completedClientCount = 0;
 
   for (const client of clients) {
     if (client.status !== "running") continue;
     if (!client.serverCapabilities?.workspaceSymbolProvider) continue;
     hasSupport = true;
     const result = await client.workspaceSymbol(query);
-    if (result) results.push(...result);
+    if (result.kind === "unavailable") {
+      failures.push(result.reason);
+      continue;
+    }
+    completedClientCount++;
+    results.push(...(result.data ?? []));
+    if (result.kind === "partial") failures.push(result.reason);
   }
 
-  return { results, hasSupport };
+  return { results, hasSupport, completedClientCount, failures };
+}
+
+/** Project one multi-client collection into the shared typed query contract. */
+export function workspaceSymbolCollectionResult(
+  collection: WorkspaceSymbolCollection,
+): CodeQueryResult<WorkspaceSymbolLike[]> {
+  if (!collection.hasSupport) {
+    return unavailableCodeQuery("No active LSP client supports workspace-symbol requests.");
+  }
+  if (collection.completedClientCount === 0) {
+    return unavailableCodeQuery(
+      collection.failures.join("; ") || "No workspace-symbol request completed.",
+    );
+  }
+  if (collection.failures.length > 0) {
+    return partialCodeQuery(collection.results, collection.failures.join("; "));
+  }
+  return completedCodeQuery(collection.results);
 }
 
 export async function managerWorkspaceSymbol(
   clients: Iterable<LspClient>,
   query: string,
-): Promise<WorkspaceSymbolLike[] | null> {
-  const { results, hasSupport } = await collectWorkspaceSymbols(clients, query);
-  return hasSupport ? results : null;
+): Promise<CodeQueryResult<WorkspaceSymbolLike[]>> {
+  return workspaceSymbolCollectionResult(await collectWorkspaceSymbols(clients, query));
 }
 
 export function findWorkspaceSymbolWarmTargets(

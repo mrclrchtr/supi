@@ -1,5 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  completedCodeQuery,
+  getDefaultWorkspaceRuntime,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { createPiMock, getHandlerOrThrow } from "@mrclrchtr/supi-test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createCodeIntelligenceApp } from "../../../src/app/app.ts";
@@ -83,10 +87,10 @@ describe("workspace-manager", () => {
   it("releasing a session does not affect the shared broker for that cwd", () => {
     const runtime = getDefaultWorkspaceRuntime();
     const semProvider = {
-      references: async () => [],
-      implementation: async () => null,
-      documentSymbols: async () => null,
-      workspaceSymbols: async () => null,
+      references: async () => completedCodeQuery([]),
+      implementation: async () => unavailableCodeQuery("not configured"),
+      documentSymbols: async () => unavailableCodeQuery("not configured"),
+      workspaceSymbols: async () => unavailableCodeQuery("not configured"),
     };
     runtime.registerSemantic("/project-a", semProvider);
 
@@ -101,10 +105,10 @@ describe("workspace-manager", () => {
   it("clears all sessions on shutdown without clearing shared broker", () => {
     const runtime = getDefaultWorkspaceRuntime();
     const semProvider = {
-      references: async () => [],
-      implementation: async () => null,
-      documentSymbols: async () => null,
-      workspaceSymbols: async () => null,
+      references: async () => completedCodeQuery([]),
+      implementation: async () => unavailableCodeQuery("not configured"),
+      documentSymbols: async () => unavailableCodeQuery("not configured"),
+      workspaceSymbols: async () => unavailableCodeQuery("not configured"),
     };
     runtime.registerSemantic("/project-a", semProvider);
 

@@ -58,10 +58,14 @@ if (state.kind === "ready") {
     "src/index.ts",
     toLspPosition(6, 11),
   );
+  if (definitions.kind === "completed") {
+    // `data: null` is a successful no-definition observation.
+    console.log(definitions.data);
+  }
 }
 ```
 
-Runtime methods use raw 0-based LSP positions. `toLspPosition()` converts user-facing 1-based coordinates. A ready runtime owner may contain only lazy routes: workspace semantic readiness requires at least one active ready client, while file readiness requires the routed client for that file to start successfully. Empty client sets and failed (`null`) routes are unavailable, not vacuously ready.
+Runtime methods use raw 0-based LSP positions. `toLspPosition()` converts user-facing 1-based coordinates. Read-only semantic and diagnostic methods return `CodeQueryResult<T>` so completed empty protocol responses remain distinct from partial or unavailable requests. A ready runtime owner may contain only lazy routes: workspace semantic readiness requires at least one active ready client, while file readiness requires the routed client for that file to start successfully. Empty client sets and failed routes are unavailable, not vacuously ready.
 
 ## Startup performance
 

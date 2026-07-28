@@ -2,8 +2,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import {
+  completedCodeQuery,
   getDefaultWorkspaceRuntime,
   type SemanticProvider,
+  type StructuralProvider,
+  unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,27 +18,28 @@ const mockLspFns = vi.hoisted(() => ({
 
 vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@mrclrchtr/supi-lsp/api")>();
-  return {
-    ...actual,
-    getWorkspaceLspRuntime: mockLspFns.getWorkspaceLspRuntime,
-  };
+  return { ...actual, getWorkspaceLspRuntime: mockLspFns.getWorkspaceLspRuntime };
 });
 
 let tmpDir: string;
 
 beforeEach(() => {
   tmpDir = mkdtempSync(path.join(os.tmpdir(), "code-inspect-"));
-  writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "inspect-ws" }, null, 2));
+  writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "inspect-ws" }));
   mkdirSync(path.join(tmpDir, "src"), { recursive: true });
   writeFileSync(
     path.join(tmpDir, "src", "index.ts"),
-    ["export function widget() {", "  const foo = 1;", "  return foo;", "}", ""].join("\n"),
+    [
+      "export class Widget {",
+      "  method() {",
+      "    const foo = 1;",
+      "    return foo;",
+      "  }",
+      "}",
+      "",
+    ].join("\n"),
   );
-
-  mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
-    kind: "unavailable",
-    reason: "no active session",
-  });
+  mockReadyLsp();
 });
 
 afterEach(() => {
@@ -45,273 +49,288 @@ afterEach(() => {
 });
 
 function mockReadyLsp(
-  overrides: Partial<{
-    waitUntilReadyForFile: ReturnType<typeof vi.fn>;
-    fileDiagnostics: ReturnType<typeof vi.fn>;
-    recoverDiagnostics: ReturnType<typeof vi.fn>;
-  }> = {},
+  options: {
+    waitUntilReadyForFile?: ReturnType<typeof vi.fn>;
+    fileDiagnostics?: ReturnType<typeof vi.fn>;
+  } = {},
 ) {
   const runtime = {
-    waitUntilReadyForFile: vi.fn().mockResolvedValue({ kind: "ready" }),
-    fileDiagnostics: vi.fn().mockResolvedValue([]),
-    recoverDiagnostics: vi.fn().mockResolvedValue({ recovered: false }),
-    ...overrides,
+    waitUntilReadyForFile:
+      options.waitUntilReadyForFile ?? vi.fn().mockResolvedValue({ kind: "ready" }),
+    fileDiagnostics: options.fileDiagnostics ?? vi.fn().mockResolvedValue(completedCodeQuery([])),
   };
-
-  mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
-    kind: "ready",
-    runtime,
-  });
-
+  mockLspFns.getWorkspaceLspRuntime.mockReturnValue({ kind: "ready", runtime });
   return runtime;
 }
 
-function registerInspectProviders(
-  semanticOverrides: Partial<Pick<SemanticProvider, "hover" | "definition">> = {},
-) {
-  const runtime = getDefaultWorkspaceRuntime();
-
-  runtime.registerSemantic(tmpDir, {
-    references: async () => [],
-    implementation: async () => [],
-    documentSymbols: async () => [],
-    workspaceSymbols: async () => [],
-    hover: async () => ({ contents: "const foo: number" }),
-    definition: async () => [
-      {
-        uri: `file://${path.join(tmpDir, "src", "helper.ts")}`,
-        range: {
-          start: { line: 0, character: 0 },
-          end: { line: 0, character: 10 },
+function registerSemantic(overrides: Partial<SemanticProvider> = {}): void {
+  getDefaultWorkspaceRuntime().registerSemantic(tmpDir, {
+    references: async () => completedCodeQuery([]),
+    implementation: async () => completedCodeQuery([]),
+    documentSymbols: async () => completedCodeQuery([]),
+    workspaceSymbols: async () => completedCodeQuery([]),
+    hover: async () => completedCodeQuery({ contents: "const foo: number" }),
+    definition: async () =>
+      completedCodeQuery([
+        {
+          uri: `file://${path.join(tmpDir, "src", "helper.ts")}`,
+          range: {
+            start: { line: 0, character: 0 },
+            end: { line: 0, character: 10 },
+          },
         },
-      },
-    ],
-    ...semanticOverrides,
+      ]),
+    ...overrides,
   });
+}
 
-  runtime.registerStructural(tmpDir, {
-    calleesAt: async (_file, _line, _character) => ({
-      kind: "unavailable" as const,
-      message: "not needed for inspect tests",
-    }),
+function registerStructural(overrides: Partial<StructuralProvider> = {}): void {
+  const unsupported = async () => unavailableCodeQuery("not configured") as never;
+  getDefaultWorkspaceRuntime().registerStructural(tmpDir, {
+    calleesAt: unsupported,
     nodeAt: async () => ({
-      kind: "success" as const,
+      kind: "success",
       data: {
         type: "identifier",
         text: "foo",
-        startLine: 2,
-        startCharacter: 9,
-        endLine: 2,
-        endCharacter: 12,
+        startLine: 3,
+        startCharacter: 11,
+        endLine: 3,
+        endCharacter: 14,
         ancestry: [
           {
             type: "variable_declarator",
-            startLine: 2,
-            startCharacter: 9,
-            endLine: 2,
-            endCharacter: 12,
+            startLine: 3,
+            startCharacter: 5,
+            endLine: 3,
+            endCharacter: 18,
           },
         ],
       },
     }),
     outline: async () => ({
-      kind: "success" as const,
+      kind: "success",
       data: [
         {
-          name: "widget",
-          kind: "function",
+          name: "Widget",
+          kind: "class",
           startLine: 1,
           startCharacter: 1,
-          endLine: 4,
-          endCharacter: 1,
-          children: [],
+          endLine: 6,
+          endCharacter: 2,
+          children: [
+            {
+              name: "method",
+              kind: "method",
+              startLine: 2,
+              startCharacter: 3,
+              endLine: 5,
+              endCharacter: 4,
+            },
+          ],
         },
       ],
     }),
-    imports: async () => ({ kind: "success" as const, data: [] }),
-    exports: async () => ({
-      kind: "success" as const,
-      data: [
-        {
-          name: "widget",
-          kind: "function",
-          startLine: 1,
-          startCharacter: 1,
-          endLine: 4,
-          endCharacter: 1,
-        },
-      ],
-    }),
-    callSites: async (_f) => ({ kind: "success" as const, data: [] }),
+    imports: async () => ({ kind: "success", data: [] }),
+    exports: async () => ({ kind: "success", data: [] }),
+    callSites: async () => ({ kind: "success", data: [] }),
+    ...overrides,
   });
 }
 
+async function executeInspect(point = { file: "src/index.ts", line: 3, character: 12 }) {
+  const pi = createPiMock();
+  codeIntelligenceExtension(pi as never);
+  return getTool(pi, "code_inspect").execute(
+    "inspect",
+    { point },
+    undefined,
+    undefined,
+    makeCtx({ cwd: tmpDir }),
+  );
+}
+
 describe("code_inspect tool", () => {
-  it("is registered as an active public tool", () => {
+  it("is registered with a nested point-only schema", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-
-    const tool = getTool(pi, "code_inspect");
-    expect(tool).toBeDefined();
-    expect(tool.name).toBe("code_inspect");
-    expect(typeof tool.execute).toBe("function");
-  });
-
-  it("has a position-only schema", () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-
     const tool = getTool(pi, "code_inspect") as {
       parameters?: { properties?: Record<string, unknown> };
     };
-
-    const props = tool.parameters?.properties;
-    expect(props).toBeDefined();
-    expect(props).toHaveProperty("point");
-    expect(props).toHaveProperty("maxResults");
-    expect(props).not.toHaveProperty("file");
-    expect(props).not.toHaveProperty("line");
-    expect(props).not.toHaveProperty("character");
-    expect(props).not.toHaveProperty("targetId");
-    expect(props).not.toHaveProperty("symbol");
-    expect(props).not.toHaveProperty("path");
+    expect(tool.parameters?.properties).toHaveProperty("point");
+    expect(tool.parameters?.properties).toHaveProperty("maxResults");
+    expect(tool.parameters?.properties).not.toHaveProperty("file");
   });
 
-  it("suppresses semantic sections when file readiness fails but keeps structural facts", async () => {
-    const hover = vi.fn(async () => ({ contents: "const foo: number" }));
-    const definition = vi.fn(async () => []);
-    registerInspectProviders({ hover, definition });
-    const fileDiagnostics = vi.fn(async () => null);
+  it("reports point facts and the narrowest recursive outline declaration", async () => {
+    registerSemantic();
+    registerStructural();
     mockReadyLsp({
-      waitUntilReadyForFile: vi
-        .fn()
-        .mockResolvedValue({ kind: "unavailable", reason: "file client lost" }),
-      fileDiagnostics,
+      fileDiagnostics: vi.fn().mockResolvedValue(
+        completedCodeQuery([
+          {
+            severity: 1,
+            message: "Local failure",
+            range: {
+              start: { line: 2, character: 10 },
+              end: { line: 2, character: 13 },
+            },
+          },
+        ]),
+      ),
     });
 
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const result = (await getTool(pi, "code_inspect").execute(
-      "inspect-degraded",
-      { point: { file: "src/index.ts", line: 2, character: 9 } },
-      undefined,
-      undefined,
-      makeCtx({ cwd: tmpDir }),
-    )) as {
+    const result = (await executeInspect()) as {
+      content: Array<{ text: string }>;
+      details?: { data: { sections: Array<{ key: string; status: string }> } };
+    };
+    const text = result.content[0]?.text ?? "";
+    expect(text).toContain("## Syntax node");
+    expect(text).toContain("`method` (method) L2:3–L5:4");
+    expect(text).toContain("const foo: number");
+    expect(text).toContain("Local failure");
+    expect(result.details?.data.sections).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "node", status: "complete" }),
+        expect.objectContaining({ key: "enclosingSymbol", status: "complete" }),
+      ]),
+    );
+  });
+
+  it("uses UTF-16 columns to distinguish declarations on the same line", async () => {
+    writeFileSync(path.join(tmpDir, "src", "index.ts"), "const first = 1; const second = 2;\n");
+    registerStructural({
+      outline: async () => ({
+        kind: "success",
+        data: [
+          {
+            name: "first",
+            kind: "variable",
+            startLine: 1,
+            startCharacter: 1,
+            endLine: 1,
+            endCharacter: 35,
+          },
+          {
+            name: "second",
+            kind: "variable",
+            startLine: 1,
+            startCharacter: 18,
+            endLine: 1,
+            endCharacter: 35,
+          },
+        ],
+      }),
+    });
+
+    const result = (await executeInspect({ file: "src/index.ts", line: 1, character: 25 })) as {
+      content: Array<{ text: string }>;
+    };
+    expect(result.content[0]?.text).toContain("`second` (variable) L1:18–L1:35");
+    expect(result.content[0]?.text).not.toContain("`first` (variable)");
+  });
+
+  it("never substitutes a diagnostic outside the nearby window", async () => {
+    registerSemantic();
+    registerStructural();
+    mockReadyLsp({
+      fileDiagnostics: vi.fn().mockResolvedValue(
+        completedCodeQuery([
+          {
+            severity: 1,
+            message: "Far-away failure",
+            range: {
+              start: { line: 20, character: 0 },
+              end: { line: 20, character: 1 },
+            },
+          },
+        ]),
+      ),
+    });
+
+    const result = (await executeInspect()) as { content: Array<{ text: string }> };
+    const text = result.content[0]?.text ?? "";
+    expect(text).not.toContain("Far-away failure");
+    expect(text).toContain("No diagnostics intersect the nearby window");
+  });
+
+  it("distinguishes completed-empty sections from provider failures", async () => {
+    registerSemantic({
+      hover: async () => {
+        throw new Error("hover transport failed");
+      },
+      definition: async () => completedCodeQuery([]),
+    });
+    registerStructural();
+    mockReadyLsp({
+      fileDiagnostics: vi.fn().mockResolvedValue(unavailableCodeQuery("diagnostic sync failed")),
+    });
+
+    const result = (await executeInspect()) as {
       content: Array<{ text: string }>;
       details?: {
-        type: "inspect";
-        data: { confidence: string; unavailableSections: string[]; nextQueries: string[] };
+        data: { sections: Array<{ key: string; status: string; reason: string | null }> };
       };
     };
-
-    expect(hover).not.toHaveBeenCalled();
-    expect(definition).not.toHaveBeenCalled();
-    expect(fileDiagnostics).not.toHaveBeenCalled();
-    expect(result.details?.data.confidence).toBe("structural");
-    expect(result.details?.data.unavailableSections).toEqual(
-      expect.arrayContaining(["hover", "definition", "diagnostics"]),
-    );
-    expect(result.details?.data.nextQueries).toEqual(
-      expect.arrayContaining([expect.stringContaining("code_health")]),
-    );
-    expect(result.details?.data.nextQueries).not.toEqual(
-      expect.arrayContaining([expect.stringContaining("code_graph")]),
+    const text = result.content[0]?.text ?? "";
+    expect(text).toContain("Hover lookup failed: hover transport failed");
+    expect(text).toContain("No definition result at this point");
+    expect(text).toContain("diagnostic sync failed");
+    expect(result.details?.data.sections).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "hover", status: "unavailable" }),
+        expect.objectContaining({ key: "definition", status: "complete", reason: null }),
+        expect.objectContaining({ key: "diagnostics", status: "unavailable" }),
+      ]),
     );
   });
 
-  it("returns best-effort point inspection sections with nearby diagnostics", async () => {
-    registerInspectProviders();
-    mockReadyLsp({
-      fileDiagnostics: vi.fn().mockResolvedValue([
-        {
-          severity: 1,
-          message: "Cannot assign to 'foo' because it is a constant.",
-          range: {
-            start: { line: 1, character: 8 },
-            end: { line: 1, character: 11 },
-          },
-        },
-      ]),
+  it("succeeds when completed-empty semantic sections are the only observations", async () => {
+    registerSemantic({
+      hover: async () => completedCodeQuery(null),
+      definition: async () => completedCodeQuery([]),
     });
 
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-
-    const tool = getTool(pi, "code_inspect");
-    const result = (await tool.execute(
-      "inspect-best-effort",
-      { point: { file: "src/index.ts", line: 2, character: 10 } },
-      undefined,
-      undefined,
-      makeCtx({ cwd: tmpDir }),
-    )) as {
-      content: Array<{ type: string; text: string }>;
-      details?: { type: string; data?: { confidence?: string; nextQueries?: string[] } };
-    };
-
-    expect(result.content[0].text).toContain("Inspect");
-    expect(result.content[0].text).toContain("Node");
-    expect(result.content[0].text).toContain("Hover");
-    expect(result.content[0].text).toContain("Definition");
-    expect(result.content[0].text).toContain("Diagnostics");
-    expect(result.content[0].text).toContain("Enclosing symbol");
-    expect(result.content[0].text).toContain("Cannot assign to 'foo'");
-    expect(result.details?.type).toBe("inspect");
-    if (result.details?.type === "inspect") {
-      expect(result.details.data?.nextQueries).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining("Use code_resolve with target.anchor"),
-          expect.stringContaining("then code_graph with the returned handle"),
-          expect.stringContaining('code_orientation with focus.path "src/index.ts"'),
-        ]),
-      );
-      expect(result.details.data?.nextQueries).not.toEqual(
-        expect.arrayContaining([expect.stringContaining("`code_orientation` with `file:")]),
-      );
-    }
+    const result = (await executeInspect()) as { content: Array<{ text: string }> };
+    const text = result.content[0]?.text ?? "";
+    expect(text).toContain("No hover result at this point");
+    expect(text).toContain("No definition result at this point");
+    expect(text).toContain("No diagnostics intersect the nearby window");
   });
 
-  it("throws when every inspection substrate is unavailable", async () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-
-    const tool = getTool(pi, "code_inspect");
-    await expect(
-      tool.execute(
-        "inspect-unavailable",
-        { point: { file: "src/index.ts", line: 2, character: 10 } },
-        undefined,
-        undefined,
-        makeCtx({ cwd: tmpDir }),
-      ),
-    ).rejects.toThrow("No semantic, structural, or diagnostic provider");
+  it("throws only when every inspection section is unavailable", async () => {
+    await expect(executeInspect()).rejects.toThrow(
+      "No semantic, structural, or diagnostic provider",
+    );
   });
 
-  it("renders ancestry with positional data instead of collapsing to type names", async () => {
-    registerInspectProviders();
-    mockReadyLsp();
+  it("rejects directories and out-of-bounds points before semantic readiness", async () => {
+    registerSemantic();
+    const waitUntilReadyForFile = vi.fn().mockResolvedValue({ kind: "ready" });
+    mockReadyLsp({ waitUntilReadyForFile });
 
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-
-    const tool = getTool(pi, "code_inspect");
-    const result = (await tool.execute(
-      "inspect-ancestry-positions",
-      { point: { file: "src/index.ts", line: 2, character: 10 } },
-      undefined,
-      undefined,
-      makeCtx({ cwd: tmpDir }),
-    )) as {
-      content: Array<{ type: string; text: string }>;
+    const directory = (await executeInspect({ file: "src", line: 1, character: 1 })) as {
+      content: Array<{ text: string }>;
     };
+    const outside = (await executeInspect({ file: "src/index.ts", line: 99, character: 1 })) as {
+      content: Array<{ text: string }>;
+    };
+    const pastLine = (await executeInspect({
+      file: "src/index.ts",
+      line: 1,
+      character: 999,
+    })) as { content: Array<{ text: string }> };
 
-    const text = result.content[0].text;
-    expect(text).toContain("Ancestry");
-    // Should contain the type name
-    expect(text).toContain("variable_declarator");
-    // Should contain positional data from the structured ancestry entry
-    expect(text).toContain("L2:9");
-    expect(text).toContain("L2:12");
+    expect(directory.content[0]?.text).toContain("Not a regular file");
+    expect(outside.content[0]?.text).toContain("beyond the end");
+    expect(pastLine.content[0]?.text).toContain("beyond line 1");
+    expect(waitUntilReadyForFile).not.toHaveBeenCalled();
+  });
+
+  it("renders ancestry with full UTF-16 positional ranges", async () => {
+    registerSemantic();
+    registerStructural();
+    const result = (await executeInspect()) as { content: Array<{ text: string }> };
+    expect(result.content[0]?.text).toContain("variable_declarator L3:5–L3:18");
   });
 });

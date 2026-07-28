@@ -1,3 +1,4 @@
+import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it } from "vitest";
 import type { LspClient } from "../../src/client/client.ts";
 import type {
@@ -46,7 +47,7 @@ describe("workspace runtime behavior", () => {
       hover: async (filePath: string, position: Position) => {
         openedPaths.push(filePath);
         receivedPosition = position;
-        return hover;
+        return completedCodeQuery(hover);
       },
     } as unknown as LspClient;
     const runtime = createRuntime(
@@ -55,7 +56,7 @@ describe("workspace runtime behavior", () => {
 
     const result = await runtime.hover("@src/index.ts", { line: 4, character: 7 });
 
-    expect(result).toEqual(hover);
+    expect(result).toEqual({ kind: "completed", data: hover });
     expect(openedPaths).toEqual(["/project/src/index.ts"]);
     expect(receivedPosition).toEqual({ line: 4, character: 7 });
   });
@@ -70,10 +71,10 @@ describe("workspace runtime behavior", () => {
       codeActions: [{ title: "Fix it" }],
     };
     const client = {
-      definition: async () => facts.definition,
-      references: async () => facts.references,
-      implementation: async () => facts.implementation,
-      documentSymbols: async () => facts.documentSymbols,
+      definition: async () => completedCodeQuery(facts.definition),
+      references: async () => completedCodeQuery(facts.references),
+      implementation: async () => completedCodeQuery(facts.implementation),
+      documentSymbols: async () => completedCodeQuery(facts.documentSymbols),
       rename: async () => facts.rename,
       getDiagnostics: () => [],
       codeActions: async () => facts.codeActions,
@@ -90,10 +91,10 @@ describe("workspace runtime behavior", () => {
         runtime.codeActions("src/index.ts", { line: 0, character: 0 }),
       ]),
     ).resolves.toEqual([
-      facts.definition,
-      facts.references,
-      facts.implementation,
-      facts.documentSymbols,
+      completedCodeQuery(facts.definition),
+      completedCodeQuery(facts.references),
+      completedCodeQuery(facts.implementation),
+      completedCodeQuery(facts.documentSymbols),
       facts.rename,
       facts.codeActions,
     ]);
@@ -112,7 +113,7 @@ describe("workspace runtime behavior", () => {
     const supportedPaths: string[] = [];
     const runtime = createRuntime(
       makeManager({
-        workspaceSymbol: async () => [symbol],
+        workspaceSymbol: async () => completedCodeQuery([symbol]),
         getKnownProjectServers: () => projectServers,
         canServeFile: (filePath: string) => {
           supportedPaths.push(filePath);
@@ -121,7 +122,7 @@ describe("workspace runtime behavior", () => {
       }),
     );
 
-    await expect(runtime.workspaceSymbol("greet")).resolves.toEqual([symbol]);
+    await expect(runtime.workspaceSymbol("greet")).resolves.toEqual(completedCodeQuery([symbol]));
     expect(runtime.getProjectServers()).toEqual(projectServers);
     expect(runtime.isSupportedSourceFile("@src/index.ts")).toBe(true);
     expect(supportedPaths).toEqual(["/project/src/index.ts"]);
@@ -187,17 +188,21 @@ describe("workspace runtime behavior", () => {
         canServeFile: () => true,
         syncFileAndGetDiagnostics: async (filePath: string, maxSeverity: number) => {
           syncPaths.push({ filePath, maxSeverity });
-          return [diagnostic];
+          return completedCodeQuery([diagnostic]);
         },
         syncFileAndGetCascadingDiagnostics: async (filePath: string, maxSeverity: number) => {
           cascadePaths.push({ filePath, maxSeverity });
-          return cascade;
+          return completedCodeQuery(cascade);
         },
       }),
     );
 
-    await expect(runtime.fileDiagnostics("@src/index.ts", 2)).resolves.toEqual([diagnostic]);
-    await expect(runtime.fileDiagnosticsWithCascade("@src/index.ts", 4)).resolves.toEqual(cascade);
+    await expect(runtime.fileDiagnostics("@src/index.ts", 2)).resolves.toEqual(
+      completedCodeQuery([diagnostic]),
+    );
+    await expect(runtime.fileDiagnosticsWithCascade("@src/index.ts", 4)).resolves.toEqual(
+      completedCodeQuery(cascade),
+    );
     expect(syncPaths).toEqual([{ filePath: "/project/src/index.ts", maxSeverity: 2 }]);
     expect(cascadePaths).toEqual([{ filePath: "/project/src/index.ts", maxSeverity: 4 }]);
   });

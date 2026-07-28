@@ -4,6 +4,7 @@
  * tree-sitter) advertise what they can do.
  */
 
+import type { CodeQueryResult } from "../query-result.ts";
 import type {
   CalleeDepth,
   CalleesData,
@@ -45,32 +46,30 @@ export type CapabilityState =
 /**
  * Semantic analysis capability backed by a language server (LSP).
  *
- * Methods return `null` to signal absence (unavailable / inactive) and
- * an array to signal a successful query (possibly empty).
+ * Every read query preserves whether collection completed, completed only
+ * partially, or was unavailable. Successful empty arrays and protocol-level
+ * null values are completed observations rather than capability failures.
  */
 export interface SemanticProvider {
-  references(filePath: string, position: CodePosition): Promise<CodeLocation[] | null>;
-  implementation(filePath: string, position: CodePosition): Promise<CodeLocation[] | null>;
-  documentSymbols(filePath: string): Promise<DocumentCodeSymbol[] | null>;
-  workspaceSymbols(query: string): Promise<CodeSymbol[] | null>;
+  references(filePath: string, position: CodePosition): Promise<CodeQueryResult<CodeLocation[]>>;
+  implementation(
+    filePath: string,
+    position: CodePosition,
+  ): Promise<CodeQueryResult<CodeLocation[]>>;
+  documentSymbols(filePath: string): Promise<CodeQueryResult<DocumentCodeSymbol[]>>;
+  workspaceSymbols(query: string): Promise<CodeQueryResult<CodeSymbol[]>>;
+
+  /** Optional definition capability with explicit completed-empty semantics. */
+  definition?(filePath: string, position: CodePosition): Promise<CodeQueryResult<CodeLocation[]>>;
 
   /**
-   * Optional definition capability. Returns the definition location(s) for
-   * the symbol at the given position. When the provider cannot produce
-   * definition info, returns `null`.
-   */
-  definition?(filePath: string, position: CodePosition): Promise<CodeLocation[] | null>;
-
-  /**
-   * Optional hover capability. Returns a simplified type/signature info
-   * shape that does not depend on vscode-languageserver-types. When the
-   * provider cannot produce hover info (unavailable, unsupported file,
-   * no result at the given position), returns `null`.
+   * Optional hover capability. A completed `null` data value means the
+   * provider successfully found no hover at the requested point.
    */
   hover?(
     filePath: string,
     position: CodePosition,
-  ): Promise<{ contents: string; range?: SourceRange } | null>;
+  ): Promise<CodeQueryResult<{ contents: string; range?: SourceRange } | null>>;
 
   /**
    * Optional operation-aware refactor capability.

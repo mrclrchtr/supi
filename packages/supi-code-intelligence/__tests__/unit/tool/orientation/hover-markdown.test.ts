@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeOrientation } from "../../../../src/session/orientation/collect.ts";
 import { renderOrientationResult } from "../../../../src/tool/orientation/markdown.ts";
@@ -52,14 +53,15 @@ describe("target Orientation hover markdown", () => {
           outline: async () => ({ kind: "success", data: [] }),
           imports: async () => ({ kind: "success", data: [] }),
           exports: async () => ({ kind: "success", data: [] }),
-          hover: async () => ({
-            contents: "```typescript\nfunction sample(): number\n```\nSample docs.",
-          }),
+          hover: async () =>
+            completedCodeQuery({
+              contents: "```typescript\nfunction sample(): number\n```\nSample docs.",
+            }),
         } as never,
         lspRuntime: {
           kind: "ready",
           runtime: {
-            fileDiagnostics: async () => [],
+            fileDiagnostics: async () => completedCodeQuery([]),
           },
         } as never,
       },

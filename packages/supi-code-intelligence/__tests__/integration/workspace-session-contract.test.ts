@@ -235,15 +235,22 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
     const inspection = await workspace.session.inspect({ point: CONTRACT_POINT.consumerHelper });
     expect(inspection.kind).toBe("completed");
     if (inspection.kind !== "completed") throw new Error("Expected completed point inspection.");
-    expect(inspection.data.node).toMatchObject({
-      text: "helper",
-      startLine: 3,
-      startCharacter: 10,
+    expect(inspection.data.sections.node).toMatchObject({
+      kind: "completed",
+      data: {
+        text: "helper",
+        startLine: 3,
+        startCharacter: 10,
+      },
     });
-    expect(inspection.data.definitions).toContainEqual({
-      file: CONTRACT_FIXTURE.contracts,
-      line: 12,
-      character: 17,
+    expect(inspection.data.sections.definition).toMatchObject({
+      data: expect.arrayContaining([
+        {
+          file: CONTRACT_FIXTURE.contracts,
+          line: 12,
+          character: 17,
+        },
+      ]),
     });
 
     const helper = resolvedEntry(

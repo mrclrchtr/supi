@@ -84,9 +84,8 @@ describe.skipIf(!HAS_BASH_LSP)("LspClient integration (bash-language-server)", (
 
   it("returns document symbols (best-effort)", async () => {
     const symbols = await client.documentSymbols(validFile);
-    // bash-language-server supports documentSymbolProvider per capabilities
-    // The response may be null, an array, or a flat list depending on version
-    expect(symbols === null || Array.isArray(symbols)).toBe(true);
+    // A successful response may contain an empty or populated symbol list.
+    expect(symbols.kind === "unavailable" || Array.isArray(symbols.data)).toBe(true);
   }, 10_000);
 
   it("closes a document and removes from tracking", () => {

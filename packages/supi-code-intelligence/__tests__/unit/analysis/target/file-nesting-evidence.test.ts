@@ -1,7 +1,11 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { SemanticProvider, StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  completedCodeQuery,
+  type SemanticProvider,
+  type StructuralProvider,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resolveFileTargetGroup } from "../../../../src/analysis/target/file.ts";
 
@@ -114,10 +118,10 @@ describe("file Target group nesting evidence", () => {
 
 function semanticProvider(symbols: readonly unknown[]): SemanticProvider {
   return {
-    documentSymbols: async () => symbols as never,
-    workspaceSymbols: async () => [],
-    references: async () => [],
-    implementation: async () => [],
+    documentSymbols: async () => completedCodeQuery(symbols as never),
+    workspaceSymbols: async () => completedCodeQuery([]),
+    references: async () => completedCodeQuery([]),
+    implementation: async () => completedCodeQuery([]),
   };
 }
 

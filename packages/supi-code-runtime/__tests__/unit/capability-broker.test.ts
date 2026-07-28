@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { SemanticProvider, StructuralProvider } from "../../src/capability/types.ts";
+import { completedCodeQuery, unavailableCodeQuery } from "../../src/query-result.ts";
 import type {
   CodeLocation,
   CodePosition,
@@ -116,13 +117,7 @@ describe("capability-broker", () => {
   describe("refactor availability metadata", () => {
     it("reports refactorAvailable=false when semantic provider lacks rename/codeActions", () => {
       runtime = new WorkspaceRuntime();
-      const noRefactorProvider: SemanticProvider = {
-        references: async () => null,
-        implementation: async () => null,
-        documentSymbols: async () => [],
-        workspaceSymbols: async () => [],
-        // No rename or codeActions
-      };
+      const noRefactorProvider: SemanticProvider = createMockSemanticProvider();
       runtime.registerSemantic("/project", noRefactorProvider);
       expect(runtime.getWorkspace("/project").semantic.refactorAvailable).toBe(false);
     });
@@ -130,10 +125,7 @@ describe("capability-broker", () => {
     it("reports refactorAvailable=true when semantic provider has rename", () => {
       runtime = new WorkspaceRuntime();
       const refactorProvider: SemanticProvider = {
-        references: async () => null,
-        implementation: async () => null,
-        documentSymbols: async () => [],
-        workspaceSymbols: async () => [],
+        ...createMockSemanticProvider(),
         rename: async (_file, _pos, _newName) => ({
           kind: "precise" as const,
           edits: { edits: [] },
@@ -146,10 +138,7 @@ describe("capability-broker", () => {
     it("reports refactorAvailable=true when semantic provider has codeActions", () => {
       runtime = new WorkspaceRuntime();
       const refactorProvider: SemanticProvider = {
-        references: async () => null,
-        implementation: async () => null,
-        documentSymbols: async () => [],
-        workspaceSymbols: async () => [],
+        ...createMockSemanticProvider(),
         codeActions: async (_file, _pos) => [{ kind: "precise" as const, edits: { edits: [] } }],
       };
       runtime.registerSemantic("/project", refactorProvider);
@@ -159,10 +148,7 @@ describe("capability-broker", () => {
     it("reports refactorAvailable=true when semantic provider has refactor", () => {
       runtime = new WorkspaceRuntime();
       const refactorProvider: SemanticProvider = {
-        references: async () => null,
-        implementation: async () => null,
-        documentSymbols: async () => [],
-        workspaceSymbols: async () => [],
+        ...createMockSemanticProvider(),
         refactor: async (_request) => ({ kind: "precise" as const, edits: { edits: [] } }),
       };
       runtime.registerSemantic("/project", refactorProvider);
@@ -177,10 +163,7 @@ describe("capability-broker", () => {
     it("refactorAvailable resets to false after semantic clearance clears a refactor-capable provider", () => {
       runtime = new WorkspaceRuntime();
       const refactorProvider: SemanticProvider = {
-        references: async () => null,
-        implementation: async () => null,
-        documentSymbols: async () => [],
-        workspaceSymbols: async () => [],
+        ...createMockSemanticProvider(),
         rename: async (_file, _pos, _newName) => ({
           kind: "precise" as const,
           edits: { edits: [] },
@@ -199,11 +182,12 @@ describe("capability-broker", () => {
 
 function createMockSemanticProvider(): SemanticProvider {
   return {
-    references: async (_file: string, _pos: CodePosition): Promise<CodeLocation[] | null> => null,
-    implementation: async (_file: string, _pos: CodePosition): Promise<CodeLocation[] | null> =>
-      null,
-    documentSymbols: async (_file: string): Promise<DocumentCodeSymbol[] | null> => [],
-    workspaceSymbols: async (_query: string): Promise<CodeSymbol[] | null> => [],
+    references: async (_file: string, _pos: CodePosition) =>
+      unavailableCodeQuery<CodeLocation[]>("not configured"),
+    implementation: async (_file: string, _pos: CodePosition) =>
+      unavailableCodeQuery<CodeLocation[]>("not configured"),
+    documentSymbols: async (_file: string) => completedCodeQuery<DocumentCodeSymbol[]>([]),
+    workspaceSymbols: async (_query: string) => completedCodeQuery<CodeSymbol[]>([]),
   };
 }
 

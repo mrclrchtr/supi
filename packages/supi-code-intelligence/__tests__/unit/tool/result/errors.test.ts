@@ -81,7 +81,8 @@ describe("error result factories", () => {
       expect(result.details?.type).toBe("inspect");
       expect(data.confidence).toBe("unavailable");
       expect(data.focusTarget).toBe("src/a.ts:2:4");
-      expect(data.unavailableSections).toEqual([]);
+      expect(data.diagnosticWindow).toBeNull();
+      expect(data.sections).toEqual([]);
       expect(data.nextQueries).toEqual(["next"]);
     });
 

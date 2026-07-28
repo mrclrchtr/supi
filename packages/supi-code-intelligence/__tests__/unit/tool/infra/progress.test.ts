@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
+import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it } from "vitest";
 import { executeFindTool } from "../../../../src/tool/find/execute.ts";
 import { executeGraphTool } from "../../../../src/tool/graph/execute.ts";
@@ -39,7 +40,7 @@ describe("executor onUpdate progress beats", () => {
   it("code_find emits a coarse semantic-search progress beat", async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "ci-progress-find-"));
     writeFileSync(path.join(dir, "a.ts"), "export function foo() { return 1; }\n");
-    registerMockProvider(dir, { workspaceSymbols: async () => [] });
+    registerMockProvider(dir, { workspaceSymbols: async () => completedCodeQuery([]) });
     const { onUpdate, beats } = captureProgress();
     try {
       await executeFindTool(
@@ -58,12 +59,13 @@ describe("executor onUpdate progress beats", () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "ci-progress-graph-"));
     writeFileSync(path.join(dir, "test.ts"), "export function foo() { return 1; }\n");
     registerMockProvider(dir, {
-      references: async () => [
-        {
-          uri: `file://${path.join(dir, "test.ts")}`,
-          range: { start: { line: 0, character: 16 }, end: { line: 0, character: 19 } },
-        },
-      ],
+      references: async () =>
+        completedCodeQuery([
+          {
+            uri: `file://${path.join(dir, "test.ts")}`,
+            range: { start: { line: 0, character: 16 }, end: { line: 0, character: 19 } },
+          },
+        ]),
     });
     const { onUpdate, beats } = captureProgress();
     try {

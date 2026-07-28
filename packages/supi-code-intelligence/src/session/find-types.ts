@@ -19,7 +19,11 @@ export type FindWorkflowData =
       readonly astKind: CodeFindAstKind;
       readonly result: Readonly<StructuredPatternResult>;
     }
-  | { readonly kind: "semantic"; readonly symbols: readonly CodeSymbol[] };
+  | {
+      readonly kind: "semantic";
+      readonly symbols: readonly CodeSymbol[];
+      readonly partialReason: string | null;
+    };
 
 export type FindWorkflowOutcome =
   | {

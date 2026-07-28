@@ -6,7 +6,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import { completedCodeQuery, getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
 import { createTreeSitterProvider } from "@mrclrchtr/supi-tree-sitter/provider/tree-sitter-provider";
@@ -16,6 +16,10 @@ import { clearMockRuntime, registerMockProvider } from "../../../helpers/registe
 
 interface TextToolResult {
   content: Array<{ type: string; text: string }>;
+}
+
+function completedQuery<T>(data: T) {
+  return async () => completedCodeQuery(data);
 }
 
 let tmpDir: string;
@@ -668,7 +672,7 @@ describe("code_find tool", () => {
     it("returns a semantic no-results result without text fallback", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), "const ghost = 1;\n");
       registerMockProvider(tmpDir, {
-        workspaceSymbols: async () => [],
+        workspaceSymbols: async () => completedCodeQuery([]),
       });
       const tool = getCodeFindTool();
 
@@ -689,14 +693,14 @@ describe("code_find tool", () => {
     it("returns workspace symbols when a semantic provider is available", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), "export function myFunc() {}\n");
       registerMockProvider(tmpDir, {
-        workspaceSymbols: async () => [
+        workspaceSymbols: completedQuery([
           {
             name: "myFunc",
             kind: "function",
             file: path.join(tmpDir, "a.ts"),
             declarationAnchor: { line: 1, character: 17 },
           },
-        ],
+        ]),
       });
       const tool = getCodeFindTool();
 
@@ -721,7 +725,7 @@ describe("code_find tool", () => {
       writeFileSync(path.join(tmpDir, "a.ts"), "export function one() {}\n");
       writeFileSync(path.join(tmpDir, "b.ts"), "export function two() {}\n");
       registerMockProvider(tmpDir, {
-        workspaceSymbols: async () => [
+        workspaceSymbols: completedQuery([
           {
             name: "one",
             kind: "function",
@@ -734,7 +738,7 @@ describe("code_find tool", () => {
             file: path.join(tmpDir, "b.ts"),
             declarationAnchor: { line: 1, character: 17 },
           },
-        ],
+        ]),
       });
       const tool = getCodeFindTool();
 
@@ -779,7 +783,7 @@ describe("code_find tool", () => {
       writeFileSync(path.join(tmpDir, "src/a.ts"), "export function scopedFunc() {}\n");
       writeFileSync(path.join(tmpDir, "other/a.ts"), "export function scopedFunc() {}\n");
       registerMockProvider(tmpDir, {
-        workspaceSymbols: async () => [
+        workspaceSymbols: completedQuery([
           {
             name: "scopedFunc",
             kind: "function",
@@ -792,7 +796,7 @@ describe("code_find tool", () => {
             file: path.join(tmpDir, "other/a.ts"),
             declarationAnchor: { line: 1, character: 17 },
           },
-        ],
+        ]),
       });
       const tool = getCodeFindTool();
 
@@ -814,7 +818,7 @@ describe("code_find tool", () => {
       mkdirSync(path.join(tmpDir, "docs"), { recursive: true });
       mkdirSync(path.join(tmpDir, "other"), { recursive: true });
       registerMockProvider(tmpDir, {
-        workspaceSymbols: async () => [
+        workspaceSymbols: completedQuery([
           {
             name: "multiScoped",
             kind: "function",
@@ -833,7 +837,7 @@ describe("code_find tool", () => {
             file: path.join(tmpDir, "other/a.ts"),
             declarationAnchor: { line: 1, character: 17 },
           },
-        ],
+        ]),
       });
       const tool = getCodeFindTool();
 

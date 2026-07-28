@@ -93,7 +93,8 @@ export function inspectErrorResult(
       data: {
         confidence: "unavailable" as const,
         focusTarget: opts?.focusTarget ?? "",
-        unavailableSections: [],
+        diagnosticWindow: null,
+        sections: [],
         nextQueries: opts?.nextQueries ?? [],
       },
     },

@@ -1,7 +1,10 @@
-// Shared session-scoped LSP service registry.
-// Peer extensions can import `getWorkspaceLspRuntime` from the package root
-// to reuse the active LSP runtime without starting duplicate servers.
+// Shared session-scoped LSP service registry reused by peer extensions.
 
+import {
+  type CodeQueryResult,
+  mapCodeQueryResult,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { createSessionStateRegistry } from "@mrclrchtr/supi-core/session";
 import type {
   CodeAction,
@@ -24,6 +27,10 @@ import { raceReadinessValue } from "./readiness.ts";
 
 function isRange(value: Position | Range): value is Range {
   return "start" in value && "end" in value;
+}
+
+function unavailableFileQuery<T>(operation: string, file: string): CodeQueryResult<T> {
+  return unavailableCodeQuery(`No routed LSP client could complete ${operation} for ${file}.`);
 }
 
 /** Workspace diagnostic summary grouped by file. */
@@ -75,18 +82,20 @@ export type SemanticReadinessResult =
  * user-facing 1-based line and character values.
  */
 export interface WorkspaceLspRuntime {
-  hover(filePath: string, position: Position): Promise<Hover | null>;
+  hover(filePath: string, position: Position): Promise<CodeQueryResult<Hover | null>>;
   definition(
     filePath: string,
     position: Position,
-  ): Promise<Location | Location[] | LocationLink[] | null>;
-  references(filePath: string, position: Position): Promise<Location[] | null>;
+  ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>>;
+  references(filePath: string, position: Position): Promise<CodeQueryResult<Location[]>>;
   implementation(
     filePath: string,
     position: Position,
-  ): Promise<Location | Location[] | LocationLink[] | null>;
-  documentSymbols(filePath: string): Promise<DocumentSymbol[] | SymbolInformation[] | null>;
-  workspaceSymbol(query: string): Promise<SymbolInformation[] | WorkspaceSymbol[] | null>;
+  ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>>;
+  documentSymbols(
+    filePath: string,
+  ): Promise<CodeQueryResult<DocumentSymbol[] | SymbolInformation[]>>;
+  workspaceSymbol(query: string): Promise<CodeQueryResult<SymbolInformation[] | WorkspaceSymbol[]>>;
   rename(filePath: string, position: Position, newName: string): Promise<WorkspaceEdit | null>;
   codeActions(filePath: string, positionOrRange: Position | Range): Promise<CodeAction[] | null>;
   /** Succeeds only when the concrete routed client exists and is query-ready. */
@@ -102,11 +111,11 @@ export interface WorkspaceLspRuntime {
   closeFile(filePath: string): void;
   pruneMissingFiles(): readonly string[];
   noteWorkspaceChanges(changes: FileEvent[]): void;
-  fileDiagnostics(filePath: string, maxSeverity?: number): Promise<Diagnostic[] | null>;
+  fileDiagnostics(filePath: string, maxSeverity?: number): Promise<CodeQueryResult<Diagnostic[]>>;
   fileDiagnosticsWithCascade(
     filePath: string,
     maxSeverity?: number,
-  ): Promise<Array<{ file: string; diagnostics: Diagnostic[] }>>;
+  ): Promise<CodeQueryResult<Array<{ file: string; diagnostics: Diagnostic[] }>>>;
   refreshOpenDiagnostics(options?: { maxWaitMs?: number; quietMs?: number }): Promise<void>;
   getWorkspaceDiagnosticSummary(): WorkspaceDiagnosticSummaryEntry[];
   getOutstandingDiagnostics(
@@ -130,48 +139,55 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
 
   // ── Semantic lookups ────────────────────────────────────────────────
 
-  async hover(filePath: string, position: Position): Promise<Hover | null> {
+  async hover(filePath: string, position: Position): Promise<CodeQueryResult<Hover | null>> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
-    if (!client) return null;
+    if (!client) return unavailableFileQuery("hover", resolvedPath);
     return client.hover(resolvedPath, position);
   }
 
   async definition(
     filePath: string,
     position: Position,
-  ): Promise<Location | Location[] | LocationLink[] | null> {
+  ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
-    if (!client) return null;
+    if (!client) return unavailableFileQuery("definition", resolvedPath);
     return client.definition(resolvedPath, position);
   }
 
-  async references(filePath: string, position: Position): Promise<Location[] | null> {
+  async references(filePath: string, position: Position): Promise<CodeQueryResult<Location[]>> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
-    if (!client) return null;
-    return client.references(resolvedPath, position);
+    if (!client) return unavailableFileQuery("references", resolvedPath);
+    return mapCodeQueryResult(
+      await client.references(resolvedPath, position),
+      (data) => data ?? [],
+    );
   }
 
   async implementation(
     filePath: string,
     position: Position,
-  ): Promise<Location | Location[] | LocationLink[] | null> {
+  ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
-    if (!client) return null;
+    if (!client) return unavailableFileQuery("implementation", resolvedPath);
     return client.implementation(resolvedPath, position);
   }
 
-  async documentSymbols(filePath: string): Promise<DocumentSymbol[] | SymbolInformation[] | null> {
+  async documentSymbols(
+    filePath: string,
+  ): Promise<CodeQueryResult<DocumentSymbol[] | SymbolInformation[]>> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
-    if (!client) return null;
-    return client.documentSymbols(resolvedPath);
+    if (!client) return unavailableFileQuery("document symbols", resolvedPath);
+    return mapCodeQueryResult(await client.documentSymbols(resolvedPath), (data) => data ?? []);
   }
 
-  async workspaceSymbol(query: string): Promise<SymbolInformation[] | WorkspaceSymbol[] | null> {
+  async workspaceSymbol(
+    query: string,
+  ): Promise<CodeQueryResult<SymbolInformation[] | WorkspaceSymbol[]>> {
     return this.manager.workspaceSymbol(query);
   }
 
@@ -294,9 +310,14 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   // ── Diagnostics and recovery ────────────────────────────────────────
 
   /** Sync a file through LSP and return diagnostics up to the supplied severity threshold. */
-  async fileDiagnostics(filePath: string, maxSeverity: number = 4): Promise<Diagnostic[] | null> {
+  async fileDiagnostics(
+    filePath: string,
+    maxSeverity: number = 4,
+  ): Promise<CodeQueryResult<Diagnostic[]>> {
     const resolvedPath = this.resolveFilePath(filePath);
-    if (!this.manager.canServeFile(resolvedPath)) return null;
+    if (!this.manager.canServeFile(resolvedPath)) {
+      return unavailableFileQuery("diagnostics", resolvedPath);
+    }
     return this.manager.syncFileAndGetDiagnostics(resolvedPath, maxSeverity);
   }
 
@@ -304,7 +325,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   async fileDiagnosticsWithCascade(
     filePath: string,
     maxSeverity: number = 4,
-  ): Promise<Array<{ file: string; diagnostics: Diagnostic[] }>> {
+  ): Promise<CodeQueryResult<Array<{ file: string; diagnostics: Diagnostic[] }>>> {
     return this.manager.syncFileAndGetCascadingDiagnostics(
       this.resolveFilePath(filePath),
       maxSeverity,

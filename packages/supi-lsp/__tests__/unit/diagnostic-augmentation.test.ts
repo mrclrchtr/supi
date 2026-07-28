@@ -1,3 +1,4 @@
+import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it, vi } from "vitest";
 import type { CodeAction, Diagnostic, Hover } from "../../src/config/types.ts";
 import { augmentDiagnostics } from "../../src/diagnostics/diagnostic-augmentation.ts";
@@ -7,8 +8,13 @@ function makeManager(mockClient: {
   hover: ReturnType<typeof vi.fn>;
   codeActions: ReturnType<typeof vi.fn>;
 }): LspManager {
+  const hover = mockClient.hover as unknown as (...args: unknown[]) => Promise<unknown>;
+  const normalizedClient = {
+    ...mockClient,
+    hover: async (...args: unknown[]) => completedCodeQuery(await hover(...args)),
+  };
   return {
-    getClientForFile: vi.fn().mockResolvedValue(mockClient),
+    getClientForFile: vi.fn().mockResolvedValue(normalizedClient),
   } as unknown as LspManager;
 }
 

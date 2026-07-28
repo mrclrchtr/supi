@@ -1,7 +1,11 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { SemanticProvider, StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  completedCodeQuery,
+  type SemanticProvider,
+  type StructuralProvider,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCapabilityAdapter } from "../../../src/session/capability-adapter.ts";
 import {
@@ -178,10 +182,10 @@ function semanticProvider(): SemanticProvider {
     nesting: "top-level" as const,
   };
   return {
-    documentSymbols: async () => [symbol],
-    workspaceSymbols: async () => [symbol],
-    references: async () => [],
-    implementation: async () => [],
+    documentSymbols: async () => completedCodeQuery([symbol]),
+    workspaceSymbols: async () => completedCodeQuery([symbol]),
+    references: async () => completedCodeQuery([]),
+    implementation: async () => completedCodeQuery([]),
   };
 }
 
@@ -230,11 +234,11 @@ function collisionSemanticProvider(): SemanticProvider {
     },
   ];
   return {
-    documentSymbols: async () => [...documentSymbols].reverse(),
+    documentSymbols: async () => completedCodeQuery([...documentSymbols].reverse()),
     workspaceSymbols: async () =>
-      documentSymbols.map(({ nameAnchor: _nameAnchor, ...symbol }) => symbol),
-    references: async () => [],
-    implementation: async () => [],
+      completedCodeQuery(documentSymbols.map(({ nameAnchor: _nameAnchor, ...symbol }) => symbol)),
+    references: async () => completedCodeQuery([]),
+    implementation: async () => completedCodeQuery([]),
   };
 }
 

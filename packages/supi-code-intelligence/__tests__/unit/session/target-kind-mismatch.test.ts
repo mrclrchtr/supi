@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
+import { completedCodeQuery, type SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCapabilityAdapter } from "../../../src/session/capability-adapter.ts";
 import {
@@ -45,10 +45,11 @@ function semanticProvider(): SemanticProvider {
     },
   ];
   return {
-    workspaceSymbols: async () => symbols,
-    documentSymbols: async (file) => symbols.filter((symbol) => symbol.file === file),
-    references: async () => [],
-    implementation: async () => [],
+    workspaceSymbols: async () => completedCodeQuery(symbols),
+    documentSymbols: async (file) =>
+      completedCodeQuery(symbols.filter((symbol) => symbol.file === file)),
+    references: async () => completedCodeQuery([]),
+    implementation: async () => completedCodeQuery([]),
   };
 }
 

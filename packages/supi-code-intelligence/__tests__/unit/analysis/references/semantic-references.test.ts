@@ -1,7 +1,11 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { SemanticProvider as SemanticSubstrate } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  completedCodeQuery,
+  type SemanticProvider as SemanticSubstrate,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeLocation, CodePosition } from "@mrclrchtr/supi-core/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ResolvedTargetData } from "../../../../src/analysis/target/types.ts";
@@ -82,7 +86,9 @@ describe("collectReferences", () => {
     const semantic: SemanticSubstrate = {
       references: vi
         .fn()
-        .mockResolvedValue([makeLocation(otherFile, 3), makeLocation(otherFile, 10)]),
+        .mockResolvedValue(
+          completedCodeQuery([makeLocation(otherFile, 3), makeLocation(otherFile, 10)]),
+        ),
       implementation: vi.fn(),
       documentSymbols: vi.fn(),
       workspaceSymbols: vi.fn(),
@@ -116,12 +122,14 @@ describe("collectReferences", () => {
     });
 
     const semantic: SemanticSubstrate = {
-      references: vi.fn().mockResolvedValue([
-        // Declaration at target position — should be filtered out
-        makeLocation(targetFile, 5),
-        // Real reference
-        makeLocation(otherFile, 3),
-      ]),
+      references: vi.fn().mockResolvedValue(
+        completedCodeQuery([
+          // Declaration at target position — should be filtered out
+          makeLocation(targetFile, 5),
+          // Real reference
+          makeLocation(otherFile, 3),
+        ]),
+      ),
       implementation: vi.fn(),
       documentSymbols: vi.fn(),
       workspaceSymbols: vi.fn(),
@@ -151,7 +159,7 @@ describe("collectReferences", () => {
     });
 
     const semantic: SemanticSubstrate = {
-      references: vi.fn().mockResolvedValue([makeLocation(extFile, 1)]),
+      references: vi.fn().mockResolvedValue(completedCodeQuery([makeLocation(extFile, 1)])),
       implementation: vi.fn(),
       documentSymbols: vi.fn(),
       workspaceSymbols: vi.fn(),
@@ -167,7 +175,7 @@ describe("collectReferences", () => {
     expect(result.confidence).toBe("semantic");
   });
 
-  it("returns unavailable when LSP returns null", async () => {
+  it("returns unavailable when the semantic query is unavailable", async () => {
     const targetFile = path.join(tmpDir, "src", "mod.ts");
     writeFile(targetFile);
 
@@ -180,7 +188,7 @@ describe("collectReferences", () => {
     });
 
     const semantic: SemanticSubstrate = {
-      references: vi.fn().mockResolvedValue(null),
+      references: vi.fn().mockResolvedValue(unavailableCodeQuery("LSP unavailable")),
       implementation: vi.fn(),
       documentSymbols: vi.fn(),
       workspaceSymbols: vi.fn(),

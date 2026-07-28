@@ -151,12 +151,12 @@ async function discoverSemantic(
 ): Promise<DiscoveryResult> {
   if (!semantic) return { available: false, targets: [] };
   try {
-    const symbols = await semantic.documentSymbols(file);
-    if (symbols === null) return { available: false, targets: [] };
+    const result = await semantic.documentSymbols(file);
+    if (result.kind === "unavailable") return { available: false, targets: [] };
     return {
       available: true,
       targets: await Promise.all(
-        symbols.map(async (symbol) => {
+        result.data.map(async (symbol) => {
           const target = targetFromSymbol(file, symbol);
           const refined = await refineTypeAliasIdentity(target, structural);
           return { ...refined, nesting: target.nesting };

@@ -7,8 +7,12 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import type { DocumentCodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
-import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  completedCodeQuery,
+  type DocumentCodeSymbol,
+  getDefaultWorkspaceRuntime,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import {
   clearWorkspaceLspRuntime,
   setWorkspaceLspRuntimeState,
@@ -24,42 +28,42 @@ import type { CodeProvider } from "../../src/analysis/provider.ts";
  * without each test spelling out symbols by hand.
  */
 export function fileDocumentSymbolsMock(): NonNullable<CodeProvider["documentSymbols"]> {
-  return async (filePath: string): Promise<DocumentCodeSymbol[] | null> => {
+  return async (filePath: string) => {
     try {
-      if (!existsSync(filePath)) return null;
-      const content = readFileSync(filePath, "utf-8");
-      const lines = content.split("\n");
-      const symbols: DocumentCodeSymbol[] = [];
-      const declRe =
-        /^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(function|class|interface|enum|type|const|let|var)\s+([A-Za-z_$][\w$]*)/;
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const m = declRe.exec(line);
-        if (!m) continue;
-        const keyword = m[1];
-        const name = m[2];
-        const declChar = line.search(/\S/) + 1; // 1-based
-        // Name (identifier) sits at the end of the full match; derive its
-        // 1-based column from the match span so a single-char name that also
-        // occurs inside `export`/`const` (e.g. `export const x`) is positioned
-        // at the identifier, not the earlier keyword occurrence.
-        const nameChar = (m.index ?? 0) + m[0].length - name.length + 1; // 1-based
-        if (nameChar <= 0) continue;
-        symbols.push({
-          name,
-          kind: kindForKeyword(keyword),
-          file: filePath,
-          declarationAnchor: { line: i + 1, character: declChar },
-          nameAnchor: { line: i + 1, character: nameChar },
-          container: null,
-          nesting: "top-level",
-        });
-      }
-      return symbols;
-    } catch {
-      return null;
+      if (!existsSync(filePath)) return unavailableCodeQuery("File not found");
+      return completedCodeQuery(scanDocumentSymbols(filePath));
+    } catch (error) {
+      return unavailableCodeQuery(
+        error instanceof Error ? error.message : "Document-symbol mock failed",
+      );
     }
   };
+}
+
+function scanDocumentSymbols(filePath: string): DocumentCodeSymbol[] {
+  const lines = readFileSync(filePath, "utf-8").split("\n");
+  const symbols: DocumentCodeSymbol[] = [];
+  const declaration =
+    /^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(function|class|interface|enum|type|const|let|var)\s+([A-Za-z_$][\w$]*)/;
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    const match = declaration.exec(line);
+    if (!match) continue;
+    const keyword = match[1];
+    const name = match[2];
+    const nameCharacter = (match.index ?? 0) + match[0].length - name.length + 1;
+    if (nameCharacter <= 0) continue;
+    symbols.push({
+      name,
+      kind: kindForKeyword(keyword),
+      file: filePath,
+      declarationAnchor: { line: index + 1, character: line.search(/\S/) + 1 },
+      nameAnchor: { line: index + 1, character: nameCharacter },
+      container: null,
+      nesting: "top-level",
+    });
+  }
+  return symbols;
 }
 
 function kindForKeyword(keyword: string): string {
@@ -81,10 +85,7 @@ function kindForKeyword(keyword: string): string {
 
 const mockCwds = new Set<string>();
 
-/**
- * Register a mock CodeProvider's worth of capabilities for cwd.
- * Sets up both semantic and structural mock providers in the shared runtime.
- */
+/** Register a mock CodeProvider's worth of typed capabilities for cwd. */
 export function registerMockProvider(cwd: string, overrides: Partial<CodeProvider> = {}): void {
   const runtime = getDefaultWorkspaceRuntime();
   mockCwds.add(cwd);
@@ -93,7 +94,7 @@ export function registerMockProvider(cwd: string, overrides: Partial<CodeProvide
     runtime: createReadyTestLspRuntime(cwd),
   });
 
-  const noopSemantic = async () => null;
+  const noopSemantic = async () => unavailableCodeQuery("not configured");
   const noopStructural = async (_file: string) =>
     ({ kind: "unsupported-language" as const, file: _file, message: "mock" }) as const;
 
@@ -104,6 +105,10 @@ export function registerMockProvider(cwd: string, overrides: Partial<CodeProvide
     documentSymbols: overrides.documentSymbols ?? fileDocumentSymbolsMock(),
     workspaceSymbols: overrides.workspaceSymbols ?? noopSemantic,
     hover: overrides.hover,
+    definition: overrides.definition,
+    codeActions: overrides.codeActions,
+    rename: overrides.rename,
+    refactor: overrides.refactor,
   });
 
   // Register structural provider
@@ -126,6 +131,14 @@ export function clearMockRuntime(): void {
 
 function createReadyTestLspRuntime(cwd: string): WorkspaceLspRuntime {
   return {
+    hover: async () => completedCodeQuery(null),
+    definition: async () => completedCodeQuery([]),
+    references: async () => completedCodeQuery([]),
+    implementation: async () => completedCodeQuery([]),
+    documentSymbols: async () => completedCodeQuery([]),
+    workspaceSymbol: async () => completedCodeQuery([]),
+    fileDiagnostics: async () => completedCodeQuery([]),
+    fileDiagnosticsWithCascade: async () => completedCodeQuery([]),
     waitUntilReadyForFile: async () => ({ kind: "ready" }),
     waitUntilReadyForWorkspace: async () => ({ kind: "ready" }),
     getProjectServers: () => [

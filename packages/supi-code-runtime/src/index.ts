@@ -12,6 +12,7 @@ export type {
   CapabilityState,
   CodeLocation,
   CodePosition,
+  CodeQueryResult,
   CodeResult,
   CodeSymbol,
   ConfidenceMode,
@@ -30,4 +31,12 @@ export type {
   WorkspaceCapabilities,
   WorkspaceContext,
 } from "./api.ts";
-export { createWorkspaceContext, getDefaultWorkspaceRuntime, WorkspaceRuntime } from "./api.ts";
+export {
+  completedCodeQuery,
+  createWorkspaceContext,
+  getDefaultWorkspaceRuntime,
+  mapCodeQueryResult,
+  partialCodeQuery,
+  unavailableCodeQuery,
+  WorkspaceRuntime,
+} from "./api.ts";

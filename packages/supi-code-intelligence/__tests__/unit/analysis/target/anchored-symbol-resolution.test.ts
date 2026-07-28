@@ -1,7 +1,12 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { DocumentCodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type CodeQueryResult,
+  completedCodeQuery,
+  type DocumentCodeSymbol,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it, vi } from "vitest";
 import { resolveAnchoredSymbolTarget } from "../../../../src/analysis/target/anchored.ts";
 
@@ -22,9 +27,9 @@ const WIDGET_SOURCE = "export function widget() { helper(); }\n";
 function docSymbols(
   file: string,
   overrides: DocumentCodeSymbol[] | null = null,
-): DocumentCodeSymbol[] | null {
+): CodeQueryResult<DocumentCodeSymbol[]> {
   if (overrides === null) {
-    return [
+    return completedCodeQuery([
       {
         name: "widget",
         kind: "Function",
@@ -34,9 +39,9 @@ function docSymbols(
         container: null,
         nesting: "top-level",
       },
-    ];
+    ]);
   }
-  return overrides;
+  return completedCodeQuery(overrides);
 }
 
 // biome-ignore lint/security/noSecrets: false positive on test description string
@@ -170,26 +175,28 @@ describe("resolveAnchoredSymbolTarget — ambiguous coordinates", () => {
     // by having two symbols whose declaration line matches the coordinate.
     writeFileSync(file, "export const a = 1;\nexport const b = 2;\n");
     const provider = {
-      documentSymbols: vi.fn(async () => [
-        {
-          name: "a",
-          kind: "Variable",
-          file,
-          declarationAnchor: { line: 1, character: 1 },
-          nameAnchor: { line: 1, character: 14 },
-          container: null,
-          nesting: "top-level" as const,
-        },
-        {
-          name: "b",
-          kind: "Variable",
-          file,
-          declarationAnchor: { line: 2, character: 1 },
-          nameAnchor: { line: 2, character: 14 },
-          container: null,
-          nesting: "top-level" as const,
-        },
-      ]),
+      documentSymbols: vi.fn(async () =>
+        completedCodeQuery([
+          {
+            name: "a",
+            kind: "Variable",
+            file,
+            declarationAnchor: { line: 1, character: 1 },
+            nameAnchor: { line: 1, character: 14 },
+            container: null,
+            nesting: "top-level" as const,
+          },
+          {
+            name: "b",
+            kind: "Variable",
+            file,
+            declarationAnchor: { line: 2, character: 1 },
+            nameAnchor: { line: 2, character: 14 },
+            container: null,
+            nesting: "top-level" as const,
+          },
+        ]),
+      ),
     };
 
     // Coordinate on line 1 `export` keyword — only `a` declares there, so
@@ -208,26 +215,28 @@ describe("resolveAnchoredSymbolTarget — ambiguous coordinates", () => {
     const file = path.join(dir, "widget.ts");
     writeFileSync(file, "export function widget() {}\n");
     const provider = {
-      documentSymbols: vi.fn(async () => [
-        {
-          name: "widget",
-          kind: "Function",
-          file,
-          declarationAnchor: { line: 1, character: 1 },
-          nameAnchor: { line: 1, character: 17 },
-          container: null,
-          nesting: "top-level" as const,
-        },
-        {
-          name: "widget",
-          kind: "Function",
-          file,
-          declarationAnchor: { line: 1, character: 1 },
-          nameAnchor: { line: 1, character: 17 },
-          container: "Other",
-          nesting: "nested" as const,
-        },
-      ]),
+      documentSymbols: vi.fn(async () =>
+        completedCodeQuery([
+          {
+            name: "widget",
+            kind: "Function",
+            file,
+            declarationAnchor: { line: 1, character: 1 },
+            nameAnchor: { line: 1, character: 17 },
+            container: null,
+            nesting: "top-level" as const,
+          },
+          {
+            name: "widget",
+            kind: "Function",
+            file,
+            declarationAnchor: { line: 1, character: 1 },
+            nameAnchor: { line: 1, character: 17 },
+            container: "Other",
+            nesting: "nested" as const,
+          },
+        ]),
+      ),
     };
 
     const result = await resolveAnchoredSymbolTarget(file, 1, 17, provider);
@@ -250,7 +259,7 @@ describe("resolveAnchoredSymbolTarget — structural fallback", () => {
     const file = path.join(dir, "widget.ts");
     writeFileSync(file, WIDGET_SOURCE);
     const provider = {
-      documentSymbols: vi.fn(async () => null),
+      documentSymbols: vi.fn(async () => unavailableCodeQuery("LSP unavailable")),
       nodeAt: vi.fn(async () => ({
         kind: "success" as const,
         data: {
@@ -297,7 +306,7 @@ describe("resolveAnchoredSymbolTarget — structural fallback", () => {
     const file = path.join(dir, "widget.ts");
     writeFileSync(file, WIDGET_SOURCE);
     const provider = {
-      documentSymbols: vi.fn(async () => null),
+      documentSymbols: vi.fn(async () => unavailableCodeQuery("LSP unavailable")),
       nodeAt: vi.fn(async () => ({
         kind: "success" as const,
         data: {

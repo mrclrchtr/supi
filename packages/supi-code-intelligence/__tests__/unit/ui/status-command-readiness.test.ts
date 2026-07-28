@@ -1,4 +1,4 @@
-import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import { completedCodeQuery, getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import type { WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -18,10 +18,10 @@ afterEach(() => {
 
 function registerSemantic(cwd: string): void {
   getDefaultWorkspaceRuntime().registerSemantic(cwd, {
-    references: async () => [],
-    implementation: async () => [],
-    documentSymbols: async () => [],
-    workspaceSymbols: async () => [],
+    references: async () => completedCodeQuery([]),
+    implementation: async () => completedCodeQuery([]),
+    documentSymbols: async () => completedCodeQuery([]),
+    workspaceSymbols: async () => completedCodeQuery([]),
   });
 }
 

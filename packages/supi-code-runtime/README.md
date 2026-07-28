@@ -8,6 +8,14 @@ This is a **library-only package** — it has no pi extension surface, no user-f
 
 - `@mrclrchtr/supi-code-runtime/api` — shared canonical types, capability interfaces, workspace runtime registry, and typed request context
 
+Read-only provider methods return `CodeQueryResult<T>`:
+
+- `completed` — collection completed; `data` may be empty or `null`
+- `partial` — usable data was collected, but one or more provider branches failed
+- `unavailable` — no result was established; includes a reason
+
+This keeps successful zero-result facts distinct from routing, transport, and provider failures.
+
 ## License
 
 MIT

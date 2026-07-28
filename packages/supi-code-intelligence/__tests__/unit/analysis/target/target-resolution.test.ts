@@ -1,9 +1,37 @@
 import * as path from "node:path";
-import type { SemanticProvider as SemanticSubstrate } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type CodeQueryResult,
+  completedCodeQuery,
+  type SemanticProvider as SemanticSubstrate,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { toLspPosition } from "@mrclrchtr/supi-lsp/api";
 import { describe, expect, it, vi } from "vitest";
 import { normalizePath } from "../../../../src/analysis/search/paths.ts";
-import { resolveSymbolTarget } from "../../../../src/analysis/target/symbol.ts";
+import { resolveSymbolTarget as resolveSymbolTargetImpl } from "../../../../src/analysis/target/symbol.ts";
+
+function resolveSymbolTarget(
+  symbol: string,
+  cwd: string,
+  semantic: SemanticSubstrate,
+  options?: Parameters<typeof resolveSymbolTargetImpl>[3],
+) {
+  return resolveSymbolTargetImpl(symbol, cwd, normalizeSemanticProvider(semantic), options);
+}
+
+function normalizeSemanticProvider(semantic: SemanticSubstrate): SemanticSubstrate {
+  return {
+    ...semantic,
+    workspaceSymbols: async (...args) => normalizeList(await semantic.workspaceSymbols(...args)),
+    documentSymbols: async (...args) => normalizeList(await semantic.documentSymbols(...args)),
+  };
+}
+
+function normalizeList<T>(value: CodeQueryResult<T[]> | T[] | null): CodeQueryResult<T[]> {
+  if (value === null) return unavailableCodeQuery("LSP unavailable");
+  if (!Array.isArray(value)) return value;
+  return completedCodeQuery(value);
+}
 
 describe("normalizePath", () => {
   it("resolves relative path against cwd", () => {
@@ -44,7 +72,7 @@ describe("resolveSymbolTarget", () => {
 
     expect(result.kind).toBe("error");
     if (result.kind === "error") {
-      expect(result.message).toContain("requires active LSP");
+      expect(result.message).toContain("is unavailable");
     }
   });
 

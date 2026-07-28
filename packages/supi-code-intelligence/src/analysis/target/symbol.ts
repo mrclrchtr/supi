@@ -61,12 +61,10 @@ async function refineResolvedSymbolAnchor(
   semantic: SemanticSubstrate,
 ): Promise<CodeSymbol> {
   try {
-    const documentSymbols = await semantic.documentSymbols(workspaceSymbol.file);
-    if (!documentSymbols || documentSymbols.length === 0) {
-      return workspaceSymbol;
-    }
+    const result = await semantic.documentSymbols(workspaceSymbol.file);
+    if (result.kind === "unavailable" || result.data.length === 0) return workspaceSymbol;
 
-    const exactMatches = documentSymbols.filter((candidate) =>
+    const exactMatches = result.data.filter((candidate) =>
       isExactDocumentSymbolMatch(candidate, workspaceSymbol),
     );
     const declarationMatches = exactMatches.filter((candidate) =>
@@ -111,19 +109,19 @@ export async function resolveSymbolTarget(
     maxResults?: number;
   },
 ): Promise<TargetOutcome> {
-  const results = await semantic.workspaceSymbols(symbol);
-  if (results === null) {
+  const result = await semantic.workspaceSymbols(symbol);
+  if (result.kind === "unavailable") {
     return {
       kind: "error",
-      message: `Symbol discovery for \`${symbol}\` requires active LSP. Use \`file\` + coordinates, or enable LSP and retry.`,
+      message: `Symbol discovery for \`${symbol}\` is unavailable: ${result.reason}`,
     };
   }
-  if (results.length === 0) {
+  if (result.data.length === 0) {
     return { kind: "error", message: `Symbol not found: \`${symbol}\`` };
   }
 
   const scopePath = options?.path ? normalizePath(options.path, cwd) : null;
-  const scoped = results.filter((candidate) =>
+  const scoped = result.data.filter((candidate) =>
     scopePath ? isWithinOrEqual(scopePath, candidate.file) : true,
   );
   const eligible = options?.exportedOnly

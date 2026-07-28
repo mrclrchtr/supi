@@ -73,11 +73,14 @@ function createFindEvidence(outcome: Extract<FindWorkflowOutcome, { kind: "compl
   metadata: EvidenceListMetadata;
 } {
   if (outcome.data.kind === "semantic") {
-    const evidence = createEvidenceList({
+    const params = {
       key: "find.semanticSymbols",
       items: [...outcome.data.symbols],
       maxResults: outcome.maxResults,
-    });
+    };
+    const evidence = outcome.data.partialReason
+      ? createPartialEvidenceList({ ...params, partialReason: "provider-limited" })
+      : createEvidenceList(params);
     return { total: outcome.data.symbols.length, metadata: evidence.metadata };
   }
 

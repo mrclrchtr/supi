@@ -1,3 +1,4 @@
+import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it } from "vitest";
 import { collectImplementations } from "../../../../src/analysis/relations/implementations.ts";
 import { collectCallers } from "../../../../src/analysis/relations/references.ts";
@@ -15,7 +16,7 @@ describe("provider relation locations", () => {
     ];
     const deps: RelationsServiceDeps = {
       cwd,
-      provider: { references: async () => locations },
+      provider: { references: async () => completedCodeQuery(locations) },
     };
 
     const result = await collectCallers(targetFile, { line: 0, character: 16 }, "target", deps);
@@ -45,7 +46,7 @@ describe("provider relation locations", () => {
     ];
     const deps: RelationsServiceDeps = {
       cwd,
-      provider: { references: async () => locations },
+      provider: { references: async () => completedCodeQuery(locations) },
     };
 
     const result = await collectCallers(targetFile, { line: 0, character: 4 }, "target", deps);
@@ -71,7 +72,7 @@ describe("provider relation locations", () => {
     const collect = (locations: typeof variants) =>
       collectCallers("C:\\repo\\src\\target.ts", { line: 0, character: 0 }, "target", {
         cwd,
-        provider: { references: async () => locations },
+        provider: { references: async () => completedCodeQuery(locations) },
       });
 
     const forward = await collect(variants);
@@ -92,7 +93,7 @@ describe("provider relation locations", () => {
     ];
     const deps: RelationsServiceDeps = {
       cwd,
-      provider: { implementation: async () => locations },
+      provider: { implementation: async () => completedCodeQuery(locations) },
     };
 
     const result = await collectImplementations(

@@ -49,8 +49,8 @@ export async function collectCallers(
     };
   }
 
-  const refs = await deps.provider.references(targetFile, targetPosition);
-  if (!refs) {
+  const result = await deps.provider.references(targetFile, targetPosition);
+  if (result.kind === "unavailable") {
     return {
       kind: "callers",
       targetName: targetName ?? "symbol",
@@ -59,11 +59,11 @@ export async function collectCallers(
       invalidLocationCount: 0,
       partialReason: null,
       evidence: "semantic-references",
-      confidence: "semantic",
+      confidence: "unavailable",
     };
   }
 
-  const normalized = normalizeProviderLocations(refs, deps.cwd);
+  const normalized = normalizeProviderLocations(result.data, deps.cwd);
   const normalizedTargetFile = normalizeTargetFile(targetFile, deps.cwd);
   const inProject: CallerReference[] = normalized.project
     .filter((reference) => !isTargetLocation(reference, normalizedTargetFile, targetPosition))
@@ -77,7 +77,8 @@ export async function collectCallers(
     references: inProject,
     externalCount: normalized.external.length,
     invalidLocationCount: normalized.invalidLocationCount,
-    partialReason: normalized.partialReason,
+    partialReason:
+      normalized.partialReason ?? (result.kind === "partial" ? "provider-limited" : null),
     evidence: "semantic-references",
     confidence: "semantic",
   };

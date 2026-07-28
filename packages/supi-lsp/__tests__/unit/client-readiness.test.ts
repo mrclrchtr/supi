@@ -359,8 +359,8 @@ describe("LspClient readiness state machine", () => {
     expect(client.ready).toBe(false);
   });
 
-  // ── Test 17: request() returns null after crash ─────────────────────
-  it("returns null from semantic requests after crash", async () => {
+  // ── Test 17: read queries preserve unavailability after crash ──────
+  it("returns unavailable from semantic read queries after crash", async () => {
     const client = createClient();
 
     // Let the no-progress timer fire so the client becomes ready initially
@@ -375,13 +375,16 @@ describe("LspClient readiness state machine", () => {
     (client as AnyClient).rpc = null;
     await vi.advanceTimersByTimeAsync(0);
 
-    // All semantic methods go through request() which returns null
-    // when the client is not running.
-    expect(await client.hover("test.ts", { line: 0, character: 0 })).toBeNull();
-    expect(await client.definition("test.ts", { line: 0, character: 0 })).toBeNull();
-    expect(await client.references("test.ts", { line: 0, character: 0 })).toBeNull();
-    expect(await client.documentSymbols("test.ts")).toBeNull();
-    expect(await client.workspaceSymbol("foo")).toBeNull();
+    // Read queries retain a typed unavailable outcome when the client is down.
+    expect((await client.hover("test.ts", { line: 0, character: 0 })).kind).toBe("unavailable");
+    expect((await client.definition("test.ts", { line: 0, character: 0 })).kind).toBe(
+      "unavailable",
+    );
+    expect((await client.references("test.ts", { line: 0, character: 0 })).kind).toBe(
+      "unavailable",
+    );
+    expect((await client.documentSymbols("test.ts")).kind).toBe("unavailable");
+    expect((await client.workspaceSymbol("foo")).kind).toBe("unavailable");
     expect(await client.rename("test.ts", { line: 0, character: 0 }, "newName")).toBeNull();
     expect(
       await client.codeActions(
@@ -392,8 +395,19 @@ describe("LspClient readiness state machine", () => {
     ).toBeNull();
   });
 
-  // ── Test 18: request() catches sendRequest errors ──────────────────
-  it("returns null when rpc.sendRequest throws", async () => {
+  it("preserves protocol null as a completed empty query", async () => {
+    const client = createClient();
+    await vi.advanceTimersByTimeAsync(2_000);
+    (client as AnyClient).rpc.sendRequest = vi.fn().mockResolvedValue(null);
+
+    await expect(client.hover("test.ts", { line: 0, character: 0 })).resolves.toEqual({
+      kind: "completed",
+      data: null,
+    });
+  });
+
+  // ── Test 18: query() preserves sendRequest errors ──────────────────
+  it("returns unavailable when rpc.sendRequest throws", async () => {
     const client = createClient();
 
     // Let the no-progress timer fire so the client becomes ready
@@ -405,8 +419,10 @@ describe("LspClient readiness state machine", () => {
       .fn()
       .mockRejectedValue(new Error("RPC connection lost"));
 
-    // request() catches the error and returns null
     const result = await client.hover("test.ts", { line: 0, character: 0 });
-    expect(result).toBeNull();
+    expect(result).toMatchObject({
+      kind: "unavailable",
+      reason: expect.stringContaining("RPC connection lost"),
+    });
   });
 });

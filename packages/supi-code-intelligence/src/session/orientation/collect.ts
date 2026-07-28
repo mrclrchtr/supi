@@ -180,13 +180,13 @@ async function appendDefinitionTargets(
 ): Promise<string[]> {
   if (!deps.provider?.definition) return [];
   try {
-    const defs = await deps.provider.definition(target.file, {
+    const result = await deps.provider.definition(target.file, {
       line: target.line - 1,
       character: target.character - 1,
     });
-    if (!defs || !Array.isArray(defs) || defs.length === 0) return [];
+    if (result.kind === "unavailable" || result.data.length === 0) return [];
     const lines: string[] = ["**Definition:**"];
-    for (const def of defs.slice(0, limit)) {
+    for (const def of result.data.slice(0, limit)) {
       const filePath = uriToFile(def.uri);
       const relPath = path.relative(deps.cwd, filePath);
       lines.push(`- \`${relPath}:${def.range.start.line + 1}:${def.range.start.character + 1}\``);
@@ -220,18 +220,20 @@ async function buildDiagnosticsSection(
 
   try {
     const targetFile = path.resolve(deps.cwd, target.file);
-    const diags = await deps.lspRuntime.runtime.fileDiagnostics(targetFile, 4);
-    if (diags === null) {
+    const result = await deps.lspRuntime.runtime.fileDiagnostics(targetFile, 4);
+    if (result.kind === "unavailable") {
       return {
-        lines: ["Diagnostics unavailable for this target."],
+        lines: [`Diagnostics unavailable for this target — ${result.reason}`],
         hasSemanticEvidence: false,
       };
     }
-    if (diags.length === 0) {
+    if (result.data.length === 0) {
       return { lines: ["No diagnostics found near this target."], hasSemanticEvidence: true };
     }
 
-    const nearby = diags.filter((d) => Math.abs((d.range.start.line ?? 0) + 1 - target.line) <= 5);
+    const nearby = result.data.filter(
+      (diagnostic) => Math.abs((diagnostic.range.start.line ?? 0) + 1 - target.line) <= 5,
+    );
     if (nearby.length === 0) {
       return { lines: ["No diagnostics found near this target."], hasSemanticEvidence: true };
     }

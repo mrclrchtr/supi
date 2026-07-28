@@ -2,16 +2,21 @@
 // SemanticProvider contract from supi-code-runtime.
 
 import { readFile } from "node:fs/promises";
-import type {
-  CodeLocation,
-  CodePosition,
-  CodeSymbol,
-  DeclarationNesting,
-  DocumentCodeSymbol,
-  RefactorRequest,
-  RefactorResult,
-  SemanticProvider,
-  SourceRange,
+import {
+  type CodeLocation,
+  type CodePosition,
+  type CodeQueryResult,
+  type CodeSymbol,
+  completedCodeQuery,
+  type DeclarationNesting,
+  type DocumentCodeSymbol,
+  mapCodeQueryResult,
+  partialCodeQuery,
+  type RefactorRequest,
+  type RefactorResult,
+  type SemanticProvider,
+  type SourceRange,
+  unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { uriToFile } from "@mrclrchtr/supi-core/path";
 import type {
@@ -40,64 +45,53 @@ import {
  */
 export function createLspSemanticProvider(lsp: WorkspaceLspRuntime): SemanticProvider {
   return {
-    async definition(filePath: string, position: CodePosition): Promise<CodeLocation[] | null> {
-      const result = await lsp.definition(filePath, position);
-      if (!result) return null;
-      const normalized = Array.isArray(result) ? result : [result];
-      const mapped: CodeLocation[] = [];
-      for (const item of normalized) {
-        const loc = toCodeLocation(item);
-        if (loc) mapped.push(loc);
-      }
-      return mapped;
+    async definition(
+      filePath: string,
+      position: CodePosition,
+    ): Promise<CodeQueryResult<CodeLocation[]>> {
+      return mapCodeQueryResult(await lsp.definition(filePath, position), mapLocations);
     },
 
     async hover(
       filePath: string,
       position: CodePosition,
-    ): Promise<{ contents: string; range?: SourceRange } | null> {
-      const result = await lsp.hover(filePath, position);
-      if (!result) return null;
-      return convertLspHover(result);
+    ): Promise<CodeQueryResult<{ contents: string; range?: SourceRange } | null>> {
+      return mapCodeQueryResult(await lsp.hover(filePath, position), (hover) =>
+        hover ? convertLspHover(hover) : null,
+      );
     },
 
-    async references(filePath: string, position: CodePosition): Promise<CodeLocation[] | null> {
-      const refResult = await lsp.references(filePath, position);
-      if (!refResult) return null;
-      const mapped: CodeLocation[] = [];
-      for (const item of refResult) {
-        const loc = toCodeLocation(item);
-        if (loc) mapped.push(loc);
-      }
-      return mapped;
+    async references(
+      filePath: string,
+      position: CodePosition,
+    ): Promise<CodeQueryResult<CodeLocation[]>> {
+      return mapCodeQueryResult(await lsp.references(filePath, position), mapLocations);
     },
 
-    async implementation(filePath: string, position: CodePosition): Promise<CodeLocation[] | null> {
-      const implResult = await lsp.implementation(filePath, position);
-      if (!implResult) return null;
-      const normalized = Array.isArray(implResult) ? implResult : [implResult];
-      const mapped: CodeLocation[] = [];
-      for (const item of normalized) {
-        const loc = toCodeLocation(item);
-        if (loc) mapped.push(loc);
-      }
-      return mapped;
+    async implementation(
+      filePath: string,
+      position: CodePosition,
+    ): Promise<CodeQueryResult<CodeLocation[]>> {
+      return mapCodeQueryResult(await lsp.implementation(filePath, position), mapLocations);
     },
 
-    async documentSymbols(filePath: string): Promise<DocumentCodeSymbol[] | null> {
-      const symbols = await lsp.documentSymbols(filePath);
-      if (!symbols) return null;
+    async documentSymbols(filePath: string): Promise<CodeQueryResult<DocumentCodeSymbol[]>> {
+      const result = await lsp.documentSymbols(filePath);
+      if (result.kind === "unavailable") return unavailableCodeQuery(result.reason);
       const sourceLines = await readSourceLines(filePath);
-      return flattenDocumentSymbols(symbols, filePath, null, {
+      const symbols = flattenDocumentSymbols(result.data, filePath, null, {
         sourceLines,
         nesting: "top-level",
       });
+      return result.kind === "partial"
+        ? partialCodeQuery(symbols, result.reason)
+        : completedCodeQuery(symbols);
     },
 
-    async workspaceSymbols(query: string): Promise<CodeSymbol[] | null> {
-      const results = await lsp.workspaceSymbol(query);
-      if (!results) return null;
-      return results.map((sym) => toCodeSymbol(sym as SymbolInformation));
+    async workspaceSymbols(query: string): Promise<CodeQueryResult<CodeSymbol[]>> {
+      return mapCodeQueryResult(await lsp.workspaceSymbol(query), (results) =>
+        results.map((symbol) => toCodeSymbol(symbol as SymbolInformation)),
+      );
     },
 
     async refactor(request: RefactorRequest): Promise<RefactorResult> {
@@ -182,6 +176,15 @@ function runExtractRefactor(
 }
 
 // ── Type conversion helpers ───────────────────────────────────────────
+
+function mapLocations(value: Location | Location[] | LocationLink[] | null): CodeLocation[] {
+  if (!value) return [];
+  const locations = Array.isArray(value) ? value : [value];
+  return locations.flatMap((item) => {
+    const location = toCodeLocation(item);
+    return location ? [location] : [];
+  });
+}
 
 function toCodeLocation(item: Location | LocationLink): CodeLocation | null {
   const loc = item as Record<string, unknown>;

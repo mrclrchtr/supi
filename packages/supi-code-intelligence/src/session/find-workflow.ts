@@ -82,11 +82,11 @@ async function runSemanticSearch(options: {
   if (!provider?.workspaceSymbols) {
     return { kind: "unavailable", reason: "No semantic workspace-symbol provider is active." };
   }
-  const symbols = await provider.workspaceSymbols(query);
-  if (symbols === null) {
-    return { kind: "unavailable", reason: "Workspace-symbol search is unavailable." };
+  const result = await provider.workspaceSymbols(query);
+  if (result.kind === "unavailable") {
+    return { kind: "unavailable", reason: result.reason };
   }
-  const scopedSymbols: CodeSymbol[] = symbols.filter((symbol) =>
+  const scopedSymbols: CodeSymbol[] = result.data.filter((symbol) =>
     scopePaths.some((scopePath) => isWithinOrEqual(scopePath, symbol.file)),
   );
   return {
@@ -95,7 +95,11 @@ async function runSemanticSearch(options: {
     mode: "semantic",
     scopeLabel,
     maxResults,
-    data: { kind: "semantic", symbols: scopedSymbols },
+    data: {
+      kind: "semantic",
+      symbols: scopedSymbols,
+      partialReason: result.kind === "partial" ? result.reason : null,
+    },
   };
 }
 

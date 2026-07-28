@@ -15,6 +15,14 @@ export type {
   StructuralProvider,
   StructuralResult,
 } from "./capability/types.ts";
+export type { CodeQueryResult } from "./query-result.ts";
+// Shared query-result constructors and contract
+export {
+  completedCodeQuery,
+  mapCodeQueryResult,
+  partialCodeQuery,
+  unavailableCodeQuery,
+} from "./query-result.ts";
 // Shared canonical types
 export type {
   CalleeDepth,

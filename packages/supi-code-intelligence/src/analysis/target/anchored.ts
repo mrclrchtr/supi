@@ -223,13 +223,14 @@ async function resolveFromSemantic(
   provider: AnchoredResolverProvider,
 ): Promise<TargetOutcome | null> {
   if (!provider.documentSymbols) return null;
-  let symbols: CodeSymbol[] | null = null;
+  let symbols: CodeSymbol[] = [];
   try {
-    symbols = await provider.documentSymbols(file);
+    const result = await provider.documentSymbols(file);
+    if (result.kind !== "unavailable") symbols = result.data;
   } catch {
-    symbols = null;
+    symbols = [];
   }
-  if (!symbols || symbols.length === 0) return null;
+  if (symbols.length === 0) return null;
 
   const exact: CodeSymbol[] = [];
   const snap: CodeSymbol[] = [];
