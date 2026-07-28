@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-review",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "SuPi Review extension — caller-defined read-only review tasks for users and agents",
   "license": "MIT",
   "repository": {
