@@ -5,8 +5,6 @@ import { runIsolatedChild } from "./child-session-runner.ts";
 import { buildReviewerSystemPrompt } from "./review-system-prompt.ts";
 import { createReviewTools } from "./review-tools.ts";
 
-const DEFAULT_TIMEOUT_MS = 60 * 60 * 1_000;
-
 /** Run one caller-defined task in an isolated read-only reviewer session. */
 export async function runReviewer(invocation: ReviewerInvocation): Promise<ReviewerRunResult> {
   if (invocation.signal?.aborted) {
@@ -23,33 +21,37 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     protocolPrompt: buildReviewerSystemPrompt(),
     model: invocation.model.model,
     thinkingLevel: clampThinkingLevel(invocation.model.model, "max"),
-    timeoutMs: DEFAULT_TIMEOUT_MS,
+    timeoutMs: undefined,
     prompt: invocation.prompt,
     signal: invocation.signal,
     tools: customTools.map((tool) => tool.name),
     customTools,
     holder,
-    successResult: (submission) => ({
+    successResult: (submission, usage) => ({
       kind: "success",
       submission,
       modelId: invocation.model.canonicalId,
+      ...(usage ? { usage } : {}),
     }),
-    canceledResult: (diagnostics) => ({
+    canceledResult: (diagnostics, usage) => ({
       kind: "canceled",
       modelId: invocation.model.canonicalId,
       diagnostics,
+      ...(usage ? { usage } : {}),
     }),
-    failedResult: (failureCode, diagnostics) => ({
+    failedResult: (failureCode, diagnostics, usage) => ({
       kind: "failed",
       failureCode,
       modelId: invocation.model.canonicalId,
       diagnostics,
+      ...(usage ? { usage } : {}),
     }),
-    timeoutResult: (timeoutMs, diagnostics) => ({
+    timeoutResult: (timeoutMs, diagnostics, usage) => ({
       kind: "timeout",
       timeoutMs,
       modelId: invocation.model.canonicalId,
       diagnostics,
+      ...(usage ? { usage } : {}),
     }),
     sessionFailedResult: {
       kind: "failed",

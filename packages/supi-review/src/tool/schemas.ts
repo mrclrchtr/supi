@@ -1,16 +1,18 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
+import { REVIEW_LIMITS } from "../review-limits.ts";
 
 /** TypeBox schema for one caller-defined review task (provider-visible). */
 export const reviewTaskSchema = Type.Object(
   {
     id: Type.String({
       minLength: 1,
-      maxLength: 64,
+      maxLength: REVIEW_LIMITS.taskIdCharacters,
       description: "Stable caller-defined task id, such as standards or spec.",
     }),
     instructions: Type.String({
       minLength: 1,
+      maxLength: REVIEW_LIMITS.taskInstructionCharacters,
       description: "Complete freeform methodology and acceptance instructions for this task.",
     }),
   },
@@ -21,7 +23,10 @@ export const reviewTaskSchema = Type.Object(
 export const reviewInputSchema = Type.Object(
   {
     sharedContext: Type.Optional(
-      Type.String({ description: "Optional context shared unchanged with every task." }),
+      Type.String({
+        maxLength: REVIEW_LIMITS.sharedContextCharacters,
+        description: "Optional context shared unchanged with every task.",
+      }),
     ),
     tasks: Type.Array(reviewTaskSchema, {
       minItems: 1,
@@ -35,9 +40,14 @@ export const reviewInputSchema = Type.Object(
 /** TypeBox schema for a single structured finding (provider-visible). */
 export const reviewFindingSchema = Type.Object(
   {
-    title: Type.String({ minLength: 1, description: "Concise finding title." }),
+    title: Type.String({
+      minLength: 1,
+      maxLength: REVIEW_LIMITS.findingTitleCharacters,
+      description: "Concise finding title.",
+    }),
     description: Type.String({
       minLength: 1,
+      maxLength: REVIEW_LIMITS.findingDescriptionCharacters,
       description: "Concrete evidence-backed explanation of the issue.",
     }),
     blocksAcceptance: Type.Boolean({
@@ -57,7 +67,11 @@ export const reviewFindingSchema = Type.Object(
     location: Type.Optional(
       Type.Object(
         {
-          path: Type.String({ minLength: 1, description: "Repository-relative target path." }),
+          path: Type.String({
+            minLength: 1,
+            maxLength: REVIEW_LIMITS.locationPathCharacters,
+            description: "Repository-relative target path.",
+          }),
           startLine: Type.Integer({ minimum: 1 }),
           endLine: Type.Integer({ minimum: 1 }),
         },
@@ -71,8 +85,13 @@ export const reviewFindingSchema = Type.Object(
 /** TypeBox schema for the submit_review tool parameters (provider-visible). */
 export const reviewSubmissionSchema = Type.Object(
   {
-    summary: Type.String({ minLength: 1, description: "Task-level review summary." }),
+    summary: Type.String({
+      minLength: 1,
+      maxLength: REVIEW_LIMITS.summaryCharacters,
+      description: "Task-level review summary.",
+    }),
     findings: Type.Array(reviewFindingSchema, {
+      maxItems: REVIEW_LIMITS.findingsPerTask,
       description: "Findings in the reviewer's intended order; use an empty array when none exist.",
     }),
   },

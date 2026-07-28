@@ -6,6 +6,7 @@
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
+import { formatReviewUsage } from "../tool/usage-format.ts";
 import type { ReviewBatchDetails, ReviewTaskResult } from "../types.ts";
 import {
   buildTaskSection,
@@ -113,7 +114,7 @@ function buildExpanded(details: ReviewBatchDetails, theme: Theme): Container {
       ? theme.fg("muted", "(planner-assisted)")
       : theme.fg("dim", "(caller-supplied)");
   container.addChild(
-    new Text(`${theme.fg("accent", theme.bold("Review Complete"))}  ${provenanceLabel}`, 1, 0),
+    new Text(`${theme.fg("accent", theme.bold("Review Finished"))}  ${provenanceLabel}`, 1, 0),
   );
   container.addChild(new Spacer(1));
 
@@ -146,6 +147,15 @@ function buildExpanded(details: ReviewBatchDetails, theme: Theme): Container {
         0,
       ),
     );
+    if (details.planning.usage) {
+      container.addChild(
+        new Text(
+          theme.fg("dim", `planner usage: ${formatReviewUsage(details.planning.usage)}`),
+          1,
+          0,
+        ),
+      );
+    }
   }
 
   // Per-task sections

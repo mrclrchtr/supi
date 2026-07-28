@@ -1,9 +1,11 @@
+import type { Usage } from "@earendil-works/pi-ai";
 import { buildSessionContext, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { StatusSpinner } from "@mrclrchtr/supi-core/status-spinner";
 import { loadReviewConfig } from "../config.ts";
 import { summarizeReviewSnapshot } from "../git.ts";
 import { collectPlannerContext } from "../history/collect.ts";
 import { resolveAgentReviewModel } from "../model.ts";
+import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
 import type { ReviewPlanStore } from "../session/review-plan-store.ts";
 import { renderPrepareCall, renderPrepareResult } from "../tui/prepare.ts";
 import { renderRunCall, renderRunResult } from "../tui/run.ts";
@@ -16,17 +18,30 @@ import {
   runReviewSchema,
 } from "./agent-review-schemas.ts";
 import { formatChildFailureDiagnostics } from "./child-failure-diagnostics.ts";
-import { pageText } from "./output-page.ts";
+import { createReviewOutput } from "./review-output-tool.ts";
 import { prepareReview, runReview } from "./review-workflow.ts";
+import { formatReviewUsage } from "./usage-format.ts";
 
 function target(input: PrepareReviewToolInput["target"]): ReviewTargetSpec {
   return (input ?? { kind: "working-tree" }) as ReviewTargetSpec;
+}
+
+function plannerFailureReason(failure: {
+  kind: string;
+  failureCode?: string;
+  timeoutMs?: number;
+}): string {
+  if (failure.kind === "failed") return failure.failureCode ?? "failed";
+  if (failure.kind === "timeout") return `timeout (${failure.timeoutMs} ms)`;
+  return failure.kind;
 }
 
 function formatPrepared(plan: {
   id: string;
   snapshot: { title: string; changedFiles: string[] };
   plannerDraft?: { sharedContext?: string; tasks: Array<{ id: string; instructions: string }> };
+  plannerFailure?: { kind: string; failureCode?: string; timeoutMs?: number };
+  plannerUsage?: Usage;
 }): string {
   const lines = [
     "# Review Plan Prepared",
@@ -35,6 +50,7 @@ function formatPrepared(plan: {
     `Target: ${plan.snapshot.title}`,
     `Files changed: ${plan.snapshot.changedFiles.length}`,
   ];
+  if (plan.plannerUsage) lines.push(`Planner usage: ${formatReviewUsage(plan.plannerUsage)}`);
   if (plan.plannerDraft) {
     lines.push("", "## Planner Draft");
     if (plan.plannerDraft.sharedContext) lines.push("", plan.plannerDraft.sharedContext);
@@ -43,6 +59,10 @@ function formatPrepared(plan: {
     }
     lines.push("", "Call supi_review_run with an explicit accept-draft or use-review decision.");
   } else {
+    if (plan.plannerFailure) {
+      const reason = plannerFailureReason(plan.plannerFailure);
+      lines.push("", `Planner unavailable: ${reason}. The plan remains usable without a draft.`);
+    }
     lines.push("", "Call supi_review_run with a use-review decision containing one to four tasks.");
   }
   return lines.join("\n");
@@ -55,6 +75,7 @@ function formatTaskResult(result: ReviewTaskResult): string[] {
     `Model: ${result.modelId}`,
     `Packet SHA-256: ${result.packetHash}`,
   ];
+  if (result.usage) lines.push(`Usage: ${formatReviewUsage(result.usage)}`);
   if (result.status === "failed") {
     lines.push(`Status: failed (${result.failureCode})`);
     if (result.diagnostics) {
@@ -94,7 +115,7 @@ function formatTaskResult(result: ReviewTaskResult): string[] {
 
 export function formatReviewBatch(details: ReviewBatchDetails): string {
   const lines = [
-    "# Review Complete",
+    "# Review Finished",
     "",
     `Mode: ${details.mode}`,
     `Provenance: ${details.provenance}`,
@@ -104,6 +125,9 @@ export function formatReviewBatch(details: ReviewBatchDetails): string {
     lines.push(
       `Planner: ${details.planning.modelId} (protocol ${details.planning.promptVersion})`,
       `Planner decision: ${details.planning.decision}`,
+      ...(details.planning.usage
+        ? [`Planner usage: ${formatReviewUsage(details.planning.usage)}`]
+        : []),
     );
   }
   for (const result of details.results) lines.push(...formatTaskResult(result));
@@ -116,7 +140,7 @@ function resolveModels(ctx: Parameters<Parameters<ExtensionAPI["registerTool"]>[
   const planner = resolveAgentReviewModel(ctx, config.plannerModel);
   if (!reviewer)
     throw new Error(`Configured reviewer model "${config.agentModel}" is unavailable.`);
-  return { reviewer, planner, config };
+  return { reviewer, planner };
 }
 
 /**
@@ -174,6 +198,7 @@ function initialTaskCount(
 /** Factory for the supi_review_run execute function with animated status-bar spinner. */
 function makeRunReviewExecute(
   planStore: ReviewPlanStore,
+  artifactStore: ReviewArtifactStore,
 ): NonNullable<Parameters<ExtensionAPI["registerTool"]>[0]["execute"]> {
   // biome-ignore lint/complexity/useMaxParams: Pi ToolDefinition execute signature
   return async (_id, params, signal, onUpdate, ctx) => {
@@ -209,9 +234,11 @@ function makeRunReviewExecute(
               onUpdate: wrappedUpdate,
             });
       if (outcome.kind !== "completed") throw new Error(outcome.reason);
+      const output = createReviewOutput(artifactStore, formatReviewBatch(outcome.details));
       return {
-        content: [{ type: "text", text: pageText(formatReviewBatch(outcome.details)).text }],
-        details: outcome.details,
+        content: [{ type: "text", text: output.text }],
+        details: { ...outcome.details, output: output.reference },
+        ...(outcome.usage ? { usage: outcome.usage } : {}),
       };
     } finally {
       statusSpinner.stop();
@@ -236,7 +263,11 @@ function throwPrepareFailure(
 }
 
 /** Register optional preparation and universal direct/prepared execution tools. */
-export function registerAgentReviewTools(pi: ExtensionAPI, planStore: ReviewPlanStore): void {
+export function registerAgentReviewTools(
+  pi: ExtensionAPI,
+  planStore: ReviewPlanStore,
+  artifactStore: ReviewArtifactStore,
+): void {
   pi.registerTool({
     name: "supi_review_prepare",
     label: "Prepare Review",
@@ -253,10 +284,6 @@ export function registerAgentReviewTools(pi: ExtensionAPI, planStore: ReviewPlan
     async execute(_id, params, signal, onUpdate, ctx) {
       const input = parsePrepareReviewToolInput(params);
       const models = resolveModels(ctx);
-      if ((input.planning ?? "none") === "suggest" && !models.planner) {
-        throw new Error(`Configured Planner model "${models.config.plannerModel}" is unavailable.`);
-      }
-
       const { statusSpinner, wrappedUpdate } = wireSpinnerToProgress(
         ctx,
         onUpdate,
@@ -280,8 +307,9 @@ export function registerAgentReviewTools(pi: ExtensionAPI, planStore: ReviewPlan
           onUpdate: wrappedUpdate,
         });
         if (outcome.kind !== "prepared") throwPrepareFailure(outcome);
+        const output = createReviewOutput(artifactStore, formatPrepared(outcome.plan));
         return {
-          content: [{ type: "text", text: pageText(formatPrepared(outcome.plan)).text }],
+          content: [{ type: "text", text: output.text }],
           details: {
             kind: "review-prepared",
             planId: outcome.plan.id,
@@ -290,7 +318,11 @@ export function registerAgentReviewTools(pi: ExtensionAPI, planStore: ReviewPlan
             plannerDraft: outcome.plan.plannerDraft,
             plannerModelId: outcome.plan.plannerModelId,
             plannerPromptVersion: outcome.plan.plannerPromptVersion,
+            plannerUsage: outcome.plan.plannerUsage,
+            plannerFailure: outcome.plan.plannerFailure,
+            output: output.reference,
           },
+          ...(outcome.usage ? { usage: outcome.usage } : {}),
         };
       } finally {
         statusSpinner.stop();
@@ -310,7 +342,7 @@ export function registerAgentReviewTools(pi: ExtensionAPI, planStore: ReviewPlan
     parameters: runReviewSchema,
     renderCall: renderRunCall,
     renderResult: renderRunResult,
-    execute: makeRunReviewExecute(planStore),
+    execute: makeRunReviewExecute(planStore, artifactStore),
   });
 
   pi.on("session_start", () => planStore.clear());

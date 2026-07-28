@@ -1,6 +1,9 @@
 import { lstat, readFile, readlink, realpath } from "node:fs/promises";
 import { dirname, posix, relative, resolve, sep, win32 } from "node:path";
 
+/** Maximum working-tree file size materialized by one review read. */
+export const MAX_REVIEW_FILE_BYTES = 16 * 1024 * 1024;
+
 /** Verified repository-relative review path that cannot lexically escape the worktree. */
 export interface SafeReviewPath {
   absolute: string;
@@ -59,6 +62,11 @@ export async function readWorkingTreeFile(cwd: string, path: string): Promise<st
     assertInsideRepository(repository, parent, path);
     if (stat.isSymbolicLink()) return await readlink(safe.absolute);
     if (!stat.isFile()) return undefined;
+    if (stat.size > MAX_REVIEW_FILE_BYTES) {
+      throw new Error(
+        `${safe.path} exceeds the ${MAX_REVIEW_FILE_BYTES}-byte working-tree review read limit.`,
+      );
+    }
     const resolvedFile = await realpath(safe.absolute);
     assertInsideRepository(repository, resolvedFile, path);
     return await readFile(safe.absolute, "utf8");
@@ -70,16 +78,14 @@ export async function readWorkingTreeFile(cwd: string, path: string): Promise<st
 
 /** Remove deleted paths from a Git-produced repository-relative path list. */
 export async function filterExistingReviewPaths(cwd: string, paths: string[]): Promise<string[]> {
-  const existing = await Promise.all(
-    paths.map(async (path) => {
-      try {
-        await lstat(resolveReviewPath(cwd, path).absolute);
-        return path;
-      } catch (error) {
-        if (isMissingPath(error)) return undefined;
-        throw error;
-      }
-    }),
-  );
-  return existing.filter((path): path is string => path !== undefined);
+  const existing: string[] = [];
+  for (const path of paths) {
+    try {
+      await lstat(resolveReviewPath(cwd, path).absolute);
+      existing.push(path);
+    } catch (error) {
+      if (!isMissingPath(error)) throw error;
+    }
+  }
+  return existing;
 }

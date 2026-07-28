@@ -1,4 +1,5 @@
 import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import { sanitizeChildErrorText } from "./diagnostic-sanitizer.ts";
 
 /** Maximum number of observed Child Lifecycle Trace entries retained per child run. */
 export const CHILD_LIFECYCLE_TRACE_MAX = 32;
@@ -80,7 +81,6 @@ export type ChildLifecycleTraceEntry =
 
 /** Minimal runner-control transitions that explain host-originated termination. */
 export type ChildLifecycleHostMarker =
-  | { type: "steer_requested"; reason: "submit" | "timeout" }
   | { type: "timeout_expired" }
   | { type: "abort_requested"; reason: "canceled" | "timeout" }
   | { type: "prompt_rejected" };
@@ -122,11 +122,6 @@ export class ChildLifecycleTraceCollector {
   /** Record an allowlisted runner-control transition. */
   recordHostMarker(marker: ChildLifecycleHostMarker): void {
     switch (marker.type) {
-      case "steer_requested":
-        if (marker.reason === "submit" || marker.reason === "timeout") {
-          this.push({ type: "steer_requested", reason: marker.reason });
-        }
-        break;
       case "abort_requested":
         if (marker.reason === "canceled" || marker.reason === "timeout") {
           this.push({ type: "abort_requested", reason: marker.reason });
@@ -219,8 +214,6 @@ function formatChildLifecycleTraceEntry(entry: ChildLifecycleTraceEntry): string
         : `summarization_retry_attempt_start(source=${entry.source})`;
     case "queue_update":
       return `queue_update(steering=${entry.steeringCount}, followUp=${entry.followUpCount})`;
-    case "steer_requested":
-      return `steer_requested(reason=${entry.reason})`;
     case "abort_requested":
       return `abort_requested(reason=${entry.reason})`;
   }
@@ -290,10 +283,7 @@ function mapLifecycleEvent(event: AgentSessionEvent): ChildLifecycleTraceEntry |
             willRetry: event.willRetry,
             hasResult: event.result !== undefined,
             hasError: event.errorMessage !== undefined,
-            errorText:
-              typeof event.errorMessage === "string" && event.errorMessage.trim()
-                ? event.errorMessage
-                : undefined,
+            errorText: sanitizeChildErrorText(event.errorMessage),
           }
         : undefined;
     case "auto_retry_start":
@@ -314,10 +304,7 @@ function mapLifecycleEvent(event: AgentSessionEvent): ChildLifecycleTraceEntry |
             success: event.success,
             attempt: event.attempt,
             hasFinalError: event.finalError !== undefined,
-            finalErrorText:
-              typeof event.finalError === "string" && event.finalError.trim()
-                ? event.finalError
-                : undefined,
+            finalErrorText: sanitizeChildErrorText(event.finalError),
           }
         : undefined;
     case "summarization_retry_scheduled":

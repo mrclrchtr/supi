@@ -1,8 +1,10 @@
+import { createHash } from "node:crypto";
 import {
   expectedGitExitOutput as expectedExitOutput,
   runGit as git,
   runGitAllowExit as gitAllowExit,
   literalPathspec,
+  resolveGitRepositoryRoot,
   withHeadIndex,
 } from "./git-command.ts";
 import {
@@ -74,11 +76,31 @@ async function commitParent(cwd: string, commit: string): Promise<string | undef
   return parent;
 }
 
-function joinDiffs(parts: string[]): string {
-  return parts
-    .filter(Boolean)
-    .map((part) => (part.endsWith("\n") ? part : `${part}\n`))
-    .join("");
+interface DiffAccumulator {
+  append(diff: string): void;
+  finish(fileCount: number): { diffHash: string; stats: DiffStats };
+}
+
+function createDiffAccumulator(): DiffAccumulator {
+  const hash = createHash("sha256");
+  let additions = 0;
+  let deletions = 0;
+  return {
+    append(diff) {
+      if (!diff) return;
+      hash.update(diff, "utf8");
+      if (!diff.endsWith("\n")) hash.update("\n", "utf8");
+      const stats = parseDiffStats(diff);
+      additions += stats.additions;
+      deletions += stats.deletions;
+    },
+    finish(fileCount) {
+      return {
+        diffHash: hash.digest("hex"),
+        stats: { files: fileCount, additions, deletions },
+      };
+    },
+  };
 }
 
 async function diffUntrackedFile(cwd: string, path: string): Promise<string> {
@@ -94,25 +116,25 @@ async function workingTreeSnapshot(cwd: string): Promise<ReviewSnapshot | undefi
   const head = await headCommit(cwd);
   if (!head) return undefined;
   return withHeadIndex(cwd, head, async (indexFile) => {
-    const [trackedDiff, tracked, untrackedText] = await Promise.all([
-      git(cwd, ["diff", ...DIFF_FLAGS, "HEAD"], indexFile),
+    const [tracked, untrackedText] = await Promise.all([
       git(cwd, ["diff", "--name-only", "-z", "HEAD"], indexFile),
       git(cwd, ["ls-files", "--others", "--exclude-standard", "-z"], indexFile),
     ]);
     const untracked = parseNullList(untrackedText);
     const changedFiles = Array.from(new Set([...parseNullList(tracked), ...untracked])).sort();
     if (changedFiles.length === 0) return undefined;
-    const diffText = joinDiffs([
-      trackedDiff,
-      ...(await Promise.all(untracked.map((path) => diffUntrackedFile(cwd, path)))),
-    ]);
+
+    const diff = createDiffAccumulator();
+    diff.append(await git(cwd, ["diff", ...DIFF_FLAGS, "HEAD"], indexFile));
+    for (const path of untracked) diff.append(await diffUntrackedFile(cwd, path));
+    const identity = diff.finish(changedFiles.length);
     return {
+      repositoryRoot: cwd,
       requestedTarget: { kind: "working-tree" },
       target: { kind: "working-tree", headCommit: head },
       title: "Working tree changes",
       changedFiles,
-      diffText,
-      stats: parseDiffStats(diffText, changedFiles.length),
+      ...identity,
     };
   });
 }
@@ -141,7 +163,10 @@ async function comparisonSnapshot(
   ]);
   const changedFiles = parseNullList(names);
   if (changedFiles.length === 0) return undefined;
+  const diff = createDiffAccumulator();
+  diff.append(diffText);
   return {
+    repositoryRoot: cwd,
     requestedTarget: requested,
     target: {
       kind: "comparison",
@@ -151,8 +176,7 @@ async function comparisonSnapshot(
     },
     title: `Changes ${mergeBase.slice(0, 7)}..${head.slice(0, 7)}`,
     changedFiles,
-    diffText,
-    stats: parseDiffStats(diffText, changedFiles.length),
+    ...diff.finish(changedFiles.length),
   };
 }
 
@@ -175,74 +199,38 @@ async function commitSnapshot(
   ]);
   const changedFiles = parseNullList(names);
   if (changedFiles.length === 0) return undefined;
+  const diff = createDiffAccumulator();
+  diff.append(diffText);
   return {
+    repositoryRoot: cwd,
     requestedTarget: requested,
     target: { kind: "commit", commit, ...(parent ? { parentCommit: parent } : {}) },
     title: `Commit ${commit.slice(0, 7)}`,
     changedFiles,
-    diffText,
-    stats: parseDiffStats(diffText, changedFiles.length),
+    ...diff.finish(changedFiles.length),
   };
 }
 
-export interface CommitChoice {
-  commit: string;
-  label: string;
-}
-
-/** List local branches with resolved commit ids for the interactive adapter. */
-export async function listLocalBranches(cwd: string): Promise<CommitChoice[]> {
-  const output = await git(cwd, [
-    "for-each-ref",
-    // biome-ignore lint/security/noSecrets: Git format syntax, not a secret
-    "--format=%(objectname)%00%(refname:short)",
-    "refs/heads",
-  ]);
-  return output
-    .trim()
-    .split("\n")
-    .flatMap((line) => {
-      const [commit, label] = line.split("\0");
-      return commit && label ? [{ commit, label }] : [];
-    });
-}
-
-/** List recent commits with resolved ids for the interactive adapter. */
-export async function listRecentCommits(cwd: string, limit = 30): Promise<CommitChoice[]> {
-  const output = await git(cwd, [
-    "log",
-    `--max-count=${limit}`,
-    // biome-ignore lint/security/noSecrets: Git format syntax, not a secret
-    "--format=%H%x00%s",
-  ]);
-  return output
-    .trim()
-    .split("\n")
-    .flatMap((line) => {
-      const [commit, subject] = line.split("\0");
-      return commit && subject ? [{ commit, label: `${commit.slice(0, 7)}  ${subject}` }] : [];
-    });
-}
-
 /** Pin target identities and capture the target's changed files, patch, and stats. */
-export function resolveReviewSnapshot(
+export async function resolveReviewSnapshot(
   cwd: string,
   target: ReviewTargetSpec,
 ): Promise<ReviewSnapshot | undefined> {
+  const root = await resolveGitRepositoryRoot(cwd);
   switch (target.kind) {
     case "working-tree":
-      return workingTreeSnapshot(cwd);
+      return workingTreeSnapshot(root);
     case "comparison":
-      return comparisonSnapshot(cwd, target);
+      return comparisonSnapshot(root, target);
     case "commit":
-      return commitSnapshot(cwd, target);
+      return commitSnapshot(root, target);
   }
 }
 
-/** Remove the potentially large patch while retaining pinned target metadata. */
+/** Return the public, patch-free snapshot summary. */
 export function summarizeReviewSnapshot(snapshot: ReviewSnapshot): ReviewSnapshotSummary {
-  const { diffText: _, ...summary } = snapshot;
-  return summary;
+  const { repositoryRoot: _, ...summary } = snapshot;
+  return { ...summary, changedFiles: [...snapshot.changedFiles] };
 }
 
 async function showBlob(
@@ -272,50 +260,56 @@ async function isWorkingTreePathAllowed(cwd: string, head: string, path: string)
 
 /** Read one before/after file from the target rather than an unrelated live checkout. */
 export async function readReviewFile(
-  cwd: string,
+  _cwd: string,
   snapshot: ReviewSnapshot,
   path: string,
   side: "before" | "after" = "after",
 ): Promise<string | undefined> {
-  const safe = resolveReviewPath(cwd, path);
+  const root = snapshot.repositoryRoot;
+  const safe = resolveReviewPath(root, path);
   const target = snapshot.target;
   if (target.kind === "working-tree") {
-    if (side === "before") return showBlob(cwd, target.headCommit, safe.path);
-    if (!(await isWorkingTreePathAllowed(cwd, target.headCommit, safe.path))) {
+    if (side === "before") return showBlob(root, target.headCommit, safe.path);
+    if (!(await isWorkingTreePathAllowed(root, target.headCommit, safe.path))) {
       throw new Error(`${safe.path} is not part of the selected working-tree target.`);
     }
-    return readWorkingTreeFile(cwd, safe.path);
+    return readWorkingTreeFile(root, safe.path);
   }
   if (target.kind === "comparison") {
-    return showBlob(cwd, side === "before" ? target.mergeBaseCommit : target.headCommit, safe.path);
+    return showBlob(
+      root,
+      side === "before" ? target.mergeBaseCommit : target.headCommit,
+      safe.path,
+    );
   }
-  return showBlob(cwd, side === "before" ? target.parentCommit : target.commit, safe.path);
+  return showBlob(root, side === "before" ? target.parentCommit : target.commit, safe.path);
 }
 
 /** Read one changed file's patch from the selected target. */
 export async function readReviewDiff(
-  cwd: string,
+  _cwd: string,
   snapshot: ReviewSnapshot,
   path: string,
 ): Promise<string> {
-  const safe = resolveReviewPath(cwd, path);
+  const root = snapshot.repositoryRoot;
+  const safe = resolveReviewPath(root, path);
   if (!snapshot.changedFiles.includes(safe.path)) {
     throw new Error(`${safe.path} is not changed by this target.`);
   }
   const target = snapshot.target;
   if (target.kind === "working-tree") {
-    return withHeadIndex(cwd, target.headCommit, async (indexFile) => {
+    return withHeadIndex(root, target.headCommit, async (indexFile) => {
       const tracked = await git(
-        cwd,
+        root,
         literalPathspec(["diff", ...DIFF_FLAGS, "HEAD", "--", safe.path]),
         indexFile,
       );
-      return tracked || diffUntrackedFile(cwd, safe.path);
+      return tracked || diffUntrackedFile(root, safe.path);
     });
   }
   if (target.kind === "comparison") {
     return git(
-      cwd,
+      root,
       literalPathspec([
         "diff",
         ...DIFF_FLAGS,
@@ -328,7 +322,7 @@ export async function readReviewDiff(
   }
   return target.parentCommit
     ? git(
-        cwd,
+        root,
         literalPathspec([
           "diff",
           ...DIFF_FLAGS,
@@ -339,7 +333,7 @@ export async function readReviewDiff(
         ]),
       )
     : git(
-        cwd,
+        root,
         literalPathspec([
           "show",
           ...DIFF_FLAGS,
@@ -353,38 +347,40 @@ export async function readReviewDiff(
 }
 
 /** List files present on the target's after side, excluding ignored untracked files. */
-export async function listReviewFiles(cwd: string, snapshot: ReviewSnapshot): Promise<string[]> {
+export async function listReviewFiles(_cwd: string, snapshot: ReviewSnapshot): Promise<string[]> {
+  const root = snapshot.repositoryRoot;
   const target = snapshot.target;
   if (target.kind !== "working-tree") {
     const commit = target.kind === "comparison" ? target.headCommit : target.commit;
-    return parseNullList(await git(cwd, ["ls-tree", "-r", "--name-only", "-z", commit]));
+    return parseNullList(await git(root, ["ls-tree", "-r", "--name-only", "-z", commit]));
   }
-  return withHeadIndex(cwd, target.headCommit, async (indexFile) => {
+  return withHeadIndex(root, target.headCommit, async (indexFile) => {
     const candidates = parseNullList(
-      await git(cwd, ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], indexFile),
+      await git(root, ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], indexFile),
     );
-    return filterExistingReviewPaths(cwd, candidates);
+    return filterExistingReviewPaths(root, candidates);
   });
 }
 
 /** Search literal text on the target's after side with Git's repository-aware search. */
 export async function searchReviewFiles(
-  cwd: string,
+  _cwd: string,
   snapshot: ReviewSnapshot,
   query: string,
   path?: string,
 ): Promise<string> {
-  const pathArgs = path ? ["--", resolveReviewPath(cwd, path).path] : [];
+  const root = snapshot.repositoryRoot;
+  const pathArgs = path ? ["--", resolveReviewPath(root, path).path] : [];
   const target = snapshot.target;
   const args = literalPathspec(["grep", "-n", "-F", "--untracked", "-e", query, ...pathArgs]);
   if (target.kind === "working-tree") {
-    return withHeadIndex(cwd, target.headCommit, (indexFile) =>
-      gitAllowExit(cwd, args, [1], indexFile),
+    return withHeadIndex(root, target.headCommit, (indexFile) =>
+      gitAllowExit(root, args, [1], indexFile),
     );
   }
   const commit = target.kind === "comparison" ? target.headCommit : target.commit;
   return gitAllowExit(
-    cwd,
+    root,
     literalPathspec(["grep", "-n", "-F", "-e", query, commit, ...pathArgs]),
     [1],
   );

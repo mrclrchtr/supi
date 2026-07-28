@@ -5,8 +5,9 @@ Caller-defined code review tasks executed in managed, read-only child sessions.
 ## Product contract
 
 - Direct Review executes a target plus complete review input in one call.
-- Prepared Review creates a session-scoped, one-shot Review Plan first.
-- Preparation is optional and may request a lightweight Planner Draft.
+- Prepared Review creates a bounded session-scoped Review Plan first.
+- Valid execution leases the plan; any completed task consumes it, while an all-non-completed batch releases it for retry.
+- Preparation is optional and may request a lightweight Planner Draft; Planner failure returns a usable no-draft plan.
 - Callers own task methodology through `{ id, instructions }` tasks.
 - The Review Engine owns target resolution, canonical packet construction and hashing, read-only tools, child lifecycle, result grammar, and per-task verdicts.
 - One to four tasks run concurrently using one reviewer model.
@@ -15,17 +16,19 @@ Caller-defined code review tasks executed in managed, read-only child sessions.
 ## Targets
 
 - Working tree: net `HEAD` to current files plus non-ignored untracked files; use a temporary HEAD-seeded index so the caller's real index and index flags are not semantic inputs.
-- Comparison: merge base of caller-supplied full base commit and captured `HEAD` to captured `HEAD`.
-- Commit: first parent or empty tree to the supplied full commit.
-- Agent tools accept full commit object ids only.
+- All targets resolve against the canonical Git worktree root, regardless of Pi's launch subdirectory.
+- Comparison: merge base of a caller-supplied 7–64 character hexadecimal base commit and captured `HEAD` to captured `HEAD`.
+- Commit: first parent or empty tree to the supplied 7–64 character hexadecimal commit.
+- Short commit ids are resolved and pinned to full object ids before packet construction.
 - Repository stability through review completion is a caller precondition. The package intentionally performs no fingerprint or freshness check.
 
 ## Planner
 
 - Uses the separately configured Planner model at low thinking effort.
 - Receives bounded compaction/branch summaries, recent visible conversation, changed-file names, and target stats.
-- Receives no code, diffs, tool calls/results, context files, or tools.
+- Receives no code, diffs, prior tool calls/results, context files, or inspection tools; only `submit_review_plan` is registered.
 - Produces only advisory `{ sharedContext?, tasks }` input.
+- Draft tasks must be answerable through the reviewer's fixed static inspection tools; they cannot request shell/runtime/nested-review operations.
 - Prepared execution explicitly accepts or replaces a draft.
 - Draft and effective input remain separate in planning provenance.
 
@@ -33,26 +36,29 @@ Caller-defined code review tasks executed in managed, read-only child sessions.
 
 Tools are fixed and target-aware:
 
+- `list_review_changes`
 - `list_review_files`
 - `read_review_diff`
 - `read_review_file`
 - `search_review_files`
 - `submit_review`
 
-Do not reintroduce live-checkout built-in read/search tools for commit-based targets. Reviewer resource loading disables extensions, context files, skills, prompt templates, and themes, explicitly suppresses discovered `SYSTEM.md` / `APPEND_SYSTEM.md` files, and uses in-memory settings with compaction/retries disabled. Inspection outputs are paged; canonical packet bytes are not.
+Do not reintroduce live-checkout built-in read/search tools for commit-based targets. Reviewer resource loading disables extensions, context files, skills, prompt templates, and themes, explicitly suppresses discovered `SYSTEM.md` / `APPEND_SYSTEM.md` files, and uses in-memory settings with compaction/retries disabled. Inspection outputs are paged; canonical packet bytes are not. Parent-facing preparation/run text uses bounded session artifacts retrievable through `supi_review_output`.
 
 ## Result grammar
 
-The reviewer submits a task summary plus findings. Each finding has title, description, `blocksAcceptance`, impact, effort, confidence, and optional target-relative location. The Review Engine derives `pass` when no finding blocks acceptance and `issues` otherwise. It validates confidence only as `0..1`, preserves reviewer order, and applies no category or confidence policy. Every task outcome carries the SHA-256 of its exact canonical packet bytes.
+The reviewer submits a task summary plus findings. Each finding has title, description, `blocksAcceptance`, impact, effort, confidence, and optional target-relative location. The Review Engine derives `pass` when no finding blocks acceptance and `issues` otherwise. It validates confidence only as `0..1`, preserves reviewer order, and applies no category or confidence policy. Every task outcome carries the SHA-256 of its exact canonical packet bytes and nested-model usage when reported. Reviewer sessions have no package-owned automatic runtime/turn/tool/token cutoff; explicit cancellation has a bounded abort grace.
 
 ## Main files
 
 - `src/review.ts` — command and extension wiring
-- `src/git.ts` — target resolution and target-aware repository access
-- `src/review-path.ts` — repository-relative path and symlink containment boundary
+- `src/git.ts` — root-pinned target resolution and target-aware repository access
+- `src/git-choices.ts` — interactive branch/commit choices
+- `src/review-path.ts` — repository-relative path, size, and symlink containment boundary
 - `src/target/packet.ts` — canonical reviewer packet
 - `src/tool/review-workflow.ts` — Direct/Prepared orchestration
-- `src/tool/agent-review-tools.ts` — public agent tools
+- `src/tool/agent-review-tools.ts` — prepare/run agent tools
+- `src/tool/review-output-tool.ts` — resumable parent-output tool
 - `src/tool/planner-runner.ts` — optional lightweight Planner
 - `src/tool/child-resource-loader.ts` — inherited-resource suppression for child sessions
 - `src/tool/review-runner.ts` — managed reviewer child
@@ -66,6 +72,7 @@ Test behavior through:
 1. Direct/Prepared Review workflow
 2. Git target resolution and target-aware reads/searches
 3. packet compilation and result normalization
-4. extension command/tool registration
+4. output artifact retrieval
+5. extension command/tool registration
 
 Use package-scoped Vitest plus both source and test TypeScript builds.

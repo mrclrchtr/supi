@@ -13,6 +13,7 @@ import {
   getRegisteredToolNames,
   toSafeAssistantStopReason,
 } from "./child-lifecycle-trace.ts";
+import { sanitizeChildErrorText } from "./diagnostic-sanitizer.ts";
 import { buildProgressTokens } from "./runner-helpers.ts";
 
 /** Inputs used to create one safe non-success child-run diagnostic artifact. */
@@ -81,6 +82,28 @@ export function formatChildFailureCopy(stage: ChildStage, code: ChildFailureCode
   }
 }
 
+export interface ChildDiagnosticErrorRow {
+  label: "Last assistant error" | "Lifecycle error";
+  text: string;
+}
+
+/** Return the distinct bounded provider error summaries shared by text and TUI rendering. */
+export function getChildDiagnosticErrorRows(
+  diagnostics: ChildFailureDiagnostics,
+): ChildDiagnosticErrorRow[] {
+  const rows: ChildDiagnosticErrorRow[] = [];
+  if (diagnostics.lastAssistantErrorText) {
+    rows.push({ label: "Last assistant error", text: diagnostics.lastAssistantErrorText });
+  }
+  if (
+    diagnostics.lastLifecycleErrorText &&
+    diagnostics.lastLifecycleErrorText !== diagnostics.lastAssistantErrorText
+  ) {
+    rows.push({ label: "Lifecycle error", text: diagnostics.lastLifecycleErrorText });
+  }
+  return rows;
+}
+
 /** Format the complete retained safe diagnostic artifact for parent-facing text. */
 export function formatChildFailureDiagnostics(diagnostics: ChildFailureDiagnostics): string[] {
   const lines = [
@@ -98,13 +121,7 @@ export function formatChildFailureDiagnostics(diagnostics: ChildFailureDiagnosti
     diagnostics.lastAssistantToolCalls && diagnostics.lastAssistantToolCalls.length > 0
       ? `- Last assistant tools: ${diagnostics.lastAssistantToolCalls.join(", ")}`
       : undefined,
-    diagnostics.lastAssistantErrorText
-      ? `- Last assistant error: ${diagnostics.lastAssistantErrorText}`
-      : undefined,
-    diagnostics.lastLifecycleErrorText &&
-    diagnostics.lastLifecycleErrorText !== diagnostics.lastAssistantErrorText
-      ? `- Lifecycle error: ${diagnostics.lastLifecycleErrorText}`
-      : undefined,
+    ...getChildDiagnosticErrorRows(diagnostics).map((row) => `- ${row.label}: ${row.text}`),
     `- ${formatChildLifecycleTrace(diagnostics.lifecycleTrace)}`,
   ];
   return lines.filter((line): line is string => !!line);
@@ -157,47 +174,7 @@ function extractAssistantToolCalls(content: unknown, registeredToolNames: Set<st
     .filter((name): name is string => !!name);
 }
 
-/** Extract error text from content text parts when the model embeds an error message. */
-function extractContentErrorText(content: unknown): string | undefined {
-  if (!Array.isArray(content)) return undefined;
-  const textParts = content
-    .filter(
-      (part): part is { type: "text"; text: string } =>
-        typeof part === "object" &&
-        part !== null &&
-        (part as { type?: unknown }).type === "text" &&
-        typeof (part as { text?: unknown }).text === "string",
-    )
-    .map((part) => part.text);
-  if (textParts.length === 0) return undefined;
-  const joined = textParts.join("\n").trim();
-  return joined || undefined;
-}
-
-/** Scan enumerable message keys for any error-like string property as a fallback. */
-function scanMessageKeysForError(message: Record<string, unknown>): string | undefined {
-  for (const key of Object.keys(message)) {
-    if (!/error|message|reason/i.test(key)) continue;
-    const value = message[key];
-    if (typeof value === "string" && value.trim()) return value;
-  }
-  return undefined;
-}
-
-/** Extract error text from an errored assistant message, trying content text parts first then top-level error fields. */
+/** Extract only Pi's canonical provider error field from an errored assistant message. */
 function extractAssistantErrorText(message: Record<string, unknown>): string | undefined {
-  // 1. Try content text parts (model may embed error in text)
-  const contentError = extractContentErrorText(message.content);
-  if (contentError) return contentError;
-
-  // 2. Try top-level error message (provider-level error payload)
-  if (typeof message.errorMessage === "string" && message.errorMessage.trim()) {
-    return message.errorMessage;
-  }
-  if (typeof message.error === "string" && message.error.trim()) {
-    return message.error;
-  }
-
-  // 3. Fallback: scan enumerable keys for any error-like string property
-  return scanMessageKeysForError(message);
+  return sanitizeChildErrorText(message.errorMessage);
 }

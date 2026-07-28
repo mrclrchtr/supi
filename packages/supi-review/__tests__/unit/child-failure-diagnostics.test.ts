@@ -34,6 +34,39 @@ describe("child failure diagnostic builder", () => {
     expect(JSON.stringify(diagnostics)).not.toContain("private_unregistered_tool");
   });
 
+  it("retains only a bounded redacted canonical provider error summary", () => {
+    const session = {
+      messages: [
+        {
+          role: "assistant",
+          content: [{ type: "text", text: "private assistant content" }],
+          stopReason: "error",
+          errorMessage: `Authorization: Bearer private-token {"apiKey":"private-json-key"}\u001b[31m ${"x".repeat(700)}`,
+          error: "private fallback error",
+          reason: "private broad-scan value",
+        },
+      ],
+      getActiveToolNames: () => [],
+      getSessionStats: () => ({}),
+    } as unknown as AgentSession;
+
+    const diagnostics = buildChildFailureDiagnostics({
+      progress: { turns: 1, toolUses: 0 },
+      session,
+      lifecycleTrace: { entries: [], droppedCount: 0 },
+      recentActivity: [],
+    });
+
+    expect(diagnostics.lastAssistantErrorText).toContain("[REDACTED]");
+    expect(diagnostics.lastAssistantErrorText?.length).toBeLessThanOrEqual(501);
+    expect(diagnostics.lastAssistantErrorText).not.toContain("private-token");
+    expect(diagnostics.lastAssistantErrorText).not.toContain("private-json-key");
+    expect(diagnostics.lastAssistantErrorText).not.toContain("\u001b");
+    expect(JSON.stringify(diagnostics)).not.toContain("private assistant content");
+    expect(JSON.stringify(diagnostics)).not.toContain("private fallback error");
+    expect(JSON.stringify(diagnostics)).not.toContain("private broad-scan value");
+  });
+
   it("omits a non-Pi assistant stop reason", () => {
     const session = {
       messages: [

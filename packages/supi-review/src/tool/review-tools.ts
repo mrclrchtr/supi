@@ -2,6 +2,7 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { listReviewFiles, readReviewDiff, readReviewFile, searchReviewFiles } from "../git.ts";
+import { REVIEW_LIMITS } from "../review-limits.ts";
 import { normalizeReviewSubmission } from "../review-result.ts";
 import type { ReviewSnapshot, ReviewSubmission } from "../types.ts";
 import { DEFAULT_PAGE_CHARACTERS, MAX_PAGE_CHARACTERS, pageText } from "./output-page.ts";
@@ -41,6 +42,14 @@ export function createReviewTools(
 ) {
   return [
     defineTool({
+      name: "list_review_changes",
+      label: "List Review Changes",
+      description: "List every repository-relative path changed by the selected target.",
+      parameters: Type.Object(paginationProperties, { additionalProperties: false }),
+      execute: async (_id, args) =>
+        pagedResult(snapshot.changedFiles.join("\n"), args.offset, args.limit),
+    }),
+    defineTool({
       name: "list_review_files",
       label: "List Review Files",
       description: "List after-side target files. Use offset to continue paged output.",
@@ -53,7 +62,10 @@ export function createReviewTools(
       label: "Read Review Diff",
       description: "Read one changed file's exact target diff. Use offset to continue.",
       parameters: Type.Object(
-        { path: Type.String({ minLength: 1 }), ...paginationProperties },
+        {
+          path: Type.String({ minLength: 1, maxLength: REVIEW_LIMITS.locationPathCharacters }),
+          ...paginationProperties,
+        },
         { additionalProperties: false },
       ),
       execute: async (_id, args) =>
@@ -65,7 +77,7 @@ export function createReviewTools(
       description: "Read a before/after target file. Use offset to continue paged output.",
       parameters: Type.Object(
         {
-          path: Type.String({ minLength: 1 }),
+          path: Type.String({ minLength: 1, maxLength: REVIEW_LIMITS.locationPathCharacters }),
           side: Type.Optional(
             StringEnum(["before", "after"] as const, {
               default: "after",
@@ -87,8 +99,13 @@ export function createReviewTools(
       description: "Search literal after-side target text. Use offset to continue paged output.",
       parameters: Type.Object(
         {
-          query: Type.String({ minLength: 1 }),
-          path: Type.Optional(Type.String({ minLength: 1 })),
+          query: Type.String({
+            minLength: 1,
+            maxLength: REVIEW_LIMITS.searchQueryCharacters,
+          }),
+          path: Type.Optional(
+            Type.String({ minLength: 1, maxLength: REVIEW_LIMITS.locationPathCharacters }),
+          ),
           ...paginationProperties,
         },
         { additionalProperties: false },

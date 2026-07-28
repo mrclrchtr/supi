@@ -7,9 +7,10 @@ import type {
   ReviewSnapshot,
   ReviewTask,
 } from "../types.ts";
+import { buildFileManifest } from "./file-manifest.ts";
 
 /** Protocol version included in every canonical reviewer packet for future evolution. */
-export const REVIEW_PACKET_PROTOCOL_VERSION = "1";
+export const REVIEW_PACKET_PROTOCOL_VERSION = "2";
 
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
@@ -46,7 +47,7 @@ export function buildReviewPacket(
     `Task id: ${task.id}`,
     `Target: ${snapshot.title}`,
     `Target identity: ${targetIdentity(snapshot.target)}`,
-    `Target diff SHA-256: ${sha256(snapshot.diffText)}`,
+    `Target diff SHA-256: ${snapshot.diffHash}`,
     `Reviewer model: ${model.canonicalId}`,
     `Changed files: ${snapshot.changedFiles.length}`,
     `Diff stats: +${snapshot.stats.additions} / -${snapshot.stats.deletions}`,
@@ -60,10 +61,11 @@ export function buildReviewPacket(
     task.instructions.trim(),
     "",
     "## Changed files",
-    ...snapshot.changedFiles.map((file) => `- ${JSON.stringify(file)}`),
+    ...buildFileManifest(snapshot.changedFiles),
     "",
     "## Inspection",
-    "Use list_review_files, read_review_diff, read_review_file, and search_review_files.",
+    "Use list_review_changes for the complete changed-path set.",
+    "Use list_review_files, read_review_diff, read_review_file, and search_review_files for target context.",
     "All tools resolve against the selected review target.",
     "",
     "## Delivery",

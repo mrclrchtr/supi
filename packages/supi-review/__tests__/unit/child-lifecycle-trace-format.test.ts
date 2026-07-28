@@ -42,7 +42,6 @@ describe("formatChildLifecycleTrace", () => {
         },
         { type: "summarization_retry_attempt_start", source: "branchSummary" },
         { type: "summarization_retry_finished" },
-        { type: "steer_requested", reason: "timeout" },
         { type: "timeout_expired" },
         { type: "abort_requested", reason: "canceled" },
         { type: "prompt_rejected" },
@@ -61,7 +60,6 @@ describe("formatChildLifecycleTrace", () => {
     expect(formatted).toContain(
       `summarization_retry_attempt_start(source=${"branch" + "Summary"})`,
     );
-    expect(formatted).toContain("steer_requested(reason=timeout)");
     expect(formatted).toContain("abort_requested(reason=canceled)");
   });
 });

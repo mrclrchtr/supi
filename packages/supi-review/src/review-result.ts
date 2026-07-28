@@ -1,9 +1,15 @@
+import { REVIEW_LIMITS } from "./review-limits.ts";
 import { normalizeRepositoryRelativePath } from "./review-path.ts";
 import type { NormalizedReviewSubmission, ReviewSubmission } from "./types.ts";
 
-function requireText(value: string, label: string): string {
+function requireText(value: string, label: string, maxCharacters: number): string {
   const normalized = value.trim();
   if (!normalized) throw new Error(`${label} must not be blank.`);
+  if (normalized.length > maxCharacters) {
+    throw new Error(
+      `${label} must not exceed ${maxCharacters.toLocaleString("en-US")} characters.`,
+    );
+  }
   return normalized;
 }
 
@@ -11,8 +17,11 @@ function requireText(value: string, label: string): string {
 export function normalizeReviewSubmission(
   submission: ReviewSubmission,
 ): NormalizedReviewSubmission {
+  if (submission.findings.length > REVIEW_LIMITS.findingsPerTask) {
+    throw new Error(`A review task may submit at most ${REVIEW_LIMITS.findingsPerTask} findings.`);
+  }
   return {
-    summary: requireText(submission.summary, "Review summary"),
+    summary: requireText(submission.summary, "Review summary", REVIEW_LIMITS.summaryCharacters),
     findings: submission.findings.map((finding, index) => {
       if (
         !Number.isFinite(finding.confidence) ||
@@ -32,13 +41,25 @@ export function normalizeReviewSubmission(
       }
       return {
         ...finding,
-        title: requireText(finding.title, `Finding ${index + 1} title`),
-        description: requireText(finding.description, `Finding ${index + 1} description`),
+        title: requireText(
+          finding.title,
+          `Finding ${index + 1} title`,
+          REVIEW_LIMITS.findingTitleCharacters,
+        ),
+        description: requireText(
+          finding.description,
+          `Finding ${index + 1} description`,
+          REVIEW_LIMITS.findingDescriptionCharacters,
+        ),
         location: finding.location
           ? {
               ...finding.location,
               path: normalizeRepositoryRelativePath(
-                requireText(finding.location.path, `Finding ${index + 1} location path`),
+                requireText(
+                  finding.location.path,
+                  `Finding ${index + 1} location path`,
+                  REVIEW_LIMITS.locationPathCharacters,
+                ),
               ),
             }
           : undefined,

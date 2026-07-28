@@ -1,4 +1,4 @@
-import type { clampThinkingLevel, Model } from "@earendil-works/pi-ai";
+import type { clampThinkingLevel, Model, Usage } from "@earendil-works/pi-ai";
 import {
   createAgentSession,
   SessionManager,
@@ -6,6 +6,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { ChildFailureDiagnostics, ReviewProgress } from "../types.ts";
 import { createIsolatedChildResources } from "./child-resource-loader.ts";
+import { buildProgressTokens } from "./runner-helpers.ts";
 import { runWithLifecycle } from "./session-lifecycle.ts";
 
 /** Configuration for one isolated child run — resource loading, session, and lifecycle. */
@@ -15,19 +16,24 @@ export interface IsolatedRunConfig<THolder, TResult> {
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
   model: Model<any>;
   thinkingLevel: ReturnType<typeof clampThinkingLevel>;
-  timeoutMs: number;
+  timeoutMs?: number;
   prompt: string;
   signal?: AbortSignal;
   tools: string[];
   customTools: ToolDefinition[];
   holder: { value?: THolder };
-  successResult: (value: THolder) => TResult;
-  canceledResult: (diagnostics: ChildFailureDiagnostics) => TResult;
+  successResult: (value: THolder, usage?: Usage) => TResult;
+  canceledResult: (diagnostics: ChildFailureDiagnostics, usage?: Usage) => TResult;
   failedResult: (
     failureCode: "prompt-rejected" | "missing-structured-output" | "unexpected-runner-failure",
     diagnostics: ChildFailureDiagnostics,
+    usage?: Usage,
   ) => TResult;
-  timeoutResult: (timeoutMs: number, diagnostics: ChildFailureDiagnostics) => TResult;
+  timeoutResult: (
+    timeoutMs: number,
+    diagnostics: ChildFailureDiagnostics,
+    usage?: Usage,
+  ) => TResult;
   sessionFailedResult: TResult;
   onProgress?: (progress: ReviewProgress) => void;
 }
@@ -62,20 +68,31 @@ export async function runIsolatedChild<THolder, TResult>(
       signal: config.signal,
       timeoutMs: config.timeoutMs,
       onEvent: (event, ctx) => {
+        const reportsProgress =
+          event.type === "turn_end" ||
+          event.type === "tool_execution_start" ||
+          event.type === "agent_settled";
         if (event.type === "turn_end") ctx.progress.turns++;
         if (event.type === "tool_execution_start") ctx.progress.toolUses++;
-        config.onProgress?.(ctx.progress);
+        if (reportsProgress) {
+          ctx.progress.tokens = buildProgressTokens(() => ctx.session.getSessionStats());
+          config.onProgress?.({ ...ctx.progress });
+        }
         if (event.type !== "agent_settled") return;
         const result = config.holder.value
-          ? config.successResult(config.holder.value)
-          : config.failedResult("missing-structured-output", ctx.getFailureDiagnostics());
+          ? config.successResult(config.holder.value, ctx.getUsage())
+          : config.failedResult(
+              "missing-structured-output",
+              ctx.getFailureDiagnostics(),
+              ctx.getUsage(),
+            );
         ctx.resolve(ctx.cleanup(result));
       },
-      canceledResult: (ctx) => config.canceledResult(ctx.getFailureDiagnostics()),
+      canceledResult: (ctx) => config.canceledResult(ctx.getFailureDiagnostics(), ctx.getUsage()),
       failedResult: (failureCode, ctx) =>
-        config.failedResult(failureCode, ctx.getFailureDiagnostics()),
+        config.failedResult(failureCode, ctx.getFailureDiagnostics(), ctx.getUsage()),
       timeoutResult: (timeoutMs, ctx) =>
-        config.timeoutResult(timeoutMs, ctx.getFailureDiagnostics()),
+        config.timeoutResult(timeoutMs, ctx.getFailureDiagnostics(), ctx.getUsage()),
     });
   } catch {
     return config.sessionFailedResult;

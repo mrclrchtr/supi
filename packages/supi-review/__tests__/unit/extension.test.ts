@@ -4,12 +4,13 @@ import { describe, expect, it } from "vitest";
 import reviewExtension from "../../src/review.ts";
 
 describe("supi-review extension", () => {
-  it("registers optional preparation, universal run, and the user command", () => {
+  it("registers preparation, run, resumable output, and the user command", () => {
     const pi = createPiMock();
     reviewExtension(pi as unknown as ExtensionAPI);
 
     expect(getTool(pi, "supi_review_prepare")).toBeDefined();
     expect(getTool(pi, "supi_review_run")).toBeDefined();
+    expect(getTool(pi, "supi_review_output")).toBeDefined();
     expect(pi.commands.has("supi-review")).toBe(true);
   });
 });

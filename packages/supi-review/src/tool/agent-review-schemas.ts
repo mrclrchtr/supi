@@ -47,7 +47,9 @@ export const runReviewSchema = Type.Object(
     mode: StringEnum(["direct", "prepared"] as const),
     target: Type.Optional(targetSchema),
     review: Type.Optional(reviewInputSchema),
-    planId: Type.Optional(Type.String({ minLength: 1, description: "Session-scoped plan id." })),
+    planId: Type.Optional(
+      Type.String({ minLength: 1, maxLength: 128, description: "Session-scoped plan id." }),
+    ),
     decision: Type.Optional(preparedDecisionSchema),
   },
   { additionalProperties: false, description: "Direct or Prepared Review execution request." },
@@ -79,13 +81,13 @@ function parseTarget(input: {
   }
   if (input.kind === "comparison") {
     if (!input.baseCommit) {
-      throw new Error(`Comparison targets require a baseCommit (full 40- or 64-char commit id).`);
+      throw new Error("Comparison targets require a baseCommit (7-64 hexadecimal characters).");
     }
     return { kind: "comparison", baseCommit: input.baseCommit };
   }
   if (input.kind === "commit") {
     if (!input.commit) {
-      throw new Error(`Commit targets require a commit field (full 40- or 64-char commit id).`);
+      throw new Error("Commit targets require a commit field (7-64 hexadecimal characters).");
     }
     return { kind: "commit", commit: input.commit };
   }

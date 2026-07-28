@@ -32,6 +32,17 @@ describe("collectPlannerContext", () => {
     expect(context).not.toContain("private custom output");
   });
 
+  it("reserves space for the latest user request even when summaries fill the budget", () => {
+    const context = collectPlannerContext([
+      message({ role: "compactionSummary", summary: `summary-${"s".repeat(8_000)}` }),
+      message({ role: "user", content: "latest-user-request" }),
+    ]);
+
+    expect(context.length).toBeLessThanOrEqual(8_000);
+    expect(context).toContain("[Summary]");
+    expect(context).toContain("latest-user-request");
+  });
+
   it("keeps a bounded prefix when the newest visible message alone exceeds the budget", () => {
     const context = collectPlannerContext([
       message({ role: "user", content: `latest-intent-${"x".repeat(9_000)}` }),

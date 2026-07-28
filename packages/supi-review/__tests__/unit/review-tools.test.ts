@@ -3,11 +3,12 @@ import { createReviewTools } from "../../src/tool/review-tools.ts";
 import type { ReviewSnapshot } from "../../src/types.ts";
 
 const snapshot: ReviewSnapshot = {
+  repositoryRoot: "/repo",
   requestedTarget: { kind: "working-tree" },
   target: { kind: "working-tree", headCommit: "a".repeat(40) },
   title: "Working tree changes",
   changedFiles: ["a.txt"],
-  diffText: "",
+  diffHash: "b".repeat(64),
   stats: { files: 1, additions: 0, deletions: 0 },
 };
 
@@ -16,6 +17,7 @@ describe("review tools", () => {
     const tools = createReviewTools("/repo", snapshot, {});
 
     expect(tools.map((tool) => tool.name)).toEqual([
+      "list_review_changes",
       "list_review_files",
       "read_review_diff",
       "read_review_file",

@@ -3,11 +3,12 @@ import { buildReviewPacket, REVIEW_PACKET_PROTOCOL_VERSION } from "../../src/tar
 import type { ReviewModelSelection, ReviewSnapshot } from "../../src/types.ts";
 
 const snapshot: ReviewSnapshot = {
+  repositoryRoot: "/repo",
   requestedTarget: { kind: "working-tree" },
   target: { kind: "working-tree", headCommit: "a".repeat(40) },
   title: "Working tree changes",
   changedFiles: ["src/a.ts"],
-  diffText: "+change",
+  diffHash: "b".repeat(64),
   stats: { files: 1, additions: 1, deletions: 0 },
 };
 const model = {
@@ -35,6 +36,24 @@ describe("buildReviewPacket", () => {
     expect(packet.packetHash).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it("bounds the embedded changed-file manifest and points to complete paging", () => {
+    const large = {
+      ...snapshot,
+      changedFiles: Array.from(
+        { length: 1_000 },
+        (_, index) => `src/${index}-${"x".repeat(100)}.ts`,
+      ),
+    };
+    const task = { id: "scale", instructions: "Review the complete target." };
+
+    const packet = buildReviewPacket(large, { tasks: [task] }, task, model);
+    const manifest = packet.prompt.split("## Changed files\n")[1]?.split("\n\n## Inspection")[0];
+
+    expect(manifest?.length).toBeLessThanOrEqual(8_000);
+    expect(manifest).toContain("additional file(s) omitted");
+    expect(packet.prompt).toContain("list_review_changes");
+  });
+
   it("reproduces exact packet bytes and hash for equivalent inputs", () => {
     const task = { id: "standards", instructions: "Check standards." };
     const review = { sharedContext: "Context", tasks: [task] };
@@ -47,7 +66,7 @@ describe("buildReviewPacket", () => {
   it("changes the packet hash when the target diff changes without embedding the diff", () => {
     const task = { id: "spec", instructions: "Check behavior." };
     const review = { tasks: [task] };
-    const changedSnapshot = { ...snapshot, diffText: "+different" };
+    const changedSnapshot = { ...snapshot, diffHash: "c".repeat(64) };
 
     const first = buildReviewPacket(snapshot, review, task, model);
     const second = buildReviewPacket(changedSnapshot, review, task, model);

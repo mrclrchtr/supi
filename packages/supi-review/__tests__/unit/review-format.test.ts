@@ -20,6 +20,7 @@ describe("formatReviewBatch", () => {
         target: { kind: "working-tree", headCommit: "b".repeat(40) },
         title: "Working tree changes",
         changedFiles: ["src/a.ts"],
+        diffHash: "c".repeat(64),
         stats: { files: 1, additions: 1, deletions: 0 },
       },
       review: { tasks: [{ id: "task", instructions: "Review." }] },

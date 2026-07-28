@@ -1,7 +1,7 @@
-import type { Model } from "@earendil-works/pi-ai";
+import type { Model, Usage } from "@earendil-works/pi-ai";
 import type { ChildLifecycleTrace } from "./tool/child-lifecycle-trace.ts";
 
-/** A full hexadecimal Git commit object id supplied by an agent caller. */
+/** A 7-64 character hexadecimal Git commit id, pinned to its full object id during resolution. */
 export type CommitId = string;
 
 /** The Git change selected for review. */
@@ -27,17 +27,20 @@ export interface DiffStats {
   deletions: number;
 }
 
-/** Concrete target metadata and diff resolved before reviewer execution. */
+/** Concrete target metadata and diff identity resolved before reviewer execution. */
 export interface ReviewSnapshot {
+  /** Canonical worktree root retained only inside the Review Engine. */
+  repositoryRoot: string;
   requestedTarget: ReviewTargetSpec;
   target: ResolvedReviewTarget;
   title: string;
   changedFiles: string[];
-  diffText: string;
+  /** SHA-256 of the exact canonical target patch bytes. */
+  diffHash: string;
   stats: DiffStats;
 }
 
-export type ReviewSnapshotSummary = Omit<ReviewSnapshot, "diffText">;
+export type ReviewSnapshotSummary = Omit<ReviewSnapshot, "repositoryRoot">;
 
 /** One independent caller-defined review objective. */
 export interface ReviewTask {
@@ -109,9 +112,9 @@ export interface ChildFailureDiagnostics {
   recentActivity?: string[];
   lastAssistantStopReason?: string;
   lastAssistantToolCalls?: string[];
-  /** Error text extracted from the last assistant message when stopReason is "error". */
+  /** Bounded, redacted canonical provider error from the last errored assistant message. */
   lastAssistantErrorText?: string;
-  /** Error text extracted from the most recent lifecycle event (compaction_end, auto_retry_end). */
+  /** Bounded, redacted provider error from the most recent recovery lifecycle event. */
   lastLifecycleErrorText?: string;
 }
 
@@ -132,9 +135,6 @@ export interface ReviewProgress {
     cacheRead?: number;
     cacheWrite?: number;
   };
-  toolCounts?: Record<string, number>;
-  currentFocus?: { label: string; detail: string };
-  elapsedMs?: number;
 }
 
 export interface PlannerInvocation {
@@ -147,10 +147,10 @@ export interface PlannerInvocation {
 }
 
 export type PlannerRunResult =
-  | { kind: "success"; draft: PlannerDraft }
-  | ({ kind: "failed" } & ChildFailedResult)
-  | { kind: "canceled"; diagnostics: ChildFailureDiagnostics }
-  | { kind: "timeout"; timeoutMs: number; diagnostics: ChildFailureDiagnostics };
+  | { kind: "success"; draft: PlannerDraft; usage?: Usage }
+  | ({ kind: "failed"; usage?: Usage } & ChildFailedResult)
+  | { kind: "canceled"; diagnostics: ChildFailureDiagnostics; usage?: Usage }
+  | { kind: "timeout"; timeoutMs: number; diagnostics: ChildFailureDiagnostics; usage?: Usage };
 
 export interface ReviewerInvocation {
   prompt: string;
@@ -163,14 +163,15 @@ export interface ReviewerInvocation {
 }
 
 export type ReviewerRunResult =
-  | { kind: "success"; submission: ReviewSubmission; modelId: string }
-  | ({ kind: "failed"; modelId: string } & ChildFailedResult)
-  | { kind: "canceled"; modelId: string; diagnostics: ChildFailureDiagnostics }
+  | { kind: "success"; submission: ReviewSubmission; modelId: string; usage?: Usage }
+  | ({ kind: "failed"; modelId: string; usage?: Usage } & ChildFailedResult)
+  | { kind: "canceled"; modelId: string; diagnostics: ChildFailureDiagnostics; usage?: Usage }
   | {
       kind: "timeout";
       timeoutMs: number;
       modelId: string;
       diagnostics: ChildFailureDiagnostics;
+      usage?: Usage;
     };
 
 interface ReviewTaskResultIdentity {
@@ -178,6 +179,8 @@ interface ReviewTaskResultIdentity {
   modelId: string;
   /** SHA-256 of the exact reviewer packet bytes. */
   packetHash: string;
+  /** Aggregate nested-model usage for this task, when reported by the provider. */
+  usage?: Usage;
 }
 
 export type ReviewTaskResult = ReviewTaskResultIdentity &
@@ -207,9 +210,19 @@ export type ReviewTaskResult = ReviewTaskResultIdentity &
 export interface PlanningRecord {
   promptVersion: string;
   modelId: string;
+  /** Planner usage is informational here and is not charged again by the run tool. */
+  usage?: Usage;
   draft: PlannerDraft;
   effectiveReview: ReviewInput;
   decision: "accept-draft" | "use-review";
+}
+
+/** Retrieval metadata for a bounded parent-facing review output page. */
+export interface ReviewOutputReference {
+  artifactId: string;
+  offset: number;
+  nextOffset?: number;
+  totalCharacters: number;
 }
 
 export interface ReviewBatchDetails {
@@ -220,6 +233,7 @@ export interface ReviewBatchDetails {
   review: ReviewInput;
   planning?: PlanningRecord;
   results: ReviewTaskResult[];
+  output?: ReviewOutputReference;
 }
 
 export interface PreparedReviewDetails {
@@ -230,6 +244,9 @@ export interface PreparedReviewDetails {
   plannerDraft?: PlannerDraft;
   plannerModelId?: string;
   plannerPromptVersion?: string;
+  plannerUsage?: Usage;
+  plannerFailure?: Exclude<PlannerRunResult, { kind: "success" }>;
+  output?: ReviewOutputReference;
 }
 
 export interface ReviewPacket {

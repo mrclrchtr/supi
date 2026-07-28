@@ -23,7 +23,7 @@ describe("runWithLifecycle", () => {
     vi.useFakeTimers();
     const session = createSession();
     const controller = new AbortController();
-    const onTimeout = vi.fn();
+    const timeoutResult = vi.fn(() => "timeout" as const);
     let finishAbort: (() => void) | undefined;
     vi.mocked(session.abort).mockImplementation(
       () =>
@@ -38,19 +38,41 @@ describe("runWithLifecycle", () => {
       signal: controller.signal,
       timeoutMs: 10,
       onEvent: () => {},
-      onTimeout,
+      canceledResult: () => "canceled" as const,
+      failedResult: () => "failed" as const,
+      timeoutResult,
+    });
+
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(20);
+    expect(timeoutResult).not.toHaveBeenCalled();
+    expect(session.abort).toHaveBeenCalledTimes(1);
+
+    finishAbort?.();
+    await expect(resultPromise).resolves.toBe("canceled");
+  });
+
+  it("settles cancellation after abort grace when the provider abort never resolves", async () => {
+    vi.useFakeTimers();
+    const session = createSession();
+    const controller = new AbortController();
+    vi.mocked(session.abort).mockImplementation(() => new Promise<void>(() => {}));
+
+    const resultPromise = runWithLifecycle({
+      session,
+      prompt: "hung provider",
+      signal: controller.signal,
+      onEvent: () => {},
       canceledResult: () => "canceled" as const,
       failedResult: () => "failed" as const,
       timeoutResult: () => "timeout" as const,
     });
 
     controller.abort();
-    await vi.advanceTimersByTimeAsync(20);
-    expect(onTimeout).not.toHaveBeenCalled();
-    expect(session.abort).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(2_000);
 
-    finishAbort?.();
     await expect(resultPromise).resolves.toBe("canceled");
+    expect(session.dispose).toHaveBeenCalledTimes(1);
   });
 
   it("cancels when the signal aborted before lifecycle wiring completed", async () => {
@@ -230,34 +252,6 @@ describe("runWithLifecycle", () => {
     await expect(resultPromise).resolves.toEqual({
       entries: [{ type: "timeout_expired" }, { type: "abort_requested", reason: "timeout" }],
       droppedCount: 0,
-    });
-  });
-
-  it("classifies a custom timeout-handler failure without retaining the thrown error", async () => {
-    vi.useFakeTimers();
-    const session = createSession();
-
-    const resultPromise = runWithLifecycle<{ code: string; trace: ChildLifecycleTrace }>({
-      session,
-      prompt: "trigger timeout handler failure",
-      timeoutMs: 10,
-      onEvent: () => {},
-      onTimeout: () => {
-        throw new Error("private timeout handler exception");
-      },
-      canceledResult: () => ({ code: "canceled", trace: { entries: [], droppedCount: 0 } }),
-      failedResult: (code, ctx) => ({ code, trace: ctx.getLifecycleTrace() }),
-      timeoutResult: () => ({ code: "timeout", trace: { entries: [], droppedCount: 0 } }),
-    });
-
-    await vi.advanceTimersByTimeAsync(10);
-
-    await expect(resultPromise).resolves.toEqual({
-      code: "unexpected-runner-failure",
-      trace: {
-        entries: [{ type: "timeout_expired" }],
-        droppedCount: 0,
-      },
     });
   });
 

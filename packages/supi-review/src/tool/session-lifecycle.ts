@@ -1,3 +1,4 @@
+import type { Usage } from "@earendil-works/pi-ai";
 import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { ChildFailureCode, ChildFailureDiagnostics, ReviewProgress } from "../types.ts";
 import { buildChildFailureDiagnostics } from "./child-failure-diagnostics.ts";
@@ -7,6 +8,10 @@ import {
   ChildLifecycleTraceCollector,
   getRegisteredToolNames,
 } from "./child-lifecycle-trace.ts";
+import { collectChildUsage } from "./child-usage.ts";
+
+/** Maximum time cancellation waits for a provider abort before host cleanup continues. */
+export const CHILD_ABORT_GRACE_MS = 2_000;
 
 /**
  * Context passed to event handlers, timeout callbacks, and result factories.
@@ -33,15 +38,10 @@ export interface LifecycleCtx<TResult> {
   getLifecycleTrace: () => ChildLifecycleTrace;
   /** Build a safe non-success diagnostic artifact from the observed child run. */
   getFailureDiagnostics: () => ChildFailureDiagnostics;
+  /** Aggregate nested-model usage observed in the child transcript. */
+  getUsage: () => Usage | undefined;
   /** Add one allowlisted runner-control marker to the Child Lifecycle Trace. */
   recordHostMarker: (marker: ChildLifecycleHostMarker) => void;
-  /**
-   * Register a teardown function that runs when cleanup is called.
-   * Useful for custom timers or resources set up by `onTimeout`.
-   */
-  addTeardown: (fn: () => void) => void;
-  /** Timestamp (ms) when the lifecycle started, for elapsed-time display. */
-  startTime: number;
 }
 
 /** Configuration for `runWithLifecycle`. */
@@ -52,20 +52,13 @@ export interface RunWithLifecycleConfig<TResult> {
   prompt: string;
   /** Optional abort signal. */
   signal?: AbortSignal;
-  /** Timeout in milliseconds before the session is aborted. */
-  timeoutMs: number;
+  /** Optional timeout in milliseconds before the session is aborted. */
+  timeoutMs?: number;
   /**
    * Event handler. Receives each session event and the lifecycle context.
    * Call `ctx.resolve(ctx.cleanup(result))` to settle the promise.
    */
   onEvent: (event: AgentSessionEvent, ctx: LifecycleCtx<TResult>) => void;
-  /**
-   * Custom timeout behavior. When omitted, the session is hard-aborted
-   * and resolved with `timeoutResult`. When provided, the callback can
-   * steer the session and schedule a hard abort, registering cleanup
-   * via `ctx.addTeardown`.
-   */
-  onTimeout?: (ctx: LifecycleCtx<TResult>) => void;
   /** Factory for the result produced when the abort signal fires. */
   canceledResult: (ctx: LifecycleCtx<TResult>) => TResult;
   /** Factory for the result produced when prompt preflight or execution fails. */
@@ -100,14 +93,12 @@ function startPrompt(options: StartPromptOptions): void {
 /**
  * Manages the lifecycle of a child agent session: subscribes to events,
  * wires abort-signal handling, enforces a timeout, and provides idempotent
- * cleanup. The caller supplies an event handler and optional custom timeout
- * behavior via `onTimeout`.
+ * cleanup. The caller supplies the structured event/result mapping.
  *
  * The returned promise resolves when:
  * - The event handler calls `ctx.resolve(ctx.cleanup(result))`
  * - The abort signal fires (resolves via `canceledResult(ctx)`)
- * - The timeout expires (resolves via `timeoutResult`, or `onTimeout` handles
- *   it by calling `ctx.resolve(ctx.cleanup(...))` itself)
+ * - The optional timeout expires and resolves via `timeoutResult`
  * - `session.prompt()` rejects (resolves via `failedResult`)
  */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: lifecycle ownership must remain in one state-machine closure
@@ -120,7 +111,6 @@ export function runWithLifecycle<TResult>(
     signal,
     timeoutMs,
     onEvent,
-    onTimeout,
     canceledResult,
     failedResult,
     timeoutResult,
@@ -157,11 +147,13 @@ export function runWithLifecycle<TResult>(
     if (state.settled) return result;
     state.settled = true;
     cancelTeardown();
-    session.dispose();
+    try {
+      session.dispose();
+    } catch {
+      // Disposal is best-effort after the outcome is already determined.
+    }
     return result;
   };
-
-  const startTime = Date.now();
 
   return new Promise<TResult>((resolve) => {
     const ctx: LifecycleCtx<TResult> = {
@@ -178,9 +170,8 @@ export function runWithLifecycle<TResult>(
           lifecycleTrace: lifecycleTrace.snapshot(),
           recentActivity: lifecycleTrace.recentActivitySnapshot(),
         }),
+      getUsage: () => collectChildUsage(session),
       recordHostMarker: (marker) => lifecycleTrace.recordHostMarker(marker),
-      addTeardown,
-      startTime,
     };
 
     let promptSettled = false;
@@ -203,7 +194,7 @@ export function runWithLifecycle<TResult>(
       dispatchEvent(event);
     };
 
-    session.subscribe((event: AgentSessionEvent) => {
+    const unsubscribe = session.subscribe((event: AgentSessionEvent) => {
       lifecycleTrace.observe(event);
       if (event.type === "agent_settled" && !promptSettled) {
         deferredAgentSettled = event;
@@ -211,18 +202,29 @@ export function runWithLifecycle<TResult>(
       }
       dispatchEvent(event);
     });
+    if (typeof unsubscribe === "function") addTeardown(unsubscribe);
+
+    const finishAfterAbort = (result: () => TResult): void => {
+      let graceId: ReturnType<typeof setTimeout> | undefined;
+      const grace = new Promise<void>((resolveGrace) => {
+        graceId = setTimeout(resolveGrace, CHILD_ABORT_GRACE_MS);
+        graceId.unref?.();
+      });
+      const abort = Promise.resolve()
+        .then(() => session.abort())
+        .catch(() => undefined);
+      void Promise.race([abort, grace]).finally(() => {
+        if (graceId) clearTimeout(graceId);
+        resolve(cleanup(result()));
+      });
+    };
 
     // Abort signal handler
     const onAbort = () => {
       if (state.settled || state.aborting) return;
       state.aborting = true;
       ctx.recordHostMarker({ type: "abort_requested", reason: "canceled" });
-      void session
-        .abort()
-        .catch(() => {})
-        .finally(() => {
-          resolve(cleanup(canceledResult(ctx)));
-        });
+      finishAfterAbort(() => canceledResult(ctx));
     };
     if (signal) {
       signal.addEventListener("abort", onAbort, { once: true });
@@ -235,30 +237,18 @@ export function runWithLifecycle<TResult>(
 
     // Timeout handler
     const onTimeoutExpired = () => {
-      if (state.settled || state.aborting) return;
+      if (timeoutMs === undefined || state.settled || state.aborting) return;
       ctx.recordHostMarker({ type: "timeout_expired" });
 
-      if (onTimeout) {
-        try {
-          onTimeout(ctx);
-        } catch {
-          resolve(cleanup(failedResult("unexpected-runner-failure", ctx)));
-        }
-      } else {
-        // Default: hard abort
-        state.aborting = true;
-        ctx.recordHostMarker({ type: "abort_requested", reason: "timeout" });
-        void session
-          .abort()
-          .catch(() => {})
-          .finally(() => {
-            resolve(cleanup(timeoutResult(timeoutMs, ctx)));
-          });
-      }
+      state.aborting = true;
+      ctx.recordHostMarker({ type: "abort_requested", reason: "timeout" });
+      finishAfterAbort(() => timeoutResult(timeoutMs, ctx));
     };
-    const timeoutId = setTimeout(onTimeoutExpired, timeoutMs);
-    timeoutId.unref?.();
-    addTeardown(() => clearTimeout(timeoutId));
+    if (timeoutMs !== undefined) {
+      const timeoutId = setTimeout(onTimeoutExpired, timeoutMs);
+      timeoutId.unref?.();
+      addTeardown(() => clearTimeout(timeoutId));
+    }
 
     // Start the session. Prompt rejection is a distinct host-owned outcome;
     // caught provider or runner errors are intentionally never retained.

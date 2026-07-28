@@ -124,14 +124,12 @@ describe("ChildLifecycleTraceCollector", () => {
   it("records runner control markers without arbitrary runner data", () => {
     const collector = new ChildLifecycleTraceCollector();
 
-    collector.recordHostMarker({ type: "steer_requested", reason: "submit" });
     collector.recordHostMarker({ type: "timeout_expired" });
     collector.recordHostMarker({ type: "abort_requested", reason: "timeout" });
     collector.recordHostMarker({ type: "prompt_rejected" });
 
     expect(collector.snapshot()).toEqual({
       entries: [
-        { type: "steer_requested", reason: "submit" },
         { type: "timeout_expired" },
         { type: "abort_requested", reason: "timeout" },
         { type: "prompt_rejected" },

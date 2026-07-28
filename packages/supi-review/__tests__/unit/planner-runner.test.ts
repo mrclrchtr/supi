@@ -24,9 +24,18 @@ vi.mock("../../src/tool/session-lifecycle.ts", () => ({
   runWithLifecycle: mocks.runWithLifecycle,
 }));
 
-import { runPlanner } from "../../src/tool/planner-runner.ts";
+import { buildPlannerSystemPrompt, runPlanner } from "../../src/tool/planner-runner.ts";
 
 describe("runPlanner", () => {
+  it("constrains drafts to the reviewers' static target-aware capabilities", () => {
+    const prompt = buildPlannerSystemPrompt();
+
+    expect(prompt).toContain("read_review_diff");
+    expect(prompt).toContain("cannot run shell commands");
+    expect(prompt).toContain("introduced by the selected change");
+    expect(prompt).toContain("Do not request runtime experiments");
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.reload.mockResolvedValue(undefined);
@@ -35,6 +44,19 @@ describe("runPlanner", () => {
       kind: "failed",
       failureCode: "session-creation-failed",
     });
+  });
+
+  it("rejects semantically invalid Planner Drafts before accepting submission", async () => {
+    await runPlanner({ cwd: "/repo", prompt: "bounded input", model: {} as never });
+
+    const options = mocks.createAgentSession.mock.calls[0]?.[0] as {
+      customTools?: Array<{ execute: (...args: unknown[]) => Promise<unknown> }>;
+    };
+    const submit = options.customTools?.[0];
+    expect(submit).toBeDefined();
+    await expect(
+      submit?.execute("call", { tasks: [{ id: " ", instructions: " " }] }),
+    ).rejects.toThrow(/blank/i);
   });
 
   it("has only its submit tool, isolated settings, and a five-minute timeout", async () => {

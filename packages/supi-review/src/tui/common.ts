@@ -8,6 +8,8 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { type Container, Spacer, Text } from "@earendil-works/pi-tui";
 import { formatEvidenceBadge } from "@mrclrchtr/supi-core/evidence-badge";
+import { getChildDiagnosticErrorRows } from "../tool/child-failure-diagnostics.ts";
+import { formatReviewUsage } from "../tool/usage-format.ts";
 import type {
   ChildFailureDiagnostics,
   FindingEffort,
@@ -151,19 +153,11 @@ function buildNonCompletedSection(
     );
   }
 
-  if (diagnostics.lastAssistantErrorText) {
-    const truncated =
-      diagnostics.lastAssistantErrorText.length > 200
-        ? `${diagnostics.lastAssistantErrorText.slice(0, 200)}…`
-        : diagnostics.lastAssistantErrorText;
-    container.addChild(new Text(theme.fg("error", truncated), 1, 0));
-  } else if (diagnostics.lastLifecycleErrorText) {
-    const truncated =
-      diagnostics.lastLifecycleErrorText.length > 200
-        ? `${diagnostics.lastLifecycleErrorText.slice(0, 200)}…`
-        : diagnostics.lastLifecycleErrorText;
-    container.addChild(new Text(theme.fg("error", truncated), 1, 0));
-  } else if (diagnostics.lastAssistantStopReason === "error") {
+  const errors = getChildDiagnosticErrorRows(diagnostics);
+  for (const error of errors) {
+    container.addChild(new Text(theme.fg("error", `${error.label}: ${error.text}`), 1, 0));
+  }
+  if (errors.length === 0 && diagnostics.lastAssistantStopReason === "error") {
     container.addChild(
       new Text(
         theme.fg(
@@ -214,6 +208,7 @@ export function buildTaskSection(
   const metaParts = [
     theme.fg("dim", `model: ${result.modelId}`),
     theme.fg("dim", `hash: ${result.packetHash.slice(0, 12)}…`),
+    ...(result.usage ? [theme.fg("dim", formatReviewUsage(result.usage))] : []),
   ];
   container.addChild(new Text(metaParts.join("  "), 1, 0));
 

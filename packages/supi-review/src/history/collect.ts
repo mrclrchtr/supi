@@ -2,6 +2,7 @@ import type { SessionContext } from "@earendil-works/pi-coding-agent";
 import { extractVisibleText } from "../tool/runner-helpers.ts";
 
 const MAX_PLANNER_CONTEXT_CHARS = 8_000;
+const MAX_SUMMARY_WITH_VISIBLE_CHARS = 3_000;
 type Message = SessionContext["messages"][number];
 
 interface PlannerRow {
@@ -31,7 +32,14 @@ function takeRecentRows(rows: string[], maxChars: number): string {
     const separator = recent.length > 0 ? 1 : 0;
     const remaining = maxChars - size - separator;
     if (row.length > remaining) {
-      if (recent.length === 0 && remaining > 0) recent.unshift(row.slice(0, remaining));
+      if (recent.length === 0 && remaining > 0) {
+        const marker = "\n[… truncated]";
+        recent.unshift(
+          remaining > marker.length
+            ? `${row.slice(0, remaining - marker.length)}${marker}`
+            : row.slice(0, remaining),
+        );
+      }
       break;
     }
     recent.unshift(row);
@@ -46,12 +54,13 @@ export function collectPlannerContext(messages: Message[]): string {
     const row = toPlannerRow(message);
     return row ? [row] : [];
   });
-  const summaries = rows
-    .filter((row) => row.kind === "summary")
-    .map((row) => row.text)
-    .join("\n")
-    .slice(0, MAX_PLANNER_CONTEXT_CHARS);
   const visible = rows.filter((row) => row.kind === "visible").map((row) => row.text);
+  const summaryBudget =
+    visible.length > 0 ? MAX_SUMMARY_WITH_VISIBLE_CHARS : MAX_PLANNER_CONTEXT_CHARS;
+  const summaries = takeRecentRows(
+    rows.filter((row) => row.kind === "summary").map((row) => row.text),
+    summaryBudget,
+  );
   const separator = summaries && visible.length > 0 ? 1 : 0;
   const recent = takeRecentRows(visible, MAX_PLANNER_CONTEXT_CHARS - summaries.length - separator);
   return [summaries, recent].filter(Boolean).join("\n");

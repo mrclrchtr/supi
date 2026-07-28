@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -17,6 +17,13 @@ function gitOptions(cwd: string, indexFile?: string) {
 /** Run Git with bounded resources and a sanitized environment. */
 export async function runGit(cwd: string, args: string[], indexFile?: string): Promise<string> {
   return (await execFileAsync("git", args, gitOptions(cwd, indexFile))).stdout;
+}
+
+/** Resolve the canonical top-level worktree containing an invocation directory. */
+export async function resolveGitRepositoryRoot(cwd: string): Promise<string> {
+  const root = (await runGit(cwd, ["rev-parse", "--show-toplevel"])).trim();
+  if (!root) throw new Error(`No Git worktree contains ${cwd}.`);
+  return realpath(root);
 }
 
 export function expectedGitExitOutput(error: unknown, allowedCodes: number[]): string | undefined {

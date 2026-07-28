@@ -1,12 +1,17 @@
-import { buildSessionContext, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import {
+  BorderedLoader,
+  buildSessionContext,
+  type ExtensionAPI,
+} from "@earendil-works/pi-coding-agent";
 import { Box } from "@earendil-works/pi-tui";
 import { loadReviewConfig, registerReviewSettings } from "./config.ts";
-import { listLocalBranches, listRecentCommits } from "./git.ts";
+import { listLocalBranches, listRecentCommits } from "./git-choices.ts";
 import { collectPlannerContext } from "./history/collect.ts";
 import { getSelectableReviewModels, resolveAgentReviewModel } from "./model.ts";
+import { ReviewArtifactStore } from "./session/review-artifact-store.ts";
 import { ReviewPlanStore } from "./session/review-plan-store.ts";
 import { formatReviewBatch, registerAgentReviewTools } from "./tool/agent-review-tools.ts";
-import { pageText } from "./tool/output-page.ts";
+import { createReviewOutput, registerReviewOutputTool } from "./tool/review-output-tool.ts";
 import { prepareReview, runReview } from "./tool/review-workflow.ts";
 import { renderRunResult } from "./tui/run.ts";
 import type { ReviewInput, ReviewModelSelection, ReviewTargetSpec } from "./types.ts";
@@ -103,18 +108,124 @@ async function editReviewInteractive(
   }
 
   const result: ReviewInput = { tasks };
-  if (review.sharedContext) {
-    const sharedContext = await ctx.ui.editor("Shared context (optional)", review.sharedContext);
-    if (sharedContext === undefined) return undefined;
-    if (sharedContext.trim()) result.sharedContext = sharedContext.trim();
-  }
+  const sharedContext = await ctx.ui.editor(
+    "Shared context (optional)",
+    review.sharedContext ?? "",
+  );
+  if (sharedContext === undefined) return undefined;
+  if (sharedContext.trim()) result.sharedContext = sharedContext.trim();
   return result;
+}
+
+/** Run command-owned child work behind an Escape-cancellable Pi loader. */
+async function withCancellableLoader<T>(
+  ctx: CommandContext,
+  message: string,
+  operation: (signal: AbortSignal) => Promise<T>,
+): Promise<T | undefined> {
+  return ctx.ui.custom<T | undefined>((tui, theme, _keybindings, done) => {
+    const loader = new BorderedLoader(tui, theme, message);
+    let settled = false;
+    const finish = (value: T | undefined) => {
+      if (settled) return;
+      settled = true;
+      done(value);
+    };
+    loader.onAbort = () => {
+      // CancellableLoader aborts loader.signal; lifecycle cleanup determines the final outcome.
+    };
+    void operation(loader.signal).then(
+      (value) => finish(value),
+      (error) => {
+        ctx.ui.notify(
+          error instanceof Error ? error.message : "Review failed unexpectedly.",
+          "error",
+        );
+        finish(undefined);
+      },
+    );
+    return loader;
+  });
+}
+
+async function prepareInteractiveReview(
+  ctx: CommandContext,
+  target: ReviewTargetSpec,
+  reviewerModel: ReviewModelSelection,
+  planStore: ReviewPlanStore,
+): Promise<{ review: ReviewInput; planId: string } | undefined> {
+  const config = loadReviewConfig(ctx.cwd);
+  const plannerModel = resolveAgentReviewModel(ctx, config.plannerModel);
+  const session = buildSessionContext(
+    ctx.sessionManager.getEntries(),
+    ctx.sessionManager.getLeafId(),
+  );
+  const outcome = await withCancellableLoader(ctx, "Planning review…", (signal) =>
+    prepareReview({
+      cwd: ctx.cwd,
+      target,
+      planning: "suggest",
+      plannerContext: collectPlannerContext(session.messages),
+      reviewerModel,
+      plannerModel,
+      planStore,
+      signal,
+    }),
+  );
+  if (!outcome) return undefined;
+  if (outcome.kind === "canceled") {
+    ctx.ui.notify("Review planning canceled.", "info");
+    return undefined;
+  }
+  if (outcome.kind !== "prepared") {
+    ctx.ui.notify(outcome.reason, "error");
+    return undefined;
+  }
+  if (outcome.plan.plannerFailure) {
+    ctx.ui.notify("Planner unavailable; edit replacement tasks to continue.", "warning");
+  }
+  return {
+    review: outcome.plan.plannerDraft ?? DEFAULT_REVIEW,
+    planId: outcome.plan.id,
+  };
+}
+
+async function executeInteractiveReview(
+  ctx: CommandContext,
+  input: {
+    target: ReviewTargetSpec;
+    review: ReviewInput;
+    reviewerModel: ReviewModelSelection;
+    planId?: string;
+    planStore: ReviewPlanStore;
+  },
+) {
+  return withCancellableLoader(ctx, "Reviewing…", (signal) =>
+    input.planId
+      ? runReview({
+          mode: "prepared",
+          cwd: ctx.cwd,
+          planId: input.planId,
+          decision: { kind: "use-review", review: input.review },
+          planStore: input.planStore,
+          signal,
+        })
+      : runReview({
+          mode: "direct",
+          cwd: ctx.cwd,
+          target: input.target,
+          review: input.review,
+          reviewerModel: input.reviewerModel,
+          signal,
+        }),
+  );
 }
 
 async function runCommand(
   ctx: CommandContext,
   pi: ExtensionAPI,
   planStore: ReviewPlanStore,
+  artifactStore: ReviewArtifactStore,
 ): Promise<void> {
   if (!ctx.hasUI) return;
   const target = await selectTarget(ctx);
@@ -127,35 +238,13 @@ async function runCommand(
   ]);
   if (!planning) return;
 
-  let review = DEFAULT_REVIEW;
-  let planId: string | undefined;
-  if (planning === "AI suggests tasks") {
-    const config = loadReviewConfig(ctx.cwd);
-    const plannerModel = resolveAgentReviewModel(ctx, config.plannerModel);
-    if (!plannerModel) {
-      ctx.ui.notify(`Configured Planner model "${config.plannerModel}" is unavailable.`, "error");
-      return;
-    }
-    const session = buildSessionContext(
-      ctx.sessionManager.getEntries(),
-      ctx.sessionManager.getLeafId(),
-    );
-    const outcome = await prepareReview({
-      cwd: ctx.cwd,
-      target,
-      planning: "suggest",
-      plannerContext: collectPlannerContext(session.messages),
-      reviewerModel,
-      plannerModel,
-      planStore,
-    });
-    if (outcome.kind !== "prepared" || !outcome.plan.plannerDraft) {
-      ctx.ui.notify("Planner did not produce a draft.", "error");
-      return;
-    }
-    review = outcome.plan.plannerDraft;
-    planId = outcome.plan.id;
-  }
+  const prepared =
+    planning === "AI suggests tasks"
+      ? await prepareInteractiveReview(ctx, target, reviewerModel, planStore)
+      : undefined;
+  if (planning === "AI suggests tasks" && !prepared) return;
+  const review = prepared?.review ?? DEFAULT_REVIEW;
+  const planId = prepared?.planId;
 
   const edited = await editReviewInteractive(ctx, review, {
     allowResize: planning === "Write my own tasks",
@@ -167,37 +256,33 @@ async function runCommand(
   );
   if (!approved) return;
 
-  const outcome = planId
-    ? await runReview({
-        mode: "prepared",
-        cwd: ctx.cwd,
-        planId,
-        decision: { kind: "use-review", review: edited },
-        planStore,
-      })
-    : await runReview({
-        mode: "direct",
-        cwd: ctx.cwd,
-        target,
-        review: edited,
-        reviewerModel,
-      });
+  const outcome = await executeInteractiveReview(ctx, {
+    target,
+    review: edited,
+    reviewerModel,
+    ...(planId ? { planId } : {}),
+    planStore,
+  });
+  if (!outcome) return;
   if (outcome.kind !== "completed") {
     ctx.ui.notify(outcome.reason, "error");
     return;
   }
+  const output = createReviewOutput(artifactStore, formatReviewBatch(outcome.details));
   pi.sendMessage({
     customType: "supi-review",
-    content: pageText(formatReviewBatch(outcome.details)).text,
+    content: output.text,
     display: true,
-    details: outcome.details,
+    details: { ...outcome.details, output: output.reference, usage: outcome.usage },
   });
 }
 
 export default function reviewExtension(pi: ExtensionAPI): void {
   const planStore = new ReviewPlanStore();
+  const artifactStore = new ReviewArtifactStore();
   registerReviewSettings(pi);
-  registerAgentReviewTools(pi, planStore);
+  registerAgentReviewTools(pi, planStore, artifactStore);
+  registerReviewOutputTool(pi, artifactStore);
 
   // Message renderer for the /supi-review slash command output.
   // Adapts the sendMessage shape into the shape renderRunResult expects.
@@ -215,6 +300,6 @@ export default function reviewExtension(pi: ExtensionAPI): void {
 
   pi.registerCommand("supi-review", {
     description: "Run one or more caller-defined read-only review tasks",
-    handler: async (_args, ctx) => runCommand(ctx, pi, planStore),
+    handler: async (_args, ctx) => runCommand(ctx, pi, planStore, artifactStore),
   });
 }

@@ -37,6 +37,26 @@ describe("normalizeReviewSubmission", () => {
     expect(result.verdict).toBe("pass");
   });
 
+  it("rejects reviewer output that exceeds persisted result bounds", () => {
+    expect(() =>
+      normalizeReviewSubmission({
+        summary: "bounded",
+        findings: Array.from({ length: 21 }, (_, index) => ({
+          title: `Finding ${index}`,
+          description: "Description",
+          blocksAcceptance: false,
+          impact: "low" as const,
+          effort: "small" as const,
+          confidence: 1,
+        })),
+      }),
+    ).toThrow(/20 findings/i);
+
+    expect(() => normalizeReviewSubmission({ summary: "x".repeat(8_001), findings: [] })).toThrow(
+      /summary.*8,000/i,
+    );
+  });
+
   it.each(["/tmp/file.ts", "../outside.ts", "C:\\secret.ts", "bad\0path.ts"])(
     "rejects non-relative finding location: %s",
     (path) => {

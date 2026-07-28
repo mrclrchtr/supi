@@ -6,6 +6,7 @@
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
+import { formatReviewUsage } from "../tool/usage-format.ts";
 import type { PreparedReviewDetails } from "../types.ts";
 import { renderError, renderPartial, renderReviewToolCall } from "./common.ts";
 
@@ -67,14 +68,63 @@ function buildCollapsed(details: PrepareDetails, theme: Theme): Text {
   segments.push(theme.fg("accent", "Plan ready"));
   segments.push(theme.fg("muted", targetKind));
   segments.push(theme.fg("dim", `${fileCount} file${fileCount !== 1 ? "s" : ""} changed`));
-  if (hasPlanner) {
-    segments.push(theme.fg("muted", "with draft"));
-  }
+  if (hasPlanner) segments.push(theme.fg("muted", "with draft"));
+  else if (details.plannerFailure) segments.push(theme.fg("warning", "planner unavailable"));
 
   return new Text(segments.join(` ${theme.fg("dim", "·")} `), 0, 0);
 }
 
 // ── Expanded ─────────────────────────────────────────────────────
+
+function plannerFailureReason(details: PrepareDetails): string | undefined {
+  const failure = details.plannerFailure;
+  if (!failure) return undefined;
+  if (failure.kind === "failed") return failure.failureCode;
+  if (failure.kind === "timeout") return `timeout (${failure.timeoutMs} ms)`;
+  return failure.kind;
+}
+
+function addPlannerMetadata(container: Container, details: PrepareDetails, theme: Theme): void {
+  container.addChild(new Spacer(1));
+  container.addChild(new Text(theme.fg("dim", `Reviewer model: ${details.reviewerModelId}`), 1, 0));
+  if (details.plannerModelId) {
+    container.addChild(new Text(theme.fg("dim", `Planner model: ${details.plannerModelId}`), 1, 0));
+  }
+  if (details.plannerUsage) {
+    container.addChild(
+      new Text(theme.fg("dim", `Planner usage: ${formatReviewUsage(details.plannerUsage)}`), 1, 0),
+    );
+  }
+  const failure = plannerFailureReason(details);
+  if (failure) {
+    container.addChild(
+      new Text(
+        theme.fg("warning", `Planner unavailable (${failure}); use-review remains available.`),
+        1,
+        0,
+      ),
+    );
+  }
+}
+
+function addPlannerDraft(container: Container, details: PrepareDetails, theme: Theme): void {
+  const draft = details.plannerDraft;
+  if (!draft) return;
+  container.addChild(new Spacer(1));
+  container.addChild(new Text(theme.fg("accent", theme.bold("Planner Draft")), 1, 0));
+  if (draft.sharedContext) {
+    container.addChild(new Spacer(1));
+    container.addChild(new Text(theme.fg("muted", draft.sharedContext), 1, 0));
+  }
+  if (draft.tasks.length === 0) return;
+  container.addChild(new Spacer(1));
+  for (const task of draft.tasks) {
+    container.addChild(
+      new Text(`${theme.fg("accent", task.id)}: ${theme.fg("muted", task.instructions)}`, 1, 0),
+    );
+    container.addChild(new Text(theme.fg("dim", "─".repeat(40)), 1, 0));
+  }
+}
 
 function buildExpanded(details: PrepareDetails, theme: Theme): Container {
   const container = new Container();
@@ -102,31 +152,7 @@ function buildExpanded(details: PrepareDetails, theme: Theme): Container {
     ),
   );
 
-  // Model info
-  container.addChild(new Spacer(1));
-  container.addChild(new Text(theme.fg("dim", `Reviewer model: ${details.reviewerModelId}`), 1, 0));
-  if (details.plannerModelId) {
-    container.addChild(new Text(theme.fg("dim", `Planner model: ${details.plannerModelId}`), 1, 0));
-  }
-
-  // Planner draft
-  if (details.plannerDraft) {
-    container.addChild(new Spacer(1));
-    container.addChild(new Text(theme.fg("accent", theme.bold("Planner Draft")), 1, 0));
-    if (details.plannerDraft.sharedContext) {
-      container.addChild(new Spacer(1));
-      container.addChild(new Text(theme.fg("muted", details.plannerDraft.sharedContext), 1, 0));
-    }
-    if (details.plannerDraft.tasks.length > 0) {
-      container.addChild(new Spacer(1));
-      for (const task of details.plannerDraft.tasks) {
-        container.addChild(
-          new Text(`${theme.fg("accent", task.id)}: ${theme.fg("muted", task.instructions)}`, 1, 0),
-        );
-        container.addChild(new Text(theme.fg("dim", "─".repeat(40)), 1, 0));
-      }
-    }
-  }
-
+  addPlannerMetadata(container, details, theme);
+  addPlannerDraft(container, details, theme);
   return container;
 }
