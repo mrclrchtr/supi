@@ -30,6 +30,8 @@ export interface OrientationWorkflowDeps extends TargetWorkflowDeps {
   readonly nativeInstructionPaths: Set<string>;
   readonly surfacedInstructionDirs: Set<string>;
   readonly markInstructionDirsSurfaced: (directories: string[]) => void;
+  /** Whether the project is trusted — controls instruction-file discovery. */
+  readonly projectTrusted: boolean;
 }
 
 /** Resolve the Orientation focus and collect immutable facts for presentation adapters. */
@@ -201,7 +203,7 @@ function addInstructionFiles(
   focusPath: string,
   deps: OrientationWorkflowDeps,
 ): Awaited<ReturnType<typeof executeOrientation>> {
-  if (!isDirectory(focusPath)) return result;
+  if (!deps.projectTrusted || !isDirectory(focusPath)) return result;
   const config = loadCodeIntelligenceConfig(deps.cwd);
   const matches = findInstructionFilesForDirectory({
     directory: focusPath,
@@ -209,6 +211,7 @@ function addInstructionFiles(
     fileNames: config.instructionFileNames,
     nativeContextPaths: deps.nativeInstructionPaths,
     surfacedDirectories: deps.surfacedInstructionDirs,
+    projectTrusted: deps.projectTrusted,
   });
   const collected = collectInstructionFiles(matches);
   if (!collected) return result;

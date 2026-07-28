@@ -16,6 +16,7 @@
  * @mrclrchtr/supi-code-intelligence — internal, not exported via api.ts
  */
 
+import { realpathSync } from "node:fs";
 import * as path from "node:path";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { LspRuntimeController } from "@mrclrchtr/supi-lsp/api";
@@ -158,9 +159,17 @@ export class WorkspaceCodeIntelligenceSession {
   /** Workspace sentinel snapshot for change detection across explicit queries. */
   #sentinelSnapshot: Map<string, number> = new Map();
 
+  /** Whether the project owning this session is trusted for config loading. */
+  #projectTrusted = false;
+
   constructor(cwd: string, capability?: CapabilityAdapter) {
     this.cwd = cwd;
     this.#capability = capability ?? new WorkspaceCapabilityAdapter();
+  }
+
+  /** Record whether project-local configuration may be read for this session. */
+  setProjectTrusted(trusted: boolean): void {
+    this.#projectTrusted = trusted;
   }
 
   /** Attach lifecycle-owned LSP state without exposing it to Tool adapters. */
@@ -267,6 +276,7 @@ export class WorkspaceCodeIntelligenceSession {
         nativeInstructionPaths: this.#nativeInstructionPaths,
         surfacedInstructionDirs: this.#surfacedInstructionDirs,
         markInstructionDirsSurfaced: (directories) => this.markInstructionDirsSurfaced(directories),
+        projectTrusted: this.#projectTrusted,
       },
       control,
     );
@@ -324,7 +334,14 @@ export class WorkspaceCodeIntelligenceSession {
   /** Remember instruction/context file paths already loaded by PI natively. */
   captureNativeInstructionPaths(files: Array<{ path: string }>): void {
     for (const file of files) {
-      this.#nativeInstructionPaths.add(path.resolve(this.cwd, file.path));
+      const resolved = path.resolve(this.cwd, file.path);
+      // Resolve to real path so dedup aligns with the realpath-aware
+      // instruction-file lookup in findInstructionFilesForDirectory.
+      try {
+        this.#nativeInstructionPaths.add(path.resolve(realpathSync(resolved)));
+      } catch {
+        this.#nativeInstructionPaths.add(resolved);
+      }
     }
   }
 
@@ -383,6 +400,7 @@ export class WorkspaceCodeIntelligenceSession {
     this.#nativeInstructionPaths.clear();
     this.#sentinelSnapshot.clear();
     this.#lspController = null;
+    this.#projectTrusted = false;
   }
 }
 

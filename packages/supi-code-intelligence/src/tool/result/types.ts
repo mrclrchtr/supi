@@ -4,7 +4,6 @@ import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import type { InstructionFilesMetadata } from "../../analysis/instruction-files.ts";
 import type { ReadNextItem } from "../../analysis/read-next.ts";
 import type { StructuredScanSummary } from "../../analysis/search/pattern.ts";
-import type { PrioritySignalsSummary } from "../../analysis/signals/project.ts";
 import type { HealthSection, SemanticHealthState } from "../../session/health-types.ts";
 import type { TargetSymbolKind } from "../../session/target-input.ts";
 import type {
@@ -47,19 +46,6 @@ export interface AnchoredResolutionMetadata {
   snapped: boolean;
   /** Provider-backed evidence source that identified the target. */
   source: AnchoredResolutionSource;
-}
-
-/** Structured details metadata returned alongside markdown brief content. */
-export interface BriefDetails {
-  confidence: ConfidenceMode;
-  focusTarget: string | null;
-  startHere: Array<{ target: string; reason: string }>;
-  publicSurfaces: string[];
-  dependencySummary: { moduleCount: number; edgeCount: number } | null;
-  omittedCount: number;
-  evidenceLists?: EvidenceListMetadata[];
-  nextQueries: string[];
-  prioritySignals?: PrioritySignalsSummary | null;
 }
 
 /** Structured details metadata for relationship and pattern results. */

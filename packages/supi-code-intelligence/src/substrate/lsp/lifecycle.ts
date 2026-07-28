@@ -20,6 +20,15 @@ export function registerLspSessionLifecycle(pi: ExtensionAPI, state: LspAdapterS
     }
     state.lspActive = false;
 
+    // Project-local LSP configuration may define custom commands; defer
+    // until the project is trusted so an untrusted repository cannot control
+    // spawned processes.
+    if (!ctx.isProjectTrusted()) {
+      state.controller = null;
+      state.lspActive = false;
+      return;
+    }
+
     const controller = new LspRuntimeController(cwd, runtime);
     const result = await controller.start();
 

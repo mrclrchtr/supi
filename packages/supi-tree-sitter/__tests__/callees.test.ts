@@ -155,6 +155,34 @@ describe("calleesAt — structural callee detection", () => {
     }
   });
 
+  it("uses full points to exclude a same-line nested scope at direct depth", async () => {
+    writeSource(
+      "same-line.ts",
+      "function outer() { before(); const inner = () => nested(); after(); }\n",
+    );
+
+    const session = createTreeSitterSession(tmpDir);
+    try {
+      const direct = await session.calleesAt("same-line.ts", 1, 10, "direct");
+      expect(direct.kind).toBe("success");
+      if (direct.kind === "success") {
+        expect(direct.data.callees.map((callee) => callee.name)).toEqual(["before", "after"]);
+      }
+
+      const deep = await session.calleesAt("same-line.ts", 1, 10, "deep");
+      expect(deep.kind).toBe("success");
+      if (deep.kind === "success") {
+        expect(deep.data.callees.map((callee) => callee.name)).toEqual([
+          "before",
+          "nested",
+          "after",
+        ]);
+      }
+    } finally {
+      session.dispose();
+    }
+  });
+
   it("returns unsupported-language for HTML files", async () => {
     writeSource("test.html", "<html><body><p>hello</p></body></html>");
 

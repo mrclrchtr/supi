@@ -92,6 +92,7 @@ export function registerCodeIntelligenceTools(
       // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
       execute: async (_toolCallId, params, signal, onUpdate, ctx: ExtensionContext) => {
         const session = getOrCreateSession(ctx.cwd);
+        session.setProjectTrusted(ctx.isProjectTrusted());
         const { content, details } = await spec.run(params, {
           cwd: ctx.cwd,
           signal,

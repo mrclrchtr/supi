@@ -8,10 +8,10 @@
  *
  * Trust considerations:
  * - The @derekstride/tree-sitter-sql install script uses "npx --yes", which
- *   some package managers flag as a supply-chain risk. pnpm ignores build
- *   scripts by default, so this script never runs during install.
+ *   some package managers flag as a supply-chain risk. This workspace disables
+ *   that package's build script explicitly via pnpm `allowBuilds`.
  * - The WASM is built locally from the installed package source (not downloaded
- *   from npm). The build uses tree-sitter-cli 0.22.6 with Emscripten/Docker.
+ *   from npm). The build uses tree-sitter-cli with Emscripten/Docker.
  * - Alternatives considered: tree-sitter-sql (m-novikov, stale since 2021),
  *   tree-sitter-sql-bigquery (dialect-specific), and dialect-specific grammars.
  *   derekstride/tree-sitter-sql is the most mature general-purpose SQL grammar.
@@ -55,6 +55,7 @@ function readMetadata() {
 
 function assertSqlWasmCurrent() {
   const sqlPackage = readPackage("@derekstride/tree-sitter-sql");
+  const cliPackage = readPackage("tree-sitter-cli");
   const metadata = readMetadata();
   const actualSha = sha256(wasmPath);
   const errors = [];
@@ -65,6 +66,11 @@ function assertSqlWasmCurrent() {
   if (metadata.source?.version !== sqlPackage.json.version) {
     errors.push(
       `metadata pins @derekstride/tree-sitter-sql ${metadata.source?.version}, but installed package is ${sqlPackage.json.version}`,
+    );
+  }
+  if (metadata.generatedWith?.treeSitterCli !== cliPackage.json.version) {
+    errors.push(
+      `metadata pins tree-sitter-cli ${metadata.generatedWith?.treeSitterCli}, but installed CLI is ${cliPackage.json.version}`,
     );
   }
   if (metadata.sha256 !== actualSha) {
@@ -92,7 +98,7 @@ function generateSqlWasm() {
   try {
     fs.cpSync(sqlPackage.dir, grammarDir, { recursive: true });
 
-    // tree-sitter-cli 0.22.6 requires a "tree-sitter" section in package.json
+    // tree-sitter-cli requires a "tree-sitter" section in package.json
     const grammarPackageJsonPath = path.join(grammarDir, "package.json");
     const grammarPackageJson = JSON.parse(fs.readFileSync(grammarPackageJsonPath, "utf-8"));
     grammarPackageJson["tree-sitter"] = [{ scope: "source.sql" }];
@@ -128,6 +134,14 @@ function generateSqlWasm() {
         treeSitterCli: cliPackage.json.version,
       },
       sha256: checksum,
+      trust: {
+        note: "The @derekstride/tree-sitter-sql npm package is a devDependency only. It is never resolved at runtime; the vendored WASM above is the sole runtime artifact. This workspace explicitly disables the package's npx-based install script via pnpm allowBuilds. The WASM was built locally from the installed package source. See scripts/generate-sql-wasm.mjs for the rebuild procedure.",
+        alternativesConsidered: [
+          "tree-sitter-sql (m-novikov, 2021, stale)",
+          "tree-sitter-sql-bigquery (BigQuery-specific)",
+          "dialect-specific grammars (too narrow)",
+        ],
+      },
     };
     fs.writeFileSync(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
     process.stdout.write(`Generated ${wasmPath}\n`);

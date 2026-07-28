@@ -2,6 +2,7 @@
 
 import { existsSync } from "node:fs";
 import { relative } from "node:path";
+import { uriToFile } from "@mrclrchtr/supi-core/path";
 import { normalizePath } from "../analysis/search/paths.ts";
 import { gatherNearbyDiagnostics, gatherTreeSitterContext } from "../ui/markdown/gather.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
@@ -145,9 +146,7 @@ function mapDefinitions(
   cwd: string,
 ): InspectResultData["definitions"] {
   return (definitions ?? []).map((definition) => {
-    const file = definition.uri.startsWith("file://")
-      ? decodeURIComponent(definition.uri.slice(7))
-      : definition.uri;
+    const file = uriToFile(definition.uri);
     return {
       file: relative(cwd, file),
       line: definition.range.start.line + 1,

@@ -1,7 +1,7 @@
 {
   "source": {
     "npmPackage": "tree-sitter-bash",
-    "version": "0.23.3"
+    "version": "0.25.1"
   },
-  "sha256": "d1844429a58620f306b6f42aebe92298243ca8120cd833a3ab5d87c7a2e7b9fd"
+  "sha256": "8292919c88a0f7d3fb31d0cd0253ca5a9531bc1ede82b0537f2c63dd8abe6a7a"
 }

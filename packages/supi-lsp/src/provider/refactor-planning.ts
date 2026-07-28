@@ -1,4 +1,5 @@
 import type { CodePosition, RefactorResult, SourceRange } from "@mrclrchtr/supi-code-runtime/api";
+import { uriToFile } from "@mrclrchtr/supi-core/path";
 import type { CodeAction, TextDocumentEdit, TextEdit, WorkspaceEdit } from "../config/types.ts";
 import type { WorkspaceLspRuntime } from "../session/runtime-registry.ts";
 
@@ -146,15 +147,6 @@ function convertLspWorkspaceEdit(edit: WorkspaceEdit | null): RefactorResult {
   return { kind: "precise", edits: { edits: fileEdits } };
 }
 
-function resolveFileFromUri(uri: string): string {
-  if (!uri.startsWith("file://")) return uri;
-  try {
-    return decodeURIComponent(uri.slice(7));
-  } catch {
-    return uri;
-  }
-}
-
 function collectDocumentChangeEdits(
   docChanges: NonNullable<WorkspaceEdit["documentChanges"]>,
 ): Array<{
@@ -170,7 +162,7 @@ function collectDocumentChangeEdits(
   for (const change of docChanges) {
     const tdEdit = change as TextDocumentEdit;
     if (!tdEdit.textDocument || !tdEdit.edits) continue;
-    const file = resolveFileFromUri(tdEdit.textDocument.uri);
+    const file = uriToFile(tdEdit.textDocument.uri);
     for (const singleEdit of tdEdit.edits) {
       const te = singleEdit as TextEdit;
       out.push({
@@ -198,7 +190,7 @@ function collectChangesEdits(changes: NonNullable<WorkspaceEdit["changes"]>): Ar
   }> = [];
   for (const [uri, textEdits] of Object.entries(changes)) {
     if (!textEdits || textEdits.length === 0) continue;
-    const file = resolveFileFromUri(uri);
+    const file = uriToFile(uri);
     for (const te of textEdits) {
       out.push({
         file,

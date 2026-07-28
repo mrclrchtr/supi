@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -6,13 +7,15 @@ import { applyWorkspaceEdit } from "../../../../src/analysis/refactor/apply.ts";
 
 // Hoisted shared state: the mock records every file path whose queue is acquired,
 // in acquisition order, while still running the real fn so the apply happens.
-const { acquiredFiles, queueMock } = vi.hoisted(() => {
+const { acquiredFiles, beforeQueuedCallbacks, queueMock } = vi.hoisted(() => {
   const acquiredFiles: string[] = [];
+  const beforeQueuedCallbacks: Array<(filePath: string) => void> = [];
   const queueMock = async <T>(filePath: string, fn: () => Promise<T>): Promise<T> => {
     acquiredFiles.push(filePath);
+    beforeQueuedCallbacks.shift()?.(filePath);
     return fn();
   };
-  return { acquiredFiles, queueMock };
+  return { acquiredFiles, beforeQueuedCallbacks, queueMock };
 });
 
 vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
@@ -64,4 +67,68 @@ describe("applyWorkspaceEdit file-mutation queue", () => {
       rmSync(tmpDir, { recursive: true, force: true });
     }
   });
+
+  it("revalidates fingerprints after entering the mutation queue", async () => {
+    const tmpDir = mkdtempSync(path.join(os.tmpdir(), "apply-queue-race-"));
+    const file = path.join(tmpDir, "source.ts");
+    const original = "const value = 'old';\n";
+    writeFileSync(file, original);
+    beforeQueuedCallbacks.push(() => writeFileSync(file, "const value = 'sibling';\n"));
+
+    try {
+      const result = await applyWorkspaceEdit(
+        {
+          edits: [
+            {
+              file,
+              range: { start: { line: 0, character: 15 }, end: { line: 0, character: 18 } },
+              newText: "new",
+            },
+          ],
+        },
+        { expectedFingerprints: new Map([[file, sha256(original)]]) },
+      );
+
+      expect(result).toMatchObject({ kind: "error" });
+      expect(readFileSync(file, "utf-8")).toBe("const value = 'sibling';\n");
+    } finally {
+      beforeQueuedCallbacks.length = 0;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns a typed stale-plan error if a queued file disappears", async () => {
+    const tmpDir = mkdtempSync(path.join(os.tmpdir(), "apply-queue-delete-"));
+    const file = path.join(tmpDir, "source.ts");
+    const original = "const value = 'old';\n";
+    writeFileSync(file, original);
+    beforeQueuedCallbacks.push(() => rmSync(file));
+
+    try {
+      const result = await applyWorkspaceEdit(
+        {
+          edits: [
+            {
+              file,
+              range: { start: { line: 0, character: 15 }, end: { line: 0, character: 18 } },
+              newText: "new",
+            },
+          ],
+        },
+        { expectedFingerprints: new Map([[file, sha256(original)]]) },
+      );
+
+      expect(result).toMatchObject({
+        kind: "error",
+        reason: expect.stringContaining("changed since the plan was generated"),
+      });
+    } finally {
+      beforeQueuedCallbacks.length = 0;
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
 });
+
+function sha256(content: string): string {
+  return createHash("sha256").update(content).digest("hex");
+}

@@ -145,6 +145,32 @@ describe("applyWorkspaceEdit", () => {
     expect(read("a.ts")).toBe("line1\nreplaced");
   });
 
+  it("orders positions lexicographically when a line exceeds one million characters", async () => {
+    const longPrefix = "a".repeat(1_000_001);
+    write("a.ts", `${longPrefix}X\nYY`);
+
+    const result = await applyWorkspaceEdit({
+      edits: [
+        {
+          file: absPath("a.ts"),
+          range: {
+            start: { line: 0, character: 1_000_001 },
+            end: { line: 0, character: 1_000_002 },
+          },
+          newText: "LONG",
+        },
+        {
+          file: absPath("a.ts"),
+          range: { start: { line: 1, character: 0 }, end: { line: 1, character: 2 } },
+          newText: "Z",
+        },
+      ],
+    });
+
+    expect(result.kind).toBe("applied");
+    expect(read("a.ts")).toBe(`${longPrefix}LONG\nZ`);
+  });
+
   it("returns error for out-of-range line indices", async () => {
     write("a.ts", "short");
 

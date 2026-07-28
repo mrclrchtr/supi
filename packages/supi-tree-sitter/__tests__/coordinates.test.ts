@@ -18,16 +18,17 @@ describe("publicToTreeSitter", () => {
     expect(result).toEqual({ row: 1, column: 2 });
   });
 
-  it("handles non-ASCII characters (UTF-8 byte conversion)", () => {
+  it("handles non-ASCII characters (UTF-16 code units)", () => {
     const source = "héllo world";
-    // 'h' = 1 byte, 'é' = 2 bytes → byte offset at char 3 (1-based) = 3 bytes
+    // 'h' is at UTF-16 index 0, 'é' is at index 1, 'l' is at index 2.
+    // Character 3 (1-based) is 'l', column should be 2 (0-based).
     const result = publicToTreeSitter(1, 3, source);
-    expect(result).toEqual({ row: 0, column: 3 });
+    expect(result).toEqual({ row: 0, column: 2 });
   });
 
   it("clamps character to line length", () => {
     const result = publicToTreeSitter(1, 100, "hi");
-    expect(result.column).toBe(2); // "hi" is 2 bytes
+    expect(result.column).toBe(2); // "hi" is 2 UTF-16 code units
   });
 });
 
@@ -42,10 +43,11 @@ describe("treeSitterToPublic", () => {
     expect(result).toEqual({ line: 2, character: 3 });
   });
 
-  it("handles non-ASCII byte-to-char conversion", () => {
+  it("handles non-ASCII characters (UTF-16 code units)", () => {
     const source = "héllo";
-    // 'h' = 1 byte, 'é' = 2 bytes → byte offset 3 is at UTF-16 index 2 (after 'h', 'é')
-    const result = treeSitterToPublic(0, 3, source);
+    // 'h' is at UTF-16 index 0, 'é' is at index 1, column 2 (0-based)
+    // is the first 'l'. So line 1 character should be 3.
+    const result = treeSitterToPublic(0, 2, source);
     expect(result).toEqual({ line: 1, character: 3 });
   });
 });

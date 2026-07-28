@@ -7,7 +7,6 @@
 export type {
   AnchoredResolutionMetadata,
   AnchoredResolutionSource,
-  BriefDetails,
   ContextDetails,
   DisambiguationCandidate,
   HealthDetails,

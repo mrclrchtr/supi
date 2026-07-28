@@ -37,6 +37,25 @@ import { JsonRpcClient, JsonRpcRequestError } from "./transport.ts";
 const SHUTDOWN_TIMEOUT_MS = 5_000;
 const DIAGNOSTIC_WAIT_MS = 3_000;
 
+/** Race an operation against a timeout without retaining the timer after settlement. */
+async function withTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 // ── Process-tree cleanup ──────────────────────────────────────────────
 
 /**
@@ -218,20 +237,13 @@ export class LspClient {
     if (!this.rpc || !this.process) return;
 
     try {
-      // Send shutdown request with a timeout
-      await Promise.race([
-        this.rpc.sendRequest("shutdown"),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("shutdown timeout")), SHUTDOWN_TIMEOUT_MS),
-        ),
-      ]);
+      await withTimeout(this.rpc.sendRequest("shutdown"), SHUTDOWN_TIMEOUT_MS, "shutdown timeout");
       // Flush the final exit notification before disposing the transport.
-      await Promise.race([
+      await withTimeout(
         this.rpc.sendNotification("exit"),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("exit notification timeout")), SHUTDOWN_TIMEOUT_MS),
-        ),
-      ]);
+        SHUTDOWN_TIMEOUT_MS,
+        "exit notification timeout",
+      );
     } catch {
       // Timeout or error — force kill
     }

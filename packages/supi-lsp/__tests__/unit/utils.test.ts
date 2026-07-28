@@ -15,9 +15,9 @@ describe("fileToUri", () => {
     expect(uri).toBe("file:///home/user/file.ts");
   });
 
-  it("handles spaces in path", () => {
+  it("percent-encodes special characters (spaces, hashes)", () => {
     const uri = fileToUri("/home/user/my project/file.ts");
-    expect(uri).toBe("file:///home/user/my project/file.ts");
+    expect(uri).toBe("file:///home/user/my%20project/file.ts");
   });
 });
 

@@ -1,5 +1,5 @@
 import { PassThrough } from "node:stream";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createMessageConnection,
   type MessageConnection,
@@ -69,6 +69,7 @@ describe("JsonRpcClient", () => {
     // Give pending writes a chance to drain before destroying streams
     serverIn.removeAllListeners();
     serverOut.removeAllListeners();
+    vi.restoreAllMocks();
   });
 
   it("correlates response by id", async () => {
@@ -170,5 +171,63 @@ describe("JsonRpcClient", () => {
       deadInput.destroy();
       deadOutput.destroy();
     }
+  });
+
+  it("clears the request timer after a successful response", async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+    server.onRequest("fast/success", () => "done");
+
+    const request = client.sendRequest("fast/success", undefined, { timeoutMs: 12_345 });
+    const timerIndex = setTimeoutSpy.mock.calls.findIndex((call) => call[1] === 12_345);
+    const timer = setTimeoutSpy.mock.results[timerIndex]?.value;
+
+    await expect(request).resolves.toBe("done");
+    expect(timer).toBeDefined();
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(timer);
+  });
+
+  it("clears the request timer after an error response", async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+    server.onRequest("fast/error", () => {
+      throw new Error("server failure");
+    });
+
+    const request = client.sendRequest("fast/error", undefined, { timeoutMs: 12_346 });
+    const timerIndex = setTimeoutSpy.mock.calls.findIndex((call) => call[1] === 12_346);
+    const timer = setTimeoutSpy.mock.results[timerIndex]?.value;
+
+    await expect(request).rejects.toThrow("server failure");
+    expect(timer).toBeDefined();
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(timer);
+  });
+
+  it("clears the request timer after timeout", async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+    server.onRequest("slow/timer", () => new Promise(() => {}));
+    const request = client.sendRequest("slow/timer", undefined, { timeoutMs: 30 });
+    const timerIndex = setTimeoutSpy.mock.calls.findIndex((call) => call[1] === 30);
+    const timer = setTimeoutSpy.mock.results[timerIndex]?.value;
+
+    await expect(request).rejects.toThrow("timed out");
+    expect(timer).toBeDefined();
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(timer);
+  });
+
+  it("clears the request timer when the client is disposed", async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+    server.onRequest("slow/dispose", () => new Promise(() => {}));
+    const request = client.sendRequest("slow/dispose", undefined, { timeoutMs: 12_347 });
+    const timerIndex = setTimeoutSpy.mock.calls.findIndex((call) => call[1] === 12_347);
+    const timer = setTimeoutSpy.mock.results[timerIndex]?.value;
+
+    client.dispose();
+
+    await expect(request).rejects.toThrow();
+    expect(timer).toBeDefined();
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(timer);
   });
 });

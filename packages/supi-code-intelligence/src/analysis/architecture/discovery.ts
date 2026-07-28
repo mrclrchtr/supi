@@ -123,18 +123,38 @@ async function detectWorkspaceModules(
   const modules: ModuleInfo[] = [];
   const resolvedDirs = resolveWorkspaceGlobs(root, workspaceGlobs);
 
+  // Pass 1: collect all package manifests and their names so we can
+  // classify dependencies by membership rather than by version protocol.
+  const packageNames = new Set<string>();
+  const moduleCandidates = new Map<
+    string,
+    {
+      manifest: PackageJson;
+      dir: string;
+      relativePath: string;
+    }
+  >();
   for (const dir of resolvedDirs) {
     const manifest = readPackageJson(dir);
     if (!manifest?.name) continue;
+    packageNames.add(manifest.name);
+    moduleCandidates.set(manifest.name, {
+      manifest,
+      dir,
+      relativePath: path.relative(root, dir),
+    });
+  }
 
-    const relativePath = path.relative(root, dir);
+  // Pass 2: classify dependencies against the collected workspace names.
+  // This works for all package managers — npm, Yarn, and pnpm — without
+  // relying on the `workspace:` protocol.
+  for (const [name, { manifest, dir, relativePath }] of moduleCandidates) {
     const allDeps = { ...manifest.dependencies, ...manifest.peerDependencies };
 
     const internalDeps: string[] = [];
     const externalDeps: string[] = [];
     for (const depName of Object.keys(allDeps)) {
-      const depVersion = allDeps[depName];
-      if (depVersion?.startsWith("workspace:")) {
+      if (packageNames.has(depName)) {
         internalDeps.push(depName);
       } else {
         externalDeps.push(depName);
@@ -151,7 +171,7 @@ async function detectWorkspaceModules(
     }
 
     modules.push({
-      name: manifest.name,
+      name,
       description: manifest.description ?? null,
       root: dir,
       relativePath,

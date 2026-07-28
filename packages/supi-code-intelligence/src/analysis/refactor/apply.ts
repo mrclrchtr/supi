@@ -5,20 +5,27 @@
  * in memory before any file is written, so a mid-apply failure never
  * leaves the workspace half-renamed.
  *
- * Edits are sorted by descending absolute offset (line + character)
- * so same-line edits are applied right-to-left regardless of order.
+ * Edits are sorted by descending source position
+ * so edits are applied from bottom-right to top-left regardless of order.
  *
  * Only called after safety validation has passed.
  */
 
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import type { FileEdit, WorkspaceEdit } from "@mrclrchtr/supi-code-runtime/api";
+import { compareCodePositions } from "./position.ts";
 import { validateEditAgainstFiles } from "./safety.ts";
 
 export type ApplyResult =
   | { kind: "applied"; filesChanged: number; totalEdits: number }
   | { kind: "error"; reason: string };
+
+export interface ApplyOptions {
+  /** Expected SHA-256 fingerprints per file, validated after queue acquisition. */
+  expectedFingerprints?: ReadonlyMap<string, string>;
+}
 
 /**
  * Apply a validated WorkspaceEdit to the filesystem.
@@ -27,6 +34,10 @@ export type ApplyResult =
  * all writes. If a commit fails after some files were already written,
  * the function rolls those files back to their original contents.
  *
+ * When `expectedFingerprints` is supplied, fingerprints are compared
+ * **after** all mutation queues are acquired, so a sibling write cannot
+ * change the file between fingerprint check and queue entry.
+ *
  * The whole precompute-then-commit (including range/safety re-checks) runs
  * inside pi's per-file mutation queue, acquired for every involved file in
  * sorted path order before reading. This serializes against sibling
@@ -34,10 +45,18 @@ export type ApplyResult =
  * across concurrent applies, while preserving all-or-nothing across files
  * (ADR 0006).
  */
-export async function applyWorkspaceEdit(edit: WorkspaceEdit): Promise<ApplyResult> {
+export async function applyWorkspaceEdit(
+  edit: WorkspaceEdit,
+  options: ApplyOptions = {},
+): Promise<ApplyResult> {
   const grouped = groupEditsByFile(edit.edits);
   const files = [...grouped.keys()].sort();
   return withAllMutationQueues(files, async () => {
+    if (options.expectedFingerprints) {
+      const freshness = validateFingerprints(files, options.expectedFingerprints);
+      if (!freshness.ok) return { kind: "error", reason: freshness.reason };
+    }
+
     const validation = validateEditAgainstFiles(edit);
     if (!validation.safe) {
       return { kind: "error", reason: validation.reason };
@@ -53,6 +72,35 @@ export async function applyWorkspaceEdit(edit: WorkspaceEdit): Promise<ApplyResu
       edit.edits.length,
     );
   });
+}
+
+function validateFingerprints(
+  files: string[],
+  expected: ReadonlyMap<string, string>,
+): { ok: true } | { ok: false; reason: string } {
+  for (const file of files) {
+    const expectedFingerprint = expected.get(file);
+    if (expectedFingerprint === undefined) continue;
+    let actual: string;
+    try {
+      actual = sha256File(file);
+    } catch {
+      return stalePlanError(file);
+    }
+    if (actual !== expectedFingerprint) return stalePlanError(file);
+  }
+  return { ok: true };
+}
+
+function sha256File(file: string): string {
+  return createHash("sha256").update(readFileSync(file, "utf-8")).digest("hex");
+}
+
+function stalePlanError(file: string): { ok: false; reason: string } {
+  return {
+    ok: false,
+    reason: `File ${file} has changed since the plan was generated. Regenerate with code_refactor_plan.`,
+  };
 }
 
 /**
@@ -111,8 +159,9 @@ function applyEditsToContent(content: string, edits: FileEdit[]): string {
   const lines = content.split("\n");
   const sortedEdits = [...edits].sort(
     (left, right) =>
-      absoluteOffset(right.range.start.line, right.range.start.character) -
-      absoluteOffset(left.range.start.line, left.range.start.character),
+      // Descending by start position so later edits don't shift earlier ones.
+      compareCodePositions(right.range.start, left.range.start) ||
+      compareCodePositions(right.range.end, left.range.end),
   );
 
   let updated = content;
@@ -166,10 +215,6 @@ function rollbackWrittenFiles(
   } catch (error) {
     return toErrorMessage(error);
   }
-}
-
-function absoluteOffset(line: number, character: number): number {
-  return line * 1_000_000 + character;
 }
 
 function toOffset(lines: string[], line: number, character: number): number {

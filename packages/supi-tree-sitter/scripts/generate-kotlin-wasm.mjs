@@ -38,6 +38,7 @@ function expectedReleaseAsset(version) {
 
 function assertKotlinWasmCurrent() {
   const kotlinPackage = readPackage("tree-sitter-kotlin");
+  const cliPackage = readPackage("tree-sitter-cli");
   const metadata = readMetadata();
   const actualSha = sha256(wasmPath);
   const errors = [];
@@ -53,6 +54,11 @@ function assertKotlinWasmCurrent() {
   if (metadata.source?.releaseAsset !== expectedReleaseAsset(kotlinPackage.json.version)) {
     errors.push(
       "metadata release asset URL does not match the installed tree-sitter-kotlin version",
+    );
+  }
+  if (metadata.generatedWith?.treeSitterCli !== cliPackage.json.version) {
+    errors.push(
+      `metadata pins tree-sitter-cli ${metadata.generatedWith?.treeSitterCli}, but installed CLI is ${cliPackage.json.version}`,
     );
   }
   if (metadata.sha256 !== actualSha) {

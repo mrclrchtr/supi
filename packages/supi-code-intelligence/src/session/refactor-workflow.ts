@@ -158,7 +158,10 @@ export async function runRefactorApplyWorkflow(
     phase: "mutation",
     message: "Applying fingerprint-checked refactor edits",
   });
-  const result = await applyWorkspaceEdit(plan.edits);
+  const expectedFingerprints = new Map(
+    plan.fileFingerprints.map(({ file, fingerprint }) => [file, fingerprint]),
+  );
+  const result = await applyWorkspaceEdit(plan.edits, { expectedFingerprints });
   if (result.kind === "error") return { kind: "unavailable", reason: result.reason };
   deps.removePlan(plan.id);
   return { kind: "completed", plan: immutablePlan(plan), result };

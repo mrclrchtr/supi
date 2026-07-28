@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 /** Strip pi's optional leading `@` file-path prefix from a tool input. */
 export function stripToolPathPrefix(target: string): string {
@@ -16,25 +17,28 @@ export function resolveToolPath(cwd: string, target: string): string {
   return path.resolve(cwd, stripToolPathPrefix(target));
 }
 
-/** Convert a file path to a file:// URI. */
+/**
+ * Convert a file path to a file:// URI.
+ *
+ * Uses Node's `pathToFileURL` to produce a standards-compliant URI with
+ * proper percent-encoding of spaces, hashes, and other special characters.
+ */
 export function fileToUri(filePath: string): string {
-  const resolved = path.resolve(filePath);
-  if (process.platform === "win32") {
-    return `file:///${resolved.replace(/\\/g, "/")}`;
-  }
-  return `file://${resolved}`;
+  return pathToFileURL(filePath).href;
 }
 
-/** Convert a file:// URI to a file path. */
+/**
+ * Convert a file:// URI to a file path.
+ *
+ * Uses Node's `fileURLToPath` for standards-compliant decoding. Non-file
+ * URIs are passed through unchanged so consumers (such as LSP diagnostic
+ * handling) remain compatible with non-file URI schemes.
+ */
 export function uriToFile(uri: string): string {
   if (!uri.startsWith("file://")) return uri;
-  let filePath = decodeURIComponent(uri.slice(7));
-  if (
-    process.platform === "win32" &&
-    filePath.startsWith("/") &&
-    /^[A-Za-z]:/.test(filePath.slice(1))
-  ) {
-    filePath = filePath.slice(1);
+  try {
+    return fileURLToPath(uri);
+  } catch {
+    return uri;
   }
-  return filePath;
 }

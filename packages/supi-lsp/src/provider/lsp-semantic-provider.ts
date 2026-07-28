@@ -13,6 +13,7 @@ import type {
   SemanticProvider,
   SourceRange,
 } from "@mrclrchtr/supi-code-runtime/api";
+import { uriToFile } from "@mrclrchtr/supi-core/path";
 import type {
   CodeAction,
   DocumentSymbol,
@@ -341,7 +342,7 @@ function toCodeSymbol(sym: SymbolInformation): CodeSymbol {
   return {
     name: sym.name,
     kind: symbolKindName(sym.kind),
-    file: uri.startsWith("file://") ? decodeURIComponent(uri.slice(7)) : uri,
+    file: uriToFile(uri),
     // SymbolInformation has no selectionRange — nameAnchor is derived later
     // by the orchestration layer's refine, or left absent.
     declarationAnchor: {

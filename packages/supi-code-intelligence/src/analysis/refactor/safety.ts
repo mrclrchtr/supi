@@ -7,6 +7,7 @@
 
 import { readFileSync } from "node:fs";
 import type { FileEdit, WorkspaceEdit } from "@mrclrchtr/supi-code-runtime/api";
+import { compareCodePositions } from "./position.ts";
 
 export type ValidationResult = { safe: true } | { safe: false; reason: string };
 
@@ -122,25 +123,17 @@ function validateCharacterBounds(file: string, edit: FileEdit, lines: string[]):
 function hasOverlappingEdits(edits: FileEdit[]): boolean {
   const fileGroups = groupByFile(edits);
   for (const [, fileEdits] of fileGroups) {
-    const sorted = [...fileEdits].sort(
-      (a, b) =>
-        absoluteOffset(a.range.start.line, a.range.start.character) -
-        absoluteOffset(b.range.start.line, b.range.start.character),
+    const sorted = [...fileEdits].sort((left, right) =>
+      compareCodePositions(left.range.start, right.range.start),
     );
 
     for (let index = 1; index < sorted.length; index++) {
       const previous = sorted[index - 1];
       const current = sorted[index];
-      const previousEnd = absoluteOffset(previous.range.end.line, previous.range.end.character);
-      const currentStart = absoluteOffset(current.range.start.line, current.range.start.character);
-      if (currentStart < previousEnd) return true;
+      if (compareCodePositions(current.range.start, previous.range.end) < 0) return true;
     }
   }
   return false;
-}
-
-function absoluteOffset(line: number, character: number): number {
-  return line * 1_000_000 + character;
 }
 
 function groupByFile(edits: FileEdit[]): Map<string, FileEdit[]> {

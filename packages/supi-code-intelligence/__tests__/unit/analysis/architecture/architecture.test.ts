@@ -88,6 +88,51 @@ describe("buildArchitectureModel", () => {
     expect(pkgB?.internalDeps).toContain("@test/pkg-a");
   });
 
+  it.each([
+    {
+      manager: "npm",
+      rootManifest: { name: "root", workspaces: ["packages/*"] },
+      workspaceFile: null,
+      internalVersion: "file:../core",
+    },
+    {
+      manager: "Yarn",
+      rootManifest: { name: "root", workspaces: { packages: ["packages/*"] } },
+      workspaceFile: null,
+      internalVersion: "^1.0.0",
+    },
+    {
+      manager: "pnpm",
+      rootManifest: { name: "root" },
+      workspaceFile: "packages:\n  - 'packages/*'\n",
+      internalVersion: "workspace:^",
+    },
+  ])(
+    "classifies $manager workspace dependencies by package membership",
+    async ({ rootManifest, workspaceFile, internalVersion }) => {
+      writeJson(tmpDir, "package.json", rootManifest);
+      if (workspaceFile) {
+        writeFileSync(path.join(tmpDir, "pnpm-workspace.yaml"), workspaceFile);
+      }
+
+      const core = path.join(tmpDir, "packages", "core");
+      mkdirSync(core, { recursive: true });
+      writeJson(core, "package.json", { name: "@t/core", version: "1.0.0" });
+
+      const app = path.join(tmpDir, "packages", "app");
+      mkdirSync(app, { recursive: true });
+      writeJson(app, "package.json", {
+        name: "@t/app",
+        dependencies: { "@t/core": internalVersion, lodash: "^4.0.0" },
+      });
+
+      const model = await buildArchitectureModel(tmpDir);
+      const appModule = model?.modules.find((module) => module.name === "@t/app");
+      expect(appModule?.internalDeps).toEqual(["@t/core"]);
+      expect(appModule?.externalDeps).toEqual(["lodash"]);
+    },
+  );
+
   it("builds dependency edges between workspace modules", async () => {
     writeJson(tmpDir, "package.json", { name: "root" });
     writeFileSync(path.join(tmpDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");

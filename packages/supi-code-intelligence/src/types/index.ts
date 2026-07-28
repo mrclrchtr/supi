@@ -15,7 +15,6 @@ export type { CodeIntelResult, CodeIntelToolExecCtx } from "./execution.ts";
 export type {
   AnchoredResolutionMetadata,
   AnchoredResolutionSource,
-  BriefDetails,
   ContextDetails,
   DisambiguationCandidate,
   HealthDetails,

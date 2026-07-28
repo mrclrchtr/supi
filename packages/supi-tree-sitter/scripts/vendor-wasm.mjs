@@ -108,8 +108,14 @@ function checkGrammar(grammarId, source) {
 
   try {
     const pkg = readPackage(source.npmPackage);
+    const sourceWasmPath = path.join(pkg.dir, source.wasmFile);
+    if (!fs.existsSync(sourceWasmPath)) {
+      errors.push(`${grammarId}: installed package is missing ${source.wasmFile}`);
+      return errors;
+    }
     const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf-8"));
     const actualSha = sha256(wasmPath);
+    const sourceSha = sha256(sourceWasmPath);
 
     if (metadata.source?.npmPackage !== source.npmPackage) {
       errors.push(`${grammarId}: metadata source npmPackage mismatch`);
@@ -119,8 +125,18 @@ function checkGrammar(grammarId, source) {
         `${grammarId}: metadata version ${metadata.source?.version} !== installed ${pkg.json.version}`,
       );
     }
+    if (actualSha !== sourceSha) {
+      errors.push(
+        `${grammarId}: vendored sha256 ${actualSha} !== installed package source ${sourceSha}`,
+      );
+    }
     if (metadata.sha256 !== actualSha) {
-      errors.push(`${grammarId}: metadata sha256 ${metadata.sha256} !== actual ${actualSha}`);
+      errors.push(`${grammarId}: metadata sha256 ${metadata.sha256} !== vendored ${actualSha}`);
+    }
+    if (metadata.sha256 !== sourceSha) {
+      errors.push(
+        `${grammarId}: metadata sha256 ${metadata.sha256} !== installed package source ${sourceSha}`,
+      );
     }
   } catch (err) {
     errors.push(`${grammarId}: ${err.message}`);

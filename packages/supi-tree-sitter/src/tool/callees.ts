@@ -188,7 +188,7 @@ export async function lookupCalleesAt(
 
   try {
     const scopes = ENCLOSING_SCOPE_TYPES[grammarId];
-    const tsPoint = tsPosition(line, character);
+    const tsPoint = { row: line - 1, column: character - 1 };
     const node = tree.rootNode.descendantForPosition(tsPoint);
 
     if (!node) {
@@ -222,13 +222,7 @@ export async function lookupCalleesAt(
       };
     }
 
-    const callees = filterCalleeCaptures(
-      queryResult.data,
-      enclosingNode,
-      scopes,
-      tsPoint.row,
-      depth,
-    );
+    const callees = filterCalleeCaptures(queryResult.data, enclosingNode, scopes, tsPoint, depth);
 
     const enclosingRange = nodeToSourceRange(enclosingNode);
     const scopeName = extractScopeName(enclosingNode.type, enclosingNode.text);
@@ -250,45 +244,72 @@ export async function lookupCalleesAt(
 }
 
 /**
- * Recursively collect line ranges of inner function/method/callback scopes that
- * do not contain the anchor row. Captures from these ranges are excluded so
+ * Recursively collect inner function/method/callback scopes that do NOT
+ * contain the anchor point. Captures from these ranges are excluded so
  * nested calls are not attributed to the parent scope.
+ *
+ * Containment compares both row and column to handle same-line nested
+ * functions correctly.
  */
 function collectInnerScopes(
   node: {
     type: string;
     children: unknown[];
-    startPosition: { row: number };
-    endPosition: { row: number };
+    startPosition: { row: number; column: number };
+    endPosition: { row: number; column: number };
   } | null,
   scopeTypes: ReadonlySet<string>,
-  anchorRow: number,
-  ranges: Array<{ startRow: number; endRow: number }>,
+  anchor: { row: number; column: number },
+  ranges: Array<{
+    startRow: number;
+    startColumn: number;
+    endRow: number;
+    endColumn: number;
+  }>,
 ): void {
   if (!node) return;
   // biome-ignore lint/complexity/noForEach: safe iteration over node children
   (node.children ?? []).forEach((child) => {
     const childNode = child as {
       type: string;
-      startPosition: { row: number };
-      endPosition: { row: number };
+      startPosition: { row: number; column: number };
+      endPosition: { row: number; column: number };
       children: unknown[];
     };
     if (scopeTypes.has(childNode.type)) {
-      // Exclude this inner scope if it does NOT contain the anchor
-      if (!(childNode.startPosition.row <= anchorRow && childNode.endPosition.row >= anchorRow)) {
+      // Exclude this inner scope if it does NOT contain the anchor point.
+      const contains = containsPoint(childNode, anchor);
+      if (!contains) {
         ranges.push({
-          startRow: childNode.startPosition.row + 1,
-          endRow: childNode.endPosition.row + 1,
+          startRow: childNode.startPosition.row,
+          startColumn: childNode.startPosition.column,
+          endRow: childNode.endPosition.row,
+          endColumn: childNode.endPosition.column,
         });
       }
       // Still recurse into it for deeper nesting
-      collectInnerScopes(childNode, scopeTypes, anchorRow, ranges);
+      collectInnerScopes(childNode, scopeTypes, anchor, ranges);
     } else {
       // Recurse into non-scope children to find deeper scopes
-      collectInnerScopes(childNode, scopeTypes, anchorRow, ranges);
+      collectInnerScopes(childNode, scopeTypes, anchor, ranges);
     }
   });
+}
+
+function containsPoint(
+  node: {
+    startPosition: { row: number; column: number };
+    endPosition: { row: number; column: number };
+  },
+  point: { row: number; column: number },
+): boolean {
+  const afterStart =
+    point.row > node.startPosition.row ||
+    (point.row === node.startPosition.row && point.column >= node.startPosition.column);
+  const beforeEnd =
+    point.row < node.endPosition.row ||
+    (point.row === node.endPosition.row && point.column <= node.endPosition.column);
+  return afterStart && beforeEnd;
 }
 
 /**
@@ -298,35 +319,57 @@ function collectInnerScopes(
  * enclosing scope are included regardless of nesting.
  */
 // biome-ignore lint/complexity/useMaxParams: filtering needs captures + node context + depth
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: filtering combines scope containment, column-aware inner-scope exclusion, and dedup in one cohesive pass
 function filterCalleeCaptures(
   captures: Array<{ range: SourceRange; text: string }>,
   // biome-ignore lint/suspicious/noExplicitAny: tree-sitter SyntaxNode is complex
   enclosingNode: any,
   scopeTypes: ReadonlySet<string>,
-  anchorRow: number,
+  anchor: { row: number; column: number },
   depth: "direct" | "deep" = "direct",
 ): Array<{ name: string; range: SourceRange }> {
-  const excludeRanges: Array<{ startRow: number; endRow: number }> = [];
+  const excludeRanges: Array<{
+    startRow: number;
+    startColumn: number;
+    endRow: number;
+    endColumn: number;
+  }> = [];
   if (depth === "direct") {
-    collectInnerScopes(enclosingNode, scopeTypes, anchorRow, excludeRanges);
+    collectInnerScopes(enclosingNode, scopeTypes, anchor, excludeRanges);
   }
 
   const seen = new Set<string>();
   const callees: Array<{ name: string; range: SourceRange }> = [];
 
-  const enclosingStartRow = enclosingNode.startPosition.row + 1;
-  const enclosingEndRow = enclosingNode.endPosition.row + 1;
+  const enclosingStartRow = enclosingNode.startPosition.row;
+  const enclosingEndRow = enclosingNode.endPosition.row;
+  const enclosingStartColumn = enclosingNode.startPosition.column;
+  const enclosingEndColumn = enclosingNode.endPosition.column;
 
   for (const capture of captures) {
-    // Only include captures within the enclosing scope
-    if (capture.range.startLine < enclosingStartRow || capture.range.endLine > enclosingEndRow) {
+    // Only include captures within the enclosing scope, using columns
+    // for same-line containment.
+    const capStartLine = capture.range.startLine - 1;
+    const capEndLine = capture.range.endLine - 1;
+    const capStartChar = capture.range.startCharacter - 1;
+    const capEndChar = capture.range.endCharacter - 1;
+    if (capStartLine < enclosingStartRow || capEndLine > enclosingEndRow) {
+      continue;
+    }
+    if (capStartLine === enclosingStartRow && capStartChar < enclosingStartColumn) {
+      continue;
+    }
+    if (capEndLine === enclosingEndRow && capEndChar > enclosingEndColumn) {
       continue;
     }
 
-    // In direct depth, exclude captures that fall within inner nested function scopes
+    // In direct depth, exclude captures within inner nested function scopes
     if (depth === "direct") {
       const isInInner = excludeRanges.some(
-        (exc) => capture.range.startLine >= exc.startRow && capture.range.endLine <= exc.endRow,
+        (exc) =>
+          (capStartLine > exc.startRow ||
+            (capStartLine === exc.startRow && capStartChar >= exc.startColumn)) &&
+          (capEndLine < exc.endRow || (capEndLine === exc.endRow && capEndChar <= exc.endColumn)),
       );
       if (isInInner) continue;
     }
@@ -343,7 +386,8 @@ function filterCalleeCaptures(
 
 // ── Internal helpers ──────────────────────────────────────────────────
 
-/** Convert a tree-sitter node to a SourceRange. */
+/** Convert a tree-sitter node to a SourceRange using the source text for
+ * UTF-16 column conversion. */
 function nodeToSourceRange(node: {
   startPosition: { row: number; column: number };
   endPosition: { row: number; column: number };
@@ -354,9 +398,4 @@ function nodeToSourceRange(node: {
     endLine: node.endPosition.row + 1,
     endCharacter: node.endPosition.column + 1,
   };
-}
-
-/** Convert 1-based position to tree-sitter 0-based point. */
-function tsPosition(line: number, character: number): { row: number; column: number } {
-  return { row: line - 1, column: character - 1 };
 }

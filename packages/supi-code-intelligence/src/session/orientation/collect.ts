@@ -1,8 +1,8 @@
 // biome-ignore-all lint/style/noExcessiveLinesPerFile: symbol-orientation section builders stay together to preserve one rendering contract
 import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
-
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import { uriToFile } from "@mrclrchtr/supi-core/path";
 import {
   type ReadNextItem,
   readNextEnclosingScope,
@@ -187,9 +187,7 @@ async function appendDefinitionTargets(
     if (!defs || !Array.isArray(defs) || defs.length === 0) return [];
     const lines: string[] = ["**Definition:**"];
     for (const def of defs.slice(0, limit)) {
-      const filePath = def.uri.startsWith("file://")
-        ? decodeURIComponent(def.uri.slice(7))
-        : def.uri;
+      const filePath = uriToFile(def.uri);
       const relPath = path.relative(deps.cwd, filePath);
       lines.push(`- \`${relPath}:${def.range.start.line + 1}:${def.range.start.character + 1}\``);
     }

@@ -40,7 +40,6 @@ export type { SemanticHealthState } from "./session/health-types.ts";
 export type { TargetSymbolKind } from "./session/target-input.ts";
 // Code-intelligence-specific result types.
 export type {
-  BriefDetails,
   CodeIntelResult,
   ContextDetails,
   DisambiguationCandidate,

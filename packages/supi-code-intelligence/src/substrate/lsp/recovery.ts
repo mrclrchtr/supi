@@ -10,6 +10,7 @@ import type {
   ExtensionContext,
   ToolResultEvent,
 } from "@earendil-works/pi-coding-agent";
+import { fileToUri } from "@mrclrchtr/supi-core/path";
 import { clearTsconfigCache } from "@mrclrchtr/supi-lsp/api";
 import type { LspAdapterState } from "./state.ts";
 
@@ -42,7 +43,7 @@ export function registerWorkspaceRecoveryHandler(pi: ExtensionAPI, state: LspAda
         clearTsconfigCache();
       }
 
-      runtime.noteWorkspaceChanges([{ uri: filePathToUri(resolved), type: 2 }]);
+      runtime.noteWorkspaceChanges([{ uri: fileToUri(resolved), type: 2 }]);
     }
   });
 }
@@ -53,11 +54,6 @@ function getFilePathFromToolResult(event: ToolResultEvent): string | null {
   const pathValue = input.path;
   if (typeof pathValue !== "string" || !pathValue) return null;
   return pathValue;
-}
-
-function filePathToUri(filePath: string): string {
-  const normalized = filePath.replace(/\\/g, "/");
-  return `file://${normalized.startsWith("/") ? "" : "/"}${normalized}`;
 }
 
 /** Extract changed file paths from a code_refactor_apply tool result. */

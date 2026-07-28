@@ -1,6 +1,6 @@
 // Directory-local instruction file discovery and rendering for code_orientation.
 
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
 import * as path from "node:path";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 
@@ -34,10 +34,29 @@ export interface InstructionFilesMetadata {
 }
 
 /**
+ * Validate that a configured instruction file name is a plain filename
+ * with no directory components. Rejects names that would allow path traversal.
+ */
+export function isValidInstructionFileName(name: unknown): name is string {
+  if (typeof name !== "string") return false;
+  const trimmed = name.trim();
+  if (trimmed.length === 0 || trimmed !== name) return false;
+  if (trimmed !== path.basename(trimmed)) return false;
+  if (trimmed === "." || trimmed === "..") return false;
+  return true;
+}
+
+/**
  * Find configured instruction files for a directory focus.
  *
  * Walks from cwd to the focused directory (shallowest first, deepest last),
- * selecting the first configured file name that exists in each directory.
+ * selecting the first valid configured file name that exists in each directory.
+ * Each configured name is validated as a plain filename; resolved candidates
+ * are verified via realpath to remain within the workspace root.
+ *
+ * When the project is not trusted, all project-configured instruction files
+ * are rejected so a repository-authored path cannot cause reads outside the
+ * workspace root.
  */
 export function findInstructionFilesForDirectory(options: {
   directory: string;
@@ -45,11 +64,17 @@ export function findInstructionFilesForDirectory(options: {
   fileNames: string[];
   nativeContextPaths: Set<string>;
   surfacedDirectories: Set<string>;
+  /** Whether project-local configuration is trusted. */
+  projectTrusted: boolean;
 }): InstructionFileMatch[] {
   const cwd = path.resolve(options.cwd);
   const directory = path.resolve(options.directory);
-  const fileNames = options.fileNames.filter((name) => name.trim().length > 0);
-  if (fileNames.length === 0) return [];
+
+  const validNames =
+    options.projectTrusted && Array.isArray(options.fileNames)
+      ? options.fileNames.filter(isValidInstructionFileName)
+      : [];
+  if (validNames.length === 0) return [];
   if (!isDirectoryWithinCwd(directory, cwd)) return [];
 
   const dirs = collectDirsShallowestFirst(directory, cwd);
@@ -57,7 +82,7 @@ export function findInstructionFilesForDirectory(options: {
 
   for (const dir of dirs) {
     if (options.surfacedDirectories.has(dir)) continue;
-    const match = findFirstInstructionFile(dir, cwd, fileNames);
+    const match = findFirstInstructionFile(dir, cwd, validNames);
     if (!match) continue;
     if (options.nativeContextPaths.has(match.absolutePath)) continue;
     matches.push(match);
@@ -68,7 +93,9 @@ export function findInstructionFilesForDirectory(options: {
 
 function isDirectoryWithinCwd(directory: string, cwd: string): boolean {
   try {
-    return statSync(directory).isDirectory() && isWithinOrEqual(cwd, directory);
+    const realCwd = path.resolve(realpathSync(cwd));
+    const realDirectory = path.resolve(realpathSync(directory));
+    return statSync(realDirectory).isDirectory() && isWithinOrEqual(realCwd, realDirectory);
   } catch {
     return false;
   }
@@ -96,9 +123,30 @@ function findFirstInstructionFile(
 ): InstructionFileMatch | null {
   for (const fileName of fileNames) {
     const candidate = path.join(dir, fileName);
-    if (!isFile(candidate)) continue;
+
+    // Resolve the candidate to its real path to defuse symlinks that
+    // may point outside the workspace.
+    let realCandidate: string;
+    try {
+      realCandidate = path.resolve(realpathSync(candidate));
+    } catch {
+      continue;
+    }
+    if (!isFile(realCandidate)) continue;
+
+    // Verify containment: both the workspace root and the candidate must
+    // be resolved consistently so symlinks in temp directories (e.g. macOS
+    // /var → /private/var) don't break containment.
+    let realCwd: string;
+    try {
+      realCwd = path.resolve(realpathSync(cwd));
+    } catch {
+      continue;
+    }
+    if (!isWithinOrEqual(realCwd, realCandidate)) continue;
+
     return {
-      absolutePath: candidate,
+      absolutePath: realCandidate,
       relativePath: path.relative(cwd, candidate),
       directory: dir,
       relativeDirectory: path.relative(cwd, dir) || ".",

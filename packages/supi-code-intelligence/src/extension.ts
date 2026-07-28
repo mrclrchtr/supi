@@ -91,6 +91,7 @@ export default function codeIntelligenceExtension(
     if (!session) return;
     session.attachLspController(lspState.controller);
     session.seedSentinelSnapshot(lspState.sentinelSnapshot);
+    session.setProjectTrusted(ctx.isProjectTrusted());
   });
 
   // ── Tool registration ─────────────────────────────────────────────

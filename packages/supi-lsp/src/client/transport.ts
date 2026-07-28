@@ -90,26 +90,29 @@ export class JsonRpcClient {
     const timeoutMs = options?.timeoutMs ?? this.timeoutMs;
     const tokenSource = new CancellationTokenSource();
 
-    const timer = setTimeout(() => tokenSource.cancel(), timeoutMs);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const timeoutError = new Error(`Request ${method} timed out after ${timeoutMs}ms`);
 
     const request = this.connection.sendRequest(method, params, tokenSource.token);
     // Catch the raw request promise to prevent unhandled rejections when
-    // dispose() cancels the token without a preceding timeout (the raced
-    // promise below covers the timeout-then-dispose path separately).
+    // dispose() cancels the token without a preceding timeout.
     request.catch(() => {});
 
-    // Race the request against a timeout so callers don't hang forever.
-    // The CancellationToken is also passed to sendRequest so the connection
-    // can short-circuit writes and cleanup when the token fires.
+    // Race the request against a single shared timeout that both cancels
+    // the JSON-RPC token and rejects the caller. Using one timer avoids
+    // a leak where the rejecting timer in a second Promise stays alive
+    // after a successful response.
     const promise = Promise.race([
       request,
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error(`Request ${method} timed out after ${timeoutMs}ms`)),
-          timeoutMs,
-        ),
-      ),
-    ]).finally(() => clearTimeout(timer));
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => {
+          tokenSource.cancel();
+          reject(timeoutError);
+        }, timeoutMs);
+      }),
+    ]).finally(() => {
+      if (timeout !== undefined) clearTimeout(timeout);
+    });
 
     // Prevent unhandled rejection when dispose() cancels requests
     promise.catch(() => {});

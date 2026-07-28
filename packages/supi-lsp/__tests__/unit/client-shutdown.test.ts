@@ -65,4 +65,23 @@ describe("LspClient shutdown", () => {
     ]);
     expect(client.status).toBe("shutdown");
   });
+
+  it("clears protocol timeout timers after a successful shutdown", async () => {
+    vi.useFakeTimers();
+    try {
+      const client = createRunningClient();
+      (client as AnyClient).rpc = {
+        sendRequest: vi.fn(async () => null),
+        sendNotification: vi.fn(async () => {}),
+        dispose: vi.fn(),
+      };
+      (client as AnyClient).process = createExitedProcess();
+
+      await client.shutdown();
+
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

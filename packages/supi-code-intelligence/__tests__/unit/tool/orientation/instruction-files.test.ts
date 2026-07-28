@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { createPiMock, getHandlerOrThrow, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
@@ -31,6 +31,7 @@ function writeFile(relPath: string, content: string): void {
 async function orientDirectory(
   pi: ReturnType<typeof createPiMock>,
   focus: string,
+  options: { projectTrusted?: boolean } = {},
 ): Promise<{ text: string; details?: { data?: Record<string, unknown> } }> {
   const tool = getTool(pi, "code_orientation");
   const result = (await tool.execute(
@@ -38,7 +39,10 @@ async function orientDirectory(
     { focus: { path: focus } },
     undefined,
     undefined,
-    makeCtx({ cwd: tmpDir }),
+    makeCtx({
+      cwd: tmpDir,
+      isProjectTrusted: () => options.projectTrusted ?? true,
+    }),
   )) as { content: Array<{ text: string }>; details?: { data?: Record<string, unknown> } };
   return { text: result.content[0]?.text ?? "", details: result.details };
 }
@@ -125,6 +129,111 @@ describe("code_orientation instruction files", () => {
     expect(result.text).toContain("### packages/foo/RULES.md");
     expect(result.text).toContain("# Rules");
     expect(result.text).not.toContain("# Claude");
+  });
+
+  it("rejects configured instruction names with directory components", async () => {
+    writeJson(".pi/supi/config.json", {
+      "code-intelligence": { instructionFileNames: ["../RULES.md"] },
+    });
+    writeFile("packages/RULES.md", "# Parent rules\n");
+    writeJson("packages/foo/package.json", { name: "foo" });
+    writeFile("packages/foo/src/index.ts", "export const foo = 1;\n");
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const result = await orientDirectory(pi, "packages/foo");
+    expect(result.text).not.toContain("## Instructions");
+    expect(result.text).not.toContain("Parent rules");
+  });
+
+  it("ignores non-string configured instruction names", async () => {
+    writeJson(".pi/supi/config.json", {
+      "code-intelligence": { instructionFileNames: [null, 42, "CLAUDE.md"] },
+    });
+    writeJson("packages/foo/package.json", { name: "foo" });
+    writeFile("packages/foo/src/index.ts", "export const foo = 1;\n");
+    writeFile("packages/foo/CLAUDE.md", "# Valid rules\n");
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const result = await orientDirectory(pi, "packages/foo");
+    expect(result.text).toContain("Valid rules");
+  });
+
+  it("rejects instruction symlinks whose real path leaves the workspace", async () => {
+    const externalDir = mkdtempSync(path.join(os.tmpdir(), "external-instructions-"));
+    const externalFile = path.join(externalDir, "CLAUDE.md");
+    writeFileSync(externalFile, "# External secret\n");
+    writeJson("packages/foo/package.json", { name: "foo" });
+    writeFile("packages/foo/src/index.ts", "export const foo = 1;\n");
+    symlinkSync(externalFile, path.join(tmpDir, "packages/foo/CLAUDE.md"));
+
+    try {
+      const pi = createPiMock();
+      codeIntelligenceExtension(pi as never);
+
+      const result = await orientDirectory(pi, "packages/foo");
+      expect(result.text).not.toContain("## Instructions");
+      expect(result.text).not.toContain("External secret");
+    } finally {
+      rmSync(externalDir, { recursive: true, force: true });
+    }
+  });
+
+  it("accepts instruction symlinks whose real path remains in the workspace", async () => {
+    writeFile("shared/CLAUDE.md", "# Shared workspace rules\n");
+    writeJson("packages/foo/package.json", { name: "foo" });
+    writeFile("packages/foo/src/index.ts", "export const foo = 1;\n");
+    symlinkSync(path.join(tmpDir, "shared/CLAUDE.md"), path.join(tmpDir, "packages/foo/CLAUDE.md"));
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const result = await orientDirectory(pi, "packages/foo");
+    expect(result.text).toContain("### packages/foo/CLAUDE.md");
+    expect(result.text).toContain("Shared workspace rules");
+  });
+
+  it("rejects focused directory symlinks whose real path leaves the workspace", async () => {
+    const externalDir = mkdtempSync(path.join(os.tmpdir(), "external-focus-"));
+    writeFile("shared/CLAUDE.md", "# Bounced workspace rules\n");
+    symlinkSync(path.join(tmpDir, "shared/CLAUDE.md"), path.join(externalDir, "CLAUDE.md"));
+    mkdirSync(path.join(tmpDir, "packages"), { recursive: true });
+    symlinkSync(externalDir, path.join(tmpDir, "packages/external"), "dir");
+
+    try {
+      const pi = createPiMock();
+      codeIntelligenceExtension(pi as never);
+
+      const result = await orientDirectory(pi, "packages/external");
+      expect(result.text).not.toContain("## Instructions");
+      expect(result.text).not.toContain("Bounced workspace rules");
+    } finally {
+      rmSync(externalDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not discover project instruction files before trust is granted", async () => {
+    writeJson("packages/foo/package.json", { name: "foo" });
+    writeFile("packages/foo/src/index.ts", "export const foo = 1;\n");
+    writeFile("packages/foo/CLAUDE.md", "# Untrusted project instructions\n");
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const untrusted = await orientDirectory(pi, "packages/foo", { projectTrusted: false });
+    expect(untrusted.text).not.toContain("## Instructions");
+    expect(untrusted.text).not.toContain("Untrusted project instructions");
+
+    const trusted = await orientDirectory(pi, "packages/foo", { projectTrusted: true });
+    expect(trusted.text).toContain("## Instructions");
+    expect(trusted.text).toContain("Untrusted project instructions");
+
+    await pi.emit("session_compact", {}, makeCtx({ cwd: tmpDir }));
+    const untrustedAgain = await orientDirectory(pi, "packages/foo", { projectTrusted: false });
+    expect(untrustedAgain.text).not.toContain("## Instructions");
   });
 });
 

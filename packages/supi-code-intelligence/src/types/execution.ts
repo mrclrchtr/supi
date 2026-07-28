@@ -1,7 +1,6 @@
 import type { AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
 import type { WorkspaceCodeIntelligenceSession } from "../session/session.ts";
 import type {
-  BriefDetails,
   ContextDetails,
   HealthDetails,
   InspectDetails,
@@ -44,7 +43,6 @@ export interface CodeIntelToolExecCtx {
 export interface CodeIntelResult {
   content: string;
   details?:
-    | { type: "brief"; data: BriefDetails }
     | { type: "context"; data: ContextDetails }
     | { type: "inspect"; data: InspectDetails }
     | { type: "search"; data: SearchDetails }

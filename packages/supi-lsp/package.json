@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-lsp",
   "version": "3.2.0",
-  "description": "SuPi LSP extension — Language Server Protocol integration for pi",
+  "description": "SuPi LSP runtime — Language Server Protocol integration library for pi",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -18,7 +18,6 @@
   "keywords": [
     "pi",
     "pi-coding-agent",
-    "pi-extension",
     "lsp",
     "language-server",
     "go-to-definition",
