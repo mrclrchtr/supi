@@ -2,11 +2,7 @@
 // biome-ignore-all lint/style/noExcessiveLinesPerFile: LspManager stays cohesive; recovery and sync helpers are split into manager-*.ts modules.
 import * as fs from "node:fs";
 import * as path from "node:path";
-import {
-  type CodeQueryResult,
-  mapCodeQueryResult,
-  unavailableCodeQuery,
-} from "@mrclrchtr/supi-code-runtime/api";
+import { type CodeQueryResult, unavailableCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import * as projectRoots from "@mrclrchtr/supi-core/project";
 import { LspClient } from "../client/client.ts";
 import { getServerForFile } from "../config/config.ts";
@@ -41,8 +37,7 @@ import {
 } from "./manager-client-state.ts";
 import {
   collectOutstandingDiagnosticsDetailed,
-  mapCascadeDiagnosticsToFiles,
-  syncClientFileAndGetCascadingDiagnostics,
+  syncClientFileAndGetDiagnostics,
 } from "./manager-diagnostics.ts";
 import {
   clientKey,
@@ -397,33 +392,14 @@ export class LspManager {
     maxSeverity: number = 1,
   ): Promise<CodeQueryResult<Diagnostic[]>> {
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
-    const result = await this.syncFileAndGetCascadingDiagnostics(resolvedPath, maxSeverity);
-    return mapCodeQueryResult(
-      result,
-      (entries) => entries.find((entry) => entry.file === resolvedPath)?.diagnostics ?? [],
-    );
-  }
-  async syncFileAndGetCascadingDiagnostics(
-    filePath: string,
-    maxSeverity: number = 1,
-  ): Promise<CodeQueryResult<Array<{ file: string; diagnostics: Diagnostic[] }>>> {
-    const resolvedPath = resolveSessionPath(this.cwd, filePath);
     const client = await this.getClientForFile(resolvedPath);
     if (!client) {
       return unavailableCodeQuery(`No LSP client can collect diagnostics for ${resolvedPath}.`);
     }
     try {
-      const { primary, cascade } = await syncClientFileAndGetCascadingDiagnostics(
-        client,
-        resolvedPath,
-        maxSeverity,
-      );
       return {
         kind: "completed",
-        data: [
-          ...(primary.length > 0 ? [{ file: resolvedPath, diagnostics: primary }] : []),
-          ...mapCascadeDiagnosticsToFiles(cascade),
-        ],
+        data: await syncClientFileAndGetDiagnostics(client, resolvedPath, maxSeverity),
       };
     } catch (error) {
       this.closeFile(resolvedPath);

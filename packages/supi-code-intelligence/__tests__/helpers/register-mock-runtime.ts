@@ -138,7 +138,6 @@ function createReadyTestLspRuntime(cwd: string): WorkspaceLspRuntime {
     documentSymbols: async () => completedCodeQuery([]),
     workspaceSymbol: async () => completedCodeQuery([]),
     fileDiagnostics: async () => completedCodeQuery([]),
-    fileDiagnosticsWithCascade: async () => completedCodeQuery([]),
     waitUntilReadyForFile: async () => ({ kind: "ready" }),
     waitUntilReadyForWorkspace: async () => ({ kind: "ready" }),
     getProjectServers: () => [

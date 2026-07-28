@@ -67,7 +67,6 @@ During shutdown, `vscode-jsonrpc` may emit `Cannot call write after a stream was
 - Pull diagnostics are preferred when `diagnosticProvider` exists; otherwise wait for push diagnostics.
 - Clear pull `resultId` state after file creation so cross-file diagnostics recompute.
 - `didClose`, prune, refresh deletion, and shutdown must release pending waiters.
-- Inline diagnostics may include `relatedDocuments` cascade updates and severity-1 hover/code-action augmentation.
 
 ## Configuration
 
@@ -95,7 +94,7 @@ Focused commands:
 pnpm exec vitest run packages/supi-lsp/__tests__/unit/runtime-registry.test.ts
 pnpm exec vitest run packages/supi-lsp/__tests__/unit/runtime-controller.test.ts
 pnpm exec vitest run packages/supi-lsp/__tests__/unit/client-refresh.test.ts packages/supi-lsp/__tests__/unit/client-pull-diagnostics.test.ts packages/supi-lsp/__tests__/unit/transport.test.ts
-pnpm exec vitest run packages/supi-lsp/__tests__/unit/diagnostic-cascade.test.ts packages/supi-lsp/__tests__/unit/suppression-diagnostics.test.ts packages/supi-lsp/__tests__/unit/stale-diagnostics.test.ts
+pnpm exec vitest run packages/supi-lsp/__tests__/unit/diagnostic-sync.test.ts packages/supi-lsp/__tests__/unit/suppression-diagnostics.test.ts packages/supi-lsp/__tests__/unit/stale-diagnostics.test.ts
 pnpm exec vitest run packages/supi-lsp/__tests__/integration/*.integration.*.test.ts
 ```
 

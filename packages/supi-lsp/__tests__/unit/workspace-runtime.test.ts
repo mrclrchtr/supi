@@ -179,10 +179,8 @@ describe("workspace runtime behavior", () => {
     });
   });
 
-  it("returns diagnostics and cascades for normalized files", async () => {
+  it("returns diagnostics for normalized files", async () => {
     const syncPaths: Array<{ filePath: string; maxSeverity: number }> = [];
-    const cascadePaths: Array<{ filePath: string; maxSeverity: number }> = [];
-    const cascade = [{ file: "src/consumer.ts", diagnostics: [diagnostic] }];
     const runtime = createRuntime(
       makeManager({
         canServeFile: () => true,
@@ -190,21 +188,13 @@ describe("workspace runtime behavior", () => {
           syncPaths.push({ filePath, maxSeverity });
           return completedCodeQuery([diagnostic]);
         },
-        syncFileAndGetCascadingDiagnostics: async (filePath: string, maxSeverity: number) => {
-          cascadePaths.push({ filePath, maxSeverity });
-          return completedCodeQuery(cascade);
-        },
       }),
     );
 
     await expect(runtime.fileDiagnostics("@src/index.ts", 2)).resolves.toEqual(
       completedCodeQuery([diagnostic]),
     );
-    await expect(runtime.fileDiagnosticsWithCascade("@src/index.ts", 4)).resolves.toEqual(
-      completedCodeQuery(cascade),
-    );
     expect(syncPaths).toEqual([{ filePath: "/project/src/index.ts", maxSeverity: 2 }]);
-    expect(cascadePaths).toEqual([{ filePath: "/project/src/index.ts", maxSeverity: 4 }]);
   });
 
   it("publishes diagnostic summaries and recovery facts", async () => {

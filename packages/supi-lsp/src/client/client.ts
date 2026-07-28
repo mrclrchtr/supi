@@ -399,11 +399,6 @@ export class LspClient {
     return result;
   }
 
-  /** Get the internal cache entry for a file (exposed for testing / version checks). */
-  getDiagnosticCacheEntry(uri: string): DiagnosticCacheEntry | undefined {
-    return this.diagnosticStore.get(uri);
-  }
-
   /**
    * Clear all pull-diagnostic result IDs, forcing full (not `unchanged`)
    * pull diagnostic responses on the next refresh cycle.
@@ -416,11 +411,6 @@ export class LspClient {
     for (const entry of this.diagnosticStore.values()) {
       delete entry.resultId;
     }
-  }
-
-  /** Get all currently open document URIs. */
-  get openUris(): string[] {
-    return Array.from(this.openDocs.keys());
   }
 
   /** Check if server supports pull diagnostics. */

@@ -113,10 +113,6 @@ export interface WorkspaceLspRuntime {
   pruneMissingFiles(): readonly string[];
   noteWorkspaceChanges(changes: FileEvent[]): void;
   fileDiagnostics(filePath: string, maxSeverity?: number): Promise<CodeQueryResult<Diagnostic[]>>;
-  fileDiagnosticsWithCascade(
-    filePath: string,
-    maxSeverity?: number,
-  ): Promise<CodeQueryResult<Array<{ file: string; diagnostics: Diagnostic[] }>>>;
   refreshOpenDiagnostics(options?: { maxWaitMs?: number; quietMs?: number }): Promise<void>;
   getWorkspaceDiagnosticSummary(): WorkspaceDiagnosticSummaryEntry[];
   getOutstandingDiagnostics(
@@ -320,17 +316,6 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       return unavailableFileQuery("diagnostics", resolvedPath);
     }
     return this.manager.syncFileAndGetDiagnostics(resolvedPath, maxSeverity);
-  }
-
-  /** Sync a file and include diagnostics cascading into other tracked files. */
-  async fileDiagnosticsWithCascade(
-    filePath: string,
-    maxSeverity: number = 4,
-  ): Promise<CodeQueryResult<Array<{ file: string; diagnostics: Diagnostic[] }>>> {
-    return this.manager.syncFileAndGetCascadingDiagnostics(
-      this.resolveFilePath(filePath),
-      maxSeverity,
-    );
   }
 
   /** Re-sync every open document and wait for diagnostics to settle. */
