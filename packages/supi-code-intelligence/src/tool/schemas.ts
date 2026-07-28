@@ -244,7 +244,7 @@ export const CodeHealthParameters = Type.Object(
     ),
     include: Type.Optional(
       Type.Array(
-        StringEnum(["diagnostics", "servers", "dirty"], {
+        StringEnum(["diagnostics", "servers"], {
           description: "Live health signals to include.",
         }),
         { description: "Requested health-signal sections.", uniqueItems: true },

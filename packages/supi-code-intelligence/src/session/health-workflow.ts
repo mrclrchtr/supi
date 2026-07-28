@@ -12,7 +12,7 @@ import {
 } from "../analysis/capability/capability-warnings.ts";
 import { collectDiagnostics, isScopedFile } from "../analysis/health/diagnostics.ts";
 import { describeStructuralState, maybeRecover } from "../analysis/health/recovery.ts";
-import { collectGitContext, collectServers } from "../analysis/health/signals.ts";
+import { collectServers } from "../analysis/health/signals.ts";
 import { resolveScope } from "../analysis/search/paths.ts";
 import { refreshLspMaintenance } from "../substrate/lsp/maintenance.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
@@ -116,7 +116,6 @@ export async function runHealthWorkflow(
     deps.cwd,
   );
   const servers = collectServers(runtime, included);
-  const gitContext = collectGitContext(included, deps.cwd);
   const capabilityWarnings = collectCapabilityWarnings(semanticRequested, deps);
   const diagnosticAgeSeconds = getDiagnosticAgeSeconds(
     included,
@@ -133,7 +132,6 @@ export async function runHealthWorkflow(
     structuralStatus: describeStructuralState(capabilityStates.structural),
     diagnostics,
     servers,
-    gitContext,
     scopeFilter: request.scope ? scopeFilter : null,
     level,
     capabilityWarnings: capabilityWarnings?.hasWarnings ? capabilityWarnings : undefined,

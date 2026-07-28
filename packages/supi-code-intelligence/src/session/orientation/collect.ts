@@ -56,7 +56,6 @@ async function executeOrientationContext(
     cwd: deps.cwd,
     focus: input.focus,
     maxResults: input.maxResults ?? 10,
-    showGitContext: input.showGitContext ?? true,
     lspRuntime: deps.lspRuntime,
   });
 }

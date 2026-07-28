@@ -1,12 +1,10 @@
 /**
  * Tests for the code_health tool (Phase 1.5).
  *
- * Covers diagnostic summary, server status, dirty workspace, code action
- * suggestions (detailed mode), and the health renderer.
+ * Covers diagnostic summary, server status, and the health renderer.
  */
 
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
@@ -201,77 +199,6 @@ describe("code_health tool", () => {
     // Servers section may be empty when no real LSP is running,
     // but the tool should not error
     expect(result.content[0].text).not.toContain("**Error");
-  });
-
-  it("includes dirty workspace section when include contains dirty", async () => {
-    registerMockProvider(tmpDir);
-
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_health");
-
-    const result = (await tool.execute(
-      "test-5",
-      { include: ["dirty"] },
-      undefined,
-      undefined,
-      makeCtx({ cwd: tmpDir }),
-    )) as {
-      content: Array<{ type: string; text: string }>;
-    };
-
-    // Dirty section may be empty when temp dir is not a git repo,
-    // but the tool should not error
-    expect(result.content[0].text).not.toContain("**Error");
-  });
-
-  it("renders modified dirty paths without dropping the first character", async () => {
-    execFileSync("git", ["init"], { cwd: tmpDir, stdio: "ignore" });
-    execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: tmpDir });
-    execFileSync("git", ["config", "user.name", "Test User"], { cwd: tmpDir });
-    writeFileSync(path.join(tmpDir, "CONTEXT.md"), "# Context\n");
-    execFileSync("git", ["add", "CONTEXT.md"], { cwd: tmpDir });
-    execFileSync("git", ["commit", "--no-gpg-sign", "-m", "initial"], {
-      cwd: tmpDir,
-      stdio: "ignore",
-    });
-    writeFileSync(path.join(tmpDir, "CONTEXT.md"), "# Context\n\nUpdated\n");
-
-    registerMockProvider(tmpDir);
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_health");
-
-    const result = (await tool.execute(
-      "test-dirty-path",
-      { include: ["dirty"] },
-      undefined,
-      undefined,
-      makeCtx({ cwd: tmpDir }),
-    )) as {
-      content: Array<{ type: string; text: string }>;
-      details?: {
-        type: "health";
-        data: {
-          evidenceLists?: Array<{
-            key: string;
-            totalCount: number | null;
-            shownCount: number;
-            omittedCount: number | null;
-          }>;
-        };
-      };
-    };
-
-    expect(result.content[0].text).toContain("- `CONTEXT.md`");
-    expect(result.content[0].text).not.toContain("- `ONTEXT.md`");
-    expect(result.details?.data.evidenceLists).toContainEqual({
-      key: "health.dirtyFiles",
-      totalCount: 1,
-      shownCount: 1,
-      omittedCount: 0,
-      partialReason: null,
-    });
   });
 
   it("defaults to diagnostics + servers when include is omitted", async () => {
@@ -583,23 +510,5 @@ describe("code_health tool", () => {
     expect(result.content[0].text).toContain("### Capability Warnings");
     expect(result.details?.data.capabilityWarnings?.hasWarnings).toBe(true);
     expect(result.details?.data.capabilityWarnings?.warnings.length).toBeGreaterThan(0);
-  });
-
-  it("omits Capability Warnings when neither diagnostics nor servers is requested", async () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const result = (await getTool(pi, "code_health").execute(
-      "dirty-without-capability-warnings",
-      { include: ["dirty"] },
-      undefined,
-      undefined,
-      makeCtx({ cwd: tmpDir }),
-    )) as {
-      content: Array<{ type: string; text: string }>;
-      details?: { type: "health"; data: { capabilityWarnings: unknown } };
-    };
-
-    expect(result.content[0].text).not.toContain("Capability Warnings");
-    expect(result.details?.data.capabilityWarnings).toBeNull();
   });
 });

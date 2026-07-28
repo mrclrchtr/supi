@@ -1,7 +1,6 @@
 import type { CapabilityWarningReport } from "../analysis/capability/capability-warnings.ts";
-import type { GitContext } from "../analysis/signals/git.ts";
 
-export type HealthSection = "diagnostics" | "servers" | "dirty";
+export type HealthSection = "diagnostics" | "servers";
 
 /** Final semantic-diagnostics readiness after routing and requested recovery. */
 export type SemanticHealthState =
@@ -45,7 +44,6 @@ export interface HealthData {
   readonly structuralStatus?: string;
   readonly diagnostics: readonly HealthDiagnosticEntry[];
   readonly servers: readonly HealthServerInfo[];
-  readonly gitContext: GitContext | null;
   readonly scopeFilter: string | null;
   readonly level: "summary" | "detailed";
   readonly capabilityWarnings?: CapabilityWarningReport;

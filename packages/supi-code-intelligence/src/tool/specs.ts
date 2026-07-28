@@ -28,7 +28,7 @@ import {
 } from "./schemas.ts";
 
 /** Substrate families that power a tool's implementation. */
-export type ToolSubstrate = "semantic" | "structural" | "search" | "git" | "diagnostics";
+export type ToolSubstrate = "semantic" | "structural" | "search" | "diagnostics";
 
 /** Canonical registration spec for one public code-intelligence tool. */
 export interface CodeIntelligenceToolDefinitionSpec {
@@ -113,9 +113,9 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     label: "Code Health",
     parameters: CodeHealthParameters,
     run: (params, ctx) => executeHealthTool(params as Parameters<typeof executeHealthTool>[0], ctx),
-    purpose: "Report live diagnostic, runtime, and Git health observations.",
+    purpose: "Report live diagnostic, runtime, and structural health observations.",
     schemaDocs: "Optional scope, refresh, include, and level; diagnostics and servers are default.",
-    substrates: ["semantic", "structural", "git", "diagnostics"],
+    substrates: ["semantic", "structural", "diagnostics"],
     nonGoals: [
       "Does not run tests or verification commands.",
       "Does not load precomputed coverage or unused-code reports.",
@@ -140,7 +140,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
       executeRefactorApplyTool(params as Parameters<typeof executeRefactorApplyTool>[0], ctx),
     purpose: "Apply one stored, fingerprint-checked refactor plan.",
     schemaDocs: "Requires the planId returned by code_refactor_plan.",
-    substrates: ["git"],
+    substrates: ["structural"],
     nonGoals: ["Does not compose plans.", "Does not bypass freshness checks."],
   },
 ] as const satisfies readonly CodeIntelligenceToolDefinitionSpec[];

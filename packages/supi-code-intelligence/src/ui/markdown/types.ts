@@ -66,8 +66,6 @@ export interface OrientationInput {
   /** Resolved orientation focus path for project/module/directory/file orientation. */
   focus?: string;
   maxResults?: number;
-  /** Show git context in orientation output. Defaults to true. */
-  showGitContext?: boolean;
 }
 
 export interface OrientationDeps {

@@ -15,14 +15,13 @@ import {
 import { listSourceFiles, summarizeDirectoryRecursively } from "../../analysis/brief/summarize.ts";
 import type { CodeProvider } from "../../analysis/provider.ts";
 import type { OrientationBlock, OrientationResultData } from "../orientation-types.ts";
-import { collectGitContextBlocks, collectPrioritySignalBlocks } from "./context-signals.ts";
+import { collectPrioritySignalBlocks } from "./context-signals.ts";
 
 interface ContextFactsInput {
   readonly model: ArchitectureModel | null;
   readonly cwd: string;
   readonly focus?: string;
   readonly maxResults: number;
-  readonly showGitContext: boolean;
   readonly provider: CodeProvider | null;
   readonly lspRuntime: WorkspaceLspRuntimeState;
 }
@@ -53,7 +52,6 @@ function collectProjectFacts(input: ContextFactsInput): OrientationResultData {
       summarizeDirectoryRecursively(model.root).allFiles,
       input.lspRuntime,
     ),
-    ...collectGitContextBlocks(model.root, input.showGitContext),
   );
 
   if (model.modules.length === 0) {
@@ -162,7 +160,6 @@ async function collectDirectoryFacts(input: ContextFactsInput): Promise<Orientat
       summarizeDirectoryRecursively(input.focus as string).allFiles,
       input.lspRuntime,
     ),
-    ...collectGitContextBlocks(model.root, input.showGitContext),
   );
 
   return resultData({
@@ -299,10 +296,7 @@ async function collectFileFacts(input: ContextFactsInput): Promise<OrientationRe
     blocks.push(paragraph(`_Module: ${shortName(module)} (\`${module.relativePath}\`)_`), blank());
   blocks.push(listItem(`Lines: ${lines}`));
   appendFileEnrichment(blocks, enrichment);
-  blocks.push(
-    ...collectPrioritySignalBlocks(model.root, [focus], input.lspRuntime),
-    ...collectGitContextBlocks(model.root, input.showGitContext),
-  );
+  blocks.push(...collectPrioritySignalBlocks(model.root, [focus], input.lspRuntime));
   return resultData({
     blocks,
     confidence: "structural",

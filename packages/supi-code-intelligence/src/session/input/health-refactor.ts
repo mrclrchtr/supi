@@ -20,7 +20,7 @@ import {
   valid,
 } from "./common.ts";
 
-const HEALTH_SECTIONS = new Set<HealthSection>(["diagnostics", "servers", "dirty"]);
+const HEALTH_SECTIONS = new Set<HealthSection>(["diagnostics", "servers"]);
 
 export function parseHealthWorkflowInput(value: unknown): InputValidation<HealthWorkflowInput> {
   const record = requireRecord(value, "code_health input");

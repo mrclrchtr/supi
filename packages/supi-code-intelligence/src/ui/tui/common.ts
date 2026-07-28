@@ -26,7 +26,6 @@ export const EVIDENCE_KEY_LABELS: Record<string, string> = {
   "exports.symbols": "exports",
   "find.astMatches": "AST matches",
   "find.semanticSymbols": "symbols",
-  "health.dirtyFiles": "dirty files",
   "implements.locations": "implementations",
   "imports.modules": "imports",
   "references.locations": "references",

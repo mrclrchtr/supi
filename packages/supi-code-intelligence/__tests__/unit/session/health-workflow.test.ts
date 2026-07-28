@@ -116,22 +116,4 @@ describe("semantic health state", () => {
 
     expect(outcome).toMatchObject({ kind: "completed", data: { semanticState: expected } });
   });
-
-  it("does not claim a semantic state when no semantic section was requested", async () => {
-    const outcome = await runHealthWorkflow(
-      { include: ["dirty"] },
-      {
-        cwd,
-        capability: capability(readyRuntime([{ status: "running", ready: true }]), {
-          kind: "ready",
-        }),
-        lspController: { getMissingServers: () => [] } as never,
-        lastRefresh: undefined,
-        trackRefresh: () => undefined,
-        sentinelSnapshot: new Map(),
-      },
-    );
-
-    expect(outcome).toMatchObject({ kind: "completed", data: { semanticState: null } });
-  });
 });

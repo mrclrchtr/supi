@@ -1,5 +1,4 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
-import { createEvidenceList, type EvidenceListMetadata } from "../../analysis/evidence.ts";
 import type { HealthData, HealthSection } from "../../session/health-types.ts";
 import {
   assembleToolResult,
@@ -27,7 +26,6 @@ export interface HealthResultAssembly {
 const SECTION_TITLES: Record<HealthSection, string> = {
   diagnostics: "Diagnostics",
   servers: "Servers",
-  dirty: "Dirty",
 };
 
 /** Assemble public code_health evidence and details before presentation adapters render it. */
@@ -35,7 +33,7 @@ export function assembleHealthResult(data: HealthData): HealthResultAssembly {
   const projections = data.includedSections.map((section) => projectSection(section, data));
   const sections = projections.map((projection) => projection.section);
   const sectionDetails = projections.map((projection) => projection.details);
-  const evidenceLists = collectHealthEvidenceLists(data);
+  const evidenceLists: never[] = [];
   const provenance = uniqueProvenance([
     ...sections.flatMap((section) => section.provenance),
     { source: "runtime", capability: "workspace-health" },
@@ -68,7 +66,6 @@ export function assembleHealthResult(data: HealthData): HealthResultAssembly {
       capabilityWarnings: data.capabilityWarnings ?? null,
       diagnosticFileCount: data.diagnostics.length,
       serverCount: data.servers.length,
-      dirtyFileCount: data.gitContext?.dirtyFiles.length ?? null,
       evidenceLists: [...assembled.evidenceLists],
     },
   };
@@ -129,13 +126,6 @@ function collectSectionFacts(key: HealthSection, data: HealthData): HealthSectio
           ? [{ source: "runtime", capability: "language-server-status" }]
           : [],
       };
-    case "dirty":
-      return {
-        available: data.gitContext !== null,
-        items: data.gitContext?.dirtyFiles ?? [],
-        confidence: "heuristic",
-        provenance: data.gitContext ? [{ source: "git" }] : [],
-      };
   }
 }
 
@@ -164,21 +154,6 @@ function healthConfidence(
     return "heuristic";
   }
   return "unavailable";
-}
-
-function collectHealthEvidenceLists(data: HealthData): EvidenceListMetadata[] {
-  const dirtyFiles =
-    data.includedSections.includes("dirty") && data.gitContext !== null
-      ? [
-          createEvidenceList({
-            key: "health.dirtyFiles",
-            items: [...data.gitContext.dirtyFiles],
-            maxResults: 5,
-          }).metadata,
-        ]
-      : [];
-
-  return dirtyFiles;
 }
 
 function uniqueProvenance(provenance: readonly ResultProvenance[]): ResultProvenance[] {

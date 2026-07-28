@@ -12,7 +12,6 @@ import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { BriefDetails } from "../../types/index.ts";
 import type { ArchitectureModel } from "../architecture/model.ts";
 import { findModuleForPath } from "../architecture/model.ts";
-import { formatGitContext, gatherGitContext } from "../signals/git.ts";
 import {
   appendPrioritySignalsSection,
   summarizePrioritySignalsForFiles,
@@ -95,14 +94,6 @@ async function generateDirectoryFocused(
   );
   appendPrioritySignalsSection(lines, prioritySignals);
 
-  // Git context
-  if (opts?.showGitContext !== false) {
-    const gitCtx = gatherGitContext(model.root);
-    if (gitCtx) {
-      lines.push(formatGitContext(gitCtx));
-    }
-  }
-
   lines.push("");
 
   return {
@@ -147,14 +138,6 @@ async function generateFileFocused(
   const extraLines: string[] = [];
   if (prioritySignals) {
     appendPrioritySignalsSection(extraLines, prioritySignals);
-  }
-
-  // Git context
-  if (opts?.showGitContext !== false) {
-    const gitCtx = gatherGitContext(model.root);
-    if (gitCtx) {
-      extraLines.push(formatGitContext(gitCtx));
-    }
   }
 
   const extraStr = extraLines.filter((l) => l.trim()).join("\n");

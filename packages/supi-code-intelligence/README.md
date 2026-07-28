@@ -58,7 +58,7 @@ The extension registers exactly eight `code_*` tools:
 - `code_orientation` — orient around a workspace, module, directory, file, or resolved symbol
 - `code_graph` — collect references, structural callees, and implementations
 - `code_find` — explicit AST structural or semantic workspace-symbol search
-- `code_health` — report live diagnostics, server status, dirty files, and supplemental Capability Warnings
+- `code_health` — report live diagnostics, server status, and supplemental Capability Warnings
 - `code_refactor_plan` — preview a precise semantic refactor without mutation
 - `code_refactor_apply` — apply a stored plan after freshness checks
 
@@ -170,11 +170,10 @@ AST Scan details disclose the structural operation, supported extensions, roots,
 ### Check health
 
 ```text
-code_health({ refresh: true, include: ["diagnostics", "servers", "dirty"] })
-code_health({ include: ["dirty"] })
+code_health({ refresh: true, include: ["diagnostics", "servers"] })
 ```
 
-Omitting `include` requests `diagnostics` and `servers`. The selectable sections are `diagnostics`, `servers`, and `dirty`; Capability Warnings supplement diagnostic/server requests rather than acting as another section. `code_health` does not discover precomputed coverage or unused-code reports. A future batch-analyzer integration must collect its observations when called.
+Omitting `include` requests `diagnostics` and `servers`. The selectable sections are `diagnostics` and `servers`; Capability Warnings supplement diagnostic/server requests rather than acting as another section. `code_health` does not discover precomputed coverage or unused-code reports. A future batch-analyzer integration must collect its observations when called.
 
 ### Plan and apply a rename
 

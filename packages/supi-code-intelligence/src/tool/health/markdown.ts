@@ -6,8 +6,6 @@
  */
 
 import type { CapabilityWarningReport } from "../../analysis/capability/capability-warnings.ts";
-import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
-import { formatGitContext } from "../../analysis/signals/git.ts";
 import type { HealthData, HealthResultAssembly, HealthSection } from "../result/health.ts";
 import { formatSemanticHealthState } from "./semantic-state.ts";
 
@@ -38,15 +36,6 @@ export function renderHealthResult(result: HealthResultAssembly, cwd: string): s
   if (hasSection("servers")) {
     renderServersSection(lines, data, sectionStatus(result, "servers"));
   }
-  if (hasSection("dirty")) {
-    renderDirtySection(
-      lines,
-      data,
-      sectionStatus(result, "dirty"),
-      result.assembled.evidenceLists.find((e) => e.key === "health.dirtyFiles"),
-    );
-  }
-
   return lines.join("\n");
 }
 
@@ -173,27 +162,6 @@ function renderServersSection(
     lines.push(`- ${statusIcon} **${server.name}** (${types}) — ${server.status}`);
   }
   lines.push("");
-}
-
-function renderDirtySection(
-  lines: string[],
-  data: HealthData,
-  status: "complete" | "partial" | "unavailable" | undefined,
-  evidence: EvidenceListMetadata | undefined,
-): void {
-  if (status === "unavailable" || !data.gitContext) {
-    lines.push("### Dirty");
-    lines.push("");
-    lines.push("Git context unavailable; this workspace is not a readable Git repository.");
-    lines.push("");
-    return;
-  }
-  if (!evidence) {
-    lines.push("Dirty-file evidence metadata was unavailable.");
-    lines.push("");
-    return;
-  }
-  lines.push(formatGitContext(data.gitContext, evidence));
 }
 
 function displaySemanticStatus(data: HealthData): string {

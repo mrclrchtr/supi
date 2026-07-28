@@ -37,7 +37,6 @@ function makeDetails(overrides: Record<string, unknown> = {}): Record<string, un
     capabilityWarnings: null,
     diagnosticFileCount: 2,
     serverCount: 1,
-    dirtyFileCount: null,
     ...overrides,
   };
 }
@@ -62,31 +61,6 @@ function render(
 beforeAll(() => initTheme("dark"));
 
 describe("code_health TUI projection", () => {
-  it("summarizes only the requested dirty signal", () => {
-    const text = render(
-      makeDetails({
-        includedSections: ["dirty"],
-        sections: [
-          {
-            key: "dirty",
-            title: "Dirty",
-            status: "complete",
-            confidence: "heuristic",
-            provenance: [{ source: "git" }],
-            itemCount: 3,
-            available: true,
-          },
-        ],
-        dirtyFileCount: 3,
-      }),
-    );
-
-    expect(text).toContain("dirty 3");
-    expect(text).not.toContain("diag");
-    expect(text).not.toContain("servers");
-    expect(text).not.toContain("lsp");
-  });
-
   it("renders Capability Warnings from structured health details", () => {
     const details = makeDetails({
       capabilityWarnings: {
@@ -105,37 +79,5 @@ describe("code_health TUI projection", () => {
     const expanded = render(details, true);
     expect(expanded).toContain("Capability Warnings");
     expect(expanded).toContain("pyright-langserver not found on PATH");
-  });
-
-  it.each([false, true])("projects bounded dirty-file evidence when expanded is %s", (expanded) => {
-    const text = render(
-      makeDetails({
-        includedSections: ["dirty"],
-        sections: [
-          {
-            key: "dirty",
-            title: "Dirty",
-            status: "complete",
-            confidence: "heuristic",
-            provenance: [{ source: "git" }],
-            itemCount: 6,
-            available: true,
-          },
-        ],
-        evidenceLists: [
-          {
-            key: "health.dirtyFiles",
-            totalCount: 6,
-            shownCount: 5,
-            omittedCount: 1,
-            partialReason: null,
-          },
-        ],
-      }),
-      expanded,
-      "## Code Health\n\n_(showing 5 of 6; 1 omitted)_",
-    );
-
-    expect(text).toContain("5 of 6 dirty files (1 omitted)");
   });
 });

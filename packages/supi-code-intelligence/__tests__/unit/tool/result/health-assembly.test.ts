@@ -13,7 +13,6 @@ function makeHealthData(overrides: Partial<HealthData> = {}): HealthData {
     structuralStatus: "unavailable — no tree-sitter",
     diagnostics: [],
     servers: [],
-    gitContext: null,
     scopeFilter: null,
     level: "summary",
     ...overrides,
@@ -21,50 +20,6 @@ function makeHealthData(overrides: Partial<HealthData> = {}): HealthData {
 }
 
 describe("code_health result assembly", () => {
-  it("assembles only requested sections with evidence-backed provenance", () => {
-    const assembly = assembleHealthResult(
-      makeHealthData({
-        includedSections: ["dirty"],
-        semanticState: null,
-        gitContext: {
-          branch: "main",
-          dirtyFiles: ["src/index.ts"],
-          lastCommitMessage: "initial",
-        },
-      }),
-    );
-
-    expect(assembly.assembled.sections).toEqual([
-      expect.objectContaining({
-        key: "health.dirty",
-        status: "complete",
-        confidence: "heuristic",
-        provenance: [{ source: "git" }],
-      }),
-    ]);
-    expect(assembly.assembled.provenance).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ source: "semantic" }),
-        expect.objectContaining({ source: "structural" }),
-      ]),
-    );
-    expect(assembly.details).toMatchObject({
-      confidence: "heuristic",
-      candidateCount: 1,
-      omittedCount: 0,
-      sections: [expect.objectContaining({ key: "dirty", itemCount: 1, status: "complete" })],
-      evidenceLists: [
-        {
-          key: "health.dirtyFiles",
-          totalCount: 1,
-          shownCount: 1,
-          omittedCount: 0,
-          partialReason: null,
-        },
-      ],
-    });
-  });
-
   it("separates complete disabled server status from unavailable semantic diagnostics", () => {
     const data = makeHealthData({
       includedSections: ["diagnostics", "servers"],

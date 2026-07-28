@@ -7,7 +7,6 @@ import { renderOverview } from "../../ui/markdown/overview.ts";
 import { buildOverviewData } from "../../ui/markdown/overview-data.ts";
 import type { ArchitectureModel } from "../architecture/model.ts";
 import { getDependents } from "../architecture/model.ts";
-import { formatGitContext, gatherGitContext } from "../signals/git.ts";
 
 // Re-export focused brief generation
 export { generateFocusedBrief } from "./main.ts";
@@ -31,10 +30,7 @@ export function generateOverview(model: ArchitectureModel): string | null {
 /**
  * Generate a full-project brief from the architecture model.
  */
-export function generateProjectBrief(
-  model: ArchitectureModel,
-  opts?: { showGitContext?: boolean },
-): {
+export function generateProjectBrief(model: ArchitectureModel): {
   content: string;
   details: BriefDetails;
 } {
@@ -47,13 +43,6 @@ export function generateProjectBrief(
   if (model.name) {
     lines.push(`**${model.name}**${model.description ? ` — ${model.description}` : ""}`);
     lines.push("");
-  }
-
-  if (opts?.showGitContext !== false) {
-    const gitCtx = gatherGitContext(model.root);
-    if (gitCtx) {
-      lines.push(formatGitContext(gitCtx));
-    }
   }
 
   if (model.modules.length === 0) {

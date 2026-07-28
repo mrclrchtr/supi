@@ -120,7 +120,6 @@ export function healthErrorResult(content: string, reason?: string): CodeIntelRe
         capabilityWarnings: null,
         diagnosticFileCount: 0,
         serverCount: 0,
-        dirtyFileCount: null,
       },
     },
   };

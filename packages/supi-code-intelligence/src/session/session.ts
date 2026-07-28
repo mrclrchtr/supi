@@ -134,9 +134,6 @@ export class WorkspaceCodeIntelligenceSession {
   /** Whether the hidden architecture overview has been injected. */
   #hasInjectedOverview = false;
 
-  /** Whether Orientation already included git context for this session. */
-  #hasShownOrientationGitContext = false;
-
   /** Time of the most recent explicit health refresh. */
   #lastHealthRefresh: number | undefined;
 
@@ -263,8 +260,6 @@ export class WorkspaceCodeIntelligenceSession {
     input: OrientationWorkflowInput,
     control?: WorkflowControl,
   ): Promise<OrientationWorkflowOutcome> {
-    const showGitContext = !this.#hasShownOrientationGitContext;
-    this.#hasShownOrientationGitContext = true;
     return runOrientationWorkflow(
       input,
       {
@@ -272,7 +267,6 @@ export class WorkspaceCodeIntelligenceSession {
         nativeInstructionPaths: this.#nativeInstructionPaths,
         surfacedInstructionDirs: this.#surfacedInstructionDirs,
         markInstructionDirsSurfaced: (directories) => this.markInstructionDirsSurfaced(directories),
-        showGitContext,
       },
       control,
     );

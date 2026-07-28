@@ -8,7 +8,6 @@ import {
   type EvidenceEntry,
   formatEvidenceEntry,
   type ResultOptios,
-  readEvidenceEntries,
   renderEvidenceLines,
   renderMarkdownDetail,
   renderPartial,
@@ -101,20 +100,10 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
     return new Text(theme.fg("dim", "No health data"), 0, 0);
   }
 
-  const evidence = readEvidenceEntries(data?.evidenceLists);
-  const usedEvidence = new Set<EvidenceEntry>();
   const semanticRequested = sections.some(
     (section) => section.key === "diagnostics" || section.key === "servers",
   );
-  const segments = sections.map((section) => {
-    const sectionEvidence = evidenceForSection(section, evidence);
-    if (sectionEvidence) usedEvidence.add(sectionEvidence);
-    return formatSectionSummary(section, sectionEvidence, theme);
-  });
-  for (const entry of evidence) {
-    if (usedEvidence.has(entry)) continue;
-    segments.push(theme.fg("success", theme.bold(formatEvidenceEntry(entry))));
-  }
+  const segments = sections.map((section) => formatSectionSummary(section, undefined, theme));
   if (semanticRequested) {
     const semanticStatus = readSemanticStatus(data);
     const statusColor = semanticStatus.startsWith("ready") ? "success" : "warning";
@@ -242,14 +231,6 @@ function buildDiagnosticSummary(data: Record<string, unknown> | null, theme: The
   );
 }
 
-function evidenceForSection(
-  section: HealthSectionSummary,
-  evidence: readonly EvidenceEntry[],
-): EvidenceEntry | undefined {
-  if (section.key !== "dirty") return undefined;
-  return evidence.find((entry) => entry.key === "health.dirtyFiles");
-}
-
 function readHealthSections(data: Record<string, unknown> | null): HealthSectionSummary[] {
   const value = data?.sections;
   if (!Array.isArray(value)) return [];
@@ -287,7 +268,6 @@ function readString(data: Record<string, unknown> | null, key: string): string |
 const SECTION_LABELS: Record<string, string> = {
   diagnostics: "diag",
   servers: "servers",
-  dirty: "dirty",
 };
 
 function sectionLabel(key: string): string {

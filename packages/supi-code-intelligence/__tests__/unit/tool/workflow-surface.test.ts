@@ -208,7 +208,7 @@ describe("code intelligence tool specs", () => {
 
     expect(healthSchema.additionalProperties).toBe(false);
     expect(Object.keys(properties).sort()).toEqual(["include", "level", "refresh", "scope"]);
-    expect(values).toEqual(["diagnostics", "dirty", "servers"]);
+    expect(values).toEqual(["diagnostics", "servers"]);
     expect(Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_health, { include: ["coverage"] })).toBe(
       false,
     );

@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -24,20 +23,8 @@ afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function scrubGitEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const next = { ...env };
-  for (const key of Object.keys(next)) {
-    if (key.startsWith("GIT_")) delete next[key];
-  }
-  return next;
-}
-
 function writeJson(dir: string, file: string, data: unknown) {
   writeFileSync(path.join(dir, file), JSON.stringify(data, null, 2));
-}
-
-function execGit(dir: string, args: string[]) {
-  return execFileSync("git", args, { cwd: dir, env: scrubGitEnv(process.env) });
 }
 
 function setupWorkspace() {
@@ -107,24 +94,6 @@ describe("generateOverview", () => {
     // Rough token estimate: ~4 chars per token
     const estimatedTokens = (overview?.length ?? 0) / 4;
     expect(estimatedTokens).toBeLessThan(600);
-  });
-
-  it("includes git context when in a git repo", async () => {
-    setupWorkspace();
-    execGit(tmpDir, ["init"]);
-    execGit(tmpDir, ["config", "user.email", "test@example.com"]);
-    execGit(tmpDir, ["config", "user.name", "Test"]);
-    execGit(tmpDir, ["config", "commit.gpgsign", "false"]);
-    execGit(tmpDir, ["config", "core.hooksPath", "/dev/null"]);
-    execGit(tmpDir, ["branch", "-m", "main"]);
-    execGit(tmpDir, ["add", "."]);
-    execGit(tmpDir, ["commit", "-m", "init"]);
-
-    const model = await buildArchitectureModel(tmpDir);
-    const overview = generateOverview(model as NonNullable<typeof model>);
-    // Overview no longer includes Git context (removed per #207).
-    expect(overview).toContain("## Modules");
-    expect(overview).toContain("_(session snapshot)_");
   });
 });
 

@@ -1,8 +1,7 @@
-// Live server and Git collection for code_health.
+// Live server collection for code_health.
 
 import type { WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 import type { HealthData, HealthSection } from "../../session/health-types.ts";
-import { gatherGitContext } from "../signals/git.ts";
 
 /** Collect the current language-server inventory when requested. */
 export function collectServers(
@@ -18,9 +17,4 @@ export function collectServers(
     status: server.status,
     ready: server.ready,
   }));
-}
-
-/** Collect current Git status when requested. */
-export function collectGitContext(included: readonly HealthSection[], cwd: string) {
-  return included.includes("dirty") ? gatherGitContext(cwd) : null;
 }

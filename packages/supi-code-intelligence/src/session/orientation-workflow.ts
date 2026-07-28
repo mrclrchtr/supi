@@ -30,7 +30,6 @@ export interface OrientationWorkflowDeps extends TargetWorkflowDeps {
   readonly nativeInstructionPaths: Set<string>;
   readonly surfacedInstructionDirs: Set<string>;
   readonly markInstructionDirsSurfaced: (directories: string[]) => void;
-  readonly showGitContext: boolean;
 }
 
 /** Resolve the Orientation focus and collect immutable facts for presentation adapters. */
@@ -55,7 +54,7 @@ export async function runOrientationWorkflow(
 
   if (!request.focus) {
     const result = await executeOrientation(
-      { maxResults, showGitContext: deps.showGitContext },
+      { maxResults },
       { model, provider, lspRuntime, cwd: deps.cwd },
     );
     return { kind: "completed", data: result };
@@ -71,7 +70,6 @@ export async function runOrientationWorkflow(
     {
       focus: focus.path,
       maxResults,
-      showGitContext: deps.showGitContext,
     },
     { model, provider, lspRuntime, cwd: deps.cwd },
   );
@@ -157,7 +155,6 @@ async function orientTarget(options: {
         anchorKind: entry.anchorKind,
       },
       maxResults,
-      showGitContext: false,
     },
     {
       model,

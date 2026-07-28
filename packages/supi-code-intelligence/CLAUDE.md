@@ -26,7 +26,7 @@ Surfaces: `./extension` (PI registration) and `./api` (reusable type contracts).
 - **`code_resolve`**: anchored resolution requires a real symbol. Whitespace/comment coordinates fail and recommend `code_inspect`. File selectors enumerate all declarations but materialize handles only for the bounded visible Target group, never a synthetic file-position handle. Canonical declaration line/occurrence distinguishes overloads; preferred display/name-anchor position is not identity. Exact structural name-anchor evidence may refine an underspecified LSP kind for identity without changing its displayed Provider-reported symbol kind. `symbolKind` is a strict provider-reported LSP kind filter; a valid query with only wrong-kind candidates returns a typed Symbol-kind mismatch with bounded handles.
 - **`code_refactor_plan`**: target is exactly one handle or anchor; operation is exactly one nested `rename_symbol`, `extract_function`, or `extract_variable` payload. No `rename` alias.
 - **`code_refactor_apply`**: revalidates SHA-256 fingerprints and edit safety. It acquires sorted per-file mutation queues and preserves cross-file rollback.
-- **`code_health`**: reports live `diagnostics`, `servers`, and `dirty` observations only. Capability Warnings supplement diagnostic/server requests; they are not an `include` section.
+- **`code_health`**: reports live `diagnostics` and `servers` observations. Capability Warnings supplement diagnostic/server requests; they are not an `include` section.
 
 `code_impact` and old flat input shapes are removed, not aliased.
 

@@ -68,8 +68,6 @@ export interface BriefOpts {
   provider?: import("../provider.ts").CodeProvider | null;
   maxResults?: number;
   cwd: string;
-  /** Show git context in orientation output. Defaults to true. */
-  showGitContext?: boolean;
   /** LSP service state for diagnostic access. */
   lspRuntime?: import("@mrclrchtr/supi-lsp/api").WorkspaceLspRuntimeState;
 }

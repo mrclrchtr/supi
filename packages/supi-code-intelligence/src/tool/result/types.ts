@@ -207,6 +207,5 @@ export interface HealthDetails {
   capabilityWarnings: CapabilityWarningReport | null;
   diagnosticFileCount: number;
   serverCount: number;
-  dirtyFileCount: number | null;
   evidenceLists?: EvidenceListMetadata[];
 }
