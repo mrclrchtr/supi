@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.2.0](https://github.com/mrclrchtr/supi/compare/v3.1.0...v3.2.0) (2026-07-28)
+
+
+### Features
+
+* **supi-review:** expand target-aware review tools ([6a15c7f](https://github.com/mrclrchtr/supi/commit/6a15c7fcd84f440e575cf29f22af0e85916cae34))
+
+
+### Bug Fixes
+
+* **supi-review:** harden review execution lifecycle ([cba4750](https://github.com/mrclrchtr/supi/commit/cba4750f80c37604bf77956bcd6b220a8a914825))
+
 ## [3.1.0](https://github.com/mrclrchtr/supi/compare/v3.0.0...v3.1.0) (2026-07-27)
 
 
