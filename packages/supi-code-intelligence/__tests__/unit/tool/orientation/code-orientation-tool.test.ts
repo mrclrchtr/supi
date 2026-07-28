@@ -304,6 +304,7 @@ describe("code_orientation tool", () => {
     expect(result.content[0].text).toContain("function widget(): number");
     expect(result.content[0].text).toContain("## Docs");
     expect(result.content[0].text).toContain("Returns the widget value");
+    expect(result.content[0].text).not.toContain("\n/\n");
     expect(result.content[0].text).toContain("## Diagnostics");
     expect(result.content[0].text).toContain("Widget diagnostic");
     expect(result.content[0].text).toContain("## Read Next");

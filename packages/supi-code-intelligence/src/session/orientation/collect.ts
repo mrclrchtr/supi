@@ -450,9 +450,9 @@ async function buildDocsSection(
       .slice(jsdocStart, jsdocEnd + 1)
       .map((line) =>
         line
-          .replace(/^\s*\*\s?/, "")
           .replace(/^\s*\/\*\*\s?/, "")
-          .replace(/\s*\*\/\s*$/, ""),
+          .replace(/\s*\*\/\s*$/, "")
+          .replace(/^\s*\*\s?/, ""),
       )
       .filter((line) => line.trim() !== "");
 

@@ -107,6 +107,9 @@ export function assembleRefactorApplyDetails(
       omittedCount: assembled.totals.omittedCount,
       evidenceLists: [...assembled.evidenceLists],
       nextQueries: assembledNextQueries(assembled),
+      ...(applyResult.kind === "applied"
+        ? { changedFiles: [...new Set(plan.edits.edits.map((edit) => edit.file))] }
+        : {}),
     },
   };
 }

@@ -62,6 +62,8 @@ export interface SearchDetails {
   omittedCount: number;
   evidenceLists?: EvidenceListMetadata[];
   nextQueries: string[];
+  /** Paths successfully changed by `code_refactor_apply`. */
+  changedFiles?: readonly string[];
   /** Present for AST mode; declares the operation-specific source-file universe and completeness. */
   scan?: StructuredScanSummary;
 }

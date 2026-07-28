@@ -1,8 +1,29 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { applyWorkspaceEdit } from "../../../../src/analysis/refactor/apply.ts";
+
+const renameMock = vi.hoisted(() => ({ failDestination: null as string | null }));
+
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return {
+    ...actual,
+    renameSync: (...args: Parameters<typeof actual.renameSync>) => {
+      if (args[1] === renameMock.failDestination) throw new Error("simulated rename failure");
+      return actual.renameSync(...args);
+    },
+  };
+});
 
 describe("applyWorkspaceEdit", () => {
   let tmpDir: string;
@@ -12,6 +33,7 @@ describe("applyWorkspaceEdit", () => {
   });
 
   afterEach(() => {
+    renameMock.failDestination = null;
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -72,7 +94,7 @@ describe("applyWorkspaceEdit", () => {
     expect(read("b.ts")).toBe("kiwi");
   });
 
-  it("does not partially commit when a later write fails", async () => {
+  it("does not commit when staging a later file fails", async () => {
     write("a.ts", "old-a");
     const lockedDir = absPath("locked");
     mkdirSync(lockedDir, { recursive: true });
@@ -104,6 +126,32 @@ describe("applyWorkspaceEdit", () => {
       chmodSync(lockedFile, 0o644);
       chmodSync(lockedDir, 0o755);
     }
+  });
+
+  it("rolls back committed replacements when a later rename fails", async () => {
+    write("a.ts", "old-a");
+    write("b.ts", "old-b");
+    renameMock.failDestination = absPath("b.ts");
+
+    const result = await applyWorkspaceEdit({
+      edits: [
+        {
+          file: absPath("a.ts"),
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
+          newText: "new-a",
+        },
+        {
+          file: absPath("b.ts"),
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
+          newText: "new-b",
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({ kind: "error", reason: "simulated rename failure" });
+    expect(read("a.ts")).toBe("old-a");
+    expect(read("b.ts")).toBe("old-b");
+    expect(readdirSync(tmpDir).sort()).toEqual(["a.ts", "b.ts"]);
   });
 
   it("applies edits in descending offset order on the same line", async () => {

@@ -506,30 +506,34 @@ describe("code_find tool", () => {
     });
 
     it("discloses truncated AST matches in markdown and details", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "export const alpha = 1;\nexport const beta = 2;\n");
+      writeFileSync(path.join(tmpDir, "a.ts"), "export const alpha = 1;\n");
+      writeFileSync(path.join(tmpDir, "b.ts"), "export const beta = 2;\n");
       registerMockProvider(tmpDir, {
-        outline: async () => ({
+        outline: async (file) => ({
           kind: "success" as const,
-          data: [
-            {
-              name: "alpha",
-              kind: "variable",
-              startLine: 1,
-              startCharacter: 14,
-              endLine: 1,
-              endCharacter: 19,
-              children: [],
-            },
-            {
-              name: "beta",
-              kind: "variable",
-              startLine: 2,
-              startCharacter: 14,
-              endLine: 2,
-              endCharacter: 18,
-              children: [],
-            },
-          ],
+          data: file.endsWith("a.ts")
+            ? [
+                {
+                  name: "alpha",
+                  kind: "variable",
+                  startLine: 1,
+                  startCharacter: 14,
+                  endLine: 1,
+                  endCharacter: 19,
+                  children: [],
+                },
+              ]
+            : [
+                {
+                  name: "beta",
+                  kind: "variable",
+                  startLine: 1,
+                  startCharacter: 14,
+                  endLine: 1,
+                  endCharacter: 18,
+                  children: [],
+                },
+              ],
         }),
       });
       const tool = getCodeFindTool();
@@ -556,6 +560,7 @@ describe("code_find tool", () => {
       };
 
       const text = result.content[0].text;
+      expect(text).toContain("**2 matches** across **2 files**");
       expect(text).toContain("alpha");
       expect(text).not.toContain("beta");
       expect(text).toContain("_(showing 1 of 2; 1 omitted)_");

@@ -340,9 +340,13 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
       undefined,
       undefined,
       makeCtx({ cwd: projectDir }),
-    )) as { content: Array<{ type: string; text: string }> };
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: { type: "search"; data: { changedFiles?: readonly string[] } };
+    };
 
     expect(applyResult.content[0].text).toContain("applied");
+    expect(applyResult.details?.data.changedFiles).toEqual([file]);
     expect(readFileSync(file, "utf-8")).toBe("newName();\n");
   });
 

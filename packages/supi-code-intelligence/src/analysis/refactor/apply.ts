@@ -1,9 +1,9 @@
 /**
  * Direct-apply file mutation path for precise workspace edits.
  *
- * Writes edits atomically per-file: all transformed content is precomputed
- * in memory before any file is written, so a mid-apply failure never
- * leaves the workspace half-renamed.
+ * Stages transformed content beside each source file before atomically
+ * replacing that file. A failed stage cannot truncate a source file, and a
+ * failed later replacement attempts to roll back files already replaced.
  *
  * Edits are sorted by descending source position
  * so edits are applied from bottom-right to top-left regardless of order.
@@ -11,8 +11,9 @@
  * Only called after safety validation has passed.
  */
 
-import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import type { FileEdit, WorkspaceEdit } from "@mrclrchtr/supi-code-runtime/api";
 import { compareCodePositions } from "./position.ts";
@@ -31,8 +32,8 @@ export interface ApplyOptions {
  * Apply a validated WorkspaceEdit to the filesystem.
  *
  * Precomputes every file's new content in memory first, then commits
- * all writes. If a commit fails after some files were already written,
- * the function rolls those files back to their original contents.
+ * all writes. If a commit fails after some files were already replaced,
+ * the function attempts to roll those files back to their original contents.
  *
  * When `expectedFingerprints` is supplied, fingerprints are compared
  * **after** all mutation queues are acquired, so a sibling write cannot
@@ -42,8 +43,9 @@ export interface ApplyOptions {
  * inside pi's per-file mutation queue, acquired for every involved file in
  * sorted path order before reading. This serializes against sibling
  * `edit`/`write` tools on the same file and prevents lock-ordering deadlock
- * across concurrent applies, while preserving all-or-nothing across files
- * (ADR 0006).
+ * across concurrent applies, while attempting to roll back ordinary commit
+ * failures across files (ADR 0006). It does not provide durable crash recovery
+ * across sequential replacements.
  */
 export async function applyWorkspaceEdit(
   edit: WorkspaceEdit,
@@ -174,26 +176,40 @@ function applyEditsToContent(content: string, edits: FileEdit[]): string {
   return updated;
 }
 
+interface StagedContents {
+  kind: "staged";
+  files: Map<string, string>;
+}
+
+type StageResult = StagedContents | { kind: "error"; reason: string };
+
 function commitTransformedContents(
   transformedContents: Map<string, string>,
   originalContents: Map<string, string>,
   totalEdits: number,
 ): ApplyResult {
-  const writtenFiles: string[] = [];
+  const staged = stageTransformedContents(transformedContents);
+  if (staged.kind === "error") return staged;
 
+  const committedFiles: string[] = [];
   try {
-    for (const file of [...transformedContents.keys()].sort()) {
-      writeFileSync(file, transformedContents.get(file) ?? "", "utf-8");
-      writtenFiles.push(file);
+    // ponytail: no durable journal; add one only if cross-file crash recovery is required.
+    for (const [file, stagedFile] of [...staged.files].sort(([left], [right]) =>
+      left.localeCompare(right),
+    )) {
+      renameSync(stagedFile, file);
+      committedFiles.push(file);
     }
   } catch (error) {
-    const rollbackError = rollbackWrittenFiles(writtenFiles, originalContents);
+    const rollbackError = rollbackCommittedFiles(committedFiles, originalContents);
     return {
       kind: "error",
       reason: rollbackError
         ? `${toErrorMessage(error)} (rollback failed: ${rollbackError})`
         : toErrorMessage(error),
     };
+  } finally {
+    cleanupStagedFiles(staged.files);
   }
 
   return {
@@ -203,12 +219,45 @@ function commitTransformedContents(
   };
 }
 
-function rollbackWrittenFiles(
-  writtenFiles: string[],
+function stageTransformedContents(transformedContents: Map<string, string>): StageResult {
+  const stagedFiles = new Map<string, string>();
+  try {
+    for (const [file, content] of transformedContents) {
+      const stagedFile = stagedFilePath(file);
+      stagedFiles.set(file, stagedFile);
+      writeFileSync(stagedFile, content, {
+        encoding: "utf-8",
+        flag: "wx",
+        mode: statSync(file).mode & 0o777,
+      });
+    }
+    return { kind: "staged", files: stagedFiles };
+  } catch (error) {
+    cleanupStagedFiles(stagedFiles);
+    return { kind: "error", reason: toErrorMessage(error) };
+  }
+}
+
+function stagedFilePath(file: string): string {
+  return join(dirname(file), `.${basename(file)}.supi-refactor-${randomUUID()}.tmp`);
+}
+
+function cleanupStagedFiles(stagedFiles: ReadonlyMap<string, string>): void {
+  for (const stagedFile of stagedFiles.values()) {
+    try {
+      rmSync(stagedFile, { force: true });
+    } catch {
+      // Staging cleanup is best-effort; source files have already been preserved or restored.
+    }
+  }
+}
+
+function rollbackCommittedFiles(
+  committedFiles: string[],
   originalContents: Map<string, string>,
 ): string | null {
   try {
-    for (const file of writtenFiles.reverse()) {
+    for (const file of committedFiles.reverse()) {
       writeFileSync(file, originalContents.get(file) ?? "", "utf-8");
     }
     return null;

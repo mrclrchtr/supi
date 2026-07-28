@@ -80,6 +80,7 @@ export function renderStructuredMatches(
 ): { content: string; evidenceList: EvidenceListMetadata } {
   const shownMatches = result.matches.slice(0, evidenceMetadata.shownCount);
   const grouped = groupMatches(shownMatches);
+  const matchedFiles = groupMatches(result.matches);
   const kindLabel = CODE_FIND_AST_KIND_LABELS[kind];
   const matchCount =
     evidenceMetadata.totalCount === null
@@ -88,7 +89,7 @@ export function renderStructuredMatches(
   const lines = [
     `# Pattern ${kindLabel}: \`${pattern}\``,
     "",
-    `**${matchCount}** across **${grouped.size} file${grouped.size === 1 ? "" : "s"}** in \`${relScope}\``,
+    `**${matchCount}** across **${matchedFiles.size} file${matchedFiles.size === 1 ? "" : "s"}** in \`${relScope}\``,
   ];
 
   if (kind === "call") {

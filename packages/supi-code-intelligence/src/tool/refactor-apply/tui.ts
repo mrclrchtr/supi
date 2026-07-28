@@ -36,10 +36,14 @@ export function renderRefactorApplyResult(
   }
 
   if (!options.expanded) {
+    const applied =
+      !result.isError &&
+      result.details?.type === "search" &&
+      result.details.data.confidence === "semantic";
     return new Text(
-      result.isError
-        ? theme.fg("error", "Refactor apply failed")
-        : theme.fg("success", theme.bold("Plan applied")),
+      applied
+        ? theme.fg("success", theme.bold("Plan applied"))
+        : theme.fg("error", "Refactor apply failed"),
       0,
       0,
     );

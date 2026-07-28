@@ -43,7 +43,7 @@ export function renderRefactorPlanResult(assembly: RefactorPlanResultAssembly): 
   for (const edit of edits.items) {
     const range = edit.range;
     lines.push(
-      `- \`${toDisplayPath(cwd, edit.file)}\` L${range.start.line + 1}:${range.start.character} → L${range.end.line + 1}:${range.end.character}`,
+      `- \`${toDisplayPath(cwd, edit.file)}\` L${range.start.line + 1}:${range.start.character + 1} → L${range.end.line + 1}:${range.end.character + 1}`,
     );
     lines.push("  ```");
     lines.push(`  ${edit.newText.split("\n").join("\n  ")}`);
