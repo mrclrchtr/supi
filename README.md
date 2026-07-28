@@ -239,7 +239,7 @@ pi install npm:@mrclrchtr/supi-bash-timeout
 
 #### [@mrclrchtr/supi-extras](packages/supi-extras#readme)
 
-<kbd>Human</kbd>
+<kbd>Agent</kbd> <kbd>Human</kbd>
 
 Aliases, skill shorthand, prompt stash overlay, activity indicators, and other PI session polish.
 

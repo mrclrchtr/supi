@@ -59,6 +59,10 @@ If the stash file cannot be read or written, the feature degrades to in-memory u
 
 ## Passive behavior
 
+### User path references
+
+Treat `@<path>` in a user message as the path `<path>`: relative paths use PI's current working directory; absolute paths stay absolute. This fixes [pi#6487](https://github.com/earendil-works/pi/issues/6487).
+
 ### Tab-title spinner
 
 While the agent is working, the package animates a spinner in the terminal tab title. When the turn finishes, it shows a done marker. If `ask_user` is active, the spinner pauses so the waiting-for-input title is not overwritten.
