@@ -67,9 +67,7 @@ function mockReadyLsp(
 }
 
 function registerInspectProviders(
-  semanticOverrides: Partial<
-    Pick<SemanticProvider, "hover" | "definition" | "codeActionTitles">
-  > = {},
+  semanticOverrides: Partial<Pick<SemanticProvider, "hover" | "definition">> = {},
 ) {
   const runtime = getDefaultWorkspaceRuntime();
 
@@ -88,7 +86,6 @@ function registerInspectProviders(
         },
       },
     ],
-    codeActionTitles: async () => [{ title: "Remove unused import", kind: "quickfix" }],
     ...semanticOverrides,
   });
 
@@ -183,8 +180,7 @@ describe("code_inspect tool", () => {
   it("suppresses semantic sections when file readiness fails but keeps structural facts", async () => {
     const hover = vi.fn(async () => ({ contents: "const foo: number" }));
     const definition = vi.fn(async () => []);
-    const codeActionTitles = vi.fn(async () => []);
-    registerInspectProviders({ hover, definition, codeActionTitles });
+    registerInspectProviders({ hover, definition });
     const fileDiagnostics = vi.fn(async () => null);
     mockReadyLsp({
       waitUntilReadyForFile: vi
@@ -211,11 +207,10 @@ describe("code_inspect tool", () => {
 
     expect(hover).not.toHaveBeenCalled();
     expect(definition).not.toHaveBeenCalled();
-    expect(codeActionTitles).not.toHaveBeenCalled();
     expect(fileDiagnostics).not.toHaveBeenCalled();
     expect(result.details?.data.confidence).toBe("structural");
     expect(result.details?.data.unavailableSections).toEqual(
-      expect.arrayContaining(["hover", "definition", "diagnostics", "codeActions"]),
+      expect.arrayContaining(["hover", "definition", "diagnostics"]),
     );
     expect(result.details?.data.nextQueries).toEqual(
       expect.arrayContaining([expect.stringContaining("code_health")]),
@@ -260,9 +255,7 @@ describe("code_inspect tool", () => {
     expect(result.content[0].text).toContain("Hover");
     expect(result.content[0].text).toContain("Definition");
     expect(result.content[0].text).toContain("Diagnostics");
-    expect(result.content[0].text).toContain("Code Actions");
     expect(result.content[0].text).toContain("Enclosing symbol");
-    expect(result.content[0].text).toContain("Remove unused import");
     expect(result.content[0].text).toContain("Cannot assign to 'foo'");
     expect(result.details?.type).toBe("inspect");
     if (result.details?.type === "inspect") {
@@ -277,58 +270,6 @@ describe("code_inspect tool", () => {
         expect.arrayContaining([expect.stringContaining("`code_orientation` with `file:")]),
       );
     }
-  });
-
-  it("discloses truncated code action facts in markdown and details", async () => {
-    registerInspectProviders();
-    const runtime = getDefaultWorkspaceRuntime();
-    runtime.registerSemantic(tmpDir, {
-      references: async () => [],
-      implementation: async () => [],
-      documentSymbols: async () => [],
-      workspaceSymbols: async () => [],
-      codeActionTitles: async () => [
-        { title: "Action one", kind: "quickfix" },
-        { title: "Action two", kind: "quickfix" },
-      ],
-    });
-    mockReadyLsp();
-
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-
-    const tool = getTool(pi, "code_inspect");
-    const result = (await tool.execute(
-      "inspect-code-actions-truncated",
-      { point: { file: "src/index.ts", line: 2, character: 10 }, maxResults: 1 },
-      undefined,
-      undefined,
-      makeCtx({ cwd: tmpDir }),
-    )) as {
-      content: Array<{ type: string; text: string }>;
-      details?: {
-        type: "inspect";
-        data?: {
-          evidenceLists?: Array<{
-            key: string;
-            totalCount: number | null;
-            shownCount: number;
-            omittedCount: number | null;
-          }>;
-        };
-      };
-    };
-
-    expect(result.content[0].text).toContain("Action one");
-    expect(result.content[0].text).not.toContain("Action two");
-    expect(result.content[0].text).toContain("_(showing 1 of 2; 1 omitted)_");
-    expect(result.details?.data?.evidenceLists).toContainEqual({
-      key: "inspect.codeActions",
-      totalCount: 2,
-      shownCount: 1,
-      omittedCount: 1,
-      partialReason: null,
-    });
   });
 
   it("throws when every inspection substrate is unavailable", async () => {

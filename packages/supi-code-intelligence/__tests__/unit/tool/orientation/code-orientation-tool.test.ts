@@ -255,7 +255,6 @@ describe("code_orientation tool", () => {
             range: { start: { line: 7, character: 10 }, end: { line: 7, character: 16 } },
           },
         ]),
-        codeActions: vi.fn(async () => []),
         recoverDiagnostics: vi.fn(async () => ({ recovered: false })),
       },
     });
@@ -313,7 +312,6 @@ describe("code_orientation tool", () => {
             range: { start: { line: 20, character: 1 }, end: { line: 20, character: 2 } },
           },
         ]),
-        codeActions: vi.fn(async () => []),
         recoverDiagnostics: vi.fn(async () => ({ recovered: false })),
       },
     });
@@ -390,7 +388,6 @@ describe("code_orientation tool", () => {
         reason: "file client lost",
       })),
       fileDiagnostics,
-      codeActions: vi.fn(async () => []),
     });
 
     const result = (await getTool(pi, "code_orientation").execute(

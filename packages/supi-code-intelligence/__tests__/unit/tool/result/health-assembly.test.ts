@@ -16,7 +16,6 @@ function makeHealthData(overrides: Partial<HealthData> = {}): HealthData {
     gitContext: null,
     scopeFilter: null,
     level: "summary",
-    codeActions: null,
     ...overrides,
   };
 }
@@ -132,28 +131,5 @@ describe("code_health result assembly", () => {
     expect(assembly.details).toHaveProperty("capabilityWarnings", capabilityWarnings);
     expect(markdown).toContain("### Capability Warnings");
     expect(markdown).toContain("pyright-langserver");
-  });
-
-  it("does not expose code-action evidence outside a requested detailed diagnostics collection", () => {
-    const codeActions = {
-      items: [{ file: "/repo/src/index.ts", line: 1, title: "Fix it" }],
-      evidence: {
-        key: "health.codeActions",
-        totalCount: 1,
-        shownCount: 1,
-        omittedCount: 0,
-        partialReason: null,
-      },
-    };
-    const serverAssembly = assembleHealthResult(
-      makeHealthData({ includedSections: ["servers"], level: "detailed", codeActions }),
-    );
-    const summaryAssembly = assembleHealthResult(
-      makeHealthData({ includedSections: ["diagnostics"], codeActions }),
-    );
-
-    expect(serverAssembly.assembled.evidenceLists).toEqual([]);
-    expect(summaryAssembly.assembled.evidenceLists).toEqual([]);
-    expect(renderHealthResult(summaryAssembly, "/repo")).not.toContain("Fix it");
   });
 });

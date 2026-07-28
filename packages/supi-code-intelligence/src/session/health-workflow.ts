@@ -10,11 +10,7 @@ import {
   evaluateCapabilityWarnings,
   gatherCapabilityWarningInput,
 } from "../analysis/capability/capability-warnings.ts";
-import {
-  collectCodeActions,
-  collectDiagnostics,
-  isScopedFile,
-} from "../analysis/health/diagnostics.ts";
+import { collectDiagnostics, isScopedFile } from "../analysis/health/diagnostics.ts";
 import { describeStructuralState, maybeRecover } from "../analysis/health/recovery.ts";
 import { collectGitContext, collectServers } from "../analysis/health/signals.ts";
 import { resolveScope } from "../analysis/search/paths.ts";
@@ -121,13 +117,6 @@ export async function runHealthWorkflow(
   );
   const servers = collectServers(runtime, included);
   const gitContext = collectGitContext(included, deps.cwd);
-  const codeActions = await collectOptionalCodeActions({
-    level,
-    included,
-    runtime: semanticReady ? runtime : null,
-    scopeFilter,
-    cwd: deps.cwd,
-  });
   const capabilityWarnings = collectCapabilityWarnings(semanticRequested, deps);
   const diagnosticAgeSeconds = getDiagnosticAgeSeconds(
     included,
@@ -147,7 +136,6 @@ export async function runHealthWorkflow(
     gitContext,
     scopeFilter: request.scope ? scopeFilter : null,
     level,
-    codeActions,
     capabilityWarnings: capabilityWarnings?.hasWarnings ? capabilityWarnings : undefined,
     diagnosticAgeSeconds,
   };
@@ -221,23 +209,6 @@ function deriveReadyOwnerWithoutServerState(
     case "ready":
       return { kind: "pending", reason: "No active, ready project servers" };
   }
-}
-
-async function collectOptionalCodeActions(options: {
-  level: "summary" | "detailed";
-  included: readonly HealthSection[];
-  runtime: WorkspaceLspRuntime | null;
-  scopeFilter: string | null;
-  cwd: string;
-}): Promise<HealthData["codeActions"]> {
-  if (
-    options.level !== "detailed" ||
-    !options.included.includes("diagnostics") ||
-    options.runtime === null
-  ) {
-    return null;
-  }
-  return collectCodeActions(options.runtime, options.scopeFilter, options.cwd);
 }
 
 function collectCapabilityWarnings(

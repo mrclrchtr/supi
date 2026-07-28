@@ -208,7 +208,5 @@ export interface HealthDetails {
   diagnosticFileCount: number;
   serverCount: number;
   dirtyFileCount: number | null;
-  /** Null means advisory code actions were not requested or collected. */
-  codeActionCount: number | null;
   evidenceLists?: EvidenceListMetadata[];
 }

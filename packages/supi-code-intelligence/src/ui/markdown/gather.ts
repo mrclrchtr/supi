@@ -18,7 +18,7 @@ export type ContextGatherProvider = Pick<
   StructuralProvider,
   "nodeAt" | "outline" | "imports" | "exports"
 > &
-  Partial<Pick<SemanticProvider, "hover" | "definition" | "codeActionTitles">>;
+  Partial<Pick<SemanticProvider, "hover" | "definition">>;
 
 export interface TreeSitterContext {
   nodeInfo: {
@@ -41,8 +41,6 @@ export interface TreeSitterContext {
   hover: { contents: string; range?: SourceRange } | null;
   /** Best-effort LSP definition targets at the anchored position. `null` when unavailable. */
   definition: Array<{ uri: string; range: SourceRange }> | null;
-  /** Best-effort code action titles at the anchored position. `null` when unavailable. */
-  codeActions: Array<{ title: string; kind?: string }> | null;
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: best-effort substrate gathering with independent try/catch blocks kept together for readability
@@ -58,10 +56,8 @@ export async function gatherTreeSitterContext(
   let exports: TreeSitterContext["exports"] = [];
   let hover: TreeSitterContext["hover"] = null;
   let definition: TreeSitterContext["definition"] = null;
-  let codeActions: TreeSitterContext["codeActions"] = null;
 
-  if (!provider)
-    return { nodeInfo, outline, imports, exports, hover, definition: null, codeActions: null };
+  if (!provider) return { nodeInfo, outline, imports, exports, hover, definition: null };
 
   try {
     const nodeResult = await provider.nodeAt(relPath, line, character);
@@ -128,29 +124,11 @@ export async function gatherTreeSitterContext(
         // definition failed — continue without it
       }
     }
-
-    // Best-effort code actions — LSP expects 0-based coordinates
-    if (provider.codeActionTitles) {
-      try {
-        const titles = await provider.codeActionTitles(relPath, {
-          line: line - 1,
-          character: character - 1,
-        });
-        if (titles && titles.length > 0) {
-          codeActions = titles.map((a) => ({
-            title: a.title,
-            kind: a.kind,
-          }));
-        }
-      } catch {
-        // code actions failed — continue without it
-      }
-    }
   } catch {
     // Provider not available
   }
 
-  return { nodeInfo, outline, imports, exports, hover, definition, codeActions };
+  return { nodeInfo, outline, imports, exports, hover, definition };
 }
 
 export interface NearbyDiagnostic {

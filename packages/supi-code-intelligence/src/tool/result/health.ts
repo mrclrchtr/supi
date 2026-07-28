@@ -10,8 +10,6 @@ import {
 import type { HealthDetails, HealthSectionDetails } from "./types.ts";
 
 export type {
-  CodeActionSuggestion,
-  HealthCodeActions,
   HealthData,
   HealthDiagnosticEntry,
   HealthSection,
@@ -71,7 +69,6 @@ export function assembleHealthResult(data: HealthData): HealthResultAssembly {
       diagnosticFileCount: data.diagnostics.length,
       serverCount: data.servers.length,
       dirtyFileCount: data.gitContext?.dirtyFiles.length ?? null,
-      codeActionCount: data.codeActions?.items.length ?? null,
       evidenceLists: [...assembled.evidenceLists],
     },
   };
@@ -180,15 +177,8 @@ function collectHealthEvidenceLists(data: HealthData): EvidenceListMetadata[] {
           }).metadata,
         ]
       : [];
-  const codeActions =
-    data.includedSections.includes("diagnostics") &&
-    data.level === "detailed" &&
-    data.codeActions !== null &&
-    (data.codeActions.items.length > 0 || data.codeActions.evidence.partialReason !== null)
-      ? [data.codeActions.evidence]
-      : [];
 
-  return [...dirtyFiles, ...codeActions];
+  return dirtyFiles;
 }
 
 function uniqueProvenance(provenance: readonly ResultProvenance[]): ResultProvenance[] {

@@ -30,7 +30,7 @@ export const CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES: CodeIntelligenceToolPromptS
   },
   code_inspect: {
     description:
-      "Inspect one exact point for syntax, enclosing symbol, hover, definition, nearby diagnostics, and advisory code-action titles. Use for point facts, not broad Orientation. Unavailable substrates are disclosed; no action is applied.",
+      "Inspect one exact point for syntax, enclosing symbol, hover, definition, and nearby diagnostics. Use for point facts, not broad Orientation. Unavailable substrates are disclosed; no action is applied.",
     promptSnippet: "code_inspect — factual point inspection",
     promptGuidelines: [],
   },

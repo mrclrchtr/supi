@@ -16,7 +16,6 @@ export function assembleInspectResult(
   data: InspectResultData,
   nextQueries: readonly string[],
 ): InspectResultAssembly {
-  const evidenceLists = data.codeActionEvidence ? [data.codeActionEvidence] : [];
   const provenance = [
     ...(data.confidence === "semantic" ? [{ source: "semantic" as const, capability: "LSP" }] : []),
     ...(data.node ? [{ source: "structural" as const, capability: "tree-sitter" }] : []),
@@ -33,7 +32,7 @@ export function assembleInspectResult(
         provenance,
       },
     ],
-    evidenceLists,
+    evidenceLists: [],
     nextQueries,
     candidateCount: 1,
     confidence: data.confidence,

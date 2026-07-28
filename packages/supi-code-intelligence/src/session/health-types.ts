@@ -1,5 +1,4 @@
 import type { CapabilityWarningReport } from "../analysis/capability/capability-warnings.ts";
-import type { EvidenceListMetadata } from "../analysis/evidence.ts";
 import type { GitContext } from "../analysis/signals/git.ts";
 
 export type HealthSection = "diagnostics" | "servers" | "dirty";
@@ -33,19 +32,6 @@ export interface HealthDiagnosticEntry {
   readonly warnings: number;
 }
 
-export interface CodeActionSuggestion {
-  readonly file: string;
-  readonly line: number;
-  readonly title: string;
-  readonly kind?: string;
-}
-
-/** Bounded advisory code-action list with explicit completeness metadata. */
-export interface HealthCodeActions {
-  readonly items: readonly CodeActionSuggestion[];
-  readonly evidence: EvidenceListMetadata;
-}
-
 /** Presentation-neutral health facts. */
 export interface HealthData {
   readonly includedSections: readonly HealthSection[];
@@ -62,7 +48,6 @@ export interface HealthData {
   readonly gitContext: GitContext | null;
   readonly scopeFilter: string | null;
   readonly level: "summary" | "detailed";
-  readonly codeActions: HealthCodeActions | null;
   readonly capabilityWarnings?: CapabilityWarningReport;
   readonly diagnosticAgeSeconds?: number;
 }

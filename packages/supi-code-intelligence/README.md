@@ -140,7 +140,7 @@ code_inspect({
 })
 ```
 
-Point inspection may include syntax, an enclosing symbol, hover/type facts, definitions, nearby diagnostics, and code-action titles. It does not invent heuristic substitutes when every required substrate is unavailable. Relationship guidance is emitted only from an evidence-backed definition location: resolve that definition first, then use its handle with `code_graph`. Structural-only inspection does not recommend a fresh graph anchor that LSP-first target establishment would reject.
+Point inspection may include syntax, an enclosing symbol, hover/type facts, definitions, and nearby diagnostics. It does not invent heuristic substitutes when every required substrate is unavailable. Relationship guidance is emitted only from an evidence-backed definition location: resolve that definition first, then use its handle with `code_graph`. Structural-only inspection does not recommend a fresh graph anchor that LSP-first target establishment would reject.
 
 ### Search code-aware evidence
 

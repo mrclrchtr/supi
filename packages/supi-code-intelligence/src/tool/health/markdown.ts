@@ -6,22 +6,12 @@
  */
 
 import type { CapabilityWarningReport } from "../../analysis/capability/capability-warnings.ts";
-import {
-  type EvidenceListMetadata,
-  renderEvidenceListMetadataDisclosure,
-} from "../../analysis/evidence.ts";
+import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import { formatGitContext } from "../../analysis/signals/git.ts";
-import type {
-  HealthCodeActions,
-  HealthData,
-  HealthResultAssembly,
-  HealthSection,
-} from "../result/health.ts";
+import type { HealthData, HealthResultAssembly, HealthSection } from "../result/health.ts";
 import { formatSemanticHealthState } from "./semantic-state.ts";
 
 export type {
-  CodeActionSuggestion,
-  HealthCodeActions,
   HealthData,
   HealthSection,
   SemanticHealthState,
@@ -33,8 +23,6 @@ export function renderHealthResult(result: HealthResultAssembly, cwd: string): s
   const hasSection = (key: HealthSection): boolean =>
     result.assembled.sections.some((section) => section.key === `health.${key}`);
   const semanticRequested = hasSection("diagnostics") || hasSection("servers");
-  const evidenceFor = (key: string): EvidenceListMetadata | undefined =>
-    result.assembled.evidenceLists.find((evidence) => evidence.key === key);
 
   renderStatusLine(lines, data, semanticRequested);
   renderStalenessBanner(lines, data, sectionStatus(result, "diagnostics"));
@@ -42,7 +30,6 @@ export function renderHealthResult(result: HealthResultAssembly, cwd: string): s
   if (hasSection("diagnostics")) {
     renderDiagnosticsSection(lines, data, cwd, {
       status: sectionStatus(result, "diagnostics"),
-      codeActionEvidence: evidenceFor("health.codeActions"),
     });
   }
   if (semanticRequested) {
@@ -56,7 +43,7 @@ export function renderHealthResult(result: HealthResultAssembly, cwd: string): s
       lines,
       data,
       sectionStatus(result, "dirty"),
-      evidenceFor("health.dirtyFiles"),
+      result.assembled.evidenceLists.find((e) => e.key === "health.dirtyFiles"),
     );
   }
 
@@ -117,7 +104,6 @@ function renderStatusLine(lines: string[], data: HealthData, semanticRequested: 
 
 interface DiagnosticRenderOptions {
   status: "complete" | "partial" | "unavailable" | undefined;
-  codeActionEvidence: EvidenceListMetadata | undefined;
 }
 
 function renderDiagnosticsSection(
@@ -139,7 +125,6 @@ function renderDiagnosticsSection(
     renderDiagnosticDetails(lines, data, cwd);
   }
 
-  renderCodeActionsSection(lines, data, cwd, options.codeActionEvidence);
   lines.push("");
 }
 
@@ -161,43 +146,6 @@ function renderDiagnosticDetails(lines: string[], data: HealthData, cwd: string)
       `- \`${relPath}\` — ${entry.errors} error${s(entry.errors)}, ${entry.warnings} warning${s(entry.warnings)}`,
     );
   }
-}
-
-function renderCodeActionsSection(
-  lines: string[],
-  data: HealthData,
-  cwd: string,
-  evidence: EvidenceListMetadata | undefined,
-): void {
-  const codeActions = data.codeActions;
-  if (!codeActions || data.level !== "detailed" || data.semanticState?.kind !== "ready") return;
-  const disclosure = evidence ? renderEvidenceListMetadataDisclosure(evidence) : null;
-  if (codeActions.items.length === 0 && !disclosure) return;
-
-  renderDetailedCodeActions(lines, codeActions, cwd, disclosure);
-}
-
-function renderDetailedCodeActions(
-  lines: string[],
-  codeActions: HealthCodeActions,
-  cwd: string,
-  disclosure: string | null,
-): void {
-  lines.push("");
-  lines.push("### Code Actions");
-  lines.push("");
-  if (codeActions.items.length === 0) {
-    lines.push("No code-action suggestions were collected.");
-  } else {
-    lines.push("Available fixes (suggestions only — not applied):");
-    lines.push("");
-    for (const action of codeActions.items) {
-      const relPath = makeRelative(cwd, action.file);
-      const kindLabel = action.kind ? ` (${action.kind})` : "";
-      lines.push(`- \`${relPath}:${action.line}\` — "${action.title}"${kindLabel}`);
-    }
-  }
-  if (disclosure) lines.push(disclosure);
 }
 
 function renderServersSection(

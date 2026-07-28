@@ -154,17 +154,6 @@ export function createLspSemanticProvider(lsp: WorkspaceLspRuntime): SemanticPro
       if (!actions) return [];
       return collectCodeActionResults(actions);
     },
-
-    async codeActionTitles(
-      file: string,
-      position: CodePosition,
-    ): Promise<Array<{ title: string; kind?: string }> | null> {
-      const actions = await lsp.codeActions(file, position);
-      if (!actions) return null;
-      return actions
-        .filter((a) => a.title)
-        .map((a) => ({ title: a.title, kind: a.kind ?? undefined }));
-    },
   };
 }
 

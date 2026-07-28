@@ -2,7 +2,6 @@
 
 import { existsSync } from "node:fs";
 import { relative } from "node:path";
-import { createEvidenceList } from "../analysis/evidence.ts";
 import { normalizePath } from "../analysis/search/paths.ts";
 import { gatherNearbyDiagnostics, gatherTreeSitterContext } from "../ui/markdown/gather.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
@@ -89,11 +88,6 @@ export async function runInspectWorkflow(
     };
   }
 
-  const codeActions = createEvidenceList({
-    key: "inspect.codeActions",
-    items: context.codeActions ?? [],
-    maxResults: request.maxResults ?? 5,
-  });
   const data: InspectResultData = {
     relPath,
     line: point.line,
@@ -111,8 +105,6 @@ export async function runInspectWorkflow(
     hover: context.hover?.contents ?? null,
     definitions,
     diagnostics,
-    codeActions: codeActions.items,
-    codeActionEvidence: codeActions.metadata,
     unavailableSections: [...new Set(unavailableSections)],
   };
 
@@ -177,9 +169,6 @@ function collectUnavailableSections(options: {
   if (!context.hover && provider?.hover == null) unavailable.push("hover");
   if (definitions.length === 0 && provider?.definition == null) unavailable.push("definition");
   if (diagnostics.length === 0 && !lspReady) unavailable.push("diagnostics");
-  if ((context.codeActions?.length ?? 0) === 0 && provider?.codeActionTitles == null) {
-    unavailable.push("codeActions");
-  }
   return unavailable;
 }
 
@@ -189,9 +178,7 @@ function inspectEvidenceState(
   hasEnclosing: boolean,
   diagnosticCount: number,
 ): { available: boolean; confidence: InspectResultData["confidence"] } {
-  const semantic = Boolean(
-    context.hover || definitionCount > 0 || (context.codeActions?.length ?? 0) > 0,
-  );
+  const semantic = Boolean(context.hover || definitionCount > 0);
   const structural = Boolean(context.nodeInfo || hasEnclosing);
   const diagnostics = diagnosticCount > 0;
   return {

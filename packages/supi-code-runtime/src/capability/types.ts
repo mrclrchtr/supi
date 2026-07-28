@@ -98,16 +98,6 @@ export interface SemanticProvider {
    * Kept as a low-level substrate helper and for lightweight introspection.
    */
   codeActions?(file: string, position: CodePosition): Promise<RefactorResult[]>;
-
-  /**
-   * Optional lightweight code action titles for display purposes.
-   * Returns simplified title/kind pairs at the given position.
-   * When the provider cannot produce code actions, returns `null`.
-   */
-  codeActionTitles?(
-    file: string,
-    position: CodePosition,
-  ): Promise<Array<{ title: string; kind?: string }> | null>;
 }
 
 /**

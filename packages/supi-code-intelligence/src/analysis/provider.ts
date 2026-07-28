@@ -127,9 +127,7 @@ function createCompositeProvider(
     async codeActions(...args: Parameters<NonNullable<SemanticProvider["codeActions"]>>) {
       return semantic?.codeActions?.(...args) ?? [];
     },
-    async codeActionTitles(...args: Parameters<NonNullable<SemanticProvider["codeActionTitles"]>>) {
-      return semantic?.codeActionTitles?.(...args) ?? null;
-    },
+
     async rename(...args: Parameters<NonNullable<SemanticProvider["rename"]>>) {
       const result = await semantic?.rename?.(...args);
       return (

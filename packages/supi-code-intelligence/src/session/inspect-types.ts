@@ -1,5 +1,4 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
-import type { EvidenceListMetadata } from "../analysis/evidence.ts";
 import type { SourcePointInput } from "./target-input.ts";
 
 /** Canonical code_inspect workflow input. */
@@ -39,8 +38,6 @@ export interface InspectResultData {
   readonly hover: string | null;
   readonly definitions: ReadonlyArray<{ file: string; line: number; character: number }>;
   readonly diagnostics: ReadonlyArray<{ line: number; severity: number | string; message: string }>;
-  readonly codeActions: ReadonlyArray<{ title: string; kind?: string }>;
-  readonly codeActionEvidence?: EvidenceListMetadata;
   readonly unavailableSections: readonly string[];
 }
 

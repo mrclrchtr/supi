@@ -72,8 +72,6 @@ export type {
   RequestedGraphRelation,
 } from "./graph-types.ts";
 export type {
-  CodeActionSuggestion,
-  HealthCodeActions,
   HealthData,
   HealthSection,
   HealthWorkflowInput,

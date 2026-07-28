@@ -192,9 +192,6 @@ export class TestCapabilityAdapter implements CapabilityAdapter {
       codeActions: this.#semantic?.codeActions
         ? (...args) => this.#semantic?.codeActions?.(...args)
         : undefined,
-      codeActionTitles: this.#semantic?.codeActionTitles
-        ? (...args) => this.#semantic?.codeActionTitles?.(...args)
-        : undefined,
       rename: this.#semantic?.rename ? (...args) => this.#semantic?.rename?.(...args) : undefined,
       refactor: this.#semantic?.refactor
         ? (...args) => this.#semantic?.refactor?.(...args)

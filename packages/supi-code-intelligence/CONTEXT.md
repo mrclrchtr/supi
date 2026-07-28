@@ -111,7 +111,7 @@ A semantic-provider location whose URI, path, or position cannot be converted in
 _Avoid_: external location, silently dropped location, guessed source location
 
 **Tool evidence**:
-The facts in a public code-intelligence result that a user or agent may rely on to make a coding decision, such as matched targets, references, diagnostics, structural declarations, imports, exports, callees, implementations, source-file listings, manifest dependency facts, planned refactor edits, or exposed code-action facts. Decorative summaries, next-step hints, and UI-only chrome are not Tool evidence.
+The facts in a public code-intelligence result that a user or agent may rely on to make a coding decision, such as matched targets, references, diagnostics, structural declarations, imports, exports, callees, implementations, source-file listings, manifest dependency facts, or planned refactor edits. Decorative summaries, next-step hints, and UI-only chrome are not Tool evidence.
 _Avoid_: treating every rendered list as evidence, convention-derived relationships, hiding evidence limits in presentation details
 
 **Tool result assembly**:

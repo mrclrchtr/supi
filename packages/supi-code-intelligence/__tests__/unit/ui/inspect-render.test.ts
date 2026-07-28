@@ -36,7 +36,6 @@ describe("renderInspectResult", () => {
               message: "Cannot assign to 'foo' because it is a constant.",
             },
           ],
-          codeActions: [{ title: "Remove unused import", kind: "quickfix" }],
           unavailableSections: [],
         },
         [
@@ -58,8 +57,6 @@ describe("renderInspectResult", () => {
     expect(result).toContain("src/helper.ts:1:1");
     expect(result).toContain("## Diagnostics");
     expect(result).toContain("Cannot assign to 'foo'");
-    expect(result).toContain("## Code Actions");
-    expect(result).toContain("Remove unused import");
   });
 
   it("renders explicit unavailable sections when provider data is missing", async () => {
@@ -80,8 +77,7 @@ describe("renderInspectResult", () => {
           hover: null,
           definitions: [],
           diagnostics: [],
-          codeActions: [],
-          unavailableSections: ["syntax", "hover", "definition", "diagnostics", "codeActions"],
+          unavailableSections: ["syntax", "hover", "definition", "diagnostics"],
         },
         [],
       ),
@@ -93,7 +89,6 @@ describe("renderInspectResult", () => {
     expect(result).toContain("hover");
     expect(result).toContain("definition");
     expect(result).toContain("diagnostics");
-    expect(result).toContain("codeActions");
     expect(result).not.toContain("heuristic");
   });
 });

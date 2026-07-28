@@ -146,7 +146,7 @@ async function buildRequestedSection(options: {
   }
 }
 
-/** Build enriched defs section: tree-sitter definitions + LSP definition targets + code actions. */
+/** Build enriched defs section: tree-sitter definitions + LSP definition targets. */
 async function buildEnrichedDefsSection(
   target: OrientationTarget | null | undefined,
   deps: OrientationDeps,
@@ -155,9 +155,7 @@ async function buildEnrichedDefsSection(
 ): Promise<{ lines: string[]; hasSemanticEvidence: boolean }> {
   const lines = buildDefinitionLines(target, deps.cwd, treeContext);
   const contextHasSemanticEvidence = Boolean(
-    treeContext?.hover ||
-      (treeContext?.definition?.length ?? 0) > 0 ||
-      (treeContext?.codeActions?.length ?? 0) > 0,
+    treeContext?.hover || (treeContext?.definition?.length ?? 0) > 0,
   );
 
   if (!target || deps.lspRuntime.kind !== "ready") {
@@ -170,15 +168,9 @@ async function buildEnrichedDefsSection(
     lines.push(...lspDefs.slice(0, limit));
   }
 
-  const actions = await appendCodeActions(target, deps, limit);
-  if (actions.length > 0) {
-    if (lines.length > 0) lines.push("");
-    lines.push(...actions.slice(0, limit));
-  }
-
   return {
     lines,
-    hasSemanticEvidence: contextHasSemanticEvidence || lspDefs.length > 0 || actions.length > 0,
+    hasSemanticEvidence: contextHasSemanticEvidence || lspDefs.length > 0,
   };
 }
 
@@ -201,29 +193,6 @@ async function appendDefinitionTargets(
         : def.uri;
       const relPath = path.relative(deps.cwd, filePath);
       lines.push(`- \`${relPath}:${def.range.start.line + 1}:${def.range.start.character + 1}\``);
-    }
-    return lines;
-  } catch {
-    return [];
-  }
-}
-
-async function appendCodeActions(
-  target: OrientationTarget,
-  deps: OrientationDeps,
-  limit: number,
-): Promise<string[]> {
-  if (deps.lspRuntime.kind !== "ready" || !deps.lspRuntime.runtime) return [];
-  try {
-    const actions = await deps.lspRuntime.runtime.codeActions(target.file, {
-      line: target.line - 1,
-      character: target.character - 1,
-    });
-    if (!actions || actions.length === 0) return [];
-    const lines: string[] = ["**Code Actions:**"];
-    for (const action of actions.slice(0, limit)) {
-      const kindLabel = action.kind ? ` (${action.kind})` : "";
-      lines.push(`- ${action.title}${kindLabel}`);
     }
     return lines;
   } catch {

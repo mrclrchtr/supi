@@ -38,7 +38,6 @@ function makeDetails(overrides: Record<string, unknown> = {}): Record<string, un
     diagnosticFileCount: 2,
     serverCount: 1,
     dirtyFileCount: null,
-    codeActionCount: null,
     ...overrides,
   };
 }
@@ -139,28 +138,4 @@ describe("code_health TUI projection", () => {
 
     expect(text).toContain("5 of 6 dirty files (1 omitted)");
   });
-
-  it.each([false, true])(
-    "keeps an unknown code-action remainder explicit when expanded is %s",
-    (expanded) => {
-      const text = render(
-        makeDetails({
-          evidenceLists: [
-            {
-              key: "health.codeActions",
-              totalCount: null,
-              shownCount: 0,
-              omittedCount: null,
-              partialReason: "safety-limit",
-            },
-          ],
-        }),
-        expanded,
-        "## Code Health\n\n_(showing 0; more may exist — safety-limit)_",
-      );
-
-      expect(text).toContain("0 code actions (more may exist — safety-limit)");
-      expect(text).not.toContain("0 of 0 code actions");
-    },
-  );
 });

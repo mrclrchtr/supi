@@ -1,4 +1,3 @@
-import { renderEvidenceListMetadataDisclosure } from "../../analysis/evidence.ts";
 import type { InspectResultAssembly } from "../result/inspect.ts";
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: inspect rendering keeps section ordering and unavailable-state handling explicit
@@ -59,21 +58,6 @@ export function renderInspectResult(assembly: InspectResultAssembly): string {
       lines.push(
         `- L${diagnostic.line}: ${formatSeverity(diagnostic.severity)}: ${diagnostic.message}`,
       );
-    }
-    lines.push("");
-  }
-
-  if (input.codeActions.length > 0) {
-    lines.push("## Code Actions");
-    for (const action of input.codeActions) {
-      const kind = action.kind ? ` (${action.kind})` : "";
-      lines.push(`- "${action.title}"${kind}`);
-    }
-    if (input.codeActionEvidence) {
-      const disclosure = renderEvidenceListMetadataDisclosure(input.codeActionEvidence);
-      if (disclosure) {
-        lines.push(disclosure);
-      }
     }
     lines.push("");
   }

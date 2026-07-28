@@ -59,9 +59,6 @@ describe("target Orientation hover markdown", () => {
         lspRuntime: {
           kind: "ready",
           runtime: {
-            codeActions: async () => [
-              { title: "Move to a new file", kind: "refactor.move.newFile" },
-            ],
             fileDiagnostics: async () => [],
           },
         } as never,
@@ -74,8 +71,5 @@ describe("target Orientation hover markdown", () => {
       "- Hover:\n```typescript\nfunction sample(): number\n```\nSample docs.",
     );
     expect(markdown).not.toContain("- Hover: ```typescript");
-    expect(markdown.indexOf("**Code Actions:**")).toBeGreaterThan(
-      markdown.indexOf("```\nSample docs."),
-    );
   });
 });
