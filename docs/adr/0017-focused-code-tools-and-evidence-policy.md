@@ -21,6 +21,8 @@ Expose exactly eight model-callable tools:
 
 `code_impact` is removed. No alias or dual input shape is retained.
 
+On-demand `code_orientation` reports only direct filesystem observations, successfully parsed manifest/workspace configuration, and explicit semantic/structural provider observations. Package and dependency facts are labeled as manifest-declared topology with their source file/field; they are not presented as a complete runtime architecture graph. Direct directory inventory is bounded to immediate regular files and directories, while source classification and recursive discovery remain explicit structural-search work.
+
 Target-taking tools use a nested exact-one selector:
 
 - `{ target: { handle: "tg-…" } }`

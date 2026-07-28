@@ -4,7 +4,13 @@ import type { ReadNextItem } from "../../analysis/read-next.ts";
 
 /** Provenance attached to an assembled result or one of its sections. */
 export interface ResultProvenance {
-  readonly source: "semantic" | "structural" | "filesystem" | "runtime";
+  readonly source:
+    | "semantic"
+    | "structural"
+    | "filesystem"
+    | "manifest"
+    | "configuration"
+    | "runtime";
   readonly capability?: string;
   readonly detail?: string;
 }

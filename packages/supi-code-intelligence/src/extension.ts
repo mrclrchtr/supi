@@ -119,7 +119,7 @@ export default function codeIntelligenceExtension(
       if (!session.claimOverviewInjection()) return;
 
       const model = await buildArchitectureModel(ctx.cwd);
-      if (!model || model.modules.length === 0) return;
+      if (model.modules.length === 0) return;
 
       const data = buildOverviewData(model);
       if (!data) return;

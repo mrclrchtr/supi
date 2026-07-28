@@ -3,11 +3,18 @@ import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import { uriToFile } from "@mrclrchtr/supi-core/path";
+import type { Diagnostic } from "@mrclrchtr/supi-lsp/api";
+import {
+  createEvidenceList,
+  createPartialEvidenceList,
+  type EvidenceListMetadata,
+} from "../../analysis/evidence.ts";
 import {
   type ReadNextItem,
   readNextEnclosingScope,
   readNextTarget,
 } from "../../analysis/read-next.ts";
+import { diagnosticMessageString } from "../../substrate/lsp/utils.ts";
 import { gatherTreeSitterContext } from "../../ui/markdown/gather.ts";
 import type {
   OrientationDeps,
@@ -15,13 +22,28 @@ import type {
   OrientationSection,
   OrientationTarget,
 } from "../../ui/markdown/types.ts";
-import type { OrientationBlock, OrientationResultData } from "../orientation-types.ts";
+import type {
+  OrientationBlock,
+  OrientationResultData,
+  OrientationSectionData,
+} from "../orientation-types.ts";
 import { collectContextOrientationFacts } from "./context-facts.ts";
+import { formatSectionNote } from "./context-sections.ts";
 
 interface CollectedOrientationSection {
   readonly key: OrientationSection;
   readonly title: string;
   readonly lines: readonly string[];
+  readonly metadata: OrientationSectionData;
+}
+
+interface TargetSectionCollection {
+  readonly lines: string[];
+  readonly hasStructuralEvidence: boolean;
+  readonly hasSemanticEvidence: boolean;
+  readonly status: "complete" | "partial" | "unavailable";
+  readonly reason: string | null;
+  readonly evidenceLists: readonly EvidenceListMetadata[];
 }
 
 const DEFAULT_TARGET_SECTIONS: OrientationSection[] = ["defs", "docs", "diagnostics"];
@@ -94,11 +116,17 @@ async function executeTargetOrientation(
 
   return {
     blocks: buildTargetBlocks(focusTarget, sections),
+    sections: sections.map((section) => section.metadata),
     confidence,
     focusTarget,
     requestedSections,
     renderedSections: sections.map((section) => section.key),
-    omittedCount: 0,
+    omittedCount: sections.reduce(
+      (total, section) =>
+        total +
+        section.metadata.evidenceLists.reduce((sum, list) => sum + (list.omittedCount ?? 0), 0),
+      0,
+    ),
     nextQueries: buildNextQueries(input.target, deps.cwd),
     readNext: buildReadNextGuidance(input.target, treeContext, deps.cwd),
   };
@@ -120,28 +148,20 @@ async function buildRequestedSection(options: {
   switch (section) {
     case "defs": {
       const result = await buildEnrichedDefsSection(target, deps, treeContext, limit);
-      return {
-        section: { key: section, title: SECTION_TITLES[section], lines: result.lines },
-        hasStructuralEvidence: hasRenderableItems(result.lines),
-        hasSemanticEvidence: result.hasSemanticEvidence,
-      };
+      return targetSectionResult(section, result, [
+        result.hasSemanticEvidence
+          ? { source: "semantic", capability: "LSP" }
+          : { source: "structural", capability: "tree-sitter" },
+      ]);
     }
-    case "docs": {
-      const result = await buildDocsSection(target, deps, limit);
-      return {
-        section: { key: section, title: SECTION_TITLES[section], lines: result.lines },
-        hasStructuralEvidence: result.hasStructuralEvidence,
-        hasSemanticEvidence: false,
-      };
-    }
-    case "diagnostics": {
-      const result = await buildDiagnosticsSection(target, deps, limit);
-      return {
-        section: { key: section, title: SECTION_TITLES[section], lines: result.lines },
-        hasStructuralEvidence: false,
-        hasSemanticEvidence: result.hasSemanticEvidence,
-      };
-    }
+    case "docs":
+      return targetSectionResult(section, await buildDocsSection(target, deps, limit), [
+        { source: "filesystem", detail: "target source file" },
+      ]);
+    case "diagnostics":
+      return targetSectionResult(section, await buildDiagnosticsSection(target, deps, limit), [
+        { source: "semantic", capability: "LSP diagnostics" },
+      ]);
   }
 }
 
@@ -151,49 +171,114 @@ async function buildEnrichedDefsSection(
   deps: OrientationDeps,
   treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>,
   limit: number,
-): Promise<{ lines: string[]; hasSemanticEvidence: boolean }> {
+): Promise<TargetSectionCollection> {
   const lines = buildDefinitionLines(target, deps.cwd, treeContext);
   const contextHasSemanticEvidence = Boolean(
     treeContext?.hover || (treeContext?.definition?.length ?? 0) > 0,
   );
+  const hasStructuralEvidence = hasRenderableItems(lines);
 
-  if (!target || deps.lspRuntime.kind !== "ready") {
-    return { lines, hasSemanticEvidence: contextHasSemanticEvidence };
+  if (!target) {
+    return unavailableTargetSection(
+      lines,
+      hasStructuralEvidence,
+      "Definitions require a precise target.",
+    );
+  }
+  if (deps.lspRuntime.kind !== "ready") {
+    return {
+      lines,
+      hasStructuralEvidence,
+      hasSemanticEvidence: contextHasSemanticEvidence,
+      status: contextHasSemanticEvidence ? "partial" : "unavailable",
+      reason: "Definition targets require a live language server.",
+      evidenceLists: [],
+    };
   }
 
-  const lspDefs = await appendDefinitionTargets(target, deps, limit);
-  if (lspDefs.length > 0) {
+  const definitions = await collectDefinitionTargets(target, deps, limit);
+  if (definitions.lines.length > 0) {
     if (lines.length > 0) lines.push("");
-    lines.push(...lspDefs.slice(0, limit));
+    lines.push("**Definition:**", ...definitions.lines);
   }
-
+  const hasSemanticEvidence = contextHasSemanticEvidence || definitions.hasSemanticEvidence;
   return {
     lines,
-    hasSemanticEvidence: contextHasSemanticEvidence || lspDefs.length > 0,
+    hasStructuralEvidence,
+    hasSemanticEvidence,
+    status:
+      definitions.status === "unavailable" && hasSemanticEvidence ? "partial" : definitions.status,
+    reason: definitions.reason,
+    evidenceLists: definitions.evidenceLists,
   };
 }
 
-async function appendDefinitionTargets(
+async function collectDefinitionTargets(
   target: OrientationTarget,
   deps: OrientationDeps,
   limit: number,
-): Promise<string[]> {
-  if (!deps.provider?.definition) return [];
+): Promise<
+  Pick<
+    TargetSectionCollection,
+    "lines" | "hasSemanticEvidence" | "status" | "reason" | "evidenceLists"
+  >
+> {
+  if (!deps.provider?.definition) {
+    return {
+      lines: [],
+      hasSemanticEvidence: false,
+      status: "unavailable",
+      reason: "Definition provider unavailable.",
+      evidenceLists: [],
+    };
+  }
   try {
     const result = await deps.provider.definition(target.file, {
       line: target.line - 1,
       character: target.character - 1,
     });
-    if (result.kind === "unavailable" || result.data.length === 0) return [];
-    const lines: string[] = ["**Definition:**"];
-    for (const def of result.data.slice(0, limit)) {
-      const filePath = uriToFile(def.uri);
-      const relPath = path.relative(deps.cwd, filePath);
-      lines.push(`- \`${relPath}:${def.range.start.line + 1}:${def.range.start.character + 1}\``);
+    if (result.kind === "unavailable") {
+      return {
+        lines: [],
+        hasSemanticEvidence: false,
+        status: "unavailable",
+        reason: result.reason,
+        evidenceLists: [],
+      };
     }
-    return lines;
-  } catch {
-    return [];
+    const locations = result.data.map((definition) => {
+      const filePath = uriToFile(definition.uri);
+      const relPath = path.relative(deps.cwd, filePath);
+      return `\`${relPath}:${definition.range.start.line + 1}:${definition.range.start.character + 1}\``;
+    });
+    const evidence =
+      result.kind === "partial"
+        ? createPartialEvidenceList({
+            key: "orientation.definitionTargets",
+            items: locations,
+            maxResults: limit,
+            partialReason: "provider-limited",
+          })
+        : createEvidenceList({
+            key: "orientation.definitionTargets",
+            items: locations,
+            maxResults: limit,
+          });
+    return {
+      lines: evidence.items,
+      hasSemanticEvidence: true,
+      status: result.kind === "partial" ? "partial" : "complete",
+      reason: result.kind === "partial" ? result.reason : null,
+      evidenceLists: [evidence.metadata],
+    };
+  } catch (error) {
+    return {
+      lines: [],
+      hasSemanticEvidence: false,
+      status: "unavailable",
+      reason: `Definition provider failed: ${String(error)}`,
+      evidenceLists: [],
+    };
   }
 }
 
@@ -201,53 +286,98 @@ async function buildDiagnosticsSection(
   target: OrientationTarget | null | undefined,
   deps: OrientationDeps,
   limit: number,
-): Promise<{ lines: string[]; hasSemanticEvidence: boolean }> {
+): Promise<TargetSectionCollection> {
   if (!target) {
-    return {
-      lines: ["Diagnostics unavailable without a precise target."],
-      hasSemanticEvidence: false,
-    };
+    return unavailableTargetSection([], false, "Diagnostics require a precise target.");
   }
-
   if (deps.lspRuntime.kind !== "ready") {
-    return {
-      lines: [
+    return unavailableTargetSection(
+      [
         "LSP not available — diagnostics require a live language server. Use `code_health` to check server status.",
       ],
-      hasSemanticEvidence: false,
-    };
+      false,
+      "Diagnostics require a live language server.",
+    );
   }
 
   try {
     const targetFile = path.resolve(deps.cwd, target.file);
     const result = await deps.lspRuntime.runtime.fileDiagnostics(targetFile, 4);
     if (result.kind === "unavailable") {
-      return {
-        lines: [`Diagnostics unavailable for this target — ${result.reason}`],
-        hasSemanticEvidence: false,
-      };
+      return unavailableTargetSection(
+        [`Diagnostics unavailable for this target — ${result.reason}`],
+        false,
+        result.reason,
+      );
     }
-    if (result.data.length === 0) {
-      return { lines: ["No diagnostics found near this target."], hasSemanticEvidence: true };
-    }
-
     const nearby = result.data.filter(
       (diagnostic) => Math.abs((diagnostic.range.start.line ?? 0) + 1 - target.line) <= 5,
     );
-    if (nearby.length === 0) {
-      return { lines: ["No diagnostics found near this target."], hasSemanticEvidence: true };
-    }
-
-    const lines: string[] = [];
-    for (const d of nearby.slice(0, limit)) {
-      const severity = (d.severity ?? 1) === 1 ? "ERROR" : "WARN";
-      const line = (d.range.start.line ?? 0) + 1;
-      lines.push(`- **${severity}** (L${line}): ${d.message}`);
-    }
-    return { lines, hasSemanticEvidence: true };
-  } catch {
-    return { lines: ["Diagnostics failed to load."], hasSemanticEvidence: false };
+    const evidence =
+      result.kind === "partial"
+        ? createPartialEvidenceList({
+            key: "orientation.diagnostics",
+            items: nearby,
+            maxResults: limit,
+            partialReason: "provider-limited",
+          })
+        : createEvidenceList({
+            key: "orientation.diagnostics",
+            items: nearby,
+            maxResults: limit,
+          });
+    return {
+      lines:
+        evidence.items.length === 0
+          ? ["No diagnostics found near this target."]
+          : evidence.items.map((diagnostic) => formatDiagnostic(diagnostic)),
+      hasStructuralEvidence: false,
+      hasSemanticEvidence: true,
+      status: result.kind === "partial" ? "partial" : "complete",
+      reason: result.kind === "partial" ? result.reason : null,
+      evidenceLists: [evidence.metadata],
+    };
+  } catch (error) {
+    return unavailableTargetSection(
+      ["Diagnostics failed to load."],
+      false,
+      `Diagnostics failed to load: ${String(error)}`,
+    );
   }
+}
+
+function formatDiagnostic(diagnostic: Diagnostic): string {
+  const severity = (diagnostic.severity ?? 1) === 1 ? "ERROR" : "WARN";
+  return `- **${severity}** (L${(diagnostic.range.start.line ?? 0) + 1}): ${diagnosticMessageString(diagnostic)}`;
+}
+
+function completedDocsSection(
+  lines: string[],
+  evidenceLists: readonly EvidenceListMetadata[],
+): TargetSectionCollection {
+  return {
+    lines,
+    hasStructuralEvidence: false,
+    hasSemanticEvidence: false,
+    status: "complete",
+    reason: null,
+    evidenceLists,
+  };
+}
+
+function unavailableTargetSection(
+  lines: string[],
+  hasStructuralEvidence: boolean,
+  reason: string,
+): TargetSectionCollection {
+  return {
+    lines,
+    hasStructuralEvidence,
+    hasSemanticEvidence: false,
+    status: "unavailable",
+    reason,
+    evidenceLists: [],
+  };
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: JSDoc parsing naturally has state-machine complexity
@@ -255,14 +385,22 @@ async function buildDocsSection(
   target: OrientationTarget | null | undefined,
   deps: OrientationDeps,
   limit: number,
-): Promise<{ lines: string[]; hasStructuralEvidence: boolean }> {
+): Promise<TargetSectionCollection> {
   if (!target) {
-    return { lines: ["Docs unavailable without a precise target."], hasStructuralEvidence: false };
+    return unavailableTargetSection(
+      ["Docs unavailable without a precise target."],
+      false,
+      "Docs require a precise target.",
+    );
   }
 
   const targetFile = path.resolve(deps.cwd, target.file);
   if (!existsSync(targetFile)) {
-    return { lines: ["Docs unavailable — target file not found."], hasStructuralEvidence: false };
+    return unavailableTargetSection(
+      ["Docs unavailable — target file not found."],
+      false,
+      "Target file not found.",
+    );
   }
 
   try {
@@ -305,10 +443,7 @@ async function buildDocsSection(
     }
 
     if (jsdocStart === -1 || jsdocEnd === -1) {
-      return {
-        lines: ["No JSDoc/TSDoc comment found for this symbol."],
-        hasStructuralEvidence: false,
-      };
+      return completedDocsSection(["No JSDoc/TSDoc comment found for this symbol."], []);
     }
 
     const docLines = lines
@@ -319,19 +454,24 @@ async function buildDocsSection(
           .replace(/^\s*\/\*\*\s?/, "")
           .replace(/\s*\*\/\s*$/, ""),
       )
-      .filter((line) => line.trim() !== "")
-      .slice(0, limit);
+      .filter((line) => line.trim() !== "");
 
     if (docLines.length === 0) {
-      return {
-        lines: ["No JSDoc/TSDoc comment found for this symbol."],
-        hasStructuralEvidence: false,
-      };
+      return completedDocsSection(["No JSDoc/TSDoc comment found for this symbol."], []);
     }
 
-    return { lines: ["```ts", ...docLines, "```"], hasStructuralEvidence: true };
-  } catch {
-    return { lines: ["Docs extraction failed."], hasStructuralEvidence: false };
+    const evidence = createEvidenceList({
+      key: "orientation.docs",
+      items: docLines,
+      maxResults: limit,
+    });
+    return completedDocsSection(["```ts", ...evidence.items, "```"], [evidence.metadata]);
+  } catch (error) {
+    return unavailableTargetSection(
+      ["Docs extraction failed."],
+      false,
+      `Docs extraction failed: ${String(error)}`,
+    );
   }
 }
 
@@ -450,6 +590,40 @@ function findEnclosingOutlineItem(
   )[0];
 }
 
+function targetSectionResult(
+  key: OrientationSection,
+  collection: TargetSectionCollection,
+  provenance: OrientationSectionData["provenance"],
+): {
+  section: CollectedOrientationSection;
+  hasStructuralEvidence: boolean;
+  hasSemanticEvidence: boolean;
+} {
+  const confidence: ConfidenceMode = collection.hasSemanticEvidence
+    ? "semantic"
+    : collection.hasStructuralEvidence
+      ? "structural"
+      : "unavailable";
+  return {
+    section: {
+      key,
+      title: SECTION_TITLES[key],
+      lines: collection.lines,
+      metadata: {
+        key,
+        title: SECTION_TITLES[key],
+        status: collection.status,
+        reason: collection.reason,
+        confidence,
+        provenance,
+        evidenceLists: collection.evidenceLists,
+      },
+    },
+    hasStructuralEvidence: collection.hasStructuralEvidence,
+    hasSemanticEvidence: collection.hasSemanticEvidence,
+  };
+}
+
 function buildTargetBlocks(
   focusTarget: string | null,
   sections: readonly CollectedOrientationSection[],
@@ -466,7 +640,10 @@ function buildTargetBlocks(
     );
   }
   for (const section of sections) {
-    blocks.push({ kind: "heading", level: 2, text: section.title });
+    blocks.push(
+      { kind: "heading", level: 2, text: section.title },
+      { kind: "paragraph", text: formatSectionNote(section.metadata) },
+    );
     blocks.push(...sectionBlocks(section.lines.join("\n")), { kind: "blank" });
   }
   return blocks;

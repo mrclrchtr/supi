@@ -1,289 +1,255 @@
-/**
- * Architecture model discovery — scans project metadata to build a structural
- * workspace model for auto-injected overviews and on-demand briefs.
- */
+/** Direct package-manifest and workspace-configuration collection for Orientation. */
 
-import * as fs from "node:fs";
+import { glob } from "node:fs/promises";
 import * as path from "node:path";
-import { findProjectRoot, walkProject } from "@mrclrchtr/supi-core/project";
-import type { ArchitectureModel, DependencyEdge, ModuleInfo } from "./model.ts";
+import {
+  errorMessage,
+  readPackageJson,
+  toModuleInfo,
+  toRootManifestObservation,
+} from "./manifest.ts";
+import type {
+  ArchitectureModel,
+  ArchitectureObservationStatus,
+  DependencyEdge,
+  ModuleInfo,
+  PackageManifestObservation,
+  WorkspaceTopology,
+} from "./model.ts";
+import { findArchitectureRoot, readWorkspaceDeclaration } from "./workspace-config.ts";
 
-// ── Constants ─────────────────────────────────────────────────────────
-
-const PROJECT_MARKERS = [
-  "package.json",
-  "pnpm-workspace.yaml",
-  "deno.json",
-  "deno.jsonc",
-  "Cargo.toml",
-  "go.mod",
-  "pyproject.toml",
-];
-
-interface PackageJson {
-  name?: string;
-  description?: string;
-  main?: string;
-  module?: string;
-  exports?: unknown;
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-  peerDependencies?: Record<string, string>;
-  workspaces?: string[] | { packages?: string[] };
-  pi?: { extensions?: string[] };
+interface WorkspaceCollection {
+  readonly modules: readonly ModuleInfo[];
+  readonly edges: readonly DependencyEdge[];
+  readonly status: ArchitectureObservationStatus;
+  readonly reason: string | null;
+  readonly failedPackageManifestCount: number;
 }
-
-// ── Public entry point ────────────────────────────────────────────────
 
 /**
- * Build an architecture model from project metadata.
- * Starts from cheap manifest scanning — no deep AST or LSP analysis.
+ * Collect directly observed package-manifest and workspace-configuration facts.
+ *
+ * Only `package.json#workspaces` and `pnpm-workspace.yaml#packages` establish
+ * workspace membership. Pattern expansion uses Node's native glob after
+ * documented pattern validation; unsupported patterns fail closed.
  */
-export async function buildArchitectureModel(cwd: string): Promise<ArchitectureModel | null> {
-  const root = findProjectRoot(cwd, PROJECT_MARKERS, cwd);
-  const rootManifest = readPackageJson(root);
+export async function buildArchitectureModel(cwd: string): Promise<ArchitectureModel> {
+  const root = findArchitectureRoot(cwd);
+  const rootRead = readPackageJson(root);
+  const rootPackage =
+    rootRead.kind === "complete" ? toModuleInfo(rootRead.value, root, root) : null;
+  const rootManifest = toRootManifestObservation(rootRead, rootPackage);
+  const declaration = readWorkspaceDeclaration(root, rootRead);
 
-  if (!rootManifest) {
-    return buildMinimalModel(root);
-  }
-
-  const projectName = rootManifest.name ?? null;
-  const projectDescription = rootManifest.description ?? null;
-  const workspaceModules = await detectWorkspaceModules(root, rootManifest);
-
-  if (workspaceModules.length === 0) {
-    return buildSinglePackageModel(root, rootManifest);
-  }
-
-  const moduleNames = new Set(workspaceModules.map((m) => m.name));
-  const edges: DependencyEdge[] = [];
-
-  for (const mod of workspaceModules) {
-    for (const dep of mod.internalDeps) {
-      if (moduleNames.has(dep)) {
-        edges.push({ from: mod.name, to: dep });
-      }
-    }
-  }
-
-  const dependedOn = new Set(edges.map((e) => e.to));
-  for (const mod of workspaceModules) {
-    mod.isLeaf = !dependedOn.has(mod.name);
-  }
-
-  return {
-    root,
-    name: projectName,
-    description: projectDescription,
-    modules: workspaceModules,
-    edges,
-  };
-}
-
-// ── Manifest reading ──────────────────────────────────────────────────
-
-function readPackageJson(dir: string): PackageJson | null {
-  try {
-    const raw = fs.readFileSync(path.join(dir, "package.json"), "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-// ── Workspace detection ───────────────────────────────────────────────
-
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: workspace detection with manifest parsing
-async function detectWorkspaceModules(
-  root: string,
-  rootManifest: PackageJson,
-): Promise<ModuleInfo[]> {
-  let workspaceGlobs: string[] = [];
-
-  try {
-    const pnpmWs = fs.readFileSync(path.join(root, "pnpm-workspace.yaml"), "utf-8");
-    const packagesMatch = pnpmWs.match(/packages:\s*\n((?:\s*-\s*.+\n?)*)/);
-    if (packagesMatch) {
-      workspaceGlobs = packagesMatch[1]
-        .split("\n")
-        .map((line) => line.replace(/^\s*-\s*/, "").replace(/['"\s]/g, ""))
-        .filter(Boolean);
-    }
-  } catch {
-    const ws = rootManifest.workspaces;
-    if (Array.isArray(ws)) {
-      workspaceGlobs = ws;
-    } else if (ws && Array.isArray(ws.packages)) {
-      workspaceGlobs = ws.packages;
-    }
-  }
-
-  if (workspaceGlobs.length === 0) return [];
-
-  const modules: ModuleInfo[] = [];
-  const resolvedDirs = resolveWorkspaceGlobs(root, workspaceGlobs);
-
-  // Pass 1: collect all package manifests and their names so we can
-  // classify dependencies by membership rather than by version protocol.
-  const packageNames = new Set<string>();
-  const moduleCandidates = new Map<
-    string,
-    {
-      manifest: PackageJson;
-      dir: string;
-      relativePath: string;
-    }
-  >();
-  for (const dir of resolvedDirs) {
-    const manifest = readPackageJson(dir);
-    if (!manifest?.name) continue;
-    packageNames.add(manifest.name);
-    moduleCandidates.set(manifest.name, {
-      manifest,
-      dir,
-      relativePath: path.relative(root, dir),
+  if (declaration.kind === "unavailable") {
+    return createModel({
+      root,
+      rootManifest,
+      topology: {
+        kind: "unavailable",
+        status: "unavailable",
+        source: null,
+        reason: declaration.reason,
+        failedPackageManifestCount: 0,
+      },
     });
   }
 
-  // Pass 2: classify dependencies against the collected workspace names.
-  // This works for all package managers — npm, Yarn, and pnpm — without
-  // relying on the `workspace:` protocol.
-  for (const [name, { manifest, dir, relativePath }] of moduleCandidates) {
-    const allDeps = { ...manifest.dependencies, ...manifest.peerDependencies };
-
-    const internalDeps: string[] = [];
-    const externalDeps: string[] = [];
-    for (const depName of Object.keys(allDeps)) {
-      if (packageNames.has(depName)) {
-        internalDeps.push(depName);
-      } else {
-        externalDeps.push(depName);
-      }
-    }
-
-    const entrypoints: string[] = [];
-    if (manifest.pi?.extensions) {
-      entrypoints.push(...manifest.pi.extensions);
-    } else if (manifest.main) {
-      entrypoints.push(manifest.main);
-    } else if (manifest.module) {
-      entrypoints.push(manifest.module);
-    }
-
-    modules.push({
-      name,
-      description: manifest.description ?? null,
-      root: dir,
-      relativePath,
-      entrypoints,
-      isLeaf: false,
-      internalDeps,
-      externalDeps,
-    });
+  if (declaration.kind === "single-package") {
+    return rootPackage
+      ? createModel({
+          root,
+          rootManifest,
+          topology: {
+            kind: "single-package",
+            status: "complete",
+            source: null,
+            reason: null,
+            failedPackageManifestCount: 0,
+          },
+          modules: [rootPackage],
+        })
+      : createModel({
+          root,
+          rootManifest,
+          topology: {
+            kind: "unavailable",
+            status: "unavailable",
+            source: null,
+            reason: rootManifest.reason ?? "Root package manifest is unavailable.",
+            failedPackageManifestCount: 0,
+          },
+        });
   }
 
-  return modules;
-}
-
-function resolveWorkspaceGlobs(root: string, globs: string[]): string[] {
-  const dirs: string[] = [];
-
-  for (const glob of globs) {
-    if (glob.includes("*")) {
-      const prefix = glob.replace(/\/?\*.*$/, "");
-      const baseDir = path.join(root, prefix);
-      const recursive = glob.includes("**");
-      try {
-        collectPackageDirs(baseDir, dirs, recursive ? 5 : 0);
-      } catch {
-        // Glob base directory doesn't exist
-      }
-    } else {
-      const fullPath = path.join(root, glob);
-      if (fs.existsSync(path.join(fullPath, "package.json"))) {
-        dirs.push(fullPath);
-      }
-    }
-  }
-
-  return dirs;
-}
-
-function collectPackageDirs(baseDir: string, dirs: string[], depth: number): void {
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(baseDir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    if (entry.name.startsWith(".")) continue;
-    if (entry.name === "node_modules") continue;
-    const fullPath = path.join(baseDir, entry.name);
-    if (fs.existsSync(path.join(fullPath, "package.json"))) {
-      dirs.push(fullPath);
-    } else if (depth > 0) {
-      collectPackageDirs(fullPath, dirs, depth - 1);
-    }
-  }
-}
-
-// ── Fallback models ───────────────────────────────────────────────────
-
-function buildSinglePackageModel(root: string, manifest: PackageJson): ArchitectureModel {
-  const entrypoints: string[] = [];
-  if (manifest.pi?.extensions) {
-    entrypoints.push(...manifest.pi.extensions);
-  } else if (manifest.main) {
-    entrypoints.push(manifest.main);
-  }
-
-  const mod: ModuleInfo = {
-    name: manifest.name ?? path.basename(root),
-    description: manifest.description ?? null,
+  const collected = await collectWorkspaceModules(root, declaration.patterns);
+  return createModel({
     root,
-    relativePath: ".",
-    entrypoints,
-    isLeaf: true,
-    internalDeps: [],
-    externalDeps: Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies }),
-  };
-
-  return {
-    root,
-    name: manifest.name ?? null,
-    description: manifest.description ?? null,
-    modules: [mod],
-    edges: [],
-  };
-}
-
-function buildMinimalModel(root: string): ArchitectureModel | null {
-  let hasSource = false;
-  walkProject(root, 2, (_dir, entries) => {
-    for (const name of entries) {
-      if (
-        name.endsWith(".ts") ||
-        name.endsWith(".js") ||
-        name.endsWith(".tsx") ||
-        name.endsWith(".jsx") ||
-        name.endsWith(".py") ||
-        name.endsWith(".rs") ||
-        name.endsWith(".go")
-      ) {
-        hasSource = true;
-      }
-    }
+    rootManifest,
+    topology: {
+      kind: collected.status === "unavailable" ? "unavailable" : "workspace",
+      status: collected.status,
+      source: declaration.source,
+      reason: collected.reason,
+      failedPackageManifestCount: collected.failedPackageManifestCount,
+    },
+    modules: collected.modules,
+    edges: collected.edges,
   });
+}
 
-  if (!hasSource) return null;
+function createModel(input: {
+  root: string;
+  rootManifest: PackageManifestObservation;
+  topology: WorkspaceTopology;
+  modules?: readonly ModuleInfo[];
+  edges?: readonly DependencyEdge[];
+}): ArchitectureModel {
+  return {
+    root: input.root,
+    rootManifest: input.rootManifest,
+    topology: input.topology,
+    modules: input.modules ?? [],
+    edges: input.edges ?? [],
+    name: input.rootManifest.package?.name ?? null,
+    description: input.rootManifest.package?.description ?? null,
+  };
+}
+
+async function collectWorkspaceModules(
+  root: string,
+  patterns: readonly string[],
+): Promise<WorkspaceCollection> {
+  let directories: string[];
+  try {
+    directories = await collectWorkspaceDirectories(root, patterns);
+  } catch (error) {
+    return unavailableCollection(`Could not expand workspace patterns: ${errorMessage(error)}`);
+  }
+
+  const result = collectPackageManifests(root, directories);
+  const relationships = collectManifestRelationships(result.modules);
+  const reasons = [
+    result.failedPackageManifestCount > 0
+      ? `${result.failedPackageManifestCount} matched package manifest${result.failedPackageManifestCount === 1 ? " is" : "s are"} unreadable or invalid`
+      : null,
+    relationships.duplicateNames.length > 0
+      ? `duplicate package names: ${relationships.duplicateNames.join(", ")}`
+      : null,
+  ].filter((reason): reason is string => reason !== null);
 
   return {
-    root,
-    name: path.basename(root),
-    description: null,
+    modules: result.modules,
+    edges: relationships.edges,
+    status: reasons.length > 0 ? "partial" : "complete",
+    reason: reasons.length > 0 ? reasons.join("; ") : null,
+    failedPackageManifestCount: result.failedPackageManifestCount,
+  };
+}
+
+/** Expand validated inclusion patterns and trailing exclusions with Node's native glob. */
+async function collectWorkspaceDirectories(
+  root: string,
+  patterns: readonly string[],
+): Promise<string[]> {
+  const inclusions = patterns.filter((pattern) => !pattern.startsWith("!"));
+  const exclusions = [
+    "**/node_modules/**",
+    "**/.pnpm/**",
+    "**/.git/**",
+    ...patterns.filter((pattern) => pattern.startsWith("!")).map((pattern) => pattern.slice(1)),
+  ];
+  const directories = new Set<string>();
+  for await (const entry of glob(inclusions, {
+    cwd: root,
+    exclude: exclusions,
+    withFileTypes: true,
+  })) {
+    if (entry.isDirectory()) directories.add(path.join(entry.parentPath, entry.name));
+  }
+  return [...directories];
+}
+
+function collectPackageManifests(root: string, directories: readonly string[]) {
+  const byDirectory = new Map<string, ModuleInfo>();
+  let failedPackageManifestCount = 0;
+  for (const directory of sortedDirectories(directories)) {
+    const manifest = readPackageJson(directory);
+    if (manifest.kind === "missing") continue;
+    if (manifest.kind === "unavailable") {
+      failedPackageManifestCount++;
+      continue;
+    }
+    byDirectory.set(directory, toModuleInfo(manifest.value, directory, root));
+  }
+  return {
+    modules: [...byDirectory.values()].sort((left, right) =>
+      left.relativePath.localeCompare(right.relativePath),
+    ),
+    failedPackageManifestCount,
+  };
+}
+
+function sortedDirectories(directories: readonly string[]): string[] {
+  return directories
+    .map((entry) => path.resolve(entry))
+    .sort((left, right) => left.localeCompare(right));
+}
+
+function collectManifestRelationships(modules: readonly ModuleInfo[]) {
+  const byName = indexModulesByName(modules);
+  const duplicateNames = [...byName.entries()]
+    .filter(([, entries]) => entries.length > 1)
+    .map(([name]) => name)
+    .sort((left, right) => left.localeCompare(right));
+  return { edges: collectEdges(modules, byName), duplicateNames };
+}
+
+function indexModulesByName(modules: readonly ModuleInfo[]): Map<string, ModuleInfo[]> {
+  const byName = new Map<string, ModuleInfo[]>();
+  for (const module of modules) {
+    if (!module.name) continue;
+    const entries = byName.get(module.name) ?? [];
+    entries.push(module);
+    byName.set(module.name, entries);
+  }
+  return byName;
+}
+
+function collectEdges(
+  modules: readonly ModuleInfo[],
+  byName: ReadonlyMap<string, readonly ModuleInfo[]>,
+): DependencyEdge[] {
+  const edges: DependencyEdge[] = [];
+  for (const module of modules) {
+    if (!module.name) continue;
+    for (const section of module.dependencySections) {
+      for (const dependency of section.entries) {
+        if ((byName.get(dependency.name)?.length ?? 0) !== 1) continue;
+        edges.push({
+          from: module.name,
+          to: dependency.name,
+          field: section.field,
+          specifier: dependency.specifier,
+          manifestPath: module.manifestPath,
+        });
+      }
+    }
+  }
+  return edges.sort(
+    (left, right) =>
+      left.from.localeCompare(right.from) ||
+      left.to.localeCompare(right.to) ||
+      left.field.localeCompare(right.field),
+  );
+}
+
+function unavailableCollection(reason: string): WorkspaceCollection {
+  return {
     modules: [],
     edges: [],
+    status: "unavailable",
+    reason,
+    failedPackageManifestCount: 0,
   };
 }

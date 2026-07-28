@@ -119,6 +119,17 @@ export interface ResolveDetails {
   nextQueries: string[];
 }
 
+/** One independently collected code_orientation section. */
+export interface OrientationSectionDetails {
+  key: string;
+  title: string;
+  status: "complete" | "partial" | "unavailable";
+  reason: string | null;
+  confidence: ConfidenceMode;
+  provenance: ResultProvenance[];
+  evidenceLists: EvidenceListMetadata[];
+}
+
 /** Structured details metadata for code_orientation results. */
 export interface ContextDetails {
   confidence: ConfidenceMode;
@@ -128,6 +139,8 @@ export interface ContextDetails {
   renderedSections: string[];
   omittedCount: number;
   evidenceLists?: EvidenceListMetadata[];
+  /** Per-section status, provenance, and bounded-list metadata. */
+  sections?: OrientationSectionDetails[];
   nextQueries: string[];
   /** Source ranges projected from the assembled read-next actions. */
   readNext?: ReadNextItem[];

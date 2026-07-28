@@ -14,10 +14,12 @@ import { loadCodeIntelligenceConfig } from "../config.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import { parseOrientationWorkflowInput } from "./input/workflows.ts";
 import { executeOrientation } from "./orientation/collect.ts";
+import { formatSectionNote } from "./orientation/context-sections.ts";
 import type {
   OrientationBlock,
   OrientationFocusInput,
   OrientationResultData,
+  OrientationSectionData,
   OrientationWorkflowInput,
   OrientationWorkflowOutcome,
 } from "./orientation-types.ts";
@@ -82,7 +84,7 @@ export async function runOrientationWorkflow(
 async function orientTarget(options: {
   targetInput: Extract<OrientationFocusInput, { target: unknown }>["target"];
   maxResults: number;
-  model: ArchitectureModel | null;
+  model: ArchitectureModel;
   deps: OrientationWorkflowDeps;
   control?: WorkflowControl;
 }): Promise<OrientationWorkflowOutcome> {
@@ -174,7 +176,7 @@ async function orientTarget(options: {
 function resolveContextFocus(
   focus: Exclude<OrientationFocusInput, { target: unknown }>,
   cwd: string,
-  model: ArchitectureModel | null,
+  model: ArchitectureModel,
 ): { kind: "resolved"; path: string } | { kind: "invalid-input"; message: string } {
   if ("path" in focus) {
     const path = normalizePath(focus.path, cwd);
@@ -183,11 +185,10 @@ function resolveContextFocus(
       : { kind: "invalid-input", message: `Focus path not found: \`${focus.path}\`.` };
   }
 
-  const matches =
-    model?.modules.filter(
-      (module) =>
-        module.name === focus.module || module.name.replace(/^@[^/]+\//, "") === focus.module,
-    ) ?? [];
+  const matches = model.modules.filter(
+    (module) =>
+      module.name === focus.module || module.name?.replace(/^@[^/]+\//, "") === focus.module,
+  );
   if (matches.length === 1) return { kind: "resolved", path: matches[0].root };
   if (matches.length > 1) {
     return {
@@ -216,9 +217,27 @@ function addInstructionFiles(
   const collected = collectInstructionFiles(matches);
   if (!collected) return result;
   deps.markInstructionDirsSurfaced(collected.metadata.files.map((file) => file.directory));
+  const section: OrientationSectionData = {
+    key: "instructions",
+    title: "Instructions",
+    status: "complete",
+    reason: null,
+    confidence: "unavailable",
+    provenance: [{ source: "filesystem", detail: "configured instruction files" }],
+    evidenceLists: [
+      {
+        key: "instructions.files",
+        totalCount: collected.files.length,
+        shownCount: collected.files.length,
+        omittedCount: 0,
+        partialReason: null,
+      },
+    ],
+  };
   return {
     ...result,
-    blocks: insertInstructionBlocks(result.blocks, collected.files),
+    blocks: insertInstructionBlocks(result.blocks, collected.files, section),
+    sections: [section, ...result.sections],
     renderedSections: ["instructions", ...result.renderedSections],
     instructions: collected.metadata,
   };
@@ -259,9 +278,11 @@ function insertInstructionBlocks(
     shownLines: number;
     totalLines: number;
   }[],
+  section: OrientationSectionData,
 ): OrientationBlock[] {
   const blocks: OrientationBlock[] = [
     { kind: "heading", level: 2, text: "Instructions" },
+    { kind: "paragraph", text: formatSectionNote(section) },
     { kind: "blank" },
   ];
   for (const file of files) {

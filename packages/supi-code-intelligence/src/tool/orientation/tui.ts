@@ -117,7 +117,7 @@ function summarySegments(
   }
 
   const confidence = typeof data.confidence === "string" ? data.confidence : "";
-  if (confidence) {
+  if (confidence && confidence !== "unavailable") {
     segments.push(`${theme.fg("dim", "confidence")} ${theme.fg("muted", confidence)}`);
   }
 
@@ -128,9 +128,6 @@ function summarySegments(
 }
 
 function orientationEvidence(data: Record<string, unknown>): EvidenceEntry | null {
-  return (
-    readEvidenceEntries(data.evidenceLists).find(
-      (evidence) => evidence.key === "orientation.sections",
-    ) ?? null
-  );
+  const evidence = readEvidenceEntries(data.evidenceLists);
+  return evidence.find((entry) => entry.shownCount > 0) ?? evidence[0] ?? null;
 }

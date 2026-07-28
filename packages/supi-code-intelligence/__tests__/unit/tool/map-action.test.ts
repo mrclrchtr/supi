@@ -8,78 +8,114 @@ import { makeTestCtx } from "../../helpers/execute-action.ts";
 let tmpDir: string;
 
 beforeEach(() => {
-  tmpDir = mkdtempSync(path.join(os.tmpdir(), "brief-enrich-"));
+  tmpDir = mkdtempSync(path.join(os.tmpdir(), "orientation-facts-"));
 });
 
 afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function writeFile(relativePath: string, content: string) {
+function writeFile(relativePath: string, content: string): void {
   const fullPath = path.join(tmpDir, relativePath);
   mkdirSync(path.dirname(fullPath), { recursive: true });
   writeFileSync(fullPath, content, "utf-8");
 }
 
-describe("directory brief enrichment", () => {
-  it("includes extension breakdown and landmarks for workspace root module", async () => {
-    writeFile("package.json", "{}");
+describe("directory Orientation facts", () => {
+  it("lists only direct filesystem entries without extension or landmark classifications", async () => {
+    writeFile("package.json", JSON.stringify({ name: "root" }));
     writeFile("src/app.ts", "export const app = 1;");
     writeFile("src/lib/util.ts", "export const util = 2;");
-    writeFile("src/routes/home.tsx", "export default () => {};");
-    writeFile("docs/readme.md", "# Docs");
+    writeFile("src/README.md", "# Source notes");
 
-    const result = await executeOrientationTool({ focus: { path: "." } }, makeTestCtx(tmpDir));
+    const result = await executeOrientationTool({ focus: { path: "src" } }, makeTestCtx(tmpDir));
 
-    expect(result.content).toContain("TypeScript: 2");
-    expect(result.content).toContain("TSX: 1");
-    expect(result.content).toContain("Markdown: 1");
-    expect(result.content).toContain("Landmark files");
-    expect(result.content).toContain("package.json");
-    expect(result.content).not.toContain("startHere");
+    expect(result.content).toContain("## Direct regular files");
+    expect(result.content).toContain("`app.ts`");
+    expect(result.content).toContain("`README.md`");
+    expect(result.content).toContain("## Direct directories");
+    expect(result.content).toContain("`lib/`");
+    expect(result.content).not.toContain("TypeScript");
+    expect(result.content).not.toContain("Landmark files");
+    expect(result.content).not.toContain("Public Surfaces");
+    expect(result.content).not.toContain("util.ts");
   });
 
-  it("includes extension breakdown for a nested package directory", async () => {
-    writeFile("package.json", "{}");
-    writeFile("packages/app/package.json", "{}");
-    writeFile("packages/app/src/main.ts", "export default function main() {}");
-    writeFile("packages/app/src/routes/home.ts", "export const home = 1;");
+  it("discloses exact direct-entry omissions in Markdown and structured details", async () => {
+    writeFile("package.json", JSON.stringify({ name: "root" }));
+    writeFile("src/a.txt", "");
+    writeFile("src/b.txt", "");
+    writeFile("src/c.txt", "");
 
     const result = await executeOrientationTool(
-      { focus: { path: "packages/app" } },
+      { focus: { path: "src" }, maxResults: 2 },
+      makeTestCtx(tmpDir),
+    );
+    const details = result.details as {
+      data?: { sections?: Array<{ key: string; evidenceLists: Array<Record<string, unknown>> }> };
+    };
+
+    expect(result.content).toContain("showing 2 of 3; 1 omitted");
+    expect(details.data?.sections).toContainEqual(
+      expect.objectContaining({
+        key: "filesystem.files",
+        evidenceLists: [expect.objectContaining({ totalCount: 3, shownCount: 2, omittedCount: 1 })],
+      }),
+    );
+  });
+
+  it("labels workspace packages with their configuration provenance", async () => {
+    writeFile("package.json", JSON.stringify({ name: "root" }));
+    writeFile("pnpm-workspace.yaml", "packages:\n  - packages/*\n");
+    writeFile("packages/app/package.json", JSON.stringify({ name: "@test/app" }));
+
+    const result = await executeOrientationTool({}, makeTestCtx(tmpDir));
+    const details = result.details as {
+      data?: { sections?: Array<{ key: string; provenance: Array<Record<string, unknown>> }> };
+    };
+
+    expect(result.content).toContain("Configuration-declared packages");
+    expect(result.content).toContain("configuration `pnpm-workspace.yaml#packages`");
+    expect(details.data?.sections).toContainEqual(
+      expect.objectContaining({
+        key: "topology.packages",
+        provenance: [
+          expect.objectContaining({
+            source: "configuration",
+            detail: "pnpm-workspace.yaml#packages",
+          }),
+        ],
+      }),
+    );
+  });
+
+  it("keeps a focused path usable when package topology is partial", async () => {
+    writeFile("package.json", JSON.stringify({ name: "root", workspaces: ["packages/*"] }));
+    writeFile("packages/valid/package.json", JSON.stringify({ name: "@test/valid" }));
+    writeFile("packages/valid/src/index.ts", "export const value = 1;");
+    writeFile("packages/broken/package.json", "{ invalid");
+
+    const result = await executeOrientationTool(
+      { focus: { path: "packages/valid/src" } },
       makeTestCtx(tmpDir),
     );
 
-    expect(result.content).toContain("TypeScript: 2");
-    expect(result.content).toContain("JSON: 1");
-    expect(result.content).toContain("`src/` — 2 files");
-    expect(result.content).toContain("Landmark files");
-    expect(result.content).toContain("package.json");
+    expect(result.content).toContain("`index.ts`");
+    expect(result.content).toContain("## Package topology");
+    expect(result.content).toContain("status: partial");
+    expect(result.content).toContain("filesystem-error");
   });
 
-  it("includes extension breakdown for any nested directory", async () => {
-    writeFile("package.json", "{}");
-    writeFile("packages/app/src/main.ts", "export default function main() {}");
-    writeFile("packages/app/src/lib/util.ts", "export const util = 1;");
-    writeFile("packages/app/src/lib/more.ts", "export const more = 2;");
+  it("keeps focused filesystem facts when package metadata cannot be parsed", async () => {
+    writeFile("package.json", "{ invalid");
+    writeFile("src/index.ts", "export const value = 1;");
 
-    const result = await executeOrientationTool(
-      { focus: { path: "packages/app/src" } },
-      makeTestCtx(tmpDir),
-    );
+    const result = await executeOrientationTool({ focus: { path: "src" } }, makeTestCtx(tmpDir));
 
-    expect(result.content).toContain("TypeScript: 3");
-  });
-
-  it("handles file paths gracefully", async () => {
-    writeFile("src/index.ts", "export const x = 1;");
-
-    const result = await executeOrientationTool(
-      { focus: { path: "src/index.ts" } },
-      makeTestCtx(tmpDir),
-    );
-
-    expect(result.content).not.toContain("code_map");
-    expect(result.content).toContain("index.ts");
+    expect(result.content).toContain("`index.ts`");
+    expect(result.content).toContain("## Package topology");
+    expect(result.content).toContain("status: unavailable");
+    expect(result.content).not.toContain("No recognized source files");
+    expect(result.content).not.toContain("No structured modules");
   });
 });

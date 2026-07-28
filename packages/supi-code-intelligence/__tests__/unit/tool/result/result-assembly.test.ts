@@ -319,6 +319,17 @@ describe("canonical Tool result assembly", () => {
   it("assembles Orientation blocks before markdown rendering", () => {
     const assembly = assembleOrientationResult({
       blocks: [{ kind: "heading", level: 1, text: "Project" }],
+      sections: [
+        {
+          key: "orientation",
+          title: "orientation",
+          status: "complete",
+          reason: null,
+          confidence: "structural",
+          provenance: [{ source: "structural", capability: "test" }],
+          evidenceLists: [],
+        },
+      ],
       confidence: "structural",
       focusTarget: null,
       requestedSections: [],

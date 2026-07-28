@@ -130,7 +130,7 @@ describe("code_orientation tool", () => {
     )) as { content: Array<{ text: string }> };
 
     expect(result.content[0].text).not.toContain("**Error");
-    expect(result.content[0].text).toContain("Project Brief");
+    expect(result.content[0].text).toContain("Workspace Orientation");
   });
 
   it("renders bounded live diagnostics as Priority Signals", async () => {
@@ -217,7 +217,8 @@ describe("code_orientation tool", () => {
       makeCtx({ cwd: tmpDir }),
     )) as { content: Array<{ text: string }> };
 
-    expect(result.content[0].text).toContain("# Module: app");
+    expect(result.content[0].text).toContain("# Directory: packages/app");
+    expect(result.content[0].text).toContain("## Package manifest");
     expect(result.content[0].text).toContain("Main app");
   });
 

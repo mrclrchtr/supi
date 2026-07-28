@@ -32,7 +32,6 @@ export const EVIDENCE_KEY_LABELS: Record<string, string> = {
   "inspect.diagnostics": "nearby diagnostics",
   "references.locations": "references",
   "refactor.edits": "edits",
-  "orientation.sections": "sections",
   "resolve.candidates": "candidates",
   "resolve.targets": "targets",
 };

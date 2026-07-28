@@ -16,6 +16,8 @@ export type EvidencePartialReason =
   | "safety-limit"
   | "interrupted"
   | "provider-limited"
+  | "filesystem-error"
+  | "configuration-error"
   | "invalid-provider-location";
 
 export interface EvidenceListMetadata {

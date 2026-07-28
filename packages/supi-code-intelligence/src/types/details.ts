@@ -12,6 +12,7 @@ export type {
   HealthDetails,
   HealthSectionDetails,
   InspectDetails,
+  OrientationSectionDetails,
   ResolveDetails,
   SearchDetails,
 } from "../tool/result/types.ts";

@@ -11,12 +11,16 @@ The set of agent-facing capabilities that help understand, navigate, search, and
 _Avoid_: code intel, IDE features
 
 **Orientation surface**:
-The code-intelligence surface that helps an agent establish where it is, what seams and landmarks matter, and what source it should inspect next before choosing more surgical tools.
+The code-intelligence surface that helps an agent establish directly observed workspace, package, directory, file, or target facts before choosing more surgical tools.
 _Avoid_: context bundle, relation graph, treating orientation as target analysis
 
 **Orientation focus**:
 The project, package, directory, file, or symbol that an orientation surface is centered on. An absent focus means workspace-level orientation; a precise focus means symbol-centered orientation rather than relation analysis.
 _Avoid_: scope, path, target when referring to orientation selection
+
+**Manifest-declared package topology**:
+The package membership and dependency declarations obtained from successfully parsed workspace configuration and package manifests. It is not a runtime architecture graph; every fact retains the establishing configuration or manifest field.
+_Avoid_: architecture inference, core-dependency classification, public-surface inference
 
 **Priority signal**:
 A bounded, focus-relevant fact included in Orientation to help choose what source to inspect next. It is prioritization context, not a full health report.
@@ -123,7 +127,7 @@ The code-intelligence flow that turns collected facts into public result evidenc
 _Avoid_: markdown-first result building, generic result builder, mixing evidence collection with rendering
 
 **Evidence list**:
-A bounded collection of tool evidence with explicit completeness metadata: which evidence atoms are shown and whether the list is complete. Normal public-tool paths compute exact totals and omitted counts. Unknown totals are reserved for exceptional interruption or provider-limited results, such as timeout, safety-limit, interrupted enumeration, or an upstream provider that cannot expose a true total, and must carry an explicit partial reason instead of pretending exact completeness. Rejected provider locations are tracked separately: valid normalized evidence retains exact counts while `invalidLocationCount` and an explicit partial reason disclose unusable provider atoms. Markdown and structured details should describe the same evidence list rather than computing truncation separately.
+A bounded collection of tool evidence with explicit completeness metadata: which evidence atoms are shown and whether the list is complete. Normal public-tool paths compute exact totals and omitted counts. Unknown totals are reserved for exceptional interruption or limited collection, such as timeout, safety-limit, interrupted enumeration, unreadable filesystem/configuration input, or an upstream provider that cannot expose a true total, and must carry an explicit partial reason instead of pretending exact completeness. Rejected provider locations are tracked separately: valid normalized evidence retains exact counts while `invalidLocationCount` and an explicit partial reason disclose unusable provider atoms. Markdown and structured details should describe the same evidence list rather than computing truncation separately.
 _Avoid_: raw capped arrays, renderer-only omission math, details-only omission math, inventing exact totals, using unknown totals as a routine performance shortcut
 
 **Actionable list**:

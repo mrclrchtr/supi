@@ -129,7 +129,7 @@ code_orientation({ focus: { module: "@scope/my-package" } })
 code_orientation({ focus: { target: { handle: "tg-…" } } })
 ```
 
-Omit `focus` for workspace Orientation. Directory Orientation also surfaces applicable local instruction files once per session branch.
+Omit `focus` for workspace Orientation. Directory Orientation also surfaces applicable local instruction files once per session branch. On-demand Orientation reports direct filesystem entries, successfully parsed manifest/workspace fields, and explicit provider observations. Package topology is manifest-declared—not a complete runtime architecture graph—and unavailable metadata is shown as its own warning instead of an absence claim. Workspace discovery supports `package.json#workspaces` and `pnpm-workspace.yaml#packages` with literal paths, `*`, `**`, and trailing exclusions; unsupported patterns fail closed.
 
 ### Inspect one source point
 

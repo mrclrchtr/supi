@@ -20,6 +20,7 @@ export type {
   HealthDetails,
   HealthSectionDetails,
   InspectDetails,
+  OrientationSectionDetails,
   ResolveDetails,
   SearchDetails,
 } from "./details.ts";

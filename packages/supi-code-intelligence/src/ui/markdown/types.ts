@@ -6,16 +6,16 @@ import type { CodeProvider } from "../../analysis/provider.ts";
 import type { AnchorKind } from "../../session/target-store.ts";
 import type { InspectDetails } from "../../types/details.ts";
 
-// ── Overview use-case ────────────────────────────────────────────────
+// ── Overview use-case ───────────────────────────────────────────────
 
 export interface OverviewModule {
   name: string;
   shortName: string;
   description: string | null;
-  isLeaf: boolean;
-  internalDeps: string[];
-  /** Entrypoints from the module manifest. */
-  entrypoints: string[];
+  /** Manifest-declared package relationships to other discovered packages. */
+  declaredDependencies: string[];
+  /** Field-labelled manifest path declarations, never selected by precedence. */
+  declaredEntrypoints: string[];
 }
 
 export interface OverviewData {
@@ -69,7 +69,7 @@ export interface OrientationInput {
 }
 
 export interface OrientationDeps {
-  model: ArchitectureModel | null;
+  model: ArchitectureModel;
   provider: CodeProvider | null;
   cwd: string;
   lspRuntime: WorkspaceLspRuntimeState;

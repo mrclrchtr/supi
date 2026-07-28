@@ -1,9 +1,13 @@
-// Typed overview data builder from ArchitectureModel.
+// Typed overview data builder from directly observed package-manifest facts.
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getSupportedExtension } from "@mrclrchtr/supi-tree-sitter/api";
-import type { ArchitectureModel } from "../../analysis/architecture/model.ts";
+import { detectGrammar } from "@mrclrchtr/supi-tree-sitter/api";
+import type {
+  ArchitectureModel,
+  ManifestField,
+  ModuleInfo,
+} from "../../analysis/architecture/model.ts";
 import type { OverviewData, OverviewModule } from "./types.ts";
 
 /** Maximum number of modules shown in the overview. */
@@ -31,55 +35,70 @@ const GRAMMAR_LANGUAGE_TAGS: Record<string, string> = {
 };
 
 /**
- * Build structured overview data from an architecture model.
- * No markdown rendering — callers pass the result to a presentation renderer.
+ * Build structured overview data from the same factual package collector used
+ * by on-demand Orientation. No markdown rendering happens here.
  */
 export function buildOverviewData(model: ArchitectureModel): OverviewData | null {
   if (model.modules.length === 0) return null;
 
-  const dependedOn = new Set(model.edges.map((e) => e.to));
-
-  // Sort by topological order: leaf modules first (most actionable).
-  const sorted = topologicalModules(model);
-
-  const modules: OverviewModule[] = sorted.slice(0, MAX_MODULES).map((mod) => ({
-    name: mod.name,
-    shortName: mod.name.replace(/^@[^/]+\//, ""),
-    description: truncateDescription(mod.description),
-    isLeaf: !dependedOn.has(mod.name),
-    internalDeps: mod.internalDeps,
-    entrypoints: mod.entrypoints,
-  }));
-
-  const omittedModuleCount = Math.max(0, model.modules.length - MAX_MODULES);
-
+  const sorted = [...model.modules].sort((left, right) =>
+    left.relativePath.localeCompare(right.relativePath),
+  );
+  const modules = sorted.slice(0, MAX_MODULES).map((module) => overviewModule(module, model));
   const detectedLanguages = detectModuleLanguages(sorted.slice(0, MAX_MODULES));
 
   return {
     projectName: model.name,
     projectDescription: model.description,
     modules,
-    omittedModuleCount,
+    omittedModuleCount: Math.max(0, model.modules.length - MAX_MODULES),
     detectedLanguages: detectedLanguages.length > 0 ? detectedLanguages : null,
   };
 }
 
-/**
- * Sort modules by topological (leaf-to-root) priority.
- *
- * Modules with no internal dependents (leafs) come first because they are
- * the most actionable entry points. Within the same tier, sort by name.
- */
-function topologicalModules(model: ArchitectureModel): typeof model.modules {
-  const dependedOn = new Set(model.edges.map((e) => e.to));
-  const leaves = model.modules.filter((m) => !dependedOn.has(m.name));
-  const nonLeaves = model.modules.filter((m) => dependedOn.has(m.name));
-  const byName = (a: (typeof model.modules)[0], b: (typeof model.modules)[0]) =>
-    a.name.localeCompare(b.name);
-  return [...leaves.sort(byName), ...nonLeaves.sort(byName)];
+function overviewModule(module: ModuleInfo, model: ArchitectureModel): OverviewModule {
+  const name = module.name ?? module.relativePath;
+  return {
+    name,
+    shortName: module.name?.replace(/^@[^/]+\//, "") ?? module.relativePath,
+    description: truncateDescription(module.description),
+    declaredDependencies: model.edges
+      .filter((edge) => edge.from === module.name)
+      .map((edge) => edge.to),
+    declaredEntrypoints: declaredEntrypoints(module.fields),
+  };
 }
 
-/** Truncate a description to the maximum length, adding ellipsis if needed. */
+/** Preserve field labels rather than selecting one inferred package entrypoint. */
+function declaredEntrypoints(fields: readonly ManifestField[]): string[] {
+  return fields.flatMap(declaredEntrypointsForField);
+}
+
+function declaredEntrypointsForField(field: ManifestField): string[] {
+  if (field.field === "pi.extensions") {
+    return stringValues(field.value).map((value) => `pi.extensions: ${value}`);
+  }
+  if (field.field === "main" || field.field === "module") {
+    return typeof field.value === "string" ? [`${field.field}: ${field.value}`] : [];
+  }
+  if (field.field !== "exports") return [];
+  if (typeof field.value === "string") return [`exports: ${field.value}`];
+  return isRecord(field.value) && typeof field.value["."] === "string"
+    ? [`exports["."]: ${field.value["."]}`]
+    : [];
+}
+
+function stringValues(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function truncateDescription(description: string | null): string | null {
   if (!description) return null;
   if (description.length <= MAX_DESCRIPTION_LENGTH) return description;
@@ -131,50 +150,9 @@ function detectModuleLanguages(modules: readonly { root: string }[]): string[] {
   return [...detected].sort();
 }
 
-/** Check a filename for a supported extension and add its language tag if found. */
+/** Use the structural provider's published grammar mapping for overview language tags. */
 function scanFileForLanguage(fileName: string, detected: Set<string>): void {
-  const supportedExt = getSupportedExtension(fileName);
-  if (!supportedExt) return;
-  const grammar = detectGrammarForExtension(supportedExt);
+  const grammar = detectGrammar(fileName);
   const tag = grammar ? GRAMMAR_LANGUAGE_TAGS[grammar] : null;
   if (tag) detected.add(tag);
-}
-
-/** Map a supported extension (with leading dot) to a grammar ID. */
-function detectGrammarForExtension(ext: string): string | null {
-  const grammarMap: Record<string, string> = {
-    ".js": "javascript",
-    ".jsx": "javascript",
-    ".mjs": "javascript",
-    ".cjs": "javascript",
-    ".ts": "typescript",
-    ".mts": "typescript",
-    ".cts": "typescript",
-    ".tsx": "tsx",
-    ".py": "python",
-    ".pyi": "python",
-    ".rs": "rust",
-    ".go": "go",
-    ".mod": "go",
-    ".c": "c",
-    ".h": "c",
-    ".cpp": "cpp",
-    ".hpp": "cpp",
-    ".cc": "cpp",
-    ".cxx": "cpp",
-    ".hxx": "cpp",
-    ".java": "java",
-    ".kt": "kotlin",
-    ".kts": "kotlin",
-    ".rb": "ruby",
-    ".sh": "bash",
-    ".bash": "bash",
-    ".zsh": "bash",
-    ".html": "html",
-    ".htm": "html",
-    ".xhtml": "html",
-    ".r": "r",
-    ".sql": "sql",
-  };
-  return grammarMap[ext] ?? null;
 }

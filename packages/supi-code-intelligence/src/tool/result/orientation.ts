@@ -4,15 +4,17 @@ import type { ReadNextItem } from "../../analysis/read-next.ts";
 import type {
   OrientationCandidate,
   OrientationResultData,
+  OrientationSectionData,
 } from "../../session/orientation-types.ts";
 import type { TargetStoreEntry } from "../../session/target-store.ts";
 import {
   assembledNextQueries,
   assembledReadNext,
   assembleToolResult,
+  type ResultSection,
   type ToolResultAssembly,
 } from "./assembly.ts";
-import type { ContextDetails } from "./types.ts";
+import type { ContextDetails, OrientationSectionDetails } from "./types.ts";
 
 export interface OrientationDetailsInput {
   readonly confidence: ConfidenceMode;
@@ -22,6 +24,7 @@ export interface OrientationDetailsInput {
   readonly renderedSections?: readonly string[];
   readonly omittedCount?: number;
   readonly evidenceLists?: readonly EvidenceListMetadata[];
+  readonly sections?: readonly OrientationSectionData[];
   readonly nextQueries: readonly string[];
   readonly readNext?: readonly ReadNextItem[];
   readonly target?: Readonly<TargetStoreEntry>;
@@ -36,29 +39,16 @@ export interface OrientationResultAssembly {
 
 /** Assemble Orientation facts and shared result policy before rendering. */
 export function assembleOrientationResult(data: OrientationResultData): OrientationResultAssembly {
-  const provenance = [
-    {
-      source: data.confidence === "semantic" ? ("semantic" as const) : ("structural" as const),
-      capability: data.confidence === "semantic" ? "LSP" : "workspace-analysis",
-    },
-  ];
-  const sectionEvidence = createOrientationEvidence(data);
+  const sections = data.sections.map(toResultSection);
+  const evidenceLists = data.sections.flatMap((section) => section.evidenceLists);
   const assembled = assembleToolResult({
     data,
-    sections: data.renderedSections.map((section) => ({
-      key: section,
-      title: section,
-      status: "complete" as const,
-      items: [section],
-      confidence: data.confidence,
-      provenance,
-    })),
-    evidenceLists: [sectionEvidence],
+    sections,
+    evidenceLists,
     nextQueries: data.nextQueries,
     readNext: data.readNext,
-    candidateCount: sectionEvidence.totalCount ?? sectionEvidence.shownCount,
     confidence: data.confidence,
-    provenance,
+    provenance: uniqueProvenance(data.sections),
   });
   return {
     assembled,
@@ -69,6 +59,7 @@ export function assembleOrientationResult(data: OrientationResultData): Orientat
       renderedSections: assembled.data.renderedSections,
       omittedCount: assembled.totals.omittedCount,
       evidenceLists: assembled.evidenceLists,
+      sections: assembled.data.sections,
       nextQueries: assembledNextQueries(assembled),
       readNext: assembledReadNext(assembled),
       target: assembled.data.target,
@@ -87,6 +78,7 @@ export function assembleOrientationDetails(input: OrientationDetailsInput): Cont
     renderedSections: [...(input.renderedSections ?? [])],
     omittedCount: input.omittedCount ?? 0,
     evidenceLists: input.evidenceLists ? [...input.evidenceLists] : undefined,
+    sections: input.sections?.map(toDetailsSection),
     nextQueries: [...input.nextQueries],
     readNext: input.readNext ? [...input.readNext] : undefined,
     target: input.target ? { ...input.target } : undefined,
@@ -104,13 +96,37 @@ export function assembleOrientationDetails(input: OrientationDetailsInput): Cont
   };
 }
 
-function createOrientationEvidence(data: OrientationResultData): EvidenceListMetadata {
-  const omittedCount = Math.max(0, data.omittedCount);
+function toResultSection(section: OrientationSectionData): ResultSection {
   return {
-    key: "orientation.sections",
-    totalCount: data.renderedSections.length + omittedCount,
-    shownCount: data.renderedSections.length,
-    omittedCount,
-    partialReason: null,
+    key: section.key,
+    title: section.title,
+    status: section.status,
+    items: [section.key],
+    confidence: section.confidence,
+    provenance: section.provenance,
   };
+}
+
+function toDetailsSection(section: OrientationSectionData): OrientationSectionDetails {
+  return {
+    key: section.key,
+    title: section.title,
+    status: section.status,
+    reason: section.reason,
+    confidence: section.confidence,
+    provenance: section.provenance.map((provenance) => ({ ...provenance })),
+    evidenceLists: section.evidenceLists.map((evidence) => ({ ...evidence })),
+  };
+}
+
+function uniqueProvenance(sections: readonly OrientationSectionData[]) {
+  const seen = new Set<string>();
+  return sections.flatMap((section) =>
+    section.provenance.filter((provenance) => {
+      const key = `${provenance.source}:${provenance.capability ?? ""}:${provenance.detail ?? ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }),
+  );
 }

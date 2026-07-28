@@ -39,7 +39,7 @@ export const CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES: CodeIntelligenceToolPromptS
       "Orient around the workspace or one path, module, or target focus before surgical work. Omit focus for workspace Orientation. Directory focus may surface local instruction files. Use code_graph for relations and code_health for health.",
     promptSnippet: "code_orientation — workspace/path/module/symbol Orientation",
     promptGuidelines: [
-      "Use code_orientation before broad file reading when you need project, package, directory, file, or symbol landmarks.",
+      "Use code_orientation before broad file reading when you need direct workspace, package, directory, file, or symbol facts.",
       "Use focus.path for a known workspace path, focus.module for a discovered module name, and focus.target for a precise symbol.",
       "Use code_graph for relationships and code_health for provider or diagnostic state.",
     ],

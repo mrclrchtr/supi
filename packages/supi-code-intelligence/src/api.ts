@@ -25,8 +25,16 @@ export type {
 // Architecture model types.
 export type {
   ArchitectureModel,
+  ArchitectureObservationStatus,
   DependencyEdge,
+  ManifestDependency,
+  ManifestDependencyField,
+  ManifestDependencySection,
+  ManifestField,
   ModuleInfo,
+  PackageManifestObservation,
+  WorkspaceTopology,
+  WorkspaceTopologySource,
 } from "./analysis/architecture/model.ts";
 // Code provider types.
 export type { CodeProvider, CodeProviderState } from "./analysis/provider.ts";
@@ -47,6 +55,7 @@ export type {
   HealthDetails,
   HealthSectionDetails,
   InspectDetails,
+  OrientationSectionDetails,
   ResolveDetails,
   SearchDetails,
 } from "./types/index.ts";

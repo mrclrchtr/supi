@@ -3,11 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildArchitectureModel } from "../../../../src/analysis/architecture/discovery.ts";
-import {
-  findModuleForPath,
-  getDependencies,
-  getDependents,
-} from "../../../../src/analysis/architecture/model.ts";
+import { findModuleForPath } from "../../../../src/analysis/architecture/model.ts";
 
 let tmpDir: string;
 
@@ -19,267 +15,185 @@ afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function writeJson(dir: string, file: string, data: unknown) {
-  writeFileSync(path.join(dir, file), JSON.stringify(data, null, 2));
+function write(relativePath: string, content: string): void {
+  const target = path.join(tmpDir, relativePath);
+  mkdirSync(path.dirname(target), { recursive: true });
+  writeFileSync(target, content);
+}
+
+function writeJson(relativePath: string, value: unknown): void {
+  write(relativePath, JSON.stringify(value, null, 2));
 }
 
 describe("buildArchitectureModel", () => {
-  it("returns null for empty directory", async () => {
-    const model = await buildArchitectureModel(tmpDir);
-    expect(model).toBeNull();
-  });
+  it("reports unavailable topology instead of inferring source-only project structure", async () => {
+    write("src/Main.java", "class Main {}\n");
 
-  it("returns null for directory with no source files and no manifest", async () => {
-    writeFileSync(path.join(tmpDir, "README.md"), "# Hello");
     const model = await buildArchitectureModel(tmpDir);
-    expect(model).toBeNull();
-  });
 
-  it("returns minimal model when source files exist but no manifest", async () => {
-    writeFileSync(path.join(tmpDir, "index.ts"), "export const x = 1;");
-    const model = await buildArchitectureModel(tmpDir);
-    expect(model).not.toBeNull();
-    expect(model?.modules).toHaveLength(0);
-    expect(model?.name).toBe(path.basename(tmpDir));
-  });
-
-  it("builds single-package model from package.json", async () => {
-    writeJson(tmpDir, "package.json", {
-      name: "my-app",
-      description: "A test app",
-      main: "index.js",
+    expect(model.topology).toMatchObject({
+      kind: "unavailable",
+      status: "unavailable",
     });
-    const model = await buildArchitectureModel(tmpDir);
-    expect(model).not.toBeNull();
-    expect(model?.name).toBe("my-app");
-    expect(model?.description).toBe("A test app");
-    expect(model?.modules).toHaveLength(1);
-    expect(model?.modules[0].name).toBe("my-app");
-    expect(model?.modules[0].entrypoints).toContain("index.js");
+    expect(model.modules).toEqual([]);
+    expect(model.rootManifest).toMatchObject({ status: "unavailable" });
   });
 
-  it("detects workspace modules from pnpm-workspace.yaml", async () => {
-    writeJson(tmpDir, "package.json", { name: "root" });
-    writeFileSync(path.join(tmpDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
-
-    const pkgDir = path.join(tmpDir, "packages", "pkg-a");
-    mkdirSync(pkgDir, { recursive: true });
-    writeJson(pkgDir, "package.json", {
-      name: "@test/pkg-a",
-      description: "Package A",
-    });
-
-    const pkgBDir = path.join(tmpDir, "packages", "pkg-b");
-    mkdirSync(pkgBDir, { recursive: true });
-    writeJson(pkgBDir, "package.json", {
-      name: "@test/pkg-b",
-      description: "Package B",
-      dependencies: { "@test/pkg-a": "workspace:*" },
+  it("preserves declared manifest fields and dependency sections without entrypoint precedence", async () => {
+    writeJson("package.json", {
+      name: "app",
+      description: "App package",
+      main: "src/main.ts",
+      module: "src/module.ts",
+      exports: { ".": "./src/api.ts", "./cli": "./src/cli.ts" },
+      bin: { app: "./src/cli.ts" },
+      pi: { extensions: ["./src/extension.ts"] },
+      bundledDependencies: ["left-pad"],
+      dependencies: { "left-pad": "^1.0.0" },
+      devDependencies: { vitest: "^4.0.0" },
+      optionalDependencies: {},
+      peerDependencies: { typescript: "^6.0.0" },
     });
 
     const model = await buildArchitectureModel(tmpDir);
-    expect(model).not.toBeNull();
-    expect(model?.modules).toHaveLength(2);
+    const pkg = model.modules[0];
 
-    const pkgA = model?.modules.find((m) => m.name === "@test/pkg-a");
-    const pkgB = model?.modules.find((m) => m.name === "@test/pkg-b");
-    expect(pkgA).toBeDefined();
-    expect(pkgB).toBeDefined();
-    expect(pkgB?.internalDeps).toContain("@test/pkg-a");
-  });
-
-  it.each([
-    {
-      manager: "npm",
-      rootManifest: { name: "root", workspaces: ["packages/*"] },
-      workspaceFile: null,
-      internalVersion: "file:../core",
-    },
-    {
-      manager: "Yarn",
-      rootManifest: { name: "root", workspaces: { packages: ["packages/*"] } },
-      workspaceFile: null,
-      internalVersion: "^1.0.0",
-    },
-    {
-      manager: "pnpm",
-      rootManifest: { name: "root" },
-      workspaceFile: "packages:\n  - 'packages/*'\n",
-      internalVersion: "workspace:^",
-    },
-  ])(
-    "classifies $manager workspace dependencies by package membership",
-    async ({ rootManifest, workspaceFile, internalVersion }) => {
-      writeJson(tmpDir, "package.json", rootManifest);
-      if (workspaceFile) {
-        writeFileSync(path.join(tmpDir, "pnpm-workspace.yaml"), workspaceFile);
-      }
-
-      const core = path.join(tmpDir, "packages", "core");
-      mkdirSync(core, { recursive: true });
-      writeJson(core, "package.json", { name: "@t/core", version: "1.0.0" });
-
-      const app = path.join(tmpDir, "packages", "app");
-      mkdirSync(app, { recursive: true });
-      writeJson(app, "package.json", {
-        name: "@t/app",
-        dependencies: { "@t/core": internalVersion, lodash: "^4.0.0" },
-      });
-
-      const model = await buildArchitectureModel(tmpDir);
-      const appModule = model?.modules.find((module) => module.name === "@t/app");
-      expect(appModule?.internalDeps).toEqual(["@t/core"]);
-      expect(appModule?.externalDeps).toEqual(["lodash"]);
-    },
-  );
-
-  it("builds dependency edges between workspace modules", async () => {
-    writeJson(tmpDir, "package.json", { name: "root" });
-    writeFileSync(path.join(tmpDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
-
-    const core = path.join(tmpDir, "packages", "core");
-    mkdirSync(core, { recursive: true });
-    writeJson(core, "package.json", { name: "@t/core" });
-
-    const app = path.join(tmpDir, "packages", "app");
-    mkdirSync(app, { recursive: true });
-    writeJson(app, "package.json", {
-      name: "@t/app",
-      dependencies: { "@t/core": "workspace:*" },
-    });
-
-    const model = await buildArchitectureModel(tmpDir);
-    expect(model?.edges).toHaveLength(1);
-    expect(model?.edges[0]).toEqual({ from: "@t/app", to: "@t/core" });
-  });
-
-  it("marks leaf modules correctly", async () => {
-    writeJson(tmpDir, "package.json", { name: "root" });
-    writeFileSync(path.join(tmpDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
-
-    const core = path.join(tmpDir, "packages", "core");
-    mkdirSync(core, { recursive: true });
-    writeJson(core, "package.json", { name: "@t/core" });
-
-    const app = path.join(tmpDir, "packages", "app");
-    mkdirSync(app, { recursive: true });
-    writeJson(app, "package.json", {
-      name: "@t/app",
-      dependencies: { "@t/core": "workspace:*" },
-    });
-
-    const model = await buildArchitectureModel(tmpDir);
-    const coreModule = model?.modules.find((m) => m.name === "@t/core");
-    const appModule = model?.modules.find((m) => m.name === "@t/app");
-    expect(coreModule?.isLeaf).toBe(false); // core is depended on
-    expect(appModule?.isLeaf).toBe(true); // app has no dependents
-  });
-
-  it("detects pi extension entrypoints", async () => {
-    writeJson(tmpDir, "package.json", {
-      name: "pi-ext",
-      pi: { extensions: ["./ext.ts"] },
-    });
-    const model = await buildArchitectureModel(tmpDir);
-    expect(model?.modules[0].entrypoints).toContain("./ext.ts");
-  });
-
-  it("distinguishes internal and external dependencies", async () => {
-    writeJson(tmpDir, "package.json", { name: "root" });
-    writeFileSync(path.join(tmpDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
-
-    const pkg = path.join(tmpDir, "packages", "pkg");
-    mkdirSync(pkg, { recursive: true });
-    writeJson(pkg, "package.json", {
-      name: "@t/pkg",
-      dependencies: {
-        "@t/other": "workspace:*",
-        lodash: "^4.0.0",
-      },
-    });
-
-    const other = path.join(tmpDir, "packages", "other");
-    mkdirSync(other, { recursive: true });
-    writeJson(other, "package.json", { name: "@t/other" });
-
-    const model = await buildArchitectureModel(tmpDir);
-    const pkgMod = model?.modules.find((m) => m.name === "@t/pkg");
-    expect(pkgMod?.internalDeps).toContain("@t/other");
-    expect(pkgMod?.externalDeps).toContain("lodash");
-  });
-});
-
-// biome-ignore lint/security/noSecrets: function name in test describe
-describe("findModuleForPath", () => {
-  it("finds the most specific module for a file path", async () => {
-    writeJson(tmpDir, "package.json", { name: "root" });
-    writeFileSync(path.join(tmpDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
-
-    const pkgDir = path.join(tmpDir, "packages", "core");
-    mkdirSync(pkgDir, { recursive: true });
-    writeJson(pkgDir, "package.json", { name: "@t/core" });
-    writeFileSync(path.join(pkgDir, "index.ts"), "");
-
-    const model = await buildArchitectureModel(tmpDir);
-    expect(model).not.toBeNull();
-
-    const found = findModuleForPath(
-      model as NonNullable<typeof model>,
-      path.join(pkgDir, "index.ts"),
+    expect(model.topology).toMatchObject({ kind: "single-package", status: "complete" });
+    expect(pkg?.fields.map((field) => field.field)).toEqual(
+      expect.arrayContaining([
+        "main",
+        "module",
+        "exports",
+        "bin",
+        "pi.extensions",
+        "bundledDependencies",
+      ]),
     );
-    expect(found?.name).toBe("@t/core");
+    expect(pkg?.dependencySections.map((section) => section.field)).toEqual([
+      "dependencies",
+      "devDependencies",
+      "optionalDependencies",
+      "peerDependencies",
+    ]);
   });
 
-  it("returns null for paths outside any module", async () => {
-    writeJson(tmpDir, "package.json", { name: "root" });
-    const model = await buildArchitectureModel(tmpDir);
-    expect(model).not.toBeNull();
-    const found = findModuleForPath(model as NonNullable<typeof model>, "/nonexistent/file.ts");
-    expect(found).toBeNull();
-  });
-});
-
-describe("getDependents / getDependencies", () => {
-  it("returns modules that depend on a given module", async () => {
-    writeJson(tmpDir, "package.json", { name: "root" });
-    writeFileSync(path.join(tmpDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
-
-    for (const name of ["core", "app", "cli"]) {
-      const d = path.join(tmpDir, "packages", name);
-      mkdirSync(d, { recursive: true });
-      const deps = name === "core" ? {} : { "@t/core": "workspace:*" };
-      writeJson(d, "package.json", { name: `@t/${name}`, dependencies: deps });
-    }
+  it("parses inline pnpm YAML and applies leading exclusions through the glob engine", async () => {
+    writeJson("package.json", { name: "root" });
+    write("pnpm-workspace.yaml", "packages: ['packages/*', '!packages/private']\n");
+    writeJson("packages/public/package.json", { name: "@test/public" });
+    writeJson("packages/private/package.json", { name: "@test/private" });
+    write("packages/not-a-directory.txt", "not a package directory");
 
     const model = await buildArchitectureModel(tmpDir);
-    expect(model).not.toBeNull();
 
-    const dependents = getDependents(model as NonNullable<typeof model>, "@t/core");
-    const names = dependents.map((m) => m.name);
-    expect(names).toContain("@t/app");
-    expect(names).toContain("@t/cli");
-    expect(names).not.toContain("@t/core");
+    expect(model.topology).toMatchObject({
+      kind: "workspace",
+      status: "complete",
+      source: { path: "pnpm-workspace.yaml", field: "packages" },
+    });
+    expect(model.modules.map((module) => module.name)).toEqual(["@test/public"]);
   });
 
-  it("returns dependencies as ModuleInfo objects", async () => {
-    writeJson(tmpDir, "package.json", { name: "root" });
-    writeFileSync(path.join(tmpDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
+  it("finds an enclosing workspace when called from a member package", async () => {
+    writeJson("package.json", { name: "root" });
+    write("pnpm-workspace.yaml", "packages:\n  - packages/*\n");
+    writeJson("packages/app/package.json", { name: "@test/app" });
+    mkdirSync(path.join(tmpDir, "packages/app/src"), { recursive: true });
 
-    const core = path.join(tmpDir, "packages", "core");
-    mkdirSync(core, { recursive: true });
-    writeJson(core, "package.json", { name: "@t/core" });
+    const model = await buildArchitectureModel(path.join(tmpDir, "packages/app/src"));
 
-    const app = path.join(tmpDir, "packages", "app");
-    mkdirSync(app, { recursive: true });
-    writeJson(app, "package.json", {
-      name: "@t/app",
-      dependencies: { "@t/core": "workspace:*" },
+    expect(model.root).toBe(tmpDir);
+    expect(model.modules.map((module) => module.name)).toEqual(["@test/app"]);
+  });
+
+  it("uses package membership and the declaring manifest field for workspace relationships", async () => {
+    writeJson("package.json", { name: "root", workspaces: { packages: ["packages/*"] } });
+    writeJson("packages/core/package.json", { name: "@test/core" });
+    writeJson("packages/app/package.json", {
+      name: "@test/app",
+      dependencies: { "@test/core": "^1.0.0", lodash: "^4.0.0" },
+      devDependencies: { "@test/core": "^1.0.0" },
     });
 
     const model = await buildArchitectureModel(tmpDir);
-    expect(model).not.toBeNull();
-    const deps = getDependencies(model as NonNullable<typeof model>, "@t/app");
-    expect(deps).toHaveLength(1);
-    expect(deps[0].name).toBe("@t/core");
+
+    expect(model.topology.source).toEqual({ path: "package.json", field: "workspaces.packages" });
+    expect(model.edges).toEqual([
+      {
+        from: "@test/app",
+        to: "@test/core",
+        field: "dependencies",
+        specifier: "^1.0.0",
+        manifestPath: "packages/app/package.json",
+      },
+      {
+        from: "@test/app",
+        to: "@test/core",
+        field: "devDependencies",
+        specifier: "^1.0.0",
+        manifestPath: "packages/app/package.json",
+      },
+    ]);
+  });
+
+  it("reports malformed configuration as unavailable rather than approximating its members", async () => {
+    writeJson("package.json", { name: "root" });
+    write("pnpm-workspace.yaml", "packages: [\n");
+    writeJson("packages/app/package.json", { name: "@test/app" });
+
+    const model = await buildArchitectureModel(tmpDir);
+
+    expect(model.topology).toMatchObject({ kind: "unavailable", status: "unavailable" });
+    expect(model.topology.reason).toContain("Could not parse pnpm-workspace.yaml");
+    expect(model.modules).toEqual([]);
+  });
+
+  it("fails closed for unsupported workspace glob syntax", async () => {
+    writeJson("package.json", { name: "root", workspaces: ["packages/{app,core}"] });
+    writeJson("packages/app/package.json", { name: "@test/app" });
+
+    const model = await buildArchitectureModel(tmpDir);
+
+    expect(model.topology).toMatchObject({ kind: "unavailable", status: "unavailable" });
+    expect(model.topology.reason).toContain("Unsupported workspace pattern");
+  });
+
+  it("fails closed when an inclusion follows an exclusion", async () => {
+    writeJson("package.json", {
+      name: "root",
+      workspaces: ["packages/*", "!packages/private", "packages/private/reincluded"],
+    });
+
+    const model = await buildArchitectureModel(tmpDir);
+
+    expect(model.topology).toMatchObject({ kind: "unavailable", status: "unavailable" });
+    expect(model.topology.reason).toContain("re-include");
+  });
+
+  it("marks topology partial when a matched package manifest cannot be parsed", async () => {
+    writeJson("package.json", { name: "root", workspaces: ["packages/*"] });
+    writeJson("packages/valid/package.json", { name: "@test/valid" });
+    write("packages/broken/package.json", "{ bad JSON");
+
+    const model = await buildArchitectureModel(tmpDir);
+
+    expect(model.topology).toMatchObject({
+      kind: "workspace",
+      status: "partial",
+      failedPackageManifestCount: 1,
+    });
+    expect(model.modules.map((module) => module.name)).toEqual(["@test/valid"]);
+  });
+
+  it("finds the most specific parsed package for a path", async () => {
+    writeJson("package.json", { name: "root", workspaces: ["packages/*"] });
+    writeJson("packages/core/package.json", { name: "@test/core" });
+    write("packages/core/src/index.ts", "export {};\n");
+
+    const model = await buildArchitectureModel(tmpDir);
+
+    expect(findModuleForPath(model, path.join(tmpDir, "packages/core/src/index.ts"))?.name).toBe(
+      "@test/core",
+    );
   });
 });

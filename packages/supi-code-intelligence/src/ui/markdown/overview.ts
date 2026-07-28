@@ -28,15 +28,16 @@ export function renderOverview(data: OverviewData): string {
   lines.push("");
 
   for (const mod of data.modules) {
-    const deps = mod.internalDeps.filter((d) =>
+    const deps = mod.declaredDependencies.filter((d) =>
       data.modules.some((m) => m.name === d || m.shortName === d),
     );
 
-    const entrypointSuffix = mod.entrypoints.length > 0 ? ` [${mod.entrypoints.join(", ")}]` : "";
+    const entrypointSuffix =
+      mod.declaredEntrypoints.length > 0 ? ` [${mod.declaredEntrypoints.join(", ")}]` : "";
 
     if (deps.length === 0) {
       lines.push(
-        `- **${mod.shortName}**${mod.isLeaf ? " (leaf)" : ""}${entrypointSuffix}${mod.description ? ` — ${mod.description}` : ""}`,
+        `- **${mod.shortName}**${entrypointSuffix}${mod.description ? ` — ${mod.description}` : ""}`,
       );
     } else {
       const depNames = deps.slice(0, 4).map((d) => d.replace(/^@[^/]+\//, ""));
@@ -59,7 +60,7 @@ export function renderOverview(data: OverviewData): string {
     lines.push("");
   }
 
-  lines.push('_For deeper orientation, use `code_orientation({ focus: "..." })`._');
+  lines.push('_For deeper orientation, use `code_orientation({ focus: { path: "..." } })`._');
   lines.push("");
   lines.push("_(session snapshot)_");
 

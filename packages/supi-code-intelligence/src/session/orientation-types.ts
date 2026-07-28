@@ -1,4 +1,5 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import type { EvidenceListMetadata } from "../analysis/evidence.ts";
 import type { InstructionFilesMetadata } from "../analysis/instruction-files.ts";
 import type { ReadNextItem } from "../analysis/read-next.ts";
 import type { OrientationTargetInput, TargetSymbolKind } from "./target-input.ts";
@@ -27,6 +28,31 @@ export type OrientationBlock =
     }
   | { readonly kind: "blank" };
 
+/** Source that established one Orientation section. */
+export interface OrientationProvenance {
+  readonly source:
+    | "semantic"
+    | "structural"
+    | "filesystem"
+    | "manifest"
+    | "configuration"
+    | "runtime";
+  readonly capability?: string;
+  readonly detail?: string;
+}
+
+/** Independently collected Orientation section and its evidence metadata. */
+export interface OrientationSectionData {
+  readonly key: string;
+  readonly title: string;
+  readonly status: "complete" | "partial" | "unavailable";
+  readonly reason: string | null;
+  /** Semantic/structural confidence only; filesystem/config facts use unavailable. */
+  readonly confidence: ConfidenceMode;
+  readonly provenance: readonly OrientationProvenance[];
+  readonly evidenceLists: readonly EvidenceListMetadata[];
+}
+
 export interface OrientationCandidate {
   readonly targetId: string;
   readonly name: string;
@@ -42,6 +68,7 @@ export interface OrientationCandidate {
 /** Immutable facts returned by the session before markdown or TUI rendering. */
 export interface OrientationResultData {
   readonly blocks: readonly OrientationBlock[];
+  readonly sections: readonly OrientationSectionData[];
   readonly confidence: ConfidenceMode;
   readonly focusTarget: string | null;
   readonly requestedSections: readonly string[];

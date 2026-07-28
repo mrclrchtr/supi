@@ -62,7 +62,7 @@ describe("code_orientation instruction files", () => {
     expect(result.text).toContain("### packages/foo/CLAUDE.md");
     expect(result.text).toContain("Follow foo rules");
     expect(result.text.indexOf("## Instructions")).toBeLessThan(
-      result.text.indexOf("## Source Files"),
+      result.text.indexOf("## Direct regular files"),
     );
     expect(result.details?.data?.instructions).toMatchObject({
       files: [
