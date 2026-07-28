@@ -87,7 +87,7 @@ export function renderRunResult(
 
 function buildCollapsed(details: ReviewBatchDetails, theme: Theme): Container {
   const taskLines = details.results.map((r) => formatTaskCollapsed(r, theme));
-  const fileCount = details.snapshot.changedFiles.length;
+  const fileCount = details.snapshot.changes.length;
 
   const container = new Container();
   // Per-task verdicts
@@ -125,7 +125,7 @@ function buildExpanded(details: ReviewBatchDetails, theme: Theme): Container {
   container.addChild(
     new Text(`${theme.fg("dim", "target:")} ${theme.fg("muted", details.snapshot.title)}`, 1, 0),
   );
-  const fileCount = details.snapshot.changedFiles.length;
+  const fileCount = details.snapshot.changes.length;
   container.addChild(
     new Text(
       theme.fg(

@@ -55,6 +55,20 @@ describe("agent review schemas", () => {
     expect(() => parseRunReviewToolInput(input)).toThrow();
   });
 
+  it("accepts a base-aware working-tree target for committed plus uncommitted work", () => {
+    expect(
+      parseRunReviewToolInput({
+        mode: "direct",
+        target: { kind: "working-tree", baseCommit: "9510d68" },
+        review,
+      }),
+    ).toEqual({
+      mode: "direct",
+      target: { kind: "working-tree", baseCommit: "9510d68" },
+      review,
+    });
+  });
+
   it("accepts short commit hashes (7+ hex chars)", () => {
     expect(
       parseRunReviewToolInput({

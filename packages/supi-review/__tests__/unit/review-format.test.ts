@@ -19,7 +19,7 @@ describe("formatReviewBatch", () => {
         requestedTarget: { kind: "working-tree" },
         target: { kind: "working-tree", headCommit: "b".repeat(40) },
         title: "Working tree changes",
-        changedFiles: ["src/a.ts"],
+        changes: [{ status: "M", path: "src/a.ts", additions: 1, deletions: 0 }],
         diffHash: "c".repeat(64),
         stats: { files: 1, additions: 1, deletions: 0 },
       },

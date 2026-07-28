@@ -4,15 +4,23 @@ import type { ChildLifecycleTrace } from "./tool/child-lifecycle-trace.ts";
 /** A 7-64 character hexadecimal Git commit id, pinned to its full object id during resolution. */
 export type CommitId = string;
 
-/** The Git change selected for review. */
+/**
+ * The Git change selected for review. A working-tree target may use an optional
+ * base commit to include committed branch work and current filesystem changes.
+ */
 export type ReviewTargetSpec =
-  | { kind: "working-tree" }
+  | { kind: "working-tree"; baseCommit?: CommitId }
   | { kind: "comparison"; baseCommit: CommitId }
   | { kind: "commit"; commit: CommitId };
 
 /** Resolved identity of a selected review target. */
 export type ResolvedReviewTarget =
-  | { kind: "working-tree"; headCommit: CommitId }
+  | {
+      kind: "working-tree";
+      headCommit: CommitId;
+      requestedBaseCommit?: CommitId;
+      mergeBaseCommit?: CommitId;
+    }
   | {
       kind: "comparison";
       requestedBaseCommit: CommitId;
@@ -27,6 +35,20 @@ export interface DiffStats {
   deletions: number;
 }
 
+/** One changed path with Git status and per-file line statistics. */
+export interface ReviewChange {
+  /** Git name-status token, such as `M`, `A`, `D`, or `R100`. */
+  status: string;
+  /** Path on the target's after side, or the deleted path when no after-side path exists. */
+  path: string;
+  /** Before-side path for a detected rename or copy. */
+  previousPath?: string;
+  /** Null for binary changes. */
+  additions: number | null;
+  /** Null for binary changes. */
+  deletions: number | null;
+}
+
 /** Concrete target metadata and diff identity resolved before reviewer execution. */
 export interface ReviewSnapshot {
   /** Canonical worktree root retained only inside the Review Engine. */
@@ -34,7 +56,7 @@ export interface ReviewSnapshot {
   requestedTarget: ReviewTargetSpec;
   target: ResolvedReviewTarget;
   title: string;
-  changedFiles: string[];
+  changes: ReviewChange[];
   /** SHA-256 of the exact canonical target patch bytes. */
   diffHash: string;
   stats: DiffStats;

@@ -60,7 +60,7 @@ export function renderPrepareResult(
 // ── Collapsed ────────────────────────────────────────────────────
 
 function buildCollapsed(details: PrepareDetails, theme: Theme): Text {
-  const fileCount = details.snapshot.changedFiles.length;
+  const fileCount = details.snapshot.changes.length;
   const targetKind = details.snapshot.requestedTarget.kind;
   const hasPlanner = details.plannerDraft !== undefined;
 
@@ -145,7 +145,7 @@ function buildExpanded(details: PrepareDetails, theme: Theme): Container {
     new Text(
       theme.fg(
         "dim",
-        `${snapshot.changedFiles.length} file${snapshot.changedFiles.length !== 1 ? "s" : ""} changed · +${snapshot.stats.additions} / -${snapshot.stats.deletions}`,
+        `${snapshot.changes.length} file${snapshot.changes.length !== 1 ? "s" : ""} changed · +${snapshot.stats.additions} / -${snapshot.stats.deletions}`,
       ),
       1,
       0,

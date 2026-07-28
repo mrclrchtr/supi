@@ -1,6 +1,14 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -43,11 +51,98 @@ describe("review targets", () => {
 
     const snapshot = await resolveReviewSnapshot(nested, { kind: "working-tree" });
 
-    expect(snapshot?.changedFiles).toEqual(["a.txt", "outside.txt"]);
+    expect(snapshot?.changes.map((change) => change.path)).toEqual(["a.txt", "outside.txt"]);
     if (!snapshot) return;
     await expect(readReviewFile(nested, snapshot, "a.txt")).resolves.toBe("changed at root\n");
     await expect(readReviewDiff(nested, snapshot, "a.txt")).resolves.toContain("+changed at root");
     await expect(listReviewFiles(nested, snapshot)).resolves.toContain("outside.txt");
+  });
+
+  it("reviews committed and uncommitted current work against a base commit", async () => {
+    const baseCommit = git(cwd, "rev-parse", "HEAD");
+    writeFileSync(join(cwd, "a.txt"), "committed\n");
+    writeFileSync(join(cwd, "branch.txt"), "branch\n");
+    git(cwd, "add", ".");
+    git(cwd, "commit", "-m", "branch change");
+    writeFileSync(join(cwd, "a.txt"), "dirty\n");
+    writeFileSync(join(cwd, "untracked.txt"), "untracked\n");
+
+    const snapshot = await resolveReviewSnapshot(cwd, {
+      kind: "working-tree",
+      baseCommit,
+    });
+
+    expect(snapshot?.changes).toEqual([
+      { status: "M", path: "a.txt", additions: 1, deletions: 1 },
+      { status: "A", path: "branch.txt", additions: 1, deletions: 0 },
+      { status: "A", path: "untracked.txt", additions: 1, deletions: 0 },
+    ]);
+    expect(snapshot?.target).toMatchObject({
+      kind: "working-tree",
+      requestedBaseCommit: baseCommit,
+      mergeBaseCommit: baseCommit,
+    });
+    if (!snapshot) return;
+
+    await expect(readReviewFile(cwd, snapshot, "a.txt", "before")).resolves.toBe("base\n");
+    await expect(readReviewFile(cwd, snapshot, "a.txt", "after")).resolves.toBe("dirty\n");
+    const fullDiff = await readReviewDiff(cwd, snapshot);
+    expect(fullDiff).toContain("+dirty");
+    expect(fullDiff).toContain("+branch");
+    expect(fullDiff).toContain("+untracked");
+    await expect(
+      searchReviewFiles(cwd, snapshot, "ba.e", { side: "before", mode: "regex" }),
+    ).resolves.toContain("a.txt:1:base");
+    await expect(searchReviewFiles(cwd, snapshot, "dirty", { side: "before" })).resolves.toBe("");
+  });
+
+  it("compares a base-tracked path directly when HEAD deleted and the worktree recreated it", async () => {
+    const baseCommit = git(cwd, "rev-parse", "HEAD");
+    git(cwd, "rm", "a.txt");
+    git(cwd, "commit", "-m", "delete a");
+    writeFileSync(join(cwd, "a.txt"), "base\n");
+
+    await expect(
+      resolveReviewSnapshot(cwd, { kind: "working-tree", baseCommit }),
+    ).resolves.toBeUndefined();
+
+    writeFileSync(join(cwd, "a.txt"), "recreated differently\n");
+    const snapshot = await resolveReviewSnapshot(cwd, { kind: "working-tree", baseCommit });
+
+    expect(snapshot?.changes).toEqual([{ status: "M", path: "a.txt", additions: 1, deletions: 1 }]);
+    if (!snapshot) return;
+    const diff = await readReviewDiff(cwd, snapshot, "a.txt");
+    expect(diff).toContain("-base");
+    expect(diff).toContain("+recreated differently");
+    expect(diff).not.toContain("deleted file mode");
+    await expect(listReviewFiles(cwd, snapshot)).resolves.toContain("a.txt");
+    await expect(searchReviewFiles(cwd, snapshot, "recreated differently")).resolves.toContain(
+      "a.txt:1:recreated differently",
+    );
+  });
+
+  it("handles file-directory transitions in a base-aware working tree", async () => {
+    writeFileSync(join(cwd, "node"), "old shape\n");
+    git(cwd, "add", ".");
+    git(cwd, "commit", "-m", "add file shape");
+    const baseCommit = git(cwd, "rev-parse", "HEAD");
+    unlinkSync(join(cwd, "node"));
+    mkdirSync(join(cwd, "node"));
+    writeFileSync(join(cwd, "node", "child.txt"), "new shape\n");
+    git(cwd, "add", "-A");
+    git(cwd, "commit", "-m", "replace file with directory");
+
+    const changed = await resolveReviewSnapshot(cwd, { kind: "working-tree", baseCommit });
+    expect(changed?.changes.map((change) => [change.status, change.path])).toEqual([
+      ["D", "node"],
+      ["A", "node/child.txt"],
+    ]);
+
+    rmSync(join(cwd, "node"), { recursive: true });
+    writeFileSync(join(cwd, "node"), "old shape\n");
+    await expect(
+      resolveReviewSnapshot(cwd, { kind: "working-tree", baseCommit }),
+    ).resolves.toBeUndefined();
   });
 
   it("resolves comparison and commit targets from the worktree root", async () => {
@@ -64,7 +159,7 @@ describe("review targets", () => {
       { kind: "commit" as const, commit },
     ]) {
       const snapshot = await resolveReviewSnapshot(nested, target);
-      expect(snapshot?.changedFiles).toEqual(["a.txt"]);
+      expect(snapshot?.changes.map((change) => change.path)).toEqual(["a.txt"]);
       if (!snapshot) continue;
       await expect(readReviewFile(nested, snapshot, "a.txt")).resolves.toBe(
         "committed from root\n",
@@ -86,7 +181,7 @@ describe("review targets", () => {
     writeFileSync(join(cwd, "a.txt"), "changed despite flag\n");
 
     const snapshot = await resolveReviewSnapshot(cwd, { kind: "working-tree" });
-    expect(snapshot?.changedFiles).toEqual(["a.txt"]);
+    expect(snapshot?.changes.map((change) => change.path)).toEqual(["a.txt"]);
     expect(snapshot?.diffHash).toMatch(/^[0-9a-f]{64}$/);
     if (snapshot) {
       await expect(readReviewDiff(cwd, snapshot, "a.txt")).resolves.toContain(
@@ -110,12 +205,8 @@ describe("review targets", () => {
     expect(snapshot).toBeDefined();
     if (!snapshot) return;
 
-    const parts: string[] = [];
-    for (const path of snapshot.changedFiles) {
-      const value = await readReviewDiff(cwd, snapshot, path);
-      if (value) parts.push(value.endsWith("\n") ? value : `${value}\n`);
-    }
-    const expected = createHash("sha256").update(parts.join(""), "utf8").digest("hex");
+    const fullDiff = await readReviewDiff(cwd, snapshot);
+    const expected = createHash("sha256").update(fullDiff, "utf8").digest("hex");
 
     expect(snapshot.diffHash).toBe(expected);
   });
@@ -125,7 +216,9 @@ describe("review targets", () => {
 
     const snapshot = await resolveReviewSnapshot(cwd, { kind: "working-tree" });
 
-    expect(snapshot?.changedFiles).toEqual(["new.txt"]);
+    expect(snapshot?.changes).toEqual([
+      { status: "A", path: "new.txt", additions: 2, deletions: 0 },
+    ]);
     expect(snapshot?.diffHash).toMatch(/^[0-9a-f]{64}$/);
     expect(snapshot).not.toHaveProperty("diffText");
     expect(snapshot?.stats).toEqual({ files: 1, additions: 2, deletions: 0 });
@@ -174,6 +267,9 @@ describe("review targets", () => {
     const snapshot = await resolveReviewSnapshot(cwd, { kind: "working-tree" });
 
     expect(snapshot?.diffHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(snapshot?.changes).toEqual([
+      { status: "A", path: "asset.bin", additions: null, deletions: null },
+    ]);
     if (snapshot) {
       const diff = await readReviewDiff(cwd, snapshot, "asset.bin");
       expect(diff).toContain("asset.bin");
@@ -200,6 +296,35 @@ describe("review targets", () => {
     await expect(searchReviewFiles(cwd, snapshot, "dirty-only")).resolves.toBe("");
   });
 
+  it("reconciles rename status and numstat using the after-side path", async () => {
+    writeFileSync(
+      join(cwd, "a.txt"),
+      `${Array.from({ length: 20 }, (_, index) => index).join("\n")}\n`,
+    );
+    git(cwd, "add", ".");
+    git(cwd, "commit", "-m", "expand fixture");
+    const baseCommit = git(cwd, "rev-parse", "HEAD");
+    git(cwd, "mv", "a.txt", "renamed.txt");
+    writeFileSync(
+      join(cwd, "renamed.txt"),
+      `${readFileSync(join(cwd, "renamed.txt"), "utf8")}extra\n`,
+    );
+    git(cwd, "add", ".");
+    git(cwd, "commit", "-m", "rename fixture");
+
+    const snapshot = await resolveReviewSnapshot(cwd, { kind: "comparison", baseCommit });
+
+    expect(snapshot?.changes).toEqual([
+      {
+        status: expect.stringMatching(/^R\d+$/),
+        previousPath: "a.txt",
+        path: "renamed.txt",
+        additions: 1,
+        deletions: 0,
+      },
+    ]);
+  });
+
   it("lists a merge commit against its first parent", async () => {
     const mainBranch = git(cwd, "branch", "--show-current");
     git(cwd, "checkout", "-b", "side");
@@ -215,7 +340,7 @@ describe("review targets", () => {
 
     const snapshot = await resolveReviewSnapshot(cwd, { kind: "commit", commit });
 
-    expect(snapshot?.changedFiles).toEqual(["side.txt"]);
+    expect(snapshot?.changes.map((change) => change.path)).toEqual(["side.txt"]);
     if (snapshot)
       await expect(readReviewDiff(cwd, snapshot, "side.txt")).resolves.toContain("+side");
   });
@@ -251,7 +376,9 @@ describe("review targets", () => {
 
       const snapshot = await resolveReviewSnapshot(rootRepo, { kind: "commit", commit });
 
-      expect(snapshot?.changedFiles).toEqual(["root.txt"]);
+      expect(snapshot?.changes).toEqual([
+        { status: "A", path: "root.txt", additions: 1, deletions: 0 },
+      ]);
       if (snapshot) {
         await expect(readReviewDiff(rootRepo, snapshot, "root.txt")).resolves.toContain("+root");
       }
@@ -275,7 +402,7 @@ describe("review targets", () => {
     const diff = await readReviewDiff(cwd, snapshot, "*.txt");
     expect(diff).toContain("literal");
     expect(diff).not.toContain("other.txt");
-    const search = await searchReviewFiles(cwd, snapshot, "other", "*.txt");
+    const search = await searchReviewFiles(cwd, snapshot, "other", { path: "*.txt" });
     expect(search).toBe("");
   });
 
@@ -292,9 +419,9 @@ describe("review targets", () => {
       await expect(readReviewFile(cwd, snapshot, "escape/secret.txt")).rejects.toThrow(
         /inside the repository|not part/,
       );
-      await expect(searchReviewFiles(cwd, snapshot, "secret", "../outside")).rejects.toThrow(
-        /inside the repository/,
-      );
+      await expect(
+        searchReviewFiles(cwd, snapshot, "secret", { path: "../outside" }),
+      ).rejects.toThrow(/inside the repository/);
     } finally {
       rmSync(outside, { recursive: true, force: true });
     }

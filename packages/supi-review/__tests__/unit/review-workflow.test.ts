@@ -24,7 +24,7 @@ const snapshot: ReviewSnapshot = {
   requestedTarget: { kind: "working-tree" },
   target: { kind: "working-tree", headCommit: "a".repeat(40) },
   title: "Working tree changes",
-  changedFiles: ["src/a.ts"],
+  changes: [{ status: "M", path: "src/a.ts", additions: 1, deletions: 0 }],
   diffHash: "b".repeat(64),
   stats: { files: 1, additions: 1, deletions: 0 },
 };
@@ -209,10 +209,12 @@ describe("Review workflow", () => {
   it("bounds the Planner changed-file manifest", async () => {
     mocks.resolveReviewSnapshot.mockResolvedValue({
       ...snapshot,
-      changedFiles: Array.from(
-        { length: 1_000 },
-        (_, index) => `src/${index}-${"x".repeat(100)}.ts`,
-      ),
+      changes: Array.from({ length: 1_000 }, (_, index) => ({
+        status: "M",
+        path: `src/${index}-${"x".repeat(100)}.ts`,
+        additions: 1,
+        deletions: 0,
+      })),
     });
     mocks.runPlanner.mockResolvedValue({ kind: "success", draft: review });
 
@@ -227,9 +229,10 @@ describe("Review workflow", () => {
     });
 
     const prompt = mocks.runPlanner.mock.calls[0]?.[0].prompt as string;
-    const manifest = prompt.split("## Changed file names\n")[1]?.split("\n\n## Bounded")[0] ?? "";
+    const manifest =
+      prompt.split("## Changed-path inventory\n")[1]?.split("\n\n## Bounded")[0] ?? "";
     expect(manifest.length).toBeLessThanOrEqual(8_000);
-    expect(manifest).toContain("additional file(s) omitted");
+    expect(manifest).toContain("additional change(s) omitted");
     expect(prompt).not.toContain("+change");
   });
 

@@ -7,7 +7,7 @@ const snapshot: ReviewSnapshot = {
   requestedTarget: { kind: "working-tree" },
   target: { kind: "working-tree", headCommit: "a".repeat(40) },
   title: "Working tree changes",
-  changedFiles: ["src/a.ts"],
+  changes: [{ status: "M", path: "src/a.ts", additions: 1, deletions: 0 }],
   diffHash: "b".repeat(64),
   stats: { files: 1, additions: 1, deletions: 0 },
 };
@@ -29,7 +29,7 @@ describe("buildReviewPacket", () => {
     expect(packet.prompt).toContain("Issue #1");
     expect(packet.prompt).toContain("Check requirement R1.");
     expect(packet.prompt).toContain("read_review_diff");
-    expect(packet.prompt).toContain("src/a.ts");
+    expect(packet.prompt).toContain('M +1 -0 "src/a.ts"');
     expect(packet.prompt).toContain(`Protocol version: ${REVIEW_PACKET_PROTOCOL_VERSION}`);
     expect(packet.prompt).toContain("a".repeat(40));
     expect(packet.prompt).not.toContain("+change");
@@ -39,10 +39,12 @@ describe("buildReviewPacket", () => {
   it("bounds the embedded changed-file manifest and points to complete paging", () => {
     const large = {
       ...snapshot,
-      changedFiles: Array.from(
-        { length: 1_000 },
-        (_, index) => `src/${index}-${"x".repeat(100)}.ts`,
-      ),
+      changes: Array.from({ length: 1_000 }, (_, index) => ({
+        status: "M",
+        path: `src/${index}-${"x".repeat(100)}.ts`,
+        additions: 1,
+        deletions: 0,
+      })),
     };
     const task = { id: "scale", instructions: "Review the complete target." };
 
@@ -50,7 +52,7 @@ describe("buildReviewPacket", () => {
     const manifest = packet.prompt.split("## Changed files\n")[1]?.split("\n\n## Inspection")[0];
 
     expect(manifest?.length).toBeLessThanOrEqual(8_000);
-    expect(manifest).toContain("additional file(s) omitted");
+    expect(manifest).toContain("additional change(s) omitted");
     expect(packet.prompt).toContain("list_review_changes");
   });
 

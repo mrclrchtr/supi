@@ -38,7 +38,7 @@ function plannerFailureReason(failure: {
 
 function formatPrepared(plan: {
   id: string;
-  snapshot: { title: string; changedFiles: string[] };
+  snapshot: { title: string; changes: Array<{ path: string }> };
   plannerDraft?: { sharedContext?: string; tasks: Array<{ id: string; instructions: string }> };
   plannerFailure?: { kind: string; failureCode?: string; timeoutMs?: number };
   plannerUsage?: Usage;
@@ -48,7 +48,7 @@ function formatPrepared(plan: {
     "",
     `Plan ID: ${plan.id}`,
     `Target: ${plan.snapshot.title}`,
-    `Files changed: ${plan.snapshot.changedFiles.length}`,
+    `Files changed: ${plan.snapshot.changes.length}`,
   ];
   if (plan.plannerUsage) lines.push(`Planner usage: ${formatReviewUsage(plan.plannerUsage)}`);
   if (plan.plannerDraft) {

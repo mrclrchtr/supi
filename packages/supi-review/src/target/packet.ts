@@ -10,14 +10,21 @@ import type {
 import { buildFileManifest } from "./file-manifest.ts";
 
 /** Protocol version included in every canonical reviewer packet for future evolution. */
-export const REVIEW_PACKET_PROTOCOL_VERSION = "2";
+export const REVIEW_PACKET_PROTOCOL_VERSION = "3";
 
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
 function targetIdentity(target: ResolvedReviewTarget): string {
-  if (target.kind === "working-tree") return `working-tree head=${target.headCommit}`;
+  if (target.kind === "working-tree") {
+    return [
+      "working-tree",
+      `head=${target.headCommit}`,
+      ...(target.requestedBaseCommit ? [`requested-base=${target.requestedBaseCommit}`] : []),
+      ...(target.mergeBaseCommit ? [`merge-base=${target.mergeBaseCommit}`] : []),
+    ].join(" ");
+  }
   if (target.kind === "comparison") {
     return [
       "comparison",
@@ -49,7 +56,7 @@ export function buildReviewPacket(
     `Target identity: ${targetIdentity(snapshot.target)}`,
     `Target diff SHA-256: ${snapshot.diffHash}`,
     `Reviewer model: ${model.canonicalId}`,
-    `Changed files: ${snapshot.changedFiles.length}`,
+    `Changed files: ${snapshot.changes.length}`,
     `Diff stats: +${snapshot.stats.additions} / -${snapshot.stats.deletions}`,
   ];
   if (review.sharedContext?.trim()) {
@@ -61,11 +68,13 @@ export function buildReviewPacket(
     task.instructions.trim(),
     "",
     "## Changed files",
-    ...buildFileManifest(snapshot.changedFiles),
+    ...buildFileManifest(snapshot.changes),
     "",
     "## Inspection",
     "Use list_review_changes for the complete changed-path set.",
     "Use list_review_files, read_review_diff, read_review_file, and search_review_files for target context.",
+    "read_review_diff without a path returns the bounded paged full target diff; oversized targets require per-path reads. read_review_file supports line-range selection.",
+    "search_review_files supports before/after sides and literal/extended-regex modes.",
     "All tools resolve against the selected review target.",
     "",
     "## Delivery",

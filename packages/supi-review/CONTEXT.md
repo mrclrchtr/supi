@@ -39,7 +39,7 @@ An optional advisory proposal of shared context and Review Tasks generated from 
 _Avoid_: generated prompt, synthesized brief, reviewer output
 
 **Working-Tree Review**:
-A review target comparing `HEAD` with the files currently present in the whole Git worktree, plus non-ignored untracked files, regardless of staging state or Pi's launch subdirectory. A temporary `HEAD`-seeded index prevents the caller's real index and index flags from becoming evidence.
+A review target comparing a resolved baseline with the files currently present in the whole Git worktree, plus non-ignored untracked files, regardless of staging state or Pi's launch subdirectory. The baseline is `HEAD` by default or the merge base of an optional caller-supplied base commit and captured `HEAD`, allowing committed branch work and uncommitted work to form one net target. A temporary `HEAD`-seeded index augmented with baseline-only tracked entries prevents the caller's real index and index flags from becoming evidence while preserving direct baseline-to-filesystem comparisons.
 _Avoid_: layered index review, commit-candidate review, cwd-scoped review
 
 **Task Verdict**:

@@ -73,9 +73,15 @@ Use `use-review` with a complete replacement review when the draft needs editing
 
 The Review Engine resolves the Git worktree root once. Review paths and target identity are always relative to the entire worktree, even when Pi starts in a subdirectory.
 
-- `working-tree` — net `HEAD` to current filesystem, plus non-ignored untracked files, computed through a temporary HEAD-seeded index rather than the caller's real index
+- `working-tree` — net current filesystem plus non-ignored untracked files against `HEAD`, or against `merge-base(baseCommit, HEAD)` when optional `baseCommit` is supplied; computed through a temporary HEAD-seeded union index rather than the caller's real index
 - `comparison` — merge base of `baseCommit` and captured `HEAD` to captured `HEAD`
 - `commit` — first parent (or empty tree) to `commit`
+
+To review a dirty feature branch including its committed and uncommitted work:
+
+```json
+{ "kind": "working-tree", "baseCommit": "9510d68" }
+```
 
 Agent-facing commit values accept 7–64 hexadecimal characters and are pinned to full commit object ids during resolution. The repository must remain stable from preparation or Direct invocation through reviewer completion, including retries; drift is not detected.
 
@@ -85,18 +91,18 @@ Callers own task methodology. The Review Engine owns target resolution, target-a
 
 Reviewers receive only:
 
-- `list_review_changes`
-- `list_review_files`
-- `read_review_diff`
-- `read_review_file`
-- `search_review_files`
+- `list_review_changes` — complete changed-path status and per-file `+/-` inventory
+- `list_review_files` — after-side file inventory
+- `read_review_diff` — the bounded paged full diff or one changed path's diff; oversized aggregate diffs require per-path reads
+- `read_review_file` — before/after file content with optional `startLine`/`lineCount` selection
+- `search_review_files` — before/after literal or extended-regex target search
 - `submit_review`
 
 They receive no shell, arbitrary extension tools, Pi context files, skills, or prompt templates. Discovered `SYSTEM.md` and `APPEND_SYSTEM.md` files are explicitly suppressed. In-memory child settings disable compaction and retries, so provider limits apply to the original packet.
 
 Reviewer sessions have no package-owned wall-clock, turn, tool-use, or token cutoff. Agent-tool cancellation and the interactive Escape loader abort them explicitly; host cleanup stops waiting for an unresponsive provider abort after a short grace period.
 
-Changed-file manifests, input/result strings, finding counts, working-tree reads, and individual tool pages are bounded. Working-tree patch hashing processes untracked files sequentially and does not retain the aggregate patch in the Review Plan.
+Changed-file manifests include status and per-file numstat but remain bounded; `list_review_changes` provides the complete inventory. Input/result strings, finding counts, working-tree reads, and individual tool pages are also bounded. Working-tree patch hashing processes untracked files sequentially and does not retain the aggregate patch in the Review Plan.
 
 ## Results and continuation
 

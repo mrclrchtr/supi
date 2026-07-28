@@ -7,7 +7,7 @@ const snapshot: ReviewSnapshot = {
   requestedTarget: { kind: "working-tree" },
   target: { kind: "working-tree", headCommit: "a".repeat(40) },
   title: "Working tree",
-  changedFiles: ["a.ts"],
+  changes: [{ status: "M", path: "a.ts", additions: 1, deletions: 0 }],
   diffHash: "b".repeat(64),
   stats: { files: 1, additions: 1, deletions: 0 },
 };

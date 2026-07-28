@@ -77,7 +77,10 @@ function parseTarget(input: {
   commit?: string;
 }): ReviewTargetSpec {
   if (input.kind === "working-tree") {
-    return { kind: "working-tree" };
+    return {
+      kind: "working-tree",
+      ...(input.baseCommit ? { baseCommit: input.baseCommit } : {}),
+    };
   }
   if (input.kind === "comparison") {
     if (!input.baseCommit) {

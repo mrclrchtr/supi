@@ -29,12 +29,13 @@ const DEFAULT_REVIEW: ReviewInput = {
 
 async function selectTarget(ctx: CommandContext): Promise<ReviewTargetSpec | undefined> {
   const kind = await ctx.ui.select("Review target", [
-    "Working tree",
-    "Comparison against a base commit",
+    "Uncommitted changes against HEAD",
+    "Current work against a base branch",
+    "Committed changes against a base branch",
     "Single commit",
   ]);
   if (!kind) return undefined;
-  if (kind === "Working tree") return { kind: "working-tree" };
+  if (kind === "Uncommitted changes against HEAD") return { kind: "working-tree" };
   const choices =
     kind === "Single commit" ? await listRecentCommits(ctx.cwd) : await listLocalBranches(ctx.cwd);
   const label = await ctx.ui.select(
@@ -43,9 +44,11 @@ async function selectTarget(ctx: CommandContext): Promise<ReviewTargetSpec | und
   );
   const choice = choices.find((candidate) => candidate.label === label);
   if (!choice) return undefined;
-  return kind === "Single commit"
-    ? { kind: "commit", commit: choice.commit }
-    : { kind: "comparison", baseCommit: choice.commit };
+  if (kind === "Single commit") return { kind: "commit", commit: choice.commit };
+  if (kind === "Current work against a base branch") {
+    return { kind: "working-tree", baseCommit: choice.commit };
+  }
+  return { kind: "comparison", baseCommit: choice.commit };
 }
 
 async function selectReviewerModel(ctx: CommandContext): Promise<ReviewModelSelection | undefined> {

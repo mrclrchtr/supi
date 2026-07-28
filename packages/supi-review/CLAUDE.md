@@ -15,7 +15,7 @@ Caller-defined code review tasks executed in managed, read-only child sessions.
 
 ## Targets
 
-- Working tree: net `HEAD` to current files plus non-ignored untracked files; use a temporary HEAD-seeded index so the caller's real index and index flags are not semantic inputs.
+- Working tree: net baseline to current files plus non-ignored untracked files; baseline is `HEAD` by default or the merge base of an optional caller-supplied base commit and captured `HEAD`. Use a temporary HEAD-seeded index augmented with baseline-only tracked entries so the caller's real index and index flags are not semantic inputs and branch deletions/renames compare directly with the current filesystem.
 - All targets resolve against the canonical Git worktree root, regardless of Pi's launch subdirectory.
 - Comparison: merge base of a caller-supplied 7–64 character hexadecimal base commit and captured `HEAD` to captured `HEAD`.
 - Commit: first parent or empty tree to the supplied 7–64 character hexadecimal commit.
@@ -25,7 +25,7 @@ Caller-defined code review tasks executed in managed, read-only child sessions.
 ## Planner
 
 - Uses the separately configured Planner model at low thinking effort.
-- Receives bounded compaction/branch summaries, recent visible conversation, changed-file names, and target stats.
+- Receives bounded compaction/branch summaries, recent visible conversation, a bounded changed-path status/numstat inventory, and target stats.
 - Receives no code, diffs, prior tool calls/results, context files, or inspection tools; only `submit_review_plan` is registered.
 - Produces only advisory `{ sharedContext?, tasks }` input.
 - Draft tasks must be answerable through the reviewer's fixed static inspection tools; they cannot request shell/runtime/nested-review operations.
@@ -36,11 +36,11 @@ Caller-defined code review tasks executed in managed, read-only child sessions.
 
 Tools are fixed and target-aware:
 
-- `list_review_changes`
-- `list_review_files`
-- `read_review_diff`
-- `read_review_file`
-- `search_review_files`
+- `list_review_changes` — complete status and per-file numstat inventory
+- `list_review_files` — after-side file inventory
+- `read_review_diff` — full target diff or one changed path, character-paged
+- `read_review_file` — before/after content with optional line-range selection, character-paged
+- `search_review_files` — before/after literal or extended-regex search
 - `submit_review`
 
 Do not reintroduce live-checkout built-in read/search tools for commit-based targets. Reviewer resource loading disables extensions, context files, skills, prompt templates, and themes, explicitly suppresses discovered `SYSTEM.md` / `APPEND_SYSTEM.md` files, and uses in-memory settings with compaction/retries disabled. Inspection outputs are paged; canonical packet bytes are not. Parent-facing preparation/run text uses bounded session artifacts retrievable through `supi_review_output`.
@@ -52,7 +52,10 @@ The reviewer submits a task summary plus findings. Each finding has title, descr
 ## Main files
 
 - `src/review.ts` — command and extension wiring
-- `src/git.ts` — root-pinned target resolution and target-aware repository access
+- `src/git.ts` — target-aware repository reads, diffs, listings, and searches
+- `src/target/resolve.ts` — root-pinned target resolution and patch identity
+- `src/target/change-metadata.ts` — Git status/numstat reconciliation and patch accounting
+- `src/target/diff.ts` — shared deterministic patch flags, untracked diffs, and NUL-list parsing
 - `src/git-choices.ts` — interactive branch/commit choices
 - `src/review-path.ts` — repository-relative path, size, and symlink containment boundary
 - `src/target/packet.ts` — canonical reviewer packet
