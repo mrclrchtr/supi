@@ -214,7 +214,7 @@ describe("workspace runtime behavior", () => {
       { file: "src/index.ts", total: 1, errors: 1, warnings: 0, information: 0, hints: 0 },
     ];
     const recovery = {
-      refreshedClients: 1,
+      attemptedClients: 1,
       restartedClients: 1,
       staleAssessment: {
         suspected: false,

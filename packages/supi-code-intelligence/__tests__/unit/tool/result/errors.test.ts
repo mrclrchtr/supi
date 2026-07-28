@@ -100,7 +100,11 @@ describe("error result factories", () => {
       expect(result.content).toBe("msg");
       expect(result.details?.type).toBe("health");
       expect(data.semanticState).toEqual({ kind: "unavailable", reason: "no providers" });
-      expect(data.recovered).toBe(false);
+      expect(data.refresh).toEqual({
+        kind: "not-attempted",
+        reason: "no providers",
+        lastAttempt: null,
+      });
       expect(data.diagnosticFileCount).toBe(0);
       expect(data.serverCount).toBe(0);
     });

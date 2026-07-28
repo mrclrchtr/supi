@@ -11,8 +11,13 @@ import type { HealthDetails, HealthSectionDetails } from "./types.ts";
 export type {
   HealthData,
   HealthDiagnosticEntry,
+  HealthDiagnosticObservation,
+  HealthDiagnosticScope,
+  HealthRefreshAttempt,
+  HealthRefreshState,
   HealthSection,
   HealthServerInfo,
+  HealthStaleAssessment,
   SemanticHealthState,
 } from "../../session/health-types.ts";
 export type { HealthSectionDetails } from "./types.ts";
@@ -38,7 +43,7 @@ export function assembleHealthResult(data: HealthData): HealthResultAssembly {
     ...sections.flatMap((section) => section.provenance),
     { source: "runtime", capability: "workspace-health" },
   ]);
-  const confidence = healthConfidence(data, sectionDetails);
+  const confidence = healthConfidence(sectionDetails);
   const assembled = assembleToolResult({
     data,
     sections,
@@ -60,11 +65,13 @@ export function assembleHealthResult(data: HealthData): HealthResultAssembly {
       omittedCount: assembled.totals.omittedCount,
       semanticState: data.semanticState,
       serverInventoryAvailable: data.serverInventoryAvailable,
-      recovered: data.recovered,
+      serverInventoryScope: "workspace",
+      diagnosticObservation: data.diagnostics,
+      refresh: data.refresh,
       structuralAvailable: structuralCapabilityReady(data),
       structuralStatus: data.structuralStatus,
       capabilityWarnings: data.capabilityWarnings ?? null,
-      diagnosticFileCount: data.diagnostics.length,
+      diagnosticFileCount: data.diagnostics.entries.length,
       serverCount: data.servers.length,
       evidenceLists: [...assembled.evidenceLists],
     },
@@ -72,6 +79,7 @@ export function assembleHealthResult(data: HealthData): HealthResultAssembly {
 }
 
 interface HealthSectionFacts {
+  status: "complete" | "partial" | "unavailable";
   available: boolean;
   items: readonly unknown[];
   confidence: ConfidenceMode;
@@ -83,13 +91,12 @@ function projectSection(
   data: HealthData,
 ): { section: ResultSection; details: HealthSectionDetails } {
   const facts = collectSectionFacts(key, data);
-  const status = facts.available ? "complete" : "unavailable";
-  const confidence = facts.available ? facts.confidence : "unavailable";
+  const confidence = facts.status === "unavailable" ? "unavailable" : facts.confidence;
   return {
     section: {
       key: `health.${key}`,
       title: SECTION_TITLES[key],
-      status,
+      status: facts.status,
       items: facts.items,
       confidence,
       provenance: facts.provenance,
@@ -97,7 +104,7 @@ function projectSection(
     details: {
       key,
       title: SECTION_TITLES[key],
-      status,
+      status: facts.status,
       confidence,
       provenance: [...facts.provenance],
       itemCount: facts.items.length,
@@ -107,31 +114,47 @@ function projectSection(
 }
 
 function collectSectionFacts(key: HealthSection, data: HealthData): HealthSectionFacts {
-  switch (key) {
-    case "diagnostics": {
-      const available = semanticHealthReady(data);
+  if (key === "servers") return serverFacts(data);
+
+  switch (data.diagnostics.kind) {
+    case "completed":
+      return semanticDiagnosticFacts("complete", data.diagnostics.entries);
+    case "partial":
+      return semanticDiagnosticFacts("partial", data.diagnostics.entries);
+    case "unavailable":
+    case "not-requested":
       return {
-        available,
-        items: data.diagnostics,
-        confidence: "semantic",
-        provenance: available ? [{ source: "semantic", capability: "LSP" }] : [],
-      };
-    }
-    case "servers":
-      return {
-        available: data.serverInventoryAvailable,
-        items: data.servers,
-        confidence: "heuristic",
-        provenance: data.serverInventoryAvailable
-          ? [{ source: "runtime", capability: "language-server-status" }]
-          : [],
+        status: "unavailable",
+        available: false,
+        items: [],
+        confidence: "unavailable",
+        provenance: [],
       };
   }
 }
 
-/** Accept only the explicit ready state; arbitrary status text is not provenance. */
-function semanticHealthReady(data: HealthData): boolean {
-  return data.semanticState?.kind === "ready";
+function semanticDiagnosticFacts(
+  status: "complete" | "partial",
+  entries: HealthData["diagnostics"]["entries"],
+): HealthSectionFacts {
+  return {
+    status,
+    available: true,
+    items: entries,
+    confidence: "semantic",
+    provenance: [{ source: "semantic", capability: "LSP" }],
+  };
+}
+
+function serverFacts(data: HealthData): HealthSectionFacts {
+  const available = data.serverInventoryAvailable;
+  return {
+    status: available ? "complete" : "unavailable",
+    available,
+    items: data.servers,
+    confidence: "heuristic",
+    provenance: available ? [{ source: "runtime", capability: "language-server-status" }] : [],
+  };
 }
 
 /** Accept only the explicit ready state; arbitrary status text is not provenance. */
@@ -139,17 +162,18 @@ function structuralCapabilityReady(data: HealthData): boolean {
   return data.structuralAvailable === true;
 }
 
-function healthConfidence(
-  _data: HealthData,
-  sections: readonly HealthSectionDetails[],
-): ConfidenceMode {
+function healthConfidence(sections: readonly HealthSectionDetails[]): ConfidenceMode {
   if (
-    sections.some((section) => section.status === "complete" && section.confidence === "semantic")
+    sections.some(
+      (section) => section.status !== "unavailable" && section.confidence === "semantic",
+    )
   ) {
     return "semantic";
   }
   if (
-    sections.some((section) => section.status === "complete" && section.confidence === "heuristic")
+    sections.some(
+      (section) => section.status !== "unavailable" && section.confidence === "heuristic",
+    )
   ) {
     return "heuristic";
   }

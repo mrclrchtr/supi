@@ -59,7 +59,7 @@ export const CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES: CodeIntelligenceToolPromptS
   },
   code_health: {
     description:
-      "Report live diagnostics, language-server status, final semantic health state. Use refresh:true to attempt diagnostic recovery before finalizing semantic state. Server inventory does not prove semantic readiness, and unavailable inventory is not reported as empty. Capability Warnings supplement diagnostic/server results.",
+      "Report live diagnostics as observations, language-server status, and final semantic health state. Use refresh:true to report a diagnostic-recovery attempt before finalizing semantic state. Tracked-file snapshots do not prove workspace completeness; server inventory is workspace-wide. Capability Warnings supplement diagnostic/server results.",
     promptSnippet: "code_health — live workspace health observations",
     promptGuidelines: [
       "Use code_health with refresh:true before relying on potentially stale diagnostics.",

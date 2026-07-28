@@ -45,7 +45,14 @@ export type {
   TargetOutcome,
   TargetProviderProvenance,
 } from "./analysis/target/types.ts";
-export type { SemanticHealthState } from "./session/health-types.ts";
+export type {
+  HealthDiagnosticObservation,
+  HealthDiagnosticScope,
+  HealthRefreshAttempt,
+  HealthRefreshState,
+  HealthStaleAssessment,
+  SemanticHealthState,
+} from "./session/health-types.ts";
 export type { TargetSymbolKind } from "./session/target-input.ts";
 // Code-intelligence-specific result types.
 export type {

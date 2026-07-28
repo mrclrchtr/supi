@@ -91,7 +91,7 @@ Runtime facts about LSP state and server inventory. A live runtime owner or expl
 _Avoid_: semantic evidence, treating unknown inventory as empty, treating disabled as unknown, inferring capability from runtime presence
 
 **Semantic health state**:
-The authoritative final readiness classification—ready, pending, inactive, disabled, or unavailable—for semantic diagnostics at the requested scope, determined after routing and requested recovery. A concrete ready project or file server establishes readiness even if capability publication lags; server inventory remains a separate fact.
+The authoritative final readiness classification—ready, pending, inactive, disabled, or unavailable—for semantic diagnostics at the requested scope, determined after routing and requested recovery. A concrete ready project or file server establishes readiness even if capability publication lags; diagnostic observation status remains a separate completed/partial/unavailable fact, and server inventory remains workspace-wide.
 _Avoid_: runtime availability, capability publication status, configured-route availability, vacuous readiness, optimistic diagnostics
 
 **Capability Warning**:
@@ -99,7 +99,7 @@ An actionable notice that Code intelligence capability is reduced or configured 
 _Avoid_: degraded coverage, coverage warning
 
 **Live health observation**:
-Tool evidence obtained by querying an available source during a `code_health` call. A continuously maintained source may expose its current snapshot with freshness limitations disclosed; a batch source must collect during the call, so a precomputed report is not a Live health observation.
+Tool evidence obtained by querying an available source during a `code_health` call. A completed file request may establish file-local absence; omitted or directory scope is only a tracked-file snapshot and never proves workspace completeness. A continuously maintained source may expose its current snapshot with freshness limitations disclosed; a batch source must collect during the call, so a precomputed report is not a Live health observation.
 _Avoid_: live/runtime-backed signal, ambient report evidence, undisclosed cached evidence
 
 **Point inspection observation**:

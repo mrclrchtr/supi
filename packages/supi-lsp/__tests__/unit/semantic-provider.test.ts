@@ -30,7 +30,7 @@ describe("LspSemanticProvider", () => {
       getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
       getOutstandingDiagnosticSummary: vi.fn().mockReturnValue([]),
       recoverDiagnostics: vi.fn().mockResolvedValue({
-        refreshedClients: 0,
+        attemptedClients: 0,
         restartedClients: 0,
         staleAssessment: { suspected: false, matchedFiles: [], warning: null },
       }),

@@ -276,7 +276,11 @@ describe("code_orientation tool", () => {
             },
           ]),
         ),
-        recoverDiagnostics: vi.fn(async () => ({ recovered: false })),
+        recoverDiagnostics: vi.fn(async () => ({
+          attemptedClients: 0,
+          restartedClients: 0,
+          staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+        })),
       },
     });
 
@@ -336,7 +340,11 @@ describe("code_orientation tool", () => {
             },
           ]),
         ),
-        recoverDiagnostics: vi.fn(async () => ({ recovered: false })),
+        recoverDiagnostics: vi.fn(async () => ({
+          attemptedClients: 0,
+          restartedClients: 0,
+          staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+        })),
       },
     });
 

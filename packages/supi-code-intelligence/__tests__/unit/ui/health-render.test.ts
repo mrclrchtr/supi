@@ -31,7 +31,17 @@ function makeDetails(overrides: Record<string, unknown> = {}): Record<string, un
       },
     ],
     semanticState: { kind: "ready" },
-    recovered: false,
+    serverInventoryScope: "workspace",
+    diagnosticObservation: {
+      kind: "completed",
+      scope: { kind: "tracked-files", filter: null },
+      entries: [],
+    },
+    refresh: {
+      kind: "not-requested",
+      reason: "Refresh was not requested.",
+      lastAttempt: null,
+    },
     structuralAvailable: true,
     structuralStatus: "ready",
     capabilityWarnings: null,
@@ -61,6 +71,22 @@ function render(
 beforeAll(() => initTheme("dark"));
 
 describe("code_health TUI projection", () => {
+  it("renders refresh status from structured health details", () => {
+    const details = makeDetails({
+      refresh: {
+        kind: "completed",
+        attemptedAt: 1,
+        requestedDiagnosticScope: { kind: "tracked-files", filter: null },
+        operationScope: "workspace-runtime",
+        attemptedActiveClients: 0,
+        restartedClients: 0,
+        staleAssessment: { suspected: false, matchedFileCount: 0, warning: null },
+      },
+    });
+
+    expect(render(details, true)).toContain("refresh completed no-op");
+  });
+
   it("renders Capability Warnings from structured health details", () => {
     const details = makeDetails({
       capabilityWarnings: {

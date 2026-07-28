@@ -34,7 +34,7 @@ describe("recoverWorkspaceDiagnostics", () => {
     ]);
     expect(manager.refreshOpenDiagnostics).toHaveBeenCalledWith({ maxWaitMs: 4_000, quietMs: 250 });
     expect(manager.restartClientsForFiles).not.toHaveBeenCalled();
-    expect(result.refreshedClients).toBe(2);
+    expect(result.attemptedClients).toBe(2);
     expect(result.restartedClients).toBe(0);
     expect(result.staleAssessment.suspected).toBe(false);
   });

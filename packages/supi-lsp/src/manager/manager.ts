@@ -465,7 +465,7 @@ export class LspManager {
     maxWaitMs?: number;
     quietMs?: number;
   }): Promise<{
-    refreshedClients: number;
+    attemptedClients: number;
     restartedClients: number;
     staleAssessment: {
       suspected: boolean;

@@ -5,7 +5,8 @@ import {
 } from "../diagnostics/stale-diagnostics.ts";
 
 export interface WorkspaceRecoveryResult {
-  refreshedClients: number;
+  /** Active clients targeted by the best-effort refresh, not confirmed successful refreshes. */
+  attemptedClients: number;
   restartedClients: number;
   staleAssessment: StaleDiagnosticAssessment;
 }
@@ -41,7 +42,7 @@ export async function recoverWorkspaceDiagnostics(
     quietMs?: number;
   } = {},
 ): Promise<WorkspaceRecoveryResult> {
-  const refreshedClients = softRecoverWorkspaceDiagnostics(host, options.changes ?? []);
+  const attemptedClients = softRecoverWorkspaceDiagnostics(host, options.changes ?? []);
 
   try {
     await host.refreshOpenDiagnostics({ maxWaitMs: options.maxWaitMs, quietMs: options.quietMs });
@@ -72,7 +73,7 @@ export async function recoverWorkspaceDiagnostics(
   }
 
   return {
-    refreshedClients,
+    attemptedClients,
     restartedClients,
     staleAssessment,
   };

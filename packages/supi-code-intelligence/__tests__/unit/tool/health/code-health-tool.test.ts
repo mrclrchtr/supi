@@ -73,7 +73,11 @@ function mockReadyLsp(
     ]),
     getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue([]),
     fileDiagnostics: vi.fn().mockResolvedValue(null),
-    recoverDiagnostics: vi.fn().mockResolvedValue({ recovered: false }),
+    recoverDiagnostics: vi.fn().mockResolvedValue({
+      attemptedClients: 0,
+      restartedClients: 0,
+      staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+    }),
     pruneMissingFiles: vi.fn().mockReturnValue([]),
     refreshOpenDiagnostics: vi.fn().mockResolvedValue(undefined),
     noteWorkspaceChanges: vi.fn(),
@@ -269,7 +273,7 @@ describe("code_health tool", () => {
     const recoverDiagnostics = vi.fn(async () => {
       ready = true;
       return {
-        refreshedClients: 1,
+        attemptedClients: 1,
         restartedClients: 1,
         staleAssessment: { suspected: false, matchedFiles: [], warning: null },
       };
@@ -359,7 +363,9 @@ describe("code_health tool", () => {
       content: Array<{ type: string; text: string }>;
     };
 
-    expect(result.content[0].text).toContain("No diagnostics found.");
+    expect(result.content[0].text).toContain(
+      "No errors or warnings are reported by the tracked-file diagnostic snapshot.",
+    );
     expect(result.content[0].text).not.toContain("1 file with issues: 0 errors, 0 warnings");
     expect(result.content[0].text).not.toContain("src/clean.ts");
   });

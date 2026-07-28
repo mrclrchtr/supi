@@ -125,7 +125,6 @@ function everySectionUnavailable(sections: InspectSections): boolean {
     sections.definition.kind === "unavailable" &&
     sections.diagnostics.kind === "unavailable"
   );
-
 }
 
 function inspectConfidence(sections: InspectSections): InspectResultData["confidence"] {

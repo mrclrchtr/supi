@@ -175,6 +175,8 @@ code_health({ refresh: true, include: ["diagnostics", "servers"] })
 
 Omitting `include` requests `diagnostics` and `servers`. The selectable sections are `diagnostics` and `servers`; Capability Warnings supplement diagnostic/server requests rather than acting as another section. `code_health` does not discover precomputed coverage or unused-code reports. A future batch-analyzer integration must collect its observations when called.
 
+An existing file scope performs a live file diagnostic request, so completed-empty can establish no reported errors or warnings for that file. Omitted or directory scope reports a tracked-file diagnostic snapshot, not proof that the workspace is clean. Server inventory remains workspace-wide. `refresh: true` reports the actual workspace-runtime attempt—targeted active-client and restart counts plus the bounded stale-module assessment—rather than claiming recovered or fresh diagnostics.
+
 ### Plan and apply a rename
 
 ```text

@@ -4,7 +4,12 @@ import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import type { InstructionFilesMetadata } from "../../analysis/instruction-files.ts";
 import type { ReadNextItem } from "../../analysis/read-next.ts";
 import type { StructuredScanSummary } from "../../analysis/search/pattern.ts";
-import type { HealthSection, SemanticHealthState } from "../../session/health-types.ts";
+import type {
+  HealthDiagnosticObservation,
+  HealthRefreshState,
+  HealthSection,
+  SemanticHealthState,
+} from "../../session/health-types.ts";
 import type { InspectResultData } from "../../session/inspect-types.ts";
 import type { TargetSymbolKind } from "../../session/target-input.ts";
 import type {
@@ -211,7 +216,12 @@ export interface HealthDetails {
   omittedCount: number;
   semanticState: SemanticHealthState | null;
   serverInventoryAvailable: boolean;
-  recovered: boolean;
+  /** Server inventory remains workspace-wide even for a scoped diagnostic request. */
+  serverInventoryScope: "workspace";
+  /** Exact status and evidence boundary of the diagnostic observation. */
+  diagnosticObservation: HealthDiagnosticObservation;
+  /** Current or most recent explicit diagnostic refresh attempt. */
+  refresh: HealthRefreshState;
   structuralAvailable: boolean;
   /** Structural (tree-sitter) substrate readiness. Undefined when not evaluated. */
   structuralStatus?: string;

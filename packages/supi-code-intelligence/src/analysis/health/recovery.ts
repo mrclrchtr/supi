@@ -2,27 +2,21 @@
 // Extracted from orchestrate.ts.
 
 import type { CapabilityState } from "@mrclrchtr/supi-code-runtime/api";
-import type { WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
+import type { RecoverDiagnosticsResult, WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 
 // ── Recovery ──────────────────────────────────────────────────────────
 
 interface RecoverOptions {
-  service: WorkspaceLspRuntime | null;
-  refresh: boolean | undefined;
+  service: WorkspaceLspRuntime;
   progress?: () => void;
 }
 
-export async function maybeRecover(opts: RecoverOptions): Promise<{ recovered: boolean }> {
-  const { service, refresh, progress } = opts;
-  if (!refresh || !service) return { recovered: false };
-
-  progress?.();
-  try {
-    await service.recoverDiagnostics({ restartIfStillStale: true });
-    return { recovered: true };
-  } catch {
-    return { recovered: false };
-  }
+/** Run the runtime's best-effort recovery and preserve its established outcome. */
+export async function recoverDiagnosticRuntime(
+  opts: RecoverOptions,
+): Promise<RecoverDiagnosticsResult> {
+  opts.progress?.();
+  return opts.service.recoverDiagnostics({ restartIfStillStale: true });
 }
 
 // ── State description helpers ─────────────────────────────────────────

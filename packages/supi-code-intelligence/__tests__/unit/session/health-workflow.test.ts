@@ -53,8 +53,8 @@ async function run(lspState: WorkspaceLspRuntimeState, semantic: CapabilityState
       cwd,
       capability: capability(lspState, semantic),
       lspController: { getMissingServers: () => [] } as never,
-      lastRefresh: undefined,
-      trackRefresh: () => undefined,
+      lastRefreshAttempt: null,
+      trackRefreshAttempt: () => undefined,
       sentinelSnapshot: new Map(),
     },
   );

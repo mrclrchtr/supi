@@ -10,6 +10,10 @@ See also: `packages/supi-code-intelligence/CONTEXT.md` and `packages/supi-code-r
 The workspace-scoped interface that owns file routing, semantic readiness and operations, tracked files, diagnostics, and recovery. It hides clients and the mutable manager, giving callers a deep operational seam with high locality inside `supi-lsp`.
 _Avoid_: LspManager, LSP singleton, provider bag, client registry
 
+**Diagnostic recovery attempt**:
+A best-effort workspace-runtime operation that clears pull state, refreshes active clients, and may restart clients for a suspected stale cluster. Its attempted-client count names targets, not confirmed successful diagnostic refreshes.
+_Avoid_: recovered diagnostics, freshness proof, per-client success inference
+
 **LSP runtime controller**:
 The lifecycle/status module for one workspace. It starts and shuts down language-server infrastructure, publishes runtime state, and reports detected project servers. It does not own semantic workflow policy.
 _Avoid_: Workspace LSP runtime, semantic provider, query router

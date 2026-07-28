@@ -52,7 +52,8 @@ export interface OutstandingDiagnosticSummaryEntry {
 
 /** Result from a workspace diagnostic recovery pass. */
 export interface RecoverDiagnosticsResult {
-  refreshedClients: number;
+  /** Active clients targeted by the best-effort refresh, not confirmed successful refreshes. */
+  attemptedClients: number;
   restartedClients: number;
   staleAssessment: {
     suspected: boolean;

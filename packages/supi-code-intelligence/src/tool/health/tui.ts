@@ -128,6 +128,9 @@ function formatSectionSummary(
   if (section.status === "unavailable" || !section.available) {
     return `${theme.fg("dim", label)} ${theme.fg("warning", "unavailable")}`;
   }
+  if (section.status === "partial") {
+    return `${theme.fg("dim", label)} ${theme.fg("warning", "partial")}`;
+  }
   if (evidence) return theme.fg("success", theme.bold(formatEvidenceEntry(evidence)));
 
   const suffix = section.key === "diagnostics" ? " with issues" : "";
@@ -143,22 +146,64 @@ function buildStatusBar(data: Record<string, unknown> | null, theme: Theme): Tex
 
   const semanticStatus = readSemanticStatus(data);
   const structuralStatus = readString(data, "structuralStatus");
-  const recovered = data.recovered === true;
+  const refreshStatus = readRefreshStatus(data);
 
   const lspColor = semanticStatus.startsWith("ready") ? "success" : "warning";
   const structuralColor = structuralStatus === "ready" ? "success" : "muted";
 
-  const lspLabel =
-    semanticStatus.includes("(recovered)") || !recovered
-      ? semanticStatus
-      : `${semanticStatus} (recovered)`;
-
-  const lines: string[] = [`LSP: ${theme.fg(lspColor, lspLabel)}`];
+  const lines: string[] = [`LSP: ${theme.fg(lspColor, semanticStatus)}`];
   if (structuralStatus) {
     lines.push(`Tree-sitter: ${theme.fg(structuralColor, structuralStatus)}`);
   }
+  if (refreshStatus) lines.push(`Diagnostics: ${theme.fg("dim", refreshStatus)}`);
 
   return new Text(lines.join("  "), 0, 0);
+}
+
+function readRefreshStatus(data: Record<string, unknown> | null): string | null {
+  const refresh = readRecord(data?.refresh);
+  if (!refresh) return null;
+
+  switch (refresh.kind) {
+    case "completed": {
+      const attempted = readNumber(refresh.attemptedActiveClients);
+      const restarted = readNumber(refresh.restartedClients);
+      const stale = readRecord(refresh.staleAssessment);
+      const noOp = attempted === 0 && restarted === 0;
+      const base = noOp
+        ? "refresh completed no-op"
+        : `refresh completed: ${attempted} clients targeted, ${restarted} restarted`;
+      return stale?.suspected === true
+        ? `${base}; stale pattern suspected in ${readNumber(stale.matchedFileCount)} files`
+        : base;
+    }
+    case "failed":
+      return `refresh failed${typeof refresh.reason === "string" ? `: ${refresh.reason}` : ""}`;
+    case "not-attempted":
+      return "refresh not attempted";
+    default:
+      return null;
+  }
+}
+
+function diagnosticEmptySummary(data: Record<string, unknown> | null): string {
+  return diagnosticScopeKind(data) === "file"
+    ? "No errors or warnings for file"
+    : "No reported issues in tracked files";
+}
+
+function diagnosticScopeKind(data: Record<string, unknown> | null): string | null {
+  const observation = readRecord(data?.diagnosticObservation);
+  const scope = readRecord(observation?.scope);
+  return typeof scope?.kind === "string" ? scope.kind : null;
+}
+
+function readRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
+}
+
+function readNumber(value: unknown): number {
+  return typeof value === "number" ? value : 0;
 }
 
 interface RenderedCapabilityWarning {
@@ -204,7 +249,7 @@ function buildHealthSectionSummary(data: Record<string, unknown> | null, theme: 
   if (sections.length === 0) return new Text("", 0, 0);
 
   const lines = sections.map((section) => {
-    const label = sectionLabel(section.key);
+    const label = section.key === "servers" ? "servers (workspace)" : sectionLabel(section.key);
     if (section.status === "unavailable" || !section.available) {
       return `${label} unavailable`;
     }
@@ -219,11 +264,22 @@ function buildDiagnosticSummary(data: Record<string, unknown> | null, theme: The
   if (section.status === "unavailable" || !section.available) {
     return new Text(theme.fg("warning", "Diagnostics unavailable"), 0, 0);
   }
+  const trackedFiles = diagnosticScopeKind(data) === "tracked-files";
+  if (section.status === "partial") {
+    return new Text(
+      theme.fg(
+        "warning",
+        trackedFiles ? "Tracked-file diagnostics partial" : "Diagnostics partial",
+      ),
+      0,
+      0,
+    );
+  }
   if (section.itemCount === 0) {
-    return new Text(theme.fg("success", "No diagnostics found"), 0, 0);
+    return new Text(theme.fg("success", diagnosticEmptySummary(data)), 0, 0);
   }
 
-  const fileLabel = section.itemCount === 1 ? "file" : "files";
+  const fileLabel = `${trackedFiles ? "tracked " : ""}${section.itemCount === 1 ? "file" : "files"}`;
   return new Text(
     theme.fg("warning", theme.bold(`${section.itemCount} ${fileLabel} with issues`)),
     0,

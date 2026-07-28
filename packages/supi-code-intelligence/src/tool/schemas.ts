@@ -240,7 +240,10 @@ export const CodeHealthParameters = Type.Object(
   {
     scope: Type.Optional(ScopeParam),
     refresh: Type.Optional(
-      Type.Boolean({ description: "Refresh provider state before collecting health data." }),
+      Type.Boolean({
+        description:
+          "Attempt workspace-runtime diagnostic recovery before collecting health data; the result reports the established attempt outcome.",
+      }),
     ),
     include: Type.Optional(
       Type.Array(

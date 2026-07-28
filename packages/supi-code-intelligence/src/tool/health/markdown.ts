@@ -6,11 +6,21 @@
  */
 
 import type { CapabilityWarningReport } from "../../analysis/capability/capability-warnings.ts";
-import type { HealthData, HealthResultAssembly, HealthSection } from "../result/health.ts";
+import type {
+  HealthData,
+  HealthDiagnosticScope,
+  HealthRefreshAttempt,
+  HealthResultAssembly,
+  HealthSection,
+} from "../result/health.ts";
 import { formatSemanticHealthState } from "./semantic-state.ts";
 
 export type {
   HealthData,
+  HealthDiagnosticObservation,
+  HealthDiagnosticScope,
+  HealthRefreshAttempt,
+  HealthRefreshState,
   HealthSection,
   SemanticHealthState,
 } from "../result/health.ts";
@@ -20,43 +30,83 @@ export function renderHealthResult(result: HealthResultAssembly, cwd: string): s
   const lines: string[] = ["## Code Health", ""];
   const hasSection = (key: HealthSection): boolean =>
     result.assembled.sections.some((section) => section.key === `health.${key}`);
-  const semanticRequested = hasSection("diagnostics") || hasSection("servers");
+  const hasDiagnostics = hasSection("diagnostics");
+  const semanticRequested = hasDiagnostics || hasSection("servers");
 
   renderStatusLine(lines, data, semanticRequested);
-  renderStalenessBanner(lines, data, sectionStatus(result, "diagnostics"));
-
-  if (hasSection("diagnostics")) {
-    renderDiagnosticsSection(lines, data, cwd, {
-      status: sectionStatus(result, "diagnostics"),
-    });
-  }
-  if (semanticRequested) {
-    renderCapabilityWarningsSection(lines, result.details.capabilityWarnings);
-  }
-  if (hasSection("servers")) {
-    renderServersSection(lines, data, sectionStatus(result, "servers"));
-  }
+  renderRefreshStatus(lines, data, hasDiagnostics, cwd);
+  if (hasDiagnostics) renderDiagnosticsSection(lines, data, cwd);
+  if (semanticRequested) renderCapabilityWarningsSection(lines, result.details.capabilityWarnings);
+  if (hasSection("servers")) renderServersSection(lines, data, sectionStatus(result, "servers"));
   return lines.join("\n");
 }
 
-function renderStalenessBanner(
+function renderRefreshStatus(
   lines: string[],
   data: HealthData,
-  status: "complete" | "partial" | "unavailable" | undefined,
+  hasDiagnostics: boolean,
+  cwd: string,
 ): void {
-  if (status !== "complete" && status !== "partial") return;
-  if (data.diagnosticAgeSeconds == null) {
-    lines.push("⚠ Diagnostics have not been refreshed this session. Use `refresh: true` to check.");
-    lines.push("");
-    return;
+  if (!hasDiagnostics) return;
+
+  switch (data.refresh.kind) {
+    case "completed":
+      lines.push(`**Diagnostic refresh**: ${completedRefreshText(data.refresh)}.`);
+      lines.push(`**Stale assessment**: ${staleAssessmentText(data.refresh)}.`);
+      lines.push("");
+      return;
+    case "failed":
+      lines.push(`**Diagnostic refresh**: failed — ${data.refresh.reason}`);
+      lines.push("");
+      return;
+    case "not-attempted":
+      lines.push(`**Diagnostic refresh**: not attempted — ${data.refresh.reason}`);
+      if (data.refresh.lastAttempt) renderLastAttempt(lines, data.refresh.lastAttempt, cwd);
+      lines.push("");
+      return;
+    case "not-requested":
+      if (data.refresh.lastAttempt) {
+        renderLastAttempt(lines, data.refresh.lastAttempt, cwd);
+      } else {
+        lines.push(
+          "**Diagnostic refresh**: not attempted this session. Use `refresh: true` to try one.",
+        );
+      }
+      lines.push("");
   }
-  if (data.diagnosticAgeSeconds < 60) return;
-  const age =
-    data.diagnosticAgeSeconds < 120
-      ? `${Math.round(data.diagnosticAgeSeconds)}s ago`
-      : `${Math.round(data.diagnosticAgeSeconds / 60)}m ago`;
-  lines.push(`⚠ Diagnostics are ${age}. Use \`refresh: true\` to re-check.`);
-  lines.push("");
+}
+
+function completedRefreshText(
+  attempt: Extract<HealthRefreshAttempt, { kind: "completed" }>,
+): string {
+  if (attempt.attemptedActiveClients === 0 && attempt.restartedClients === 0) {
+    return "completed no-op — no active clients were targeted";
+  }
+  return `completed — ${attempt.attemptedActiveClients} active client${plural(attempt.attemptedActiveClients)} targeted, ${attempt.restartedClients} restarted`;
+}
+
+function staleAssessmentText(
+  attempt: Extract<HealthRefreshAttempt, { kind: "completed" }>,
+): string {
+  if (attempt.staleAssessment.warning) return attempt.staleAssessment.warning;
+  const matches = `${attempt.staleAssessment.matchedFileCount} file${plural(attempt.staleAssessment.matchedFileCount)} match the stale-module heuristic`;
+  return attempt.staleAssessment.suspected
+    ? `${matches}; a clustered stale-module pattern is suspected`
+    : `${matches}; no clustered stale-module pattern is suspected`;
+}
+
+function renderLastAttempt(lines: string[], attempt: HealthRefreshAttempt, cwd: string): void {
+  const outcome =
+    attempt.kind === "completed" ? completedRefreshText(attempt) : `failed — ${attempt.reason}`;
+  lines.push(
+    `**Last diagnostic refresh attempt**: ${outcome}, started ${formatElapsed(Date.now() - attempt.attemptedAt)}; requested ${formatDiagnosticScope(attempt.requestedDiagnosticScope, cwd)}; operation scope: workspace runtime.`,
+  );
+}
+
+function formatElapsed(milliseconds: number): string {
+  const seconds = Math.max(0, Math.round(milliseconds / 1_000));
+  if (seconds < 60) return `${seconds}s ago`;
+  return `${Math.round(seconds / 60)}m ago`;
 }
 
 function renderCapabilityWarningsSection(
@@ -71,9 +121,7 @@ function renderCapabilityWarningsSection(
   for (const warning of report.warnings) {
     const lang = warning.language ? `[${warning.language}] ` : "";
     lines.push(`- ⚠ ${lang}${warning.message}`);
-    if (warning.detail) {
-      lines.push(`  — ${warning.detail}`);
-    }
+    if (warning.detail) lines.push(`  — ${warning.detail}`);
   }
   lines.push("");
 }
@@ -82,57 +130,86 @@ function renderStatusLine(lines: string[], data: HealthData, semanticRequested: 
   if (!semanticRequested) return;
 
   lines.push(`**LSP**: ${displaySemanticStatus(data)}`);
-  if (data.structuralStatus) {
-    lines.push(`**Structural**: ${data.structuralStatus}`);
-  }
-  if (data.recovered) {
-    lines.push("**Recovery**: diagnostics refreshed");
-  }
+  if (data.structuralStatus) lines.push(`**Structural**: ${data.structuralStatus}`);
   lines.push("");
 }
 
-interface DiagnosticRenderOptions {
-  status: "complete" | "partial" | "unavailable" | undefined;
-}
-
-function renderDiagnosticsSection(
-  lines: string[],
-  data: HealthData,
-  cwd: string,
-  options: DiagnosticRenderOptions,
-): void {
+function renderDiagnosticsSection(lines: string[], data: HealthData, cwd: string): void {
+  const observation = data.diagnostics;
   lines.push("### Diagnostics");
   lines.push("");
 
-  if (options.status === "unavailable") {
-    lines.push(`Diagnostics unavailable — ${displaySemanticStatus(data)}.`);
-  } else if (data.diagnostics.length === 0) {
-    lines.push("No diagnostics found.");
-  } else if (data.level === "summary") {
-    renderDiagnosticSummary(lines, data);
+  if (observation.kind === "not-requested") {
+    lines.push("Diagnostics were not requested.");
   } else {
-    renderDiagnosticDetails(lines, data, cwd);
+    lines.push(`**Evidence scope**: ${formatDiagnosticScope(observation.scope, cwd)}.`);
+    lines.push("");
+    renderDiagnosticObservation(lines, data, cwd);
   }
 
   lines.push("");
 }
 
-function renderDiagnosticSummary(lines: string[], data: HealthData): void {
-  const totalErrors = data.diagnostics.reduce((sum, d) => sum + d.errors, 0);
-  const totalWarnings = data.diagnostics.reduce((sum, d) => sum + d.warnings, 0);
-  const fileCount = data.diagnostics.length;
-  const s = (n: number) => (n !== 1 ? "s" : "");
+function renderDiagnosticObservation(lines: string[], data: HealthData, cwd: string): void {
+  const observation = data.diagnostics;
+  if (observation.kind === "not-requested") return;
+  if (observation.kind === "unavailable") {
+    lines.push(`Diagnostics unavailable — ${observation.reason}.`);
+    return;
+  }
+  if (observation.kind === "partial") {
+    lines.push(`Diagnostics partially collected — ${observation.reason}.`);
+    if (observation.entries.length > 0) {
+      lines.push("");
+      lines.push("Partial results:");
+      renderDiagnosticEntries(lines, data, cwd);
+    }
+    return;
+  }
+  if (observation.entries.length === 0) {
+    lines.push(emptyDiagnosticText(observation.scope, cwd));
+    return;
+  }
+  renderDiagnosticEntries(lines, data, cwd);
+}
+
+function emptyDiagnosticText(scope: HealthDiagnosticScope, cwd: string): string {
+  if (scope.kind === "file") {
+    return `No errors or warnings found for \`${makeRelative(cwd, scope.path)}\`.`;
+  }
+  return scope.filter
+    ? `No errors or warnings are reported by the tracked-file diagnostic snapshot under \`${makeRelative(cwd, scope.filter)}\`.`
+    : "No errors or warnings are reported by the tracked-file diagnostic snapshot.";
+}
+
+function renderDiagnosticEntries(lines: string[], data: HealthData, cwd: string): void {
+  const entries = data.diagnostics.entries;
+  if (data.level === "summary") {
+    renderDiagnosticSummary(lines, entries);
+  } else {
+    renderDiagnosticDetails(lines, entries, cwd);
+  }
+}
+
+function renderDiagnosticSummary(
+  lines: string[],
+  entries: HealthData["diagnostics"]["entries"],
+): void {
+  const totalErrors = entries.reduce((sum, entry) => sum + entry.errors, 0);
+  const totalWarnings = entries.reduce((sum, entry) => sum + entry.warnings, 0);
   lines.push(
-    `${fileCount} file${s(fileCount)} with issues: ${totalErrors} error${s(totalErrors)}, ${totalWarnings} warning${s(totalWarnings)}`,
+    `${entries.length} file${plural(entries.length)} with issues: ${totalErrors} error${plural(totalErrors)}, ${totalWarnings} warning${plural(totalWarnings)}`,
   );
 }
 
-function renderDiagnosticDetails(lines: string[], data: HealthData, cwd: string): void {
-  for (const entry of data.diagnostics) {
-    const relPath = makeRelative(cwd, entry.file);
-    const s = (n: number) => (n !== 1 ? "s" : "");
+function renderDiagnosticDetails(
+  lines: string[],
+  entries: HealthData["diagnostics"]["entries"],
+  cwd: string,
+): void {
+  for (const entry of entries) {
     lines.push(
-      `- \`${relPath}\` — ${entry.errors} error${s(entry.errors)}, ${entry.warnings} warning${s(entry.warnings)}`,
+      `- \`${makeRelative(cwd, entry.file)}\` — ${entry.errors} error${plural(entry.errors)}, ${entry.warnings} warning${plural(entry.warnings)}`,
     );
   }
 }
@@ -144,22 +221,20 @@ function renderServersSection(
 ): void {
   lines.push("### Servers");
   lines.push("");
+  lines.push("**Inventory scope**: workspace-wide.");
+  lines.push("");
 
   if (status === "unavailable") {
     lines.push(`Server status unavailable — ${displaySemanticStatus(data)}.`);
-    lines.push("");
-    return;
-  }
-  if (data.servers.length === 0) {
+  } else if (data.servers.length === 0) {
     lines.push("No servers found.");
-    lines.push("");
-    return;
-  }
-
-  for (const server of data.servers) {
-    const statusIcon = server.status === "running" ? "✓" : "✗";
-    const types = server.fileTypes.join(", ");
-    lines.push(`- ${statusIcon} **${server.name}** (${types}) — ${server.status}`);
+  } else {
+    for (const server of data.servers) {
+      const statusIcon = server.status === "running" ? "✓" : "✗";
+      lines.push(
+        `- ${statusIcon} **${server.name}** (${server.fileTypes.join(", ")}) — ${server.status}`,
+      );
+    }
   }
   lines.push("");
 }
@@ -175,9 +250,18 @@ function sectionStatus(
   return result.assembled.sections.find((section) => section.key === `health.${key}`)?.status;
 }
 
+function formatDiagnosticScope(scope: HealthDiagnosticScope, cwd: string): string {
+  if (scope.kind === "file")
+    return `live file diagnostic request for \`${makeRelative(cwd, scope.path)}\``;
+  return scope.filter
+    ? `tracked-file diagnostic snapshot under \`${makeRelative(cwd, scope.filter)}\``
+    : "tracked-file diagnostic snapshot";
+}
+
+function plural(count: number): string {
+  return count === 1 ? "" : "s";
+}
+
 function makeRelative(cwd: string, file: string): string {
-  if (file.startsWith(cwd)) {
-    return file.slice(cwd.length + 1);
-  }
-  return file;
+  return file.startsWith(cwd) ? file.slice(cwd.length + 1) : file;
 }

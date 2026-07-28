@@ -25,7 +25,11 @@ import type { FindWorkflowInput, FindWorkflowOutcome } from "./find-types.ts";
 import { runFindWorkflow } from "./find-workflow.ts";
 import type { GraphWorkflowInput, GraphWorkflowOutcome } from "./graph-types.ts";
 import { runGraphWorkflow } from "./graph-workflow.ts";
-import type { HealthWorkflowInput, HealthWorkflowOutcome } from "./health-types.ts";
+import type {
+  HealthRefreshAttempt,
+  HealthWorkflowInput,
+  HealthWorkflowOutcome,
+} from "./health-types.ts";
 import { runHealthWorkflow } from "./health-workflow.ts";
 import { parseResolveRequest } from "./input/common.ts";
 import type { InspectWorkflowInput, InspectWorkflowOutcome } from "./inspect-types.ts";
@@ -135,8 +139,8 @@ export class WorkspaceCodeIntelligenceSession {
   /** Whether the hidden architecture overview has been injected. */
   #hasInjectedOverview = false;
 
-  /** Time of the most recent explicit health refresh. */
-  #lastHealthRefresh: number | undefined;
+  /** Most recent explicit diagnostic refresh attempt, including its established outcome. */
+  #lastHealthRefreshAttempt: HealthRefreshAttempt | null = null;
 
   /** Session-scoped workflow target storage (targetId → entry). */
   readonly #workflowTargets = new Map<string, TargetStoreEntry>();
@@ -249,9 +253,9 @@ export class WorkspaceCodeIntelligenceSession {
         cwd: this.cwd,
         capability: this.#capability,
         lspController: this.#lspController,
-        lastRefresh: this.#lastHealthRefresh,
-        trackRefresh: () => {
-          this.#lastHealthRefresh = Date.now();
+        lastRefreshAttempt: this.#lastHealthRefreshAttempt,
+        trackRefreshAttempt: (attempt) => {
+          this.#lastHealthRefreshAttempt = attempt;
         },
         sentinelSnapshot: this.#sentinelSnapshot,
       },
