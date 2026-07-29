@@ -6,8 +6,12 @@
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
+import type {
+  ReviewExecutionPartialTaskState,
+  ReviewExecutionProgressDetails,
+} from "../tool/review-execution.ts";
 import { formatReviewUsage } from "../tool/usage-format.ts";
-import type { ReviewBatchDetails, ReviewProgress, ReviewTask, ReviewTaskResult } from "../types.ts";
+import type { ReviewBatchDetails, ReviewProgress, ReviewTaskResult } from "../types.ts";
 import {
   buildTaskSection,
   formatStatusLabel,
@@ -61,17 +65,7 @@ export function renderRunCall(args: unknown, theme: Theme): Text {
 
 // ── renderResult ─────────────────────────────────────────────────
 
-interface PartialReviewDetails {
-  completedCount?: number;
-  totalCount?: number;
-  targetTitle?: string;
-  workspacePath?: string;
-  reviewerModelId?: string;
-  sharedContext?: string;
-  tasks?: ReviewTask[];
-  taskId?: string;
-  progress?: ReviewProgress;
-}
+type PartialReviewDetails = ReviewExecutionProgressDetails;
 
 function formatProgress(progress: ReviewProgress): string {
   const parts = [`${progress.turns} turns`, `${progress.toolUses} tool uses`];
@@ -102,29 +96,56 @@ function addPartialPreamble(
   }
 }
 
+function formatPartialTask(
+  taskId: string,
+  state: ReviewExecutionPartialTaskState | undefined,
+  theme: Theme,
+): string {
+  const progress = state?.progress ? ` · ${formatProgress(state.progress)}` : "";
+  switch (state?.status ?? "waiting") {
+    case "running":
+      return theme.fg("accent", `● ${taskId}${progress}`);
+    case "completed":
+      return theme.fg("success", `✓ ${taskId} · complete`);
+    case "failed":
+    case "canceled":
+    case "timeout":
+      return theme.fg("warning", `! ${taskId} · ${state?.status}`);
+    default:
+      return theme.fg("dim", `○ ${taskId} · queued`);
+  }
+}
+
 function addPartialTasks(container: Container, details: PartialReviewDetails, theme: Theme): void {
-  if (!details.tasks?.length) return;
+  if (!details.taskIds?.length) return;
   container.addChild(new Spacer(1));
   container.addChild(new Text(theme.fg("accent", theme.bold("Tasks")), 1, 0));
-  for (const task of details.tasks) {
-    const active = task.id === details.taskId;
-    const label = `${task.id}${active ? " (in progress)" : ""}`;
-    container.addChild(new Text(theme.fg(active ? "accent" : "muted", label), 1, 0));
-    container.addChild(new Text(theme.fg("dim", task.instructions), 1, 0));
-    if (active && details.progress) {
-      container.addChild(new Text(theme.fg("dim", formatProgress(details.progress)), 1, 0));
-    }
+  for (const taskId of details.taskIds) {
+    container.addChild(
+      new Text(formatPartialTask(taskId, details.taskStates?.[taskId], theme), 1, 0),
+    );
+    const instructions = details.tasks?.find((task) => task.id === taskId)?.instructions;
+    if (instructions) container.addChild(new Text(theme.fg("dim", instructions), 1, 0));
   }
+}
+
+function partialLabel(completed: number, total: number): string {
+  return total > 0 ? `Reviewing… (${completed} of ${total} tasks finished)` : "Reviewing…";
 }
 
 function buildExpandedPartial(details: PartialReviewDetails, theme: Theme): Container {
   const completed = details.completedCount ?? 0;
   const total = details.totalCount ?? 0;
-  const label = total > 0 ? `Reviewing… (${completed} of ${total} tasks complete)` : "Reviewing…";
+  const label = partialLabel(completed, total);
   const container = new Container();
   container.addChild(renderPartial(label, theme));
 
-  if (!details.targetTitle && !details.workspacePath && !(details.tasks?.length ?? 0)) {
+  if (
+    !details.targetTitle &&
+    !details.workspacePath &&
+    !details.reviewerModelId &&
+    !(details.taskIds?.length ?? 0)
+  ) {
     return container;
   }
 
@@ -148,8 +169,7 @@ export function renderRunResult(
     if (options.expanded) return buildExpandedPartial(details ?? {}, theme);
     const completed = details?.completedCount ?? 0;
     const total = details?.totalCount ?? 0;
-    const label = total > 0 ? `Reviewing… (${completed} of ${total} tasks complete)` : "Reviewing…";
-    return renderPartial(label, theme);
+    return renderPartial(partialLabel(completed, total), theme);
   }
 
   const details = result.details as ReviewBatchDetails | undefined;

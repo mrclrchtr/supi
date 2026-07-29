@@ -13,32 +13,6 @@ export interface TextPage {
   totalCharacters: number;
 }
 
-/** One selected 1-based line range before character paging is applied. */
-export interface LineSelection {
-  text: string;
-  startLine: number;
-  endLine: number;
-  totalLines: number;
-}
-
-/** Select a bounded 1-based line range from file text. */
-export function selectLineRange(text: string, startLine: number, lineCount = 200): LineSelection {
-  const lines = text.split("\n");
-  if (!Number.isSafeInteger(startLine) || startLine < 1 || startLine > lines.length) {
-    throw new Error(`Start line must be an integer between 1 and ${lines.length}.`);
-  }
-  if (!Number.isSafeInteger(lineCount) || lineCount < 1 || lineCount > MAX_PAGE_LINES) {
-    throw new Error(`Line count must be an integer between 1 and ${MAX_PAGE_LINES}.`);
-  }
-  const endLine = Math.min(lines.length, startLine + lineCount - 1);
-  return {
-    text: lines.slice(startLine - 1, endLine).join("\n"),
-    startLine,
-    endLine,
-    totalLines: lines.length,
-  };
-}
-
 function lineBoundedEnd(text: string, start: number, proposedEnd: number): number {
   let lines = 1;
   for (let index = start; index < proposedEnd; index++) {

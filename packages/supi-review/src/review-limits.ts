@@ -8,5 +8,4 @@ export const REVIEW_LIMITS = {
   findingTitleCharacters: 200,
   findingDescriptionCharacters: 8_000,
   locationPathCharacters: 4_096,
-  searchQueryCharacters: 4_096,
 } as const;

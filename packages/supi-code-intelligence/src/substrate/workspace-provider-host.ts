@@ -57,11 +57,12 @@ class WorkspaceProviderHost {
 
   async acquire(projectTrusted: boolean): Promise<WorkspaceProviderHostLease> {
     if (this.#closed) throw new Error("Workspace provider host is closed.");
+    // Count this pending acquirer before awaiting startup so the final active lease cannot shut it down.
+    this.#leases++;
     this.#settledStart = this.#settledStart
       .then(() => this.#startMissing(projectTrusted))
       .catch(() => undefined);
     await this.#settledStart;
-    this.#leases++;
     let released = false;
     return {
       cwd: this.cwd,

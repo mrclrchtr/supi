@@ -204,7 +204,7 @@ function wireSpinnerToProgress(
     totalCount = details.totalCount ?? totalCount;
     const label =
       totalCount > 0
-        ? `Reviewing… (${completedCount} of ${totalCount} tasks complete)`
+        ? `Reviewing… (${completedCount} of ${totalCount} tasks finished)`
         : "Reviewing…";
     statusSpinner.update(label);
     onUpdate?.(result);
@@ -221,6 +221,17 @@ function initialReviewInput(
   return planStore.peek(input.planId)?.plannerDraft;
 }
 
+function initialReviewProgress(review: ReviewInput | undefined) {
+  if (!review) return {};
+  return {
+    completedCount: 0,
+    totalCount: review.tasks.length,
+    ...(review.sharedContext ? { sharedContext: review.sharedContext } : {}),
+    tasks: review.tasks,
+    taskIds: review.tasks.map((task) => task.id),
+  };
+}
+
 /** Factory for the supi_review_run execute function with animated status-bar spinner. */
 function makeRunReviewExecute(
   planStore: ReviewPlanStore,
@@ -233,14 +244,9 @@ function makeRunReviewExecute(
     const { statusSpinner, wrappedUpdate } = wireSpinnerToProgress(ctx, onUpdate);
 
     const initialReview = initialReviewInput(input, planStore);
-    const taskCount = initialReview?.tasks.length ?? 0;
     wrappedUpdate({
       content: [{ type: "text", text: "Starting review…" }],
-      details: {
-        ...(taskCount > 0 ? { completedCount: 0, totalCount: taskCount } : {}),
-        ...(initialReview?.sharedContext ? { sharedContext: initialReview.sharedContext } : {}),
-        ...(initialReview ? { tasks: initialReview.tasks } : {}),
-      },
+      details: initialReviewProgress(initialReview),
     });
 
     try {

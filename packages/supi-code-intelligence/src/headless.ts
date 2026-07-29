@@ -5,14 +5,17 @@ import { createLspAdapterState } from "./substrate/lsp/state.ts";
 import { registerCodeIntelligenceTools } from "./tool/register.ts";
 import { CODE_INTELLIGENCE_TOOL_SPECS } from "./tool/specs.ts";
 
-const INSPECTION_TOOL_NAMES = new Set([
+/** Exact Code Intelligence tool surface available to managed Reviewer Sessions. */
+export const HEADLESS_INSPECTION_TOOL_NAMES = [
   "code_resolve",
   "code_inspect",
   "code_orientation",
   "code_graph",
   "code_find",
   "code_health",
-]);
+] as const;
+
+const inspectionToolNames = new Set<string>(HEADLESS_INSPECTION_TOOL_NAMES);
 
 /**
  * Register the managed-child profile: six inspection tools backed by the shared
@@ -33,6 +36,6 @@ export default function headlessInspectionProfile(pi: ExtensionAPI): void {
     pi,
     sessions.getOrCreate,
     undefined,
-    CODE_INTELLIGENCE_TOOL_SPECS.filter((spec) => INSPECTION_TOOL_NAMES.has(spec.name)),
+    CODE_INTELLIGENCE_TOOL_SPECS.filter((spec) => inspectionToolNames.has(spec.name)),
   );
 }

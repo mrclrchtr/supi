@@ -73,20 +73,45 @@ describe("supi_review_run TUI", () => {
     expect(output).toContain("Commit aaaaaaa (2 files · +3 / -1)");
   });
 
-  it("shows the frozen workspace and review instructions while expanded", () => {
+  it("shows a workspace placeholder while freezing", () => {
+    const output = renderRunResult(
+      {
+        content: [],
+        details: { totalCount: 2, targetTitle: "Commit f2c56ef", taskIds: ["standards", "spec"] },
+      },
+      { expanded: true, isPartial: true },
+      theme,
+    )
+      .render(160)
+      .join("\n");
+
+    expect(output).toContain("Reviewing… (0 of 2 tasks finished)");
+    expect(output).toContain("workspace: preparing frozen workspace…");
+  });
+
+  it("shows review context with concurrent task state", () => {
     const output = renderRunResult(
       {
         content: [],
         details: {
           completedCount: 0,
-          totalCount: 1,
+          totalCount: 2,
           targetTitle: "Commit f2c56ef",
           workspacePath: "/tmp/supi-review-workspace-test/workspace",
           reviewerModelId: "provider/reviewer",
           sharedContext: "Live smoke test.",
-          tasks: [{ id: "live-smoke", instructions: "Check the result renderer." }],
-          taskId: "live-smoke",
-          progress: { turns: 2, toolUses: 3, tokens: { total: 18 } },
+          tasks: [
+            { id: "standards", instructions: "Check the renderer." },
+            { id: "spec", instructions: "Check the result contract." },
+          ],
+          taskIds: ["standards", "spec"],
+          taskStates: {
+            standards: {
+              status: "running",
+              progress: { turns: 2, toolUses: 3, tokens: { total: 18 } },
+            },
+            spec: { status: "waiting" },
+          },
         },
       },
       { expanded: true, isPartial: true },
@@ -95,13 +120,14 @@ describe("supi_review_run TUI", () => {
       .render(160)
       .join("\n");
 
-    expect(output).toContain("Reviewing… (0 of 1 tasks complete)");
+    expect(output).toContain("Reviewing… (0 of 2 tasks finished)");
     expect(output).toContain("target: Commit f2c56ef");
-    expect(output).toContain("workspace: /tmp/supi-review-workspace-test/workspace");
     expect(output).toContain("reviewer: provider/reviewer");
+    expect(output).toContain("workspace: /tmp/supi-review-workspace-test/workspace");
     expect(output).toContain("context: Live smoke test.");
-    expect(output).toContain("live-smoke (in progress)");
-    expect(output).toContain("Check the result renderer.");
-    expect(output).toContain("2 turns · 3 tool uses · 18 tokens");
+    expect(output).toContain("● standards · 2 turns · 3 tool uses · 18 tokens");
+    expect(output).toContain("Check the renderer.");
+    expect(output).toContain("○ spec · queued");
+    expect(output).toContain("Check the result contract.");
   });
 });

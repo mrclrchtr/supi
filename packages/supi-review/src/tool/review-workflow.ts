@@ -293,6 +293,7 @@ export async function runReview(input: RunReviewInput) {
       reviewerModelId: model.canonicalId,
       ...(review.sharedContext ? { sharedContext: review.sharedContext } : {}),
       tasks: review.tasks,
+      taskIds: review.tasks.map((task) => task.id),
     },
   });
   let workspace: Awaited<ReturnType<typeof materializeReviewWorkspace>>;

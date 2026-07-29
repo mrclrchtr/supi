@@ -62,4 +62,17 @@ describe("Workspace provider host", () => {
     expect(mocks.lsp[0]?.shutdown).toHaveBeenCalledOnce();
     expect(mocks.tree[0]?.shutdown).toHaveBeenCalledOnce();
   });
+
+  it("keeps a pending acquirer alive while the prior lease releases", async () => {
+    const first = await acquireWorkspaceProviderHost("/workspace", { projectTrusted: true });
+    const pending = acquireWorkspaceProviderHost("/workspace", { projectTrusted: true });
+
+    await first.release();
+    const second = await pending;
+
+    expect(second.lspController).not.toBeNull();
+    expect(mocks.lsp[0]?.shutdown).not.toHaveBeenCalled();
+    await second.release();
+    expect(mocks.lsp[0]?.shutdown).toHaveBeenCalledOnce();
+  });
 });

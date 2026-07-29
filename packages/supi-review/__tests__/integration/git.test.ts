@@ -1,24 +1,10 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  listReviewFiles,
-  readReviewDiff,
-  readReviewFile,
-  resolveReviewSnapshot,
-  searchReviewFiles,
-} from "../../src/git.ts";
+import { readReviewDiff, resolveReviewSnapshot } from "../../src/git.ts";
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
@@ -53,9 +39,7 @@ describe("review targets", () => {
 
     expect(snapshot?.changes.map((change) => change.path)).toEqual(["a.txt", "outside.txt"]);
     if (!snapshot) return;
-    await expect(readReviewFile(nested, snapshot, "a.txt")).resolves.toBe("changed at root\n");
     await expect(readReviewDiff(nested, snapshot, "a.txt")).resolves.toContain("+changed at root");
-    await expect(listReviewFiles(nested, snapshot)).resolves.toContain("outside.txt");
   });
 
   it("reviews committed and uncommitted current work against a base commit", async () => {
@@ -84,16 +68,10 @@ describe("review targets", () => {
     });
     if (!snapshot) return;
 
-    await expect(readReviewFile(cwd, snapshot, "a.txt", "before")).resolves.toBe("base\n");
-    await expect(readReviewFile(cwd, snapshot, "a.txt", "after")).resolves.toBe("dirty\n");
     const fullDiff = await readReviewDiff(cwd, snapshot);
     expect(fullDiff).toContain("+dirty");
     expect(fullDiff).toContain("+branch");
     expect(fullDiff).toContain("+untracked");
-    await expect(
-      searchReviewFiles(cwd, snapshot, "ba.e", { side: "before", mode: "regex" }),
-    ).resolves.toContain("a.txt:1:base");
-    await expect(searchReviewFiles(cwd, snapshot, "dirty", { side: "before" })).resolves.toBe("");
   });
 
   it("compares a base-tracked path directly when HEAD deleted and the worktree recreated it", async () => {
@@ -115,10 +93,6 @@ describe("review targets", () => {
     expect(diff).toContain("-base");
     expect(diff).toContain("+recreated differently");
     expect(diff).not.toContain("deleted file mode");
-    await expect(listReviewFiles(cwd, snapshot)).resolves.toContain("a.txt");
-    await expect(searchReviewFiles(cwd, snapshot, "recreated differently")).resolves.toContain(
-      "a.txt:1:recreated differently",
-    );
   });
 
   it("handles file-directory transitions in a base-aware working tree", async () => {
@@ -161,9 +135,6 @@ describe("review targets", () => {
       const snapshot = await resolveReviewSnapshot(nested, target);
       expect(snapshot?.changes.map((change) => change.path)).toEqual(["a.txt"]);
       if (!snapshot) continue;
-      await expect(readReviewFile(nested, snapshot, "a.txt")).resolves.toBe(
-        "committed from root\n",
-      );
       await expect(readReviewDiff(nested, snapshot, "a.txt")).resolves.toContain(
         "+committed from root",
       );
@@ -228,39 +199,6 @@ describe("review targets", () => {
     expect(diff).toContain("+first");
   });
 
-  it("lists the current filesystem without deleted or ignored paths", async () => {
-    writeFileSync(join(cwd, ".gitignore"), "ignored.txt\n");
-    git(cwd, "add", ".gitignore");
-    git(cwd, "commit", "-m", "ignore generated files");
-    unlinkSync(join(cwd, "a.txt"));
-    writeFileSync(join(cwd, "new.txt"), "visible\n");
-    writeFileSync(join(cwd, "ignored.txt"), "hidden\n");
-    const snapshot = await resolveReviewSnapshot(cwd, { kind: "working-tree" });
-    expect(snapshot).toBeDefined();
-    if (!snapshot) return;
-
-    const files = await listReviewFiles(cwd, snapshot);
-
-    expect(files).toContain("new.txt");
-    expect(files).not.toContain("a.txt");
-    expect(files).not.toContain("ignored.txt");
-  });
-
-  it("rejects ignored and Git-administrative working-tree reads", async () => {
-    writeFileSync(join(cwd, ".gitignore"), ".env\n");
-    git(cwd, "add", ".gitignore");
-    git(cwd, "commit", "-m", "ignore secrets");
-    writeFileSync(join(cwd, ".env"), "ignored fixture\n");
-    writeFileSync(join(cwd, "change.txt"), "review me\n");
-    const snapshot = await resolveReviewSnapshot(cwd, { kind: "working-tree" });
-    expect(snapshot).toBeDefined();
-    if (!snapshot) return;
-
-    await expect(readReviewFile(cwd, snapshot, ".env")).rejects.toThrow(/not part/);
-    await expect(readReviewFile(cwd, snapshot, ".git/config")).rejects.toThrow(/not part/);
-    await expect(readReviewFile(cwd, snapshot, "a.txt")).resolves.toBe("base\n");
-  });
-
   it("includes an untracked binary file as a binary patch", async () => {
     writeFileSync(join(cwd, "asset.bin"), Buffer.from([0, 1, 2, 3]));
 
@@ -275,25 +213,6 @@ describe("review targets", () => {
       expect(diff).toContain("asset.bin");
       expect(diff).toMatch(/GIT binary patch|Binary files/);
     }
-  });
-
-  it("reads comparison context from the pinned head tree instead of dirty files", async () => {
-    const baseCommit = git(cwd, "rev-parse", "HEAD");
-    writeFileSync(join(cwd, "a.txt"), "committed\n");
-    git(cwd, "add", ".");
-    git(cwd, "commit", "-m", "change");
-    const snapshot = await resolveReviewSnapshot(cwd, { kind: "comparison", baseCommit });
-    expect(snapshot).toBeDefined();
-    if (!snapshot) return;
-    writeFileSync(join(cwd, "a.txt"), "dirty\n");
-    writeFileSync(join(cwd, "untracked.txt"), "dirty-only\n");
-
-    await expect(readReviewFile(cwd, snapshot, "a.txt")).resolves.toBe("committed\n");
-    await expect(listReviewFiles(cwd, snapshot)).resolves.not.toContain("untracked.txt");
-    await expect(searchReviewFiles(cwd, snapshot, "committed")).resolves.toContain(
-      "a.txt:1:committed",
-    );
-    await expect(searchReviewFiles(cwd, snapshot, "dirty-only")).resolves.toBe("");
   });
 
   it("reconciles rename status and numstat using the after-side path", async () => {
@@ -382,11 +301,6 @@ describe("review targets", () => {
       if (snapshot) {
         await expect(readReviewDiff(rootRepo, snapshot, "root.txt")).resolves.toContain("+root");
       }
-      if (!snapshot) return;
-      await expect(
-        readReviewFile(rootRepo, snapshot, "root.txt", "before"),
-      ).resolves.toBeUndefined();
-      await expect(readReviewFile(rootRepo, snapshot, "root.txt", "after")).resolves.toBe("root\n");
     } finally {
       rmSync(rootRepo, { recursive: true, force: true });
     }
@@ -402,28 +316,5 @@ describe("review targets", () => {
     const diff = await readReviewDiff(cwd, snapshot, "*.txt");
     expect(diff).toContain("literal");
     expect(diff).not.toContain("other.txt");
-    const search = await searchReviewFiles(cwd, snapshot, "other", { path: "*.txt" });
-    expect(search).toBe("");
-  });
-
-  it("does not read through an intermediate symlink outside the repository", async () => {
-    const outside = mkdtempSync(join(tmpdir(), "supi-review-outside-"));
-    try {
-      writeFileSync(join(outside, "secret.txt"), "secret\n");
-      symlinkSync(outside, join(cwd, "escape"), "dir");
-      writeFileSync(join(cwd, "touch.txt"), "change\n");
-      const snapshot = await resolveReviewSnapshot(cwd, { kind: "working-tree" });
-      expect(snapshot).toBeDefined();
-      if (!snapshot) return;
-
-      await expect(readReviewFile(cwd, snapshot, "escape/secret.txt")).rejects.toThrow(
-        /inside the repository|not part/,
-      );
-      await expect(
-        searchReviewFiles(cwd, snapshot, "secret", { path: "../outside" }),
-      ).rejects.toThrow(/inside the repository/);
-    } finally {
-      rmSync(outside, { recursive: true, force: true });
-    }
   });
 });

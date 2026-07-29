@@ -1,4 +1,5 @@
 import { clampThinkingLevel } from "@earendil-works/pi-ai";
+import { HEADLESS_INSPECTION_TOOL_NAMES } from "@mrclrchtr/supi-code-intelligence/headless";
 import type {
   ReviewerCapabilityWarning,
   ReviewerInvocation,
@@ -9,15 +10,6 @@ import { createEarlyCancellationDiagnostics } from "./child-failure-diagnostics.
 import { runIsolatedChild } from "./child-session-runner.ts";
 import { buildReviewerSystemPrompt } from "./review-system-prompt.ts";
 import { createReviewSubmissionTool } from "./review-tools.ts";
-
-const INSPECTION_TOOL_NAMES = [
-  "code_resolve",
-  "code_inspect",
-  "code_orientation",
-  "code_graph",
-  "code_find",
-  "code_health",
-] as const;
 
 /** Run one caller-defined task in an isolated Inspection-only Reviewer Session. */
 export async function runReviewer(invocation: ReviewerInvocation): Promise<ReviewerRunResult> {
@@ -41,14 +33,14 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     timeoutMs: undefined,
     prompt: invocation.prompt,
     signal: invocation.signal,
-    tools: ["read", "bash", ...INSPECTION_TOOL_NAMES, submit.name],
+    tools: ["read", "bash", ...HEADLESS_INSPECTION_TOOL_NAMES, submit.name],
     customTools: [submit],
     holder,
     headlessInspection: true,
     projectTrusted: invocation.projectTrusted ?? false,
     onSessionCreated: (session) => {
       const active = new Set(session.getActiveToolNames());
-      if (INSPECTION_TOOL_NAMES.every((name) => active.has(name))) return;
+      if (HEADLESS_INSPECTION_TOOL_NAMES.every((name) => active.has(name))) return;
       warnings.push({
         message:
           "Headless Code Intelligence was unavailable; this reviewer continued with read and bash inspection.",

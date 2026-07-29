@@ -1,15 +1,5 @@
-import {
-  expectedGitExitOutput as expectedExitOutput,
-  runGit as git,
-  runGitAllowExit as gitAllowExit,
-  literalPathspec,
-  withReviewIndex,
-} from "./git-command.ts";
-import {
-  filterExistingReviewPaths,
-  readWorkingTreeFile,
-  resolveReviewPath,
-} from "./review-path.ts";
+import { runGit as git, literalPathspec, withReviewIndex } from "./git-command.ts";
+import { resolveReviewPath } from "./review-path.ts";
 import {
   assertFullDiffCharacters,
   DIFF_FLAGS,
@@ -20,20 +10,6 @@ import {
 import type { ResolvedReviewTarget, ReviewSnapshot } from "./types.ts";
 
 export { resolveReviewSnapshot, summarizeReviewSnapshot } from "./target/resolve.ts";
-
-async function showBlob(
-  cwd: string,
-  commit: string | undefined,
-  path: string,
-): Promise<string | undefined> {
-  if (!commit) return undefined;
-  try {
-    return await git(cwd, ["show", `${commit}:${path}`]);
-  } catch (error) {
-    if (expectedExitOutput(error, [128]) !== undefined) return undefined;
-    throw error;
-  }
-}
 
 function withWorkingTreeIndex<T>(
   cwd: string,
@@ -46,50 +22,6 @@ function withWorkingTreeIndex<T>(
     target.mergeBaseCommit ?? target.headCommit,
     operation,
   );
-}
-
-async function isWorkingTreePathAllowed(
-  cwd: string,
-  target: Extract<ResolvedReviewTarget, { kind: "working-tree" }>,
-  path: string,
-): Promise<boolean> {
-  return withWorkingTreeIndex(cwd, target, async (indexFile) => {
-    const output = await git(
-      cwd,
-      literalPathspec(["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", path]),
-      indexFile,
-    );
-    return parseNullList(output).includes(path);
-  });
-}
-
-/** Read one before/after file from the target rather than an unrelated live checkout. */
-export async function readReviewFile(
-  _cwd: string,
-  snapshot: ReviewSnapshot,
-  path: string,
-  side: "before" | "after" = "after",
-): Promise<string | undefined> {
-  const root = snapshot.repositoryRoot;
-  const safe = resolveReviewPath(root, path);
-  const target = snapshot.target;
-  if (target.kind === "working-tree") {
-    if (side === "before") {
-      return showBlob(root, target.mergeBaseCommit ?? target.headCommit, safe.path);
-    }
-    if (!(await isWorkingTreePathAllowed(root, target, safe.path))) {
-      throw new Error(`${safe.path} is not part of the selected working-tree target.`);
-    }
-    return readWorkingTreeFile(root, safe.path);
-  }
-  if (target.kind === "comparison") {
-    return showBlob(
-      root,
-      side === "before" ? target.mergeBaseCommit : target.headCommit,
-      safe.path,
-    );
-  }
-  return showBlob(root, side === "before" ? target.parentCommit : target.commit, safe.path);
 }
 
 async function readWorkingTreeDiff(
@@ -157,67 +89,4 @@ export async function readReviewDiff(
         root,
         literalPathspec(["show", ...DIFF_FLAGS, "--format=", "--root", target.commit, ...pathArgs]),
       );
-}
-
-/** List files present on the target's after side, excluding ignored untracked files. */
-export async function listReviewFiles(_cwd: string, snapshot: ReviewSnapshot): Promise<string[]> {
-  const root = snapshot.repositoryRoot;
-  const target = snapshot.target;
-  if (target.kind !== "working-tree") {
-    const commit = target.kind === "comparison" ? target.headCommit : target.commit;
-    return parseNullList(await git(root, ["ls-tree", "-r", "--name-only", "-z", commit]));
-  }
-  return withWorkingTreeIndex(root, target, async (indexFile) => {
-    const candidates = parseNullList(
-      await git(root, ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], indexFile),
-    );
-    return filterExistingReviewPaths(root, candidates);
-  });
-}
-
-/** Target side, Git search mode, and optional repository-relative scope. */
-export interface ReviewSearchOptions {
-  path?: string;
-  side?: "before" | "after";
-  mode?: "literal" | "regex";
-}
-
-function resolveSearchCommit(
-  target: ResolvedReviewTarget,
-  side: "before" | "after",
-): string | undefined {
-  if (target.kind === "working-tree") return target.mergeBaseCommit ?? target.headCommit;
-  if (target.kind === "comparison") {
-    return side === "before" ? target.mergeBaseCommit : target.headCommit;
-  }
-  return side === "before" ? target.parentCommit : target.commit;
-}
-
-/** Search literal or extended-regex text on either selected target side. */
-export async function searchReviewFiles(
-  _cwd: string,
-  snapshot: ReviewSnapshot,
-  query: string,
-  options: ReviewSearchOptions = {},
-): Promise<string> {
-  const root = snapshot.repositoryRoot;
-  const pathArgs = options.path ? ["--", resolveReviewPath(root, options.path).path] : [];
-  const target = snapshot.target;
-  const side = options.side ?? "after";
-  const modeFlag = options.mode === "regex" ? "-E" : "-F";
-
-  if (target.kind === "working-tree" && side === "after") {
-    const args = literalPathspec(["grep", "-n", modeFlag, "--untracked", "-e", query, ...pathArgs]);
-    return withWorkingTreeIndex(root, target, (indexFile) =>
-      gitAllowExit(root, args, [1], indexFile),
-    );
-  }
-
-  const commit = resolveSearchCommit(target, side);
-  if (!commit) return "";
-  return gitAllowExit(
-    root,
-    literalPathspec(["grep", "-n", modeFlag, "-e", query, commit, ...pathArgs]),
-    [1],
-  );
 }

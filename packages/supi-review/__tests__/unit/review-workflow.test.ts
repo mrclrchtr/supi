@@ -82,7 +82,10 @@ describe("Review workflow", () => {
     expect(outcome.kind).toBe("completed");
     if (outcome.kind !== "completed") return;
     expect(mocks.runReviewer).toHaveBeenCalledTimes(2);
-    expect(onUpdate).toHaveBeenCalledWith({
+    const workspaceUpdate = onUpdate.mock.calls
+      .map(([update]) => update)
+      .find((update) => update.content[0]?.text === "Reviewing frozen Review Workspace…");
+    expect(workspaceUpdate).toEqual({
       content: [{ type: "text", text: "Reviewing frozen Review Workspace…" }],
       details: {
         completedCount: 0,
@@ -92,6 +95,11 @@ describe("Review workflow", () => {
         reviewerModelId: "provider/model",
         sharedContext: "Shared",
         tasks: review.tasks,
+        taskIds: ["standards", "spec"],
+        taskStates: {
+          standards: { status: "waiting" },
+          spec: { status: "waiting" },
+        },
       },
     });
     expect(outcome.details.mode).toBe("direct");
