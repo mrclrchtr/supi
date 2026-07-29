@@ -227,13 +227,13 @@ For packages within a monorepo or distinct modules.
 - <cross-tool workflow or hook behavior>
 ```
 
-> ⚠️ **When SuPi is active:** The `## Packages` table in this template is already visible in the code-intelligence overview on the first turn. Omit it. Focus on `## Start Here` and `## Cross-Package Patterns` sections that capture conventions not visible in manifests.
+> ⚠️ **When SuPi is active:** The complete discovered module list is already visible in the first-turn code-intelligence overview; package paths and manifest facts are routine `code_orientation` output. Omit the table and preserve only human guidance.
 
 ---
 
 ## Template: SuPi-Optimized Project Root
 
-For projects using SuPi extensions (`code-intelligence`, `claude-md`). Omits sections that extensions auto-deliver and favors compressed human-only guidance after a baseline overlap review.
+For projects using SuPi extensions (`code-intelligence`, `claude-md`). Assumes heavy `code_orientation` use and keeps only compressed human guidance beyond first-turn and on-demand facts.
 
 ```markdown
 # <Project Name>
@@ -267,9 +267,9 @@ For projects using SuPi extensions (`code-intelligence`, `claude-md`). Omits sec
 ```
 
 **What's intentionally absent:**
-- `## Modules` / `## Packages` — the code-intelligence overview/`code_orientation` covers this
-- Large root `## Project structure` / `## Architecture` directory trees that just restate the workspace layout
-- `## Dependencies` table — derivable from `package.json`
+- `## Modules` / `## Packages` — the complete first-turn overview and workspace Orientation cover them
+- Static `## Project structure` / `## Architecture` trees — repeated focused Orientation covers them
+- `## Dependencies` table — workspace/package Orientation reports manifest-declared relationships
 - Routine `## Commands` listing `npm install`/`npm test`/`npm run build` — those are in `package.json`
 
 If you keep any structure section in a SuPi-enabled root doc, make it short and opinionated: explain where to start, why boundaries exist, or which exception matters. After the baseline review, split the redundant tree/inventory portion from the unique guidance portion instead of keeping both together. Do not paste the tree unless the tree itself carries human-only meaning.

@@ -64,7 +64,7 @@ The extension registers exactly eight `code_*` tools:
 
 `code_impact`, `code_context`, `code_brief`, `code_references`, `code_calls`, and `code_implementations` are not compatibility aliases.
 
-A lightweight architecture overview may be injected once near session start when a project model is available.
+A complete manifest-derived architecture overview is injected once near session start when a project model is available; discovered modules, descriptions, entrypoints, and relationships are not truncated.
 
 ## Exact-one target selectors
 

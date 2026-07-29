@@ -19,19 +19,17 @@
 
 ### 2. Architecture Clarity (15 points)
 
-**15 points**: Clear codebase map
-- Key directories explained
-- Module relationships documented
-- Entry points identified
-- Data flow described where relevant
+Score human architectural meaning, not inventories available from the complete first-turn overview or routine `code_orientation`.
 
-**12 points**: Good structure overview, minor gaps
+**15 points**: Ownership, boundaries, initialization/data flow, important entry paths, and exceptions are clear where relevant
 
-**8 points**: Basic directory listing only
+**12 points**: Useful architectural reasoning with minor gaps
+
+**8 points**: Mostly static structure or module relationships already available through SuPi
 
 **4 points**: Vague or incomplete
 
-**0 points**: No architecture info
+**0 points**: No useful architectural guidance
 
 ### 3. Non-Obvious Patterns (15 points)
 
@@ -89,35 +87,32 @@
 
 **0 points**: Vague or theoretical
 
-### 7. Auto-Delivered Overlap (10 points)
+### 7. SuPi Context Overlap (10 points)
 
-Score this criterion after a **context baseline review**: compare the CLAUDE.md against what a SuPi-enabled PI session likely already has from the code-intelligence overview/`code_orientation` and other known injected context.
+Score after comparing the file with the complete first-turn code-intelligence overview, native PI context, and workspace/directory/file Orientation. Assume `code_orientation` is used repeatedly with adequate `maxResults` or narrower focuses.
 
-**10 points**: Almost no overlap. Any overlap is tiny and clearly justified by human-only reasoning.
+**10 points**: Almost no overlap; mentions of discoverable files/packages carry human-only reasoning.
 
-**7 points**: Some overlap, but the file still adds meaningful unique guidance (for example, a partially redundant structure section that keeps ownership rules or a concise "start here" note).
+**7 points**: Some static overlap remains, but the section primarily adds ownership, boundaries, flow, exceptions, or concise "start here" guidance.
 
-**4 points**: Significant overlap — package tables, root project-structure trees, architecture overviews, or dependency graphs duplicate the baseline context and should be compressed.
+**4 points**: Significant overlap—package/path tables, static project trees, manifest declarations, or dependency graphs should be compressed.
 
-**0 points**: Large sections are almost entirely duplicated generated context (module lists with descriptions, dense dependency tables, long root directory trees).
+**0 points**: Large sections are generated inventories with no human-only meaning.
 
-**Scoring for package-specific files surfaced by `code_orientation`**: When Phase 1 identifies that `code_orientation` already surfaces a package's CLAUDE.md (directory focus), the surfaced file itself does not earn context-window space. Score additively from a base of 3/10, then add:
-- +3 for unique gotchas not derivable from manifests or `code_orientation` output
-- +2 for non-obvious commands or workflows (gotcha flags, hook behaviors, ordering — not routine npm install/test/build)
-- +2 for cross-package patterns or ownership rules
-Maximum 10/10 only if the file is predominantly unique guidance. Files that are purely structural overviews with no unique content stay at 3/10.
+**Package-specific files:** Compare the file's contents with the non-instruction sections returned by focused Orientation. Do not penalize the file merely because Orientation surfaces it; that is the delivery mechanism. Score only whether its contents duplicate direct entries, package manifest facts, dependencies, or source observations.
 
-**What is NOT overlap:** Gotchas specific to a package's behavior; cross-package patterns that aren't discoverable from manifests; non-obvious commands and workflows (gotcha flags, hook behaviors, ordering requirements — not routine npm install/test/build); human-curated "Start Here" guidance with reasoning; concise structure notes that explain boundaries, ownership, initialization order, or important exceptions; and sections classified as **unique** during the baseline review.
+**What is NOT overlap:** Gotchas; non-obvious commands/workflows; ownership and boundary rules; initialization/data flow; project-specific exceptions; and curated navigation with reasoning.
 
-**What IS overlap:** Monorepo package tables where every row is `{name, description, path}`; root-level "Modules" or "Packages" sections with >5 entries; the **fully redundant** portion of a section during baseline review; root `## Project structure` / `## Architecture` trees that mostly restate folders, packages, or module layout already visible from the code-intelligence overview or `code_orientation`; high-level architecture overviews that don't add relationships, gotchas, conventions, or exceptions beyond what's in `package.json`; and dependency graphs that could be generated from `pnpm-workspace.yaml`.
+**What IS overlap:** Module/package tables; package paths; direct file/directory listings; manifest entrypoint/dependency tables; source-symbol inventories; static trees reproducible through repeated Orientation; and architecture prose that adds no meaning beyond those facts.
 
 ## Assessment Process
 
-1. Read the CLAUDE.md file completely.
-2. If SuPi is active, perform a **context baseline review** first: compare against the code-intelligence overview/`code_orientation` and other known injected context, then classify sections as **fully redundant**, **partially redundant**, or **unique**.
-3. Cross-reference with the actual codebase: run documented commands (mentally or actually), check that referenced files exist, and verify architecture descriptions.
-4. Score each criterion, calculate the total, assign the grade, list the specific issues, and propose concrete improvements.
+1. Run workspace Orientation, then focused directory/file Orientation for the target; repeat or raise `maxResults` as needed.
+2. Read the CLAUDE.md file completely.
+3. Classify sections against the first-turn overview, native PI context, and Orientation as **fully redundant**, **partially redundant**, or **unique**.
+4. Cross-reference with the codebase: test non-obvious commands, check paths, and verify human architectural claims.
+5. Score each criterion, calculate the total, assign the grade, list issues, and propose concrete improvements.
 
 ## Red Flags
 
-Watch for commands that would fail (wrong paths, missing deps), references to deleted files or folders, outdated tech versions, template copy without customization, generic advice, stale `TODO` items, duplicate info across multiple CLAUDE.md files, sections that duplicate the code-intelligence overview or `code_orientation` output, and structure sections where the redundant tree/inventory portion should be separated from the unique guidance portion.
+Watch for failing commands, deleted paths, outdated versions, generic advice, stale TODOs, duplicate instructions, and static inventories already supplied by the first-turn overview or routine Orientation. Split any human-only ownership/flow/exception guidance from the removable inventory around it.

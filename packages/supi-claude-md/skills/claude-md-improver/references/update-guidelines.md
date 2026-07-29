@@ -65,26 +65,28 @@ Why: Establishes patterns that work.
 
 Why: Environment-specific knowledge.
 
-## What SuPi Extensions Already Deliver
+## What SuPi Already Provides
 
-When auditing or updating CLAUDE.md in a project using SuPi extensions, these sections are redundant because they're already delivered by the session or explicit orientation workflow:
+Assume `code_orientation` is used heavily. Distinguish first-turn context from routine on-demand facts, but treat both as a baseline that static CLAUDE.md inventories should not duplicate:
 
-| Extension | What It Delivers | When |
-|-----------|----------------|------|
-| `supi-code-intelligence` | Workspace module graph (names, descriptions, paths, dependency edges) and directory instruction-file sections | First `before_agent_start` per session for overview; explicit directory `code_orientation` for instruction files |
-| `supi-core` | `findProjectRoot`, `walkProject`, XML `<extension-context>` tagging | Available to all extensions |
+| Surface | What It Provides | When |
+|---------|------------------|------|
+| `supi-code-intelligence` overview | Every discovered module's name, description, selected manifest entrypoints, manifest-declared dependency arrows, and detected languages | Hidden message on the first `before_agent_start` |
+| Workspace `code_orientation` | Root manifest, package names and paths, manifest-declared relationships, direct root files/directories | Routine on demand |
+| Directory/file `code_orientation` | Applicable instruction files, direct entries, package manifest/dependency facts, and file outline/import/export observations | Routine on demand for trusted focused paths |
+| Native PI context | Context files from the cwd and ancestor chain | Session startup/system prompt |
 
-**Implication:** A root CLAUDE.md doesn't need to document what the code-intelligence overview or `code_orientation` would say. Focus instead on:
-- Non-obvious commands and workflows (gotcha flags, hook behaviors — NOT routine npm install/test/build)
-- Cross-package conventions and patterns
-- Gotchas that aren't in code
-- Human-curated guidance ("start here for X")
+**Implication:** Instruction files should preserve only information that these surfaces cannot generate:
+- Non-obvious commands and workflows (gotcha flags, hook behaviors—not routine npm install/test/build)
+- Ownership, boundaries, initialization/data flow, and exceptions
+- Cross-package conventions and decisions
+- Gotchas and human-curated "start here" guidance with reasoning
 
-When SuPi is active, do a quick baseline review first: compare the CLAUDE.md against the code-intelligence overview/`code_orientation` and other known injected context, then separate each section into overlap vs unique value. If a root `## Project structure` / `## Architecture` section mostly restates the workspace tree, treat that portion as redundant and keep only the orientation, boundary rules, or exceptions that the generated overview cannot supply.
+Run workspace Orientation once, then focus every target file's directory and relevant child paths. Increase `maxResults` or use narrower repeated focuses when necessary. Compare instruction content with the non-instruction sections of those results; the file's appearance inside Orientation is delivery, not duplication by itself.
 
 ## What to REMOVE or Compress
 
-When auditing an existing CLAUDE.md, identify content that MUST be removed or tightened before adding anything new. Never skip removals because of edit churn — a one-time edit that saves tokens every session pays for itself immediately. Content that's already in the Context Baseline (auto-delivered by SuPi extensions) wastes tokens every session it persists and MUST be removed.
+When auditing an existing CLAUDE.md, remove or tighten content before adding anything. Static facts already present on the first turn or available through routine Orientation waste context whenever the file is loaded and MUST be removed.
 
 ### 1. Routine Command Listings
 
@@ -99,16 +101,15 @@ Remove:
 (These are in package.json — they don't earn context-window space.)
 ```
 
-### 2. Auto-Delivered Content (Non-Negotiable)
+### 2. SuPi-Provided Static Facts (Non-Negotiable)
 
-These sections MUST be removed — they duplicate what SuPi extensions already inject and waste tokens every session:
-- Package/module tables that match the code-intelligence overview or `code_orientation` output
-- Package layout / project structure sections that just list packages with descriptions
-- Architecture trees that restate what the code-intelligence overview or `code_orientation` delivers
-- Dependency graphs derivable from workspace manifests
-- Root directory trees that just restate the folder layout
+These sections MUST be removed unless they add ownership, flow, boundary, exception, or rationale:
+- Package/module tables already present in the complete first-turn overview
+- Package paths, manifest declarations, dependency lists, and relationships reported by Orientation
+- Direct file/directory inventories and static project trees reproducible through repeated focused Orientation
+- Source-symbol inventories reported by file Orientation
 
-These are never "minor overlaps worth a point" — they are unconditional waste. Remove them.
+Generated inventories are unconditional waste; keep only the human meaning around them.
 
 ### 3. Verbose Explanations
 
@@ -270,4 +271,4 @@ Before finalizing an update, verify:
 - [ ] File paths are accurate
 - [ ] Would a new Claude session find this helpful?
 - [ ] Is this the most concise way to express the info?
-- [ ] No overlap with SuPi auto-delivered content (when SuPi is active)
+- [ ] No overlap with the first-turn overview or routine Orientation facts (when SuPi is active)

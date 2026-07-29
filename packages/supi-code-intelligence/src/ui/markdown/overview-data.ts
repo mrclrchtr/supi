@@ -10,11 +10,6 @@ import type {
 } from "../../analysis/architecture/model.ts";
 import type { OverviewData, OverviewModule } from "./types.ts";
 
-/** Maximum number of modules shown in the overview. */
-const MAX_MODULES = 8;
-/** Maximum characters per module description before truncation. */
-const MAX_DESCRIPTION_LENGTH = 60;
-
 /** Grammar ID to short language tag for the overview. */
 const GRAMMAR_LANGUAGE_TAGS: Record<string, string> = {
   javascript: "js",
@@ -44,14 +39,13 @@ export function buildOverviewData(model: ArchitectureModel): OverviewData | null
   const sorted = [...model.modules].sort((left, right) =>
     left.relativePath.localeCompare(right.relativePath),
   );
-  const modules = sorted.slice(0, MAX_MODULES).map((module) => overviewModule(module, model));
-  const detectedLanguages = detectModuleLanguages(sorted.slice(0, MAX_MODULES));
+  const modules = sorted.map((module) => overviewModule(module, model));
+  const detectedLanguages = detectModuleLanguages(sorted);
 
   return {
     projectName: model.name,
     projectDescription: model.description,
     modules,
-    omittedModuleCount: Math.max(0, model.modules.length - MAX_MODULES),
     detectedLanguages: detectedLanguages.length > 0 ? detectedLanguages : null,
   };
 }
@@ -61,7 +55,7 @@ function overviewModule(module: ModuleInfo, model: ArchitectureModel): OverviewM
   return {
     name,
     shortName: module.name?.replace(/^@[^/]+\//, "") ?? module.relativePath,
-    description: truncateDescription(module.description),
+    description: module.description,
     declaredDependencies: model.edges
       .filter((edge) => edge.from === module.name)
       .map((edge) => edge.to),
@@ -97,12 +91,6 @@ function stringValues(value: unknown): string[] {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function truncateDescription(description: string | null): string | null {
-  if (!description) return null;
-  if (description.length <= MAX_DESCRIPTION_LENGTH) return description;
-  return `${description.slice(0, MAX_DESCRIPTION_LENGTH - 1)}…`;
 }
 
 /**

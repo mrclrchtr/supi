@@ -72,7 +72,7 @@ Planning and application remain separate (ADR 0002). `validateEditAgainstFiles()
 
 ## First-turn overview
 
-The hidden architecture overview is claimed atomically through session behavior and injected with `display: false`. Reload/resume reconstruction scans for the existing `code-intelligence-overview` custom message. Do not expose session state fields to app wiring.
+The hidden architecture overview is claimed atomically through session behavior and injected with `display: false`. It renders every discovered module, description, entrypoint, and manifest-declared relationship without truncation; the token budget only emits a warning. Reload/resume reconstruction scans for the existing `code-intelligence-overview` custom message. Do not expose session state fields to app wiring.
 
 ## TUI rendering
 

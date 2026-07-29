@@ -22,7 +22,6 @@ export interface OverviewData {
   projectName: string | null;
   projectDescription: string | null;
   modules: OverviewModule[];
-  omittedModuleCount: number;
   /** Detected source languages (e.g. ["ts", "js", "py"]). */
   detectedLanguages: string[] | null;
 }

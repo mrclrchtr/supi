@@ -11,74 +11,74 @@ Audit, evaluate, and improve CLAUDE.md files across a codebase to ensure PI has 
 
 ## Workflow
 
-### Phase 1: Context Baseline Review
+### Phase 1: SuPi Context Baseline Review
 
-**No file reads in this phase.** Use only what is already loaded in this session's context.
+**Do not read target instruction files yet.** Start from the session context and available tool surface. When `code_orientation` is available, assume future agents use it routinely and repeatedly—not only as a fallback. Static facts that are on demand rather than automatically injected are still poor CLAUDE.md content when Orientation exposes them directly.
 
-**Purpose:** This baseline review is the primary evidence for scoring Criterion 7 (Auto-Delivered Overlap) in Phase 3. Its goal is to identify which information categories are already delivered automatically by SuPi extensions or native pi, so you do NOT recommend adding that same content to CLAUDE.md. If you skip this step, you will inflate scores and propose redundant additions that already appear in every session.
+**Purpose:** This baseline is the primary evidence for scoring Criterion 7 (SuPi Context Overlap) in Phase 3. Separate context that arrives on the first turn from facts routinely obtained through Orientation so the audit preserves human reasoning rather than generated inventories.
 
-**Step 1 — Detect auto-delivered sources.** Scan the conversation context for:
+**Step 1 — Detect SuPi context surfaces.** Scan the conversation context and available tools for:
 
 | Source identifier | What to look for | Typical content |
-|-------------------|------------------|---------------|
-| `supi-code-intelligence` | Workspace module graphs, package lists, dependency arrows, file counts, orientation instruction sections | `## Modules` tables, architecture overviews, root directory trees, `## Instructions` in directory orientation |
-| `native-pi` | Root CLAUDE.md or AGENTS.md loaded into the system prompt | Project-wide instructions from the repository root |
+|-------------------|------------------|-----------------|
+| `supi-code-intelligence` overview | Hidden first-turn project overview | Every discovered module's name, description, selected manifest entrypoints, manifest-declared dependency arrows, detected languages |
+| `code_orientation` workspace focus | Workspace Orientation | Root manifest, package names and paths, manifest-declared package relationships, direct root files and directories |
+| `code_orientation` directory/file focus | Focused Orientation | Applicable instruction files, direct directory entries, package manifest/dependency facts, file outline/import/export observations |
+| `native-pi` | Root/ancestor CLAUDE.md or AGENTS.md loaded into the system prompt | Project-wide instructions from the cwd chain |
 | Other extensions | `<extension-context source="...">` blocks | Any other extension-delivered context |
 
-**Step 2 — Build the baseline.** For each source found, record what it already covers:
+**Step 2 — Build the baseline.** Record both first-turn and routine on-demand coverage:
 
 | Source | Content Category | Already Covers | Scope |
 |--------|------------------|----------------|-------|
-| `supi-code-intelligence` | Module graph | Package names, descriptions, dependency relationships | **Root-level** |
-| `supi-code-intelligence` | Workspace overview | File counts, root directory tree, top-level landmarks | **Root-level** |
-| `supi-code-intelligence` | Instruction-File Surfacing | `code_orientation` with directory focus surfaces `CLAUDE.md`/`AGENTS.md`; 200-line per-file limit, guidance chrome (not tool evidence) | **Package-specific** |
-| `native-pi` | Root instructions | `./CLAUDE.md`, `./AGENTS.md` in system prompt | **Root-level** |
+| `supi-code-intelligence` overview | Complete discovered module graph | Module names, descriptions, entrypoints, dependency relationships, languages | **Root-level / first turn** |
+| `code_orientation` | Workspace facts | Package paths, manifests, dependency relationships, direct root entries | **Root-level / on demand** |
+| `code_orientation` | Directory and file facts | Direct entries, package declarations/dependencies, outlines/imports/exports | **Package-specific / on demand** |
+| `code_orientation` | Instruction-file surfacing | Configured `CLAUDE.md`/`AGENTS.md` files for trusted directory focus, up to 200 lines per file | **Package-specific / on demand** |
+| `native-pi` | Root instructions | Context files in the cwd/ancestor chain | **Root-level / first turn** |
 
-Add rows for any additional categories visible in context.
+Add rows for other visible sources. Do not treat an instruction file as redundant merely because `code_orientation` is how its contents reach the model; compare its contents with the other facts Orientation provides.
 
-**Step 3 — Classify redundancy risk by scope.** Use the table above to categorize:
+**Step 3 — Classify redundancy risk by scope.** Assume heavy Orientation use:
 
-- **Root-level high risk** (already auto-delivered; do NOT recommend for root `./CLAUDE.md`):
-  - Package/module inventories (from `supi-code-intelligence`)
-  - Package layout / project structure sections that just list packages with descriptions (from `supi-code-intelligence`)
-  - Root directory trees and file counts (from `supi-code-intelligence`)
-  - Dependency graphs from manifests (from `supi-code-intelligence`)
-  - High-level architecture without project-specific reasoning (from `supi-code-intelligence`)
+- **Root-level high risk** (do NOT recommend for root `./CLAUDE.md`):
+  - Package/module inventories, descriptions, entrypoint tables, and manifest dependency graphs
+  - Package paths, static project-layout trees, and direct file/directory inventories
+  - High-level architecture that adds no ownership, boundary, flow, exception, or rationale
 
-- **Package-specific high risk** (already surfaced by directory orientation; do NOT recommend for that package's `CLAUDE.md`):
-  - Subdirectory CLAUDE.md/AGENTS.md already shown by `code_orientation` during this session
+- **Package-specific high risk** (do NOT recommend for that package's instruction file):
+  - Direct file/subdirectory listings
+  - Package manifest declarations, dependency lists, and manifest-derived relationships
+  - Source-symbol inventories that file Orientation exposes without additional reasoning
 
-- **Low risk** (not auto-delivered; safe to recommend in CLAUDE.md at any scope):
-  - Non-obvious commands and workflows (not routine build/test/lint — those are in package.json)
-  - Gotchas and non-obvious patterns
-  - Cross-package conventions not obvious from manifests
-  - Curated "start here" guidance with ownership or boundary reasoning
-  - Project-specific exceptions to generic rules
+- **Low risk** (safe to recommend at any scope):
+  - Non-obvious commands and workflows (not routine build/test/lint)
+  - Gotchas, failure modes, and ordering constraints
+  - Ownership, boundaries, initialization/data flow, and exceptions not derivable from manifests
+  - Curated "start here" guidance with reasoning
+  - Cross-package conventions and project-specific decisions
 
-**Step 4 — Output the baseline.** Produce this structured overview before proceeding to Phase 2:
+**Step 4 — Output the baseline.** Produce this structured overview before Phase 2:
 
 ```markdown
 ## Phase 1 Baseline Review
 
 ### SuPi Detected: yes / no
 
-### Auto-Injected Content by Source
+### SuPi Context Surfaces
 
-| Source | Content Category | Already Covers | Scope |
-|--------|------------------|----------------|-------|
-| ... | ... | ... | Root / Package-specific |
+| Source | Delivery | Already Covers | Scope |
+|--------|----------|----------------|-------|
+| ... | First turn / Routine Orientation | ... | Root / Package-specific |
 
 ### Redundancy Risk Assessment
 
-- **Root-level high risk** (do NOT recommend for root `./CLAUDE.md`):
-  - [List categories]
-- **Package-specific high risk** (do NOT recommend for matching package `CLAUDE.md`):
-  - [List categories]
-- **Low risk** (safe to recommend):
-  - [List categories]
+- **Root-level high risk:** [categories]
+- **Package-specific high risk:** [categories]
+- **Low risk:** [categories]
 ```
 
-**Note:** This review is intentionally approximate — it compares against the context already visible to you, not the literal hidden system prompt. If no SuPi-delivered context is visible in the conversation, the baseline is empty and this phase is a no-op.
+**Note:** If `code_orientation` is available, include its documented workspace/directory/file coverage even before calling it; Phase 2 verifies the actual target outputs.
 
 ### Phase 2: Discovery
 
@@ -98,7 +98,9 @@ find . -name "CLAUDE.md" -o -name ".claude.md" -o -name ".claude.local.md" 2>/de
 | Package-specific | `./packages/*/CLAUDE.md` | Module-level context in monorepos |
 | Subdirectory | Any nested location | Feature/domain-specific context |
 
-**Note:** PI auto-discovers CLAUDE.md files in parent directories, making monorepo setups work automatically.
+**Note:** PI natively loads context files from the cwd and its ancestors. Nested package files are surfaced when `code_orientation` focuses their directories.
+
+After discovery, run workspace `code_orientation` once, then directory Orientation for every target file's containing directory. Use a sufficiently high `maxResults` or narrower repeated focuses so a display cap is not mistaken for absence. This is required baseline evidence, not an optional removal check.
 
 ### Phase 3: Quality Assessment
 
@@ -114,11 +116,12 @@ For each CLAUDE.md file found in Phase 2, evaluate against quality criteria, inc
 | Conciseness | Medium | No verbose explanations or obvious info? |
 | Currency | High | Does it reflect current codebase state? |
 | Actionability | High | Are instructions executable, not vague? |
-| Auto-delivered overlap | Low | Does it duplicate what SuPi extensions already inject? **Use the Phase 1 Redundancy Risk Assessment as primary evidence.** |
+| SuPi context overlap | Low | Does it duplicate the first-turn overview or facts available through routine `code_orientation` use? **Use the Phase 1 assessment as primary evidence.** |
 
 **Phase 1 enforcement for Criterion 7:**
-- **Package-specific CLAUDE.md files** that Phase 1 identified as already surfaced by `code_orientation` → base score 3/10 (the surfaced file itself does not earn context-window space — `code_orientation` already delivers it). Add points for unique content: unique gotchas (+3), non-obvious commands/workflows (+2), cross-package patterns or ownership rules (+2). Maximum 10/10 only if the file is predominantly unique guidance, not restating what orientation already shows.
-- **Root-level content** that Phase 1 classified as root-level high risk → must be flagged for removal, not scored as "minor overlap."
+- Score package-specific files by comparing their contents with the non-instruction sections of directory/file Orientation. Surfacing is the delivery mechanism, not overlap by itself.
+- Root- or package-level static facts classified as high risk must be flagged for removal rather than excused as minor overlap.
+- Preserve concise human reasoning—ownership, boundaries, flow, exceptions, and gotchas—even when it mentions files or packages also shown by Orientation.
 
 **Quality Scores:**
 - **A (90-100)**: Comprehensive, current, actionable
@@ -140,9 +143,9 @@ Format:
 - Files found: X
 - Average score: X/100
 - Files needing update: X
-- Potential token savings: ~X (removing redundant/auto-delivered content)
+- Potential token savings: ~X (removing redundant generated/discoverable context)
 
-**Auto-delivered content overlaps are never "minor" or "not worth the churn."** Content that duplicates what SuPi extensions auto-inject wastes tokens every session and MUST be flagged for removal. A single edit that saves ~200 tokens per session pays for itself within a few sessions.
+**SuPi context overlap is never "minor" when it is only a generated inventory.** Content that duplicates the first-turn overview or routine Orientation wastes context whenever the instruction file is loaded and MUST be flagged for removal.
 
 ### File-by-File Assessment
 
@@ -154,7 +157,7 @@ Format:
 - **Fully redundant (package-specific):** [sections already covered by baseline context — applies to that package's `CLAUDE.md`]
 - **Partially redundant:** [sections with overlap plus human-only value]
 - **Unique:** [sections that should stay]
-- **Estimated waste:** ~X tokens (characters ÷ 4) of existing content duplicate auto-delivered context — should be removed
+- **Estimated waste:** ~X tokens (characters ÷ 4) duplicate first-turn or routine Orientation context — should be removed
 
 | Criterion | Score | Notes |
 |-----------|-------|-------|
@@ -164,13 +167,13 @@ Format:
 | Conciseness | X/15 | ... |
 | Currency | X/15 | ... |
 | Actionability | X/15 | ... |
-| Auto-delivered overlap | X/10 | ... |
+| SuPi context overlap | X/10 | ... |
 
 **Issues:**
 - [List specific problems]
 
-**Recommended removals (non-negotiable for auto-delivered content):**
-- [List what MUST be removed or compressed, with estimated token savings. Auto-delivered content is never "minor" or "not worth the churn" — it wastes tokens every session and MUST be removed.]
+**Recommended removals (non-negotiable generated/discoverable overlap):**
+- [List static inventories that MUST be removed or compressed, with estimated token savings.]
 
 **Recommended additions:**
 - [List what should be added]
@@ -185,14 +188,14 @@ Format:
 
 After outputting the quality report, ask user for confirmation before updating.
 
-**Before recommending removals, verify flagged overlaps.** When Phase 3 flagged a file for potential auto-delivered overlap (Criterion 7 ≤ 6/10), run `code_orientation({ focus: "<package-directory>" })` on that package. Compare the orientation output against the file — if the flagged sections genuinely duplicate what orientation already shows, the removal recommendation is confirmed. If orientation reveals context the file uniquely adds, adjust the recommendation.
+**Before recommending removals, verify the Phase 2 Orientation baseline.** Compare each target file with workspace and focused `code_orientation` output. Remove facts Orientation already supplies; retain human-only meaning. Never count the instruction text shown inside the Orientation result as evidence that the same text is redundant.
 
 **Update Guidelines (Critical):**
 
-1. **Remove or compress unnecessary content first** — Before adding anything, flag sections that MUST be removed or tightened. Never skip removals because of edit churn — a one-time edit that saves tokens every session pays for itself immediately.
+1. **Remove or compress unnecessary content first** — Before adding anything, flag sections that MUST be removed or tightened. Never skip removals because of edit churn—a one-time edit that saves tokens on every relevant load pays for itself quickly.
    - Routine command listings (`npm install`, `npm test`, `npm run build`) — remove; they're in package.json
-   - Package/module inventories that duplicate what the code-intelligence overview already delivers — MUST be removed (these waste hundreds of tokens every session)
-   - Package layout / project structure sections that just list packages with descriptions — MUST be removed; `code_intelligence` delivers this. Architecture trees that restate what the code-intelligence overview or `code_orientation` delivers are never acceptable.
+   - Package/module inventories that duplicate the complete first-turn overview — MUST be removed
+   - Package paths, project trees, manifest facts, and dependency listings available through routine `code_orientation` use — MUST be removed unless they add ownership, flow, boundary, exception, or rationale
    - Verbose explanations where a one-liner suffices — compress
    - Stale or outdated commands, file references, or architecture descriptions — remove
 

@@ -7,8 +7,8 @@ import type { OverviewData } from "./types.ts";
 const OVERVIEW_TOKEN_BUDGET = 600;
 
 /**
- * Render the compact architecture overview for first-turn session injection.
- * Targets at most 600 estimated tokens; logs a supi_debug warning when exceeded.
+ * Render the complete manifest-derived architecture overview for first-turn injection.
+ * Output is never truncated; callers may warn when it exceeds the soft token budget.
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: module-edge overview rendering with multiple formatting paths is clearer as one function
 export function renderOverview(data: OverviewData): string {
@@ -40,17 +40,11 @@ export function renderOverview(data: OverviewData): string {
         `- **${mod.shortName}**${entrypointSuffix}${mod.description ? ` — ${mod.description}` : ""}`,
       );
     } else {
-      const depNames = deps.slice(0, 4).map((d) => d.replace(/^@[^/]+\//, ""));
-      const depStr = depNames.join(", ");
-      const suffix = deps.length > 4 ? ` +${deps.length - 4} more` : "";
+      const depNames = deps.map((dependency) => dependency.replace(/^@[^/]+\//, ""));
       lines.push(
-        `- **${mod.shortName}** → ${depStr}${suffix}${entrypointSuffix}${mod.description ? ` — ${mod.description}` : ""}`,
+        `- **${mod.shortName}** → ${depNames.join(", ")}${entrypointSuffix}${mod.description ? ` — ${mod.description}` : ""}`,
       );
     }
-  }
-
-  if (data.omittedModuleCount > 0) {
-    lines.push(`- _+${data.omittedModuleCount} more modules omitted_`);
   }
 
   lines.push("");
