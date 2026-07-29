@@ -26,7 +26,7 @@ Reviewer resource loading suppresses ambient extensions, context files, skills, 
 
 ## Result grammar
 
-`submit_review` returns a summary and ordered findings. Each finding has title, description, `blocksAcceptance`, impact, effort, confidence, and optional target-relative location. The Review Engine derives `pass` or `issues` solely from blocking findings.
+`submit_review` returns a summary and ordered findings. Each finding has title, description, `blocksAcceptance`, impact, effort, confidence, and optional target-relative location. The Review Engine derives `pass` for no findings, `pass_with_findings` for advisory-only findings, and `issues` for any blocking finding, with structured finding counts by blocking status and impact.
 
 Child diagnostics retain only bounded lifecycle metadata and redacted provider error summaries. Never retain reviewer transcripts, commands, tool arguments/results, or repository evidence.
 

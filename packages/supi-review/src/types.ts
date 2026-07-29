@@ -82,7 +82,15 @@ export type PlannerDraft = ReviewInput;
 
 export type FindingImpact = "low" | "medium" | "high";
 export type FindingEffort = "small" | "medium" | "large";
-export type TaskVerdict = "pass" | "issues";
+export type TaskVerdict = "pass" | "pass_with_findings" | "issues";
+
+/** Machine-derived count of all findings, including their acceptance and impact split. */
+export interface FindingCounts {
+  total: number;
+  blocking: number;
+  nonBlocking: number;
+  byImpact: Record<FindingImpact, number>;
+}
 
 export interface ReviewLocation {
   path: string;
@@ -109,6 +117,7 @@ export interface ReviewSubmission {
 
 export interface NormalizedReviewSubmission extends ReviewSubmission {
   verdict: TaskVerdict;
+  findingCounts: FindingCounts;
 }
 
 export type ReviewModelSelection = import("@mrclrchtr/supi-core/model-selection").ModelSelection;
@@ -220,6 +229,7 @@ export type ReviewTaskResult = ReviewTaskResultIdentity &
     | {
         status: "completed";
         verdict: TaskVerdict;
+        findingCounts: FindingCounts;
         summary: string;
         findings: ReviewFinding[];
       }

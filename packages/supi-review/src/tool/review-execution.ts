@@ -34,6 +34,7 @@ function toTaskResult(
       status: "completed",
       ...identity,
       verdict: normalized.verdict,
+      findingCounts: normalized.findingCounts,
       summary: normalized.summary,
       findings: normalized.findings,
     };

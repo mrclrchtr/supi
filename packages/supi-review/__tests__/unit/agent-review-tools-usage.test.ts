@@ -60,6 +60,12 @@ const details: ReviewBatchDetails = {
       packetHash: "c".repeat(64),
       usage,
       verdict: "pass",
+      findingCounts: {
+        total: 0,
+        blocking: 0,
+        nonBlocking: 0,
+        byImpact: { low: 0, medium: 0, high: 0 },
+      },
       summary: "No issues.",
       findings: [],
     },

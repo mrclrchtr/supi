@@ -79,7 +79,7 @@ A review target comparing `HEAD`, or the merge base of an optional base commit a
 _Avoid_: layered index review, commit-candidate review, cwd-scoped review
 
 **Task Verdict**:
-The Review Engine-derived `pass` or `issues` result for one completed Review Task, based only on whether that task reported a finding that blocks acceptance.
+The Review Engine-derived `pass` (no findings), `pass_with_findings` (advisory findings only), or `issues` (one or more blocking findings) result for one completed Review Task. It includes structured finding counts by blocking status and impact.
 _Avoid_: reviewer verdict, run-level verdict, proof of correctness
 
 **Review Output Artifact**:

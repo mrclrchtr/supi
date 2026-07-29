@@ -10,6 +10,7 @@ import type { ReviewPlanStore } from "../session/review-plan-store.ts";
 import { renderPrepareCall, renderPrepareResult } from "../tui/prepare.ts";
 import { renderRunCall, renderRunResult } from "../tui/run.ts";
 import type {
+  FindingCounts,
   ReviewBatchDetails,
   ReviewInput,
   ReviewTargetSpec,
@@ -79,6 +80,10 @@ function appendCapabilityWarnings(lines: string[], result: ReviewTaskResult): vo
   }
 }
 
+function formatFindingCounts(counts: FindingCounts): string {
+  return `Findings: ${counts.total} total · ${counts.blocking} blocking · ${counts.nonBlocking} non-blocking · impact: ${counts.byImpact.high} high, ${counts.byImpact.medium} medium, ${counts.byImpact.low} low`;
+}
+
 function formatTaskResult(result: ReviewTaskResult): string[] {
   const lines = [
     "",
@@ -109,7 +114,12 @@ function formatTaskResult(result: ReviewTaskResult): string[] {
     }
     return lines;
   }
-  lines.push(`Verdict: ${result.verdict.toUpperCase()}`, "", result.summary);
+  lines.push(
+    `Verdict: ${result.verdict.toUpperCase()}`,
+    formatFindingCounts(result.findingCounts),
+    "",
+    result.summary,
+  );
   for (const finding of result.findings) {
     lines.push(
       "",

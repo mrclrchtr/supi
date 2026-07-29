@@ -89,7 +89,7 @@ Ambient extensions, context files, skills, prompt templates, themes, and discove
 
 ## Results and continuation
 
-Each successful task returns a summary and ordered findings. Findings contain `blocksAcceptance`, `impact`, `effort`, `confidence`, and an optional target-relative location. The Review Engine derives `pass` or `issues` per task and never aggregates or reranks tasks.
+Each successful task returns a summary, ordered findings, and structured counts by blocking status and impact. Findings contain `blocksAcceptance`, `impact`, `effort`, `confidence`, and an optional target-relative location. The Review Engine derives `pass` when there are no findings, `pass_with_findings` for advisory-only findings, and `issues` when any finding blocks acceptance; it never aggregates or reranks tasks.
 
 Capability and cleanup warnings are execution provenance, not findings. Non-success diagnostics retain only bounded lifecycle metadata and redacted provider-owned error summaries; reviewer conversation, shell commands, tool arguments/results, and repository evidence are never retained.
 

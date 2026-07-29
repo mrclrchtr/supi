@@ -32,9 +32,36 @@ describe("normalizeReviewSubmission", () => {
     ]);
   });
 
-  it("derives a pass verdict when no finding blocks acceptance", () => {
-    const result = normalizeReviewSubmission({ summary: "No blockers.", findings: [] });
-    expect(result.verdict).toBe("pass");
+  it("distinguishes advisory findings from a clean pass and counts their impact", () => {
+    const advisory = normalizeReviewSubmission({
+      summary: "One advisory.",
+      findings: [
+        {
+          title: "Consider this",
+          description: "It is not acceptance-blocking.",
+          blocksAcceptance: false,
+          impact: "medium",
+          effort: "small",
+          confidence: 0.7,
+        },
+      ],
+    });
+    const clean = normalizeReviewSubmission({ summary: "No findings.", findings: [] });
+
+    expect(advisory.verdict).toBe("pass_with_findings");
+    expect(advisory.findingCounts).toEqual({
+      total: 1,
+      blocking: 0,
+      nonBlocking: 1,
+      byImpact: { low: 0, medium: 1, high: 0 },
+    });
+    expect(clean.verdict).toBe("pass");
+    expect(clean.findingCounts).toEqual({
+      total: 0,
+      blocking: 0,
+      nonBlocking: 0,
+      byImpact: { low: 0, medium: 0, high: 0 },
+    });
   });
 
   it("rejects reviewer output that exceeds persisted result bounds", () => {

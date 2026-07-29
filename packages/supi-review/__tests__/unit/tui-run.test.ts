@@ -1,5 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
+import { formatVerdictBadge } from "../../src/tui/common.ts";
 import { renderRunResult } from "../../src/tui/run.ts";
 import type { ReviewBatchDetails } from "../../src/types.ts";
 
@@ -39,6 +40,12 @@ const details: ReviewBatchDetails = {
         cost: { input: 1, output: 2, cacheRead: 3, cacheWrite: 4, total: 10 },
       },
       verdict: "pass",
+      findingCounts: {
+        total: 0,
+        blocking: 0,
+        nonBlocking: 0,
+        byImpact: { low: 0, medium: 0, high: 0 },
+      },
       summary: "Frozen workspace review completed successfully.",
       findings: [],
     },
@@ -46,6 +53,10 @@ const details: ReviewBatchDetails = {
 };
 
 describe("supi_review_run TUI", () => {
+  it("labels advisory findings separately from a clean pass", () => {
+    expect(formatVerdictBadge("pass_with_findings", theme)).toBe("PASS WITH FINDINGS");
+  });
+
   it("keeps the collapsed result informative", () => {
     const output = renderRunResult(
       { content: [], details },

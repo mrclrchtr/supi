@@ -33,11 +33,13 @@ export function renderError(label: string, theme: Theme): Text {
 
 // ── Verdict / status badges ──────────────────────────────────────
 
-/** Colored verdict label for PASS or ISSUES. */
+/** Colored verdict label that distinguishes acceptance with advisory findings. */
 export function formatVerdictBadge(verdict: TaskVerdict, theme: Theme): string {
-  return verdict === "pass"
-    ? theme.fg("success", theme.bold("PASS"))
-    : theme.fg("error", theme.bold("ISSUES"));
+  if (verdict === "pass") return theme.fg("success", theme.bold("PASS"));
+  if (verdict === "pass_with_findings") {
+    return theme.fg("warning", theme.bold("PASS WITH FINDINGS"));
+  }
+  return theme.fg("error", theme.bold("ISSUES"));
 }
 
 /** Colored status label for non-completed task results. */

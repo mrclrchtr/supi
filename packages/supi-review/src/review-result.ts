@@ -1,6 +1,11 @@
 import { REVIEW_LIMITS } from "./review-limits.ts";
 import { normalizeRepositoryRelativePath } from "./review-path.ts";
-import type { NormalizedReviewSubmission, ReviewSubmission } from "./types.ts";
+import type {
+  FindingCounts,
+  NormalizedReviewSubmission,
+  ReviewFinding,
+  ReviewSubmission,
+} from "./types.ts";
 
 function requireText(value: string, label: string, maxCharacters: number): string {
   const normalized = value.trim();
@@ -13,13 +18,29 @@ function requireText(value: string, label: string, maxCharacters: number): strin
   return normalized;
 }
 
-/** Derive the machine verdict while preserving reviewer-authored finding order. */
+function countFindings(findings: ReviewFinding[]): FindingCounts {
+  const counts: FindingCounts = {
+    total: findings.length,
+    blocking: 0,
+    nonBlocking: 0,
+    byImpact: { low: 0, medium: 0, high: 0 },
+  };
+  for (const finding of findings) {
+    if (finding.blocksAcceptance) counts.blocking++;
+    else counts.nonBlocking++;
+    counts.byImpact[finding.impact]++;
+  }
+  return counts;
+}
+
+/** Derive an acceptance verdict and structured finding counts without reordering findings. */
 export function normalizeReviewSubmission(
   submission: ReviewSubmission,
 ): NormalizedReviewSubmission {
   if (submission.findings.length > REVIEW_LIMITS.findingsPerTask) {
     throw new Error(`A review task may submit at most ${REVIEW_LIMITS.findingsPerTask} findings.`);
   }
+  const findingCounts = countFindings(submission.findings);
   return {
     summary: requireText(submission.summary, "Review summary", REVIEW_LIMITS.summaryCharacters),
     findings: submission.findings.map((finding, index) => {
@@ -65,6 +86,12 @@ export function normalizeReviewSubmission(
           : undefined,
       };
     }),
-    verdict: submission.findings.some((finding) => finding.blocksAcceptance) ? "issues" : "pass",
+    findingCounts,
+    verdict:
+      findingCounts.blocking > 0
+        ? "issues"
+        : findingCounts.total > 0
+          ? "pass_with_findings"
+          : "pass",
   };
 }

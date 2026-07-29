@@ -34,6 +34,12 @@ describe("formatReviewBatch", () => {
           ...base,
           status: "completed",
           verdict: "issues",
+          findingCounts: {
+            total: 1,
+            blocking: 1,
+            nonBlocking: 0,
+            byImpact: { low: 0, medium: 0, high: 1 },
+          },
           summary: "Found one.",
           capabilityWarnings: [{ message: "Code Intelligence unavailable." }],
           findings: [
@@ -45,6 +51,29 @@ describe("formatReviewBatch", () => {
               effort: "small",
               confidence: 1,
               location: { path: "src/a.ts", startLine: 2, endLine: 3 },
+            },
+          ],
+        },
+        {
+          ...base,
+          taskId: "advisory",
+          status: "completed",
+          verdict: "pass_with_findings",
+          findingCounts: {
+            total: 1,
+            blocking: 0,
+            nonBlocking: 1,
+            byImpact: { low: 1, medium: 0, high: 0 },
+          },
+          summary: "One advisory.",
+          findings: [
+            {
+              title: "Advisory",
+              description: "Worth considering.",
+              blocksAcceptance: false,
+              impact: "low",
+              effort: "small",
+              confidence: 1,
             },
           ],
         },
@@ -63,6 +92,14 @@ describe("formatReviewBatch", () => {
     const output = formatReviewBatch(details);
     expect(output).toContain("Mode: prepared");
     expect(output).toContain("Provenance: planner-assisted");
+    expect(output).toContain("Verdict: ISSUES");
+    expect(output).toContain(
+      "Findings: 1 total · 1 blocking · 0 non-blocking · impact: 1 high, 0 medium, 0 low",
+    );
+    expect(output).toContain("Verdict: PASS_WITH_FINDINGS");
+    expect(output).toContain(
+      "Findings: 1 total · 0 blocking · 1 non-blocking · impact: 0 high, 0 medium, 1 low",
+    );
     expect(output).toContain("src/a.ts:2-3");
     expect(output).toContain("Status: failed (prompt-rejected)");
     expect(output).toContain("Status: canceled");
