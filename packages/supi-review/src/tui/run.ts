@@ -32,31 +32,22 @@ function findingScope(details: ReviewBatchDetails, taskId: string): FindingScope
   return details.review.tasks.find((task) => task.id === taskId)?.findingScope ?? "change-only";
 }
 
-/** Format a compact per-task collapsed line. */
+/** Format one task without collapsing independent verdicts into a batch verdict. */
 function formatTaskCollapsed(result: ReviewTaskResult, scope: FindingScope, theme: Theme): string {
+  const warnings = result.capabilityWarnings?.length ?? 0;
+  const warningLabel =
+    warnings > 0 ? ` · ${warnings} capability warning${warnings === 1 ? "" : "s"}` : "";
   if (result.status === "completed") {
-    const findingCount = result.findings.length;
-    const findingLabel =
-      findingCount > 0 ? ` (${findingCount} finding${findingCount !== 1 ? "s" : ""})` : "";
-    const metadata = [
-      `scope: ${scope}`,
-      `model: ${result.modelId}`,
-      ...(result.usage ? [formatReviewUsage(result.usage)] : []),
-    ].join(" · ");
-    return `${result.taskId}: ${formatVerdictBadge(result.verdict, theme)}${theme.fg("dim", `${findingLabel} · ${metadata}`)}`;
+    const findings = result.findings.length;
+    const findingLabel = findings > 0 ? ` · ${findings} finding${findings === 1 ? "" : "s"}` : "";
+    return `${result.taskId}: ${formatVerdictBadge(result.verdict, theme)}${theme.fg("dim", ` · ${scope}${findingLabel}${warningLabel}`)}`;
   }
-  // Non-completed task — show status
   const label = formatStatusLabel(
     result.status,
     result.status === "failed" ? result.failureCode : undefined,
     result.status === "timeout" ? result.timeoutMs : undefined,
   );
-  const metadata = [
-    `scope: ${scope}`,
-    `model: ${result.modelId}`,
-    ...(result.usage ? [formatReviewUsage(result.usage)] : []),
-  ].join(" · ");
-  return `${result.taskId}: ${theme.fg("warning", label)}${theme.fg("dim", ` · ${metadata}`)}`;
+  return `${result.taskId}: ${theme.fg("warning", label)}${theme.fg("dim", ` · ${scope}${warningLabel}`)}`;
 }
 
 // ── renderCall ───────────────────────────────────────────────────
@@ -207,32 +198,16 @@ export function renderRunResult(
 
 // ── Collapsed ────────────────────────────────────────────────────
 
-function buildCollapsed(details: ReviewBatchDetails, theme: Theme): Container {
-  const container = new Container();
-  for (const result of details.results) {
-    container.addChild(
-      new Text(formatTaskCollapsed(result, findingScope(details, result.taskId), theme), 0, 0),
-    );
-    if (result.status === "completed") {
-      container.addChild(new Text(theme.fg("muted", result.summary), 0, 0));
-    }
-    for (const warning of result.capabilityWarnings ?? []) {
-      container.addChild(new Text(theme.fg("warning", `capability: ${warning.message}`), 0, 0));
-    }
-  }
-
+function buildCollapsed(details: ReviewBatchDetails, theme: Theme): Text {
+  const tasks = details.results
+    .map((result) => formatTaskCollapsed(result, findingScope(details, result.taskId), theme))
+    .join(` ${theme.fg("dim", "·")} `);
   const { additions, deletions, files } = details.snapshot.stats;
-  container.addChild(
-    new Text(
-      theme.fg(
-        "dim",
-        `${details.snapshot.title} (${files} file${files !== 1 ? "s" : ""} · +${additions.toLocaleString("en-US")} / -${deletions.toLocaleString("en-US")})`,
-      ),
-      0,
-      0,
-    ),
+  const target = theme.fg(
+    "dim",
+    `${details.snapshot.title} (${files} file${files !== 1 ? "s" : ""} · +${additions.toLocaleString("en-US")} / -${deletions.toLocaleString("en-US")})`,
   );
-  return container;
+  return new Text(`${tasks}\n${target}`, 0, 0);
 }
 
 // ── Expanded ─────────────────────────────────────────────────────

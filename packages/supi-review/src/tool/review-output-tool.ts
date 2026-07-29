@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
+import { renderOutputCall, renderOutputResult } from "../tui/paged-output.ts";
 import type { ReviewOutputReference } from "../types.ts";
 import { DEFAULT_PAGE_CHARACTERS, MAX_PAGE_CHARACTERS, type TextPage } from "./output-page.ts";
 
@@ -74,6 +75,8 @@ export function registerReviewOutputTool(pi: ExtensionAPI, store: ReviewArtifact
     description: `Read up to ${MAX_PAGE_CHARACTERS} UTF-16 characters from a session-scoped review or preparation output continuation. Use only with an artifact id returned by supi_review_prepare or supi_review_run.`,
     promptSnippet: "Continue paged review output",
     parameters: outputPageSchema,
+    renderCall: renderOutputCall,
+    renderResult: renderOutputResult,
     async execute(_id, params) {
       const page = store.read(params.artifactId, params.offset, params.limit);
       if (!page) {

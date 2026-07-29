@@ -1,7 +1,13 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { LocalReviewAuditStore } from "../audit/local-review-audit-store.ts";
-import { DEFAULT_PAGE_CHARACTERS, MAX_PAGE_CHARACTERS, pageText } from "./output-page.ts";
+import { renderAuditCall, renderAuditResult } from "../tui/paged-output.ts";
+import {
+  DEFAULT_PAGE_CHARACTERS,
+  MAX_PAGE_CHARACTERS,
+  pageText,
+  type TextPage,
+} from "./output-page.ts";
 
 const reviewAuditSchema = Type.Object(
   {
@@ -46,13 +52,7 @@ function formatAuditList(audits: Awaited<ReturnType<LocalReviewAuditStore["list"
   ].join("\n");
 }
 
-function modelFacingPage(
-  artifactId: string,
-  text: string,
-  offset?: number,
-  limit?: number,
-): string {
-  const page = pageText(text, offset, limit);
+function modelFacingPage(artifactId: string, page: TextPage): string {
   if (page.nextOffset === undefined) return page.text;
   const body = page.text.slice(0, page.text.lastIndexOf("\n\n[output paged;"));
   return [
@@ -71,25 +71,36 @@ export function registerReviewAuditTool(pi: ExtensionAPI, store: LocalReviewAudi
     promptSnippet: "List or inspect local reviewer replays",
     promptGuidelines: ["Do not repeat raw supi_review_audit replay content unless necessary."],
     parameters: reviewAuditSchema,
+    renderCall: renderAuditCall,
+    renderResult: renderAuditResult,
     async execute(_id, params) {
       if (!params.artifactId) {
+        const audits = await store.list();
         return {
-          content: [{ type: "text" as const, text: formatAuditList(await store.list()) }],
-          details: { kind: "review-audit" as const, artifactId: "" },
+          content: [{ type: "text" as const, text: formatAuditList(audits) }],
+          details: { kind: "review-audit" as const, mode: "list" as const, audits },
         };
       }
       const text = await store.read(params.artifactId);
       if (text === undefined) {
         throw new Error(`Reviewer replay ${params.artifactId} was not found or has expired.`);
       }
+      const page = pageText(text, params.offset, params.limit);
       return {
         content: [
           {
             type: "text" as const,
-            text: modelFacingPage(params.artifactId, text, params.offset, params.limit),
+            text: modelFacingPage(params.artifactId, page),
           },
         ],
-        details: { kind: "review-audit" as const, artifactId: params.artifactId },
+        details: {
+          kind: "review-audit" as const,
+          mode: "replay" as const,
+          artifactId: params.artifactId,
+          offset: page.offset,
+          ...(page.nextOffset === undefined ? {} : { nextOffset: page.nextOffset }),
+          totalCharacters: page.totalCharacters,
+        },
       };
     },
   });

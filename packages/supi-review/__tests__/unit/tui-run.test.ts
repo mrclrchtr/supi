@@ -105,12 +105,11 @@ describe("supi_review_run TUI", () => {
       .render(160)
       .join("\n");
 
-    expect(output).toContain("live-smoke: PASS");
-    expect(output).toContain("Frozen workspace review completed successfully.");
-    expect(output).toContain("scope: boy-scout");
-    expect(output).toContain("model: provider/reviewer");
-    expect(output).toContain("18 tokens");
+    expect(output).toContain("live-smoke: PASS · boy-scout");
     expect(output).toContain("Commit aaaaaaa (2 files · +3 / -1)");
+    expect(output.split("\n")).toHaveLength(2);
+    expect(output).not.toContain("Frozen workspace review completed successfully.");
+    expect(output).not.toContain("model: provider/reviewer");
     expect(output).not.toContain("workspace:");
   });
 
