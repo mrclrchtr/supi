@@ -1,5 +1,26 @@
 # Changelog
 
+## [4.2.0](https://github.com/mrclrchtr/supi/compare/v4.1.0...v4.2.0) (2026-07-29)
+
+
+### Features
+
+* make code-intelligence overview comprehensive ([e095cdf](https://github.com/mrclrchtr/supi/commit/e095cdfea0d9caca65f434496db7ccff09a6f89b))
+* **supi-extras:** add cross-worktree session cloning ([fdea663](https://github.com/mrclrchtr/supi/commit/fdea66359f2c0ec268dd96b3c778f358db852c53))
+* **supi-tree-sitter:** add C and JVM outline support ([73d62d3](https://github.com/mrclrchtr/supi/commit/73d62d340c0fc06eb315efeae4d4e4beba426c5b))
+* **supi-tree-sitter:** add HTML and SQL outline support ([290a0c1](https://github.com/mrclrchtr/supi/commit/290a0c1f90c0b25948efd3f06c26a919fc87d00f))
+* **supi-tree-sitter:** add scripting outline support ([e4a4e27](https://github.com/mrclrchtr/supi/commit/e4a4e27a4e994c094bd1c6ca3e6a2975209adcb2))
+* **supi-tree-sitter:** expand polyglot outline support ([ff951f1](https://github.com/mrclrchtr/supi/commit/ff951f1c00fa601f2dfb39291464342b8f7776fe))
+
+
+### Bug Fixes
+
+* align code intelligence language compatibility ([75a6b1e](https://github.com/mrclrchtr/supi/commit/75a6b1e258e3493c9f2e993ecfe85c931635519e))
+* **supi-ask-user:** decode Unicode escapes in display text ([ed4671f](https://github.com/mrclrchtr/supi/commit/ed4671f304ae833265ba88c43448617f0f20a127))
+* **supi-code-intelligence:** add recovery hints to symbol-not-found errors ([5aff058](https://github.com/mrclrchtr/supi/commit/5aff058f66be2a7fa40d408922dba48a4b6aeb88))
+* **supi-code-intelligence:** skip tool registration when already loaded ([62650fb](https://github.com/mrclrchtr/supi/commit/62650fb2ab9821b44f2728de4c229efae06acc93))
+* **supi-code-intelligence:** use WeakSet guard instead of getAllTools ([f068a32](https://github.com/mrclrchtr/supi/commit/f068a32ca80a6e7887304da89ef34b4744661cf5))
+
 ## [4.1.0](https://github.com/mrclrchtr/supi/compare/v4.0.0...v4.1.0) (2026-07-29)
 
 
