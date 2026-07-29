@@ -24,12 +24,18 @@ describe("formatReviewBatch", () => {
         stats: { files: 1, additions: 1, deletions: 0 },
       },
       review: { tasks: [{ id: "task", instructions: "Review." }] },
+      cleanupWarning: {
+        workspacePath: "/tmp/review-workspace",
+        message: "Cleanup failed.",
+        recoveryCommand: "git worktree remove --force /tmp/review-workspace",
+      },
       results: [
         {
           ...base,
           status: "completed",
           verdict: "issues",
           summary: "Found one.",
+          capabilityWarnings: [{ message: "Code Intelligence unavailable." }],
           findings: [
             {
               title: "Bug",
@@ -61,6 +67,8 @@ describe("formatReviewBatch", () => {
     expect(output).toContain("Status: failed (prompt-rejected)");
     expect(output).toContain("Status: canceled");
     expect(output).toContain("Status: timeout (500 ms)");
+    expect(output).toContain("Reviewer capability warning: Code Intelligence unavailable.");
+    expect(output).toContain("Review Workspace cleanup warning: Cleanup failed.");
     expect(output).not.toMatch(/overall|run-level/i);
   });
 });

@@ -137,6 +137,14 @@ function buildExpanded(details: ReviewBatchDetails, theme: Theme): Container {
     ),
   );
 
+  if (details.cleanupWarning) {
+    container.addChild(new Spacer(1));
+    container.addChild(
+      new Text(theme.fg("warning", `cleanup: ${details.cleanupWarning.message}`), 1, 0),
+    );
+    container.addChild(new Text(theme.fg("dim", details.cleanupWarning.workspacePath), 1, 0));
+  }
+
   // Planning info
   if (details.planning) {
     container.addChild(new Spacer(1));

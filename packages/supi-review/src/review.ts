@@ -15,6 +15,7 @@ import { createReviewOutput, registerReviewOutputTool } from "./tool/review-outp
 import { prepareReview, runReview } from "./tool/review-workflow.ts";
 import { renderRunResult } from "./tui/run.ts";
 import type { ReviewInput, ReviewModelSelection, ReviewTargetSpec } from "./types.ts";
+import { registerReviewWorkspaceCleanupCommand } from "./workspace/cleanup-command.ts";
 
 type CommandContext = Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1];
 
@@ -211,6 +212,7 @@ async function executeInteractiveReview(
           planId: input.planId,
           decision: { kind: "use-review", review: input.review },
           planStore: input.planStore,
+          projectTrusted: ctx.isProjectTrusted(),
           signal,
         })
       : runReview({
@@ -219,6 +221,7 @@ async function executeInteractiveReview(
           target: input.target,
           review: input.review,
           reviewerModel: input.reviewerModel,
+          projectTrusted: ctx.isProjectTrusted(),
           signal,
         }),
   );
@@ -286,6 +289,7 @@ export default function reviewExtension(pi: ExtensionAPI): void {
   registerReviewSettings(pi);
   registerAgentReviewTools(pi, planStore, artifactStore);
   registerReviewOutputTool(pi, artifactStore);
+  registerReviewWorkspaceCleanupCommand(pi);
 
   // Message renderer for the /supi-review slash command output.
   // Adapts the sendMessage shape into the shape renderRunResult expects.
@@ -302,7 +306,7 @@ export default function reviewExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("supi-review", {
-    description: "Run one or more caller-defined read-only review tasks",
+    description: "Run one or more caller-defined Inspection-only review tasks",
     handler: async (_args, ctx) => runCommand(ctx, pi, planStore, artifactStore),
   });
 }

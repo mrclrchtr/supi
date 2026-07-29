@@ -54,6 +54,8 @@ export interface RunWithLifecycleConfig<TResult> {
   signal?: AbortSignal;
   /** Optional timeout in milliseconds before the session is aborted. */
   timeoutMs?: number;
+  /** Optional owner teardown; used when an AgentSessionRuntime owns session shutdown. */
+  dispose?: () => void;
   /**
    * Event handler. Receives each session event and the lifecycle context.
    * Call `ctx.resolve(ctx.cleanup(result))` to settle the promise.
@@ -110,6 +112,7 @@ export function runWithLifecycle<TResult>(
     prompt,
     signal,
     timeoutMs,
+    dispose,
     onEvent,
     canceledResult,
     failedResult,
@@ -148,7 +151,8 @@ export function runWithLifecycle<TResult>(
     state.settled = true;
     cancelTeardown();
     try {
-      session.dispose();
+      if (dispose) dispose();
+      else session.dispose();
     } catch {
       // Disposal is best-effort after the outcome is already determined.
     }

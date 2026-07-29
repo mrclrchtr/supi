@@ -125,17 +125,14 @@ function scanBundlesDir(bundlesDir) {
  */
 function collectWorkspacePackageDirs(stageDir) {
   const dirs = [stageDir];
+  const seen = new Set(dirs);
 
-  // Collect top-level @mrclrchtr workspace bundles
-  const topDir = join(stageDir, "node_modules", "@mrclrchtr");
-  dirs.push(...scanBundlesDir(topDir));
-
-  // Collect deeper nested bundles: node_modules/@mrclrchtr/*/node_modules/@mrclrchtr/*
-  for (const parent of [...dirs]) {
-    if (parent === stageDir) continue;
+  for (const parent of dirs) {
     const nested = join(parent, "node_modules", "@mrclrchtr");
     for (const sub of scanBundlesDir(nested)) {
-      if (!dirs.includes(sub)) dirs.push(sub);
+      if (seen.has(sub)) continue;
+      seen.add(sub);
+      dirs.push(sub);
     }
   }
 

@@ -385,6 +385,9 @@ importers:
       '@earendil-works/pi-tui':
         specifier: '*'
         version: 0.82.1
+      '@mrclrchtr/supi-code-intelligence':
+        specifier: workspace:*
+        version: link:../supi-code-intelligence
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core

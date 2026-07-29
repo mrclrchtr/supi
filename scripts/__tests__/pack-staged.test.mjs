@@ -160,6 +160,18 @@ describe("packStaged clean manifest", () => {
     expect(pkg.name).toBe("@mrclrchtr/supi-code-intelligence");
   });
 
+  it("rewrites deeply bundled Review manifests without workspace protocol", {
+    timeout: SLOW_TIMEOUT,
+  }, async () => {
+    tarball = await packStaged("packages/supi-review", { outDir });
+    const manifests = listTarballEntries(tarball).filter((entry) => entry.endsWith("package.json"));
+
+    for (const manifestPath of manifests) {
+      const manifest = extractJson(tarball, manifestPath);
+      expect(JSON.stringify(manifest)).not.toContain("workspace:");
+    }
+  });
+
   it("publishes explicit api and extension subpaths for packages/supi-ask-user", {
     timeout: SLOW_TIMEOUT,
   }, async () => {

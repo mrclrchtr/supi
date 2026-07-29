@@ -30,16 +30,19 @@ describe("runPlanner", () => {
   it("constrains drafts to the reviewers' static target-aware capabilities", () => {
     const prompt = buildPlannerSystemPrompt();
 
-    expect(prompt).toContain("read_review_diff");
-    expect(prompt).toContain("cannot run shell commands");
+    expect(prompt).toContain("code_orientation");
+    expect(prompt).toContain("read, bash");
     expect(prompt).toContain("introduced by the selected change");
-    expect(prompt).toContain("Do not request runtime experiments");
+    expect(prompt).toContain("Do not request tests, builds, linters");
   });
 
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.reload.mockResolvedValue(undefined);
-    mocks.createAgentSession.mockResolvedValue({ session: {} });
+    mocks.createAgentSession.mockResolvedValue({
+      session: { bindExtensions: vi.fn() },
+      extensionsResult: { errors: [] },
+    });
     mocks.runWithLifecycle.mockResolvedValue({
       kind: "failed",
       failureCode: "session-creation-failed",

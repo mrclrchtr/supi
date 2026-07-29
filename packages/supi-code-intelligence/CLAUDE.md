@@ -14,7 +14,7 @@ Surfaces: `./extension` (PI registration) and `./api` (reusable type contracts).
 | Result assembly | `src/tool/result/` | Sections, evidence lists, totals, provenance, actions, details |
 | Workflows | `src/session/` | Workspace session, typed outcomes, target handles, refactor plans |
 | Analysis | `src/analysis/` | PI-free evidence collection and refactor safety |
-| Substrates | `src/substrate/` | LSP and Tree-sitter lifecycle adapters |
+| Substrates | `src/substrate/` | Process-shared LSP and Tree-sitter provider-host lifecycle |
 | Shared UI | `src/ui/` | Status, footer, and shared TUI/markdown helpers |
 
 ## Public tool gotchas
@@ -41,6 +41,7 @@ Whole-workflow capability unavailable → throw from `execute()` so PI marks a r
 ## Tool adapter contract
 
 - `src/tool/register.ts` truncates content at PI defaults (2000 lines / 50 KB); details remain structured and untruncated. Full content spills to a temporary file.
+- `src/headless.ts` is the managed-child profile. It registers exactly `code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, and `code_health`; never add refactors, settings, UI, commands, or overview injection there.
 - Forward `signal` and `onUpdate` through `toWorkflowControl()`.
 - PI schema validation is not enough: workflow validation must protect direct callers.
 - Exact-one schemas use closed one-key objects rather than TypeBox unions/literals for model-provider compatibility.
@@ -56,7 +57,7 @@ Whole-workflow capability unavailable → throw from `execute()` so PI marks a r
 
 ## Provider/runtime contract
 
-`WorkspaceCapabilityAdapter` reads `supi-code-runtime` capability state and the `WorkspaceLspRuntime`. `TestCapabilityAdapter` is the in-memory workflow-test seam. Read-only semantic providers return `CodeQueryResult<T>`; completed empty data must not be inferred as unavailable. When provider contracts change, update the LSP runtime, composite provider, test adapter, and behavior tests together.
+`WorkspaceCapabilityAdapter` reads `supi-code-runtime` capability state and the `WorkspaceLspRuntime`. `Workspace provider host` is process-shared and reference-counted by canonical workspace; it starts LSP and Tree-sitter once and shuts them down only after the final session lease. Target/refactor stores remain session-local. `TestCapabilityAdapter` is the in-memory workflow-test seam. Read-only semantic providers return `CodeQueryResult<T>`; completed empty data must not be inferred as unavailable. When provider contracts change, update the LSP runtime, composite provider, test adapter, and behavior tests together.
 
 ## Always-on LSP policy
 

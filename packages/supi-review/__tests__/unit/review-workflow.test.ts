@@ -2,12 +2,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   resolveReviewSnapshot: vi.fn(),
+  materializeReviewWorkspace: vi.fn(),
+  cleanupWorkspace: vi.fn(),
   runPlanner: vi.fn(),
   runReviewer: vi.fn(),
 }));
 vi.mock("../../src/git.ts", async (original) => ({
   ...(await original()),
   resolveReviewSnapshot: mocks.resolveReviewSnapshot,
+}));
+vi.mock("../../src/workspace/review-workspace.ts", async (original) => ({
+  ...(await original()),
+  materializeReviewWorkspace: mocks.materializeReviewWorkspace,
 }));
 vi.mock("../../src/tool/planner-runner.ts", () => ({
   PLANNER_PROMPT_VERSION: "test-v1",
@@ -50,6 +56,10 @@ describe("Review workflow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.resolveReviewSnapshot.mockResolvedValue(snapshot);
+    mocks.materializeReviewWorkspace.mockResolvedValue({
+      cwd: "/review-workspace",
+      cleanup: mocks.cleanupWorkspace,
+    });
     mocks.runReviewer.mockResolvedValue({
       kind: "success",
       modelId: model.canonicalId,

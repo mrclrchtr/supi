@@ -1,5 +1,6 @@
 import type { Model, Usage } from "@earendil-works/pi-ai";
 import type { ChildLifecycleTrace } from "./tool/child-lifecycle-trace.ts";
+import type { ReviewWorkspaceCleanupWarning } from "./workspace/review-workspace.ts";
 
 /** A 7-64 character hexadecimal Git commit id, pinned to its full object id during resolution. */
 export type CommitId = string;
@@ -174,6 +175,11 @@ export type PlannerRunResult =
   | { kind: "canceled"; diagnostics: ChildFailureDiagnostics; usage?: Usage }
   | { kind: "timeout"; timeoutMs: number; diagnostics: ChildFailureDiagnostics; usage?: Usage };
 
+/** Parent-facing execution provenance for an unavailable Reviewer Extension Set capability. */
+export interface ReviewerCapabilityWarning {
+  message: string;
+}
+
 export interface ReviewerInvocation {
   prompt: string;
   task: ReviewTask;
@@ -181,10 +187,11 @@ export interface ReviewerInvocation {
   cwd: string;
   snapshot: ReviewSnapshot;
   signal?: AbortSignal;
+  projectTrusted?: boolean;
   onProgress?: (progress: ReviewProgress) => void;
 }
 
-export type ReviewerRunResult =
+export type ReviewerRunResult = (
   | { kind: "success"; submission: ReviewSubmission; modelId: string; usage?: Usage }
   | ({ kind: "failed"; modelId: string; usage?: Usage } & ChildFailedResult)
   | { kind: "canceled"; modelId: string; diagnostics: ChildFailureDiagnostics; usage?: Usage }
@@ -194,7 +201,8 @@ export type ReviewerRunResult =
       modelId: string;
       diagnostics: ChildFailureDiagnostics;
       usage?: Usage;
-    };
+    }
+) & { capabilityWarnings?: ReviewerCapabilityWarning[] };
 
 interface ReviewTaskResultIdentity {
   taskId: string;
@@ -203,6 +211,8 @@ interface ReviewTaskResultIdentity {
   packetHash: string;
   /** Aggregate nested-model usage for this task, when reported by the provider. */
   usage?: Usage;
+  /** Reviewer Extension Set capability degradation, kept separate from findings. */
+  capabilityWarnings?: ReviewerCapabilityWarning[];
 }
 
 export type ReviewTaskResult = ReviewTaskResultIdentity &
@@ -255,6 +265,7 @@ export interface ReviewBatchDetails {
   review: ReviewInput;
   planning?: PlanningRecord;
   results: ReviewTaskResult[];
+  cleanupWarning?: ReviewWorkspaceCleanupWarning;
   output?: ReviewOutputReference;
 }
 

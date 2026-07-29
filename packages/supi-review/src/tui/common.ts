@@ -171,6 +171,16 @@ function buildNonCompletedSection(
   }
 }
 
+function appendCapabilityWarnings(
+  container: Container,
+  result: ReviewTaskResult,
+  theme: Theme,
+): void {
+  for (const warning of result.capabilityWarnings ?? []) {
+    container.addChild(new Text(theme.fg("warning", `capability: ${warning.message}`), 1, 0));
+  }
+}
+
 /** Build an expanded-view section for a single review task result. */
 export function buildTaskSection(
   container: Container,
@@ -211,6 +221,7 @@ export function buildTaskSection(
     ...(result.usage ? [theme.fg("dim", formatReviewUsage(result.usage))] : []),
   ];
   container.addChild(new Text(metaParts.join("  "), 1, 0));
+  appendCapabilityWarnings(container, result, theme);
 
   // Completed task — show summary and findings
   if (result.status !== "completed") {

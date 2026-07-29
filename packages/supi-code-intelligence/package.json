@@ -82,6 +82,7 @@
     ".": "./src/index.ts",
     "./api": "./src/api.ts",
     "./extension": "./src/extension.ts",
+    "./headless": "./src/headless.ts",
     "./package.json": "./package.json"
   }
 }

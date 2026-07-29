@@ -113,19 +113,4 @@ describe("focused code intelligence tool registration", () => {
 
     expect(Object.keys(propertiesOf(getTool(pi, "code_refactor_apply")))).toEqual(["planId"]);
   });
-
-  it("shares one process-exit listener across extension reloads", () => {
-    const first = createPiMock();
-    codeIntelligenceExtension(first as never);
-    const afterFirst = process.listenerCount("exit");
-
-    const second = createPiMock();
-    codeIntelligenceExtension(second as never);
-    expect(process.listenerCount("exit")).toBe(afterFirst);
-
-    const shutdown = second.getHandlers("session_shutdown").at(-1);
-    expect(shutdown).toBeDefined();
-    shutdown?.({} as never, {} as never);
-    expect(process.listenerCount("exit")).toBeLessThanOrEqual(afterFirst);
-  });
 });

@@ -91,6 +91,11 @@ export class ReviewPlanStore {
 
   /** Permanently consume a running plan after at least one task completes. */
   consume(lease: ReviewPlanLease): boolean {
+    return this.invalidate(lease);
+  }
+
+  /** Remove a leased plan whose pinned Review Snapshot no longer matches the target. */
+  invalidate(lease: ReviewPlanLease): boolean {
     const entry = this.#plans.get(lease.plan.id);
     if (!entry || entry.leaseToken !== lease.token) return false;
     this.#plans.delete(lease.plan.id);

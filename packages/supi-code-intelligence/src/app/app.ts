@@ -61,7 +61,10 @@ export function createSessionCache(): {
   const sessions = new Map<string, WorkspaceCodeIntelligenceSession>();
   return {
     getOrCreate: (cwd) => getOrCreateSession(sessions, cwd),
-    clear: () => sessions.clear(),
+    clear: () => {
+      for (const session of sessions.values()) session.clearStores();
+      sessions.clear();
+    },
   };
 }
 

@@ -3,35 +3,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { registerLspSessionLifecycle } from "../../../../src/substrate/lsp/lifecycle.ts";
 import { createLspAdapterState } from "../../../../src/substrate/lsp/state.ts";
 
-const controllerMocks = vi.hoisted(() => {
-  const instances: Array<{
-    cwd: string;
-    start: ReturnType<typeof vi.fn>;
-    shutdown: ReturnType<typeof vi.fn>;
-  }> = [];
-  return { instances };
-});
-
-vi.mock("@mrclrchtr/supi-lsp/api", () => ({
-  LspRuntimeController: class {
-    cwd: string;
-    start = vi.fn(async () => ({ kind: "ready" as const }));
-    shutdown = vi.fn(async () => {});
-
-    constructor(cwd: string) {
-      this.cwd = cwd;
-      controllerMocks.instances.push(this);
-    }
-  },
-  scanWorkspaceSentinels: vi.fn(() => new Map([["package.json", 1]])),
+const mocks = vi.hoisted(() => ({ acquire: vi.fn(), release: vi.fn() }));
+vi.mock("../../../../src/substrate/workspace-provider-host.ts", () => ({
+  acquireWorkspaceProviderHost: mocks.acquire,
 }));
 
-describe("LSP project trust lifecycle", () => {
+describe("LSP shared-host lifecycle", () => {
   beforeEach(() => {
-    controllerMocks.instances.length = 0;
+    vi.clearAllMocks();
+    mocks.acquire.mockResolvedValue({
+      lspController: null,
+      sentinelSnapshot: new Map(),
+      release: mocks.release,
+    });
   });
 
-  it("does not create or start a workspace controller for an untrusted project", async () => {
+  it("mirrors an untrusted project's decision to the provider host", async () => {
     const pi = createPiMock();
     const state = createLspAdapterState();
     registerLspSessionLifecycle(pi as never, state);
@@ -42,41 +29,40 @@ describe("LSP project trust lifecycle", () => {
       makeCtx({ cwd: "/untrusted", isProjectTrusted: () => false }),
     );
 
-    expect(controllerMocks.instances).toHaveLength(0);
+    expect(mocks.acquire).toHaveBeenCalledWith("/untrusted", { projectTrusted: false });
     expect(state.controller).toBeNull();
     expect(state.lspActive).toBe(false);
   });
 
-  it("shuts down prior workspace state before entering an untrusted project", async () => {
+  it("retains the shared controller and sentinel snapshot for a trusted project", async () => {
     const pi = createPiMock();
     const state = createLspAdapterState();
-    const shutdown = vi.fn(async () => {});
-    state.controller = { shutdown } as never;
-    state.lspActive = true;
-    registerLspSessionLifecycle(pi as never, state);
-
-    await pi.emit(
-      "session_start",
-      {},
-      makeCtx({ cwd: "/untrusted", isProjectTrusted: () => false }),
-    );
-
-    expect(shutdown).toHaveBeenCalledOnce();
-    expect(state.controller).toBeNull();
-    expect(state.lspActive).toBe(false);
-  });
-
-  it("starts and publishes a controller after project trust is granted", async () => {
-    const pi = createPiMock();
-    const state = createLspAdapterState();
+    const controller = { kind: "ready" };
+    const snapshot = new Map([["package.json", 1]]);
+    mocks.acquire.mockResolvedValue({
+      lspController: controller,
+      sentinelSnapshot: snapshot,
+      release: mocks.release,
+    });
     registerLspSessionLifecycle(pi as never, state);
 
     await pi.emit("session_start", {}, makeCtx({ cwd: "/trusted" }));
 
-    expect(controllerMocks.instances).toHaveLength(1);
-    expect(controllerMocks.instances[0]?.start).toHaveBeenCalledOnce();
-    expect(state.controller).toBe(controllerMocks.instances[0]);
+    expect(mocks.acquire).toHaveBeenCalledWith("/trusted", { projectTrusted: true });
+    expect(state.controller).toBe(controller);
     expect(state.lspActive).toBe(true);
-    expect(state.sentinelSnapshot).toEqual(new Map([["package.json", 1]]));
+    expect(state.sentinelSnapshot).toBe(snapshot);
+  });
+
+  it("releases its lease on session shutdown", async () => {
+    const pi = createPiMock();
+    const state = createLspAdapterState();
+    registerLspSessionLifecycle(pi as never, state);
+    await pi.emit("session_start", {}, makeCtx({ cwd: "/trusted" }));
+
+    await pi.emit("session_shutdown", {}, makeCtx({ cwd: "/trusted" }));
+
+    expect(mocks.release).toHaveBeenCalledOnce();
+    expect(state.providerLease).toBeNull();
   });
 });

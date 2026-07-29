@@ -42,7 +42,23 @@ describe("runReviewer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.reload.mockResolvedValue(undefined);
-    mocks.createAgentSession.mockResolvedValue({ session: {} });
+    mocks.createAgentSession.mockResolvedValue({
+      session: {
+        bindExtensions: vi.fn(),
+        getActiveToolNames: () => [
+          "read",
+          "bash",
+          "code_resolve",
+          "code_inspect",
+          "code_orientation",
+          "code_graph",
+          "code_find",
+          "code_health",
+          "submit_review",
+        ],
+      },
+      extensionsResult: { errors: [] },
+    });
     mocks.runWithLifecycle.mockResolvedValue({
       kind: "failed",
       failureCode: "session-creation-failed",
@@ -81,7 +97,7 @@ describe("runReviewer", () => {
     });
   });
 
-  it("wires only fixed review tools, isolated settings, exact prompt, and no automatic timeout", async () => {
+  it("wires read, bash, headless Code Intelligence, and submit_review with isolated settings", async () => {
     await runReviewer({
       cwd: "/repo",
       snapshot,
@@ -94,11 +110,14 @@ describe("runReviewer", () => {
       expect.objectContaining({
         settingsManager: mocks.settingsManager,
         tools: [
-          "list_review_changes",
-          "list_review_files",
-          "read_review_diff",
-          "read_review_file",
-          "search_review_files",
+          "read",
+          "bash",
+          "code_resolve",
+          "code_inspect",
+          "code_orientation",
+          "code_graph",
+          "code_find",
+          "code_health",
           "submit_review",
         ],
       }),

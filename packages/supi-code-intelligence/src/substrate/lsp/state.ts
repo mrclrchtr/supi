@@ -4,6 +4,7 @@
 // through LspRuntimeController from @mrclrchtr/supi-lsp/api.
 
 import type { LspRuntimeController } from "@mrclrchtr/supi-lsp/api";
+import type { WorkspaceProviderHostLease } from "../workspace-provider-host.ts";
 
 /** LSP status overlay UI state (handle + close). */
 export interface LspInspectorState {
@@ -19,6 +20,7 @@ export interface LspInspectorState {
  */
 export interface LspAdapterState {
   controller: LspRuntimeController | null;
+  providerLease: WorkspaceProviderHostLease | null;
   inspector: LspInspectorState;
   lspActive: boolean;
   /** Snapshot of workspace sentinel files (package.json, tsconfig, lockfiles) for change detection. */
@@ -28,6 +30,7 @@ export interface LspAdapterState {
 export function createLspAdapterState(): LspAdapterState {
   return {
     controller: null,
+    providerLease: null,
     inspector: { handle: null, close: null },
     lspActive: false,
     sentinelSnapshot: new Map(),

@@ -1,9 +1,7 @@
 import { resolveReviewSnapshot, summarizeReviewSnapshot } from "../git.ts";
 import { normalizeReviewInput } from "../review-input.ts";
-import { normalizeReviewSubmission } from "../review-result.ts";
 import type { ReviewPlanLease, ReviewPlanStore } from "../session/review-plan-store.ts";
 import { buildFileManifest } from "../target/file-manifest.ts";
-import { buildReviewPacket } from "../target/packet.ts";
 import type {
   PlannerDraft,
   PlannerRunResult,
@@ -15,13 +13,14 @@ import type {
   ReviewTargetSpec,
   ReviewTaskResult,
 } from "../types.ts";
+import { materializeReviewWorkspace } from "../workspace/review-workspace.ts";
 import {
   createEarlyCancellationDiagnostics,
   createUnobservedChildFailureDiagnostics,
 } from "./child-failure-diagnostics.ts";
 import { combineUsage } from "./child-usage.ts";
 import { PLANNER_PROMPT_VERSION, runPlanner } from "./planner-runner.ts";
-import { runReviewer } from "./review-runner.ts";
+import { executeReviewTasks, type ReviewExecutionUpdate } from "./review-execution.ts";
 
 /** Input required by the prepare workflow: target resolution plus optional Planner run. */
 export interface PrepareReviewInput {
@@ -37,10 +36,7 @@ export interface PrepareReviewInput {
 }
 
 /** Tool update callback signature shared across workflow adapters. */
-type OnUpdate = (result: {
-  content: Array<{ type: "text"; text: string }>;
-  details: Record<string, unknown>;
-}) => void;
+type OnUpdate = ReviewExecutionUpdate;
 
 /** Complete Direct Review request: target, full review input, and reviewer model. */
 export interface DirectRunInput {
@@ -49,6 +45,7 @@ export interface DirectRunInput {
   target: ReviewTargetSpec;
   review: ReviewInput;
   reviewerModel: ReviewModelSelection;
+  projectTrusted?: boolean;
   signal?: AbortSignal;
   onUpdate?: OnUpdate;
 }
@@ -60,6 +57,7 @@ export interface PreparedRunInput {
   planId: string;
   decision: { kind: "accept-draft" } | { kind: "use-review"; review: ReviewInput };
   planStore: ReviewPlanStore;
+  projectTrusted?: boolean;
   signal?: AbortSignal;
   onUpdate?: OnUpdate;
 }
@@ -177,122 +175,32 @@ export async function prepareReview(input: PrepareReviewInput) {
   return { kind: "prepared" as const, plan, ...(planning.usage ? { usage: planning.usage } : {}) };
 }
 
-function toTaskResult(
-  taskId: string,
-  packetHash: string,
-  result: Awaited<ReturnType<typeof runReviewer>>,
-): ReviewTaskResult {
-  const identity = {
-    taskId,
-    packetHash,
-    modelId: result.modelId,
-    ...(result.usage ? { usage: result.usage } : {}),
-  };
-  if (result.kind === "success") {
-    const normalized = normalizeReviewSubmission(result.submission);
-    return {
-      status: "completed",
-      ...identity,
-      verdict: normalized.verdict,
-      summary: normalized.summary,
-      findings: normalized.findings,
-    };
+function targetsMatch(left: ReviewSnapshot["target"], right: ReviewSnapshot["target"]): boolean {
+  if (left.kind !== right.kind) return false;
+  if (left.kind === "working-tree" && right.kind === "working-tree") {
+    return (
+      left.headCommit === right.headCommit &&
+      left.requestedBaseCommit === right.requestedBaseCommit &&
+      left.mergeBaseCommit === right.mergeBaseCommit
+    );
   }
-  if (result.kind === "failed") {
-    return {
-      status: "failed",
-      ...identity,
-      failureCode: result.failureCode,
-      ...(result.diagnostics ? { diagnostics: result.diagnostics } : {}),
-    };
+  if (left.kind === "comparison" && right.kind === "comparison") {
+    return (
+      left.requestedBaseCommit === right.requestedBaseCommit &&
+      left.mergeBaseCommit === right.mergeBaseCommit &&
+      left.headCommit === right.headCommit
+    );
   }
-  if (result.kind === "canceled") {
-    return { status: "canceled", ...identity, diagnostics: result.diagnostics };
-  }
-  return {
-    status: "timeout",
-    ...identity,
-    timeoutMs: result.timeoutMs,
-    diagnostics: result.diagnostics,
-  };
-}
-
-function emitUpdate(onUpdate: OnUpdate | undefined, result: Parameters<OnUpdate>[0]): void {
-  try {
-    onUpdate?.(result);
-  } catch {
-    // Progress presentation cannot change review execution semantics.
-  }
-}
-
-// biome-ignore lint/complexity/useMaxParams: compact internal fan-out helper
-async function execute(
-  cwd: string,
-  snapshot: ReviewSnapshot,
-  reviewInput: ReviewInput,
-  model: ReviewModelSelection,
-  signal?: AbortSignal,
-  onUpdate?: OnUpdate,
-): Promise<ReviewTaskResult[]> {
-  const review = normalizeReviewInput(reviewInput);
-  let completedCount = 0;
-  const totalCount = review.tasks.length;
-
-  return Promise.all(
-    review.tasks.map(async (task) => {
-      const packet = buildReviewPacket(snapshot, review, task, model);
-      try {
-        const result = await runReviewer({
-          cwd,
-          snapshot,
-          task,
-          prompt: packet.prompt,
-          model,
-          signal,
-          onProgress: (progress) =>
-            emitUpdate(onUpdate, {
-              content: [
-                {
-                  type: "text",
-                  text: `Task ${task.id}: ${progress.turns} turns, ${progress.toolUses} tool uses${progress.tokens ? `, ${progress.tokens.total} tokens` : ""}`,
-                },
-              ],
-              details: { taskId: task.id, progress, completedCount, totalCount },
-            }),
-        });
-        const taskResult = toTaskResult(task.id, packet.packetHash, result);
-        completedCount++;
-        const verb = taskResult.status === "completed" ? "complete" : taskResult.status;
-        emitUpdate(onUpdate, {
-          content: [
-            { type: "text", text: `Task ${task.id} ${verb} (${completedCount} of ${totalCount})` },
-          ],
-          details: { completedCount, totalCount },
-        });
-        return taskResult;
-      } catch {
-        const taskResult: ReviewTaskResult = {
-          status: "failed",
-          taskId: task.id,
-          packetHash: packet.packetHash,
-          modelId: model.canonicalId,
-          failureCode: "unexpected-runner-failure",
-          diagnostics: createUnobservedChildFailureDiagnostics(),
-        };
-        completedCount++;
-        emitUpdate(onUpdate, {
-          content: [
-            {
-              type: "text",
-              text: `Task ${task.id} failed (${completedCount} of ${totalCount})`,
-            },
-          ],
-          details: { completedCount, totalCount },
-        });
-        return taskResult;
-      }
-    }),
+  return (
+    left.kind === "commit" &&
+    right.kind === "commit" &&
+    left.commit === right.commit &&
+    left.parentCommit === right.parentCommit
   );
+}
+
+function snapshotsMatch(left: ReviewSnapshot, right: ReviewSnapshot): boolean {
+  return left.diffHash === right.diffHash && targetsMatch(left.target, right.target);
 }
 
 /** Execute a Direct Review or atomically consume and execute a Prepared Review. */
@@ -303,6 +211,7 @@ export async function runReview(input: RunReviewInput) {
   let model: ReviewModelSelection;
   let planning: PlanningRecord | undefined;
   let lease: ReviewPlanLease | undefined;
+  let planStore: ReviewPlanStore | undefined;
   let provenance: ReviewBatchDetails["provenance"] = "caller-supplied";
 
   if (input.mode === "direct") {
@@ -334,14 +243,32 @@ export async function runReview(input: RunReviewInput) {
     if (!selectedReview) {
       return { kind: "invalid" as const, reason: "This plan has no Planner Draft." };
     }
-    lease = input.planStore.acquire(input.planId);
+    planStore = input.planStore;
+    lease = planStore.acquire(input.planId);
     if (!lease) {
       return {
         kind: "invalid" as const,
         reason: `Review Plan ${input.planId} is already running.`,
       };
     }
-    snapshot = lease.plan.snapshot;
+    let refreshed: Awaited<ReturnType<typeof resolveReviewSnapshot>>;
+    try {
+      refreshed = await resolveReviewSnapshot(input.cwd, lease.plan.snapshot.requestedTarget);
+    } catch {
+      input.planStore.invalidate(lease);
+      return {
+        kind: "invalid" as const,
+        reason: "Could not revalidate this Review Plan target. Prepare a new plan.",
+      };
+    }
+    if (!refreshed || !snapshotsMatch(lease.plan.snapshot, refreshed)) {
+      input.planStore.invalidate(lease);
+      return {
+        kind: "invalid" as const,
+        reason: "This Review Plan is stale because its target changed. Prepare a new plan.",
+      };
+    }
+    snapshot = refreshed;
     review = selectedReview;
     model = lease.plan.reviewerModel;
     provenance = input.decision.kind === "accept-draft" ? "planner-assisted" : "caller-supplied";
@@ -357,23 +284,39 @@ export async function runReview(input: RunReviewInput) {
     }
   }
 
-  let results: ReviewTaskResult[];
+  input.onUpdate?.({
+    content: [{ type: "text", text: "Freezing Review Workspace…" }],
+    details: {},
+  });
+  let workspace: Awaited<ReturnType<typeof materializeReviewWorkspace>>;
   try {
-    results = await execute(
-      snapshot.repositoryRoot,
+    workspace = await materializeReviewWorkspace(snapshot);
+  } catch {
+    if (lease && planStore) planStore.release(lease);
+    return { kind: "invalid" as const, reason: "Could not create the Review Workspace." };
+  }
+
+  let results: ReviewTaskResult[];
+  let cleanupWarning: Awaited<ReturnType<typeof workspace.cleanup>>;
+  try {
+    results = await executeReviewTasks(
+      workspace.cwd,
       snapshot,
       review,
       model,
+      input.projectTrusted,
       input.signal,
       input.onUpdate,
     );
   } catch (error) {
-    if (lease && input.mode === "prepared") input.planStore.release(lease);
+    if (lease && planStore) planStore.release(lease);
     throw error;
+  } finally {
+    cleanupWarning = await workspace.cleanup();
   }
-  if (lease && input.mode === "prepared") {
-    if (results.some((result) => result.status === "completed")) input.planStore.consume(lease);
-    else input.planStore.release(lease);
+  if (lease && planStore) {
+    if (results.some((result) => result.status === "completed")) planStore.consume(lease);
+    else planStore.release(lease);
   }
   const details: ReviewBatchDetails = {
     kind: "review-batch",
@@ -382,6 +325,7 @@ export async function runReview(input: RunReviewInput) {
     snapshot: summarizeReviewSnapshot(snapshot),
     review,
     ...(planning ? { planning } : {}),
+    ...(cleanupWarning ? { cleanupWarning } : {}),
     results,
   };
   const usage = combineUsage(results.map((result) => result.usage));

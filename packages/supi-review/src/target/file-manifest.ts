@@ -35,6 +35,8 @@ export function buildFileManifest(
   }
   const omitted = changes.length - lines.length;
   if (omitted > 0)
-    lines.push(`- … ${omitted} additional change(s) omitted; use list_review_changes`);
+    lines.push(
+      `- … ${omitted} additional change(s) omitted; use Git to inspect the complete inventory.`,
+    );
   return lines;
 }

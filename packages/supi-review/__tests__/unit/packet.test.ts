@@ -28,7 +28,9 @@ describe("buildReviewPacket", () => {
 
     expect(packet.prompt).toContain("Issue #1");
     expect(packet.prompt).toContain("Check requirement R1.");
-    expect(packet.prompt).toContain("read_review_diff");
+    expect(packet.prompt).toContain("git diff HEAD");
+    expect(packet.prompt).toContain("code_orientation");
+    expect(packet.prompt).not.toContain("read_review_diff");
     expect(packet.prompt).toContain('M +1 -0 "src/a.ts"');
     expect(packet.prompt).toContain(`Protocol version: ${REVIEW_PACKET_PROTOCOL_VERSION}`);
     expect(packet.prompt).toContain("a".repeat(40));
@@ -53,7 +55,7 @@ describe("buildReviewPacket", () => {
 
     expect(manifest?.length).toBeLessThanOrEqual(8_000);
     expect(manifest).toContain("additional change(s) omitted");
-    expect(packet.prompt).toContain("list_review_changes");
+    expect(packet.prompt).toContain("git diff HEAD");
   });
 
   it("reproduces exact packet bytes and hash for equivalent inputs", () => {

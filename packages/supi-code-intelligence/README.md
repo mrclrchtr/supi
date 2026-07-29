@@ -251,6 +251,8 @@ The old global `lsp.enabled` and `lsp.active` keys are deprecated and ignored. M
 - `supi-code-runtime` owns canonical provider contracts and workspace capability state.
 - `supi-lsp` owns semantic lifecycle and the Workspace LSP runtime.
 - `supi-tree-sitter` owns structural parser reuse.
+- The process-shared Workspace provider host starts LSP and Tree-sitter once per canonical workspace and releases them after the final session lease. Target and refactor handles remain session-local.
+- The Headless inspection profile is for managed child sessions and registers only the six non-mutating inspection tools; it omits refactors, settings, UI, commands, and overview injection.
 
 Markdown and TUI are adapters over assembled typed results. Providers, clients, mutable targets, and the LSP manager do not cross the workflow seam.
 
@@ -264,4 +266,5 @@ See:
 ## Package exports
 
 - `@mrclrchtr/supi-code-intelligence/api` — reusable type contracts
-- `@mrclrchtr/supi-code-intelligence/extension` — PI extension entrypoint
+- `@mrclrchtr/supi-code-intelligence/extension` — full interactive PI extension entrypoint
+- `@mrclrchtr/supi-code-intelligence/headless` — managed-child inspection profile

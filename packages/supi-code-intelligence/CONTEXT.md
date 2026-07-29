@@ -27,8 +27,16 @@ A bounded, focus-relevant fact included in Orientation to help choose what sourc
 _Avoid_: health section, diagnostic report, priority warning
 
 **Workspace code-intelligence session**:
-The workspace-scoped Code intelligence context that owns workflow policy, capability readiness, and ephemeral target and refactor handles for one PI session. It yields typed workflow outcomes without owning Tool result assembly or presentation.
+The workspace-scoped Code intelligence context that owns workflow policy, capability readiness, and ephemeral target and refactor handles for one PI session. It yields typed workflow outcomes without owning Tool result assembly, presentation, or provider lifecycle.
 _Avoid_: provider bag, renderer, global code-intelligence state
+
+**Workspace provider host**:
+The process-shared, reference-counted owner of LSP and structural-provider lifecycle for one canonical workspace. Pi sessions share its providers while keeping target and refactor handles session-local; providers stop after the final session releases them.
+_Avoid_: session controller, global code-intelligence session, provider bag
+
+**Headless inspection profile**:
+The Pi extension profile for managed child sessions that acquires a Workspace provider host and registers only the six non-mutating Code intelligence inspection tools. It omits refactor tools, settings and UI registration, overview injection, and other interactive-session contributions.
+_Avoid_: full extension, tool factory, ambient extension
 
 **Target workflow**:
 The code-intelligence flow that turns one exact target selector — a handle, anchored coordinate, symbol query, or permitted file reference — into evidence-backed target facts before graph, Orientation, or refactor analysis begins. Target workflow decisions preserve selector exactness and honest correctness before downstream analysis runs.

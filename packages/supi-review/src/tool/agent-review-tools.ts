@@ -68,6 +68,12 @@ function formatPrepared(plan: {
   return lines.join("\n");
 }
 
+function appendCapabilityWarnings(lines: string[], result: ReviewTaskResult): void {
+  for (const warning of result.capabilityWarnings ?? []) {
+    lines.push(`Reviewer capability warning: ${warning.message}`);
+  }
+}
+
 function formatTaskResult(result: ReviewTaskResult): string[] {
   const lines = [
     "",
@@ -76,6 +82,7 @@ function formatTaskResult(result: ReviewTaskResult): string[] {
     `Packet SHA-256: ${result.packetHash}`,
   ];
   if (result.usage) lines.push(`Usage: ${formatReviewUsage(result.usage)}`);
+  appendCapabilityWarnings(lines, result);
   if (result.status === "failed") {
     lines.push(`Status: failed (${result.failureCode})`);
     if (result.diagnostics) {
@@ -128,6 +135,14 @@ export function formatReviewBatch(details: ReviewBatchDetails): string {
       ...(details.planning.usage
         ? [`Planner usage: ${formatReviewUsage(details.planning.usage)}`]
         : []),
+    );
+  }
+  if (details.cleanupWarning) {
+    lines.push(
+      "",
+      `Review Workspace cleanup warning: ${details.cleanupWarning.message}`,
+      `Workspace: ${details.cleanupWarning.workspacePath}`,
+      `Recovery: ${details.cleanupWarning.recoveryCommand}`,
     );
   }
   for (const result of details.results) lines.push(...formatTaskResult(result));
@@ -221,6 +236,7 @@ function makeRunReviewExecute(
               target: input.target,
               review: input.review,
               reviewerModel: resolveModels(ctx).reviewer,
+              projectTrusted: ctx.isProjectTrusted(),
               signal,
               onUpdate: wrappedUpdate,
             })
@@ -230,6 +246,7 @@ function makeRunReviewExecute(
               planId: input.planId,
               decision: input.decision,
               planStore,
+              projectTrusted: ctx.isProjectTrusted(),
               signal,
               onUpdate: wrappedUpdate,
             });
@@ -334,10 +351,10 @@ export function registerAgentReviewTools(
     name: "supi_review_run",
     label: "Run Review",
     description: "Run one to four caller-defined review tasks directly or from a prepared plan.",
-    promptSnippet: "Run independent read-only code review tasks",
+    promptSnippet: "Run independent Inspection-only code review tasks",
     promptGuidelines: [
       "Use supi_review_run directly when a skill or the main agent already has complete review task instructions.",
-      "Repository stability from invocation through completion is a caller precondition for supi_review_run.",
+      "Review Workspaces freeze the verified target before Reviewer Sessions start; direct shell inspection is available only inside the external sandbox boundary.",
     ],
     parameters: runReviewSchema,
     renderCall: renderRunCall,
