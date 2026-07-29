@@ -41,6 +41,8 @@ The extension detects project languages and starts matching language servers. In
 | Kotlin | `kotlin-lsp` |
 | R | `R` with `languageserver` |
 
+Semantic and structural support intentionally differ where the syntax differs: Ruby LSP handles ERB templates, and gopls handles `go.mod`, while AST search excludes both rather than parsing them with the wrong Tree-sitter grammar. Ruby gemspecs and KornShell files use the existing Ruby and Bash structural grammars.
+
 Check runtime status with:
 
 ```text

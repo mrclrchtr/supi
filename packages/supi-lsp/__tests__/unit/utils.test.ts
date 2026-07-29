@@ -56,12 +56,16 @@ describe("detectLanguageId", () => {
     ["lib.py", "python"],
     ["main.rs", "rust"],
     ["main.go", "go"],
+    ["go.mod", "go.mod"],
     ["app.c", "c"],
     ["app.cpp", "cpp"],
     ["style.css", "css"],
     ["doc.md", "markdown"],
     ["config.yaml", "yaml"],
+    ["views/index.html.erb", "erb"],
+    ["project.gemspec", "ruby"],
     ["script.sh", "shellscript"],
+    ["script.ksh", "shellscript"],
   ])("detects %s as %s", (file, expected) => {
     expect(detectLanguageId(file)).toBe(expected);
   });

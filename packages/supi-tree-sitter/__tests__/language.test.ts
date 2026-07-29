@@ -21,16 +21,18 @@ describe("isSupportedFile", () => {
     ["file.pyi", true],
     ["file.rs", true],
     ["file.go", true],
-    ["file.mod", true],
+    ["go.mod", false],
     ["file.c", true],
     ["file.cpp", true],
     ["file.java", true],
     ["file.kt", true],
     ["file.kts", true],
     ["file.rb", true],
+    ["project.gemspec", true],
     ["file.sh", true],
     ["file.bash", true],
     ["file.zsh", true],
+    ["file.ksh", true],
     ["file.html", true],
     ["file.htm", true],
     ["file.xhtml", true],
@@ -84,9 +86,9 @@ describe("detectGrammar", () => {
     expect(detectGrammar("lib.rs")).toBe("rust");
   });
 
-  it("maps Go extensions to go grammar", () => {
+  it("maps Go source files to go grammar without treating module manifests as source", () => {
     expect(detectGrammar("main.go")).toBe("go");
-    expect(detectGrammar("go.mod")).toBe("go");
+    expect(detectGrammar("go.mod")).toBeUndefined();
   });
 
   it("maps C/C++ extensions to c and cpp grammars", () => {
@@ -107,12 +109,14 @@ describe("detectGrammar", () => {
 
   it("maps Ruby extensions to ruby grammar", () => {
     expect(detectGrammar("app.rb")).toBe("ruby");
+    expect(detectGrammar("project.gemspec")).toBe("ruby");
   });
 
   it("maps Shell extensions to bash grammar", () => {
     expect(detectGrammar("script.sh")).toBe("bash");
     expect(detectGrammar("script.bash")).toBe("bash");
     expect(detectGrammar("script.zsh")).toBe("bash");
+    expect(detectGrammar("script.ksh")).toBe("bash");
   });
 
   it("maps HTML extensions to html grammar", () => {

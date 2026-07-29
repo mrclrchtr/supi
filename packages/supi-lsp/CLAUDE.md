@@ -70,7 +70,7 @@ During shutdown, `vscode-jsonrpc` may emit `Cannot call write after a stream was
 
 ## Configuration
 
-`loadConfig()` reads `lsp.servers` from SuPi project/global config. `.pi-lsp.json` is not read. Keys are language names (`typescript`, `python`, `rust`, `c`, `cpp`, `ruby`, `java`, `kotlin`), not binary names.
+`loadConfig()` reads `lsp.servers` from SuPi project/global config. `.pi-lsp.json` is not read. Built-in keys are language names (`typescript`, `python`, `rust`, `go`, `c`, `ruby`, `java`, `kotlin`, `bash`, `html`, `sql`, `r`), not binary names; `cpp` aliases to `c`.
 
 Always-on policy:
 
@@ -81,6 +81,8 @@ Always-on policy:
 - `getDeprecatedLspKeys()` lets downstream packages report old keys.
 
 `lsp.exclude` contains gitignore-style patterns used only by diagnostics and coverage. Explicit semantic requests are not filtered. `isGlobMatch()` supports anchored `/`, directory-only trailing `/`, `**`, and single-segment `*`.
+
+`didOpen` language IDs must follow the server's document contract rather than blindly reuse the extension: ERB uses `erb`, Go module manifests use `go.mod`, and shell dialect extensions use `shellscript`.
 
 Thread `ctx.cwd` through manager and formatting code; do not use `process.cwd()` for workspace path resolution.
 

@@ -27,7 +27,7 @@ async function outline(file: string, source: string): Promise<OutlineItem[]> {
 describe("scripting-language outline extraction", () => {
   it("extracts Ruby constants, modules, classes, and methods without local assignments", async () => {
     const items = await outline(
-      "sample.rb",
+      "sample.gemspec",
       `VALUE, SECOND = 1, 2
 client.timeout = 5
 items[0] = :ignored
@@ -104,7 +104,7 @@ end
 
   it("extracts shell variables, constants, and functions without function locals", async () => {
     const items = await outline(
-      "sample.sh",
+      "sample.ksh",
       `GLOBAL=1
 ARRAY=(one two)
 items[0]=ignored

@@ -40,17 +40,17 @@ Coordinates in the library APIs use **1-based** line and character columns. Char
 - JavaScript / TypeScript (`.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`, `.mts`, `.cts`)
 - Python (`.py`, `.pyi`)
 - Rust (`.rs`)
-- Go (`.go`, `.mod`)
+- Go (`.go`)
 - C / C++ (`.c`, `.h`, `.cpp`, `.hpp`, `.cc`, `.cxx`, `.hxx`, `.c++`, `.h++`)
 - Java (`.java`)
 - Kotlin (`.kt`, `.kts`)
-- Ruby (`.rb`)
-- Bash / shell (`.sh`, `.bash`, `.zsh`)
+- Ruby (`.rb`, `.gemspec`)
+- Bash / shell (`.sh`, `.bash`, `.zsh`, `.ksh`)
 - HTML (`.html`, `.htm`, `.xhtml`)
 - R (`.r`)
 - SQL (`.sql`)
 
-Outline collection supports every listed family. HTML outlines contain elements with non-empty `id` attributes; SQL outlines contain `CREATE` declarations and shallow table/type members. Import and export collection remains JavaScript/TypeScript-only, and call-site collection supports every listed family except HTML and SQL. Consumers performing a bulk structural scan should use `getStructuralSearchSupportedExtensions(operation)` rather than treating parser support as operation support.
+Outline collection supports every listed family. HTML outlines contain elements with non-empty `id` attributes; SQL outlines contain `CREATE` declarations and shallow table/type members. Import and export collection remains JavaScript/TypeScript-only, and call-site collection supports every listed family except HTML and SQL. Go module manifests and ERB templates are intentionally excluded because the Go and Ruby grammars do not parse those mixed or separate syntaxes; `supi-lsp` still handles them semantically. Consumers performing a bulk structural scan should use `getStructuralSearchSupportedExtensions(operation)` rather than treating parser support as operation support.
 
 ## Architecture
 
