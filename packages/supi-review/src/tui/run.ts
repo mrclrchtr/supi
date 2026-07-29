@@ -7,7 +7,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import { formatReviewUsage } from "../tool/usage-format.ts";
-import type { ReviewBatchDetails, ReviewTaskResult } from "../types.ts";
+import type { ReviewBatchDetails, ReviewProgress, ReviewTask, ReviewTaskResult } from "../types.ts";
 import {
   buildTaskSection,
   formatStatusLabel,
@@ -61,6 +61,79 @@ export function renderRunCall(args: unknown, theme: Theme): Text {
 
 // ── renderResult ─────────────────────────────────────────────────
 
+interface PartialReviewDetails {
+  completedCount?: number;
+  totalCount?: number;
+  targetTitle?: string;
+  workspacePath?: string;
+  reviewerModelId?: string;
+  sharedContext?: string;
+  tasks?: ReviewTask[];
+  taskId?: string;
+  progress?: ReviewProgress;
+}
+
+function formatProgress(progress: ReviewProgress): string {
+  const parts = [`${progress.turns} turns`, `${progress.toolUses} tool uses`];
+  if (progress.tokens) parts.push(`${progress.tokens.total.toLocaleString("en-US")} tokens`);
+  return parts.join(" · ");
+}
+
+function addPartialPreamble(
+  container: Container,
+  details: PartialReviewDetails,
+  theme: Theme,
+): void {
+  if (details.targetTitle) {
+    container.addChild(new Text(theme.fg("dim", `target: ${details.targetTitle}`), 1, 0));
+  }
+  container.addChild(
+    new Text(
+      theme.fg("dim", `workspace: ${details.workspacePath ?? "preparing frozen workspace…"}`),
+      1,
+      0,
+    ),
+  );
+  if (details.reviewerModelId) {
+    container.addChild(new Text(theme.fg("dim", `reviewer: ${details.reviewerModelId}`), 1, 0));
+  }
+  if (details.sharedContext) {
+    container.addChild(new Text(theme.fg("dim", `context: ${details.sharedContext}`), 1, 0));
+  }
+}
+
+function addPartialTasks(container: Container, details: PartialReviewDetails, theme: Theme): void {
+  if (!details.tasks?.length) return;
+  container.addChild(new Spacer(1));
+  container.addChild(new Text(theme.fg("accent", theme.bold("Tasks")), 1, 0));
+  for (const task of details.tasks) {
+    const active = task.id === details.taskId;
+    const label = `${task.id}${active ? " (in progress)" : ""}`;
+    container.addChild(new Text(theme.fg(active ? "accent" : "muted", label), 1, 0));
+    container.addChild(new Text(theme.fg("dim", task.instructions), 1, 0));
+    if (active && details.progress) {
+      container.addChild(new Text(theme.fg("dim", formatProgress(details.progress)), 1, 0));
+    }
+  }
+}
+
+function buildExpandedPartial(details: PartialReviewDetails, theme: Theme): Container {
+  const completed = details.completedCount ?? 0;
+  const total = details.totalCount ?? 0;
+  const label = total > 0 ? `Reviewing… (${completed} of ${total} tasks complete)` : "Reviewing…";
+  const container = new Container();
+  container.addChild(renderPartial(label, theme));
+
+  if (!details.targetTitle && !details.workspacePath && !(details.tasks?.length ?? 0)) {
+    return container;
+  }
+
+  container.addChild(new Spacer(1));
+  addPartialPreamble(container, details, theme);
+  addPartialTasks(container, details, theme);
+  return container;
+}
+
 export function renderRunResult(
   result: {
     content?: Array<{ type: string; text?: string }>;
@@ -71,7 +144,8 @@ export function renderRunResult(
   theme: Theme,
 ): Container | Text {
   if (options.isPartial) {
-    const details = result.details as { completedCount?: number; totalCount?: number } | undefined;
+    const details = result.details as PartialReviewDetails | undefined;
+    if (options.expanded) return buildExpandedPartial(details ?? {}, theme);
     const completed = details?.completedCount ?? 0;
     const total = details?.totalCount ?? 0;
     const label = total > 0 ? `Reviewing… (${completed} of ${total} tasks complete)` : "Reviewing…";

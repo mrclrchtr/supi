@@ -286,7 +286,14 @@ export async function runReview(input: RunReviewInput) {
 
   input.onUpdate?.({
     content: [{ type: "text", text: "Freezing Review Workspace…" }],
-    details: {},
+    details: {
+      completedCount: 0,
+      totalCount: review.tasks.length,
+      targetTitle: snapshot.title,
+      reviewerModelId: model.canonicalId,
+      ...(review.sharedContext ? { sharedContext: review.sharedContext } : {}),
+      tasks: review.tasks,
+    },
   });
   let workspace: Awaited<ReturnType<typeof materializeReviewWorkspace>>;
   try {

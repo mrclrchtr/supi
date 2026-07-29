@@ -82,6 +82,17 @@ export async function executeReviewTasks(
   const review = normalizeReviewInput(reviewInput);
   let completedCount = 0;
   const totalCount = review.tasks.length;
+  const presentation = {
+    targetTitle: snapshot.title,
+    workspacePath: workspaceCwd,
+    reviewerModelId: model.canonicalId,
+    ...(review.sharedContext ? { sharedContext: review.sharedContext } : {}),
+    tasks: review.tasks,
+  };
+  emitUpdate(onUpdate, {
+    content: [{ type: "text", text: "Reviewing frozen Review Workspace…" }],
+    details: { ...presentation, completedCount, totalCount },
+  });
 
   return Promise.all(
     review.tasks.map(async (task) => {
@@ -103,7 +114,7 @@ export async function executeReviewTasks(
                   text: `Task ${task.id}: ${progress.turns} turns, ${progress.toolUses} tool uses${progress.tokens ? `, ${progress.tokens.total} tokens` : ""}`,
                 },
               ],
-              details: { taskId: task.id, progress, completedCount, totalCount },
+              details: { ...presentation, taskId: task.id, progress, completedCount, totalCount },
             }),
         });
         const taskResult = toTaskResult(task.id, packet.packetHash, result);
@@ -113,7 +124,7 @@ export async function executeReviewTasks(
           content: [
             { type: "text", text: `Task ${task.id} ${verb} (${completedCount} of ${totalCount})` },
           ],
-          details: { completedCount, totalCount },
+          details: { ...presentation, completedCount, totalCount },
         });
         return taskResult;
       } catch {
@@ -130,7 +141,7 @@ export async function executeReviewTasks(
           content: [
             { type: "text", text: `Task ${task.id} failed (${completedCount} of ${totalCount})` },
           ],
-          details: { completedCount, totalCount },
+          details: { ...presentation, completedCount, totalCount },
         });
         return taskResult;
       }

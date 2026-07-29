@@ -9,7 +9,12 @@ import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
 import type { ReviewPlanStore } from "../session/review-plan-store.ts";
 import { renderPrepareCall, renderPrepareResult } from "../tui/prepare.ts";
 import { renderRunCall, renderRunResult } from "../tui/run.ts";
-import type { ReviewBatchDetails, ReviewTargetSpec, ReviewTaskResult } from "../types.ts";
+import type {
+  ReviewBatchDetails,
+  ReviewInput,
+  ReviewTargetSpec,
+  ReviewTaskResult,
+} from "../types.ts";
 import {
   type PrepareReviewToolInput,
   parsePrepareReviewToolInput,
@@ -197,17 +202,13 @@ function wireSpinnerToProgress(
   return { statusSpinner, wrappedUpdate };
 }
 
-/** Compute the initial task count for the progress indicator. */
-function initialTaskCount(
+function initialReviewInput(
   input: ReturnType<typeof parseRunReviewToolInput>,
   planStore: ReviewPlanStore,
-): number {
-  if (input.mode === "direct") return input.review?.tasks?.length ?? 1;
-  if (input.decision?.kind === "use-review") return input.decision.review?.tasks?.length ?? 0;
-  if (input.decision?.kind === "accept-draft") {
-    return planStore.peek(input.planId)?.plannerDraft?.tasks.length ?? 0;
-  }
-  return 0;
+): ReviewInput | undefined {
+  if (input.mode === "direct") return input.review;
+  if (input.decision.kind === "use-review") return input.decision.review;
+  return planStore.peek(input.planId)?.plannerDraft;
 }
 
 /** Factory for the supi_review_run execute function with animated status-bar spinner. */
@@ -221,10 +222,15 @@ function makeRunReviewExecute(
 
     const { statusSpinner, wrappedUpdate } = wireSpinnerToProgress(ctx, onUpdate);
 
-    const taskCount = initialTaskCount(input, planStore);
+    const initialReview = initialReviewInput(input, planStore);
+    const taskCount = initialReview?.tasks.length ?? 0;
     wrappedUpdate({
       content: [{ type: "text", text: "Starting review…" }],
-      details: taskCount > 0 ? { completedCount: 0, totalCount: taskCount } : {},
+      details: {
+        ...(taskCount > 0 ? { completedCount: 0, totalCount: taskCount } : {}),
+        ...(initialReview?.sharedContext ? { sharedContext: initialReview.sharedContext } : {}),
+        ...(initialReview ? { tasks: initialReview.tasks } : {}),
+      },
     });
 
     try {

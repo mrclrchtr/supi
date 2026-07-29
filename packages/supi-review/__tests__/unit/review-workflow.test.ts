@@ -69,17 +69,31 @@ describe("Review workflow", () => {
   });
 
   it("runs caller-defined Direct Review tasks independently with packet provenance", async () => {
+    const onUpdate = vi.fn();
     const outcome = await runReview({
       mode: "direct",
       cwd: "/repo",
       target: { kind: "working-tree" },
       review,
       reviewerModel: model,
+      onUpdate,
     });
 
     expect(outcome.kind).toBe("completed");
     if (outcome.kind !== "completed") return;
     expect(mocks.runReviewer).toHaveBeenCalledTimes(2);
+    expect(onUpdate).toHaveBeenCalledWith({
+      content: [{ type: "text", text: "Reviewing frozen Review Workspace…" }],
+      details: {
+        completedCount: 0,
+        totalCount: 2,
+        targetTitle: "Working tree changes",
+        workspacePath: "/review-workspace",
+        reviewerModelId: "provider/model",
+        sharedContext: "Shared",
+        tasks: review.tasks,
+      },
+    });
     expect(outcome.details.mode).toBe("direct");
     expect(outcome.details.provenance).toBe("caller-supplied");
     expect(outcome.details.snapshot).not.toHaveProperty("repositoryRoot");
