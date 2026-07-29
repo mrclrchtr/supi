@@ -3,11 +3,11 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { TestCapabilityAdapter } from "../../../src/session/capability-adapter.ts";
 import type { FindWorkflowOutcome } from "../../../src/session/find-types.ts";
 import { runFindWorkflow } from "../../../src/session/find-workflow.ts";
 import { renderFindResult } from "../../../src/tool/find/render.ts";
 import { assembleFindWorkflowResult } from "../../../src/tool/result/find.ts";
+import { TestCapabilityAdapter } from "../../helpers/test-capability-adapter.ts";
 
 let tmpDir: string;
 

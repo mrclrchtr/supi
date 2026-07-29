@@ -7,7 +7,6 @@ import {
   type StructuralProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { TestCapabilityAdapter } from "../../../src/session/capability-adapter.ts";
 import {
   getWorkflowTarget,
   registerWorkflowTarget,
@@ -17,6 +16,7 @@ import {
   resolveTargetWorkflow,
   type TargetWorkflowDeps,
 } from "../../../src/session/target-workflow.ts";
+import { TestCapabilityAdapter } from "../../helpers/test-capability-adapter.ts";
 
 let cwd: string;
 let file: string;

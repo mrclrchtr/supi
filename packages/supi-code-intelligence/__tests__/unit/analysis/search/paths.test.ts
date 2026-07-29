@@ -6,7 +6,6 @@ import {
   normalizePath,
   resolveScope,
   resolveScopeSet,
-  uriToFile,
 } from "../../../../src/analysis/search/paths.ts";
 
 let tmpDir: string;
@@ -22,7 +21,6 @@ afterEach(() => {
 describe("search scope paths", () => {
   it("normalizes PI @ paths and file URIs", () => {
     expect(normalizePath("@packages/core", "/project")).toBe("/project/packages/core");
-    expect(uriToFile("file:///project/my%20file.ts")).toBe("/project/my file.ts");
   });
 
   it("resolves omitted, directory, and file scopes", () => {

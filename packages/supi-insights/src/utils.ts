@@ -26,14 +26,6 @@ export function getLanguageFromPath(filePath: string): string | null {
   return EXTENSION_TO_LANGUAGE[ext] ?? null;
 }
 
-export function countCharInString(str: string, char: string): number {
-  let count = 0;
-  for (const c of str) {
-    if (c === char) count++;
-  }
-  return count;
-}
-
 export function escapeXmlAttr(text: string): string {
   return text
     .replace(/&/g, "&amp;")

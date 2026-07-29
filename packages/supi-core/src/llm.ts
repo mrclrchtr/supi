@@ -25,16 +25,6 @@ export interface WithRetryOptions {
 }
 
 /**
- * Attempt an async operation with retries and exponential backoff.
- *
- * If the signal is already aborted on entry, the operation is skipped entirely.
- * If the signal aborts during a delay, the delay is cancelled immediately.
- *
- * @param fn - The async operation to retry.
- * @param options - Optional configuration for retries, backoff, signal, and callbacks.
- * @returns The result on success, or `null` if all attempts fail or the signal aborts.
- */
-/**
  * Create a promise that resolves after `ms` milliseconds, or rejects if
  * the signal fires before the timeout elapses.
  */

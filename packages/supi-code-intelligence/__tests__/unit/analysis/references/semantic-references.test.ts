@@ -1,12 +1,12 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import type { CodeLocation, CodePosition } from "@mrclrchtr/supi-code-runtime/api";
 import {
   completedCodeQuery,
   type SemanticProvider as SemanticSubstrate,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
-import type { CodeLocation, CodePosition } from "@mrclrchtr/supi-core/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ResolvedTargetData } from "../../../../src/analysis/target/types.ts";
 

@@ -12,7 +12,7 @@ import { migrateSessionEntries, parseSessionEntries } from "@earendil-works/pi-c
 import { getActiveBranchEntries } from "@mrclrchtr/supi-core/session";
 import { diffLines } from "diff";
 import type { SessionMeta } from "./types.ts";
-import { countCharInString, getLanguageFromPath } from "./utils.ts";
+import { getLanguageFromPath } from "./utils.ts";
 
 // Local type shims for pi-coding-agent message types not re-exported from index
 interface BashExecutionMessage {
@@ -198,7 +198,7 @@ function extractToolStats(entries: SessionEntry[]) {
               }
 
               if (toolName === "write" && typeof input.content === "string") {
-                linesAdded += countCharInString(input.content, "\n") + 1;
+                linesAdded += input.content.split("\n").length;
               }
 
               const command = (input.command as string) || "";

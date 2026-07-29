@@ -3,13 +3,13 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { completedCodeQuery, type SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { TestCapabilityAdapter } from "../../../src/session/capability-adapter.ts";
 import {
   getWorkflowTarget,
   registerWorkflowTarget,
   type TargetStoreEntry,
 } from "../../../src/session/target-store.ts";
 import { resolveTargetWorkflow } from "../../../src/session/target-workflow.ts";
+import { TestCapabilityAdapter } from "../../helpers/test-capability-adapter.ts";
 
 let cwd: string;
 let store: Map<string, TargetStoreEntry>;

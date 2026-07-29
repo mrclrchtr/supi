@@ -1,9 +1,6 @@
 import { existsSync } from "node:fs";
 import * as path from "node:path";
-import { resolveToolPath, uriToFile as uriToFileShared } from "@mrclrchtr/supi-core/path";
-
-/** Convert a file URI to the shared SuPi filesystem representation. */
-export const uriToFile = uriToFileShared;
+import { resolveToolPath } from "@mrclrchtr/supi-core/path";
 
 /** Check whether a path is within the project rather than a dependency store. */
 export function isInProjectPath(filePath: string, cwd: string): boolean {

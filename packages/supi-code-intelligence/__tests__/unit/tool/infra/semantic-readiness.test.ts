@@ -10,7 +10,6 @@ import {
 } from "@mrclrchtr/supi-lsp/api";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ensureSemanticReadiness } from "../../../../src/analysis/readiness.ts";
-import { renderSemanticReadinessTimeout } from "../../../../src/tool/infra/readiness-message.ts";
 
 describe("ensureSemanticReadiness", () => {
   afterEach(() => {
@@ -101,19 +100,6 @@ describe("ensureSemanticReadiness", () => {
 
     const result = await ensureSemanticReadiness("/test", { kind: "workspace" }, 100);
     expect(result.kind).toBe("unavailable");
-  });
-});
-
-describe("renderSemanticReadinessTimeout", () => {
-  it("includes the tool name and rounded seconds", () => {
-    const msg = renderSemanticReadinessTimeout("code_graph", 15_000);
-    expect(msg).toContain("code_graph");
-    expect(msg).toContain("15s");
-  });
-
-  it("rounds up sub-second timeouts to 1s", () => {
-    const msg = renderSemanticReadinessTimeout("code_find", 500);
-    expect(msg).toContain("1s");
   });
 });
 

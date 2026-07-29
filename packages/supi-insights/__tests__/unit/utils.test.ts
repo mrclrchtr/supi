@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  countCharInString,
   escapeHtmlWithBold,
   escapeXmlAttr,
   generateBarChartHtml,
@@ -31,21 +30,6 @@ describe("getLanguageFromPath", () => {
   });
   it("handles paths with directory components", () => {
     expect(getLanguageFromPath("/a/b/c/main.py")).toBe("Python");
-  });
-});
-
-describe("countCharInString", () => {
-  it("counts newlines", () => {
-    expect(countCharInString("a\nb\nc", "\n")).toBe(2);
-  });
-  it("returns 0 for no matches", () => {
-    expect(countCharInString("abc", "\n")).toBe(0);
-  });
-  it("handles empty string", () => {
-    expect(countCharInString("", "\n")).toBe(0);
-  });
-  it("counts any character", () => {
-    expect(countCharInString("aaaa", "a")).toBe(4);
   });
 });
 

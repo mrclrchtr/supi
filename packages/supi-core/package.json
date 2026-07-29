@@ -54,7 +54,6 @@
   },
   "main": "src/api.ts",
   "exports": {
-    "./abort-utils": "./src/abort-utils.ts",
     "./api": "./src/api.ts",
     "./config": "./src/config.ts",
     "./context": "./src/context.ts",
@@ -75,7 +74,6 @@
     "./status-spinner": "./src/status-spinner.ts",
     "./terminal": "./src/terminal.ts",
     "./tool-framework": "./src/tool-framework.ts",
-    "./prompt-surface": "./src/prompt-surface.ts",
-    "./types": "./src/types.ts"
+    "./prompt-surface": "./src/prompt-surface.ts"
   }
 }

@@ -6,6 +6,7 @@ import type {
   ConfidenceMode,
   SemanticProvider as SemanticSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
+import { uriToFile } from "@mrclrchtr/supi-core/path";
 import {
   createEvidenceList,
   type EvidenceList,
@@ -13,7 +14,7 @@ import {
   renderEvidenceListDisclosure,
 } from "../evidence.ts";
 import { dedupeFileLineRefs, highestConfidence } from "../helpers.ts";
-import { isInProjectPath, uriToFile } from "../search/paths.ts";
+import { isInProjectPath } from "../search/paths.ts";
 import type { ResolvedTargetData } from "../target/types.ts";
 import { filterOutDeclaration } from "./locations.ts";
 

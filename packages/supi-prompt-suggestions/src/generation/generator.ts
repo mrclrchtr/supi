@@ -10,7 +10,6 @@
  */
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { combineAbortSignals } from "@mrclrchtr/supi-core/abort-utils";
 import { loadSectionConfig } from "@mrclrchtr/supi-core/config";
 import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import { CONFIG_SECTION, DEFAULTS } from "../config/config.ts";
@@ -176,10 +175,10 @@ export class SuggestionGenerator {
     opts: RunOptions,
     auth: ResolvedAuth,
   ): Promise<SuggestionClientOutput | null> {
-    const { signal: combinedSignal, cleanup: cleanupTimeout } = combineAbortSignals(
-      opts.abort,
-      GENERATION_TIMEOUT_MS,
-    );
+    const combinedSignal = AbortSignal.any([
+      opts.abort.signal,
+      AbortSignal.timeout(GENERATION_TIMEOUT_MS),
+    ]);
 
     try {
       return await callSuggestionModel({
@@ -201,8 +200,6 @@ export class SuggestionGenerator {
         return null;
       }
       throw err;
-    } finally {
-      cleanupTimeout();
     }
   }
 

@@ -8,7 +8,6 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { WorkspaceCodeIntelligenceSession } from "../session/session.ts";
-import { WorkspaceManager } from "./manager.ts";
 
 /**
  * The code-intelligence app object.
@@ -34,6 +33,19 @@ export interface CodeIntelligenceApp {
   shutdown(): void;
 }
 
+/** Get or create a session in a Map-based cache. */
+export function getOrCreateSession(
+  sessions: Map<string, WorkspaceCodeIntelligenceSession>,
+  cwd: string,
+): WorkspaceCodeIntelligenceSession {
+  let session = sessions.get(cwd);
+  if (!session) {
+    session = new WorkspaceCodeIntelligenceSession(cwd);
+    sessions.set(cwd, session);
+  }
+  return session;
+}
+
 /**
  * Create a simple session cache for tests and ad-hoc usage.
  *
@@ -48,17 +60,8 @@ export function createSessionCache(): {
 } {
   const sessions = new Map<string, WorkspaceCodeIntelligenceSession>();
   return {
-    getOrCreate(cwd: string): WorkspaceCodeIntelligenceSession {
-      let session = sessions.get(cwd);
-      if (!session) {
-        session = new WorkspaceCodeIntelligenceSession(cwd);
-        sessions.set(cwd, session);
-      }
-      return session;
-    },
-    clear(): void {
-      sessions.clear();
-    },
+    getOrCreate: (cwd) => getOrCreateSession(sessions, cwd),
+    clear: () => sessions.clear(),
   };
 }
 
@@ -71,30 +74,29 @@ export function createSessionCache(): {
  * - `session_shutdown` — releases all sessions and clears per-session stores
  */
 export function createCodeIntelligenceApp(pi: ExtensionAPI): CodeIntelligenceApp {
-  const manager = new WorkspaceManager();
+  const sessions = new Map<string, WorkspaceCodeIntelligenceSession>();
   const OVERVIEW_CUSTOM_TYPE = "code-intelligence-overview";
 
   pi.on("session_start", (_event, ctx) => {
-    const session = manager.getOrCreateSession(ctx.cwd);
+    const session = getOrCreateSession(sessions, ctx.cwd);
     restoreBranchOverviewState(session, ctx.sessionManager.getBranch());
   });
 
   pi.on("session_tree", (_event, ctx) => {
-    const session = manager.getSession(ctx.cwd);
+    const session = sessions.get(ctx.cwd);
     if (!session) return;
     restoreBranchOverviewState(session, ctx.sessionManager.getBranch());
   });
 
   pi.on("session_compact", (_event, ctx) => {
-    manager.getSession(ctx.cwd)?.resetSurfacedInstructionDirs();
+    sessions.get(ctx.cwd)?.resetSurfacedInstructionDirs();
   });
 
   pi.on("session_shutdown", () => {
-    // Clear per-session stores before releasing sessions
-    for (const session of manager.allSessions()) {
+    for (const session of sessions.values()) {
       session.clearStores();
     }
-    manager.shutdown();
+    sessions.clear();
   });
 
   /**
@@ -119,27 +121,17 @@ export function createCodeIntelligenceApp(pi: ExtensionAPI): CodeIntelligenceApp
   }
 
   return {
-    getSession(cwd: string): WorkspaceCodeIntelligenceSession | undefined {
-      return manager.getSession(cwd);
-    },
-
-    createSession(cwd: string): WorkspaceCodeIntelligenceSession {
-      return manager.getOrCreateSession(cwd);
-    },
-
+    getSession: (cwd) => sessions.get(cwd),
+    createSession: (cwd) => getOrCreateSession(sessions, cwd),
     releaseSession(cwd: string): void {
-      const session = manager.getSession(cwd);
-      if (session) {
-        session.clearStores();
-      }
-      manager.releaseSession(cwd);
+      sessions.get(cwd)?.clearStores();
+      sessions.delete(cwd);
     },
-
     shutdown(): void {
-      for (const session of manager.allSessions()) {
+      for (const session of sessions.values()) {
         session.clearStores();
       }
-      manager.shutdown();
+      sessions.clear();
     },
   };
 }
