@@ -1,5 +1,48 @@
 # Changelog
 
+## [4.0.0](https://github.com/mrclrchtr/supi/compare/v3.2.0...v4.0.0) (2026-07-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **supi-code-intelligence:** The code_* family is now eight tools with nested exact-one target selectors and closed one-key schemas. code_impact is removed. code_graph exposes only references, structural callees, and implementations. Flat targetId/file/line/character/symbol fields are retired without aliases.
+
+### Features
+
+* **supi-code-intelligence:** deepen session and LSP runtime, remove code_impact ([eaebb8a](https://github.com/mrclrchtr/supi/commit/eaebb8a6be2563190e150a33bfaa1d1d8f827f67))
+* **supi-code-intelligence:** narrow code_find to code-aware search ([a895c47](https://github.com/mrclrchtr/supi/commit/a895c476ea0e11f8e0ded5290f4ea4bf658b59fa)), closes [#203](https://github.com/mrclrchtr/supi/issues/203)
+* **supi-code-intelligence:** remove ambient diagnostics and built-in tool overrides ([1eacb06](https://github.com/mrclrchtr/supi/commit/1eacb06ab9d2d6de42aae7c84473860772ed0864)), closes [#207](https://github.com/mrclrchtr/supi/issues/207)
+* **supi-code-intelligence:** restrict health to live observations ([3efddab](https://github.com/mrclrchtr/supi/commit/3efddab3e8fdb20ebba219b998e7c2b94c486309)), closes [#199](https://github.com/mrclrchtr/supi/issues/199)
+* **supi-code-intelligence:** show diagnostic messages in detailed code_health ([8cefacf](https://github.com/mrclrchtr/supi/commit/8cefacfd706c3b78006d2d23d8bf7ad2441ad9b0))
+
+
+### Bug Fixes
+
+* harden trust, paths, timers, coordinates, and refactor application ([8cb3088](https://github.com/mrclrchtr/supi/commit/8cb3088b5462d777a7c11a0f08a097d79bb8f358))
+* harden trust, paths, timers, coordinates, and refactor application ([28027d2](https://github.com/mrclrchtr/supi/commit/28027d2338a45001c25960d7a069e7ef94a9641d))
+* **supi-code-intelligence:** assemble requested health evidence ([5af08f0](https://github.com/mrclrchtr/supi/commit/5af08f0ff848ba14dbfbc5fa80d8fdc5713bba1e)), closes [#187](https://github.com/mrclrchtr/supi/issues/187)
+* **supi-code-intelligence:** avoid duplicate resolve error prefixes ([fe69382](https://github.com/mrclrchtr/supi/commit/fe6938205bcc170a0c3c7f3022e402ade3c5df72))
+* **supi-code-intelligence:** correct live tool edge cases ([5cf94f3](https://github.com/mrclrchtr/supi/commit/5cf94f36b703946b07a00576782d24fdb710587c))
+* **supi-code-intelligence:** correct refactor tool reporting ([62b89b6](https://github.com/mrclrchtr/supi/commit/62b89b6a93646610a2fce4742ba4485aac3244ac))
+* **supi-code-intelligence:** correct target and health evidence ([6a049dc](https://github.com/mrclrchtr/supi/commit/6a049dc19872bafae171adb9d3aaf9957b60635d))
+* **supi-code-intelligence:** harden code evidence contracts ([72e398d](https://github.com/mrclrchtr/supi/commit/72e398d4c35edb9827c6359a0293baabca374569))
+* **supi-code-intelligence:** import token budget utils, handle refactor-apply recovery ([df806f3](https://github.com/mrclrchtr/supi/commit/df806f3d472381b039907fe546830c7182981088))
+* **supi-code-intelligence:** make AST scans operation-aware ([e7edaa7](https://github.com/mrclrchtr/supi/commit/e7edaa777f65498841853b5b0814ae0166901065))
+* **supi-code-intelligence:** make point inspection truthful ([4a35a93](https://github.com/mrclrchtr/supi/commit/4a35a9395ecb5a0617659a585670260438f7046b)), closes [#209](https://github.com/mrclrchtr/supi/issues/209)
+* **supi-code-intelligence:** merge type-alias target evidence ([2dac5de](https://github.com/mrclrchtr/supi/commit/2dac5de3afe569d06849171c1a65fa8a7f63b27b)), closes [#201](https://github.com/mrclrchtr/supi/issues/201)
+* **supi-code-intelligence:** normalize graph provider locations ([162b347](https://github.com/mrclrchtr/supi/commit/162b3476cc1f9a91ca77e8d4605b7ed97f24246e)), closes [#211](https://github.com/mrclrchtr/supi/issues/211)
+* **supi-code-intelligence:** preserve code_find query semantics ([f75c089](https://github.com/mrclrchtr/supi/commit/f75c0898832e0286802aad1c5549d2b74e888b3d))
+* **supi-code-intelligence:** prioritize top-level declarations ([3bb0532](https://github.com/mrclrchtr/supi/commit/3bb0532f6e5a0dc1a83f0a30904eeed023343a27)), closes [#235](https://github.com/mrclrchtr/supi/issues/235)
+* **supi-code-intelligence:** refine target display kind ([b331406](https://github.com/mrclrchtr/supi/commit/b33140609c89766c8525a5e7e7045f7ff7a317e9))
+* **supi-code-intelligence:** remove dead capability warning state, simplify language detection ([c68425f](https://github.com/mrclrchtr/supi/commit/c68425f069e33065940030fba0f599fac85dc0e3))
+* **supi-code-intelligence:** remove unsupported AST test kind ([6de41f8](https://github.com/mrclrchtr/supi/commit/6de41f889ce03b04ea8983337553e2e9ad4433a1)), closes [#202](https://github.com/mrclrchtr/supi/issues/202)
+* **supi-code-intelligence:** report health evidence truthfully ([f8de7d7](https://github.com/mrclrchtr/supi/commit/f8de7d7c8b06e88107358ce2f063d3e682fba504))
+* **supi-code-intelligence:** restrict orientation to observed facts ([ce03087](https://github.com/mrclrchtr/supi/commit/ce030876f2f66d2a4c8051fe28e131181d5bbeb3))
+* **supi-code-intelligence:** search nested outline declarations ([91a754c](https://github.com/mrclrchtr/supi/commit/91a754c8de241bada148be61f019dd6b955f0f6a))
+* **supi-code-intelligence:** sync discovery metadata ([8e4ac62](https://github.com/mrclrchtr/supi/commit/8e4ac62ba8a725174d39c339286a989725c00739))
+* **supi-code-intelligence:** unify tool evidence summaries ([4fae196](https://github.com/mrclrchtr/supi/commit/4fae1964c2d08ead3d806749ed8cb50318de1fbc)), closes [#188](https://github.com/mrclrchtr/supi/issues/188)
+* **supi-extras:** add @ path guidance ([dd8127d](https://github.com/mrclrchtr/supi/commit/dd8127d1b272533aab5f04a7c56a016f992d4f32))
+
 ## [3.2.0](https://github.com/mrclrchtr/supi/compare/v3.1.0...v3.2.0) (2026-07-28)
 
 
