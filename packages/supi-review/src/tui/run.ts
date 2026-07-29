@@ -25,7 +25,11 @@ function formatTaskCollapsed(result: ReviewTaskResult, theme: Theme): string {
     const findingCount = result.findings.length;
     const findingLabel =
       findingCount > 0 ? ` (${findingCount} finding${findingCount !== 1 ? "s" : ""})` : "";
-    return `${result.taskId}: ${formatVerdictBadge(result.verdict, theme)}${theme.fg("dim", findingLabel)}`;
+    const metadata = [
+      `model: ${result.modelId}`,
+      ...(result.usage ? [formatReviewUsage(result.usage)] : []),
+    ].join(" · ");
+    return `${result.taskId}: ${formatVerdictBadge(result.verdict, theme)}${theme.fg("dim", `${findingLabel} · ${metadata}`)}`;
   }
   // Non-completed task — show status
   const label = formatStatusLabel(
@@ -33,7 +37,11 @@ function formatTaskCollapsed(result: ReviewTaskResult, theme: Theme): string {
     result.status === "failed" ? result.failureCode : undefined,
     result.status === "timeout" ? result.timeoutMs : undefined,
   );
-  return `${result.taskId}: ${theme.fg("warning", label)}`;
+  const metadata = [
+    `model: ${result.modelId}`,
+    ...(result.usage ? [formatReviewUsage(result.usage)] : []),
+  ].join(" · ");
+  return `${result.taskId}: ${theme.fg("warning", label)}${theme.fg("dim", ` · ${metadata}`)}`;
 }
 
 // ── renderCall ───────────────────────────────────────────────────
@@ -86,16 +94,24 @@ export function renderRunResult(
 // ── Collapsed ────────────────────────────────────────────────────
 
 function buildCollapsed(details: ReviewBatchDetails, theme: Theme): Container {
-  const taskLines = details.results.map((r) => formatTaskCollapsed(r, theme));
-  const fileCount = details.snapshot.changes.length;
-
   const container = new Container();
-  // Per-task verdicts
-  container.addChild(new Text(taskLines.join(` ${theme.fg("dim", "·")} `), 0, 0));
-  // Target summary
+  for (const result of details.results) {
+    container.addChild(new Text(formatTaskCollapsed(result, theme), 0, 0));
+    if (result.status === "completed") {
+      container.addChild(new Text(theme.fg("muted", result.summary), 0, 0));
+    }
+    for (const warning of result.capabilityWarnings ?? []) {
+      container.addChild(new Text(theme.fg("warning", `capability: ${warning.message}`), 0, 0));
+    }
+  }
+
+  const { additions, deletions, files } = details.snapshot.stats;
   container.addChild(
     new Text(
-      theme.fg("dim", `${details.snapshot.title} (${fileCount} file${fileCount !== 1 ? "s" : ""})`),
+      theme.fg(
+        "dim",
+        `${details.snapshot.title} (${files} file${files !== 1 ? "s" : ""} · +${additions.toLocaleString("en-US")} / -${deletions.toLocaleString("en-US")})`,
+      ),
       0,
       0,
     ),
