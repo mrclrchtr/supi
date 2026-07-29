@@ -35,7 +35,7 @@ describe("enumerateAstFiles", () => {
     writeFileSync(path.join(tmpDir, ".gitignore"), "src/generated.ts\n");
     write("src/readme.md", "target\n");
     const python = write("src/python.py", "target()\n");
-    write("src/query.sql", "select 1;\n");
+    const sql = write("src/query.sql", "select 1;\n");
     write(".hidden.ts");
     write("node_modules/pkg/index.js");
     write("dist/generated.ts");
@@ -51,18 +51,20 @@ describe("enumerateAstFiles", () => {
     expect(result.kind).toBe("completed");
     if (result.kind !== "completed") return;
     expect(result.files).toEqual(
-      [realpathSync(gitIgnoredSource), realpathSync(python), realpathSync(source)].sort((a, b) =>
-        a.localeCompare(b),
-      ),
+      [
+        realpathSync(gitIgnoredSource),
+        realpathSync(python),
+        realpathSync(source),
+        realpathSync(sql),
+      ].sort((a, b) => a.localeCompare(b)),
     );
-    expect(result.eligibleFileCount).toBe(3);
+    expect(result.eligibleFileCount).toBe(4);
     expect(result.complete).toBe(true);
     expect(result.exclusions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ reason: "hidden-entry" }),
         expect.objectContaining({ reason: "excluded-directory" }),
         expect.objectContaining({ reason: "unsupported-extension" }),
-        expect.objectContaining({ reason: "unsupported-operation" }),
       ]),
     );
   });
@@ -125,14 +127,14 @@ describe("enumerateAstFiles", () => {
       enumerateAstFiles({
         cwd: tmpDir,
         roots: [sql],
-        operation: "outline",
+        operation: "imports",
         deadline: Number.POSITIVE_INFINITY,
         maxFiles: 5_000,
       }),
     ).resolves.toEqual({
       kind: "invalid-root",
       path: "src/source.sql",
-      reason: "Explicit AST file scope does not support the outline operation.",
+      reason: "Explicit AST file scope does not support the imports operation.",
     });
   });
 

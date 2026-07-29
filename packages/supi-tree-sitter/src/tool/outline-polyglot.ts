@@ -2,6 +2,7 @@ import { nodeToRange } from "../coordinates.ts";
 import type { SyntaxNodeLike } from "../syntax-node.ts";
 import type { OutlineItem } from "../types.ts";
 import { extractCFamilyOutlineItems } from "./outline-c-family.ts";
+import { extractHtmlSqlOutlineItems } from "./outline-html-sql.ts";
 import { extractJvmOutlineItems } from "./outline-jvm.ts";
 import { extractScriptingOutlineItems } from "./outline-scripting.ts";
 
@@ -12,6 +13,9 @@ export function extractPolyglotOutlineItems(
 ): OutlineItem[] | undefined {
   const scriptingItems = extractScriptingOutlineItems(node, source);
   if (scriptingItems) return scriptingItems;
+
+  const htmlSqlItems = extractHtmlSqlOutlineItems(node, source);
+  if (htmlSqlItems) return htmlSqlItems;
 
   switch (node.type) {
     case "function_definition": {

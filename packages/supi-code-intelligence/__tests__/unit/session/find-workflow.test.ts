@@ -25,17 +25,15 @@ function deps(structural?: StructuralProvider) {
 
 function structuralProvider(): StructuralProvider {
   return {
-    outline: async () => ({
+    imports: async () => ({
       kind: "success",
       data: [
         {
-          name: "target",
-          kind: "variable",
+          moduleSpecifier: "target",
           startLine: 1,
           startCharacter: 1,
           endLine: 1,
           endCharacter: 2,
-          children: [],
         },
       ],
     }),
@@ -49,7 +47,7 @@ describe("runFindWorkflow", () => {
     writeFileSync(path.join(tmpDir, "gamma.sql"), "select alpha;\n");
 
     const outcome = await runFindWorkflow(
-      { query: "a", mode: "ast", kind: "definition", maxResults: 1 },
+      { query: "a", mode: "ast", kind: "import", maxResults: 1 },
       deps(structuralProvider()),
     );
 

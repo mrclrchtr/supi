@@ -29,8 +29,10 @@ export const CONTRACT_FIXTURE = {
   bash: "bash/task.sh",
   rRoot: "r",
   r: "r/model.r",
+  htmlRoot: "html",
+  html: "html/index.html",
   sqlRoot: "sql",
-  sql: "sql/query.sql",
+  sql: "sql/schema.sql",
   unsupported: "README.md",
 } as const;
 
@@ -110,6 +112,7 @@ function writeContractFixture(cwd: string): void {
   mkdirSync(join(cwd, CONTRACT_FIXTURE.rubyRoot), { recursive: true });
   mkdirSync(join(cwd, CONTRACT_FIXTURE.bashRoot), { recursive: true });
   mkdirSync(join(cwd, CONTRACT_FIXTURE.rRoot), { recursive: true });
+  mkdirSync(join(cwd, CONTRACT_FIXTURE.htmlRoot), { recursive: true });
   mkdirSync(join(cwd, CONTRACT_FIXTURE.sqlRoot), { recursive: true });
   writeFileSync(join(cwd, ".pi", "supi", "config.json"), configuredLspJson());
   writeFileSync(join(cwd, "tsconfig.json"), tsconfigJson());
@@ -125,7 +128,11 @@ function writeContractFixture(cwd: string): void {
   writeFileSync(join(cwd, CONTRACT_FIXTURE.ruby), "class RubyModel\n  def run; end\nend\n");
   writeFileSync(join(cwd, CONTRACT_FIXTURE.bash), "shell_task() { echo hi; }\n");
   writeFileSync(join(cwd, CONTRACT_FIXTURE.r), "r_task <- function() 1\n");
-  writeFileSync(join(cwd, CONTRACT_FIXTURE.sql), "select 1;\n");
+  writeFileSync(join(cwd, CONTRACT_FIXTURE.html), '<main id="contract-root"></main>\n');
+  writeFileSync(
+    join(cwd, CONTRACT_FIXTURE.sql),
+    "CREATE TABLE contract_records (id bigint);\nCREATE TYPE contract_state AS ENUM ('ready');\n",
+  );
   writeFileSync(join(cwd, CONTRACT_FIXTURE.unsupported), "# unsupported AST fixture\n");
 }
 

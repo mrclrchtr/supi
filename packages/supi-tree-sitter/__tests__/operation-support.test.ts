@@ -25,12 +25,16 @@ const OUTLINE_EXTENSIONS = [
   ".sh",
   ".bash",
   ".zsh",
+  ".html",
+  ".htm",
+  ".xhtml",
   ".r",
+  ".sql",
 ];
 const CALL_UNSUPPORTED_EXTENSIONS = new Set([".html", ".htm", ".xhtml", ".sql"]);
 
 describe("structural search operation support", () => {
-  it("declares the supported polyglot outline extensions", () => {
+  it("declares every parser extension eligible for outlines", () => {
     expect(getStructuralSearchSupportedExtensions("outline")).toEqual(OUTLINE_EXTENSIONS);
   });
 

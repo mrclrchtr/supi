@@ -28,6 +28,12 @@ function outlineProvider(
   return { outline: resultForFile } as StructuralProvider;
 }
 
+function importsProvider(
+  resultForFile: (file: string) => ReturnType<StructuralProvider["imports"]>,
+): StructuralProvider {
+  return { imports: resultForFile } as StructuralProvider;
+}
+
 describe("structured pattern AST Scan", () => {
   it("reports exact totals without an rg executable after a complete scan", async () => {
     vi.stubEnv("PATH", "");
@@ -158,13 +164,13 @@ describe("structured pattern AST Scan", () => {
     source("src/a.ts");
     source("src/b.sql");
     const analyzedFiles: string[] = [];
-    const provider = outlineProvider(async (file) => {
+    const provider = importsProvider(async (file) => {
       analyzedFiles.push(file);
       return { kind: "success", data: [] };
     });
 
     const outcome = await getStructuredPatternMatches({
-      params: { pattern: "missing", kind: "definition" },
+      params: { pattern: "missing", kind: "import" },
       roots: [path.join(tmpDir, "src")],
       cwd: tmpDir,
       structural: provider,
@@ -188,20 +194,20 @@ describe("structured pattern AST Scan", () => {
 
   it("returns unavailable when a directory contains only operation-ineligible files", async () => {
     source("sql/query.sql");
-    const outline = vi.fn(async () => ({ kind: "success" as const, data: [] }));
+    const imports = vi.fn(async () => ({ kind: "success" as const, data: [] }));
 
     const outcome = await getStructuredPatternMatches({
-      params: { pattern: "missing", kind: "definition" },
+      params: { pattern: "missing", kind: "import" },
       roots: [path.join(tmpDir, "sql")],
       cwd: tmpDir,
-      structural: { outline } as unknown as StructuralProvider,
+      structural: { imports } as unknown as StructuralProvider,
     });
 
     expect(outcome).toEqual({
       kind: "unavailable",
-      reason: "No file in the requested scope supports AST definition search.",
+      reason: "No file in the requested scope supports AST import search.",
     });
-    expect(outline).not.toHaveBeenCalled();
+    expect(imports).not.toHaveBeenCalled();
   });
 
   it("rejects a provider capability mismatch instead of falling back", async () => {

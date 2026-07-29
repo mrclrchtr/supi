@@ -57,6 +57,30 @@ const TRANCHE_THREE_AST_EXPECTATIONS = [
   },
 ] as const;
 
+const TRANCHE_FOUR_AST_EXPECTATIONS = [
+  {
+    file: CONTRACT_FIXTURE.html,
+    kind: "definition",
+    query: "contract-root",
+    resultKind: "element",
+    line: 1,
+  },
+  {
+    file: CONTRACT_FIXTURE.sql,
+    kind: "definition",
+    query: "contract_records",
+    resultKind: "table",
+    line: 1,
+  },
+  {
+    file: CONTRACT_FIXTURE.sql,
+    kind: "enum",
+    query: "contract_state",
+    resultKind: "enum",
+    line: 2,
+  },
+] as const;
+
 type FindOutcome = Awaited<ReturnType<WorkspaceCodeIntelligenceSession["find"]>>;
 type ResolveOutcome = Awaited<ReturnType<WorkspaceCodeIntelligenceSession["resolve"]>>;
 
@@ -142,7 +166,7 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
     },
   );
 
-  it.each(TRANCHE_THREE_AST_EXPECTATIONS)(
+  it.each([...TRANCHE_THREE_AST_EXPECTATIONS, ...TRANCHE_FOUR_AST_EXPECTATIONS])(
     "finds $resultKind $kind evidence in $file",
     async ({ file, kind, query, resultKind, line }) => {
       const result = astResult(
@@ -229,35 +253,32 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
       await session.find({ query: "AbsentContractClass", mode: "ast", kind: "definition" }),
     );
     expect(mixedWorkspace.partialReason).toBeNull();
-    expect(mixedWorkspace.scan).toMatchObject({
-      complete: true,
-      exclusions: expect.arrayContaining([
-        expect.objectContaining({ reason: "unsupported-operation", pathCount: 1 }),
-      ]),
-      limitations: [],
-    });
+    expect(mixedWorkspace.scan).toMatchObject({ complete: true, limitations: [] });
+    expect(mixedWorkspace.scan.exclusions).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ reason: "unsupported-operation" })]),
+    );
 
     const operationIneligible = await session.find({
-      query: "query",
+      query: "accounting",
       mode: "ast",
-      kind: "definition",
+      kind: "import",
       scope: [CONTRACT_FIXTURE.sql],
     });
     expect(operationIneligible).toMatchObject({
       kind: "invalid-input",
-      message: expect.stringContaining("does not support the outline operation"),
+      message: expect.stringContaining("does not support the imports operation"),
     });
 
     await expect(
       session.find({
-        query: "query",
+        query: "accounting",
         mode: "ast",
-        kind: "definition",
+        kind: "import",
         scope: [CONTRACT_FIXTURE.sqlRoot],
       }),
     ).resolves.toEqual({
       kind: "unavailable",
-      reason: "No file in the requested scope supports AST definition search.",
+      reason: "No file in the requested scope supports AST import search.",
     });
 
     const unsupported = await session.find({

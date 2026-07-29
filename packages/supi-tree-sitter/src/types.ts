@@ -79,7 +79,10 @@ export interface TreeSitterService {
   canParse(file: string): Promise<TreeSitterResult<{ file: string; language: string }>>;
   /** Run a Tree-sitter query and return all captures. */
   query(file: string, queryString: string): Promise<TreeSitterResult<QueryCapture[]>>;
-  /** Extract top-level declarations plus supported class/interface/enum members. */
+  /**
+   * Extract shallow declarations, including supported nested code members,
+   * HTML ids, and SQL schema members.
+   */
   outline(file: string): Promise<TreeSitterResult<OutlineItem[]>>;
   /** Extract static ES import declarations. */
   imports(file: string): Promise<TreeSitterResult<ImportRecord[]>>;

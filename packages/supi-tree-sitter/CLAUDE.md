@@ -54,6 +54,7 @@ src/
     outline-c-family.ts # C and C++ outline extraction
     outline-jvm.ts    # Java and Kotlin outline extraction
     outline-scripting.ts # Ruby, Bash/shell, and R outline extraction
+    outline-html-sql.ts # HTML id and SQL schema outline extraction
     structure.ts      # re-exports from tool sub-modules
   provider/
     tree-sitter-provider.ts # StructuralProvider impl consumed by supi-code-intelligence
@@ -91,7 +92,7 @@ pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json
 - `declare module "foo"` parses as a string-named `module` node; keep outline shallow and preserve the module name.
 - CRLF input needs normalized line splitting in coordinate helpers and `node_at` bounds to stay LSP-compatible.
 - Outline should stay shallow: top-level declarations plus supported class/interface/enum members, not local function bodies.
-- General parser support is broader than extractor support. `outline` supports JavaScript, TypeScript, Python, Rust, Go, C, C++, Java, Kotlin, Ruby, Bash/shell, and R; `imports` and `exports` remain JavaScript/TypeScript-only. `call-sites` supports only grammars with a registered, contract-tested query (currently every parser grammar except HTML and SQL). `getStructuralSearchSupportedExtensions()` is the authoritative public declaration used by AST Scan eligibility. The runtime also exposes a `query()` method on `TreeSitterSession` that works across all parser grammars.
+- `outline` supports every parser grammar. HTML outline evidence is limited to elements with non-empty `id` attributes; SQL outline evidence is limited to supported `CREATE` declarations plus shallow table/type members. `imports` and `exports` remain JavaScript/TypeScript-only. `call-sites` supports only grammars with a registered, contract-tested query (currently every parser grammar except HTML and SQL). `getStructuralSearchSupportedExtensions()` is the authoritative public declaration used by AST Scan eligibility. The runtime also exposes a `query()` method on `TreeSitterSession` that works across all parser grammars.
 - `pnpm peers check` currently reports missing `tree-sitter` peers for `@derekstride/tree-sitter-sql` and `tree-sitter-kotlin`; these grammar packages are dev-only WASM generators, so treat that warning as known workspace noise unless the vendoring strategy changes.
 
 ## Packaging
