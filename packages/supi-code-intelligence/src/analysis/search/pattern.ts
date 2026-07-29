@@ -344,7 +344,7 @@ async function collectMatchesForFile(
   const outline = await structural.outline(relFile);
   if (!handleStructuralResult(outline, recordFailure)) return;
   for (const item of flattenOutlineItems(outline.data)) {
-    if (kind === "type" && !TYPE_LIKE_KINDS.has(item.kind.toLowerCase())) continue;
+    if (kind === "type" && !TYPE_KIND.test(item.kind.toLowerCase())) continue;
     if (kind === "interface" && item.kind.toLowerCase() !== "interface") continue;
     if (kind === "class" && item.kind.toLowerCase() !== "class") continue;
     if (kind === "method" && item.kind.toLowerCase() !== "method") continue;
@@ -368,7 +368,7 @@ function handleStructuralResult<T>(
   return false;
 }
 
-const TYPE_LIKE_KINDS = new Set(["class", "interface", "type", "enum", "struct", "union"]);
+const TYPE_KIND = /^(?:class|interface|type|enum|struct|union|record|object|concept)$/;
 
 const AST_KIND_OPERATIONS = {
   definition: "outline",

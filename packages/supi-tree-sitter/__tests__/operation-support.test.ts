@@ -2,11 +2,30 @@ import { describe, expect, it } from "vitest";
 import { getStructuralSearchSupportedExtensions, getSupportedExtensions } from "../src/api.ts";
 
 const JS_TS_EXTENSIONS = [".js", ".jsx", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx"];
-const OUTLINE_EXTENSIONS = [...JS_TS_EXTENSIONS, ".py", ".pyi", ".rs", ".go", ".mod"];
+const OUTLINE_EXTENSIONS = [
+  ...JS_TS_EXTENSIONS,
+  ".py",
+  ".pyi",
+  ".rs",
+  ".go",
+  ".mod",
+  ".c",
+  ".h",
+  ".cpp",
+  ".hpp",
+  ".cc",
+  ".cxx",
+  ".hxx",
+  ".c++",
+  ".h++",
+  ".java",
+  ".kt",
+  ".kts",
+];
 const CALL_UNSUPPORTED_EXTENSIONS = new Set([".html", ".htm", ".xhtml", ".sql"]);
 
 describe("structural search operation support", () => {
-  it("declares Python, Rust, and Go outline support", () => {
+  it("declares the supported polyglot outline extensions", () => {
     expect(getStructuralSearchSupportedExtensions("outline")).toEqual(OUTLINE_EXTENSIONS);
   });
 

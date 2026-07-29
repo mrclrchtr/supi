@@ -17,6 +17,12 @@ export const CONTRACT_FIXTURE = {
   consumer: "src/consumer.ts",
   pythonRoot: "python",
   python: "python/contracts.py",
+  cppRoot: "cpp",
+  cpp: "cpp/contracts.cpp",
+  javaRoot: "java",
+  java: "java/Contracts.java",
+  kotlinRoot: "kotlin",
+  kotlin: "kotlin/contracts.kt",
   sqlRoot: "sql",
   sql: "sql/query.sql",
   unsupported: "README.md",
@@ -92,12 +98,21 @@ function writeContractFixture(cwd: string): void {
   mkdirSync(join(cwd, ".pi", "supi"), { recursive: true });
   mkdirSync(join(cwd, "src"), { recursive: true });
   mkdirSync(join(cwd, CONTRACT_FIXTURE.pythonRoot), { recursive: true });
+  mkdirSync(join(cwd, CONTRACT_FIXTURE.cppRoot), { recursive: true });
+  mkdirSync(join(cwd, CONTRACT_FIXTURE.javaRoot), { recursive: true });
+  mkdirSync(join(cwd, CONTRACT_FIXTURE.kotlinRoot), { recursive: true });
   mkdirSync(join(cwd, CONTRACT_FIXTURE.sqlRoot), { recursive: true });
   writeFileSync(join(cwd, ".pi", "supi", "config.json"), configuredLspJson());
   writeFileSync(join(cwd, "tsconfig.json"), tsconfigJson());
   writeFileSync(join(cwd, CONTRACT_FIXTURE.contracts), contractsSource());
   writeFileSync(join(cwd, CONTRACT_FIXTURE.consumer), consumerSource());
   writeFileSync(join(cwd, CONTRACT_FIXTURE.python), pythonSource());
+  writeFileSync(
+    join(cwd, CONTRACT_FIXTURE.cpp),
+    "namespace app { struct NativeModel { void run() {} }; }\n",
+  );
+  writeFileSync(join(cwd, CONTRACT_FIXTURE.java), "record JavaModel(int id) { void run() {} }\n");
+  writeFileSync(join(cwd, CONTRACT_FIXTURE.kotlin), "object KotlinModel { fun run() {} }\n");
   writeFileSync(join(cwd, CONTRACT_FIXTURE.sql), "select 1;\n");
   writeFileSync(join(cwd, CONTRACT_FIXTURE.unsupported), "# unsupported AST fixture\n");
 }

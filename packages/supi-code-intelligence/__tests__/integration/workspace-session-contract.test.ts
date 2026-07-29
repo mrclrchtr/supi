@@ -32,6 +32,12 @@ const PYTHON_AST_EXPECTATIONS = [
   { kind: "enum", supported: true, query: "pythonHelper" },
 ] as const;
 
+const TRANCHE_TWO_AST_EXPECTATIONS = [
+  { file: CONTRACT_FIXTURE.cpp, query: "NativeModel", resultKind: "struct" },
+  { file: CONTRACT_FIXTURE.java, query: "JavaModel", resultKind: "record" },
+  { file: CONTRACT_FIXTURE.kotlin, query: "KotlinModel", resultKind: "object" },
+] as const;
+
 type FindOutcome = Awaited<ReturnType<WorkspaceCodeIntelligenceSession["find"]>>;
 type ResolveOutcome = Awaited<ReturnType<WorkspaceCodeIntelligenceSession["resolve"]>>;
 
@@ -101,6 +107,19 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
         kind: "invalid-input",
         message: expect.stringContaining("does not support the"),
       });
+    },
+  );
+
+  it.each(TRANCHE_TWO_AST_EXPECTATIONS)(
+    "finds $resultKind type evidence in $file",
+    async ({ file, query, resultKind }) => {
+      const result = astResult(
+        await getWorkspace().session.find({ query, mode: "ast", kind: "type", scope: [file] }),
+      );
+
+      expect(result.matches).toContainEqual({ file, name: query, kind: resultKind, line: 1 });
+      expect(result.partialReason).toBeNull();
+      expect(result.scan.complete).toBe(true);
     },
   );
 

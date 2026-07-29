@@ -50,7 +50,7 @@ Coordinates in the library APIs use **1-based** line and character columns. Char
 - R (`.r`)
 - SQL (`.sql`)
 
-Parser support is broader than extractor support. Outline collection supports JavaScript, TypeScript, Python, Rust, and Go; import and export collection currently support JavaScript/TypeScript-family grammars. Call-site collection supports every listed family except HTML and SQL. Consumers performing a bulk structural scan should use `getStructuralSearchSupportedExtensions(operation)` rather than treating every parseable extension as eligible.
+Parser support is broader than extractor support. Outline collection supports JavaScript, TypeScript, Python, Rust, Go, C, C++, Java, and Kotlin; import and export collection currently support JavaScript/TypeScript-family grammars. Call-site collection supports every listed family except HTML and SQL. Consumers performing a bulk structural scan should use `getStructuralSearchSupportedExtensions(operation)` rather than treating every parseable extension as eligible.
 
 ## Architecture
 
@@ -107,4 +107,4 @@ if (state.kind === "ready") {
 - `src/operation-support.ts` — authoritative operation-specific extension support
 - `src/session/service-registry.ts` — shared session-scoped structural service registry
 - `src/provider/tree-sitter-provider.ts` — `StructuralProvider` adapter consumed by `@mrclrchtr/supi-code-intelligence`
-- `src/tool/outline.ts`, `src/tool/imports.ts`, `src/tool/exports.ts`, `src/tool/node-at.ts`, `src/tool/callees.ts`, `src/tool/call-sites.ts` — structural analyses exposed through the library surface
+- `src/tool/outline.ts`, `src/tool/outline-*.ts`, `src/tool/imports.ts`, `src/tool/exports.ts`, `src/tool/node-at.ts`, `src/tool/callees.ts`, `src/tool/call-sites.ts` — structural analyses exposed through the library surface

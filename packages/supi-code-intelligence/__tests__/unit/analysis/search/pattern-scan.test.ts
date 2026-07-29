@@ -80,7 +80,7 @@ describe("structured pattern AST Scan", () => {
     });
   });
 
-  it("matches structural structs as AST types", async () => {
+  it("matches structural polyglot declarations as AST types", async () => {
     source("src/model.go");
     const provider = outlineProvider(async () => ({
       kind: "success",
@@ -103,6 +103,33 @@ describe("structured pattern AST Scan", () => {
           endCharacter: 20,
           children: [],
         },
+        {
+          name: "RecordValue",
+          kind: "record",
+          startLine: 4,
+          startCharacter: 1,
+          endLine: 4,
+          endCharacter: 20,
+          children: [],
+        },
+        {
+          name: "ObjectValue",
+          kind: "object",
+          startLine: 5,
+          startCharacter: 1,
+          endLine: 5,
+          endCharacter: 20,
+          children: [],
+        },
+        {
+          name: "ConceptValue",
+          kind: "concept",
+          startLine: 6,
+          startCharacter: 1,
+          endLine: 6,
+          endCharacter: 20,
+          children: [],
+        },
       ],
     }));
 
@@ -119,6 +146,9 @@ describe("structured pattern AST Scan", () => {
         matches: [
           { file: "src/model.go", name: "Model", kind: "struct", line: 2 },
           { file: "src/model.go", name: "Value", kind: "union", line: 3 },
+          { file: "src/model.go", name: "RecordValue", kind: "record", line: 4 },
+          { file: "src/model.go", name: "ObjectValue", kind: "object", line: 5 },
+          { file: "src/model.go", name: "ConceptValue", kind: "concept", line: 6 },
         ],
       },
     });

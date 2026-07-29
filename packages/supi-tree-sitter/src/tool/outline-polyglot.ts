@@ -1,15 +1,21 @@
 import { nodeToRange } from "../coordinates.ts";
 import type { SyntaxNodeLike } from "../syntax-node.ts";
 import type { OutlineItem } from "../types.ts";
+import { extractCFamilyOutlineItems } from "./outline-c-family.ts";
+import { extractJvmOutlineItems } from "./outline-jvm.ts";
 
-/** Extract declarations whose Tree-sitter node shapes are specific to Python, Rust, or Go. */
+/** Extract declarations whose Tree-sitter node shapes are specific to non-JS/TS grammars. */
 export function extractPolyglotOutlineItems(
   node: SyntaxNodeLike,
   source: string,
 ): OutlineItem[] | undefined {
   switch (node.type) {
-    case "function_definition":
-      return one(named(node, "function", source));
+    case "function_definition": {
+      const name = node.childForFieldName("name");
+      return name
+        ? [{ name: name.text, kind: "function", range: nodeToRange(node, source) }]
+        : extractCFamilyOutlineItems(node, source);
+    }
     case "class_definition":
       return one(container(node, "class", source, pythonMethods));
     case "expression_statement":
@@ -45,7 +51,7 @@ export function extractPolyglotOutlineItems(
     case "var_spec":
       return namedItems(node, "variable", source);
     default:
-      return undefined;
+      return extractCFamilyOutlineItems(node, source) ?? extractJvmOutlineItems(node, source);
   }
 }
 

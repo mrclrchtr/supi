@@ -9,6 +9,10 @@ const OUTLINE_GRAMMARS: ReadonlySet<GrammarId> = new Set([
   "python",
   "rust",
   "go",
+  "c",
+  "cpp",
+  "java",
+  "kotlin",
 ]);
 
 /** Structural collection operations whose language support defines an AST Scan universe. */
