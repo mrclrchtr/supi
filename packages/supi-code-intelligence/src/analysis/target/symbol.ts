@@ -117,7 +117,10 @@ export async function resolveSymbolTarget(
     };
   }
   if (result.data.length === 0) {
-    return { kind: "error", message: `Symbol not found: \`${symbol}\`` };
+    return {
+      kind: "error",
+      message: `Symbol not found: \`${symbol}\`. Try \`code_resolve\` to search for it, or use an anchor target (file/line/character) if you know the location.`,
+    };
   }
 
   const scopePath = options?.path ? normalizePath(options.path, cwd) : null;
@@ -130,7 +133,7 @@ export async function resolveSymbolTarget(
   if (eligible.length === 0) {
     return {
       kind: "error",
-      message: `Symbol not found: \`${symbol}\`${scopePath ? ` in path \`${options?.path}\`` : ""}`,
+      message: `Symbol not found: \`${symbol}\`${scopePath ? ` in path \`${options?.path}\`` : ""}. Try \`code_resolve\` to search for it, or use an anchor target (file/line/character) if you know the location.`,
     };
   }
 
