@@ -6,7 +6,7 @@ import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts
 import { searchErrorResult } from "../infra/error-results.ts";
 import { toWorkflowControl } from "../infra/workflow-control.ts";
 import { assembleGraphResult } from "../result/graph.ts";
-import { renderGraphResult } from "./markdown-base.ts";
+import { renderGraphResult } from "./markdown.ts";
 
 export type GraphRelation = RequestedGraphRelation;
 

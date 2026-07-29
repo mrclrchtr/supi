@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderGraphResult } from "../../../../src/tool/graph/markdown-base.ts";
+import { renderGraphResult } from "../../../../src/tool/graph/markdown.ts";
 import { renderResolveResult } from "../../../../src/tool/resolve/markdown.ts";
 import { assembleToolResult } from "../../../../src/tool/result/assembly.ts";
 import { assembleGraphResult } from "../../../../src/tool/result/graph.ts";
