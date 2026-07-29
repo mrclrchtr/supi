@@ -51,8 +51,10 @@ echo ""
 
 FAILED=()
 for pkg in "${PACKAGES[@]}"; do
+  APPR=""
+  [[ -n "$LOCAL_FLAG" ]] && APPR="--approve"
   printf "  %-30s " "$pkg"
-  if pi uninstall "npm:@mrclrchtr/$pkg" $LOCAL_FLAG &>/dev/null; then
+  if pi uninstall "npm:@mrclrchtr/$pkg" $LOCAL_FLAG $APPR &>/dev/null; then
     echo "✓"
   else
     echo "✗"
@@ -65,8 +67,10 @@ if [[ ${#REMOVED_PACKAGES[@]} -gt 0 ]]; then
   echo ""
   echo "Removing deprecated / removed packages…"
   for pkg in "${REMOVED_PACKAGES[@]}"; do
+    APPR=""
+    [[ -n "$LOCAL_FLAG" ]] && APPR="--approve"
     printf "  %-30s " "$pkg"
-    if pi uninstall "npm:@mrclrchtr/$pkg" $LOCAL_FLAG &>/dev/null; then
+    if pi uninstall "npm:@mrclrchtr/$pkg" $LOCAL_FLAG $APPR &>/dev/null; then
       echo "✓"
     else
       echo "—"
