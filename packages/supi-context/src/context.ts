@@ -5,7 +5,7 @@ import { analyzeContext, analyzeContextPressure } from "./analysis.ts";
 import { loadContextConfig } from "./config.ts";
 import { type ContextReportEntryData, registerContextEntryRenderer } from "./entry-renderer.ts";
 import { registerContextSettings } from "./settings-registration.ts";
-import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
+import { promptSnippet, toolDescription } from "./tool/guidance.ts";
 import { serializeFullContextAnalysis } from "./tool/output.ts";
 import {
   type ContextToolDetails,
@@ -57,7 +57,6 @@ export default function contextExtension(pi: ExtensionAPI) {
       description: toolDescription,
       promptSnippet,
       parameters: contextToolParameters,
-      promptGuidelines,
       renderCall: renderContextToolCall,
       renderResult: renderContextToolResult,
       // biome-ignore lint/complexity/useMaxParams: pi tool execute signature
