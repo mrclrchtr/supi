@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-ask-user",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "SuPi ask-user extension — rich questionnaire UI for structured agent-user decisions",
   "license": "MIT",
   "repository": {
