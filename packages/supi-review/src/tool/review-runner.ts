@@ -51,7 +51,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     timeoutMs: undefined,
     prompt: invocation.prompt,
     signal: invocation.signal,
-    tools: ["read", "bash", ...HEADLESS_INSPECTION_TOOL_NAMES, submit.name],
+    tools: ["read", "bash", "grep", ...HEADLESS_INSPECTION_TOOL_NAMES, submit.name],
     customTools: [submit],
     holder,
     headlessInspection: true,
@@ -66,7 +66,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
       if (HEADLESS_INSPECTION_TOOL_NAMES.every((name) => active.has(name))) return;
       warnings.push({
         message:
-          "Headless Code Intelligence was unavailable; this reviewer continued with read and bash inspection.",
+          "Headless Code Intelligence was unavailable; this reviewer continued with read, bash, and grep inspection.",
       });
     },
     successResult: (submission, usage) => ({

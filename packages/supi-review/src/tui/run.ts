@@ -11,7 +11,12 @@ import type {
   ReviewExecutionProgressDetails,
 } from "../tool/review-execution.ts";
 import { formatReviewUsage } from "../tool/usage-format.ts";
-import type { ReviewBatchDetails, ReviewProgress, ReviewTaskResult } from "../types.ts";
+import type {
+  FindingScope,
+  ReviewBatchDetails,
+  ReviewProgress,
+  ReviewTaskResult,
+} from "../types.ts";
 import {
   buildTaskSection,
   formatStatusLabel,
@@ -23,13 +28,18 @@ import {
 
 // ── Helpers ──────────────────────────────────────────────────────
 
+function findingScope(details: ReviewBatchDetails, taskId: string): FindingScope {
+  return details.review.tasks.find((task) => task.id === taskId)?.findingScope ?? "change-only";
+}
+
 /** Format a compact per-task collapsed line. */
-function formatTaskCollapsed(result: ReviewTaskResult, theme: Theme): string {
+function formatTaskCollapsed(result: ReviewTaskResult, scope: FindingScope, theme: Theme): string {
   if (result.status === "completed") {
     const findingCount = result.findings.length;
     const findingLabel =
       findingCount > 0 ? ` (${findingCount} finding${findingCount !== 1 ? "s" : ""})` : "";
     const metadata = [
+      `scope: ${scope}`,
       `model: ${result.modelId}`,
       ...(result.usage ? [formatReviewUsage(result.usage)] : []),
     ].join(" · ");
@@ -42,6 +52,7 @@ function formatTaskCollapsed(result: ReviewTaskResult, theme: Theme): string {
     result.status === "timeout" ? result.timeoutMs : undefined,
   );
   const metadata = [
+    `scope: ${scope}`,
     `model: ${result.modelId}`,
     ...(result.usage ? [formatReviewUsage(result.usage)] : []),
   ].join(" · ");
@@ -190,7 +201,9 @@ export function renderRunResult(
 function buildCollapsed(details: ReviewBatchDetails, theme: Theme): Container {
   const container = new Container();
   for (const result of details.results) {
-    container.addChild(new Text(formatTaskCollapsed(result, theme), 0, 0));
+    container.addChild(
+      new Text(formatTaskCollapsed(result, findingScope(details, result.taskId), theme), 0, 0),
+    );
     if (result.status === "completed") {
       container.addChild(new Text(theme.fg("muted", result.summary), 0, 0));
     }
@@ -289,7 +302,8 @@ function buildExpanded(details: ReviewBatchDetails, theme: Theme): Container {
   // Per-task sections
   for (const result of details.results) {
     container.addChild(new Spacer(1));
-    container.addChild(new Text(theme.fg("accent", theme.bold(result.taskId)), 1, 0));
+    const taskLabel = `${result.taskId} (${findingScope(details, result.taskId)})`;
+    container.addChild(new Text(theme.fg("accent", theme.bold(taskLabel)), 1, 0));
     container.addChild(new Text(theme.fg("dim", "─".repeat(40)), 1, 0));
     buildTaskSection(container, result, theme);
   }

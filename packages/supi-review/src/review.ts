@@ -111,7 +111,11 @@ async function editReviewInteractive(
       defaultInstructions,
     });
     if (instructions === undefined) return undefined;
-    tasks.push({ id, instructions });
+    tasks.push({
+      id,
+      instructions,
+      ...(existing?.findingScope ? { findingScope: existing.findingScope } : {}),
+    });
   }
 
   const result: ReviewInput = { tasks };

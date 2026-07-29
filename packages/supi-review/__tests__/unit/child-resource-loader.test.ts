@@ -32,7 +32,7 @@ describe("createIsolatedResourceLoader", () => {
     expect(settingsManager.getCompactionEnabled()).toBe(false);
     expect(settingsManager.getRetrySettings().enabled).toBe(false);
     expect(loader.getAgentsFiles().agentsFiles).toEqual([]);
-    expect(loader.getSystemPrompt()).toBeUndefined();
-    expect(loader.getAppendSystemPrompt()).toEqual(["owned protocol"]);
+    expect(loader.getSystemPrompt()).toBe("owned protocol");
+    expect(loader.getAppendSystemPrompt()).toEqual([]);
   });
 });

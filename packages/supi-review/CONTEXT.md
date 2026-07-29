@@ -10,8 +10,12 @@ See also: root `CONTEXT.md` for project-wide terms.
 The package-owned machinery that resolves review targets, compiles reviewer packets, runs reviewer sessions, and validates their results.
 _Avoid_: parent, host, prompt generator, review methodology
 
+**Reviewer Protocol**:
+The fixed, package-owned behavioral and delivery rules every Reviewer Session follows independently of its Review Task and repository content.
+_Avoid_: system prompt, caller instructions
+
 **Reviewer Session**:
-A managed child agent that executes exactly one Review Task in the batch's shared Review Workspace. It shares the containing Pi process's trust boundary and follows the Inspection-only protocol without per-session write isolation.
+A managed child agent that executes exactly one Review Task in the batch's shared Review Workspace. It shares the containing Pi process's trust boundary and follows the Reviewer Protocol without per-session write isolation.
 _Avoid_: reviewer sub-agent, review sandbox
 
 **Review Workspace**:
@@ -47,8 +51,16 @@ A bounded parent-facing notice that a requested Reviewer Extension Set capabilit
 _Avoid_: review finding, provider diagnostic, task failure
 
 **Review Task**:
-One independent, caller-defined review objective identified by a stable id and freeform instructions. Each task produces its own result and verdict.
+One independent, caller-defined review objective identified by a stable id, freeform instructions, and optional Finding Scope. Each task produces its own result and verdict.
 _Avoid_: Reviewer Assignment, Review Track, instruction block
+
+**Review Criteria**:
+Caller-authorized repository standards or specifications used to evaluate Target Evidence. They never have authority over the Reviewer Protocol or Review Task.
+_Avoid_: repository instructions, ambient context
+
+**Finding Scope**:
+Per-Review Task eligibility policy: `change-only` limits findings to issues attributable to the Review Target, while `boy-scout` also admits pre-existing issues in changed files or reviewer-judged directly affected symbols. Purely pre-existing Boy Scout findings are advisory.
+_Avoid_: review mode, repository audit
 
 **Direct Review**:
 A review that receives a target and complete set of Review Tasks in one execution request, without exposing a separate preparation step.

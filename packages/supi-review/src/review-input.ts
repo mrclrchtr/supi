@@ -7,12 +7,23 @@ export function normalizeReviewInput(review: ReviewInput): ReviewInput {
   const tasks = review.tasks.map((task) => ({
     id: task.id.trim(),
     instructions: task.instructions.trim(),
+    ...(task.findingScope !== undefined ? { findingScope: task.findingScope } : {}),
   }));
   if (tasks.length < 1 || tasks.length > 4) {
     throw new Error("Provide between one and four review tasks.");
   }
   if (tasks.some((task) => !task.id || !task.instructions)) {
     throw new Error("Review task ids and instructions must not be blank.");
+  }
+  if (
+    tasks.some(
+      (task) =>
+        task.findingScope !== undefined &&
+        task.findingScope !== "change-only" &&
+        task.findingScope !== "boy-scout",
+    )
+  ) {
+    throw new Error('Review task findingScope must be "change-only" or "boy-scout".');
   }
   if (tasks.some((task) => task.id.length > REVIEW_LIMITS.taskIdCharacters)) {
     throw new Error(

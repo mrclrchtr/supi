@@ -15,6 +15,13 @@ export const reviewTaskSchema = Type.Object(
       maxLength: REVIEW_LIMITS.taskInstructionCharacters,
       description: "Complete freeform methodology and acceptance instructions for this task.",
     }),
+    findingScope: Type.Optional(
+      StringEnum(["change-only", "boy-scout"] as const, {
+        default: "change-only",
+        description:
+          "Finding eligibility: change-only admits target-attributable issues; boy-scout also admits advisory pre-existing issues in changed files and reviewer-judged directly affected symbols.",
+      }),
+    ),
   },
   { additionalProperties: false },
 );

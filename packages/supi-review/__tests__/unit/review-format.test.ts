@@ -23,7 +23,9 @@ describe("formatReviewBatch", () => {
         diffHash: "c".repeat(64),
         stats: { files: 1, additions: 1, deletions: 0 },
       },
-      review: { tasks: [{ id: "task", instructions: "Review." }] },
+      review: {
+        tasks: [{ id: "task", instructions: "Review.", findingScope: "boy-scout" }],
+      },
       workspaceReceipt: {
         status: "verified",
         targetKind: "working-tree",
@@ -102,6 +104,7 @@ describe("formatReviewBatch", () => {
     const output = formatReviewBatch(details);
     expect(output).toContain("Mode: prepared");
     expect(output).toContain("Provenance: planner-assisted");
+    expect(output).toContain("Finding Scope: boy-scout");
     expect(output).toContain("Verdict: ISSUES");
     expect(output).toContain(
       "Findings: 1 total · 1 blocking · 0 non-blocking · impact: 1 high, 0 medium, 0 low",

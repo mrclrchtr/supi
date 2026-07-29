@@ -84,10 +84,15 @@ export interface ReviewAuditReference {
   expiresAt: string;
 }
 
+/** Eligibility policy for findings produced by one Review Task. */
+export type FindingScope = "change-only" | "boy-scout";
+
 /** One independent caller-defined review objective. */
 export interface ReviewTask {
   id: string;
   instructions: string;
+  /** Defaults to change-only when omitted. */
+  findingScope?: FindingScope;
 }
 
 /** Semantic input shared with the reviewer tasks in one run. */

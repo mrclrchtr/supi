@@ -4,7 +4,7 @@ Caller-defined code review tasks run in managed, Inspection-only Reviewer Sessio
 
 ## Product contract
 
-- Direct Review executes one target plus complete caller-owned Review Tasks.
+- Direct Review executes one target plus complete caller-owned Review Tasks. Each task may select `change-only` (default) or `boy-scout` Finding Scope.
 - Prepared Review creates a one-shot Review Plan. Execution re-resolves its Review Snapshot; drift invalidates the plan before a Reviewer Session starts. Any completed task consumes a plan; an all-non-completed batch releases it.
 - The Review Engine owns target resolution, canonical packets and hashes, Review Workspace lifecycle, structured submissions, usage accounting, and per-task Task Verdicts.
 - One to four independent tasks share a single frozen Review Workspace and run concurrently. Results remain separate; never aggregate or rerank their verdicts.
@@ -18,15 +18,15 @@ Caller-defined code review tasks run in managed, Inspection-only Reviewer Sessio
 
 ## Reviewer sessions
 
-Reviewers receive Pi `read` and `bash`, headless Code Intelligence (`code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, `code_health`), and `submit_review`. Do not restore the five target-specific inspection tools.
+Reviewers receive Pi `read`, `bash`, and `grep`, headless Code Intelligence (`code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, `code_health`), and `submit_review`. Do not restore the five target-specific inspection tools.
 
 Inspection-only is a prompt protocol, not access control. The surrounding Sandboxed Pi Environment is the security boundary. When `review.bootstrapCommand` is configured, the Review Engine performs that one Dependency Bootstrap before fan-out and reviewers receive no bootstrap instruction; otherwise they may choose one. Reviewers must not intentionally mutate Target Evidence or Git history; tests, builds, linters, runtime experiments, nested Pi, and nested reviews are outside protocol.
 
-Reviewer resource loading suppresses ambient extensions, context files, skills, prompt templates, themes, and discovered system prompts. The fixed Reviewer Extension Set is only the Code Intelligence Headless inspection profile, under the containing session's project-trust decision. Its registration failure leaves `read`/`bash` available and produces a Reviewer Capability Warning separate from findings.
+Reviewer resource loading replaces Pi's generic coding prompt with the package-owned Reviewer Protocol and suppresses ambient extensions, context files, skills, prompt templates, themes, and discovered system prompts. The fixed Reviewer Extension Set is only the Code Intelligence Headless inspection profile, under the containing session's project-trust decision. Its registration failure leaves `read`/`bash`/`grep` available and produces a Reviewer Capability Warning separate from findings.
 
 ## Result grammar
 
-`submit_review` returns a summary and ordered findings. Each finding has title, description, `blocksAcceptance`, impact, effort, confidence, and optional target-relative location. The Review Engine derives `pass` for no findings, `pass_with_findings` for advisory-only findings, and `issues` for any blocking finding, with structured finding counts by blocking status and impact.
+`submit_review` returns a summary and ordered findings. Parent-facing task output identifies the effective Finding Scope. Each finding has title, description, `blocksAcceptance`, impact, effort, confidence, and optional target-relative location. `change-only` admits issues attributable to the target; `boy-scout` also admits pre-existing issues in changed files or reviewer-judged directly affected symbols, but purely pre-existing findings remain advisory. The Review Engine derives `pass` for no findings, `pass_with_findings` for advisory-only findings, and `issues` for any blocking finding, with structured finding counts by blocking status and impact.
 
 Default child diagnostics retain only bounded lifecycle metadata and redacted provider error summaries. When `review.auditEnabled` is on, every task stores a private, seven-day local replay of provider-visible messages and tool output; omit thinking blocks/signatures and never include raw replay content in normal review output. `supi_review_audit` is registered only after enabling the setting and reloading.
 

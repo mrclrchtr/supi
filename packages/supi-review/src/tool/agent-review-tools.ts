@@ -10,7 +10,7 @@ import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
 import type { ReviewPlanStore } from "../session/review-plan-store.ts";
 import { renderPrepareCall, renderPrepareResult } from "../tui/prepare.ts";
 import { renderRunCall, renderRunResult } from "../tui/run.ts";
-import type { ReviewInput, ReviewTargetSpec } from "../types.ts";
+import type { FindingScope, ReviewInput, ReviewTargetSpec } from "../types.ts";
 import {
   type PrepareReviewToolInput,
   parsePrepareReviewToolInput,
@@ -43,7 +43,10 @@ function plannerFailureReason(failure: {
 function formatPrepared(plan: {
   id: string;
   snapshot: { title: string; changes: Array<{ path: string }> };
-  plannerDraft?: { sharedContext?: string; tasks: Array<{ id: string; instructions: string }> };
+  plannerDraft?: {
+    sharedContext?: string;
+    tasks: Array<{ id: string; instructions: string; findingScope?: FindingScope }>;
+  };
   plannerFailure?: { kind: string; failureCode?: string; timeoutMs?: number };
   plannerUsage?: Usage;
 }): string {
@@ -59,7 +62,7 @@ function formatPrepared(plan: {
     lines.push("", "## Planner Draft");
     if (plan.plannerDraft.sharedContext) lines.push("", plan.plannerDraft.sharedContext);
     for (const task of plan.plannerDraft.tasks) {
-      lines.push("", `### ${task.id}`, task.instructions);
+      lines.push("", `### ${task.id} (${task.findingScope ?? "change-only"})`, task.instructions);
     }
     lines.push("", "Call supi_review_run with an explicit accept-draft or use-review decision.");
   } else {

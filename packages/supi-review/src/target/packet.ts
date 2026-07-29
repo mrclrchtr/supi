@@ -10,7 +10,7 @@ import type {
 import { buildFileManifest } from "./file-manifest.ts";
 
 /** Protocol version included in every canonical reviewer packet for future evolution. */
-export const REVIEW_PACKET_PROTOCOL_VERSION = "4";
+export const REVIEW_PACKET_PROTOCOL_VERSION = "5";
 
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
@@ -43,10 +43,8 @@ function targetIdentity(target: ResolvedReviewTarget): string {
 function inspectionGuidance(target: ResolvedReviewTarget): string[] {
   const common = [
     "Your cwd is the shared frozen Review Workspace for this batch.",
-    "Use Pi read and ordinary Git/bash inspection. The available Code Intelligence tools are code_resolve, code_inspect, code_orientation, code_graph, code_find, and code_health.",
+    "Use the available inspection tools to inspect the repository.",
     "Use Git to inspect the pinned before side; do not infer it from the caller's live worktree.",
-    "If missing local dependencies limit Code Intelligence, you may choose a Dependency Bootstrap command in this disposable workspace.",
-    "Do not run tests, builds, linters, services, nested Pi sessions, nested reviews, or intentional source/Git-history mutation.",
   ];
   if (target.kind === "working-tree") {
     const baseline = target.mergeBaseCommit ?? target.headCommit;
@@ -89,6 +87,7 @@ export function buildReviewPacket(
     "",
     `Protocol version: ${REVIEW_PACKET_PROTOCOL_VERSION}`,
     `Task id: ${task.id}`,
+    `Finding Scope: ${task.findingScope ?? "change-only"}`,
     `Target: ${snapshot.title}`,
     `Target identity: ${targetIdentity(snapshot.target)}`,
     `Target diff SHA-256: ${snapshot.diffHash}`,
@@ -109,9 +108,6 @@ export function buildReviewPacket(
     "",
     "## Inspection",
     ...inspectionGuidance(snapshot.target),
-    "",
-    "## Delivery",
-    "Call submit_review exactly once with the task summary and findings.",
   );
   const prompt = parts.join("\n");
   return { prompt, packetHash: sha256(prompt), taskId: task.id };

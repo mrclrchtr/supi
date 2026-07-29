@@ -66,6 +66,46 @@ describe("agent review schemas", () => {
     ).toThrow();
   });
 
+  it("accepts per-task finding scope and rejects unknown modes", () => {
+    expect(
+      parseRunReviewToolInput({
+        mode: "direct",
+        target: { kind: "working-tree" },
+        review: {
+          tasks: [
+            {
+              id: "cleanup",
+              instructions: "Take Boy Scout responsibility.",
+              findingScope: "boy-scout",
+            },
+          ],
+        },
+      }),
+    ).toEqual({
+      mode: "direct",
+      target: { kind: "working-tree" },
+      review: {
+        tasks: [
+          {
+            id: "cleanup",
+            instructions: "Take Boy Scout responsibility.",
+            findingScope: "boy-scout",
+          },
+        ],
+      },
+    });
+
+    expect(() =>
+      parseRunReviewToolInput({
+        mode: "direct",
+        target: { kind: "working-tree" },
+        review: {
+          tasks: [{ id: "cleanup", instructions: "Review.", findingScope: "repository-wide" }],
+        },
+      }),
+    ).toThrow();
+  });
+
   it("accepts a base-aware working-tree target for committed plus uncommitted work", () => {
     expect(
       parseRunReviewToolInput({

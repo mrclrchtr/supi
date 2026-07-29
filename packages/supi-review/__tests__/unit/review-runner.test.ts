@@ -59,6 +59,7 @@ describe("runReviewer", () => {
         getActiveToolNames: () => [
           "read",
           "bash",
+          "grep",
           "code_resolve",
           "code_inspect",
           "code_orientation",
@@ -149,7 +150,7 @@ describe("runReviewer", () => {
     expect(result.audit?.artifactId).toMatch(/^review-audit-/);
   });
 
-  it("wires read, bash, headless Code Intelligence, and submit_review with isolated settings", async () => {
+  it("wires read, bash, grep, headless Code Intelligence, and submit_review with isolated settings", async () => {
     await runReviewer({
       cwd: "/repo",
       snapshot,
@@ -165,6 +166,7 @@ describe("runReviewer", () => {
         tools: [
           "read",
           "bash",
+          "grep",
           "code_resolve",
           "code_inspect",
           "code_orientation",

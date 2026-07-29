@@ -7,14 +7,14 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import { formatReviewUsage } from "../tool/usage-format.ts";
-import type { PreparedReviewDetails } from "../types.ts";
+import type { FindingScope, PreparedReviewDetails } from "../types.ts";
 import { renderError, renderPartial, renderReviewToolCall } from "./common.ts";
 
 /** Plan details shape extracted from execute's details return. */
 interface PrepareDetails extends PreparedReviewDetails {
   plannerDraft?: {
     sharedContext?: string;
-    tasks: Array<{ id: string; instructions: string }>;
+    tasks: Array<{ id: string; instructions: string; findingScope?: FindingScope }>;
   };
 }
 
@@ -120,7 +120,11 @@ function addPlannerDraft(container: Container, details: PrepareDetails, theme: T
   container.addChild(new Spacer(1));
   for (const task of draft.tasks) {
     container.addChild(
-      new Text(`${theme.fg("accent", task.id)}: ${theme.fg("muted", task.instructions)}`, 1, 0),
+      new Text(
+        `${theme.fg("accent", task.id)} ${theme.fg("dim", `(${task.findingScope ?? "change-only"})`)}: ${theme.fg("muted", task.instructions)}`,
+        1,
+        0,
+      ),
     );
     container.addChild(new Text(theme.fg("dim", "─".repeat(40)), 1, 0));
   }

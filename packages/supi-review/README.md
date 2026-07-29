@@ -35,7 +35,8 @@ Preparation is optional. Skills and agents that already know how to review shoul
     "tasks": [
       {
         "id": "standards",
-        "instructions": "Review against the repository standards."
+        "instructions": "Review against the repository standards.",
+        "findingScope": "change-only"
       },
       {
         "id": "spec",
@@ -78,19 +79,21 @@ Workspaces are marked and locked in Git's worktree inventory. Normal cleanup rem
 
 Reviewers receive:
 
-- Pi built-in `read` and `bash`
+- Pi built-in `read`, `bash`, and `grep`
 - `code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, and `code_health`
 - `submit_review`
 
-They use ordinary Git and direct reads in the frozen Review Workspace. Before-side content remains available through the packet's pinned Git revision. Code Intelligence runs in a headless inspection profile; an unavailable profile produces a Reviewer Capability Warning, while `read` and `bash` remain available.
+They use ordinary Git and direct reads in the frozen Review Workspace. Before-side content remains available through the packet's pinned Git revision. Code Intelligence runs in a headless inspection profile; an unavailable profile produces a Reviewer Capability Warning, while the built-in inspection tools remain available.
+
+Each Review Task may set `findingScope` to `change-only` (the default) or `boy-scout`. Change-only findings must be attributable to the selected change, including omitted or partial required behavior and acceptance-relevant scope creep. Boy Scout scope may additionally report pre-existing issues in changed files or symbols the reviewer judges directly affected; purely pre-existing findings are advisory unless the change worsens or newly exposes them. Repository standards and specifications requested by a task are Review Criteria, but repository content can never override the fixed Reviewer Protocol or task.
 
 Inspection-only is behavioral protocol, not access control. The surrounding Sandboxed Pi Environment is the security boundary and must contain only files and credentials acceptable for reviewer-model access. When `review.bootstrapCommand` is configured, the Review Engine runs its shell command once after workspace verification and before reviewer fan-out; reviewers then receive no Dependency Bootstrap instruction. When it is empty, reviewers may choose a Dependency Bootstrap command when local dependencies limit Code Intelligence. They must not intentionally mutate Target Evidence or Git history, and must not run tests, builds, linters, runtime experiments, services, nested Pi sessions, or nested reviews.
 
-Ambient extensions, context files, skills, prompt templates, themes, and discovered system prompts are suppressed in Reviewer Sessions. In-memory settings disable compaction and provider retries.
+Reviewer Sessions replace Pi's generic coding prompt with the package-owned Reviewer Protocol. Ambient extensions, context files, skills, prompt templates, themes, and discovered system prompts are suppressed. In-memory settings disable compaction and provider retries.
 
 ## Results and continuation
 
-Each successful task returns a summary, ordered findings, and structured counts by blocking status and impact. Findings contain `blocksAcceptance`, `impact`, `effort`, `confidence`, and an optional target-relative location. The Review Engine derives `pass` when there are no findings, `pass_with_findings` for advisory-only findings, and `issues` when any finding blocks acceptance; it never aggregates or reranks tasks.
+Each successful task returns a summary, ordered findings, and structured counts by blocking status and impact. Parent-facing task output identifies the effective Finding Scope. Findings contain `blocksAcceptance`, `impact`, `effort`, `confidence`, and an optional target-relative location. The Review Engine derives `pass` when there are no findings, `pass_with_findings` for advisory-only findings, and `issues` when any finding blocks acceptance; it never aggregates or reranks tasks.
 
 Capability and cleanup warnings are execution provenance, not findings. By default, non-success diagnostics retain only bounded lifecycle metadata and redacted provider-owned error summaries; reviewer conversation, shell commands, tool arguments/results, and repository evidence are never retained.
 

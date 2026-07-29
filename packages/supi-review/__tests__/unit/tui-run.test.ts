@@ -24,7 +24,9 @@ const details: ReviewBatchDetails = {
     diffHash: "c".repeat(64),
     stats: { files: 2, additions: 3, deletions: 1 },
   },
-  review: { tasks: [{ id: "live-smoke", instructions: "Smoke test." }] },
+  review: {
+    tasks: [{ id: "live-smoke", instructions: "Smoke test.", findingScope: "boy-scout" }],
+  },
   workspaceReceipt: {
     status: "verified",
     targetKind: "commit",
@@ -78,6 +80,7 @@ describe("supi_review_run TUI", () => {
 
     expect(output).toContain("live-smoke: PASS");
     expect(output).toContain("Frozen workspace review completed successfully.");
+    expect(output).toContain("scope: boy-scout");
     expect(output).toContain("model: provider/reviewer");
     expect(output).toContain("18 tokens");
     expect(output).toContain("Commit aaaaaaa (2 files · +3 / -1)");
@@ -94,6 +97,7 @@ describe("supi_review_run TUI", () => {
       .join("\n");
 
     expect(output).toContain("workspace: verified · commit · 2 paths");
+    expect(output).toContain("live-smoke (boy-scout)");
   });
 
   it("shows a workspace placeholder while freezing", () => {

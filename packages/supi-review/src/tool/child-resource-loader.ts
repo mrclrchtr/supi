@@ -14,9 +14,9 @@ export interface IsolatedChildResourceOptions {
 }
 
 /**
- * Build child-session resources with no ambient settings or discovered prompt
- * content. Compaction and retries stay disabled so provider limits apply to the
- * original packet directly.
+ * Build child-session resources with the package-owned protocol as the complete
+ * system prompt and no ambient settings or discovered prompt content. Compaction
+ * and retries stay disabled so provider limits apply to the original packet directly.
  */
 export function createIsolatedChildResources(
   cwd: string,
@@ -45,9 +45,8 @@ export function createIsolatedChildResources(
     noPromptTemplates: true,
     noThemes: true,
     noContextFiles: true,
-    appendSystemPrompt: [protocolPrompt],
-    systemPromptOverride: () => undefined,
-    appendSystemPromptOverride: () => [protocolPrompt],
+    systemPromptOverride: () => protocolPrompt,
+    appendSystemPromptOverride: () => [],
   });
   return { loader, settingsManager };
 }

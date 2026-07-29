@@ -1,4 +1,9 @@
-import type { FindingCounts, ReviewBatchDetails, ReviewTaskResult } from "../types.ts";
+import type {
+  FindingCounts,
+  FindingScope,
+  ReviewBatchDetails,
+  ReviewTaskResult,
+} from "../types.ts";
 import { formatChildFailureDiagnostics } from "./child-failure-diagnostics.ts";
 import { formatReviewUsage } from "./usage-format.ts";
 
@@ -26,10 +31,11 @@ function appendTaskStatus(
   if (result.diagnostics) lines.push("", ...formatChildFailureDiagnostics(result.diagnostics));
 }
 
-function formatTaskResult(result: ReviewTaskResult): string[] {
+function formatTaskResult(result: ReviewTaskResult, findingScope: FindingScope): string[] {
   const lines = [
     "",
     `## ${result.taskId}`,
+    `Finding Scope: ${findingScope}`,
     `Model: ${result.modelId}`,
     `Packet SHA-256: ${result.packetHash}`,
   ];
@@ -91,6 +97,11 @@ export function formatReviewBatch(details: ReviewBatchDetails): string {
       `Recovery: ${details.cleanupWarning.recoveryCommand}`,
     );
   }
-  for (const result of details.results) lines.push(...formatTaskResult(result));
+  const findingScopes = new Map(
+    details.review.tasks.map((task) => [task.id, task.findingScope ?? "change-only"]),
+  );
+  for (const result of details.results) {
+    lines.push(...formatTaskResult(result, findingScopes.get(result.taskId) ?? "change-only"));
+  }
   return lines.join("\n");
 }

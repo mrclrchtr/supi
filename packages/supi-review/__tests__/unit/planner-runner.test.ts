@@ -24,15 +24,21 @@ vi.mock("../../src/tool/session-lifecycle.ts", () => ({
   runWithLifecycle: mocks.runWithLifecycle,
 }));
 
-import { buildPlannerSystemPrompt, runPlanner } from "../../src/tool/planner-runner.ts";
+import {
+  buildPlannerSystemPrompt,
+  PLANNER_PROMPT_VERSION,
+  runPlanner,
+} from "../../src/tool/planner-runner.ts";
 
 describe("runPlanner", () => {
   it("constrains drafts to the reviewers' static target-aware capabilities", () => {
     const prompt = buildPlannerSystemPrompt();
 
+    expect(PLANNER_PROMPT_VERSION).toBe("3");
     expect(prompt).toContain("code_orientation");
-    expect(prompt).toContain("read, bash");
-    expect(prompt).toContain("introduced by the selected change");
+    expect(prompt).toContain("read, bash, grep");
+    expect(prompt).toMatch(/findingScope.*change-only.*boy-scout/is);
+    expect(prompt).not.toContain("concrete regressions introduced");
     expect(prompt).toContain("Do not request tests, builds, linters");
   });
 
@@ -60,6 +66,26 @@ describe("runPlanner", () => {
     await expect(
       submit?.execute("call", { tasks: [{ id: " ", instructions: " " }] }),
     ).rejects.toThrow(/blank/i);
+    await expect(
+      submit?.execute("call", {
+        tasks: [{ id: "scope", instructions: "Review.", findingScope: "repository-wide" }],
+      }),
+    ).rejects.toThrow(/findingScope/i);
+  });
+
+  it("preserves a valid Finding Scope through Planner Draft normalization", async () => {
+    await runPlanner({ cwd: "/repo", prompt: "bounded input", model: {} as never });
+
+    const options = mocks.createAgentSession.mock.calls[0]?.[0] as {
+      customTools?: Array<{ execute: (...args: unknown[]) => Promise<{ details?: unknown }> }>;
+    };
+    const result = await options.customTools?.[0]?.execute("call", {
+      tasks: [{ id: "scope", instructions: "Review.", findingScope: "boy-scout" }],
+    });
+
+    expect(result?.details).toEqual({
+      tasks: [{ id: "scope", instructions: "Review.", findingScope: "boy-scout" }],
+    });
   });
 
   it("has only its submit tool, isolated settings, and a five-minute timeout", async () => {
