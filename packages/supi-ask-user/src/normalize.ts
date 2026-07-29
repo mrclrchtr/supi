@@ -80,8 +80,8 @@ function validateQuestionCount(count: number): void {
 
 function validateCommonFields(question: ExternalQuestion): void {
   const id = question.id.trim();
-  const header = question.header.trim();
-  const prompt = question.prompt.trim();
+  const header = normalizeDisplayText(question.header);
+  const prompt = normalizeDisplayText(question.prompt);
 
   if (!id) throw new AskUserValidationError("Question id must be a non-empty string.");
   if (!header) {
@@ -119,8 +119,8 @@ function normalizeChoice(question: ExternalChoiceQuestion): NormalizedChoiceQues
 
   return {
     id: question.id.trim(),
-    header: question.header.trim(),
-    prompt: question.prompt.trim(),
+    header: normalizeDisplayText(question.header),
+    prompt: normalizeDisplayText(question.prompt),
     type: "choice",
     options,
     multi,
@@ -155,8 +155,8 @@ function normalizeText(question: ExternalTextQuestion): NormalizedTextQuestion {
 
   return {
     id: question.id.trim(),
-    header: question.header.trim(),
-    prompt: question.prompt.trim(),
+    header: normalizeDisplayText(question.header),
+    prompt: normalizeDisplayText(question.prompt),
     type: "text",
     ...(recommendation ? { recommendation } : {}),
     ...(placeholder ? { placeholder } : {}),
@@ -179,7 +179,7 @@ function normalizeOptions(
   const seen = new Set<string>();
   return options.map((option) => {
     const value = option.value.trim();
-    const label = option.label.trim();
+    const label = normalizeDisplayText(option.label);
     if (!value || !label) {
       throw new AskUserValidationError(
         `choice question "${questionId}" has an option with empty value or label.`,
@@ -251,7 +251,16 @@ function resolveIndexes(args: {
   });
 }
 
+/** Decodes JSON-style Unicode escapes that models sometimes emit literally in display text. */
+function normalizeDisplayText(value: string): string {
+  return value
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_escape, hex: string) =>
+      String.fromCharCode(Number.parseInt(hex, 16)),
+    )
+    .trim();
+}
+
 function trimOptional(value: string | undefined): string | undefined {
-  const trimmed = value?.trim();
+  const trimmed = value === undefined ? undefined : normalizeDisplayText(value);
   return trimmed ? trimmed : undefined;
 }

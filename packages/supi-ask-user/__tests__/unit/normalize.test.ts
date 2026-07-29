@@ -332,6 +332,22 @@ describe("normalizeQuestionnaire", () => {
     });
   });
 
+  it("decodes JSON Unicode escapes in human-readable text", () => {
+    const slash = "\\";
+    const result = normalizeQuestionnaire({
+      questions: [
+        {
+          type: "text",
+          id: "domain-model",
+          header: "Naming",
+          prompt: `Question 3 of ~6 ${slash}u2014 naming and the domain model ${slash}uD83D${slash}uDE00`,
+        },
+      ],
+    });
+
+    expect(result.questions[0]?.prompt).toBe("Question 3 of ~6 — naming and the domain model 😀");
+  });
+
   it("accepts a valid mixed decision form with both choice and text questions", () => {
     const result = normalizeQuestionnaire({
       title: " Formatter ",
