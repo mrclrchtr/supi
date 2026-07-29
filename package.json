@@ -42,6 +42,7 @@
     "test:ai": "vitest run --reporter=agent",
     "pack:check": "for p in packages/supi*; do [ -f \"$p/package.json\" ] || continue; node scripts/pack-staged.mjs \"$p\" --dry-run || exit 1; done",
     "pack:verify": "node scripts/pack-all.mjs",
+    "prototype:nono": "bash scripts/prototype-nono-pi.sh",
     "check:fast": "pnpm biome",
     "check": "pnpm biome && pnpm typecheck && pnpm test",
     "check:ai": "pnpm biome:ai && pnpm typecheck:ai && pnpm test:ai",
