@@ -25,10 +25,20 @@ export interface HealthServerInfo {
   readonly ready: boolean;
 }
 
+/** A single diagnostic message extracted for detailed health output. */
+export interface HealthDiagnosticMessage {
+  readonly line: number;
+  readonly severity: "error" | "warning";
+  readonly message: string;
+  readonly source?: string;
+}
+
 export interface HealthDiagnosticEntry {
   readonly file: string;
   readonly errors: number;
   readonly warnings: number;
+  /** Individual messages, present only in detailed mode. Capped per file. */
+  readonly messages?: readonly HealthDiagnosticMessage[];
 }
 
 /** The evidence boundary for diagnostics collected by one health request. */

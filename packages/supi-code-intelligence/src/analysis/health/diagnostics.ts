@@ -4,9 +4,10 @@
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
-import type { WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
+import type { Diagnostic, WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 import type {
   HealthDiagnosticEntry,
+  HealthDiagnosticMessage,
   HealthDiagnosticObservation,
   HealthDiagnosticScope,
   HealthSection,
@@ -31,30 +32,33 @@ interface CollectDiagnosticsOptions {
   readonly scope: HealthDiagnosticScope;
   readonly cwd: string;
   readonly unavailableReason: string;
+  /** Collect individual messages per file (detailed level). */
+  readonly detailed?: boolean;
 }
 
 /** Collect diagnostics without widening the requested evidence scope. */
 export async function collectDiagnostics(
   options: CollectDiagnosticsOptions,
 ): Promise<HealthDiagnosticObservation> {
-  const { service, included, scope, cwd, unavailableReason } = options;
+  const { service, included, scope, cwd, unavailableReason, detailed } = options;
   if (!included.includes("diagnostics")) return { kind: "not-requested", entries: [] };
   if (!service) return unavailableDiagnostics(scope, unavailableReason);
 
   return scope.kind === "file"
-    ? collectScopedFileDiagnostics(service, scope)
-    : collectTrackedFileDiagnostics(service, scope, cwd);
+    ? collectScopedFileDiagnostics(service, scope, detailed)
+    : collectTrackedFileDiagnostics(service, scope, cwd, detailed);
 }
 
 async function collectScopedFileDiagnostics(
   service: WorkspaceLspRuntime,
   scope: Extract<HealthDiagnosticScope, { kind: "file" }>,
+  detailed?: boolean,
 ): Promise<HealthDiagnosticObservation> {
   try {
     const result = await service.fileDiagnostics(scope.path, 4);
     if (result.kind === "unavailable") return unavailableDiagnostics(scope, result.reason);
 
-    const entries = toFileDiagnosticEntries(scope.path, result.data);
+    const entries = toFileDiagnosticEntries(scope.path, result.data, detailed);
     return result.kind === "partial"
       ? { kind: "partial", scope, entries, reason: result.reason }
       : { kind: "completed", scope, entries };
@@ -67,9 +71,12 @@ function collectTrackedFileDiagnostics(
   service: WorkspaceLspRuntime,
   scope: Extract<HealthDiagnosticScope, { kind: "tracked-files" }>,
   cwd: string,
+  detailed?: boolean,
 ): HealthDiagnosticObservation {
   try {
-    const entries = collectWorkspaceDiagnostics(service, scope.filter, cwd);
+    const entries = detailed
+      ? collectWorkspaceDiagnosticsDetailed(service, scope.filter, cwd)
+      : collectWorkspaceDiagnostics(service, scope.filter, cwd);
     return { kind: "completed", scope, entries };
   } catch (error) {
     return unavailableDiagnostics(
@@ -81,11 +88,17 @@ function collectTrackedFileDiagnostics(
 
 function toFileDiagnosticEntries(
   file: string,
-  diagnostics: ReadonlyArray<{ severity?: number }>,
+  diagnostics: ReadonlyArray<Pick<Diagnostic, "severity" | "message" | "source" | "range">>,
+  detailed?: boolean,
 ): HealthDiagnosticEntry[] {
   const errors = diagnostics.filter((diagnostic) => (diagnostic.severity ?? 1) === 1).length;
   const warnings = diagnostics.filter((diagnostic) => (diagnostic.severity ?? 1) === 2).length;
-  return hasIssueCounts(errors, warnings) ? [{ file, errors, warnings }] : [];
+  if (!hasIssueCounts(errors, warnings)) return [];
+  const entry: HealthDiagnosticEntry = { file, errors, warnings };
+  if (detailed) {
+    return [{ ...entry, messages: extractMessages(diagnostics) }];
+  }
+  return [entry];
 }
 
 function collectWorkspaceDiagnostics(
@@ -104,6 +117,46 @@ function collectWorkspaceDiagnostics(
   }
 
   return result;
+}
+
+/** Detailed workspace path: full diagnostics with messages, capped per file. */
+function collectWorkspaceDiagnosticsDetailed(
+  service: WorkspaceLspRuntime,
+  scopeFilter: string | null,
+  cwd: string,
+): HealthDiagnosticEntry[] {
+  const outstanding = service.getOutstandingDiagnostics(2);
+  const result: HealthDiagnosticEntry[] = [];
+
+  for (const { file, diagnostics } of outstanding) {
+    const filePath = resolve(cwd, file);
+    if (scopeFilter && !isWithinOrEqual(scopeFilter, filePath)) continue;
+    const entries = toFileDiagnosticEntries(filePath, diagnostics, true);
+    result.push(...entries);
+  }
+
+  return result;
+}
+
+// ── Message extraction ────────────────────────────────────────────────
+
+const MAX_MESSAGES_PER_FILE = 3;
+
+function extractMessages(
+  diagnostics: ReadonlyArray<Pick<Diagnostic, "severity" | "message" | "source" | "range">>,
+): HealthDiagnosticMessage[] {
+  const errorsAndWarnings = diagnostics
+    .filter((d) => (d.severity ?? 1) <= 2)
+    .sort(
+      (a, b) => (a.severity ?? 1) - (b.severity ?? 1) || a.range.start.line - b.range.start.line,
+    );
+
+  return errorsAndWarnings.slice(0, MAX_MESSAGES_PER_FILE).map((d) => ({
+    line: d.range.start.line + 1,
+    severity: (d.severity ?? 1) === 1 ? ("error" as const) : ("warning" as const),
+    message: typeof d.message === "string" ? d.message : d.message.value,
+    ...(d.source ? { source: d.source } : {}),
+  }));
 }
 
 function unavailableDiagnostics(

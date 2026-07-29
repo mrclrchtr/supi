@@ -72,6 +72,8 @@ export function renderHealthResult(
   }
   container.addChild(new Spacer(1));
   container.addChild(buildDiagnosticSummary(data, theme));
+  const diagnosticEntries = buildDiagnosticEntries(data, theme);
+  if (diagnosticEntries) container.addChild(diagnosticEntries);
   container.addChild(buildHealthSectionSummary(data, theme));
 
   const lists = data?.evidenceLists as EvidenceEntry[] | undefined;
@@ -285,6 +287,36 @@ function buildDiagnosticSummary(data: Record<string, unknown> | null, theme: The
     0,
     0,
   );
+}
+
+/** Render per-file diagnostic messages in expanded detailed mode. */
+function buildDiagnosticEntries(data: Record<string, unknown> | null, theme: Theme): Text | null {
+  const observation = readRecord(data?.diagnosticObservation);
+  const entries = observation?.entries;
+  if (!Array.isArray(entries) || entries.length === 0) return null;
+
+  const lines: string[] = [];
+  for (const raw of entries) {
+    const entry = readRecord(raw);
+    if (!entry || !Array.isArray(entry.messages) || entry.messages.length === 0) continue;
+    lines.push(theme.fg("dim", `  ${typeof entry.file === "string" ? entry.file : ""}`));
+    for (const rawMsg of entry.messages) {
+      const formatted = formatDiagnosticMessage(readRecord(rawMsg), theme);
+      if (formatted) lines.push(formatted);
+    }
+  }
+
+  return lines.length > 0 ? new Text(lines.join("\n"), 0, 0) : null;
+}
+
+function formatDiagnosticMessage(msg: Record<string, unknown> | null, theme: Theme): string | null {
+  if (!msg || typeof msg.message !== "string") return null;
+  const line = typeof msg.line === "number" ? `L${msg.line} ` : "";
+  const isError = msg.severity === "error";
+  const color = isError ? "error" : "warning";
+  const icon = isError ? "✖" : "⚠";
+  const source = typeof msg.source === "string" ? ` [${msg.source}]` : "";
+  return `    ${theme.fg(color, `${icon} ${line}${msg.severity}${source}`)}: ${msg.message}`;
 }
 
 function readHealthSections(data: Record<string, unknown> | null): HealthSectionSummary[] {

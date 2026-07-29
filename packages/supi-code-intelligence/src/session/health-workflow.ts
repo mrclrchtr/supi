@@ -95,6 +95,7 @@ export async function runHealthWorkflow(
     scope: diagnosticsScope,
     cwd: deps.cwd,
     unavailableReason: diagnosticUnavailableReason(semanticState),
+    detailed: level === "detailed",
   });
   const servers = collectServers(runtime, included);
   const capabilityWarnings = collectCapabilityWarnings(semanticRequested, deps);

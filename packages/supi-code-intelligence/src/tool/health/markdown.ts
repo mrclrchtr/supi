@@ -211,6 +211,12 @@ function renderDiagnosticDetails(
     lines.push(
       `- \`${makeRelative(cwd, entry.file)}\` — ${entry.errors} error${plural(entry.errors)}, ${entry.warnings} warning${plural(entry.warnings)}`,
     );
+    if (entry.messages) {
+      for (const msg of entry.messages) {
+        const source = msg.source ? ` [${msg.source}]` : "";
+        lines.push(`  - L${msg.line} ${msg.severity}${source}: ${msg.message}`);
+      }
+    }
   }
 }
 
