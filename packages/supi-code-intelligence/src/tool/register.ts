@@ -80,6 +80,12 @@ export function registerCodeIntelligenceTools(
   promptSurfaces: CodeIntelligenceToolPromptSurfaceMap = CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES,
   specs: readonly CodeIntelligenceToolDefinitionSpec[] = CODE_INTELLIGENCE_TOOL_SPECS,
 ): void {
+  // Skip when another copy is already loaded (e.g. standalone install + bundled
+  // copy inside supi-review). Pi reports tool-name conflicts as diagnostics;
+  // guarding here avoids the noise entirely.
+  const existing = new Set(pi.getAllTools().map((t) => t.name));
+  if (specs.some((s) => existing.has(s.name))) return;
+
   for (const spec of specs) {
     const surface = promptSurfaces[spec.name];
     pi.registerTool({
