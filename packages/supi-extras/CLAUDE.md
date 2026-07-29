@@ -13,6 +13,7 @@ src/
 ├── extension.ts
 ├── aliases.ts
 ├── clipboard.ts
+├── clone-session.ts
 ├── copy-prompt.ts
 ├── git-editor.ts
 ├── supi-footer.ts
@@ -24,6 +25,7 @@ __tests__/
 ├── tsconfig.json
 ├── unit/
 │   ├── clipboard.test.ts
+│   ├── clone-session.test.ts
 │   ├── copy-prompt.test.ts
 │   ├── git-editor.test.ts
 │   ├── supi-footer.test.ts
@@ -41,6 +43,7 @@ __tests__/
 |---|---|
 | `clipboard.ts` | Shared clipboard utility — wraps `clipboardy` for cross-platform copy |
 | `copy-prompt.ts` | `Alt+C` (Option+C) to copy the current editor text to clipboard |
+| `clone-session.ts` | `/clone-session <session-id>` clones a session into the current worktree and switches to it |
 | `tab-spinner.ts` | Braille spinner in terminal tab title during agent work + `supi:working:*` events |
 | `prompt-stash.ts` | Persistent prompt stash with `Alt+S` shortcut and `/supi-stash` overlay |
 | `git-editor.ts` | Sets `GIT_EDITOR=true` to prevent git from blocking on interactive editors |

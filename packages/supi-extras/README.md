@@ -33,6 +33,7 @@ This package mixes a few commands and shortcuts with a few always-on UI tweaks.
 - `/exit` — exit pi
 - `/e` — alias for `/exit`
 - `/clear` — start a new session (alias for `/new`)
+- `/clone-session <session-id>` — clone a session into the current worktree and switch to it; autocomplete searches IDs and session names
 - `/supi-stash` — browse, restore, copy, delete, or clear saved prompt drafts
 
 ## Shortcuts
@@ -83,6 +84,7 @@ That prevents git subprocesses from hanging while waiting for an interactive edi
 ## Source
 
 - `src/aliases.ts` — command aliases
+- `src/clone-session.ts` — cross-worktree session cloning by ID
 - `src/prompt-stash.ts` — prompt stash shortcuts, persistence, and overlay
 - `src/skill-shortcut.ts` — `$skill-name` expansion and autocomplete
 - `src/tab-spinner.ts` — terminal tab-title spinner
