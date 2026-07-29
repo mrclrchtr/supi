@@ -368,7 +368,7 @@ function handleStructuralResult<T>(
   return false;
 }
 
-const TYPE_LIKE_KINDS = new Set(["class", "interface", "type", "enum"]);
+const TYPE_LIKE_KINDS = new Set(["class", "interface", "type", "enum", "struct", "union"]);
 
 const AST_KIND_OPERATIONS = {
   definition: "outline",

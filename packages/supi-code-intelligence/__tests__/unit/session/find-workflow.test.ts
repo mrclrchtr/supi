@@ -46,7 +46,7 @@ describe("runFindWorkflow", () => {
   it("collects every AST match before result assembly applies maxResults", async () => {
     writeFileSync(path.join(tmpDir, "alpha.ts"), "export const alpha = 1;\n");
     writeFileSync(path.join(tmpDir, "beta.ts"), "export const beta = 1;\n");
-    writeFileSync(path.join(tmpDir, "gamma.py"), "alpha()\n");
+    writeFileSync(path.join(tmpDir, "gamma.sql"), "select alpha;\n");
 
     const outcome = await runFindWorkflow(
       { query: "a", mode: "ast", kind: "definition", maxResults: 1 },
@@ -60,7 +60,7 @@ describe("runFindWorkflow", () => {
       eligibleFileCount: 2,
       analyzedFileCount: 2,
       complete: true,
-      exclusions: [{ reason: "unsupported-operation", pathCount: 1, examples: ["gamma.py"] }],
+      exclusions: [{ reason: "unsupported-operation", pathCount: 1, examples: ["gamma.sql"] }],
     });
 
     const assembly = assembleFindWorkflowResult(outcome);

@@ -49,7 +49,8 @@ src/
     exports.ts        # export extraction
     imports.ts        # import extraction
     node-at.ts        # node_at action
-    outline.ts        # outline extraction
+    outline.ts        # JavaScript/TypeScript outline extraction and dispatch
+    outline-polyglot.ts # Python, Rust, and Go outline extraction
     structure.ts      # re-exports from tool sub-modules
   provider/
     tree-sitter-provider.ts # StructuralProvider impl consumed by supi-code-intelligence
@@ -87,7 +88,7 @@ pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json
 - `declare module "foo"` parses as a string-named `module` node; keep outline shallow and preserve the module name.
 - CRLF input needs normalized line splitting in coordinate helpers and `node_at` bounds to stay LSP-compatible.
 - Outline should stay shallow: top-level declarations plus supported class/interface/enum members, not local function bodies.
-- General parser support is broader than extractor support. `outline`, `imports`, and `exports` are currently JavaScript/TypeScript-only. `call-sites` supports only grammars with a registered, contract-tested query (currently every parser grammar except HTML and SQL). `getStructuralSearchSupportedExtensions()` is the authoritative public declaration used by AST Scan eligibility. The runtime also exposes a `query()` method on `TreeSitterSession` that works across all parser grammars.
+- General parser support is broader than extractor support. `outline` supports JavaScript, TypeScript, Python, Rust, and Go; `imports` and `exports` remain JavaScript/TypeScript-only. `call-sites` supports only grammars with a registered, contract-tested query (currently every parser grammar except HTML and SQL). `getStructuralSearchSupportedExtensions()` is the authoritative public declaration used by AST Scan eligibility. The runtime also exposes a `query()` method on `TreeSitterSession` that works across all parser grammars.
 - `pnpm peers check` currently reports missing `tree-sitter` peers for `@derekstride/tree-sitter-sql` and `tree-sitter-kotlin`; these grammar packages are dev-only WASM generators, so treat that warning as known workspace noise unless the vendoring strategy changes.
 
 ## Packaging

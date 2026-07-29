@@ -34,7 +34,8 @@ describe("enumerateAstFiles", () => {
     const gitIgnoredSource = write("src/generated.ts");
     writeFileSync(path.join(tmpDir, ".gitignore"), "src/generated.ts\n");
     write("src/readme.md", "target\n");
-    write("src/python.py", "target()\n");
+    const python = write("src/python.py", "target()\n");
+    write("src/query.sql", "select 1;\n");
     write(".hidden.ts");
     write("node_modules/pkg/index.js");
     write("dist/generated.ts");
@@ -50,9 +51,11 @@ describe("enumerateAstFiles", () => {
     expect(result.kind).toBe("completed");
     if (result.kind !== "completed") return;
     expect(result.files).toEqual(
-      [realpathSync(gitIgnoredSource), realpathSync(source)].sort((a, b) => a.localeCompare(b)),
+      [realpathSync(gitIgnoredSource), realpathSync(python), realpathSync(source)].sort((a, b) =>
+        a.localeCompare(b),
+      ),
     );
-    expect(result.eligibleFileCount).toBe(2);
+    expect(result.eligibleFileCount).toBe(3);
     expect(result.complete).toBe(true);
     expect(result.exclusions).toEqual(
       expect.arrayContaining([
@@ -116,19 +119,19 @@ describe("enumerateAstFiles", () => {
   });
 
   it("rejects an exact file whose grammar does not support the requested operation", async () => {
-    const python = write("src/source.py", "target()\n");
+    const sql = write("src/source.sql", "select 1;\n");
 
     await expect(
       enumerateAstFiles({
         cwd: tmpDir,
-        roots: [python],
+        roots: [sql],
         operation: "outline",
         deadline: Number.POSITIVE_INFINITY,
         maxFiles: 5_000,
       }),
     ).resolves.toEqual({
       kind: "invalid-root",
-      path: "src/source.py",
+      path: "src/source.sql",
       reason: "Explicit AST file scope does not support the outline operation.",
     });
   });

@@ -3,6 +3,7 @@
 import { nodeToRange } from "../coordinates.ts";
 import type { SyntaxNodeLike } from "../syntax-node.ts";
 import type { OutlineItem } from "../types.ts";
+import { extractPolyglotOutlineItems } from "./outline-polyglot.ts";
 
 /** Node types that can be extracted directly as outline items. */
 const OUTLINE_DECLARATION_NODE_TYPES = new Set([
@@ -32,12 +33,15 @@ function collectItems(node: SyntaxNodeLike, source: string): OutlineItem[] {
   const items: OutlineItem[] = [];
 
   for (const child of node.children) {
-    const item = extractItem(child, source);
-    if (item) {
-      items.push(item);
-    } else {
-      items.push(...collectItems(child, source));
+    const polyglotItems = extractPolyglotOutlineItems(child, source);
+    if (polyglotItems) {
+      items.push(...polyglotItems);
+      continue;
     }
+
+    const item = extractItem(child, source);
+    if (item) items.push(item);
+    else items.push(...collectItems(child, source));
   }
 
   return items;

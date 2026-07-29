@@ -80,9 +80,53 @@ describe("structured pattern AST Scan", () => {
     });
   });
 
+  it("matches structural structs as AST types", async () => {
+    source("src/model.go");
+    const provider = outlineProvider(async () => ({
+      kind: "success",
+      data: [
+        {
+          name: "Model",
+          kind: "struct",
+          startLine: 2,
+          startCharacter: 1,
+          endLine: 2,
+          endCharacter: 20,
+          children: [],
+        },
+        {
+          name: "Value",
+          kind: "union",
+          startLine: 3,
+          startCharacter: 1,
+          endLine: 3,
+          endCharacter: 20,
+          children: [],
+        },
+      ],
+    }));
+
+    const outcome = await getStructuredPatternMatches({
+      params: { pattern: "e", kind: "type" },
+      roots: [path.join(tmpDir, "src")],
+      cwd: tmpDir,
+      structural: provider,
+    });
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      result: {
+        matches: [
+          { file: "src/model.go", name: "Model", kind: "struct", line: 2 },
+          { file: "src/model.go", name: "Value", kind: "union", line: 3 },
+        ],
+      },
+    });
+  });
+
   it("excludes operation-ineligible languages without making a mixed scan partial", async () => {
     source("src/a.ts");
-    source("src/b.py");
+    source("src/b.sql");
     const analyzedFiles: string[] = [];
     const provider = outlineProvider(async (file) => {
       analyzedFiles.push(file);
@@ -105,7 +149,7 @@ describe("structured pattern AST Scan", () => {
           eligibleFileCount: 1,
           analyzedFileCount: 1,
           complete: true,
-          exclusions: [{ reason: "unsupported-operation", pathCount: 1, examples: ["src/b.py"] }],
+          exclusions: [{ reason: "unsupported-operation", pathCount: 1, examples: ["src/b.sql"] }],
           limitations: [],
         },
       },
@@ -113,12 +157,12 @@ describe("structured pattern AST Scan", () => {
   });
 
   it("returns unavailable when a directory contains only operation-ineligible files", async () => {
-    source("python/a.py");
+    source("sql/query.sql");
     const outline = vi.fn(async () => ({ kind: "success" as const, data: [] }));
 
     const outcome = await getStructuredPatternMatches({
       params: { pattern: "missing", kind: "definition" },
-      roots: [path.join(tmpDir, "python")],
+      roots: [path.join(tmpDir, "sql")],
       cwd: tmpDir,
       structural: { outline } as unknown as StructuralProvider,
     });

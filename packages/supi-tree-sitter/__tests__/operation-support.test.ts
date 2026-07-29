@@ -1,14 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { getStructuralSearchSupportedExtensions, getSupportedExtensions } from "../src/api.ts";
 
-const OUTLINE_EXTENSIONS = [".js", ".jsx", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx"];
+const JS_TS_EXTENSIONS = [".js", ".jsx", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx"];
+const OUTLINE_EXTENSIONS = [...JS_TS_EXTENSIONS, ".py", ".pyi", ".rs", ".go", ".mod"];
 const CALL_UNSUPPORTED_EXTENSIONS = new Set([".html", ".htm", ".xhtml", ".sql"]);
 
 describe("structural search operation support", () => {
-  it.each(["outline", "imports", "exports"] as const)(
+  it("declares Python, Rust, and Go outline support", () => {
+    expect(getStructuralSearchSupportedExtensions("outline")).toEqual(OUTLINE_EXTENSIONS);
+  });
+
+  it.each(["imports", "exports"] as const)(
     "declares only JavaScript and TypeScript extensions for %s",
     (operation) => {
-      expect(getStructuralSearchSupportedExtensions(operation)).toEqual(OUTLINE_EXTENSIONS);
+      expect(getStructuralSearchSupportedExtensions(operation)).toEqual(JS_TS_EXTENSIONS);
     },
   );
 

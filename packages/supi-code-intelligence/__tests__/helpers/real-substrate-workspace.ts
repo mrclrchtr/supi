@@ -17,6 +17,8 @@ export const CONTRACT_FIXTURE = {
   consumer: "src/consumer.ts",
   pythonRoot: "python",
   python: "python/contracts.py",
+  sqlRoot: "sql",
+  sql: "sql/query.sql",
   unsupported: "README.md",
 } as const;
 
@@ -90,11 +92,13 @@ function writeContractFixture(cwd: string): void {
   mkdirSync(join(cwd, ".pi", "supi"), { recursive: true });
   mkdirSync(join(cwd, "src"), { recursive: true });
   mkdirSync(join(cwd, CONTRACT_FIXTURE.pythonRoot), { recursive: true });
+  mkdirSync(join(cwd, CONTRACT_FIXTURE.sqlRoot), { recursive: true });
   writeFileSync(join(cwd, ".pi", "supi", "config.json"), configuredLspJson());
   writeFileSync(join(cwd, "tsconfig.json"), tsconfigJson());
   writeFileSync(join(cwd, CONTRACT_FIXTURE.contracts), contractsSource());
   writeFileSync(join(cwd, CONTRACT_FIXTURE.consumer), consumerSource());
   writeFileSync(join(cwd, CONTRACT_FIXTURE.python), pythonSource());
+  writeFileSync(join(cwd, CONTRACT_FIXTURE.sql), "select 1;\n");
   writeFileSync(join(cwd, CONTRACT_FIXTURE.unsupported), "# unsupported AST fixture\n");
 }
 

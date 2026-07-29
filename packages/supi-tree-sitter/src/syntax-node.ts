@@ -10,4 +10,5 @@ export interface SyntaxNodeLike {
   startPosition: { row: number; column: number };
   endPosition: { row: number; column: number };
   childForFieldName(name: string): SyntaxNodeLike | null;
+  childrenForFieldName(name: string): SyntaxNodeLike[];
 }

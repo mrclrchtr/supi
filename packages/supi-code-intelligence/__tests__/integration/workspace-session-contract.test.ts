@@ -21,15 +21,15 @@ const TYPESCRIPT_AST_EXPECTATIONS = [
 ] as const;
 
 const PYTHON_AST_EXPECTATIONS = [
-  { kind: "call", supported: true },
-  { kind: "definition", supported: false },
-  { kind: "import", supported: false },
-  { kind: "export", supported: false },
-  { kind: "type", supported: false },
-  { kind: "interface", supported: false },
-  { kind: "class", supported: false },
-  { kind: "method", supported: false },
-  { kind: "enum", supported: false },
+  { kind: "call", supported: true, query: "pythonHelper", resultKind: "call", line: 2 },
+  { kind: "definition", supported: true, query: "invoke_python", resultKind: "function", line: 1 },
+  { kind: "import", supported: false, query: "pythonHelper" },
+  { kind: "export", supported: false, query: "pythonHelper" },
+  { kind: "type", supported: true, query: "pythonHelper" },
+  { kind: "interface", supported: true, query: "pythonHelper" },
+  { kind: "class", supported: true, query: "pythonHelper" },
+  { kind: "method", supported: true, query: "pythonHelper" },
+  { kind: "enum", supported: true, query: "pythonHelper" },
 ] as const;
 
 type FindOutcome = Awaited<ReturnType<WorkspaceCodeIntelligenceSession["find"]>>;
@@ -73,22 +73,26 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
 
   it.each(PYTHON_AST_EXPECTATIONS)(
     "records the Python $kind support expectation",
-    async ({ kind, supported }) => {
+    async (expectation) => {
       const outcome = await getWorkspace().session.find({
-        query: "pythonHelper",
+        query: expectation.query,
         mode: "ast",
-        kind,
+        kind: expectation.kind,
         scope: [CONTRACT_FIXTURE.python],
       });
 
-      if (supported) {
+      if (expectation.supported) {
         const result = astResult(outcome);
-        expect(result.matches).toContainEqual({
-          file: CONTRACT_FIXTURE.python,
-          name: "pythonHelper",
-          kind: "call",
-          line: 2,
-        });
+        if ("resultKind" in expectation) {
+          expect(result.matches).toContainEqual({
+            file: CONTRACT_FIXTURE.python,
+            name: expectation.query,
+            kind: expectation.resultKind,
+            line: expectation.line,
+          });
+        } else {
+          expect(result.matches).toEqual([]);
+        }
         expect(result.partialReason).toBeNull();
         return;
       }
@@ -178,10 +182,10 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
     });
 
     const operationIneligible = await session.find({
-      query: "pythonHelper",
+      query: "query",
       mode: "ast",
       kind: "definition",
-      scope: [CONTRACT_FIXTURE.python],
+      scope: [CONTRACT_FIXTURE.sql],
     });
     expect(operationIneligible).toMatchObject({
       kind: "invalid-input",
@@ -190,10 +194,10 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
 
     await expect(
       session.find({
-        query: "pythonHelper",
+        query: "query",
         mode: "ast",
         kind: "definition",
-        scope: [CONTRACT_FIXTURE.pythonRoot],
+        scope: [CONTRACT_FIXTURE.sqlRoot],
       }),
     ).resolves.toEqual({
       kind: "unavailable",
