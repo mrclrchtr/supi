@@ -21,6 +21,11 @@ const OUTLINE_EXTENSIONS = [
   ".java",
   ".kt",
   ".kts",
+  ".rb",
+  ".sh",
+  ".bash",
+  ".zsh",
+  ".r",
 ];
 const CALL_UNSUPPORTED_EXTENSIONS = new Set([".html", ".htm", ".xhtml", ".sql"]);
 

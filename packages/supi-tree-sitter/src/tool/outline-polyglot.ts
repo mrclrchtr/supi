@@ -3,12 +3,16 @@ import type { SyntaxNodeLike } from "../syntax-node.ts";
 import type { OutlineItem } from "../types.ts";
 import { extractCFamilyOutlineItems } from "./outline-c-family.ts";
 import { extractJvmOutlineItems } from "./outline-jvm.ts";
+import { extractScriptingOutlineItems } from "./outline-scripting.ts";
 
 /** Extract declarations whose Tree-sitter node shapes are specific to non-JS/TS grammars. */
 export function extractPolyglotOutlineItems(
   node: SyntaxNodeLike,
   source: string,
 ): OutlineItem[] | undefined {
+  const scriptingItems = extractScriptingOutlineItems(node, source);
+  if (scriptingItems) return scriptingItems;
+
   switch (node.type) {
     case "function_definition": {
       const name = node.childForFieldName("name");

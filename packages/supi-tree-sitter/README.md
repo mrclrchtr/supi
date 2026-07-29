@@ -50,7 +50,7 @@ Coordinates in the library APIs use **1-based** line and character columns. Char
 - R (`.r`)
 - SQL (`.sql`)
 
-Parser support is broader than extractor support. Outline collection supports JavaScript, TypeScript, Python, Rust, Go, C, C++, Java, and Kotlin; import and export collection currently support JavaScript/TypeScript-family grammars. Call-site collection supports every listed family except HTML and SQL. Consumers performing a bulk structural scan should use `getStructuralSearchSupportedExtensions(operation)` rather than treating every parseable extension as eligible.
+Parser support is broader than extractor support. Outline collection supports JavaScript, TypeScript, Python, Rust, Go, C, C++, Java, Kotlin, Ruby, Bash/shell, and R; import and export collection currently support JavaScript/TypeScript-family grammars. Call-site collection supports every listed family except HTML and SQL. Consumers performing a bulk structural scan should use `getStructuralSearchSupportedExtensions(operation)` rather than treating every parseable extension as eligible.
 
 ## Architecture
 

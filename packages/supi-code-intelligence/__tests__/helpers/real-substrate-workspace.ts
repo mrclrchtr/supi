@@ -23,6 +23,12 @@ export const CONTRACT_FIXTURE = {
   java: "java/Contracts.java",
   kotlinRoot: "kotlin",
   kotlin: "kotlin/contracts.kt",
+  rubyRoot: "ruby",
+  ruby: "ruby/model.rb",
+  bashRoot: "bash",
+  bash: "bash/task.sh",
+  rRoot: "r",
+  r: "r/model.r",
   sqlRoot: "sql",
   sql: "sql/query.sql",
   unsupported: "README.md",
@@ -101,6 +107,9 @@ function writeContractFixture(cwd: string): void {
   mkdirSync(join(cwd, CONTRACT_FIXTURE.cppRoot), { recursive: true });
   mkdirSync(join(cwd, CONTRACT_FIXTURE.javaRoot), { recursive: true });
   mkdirSync(join(cwd, CONTRACT_FIXTURE.kotlinRoot), { recursive: true });
+  mkdirSync(join(cwd, CONTRACT_FIXTURE.rubyRoot), { recursive: true });
+  mkdirSync(join(cwd, CONTRACT_FIXTURE.bashRoot), { recursive: true });
+  mkdirSync(join(cwd, CONTRACT_FIXTURE.rRoot), { recursive: true });
   mkdirSync(join(cwd, CONTRACT_FIXTURE.sqlRoot), { recursive: true });
   writeFileSync(join(cwd, ".pi", "supi", "config.json"), configuredLspJson());
   writeFileSync(join(cwd, "tsconfig.json"), tsconfigJson());
@@ -113,6 +122,9 @@ function writeContractFixture(cwd: string): void {
   );
   writeFileSync(join(cwd, CONTRACT_FIXTURE.java), "record JavaModel(int id) { void run() {} }\n");
   writeFileSync(join(cwd, CONTRACT_FIXTURE.kotlin), "object KotlinModel { fun run() {} }\n");
+  writeFileSync(join(cwd, CONTRACT_FIXTURE.ruby), "class RubyModel\n  def run; end\nend\n");
+  writeFileSync(join(cwd, CONTRACT_FIXTURE.bash), "shell_task() { echo hi; }\n");
+  writeFileSync(join(cwd, CONTRACT_FIXTURE.r), "r_task <- function() 1\n");
   writeFileSync(join(cwd, CONTRACT_FIXTURE.sql), "select 1;\n");
   writeFileSync(join(cwd, CONTRACT_FIXTURE.unsupported), "# unsupported AST fixture\n");
 }

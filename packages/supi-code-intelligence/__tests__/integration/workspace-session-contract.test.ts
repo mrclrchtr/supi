@@ -38,6 +38,25 @@ const TRANCHE_TWO_AST_EXPECTATIONS = [
   { file: CONTRACT_FIXTURE.kotlin, query: "KotlinModel", resultKind: "object" },
 ] as const;
 
+const TRANCHE_THREE_AST_EXPECTATIONS = [
+  { file: CONTRACT_FIXTURE.ruby, kind: "class", query: "RubyModel", resultKind: "class", line: 1 },
+  { file: CONTRACT_FIXTURE.ruby, kind: "method", query: "run", resultKind: "method", line: 2 },
+  {
+    file: CONTRACT_FIXTURE.bash,
+    kind: "definition",
+    query: "shell_task",
+    resultKind: "function",
+    line: 1,
+  },
+  {
+    file: CONTRACT_FIXTURE.r,
+    kind: "definition",
+    query: "r_task",
+    resultKind: "function",
+    line: 1,
+  },
+] as const;
+
 type FindOutcome = Awaited<ReturnType<WorkspaceCodeIntelligenceSession["find"]>>;
 type ResolveOutcome = Awaited<ReturnType<WorkspaceCodeIntelligenceSession["resolve"]>>;
 
@@ -118,6 +137,24 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
       );
 
       expect(result.matches).toContainEqual({ file, name: query, kind: resultKind, line: 1 });
+      expect(result.partialReason).toBeNull();
+      expect(result.scan.complete).toBe(true);
+    },
+  );
+
+  it.each(TRANCHE_THREE_AST_EXPECTATIONS)(
+    "finds $resultKind $kind evidence in $file",
+    async ({ file, kind, query, resultKind, line }) => {
+      const result = astResult(
+        await getWorkspace().session.find({ query, mode: "ast", kind, scope: [file] }),
+      );
+
+      expect(result.matches).toContainEqual({
+        file,
+        name: query,
+        kind: resultKind,
+        line,
+      });
       expect(result.partialReason).toBeNull();
       expect(result.scan.complete).toBe(true);
     },

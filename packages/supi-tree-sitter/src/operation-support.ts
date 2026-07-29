@@ -13,6 +13,9 @@ const OUTLINE_GRAMMARS: ReadonlySet<GrammarId> = new Set([
   "cpp",
   "java",
   "kotlin",
+  "ruby",
+  "bash",
+  "r",
 ]);
 
 /** Structural collection operations whose language support defines an AST Scan universe. */

@@ -157,7 +157,7 @@ code_find({ query: "@scope/package", mode: "ast", kind: "import", scope: ["src"]
 
 Use PI's `grep` tool for literal or regex source search when it is active. `code_find` does not redirect removed text/regex calls to another tool.
 
-AST `kind` accepts exactly `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, and `enum`. Outline-backed kinds support JavaScript, TypeScript, Python, Rust, Go, C, C++, Java, and Kotlin. AST `call` finds written call-site names, not symbol identity. Use `code_graph` references on a resolved target for symbol-identity relationships.
+AST `kind` accepts exactly `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, and `enum`. Outline-backed kinds support JavaScript, TypeScript, Python, Rust, Go, C, C++, Java, Kotlin, Ruby, Bash/shell, and R. AST `call` finds written call-site names, not symbol identity. Use `code_graph` references on a resolved target for symbol-identity relationships.
 
 #### AST Scan universe
 
