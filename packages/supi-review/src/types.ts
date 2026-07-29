@@ -221,6 +221,8 @@ export interface ReviewerInvocation {
   cwd: string;
   snapshot: ReviewSnapshot;
   audit?: ReviewerAuditRequest;
+  /** A parent-owned bootstrap was configured, so reviewers must not bootstrap independently. */
+  dependencyBootstrapConfigured?: boolean;
   signal?: AbortSignal;
   projectTrusted?: boolean;
   onProgress?: (progress: ReviewProgress) => void;

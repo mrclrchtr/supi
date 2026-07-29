@@ -9,8 +9,10 @@ export interface ReviewConfig extends Record<string, unknown> {
   agentModel: string;
   /** Canonical Planner model id, or `current` for the active session model. */
   plannerModel: string;
-  /** Enable explicit local reviewer replay capture and retrieval. */
+  /** Record every reviewer's local replay and enable replay retrieval. */
   auditEnabled: boolean;
+  /** Shell command run once before reviewers start. */
+  bootstrapCommand: string;
 }
 
 /** Shared SuPi configuration section owned by this package. */
@@ -20,6 +22,7 @@ export const REVIEW_DEFAULTS: ReviewConfig = {
   agentModel: CURRENT_SESSION_REVIEW_MODEL,
   plannerModel: CURRENT_SESSION_REVIEW_MODEL,
   auditEnabled: false,
+  bootstrapCommand: "",
 };
 
 /** Load merged and normalized review configuration. */
@@ -32,10 +35,12 @@ export function loadReviewConfig(cwd: string, homeDir?: string): ReviewConfig {
     if (typeof value === "string") return value.trim().toLowerCase() === "true";
     return fallback;
   };
+  const readCommand = (value: unknown) => (typeof value === "string" ? value.trim() : "");
   return {
     agentModel: readModel(raw.agentModel, REVIEW_DEFAULTS.agentModel),
     plannerModel: readModel(raw.plannerModel, REVIEW_DEFAULTS.plannerModel),
     auditEnabled: readBoolean(raw.auditEnabled, REVIEW_DEFAULTS.auditEnabled),
+    bootstrapCommand: readCommand(raw.bootstrapCommand),
   };
 }
 
@@ -68,11 +73,18 @@ export function registerReviewSettings(pi: ExtensionAPI, homeDir?: string): void
         staticOptions: [currentOption],
       },
       {
+        kind: "string",
+        key: "bootstrapCommand",
+        label: "Bootstrap command",
+        description:
+          "Run once in the frozen Review Workspace before reviewers start. Empty lets reviewers bootstrap when needed.",
+      },
+      {
         kind: "boolean" as const,
         key: "auditEnabled",
         label: "Local reviewer replay",
         description:
-          "Enable opt-in seven-day local replay capture and the supi_review_audit tool. Requires /reload.",
+          "Record every reviewer's raw messages and tool output locally for seven days. Requires /reload.",
       },
     ],
     ...(homeDir ? { homeDir } : {}),

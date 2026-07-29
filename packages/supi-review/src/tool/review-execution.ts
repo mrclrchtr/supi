@@ -103,6 +103,7 @@ export async function executeReviewTasks(
   signal?: AbortSignal,
   onUpdate?: ReviewExecutionUpdate,
   audit?: ReviewerAuditRequest,
+  dependencyBootstrapConfigured = false,
 ): Promise<ReviewTaskResult[]> {
   const review = normalizeReviewInput(reviewInput);
   let completedCount = 0;
@@ -148,6 +149,7 @@ export async function executeReviewTasks(
           model,
           projectTrusted,
           ...(audit ? { audit } : {}),
+          ...(dependencyBootstrapConfigured ? { dependencyBootstrapConfigured } : {}),
           signal,
           onProgress: (progress) => {
             taskStates[task.id] = { status: "running", progress };

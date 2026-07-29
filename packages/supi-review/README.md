@@ -17,7 +17,7 @@ This is a beta package with intentionally unstable interfaces.
 - `supi_review_prepare` — optional preparation with `planning: "none" | "suggest"`
 - `supi_review_run` — universal Direct or Prepared Review execution
 - `supi_review_output` — retrieve continuation pages from review/preparation output
-- `supi_review_audit` — disabled-by-default retrieval of explicitly recorded local reviewer replays
+- `supi_review_audit` — disabled-by-default retrieval of locally recorded reviewer replays
 
 Preparation is optional. Skills and agents that already know how to review should use Direct Review.
 
@@ -84,7 +84,7 @@ Reviewers receive:
 
 They use ordinary Git and direct reads in the frozen Review Workspace. Before-side content remains available through the packet's pinned Git revision. Code Intelligence runs in a headless inspection profile; an unavailable profile produces a Reviewer Capability Warning, while `read` and `bash` remain available.
 
-Inspection-only is behavioral protocol, not access control. The surrounding Sandboxed Pi Environment is the security boundary and must contain only files and credentials acceptable for reviewer-model access. Reviewers may choose a Dependency Bootstrap command when local dependencies limit Code Intelligence. They must not intentionally mutate Target Evidence or Git history, and must not run tests, builds, linters, runtime experiments, services, nested Pi sessions, or nested reviews.
+Inspection-only is behavioral protocol, not access control. The surrounding Sandboxed Pi Environment is the security boundary and must contain only files and credentials acceptable for reviewer-model access. When `review.bootstrapCommand` is configured, the Review Engine runs its shell command once after workspace verification and before reviewer fan-out; reviewers then receive no Dependency Bootstrap instruction. When it is empty, reviewers may choose a Dependency Bootstrap command when local dependencies limit Code Intelligence. They must not intentionally mutate Target Evidence or Git history, and must not run tests, builds, linters, runtime experiments, services, nested Pi sessions, or nested reviews.
 
 Ambient extensions, context files, skills, prompt templates, themes, and discovered system prompts are suppressed in Reviewer Sessions. In-memory settings disable compaction and provider retries.
 
@@ -96,7 +96,7 @@ Capability and cleanup warnings are execution provenance, not findings. By defau
 
 ### Local reviewer replay
 
-`review.auditEnabled` is off by default and requires `/reload` after changing it. When enabled, a caller may add `"audit": "local-replay"` to `supi_review_run`; the interactive command asks separately. Each task then records a protected local replay containing provider-visible messages, tool calls/results, packet and protocol text, lifecycle timing, usage, and the Workspace receipt. Thinking blocks and thought signatures are omitted.
+`review.auditEnabled` is off by default and requires `/reload` after changing it. When enabled, every task records a protected local replay containing provider-visible messages, tool calls/results, packet and protocol text, lifecycle timing, usage, and the Workspace receipt. Thinking blocks and thought signatures are omitted.
 
 Replays expire automatically after seven days. They are not included in normal review output: a task reports only an opaque artifact id. Use `supi_review_audit` to list artifacts or page through one by id. Replays can contain raw repository evidence and shell output, so enable this only in environments where seven-day local retention is acceptable.
 
@@ -105,3 +105,15 @@ Parent-facing text is stored as a bounded session artifact. Use `supi_review_out
 ## Models
 
 `/supi-review` asks for the reviewer model. Agent-triggered runs use `review.agentModel`. Optional planning uses `review.plannerModel` at low thinking effort. Both default to the current session model.
+
+Configure a single dependency setup command:
+
+```json
+{
+  "review": {
+    "bootstrapCommand": "pnpm install --frozen-lockfile"
+  }
+}
+```
+
+In `/supi-settings`, enter `pnpm install --frozen-lockfile`. An empty command (the default) leaves dependency bootstrap available to reviewers.

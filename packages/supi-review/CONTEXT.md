@@ -8,7 +8,7 @@ See also: root `CONTEXT.md` for project-wide terms.
 
 **Review Engine**:
 The package-owned machinery that resolves review targets, compiles reviewer packets, runs reviewer sessions, and validates their results.
-_Avoid_: host, prompt generator, review methodology
+_Avoid_: parent, host, prompt generator, review methodology
 
 **Reviewer Session**:
 A managed child agent that executes exactly one Review Task in the batch's shared Review Workspace. It shares the containing Pi process's trust boundary and follows the Inspection-only protocol without per-session write isolation.
@@ -27,7 +27,7 @@ The explicit recovery operation for multi-selecting and removing SuPi-marked Rev
 _Avoid_: automatic pruning, age-based cleanup, transactional cleanup
 
 **Dependency Bootstrap**:
-A reviewer-chosen dependency installation inside a Review Workspace when Code Intelligence needs local dependencies. Generated state is contextual; duplicate attempts and Target Evidence mutation are prevented by instruction, not enforcement or post-command checking.
+A dependency command inside a Review Workspace when Code Intelligence needs local dependencies. When `review.bootstrapCommand` is configured, the Review Engine runs it once before reviewer fan-out and reviewers receive no bootstrap instruction; otherwise it is reviewer-chosen. Generated state is contextual; Target Evidence mutation is prevented by instruction, not enforcement or post-command checking.
 _Avoid_: workspace replication, setup phase, verification command
 
 **Sandboxed Pi Environment**:
@@ -95,5 +95,5 @@ A bounded, ordered diagnostic record of lifecycle transitions for one child sess
 _Avoid_: recent events, event log, child transcript, telemetry
 
 **Local Reviewer Replay**:
-An explicitly requested, private local artifact for tuning a Reviewer Session. It retains provider-visible messages and tool output, packet/protocol text, timing, usage, and the Review Workspace Receipt for seven days; thinking blocks and thought signatures are omitted. It is disabled by default and accessed only through `supi_review_audit` after enabling `review.auditEnabled` and reloading.
+A private local artifact for tuning a Reviewer Session. It retains provider-visible messages and tool output, packet/protocol text, timing, usage, and the Review Workspace Receipt for seven days; thinking blocks and thought signatures are omitted. It is disabled by default; enabling `review.auditEnabled` records every task and registers `supi_review_audit` after reload.
 _Avoid_: normal review output, child diagnostics, permanent transcript

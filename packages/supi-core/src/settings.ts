@@ -26,6 +26,7 @@ export type {
   SettingsField,
   SettingsFieldAction,
   SettingsPersistedChange,
+  StringField,
   StringListField,
   ValueSource,
 } from "./settings/settings-schema.ts";

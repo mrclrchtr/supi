@@ -57,10 +57,10 @@ export function registerReviewAuditTool(pi: ExtensionAPI, store: LocalReviewAudi
   pi.registerTool({
     name: "supi_review_audit",
     label: "Inspect Review Replay",
-    description: "List or page through explicitly recorded local reviewer replays.",
-    promptSnippet: "Inspect an opt-in local reviewer replay",
+    description: "List or page through locally recorded reviewer replays.",
+    promptSnippet: "Inspect a local reviewer replay",
     promptGuidelines: [
-      "Use supi_review_audit only when an audited supi_review_run task returned an audit artifact id, or to list local replays explicitly.",
+      "Use supi_review_audit only when review output returned an audit artifact id, or to list local replays explicitly.",
       "Replay content may contain raw repository evidence and tool output; do not repeat it unless necessary.",
     ],
     parameters: reviewAuditSchema,

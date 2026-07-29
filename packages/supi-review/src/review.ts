@@ -208,6 +208,9 @@ async function executeInteractiveReview(
     auditStore?: LocalReviewAuditStore;
   },
 ) {
+  const config = loadReviewConfig(ctx.cwd);
+  const bootstrapCommand = config.bootstrapCommand;
+  const auditStore = config.auditEnabled ? input.auditStore : undefined;
   return withCancellableLoader(ctx, "Reviewing…", (signal) =>
     input.planId
       ? runReview({
@@ -216,8 +219,9 @@ async function executeInteractiveReview(
           planId: input.planId,
           decision: { kind: "use-review", review: input.review },
           planStore: input.planStore,
+          bootstrapCommand,
           projectTrusted: ctx.isProjectTrusted(),
-          ...(input.auditStore ? { auditStore: input.auditStore } : {}),
+          ...(auditStore ? { auditStore } : {}),
           signal,
         })
       : runReview({
@@ -226,8 +230,9 @@ async function executeInteractiveReview(
           target: input.target,
           review: input.review,
           reviewerModel: input.reviewerModel,
+          bootstrapCommand,
           projectTrusted: ctx.isProjectTrusted(),
-          ...(input.auditStore ? { auditStore: input.auditStore } : {}),
+          ...(auditStore ? { auditStore } : {}),
           signal,
         }),
   );
@@ -238,19 +243,6 @@ interface ReviewCommandServices {
   planStore: ReviewPlanStore;
   artifactStore: ReviewArtifactStore;
   auditStore: LocalReviewAuditStore;
-}
-
-async function selectAuditStore(
-  ctx: CommandContext,
-  auditStore: LocalReviewAuditStore,
-): Promise<LocalReviewAuditStore | undefined> {
-  if (!loadReviewConfig(ctx.cwd).auditEnabled) return undefined;
-  return (await ctx.ui.confirm(
-    "Record local reviewer replay?",
-    "Store raw reviewer messages and tool output locally for seven days.",
-  ))
-    ? auditStore
-    : undefined;
 }
 
 async function runCommand(ctx: CommandContext, services: ReviewCommandServices): Promise<void> {
@@ -283,15 +275,13 @@ async function runCommand(ctx: CommandContext, services: ReviewCommandServices):
     `${edited.tasks.length} task(s) using ${reviewerModel.canonicalId}`,
   );
   if (!approved) return;
-  const recordAudit = await selectAuditStore(ctx, auditStore);
-
   const outcome = await executeInteractiveReview(ctx, {
     target,
     review: edited,
     reviewerModel,
     ...(planId ? { planId } : {}),
     planStore,
-    ...(recordAudit ? { auditStore: recordAudit } : {}),
+    auditStore,
   });
   if (!outcome) return;
   if (outcome.kind !== "completed") {

@@ -1,5 +1,6 @@
 {
   "review": {
-    "auditEnabled": true
+    "auditEnabled": true,
+    "bootstrapCommand": "pnpm install"
   }
 }

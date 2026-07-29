@@ -34,6 +34,7 @@ export function buildActionMenu(field: ScopedFieldValue, scope: SettingsScope): 
     if (choices.length > 0) {
       for (const choice of choices) menu.push({ value: `set:${choice}`, label: choice });
     } else if (field.field.kind === "number") menu.push({ value: "edit", label: "Edit value…" });
+    else if (field.field.kind === "string") menu.push({ value: "edit", label: "Edit value…" });
     else if (field.field.kind === "stringList") menu.push({ value: "edit", label: "Edit values…" });
     else if (field.field.kind === "modelPicker")
       menu.push({ value: "edit", label: "Choose model…" });

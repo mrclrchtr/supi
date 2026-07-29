@@ -32,6 +32,7 @@ describe("review config", () => {
         agentModel: CURRENT_SESSION_REVIEW_MODEL,
         plannerModel: CURRENT_SESSION_REVIEW_MODEL,
         auditEnabled: false,
+        bootstrapCommand: "",
       });
     } finally {
       fs.rmSync(homeDir, { recursive: true, force: true });
@@ -45,7 +46,11 @@ describe("review config", () => {
     try {
       writeSupiConfig(
         { section: REVIEW_CONFIG_SECTION, scope: "project", cwd },
-        { agentModel: "  openai/reviewer  ", plannerModel: "  openai/planner  " },
+        {
+          agentModel: "  openai/reviewer  ",
+          plannerModel: "  openai/planner  ",
+          bootstrapCommand: " pnpm install --frozen-lockfile ",
+        },
         { homeDir },
       );
 
@@ -53,6 +58,7 @@ describe("review config", () => {
         agentModel: "openai/reviewer",
         plannerModel: "openai/planner",
         auditEnabled: false,
+        bootstrapCommand: "pnpm install --frozen-lockfile",
       });
     } finally {
       fs.rmSync(homeDir, { recursive: true, force: true });
@@ -70,6 +76,7 @@ describe("review config", () => {
         fields: [
           expect.objectContaining({ kind: "modelPicker", key: "agentModel" }),
           expect.objectContaining({ kind: "modelPicker", key: "plannerModel" }),
+          expect.objectContaining({ kind: "string", key: "bootstrapCommand" }),
           expect.objectContaining({ kind: "boolean", key: "auditEnabled" }),
         ],
       }),

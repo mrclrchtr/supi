@@ -137,7 +137,7 @@ describe("agent review tool usage", () => {
     expect(result.details?.output?.artifactId).toMatch(/^review-output-/);
   });
 
-  it("passes an explicitly enabled local replay store into the review workflow", async () => {
+  it("passes the local replay store into every review when enabled", async () => {
     const pi = createPiMock();
     const localAuditStore = { create: vi.fn() } as never;
     mocks.loadReviewConfig.mockReturnValue({
@@ -158,7 +158,6 @@ describe("agent review tool usage", () => {
         mode: "direct",
         target: { kind: "working-tree" },
         review: { tasks: [{ id: "spec", instructions: "Review." }] },
-        audit: "local-replay",
       },
       undefined,
       undefined,

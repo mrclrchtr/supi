@@ -149,16 +149,8 @@ function makeRunReviewExecute(
   // biome-ignore lint/complexity/useMaxParams: Pi ToolDefinition execute signature
   return async (_id, params, signal, onUpdate, ctx) => {
     const input = parseRunReviewToolInput(params);
-    const auditStore = input.audit
-      ? (() => {
-          if (!loadReviewConfig(ctx.cwd).auditEnabled || !localAuditStore) {
-            throw new Error(
-              "Local reviewer replay is disabled. Enable Review → Local reviewer replay and /reload before requesting audit: local-replay.",
-            );
-          }
-          return localAuditStore;
-        })()
-      : undefined;
+    const config = loadReviewConfig(ctx.cwd);
+    const auditStore = config.auditEnabled ? localAuditStore : undefined;
 
     const { statusSpinner, wrappedUpdate } = wireSpinnerToProgress(ctx, onUpdate);
 
@@ -177,6 +169,7 @@ function makeRunReviewExecute(
               target: input.target,
               review: input.review,
               reviewerModel: resolveModels(ctx).reviewer,
+              bootstrapCommand: config.bootstrapCommand,
               projectTrusted: ctx.isProjectTrusted(),
               ...(auditStore ? { auditStore } : {}),
               signal,
@@ -188,6 +181,7 @@ function makeRunReviewExecute(
               planId: input.planId,
               decision: input.decision,
               planStore,
+              bootstrapCommand: config.bootstrapCommand,
               projectTrusted: ctx.isProjectTrusted(),
               ...(auditStore ? { auditStore } : {}),
               signal,

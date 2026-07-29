@@ -36,7 +36,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
   const holder: { value?: ReviewSubmission } = {};
   const submit = createReviewSubmissionTool(holder);
   const warnings: ReviewerCapabilityWarning[] = [];
-  const protocolPrompt = buildReviewerSystemPrompt();
+  const protocolPrompt = buildReviewerSystemPrompt(invocation.dependencyBootstrapConfigured);
   const thinkingLevel = clampThinkingLevel(invocation.model.model, "max");
   const withWarnings = () => (warnings.length > 0 ? { capabilityWarnings: warnings } : {});
   let session: AgentSession | undefined;

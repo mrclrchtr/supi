@@ -14,6 +14,7 @@ import type {
   ReviewTargetSpec,
   ReviewTaskResult,
 } from "../types.ts";
+import { runDependencyBootstrap } from "../workspace/dependency-bootstrap.ts";
 import { materializeReviewWorkspace } from "../workspace/review-workspace.ts";
 import {
   createEarlyCancellationDiagnostics,
@@ -46,8 +47,10 @@ export interface DirectRunInput {
   target: ReviewTargetSpec;
   review: ReviewInput;
   reviewerModel: ReviewModelSelection;
+  /** Shell command run once before reviewer fan-out. */
+  bootstrapCommand?: string;
   projectTrusted?: boolean;
-  /** Present only for an explicitly requested local reviewer replay. */
+  /** Present when local reviewer replay is enabled. */
   auditStore?: LocalReviewAuditStore;
   signal?: AbortSignal;
   onUpdate?: OnUpdate;
@@ -60,8 +63,10 @@ export interface PreparedRunInput {
   planId: string;
   decision: { kind: "accept-draft" } | { kind: "use-review"; review: ReviewInput };
   planStore: ReviewPlanStore;
+  /** Shell command run once before reviewer fan-out. */
+  bootstrapCommand?: string;
   projectTrusted?: boolean;
-  /** Present only for an explicitly requested local reviewer replay. */
+  /** Present when local reviewer replay is enabled. */
   auditStore?: LocalReviewAuditStore;
   signal?: AbortSignal;
   onUpdate?: OnUpdate;
@@ -215,8 +220,28 @@ function workspaceFailureReason(error: unknown): string {
   return "Could not create the Review Workspace.";
 }
 
+interface DependencyBootstrapInput {
+  cwd: string;
+  command?: string;
+  signal?: AbortSignal;
+  onUpdate?: OnUpdate;
+}
+
+/** Run the configured command once before reviewers share the workspace. */
+async function bootstrapReviewWorkspace(input: DependencyBootstrapInput): Promise<boolean> {
+  const command = input.command?.trim();
+  if (!command) return false;
+  input.onUpdate?.({
+    content: [{ type: "text", text: "Bootstrapping dependencies…" }],
+    details: {},
+  });
+  await runDependencyBootstrap(input.cwd, command, input.signal);
+  return true;
+}
+
 /** Execute a Direct Review or atomically consume and execute a Prepared Review. */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: direct/prepared orchestration stays at one public seam
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: direct/prepared orchestration stays at one public seam
 export async function runReview(input: RunReviewInput) {
   let snapshot: ReviewSnapshot;
   let review: ReviewInput;
@@ -316,6 +341,20 @@ export async function runReview(input: RunReviewInput) {
     return { kind: "invalid" as const, reason: workspaceFailureReason(error) };
   }
 
+  let dependencyBootstrapConfigured: boolean;
+  try {
+    dependencyBootstrapConfigured = await bootstrapReviewWorkspace({
+      cwd: workspace.cwd,
+      command: input.bootstrapCommand,
+      signal: input.signal,
+      onUpdate: input.onUpdate,
+    });
+  } catch {
+    if (lease && planStore) planStore.release(lease);
+    await workspace.cleanup();
+    return { kind: "invalid" as const, reason: "Configured Dependency Bootstrap failed." };
+  }
+
   let results: ReviewTaskResult[];
   let cleanupWarning: Awaited<ReturnType<typeof workspace.cleanup>>;
   try {
@@ -330,6 +369,7 @@ export async function runReview(input: RunReviewInput) {
       input.auditStore
         ? { store: input.auditStore, workspaceReceipt: workspace.receipt }
         : undefined,
+      dependencyBootstrapConfigured,
     );
   } catch (error) {
     if (lease && planStore) planStore.release(lease);

@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   resolveReviewSnapshot: vi.fn(),
   materializeReviewWorkspace: vi.fn(),
   cleanupWorkspace: vi.fn(),
+  runDependencyBootstrap: vi.fn(),
   runPlanner: vi.fn(),
   runReviewer: vi.fn(),
 }));
@@ -14,6 +15,9 @@ vi.mock("../../src/git.ts", async (original) => ({
 vi.mock("../../src/workspace/review-workspace.ts", async (original) => ({
   ...(await original()),
   materializeReviewWorkspace: mocks.materializeReviewWorkspace,
+}));
+vi.mock("../../src/workspace/dependency-bootstrap.ts", () => ({
+  runDependencyBootstrap: mocks.runDependencyBootstrap,
 }));
 vi.mock("../../src/tool/planner-runner.ts", () => ({
   PLANNER_PROMPT_VERSION: "test-v1",
@@ -71,6 +75,7 @@ describe("Review workflow", () => {
       receipt,
       cleanup: mocks.cleanupWorkspace,
     });
+    mocks.runDependencyBootstrap.mockResolvedValue(undefined);
     mocks.runReviewer.mockResolvedValue({
       kind: "success",
       modelId: model.canonicalId,
@@ -132,6 +137,46 @@ describe("Review workflow", () => {
     expect(
       outcome.details.results.every((result) => /^[0-9a-f]{64}$/.test(result.packetHash)),
     ).toBe(true);
+  });
+
+  it("bootstraps once before concurrent reviewers and disables reviewer bootstrap", async () => {
+    const outcome = await runReview({
+      mode: "direct",
+      cwd: "/repo",
+      target: { kind: "working-tree" },
+      review,
+      reviewerModel: model,
+      bootstrapCommand: "pnpm install --frozen-lockfile",
+    });
+
+    expect(outcome.kind).toBe("completed");
+    expect(mocks.runDependencyBootstrap).toHaveBeenCalledOnce();
+    expect(mocks.runDependencyBootstrap).toHaveBeenCalledWith(
+      "/review-workspace",
+      "pnpm install --frozen-lockfile",
+      undefined,
+    );
+    expect(mocks.runReviewer).toHaveBeenCalledWith(
+      expect.objectContaining({ dependencyBootstrapConfigured: true }),
+    );
+  });
+
+  it("stops before reviewer fan-out when dependency bootstrap fails", async () => {
+    mocks.runDependencyBootstrap.mockRejectedValue(new Error("install failed"));
+
+    await expect(
+      runReview({
+        mode: "direct",
+        cwd: "/repo",
+        target: { kind: "working-tree" },
+        review,
+        reviewerModel: model,
+        bootstrapCommand: "pnpm install",
+      }),
+    ).resolves.toEqual({ kind: "invalid", reason: "Configured Dependency Bootstrap failed." });
+
+    expect(mocks.runReviewer).not.toHaveBeenCalled();
+    expect(mocks.cleanupWorkspace).toHaveBeenCalledOnce();
   });
 
   it("preserves safe frozen-workspace verification diagnostics", async () => {

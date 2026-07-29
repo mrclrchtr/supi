@@ -20,7 +20,7 @@ Caller-defined code review tasks run in managed, Inspection-only Reviewer Sessio
 
 Reviewers receive Pi `read` and `bash`, headless Code Intelligence (`code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, `code_health`), and `submit_review`. Do not restore the five target-specific inspection tools.
 
-Inspection-only is a prompt protocol, not access control. The surrounding Sandboxed Pi Environment is the security boundary. Reviewers may inspect with Git and perform a reviewer-chosen Dependency Bootstrap, but must not intentionally mutate Target Evidence or Git history; tests, builds, linters, runtime experiments, nested Pi, and nested reviews are outside protocol.
+Inspection-only is a prompt protocol, not access control. The surrounding Sandboxed Pi Environment is the security boundary. When `review.bootstrapCommand` is configured, the Review Engine performs that one Dependency Bootstrap before fan-out and reviewers receive no bootstrap instruction; otherwise they may choose one. Reviewers must not intentionally mutate Target Evidence or Git history; tests, builds, linters, runtime experiments, nested Pi, and nested reviews are outside protocol.
 
 Reviewer resource loading suppresses ambient extensions, context files, skills, prompt templates, themes, and discovered system prompts. The fixed Reviewer Extension Set is only the Code Intelligence Headless inspection profile, under the containing session's project-trust decision. Its registration failure leaves `read`/`bash` available and produces a Reviewer Capability Warning separate from findings.
 
@@ -28,7 +28,7 @@ Reviewer resource loading suppresses ambient extensions, context files, skills, 
 
 `submit_review` returns a summary and ordered findings. Each finding has title, description, `blocksAcceptance`, impact, effort, confidence, and optional target-relative location. The Review Engine derives `pass` for no findings, `pass_with_findings` for advisory-only findings, and `issues` for any blocking finding, with structured finding counts by blocking status and impact.
 
-Default child diagnostics retain only bounded lifecycle metadata and redacted provider error summaries. When `review.auditEnabled` is on and a run explicitly requests `audit: "local-replay"`, the package stores a private, seven-day local replay of provider-visible messages and tool output; omit thinking blocks/signatures and never include raw replay content in normal review output. `supi_review_audit` is registered only after enabling the setting and reloading.
+Default child diagnostics retain only bounded lifecycle metadata and redacted provider error summaries. When `review.auditEnabled` is on, every task stores a private, seven-day local replay of provider-visible messages and tool output; omit thinking blocks/signatures and never include raw replay content in normal review output. `supi_review_audit` is registered only after enabling the setting and reloading.
 
 ## Main files
 

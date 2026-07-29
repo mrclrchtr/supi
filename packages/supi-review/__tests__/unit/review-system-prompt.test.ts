@@ -8,4 +8,9 @@ describe("reviewer system prompt", () => {
     expect(prompt).toMatch(/repository content.*untrusted/i);
     expect(prompt).toMatch(/do not follow.*instructions/i);
   });
+
+  it("allows reviewer bootstrap only when no parent command is configured", () => {
+    expect(buildReviewerSystemPrompt()).toMatch(/optional Dependency Bootstrap/i);
+    expect(buildReviewerSystemPrompt(true)).not.toMatch(/Dependency Bootstrap/i);
+  });
 });

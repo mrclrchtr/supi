@@ -7,6 +7,7 @@ import type {
   BoolField,
   EnumField,
   NumberField,
+  StringField,
   StringListField,
 } from "../../../src/settings/settings-schema.ts";
 import {
@@ -112,6 +113,12 @@ describe("formatValue", () => {
     expect(formatValue([], field)).toBe("none");
   });
 
+  it("formats an empty string as 'none' without pre-filling it", () => {
+    const field: StringField = { kind: "string", key: "command", label: "Command" };
+    expect(formatValue("", field)).toBe("none");
+    expect(formatEditValue("", field)).toBe("");
+  });
+
   it("formats enum values as string", () => {
     const field: EnumField = {
       kind: "enum",
@@ -210,6 +217,13 @@ describe("parseTypedValue", () => {
       label: "Files",
     };
     expect(parseTypedValue("", field)).toEqual([]);
+  });
+
+  it("preserves a free-form string", () => {
+    const field: StringField = { kind: "string", key: "command", label: "Command" };
+    expect(parseTypedValue("pnpm install && mise install", field)).toBe(
+      "pnpm install && mise install",
+    );
   });
 
   it("parses enum values as strings", () => {

@@ -51,12 +51,6 @@ export const runReviewSchema = Type.Object(
       Type.String({ minLength: 1, maxLength: 128, description: "Session-scoped plan id." }),
     ),
     decision: Type.Optional(preparedDecisionSchema),
-    audit: Type.Optional(
-      StringEnum(["local-replay"] as const, {
-        description:
-          "Explicitly record this run as a protected local reviewer replay when review.auditEnabled is on.",
-      }),
-    ),
   },
   { additionalProperties: false, description: "Direct or Prepared Review execution request." },
 );
@@ -70,12 +64,11 @@ export interface PrepareReviewToolInput {
 }
 
 export type RunReviewToolInput =
-  | { mode: "direct"; target: ReviewTargetSpec; review: ReviewInput; audit?: "local-replay" }
+  | { mode: "direct"; target: ReviewTargetSpec; review: ReviewInput }
   | {
       mode: "prepared";
       planId: string;
       decision: { kind: "accept-draft" } | { kind: "use-review"; review: ReviewInput };
-      audit?: "local-replay";
     };
 
 function parseTarget(input: {
@@ -115,10 +108,6 @@ export function parsePrepareReviewToolInput(input: unknown): PrepareReviewToolIn
   };
 }
 
-function auditOption(parsed: RawRunReviewInput): { audit?: "local-replay" } {
-  return parsed.audit ? { audit: parsed.audit } : {};
-}
-
 function parseDirectRun(parsed: RawRunReviewInput): RunReviewToolInput {
   if (!parsed.target || !parsed.review || parsed.planId || parsed.decision) {
     throw new Error("Direct Review requires only target and review.");
@@ -127,7 +116,6 @@ function parseDirectRun(parsed: RawRunReviewInput): RunReviewToolInput {
     mode: "direct",
     target: parseTarget(parsed.target),
     review: parsed.review,
-    ...auditOption(parsed),
   };
 }
 
@@ -140,7 +128,6 @@ function parsePreparedRun(parsed: RawRunReviewInput): RunReviewToolInput {
       mode: "prepared",
       planId: parsed.planId,
       decision: { kind: "accept-draft" },
-      ...auditOption(parsed),
     };
   }
   if (parsed.decision.kind === "use-review" && parsed.decision.review) {
@@ -148,7 +135,6 @@ function parsePreparedRun(parsed: RawRunReviewInput): RunReviewToolInput {
       mode: "prepared",
       planId: parsed.planId,
       decision: { kind: "use-review", review: parsed.decision.review },
-      ...auditOption(parsed),
     };
   }
   throw new Error(`Decision fields do not match decision kind "${parsed.decision.kind}".`);

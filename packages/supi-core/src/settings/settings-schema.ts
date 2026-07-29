@@ -86,6 +86,11 @@ export interface NumberField extends BaseField {
   values?: string[];
 }
 
+/** One free-form string. */
+export interface StringField extends BaseField {
+  kind: "string";
+}
+
 /** Comma-separated string list. */
 export interface StringListField extends BaseField {
   kind: "stringList";
@@ -164,6 +169,7 @@ export type SettingsField =
   | BoolField
   | EnumField
   | NumberField
+  | StringField
   | StringListField
   | ModelPickerField
   | CustomField;
@@ -248,6 +254,8 @@ export function formatValue(value: unknown, field: SettingsField): string {
       return value ? "on" : "off";
     case "number":
       return String(value ?? "");
+    case "string":
+      return typeof value === "string" && value ? value : "none";
     case "stringList": {
       const arr = Array.isArray(value) ? value : [];
       return arr.length > 0 ? arr.map(String).join(", ") : "none";
@@ -271,6 +279,7 @@ export function sourceBadge(displayValue: string, source: ValueSource): string {
 
 /** Format the value used to prefill editors and compare concrete choices. */
 export function formatEditValue(value: unknown, field: SettingsField): string {
+  if (field.kind === "string") return typeof value === "string" ? value : "";
   if (field.kind === "stringList") {
     const arr = Array.isArray(value) ? value : [];
     return arr.map(String).join(", ");

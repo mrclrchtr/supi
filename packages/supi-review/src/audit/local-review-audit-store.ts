@@ -28,7 +28,7 @@ export interface LocalReviewAuditStoreOptions {
 }
 
 /**
- * Stores explicitly requested raw reviewer replays outside the repository.
+ * Stores raw reviewer replays outside the repository when capture is enabled.
  * Files and their containing directory are private to the current user.
  */
 export class LocalReviewAuditStore {
