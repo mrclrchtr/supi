@@ -17,6 +17,7 @@ This is a beta package with intentionally unstable interfaces.
 - `supi_review_prepare` — optional preparation with `planning: "none" | "suggest"`
 - `supi_review_run` — universal Direct or Prepared Review execution
 - `supi_review_output` — retrieve continuation pages from review/preparation output
+- `supi_review_audit` — disabled-by-default retrieval of explicitly recorded local reviewer replays
 
 Preparation is optional. Skills and agents that already know how to review should use Direct Review.
 
@@ -69,7 +70,7 @@ The Review Engine resolves the Git worktree root once and pins commit identities
 - `comparison` — merge base of `baseCommit` and captured `HEAD` to captured `HEAD`
 - `commit` — first parent (or empty tree) to `commit`
 
-A Working-Tree Review Workspace checks out its pinned baseline and stages the exact canonical patch, so `git diff HEAD` shows the complete target. Comparison and Commit workspaces check out their pinned after commit. The engine verifies the Working-Tree patch hash before Reviewer Sessions start, so later caller edits cannot change the in-flight target.
+A Working-Tree Review Workspace checks out its pinned baseline and stages the exact canonical patch, so `git diff HEAD` shows the complete target. Comparison and Commit workspaces check out their pinned after commit. Before Reviewer Sessions start, the engine re-compiles the target patch from the linked workspace and verifies its hash, expected checkout commit, and changed-path count. Every completed batch includes that compact Workspace receipt, so later caller edits cannot change the in-flight target.
 
 Workspaces are marked and locked in Git's worktree inventory. Normal cleanup removes them; an interrupted or failed cleanup can be recovered with `/supi-review-cleanup`. That command lists only SuPi-marked worktrees, requires a second confirmation for apparently active owners, and continues after individual failures.
 
@@ -91,7 +92,13 @@ Ambient extensions, context files, skills, prompt templates, themes, and discove
 
 Each successful task returns a summary, ordered findings, and structured counts by blocking status and impact. Findings contain `blocksAcceptance`, `impact`, `effort`, `confidence`, and an optional target-relative location. The Review Engine derives `pass` when there are no findings, `pass_with_findings` for advisory-only findings, and `issues` when any finding blocks acceptance; it never aggregates or reranks tasks.
 
-Capability and cleanup warnings are execution provenance, not findings. Non-success diagnostics retain only bounded lifecycle metadata and redacted provider-owned error summaries; reviewer conversation, shell commands, tool arguments/results, and repository evidence are never retained.
+Capability and cleanup warnings are execution provenance, not findings. By default, non-success diagnostics retain only bounded lifecycle metadata and redacted provider-owned error summaries; reviewer conversation, shell commands, tool arguments/results, and repository evidence are never retained.
+
+### Local reviewer replay
+
+`review.auditEnabled` is off by default and requires `/reload` after changing it. When enabled, a caller may add `"audit": "local-replay"` to `supi_review_run`; the interactive command asks separately. Each task then records a protected local replay containing provider-visible messages, tool calls/results, packet and protocol text, lifecycle timing, usage, and the Workspace receipt. Thinking blocks and thought signatures are omitted.
+
+Replays expire automatically after seven days. They are not included in normal review output: a task reports only an opaque artifact id. Use `supi_review_audit` to list artifacts or page through one by id. Replays can contain raw repository evidence and shell output, so enable this only in environments where seven-day local retention is acceptable.
 
 Parent-facing text is stored as a bounded session artifact. Use `supi_review_output` with its returned opaque `artifactId` and offset to retrieve continuation pages.
 

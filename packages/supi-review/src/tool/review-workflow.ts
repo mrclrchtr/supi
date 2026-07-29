@@ -1,3 +1,4 @@
+import type { LocalReviewAuditStore } from "../audit/local-review-audit-store.ts";
 import { resolveReviewSnapshot, summarizeReviewSnapshot } from "../git.ts";
 import { normalizeReviewInput } from "../review-input.ts";
 import type { ReviewPlanLease, ReviewPlanStore } from "../session/review-plan-store.ts";
@@ -46,6 +47,8 @@ export interface DirectRunInput {
   review: ReviewInput;
   reviewerModel: ReviewModelSelection;
   projectTrusted?: boolean;
+  /** Present only for an explicitly requested local reviewer replay. */
+  auditStore?: LocalReviewAuditStore;
   signal?: AbortSignal;
   onUpdate?: OnUpdate;
 }
@@ -58,6 +61,8 @@ export interface PreparedRunInput {
   decision: { kind: "accept-draft" } | { kind: "use-review"; review: ReviewInput };
   planStore: ReviewPlanStore;
   projectTrusted?: boolean;
+  /** Present only for an explicitly requested local reviewer replay. */
+  auditStore?: LocalReviewAuditStore;
   signal?: AbortSignal;
   onUpdate?: OnUpdate;
 }
@@ -203,6 +208,13 @@ function snapshotsMatch(left: ReviewSnapshot, right: ReviewSnapshot): boolean {
   return left.diffHash === right.diffHash && targetsMatch(left.target, right.target);
 }
 
+function workspaceFailureReason(error: unknown): string {
+  if (error instanceof Error && error.message.startsWith("Review Workspace ")) {
+    return error.message;
+  }
+  return "Could not create the Review Workspace.";
+}
+
 /** Execute a Direct Review or atomically consume and execute a Prepared Review. */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: direct/prepared orchestration stays at one public seam
 export async function runReview(input: RunReviewInput) {
@@ -299,9 +311,9 @@ export async function runReview(input: RunReviewInput) {
   let workspace: Awaited<ReturnType<typeof materializeReviewWorkspace>>;
   try {
     workspace = await materializeReviewWorkspace(snapshot);
-  } catch {
+  } catch (error) {
     if (lease && planStore) planStore.release(lease);
-    return { kind: "invalid" as const, reason: "Could not create the Review Workspace." };
+    return { kind: "invalid" as const, reason: workspaceFailureReason(error) };
   }
 
   let results: ReviewTaskResult[];
@@ -315,6 +327,9 @@ export async function runReview(input: RunReviewInput) {
       input.projectTrusted,
       input.signal,
       input.onUpdate,
+      input.auditStore
+        ? { store: input.auditStore, workspaceReceipt: workspace.receipt }
+        : undefined,
     );
   } catch (error) {
     if (lease && planStore) planStore.release(lease);
@@ -332,6 +347,7 @@ export async function runReview(input: RunReviewInput) {
     provenance,
     snapshot: summarizeReviewSnapshot(snapshot),
     review,
+    workspaceReceipt: workspace.receipt,
     ...(planning ? { planning } : {}),
     ...(cleanupWarning ? { cleanupWarning } : {}),
     results,

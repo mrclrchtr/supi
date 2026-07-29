@@ -49,6 +49,13 @@ describe("Review Workspace", () => {
     if (!snapshot) return;
 
     const workspace = await materializeReviewWorkspace(snapshot);
+    expect(workspace.receipt).toMatchObject({
+      status: "verified",
+      targetKind: "working-tree",
+      expectedDiffHash: snapshot.diffHash,
+      observedDiffHash: snapshot.diffHash,
+      changedPathCount: 2,
+    });
     expect(git(workspace.cwd, "diff", "--cached", "--name-only", "HEAD").split("\n")).toEqual([
       "tracked.txt",
       "untracked.txt",
@@ -60,5 +67,31 @@ describe("Review Workspace", () => {
 
     await workspace.cleanup();
     expect(git(cwd, "worktree", "list", "--porcelain")).not.toContain(`worktree ${workspace.cwd}`);
+  });
+
+  it("verifies pinned comparison and commit workspaces before reviewers start", async () => {
+    const base = git(cwd, "rev-parse", "HEAD");
+    writeFileSync(join(cwd, "tracked.txt"), "committed target\n");
+    git(cwd, "commit", "-am", "target");
+    const target = git(cwd, "rev-parse", "HEAD");
+
+    for (const spec of [
+      { kind: "comparison" as const, baseCommit: base },
+      { kind: "commit" as const, commit: target },
+    ]) {
+      const snapshot = await resolveReviewSnapshot(cwd, spec);
+      expect(snapshot).toBeDefined();
+      if (!snapshot) continue;
+      const workspace = await materializeReviewWorkspace(snapshot);
+      expect(workspace.receipt).toMatchObject({
+        status: "verified",
+        targetKind: spec.kind,
+        expectedWorkspaceHead: target,
+        observedWorkspaceHead: target,
+        expectedDiffHash: snapshot.diffHash,
+        observedDiffHash: snapshot.diffHash,
+      });
+      await workspace.cleanup();
+    }
   });
 });

@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   runReview: vi.fn(),
   prepareReview: vi.fn(),
   resolveAgentReviewModel: vi.fn(),
+  loadReviewConfig: vi.fn(),
 }));
 
 vi.mock("@mrclrchtr/supi-core/status-spinner", () => ({
@@ -14,7 +15,7 @@ vi.mock("@mrclrchtr/supi-core/status-spinner", () => ({
   },
 }));
 vi.mock("../../src/config.ts", () => ({
-  loadReviewConfig: () => ({ agentModel: "provider/model", plannerModel: "provider/model" }),
+  loadReviewConfig: mocks.loadReviewConfig,
 }));
 vi.mock("../../src/model.ts", () => ({
   resolveAgentReviewModel: mocks.resolveAgentReviewModel,
@@ -52,6 +53,16 @@ const details: ReviewBatchDetails = {
     stats: { files: 1, additions: 1, deletions: 0 },
   },
   review: { tasks: [{ id: "spec", instructions: "Review." }] },
+  workspaceReceipt: {
+    status: "verified",
+    targetKind: "working-tree",
+    baselineRevision: "a".repeat(40),
+    expectedWorkspaceHead: "a".repeat(40),
+    observedWorkspaceHead: "a".repeat(40),
+    expectedDiffHash: "b".repeat(64),
+    observedDiffHash: "b".repeat(64),
+    changedPathCount: 1,
+  },
   results: [
     {
       status: "completed",
@@ -75,6 +86,11 @@ const details: ReviewBatchDetails = {
 describe("agent review tool usage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.loadReviewConfig.mockReturnValue({
+      agentModel: "provider/model",
+      plannerModel: "provider/model",
+      auditEnabled: false,
+    });
     mocks.resolveAgentReviewModel.mockReturnValue({
       canonicalId: "provider/model",
       model: {},
@@ -119,6 +135,39 @@ describe("agent review tool usage", () => {
     expect(result.usage).toBe(usage);
     expect(result.details?.results[0]?.usage).toBe(usage);
     expect(result.details?.output?.artifactId).toMatch(/^review-output-/);
+  });
+
+  it("passes an explicitly enabled local replay store into the review workflow", async () => {
+    const pi = createPiMock();
+    const localAuditStore = { create: vi.fn() } as never;
+    mocks.loadReviewConfig.mockReturnValue({
+      agentModel: "provider/model",
+      plannerModel: "provider/model",
+      auditEnabled: true,
+    });
+    registerAgentReviewTools(
+      pi as unknown as ExtensionAPI,
+      new ReviewPlanStore(),
+      new ReviewArtifactStore(),
+      localAuditStore,
+    );
+
+    await getTool(pi, "supi_review_run").execute(
+      "call",
+      {
+        mode: "direct",
+        target: { kind: "working-tree" },
+        review: { tasks: [{ id: "spec", instructions: "Review." }] },
+        audit: "local-replay",
+      },
+      undefined,
+      undefined,
+      makeCtx(),
+    );
+
+    expect(mocks.runReview).toHaveBeenCalledWith(
+      expect.objectContaining({ auditStore: localAuditStore }),
+    );
   });
 
   it("returns Planner usage on the preparation tool result", async () => {

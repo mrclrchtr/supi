@@ -9,6 +9,8 @@ export interface ReviewConfig extends Record<string, unknown> {
   agentModel: string;
   /** Canonical Planner model id, or `current` for the active session model. */
   plannerModel: string;
+  /** Enable explicit local reviewer replay capture and retrieval. */
+  auditEnabled: boolean;
 }
 
 /** Shared SuPi configuration section owned by this package. */
@@ -17,6 +19,7 @@ export const REVIEW_CONFIG_SECTION = "review";
 export const REVIEW_DEFAULTS: ReviewConfig = {
   agentModel: CURRENT_SESSION_REVIEW_MODEL,
   plannerModel: CURRENT_SESSION_REVIEW_MODEL,
+  auditEnabled: false,
 };
 
 /** Load merged and normalized review configuration. */
@@ -24,9 +27,15 @@ export function loadReviewConfig(cwd: string, homeDir?: string): ReviewConfig {
   const raw = loadSupiConfig(REVIEW_CONFIG_SECTION, cwd, REVIEW_DEFAULTS, { homeDir });
   const readModel = (value: unknown, fallback: string) =>
     typeof value === "string" && value.trim() ? value.trim() : fallback;
+  const readBoolean = (value: unknown, fallback: boolean) => {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") return value.trim().toLowerCase() === "true";
+    return fallback;
+  };
   return {
     agentModel: readModel(raw.agentModel, REVIEW_DEFAULTS.agentModel),
     plannerModel: readModel(raw.plannerModel, REVIEW_DEFAULTS.plannerModel),
+    auditEnabled: readBoolean(raw.auditEnabled, REVIEW_DEFAULTS.auditEnabled),
   };
 }
 
@@ -57,6 +66,13 @@ export function registerReviewSettings(pi: ExtensionAPI, homeDir?: string): void
         description: "Lightweight model used only when planning is set to suggest.",
         includeDisabled: false,
         staticOptions: [currentOption],
+      },
+      {
+        kind: "boolean" as const,
+        key: "auditEnabled",
+        label: "Local reviewer replay",
+        description:
+          "Enable opt-in seven-day local replay capture and the supi_review_audit tool. Requires /reload.",
       },
     ],
     ...(homeDir ? { homeDir } : {}),

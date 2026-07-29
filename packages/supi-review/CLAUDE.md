@@ -13,7 +13,7 @@ Caller-defined code review tasks run in managed, Inspection-only Reviewer Sessio
 
 - Working tree targets compare the net current filesystem (including non-ignored untracked files) to `HEAD`, or `merge-base(baseCommit, HEAD)`. The caller index is not evidence.
 - Comparison and commit targets pin full commit identities. A working-tree workspace checks out the baseline and stages the exact canonical patch; commit/comparison workspaces check out their pinned after commit.
-- Materialization verifies the current Working-Tree Review patch hash before children start. After that, the caller checkout may change without changing Target Evidence.
+- Materialization verifies the current Working-Tree Review patch hash before children start, then re-compiles the linked workspace through the canonical patch compiler. Its receipt records mode, baseline, expected/observed checkout, diff hashes, and changed-path count. After that, the caller checkout may change without changing Target Evidence.
 - Workspaces are linked Git worktrees locked with the `supi-review:` ownership marker. Cleanup is best-effort; `/supi-review-cleanup` only lists that marker and never auto-prunes.
 
 ## Reviewer sessions
@@ -28,7 +28,7 @@ Reviewer resource loading suppresses ambient extensions, context files, skills, 
 
 `submit_review` returns a summary and ordered findings. Each finding has title, description, `blocksAcceptance`, impact, effort, confidence, and optional target-relative location. The Review Engine derives `pass` for no findings, `pass_with_findings` for advisory-only findings, and `issues` for any blocking finding, with structured finding counts by blocking status and impact.
 
-Child diagnostics retain only bounded lifecycle metadata and redacted provider error summaries. Never retain reviewer transcripts, commands, tool arguments/results, or repository evidence.
+Default child diagnostics retain only bounded lifecycle metadata and redacted provider error summaries. When `review.auditEnabled` is on and a run explicitly requests `audit: "local-replay"`, the package stores a private, seven-day local replay of provider-visible messages and tool output; omit thinking blocks/signatures and never include raw replay content in normal review output. `supi_review_audit` is registered only after enabling the setting and reloading.
 
 ## Main files
 
@@ -36,7 +36,8 @@ Child diagnostics retain only bounded lifecycle metadata and redacted provider e
 - `src/workspace/review-workspace.ts` — linked-worktree materialization and best-effort cleanup
 - `src/workspace/review-workspace-cleanup.ts` — marked-worktree recovery inventory/removal
 - `src/workspace/cleanup-command.ts` — `/supi-review-cleanup`
-- `src/tool/review-runner.ts` — Reviewer child and structured delivery
+- `src/tool/review-runner.ts` — Reviewer child, optional replay capture, and structured delivery
+- `src/audit/` — private seven-day local replay persistence and trace capture
 - `src/tool/child-session-runner.ts` — owned AgentSession runtime lifecycle
 - `src/target/` — target resolution, canonical patches, changed-path metadata, Reviewer Packets
 

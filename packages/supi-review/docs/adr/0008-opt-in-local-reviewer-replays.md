@@ -1,0 +1,7 @@
+# Opt-in local Reviewer Replays
+
+Reviewer Sessions normally retain only bounded lifecycle diagnostics: repository evidence, commands, tool arguments/results, and conversation are not persisted. Prompt tuning and quality investigation sometimes need the actual investigator path, so `review.auditEnabled` gates an explicit `audit: "local-replay"` capture instead of making it a normal outcome.
+
+An enabled replay is a private file beneath Pi's agent directory with seven-day expiry and user-only permissions. It contains provider-visible messages, tool output, packet/protocol text, timing/usage, and the Workspace receipt; thinking blocks and thought signatures are removed. Normal review output exposes only an opaque id, and `supi_review_audit` is not registered until the setting is enabled and Pi reloads.
+
+This keeps the ordinary product contract evidence-free while giving deliberate debugging runs enough context to evaluate review direction and resource use.

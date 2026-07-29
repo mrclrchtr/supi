@@ -25,6 +25,16 @@ const details: ReviewBatchDetails = {
     stats: { files: 2, additions: 3, deletions: 1 },
   },
   review: { tasks: [{ id: "live-smoke", instructions: "Smoke test." }] },
+  workspaceReceipt: {
+    status: "verified",
+    targetKind: "commit",
+    baselineRevision: "b".repeat(40),
+    expectedWorkspaceHead: "a".repeat(40),
+    observedWorkspaceHead: "a".repeat(40),
+    expectedDiffHash: "c".repeat(64),
+    observedDiffHash: "c".repeat(64),
+    changedPathCount: 2,
+  },
   results: [
     {
       status: "completed",
@@ -71,6 +81,19 @@ describe("supi_review_run TUI", () => {
     expect(output).toContain("model: provider/reviewer");
     expect(output).toContain("18 tokens");
     expect(output).toContain("Commit aaaaaaa (2 files · +3 / -1)");
+    expect(output).not.toContain("workspace:");
+  });
+
+  it("shows the verified workspace receipt when expanded", () => {
+    const output = renderRunResult(
+      { content: [], details },
+      { expanded: true, isPartial: false },
+      theme,
+    )
+      .render(160)
+      .join("\n");
+
+    expect(output).toContain("workspace: verified · commit · 2 paths");
   });
 
   it("shows a workspace placeholder while freezing", () => {

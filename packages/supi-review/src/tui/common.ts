@@ -223,6 +223,9 @@ export function buildTaskSection(
     ...(result.usage ? [theme.fg("dim", formatReviewUsage(result.usage))] : []),
   ];
   container.addChild(new Text(metaParts.join("  "), 1, 0));
+  if (result.audit) {
+    container.addChild(new Text(theme.fg("dim", `local replay: ${result.audit.artifactId}`), 1, 0));
+  }
   appendCapabilityWarnings(container, result, theme);
 
   // Completed task — show summary and findings

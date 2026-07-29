@@ -31,6 +31,7 @@ describe("review config", () => {
       expect(loadReviewConfig(path.join(homeDir, "repo"), homeDir)).toEqual({
         agentModel: CURRENT_SESSION_REVIEW_MODEL,
         plannerModel: CURRENT_SESSION_REVIEW_MODEL,
+        auditEnabled: false,
       });
     } finally {
       fs.rmSync(homeDir, { recursive: true, force: true });
@@ -51,6 +52,7 @@ describe("review config", () => {
       expect(loadReviewConfig(cwd, homeDir)).toEqual({
         agentModel: "openai/reviewer",
         plannerModel: "openai/planner",
+        auditEnabled: false,
       });
     } finally {
       fs.rmSync(homeDir, { recursive: true, force: true });
@@ -68,6 +70,7 @@ describe("review config", () => {
         fields: [
           expect.objectContaining({ kind: "modelPicker", key: "agentModel" }),
           expect.objectContaining({ kind: "modelPicker", key: "plannerModel" }),
+          expect.objectContaining({ kind: "boolean", key: "auditEnabled" }),
         ],
       }),
     );

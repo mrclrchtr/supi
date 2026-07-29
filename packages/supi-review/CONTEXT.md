@@ -18,6 +18,10 @@ _Avoid_: reviewer sub-agent, review sandbox
 A clean, disposable registered Git worktree that freezes one verified Review Target's after-state for a concurrent review batch. It is visible in Git while active and removed best-effort afterward; later caller edits and reviewer-generated dependency state are not Target Evidence.
 _Avoid_: live worktree, per-reviewer checkout, child sandbox
 
+**Review Workspace Receipt**:
+The compact post-materialization proof attached to every review batch. It records the target mode, baseline, expected and observed checkout, canonical patch hashes, and changed-path count after the linked worktree is reconstructed; it is evidence that children began from the selected target, not a post-review mutation audit.
+_Avoid_: workspace path, cleanup receipt, reviewer activity log
+
 **Review Workspace Cleanup**:
 The explicit recovery operation for multi-selecting and removing SuPi-marked Review Workspaces left by interrupted or failed cleanup. Apparently active owners require an extra warning, liveness is advisory, and each selected removal reports its own outcome.
 _Avoid_: automatic pruning, age-based cleanup, transactional cleanup
@@ -89,3 +93,7 @@ _Avoid_: review result, transcript, permanent report
 **Child Lifecycle Trace**:
 A bounded, ordered diagnostic record of lifecycle transitions for one child session. It contains allowlisted control metadata and may contain bounded, redacted provider-owned error summaries. It never contains assistant conversation, repository evidence, tool arguments, or tool results.
 _Avoid_: recent events, event log, child transcript, telemetry
+
+**Local Reviewer Replay**:
+An explicitly requested, private local artifact for tuning a Reviewer Session. It retains provider-visible messages and tool output, packet/protocol text, timing, usage, and the Review Workspace Receipt for seven days; thinking blocks and thought signatures are omitted. It is disabled by default and accessed only through `supi_review_audit` after enabling `review.auditEnabled` and reloading.
+_Avoid_: normal review output, child diagnostics, permanent transcript

@@ -24,6 +24,16 @@ describe("formatReviewBatch", () => {
         stats: { files: 1, additions: 1, deletions: 0 },
       },
       review: { tasks: [{ id: "task", instructions: "Review." }] },
+      workspaceReceipt: {
+        status: "verified",
+        targetKind: "working-tree",
+        baselineRevision: "b".repeat(40),
+        expectedWorkspaceHead: "b".repeat(40),
+        observedWorkspaceHead: "b".repeat(40),
+        expectedDiffHash: "c".repeat(64),
+        observedDiffHash: "c".repeat(64),
+        changedPathCount: 1,
+      },
       cleanupWarning: {
         workspacePath: "/tmp/review-workspace",
         message: "Cleanup failed.",

@@ -2,8 +2,10 @@ import {
   BorderedLoader,
   buildSessionContext,
   type ExtensionAPI,
+  getAgentDir,
 } from "@earendil-works/pi-coding-agent";
 import { Box } from "@earendil-works/pi-tui";
+import { LocalReviewAuditStore } from "./audit/local-review-audit-store.ts";
 import { loadReviewConfig, registerReviewSettings } from "./config.ts";
 import { listLocalBranches, listRecentCommits } from "./git-choices.ts";
 import { collectPlannerContext } from "./history/collect.ts";
@@ -11,6 +13,7 @@ import { getSelectableReviewModels, resolveAgentReviewModel } from "./model.ts";
 import { ReviewArtifactStore } from "./session/review-artifact-store.ts";
 import { ReviewPlanStore } from "./session/review-plan-store.ts";
 import { formatReviewBatch, registerAgentReviewTools } from "./tool/agent-review-tools.ts";
+import { registerReviewAuditTool } from "./tool/review-audit-tool.ts";
 import { createReviewOutput, registerReviewOutputTool } from "./tool/review-output-tool.ts";
 import { prepareReview, runReview } from "./tool/review-workflow.ts";
 import { renderRunResult } from "./tui/run.ts";
@@ -202,6 +205,7 @@ async function executeInteractiveReview(
     reviewerModel: ReviewModelSelection;
     planId?: string;
     planStore: ReviewPlanStore;
+    auditStore?: LocalReviewAuditStore;
   },
 ) {
   return withCancellableLoader(ctx, "Reviewing…", (signal) =>
@@ -213,6 +217,7 @@ async function executeInteractiveReview(
           decision: { kind: "use-review", review: input.review },
           planStore: input.planStore,
           projectTrusted: ctx.isProjectTrusted(),
+          ...(input.auditStore ? { auditStore: input.auditStore } : {}),
           signal,
         })
       : runReview({
@@ -222,17 +227,34 @@ async function executeInteractiveReview(
           review: input.review,
           reviewerModel: input.reviewerModel,
           projectTrusted: ctx.isProjectTrusted(),
+          ...(input.auditStore ? { auditStore: input.auditStore } : {}),
           signal,
         }),
   );
 }
 
-async function runCommand(
+interface ReviewCommandServices {
+  pi: ExtensionAPI;
+  planStore: ReviewPlanStore;
+  artifactStore: ReviewArtifactStore;
+  auditStore: LocalReviewAuditStore;
+}
+
+async function selectAuditStore(
   ctx: CommandContext,
-  pi: ExtensionAPI,
-  planStore: ReviewPlanStore,
-  artifactStore: ReviewArtifactStore,
-): Promise<void> {
+  auditStore: LocalReviewAuditStore,
+): Promise<LocalReviewAuditStore | undefined> {
+  if (!loadReviewConfig(ctx.cwd).auditEnabled) return undefined;
+  return (await ctx.ui.confirm(
+    "Record local reviewer replay?",
+    "Store raw reviewer messages and tool output locally for seven days.",
+  ))
+    ? auditStore
+    : undefined;
+}
+
+async function runCommand(ctx: CommandContext, services: ReviewCommandServices): Promise<void> {
+  const { pi, planStore, artifactStore, auditStore } = services;
   if (!ctx.hasUI) return;
   const target = await selectTarget(ctx);
   if (!target) return;
@@ -261,6 +283,7 @@ async function runCommand(
     `${edited.tasks.length} task(s) using ${reviewerModel.canonicalId}`,
   );
   if (!approved) return;
+  const recordAudit = await selectAuditStore(ctx, auditStore);
 
   const outcome = await executeInteractiveReview(ctx, {
     target,
@@ -268,6 +291,7 @@ async function runCommand(
     reviewerModel,
     ...(planId ? { planId } : {}),
     planStore,
+    ...(recordAudit ? { auditStore: recordAudit } : {}),
   });
   if (!outcome) return;
   if (outcome.kind !== "completed") {
@@ -286,9 +310,13 @@ async function runCommand(
 export default function reviewExtension(pi: ExtensionAPI): void {
   const planStore = new ReviewPlanStore();
   const artifactStore = new ReviewArtifactStore();
+  const auditStore = new LocalReviewAuditStore({
+    agentDir: process.env.PI_CODING_AGENT_DIR || getAgentDir(),
+  });
   registerReviewSettings(pi);
-  registerAgentReviewTools(pi, planStore, artifactStore);
+  registerAgentReviewTools(pi, planStore, artifactStore, auditStore);
   registerReviewOutputTool(pi, artifactStore);
+  if (loadReviewConfig(process.cwd()).auditEnabled) registerReviewAuditTool(pi, auditStore);
   registerReviewWorkspaceCleanupCommand(pi);
 
   // Message renderer for the /supi-review slash command output.
@@ -307,6 +335,6 @@ export default function reviewExtension(pi: ExtensionAPI): void {
 
   pi.registerCommand("supi-review", {
     description: "Run one or more caller-defined Inspection-only review tasks",
-    handler: async (_args, ctx) => runCommand(ctx, pi, planStore, artifactStore),
+    handler: async (_args, ctx) => runCommand(ctx, { pi, planStore, artifactStore, auditStore }),
   });
 }

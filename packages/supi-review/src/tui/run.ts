@@ -246,6 +246,16 @@ function buildExpanded(details: ReviewBatchDetails, theme: Theme): Container {
       0,
     ),
   );
+  container.addChild(
+    new Text(
+      theme.fg(
+        "dim",
+        `workspace: ${details.workspaceReceipt.status} · ${details.workspaceReceipt.targetKind} · ${details.workspaceReceipt.changedPathCount} paths`,
+      ),
+      1,
+      0,
+    ),
+  );
 
   if (details.cleanupWarning) {
     container.addChild(new Spacer(1));

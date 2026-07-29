@@ -35,6 +35,16 @@ const snapshot: ReviewSnapshot = {
   stats: { files: 1, additions: 1, deletions: 0 },
 };
 const model = { canonicalId: "provider/model", model: {} } as ReviewModelSelection;
+const receipt = {
+  status: "verified" as const,
+  targetKind: "working-tree" as const,
+  baselineRevision: "a".repeat(40),
+  expectedWorkspaceHead: "a".repeat(40),
+  observedWorkspaceHead: "a".repeat(40),
+  expectedDiffHash: "b".repeat(64),
+  observedDiffHash: "b".repeat(64),
+  changedPathCount: 1,
+};
 const usage = {
   input: 10,
   output: 5,
@@ -58,6 +68,7 @@ describe("Review workflow", () => {
     mocks.resolveReviewSnapshot.mockResolvedValue(snapshot);
     mocks.materializeReviewWorkspace.mockResolvedValue({
       cwd: "/review-workspace",
+      receipt,
       cleanup: mocks.cleanupWorkspace,
     });
     mocks.runReviewer.mockResolvedValue({
@@ -105,6 +116,7 @@ describe("Review workflow", () => {
     expect(outcome.details.mode).toBe("direct");
     expect(outcome.details.provenance).toBe("caller-supplied");
     expect(outcome.details.snapshot).not.toHaveProperty("repositoryRoot");
+    expect(outcome.details.workspaceReceipt).toEqual(receipt);
     expect(outcome.details.results.map((result) => result.taskId)).toEqual(["standards", "spec"]);
     expect(outcome.details.results.every((result) => result.status === "completed")).toBe(true);
     expect(outcome.details.results.every((result) => result.usage === usage)).toBe(true);
@@ -120,6 +132,25 @@ describe("Review workflow", () => {
     expect(
       outcome.details.results.every((result) => /^[0-9a-f]{64}$/.test(result.packetHash)),
     ).toBe(true);
+  });
+
+  it("preserves safe frozen-workspace verification diagnostics", async () => {
+    mocks.materializeReviewWorkspace.mockRejectedValue(
+      new Error("Review Workspace does not match the pinned target patch."),
+    );
+
+    await expect(
+      runReview({
+        mode: "direct",
+        cwd: "/repo",
+        target: { kind: "working-tree" },
+        review,
+        reviewerModel: model,
+      }),
+    ).resolves.toEqual({
+      kind: "invalid",
+      reason: "Review Workspace does not match the pinned target patch.",
+    });
   });
 
   it("produces identical packet hashes for equivalent Direct and Prepared inputs", async () => {

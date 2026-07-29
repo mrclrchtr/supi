@@ -2,6 +2,7 @@ import { normalizeReviewInput } from "../review-input.ts";
 import { normalizeReviewSubmission } from "../review-result.ts";
 import { buildReviewPacket } from "../target/packet.ts";
 import type {
+  ReviewerAuditRequest,
   ReviewInput,
   ReviewModelSelection,
   ReviewProgress,
@@ -48,6 +49,7 @@ function toTaskResult(
     modelId: result.modelId,
     ...(result.usage ? { usage: result.usage } : {}),
     ...(result.capabilityWarnings ? { capabilityWarnings: result.capabilityWarnings } : {}),
+    ...(result.audit ? { audit: result.audit } : {}),
   };
   if (result.kind === "success") {
     const normalized = normalizeReviewSubmission(result.submission);
@@ -100,6 +102,7 @@ export async function executeReviewTasks(
   projectTrusted?: boolean,
   signal?: AbortSignal,
   onUpdate?: ReviewExecutionUpdate,
+  audit?: ReviewerAuditRequest,
 ): Promise<ReviewTaskResult[]> {
   const review = normalizeReviewInput(reviewInput);
   let completedCount = 0;
@@ -141,8 +144,10 @@ export async function executeReviewTasks(
           snapshot,
           task,
           prompt: packet.prompt,
+          packetHash: packet.packetHash,
           model,
           projectTrusted,
+          ...(audit ? { audit } : {}),
           signal,
           onProgress: (progress) => {
             taskStates[task.id] = { status: "running", progress };

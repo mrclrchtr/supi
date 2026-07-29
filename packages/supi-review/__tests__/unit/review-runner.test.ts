@@ -45,6 +45,17 @@ describe("runReviewer", () => {
     mocks.createAgentSession.mockResolvedValue({
       session: {
         bindExtensions: vi.fn(),
+        subscribe: vi.fn(() => vi.fn()),
+        messages: [
+          {
+            role: "assistant",
+            content: [
+              { type: "thinking", thinking: "private" },
+              { type: "text", text: "visible" },
+            ],
+            usage: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0, totalTokens: 3, cost: {} },
+          },
+        ],
         getActiveToolNames: () => [
           "read",
           "bash",
@@ -73,6 +84,7 @@ describe("runReviewer", () => {
       snapshot,
       task: { id: "spec", instructions: "Review." },
       prompt: "exact packet bytes",
+      packetHash: "c".repeat(64),
       model,
       onProgress,
     });
@@ -97,12 +109,53 @@ describe("runReviewer", () => {
     });
   });
 
+  it("persists an opted-in local replay without provider thinking", async () => {
+    const create = vi.fn().mockResolvedValue({
+      artifactId: "review-audit-11111111-1111-1111-1111-111111111111",
+      expiresAt: "2026-01-08T00:00:00.000Z",
+    });
+    mocks.runWithLifecycle.mockResolvedValue({
+      kind: "success",
+      modelId: model.canonicalId,
+      submission: { summary: "Done", findings: [] },
+    });
+
+    const result = await runReviewer({
+      cwd: "/repo",
+      snapshot,
+      task: { id: "spec", instructions: "Review." },
+      prompt: "exact packet bytes",
+      packetHash: "c".repeat(64),
+      model,
+      audit: {
+        store: { create } as never,
+        workspaceReceipt: {
+          status: "verified",
+          targetKind: "working-tree",
+          baselineRevision: "a".repeat(40),
+          expectedWorkspaceHead: "a".repeat(40),
+          observedWorkspaceHead: "a".repeat(40),
+          expectedDiffHash: "b".repeat(64),
+          observedDiffHash: "b".repeat(64),
+          changedPathCount: 1,
+        },
+      },
+    });
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ packet: "exact packet bytes", packetHash: "c".repeat(64) }),
+    );
+    expect(JSON.stringify(create.mock.calls[0]?.[0])).not.toContain("private");
+    expect(result.audit?.artifactId).toMatch(/^review-audit-/);
+  });
+
   it("wires read, bash, headless Code Intelligence, and submit_review with isolated settings", async () => {
     await runReviewer({
       cwd: "/repo",
       snapshot,
       task: { id: "spec", instructions: "Review." },
       prompt: "exact packet bytes",
+      packetHash: "c".repeat(64),
       model,
     });
 

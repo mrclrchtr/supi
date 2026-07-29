@@ -55,6 +55,17 @@ describe("agent review schemas", () => {
     expect(() => parseRunReviewToolInput(input)).toThrow();
   });
 
+  it("preserves an explicit local replay request", () => {
+    expect(
+      parseRunReviewToolInput({
+        mode: "direct",
+        target: { kind: "working-tree" },
+        review,
+        audit: "local-replay",
+      }),
+    ).toMatchObject({ mode: "direct", audit: "local-replay" });
+  });
+
   it("accepts a base-aware working-tree target for committed plus uncommitted work", () => {
     expect(
       parseRunReviewToolInput({

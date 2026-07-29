@@ -1,4 +1,5 @@
 import type { Model, Usage } from "@earendil-works/pi-ai";
+import type { LocalReviewAuditStore } from "./audit/local-review-audit-store.ts";
 import type { ChildLifecycleTrace } from "./tool/child-lifecycle-trace.ts";
 import type { ReviewWorkspaceCleanupWarning } from "./workspace/review-workspace.ts";
 
@@ -64,6 +65,24 @@ export interface ReviewSnapshot {
 }
 
 export type ReviewSnapshotSummary = Omit<ReviewSnapshot, "repositoryRoot">;
+
+/** Post-materialization proof that a Review Workspace matches its pinned target. */
+export interface ReviewWorkspaceReceipt {
+  status: "verified";
+  targetKind: ReviewTargetSpec["kind"];
+  baselineRevision: string;
+  expectedWorkspaceHead: CommitId;
+  observedWorkspaceHead: CommitId;
+  expectedDiffHash: string;
+  observedDiffHash: string;
+  changedPathCount: number;
+}
+
+/** Opaque identifier for an opt-in local reviewer replay artifact. */
+export interface ReviewAuditReference {
+  artifactId: string;
+  expiresAt: string;
+}
 
 /** One independent caller-defined review objective. */
 export interface ReviewTask {
@@ -189,12 +208,19 @@ export interface ReviewerCapabilityWarning {
   message: string;
 }
 
+export interface ReviewerAuditRequest {
+  store: LocalReviewAuditStore;
+  workspaceReceipt: ReviewWorkspaceReceipt;
+}
+
 export interface ReviewerInvocation {
   prompt: string;
+  packetHash: string;
   task: ReviewTask;
   model: ReviewModelSelection;
   cwd: string;
   snapshot: ReviewSnapshot;
+  audit?: ReviewerAuditRequest;
   signal?: AbortSignal;
   projectTrusted?: boolean;
   onProgress?: (progress: ReviewProgress) => void;
@@ -211,7 +237,10 @@ export type ReviewerRunResult = (
       diagnostics: ChildFailureDiagnostics;
       usage?: Usage;
     }
-) & { capabilityWarnings?: ReviewerCapabilityWarning[] };
+) & {
+  capabilityWarnings?: ReviewerCapabilityWarning[];
+  audit?: ReviewAuditReference;
+};
 
 interface ReviewTaskResultIdentity {
   taskId: string;
@@ -222,6 +251,8 @@ interface ReviewTaskResultIdentity {
   usage?: Usage;
   /** Reviewer Extension Set capability degradation, kept separate from findings. */
   capabilityWarnings?: ReviewerCapabilityWarning[];
+  /** Local-only opt-in reviewer replay, never included inline in review output. */
+  audit?: ReviewAuditReference;
 }
 
 export type ReviewTaskResult = ReviewTaskResultIdentity &
@@ -273,6 +304,8 @@ export interface ReviewBatchDetails {
   provenance: "caller-supplied" | "planner-assisted";
   snapshot: ReviewSnapshotSummary;
   review: ReviewInput;
+  /** Verification receipt for the shared frozen Review Workspace. */
+  workspaceReceipt: ReviewWorkspaceReceipt;
   planning?: PlanningRecord;
   results: ReviewTaskResult[];
   cleanupWarning?: ReviewWorkspaceCleanupWarning;

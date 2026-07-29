@@ -1,6 +1,7 @@
 import type { Usage } from "@earendil-works/pi-ai";
 import { buildSessionContext, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { StatusSpinner } from "@mrclrchtr/supi-core/status-spinner";
+import type { LocalReviewAuditStore } from "../audit/local-review-audit-store.ts";
 import { loadReviewConfig } from "../config.ts";
 import { summarizeReviewSnapshot } from "../git.ts";
 import { collectPlannerContext } from "../history/collect.ts";
@@ -9,13 +10,7 @@ import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
 import type { ReviewPlanStore } from "../session/review-plan-store.ts";
 import { renderPrepareCall, renderPrepareResult } from "../tui/prepare.ts";
 import { renderRunCall, renderRunResult } from "../tui/run.ts";
-import type {
-  FindingCounts,
-  ReviewBatchDetails,
-  ReviewInput,
-  ReviewTargetSpec,
-  ReviewTaskResult,
-} from "../types.ts";
+import type { ReviewInput, ReviewTargetSpec } from "../types.ts";
 import {
   type PrepareReviewToolInput,
   parsePrepareReviewToolInput,
@@ -23,8 +18,11 @@ import {
   prepareReviewSchema,
   runReviewSchema,
 } from "./agent-review-schemas.ts";
-import { formatChildFailureDiagnostics } from "./child-failure-diagnostics.ts";
+import { formatReviewBatch } from "./review-format.ts";
 import { createReviewOutput } from "./review-output-tool.ts";
+
+export { formatReviewBatch } from "./review-format.ts";
+
 import { prepareReview, runReview } from "./review-workflow.ts";
 import { formatReviewUsage } from "./usage-format.ts";
 
@@ -71,96 +69,6 @@ function formatPrepared(plan: {
     }
     lines.push("", "Call supi_review_run with a use-review decision containing one to four tasks.");
   }
-  return lines.join("\n");
-}
-
-function appendCapabilityWarnings(lines: string[], result: ReviewTaskResult): void {
-  for (const warning of result.capabilityWarnings ?? []) {
-    lines.push(`Reviewer capability warning: ${warning.message}`);
-  }
-}
-
-function formatFindingCounts(counts: FindingCounts): string {
-  return `Findings: ${counts.total} total · ${counts.blocking} blocking · ${counts.nonBlocking} non-blocking · impact: ${counts.byImpact.high} high, ${counts.byImpact.medium} medium, ${counts.byImpact.low} low`;
-}
-
-function formatTaskResult(result: ReviewTaskResult): string[] {
-  const lines = [
-    "",
-    `## ${result.taskId}`,
-    `Model: ${result.modelId}`,
-    `Packet SHA-256: ${result.packetHash}`,
-  ];
-  if (result.usage) lines.push(`Usage: ${formatReviewUsage(result.usage)}`);
-  appendCapabilityWarnings(lines, result);
-  if (result.status === "failed") {
-    lines.push(`Status: failed (${result.failureCode})`);
-    if (result.diagnostics) {
-      lines.push("", ...formatChildFailureDiagnostics(result.diagnostics));
-    }
-    return lines;
-  }
-  if (result.status === "canceled") {
-    lines.push("Status: canceled");
-    if (result.diagnostics) {
-      lines.push("", ...formatChildFailureDiagnostics(result.diagnostics));
-    }
-    return lines;
-  }
-  if (result.status === "timeout") {
-    lines.push(`Status: timeout (${result.timeoutMs} ms)`);
-    if (result.diagnostics) {
-      lines.push("", ...formatChildFailureDiagnostics(result.diagnostics));
-    }
-    return lines;
-  }
-  lines.push(
-    `Verdict: ${result.verdict.toUpperCase()}`,
-    formatFindingCounts(result.findingCounts),
-    "",
-    result.summary,
-  );
-  for (const finding of result.findings) {
-    lines.push(
-      "",
-      `- ${finding.title} [${finding.blocksAcceptance ? "blocking" : "non-blocking"}; impact ${finding.impact}; effort ${finding.effort}; confidence ${finding.confidence}]`,
-      ...(finding.location
-        ? [
-            `  Location: ${finding.location.path}:${finding.location.startLine}-${finding.location.endLine}`,
-          ]
-        : []),
-      `  ${finding.description}`,
-    );
-  }
-  return lines;
-}
-
-export function formatReviewBatch(details: ReviewBatchDetails): string {
-  const lines = [
-    "# Review Finished",
-    "",
-    `Mode: ${details.mode}`,
-    `Provenance: ${details.provenance}`,
-    `Target: ${details.snapshot.title}`,
-  ];
-  if (details.planning) {
-    lines.push(
-      `Planner: ${details.planning.modelId} (protocol ${details.planning.promptVersion})`,
-      `Planner decision: ${details.planning.decision}`,
-      ...(details.planning.usage
-        ? [`Planner usage: ${formatReviewUsage(details.planning.usage)}`]
-        : []),
-    );
-  }
-  if (details.cleanupWarning) {
-    lines.push(
-      "",
-      `Review Workspace cleanup warning: ${details.cleanupWarning.message}`,
-      `Workspace: ${details.cleanupWarning.workspacePath}`,
-      `Recovery: ${details.cleanupWarning.recoveryCommand}`,
-    );
-  }
-  for (const result of details.results) lines.push(...formatTaskResult(result));
   return lines.join("\n");
 }
 
@@ -236,10 +144,21 @@ function initialReviewProgress(review: ReviewInput | undefined) {
 function makeRunReviewExecute(
   planStore: ReviewPlanStore,
   artifactStore: ReviewArtifactStore,
+  localAuditStore?: LocalReviewAuditStore,
 ): NonNullable<Parameters<ExtensionAPI["registerTool"]>[0]["execute"]> {
   // biome-ignore lint/complexity/useMaxParams: Pi ToolDefinition execute signature
   return async (_id, params, signal, onUpdate, ctx) => {
     const input = parseRunReviewToolInput(params);
+    const auditStore = input.audit
+      ? (() => {
+          if (!loadReviewConfig(ctx.cwd).auditEnabled || !localAuditStore) {
+            throw new Error(
+              "Local reviewer replay is disabled. Enable Review → Local reviewer replay and /reload before requesting audit: local-replay.",
+            );
+          }
+          return localAuditStore;
+        })()
+      : undefined;
 
     const { statusSpinner, wrappedUpdate } = wireSpinnerToProgress(ctx, onUpdate);
 
@@ -259,6 +178,7 @@ function makeRunReviewExecute(
               review: input.review,
               reviewerModel: resolveModels(ctx).reviewer,
               projectTrusted: ctx.isProjectTrusted(),
+              ...(auditStore ? { auditStore } : {}),
               signal,
               onUpdate: wrappedUpdate,
             })
@@ -269,6 +189,7 @@ function makeRunReviewExecute(
               decision: input.decision,
               planStore,
               projectTrusted: ctx.isProjectTrusted(),
+              ...(auditStore ? { auditStore } : {}),
               signal,
               onUpdate: wrappedUpdate,
             });
@@ -306,6 +227,7 @@ export function registerAgentReviewTools(
   pi: ExtensionAPI,
   planStore: ReviewPlanStore,
   artifactStore: ReviewArtifactStore,
+  localAuditStore?: LocalReviewAuditStore,
 ): void {
   pi.registerTool({
     name: "supi_review_prepare",
@@ -381,7 +303,7 @@ export function registerAgentReviewTools(
     parameters: runReviewSchema,
     renderCall: renderRunCall,
     renderResult: renderRunResult,
-    execute: makeRunReviewExecute(planStore, artifactStore),
+    execute: makeRunReviewExecute(planStore, artifactStore, localAuditStore),
   });
 
   pi.on("session_start", () => planStore.clear());

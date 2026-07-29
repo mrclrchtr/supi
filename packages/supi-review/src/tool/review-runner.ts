@@ -1,5 +1,8 @@
 import { clampThinkingLevel } from "@earendil-works/pi-ai";
+import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { HEADLESS_INSPECTION_TOOL_NAMES } from "@mrclrchtr/supi-code-intelligence/headless";
+import { ReviewAuditTraceCollector } from "../audit/review-audit.ts";
+import { summarizeReviewSnapshot } from "../git.ts";
 import type {
   ReviewerCapabilityWarning,
   ReviewerInvocation,
@@ -10,6 +13,16 @@ import { createEarlyCancellationDiagnostics } from "./child-failure-diagnostics.
 import { runIsolatedChild } from "./child-session-runner.ts";
 import { buildReviewerSystemPrompt } from "./review-system-prompt.ts";
 import { createReviewSubmissionTool } from "./review-tools.ts";
+
+function auditOutcome(result: ReviewerRunResult): {
+  kind: string;
+  failureCode?: string;
+  timeoutMs?: number;
+} {
+  if (result.kind === "failed") return { kind: result.kind, failureCode: result.failureCode };
+  if (result.kind === "timeout") return { kind: result.kind, timeoutMs: result.timeoutMs };
+  return { kind: result.kind };
+}
 
 /** Run one caller-defined task in an isolated Inspection-only Reviewer Session. */
 export async function runReviewer(invocation: ReviewerInvocation): Promise<ReviewerRunResult> {
@@ -23,13 +36,18 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
   const holder: { value?: ReviewSubmission } = {};
   const submit = createReviewSubmissionTool(holder);
   const warnings: ReviewerCapabilityWarning[] = [];
+  const protocolPrompt = buildReviewerSystemPrompt();
+  const thinkingLevel = clampThinkingLevel(invocation.model.model, "max");
   const withWarnings = () => (warnings.length > 0 ? { capabilityWarnings: warnings } : {});
+  let session: AgentSession | undefined;
+  let trace: ReviewAuditTraceCollector | undefined;
+  let unsubscribe: (() => void) | undefined;
 
-  return runIsolatedChild<ReviewSubmission, ReviewerRunResult>({
+  const result = await runIsolatedChild<ReviewSubmission, ReviewerRunResult>({
     cwd: invocation.cwd,
-    protocolPrompt: buildReviewerSystemPrompt(),
+    protocolPrompt,
     model: invocation.model.model,
-    thinkingLevel: clampThinkingLevel(invocation.model.model, "max"),
+    thinkingLevel,
     timeoutMs: undefined,
     prompt: invocation.prompt,
     signal: invocation.signal,
@@ -38,8 +56,13 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     holder,
     headlessInspection: true,
     projectTrusted: invocation.projectTrusted ?? false,
-    onSessionCreated: (session) => {
-      const active = new Set(session.getActiveToolNames());
+    onSessionCreated: (created) => {
+      session = created;
+      if (invocation.audit) {
+        trace = new ReviewAuditTraceCollector();
+        unsubscribe = created.subscribe((event) => trace?.observe(event));
+      }
+      const active = new Set(created.getActiveToolNames());
       if (HEADLESS_INSPECTION_TOOL_NAMES.every((name) => active.has(name))) return;
       warnings.push({
         message:
@@ -83,4 +106,25 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     },
     onProgress: invocation.onProgress,
   });
+  unsubscribe?.();
+  if (!invocation.audit || !session || !trace) return result;
+
+  try {
+    const replay = trace.snapshot(session, result.usage);
+    const audit = await invocation.audit.store.create({
+      task: invocation.task,
+      modelId: invocation.model.canonicalId,
+      thinkingLevel,
+      protocolPrompt,
+      packet: invocation.prompt,
+      packetHash: invocation.packetHash,
+      snapshot: summarizeReviewSnapshot(invocation.snapshot),
+      workspaceReceipt: invocation.audit.workspaceReceipt,
+      outcome: auditOutcome(result),
+      ...replay,
+    });
+    return { ...result, audit };
+  } catch {
+    return result;
+  }
 }
