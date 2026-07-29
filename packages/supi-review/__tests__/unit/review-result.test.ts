@@ -32,6 +32,29 @@ describe("normalizeReviewSubmission", () => {
     ]);
   });
 
+  it("defaults an omitted finding end line to its start line", () => {
+    const result = normalizeReviewSubmission({
+      summary: "One finding.",
+      findings: [
+        {
+          title: "Finding",
+          description: "Evidence.",
+          blocksAcceptance: true,
+          impact: "high",
+          effort: "small",
+          confidence: 1,
+          location: { path: "src/file.ts", startLine: 10 },
+        },
+      ],
+    });
+
+    expect(result.findings[0]?.location).toEqual({
+      path: "src/file.ts",
+      startLine: 10,
+      endLine: 10,
+    });
+  });
+
   it("distinguishes advisory findings from a clean pass and counts their impact", () => {
     const advisory = normalizeReviewSubmission({
       summary: "One advisory.",

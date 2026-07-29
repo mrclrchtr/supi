@@ -1,7 +1,8 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 import { formatVerdictBadge } from "../../src/tui/common.ts";
-import { renderRunResult } from "../../src/tui/run.ts";
+import { renderPrepareCall } from "../../src/tui/prepare.ts";
+import { renderRunCall, renderRunResult } from "../../src/tui/run.ts";
 import type { ReviewBatchDetails } from "../../src/types.ts";
 
 const theme = {
@@ -67,6 +68,32 @@ const details: ReviewBatchDetails = {
 describe("supi_review_run TUI", () => {
   it("labels advisory findings separately from a clean pass", () => {
     expect(formatVerdictBadge("pass_with_findings", theme)).toBe("PASS WITH FINDINGS");
+  });
+
+  it("labels exact-one execution paths in tool calls", () => {
+    expect(
+      renderRunCall(
+        { direct: { target: { comparison: { baseCommit: "9510d68" } }, tasks: [] } },
+        theme,
+      )
+        .render(160)
+        .join("\n"),
+    ).toContain("supi_review_run direct — comparison");
+    expect(
+      renderRunCall({ direct: { tasks: [] } }, theme)
+        .render(160)
+        .join("\n"),
+    ).toContain("supi_review_run direct — working-tree");
+    expect(
+      renderRunCall({ prepared: { planId: "plan-1" } }, theme)
+        .render(160)
+        .join("\n"),
+    ).toContain("supi_review_run prepared — from plan");
+    expect(
+      renderPrepareCall({ planning: "suggest", target: { commit: { commit: "9510d68" } } }, theme)
+        .render(160)
+        .join("\n"),
+    ).toContain("supi_review_prepare suggest — commit");
   });
 
   it("keeps the collapsed result informative", () => {

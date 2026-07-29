@@ -8,18 +8,21 @@ export const reviewTaskSchema = Type.Object(
     id: Type.String({
       minLength: 1,
       maxLength: REVIEW_LIMITS.taskIdCharacters,
-      description: "Stable caller-defined task id, such as standards or spec.",
+      pattern: "\\S",
+      description: "Unique task id used to match its result, such as standards or spec.",
     }),
     instructions: Type.String({
       minLength: 1,
       maxLength: REVIEW_LIMITS.taskInstructionCharacters,
-      description: "Complete freeform methodology and acceptance instructions for this task.",
+      pattern: "\\S",
+      description:
+        "Self-contained review objective and criteria. Tasks run independently and cannot see each other's progress.",
     }),
     findingScope: Type.Optional(
       StringEnum(["change-only", "boy-scout"] as const, {
         default: "change-only",
         description:
-          "Finding eligibility: change-only admits target-attributable issues; boy-scout also admits advisory pre-existing issues in changed files and reviewer-judged directly affected symbols.",
+          "change-only reports issues attributable to the target. boy-scout may also report directly related pre-existing issues, which stay advisory unless the target worsens or newly exposes them.",
       }),
     ),
   },
@@ -32,16 +35,21 @@ export const reviewInputSchema = Type.Object(
     sharedContext: Type.Optional(
       Type.String({
         maxLength: REVIEW_LIMITS.sharedContextCharacters,
-        description: "Optional context shared unchanged with every task.",
+        pattern: "\\S",
+        description: "Context copied to every reviewer; omit task-specific instructions.",
       }),
     ),
     tasks: Type.Array(reviewTaskSchema, {
       minItems: 1,
       maxItems: 4,
-      description: "One to four independent tasks executed concurrently in caller order.",
+      description:
+        "One to four independent tasks, in caller order. Task ids must be unique; tasks run concurrently.",
     }),
   },
-  { additionalProperties: false },
+  {
+    additionalProperties: false,
+    description: "Complete reviewer context and one to four independent Review Tasks.",
+  },
 );
 
 /** TypeBox schema for a single structured finding (provider-visible). */
@@ -50,26 +58,28 @@ export const reviewFindingSchema = Type.Object(
     title: Type.String({
       minLength: 1,
       maxLength: REVIEW_LIMITS.findingTitleCharacters,
-      description: "Concise finding title.",
+      pattern: "\\S",
+      description: "Short, specific assertion of one problem.",
     }),
     description: Type.String({
       minLength: 1,
       maxLength: REVIEW_LIMITS.findingDescriptionCharacters,
-      description: "Concrete evidence-backed explanation of the issue.",
+      pattern: "\\S",
+      description: "Concrete evidence, consequence, and needed correction.",
     }),
     blocksAcceptance: Type.Boolean({
-      description: "Whether this finding must be corrected before accepting the change.",
+      description: "True only when the change should not be accepted until this is corrected.",
     }),
     impact: StringEnum(["low", "medium", "high"] as const, {
-      description: "Downside if the issue remains unfixed.",
+      description: "Downside if unfixed, not the size of the correction.",
     }),
     effort: StringEnum(["small", "medium", "large"] as const, {
-      description: "Estimated size of the correction.",
+      description: "Estimated correction size, not issue severity.",
     }),
     confidence: Type.Number({
       minimum: 0,
       maximum: 1,
-      description: "Confidence from 0 through 1; findings are never threshold-filtered.",
+      description: "Evidence confidence from 0 through 1; no confidence threshold is applied.",
     }),
     location: Type.Optional(
       Type.Object(
@@ -77,12 +87,21 @@ export const reviewFindingSchema = Type.Object(
           path: Type.String({
             minLength: 1,
             maxLength: REVIEW_LIMITS.locationPathCharacters,
-            description: "Repository-relative target path.",
+            description: "Target-relative path only; do not use absolute paths or .. segments.",
           }),
-          startLine: Type.Integer({ minimum: 1 }),
-          endLine: Type.Integer({ minimum: 1 }),
+          startLine: Type.Integer({ minimum: 1, description: "First 1-based inclusive line." }),
+          endLine: Type.Optional(
+            Type.Integer({
+              minimum: 1,
+              description:
+                "Last 1-based inclusive line; omit for a single-line finding, otherwise must be at least startLine.",
+            }),
+          ),
         },
-        { additionalProperties: false },
+        {
+          additionalProperties: false,
+          description: "Optional exact source span for this finding.",
+        },
       ),
     ),
   },
@@ -95,11 +114,12 @@ export const reviewSubmissionSchema = Type.Object(
     summary: Type.String({
       minLength: 1,
       maxLength: REVIEW_LIMITS.summaryCharacters,
-      description: "Task-level review summary.",
+      pattern: "\\S",
+      description: "Brief task conclusion, required even when findings is empty.",
     }),
     findings: Type.Array(reviewFindingSchema, {
       maxItems: REVIEW_LIMITS.findingsPerTask,
-      description: "Findings in the reviewer's intended order; use an empty array when none exist.",
+      description: "Findings in intended order; use [] after a clean review (at most 20 findings).",
     }),
   },
   { additionalProperties: false },

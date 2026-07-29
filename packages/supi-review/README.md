@@ -25,12 +25,10 @@ Preparation is optional. Skills and agents that already know how to review shoul
 
 ```json
 {
-  "mode": "direct",
-  "target": {
-    "kind": "comparison",
-    "baseCommit": "9510d68"
-  },
-  "review": {
+  "direct": {
+    "target": {
+      "comparison": { "baseCommit": "9510d68" }
+    },
     "sharedContext": "The change implements issue #123.",
     "tasks": [
       {
@@ -55,13 +53,14 @@ Preparation returns a session-scoped `planId` and optional Planner Draft. Planne
 
 ```json
 {
-  "mode": "prepared",
-  "planId": "review-plan-...",
-  "decision": { "kind": "accept-draft" }
+  "prepared": {
+    "planId": "review-plan-...",
+    "draftDecision": { "useDraft": {} }
+  }
 }
 ```
 
-Use `use-review` with a complete replacement review when the draft needs editing.
+Use `draftDecision.replaceDraft` with a complete replacement task set when no draft was returned or it needs editing.
 
 ## Targets and Review Workspaces
 

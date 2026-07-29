@@ -9,21 +9,30 @@ const outputPageSchema = Type.Object(
     artifactId: Type.String({
       minLength: 1,
       maxLength: 128,
-      description: "Session-scoped review output id.",
+      description:
+        "Opaque session-scoped id returned by supi_review_prepare or supi_review_run, not a file path.",
     }),
     offset: Type.Optional(
-      Type.Integer({ minimum: 0, default: 0, description: "UTF-16 character offset." }),
+      Type.Integer({
+        minimum: 0,
+        default: 0,
+        description:
+          "UTF-16 character offset; omit for the first page, then use returned nextOffset.",
+      }),
     ),
     limit: Type.Optional(
       Type.Integer({
         minimum: 1,
         maximum: MAX_PAGE_CHARACTERS,
         default: DEFAULT_PAGE_CHARACTERS,
-        description: "Maximum characters for this page.",
+        description: "Maximum characters for this page; omit for the default.",
       }),
     ),
   },
-  { additionalProperties: false },
+  {
+    additionalProperties: false,
+    description: "Read one page of an output artifact returned by a review or preparation call.",
+  },
 );
 
 function modelFacingPage(artifactId: string, page: TextPage): string {
@@ -62,11 +71,8 @@ export function registerReviewOutputTool(pi: ExtensionAPI, store: ReviewArtifact
   pi.registerTool({
     name: "supi_review_output",
     label: "Read Review Output",
-    description: "Read a page of session-scoped review or preparation output.",
+    description: `Read up to ${MAX_PAGE_CHARACTERS} UTF-16 characters from a session-scoped review or preparation output continuation. Use only with an artifact id returned by supi_review_prepare or supi_review_run.`,
     promptSnippet: "Continue paged review output",
-    promptGuidelines: [
-      "Use supi_review_output only when supi_review_prepare or supi_review_run returns an output continuation.",
-    ],
     parameters: outputPageSchema,
     async execute(_id, params) {
       const page = store.read(params.artifactId, params.offset, params.limit);

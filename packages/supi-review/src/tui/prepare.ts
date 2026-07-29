@@ -23,12 +23,15 @@ interface PrepareDetails extends PreparedReviewDetails {
 export function renderPrepareCall(args: unknown, theme: Theme): Text {
   const params = (args ?? {}) as {
     planning?: string;
-    target?: { kind?: string };
+    target?: { workingTree?: unknown; comparison?: unknown; commit?: unknown };
   };
-  const planning = params.planning ?? "none";
-  const targetKind = params.target?.kind ?? "working-tree";
+  const targetKind = params.target?.comparison
+    ? "comparison"
+    : params.target?.commit
+      ? "commit"
+      : "working-tree";
 
-  return renderReviewToolCall("supi_review_prepare", planning, theme, targetKind);
+  return renderReviewToolCall("supi_review_prepare", params.planning ?? "none", theme, targetKind);
 }
 
 // ── renderResult ─────────────────────────────────────────────────
@@ -99,7 +102,10 @@ function addPlannerMetadata(container: Container, details: PrepareDetails, theme
   if (failure) {
     container.addChild(
       new Text(
-        theme.fg("warning", `Planner unavailable (${failure}); use-review remains available.`),
+        theme.fg(
+          "warning",
+          `Planner unavailable (${failure}); replacement tasks remain available.`,
+        ),
         1,
         0,
       ),

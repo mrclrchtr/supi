@@ -11,7 +11,9 @@ export function createReviewSubmissionTool(submission: { value?: ReviewSubmissio
     description: "Submit the final structured result for this review task.",
     parameters: reviewSubmissionSchema,
     execute: async (_id, args) => {
-      const { verdict: _, ...normalized } = normalizeReviewSubmission(args as ReviewSubmission);
+      const { verdict: _, ...normalized } = normalizeReviewSubmission(
+        args as Parameters<typeof normalizeReviewSubmission>[0],
+      );
       submission.value = normalized;
       return {
         content: [{ type: "text" as const, text: "Review submitted." }],

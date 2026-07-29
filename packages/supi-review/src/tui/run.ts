@@ -63,15 +63,24 @@ function formatTaskCollapsed(result: ReviewTaskResult, scope: FindingScope, them
 
 export function renderRunCall(args: unknown, theme: Theme): Text {
   const params = (args ?? {}) as {
-    mode?: string;
-    target?: { kind?: string };
-    planId?: string;
+    direct?: { target?: { workingTree?: unknown; comparison?: unknown; commit?: unknown } };
+    prepared?: unknown;
   };
-  const mode = params.mode ?? "direct";
-  const primary = mode;
-  const secondary = mode === "prepared" ? "from plan" : (params.target?.kind ?? undefined);
+  const target = params.direct?.target;
+  const targetKind = target?.workingTree
+    ? "working-tree"
+    : target?.comparison
+      ? "comparison"
+      : target?.commit
+        ? "commit"
+        : "working-tree";
 
-  return renderReviewToolCall("supi_review_run", primary, theme, secondary);
+  return renderReviewToolCall(
+    "supi_review_run",
+    params.prepared ? "prepared" : "direct",
+    theme,
+    params.prepared ? "from plan" : targetKind,
+  );
 }
 
 // ── renderResult ─────────────────────────────────────────────────

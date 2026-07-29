@@ -9,22 +9,32 @@ const reviewAuditSchema = Type.Object(
       Type.String({
         minLength: 1,
         maxLength: 128,
-        description: "Local replay id returned by an audited supi_review_run task.",
+        description:
+          "Local replay id returned by an audited supi_review_run task; omit to list replays.",
       }),
     ),
     offset: Type.Optional(
-      Type.Integer({ minimum: 0, default: 0, description: "UTF-16 character offset." }),
+      Type.Integer({
+        minimum: 0,
+        default: 0,
+        description:
+          "UTF-16 character offset; use only with artifactId and omit for the first page.",
+      }),
     ),
     limit: Type.Optional(
       Type.Integer({
         minimum: 1,
         maximum: MAX_PAGE_CHARACTERS,
         default: DEFAULT_PAGE_CHARACTERS,
-        description: "Maximum characters for this page.",
+        description: "Maximum characters for this page; use only with artifactId.",
       }),
     ),
   },
-  { additionalProperties: false },
+  {
+    additionalProperties: false,
+    description:
+      "Omit artifactId to list local replays. Supply artifactId to read one replay page.",
+  },
 );
 
 function formatAuditList(audits: Awaited<ReturnType<LocalReviewAuditStore["list"]>>): string {
@@ -57,12 +67,9 @@ export function registerReviewAuditTool(pi: ExtensionAPI, store: LocalReviewAudi
   pi.registerTool({
     name: "supi_review_audit",
     label: "Inspect Review Replay",
-    description: "List or page through locally recorded reviewer replays.",
-    promptSnippet: "Inspect a local reviewer replay",
-    promptGuidelines: [
-      "Use supi_review_audit only when review output returned an audit artifact id, or to list local replays explicitly.",
-      "Replay content may contain raw repository evidence and tool output; do not repeat it unless necessary.",
-    ],
+    description: `List local reviewer replays or read up to ${MAX_PAGE_CHARACTERS} UTF-16 characters from one. Available only when review auditing is enabled; replay content may contain raw repository evidence and tool output.`,
+    promptSnippet: "List or inspect local reviewer replays",
+    promptGuidelines: ["Do not repeat raw supi_review_audit replay content unless necessary."],
     parameters: reviewAuditSchema,
     async execute(_id, params) {
       if (!params.artifactId) {

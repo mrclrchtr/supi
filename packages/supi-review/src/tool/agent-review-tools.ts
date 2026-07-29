@@ -64,13 +64,19 @@ function formatPrepared(plan: {
     for (const task of plan.plannerDraft.tasks) {
       lines.push("", `### ${task.id} (${task.findingScope ?? "change-only"})`, task.instructions);
     }
-    lines.push("", "Call supi_review_run with an explicit accept-draft or use-review decision.");
+    lines.push(
+      "",
+      "Call supi_review_run with prepared: { planId, draftDecision: { useDraft: {} } } to use this draft.",
+    );
   } else {
     if (plan.plannerFailure) {
       const reason = plannerFailureReason(plan.plannerFailure);
       lines.push("", `Planner unavailable: ${reason}. The plan remains usable without a draft.`);
     }
-    lines.push("", "Call supi_review_run with a use-review decision containing one to four tasks.");
+    lines.push(
+      "",
+      "Call supi_review_run with prepared.draftDecision.replaceDraft containing one to four tasks.",
+    );
   }
   return lines.join("\n");
 }
@@ -229,11 +235,11 @@ export function registerAgentReviewTools(
   pi.registerTool({
     name: "supi_review_prepare",
     label: "Prepare Review",
-    description: "Create a one-shot Review Plan, optionally with a lightweight Planner Draft.",
-    promptSnippet: "Prepare an optional one-shot code review plan",
+    description:
+      "Create a session-scoped, one-shot Review Plan for a Git change; optionally draft tasks from bounded context and target metadata without inspecting code. Use only before a Prepared Review. Large output is paged.",
+    promptSnippet: "Prepare an optional one-shot review plan",
     promptGuidelines: [
-      "Use supi_review_prepare only when a caller wants to inspect or request a Planner Draft before execution.",
-      "Use supi_review_run in direct mode when the current skill or agent already knows the review tasks.",
+      "Use supi_review_prepare only when the caller asks for a Review Plan or Planner Draft; otherwise call supi_review_run directly.",
     ],
     parameters: prepareReviewSchema,
     renderCall: renderPrepareCall,
@@ -291,12 +297,9 @@ export function registerAgentReviewTools(
   pi.registerTool({
     name: "supi_review_run",
     label: "Run Review",
-    description: "Run one to four caller-defined review tasks directly or from a prepared plan.",
-    promptSnippet: "Run independent Inspection-only code review tasks",
-    promptGuidelines: [
-      "Use supi_review_run directly when a skill or the main agent already has complete review task instructions.",
-      "Review Workspaces freeze the verified target before Reviewer Sessions start; direct shell inspection is available only inside the external sandbox boundary.",
-    ],
+    description:
+      "Run one to four independent Inspection-only review tasks concurrently against one frozen Git change, directly or from a prepared plan. Creates a disposable linked Git worktree; large output is paged.",
+    promptSnippet: "Run independent inspection-only review tasks",
     parameters: runReviewSchema,
     renderCall: renderRunCall,
     renderResult: renderRunResult,

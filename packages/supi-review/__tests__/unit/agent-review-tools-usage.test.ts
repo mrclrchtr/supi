@@ -123,9 +123,10 @@ describe("agent review tool usage", () => {
     const result = (await tool.execute(
       "call",
       {
-        mode: "direct",
-        target: { kind: "working-tree" },
-        review: { tasks: [{ id: "spec", instructions: "Review." }] },
+        direct: {
+          target: { workingTree: {} },
+          tasks: [{ id: "spec", instructions: "Review." }],
+        },
       },
       undefined,
       undefined,
@@ -155,9 +156,10 @@ describe("agent review tool usage", () => {
     await getTool(pi, "supi_review_run").execute(
       "call",
       {
-        mode: "direct",
-        target: { kind: "working-tree" },
-        review: { tasks: [{ id: "spec", instructions: "Review." }] },
+        direct: {
+          target: { workingTree: {} },
+          tasks: [{ id: "spec", instructions: "Review." }],
+        },
       },
       undefined,
       undefined,
@@ -191,6 +193,7 @@ describe("agent review tool usage", () => {
       undefined,
       ctx,
     )) as {
+      content?: Array<{ text: string }>;
       usage?: unknown;
       details?: { plannerUsage?: unknown; output?: { artifactId: string } };
     };
@@ -198,5 +201,6 @@ describe("agent review tool usage", () => {
     expect(result.usage).toBe(usage);
     expect(result.details?.plannerUsage).toBe(usage);
     expect(result.details?.output?.artifactId).toMatch(/^review-output-/);
+    expect(result.content?.[0]?.text).toContain("draftDecision: { useDraft: {} }");
   });
 });

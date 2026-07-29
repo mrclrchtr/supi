@@ -4,8 +4,17 @@ import type {
   FindingCounts,
   NormalizedReviewSubmission,
   ReviewFinding,
+  ReviewLocation,
   ReviewSubmission,
 } from "./types.ts";
+
+type ReviewSubmissionInput = Omit<ReviewSubmission, "findings"> & {
+  findings: Array<
+    Omit<ReviewFinding, "location"> & {
+      location?: Omit<ReviewLocation, "endLine"> & { endLine?: number };
+    }
+  >;
+};
 
 function requireText(value: string, label: string, maxCharacters: number): string {
   const normalized = value.trim();
@@ -18,7 +27,9 @@ function requireText(value: string, label: string, maxCharacters: number): strin
   return normalized;
 }
 
-function countFindings(findings: ReviewFinding[]): FindingCounts {
+function countFindings(
+  findings: Array<Pick<ReviewFinding, "blocksAcceptance" | "impact">>,
+): FindingCounts {
   const counts: FindingCounts = {
     total: findings.length,
     blocking: 0,
@@ -35,7 +46,7 @@ function countFindings(findings: ReviewFinding[]): FindingCounts {
 
 /** Derive an acceptance verdict and structured finding counts without reordering findings. */
 export function normalizeReviewSubmission(
-  submission: ReviewSubmission,
+  submission: ReviewSubmissionInput,
 ): NormalizedReviewSubmission {
   if (submission.findings.length > REVIEW_LIMITS.findingsPerTask) {
     throw new Error(`A review task may submit at most ${REVIEW_LIMITS.findingsPerTask} findings.`);
@@ -51,14 +62,16 @@ export function normalizeReviewSubmission(
       ) {
         throw new Error(`Finding ${index + 1} confidence must be between 0 and 1.`);
       }
-      if (
-        finding.location &&
-        (!Number.isSafeInteger(finding.location.startLine) ||
-          !Number.isSafeInteger(finding.location.endLine) ||
+      if (finding.location) {
+        const endLine = finding.location.endLine ?? finding.location.startLine;
+        if (
+          !Number.isSafeInteger(finding.location.startLine) ||
+          !Number.isSafeInteger(endLine) ||
           finding.location.startLine < 1 ||
-          finding.location.endLine < finding.location.startLine)
-      ) {
-        throw new Error(`Finding ${index + 1} location must contain a valid ordered line range.`);
+          endLine < finding.location.startLine
+        ) {
+          throw new Error(`Finding ${index + 1} location must contain a valid ordered line range.`);
+        }
       }
       return {
         ...finding,
@@ -75,6 +88,7 @@ export function normalizeReviewSubmission(
         location: finding.location
           ? {
               ...finding.location,
+              endLine: finding.location.endLine ?? finding.location.startLine,
               path: normalizeRepositoryRelativePath(
                 requireText(
                   finding.location.path,
