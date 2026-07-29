@@ -1,5 +1,26 @@
 # Changelog
 
+## [4.1.0](https://github.com/mrclrchtr/supi/compare/v4.0.0...v4.1.0) (2026-07-29)
+
+
+### Features
+
+* **supi-review:** add configurable review bootstrap ([4418130](https://github.com/mrclrchtr/supi/commit/441813048edc047784eb026edaea200f308564f9))
+* **supi-review:** add local reviewer replay audits ([05c6b83](https://github.com/mrclrchtr/supi/commit/05c6b83a5b2d84f91074bb2803a0b6e870c90513))
+* **supi-review:** distinguish advisory review findings ([fb5c6fb](https://github.com/mrclrchtr/supi/commit/fb5c6fb24ac7c9d1fc734eb4c1529ea3ba627cfd))
+* **supi-review:** enrich collapsed review results ([#252](https://github.com/mrclrchtr/supi/issues/252)) ([9d6e33f](https://github.com/mrclrchtr/supi/commit/9d6e33f230f2c87ff6cf79e16d2000dd3ab971f7))
+* **supi-review:** improve agent tool schemas ([665b502](https://github.com/mrclrchtr/supi/commit/665b502c7bd1a799ccc04179fc3eabbde5464f4c))
+* **supi-review:** improve tool output rendering ([596a1ed](https://github.com/mrclrchtr/supi/commit/596a1ed46146fd7f78f512939421368519f69b35))
+* **supi-review:** refine reviewer finding scopes ([4721e50](https://github.com/mrclrchtr/supi/commit/4721e50c61bbb74dedb95d4bba56ecf75086f72b))
+* **supi-review:** run reviewers in frozen workspaces ([#252](https://github.com/mrclrchtr/supi/issues/252)) ([4f25660](https://github.com/mrclrchtr/supi/commit/4f2566057a991d3cc1a54b4cf5a908c8f60efea9))
+* **supi-review:** show running review details ([#252](https://github.com/mrclrchtr/supi/issues/252)) ([dddf507](https://github.com/mrclrchtr/supi/commit/dddf50771a6e21824b659275ca51e899f378422b))
+
+
+### Bug Fixes
+
+* approve local package uninstalls ([0fd75f9](https://github.com/mrclrchtr/supi/commit/0fd75f99c533ad3ac8c5504d26d4924a230e4fe0))
+* harden review runtime contracts ([7433898](https://github.com/mrclrchtr/supi/commit/7433898b5b5555796108b61cea9633f8ad43ae1f))
+
 ## [4.0.0](https://github.com/mrclrchtr/supi/compare/v3.2.0...v4.0.0) (2026-07-29)
 
 
