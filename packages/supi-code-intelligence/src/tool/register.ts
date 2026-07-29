@@ -74,6 +74,8 @@ function getToolRenderer(name: string): ToolRenderer {
  * @param getOrCreateSession — session factory; production passes the app-managed
  *   sessions, tests pass a `createSessionCache`-backed factory.
  */
+const registeredPis = new WeakSet<object>();
+
 export function registerCodeIntelligenceTools(
   pi: ExtensionAPI,
   getOrCreateSession: (cwd: string) => WorkspaceCodeIntelligenceSession,
@@ -81,10 +83,12 @@ export function registerCodeIntelligenceTools(
   specs: readonly CodeIntelligenceToolDefinitionSpec[] = CODE_INTELLIGENCE_TOOL_SPECS,
 ): void {
   // Skip when another copy is already loaded (e.g. standalone install + bundled
-  // copy inside supi-review). Pi reports tool-name conflicts as diagnostics;
-  // guarding here avoids the noise entirely.
-  const existing = new Set(pi.getAllTools().map((t) => t.name));
-  if (specs.some((s) => existing.has(s.name))) return;
+  // copy inside supi-review). Pi loads packages with separate module roots, so
+  // module-level state is not shared. Key on the pi object: both copies receive
+  // the same ExtensionAPI in one process, while tests get fresh mocks.
+  // ponytail: WeakSet on pi identity; getAllTools() is not callable during load.
+  if (registeredPis.has(pi)) return;
+  registeredPis.add(pi);
 
   for (const spec of specs) {
     const surface = promptSurfaces[spec.name];
