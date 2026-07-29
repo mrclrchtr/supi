@@ -7,7 +7,6 @@ import type { EvidenceListMetadata, EvidencePartialReason } from "../../analysis
 import { createEvidenceList } from "../../analysis/evidence.ts";
 import type { CodeProvider } from "../../analysis/provider.ts";
 import type {
-  OrientationBlock,
   OrientationProvenance,
   OrientationResultData,
   OrientationSectionData,
@@ -15,8 +14,9 @@ import type {
 
 /** Mutable collection state kept private to context-Oriented fact assembly. */
 export interface ContextOrientationBuilder {
-  readonly blocks: OrientationBlock[];
+  readonly title: string;
   readonly sections: OrientationSectionData[];
+  readonly notes: string[];
   readonly maxResults: number;
 }
 
@@ -34,16 +34,17 @@ export interface ListSectionInput<T> {
   readonly partialReason?: EvidencePartialReason;
 }
 
-/** Start a context-Oriented document with one factual focus heading. */
+/** Start a context-Oriented document with one factual focus title. */
 export function createBuilder(maxResults: number, title: string): ContextOrientationBuilder {
   return {
-    blocks: [{ kind: "heading", level: 1, text: title }, { kind: "blank" }],
+    title,
     sections: [],
+    notes: [],
     maxResults,
   };
 }
 
-/** Add one bounded evidence list and matching Markdown/structured metadata. */
+/** Add one bounded evidence list and matching section facts. */
 export function appendList<T>(
   builder: ContextOrientationBuilder,
   input: ListSectionInput<T>,
@@ -60,7 +61,7 @@ export function appendList<T>(
         partialReason: input.partialReason ?? "filesystem-error",
       }
     : list.metadata;
-  const section: OrientationSectionData = {
+  builder.sections.push({
     key: input.key,
     title: input.title,
     status: input.status ?? "complete",
@@ -68,16 +69,8 @@ export function appendList<T>(
     confidence: input.confidence,
     provenance: input.provenance,
     evidenceLists: [{ ...metadata, key: input.key }],
-  };
-  builder.sections.push(section);
-  builder.blocks.push(
-    { kind: "heading", level: 2, text: input.title },
-    { kind: "paragraph", text: formatSectionNote(section) },
-  );
-  for (const item of list.items) {
-    builder.blocks.push({ kind: "list-item", text: input.render(item) });
-  }
-  builder.blocks.push({ kind: "blank" });
+    items: list.items.map((item) => ({ kind: "list-item", text: input.render(item) })),
+  });
 }
 
 /** Add an unavailable section without manufacturing an absence claim. */
@@ -90,7 +83,7 @@ export function appendUnavailable(
     provenance: readonly OrientationProvenance[];
   },
 ): void {
-  const section: OrientationSectionData = {
+  builder.sections.push({
     key: input.key,
     title: input.title,
     status: "unavailable",
@@ -98,13 +91,8 @@ export function appendUnavailable(
     confidence: "unavailable",
     provenance: input.provenance,
     evidenceLists: [],
-  };
-  builder.sections.push(section);
-  builder.blocks.push(
-    { kind: "heading", level: 2, text: input.title },
-    { kind: "paragraph", text: formatSectionNote(section) },
-    { kind: "blank" },
-  );
+    items: [],
+  });
 }
 
 /** Collect direct regular-file and directory names from one filesystem level. */
@@ -294,7 +282,8 @@ export function resultData(
     0,
   );
   return {
-    blocks: builder.blocks,
+    title: builder.title,
+    notes: builder.notes,
     sections: builder.sections,
     confidence: highestConfidence(builder.sections),
     focusTarget: focus,
@@ -320,29 +309,6 @@ export function formatManifestValue(value: unknown): string {
   if (typeof value === "string") return `\`${value}\``;
   const serialized = JSON.stringify(value);
   return `\`${serialized ?? String(value)}\``;
-}
-
-/** Render the same section status/provenance metadata stored in result details. */
-export function formatSectionNote(section: OrientationSectionData): string {
-  const facts = section.evidenceLists.map(evidenceSummary).join("; ");
-  const provenance = section.provenance.map(formatProvenance).join(", ");
-  return `_(status: ${section.status}; provenance: ${provenance || "none"}${section.reason ? `; ${section.reason}` : ""}${facts ? `; ${facts}` : ""})_`;
-}
-
-function evidenceSummary(metadata: EvidenceListMetadata): string {
-  if (metadata.totalCount === null) {
-    const omitted = metadata.omittedCount ? `; ${metadata.omittedCount} collected omitted` : "";
-    return `showing ${metadata.shownCount}${omitted}; more may exist — ${metadata.partialReason ?? "partial"}`;
-  }
-  if ((metadata.omittedCount ?? 0) > 0) {
-    return `showing ${metadata.shownCount} of ${metadata.totalCount}; ${metadata.omittedCount} omitted`;
-  }
-  return `${metadata.totalCount} observed`;
-}
-
-function formatProvenance(provenance: OrientationProvenance): string {
-  const detail = provenance.detail ? ` \`${provenance.detail}\`` : "";
-  return `${provenance.source}${provenance.capability ? ` (${provenance.capability})` : ""}${detail}`;
 }
 
 function highestConfidence(sections: readonly OrientationSectionData[]): ConfidenceMode {

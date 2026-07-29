@@ -23,22 +23,14 @@ import type {
   OrientationTarget,
 } from "../../ui/markdown/types.ts";
 import type {
-  OrientationBlock,
+  OrientationItem,
   OrientationResultData,
   OrientationSectionData,
 } from "../orientation-types.ts";
 import { collectContextOrientationFacts } from "./context-facts.ts";
-import { formatSectionNote } from "./context-sections.ts";
-
-interface CollectedOrientationSection {
-  readonly key: OrientationSection;
-  readonly title: string;
-  readonly lines: readonly string[];
-  readonly metadata: OrientationSectionData;
-}
 
 interface TargetSectionCollection {
-  readonly lines: string[];
+  readonly items: OrientationItem[];
   readonly hasStructuralEvidence: boolean;
   readonly hasSemanticEvidence: boolean;
   readonly status: "complete" | "partial" | "unavailable";
@@ -89,7 +81,7 @@ async function executeTargetOrientation(
   const requestedSections = DEFAULT_TARGET_SECTIONS;
   const limit = input.maxResults ?? 10;
   const focusTarget = input.target ? formatFocusTarget(input.target, deps.cwd) : null;
-  const sections: CollectedOrientationSection[] = [];
+  const sections: OrientationSectionData[] = [];
 
   let hasStructural = false;
   let hasSemantic = false;
@@ -115,16 +107,16 @@ async function executeTargetOrientation(
       : "unavailable";
 
   return {
-    blocks: buildTargetBlocks(focusTarget, sections),
-    sections: sections.map((section) => section.metadata),
+    title: "Code Orientation",
+    notes: [],
+    sections,
     confidence,
     focusTarget,
     requestedSections,
     renderedSections: sections.map((section) => section.key),
     omittedCount: sections.reduce(
       (total, section) =>
-        total +
-        section.metadata.evidenceLists.reduce((sum, list) => sum + (list.omittedCount ?? 0), 0),
+        total + section.evidenceLists.reduce((sum, list) => sum + (list.omittedCount ?? 0), 0),
       0,
     ),
     nextQueries: buildNextQueries(input.target, deps.cwd),
@@ -139,7 +131,7 @@ async function buildRequestedSection(options: {
   limit: number;
   treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>;
 }): Promise<{
-  section: CollectedOrientationSection;
+  section: OrientationSectionData;
   hasStructuralEvidence: boolean;
   hasSemanticEvidence: boolean;
 }> {
@@ -172,22 +164,22 @@ async function buildEnrichedDefsSection(
   treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>,
   limit: number,
 ): Promise<TargetSectionCollection> {
-  const lines = buildDefinitionLines(target, deps.cwd, treeContext);
+  const items = buildDefinitionItems(target, deps.cwd, treeContext);
   const contextHasSemanticEvidence = Boolean(
     treeContext?.hover || (treeContext?.definition?.length ?? 0) > 0,
   );
-  const hasStructuralEvidence = hasRenderableItems(lines);
+  const hasStructuralEvidence = hasRenderableItems(items);
 
   if (!target) {
     return unavailableTargetSection(
-      lines,
+      items,
       hasStructuralEvidence,
       "Definitions require a precise target.",
     );
   }
   if (deps.lspRuntime.kind !== "ready") {
     return {
-      lines,
+      items,
       hasStructuralEvidence,
       hasSemanticEvidence: contextHasSemanticEvidence,
       status: contextHasSemanticEvidence ? "partial" : "unavailable",
@@ -197,13 +189,13 @@ async function buildEnrichedDefsSection(
   }
 
   const definitions = await collectDefinitionTargets(target, deps, limit);
-  if (definitions.lines.length > 0) {
-    if (lines.length > 0) lines.push("");
-    lines.push("**Definition:**", ...definitions.lines);
+  if (definitions.items.length > 0) {
+    if (items.length > 0) items.push({ kind: "blank" });
+    items.push({ kind: "paragraph", text: "**Definition:**" }, ...definitions.items);
   }
   const hasSemanticEvidence = contextHasSemanticEvidence || definitions.hasSemanticEvidence;
   return {
-    lines,
+    items,
     hasStructuralEvidence,
     hasSemanticEvidence,
     status:
@@ -220,12 +212,12 @@ async function collectDefinitionTargets(
 ): Promise<
   Pick<
     TargetSectionCollection,
-    "lines" | "hasSemanticEvidence" | "status" | "reason" | "evidenceLists"
+    "items" | "hasSemanticEvidence" | "status" | "reason" | "evidenceLists"
   >
 > {
   if (!deps.provider?.definition) {
     return {
-      lines: [],
+      items: [],
       hasSemanticEvidence: false,
       status: "unavailable",
       reason: "Definition provider unavailable.",
@@ -239,7 +231,7 @@ async function collectDefinitionTargets(
     });
     if (result.kind === "unavailable") {
       return {
-        lines: [],
+        items: [],
         hasSemanticEvidence: false,
         status: "unavailable",
         reason: result.reason,
@@ -265,7 +257,7 @@ async function collectDefinitionTargets(
             maxResults: limit,
           });
     return {
-      lines: evidence.items,
+      items: evidence.items.map((location) => ({ kind: "paragraph", text: location })),
       hasSemanticEvidence: true,
       status: result.kind === "partial" ? "partial" : "complete",
       reason: result.kind === "partial" ? result.reason : null,
@@ -273,7 +265,7 @@ async function collectDefinitionTargets(
     };
   } catch (error) {
     return {
-      lines: [],
+      items: [],
       hasSemanticEvidence: false,
       status: "unavailable",
       reason: `Definition provider failed: ${String(error)}`,
@@ -293,7 +285,10 @@ async function buildDiagnosticsSection(
   if (deps.lspRuntime.kind !== "ready") {
     return unavailableTargetSection(
       [
-        "LSP not available — diagnostics require a live language server. Use `code_health` to check server status.",
+        {
+          kind: "paragraph",
+          text: "LSP not available — diagnostics require a live language server. Use `code_health` to check server status.",
+        },
       ],
       false,
       "Diagnostics require a live language server.",
@@ -305,7 +300,7 @@ async function buildDiagnosticsSection(
     const result = await deps.lspRuntime.runtime.fileDiagnostics(targetFile, 4);
     if (result.kind === "unavailable") {
       return unavailableTargetSection(
-        [`Diagnostics unavailable for this target — ${result.reason}`],
+        [{ kind: "paragraph", text: `Diagnostics unavailable for this target — ${result.reason}` }],
         false,
         result.reason,
       );
@@ -327,10 +322,10 @@ async function buildDiagnosticsSection(
             maxResults: limit,
           });
     return {
-      lines:
+      items:
         evidence.items.length === 0
-          ? ["No diagnostics found near this target."]
-          : evidence.items.map((diagnostic) => formatDiagnostic(diagnostic)),
+          ? [{ kind: "paragraph", text: "No diagnostics found near this target." }]
+          : evidence.items.map((diagnostic) => formatDiagnosticItem(diagnostic)),
       hasStructuralEvidence: false,
       hasSemanticEvidence: true,
       status: result.kind === "partial" ? "partial" : "complete",
@@ -339,24 +334,27 @@ async function buildDiagnosticsSection(
     };
   } catch (error) {
     return unavailableTargetSection(
-      ["Diagnostics failed to load."],
+      [{ kind: "paragraph", text: "Diagnostics failed to load." }],
       false,
       `Diagnostics failed to load: ${String(error)}`,
     );
   }
 }
 
-function formatDiagnostic(diagnostic: Diagnostic): string {
+function formatDiagnosticItem(diagnostic: Diagnostic): OrientationItem {
   const severity = (diagnostic.severity ?? 1) === 1 ? "ERROR" : "WARN";
-  return `- **${severity}** (L${(diagnostic.range.start.line ?? 0) + 1}): ${diagnosticMessageString(diagnostic)}`;
+  return {
+    kind: "list-item",
+    text: `**${severity}** (L${(diagnostic.range.start.line ?? 0) + 1}): ${diagnosticMessageString(diagnostic)}`,
+  };
 }
 
 function completedDocsSection(
-  lines: string[],
+  items: OrientationItem[],
   evidenceLists: readonly EvidenceListMetadata[],
 ): TargetSectionCollection {
   return {
-    lines,
+    items,
     hasStructuralEvidence: false,
     hasSemanticEvidence: false,
     status: "complete",
@@ -366,12 +364,12 @@ function completedDocsSection(
 }
 
 function unavailableTargetSection(
-  lines: string[],
+  items: OrientationItem[],
   hasStructuralEvidence: boolean,
   reason: string,
 ): TargetSectionCollection {
   return {
-    lines,
+    items,
     hasStructuralEvidence,
     hasSemanticEvidence: false,
     status: "unavailable",
@@ -388,7 +386,7 @@ async function buildDocsSection(
 ): Promise<TargetSectionCollection> {
   if (!target) {
     return unavailableTargetSection(
-      ["Docs unavailable without a precise target."],
+      [{ kind: "paragraph", text: "Docs unavailable without a precise target." }],
       false,
       "Docs require a precise target.",
     );
@@ -397,7 +395,7 @@ async function buildDocsSection(
   const targetFile = path.resolve(deps.cwd, target.file);
   if (!existsSync(targetFile)) {
     return unavailableTargetSection(
-      ["Docs unavailable — target file not found."],
+      [{ kind: "paragraph", text: "Docs unavailable — target file not found." }],
       false,
       "Target file not found.",
     );
@@ -443,7 +441,10 @@ async function buildDocsSection(
     }
 
     if (jsdocStart === -1 || jsdocEnd === -1) {
-      return completedDocsSection(["No JSDoc/TSDoc comment found for this symbol."], []);
+      return completedDocsSection(
+        [{ kind: "paragraph", text: "No JSDoc/TSDoc comment found for this symbol." }],
+        [],
+      );
     }
 
     const docLines = lines
@@ -457,7 +458,10 @@ async function buildDocsSection(
       .filter((line) => line.trim() !== "");
 
     if (docLines.length === 0) {
-      return completedDocsSection(["No JSDoc/TSDoc comment found for this symbol."], []);
+      return completedDocsSection(
+        [{ kind: "paragraph", text: "No JSDoc/TSDoc comment found for this symbol." }],
+        [],
+      );
     }
 
     const evidence = createEvidenceList({
@@ -465,10 +469,13 @@ async function buildDocsSection(
       items: docLines,
       maxResults: limit,
     });
-    return completedDocsSection(["```ts", ...evidence.items, "```"], [evidence.metadata]);
+    return completedDocsSection(
+      [{ kind: "code", language: "ts", lines: evidence.items }],
+      [evidence.metadata],
+    );
   } catch (error) {
     return unavailableTargetSection(
-      ["Docs extraction failed."],
+      [{ kind: "paragraph", text: "Docs extraction failed." }],
       false,
       `Docs extraction failed: ${String(error)}`,
     );
@@ -484,66 +491,106 @@ async function maybeGatherTreeContext(
   return gatherTreeSitterContext(deps.provider, relPath, target.line, target.character);
 }
 
-function buildDefinitionLines(
+function buildDefinitionItems(
   target: OrientationTarget | null | undefined,
   cwd: string,
   treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>,
-): string[] {
-  if (!target) return ["No precise target context found."];
+): OrientationItem[] {
+  if (!target) return [{ kind: "paragraph", text: "No precise target context found." }];
 
-  const lines = [`- Focus: \`${formatFocusTarget(target, cwd)}\``];
+  const items: OrientationItem[] = [
+    { kind: "list-item", text: `Focus: \`${formatFocusTarget(target, cwd)}\`` },
+  ];
   if (target.name) {
-    lines.push(`- Symbol: \`${target.name}\`${target.kind ? ` (${target.kind})` : ""}`);
+    items.push({
+      kind: "list-item",
+      text: `Symbol: \`${target.name}\`${target.kind ? ` (${target.kind})` : ""}`,
+    });
   }
   if (treeContext?.nodeInfo?.type) {
-    lines.push(`- Node: \`${treeContext.nodeInfo.type}\``);
+    items.push({ kind: "list-item", text: `Node: \`${treeContext.nodeInfo.type}\`` });
   }
   if (treeContext?.hover?.contents) {
-    lines.push(...formatHoverLine(treeContext.hover.contents));
+    items.push(...hoverItems(treeContext.hover.contents));
   }
-  return lines;
+  return items;
 }
 
-function formatHoverLine(contents: string): string[] {
-  const trimmed = contents.trim();
-  const maxHoverChars = 600;
-  if (trimmed.startsWith("```")) {
-    return formatFencedHover(trimmed, maxHoverChars);
-  }
-  if (trimmed.length <= maxHoverChars) return [`- Hover: ${trimmed}`];
+const MAX_HOVER_CHARS = 600;
+const HOVER_TRUNCATED_NOTE = "_(truncated, use `code_inspect` for full type)_";
 
-  const hoverLines = trimmed.split("\n");
-  if (hoverLines.length === 1) {
+function hoverItems(contents: string): OrientationItem[] {
+  const trimmed = contents.trim();
+  if (!trimmed.startsWith("```")) {
+    if (trimmed.length <= MAX_HOVER_CHARS)
+      return [{ kind: "list-item", text: `Hover: ${trimmed}` }];
     return [
-      `- Hover: ${trimmed.slice(0, maxHoverChars)}...`,
-      "  _(truncated, use `code_inspect` for full type)_",
+      { kind: "list-item", text: `Hover: ${clipHoverText(trimmed)}...` },
+      { kind: "paragraph", text: HOVER_TRUNCATED_NOTE },
     ];
   }
-
-  let acc = "";
-  for (const line of hoverLines) {
-    if (acc.length + line.length + 1 > maxHoverChars && acc.length > 0) break;
-    acc += (acc ? "\n" : "") + line;
-  }
-  return [`- Hover: ${acc}`, "  _(truncated, use `code_inspect` for full type)_"];
+  const { lines, truncated } = clipHoverLines(trimmed);
+  const items: OrientationItem[] = [
+    { kind: "list-item", text: "Hover:" },
+    ...hoverBodyItems(lines),
+  ];
+  if (truncated) items.push({ kind: "paragraph", text: HOVER_TRUNCATED_NOTE });
+  return items;
 }
 
-/** Keep provider-supplied Markdown fences at block boundaries understood by sectionBlocks(). */
-function formatFencedHover(contents: string, maxChars: number): string[] {
-  const sourceLines = contents.split("\n");
-  if (contents.length <= maxChars) return ["- Hover:", ...sourceLines];
+function clipHoverText(trimmed: string): string {
+  const lines = trimmed.split("\n");
+  if (lines.length === 1) return trimmed.slice(0, MAX_HOVER_CHARS);
+  let acc = "";
+  for (const line of lines) {
+    if (acc.length + line.length + 1 > MAX_HOVER_CHARS && acc.length > 0) break;
+    acc += (acc ? "\n" : "") + line;
+  }
+  return acc;
+}
 
+function clipHoverLines(contents: string): { lines: string[]; truncated: boolean } {
+  const sourceLines = contents.split("\n");
+  if (contents.length <= MAX_HOVER_CHARS) return { lines: sourceLines, truncated: false };
   const lines = [sourceLines[0]];
   let length = sourceLines[0].length;
-  let closed = false;
   for (const line of sourceLines.slice(1)) {
-    if (length + line.length + 1 > maxChars) break;
+    if (length + line.length + 1 > MAX_HOVER_CHARS) break;
     lines.push(line);
     length += line.length + 1;
-    if (line.startsWith("```")) closed = true;
   }
-  if (!closed) lines.push("```");
-  return ["- Hover:", ...lines, "_(truncated, use `code_inspect` for full type)_"];
+  return { lines, truncated: true };
+}
+
+/** Parse provider hover Markdown (fenced code + prose) into rendered items. */
+function hoverBodyItems(lines: readonly string[]): OrientationItem[] {
+  const items: OrientationItem[] = [];
+  let codeLanguage: string | null = null;
+  let codeLines: string[] = [];
+  const closeCode = (): void => {
+    if (codeLanguage === null) return;
+    items.push({
+      kind: "code",
+      language: codeLanguage.length > 0 ? codeLanguage : null,
+      lines: codeLines,
+    });
+    codeLanguage = null;
+    codeLines = [];
+  };
+  for (const line of lines) {
+    if (line.startsWith("```")) {
+      if (codeLanguage === null) codeLanguage = line.slice(3).trim();
+      else closeCode();
+      continue;
+    }
+    if (codeLanguage !== null) {
+      codeLines.push(line);
+      continue;
+    }
+    items.push(line.trim().length === 0 ? { kind: "blank" } : { kind: "paragraph", text: line });
+  }
+  closeCode();
+  return items;
 }
 
 function formatFocusTarget(target: OrientationTarget, cwd: string): string {
@@ -595,7 +642,7 @@ function targetSectionResult(
   collection: TargetSectionCollection,
   provenance: OrientationSectionData["provenance"],
 ): {
-  section: CollectedOrientationSection;
+  section: OrientationSectionData;
   hasStructuralEvidence: boolean;
   hasSemanticEvidence: boolean;
 } {
@@ -608,111 +655,18 @@ function targetSectionResult(
     section: {
       key,
       title: SECTION_TITLES[key],
-      lines: collection.lines,
-      metadata: {
-        key,
-        title: SECTION_TITLES[key],
-        status: collection.status,
-        reason: collection.reason,
-        confidence,
-        provenance,
-        evidenceLists: collection.evidenceLists,
-      },
+      status: collection.status,
+      reason: collection.reason,
+      confidence,
+      provenance,
+      evidenceLists: collection.evidenceLists,
+      items: collection.items,
     },
     hasStructuralEvidence: collection.hasStructuralEvidence,
     hasSemanticEvidence: collection.hasSemanticEvidence,
   };
 }
 
-function buildTargetBlocks(
-  focusTarget: string | null,
-  sections: readonly CollectedOrientationSection[],
-): OrientationBlock[] {
-  const blocks: OrientationBlock[] = [
-    { kind: "heading", level: 1, text: "Code Orientation" },
-    { kind: "blank" },
-  ];
-  if (focusTarget) {
-    blocks.push(
-      { kind: "heading", level: 2, text: "Focus" },
-      { kind: "list-item", text: `\`${focusTarget}\`` },
-      { kind: "blank" },
-    );
-  }
-  for (const section of sections) {
-    blocks.push(
-      { kind: "heading", level: 2, text: section.title },
-      { kind: "paragraph", text: formatSectionNote(section.metadata) },
-    );
-    blocks.push(...sectionBlocks(section.lines.join("\n")), { kind: "blank" });
-  }
-  return blocks;
-}
-
-interface SectionBlockState {
-  blocks: OrientationBlock[];
-  codeLanguage: string | null;
-  codeLines: string[];
-}
-
-/** Convert target-section fragments into typed blocks. Context Orientation never crosses a markdown seam. */
-function sectionBlocks(document: string): OrientationBlock[] {
-  const state: SectionBlockState = { blocks: [], codeLanguage: null, codeLines: [] };
-  for (const line of document.split("\n")) appendSectionLine(state, line);
-  closeCodeBlock(state);
-  return state.blocks;
-}
-
-function appendSectionLine(state: SectionBlockState, line: string): void {
-  if (line.startsWith("```")) {
-    toggleCodeBlock(state, line.slice(3).trim());
-    return;
-  }
-  if (state.codeLanguage !== null) {
-    state.codeLines.push(line);
-    return;
-  }
-  appendProseBlock(state.blocks, line);
-}
-
-function toggleCodeBlock(state: SectionBlockState, language: string): void {
-  if (state.codeLanguage === null) {
-    state.codeLanguage = language;
-    return;
-  }
-  closeCodeBlock(state);
-}
-
-function closeCodeBlock(state: SectionBlockState): void {
-  if (state.codeLanguage === null) return;
-  state.blocks.push({
-    kind: "code",
-    language: state.codeLanguage.length > 0 ? state.codeLanguage : null,
-    lines: state.codeLines,
-  });
-  state.codeLanguage = null;
-  state.codeLines = [];
-}
-
-function appendProseBlock(blocks: OrientationBlock[], line: string): void {
-  const heading = /^(#{1,3})\s+(.*)$/.exec(line);
-  if (heading) {
-    blocks.push({
-      kind: "heading",
-      level: heading[1].length as 1 | 2 | 3,
-      text: heading[2],
-    });
-    return;
-  }
-  if (line.startsWith("- ")) {
-    blocks.push({ kind: "list-item", text: line.slice(2) });
-  } else if (line.trim().length === 0) {
-    blocks.push({ kind: "blank" });
-  } else {
-    blocks.push({ kind: "paragraph", text: line });
-  }
-}
-
-function hasRenderableItems(lines: string[]): boolean {
-  return lines.some((line) => line.trim().startsWith("- "));
+function hasRenderableItems(items: readonly OrientationItem[]): boolean {
+  return items.some((item) => item.kind === "list-item");
 }

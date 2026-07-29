@@ -1,5 +1,6 @@
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { beforeAll, describe, expect, it } from "vitest";
+import type { OrientationResultData } from "../../../src/session/orientation-types.ts";
 import { renderOrientationResult as renderOrientationMarkdown } from "../../../src/tool/orientation/markdown.ts";
 import { renderOrientationResult as renderOrientationTui } from "../../../src/tool/orientation/tui.ts";
 import { assembleOrientationResult } from "../../../src/tool/result/orientation.ts";
@@ -20,7 +21,8 @@ describe("Orientation result projections", () => {
       reason: "inspect the entrypoint",
     };
     const assembly = assembleOrientationResult({
-      blocks: [{ kind: "heading", level: 1, text: "Project" }],
+      title: "Project",
+      notes: [],
       sections: [
         {
           key: "orientation",
@@ -30,6 +32,7 @@ describe("Orientation result projections", () => {
           confidence: "structural",
           provenance: [{ source: "structural", capability: "test" }],
           evidenceLists: [],
+          items: [],
         },
       ],
       confidence: "structural",
@@ -78,4 +81,64 @@ describe("Orientation result projections", () => {
       expect(text).not.toContain("0 sections");
     },
   );
+
+  it("frames title, notes, focus, section notes, and items from Orientation facts", () => {
+    const target = {
+      targetId: "tg-1",
+      spanId: "sp-1",
+      file: "src/widget.ts",
+      displayLine: 1,
+      displayCharacter: 1,
+      name: "widget",
+    } as unknown as NonNullable<OrientationResultData["target"]>;
+
+    const markdown = renderOrientationMarkdown(
+      assembleOrientationResult({
+        title: "Code Orientation",
+        notes: ["Resolved target widget: src/widget.ts:1:1 — Target ID: tg-1"],
+        sections: [
+          {
+            key: "defs",
+            title: "Definitions",
+            status: "complete",
+            reason: null,
+            confidence: "semantic",
+            provenance: [{ source: "semantic", capability: "LSP" }],
+            evidenceLists: [],
+            items: [
+              { kind: "list-item", text: "Focus: `src/widget.ts:1:1`" },
+              { kind: "code", language: "ts", lines: ["function widget(): number"] },
+            ],
+          },
+          {
+            key: "instructions",
+            title: "Instructions",
+            status: "complete",
+            reason: null,
+            confidence: "unavailable",
+            provenance: [{ source: "filesystem", detail: "configured instruction files" }],
+            evidenceLists: [],
+            items: [{ kind: "subheading", text: "AGENTS.md" }],
+          },
+        ],
+        confidence: "semantic",
+        focusTarget: "src/widget.ts:1:1",
+        requestedSections: ["defs"],
+        renderedSections: ["defs", "instructions"],
+        omittedCount: 0,
+        nextQueries: [],
+        readNext: [],
+        target,
+      }),
+    );
+
+    expect(markdown).toContain("Resolved target widget: src/widget.ts:1:1 — Target ID: tg-1");
+    expect(markdown).toContain("# Code Orientation");
+    expect(markdown).toContain("## Focus\n- `src/widget.ts:1:1`");
+    expect(markdown).toContain("## Definitions");
+    expect(markdown).toContain("- Focus: `src/widget.ts:1:1`");
+    expect(markdown).toContain("```ts\nfunction widget(): number\n```");
+    expect(markdown).toContain("## Instructions");
+    expect(markdown).toContain("### AGENTS.md");
+  });
 });

@@ -16,11 +16,16 @@ export interface OrientationWorkflowInput {
   readonly maxResults?: number;
 }
 
-/** Presentation-neutral block collected for an Orientation result. */
-export type OrientationBlock =
-  | { readonly kind: "heading"; readonly level: 1 | 2 | 3; readonly text: string }
+/**
+ * Presentation-neutral content atom a collector emits for one Orientation
+ * section. Collectors never build headings, section notes, or document
+ * framing — the markdown adapter owns all of that. `subheading` renders as an
+ * h3 within a section (only instruction-file paths use it).
+ */
+export type OrientationItem =
   | { readonly kind: "paragraph"; readonly text: string }
   | { readonly kind: "list-item"; readonly text: string }
+  | { readonly kind: "subheading"; readonly text: string }
   | {
       readonly kind: "code";
       readonly language: string | null;
@@ -51,6 +56,8 @@ export interface OrientationSectionData {
   readonly confidence: ConfidenceMode;
   readonly provenance: readonly OrientationProvenance[];
   readonly evidenceLists: readonly EvidenceListMetadata[];
+  /** Content atoms for this section; the adapter frames them under the title + note. */
+  readonly items: readonly OrientationItem[];
 }
 
 export interface OrientationCandidate {
@@ -67,7 +74,10 @@ export interface OrientationCandidate {
 
 /** Immutable facts returned by the session before markdown or TUI rendering. */
 export interface OrientationResultData {
-  readonly blocks: readonly OrientationBlock[];
+  /** Document title rendered as the leading h1 (e.g. "Workspace Orientation", "Code Orientation"). */
+  readonly title: string;
+  /** Leading paragraphs rendered before the title (target summary / resolution notes). */
+  readonly notes: readonly string[];
   readonly sections: readonly OrientationSectionData[];
   readonly confidence: ConfidenceMode;
   readonly focusTarget: string | null;

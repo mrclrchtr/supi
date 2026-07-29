@@ -316,9 +316,10 @@ describe("canonical Tool result assembly", () => {
     expect(markdown).toContain("showing 1 of 2; 1 omitted");
   });
 
-  it("assembles Orientation blocks before markdown rendering", () => {
+  it("assembles Orientation facts before markdown rendering", () => {
     const assembly = assembleOrientationResult({
-      blocks: [{ kind: "heading", level: 1, text: "Project" }],
+      title: "Project",
+      notes: [],
       sections: [
         {
           key: "orientation",
@@ -328,6 +329,7 @@ describe("canonical Tool result assembly", () => {
           confidence: "structural",
           provenance: [{ source: "structural", capability: "test" }],
           evidenceLists: [],
+          items: [],
         },
       ],
       confidence: "structural",
@@ -339,11 +341,7 @@ describe("canonical Tool result assembly", () => {
       readNext: [],
     });
 
-    expect(assembly.assembled.data.blocks[0]).toEqual({
-      kind: "heading",
-      level: 1,
-      text: "Project",
-    });
+    expect(assembly.assembled.data.title).toBe("Project");
     expect(assembly.details.renderedSections).toEqual(["orientation"]);
   });
 

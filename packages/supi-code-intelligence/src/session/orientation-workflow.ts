@@ -14,10 +14,9 @@ import { loadCodeIntelligenceConfig } from "../config.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import { parseOrientationWorkflowInput } from "./input/workflows.ts";
 import { executeOrientation } from "./orientation/collect.ts";
-import { formatSectionNote } from "./orientation/context-sections.ts";
 import type {
-  OrientationBlock,
   OrientationFocusInput,
+  OrientationItem,
   OrientationResultData,
   OrientationSectionData,
   OrientationWorkflowInput,
@@ -217,6 +216,20 @@ function addInstructionFiles(
   const collected = collectInstructionFiles(matches);
   if (!collected) return result;
   deps.markInstructionDirsSurfaced(collected.metadata.files.map((file) => file.directory));
+  const items: OrientationItem[] = [];
+  for (const file of collected.files) {
+    items.push(
+      { kind: "subheading", text: file.path },
+      { kind: "code", language: null, lines: file.content.split("\n") },
+    );
+    if (file.truncated) {
+      items.push({
+        kind: "paragraph",
+        text: `Instruction file truncated to ${file.shownLines} of ${file.totalLines} lines. Read ${file.path} for the full file.`,
+      });
+    }
+    items.push({ kind: "blank" });
+  }
   const section: OrientationSectionData = {
     key: "instructions",
     title: "Instructions",
@@ -233,10 +246,10 @@ function addInstructionFiles(
         partialReason: null,
       },
     ],
+    items,
   };
   return {
     ...result,
-    blocks: insertInstructionBlocks(result.blocks, collected.files, section),
     sections: [section, ...result.sections],
     renderedSections: ["instructions", ...result.renderedSections],
     instructions: collected.metadata,
@@ -258,50 +271,9 @@ function addTargetSummary(
   cwd: string,
 ): OrientationResultData {
   const name = entry.name ? ` ${entry.name}` : "";
-  const summary: OrientationBlock[] = [
-    ...notes.map((note): OrientationBlock => ({ kind: "paragraph", text: `Note: ${note}` })),
-    {
-      kind: "paragraph",
-      text: `Resolved target${name}: ${relative(cwd, entry.file) || entry.file}:${entry.displayLine}:${entry.displayCharacter} — Target ID: ${entry.targetId}`,
-    },
-    { kind: "blank" },
+  const summaryNotes = [
+    ...notes.map((note) => `Note: ${note}`),
+    `Resolved target${name}: ${relative(cwd, entry.file) || entry.file}:${entry.displayLine}:${entry.displayCharacter} — Target ID: ${entry.targetId}`,
   ];
-  return { ...result, blocks: [...summary, ...result.blocks], target: { ...entry } };
-}
-
-function insertInstructionBlocks(
-  existing: readonly OrientationBlock[],
-  files: readonly {
-    path: string;
-    content: string;
-    truncated: boolean;
-    shownLines: number;
-    totalLines: number;
-  }[],
-  section: OrientationSectionData,
-): OrientationBlock[] {
-  const blocks: OrientationBlock[] = [
-    { kind: "heading", level: 2, text: "Instructions" },
-    { kind: "paragraph", text: formatSectionNote(section) },
-    { kind: "blank" },
-  ];
-  for (const file of files) {
-    blocks.push(
-      { kind: "heading", level: 3, text: file.path },
-      { kind: "code", language: null, lines: file.content.split("\n") },
-    );
-    if (file.truncated) {
-      blocks.push({
-        kind: "paragraph",
-        text: `Instruction file truncated to ${file.shownLines} of ${file.totalLines} lines. Read ${file.path} for the full file.`,
-      });
-    }
-    blocks.push({ kind: "blank" });
-  }
-
-  const insertion = existing.findIndex(
-    (block, index) => index > 0 && block.kind === "heading" && block.level === 2,
-  );
-  if (insertion < 0) return [...existing, ...blocks];
-  return [...existing.slice(0, insertion), ...blocks, ...existing.slice(insertion)];
+  return { ...result, notes: [...summaryNotes, ...result.notes], target: { ...entry } };
 }
