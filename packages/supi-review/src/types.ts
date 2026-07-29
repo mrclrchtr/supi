@@ -181,6 +181,20 @@ export type ChildFailedResult =
       diagnostics: ChildFailureDiagnostics;
     };
 
+/**
+ * Typed result of running one isolated child session (planner or reviewer).
+ *
+ * Substrate-level: it carries the structured `value` on success, aggregate
+ * `usage`, and bounded failure diagnostics — but no modelId, capability
+ * warnings, or audit. Adapters attach those domain facts. `session-creation-failed`
+ * stays a diagnostics-free `failed` via {@link ChildFailedResult}.
+ */
+export type ChildRunOutcome<T> =
+  | { kind: "success"; value: T; usage?: Usage }
+  | ({ kind: "failed"; usage?: Usage } & ChildFailedResult)
+  | { kind: "canceled"; diagnostics: ChildFailureDiagnostics; usage?: Usage }
+  | { kind: "timeout"; timeoutMs: number; diagnostics: ChildFailureDiagnostics; usage?: Usage };
+
 export interface ReviewProgress {
   turns: number;
   toolUses: number;
@@ -202,11 +216,7 @@ export interface PlannerInvocation {
   onProgress?: (progress: ReviewProgress) => void;
 }
 
-export type PlannerRunResult =
-  | { kind: "success"; draft: PlannerDraft; usage?: Usage }
-  | ({ kind: "failed"; usage?: Usage } & ChildFailedResult)
-  | { kind: "canceled"; diagnostics: ChildFailureDiagnostics; usage?: Usage }
-  | { kind: "timeout"; timeoutMs: number; diagnostics: ChildFailureDiagnostics; usage?: Usage };
+export type PlannerRunResult = ChildRunOutcome<PlannerDraft>;
 
 /** Parent-facing execution provenance for an unavailable Reviewer Extension Set capability. */
 export interface ReviewerCapabilityWarning {
@@ -233,18 +243,8 @@ export interface ReviewerInvocation {
   onProgress?: (progress: ReviewProgress) => void;
 }
 
-export type ReviewerRunResult = (
-  | { kind: "success"; submission: ReviewSubmission; modelId: string; usage?: Usage }
-  | ({ kind: "failed"; modelId: string; usage?: Usage } & ChildFailedResult)
-  | { kind: "canceled"; modelId: string; diagnostics: ChildFailureDiagnostics; usage?: Usage }
-  | {
-      kind: "timeout";
-      timeoutMs: number;
-      modelId: string;
-      diagnostics: ChildFailureDiagnostics;
-      usage?: Usage;
-    }
-) & {
+export type ReviewerRunResult = ChildRunOutcome<ReviewSubmission> & {
+  modelId: string;
   capabilityWarnings?: ReviewerCapabilityWarning[];
   audit?: ReviewAuditReference;
 };

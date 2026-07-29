@@ -106,6 +106,10 @@ _Avoid_: review result, transcript, permanent report
 A bounded, ordered diagnostic record of lifecycle transitions for one child session. It contains allowlisted control metadata and may contain bounded, redacted provider-owned error summaries. It never contains assistant conversation, repository evidence, tool arguments, or tool results.
 _Avoid_: recent events, event log, child transcript, telemetry
 
+**Child Run Outcome**:
+The typed result of running one isolated child session (planner or reviewer): a `success` carrying the structured `value` and aggregate usage, or a `canceled`, `timeout`, or `failed` outcome carrying bounded Child Failure diagnostics. It is substrate-level — it carries no model id, Reviewer Capability Warning, or audit reference; adapters attach those when mapping it to a run result. `session-creation-failed` is a diagnostics-free `failed`.
+_Avoid_: reviewer output, run result, result-builder callbacks
+
 **Local Reviewer Replay**:
 A private local artifact for tuning a Reviewer Session. It retains provider-visible messages and tool output, packet/protocol text, timing, usage, and the Review Workspace Receipt for seven days; thinking blocks and thought signatures are omitted. It is disabled by default; enabling `review.auditEnabled` records every task and registers `supi_review_audit` after reload.
 _Avoid_: normal review output, child diagnostics, permanent transcript

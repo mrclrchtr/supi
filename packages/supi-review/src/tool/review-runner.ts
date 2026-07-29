@@ -38,12 +38,11 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
   const warnings: ReviewerCapabilityWarning[] = [];
   const protocolPrompt = buildReviewerSystemPrompt(invocation.dependencyBootstrapConfigured);
   const thinkingLevel = clampThinkingLevel(invocation.model.model, "max");
-  const withWarnings = () => (warnings.length > 0 ? { capabilityWarnings: warnings } : {});
   let session: AgentSession | undefined;
   let trace: ReviewAuditTraceCollector | undefined;
   let unsubscribe: (() => void) | undefined;
 
-  const result = await runIsolatedChild<ReviewSubmission, ReviewerRunResult>({
+  const outcome = await runIsolatedChild<ReviewSubmission>({
     cwd: invocation.cwd,
     protocolPrompt,
     model: invocation.model.model,
@@ -69,44 +68,14 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
           "Headless Code Intelligence was unavailable; this reviewer continued with read, bash, and grep inspection.",
       });
     },
-    successResult: (submission, usage) => ({
-      kind: "success",
-      submission,
-      modelId: invocation.model.canonicalId,
-      ...(usage ? { usage } : {}),
-      ...withWarnings(),
-    }),
-    canceledResult: (diagnostics, usage) => ({
-      kind: "canceled",
-      modelId: invocation.model.canonicalId,
-      diagnostics,
-      ...(usage ? { usage } : {}),
-      ...withWarnings(),
-    }),
-    failedResult: (failureCode, diagnostics, usage) => ({
-      kind: "failed",
-      failureCode,
-      modelId: invocation.model.canonicalId,
-      diagnostics,
-      ...(usage ? { usage } : {}),
-      ...withWarnings(),
-    }),
-    timeoutResult: (timeoutMs, diagnostics, usage) => ({
-      kind: "timeout",
-      timeoutMs,
-      modelId: invocation.model.canonicalId,
-      diagnostics,
-      ...(usage ? { usage } : {}),
-      ...withWarnings(),
-    }),
-    sessionFailedResult: {
-      kind: "failed",
-      failureCode: "session-creation-failed",
-      modelId: invocation.model.canonicalId,
-    },
     onProgress: invocation.onProgress,
   });
   unsubscribe?.();
+  const result: ReviewerRunResult = {
+    ...outcome,
+    modelId: invocation.model.canonicalId,
+    ...(warnings.length > 0 ? { capabilityWarnings: warnings } : {}),
+  };
   if (!invocation.audit || !session || !trace) return result;
 
   try {

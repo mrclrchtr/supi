@@ -101,4 +101,70 @@ describe("runPlanner", () => {
       expect.objectContaining({ prompt: "bounded input", timeoutMs: 5 * 60 * 1_000 }),
     );
   });
+
+  it("returns each runIsolatedChild outcome unchanged, keeping session-creation-failed diagnostics-free", async () => {
+    const diagnostics = { lifecycleTrace: { entries: [], droppedCount: 0 }, turns: 0, toolUses: 0 };
+    const factoryCtx = { getFailureDiagnostics: () => diagnostics, getUsage: () => undefined };
+    const args = { cwd: "/repo", prompt: "bounded input", model: {} as never };
+
+    // success: the structured value flows straight through as `value`.
+    const draft = { tasks: [{ id: "t", instructions: "Review." }] };
+    mocks.runWithLifecycle.mockResolvedValueOnce({ kind: "success", value: draft });
+    await expect(runPlanner(args)).resolves.toEqual({ kind: "success", value: draft });
+
+    // agent settled with no submission -> missing-structured-output (exercises onEvent).
+    mocks.runWithLifecycle.mockImplementationOnce(
+      (cfg: { onEvent: (event: { type: string }, ctx: unknown) => void }) =>
+        new Promise((resolve) =>
+          cfg.onEvent(
+            { type: "agent_settled" },
+            {
+              ...factoryCtx,
+              progress: { turns: 0, toolUses: 0 },
+              session: { getSessionStats: () => ({}) },
+              resolve,
+              cleanup: (result: unknown) => result,
+            },
+          ),
+        ),
+    );
+    await expect(runPlanner(args)).resolves.toEqual({
+      kind: "failed",
+      failureCode: "missing-structured-output",
+      diagnostics,
+    });
+
+    // canceled / failed / timeout are built by runIsolatedChild's own factories.
+    mocks.runWithLifecycle.mockImplementationOnce(
+      (cfg: { canceledResult: (ctx: unknown) => unknown }) =>
+        Promise.resolve(cfg.canceledResult(factoryCtx)),
+    );
+    await expect(runPlanner(args)).resolves.toEqual({ kind: "canceled", diagnostics });
+
+    mocks.runWithLifecycle.mockImplementationOnce(
+      (cfg: { failedResult: (code: string, ctx: unknown) => unknown }) =>
+        Promise.resolve(cfg.failedResult("prompt-rejected", factoryCtx)),
+    );
+    await expect(runPlanner(args)).resolves.toEqual({
+      kind: "failed",
+      failureCode: "prompt-rejected",
+      diagnostics,
+    });
+
+    mocks.runWithLifecycle.mockImplementationOnce(
+      (cfg: { timeoutResult: (ms: number, ctx: unknown) => unknown }) =>
+        Promise.resolve(cfg.timeoutResult(1234, factoryCtx)),
+    );
+    await expect(runPlanner(args)).resolves.toEqual({
+      kind: "timeout",
+      timeoutMs: 1234,
+      diagnostics,
+    });
+
+    // child resource loading failure -> diagnostics-free session-creation-failed.
+    mocks.reload.mockRejectedValueOnce(new Error("boom"));
+    const created = await runPlanner(args);
+    expect(created).toEqual({ kind: "failed", failureCode: "session-creation-failed" });
+    expect(created).not.toHaveProperty("diagnostics");
+  }, 15_000);
 });

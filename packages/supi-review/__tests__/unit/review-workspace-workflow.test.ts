@@ -37,7 +37,7 @@ describe("runReview Review Workspace boundary", () => {
     mocks.runReviewer.mockResolvedValue({
       kind: "success",
       modelId: model.canonicalId,
-      submission: { summary: "Done", findings: [] },
+      value: { summary: "Done", findings: [] },
     });
 
     await runReview({

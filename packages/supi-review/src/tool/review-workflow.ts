@@ -153,7 +153,7 @@ async function preparePlanner(
   };
   if (result.kind === "canceled") return { canceled: result, ...identity };
   if (result.kind === "success") {
-    return { draft: normalizeReviewInput(result.draft), ...identity };
+    return { draft: normalizeReviewInput(result.value), ...identity };
   }
   return { failure: result, ...identity };
 }

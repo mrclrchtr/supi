@@ -74,7 +74,6 @@ describe("runReviewer", () => {
     mocks.runWithLifecycle.mockResolvedValue({
       kind: "failed",
       failureCode: "session-creation-failed",
-      modelId: model.canonicalId,
     });
   });
 
@@ -117,8 +116,7 @@ describe("runReviewer", () => {
     });
     mocks.runWithLifecycle.mockResolvedValue({
       kind: "success",
-      modelId: model.canonicalId,
-      submission: { summary: "Done", findings: [] },
+      value: { summary: "Done", findings: [] },
     });
 
     const result = await runReviewer({
@@ -180,5 +178,56 @@ describe("runReviewer", () => {
     expect(mocks.runWithLifecycle).toHaveBeenCalledWith(
       expect.objectContaining({ prompt: "exact packet bytes", timeoutMs: undefined }),
     );
+  });
+
+  it("maps each child run outcome into a reviewer result carrying modelId", async () => {
+    const diagnostics = { lifecycleTrace: { entries: [], droppedCount: 0 }, turns: 0, toolUses: 0 };
+    const invocation = {
+      cwd: "/repo",
+      snapshot,
+      task: { id: "spec", instructions: "Review." },
+      prompt: "exact packet bytes",
+      packetHash: "c".repeat(64),
+      model,
+    };
+
+    // success: value preserved, modelId attached, no capability warnings when tools are present.
+    mocks.runWithLifecycle.mockResolvedValueOnce({
+      kind: "success",
+      value: { summary: "Done", findings: [] },
+    });
+    await expect(runReviewer(invocation)).resolves.toEqual({
+      kind: "success",
+      value: { summary: "Done", findings: [] },
+      modelId: model.canonicalId,
+    });
+
+    // timeout built by runIsolatedChild's factory, enriched with modelId.
+    mocks.runWithLifecycle.mockImplementationOnce(
+      (cfg: { timeoutResult: (ms: number, ctx: unknown) => unknown }) =>
+        Promise.resolve(
+          cfg.timeoutResult(1234, {
+            getFailureDiagnostics: () => diagnostics,
+            getUsage: () => undefined,
+          }),
+        ),
+    );
+    await expect(runReviewer(invocation)).resolves.toEqual({
+      kind: "timeout",
+      timeoutMs: 1234,
+      diagnostics,
+      modelId: model.canonicalId,
+    });
+
+    // session-creation-failed stays diagnostics-free but still carries modelId.
+    mocks.reload.mockRejectedValueOnce(new Error("boom"));
+    const created = await runReviewer(invocation);
+    expect(created).toEqual({
+      kind: "failed",
+      failureCode: "session-creation-failed",
+      modelId: model.canonicalId,
+    });
+    expect(created).not.toHaveProperty("diagnostics");
+    expect(created).not.toHaveProperty("capabilityWarnings");
   });
 });

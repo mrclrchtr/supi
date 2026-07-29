@@ -8,7 +8,7 @@ import {
   SessionManager,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import type { ChildFailureDiagnostics, ReviewProgress } from "../types.ts";
+import type { ChildRunOutcome, ReviewProgress } from "../types.ts";
 import { createIsolatedChildResources } from "./child-resource-loader.ts";
 import { buildProgressTokens } from "./runner-helpers.ts";
 import { runWithLifecycle } from "./session-lifecycle.ts";
@@ -16,7 +16,7 @@ import { runWithLifecycle } from "./session-lifecycle.ts";
 const CHILD_RUNTIME_SHUTDOWN_GRACE_MS = 2_000;
 
 /** Configuration for one isolated child run — resource loading, session, and lifecycle. */
-export interface IsolatedRunConfig<THolder, TResult> {
+export interface IsolatedRunConfig<T> {
   cwd: string;
   protocolPrompt: string;
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
@@ -27,23 +27,10 @@ export interface IsolatedRunConfig<THolder, TResult> {
   signal?: AbortSignal;
   tools: string[];
   customTools: ToolDefinition[];
-  holder: { value?: THolder };
+  holder: { value?: T };
   headlessInspection?: boolean;
   projectTrusted?: boolean;
   onSessionCreated?: (session: AgentSession) => void;
-  successResult: (value: THolder, usage?: Usage) => TResult;
-  canceledResult: (diagnostics: ChildFailureDiagnostics, usage?: Usage) => TResult;
-  failedResult: (
-    failureCode: "prompt-rejected" | "missing-structured-output" | "unexpected-runner-failure",
-    diagnostics: ChildFailureDiagnostics,
-    usage?: Usage,
-  ) => TResult;
-  timeoutResult: (
-    timeoutMs: number,
-    diagnostics: ChildFailureDiagnostics,
-    usage?: Usage,
-  ) => TResult;
-  sessionFailedResult: TResult;
   onProgress?: (progress: ReviewProgress) => void;
 }
 
@@ -57,14 +44,19 @@ async function disposeRuntime(runtime: AgentSessionRuntime): Promise<void> {
   ]);
 }
 
+/** Spread helper: include `usage` only when present (honors exact optional properties). */
+function usageFields(usage: Usage | undefined): { usage?: Usage } {
+  return usage ? { usage } : {};
+}
+
 /**
  * Shared orchestration for isolated child sessions: resource loading,
  * AgentSession runtime lifecycle, and lifecycle wiring so Planner and reviewer
  * runners share one pattern rather than duplicating it.
  */
-export async function runIsolatedChild<THolder, TResult>(
-  config: IsolatedRunConfig<THolder, TResult>,
-): Promise<TResult> {
+export async function runIsolatedChild<T>(
+  config: IsolatedRunConfig<T>,
+): Promise<ChildRunOutcome<T>> {
   const agentDir = process.env.PI_CODING_AGENT_DIR || getAgentDir();
   const { loader, settingsManager } = createIsolatedChildResources(
     config.cwd,
@@ -111,7 +103,7 @@ export async function runIsolatedChild<THolder, TResult>(
     const activeRuntime = runtime;
     await activeRuntime.session.bindExtensions({ mode: "print" });
     config.onSessionCreated?.(activeRuntime.session);
-    return await runWithLifecycle({
+    return await runWithLifecycle<ChildRunOutcome<T>>({
       session: activeRuntime.session,
       dispose: () => {
         runtimeDisposal ??= disposeRuntime(activeRuntime);
@@ -131,23 +123,36 @@ export async function runIsolatedChild<THolder, TResult>(
           config.onProgress?.({ ...ctx.progress });
         }
         if (event.type !== "agent_settled") return;
-        const result = config.holder.value
-          ? config.successResult(config.holder.value, ctx.getUsage())
-          : config.failedResult(
-              "missing-structured-output",
-              ctx.getFailureDiagnostics(),
-              ctx.getUsage(),
-            );
+        const result: ChildRunOutcome<T> = config.holder.value
+          ? { kind: "success", value: config.holder.value, ...usageFields(ctx.getUsage()) }
+          : {
+              kind: "failed",
+              failureCode: "missing-structured-output",
+              diagnostics: ctx.getFailureDiagnostics(),
+              ...usageFields(ctx.getUsage()),
+            };
         ctx.resolve(ctx.cleanup(result));
       },
-      canceledResult: (ctx) => config.canceledResult(ctx.getFailureDiagnostics(), ctx.getUsage()),
-      failedResult: (failureCode, ctx) =>
-        config.failedResult(failureCode, ctx.getFailureDiagnostics(), ctx.getUsage()),
-      timeoutResult: (timeoutMs, ctx) =>
-        config.timeoutResult(timeoutMs, ctx.getFailureDiagnostics(), ctx.getUsage()),
+      canceledResult: (ctx) => ({
+        kind: "canceled",
+        diagnostics: ctx.getFailureDiagnostics(),
+        ...usageFields(ctx.getUsage()),
+      }),
+      failedResult: (failureCode, ctx) => ({
+        kind: "failed",
+        failureCode,
+        diagnostics: ctx.getFailureDiagnostics(),
+        ...usageFields(ctx.getUsage()),
+      }),
+      timeoutResult: (timeoutMs, ctx) => ({
+        kind: "timeout",
+        timeoutMs,
+        diagnostics: ctx.getFailureDiagnostics(),
+        ...usageFields(ctx.getUsage()),
+      }),
     });
   } catch {
-    return config.sessionFailedResult;
+    return { kind: "failed", failureCode: "session-creation-failed" };
   } finally {
     if (runtime) {
       runtimeDisposal ??= disposeRuntime(runtime);

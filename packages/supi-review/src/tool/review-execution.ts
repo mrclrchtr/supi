@@ -52,7 +52,7 @@ function toTaskResult(
     ...(result.audit ? { audit: result.audit } : {}),
   };
   if (result.kind === "success") {
-    const normalized = normalizeReviewSubmission(result.submission);
+    const normalized = normalizeReviewSubmission(result.value);
     return {
       status: "completed",
       ...identity,

@@ -79,7 +79,7 @@ describe("Review workflow", () => {
     mocks.runReviewer.mockResolvedValue({
       kind: "success",
       modelId: model.canonicalId,
-      submission: { summary: "Done", findings: [] },
+      value: { summary: "Done", findings: [] },
       usage,
     });
   });
@@ -324,7 +324,7 @@ describe("Review workflow", () => {
         deletions: 0,
       })),
     });
-    mocks.runPlanner.mockResolvedValue({ kind: "success", draft: review });
+    mocks.runPlanner.mockResolvedValue({ kind: "success", value: review });
 
     await prepareReview({
       cwd: "/repo",
@@ -346,7 +346,7 @@ describe("Review workflow", () => {
 
   it("accepts a Planner Draft once, uses the pinned model, and retains provenance", async () => {
     const store = new ReviewPlanStore();
-    mocks.runPlanner.mockResolvedValue({ kind: "success", draft: review });
+    mocks.runPlanner.mockResolvedValue({ kind: "success", value: review });
     const prepared = await prepareReview({
       cwd: "/repo",
       target: { kind: "working-tree" },
@@ -395,7 +395,7 @@ describe("Review workflow", () => {
 
   it("marks replacement Prepared Review input as caller-supplied", async () => {
     const store = new ReviewPlanStore();
-    mocks.runPlanner.mockResolvedValue({ kind: "success", draft: review });
+    mocks.runPlanner.mockResolvedValue({ kind: "success", value: review });
     const prepared = await prepareReview({
       cwd: "/repo",
       target: { kind: "working-tree" },
@@ -483,7 +483,7 @@ describe("Review workflow", () => {
       .mockResolvedValueOnce({
         kind: "success",
         modelId: model.canonicalId,
-        submission: { summary: "Done", findings: [] },
+        value: { summary: "Done", findings: [] },
       })
       .mockResolvedValueOnce({
         kind: "failed",
@@ -532,7 +532,7 @@ describe("Review workflow", () => {
       | ((value: {
           kind: "success";
           modelId: string;
-          submission: { summary: string; findings: [] };
+          value: { summary: string; findings: [] };
         }) => void)
       | undefined;
     mocks.runReviewer.mockImplementationOnce(
@@ -560,7 +560,7 @@ describe("Review workflow", () => {
     finishReviewer?.({
       kind: "success",
       modelId: model.canonicalId,
-      submission: { summary: "Done", findings: [] },
+      value: { summary: "Done", findings: [] },
     });
     await expect(running).resolves.toMatchObject({ kind: "completed" });
   });

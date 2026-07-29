@@ -51,7 +51,7 @@ export async function runPlanner(invocation: PlannerInvocation): Promise<Planner
       };
     },
   });
-  return runIsolatedChild<PlannerDraft, PlannerRunResult>({
+  return runIsolatedChild<PlannerDraft>({
     cwd: invocation.cwd,
     protocolPrompt: buildPlannerSystemPrompt(),
     model: invocation.model,
@@ -62,29 +62,6 @@ export async function runPlanner(invocation: PlannerInvocation): Promise<Planner
     tools: [submit.name],
     customTools: [submit],
     holder,
-    successResult: (draft, usage) => ({
-      kind: "success",
-      draft,
-      ...(usage ? { usage } : {}),
-    }),
-    canceledResult: (diagnostics, usage) => ({
-      kind: "canceled",
-      diagnostics,
-      ...(usage ? { usage } : {}),
-    }),
-    failedResult: (failureCode, diagnostics, usage) => ({
-      kind: "failed",
-      failureCode,
-      diagnostics,
-      ...(usage ? { usage } : {}),
-    }),
-    timeoutResult: (timeoutMs, diagnostics, usage) => ({
-      kind: "timeout",
-      timeoutMs,
-      diagnostics,
-      ...(usage ? { usage } : {}),
-    }),
-    sessionFailedResult: { kind: "failed", failureCode: "session-creation-failed" },
     onProgress: invocation.onProgress,
   });
 }
