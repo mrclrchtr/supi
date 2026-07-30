@@ -64,8 +64,7 @@
   },
   "pi": {
     "extensions": [
-      "./src/extension.ts",
-      "node_modules/@mrclrchtr/supi-code-intelligence/src/extension.ts"
+      "./src/extension.ts"
     ],
     "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-review-3.png"
   },

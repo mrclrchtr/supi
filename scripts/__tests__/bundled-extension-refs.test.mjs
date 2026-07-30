@@ -4,6 +4,12 @@ import { describe, expect, it } from "vitest";
 
 const PACKAGES_DIR = new URL("../../packages", import.meta.url).pathname;
 
+// Review imports this dependency only as an isolated child-session profile. Loading
+// its full extension in the parent duplicates a separately installed Code Intelligence.
+const BUNDLED_LIBRARY_DEPENDENCIES = new Map([
+  ["@mrclrchtr/supi-review", new Set(["@mrclrchtr/supi-code-intelligence"])],
+]);
+
 function readJson(filePath) {
   return JSON.parse(readFileSync(filePath, "utf-8"));
 }
@@ -31,7 +37,11 @@ describe("bundled extension references", () => {
     const name = pkg.name;
     if (!name) continue;
 
-    const bundled = (pkg.bundledDependencies ?? []).filter((b) => b.startsWith("@mrclrchtr/"));
+    const bundled = (pkg.bundledDependencies ?? []).filter(
+      (dependency) =>
+        dependency.startsWith("@mrclrchtr/") &&
+        !BUNDLED_LIBRARY_DEPENDENCIES.get(pkg.name)?.has(dependency),
+    );
     if (bundled.length === 0) continue;
 
     it(`${name} references all bundled pi dependency extensions in pi.extensions`, () => {
@@ -65,4 +75,11 @@ describe("bundled extension references", () => {
       ).toEqual([]);
     });
   }
+
+  it("keeps Review's child-only Code Intelligence profile out of parent extensions", () => {
+    const review = readJson(join(PACKAGES_DIR, "supi-review", "package.json"));
+    expect(review.pi?.extensions).not.toContain(
+      "node_modules/@mrclrchtr/supi-code-intelligence/src/extension.ts",
+    );
+  });
 });
