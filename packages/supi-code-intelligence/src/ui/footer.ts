@@ -1,29 +1,38 @@
 /**
  * LSP footer stats-end contribution for code-intelligence.
  *
- * Provides the persistent "| λ lsp • N servers • M open files" suffix on the
+ * Provides the persistent "| λ lsp • N ✓ • M open files" suffix on the
  * footer stats line, after cost and context info. This was removed during the
  * supi-lsp → supi-code-intelligence migration.
  */
 
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { footerContributions } from "@mrclrchtr/supi-core/footer-registry";
-import type { LspAdapterState } from "../substrate/lsp/state.ts";
+import { LSP_STATE_CHANGE_EVENT, type LspAdapterState } from "../substrate/lsp/state.ts";
 
-/** Build the LSP status text: "λ lsp • 2 servers • 5 open files" */
+/** Build the LSP status text: "λ lsp • 3 ✓ • 1 ⟳ • 1 ✗ • 2 open files" */
 export function buildLspStatusText(lspState: LspAdapterState): string | undefined {
   const controller = lspState.controller;
   const runtime = controller?.workspaceRuntime;
   if (!runtime) return undefined;
 
   const servers = runtime.getProjectServers();
-  const runningServers = servers.filter((s) => s.status === "running").length;
   const openFiles = servers.reduce((sum, s) => sum + s.openFiles.length, 0);
 
-  if (runningServers === 0 && openFiles === 0) return undefined;
+  // Aggregate server states
+  const ready = servers.filter((s) => s.status === "running" && s.ready).length;
+  const starting = servers.filter((s) => s.status === "running" && !s.ready).length;
+  const error = servers.filter((s) => s.status === "error").length;
+  const unavailable = servers.filter((s) => s.status === "unavailable").length;
+
+  const hasServers = ready + starting + error + unavailable > 0;
+  if (!hasServers && openFiles === 0) return undefined;
 
   const parts = ["λ lsp"];
-  if (runningServers > 0)
-    parts.push(`${runningServers} ${runningServers === 1 ? "server" : "servers"}`);
+  if (ready > 0) parts.push(`${ready} ✓`);
+  if (starting > 0) parts.push(`${starting} ⟳`);
+  if (error > 0) parts.push(`${error} ✗`);
+  if (unavailable > 0) parts.push(`${unavailable} ⊘`);
   if (openFiles > 0) parts.push(`${openFiles} ${openFiles === 1 ? "open file" : "open files"}`);
   return parts.join(" • ");
 }
@@ -33,7 +42,12 @@ export function buildLspStatusText(lspState: LspAdapterState): string | undefine
 const FOOTER_KEY = "lsp-status";
 
 /** Register the LSP stats-end footer contribution for the given adapter state. */
-export function registerLspFooterContribution(lspState: LspAdapterState): void {
+export function registerLspFooterContribution(
+  pi: ExtensionAPI,
+  lspState: LspAdapterState,
+): {
+  dispose: () => void;
+} {
   footerContributions.register({
     key: FOOTER_KEY,
     placement: "stats-end",
@@ -44,6 +58,17 @@ export function registerLspFooterContribution(lspState: LspAdapterState): void {
       return `| ${text}`;
     },
   });
+
+  // Trigger TUI re-render when server states change.
+  const handler = () => pi.events.emit("supi:lsp:invalidate", {});
+  lspState.stateChanges.addEventListener(LSP_STATE_CHANGE_EVENT, handler);
+
+  return {
+    dispose() {
+      lspState.stateChanges.removeEventListener(LSP_STATE_CHANGE_EVENT, handler);
+      unregisterLspFooterContribution();
+    },
+  };
 }
 
 /** Remove the LSP stats footer contribution. */

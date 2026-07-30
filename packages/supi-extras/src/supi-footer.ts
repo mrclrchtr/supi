@@ -31,9 +31,15 @@ import {
 export default function supiFooter(pi: ExtensionAPI) {
   let currentModel: unknown;
   let requestRender: (() => void) | undefined;
+  let unregisterInvalidate: (() => void) | undefined;
 
   pi.on("session_start", (_event, ctx) => {
     currentModel = ctx.model;
+    if (!unregisterInvalidate) {
+      unregisterInvalidate = pi.events.on("supi:lsp:invalidate", () => {
+        requestRender?.();
+      });
+    }
     installFooter(ctx);
   });
 
@@ -42,16 +48,16 @@ export default function supiFooter(pi: ExtensionAPI) {
     requestRender?.();
   });
 
-  pi.on("thinking_level_select", (_event, _ctx) => {
+  pi.on("thinking_level_select", () => {
     requestRender?.();
   });
 
   pi.on("session_shutdown", () => {
     currentModel = undefined;
     requestRender = undefined;
+    unregisterInvalidate?.();
+    unregisterInvalidate = undefined;
   });
-
-  // ---- footer installation ----
 
   // biome-ignore lint/suspicious/noExplicitAny: ctx type from pi session_start handler is complex
   function installFooter(ctx: any) {
@@ -151,8 +157,6 @@ export default function supiFooter(pi: ExtensionAPI) {
               theme.fg("dim", statsLeft) + theme.fg("dim", laidOut.padding) + laidOut.styled;
 
             const lines = [pwdLine, truncateToWidth(statsLine, width, theme.fg("dim", "..."))];
-
-            // Extension statuses
             buildStatusLine(lines, footerData, width, theme);
 
             return lines;

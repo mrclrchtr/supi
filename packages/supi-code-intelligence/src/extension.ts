@@ -43,7 +43,11 @@ export default function codeIntelligenceExtension(
   );
 
   registerCiStatusCommand(pi);
-  registerLspFooterContribution(lspState);
+  const lspFooter = registerLspFooterContribution(pi, lspState);
+
+  pi.on("session_shutdown", () => {
+    lspFooter.dispose();
+  });
 
   pi.on("before_agent_start", (event, ctx) => {
     const session = app.getSession(ctx.cwd) ?? app.createSession(ctx.cwd);

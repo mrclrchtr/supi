@@ -25,6 +25,8 @@ export interface LspAdapterState {
   lspActive: boolean;
   /** Snapshot of workspace sentinel files (package.json, tsconfig, lockfiles) for change detection. */
   sentinelSnapshot: Map<string, number>;
+  /** Fired when server statuses or readiness change — footer listens for re-renders. */
+  stateChanges: EventTarget;
 }
 
 export function createLspAdapterState(): LspAdapterState {
@@ -34,5 +36,9 @@ export function createLspAdapterState(): LspAdapterState {
     inspector: { handle: null, close: null },
     lspActive: false,
     sentinelSnapshot: new Map(),
+    stateChanges: new EventTarget(),
   };
 }
+
+/** Event type dispatched on {@link LspAdapterState.stateChanges} when server statuses change. */
+export const LSP_STATE_CHANGE_EVENT = "server-status-changed" as const;
