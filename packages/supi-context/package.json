@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-context",
-  "version": "4.3.0",
+  "version": "4.4.0",
   "description": "SuPi Context extension — agent pressure snapshots and TUI usage reports",
   "license": "MIT",
   "repository": {

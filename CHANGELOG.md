@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.4.0](https://github.com/mrclrchtr/supi/compare/v4.3.0...v4.4.0) (2026-07-30)
+
+
+### Features
+
+* **supi-review:** configure post-review agent behavior ([75359e3](https://github.com/mrclrchtr/supi/commit/75359e38c74a92917794c92cdb061df99371be69))
+
+
+### Bug Fixes
+
+* **deps:** update dependency jsdom to v30 ([5547f8a](https://github.com/mrclrchtr/supi/commit/5547f8af880ec2551966fd025df522679734f439))
+
 ## [4.3.0](https://github.com/mrclrchtr/supi/compare/v4.2.0...v4.3.0) (2026-07-30)
 
 
