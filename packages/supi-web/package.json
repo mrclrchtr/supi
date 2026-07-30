@@ -33,7 +33,7 @@
   ],
   "dependencies": {
     "@mrclrchtr/supi-core": "workspace:*",
-    "jsdom": "^29.0.0",
+    "jsdom": "^30.0.0",
     "@mozilla/readability": "^0.6.0",
     "turndown": "^7.2.0",
     "turndown-plugin-gfm": "^1.0.2"
