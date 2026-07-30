@@ -33,6 +33,7 @@ describe("review config", () => {
         plannerModel: CURRENT_SESSION_REVIEW_MODEL,
         auditEnabled: false,
         bootstrapCommand: "",
+        postReviewPolicy: "ask",
       });
     } finally {
       fs.rmSync(homeDir, { recursive: true, force: true });
@@ -50,6 +51,7 @@ describe("review config", () => {
           agentModel: "  openai/reviewer  ",
           plannerModel: "  openai/planner  ",
           bootstrapCommand: " pnpm install --frozen-lockfile ",
+          postReviewPolicy: "verify-and-fix",
         },
         { homeDir },
       );
@@ -59,7 +61,25 @@ describe("review config", () => {
         plannerModel: "openai/planner",
         auditEnabled: false,
         bootstrapCommand: "pnpm install --frozen-lockfile",
+        postReviewPolicy: "verify-and-fix",
       });
+    } finally {
+      fs.rmSync(homeDir, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back to Ask for an unknown post-review policy", () => {
+    const homeDir = makeTempDir();
+    const cwd = path.join(homeDir, "repo");
+    fs.mkdirSync(cwd, { recursive: true });
+    try {
+      writeSupiConfig(
+        { section: REVIEW_CONFIG_SECTION, scope: "project", cwd },
+        { postReviewPolicy: "unknown" },
+        { homeDir },
+      );
+
+      expect(loadReviewConfig(cwd, homeDir).postReviewPolicy).toBe("ask");
     } finally {
       fs.rmSync(homeDir, { recursive: true, force: true });
     }
@@ -77,6 +97,11 @@ describe("review config", () => {
           expect.objectContaining({ kind: "modelPicker", key: "agentModel" }),
           expect.objectContaining({ kind: "modelPicker", key: "plannerModel" }),
           expect.objectContaining({ kind: "string", key: "bootstrapCommand" }),
+          expect.objectContaining({
+            kind: "enum",
+            key: "postReviewPolicy",
+            values: ["ask", "verify", "verify-and-fix", "fix", "report"],
+          }),
           expect.objectContaining({ kind: "boolean", key: "auditEnabled" }),
         ],
       }),

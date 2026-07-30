@@ -62,6 +62,10 @@ _Avoid_: repository instructions, ambient context
 Per-Review Task eligibility policy: `change-only` limits findings to issues attributable to the Review Target, while `boy-scout` also admits pre-existing issues in changed files or reviewer-judged directly affected symbols. Purely pre-existing Boy Scout findings are advisory.
 _Avoid_: review mode, repository audit
 
+**Finding Verification**:
+The containing Agent's independent confirmation or refutation of each reported finding against Target Evidence before any mutation. It concludes by presenting the verified findings and asking the user what to do next.
+_Avoid_: Reviewer Session, review rerun, fixing
+
 **Direct Review**:
 A review that receives a target and complete set of Review Tasks in one execution request, without exposing a separate preparation step.
 _Avoid_: manual review, unprepared review
@@ -97,6 +101,14 @@ _Avoid_: layered index review, commit-candidate review, cwd-scoped review
 **Task Verdict**:
 The Review Engine-derived `pass` (no findings), `pass_with_findings` (advisory findings only), or `issues` (one or more blocking findings) result for one completed Review Task. It includes structured finding counts by blocking status and impact.
 _Avoid_: reviewer verdict, run-level verdict, proof of correctness
+
+**Post-Review Disposition**:
+A direct user instruction to ask, verify, verify and fix, fix, or only report the findings from the current review. It overrides the Post-Review Policy; generic authorization to edit code is not a disposition.
+_Avoid_: Review Task, Finding Scope, Agent plan
+
+**Post-Review Policy**:
+The configured default for how the containing Agent responds to findings when no Post-Review Disposition exists. It applies consistently to interactive and agent-initiated reviews and defaults to asking the user.
+_Avoid_: Reviewer Protocol, Review Task, Task Verdict
 
 **Review Output Artifact**:
 A bounded, session-scoped copy of complete parent-facing preparation or review text. The first page carries its opaque id; `supi_review_output` retrieves repeatable continuation pages until expiry or eviction.

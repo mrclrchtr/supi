@@ -8,6 +8,7 @@ Caller-defined code review tasks run in managed, Inspection-only Reviewer Sessio
 - Prepared Review creates a one-shot Review Plan. Execution re-resolves its Review Snapshot; drift invalidates the plan before a Reviewer Session starts. Any completed task consumes a plan; an all-non-completed batch releases it.
 - The Review Engine owns target resolution, canonical packets and hashes, Review Workspace lifecycle, structured submissions, usage accounting, and per-task Task Verdicts.
 - One to four independent tasks share a single frozen Review Workspace and run concurrently. Results remain separate; never aggregate or rerank their verdicts.
+- `review.postReviewPolicy` controls the containing Agent's prompt-level response to findings on both review surfaces; direct user disposition wins while `/supi-review` with `report` remains terminal.
 
 ## Targets and Review Workspaces
 

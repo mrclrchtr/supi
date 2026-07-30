@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
     agentModel: "current",
     plannerModel: "current",
     auditEnabled: false,
+    bootstrapCommand: "",
+    postReviewPolicy: "ask",
   })),
   registerReviewSettings: vi.fn(),
 }));

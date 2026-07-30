@@ -3,7 +3,12 @@ import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
 import { registerDeclarativeSettings } from "@mrclrchtr/supi-core/settings";
 import { CURRENT_SESSION_REVIEW_MODEL } from "./model.ts";
 
-/** Persisted model choices for agent-triggered reviews and optional planning. */
+/** Supported containing-Agent behaviors after a review returns findings. */
+export const POST_REVIEW_POLICIES = ["ask", "verify", "verify-and-fix", "fix", "report"] as const;
+/** Configured default behavior after a review returns findings. */
+export type PostReviewPolicy = (typeof POST_REVIEW_POLICIES)[number];
+
+/** Persisted review settings. */
 export interface ReviewConfig extends Record<string, unknown> {
   /** Canonical reviewer model id, or `current` for the active session model. */
   agentModel: string;
@@ -13,6 +18,8 @@ export interface ReviewConfig extends Record<string, unknown> {
   auditEnabled: boolean;
   /** Shell command run once before reviewers start. */
   bootstrapCommand: string;
+  /** Default containing-Agent behavior after a review returns findings. */
+  postReviewPolicy: PostReviewPolicy;
 }
 
 /** Shared SuPi configuration section owned by this package. */
@@ -23,6 +30,7 @@ export const REVIEW_DEFAULTS: ReviewConfig = {
   plannerModel: CURRENT_SESSION_REVIEW_MODEL,
   auditEnabled: false,
   bootstrapCommand: "",
+  postReviewPolicy: "ask",
 };
 
 /** Load merged and normalized review configuration. */
@@ -36,11 +44,14 @@ export function loadReviewConfig(cwd: string, homeDir?: string): ReviewConfig {
     return fallback;
   };
   const readCommand = (value: unknown) => (typeof value === "string" ? value.trim() : "");
+  const readPostReviewPolicy = (value: unknown) =>
+    POST_REVIEW_POLICIES.find((policy) => policy === value) ?? REVIEW_DEFAULTS.postReviewPolicy;
   return {
     agentModel: readModel(raw.agentModel, REVIEW_DEFAULTS.agentModel),
     plannerModel: readModel(raw.plannerModel, REVIEW_DEFAULTS.plannerModel),
     auditEnabled: readBoolean(raw.auditEnabled, REVIEW_DEFAULTS.auditEnabled),
     bootstrapCommand: readCommand(raw.bootstrapCommand),
+    postReviewPolicy: readPostReviewPolicy(raw.postReviewPolicy),
   };
 }
 
@@ -78,6 +89,13 @@ export function registerReviewSettings(pi: ExtensionAPI, homeDir?: string): void
         label: "Bootstrap command",
         description:
           "Run once in the frozen Review Workspace before reviewers start. Empty lets reviewers bootstrap when needed.",
+      },
+      {
+        kind: "enum",
+        key: "postReviewPolicy",
+        label: "After review",
+        description: "Default Agent behavior when a completed review returns findings.",
+        values: [...POST_REVIEW_POLICIES],
       },
       {
         kind: "boolean" as const,

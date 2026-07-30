@@ -83,6 +83,38 @@ const details: ReviewBatchDetails = {
   ],
 };
 
+function detailsWithFinding(): ReviewBatchDetails {
+  return {
+    ...details,
+    results: [
+      {
+        status: "completed",
+        taskId: "spec",
+        modelId: "provider/model",
+        packetHash: "c".repeat(64),
+        verdict: "issues",
+        findingCounts: {
+          total: 1,
+          blocking: 1,
+          nonBlocking: 0,
+          byImpact: { low: 0, medium: 0, high: 1 },
+        },
+        summary: "One issue.",
+        findings: [
+          {
+            title: "Bug",
+            description: "Broken.",
+            blocksAcceptance: true,
+            impact: "high",
+            effort: "small",
+            confidence: 1,
+          },
+        ],
+      },
+    ],
+  };
+}
+
 describe("agent review tool usage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -90,6 +122,8 @@ describe("agent review tool usage", () => {
       agentModel: "provider/model",
       plannerModel: "provider/model",
       auditEnabled: false,
+      bootstrapCommand: "",
+      postReviewPolicy: "ask",
     });
     mocks.resolveAgentReviewModel.mockReturnValue({
       canonicalId: "provider/model",
@@ -138,6 +172,32 @@ describe("agent review tool usage", () => {
     expect(result.details?.output?.artifactId).toMatch(/^review-output-/);
   });
 
+  it("returns the configured post-review instruction with findings", async () => {
+    mocks.runReview.mockResolvedValueOnce({ kind: "completed", details: detailsWithFinding() });
+    const pi = createPiMock();
+    registerAgentReviewTools(
+      pi as unknown as ExtensionAPI,
+      new ReviewPlanStore(),
+      new ReviewArtifactStore(),
+    );
+
+    const result = (await getTool(pi, "supi_review_run").execute(
+      "call",
+      {
+        direct: {
+          target: { workingTree: {} },
+          tasks: [{ id: "spec", instructions: "Review." }],
+        },
+      },
+      undefined,
+      undefined,
+      makeCtx(),
+    )) as { content?: Array<{ text: string }> };
+
+    expect(result.content?.[0]?.text).toContain('kind="post-review-policy" policy="ask"');
+    expect(result.content?.[0]?.text).toContain("Fix selected");
+  });
+
   it("passes the local replay store into every review when enabled", async () => {
     const pi = createPiMock();
     const localAuditStore = { create: vi.fn() } as never;
@@ -145,6 +205,8 @@ describe("agent review tool usage", () => {
       agentModel: "provider/model",
       plannerModel: "provider/model",
       auditEnabled: true,
+      bootstrapCommand: "",
+      postReviewPolicy: "ask",
     });
     registerAgentReviewTools(
       pi as unknown as ExtensionAPI,

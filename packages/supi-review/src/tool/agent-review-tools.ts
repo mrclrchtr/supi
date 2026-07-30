@@ -18,6 +18,7 @@ import {
   prepareReviewSchema,
   runReviewSchema,
 } from "./agent-review-schemas.ts";
+import { withPostReviewInstruction } from "./post-review-policy.ts";
 import { formatReviewBatch } from "./review-format.ts";
 import { createReviewOutput } from "./review-output-tool.ts";
 
@@ -198,8 +199,14 @@ function makeRunReviewExecute(
             });
       if (outcome.kind !== "completed") throw new Error(outcome.reason);
       const output = createReviewOutput(artifactStore, formatReviewBatch(outcome.details));
+      const text = withPostReviewInstruction(
+        output.text,
+        config.postReviewPolicy,
+        outcome.details,
+        output.reference,
+      );
       return {
-        content: [{ type: "text", text: output.text }],
+        content: [{ type: "text", text }],
         details: { ...outcome.details, output: output.reference },
         ...(outcome.usage ? { usage: outcome.usage } : {}),
       };

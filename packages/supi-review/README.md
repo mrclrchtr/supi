@@ -104,15 +104,28 @@ Replays expire automatically after seven days. They are not included in normal r
 
 Parent-facing text is stored as a bounded session artifact. Use `supi_review_output` with its returned opaque `artifactId` and offset to retrieve continuation pages.
 
+## Post-review behavior
+
+`review.postReviewPolicy` controls what the containing Agent does when a completed review returns findings on either `/supi-review` or `supi_review_run`:
+
+- `ask` (default) — ask whether to verify, verify and fix, fix all or selected findings, or only report
+- `verify` — independently confirm or refute findings, then ask what to fix
+- `verify-and-fix` — verify every finding and fix those confirmed
+- `fix` — fix every reported finding, re-verifying conflicts or stale live code first
+- `report` — present the result without another action; `/supi-review` does not trigger an Agent turn
+
+A direct user instruction about the current review's findings overrides this default when the Agent is already running. Reviews without findings do not trigger an extra command-originated turn.
+
 ## Models
 
 `/supi-review` asks for the reviewer model. Agent-triggered runs use `review.agentModel`. Optional planning uses `review.plannerModel` at low thinking effort. Both default to the current session model.
 
-Configure a single dependency setup command:
+Configure post-review behavior and a single dependency setup command:
 
 ```json
 {
   "review": {
+    "postReviewPolicy": "ask",
     "bootstrapCommand": "pnpm install --frozen-lockfile"
   }
 }

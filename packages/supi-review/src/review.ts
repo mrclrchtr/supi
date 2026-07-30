@@ -13,6 +13,7 @@ import { getSelectableReviewModels, resolveAgentReviewModel } from "./model.ts";
 import { ReviewArtifactStore } from "./session/review-artifact-store.ts";
 import { ReviewPlanStore } from "./session/review-plan-store.ts";
 import { formatReviewBatch, registerAgentReviewTools } from "./tool/agent-review-tools.ts";
+import { queuePostReviewTurn } from "./tool/post-review-policy.ts";
 import { registerReviewAuditTool } from "./tool/review-audit-tool.ts";
 import { createReviewOutput, registerReviewOutputTool } from "./tool/review-output-tool.ts";
 import { prepareReview, runReview } from "./tool/review-workflow.ts";
@@ -299,6 +300,12 @@ async function runCommand(ctx: CommandContext, services: ReviewCommandServices):
     display: true,
     details: { ...outcome.details, output: output.reference, usage: outcome.usage },
   });
+  queuePostReviewTurn(
+    pi,
+    loadReviewConfig(ctx.cwd).postReviewPolicy,
+    outcome.details,
+    output.reference,
+  );
 }
 
 export default function reviewExtension(pi: ExtensionAPI): void {
