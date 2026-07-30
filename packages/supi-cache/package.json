@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-cache",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "description": "SuPi Cache — prompt cache health monitoring and cross-session forensics",
   "license": "MIT",
   "repository": {

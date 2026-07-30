@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.3.0](https://github.com/mrclrchtr/supi/compare/v4.2.0...v4.3.0) (2026-07-30)
+
+
+### Features
+
+* **supi-code-intelligence:** show live LSP server states in footer ([e0ce64b](https://github.com/mrclrchtr/supi/commit/e0ce64b0690a71345bfc621d4c75aedc0eeb4849))
+
+
+### Bug Fixes
+
+* **supi-review:** avoid duplicate Code Intelligence tools ([50c6190](https://github.com/mrclrchtr/supi/commit/50c619007d85c836935ae373466128062dc042b0))
+
 ## [4.2.0](https://github.com/mrclrchtr/supi/compare/v4.1.0...v4.2.0) (2026-07-29)
 
 
