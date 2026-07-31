@@ -1,7 +1,7 @@
 [tools]
 node = "lts"
 pnpm = "latest"
-hk = "1.53.0"
+hk = "1.54.0"
 pkl = "0.32.1"
 
 [tasks.hooks]
