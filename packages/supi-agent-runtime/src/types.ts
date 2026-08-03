@@ -134,6 +134,7 @@ export interface AgentRunDiagnostics {
   readonly recentActivity?: readonly string[];
   readonly lastAssistantStopReason?: SafeAssistantStopReason;
   readonly lastAssistantToolCalls?: readonly string[];
+  readonly lastAssistantToolCallsDropped?: number;
   readonly lastAssistantErrorText?: string;
   readonly lastLifecycleErrorText?: string;
 }

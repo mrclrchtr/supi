@@ -1,6 +1,7 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 import {
+  AGENT_RUN_DIAGNOSTIC_NAME_MAX,
   AGENT_RUN_LIFECYCLE_TRACE_MAX,
   AgentRunLifecycleTraceCollector,
   formatAgentRunDiagnostics,
@@ -29,6 +30,16 @@ describe("AgentRunLifecycleTraceCollector", () => {
     });
     expect(collector.recentActivitySnapshot()).toEqual(["tool:start:read"]);
     expect(JSON.stringify(collector.snapshot())).not.toContain("private");
+  });
+
+  it("bounds registered tool names in recent activity", () => {
+    const name = `tool-${"x".repeat(200)}`;
+    const collector = new AgentRunLifecycleTraceCollector(new Set([name]));
+    collector.observe({ type: "tool_execution_start", toolName: name } as AgentSessionEvent);
+
+    expect(collector.recentActivitySnapshot()[0]?.length).toBeLessThanOrEqual(
+      "tool:start:".length + AGENT_RUN_DIAGNOSTIC_NAME_MAX,
+    );
   });
 
   it("uses the stable Agent Run prefix for diagnostics and adapter relabeling", () => {

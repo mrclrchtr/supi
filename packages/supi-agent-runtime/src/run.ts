@@ -163,11 +163,16 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       }
       observerCleanup = undefined;
       await disposeRuntime();
+      const finalOutcome = outcomeWithUsage(outcome);
       terminal = true;
-      progressState.status = outcome.kind === "success" ? "completed" : outcome.kind;
-      progressState.usage = outcome.usage ?? progressState.usage;
+      progressState.status = finalOutcome.kind === "success" ? "completed" : finalOutcome.kind;
+      progressState.usage = finalOutcome.usage ?? progressState.usage;
       publish();
-      resolveResult(outcomeWithUsage(outcome));
+      resolveResult(finalOutcome);
+      runtime = undefined;
+      session = undefined;
+      view = undefined;
+      listeners.clear();
     })();
     return finalization;
   };
@@ -325,6 +330,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     }
     const onPreflight = (accepted: boolean): void => {
       if (!accepted) {
+        if (cancelRequested || timeoutRequested || aborting || terminal || finalizing) return;
         lifecycle.recordHostMarker({ type: "prompt_rejected" });
         void finishFailed("prompt-rejected");
         return;
@@ -338,7 +344,8 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
         () => {
           promptPromiseSettled = true;
           promptAccepted = true;
-          flushSettlement();
+          if (settledEventObserved) flushSettlement();
+          else if (!cancelRequested && !timeoutRequested && !aborting) void resolveCompletion();
         },
         () => {
           promptPromiseSettled = true;
@@ -399,6 +406,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
           const cleanup = await options.observer(view);
           if (typeof cleanup === "function") observerCleanup = cleanup;
         } catch {
+          if (cancelRequested) return;
           await finishFailed("session-not-ready");
           return;
         }
@@ -412,6 +420,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
           ready = false;
         }
         if (!ready) {
+          if (cancelRequested) return;
           await finishFailed("session-not-ready");
           return;
         }

@@ -1,3 +1,0 @@
-# Limit parallel delegation to read-only profiles
-
-A multi-task Delegation Batch may run concurrently only when every selected Agent Profile is read-only. Read-only eligibility is derived from the package-owned tool classification; unrestricted `bash` is mutation-capable because shell effects cannot be reliably classified, even when a profile intends only inspection. Mutation-capable profiles require a single-task batch, and the outer `supi_agent_run` tool uses PI's sequential execution mode so parent sibling tools cannot race a child implementer. Per-task workspaces or explicit scheduling may relax the internal rule later.

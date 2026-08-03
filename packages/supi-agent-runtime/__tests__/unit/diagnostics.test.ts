@@ -1,6 +1,6 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import { buildAgentRunDiagnostics } from "../../src/api.ts";
+import { buildAgentRunDiagnostics, formatAgentRunDiagnostics } from "../../src/api.ts";
 
 function build(session: unknown) {
   return buildAgentRunDiagnostics({
@@ -23,7 +23,7 @@ describe("Agent Run diagnostics", () => {
             { type: "toolCall", name: "private_tool" },
           ],
           stopReason: "error",
-          errorMessage: `\u001b[31mAuthorization: Bearer private-token {"apiKey":"private-json-key"} ${"x".repeat(700)}`,
+          errorMessage: `\u001b[31mAuthorization: Bearer private-token {"apiKey":"private-json-key"}\nAuthorization: Basic dXNlcjpwYXNz ${"x".repeat(700)}`,
         },
       ],
       getActiveToolNames: () => ["read"],
@@ -37,8 +37,26 @@ describe("Agent Run diagnostics", () => {
     expect(JSON.stringify(diagnostics)).not.toContain("private assistant content");
     expect(JSON.stringify(diagnostics)).not.toContain("private-token");
     expect(JSON.stringify(diagnostics)).not.toContain("private-json-key");
+    expect(JSON.stringify(diagnostics)).not.toContain("dXNlcjpwYXNz");
     expect(JSON.stringify(diagnostics)).not.toContain("private_tool");
     expect(JSON.stringify(diagnostics)).not.toContain("\u001b");
+  });
+
+  it("bounds assistant tool metadata and discloses omitted calls", () => {
+    const names = Array.from({ length: 12 }, (_, index) => `tool-${index}`);
+    const diagnostics = build({
+      messages: [
+        {
+          role: "assistant",
+          content: names.map((name) => ({ type: "toolCall", name })),
+        },
+      ],
+      getActiveToolNames: () => names,
+    });
+
+    expect(diagnostics.lastAssistantToolCalls).toHaveLength(10);
+    expect(diagnostics.lastAssistantToolCallsDropped).toBe(2);
+    expect(formatAgentRunDiagnostics(diagnostics).join("\n")).toContain("+2 omitted");
   });
 
   it("omits unknown stop reasons and fails closed when tool lookup throws", () => {

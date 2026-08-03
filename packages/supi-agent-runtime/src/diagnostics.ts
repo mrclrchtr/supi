@@ -1,13 +1,18 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { sanitizeAgentRunErrorText } from "./diagnostic-sanitizer.ts";
 import {
+  AGENT_RUN_RECENT_ACTIVITY_MAX,
   AgentRunLifecycleTraceCollector,
   extractLastLifecycleErrorText,
   formatAgentRunLifecycleTrace,
   getRegisteredToolNames,
   toSafeAssistantStopReason,
+  truncateAgentRunDiagnosticName,
 } from "./lifecycle-trace.ts";
 import type { AgentRunDiagnostics, AgentRunLifecycleTrace, AgentRunProgress } from "./types.ts";
+
+/** Maximum assistant tool-call names retained in one diagnostic artifact. */
+export const AGENT_RUN_ASSISTANT_TOOL_CALLS_MAX = 10;
 
 /** Build inputs for one bounded non-success diagnostic artifact. */
 export interface BuildAgentRunDiagnosticsInput {
@@ -27,14 +32,20 @@ export function buildAgentRunDiagnostics(
       ? tokensFromUsage(input.progress.usage)
       : undefined;
   const lastAssistant = input.session ? extractLastAssistantMetadata(input.session) : undefined;
+  const recentActivity = input.recentActivity
+    .slice(-AGENT_RUN_RECENT_ACTIVITY_MAX)
+    .map(truncateAgentRunDiagnosticName);
   return {
     lifecycleTrace: input.lifecycleTrace,
     turns: input.progress.turns,
     toolUses: input.progress.toolUses,
     ...(tokens ? { tokens } : {}),
-    ...(input.recentActivity.length > 0 ? { recentActivity: [...input.recentActivity] } : {}),
+    ...(recentActivity.length > 0 ? { recentActivity } : {}),
     ...(lastAssistant?.stopReason ? { lastAssistantStopReason: lastAssistant.stopReason } : {}),
     ...(lastAssistant?.toolCalls ? { lastAssistantToolCalls: lastAssistant.toolCalls } : {}),
+    ...(lastAssistant?.toolCallsDropped
+      ? { lastAssistantToolCallsDropped: lastAssistant.toolCallsDropped }
+      : {}),
     ...(lastAssistant?.errorText ? { lastAssistantErrorText: lastAssistant.errorText } : {}),
     ...(extractLastLifecycleErrorText(input.lifecycleTrace)
       ? { lastLifecycleErrorText: extractLastLifecycleErrorText(input.lifecycleTrace) }
@@ -77,8 +88,10 @@ export function formatAgentRunDiagnostics(diagnostics: AgentRunDiagnostics): str
       ? `- Last assistant stop: ${diagnostics.lastAssistantStopReason}`
       : undefined,
     diagnostics.lastAssistantToolCalls && diagnostics.lastAssistantToolCalls.length > 0
-      ? `- Last assistant tools: ${diagnostics.lastAssistantToolCalls.join(", ")}`
-      : undefined,
+      ? `- Last assistant tools: ${diagnostics.lastAssistantToolCalls.join(", ")}${diagnostics.lastAssistantToolCallsDropped ? ` (+${diagnostics.lastAssistantToolCallsDropped} omitted)` : ""}`
+      : diagnostics.lastAssistantToolCallsDropped
+        ? `- Last assistant tools: (none) (+${diagnostics.lastAssistantToolCallsDropped} omitted)`
+        : undefined,
     ...getAgentRunDiagnosticErrorRows(diagnostics).map((row) => `- ${row.label}: ${row.text}`),
     `- ${formatAgentRunLifecycleTrace(diagnostics.lifecycleTrace)}`,
   ].filter((line): line is string => !!line);
@@ -141,6 +154,7 @@ function buildTokensFromSession(session: AgentSession) {
 interface LastAssistantMetadata {
   stopReason?: AgentRunDiagnostics["lastAssistantStopReason"];
   toolCalls?: string[];
+  toolCallsDropped?: number;
   errorText?: string;
 }
 
@@ -155,7 +169,8 @@ function extractLastAssistantMetadata(session: AgentSession): LastAssistantMetad
       const toolCalls = extractAssistantToolCalls(message.content, registeredToolNames);
       return {
         stopReason,
-        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+        toolCalls: toolCalls.names.length > 0 ? toolCalls.names : undefined,
+        toolCallsDropped: toolCalls.droppedCount > 0 ? toolCalls.droppedCount : undefined,
         errorText:
           stopReason === "error" ? sanitizeAgentRunErrorText(message.errorMessage) : undefined,
       };
@@ -169,17 +184,20 @@ function extractLastAssistantMetadata(session: AgentSession): LastAssistantMetad
 function extractAssistantToolCalls(
   content: unknown,
   registeredToolNames: ReadonlySet<string>,
-): string[] {
-  if (!Array.isArray(content)) return [];
-  return content
-    .map((part) => {
-      if (typeof part !== "object" || !part) return undefined;
-      const tool = part as { type?: unknown; name?: unknown };
-      return tool.type === "toolCall" &&
-        typeof tool.name === "string" &&
-        registeredToolNames.has(tool.name)
-        ? tool.name
-        : undefined;
-    })
-    .filter((name): name is string => !!name);
+): { names: string[]; droppedCount: number } {
+  if (!Array.isArray(content)) return { names: [], droppedCount: 0 };
+  const names: string[] = [];
+  let droppedCount = 0;
+  for (const part of content) {
+    if (typeof part !== "object" || !part) continue;
+    const tool = part as { type?: unknown; name?: unknown };
+    if (tool.type !== "toolCall" || typeof tool.name !== "string") continue;
+    if (!registeredToolNames.has(tool.name)) continue;
+    if (names.length >= AGENT_RUN_ASSISTANT_TOOL_CALLS_MAX) {
+      droppedCount++;
+      continue;
+    }
+    names.push(truncateAgentRunDiagnosticName(tool.name));
+  }
+  return { names, droppedCount };
 }

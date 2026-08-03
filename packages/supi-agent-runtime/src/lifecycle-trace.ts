@@ -10,6 +10,8 @@ import type {
 export const AGENT_RUN_LIFECYCLE_TRACE_MAX = 32;
 /** Maximum compact activity entries retained per Agent Run. */
 export const AGENT_RUN_RECENT_ACTIVITY_MAX = 10;
+/** Maximum characters retained for one diagnostic tool/activity name. */
+export const AGENT_RUN_DIAGNOSTIC_NAME_MAX = 80;
 
 const STOP_REASONS = new Set<SafeAssistantStopReason>([
   "stop",
@@ -27,6 +29,12 @@ export function toSafeAssistantStopReason(value: unknown): SafeAssistantStopReas
   return typeof value === "string" && STOP_REASONS.has(value as SafeAssistantStopReason)
     ? (value as SafeAssistantStopReason)
     : undefined;
+}
+
+/** Bound a provider/tool name before it enters normal diagnostics. */
+export function truncateAgentRunDiagnosticName(name: string): string {
+  if (name.length <= AGENT_RUN_DIAGNOSTIC_NAME_MAX) return name;
+  return `${name.slice(0, AGENT_RUN_DIAGNOSTIC_NAME_MAX - 1)}…`;
 }
 
 /** Read active tool names without allowing a provider/session error to escape. */
@@ -167,13 +175,13 @@ function summarizeRecentActivity(
       return "turn:end";
     case "tool_execution_start":
       return typeof event.toolName === "string" && registeredToolNames.has(event.toolName)
-        ? `tool:start:${event.toolName}`
+        ? `tool:start:${truncateAgentRunDiagnosticName(event.toolName)}`
         : undefined;
     case "tool_execution_end":
       return typeof event.toolName === "string" &&
         typeof event.isError === "boolean" &&
         registeredToolNames.has(event.toolName)
-        ? `tool:end:${event.toolName}${event.isError ? ":error" : ""}`
+        ? `tool:end:${truncateAgentRunDiagnosticName(event.toolName)}${event.isError ? ":error" : ""}`
         : undefined;
     default:
       return undefined;

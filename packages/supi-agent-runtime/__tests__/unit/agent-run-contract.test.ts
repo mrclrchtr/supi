@@ -132,6 +132,63 @@ describe("Agent Run public lifecycle seam", () => {
     expect(harness.session.prompt).not.toHaveBeenCalled();
   });
 
+  it("cancels instead of reporting observer setup failure", async () => {
+    const harness = createHarness();
+    let rejectObserver!: (error: Error) => void;
+    const run = startAgentRun({
+      inputs: inputs(),
+      prompt: "cancel observer",
+      observer: async () =>
+        new Promise<undefined>((_resolve, reject) => {
+          rejectObserver = reject;
+        }),
+      completionResolver: () => "done",
+    });
+    await vi.waitFor(() => expect(rejectObserver).toBeTypeOf("function"));
+    const stopped = run.stop();
+    rejectObserver(new Error("observer failed after cancellation"));
+
+    await stopped;
+    await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
+    expect(harness.session.prompt).not.toHaveBeenCalled();
+  });
+
+  it("cancels instead of reporting readiness failure", async () => {
+    const harness = createHarness();
+    let rejectReadiness!: (error: Error) => void;
+    const run = startAgentRun({
+      inputs: inputs(),
+      prompt: "cancel readiness",
+      readinessCheck: async () =>
+        new Promise<boolean>((_resolve, reject) => {
+          rejectReadiness = reject;
+        }),
+      completionResolver: () => "done",
+    });
+    await vi.waitFor(() => expect(rejectReadiness).toBeTypeOf("function"));
+    const stopped = run.stop();
+    rejectReadiness(new Error("readiness failed after cancellation"));
+
+    await stopped;
+    await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
+    expect(harness.session.prompt).not.toHaveBeenCalled();
+  });
+
+  it("settles handled prompts even when no agent_settled event is emitted", async () => {
+    const harness = createHarness();
+    harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
+      options?.preflightResult?.(true);
+    });
+    const run = startAgentRun({
+      inputs: inputs(),
+      prompt: "/handled-command",
+      completionResolver: () => "done",
+    });
+
+    await expect(run.result).resolves.toMatchObject({ kind: "success", value: "done" });
+    expect(harness.runtime.dispose).toHaveBeenCalledTimes(1);
+  });
+
   it("distinguishes prompt rejection and missing completion", async () => {
     const first = createHarness();
     first.session.prompt.mockImplementationOnce(async (_prompt, options) => {
@@ -309,6 +366,28 @@ describe("Agent Run public lifecycle seam", () => {
     await stopped;
     await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
     expect(harness.session.abort).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets cancellation own a later prompt rejection", async () => {
+    const harness = createHarness();
+    let rejectPreflight!: () => void;
+    harness.session.prompt.mockImplementationOnce(
+      async (_prompt, options) =>
+        new Promise<void>(() => {
+          rejectPreflight = () => options?.preflightResult?.(false);
+        }),
+    );
+    const run = startAgentRun({
+      inputs: inputs(),
+      prompt: "cancel rejected prompt",
+      completionResolver: () => "done",
+    });
+    await vi.waitFor(() => expect(harness.session.prompt).toHaveBeenCalled());
+    const stopped = run.stop();
+    rejectPreflight();
+
+    await stopped;
+    await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
   });
 
   it("lets cancellation own a later accepted-prompt rejection", async () => {

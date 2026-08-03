@@ -9,6 +9,7 @@ export type {
   BuildAgentRunDiagnosticsInput,
 } from "./diagnostics.ts";
 export {
+  AGENT_RUN_ASSISTANT_TOOL_CALLS_MAX,
   buildAgentRunDiagnostics,
   createEarlyCancellationDiagnostics,
   createUnobservedAgentRunDiagnostics,
@@ -16,6 +17,7 @@ export {
   getAgentRunDiagnosticErrorRows,
 } from "./diagnostics.ts";
 export {
+  AGENT_RUN_DIAGNOSTIC_NAME_MAX,
   AGENT_RUN_LIFECYCLE_TRACE_MAX,
   AGENT_RUN_RECENT_ACTIVITY_MAX,
   AgentRunLifecycleTraceCollector,
