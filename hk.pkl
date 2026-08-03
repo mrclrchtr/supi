@@ -39,6 +39,7 @@ local precommit = new Mapping<String, Step> {
 local commitmsg = new Mapping<String, Step> {
   ["commitlint"] = new Step {
     check = "commitlint --edit {{commit_msg_file}}"
+    prefix = "pnpm -s exec"
   }
 }
 
