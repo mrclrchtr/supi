@@ -1,6 +1,9 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
+import type { ArchitectureModel } from "../analysis/architecture/model.ts";
 import type { EvidenceListMetadata } from "../analysis/evidence.ts";
 import type { InstructionFilesMetadata } from "../analysis/instruction-files.ts";
+import type { CodeProvider } from "../analysis/provider.ts";
 import type { ReadNextItem } from "../analysis/read-next.ts";
 import type { OrientationTargetInput, TargetSymbolKind } from "./target-input.ts";
 import type { AnchorKind, TargetStoreEntry } from "./target-store.ts";
@@ -14,6 +17,26 @@ export type OrientationFocusInput =
 export interface OrientationWorkflowInput {
   readonly focus?: OrientationFocusInput;
   readonly maxResults?: number;
+}
+
+/** Section keys the Orientation evidence collector gathers for a precise target. */
+export type OrientationSection = "defs" | "docs" | "diagnostics";
+
+/** Input to the Orientation evidence collector. */
+export interface OrientationInput {
+  /** Resolved target entry, consumed read-only; absent for context orientation. */
+  target?: Readonly<TargetStoreEntry> | null;
+  /** Resolved orientation focus path for project/module/directory/file orientation. */
+  focus?: string;
+  maxResults?: number;
+}
+
+/** Capabilities the Orientation evidence collector requires. */
+export interface OrientationDeps {
+  readonly model: ArchitectureModel;
+  readonly provider: CodeProvider | null;
+  readonly cwd: string;
+  readonly lspRuntime: WorkspaceLspRuntimeState;
 }
 
 /**

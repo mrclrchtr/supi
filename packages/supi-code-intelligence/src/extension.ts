@@ -5,6 +5,8 @@ import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/
 import { buildArchitectureModel } from "./analysis/architecture/discovery.ts";
 import { createCodeIntelligenceApp } from "./app/app.ts";
 import { registerCodeIntelligenceSettings } from "./config.ts";
+import { estimateTokens, OVERVIEW_TOKEN_BUDGET, renderOverview } from "./overview/overview.ts";
+import { buildOverviewData } from "./overview/overview-data.ts";
 import type { WorkspaceCodeIntelligenceSession } from "./session/session.ts";
 import { registerLspSessionLifecycle } from "./substrate/lsp/lifecycle.ts";
 import { registerWorkspaceRecoveryHandler } from "./substrate/lsp/recovery.ts";
@@ -12,8 +14,6 @@ import { registerLspSettings } from "./substrate/lsp/settings.ts";
 import { createLspAdapterState } from "./substrate/lsp/state.ts";
 import { registerCodeIntelligenceTools } from "./tool/register.ts";
 import { registerLspFooterContribution } from "./ui/footer.ts";
-import { estimateTokens, OVERVIEW_TOKEN_BUDGET, renderOverview } from "./ui/markdown/overview.ts";
-import { buildOverviewData } from "./ui/markdown/overview-data.ts";
 import { registerCiStatusCommand } from "./ui/status-command.ts";
 
 const OVERVIEW_CUSTOM_TYPE = "code-intelligence-overview";

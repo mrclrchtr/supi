@@ -1,8 +1,9 @@
 /**
- * Substrate context gathering for symbol briefs and point inspection (code_inspect).
+ * Substrate context gathering for symbol-centered Orientation.
  *
- * Extracted from generate-brief.ts to keep the file within the
- * noExcessiveLinesPerFile threshold.
+ * Best-effort tree-sitter node/outline/imports/exports context plus LSP
+ * hover/definition at one target position. Consumed by the Orientation
+ * evidence collector in `collect.ts`.
  */
 
 import type {
@@ -11,13 +12,18 @@ import type {
   StructuralProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
 
+/** Structural provider subset plus optional semantic hover/definition used for gathering. */
 export type ContextGatherProvider = Pick<
   StructuralProvider,
   "nodeAt" | "outline" | "imports" | "exports"
 > &
   Partial<Pick<SemanticProvider, "hover" | "definition">>;
 
-export interface TreeSitterContext {
+/**
+ * Best-effort substrate evidence at one target position. `null` fields mean
+ * the evidence was unavailable, not that the position is invalid.
+ */
+export interface SubstrateContext {
   nodeInfo: {
     type: string;
     text: string;
@@ -40,32 +46,46 @@ export interface TreeSitterContext {
   definition: Array<{ uri: string; range: SourceRange }> | null;
 }
 
+/**
+ * Gather best-effort substrate context at one target position.
+ *
+ * `line`/`character` are 1-based display coordinates; LSP hover/definition
+ * queries convert to 0-based internally. Position-strict operations
+ * (tree-sitter `nodeAt`, hover-at) run only when `positionStrict` is true —
+ * callers holding a declaration-anchor target must pass false (ADR 0003).
+ * File-level evidence (outline, imports, exports) and position-tolerant
+ * definition lookups run regardless. Failures degrade to `null`/empty.
+ */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: best-effort substrate gathering with independent try/catch blocks kept together for readability
-export async function gatherTreeSitterContext(
+// biome-ignore lint/complexity/useMaxParams: one internal gather call site carries the full position context
+export async function gatherSubstrateContext(
   provider: ContextGatherProvider | null,
   relPath: string,
   line: number,
   character: number,
-): Promise<TreeSitterContext> {
-  let nodeInfo: TreeSitterContext["nodeInfo"] = null;
-  let outline: TreeSitterContext["outline"] = [];
-  let imports: TreeSitterContext["imports"] = [];
-  let exports: TreeSitterContext["exports"] = [];
-  let hover: TreeSitterContext["hover"] = null;
-  let definition: TreeSitterContext["definition"] = null;
+  positionStrict: boolean,
+): Promise<SubstrateContext> {
+  let nodeInfo: SubstrateContext["nodeInfo"] = null;
+  let outline: SubstrateContext["outline"] = [];
+  let imports: SubstrateContext["imports"] = [];
+  let exports: SubstrateContext["exports"] = [];
+  let hover: SubstrateContext["hover"] = null;
+  let definition: SubstrateContext["definition"] = null;
 
   if (!provider) return { nodeInfo, outline, imports, exports, hover, definition: null };
 
   try {
-    const nodeResult = await provider.nodeAt(relPath, line, character);
-    if (nodeResult.kind === "success") {
-      nodeInfo = {
-        type: nodeResult.data.type,
-        text: nodeResult.data.text,
-        startLine: nodeResult.data.startLine,
-        startCharacter: nodeResult.data.startCharacter,
-        ancestry: nodeResult.data.ancestry ?? [],
-      };
+    if (positionStrict) {
+      const nodeResult = await provider.nodeAt(relPath, line, character);
+      if (nodeResult.kind === "success") {
+        nodeInfo = {
+          type: nodeResult.data.type,
+          text: nodeResult.data.text,
+          startLine: nodeResult.data.startLine,
+          startCharacter: nodeResult.data.startCharacter,
+          ancestry: nodeResult.data.ancestry ?? [],
+        };
+      }
     }
 
     const outlineResult = await provider.outline(relPath);
@@ -91,8 +111,8 @@ export async function gatherTreeSitterContext(
       }));
     }
 
-    // Best-effort hover — LSP expects 0-based coordinates
-    if (provider.hover) {
+    // Best-effort hover — LSP expects 0-based coordinates; hover-at is position-strict.
+    if (positionStrict && provider.hover) {
       try {
         const hoverResult = await provider.hover(relPath, {
           line: line - 1,
@@ -104,7 +124,7 @@ export async function gatherTreeSitterContext(
       }
     }
 
-    // Best-effort definition — LSP expects 0-based coordinates
+    // Best-effort definition — LSP expects 0-based coordinates; definitions are position-tolerant.
     if (provider.definition) {
       try {
         const defResult = await provider.definition(relPath, {

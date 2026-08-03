@@ -25,12 +25,19 @@ describe("target Orientation hover markdown", () => {
     const result = await executeOrientation(
       {
         target: {
+          targetId: "test-target",
+          spanId: "test-span",
           file,
-          line: 1,
-          character: 17,
+          position: { line: 0, character: 16 },
+          displayLine: 1,
+          displayCharacter: 17,
           name: "sample",
           kind: "Function",
+          confidence: "semantic",
+          provenance: [],
           anchorKind: "name",
+          fileFingerprint: "test",
+          container: null,
         },
         maxResults: 5,
       },
@@ -73,5 +80,71 @@ describe("target Orientation hover markdown", () => {
       "- Hover:\n```typescript\nfunction sample(): number\n```\nSample docs.",
     );
     expect(markdown).not.toContain("- Hover: ```typescript");
+  });
+
+  it("withholds position-strict substrate evidence for declaration anchors", async () => {
+    let nodeAtCalls = 0;
+    let hoverCalls = 0;
+    const result = await executeOrientation(
+      {
+        target: {
+          targetId: "test-target",
+          spanId: "test-span",
+          file,
+          position: { line: 0, character: 0 },
+          displayLine: 1,
+          displayCharacter: 1,
+          name: "sample",
+          kind: "Function",
+          confidence: "semantic",
+          provenance: [],
+          anchorKind: "declaration",
+          fileFingerprint: "test",
+          container: null,
+        },
+        maxResults: 5,
+      },
+      {
+        cwd: tmpDir,
+        model: {} as never,
+        provider: {
+          nodeAt: async () => {
+            nodeAtCalls++;
+            return {
+              kind: "success",
+              data: {
+                type: "identifier",
+                text: "sample",
+                startLine: 1,
+                startCharacter: 1,
+                endLine: 1,
+                endCharacter: 7,
+                ancestry: [],
+              },
+            };
+          },
+          outline: async () => ({ kind: "success", data: [] }),
+          imports: async () => ({ kind: "success", data: [] }),
+          exports: async () => ({ kind: "success", data: [] }),
+          hover: async () => {
+            hoverCalls++;
+            return completedCodeQuery({ contents: "should not appear" });
+          },
+        } as never,
+        lspRuntime: {
+          kind: "ready",
+          runtime: {
+            fileDiagnostics: async () => completedCodeQuery([]),
+          },
+        } as never,
+      },
+    );
+
+    const markdown = renderOrientationResult(assembleOrientationResult(result));
+
+    expect(nodeAtCalls).toBe(0);
+    expect(hoverCalls).toBe(0);
+    expect(markdown).toContain("Node and hover evidence withheld");
+    expect(markdown).not.toContain("should not appear");
   });
 });

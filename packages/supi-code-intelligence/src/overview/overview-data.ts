@@ -7,7 +7,7 @@ import type {
   ArchitectureModel,
   ManifestField,
   ModuleInfo,
-} from "../../analysis/architecture/model.ts";
+} from "../analysis/architecture/model.ts";
 import type { OverviewData, OverviewModule } from "./types.ts";
 
 /** Grammar ID to short language tag for the overview. */

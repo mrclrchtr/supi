@@ -148,17 +148,7 @@ async function orientTarget(options: {
         reason: readiness.kind === "timeout" ? "Semantic readiness timed out" : readiness.reason,
       };
   const result = await executeOrientation(
-    {
-      target: {
-        file: entry.file,
-        line: entry.displayLine,
-        character: entry.displayCharacter,
-        name: entry.name,
-        kind: entry.kind,
-        anchorKind: entry.anchorKind,
-      },
-      maxResults,
-    },
+    { target: entry, maxResults },
     {
       model,
       provider,

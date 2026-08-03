@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ArchitectureModel, ModuleInfo } from "../../../src/analysis/architecture/model.ts";
-import { renderOverview } from "../../../src/ui/markdown/overview.ts";
-import { buildOverviewData } from "../../../src/ui/markdown/overview-data.ts";
+import { renderOverview } from "../../../src/overview/overview.ts";
+import { buildOverviewData } from "../../../src/overview/overview-data.ts";
 
 const LONG_DESCRIPTION = `Module zero ${"details ".repeat(12)}`;
 

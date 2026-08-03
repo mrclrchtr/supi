@@ -23,4 +23,4 @@ export type {
   OrientationSectionDetails,
   ResolveDetails,
   SearchDetails,
-} from "./details.ts";
+} from "../tool/result/types.ts";

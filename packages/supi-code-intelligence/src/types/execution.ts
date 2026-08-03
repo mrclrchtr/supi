@@ -6,7 +6,7 @@ import type {
   InspectDetails,
   ResolveDetails,
   SearchDetails,
-} from "./details.ts";
+} from "../tool/result/types.ts";
 
 /**
  * Execution context passed to every code-intelligence tool executor.

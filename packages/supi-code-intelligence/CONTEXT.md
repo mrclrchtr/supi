@@ -18,6 +18,10 @@ _Avoid_: context bundle, relation graph, treating orientation as target analysis
 The project, package, directory, file, or symbol that an orientation surface is centered on. An absent focus means workspace-level orientation; a precise focus means symbol-centered orientation rather than relation analysis.
 _Avoid_: scope, path, target when referring to orientation selection
 
+**Orientation evidence collector**:
+The session-internal module that materializes orientation evidence — context facts, or definitions, docs, local diagnostics, and substrate context for one Resolved target entry, which it consumes read-only. It emits presentation-neutral content atoms; document framing (headings, section notes) belongs to the markdown adapter. Position-strict substrate evidence is withheld for declaration-anchor targets per ADR 0003. Distinct from the public Orientation surface and from Tool result assembly.
+_Avoid_: brief generator, treating it as the public Orientation surface
+
 **Manifest-declared package topology**:
 The package membership and dependency declarations obtained from successfully parsed workspace configuration and package manifests. It is not a runtime architecture graph; every fact retains the establishing configuration or manifest field.
 _Avoid_: architecture inference, core-dependency classification, public-surface inference

@@ -15,19 +15,17 @@ import {
   readNextTarget,
 } from "../../analysis/read-next.ts";
 import { diagnosticMessageString } from "../../substrate/lsp/utils.ts";
-import { gatherTreeSitterContext } from "../../ui/markdown/gather.ts";
 import type {
   OrientationDeps,
   OrientationInput,
-  OrientationSection,
-  OrientationTarget,
-} from "../../ui/markdown/types.ts";
-import type {
   OrientationItem,
   OrientationResultData,
+  OrientationSection,
   OrientationSectionData,
 } from "../orientation-types.ts";
+import type { TargetStoreEntry } from "../target-store.ts";
 import { collectContextOrientationFacts } from "./context-facts.ts";
+import { gatherSubstrateContext } from "./gather.ts";
 
 interface TargetSectionCollection {
   readonly items: OrientationItem[];
@@ -126,7 +124,7 @@ async function executeTargetOrientation(
 
 async function buildRequestedSection(options: {
   section: OrientationSection;
-  target: OrientationTarget | null | undefined;
+  target: Readonly<TargetStoreEntry> | null | undefined;
   deps: OrientationDeps;
   limit: number;
   treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>;
@@ -159,7 +157,7 @@ async function buildRequestedSection(options: {
 
 /** Build enriched defs section: tree-sitter definitions + LSP definition targets. */
 async function buildEnrichedDefsSection(
-  target: OrientationTarget | null | undefined,
+  target: Readonly<TargetStoreEntry> | null | undefined,
   deps: OrientationDeps,
   treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>,
   limit: number,
@@ -206,7 +204,7 @@ async function buildEnrichedDefsSection(
 }
 
 async function collectDefinitionTargets(
-  target: OrientationTarget,
+  target: Readonly<TargetStoreEntry>,
   deps: OrientationDeps,
   limit: number,
 ): Promise<
@@ -226,8 +224,8 @@ async function collectDefinitionTargets(
   }
   try {
     const result = await deps.provider.definition(target.file, {
-      line: target.line - 1,
-      character: target.character - 1,
+      line: target.displayLine - 1,
+      character: target.displayCharacter - 1,
     });
     if (result.kind === "unavailable") {
       return {
@@ -275,7 +273,7 @@ async function collectDefinitionTargets(
 }
 
 async function buildDiagnosticsSection(
-  target: OrientationTarget | null | undefined,
+  target: Readonly<TargetStoreEntry> | null | undefined,
   deps: OrientationDeps,
   limit: number,
 ): Promise<TargetSectionCollection> {
@@ -306,7 +304,7 @@ async function buildDiagnosticsSection(
       );
     }
     const nearby = result.data.filter(
-      (diagnostic) => Math.abs((diagnostic.range.start.line ?? 0) + 1 - target.line) <= 5,
+      (diagnostic) => Math.abs((diagnostic.range.start.line ?? 0) + 1 - target.displayLine) <= 5,
     );
     const evidence =
       result.kind === "partial"
@@ -380,7 +378,7 @@ function unavailableTargetSection(
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: JSDoc parsing naturally has state-machine complexity
 async function buildDocsSection(
-  target: OrientationTarget | null | undefined,
+  target: Readonly<TargetStoreEntry> | null | undefined,
   deps: OrientationDeps,
   limit: number,
 ): Promise<TargetSectionCollection> {
@@ -404,7 +402,7 @@ async function buildDocsSection(
   try {
     const content = readFileSync(targetFile, "utf-8");
     const lines = content.split("\n");
-    const startIdx = Math.max(0, target.line - 2);
+    const startIdx = Math.max(0, target.displayLine - 2);
     let jsdocStart = -1;
     let jsdocEnd = -1;
 
@@ -483,16 +481,22 @@ async function buildDocsSection(
 }
 
 async function maybeGatherTreeContext(
-  target: OrientationTarget | null | undefined,
+  target: Readonly<TargetStoreEntry> | null | undefined,
   deps: OrientationDeps,
 ) {
   if (!target) return null;
   const relPath = path.relative(deps.cwd, target.file);
-  return gatherTreeSitterContext(deps.provider, relPath, target.line, target.character);
+  return gatherSubstrateContext(
+    deps.provider,
+    relPath,
+    target.displayLine,
+    target.displayCharacter,
+    target.anchorKind !== "declaration",
+  );
 }
 
 function buildDefinitionItems(
-  target: OrientationTarget | null | undefined,
+  target: Readonly<TargetStoreEntry> | null | undefined,
   cwd: string,
   treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>,
 ): OrientationItem[] {
@@ -505,6 +509,12 @@ function buildDefinitionItems(
     items.push({
       kind: "list-item",
       text: `Symbol: \`${target.name}\`${target.kind ? ` (${target.kind})` : ""}`,
+    });
+  }
+  if (target.anchorKind === "declaration") {
+    items.push({
+      kind: "paragraph",
+      text: "Node and hover evidence withheld: this target has a declaration anchor, and position-strict substrates require a name anchor (ADR 0003).",
     });
   }
   if (treeContext?.nodeInfo?.type) {
@@ -593,22 +603,25 @@ function hoverBodyItems(lines: readonly string[]): OrientationItem[] {
   return items;
 }
 
-function formatFocusTarget(target: OrientationTarget, cwd: string): string {
+function formatFocusTarget(target: Readonly<TargetStoreEntry>, cwd: string): string {
   const relPath = path.relative(cwd, target.file) || target.file;
-  return `${relPath}:${target.line}:${target.character}`;
+  return `${relPath}:${target.displayLine}:${target.displayCharacter}`;
 }
 
-function buildNextQueries(target: OrientationTarget | null | undefined, cwd: string): string[] {
+function buildNextQueries(
+  target: Readonly<TargetStoreEntry> | null | undefined,
+  cwd: string,
+): string[] {
   if (!target) return ["Use `code_orientation` for a neutral orientation summary."];
 
   const relPath = path.relative(cwd, target.file) || target.file;
   return [
-    `\`code_graph\` with \`target: { anchor: { file: "${relPath}", line: ${target.line}, character: ${target.character} } }\` for relation follow-up`,
+    `\`code_graph\` with \`target: { anchor: { file: "${relPath}", line: ${target.displayLine}, character: ${target.displayCharacter} } }\` for relation follow-up`,
   ];
 }
 
 function buildReadNextGuidance(
-  target: OrientationTarget | null | undefined,
+  target: Readonly<TargetStoreEntry> | null | undefined,
   treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>,
   cwd: string,
 ): ReadNextItem[] {
@@ -616,18 +629,18 @@ function buildReadNextGuidance(
   const relPath = path.relative(cwd, target.file) || target.file;
   const enclosing = findEnclosingOutlineItem(target, treeContext);
   if (enclosing) {
-    return [readNextEnclosingScope(relPath, enclosing, target.line)];
+    return [readNextEnclosingScope(relPath, enclosing, target.displayLine)];
   }
-  return [readNextTarget(relPath, target.line, "inspect the target implementation")];
+  return [readNextTarget(relPath, target.displayLine, "inspect the target implementation")];
 }
 
 function findEnclosingOutlineItem(
-  target: OrientationTarget,
+  target: Readonly<TargetStoreEntry>,
   treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>,
 ): { name: string; kind: string; startLine: number; endLine: number } | null {
   if (!treeContext || treeContext.outline.length === 0) return null;
   const candidates = treeContext.outline.filter(
-    (item) => item.startLine <= target.line && item.endLine >= target.line,
+    (item) => item.startLine <= target.displayLine && item.endLine >= target.displayLine,
   );
   if (candidates.length === 0) return null;
   const matchingName = candidates.find((item) => target.name && item.name === target.name);
