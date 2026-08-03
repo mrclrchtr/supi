@@ -223,7 +223,7 @@ export class LspClient {
       })) as InitializeResult;
 
       this.capabilities = result.capabilities;
-      this.rpc.sendNotification("initialized", {});
+      void this.rpc.sendNotification("initialized", {});
       this._status = "running";
 
       this.armNoProgressTimer();
@@ -306,7 +306,7 @@ export class LspClient {
     }
 
     this.openDocs.set(uri, { version: 1, languageId });
-    this.rpc.sendNotification("textDocument/didOpen", {
+    void this.rpc.sendNotification("textDocument/didOpen", {
       textDocument: {
         uri,
         languageId,
@@ -330,7 +330,7 @@ export class LspClient {
     }
 
     doc.version++;
-    this.rpc.sendNotification("textDocument/didChange", {
+    void this.rpc.sendNotification("textDocument/didChange", {
       textDocument: { uri, version: doc.version } satisfies VersionedTextDocumentIdentifier,
       contentChanges: [{ text: content }],
     });
@@ -345,7 +345,7 @@ export class LspClient {
 
     if (!wasOpen || !this.rpc || this._status !== "running") return;
 
-    this.rpc.sendNotification("textDocument/didClose", {
+    void this.rpc.sendNotification("textDocument/didClose", {
       textDocument: { uri } satisfies TextDocumentIdentifier,
     });
   }
@@ -364,7 +364,7 @@ export class LspClient {
       removedFiles.push(filePath);
 
       if (wasOpen && this.rpc && this._status === "running") {
-        this.rpc.sendNotification("textDocument/didClose", {
+        void this.rpc.sendNotification("textDocument/didClose", {
           textDocument: { uri } satisfies TextDocumentIdentifier,
         });
       }
@@ -421,7 +421,7 @@ export class LspClient {
   /** Notify the server that watched workspace files changed. */
   notifyWorkspaceFileChanges(changes: FileEvent[]): void {
     if (!this.rpc || this._status !== "running" || changes.length === 0) return;
-    this.rpc.sendNotification("workspace/didChangeWatchedFiles", {
+    void this.rpc.sendNotification("workspace/didChangeWatchedFiles", {
       changes,
     } satisfies DidChangeWatchedFilesParams);
   }
