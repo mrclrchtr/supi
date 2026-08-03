@@ -1,0 +1,54 @@
+{
+  "name": "@mrclrchtr/supi-agent-runtime",
+  "version": "4.4.0",
+  "description": "SuPi Agent Run runtime — neutral lifecycle management for in-process pi sessions",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrclrchtr/supi.git",
+    "directory": "packages/supi-agent-runtime"
+  },
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-agent-runtime#readme",
+  "bugs": {
+    "url": "https://github.com/mrclrchtr/supi/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "supi",
+    "agent-run",
+    "agent-runtime"
+  ],
+  "type": "module",
+  "files": [
+    "src/**/*.ts",
+    "!__tests__"
+  ],
+  "dependencies": {
+    "@mrclrchtr/supi-core": "workspace:*"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-ai": {
+      "optional": true
+    },
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "25.9.5",
+    "vitest": "4.1.10"
+  },
+  "main": "src/api.ts",
+  "exports": {
+    "./api": "./src/api.ts",
+    "./package.json": "./package.json"
+  }
+}

@@ -41,7 +41,7 @@ Default child diagnostics retain only bounded lifecycle metadata and redacted pr
 - `src/workspace/cleanup-command.ts` — `/supi-review-cleanup`
 - `src/tool/review-runner.ts` — Reviewer child, optional replay capture, and structured delivery
 - `src/audit/` — private seven-day local replay persistence and trace capture
-- `src/tool/child-session-runner.ts` — owned AgentSession runtime lifecycle
+- `src/tool/child-session-runner.ts` — thin adapter over `@mrclrchtr/supi-agent-runtime`, mapping review resources and structured completion to `ChildRunOutcome`
 - `src/target/` — target resolution, canonical patches, changed-path metadata, Reviewer Packets
 
 ## Testing seams

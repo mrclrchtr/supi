@@ -1,5 +1,6 @@
 import type { Usage } from "@earendil-works/pi-ai";
-import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import type { AgentRunSessionView } from "@mrclrchtr/supi-agent-runtime/api";
 import type { ReviewSnapshotSummary, ReviewTask, ReviewWorkspaceReceipt } from "../types.ts";
 
 const OMIT = Symbol("omit-audit-value");
@@ -148,7 +149,7 @@ export class ReviewAuditTraceCollector {
   }
 
   snapshot(
-    session: AgentSession,
+    session: Pick<AgentRunSessionView, "messages">,
     aggregateUsage?: Usage,
   ): { trace: ReviewAuditTrace; messages: ReplayValue[] } {
     const finishedAt = this.now();

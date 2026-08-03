@@ -1,5 +1,8 @@
 import { clampThinkingLevel } from "@earendil-works/pi-ai";
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import {
+  type AgentRunSessionView,
+  createEarlyCancellationDiagnostics,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import { HEADLESS_INSPECTION_TOOL_NAMES } from "@mrclrchtr/supi-code-intelligence/headless";
 import { ReviewAuditTraceCollector } from "../audit/review-audit.ts";
 import { summarizeReviewSnapshot } from "../git.ts";
@@ -10,7 +13,6 @@ import type {
   ReviewerRunResult,
   ReviewSubmission,
 } from "../types.ts";
-import { createEarlyCancellationDiagnostics } from "./child-failure-diagnostics.ts";
 import { runIsolatedChild } from "./child-session-runner.ts";
 import { buildReviewerSystemPrompt } from "./review-system-prompt.ts";
 import { createReviewSubmissionTool } from "./review-tools.ts";
@@ -41,7 +43,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
   const protocolPrompt = buildReviewerSystemPrompt(invocation.dependencyBootstrapConfigured);
   const thinkingLevel = clampThinkingLevel(invocation.model.model, "max");
   let reviewerExtensionSetStatus: ReviewerExtensionSetStatus = "unobserved";
-  let session: AgentSession | undefined;
+  let session: AgentRunSessionView | undefined;
   let trace: ReviewAuditTraceCollector | undefined;
   let unsubscribe: (() => void) | undefined;
 

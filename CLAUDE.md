@@ -59,7 +59,7 @@ New packages should be added to the root `package.json` `pi.extensions` array fo
 ## Packaging conventions
 
 - Every published SuPi pi-package exposes an explicit `./extension` export. Packages with a reusable library API expose an explicit `./api` export (optional — omit when there is no library surface). Do not rely on package-root (`.`) imports or cross-package `src/...` deep imports.
-- `supi-core` is the exception — it is a library-only package with no pi extension surface, no `./extension` export, and no `pi.extensions` entry. Other SuPi packages bundle it for the library API only.
+- `supi-core` and `supi-agent-runtime` are library-only packages with no pi extension surface, no `./extension` export, and no `pi.extensions` entry. Library-only dependencies use normal npm resolution; installable packages bundle them when required by the pi package boundary.
 - `pi.extensions` / `pi.prompts` / `pi.skills` / `pi.themes` manifest entries must remain **real package-relative file paths**. Do not replace them with `exports` aliases.
 - Any SuPi package that depends on another `@mrclrchtr/supi-*` package must list it in both `dependencies` and `bundledDependencies`. Per [pi packages docs](https://github.com/earendil-works/pi/blob/main/docs/packages.md), pi packages that depend on other pi packages must be bundled in the tarball — npm transitive dependency resolution is not guaranteed by pi's module isolation.
 - When a package bundles another `@mrclrchtr/supi-*` package, reference that package's extension in `pi.extensions` via `node_modules/<pkg>/src/extension.ts`. Otherwise, standalone `pi install npm:@mrclrchtr/supi-<name>` won't load the bundled extension — pi only reads the top-level installed package's `pi.extensions`.

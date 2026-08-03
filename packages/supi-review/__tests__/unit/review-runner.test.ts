@@ -1,29 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  createAgentSession: vi.fn(),
-  reload: vi.fn(),
-  runWithLifecycle: vi.fn(),
-  settingsManager: { marker: "isolated" },
-}));
-vi.mock("@earendil-works/pi-ai", async (original) => ({
-  ...(await original()),
-  clampThinkingLevel: () => "off",
-}));
-vi.mock("@earendil-works/pi-coding-agent", async (original) => ({
-  ...(await original()),
-  createAgentSession: mocks.createAgentSession,
-}));
-vi.mock("../../src/tool/child-resource-loader.ts", () => ({
-  createIsolatedChildResources: () => ({
-    loader: { reload: mocks.reload },
-    settingsManager: mocks.settingsManager,
-  }),
-}));
-vi.mock("../../src/tool/session-lifecycle.ts", () => ({
-  runWithLifecycle: mocks.runWithLifecycle,
+  runIsolatedChild: vi.fn(),
 }));
 
+vi.mock("../../src/tool/child-session-runner.ts", () => ({
+  runIsolatedChild: mocks.runIsolatedChild,
+}));
+
+import type { AgentRunSessionView } from "@mrclrchtr/supi-agent-runtime/api";
 import { runReviewer } from "../../src/tool/review-runner.ts";
 import type { ReviewModelSelection, ReviewSnapshot } from "../../src/types.ts";
 
@@ -37,85 +22,71 @@ const snapshot: ReviewSnapshot = {
   stats: { files: 1, additions: 1, deletions: 0 },
 };
 const model = { canonicalId: "provider/model", model: {} } as ReviewModelSelection;
+const diagnostics = { lifecycleTrace: { entries: [], droppedCount: 0 }, turns: 0, toolUses: 0 };
+
+function createView(
+  activeTools = [
+    "read",
+    "bash",
+    "grep",
+    "code_resolve",
+    "code_inspect",
+    "code_orientation",
+    "code_graph",
+    "code_find",
+    "code_health",
+    "submit_review",
+  ],
+): AgentRunSessionView {
+  return {
+    cwd: "/repo",
+    model: undefined,
+    thinkingLevel: "off",
+    isStreaming: false,
+    messages: [
+      {
+        role: "assistant",
+        content: [
+          { type: "thinking", thinking: "private" },
+          { type: "text", text: "visible" },
+        ],
+      },
+    ],
+    getActiveToolNames: () => [...activeTools],
+    getSessionStats: () => ({ tokens: { input: 1, output: 2, total: 3 } }) as never,
+    getLastAssistantText: () => "visible",
+    subscribe: vi.fn(() => vi.fn()),
+  };
+}
 
 describe("runReviewer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.reload.mockResolvedValue(undefined);
-    mocks.createAgentSession.mockResolvedValue({
-      session: {
-        bindExtensions: vi.fn(),
-        subscribe: vi.fn(() => vi.fn()),
-        messages: [
-          {
-            role: "assistant",
-            content: [
-              { type: "thinking", thinking: "private" },
-              { type: "text", text: "visible" },
-            ],
-            usage: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0, totalTokens: 3, cost: {} },
-          },
-        ],
-        getActiveToolNames: () => [
-          "read",
-          "bash",
-          "grep",
-          "code_resolve",
-          "code_inspect",
-          "code_orientation",
-          "code_graph",
-          "code_find",
-          "code_health",
-          "submit_review",
-        ],
-      },
-      extensionsResult: { errors: [] },
-    });
-    mocks.runWithLifecycle.mockResolvedValue({
+    mocks.runIsolatedChild.mockResolvedValue({
       kind: "failed",
       failureCode: "session-creation-failed",
     });
   });
 
-  it("reports progress only at meaningful lifecycle boundaries", async () => {
+  const invocation = {
+    cwd: "/repo",
+    snapshot,
+    task: { id: "spec", instructions: "Review." },
+    prompt: "exact packet bytes",
+    packetHash: "c".repeat(64),
+    model,
+  };
+
+  it("forwards runtime progress to the review adapter", async () => {
     const onProgress = vi.fn();
-    await runReviewer({
-      cwd: "/repo",
-      snapshot,
-      task: { id: "spec", instructions: "Review." },
-      prompt: "exact packet bytes",
-      packetHash: "c".repeat(64),
-      model,
-      onProgress,
+    mocks.runIsolatedChild.mockImplementation(async (config) => {
+      config.onProgress?.({ turns: 1, toolUses: 0, toolErrors: 1 });
+      return { kind: "failed", failureCode: "session-creation-failed" };
     });
 
-    const lifecycle = mocks.runWithLifecycle.mock.calls[0]?.[0] as {
-      onEvent: (event: { type: string; isError?: boolean }, ctx: Record<string, unknown>) => void;
-    };
-    const ctx = {
-      progress: { turns: 0, toolUses: 0, toolErrors: 0 },
-      session: {
-        getSessionStats: () => ({ tokens: { input: 1, output: 2, total: 3 } }),
-      },
-    };
+    await runReviewer({ ...invocation, onProgress });
 
-    lifecycle.onEvent({ type: "message_update" }, ctx);
-    expect(onProgress).not.toHaveBeenCalled();
-    lifecycle.onEvent({ type: "turn_end" }, ctx);
-    expect(onProgress).toHaveBeenCalledWith({
-      turns: 1,
-      toolUses: 0,
-      toolErrors: 0,
-      tokens: { input: 1, output: 2, total: 3, cacheRead: undefined, cacheWrite: undefined },
-    });
-
-    lifecycle.onEvent({ type: "tool_execution_end", isError: true }, ctx);
-    expect(onProgress).toHaveBeenLastCalledWith({
-      turns: 1,
-      toolUses: 0,
-      toolErrors: 1,
-      tokens: { input: 1, output: 2, total: 3, cacheRead: undefined, cacheWrite: undefined },
-    });
+    expect(onProgress).toHaveBeenCalledWith({ turns: 1, toolUses: 0, toolErrors: 1 });
   });
 
   it("persists an opted-in local replay without provider thinking", async () => {
@@ -123,18 +94,17 @@ describe("runReviewer", () => {
       artifactId: "review-audit-11111111-1111-1111-1111-111111111111",
       expiresAt: "2026-01-08T00:00:00.000Z",
     });
-    mocks.runWithLifecycle.mockResolvedValue({
-      kind: "success",
-      value: { summary: "Done", findings: [], criteriaCoverage: { status: "complete" } },
+    const view = createView();
+    mocks.runIsolatedChild.mockImplementation(async (config) => {
+      config.onSessionCreated?.(view);
+      return {
+        kind: "success",
+        value: { summary: "Done", findings: [], criteriaCoverage: { status: "complete" } },
+      };
     });
 
     const result = await runReviewer({
-      cwd: "/repo",
-      snapshot,
-      task: { id: "spec", instructions: "Review." },
-      prompt: "exact packet bytes",
-      packetHash: "c".repeat(64),
-      model,
+      ...invocation,
       audit: {
         store: { create } as never,
         workspaceReceipt: {
@@ -157,19 +127,13 @@ describe("runReviewer", () => {
     expect(result.audit?.artifactId).toMatch(/^review-audit-/);
   });
 
-  it("wires read, bash, grep, headless Code Intelligence, and submit_review with isolated settings", async () => {
-    await runReviewer({
-      cwd: "/repo",
-      snapshot,
-      task: { id: "spec", instructions: "Review." },
-      prompt: "exact packet bytes",
-      packetHash: "c".repeat(64),
-      model,
-    });
+  it("wires the review tool allowlist and isolated prompt through the runtime adapter", async () => {
+    await runReviewer(invocation);
 
-    expect(mocks.createAgentSession).toHaveBeenCalledWith(
+    expect(mocks.runIsolatedChild).toHaveBeenCalledWith(
       expect.objectContaining({
-        settingsManager: mocks.settingsManager,
+        prompt: "exact packet bytes",
+        timeoutMs: undefined,
         tools: [
           "read",
           "bash",
@@ -184,26 +148,15 @@ describe("runReviewer", () => {
         ],
       }),
     );
-    expect(mocks.runWithLifecycle).toHaveBeenCalledWith(
-      expect.objectContaining({ prompt: "exact packet bytes", timeoutMs: undefined }),
-    );
   });
 
-  it("maps each child run outcome into a reviewer result carrying modelId", async () => {
-    const diagnostics = { lifecycleTrace: { entries: [], droppedCount: 0 }, turns: 0, toolUses: 0 };
-    const invocation = {
-      cwd: "/repo",
-      snapshot,
-      task: { id: "spec", instructions: "Review." },
-      prompt: "exact packet bytes",
-      packetHash: "c".repeat(64),
-      model,
-    };
-
-    // success: value preserved, modelId attached, no capability warnings when tools are present.
-    mocks.runWithLifecycle.mockResolvedValueOnce({
-      kind: "success",
-      value: { summary: "Done", findings: [], criteriaCoverage: { status: "complete" } },
+  it("maps each runtime outcome into a reviewer result carrying modelId", async () => {
+    mocks.runIsolatedChild.mockImplementationOnce(async (config) => {
+      config.onSessionCreated?.(createView());
+      return {
+        kind: "success",
+        value: { summary: "Done", findings: [], criteriaCoverage: { status: "complete" } },
+      };
     });
     await expect(runReviewer(invocation)).resolves.toEqual({
       kind: "success",
@@ -212,16 +165,10 @@ describe("runReviewer", () => {
       reviewerExtensionSetStatus: "active",
     });
 
-    // timeout built by runIsolatedChild's factory, enriched with modelId.
-    mocks.runWithLifecycle.mockImplementationOnce(
-      (cfg: { timeoutResult: (ms: number, ctx: unknown) => unknown }) =>
-        Promise.resolve(
-          cfg.timeoutResult(1234, {
-            getFailureDiagnostics: () => diagnostics,
-            getUsage: () => undefined,
-          }),
-        ),
-    );
+    mocks.runIsolatedChild.mockImplementationOnce(async (config) => {
+      config.onSessionCreated?.(createView());
+      return { kind: "timeout", timeoutMs: 1234, diagnostics };
+    });
     await expect(runReviewer(invocation)).resolves.toEqual({
       kind: "timeout",
       timeoutMs: 1234,
@@ -230,16 +177,15 @@ describe("runReviewer", () => {
       reviewerExtensionSetStatus: "active",
     });
 
-    // session-creation-failed stays diagnostics-free but still carries modelId.
-    mocks.reload.mockRejectedValueOnce(new Error("boom"));
-    const created = await runReviewer(invocation);
-    expect(created).toEqual({
+    mocks.runIsolatedChild.mockResolvedValueOnce({
+      kind: "failed",
+      failureCode: "session-creation-failed",
+    });
+    await expect(runReviewer(invocation)).resolves.toEqual({
       kind: "failed",
       failureCode: "session-creation-failed",
       modelId: model.canonicalId,
       reviewerExtensionSetStatus: "unobserved",
     });
-    expect(created).not.toHaveProperty("diagnostics");
-    expect(created).not.toHaveProperty("capabilityWarnings");
   });
 });

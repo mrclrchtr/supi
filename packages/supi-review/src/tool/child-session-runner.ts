@@ -1,21 +1,16 @@
-import type { clampThinkingLevel, Model, Usage } from "@earendil-works/pi-ai";
+import type { clampThinkingLevel, Model } from "@earendil-works/pi-ai";
+import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import {
-  type AgentSession,
-  type AgentSessionRuntime,
-  createAgentSession,
-  createAgentSessionRuntime,
-  getAgentDir,
-  SessionManager,
-  type ToolDefinition,
-} from "@earendil-works/pi-coding-agent";
+  type AgentRunOutcome,
+  type AgentRunProgress,
+  type AgentRunSessionView,
+  startAgentRun,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import type { ChildRunOutcome, ReviewProgress } from "../types.ts";
 import { createIsolatedChildResources } from "./child-resource-loader.ts";
-import { buildProgressTokens } from "./runner-helpers.ts";
-import { runWithLifecycle } from "./session-lifecycle.ts";
 
-const CHILD_RUNTIME_SHUTDOWN_GRACE_MS = 2_000;
-
-/** Configuration for one isolated child run — resource loading, session, and lifecycle. */
+/** Configuration for one review adapter over the neutral Agent Run runtime. */
 export interface IsolatedRunConfig<T> {
   cwd: string;
   protocolPrompt: string;
@@ -30,30 +25,66 @@ export interface IsolatedRunConfig<T> {
   holder: { value?: T };
   headlessInspection?: boolean;
   projectTrusted?: boolean;
-  onSessionCreated?: (session: AgentSession) => void;
+  onSessionCreated?: (session: AgentRunSessionView) => void;
   onProgress?: (progress: ReviewProgress) => void;
 }
 
-async function disposeRuntime(runtime: AgentSessionRuntime): Promise<void> {
-  await Promise.race([
-    runtime.dispose().catch(() => undefined),
-    new Promise<void>((resolveGrace) => {
-      const timeout = setTimeout(resolveGrace, CHILD_RUNTIME_SHUTDOWN_GRACE_MS);
-      timeout.unref?.();
-    }),
-  ]);
+/** Convert the runtime's complete Usage snapshot to review's compact progress shape. */
+function toReviewProgress(progress: AgentRunProgress): ReviewProgress {
+  const usage = progress.usage;
+  return {
+    turns: progress.turns,
+    toolUses: progress.toolUses,
+    toolErrors: progress.toolErrors,
+    ...(usage
+      ? {
+          tokens: {
+            input: usage.input,
+            output: usage.output,
+            total: usage.totalTokens,
+            cacheRead: usage.cacheRead,
+            cacheWrite: usage.cacheWrite,
+          },
+        }
+      : {}),
+  };
 }
 
-/** Spread helper: include `usage` only when present (honors exact optional properties). */
-function usageFields(usage: Usage | undefined): { usage?: Usage } {
-  return usage ? { usage } : {};
+/** Map neutral Agent Run failures back to review's stable ChildRunOutcome vocabulary. */
+function mapOutcome<T>(outcome: AgentRunOutcome<T>): ChildRunOutcome<T> {
+  if (outcome.kind === "success") return outcome;
+  if (outcome.kind === "canceled" || outcome.kind === "timeout") return outcome;
+  if (outcome.failureCode === "session-creation-failed") return outcome;
+  if (outcome.failureCode === "missing-completion") {
+    return { ...outcome, failureCode: "missing-structured-output" };
+  }
+  if (outcome.failureCode === "session-not-ready") {
+    return {
+      kind: "failed",
+      failureCode: "session-creation-failed",
+      ...(outcome.usage ? { usage: outcome.usage } : {}),
+    };
+  }
+  if (
+    outcome.failureCode === "prompt-rejected" ||
+    outcome.failureCode === "unexpected-runner-failure"
+  ) {
+    return {
+      kind: "failed",
+      failureCode: outcome.failureCode,
+      diagnostics: outcome.diagnostics,
+      ...(outcome.usage ? { usage: outcome.usage } : {}),
+    };
+  }
+  return {
+    kind: "failed",
+    failureCode: "missing-structured-output",
+    diagnostics: outcome.diagnostics,
+    ...(outcome.usage ? { usage: outcome.usage } : {}),
+  };
 }
 
-/**
- * Shared orchestration for isolated child sessions: resource loading,
- * AgentSession runtime lifecycle, and lifecycle wiring so Planner and reviewer
- * runners share one pattern rather than duplicating it.
- */
+/** Run one review child through the shared Agent Run lifecycle. */
 export async function runIsolatedChild<T>(
   config: IsolatedRunConfig<T>,
 ): Promise<ChildRunOutcome<T>> {
@@ -67,99 +98,39 @@ export async function runIsolatedChild<T>(
       projectTrusted: config.projectTrusted,
     },
   );
-  let runtime: AgentSessionRuntime | undefined;
-  let runtimeDisposal: Promise<void> | undefined;
+  const run = startAgentRun<T>({
+    inputs: {
+      cwd: config.cwd,
+      model: config.model,
+      thinkingLevel: config.thinkingLevel,
+      tools: [...config.tools],
+      customTools: [...config.customTools],
+      resourceLoader: loader,
+      settingsManager,
+      agentDir,
+    },
+    prompt: config.prompt,
+    timeoutMs: config.timeoutMs,
+    signal: config.signal,
+    completionResolver: (_session) => config.holder.value,
+    observer: (session) => {
+      config.onSessionCreated?.(session);
+    },
+  });
+  const unsubscribe = config.onProgress
+    ? run.subscribe((progress) => {
+        if (
+          progress.status !== "running" ||
+          (progress.turns === 0 && progress.toolUses === 0 && !progress.usage)
+        ) {
+          return;
+        }
+        config.onProgress?.(toReviewProgress(progress));
+      })
+    : undefined;
   try {
-    await loader.reload();
-    runtime = await createAgentSessionRuntime(
-      async ({ cwd, sessionManager, sessionStartEvent }) => {
-        const result = await createAgentSession({
-          cwd,
-          agentDir,
-          model: config.model,
-          thinkingLevel: config.thinkingLevel,
-          tools: config.tools,
-          customTools: config.customTools,
-          resourceLoader: loader,
-          settingsManager,
-          sessionManager,
-          sessionStartEvent,
-        });
-        return {
-          ...result,
-          services: {
-            cwd,
-            agentDir,
-            modelRuntime: result.session.modelRuntime,
-            settingsManager,
-            resourceLoader: loader,
-            diagnostics: [],
-          },
-          diagnostics: [],
-        };
-      },
-      { cwd: config.cwd, agentDir, sessionManager: SessionManager.inMemory(config.cwd) },
-    );
-    const activeRuntime = runtime;
-    await activeRuntime.session.bindExtensions({ mode: "print" });
-    config.onSessionCreated?.(activeRuntime.session);
-    return await runWithLifecycle<ChildRunOutcome<T>>({
-      session: activeRuntime.session,
-      dispose: () => {
-        runtimeDisposal ??= disposeRuntime(activeRuntime);
-      },
-      prompt: config.prompt,
-      signal: config.signal,
-      timeoutMs: config.timeoutMs,
-      onEvent: (event, ctx) => {
-        const reportsProgress =
-          event.type === "turn_end" ||
-          event.type === "tool_execution_start" ||
-          event.type === "tool_execution_end" ||
-          event.type === "agent_settled";
-        if (event.type === "turn_end") ctx.progress.turns++;
-        if (event.type === "tool_execution_start") ctx.progress.toolUses++;
-        if (event.type === "tool_execution_end" && event.isError) {
-          ctx.progress.toolErrors = (ctx.progress.toolErrors ?? 0) + 1;
-        }
-        if (reportsProgress) {
-          ctx.progress.tokens = buildProgressTokens(() => ctx.session.getSessionStats());
-          config.onProgress?.({ ...ctx.progress });
-        }
-        if (event.type !== "agent_settled") return;
-        const result: ChildRunOutcome<T> = config.holder.value
-          ? { kind: "success", value: config.holder.value, ...usageFields(ctx.getUsage()) }
-          : {
-              kind: "failed",
-              failureCode: "missing-structured-output",
-              diagnostics: ctx.getFailureDiagnostics(),
-              ...usageFields(ctx.getUsage()),
-            };
-        ctx.resolve(ctx.cleanup(result));
-      },
-      canceledResult: (ctx) => ({
-        kind: "canceled",
-        diagnostics: ctx.getFailureDiagnostics(),
-        ...usageFields(ctx.getUsage()),
-      }),
-      failedResult: (failureCode, ctx) => ({
-        kind: "failed",
-        failureCode,
-        diagnostics: ctx.getFailureDiagnostics(),
-        ...usageFields(ctx.getUsage()),
-      }),
-      timeoutResult: (timeoutMs, ctx) => ({
-        kind: "timeout",
-        timeoutMs,
-        diagnostics: ctx.getFailureDiagnostics(),
-        ...usageFields(ctx.getUsage()),
-      }),
-    });
-  } catch {
-    return { kind: "failed", failureCode: "session-creation-failed" };
+    return mapOutcome(await run.result);
   } finally {
-    if (runtime) {
-      await (runtimeDisposal ?? disposeRuntime(runtime));
-    }
+    unsubscribe?.();
   }
 }

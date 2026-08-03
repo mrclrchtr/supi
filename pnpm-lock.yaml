@@ -64,6 +64,25 @@ importers:
         specifier: 0.26.12
         version: 0.26.12
 
+  packages/supi-agent-runtime:
+    dependencies:
+      '@earendil-works/pi-ai':
+        specifier: '*'
+        version: 0.83.0(ws@8.21.1)(zod@4.4.3)
+      '@earendil-works/pi-coding-agent':
+        specifier: '*'
+        version: 0.83.0(ws@8.21.1)(zod@4.4.3)
+      '@mrclrchtr/supi-core':
+        specifier: workspace:*
+        version: link:../supi-core
+    devDependencies:
+      '@types/node':
+        specifier: 25.9.5
+        version: 25.9.5
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.0(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+
   packages/supi-ask-user:
     dependencies:
       '@earendil-works/pi-coding-agent':
@@ -378,6 +397,9 @@ importers:
       '@earendil-works/pi-tui':
         specifier: '*'
         version: 0.84.1
+      '@mrclrchtr/supi-agent-runtime':
+        specifier: workspace:*
+        version: link:../supi-agent-runtime
       '@mrclrchtr/supi-code-intelligence':
         specifier: workspace:*
         version: link:../supi-code-intelligence

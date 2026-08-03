@@ -31,10 +31,12 @@
     "README.md"
   ],
   "dependencies": {
+    "@mrclrchtr/supi-agent-runtime": "workspace:*",
     "@mrclrchtr/supi-code-intelligence": "workspace:*",
     "@mrclrchtr/supi-core": "workspace:*"
   },
   "bundledDependencies": [
+    "@mrclrchtr/supi-agent-runtime",
     "@mrclrchtr/supi-code-intelligence",
     "@mrclrchtr/supi-core"
   ],

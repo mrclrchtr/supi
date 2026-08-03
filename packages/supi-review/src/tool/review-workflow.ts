@@ -1,3 +1,8 @@
+import {
+  combineAgentRunUsage,
+  createEarlyCancellationDiagnostics,
+  createUnobservedAgentRunDiagnostics,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import type { LocalReviewAuditStore } from "../audit/local-review-audit-store.ts";
 import { resolveReviewSnapshot, summarizeReviewSnapshot } from "../git.ts";
 import { normalizeReviewInput } from "../review-input.ts";
@@ -17,11 +22,6 @@ import type {
 } from "../types.ts";
 import { runDependencyBootstrap } from "../workspace/dependency-bootstrap.ts";
 import { materializeReviewWorkspace } from "../workspace/review-workspace.ts";
-import {
-  createEarlyCancellationDiagnostics,
-  createUnobservedChildFailureDiagnostics,
-} from "./child-failure-diagnostics.ts";
-import { combineUsage } from "./child-usage.ts";
 import { enforceCriteriaOnlyScope } from "./criteria-only-scope.ts";
 import { PLANNER_PROMPT_VERSION, runPlanner } from "./planner-runner.ts";
 import { executeReviewTasks, type ReviewExecutionUpdate } from "./review-execution.ts";
@@ -163,7 +163,7 @@ async function preparePlanner(
       failure: {
         kind: "failed",
         failureCode: "unexpected-runner-failure",
-        diagnostics: createUnobservedChildFailureDiagnostics(),
+        diagnostics: createUnobservedAgentRunDiagnostics(),
       },
       modelId,
       promptVersion,
@@ -395,6 +395,6 @@ export async function runReview(input: RunReviewInput) {
     ...(cleanupWarning ? { cleanupWarning } : {}),
     results,
   };
-  const usage = combineUsage(results.map((result) => result.usage));
+  const usage = combineAgentRunUsage(results.map((result) => result.usage));
   return { kind: "completed" as const, details, ...(usage ? { usage } : {}) };
 }

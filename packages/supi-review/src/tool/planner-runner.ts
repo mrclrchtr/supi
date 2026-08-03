@@ -1,8 +1,8 @@
 import { clampThinkingLevel } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-coding-agent";
+import { createEarlyCancellationDiagnostics } from "@mrclrchtr/supi-agent-runtime/api";
 import { normalizeReviewInput } from "../review-input.ts";
 import type { PlannerDraft, PlannerInvocation, PlannerRunResult } from "../types.ts";
-import { createEarlyCancellationDiagnostics } from "./child-failure-diagnostics.ts";
 import { runIsolatedChild } from "./child-session-runner.ts";
 import { plannerDraftSchema } from "./schemas.ts";
 

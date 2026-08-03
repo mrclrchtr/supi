@@ -132,6 +132,7 @@ These packages power the stack and are not standalone Pi extensions:
 - [`supi-lsp`](packages/supi-lsp/README.md) — Language Server Protocol runtime bundled by Code Intelligence.
 - [`supi-tree-sitter`](packages/supi-tree-sitter/README.md) — structural AST analysis bundled by Code Intelligence.
 - [`supi-code-runtime`](packages/supi-code-runtime/README.md) — shared code-intelligence contracts and workspace capability state.
+- [`supi-agent-runtime`](packages/supi-agent-runtime/README.md) — neutral in-memory Agent Run lifecycle, usage accounting, and bounded diagnostics for extension-owned adapters.
 - [`supi-core`](packages/supi-core/README.md) — common configuration, settings, reporting, and session infrastructure.
 - [`supi-test-utils`](packages/supi-test-utils/README.md) — shared test helpers for SuPi packages.
 

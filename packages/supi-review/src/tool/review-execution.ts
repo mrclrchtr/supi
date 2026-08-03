@@ -1,3 +1,4 @@
+import { createUnobservedAgentRunDiagnostics } from "@mrclrchtr/supi-agent-runtime/api";
 import { normalizeReviewInput } from "../review-input.ts";
 import { normalizeReviewSubmission } from "../review-result.ts";
 import { buildReviewPacket } from "../target/packet.ts";
@@ -11,7 +12,6 @@ import type {
   ReviewTask,
   ReviewTaskResult,
 } from "../types.ts";
-import { createUnobservedChildFailureDiagnostics } from "./child-failure-diagnostics.ts";
 import { recordReviewTaskDebugSummary } from "./review-debug-summary.ts";
 import { runReviewer } from "./review-runner.ts";
 
@@ -203,7 +203,7 @@ export async function executeReviewTasks(
           packetHash: packet.packetHash,
           modelId: model.canonicalId,
           failureCode: "unexpected-runner-failure",
-          diagnostics: createUnobservedChildFailureDiagnostics(),
+          diagnostics: createUnobservedAgentRunDiagnostics(),
         };
         debugSummary(taskResult, "unobserved");
         taskStates[task.id] = { status: "failed" };

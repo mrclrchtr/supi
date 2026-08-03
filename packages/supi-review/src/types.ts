@@ -1,6 +1,6 @@
 import type { Model, Usage } from "@earendil-works/pi-ai";
+import type { AgentRunDiagnostics } from "@mrclrchtr/supi-agent-runtime/api";
 import type { LocalReviewAuditStore } from "./audit/local-review-audit-store.ts";
-import type { ChildLifecycleTrace } from "./tool/child-lifecycle-trace.ts";
 import type { ReviewWorkspaceCleanupWarning } from "./workspace/review-workspace.ts";
 
 /** A 7-64 character hexadecimal Git commit id, pinned to its full object id during resolution. */
@@ -172,31 +172,14 @@ export type ReviewModelSelection = import("@mrclrchtr/supi-core/model-selection"
 
 export type ChildStage = "planner" | "reviewer";
 
+/** Runtime diagnostics retained under review's existing failure vocabulary. */
+export type ChildFailureDiagnostics = AgentRunDiagnostics;
+
 export type ChildFailureCode =
   | "session-creation-failed"
   | "prompt-rejected"
   | "missing-structured-output"
   | "unexpected-runner-failure";
-
-export interface ChildFailureDiagnostics {
-  lifecycleTrace: ChildLifecycleTrace;
-  turns: number;
-  toolUses: number;
-  tokens?: {
-    input: number;
-    output: number;
-    total: number;
-    cacheRead?: number;
-    cacheWrite?: number;
-  };
-  recentActivity?: string[];
-  lastAssistantStopReason?: string;
-  lastAssistantToolCalls?: string[];
-  /** Bounded, redacted canonical provider error from the last errored assistant message. */
-  lastAssistantErrorText?: string;
-  /** Bounded, redacted provider error from the most recent recovery lifecycle event. */
-  lastLifecycleErrorText?: string;
-}
 
 export type ChildFailedResult =
   | { failureCode: "session-creation-failed"; diagnostics?: never }
