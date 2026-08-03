@@ -155,8 +155,7 @@ export async function runIsolatedChild<T>(
     return { kind: "failed", failureCode: "session-creation-failed" };
   } finally {
     if (runtime) {
-      runtimeDisposal ??= disposeRuntime(runtime);
-      await runtimeDisposal;
+      await (runtimeDisposal ?? disposeRuntime(runtime));
     }
   }
 }

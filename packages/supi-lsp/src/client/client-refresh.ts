@@ -85,7 +85,7 @@ function sendDidChange(client: LspClient, uri: string, version: number, content:
 /** Send an RPC notification through the client. */
 function sendNotification(client: LspClient, method: string, params: unknown): void {
   const rpc = accessClient(client).rpc;
-  if (rpc) rpc.sendNotification(method, params);
+  if (rpc) void rpc.sendNotification(method, params);
 }
 
 /** Clear open doc and diagnostic state for a URI. */
