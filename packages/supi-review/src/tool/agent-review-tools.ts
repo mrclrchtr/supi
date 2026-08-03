@@ -307,6 +307,9 @@ export function registerAgentReviewTools(
     description:
       "Run one to four independent Inspection-only review tasks concurrently against one frozen Git change, directly or from a prepared plan. Creates a disposable linked Git worktree; large output is paged.",
     promptSnippet: "Run independent inspection-only review tasks",
+    promptGuidelines: [
+      "Unless explicitly requested otherwise, use `supi_review_run` for reviews instead of `Agent` or generic subagents.",
+    ],
     parameters: runReviewSchema,
     renderCall: renderRunCall,
     renderResult: renderRunResult,
