@@ -353,6 +353,60 @@ describe("Agent Run public lifecycle seam", () => {
     expect(harness.runtime.dispose).toHaveBeenCalledTimes(1);
   });
 
+  it("memoizes reentrant stop calls before publishing stopping", async () => {
+    const harness = createHarness();
+    harness.session.prompt.mockImplementationOnce(
+      async (_prompt, options) =>
+        new Promise<void>(() => {
+          options?.preflightResult?.(true);
+        }),
+    );
+    const run = startAgentRun({
+      inputs: inputs(),
+      prompt: "reentrant stop",
+      completionResolver: () => "done",
+    });
+    await vi.waitFor(() => expect(harness.session.prompt).toHaveBeenCalled());
+    let nestedStop: Promise<void> | undefined;
+    run.subscribe((progress) => {
+      if (progress.status === "stopping" && !nestedStop) nestedStop = run.stop();
+    });
+    const firstStop = run.stop();
+
+    expect(nestedStop).toBe(firstStop);
+    await firstStop;
+    await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
+    expect(harness.session.abort).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for prompt preflight to settle before disposing after stop", async () => {
+    const harness = createHarness();
+    let finishPreflight!: (accepted: boolean) => void;
+    harness.session.prompt.mockImplementationOnce(
+      async (_prompt, options) =>
+        new Promise<void>(() => {
+          finishPreflight = (accepted) => options?.preflightResult?.(accepted);
+        }),
+    );
+    const run = startAgentRun({
+      inputs: inputs(),
+      prompt: "wait preflight",
+      completionResolver: () => "done",
+    });
+    await vi.waitFor(() => expect(harness.session.prompt).toHaveBeenCalled());
+    const stopped = run.stop();
+    let stoppedEarly = false;
+    void stopped.then(() => {
+      stoppedEarly = true;
+    });
+    await Promise.resolve();
+    expect(stoppedEarly).toBe(false);
+    finishPreflight(false);
+
+    await stopped;
+    await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
+  });
+
   it("lets cancellation win a timeout race and records one abort request", async () => {
     vi.useFakeTimers();
     const harness = createHarness();
@@ -485,7 +539,7 @@ describe("Agent Run public lifecycle seam", () => {
     await vi.waitFor(() => expect(harness.session.prompt).toHaveBeenCalled());
     const stopped = run.stop();
     rejectPrompt(new Error("private accepted prompt error"));
-    await Promise.resolve();
+    await vi.waitFor(() => expect(finishAbort).toBeTypeOf("function"));
     finishAbort();
 
     await stopped;

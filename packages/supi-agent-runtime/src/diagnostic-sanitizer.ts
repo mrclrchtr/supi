@@ -7,9 +7,9 @@ const ANSI_ESCAPE_RE = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~
 const AUTH_HEADER_RE = /\b(authorization\s*[:=]\s*)[^\r\n]*/gi;
 const BEARER_TOKEN_RE = /\b(bearer\s+)[^\s;&|]+/gi;
 const JSON_DOUBLE_SECRET_RE =
-  /(["']?(?:token|password|passwd|secret|api[_-]?key|authorization|credential)["']?\s*:\s*)"(?:\\.|[^"\\])*"/gi;
+  /((?:\\?["']?)(?:token|password|passwd|secret|api[_-]?key|authorization|credential)(?:\\?["']?\s*:\s*))\\?"(?:\\.|[^"\\])*\\?"/gi;
 const JSON_SINGLE_SECRET_RE =
-  /(["']?(?:token|password|passwd|secret|api[_-]?key|authorization|credential)["']?\s*:\s*)'(?:\\.|[^'\\])*'/gi;
+  /((?:\\?["']?)(?:token|password|passwd|secret|api[_-]?key|authorization|credential)(?:\\?["']?\s*:\s*))\\?'(?:\\.|[^'\\])*\\?'/gi;
 const UNQUOTED_SECRET_RE =
   /(["']?(?:token|password|passwd|secret|api[_-]?key|authorization|credential)["']?\s*:\s*)(?!["'])[^\s,}\]]+/gi;
 

@@ -51,12 +51,19 @@ describe("Agent Run diagnostics", () => {
     const text = sanitizeAgentRunErrorText(
       '{"authorization":"Digest username=\\"u\\", response=\\"private-digest\\"}"',
     );
+    const escapedQuote = String.fromCharCode(92);
+    const escapedKeyText = sanitizeAgentRunErrorText(
+      `{${escapedQuote}"authorization${escapedQuote}":${escapedQuote}"Basic escaped-value${escapedQuote}"}`,
+    );
     const ansiText = sanitizeAgentRunErrorText(
       `\u001b[31mAuthorization\u001b[0m: Basic private-ansi-credential`,
     );
+    const splitBearerText = sanitizeAgentRunErrorText(`Bearer abc\u001b[0mdef`);
 
     expect(text).not.toContain("private-digest");
+    expect(escapedKeyText).not.toContain("escaped-value");
     expect(ansiText).not.toContain("private-ansi-credential");
+    expect(splitBearerText).not.toContain("abcdef");
   });
 
   it("bounds assistant tool metadata and discloses omitted calls", () => {

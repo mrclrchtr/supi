@@ -58,6 +58,8 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   let promptStarted = false;
   let promptActive = false;
+  let promptPreflightSettled = false;
+  let promptPreflightCompletion: Promise<void> | undefined;
   let promptAccepted = false;
   let promptPromiseSettled = false;
   let settledEventObserved = false;
@@ -204,6 +206,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
 
   const abortAndFinish = (kind: "canceled" | "timeout"): Promise<void> => {
     if (abortCompletion !== undefined) return abortCompletion;
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: abort waits for provider, preflight, and bounded disposal races.
     abortCompletion = (async () => {
       if (terminal || finalizing) return;
       const activeSession = session;
@@ -216,6 +219,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
         .then(() => activeSession.abort())
         .catch(() => undefined);
       await Promise.race([abortPromise, wait(AGENT_RUN_ABORT_GRACE_MS)]);
+      if (!promptPreflightSettled) await promptPreflightCompletion;
       if (kind === "timeout") await finishTimeout();
       else await finishCanceled();
     })();
@@ -230,10 +234,10 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
 
   const requestCancellation = (): Promise<void> => {
     if (stopRequest !== undefined) return stopRequest;
-    cancelRequested = true;
-    if (!terminal && !finalizing) setStatus("stopping");
+    // Memoize before publishing `stopping`; progress listeners may call stop() reentrantly.
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: cancellation coordinates setup, abort, and timeout races.
     stopRequest = (async () => {
+      await Promise.resolve();
       if (!setupFinished) {
         await setupDone;
         if (terminal) return;
@@ -252,6 +256,8 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       if (promptStarted) await abortAndFinish("canceled");
       else await finishCanceled();
     })();
+    cancelRequested = true;
+    if (!terminal && !finalizing) setStatus("stopping");
     return stopRequest;
   };
 
@@ -261,8 +267,9 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     aborting = true;
     lifecycle.recordHostMarker({ type: "timeout_expired" });
     lifecycle.recordHostMarker({ type: "abort_requested", reason: "timeout" });
+    const abortPromise = abortAndFinish("timeout");
     setStatus("stopping");
-    void abortAndFinish("timeout");
+    void abortPromise;
   };
 
   const dispatchEvent = (event: AgentSessionEvent): void => {
@@ -326,11 +333,21 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     if (cancelRequested || terminal || finalizing || !session) return;
     promptStarted = true;
     promptActive = false;
+    let resolvePromptPreflight!: () => void;
+    promptPreflightCompletion = new Promise<void>((resolve) => {
+      resolvePromptPreflight = resolve;
+    });
+    const settlePromptPreflight = (): void => {
+      if (promptPreflightSettled) return;
+      promptPreflightSettled = true;
+      resolvePromptPreflight();
+    };
     if (options.timeoutMs !== undefined) {
       timeoutId = setTimeout(requestTimeout, options.timeoutMs);
       timeoutId.unref?.();
     }
     const onPreflight = (accepted: boolean): void => {
+      settlePromptPreflight();
       if (!accepted) {
         promptActive = false;
         if (cancelRequested || timeoutRequested || aborting || terminal || finalizing) return;
@@ -349,6 +366,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       const promptPromise = session.prompt(options.prompt, { preflightResult: onPreflight });
       void Promise.resolve(promptPromise).then(
         () => {
+          settlePromptPreflight();
           promptPromiseSettled = true;
           promptActive = false;
           promptAccepted = true;
@@ -356,12 +374,14 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
           else if (!cancelRequested && !timeoutRequested && !aborting) void resolveCompletion();
         },
         () => {
+          settlePromptPreflight();
           promptPromiseSettled = true;
           promptActive = false;
           if (!terminal && !finalizing && !aborting) void finishFailed("unexpected-runner-failure");
         },
       );
     } catch {
+      settlePromptPreflight();
       promptActive = false;
       void finishFailed("unexpected-runner-failure");
     }
