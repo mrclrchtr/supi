@@ -54,11 +54,12 @@ for pkg in "${PACKAGES[@]}"; do
   APPR=""
   [[ -n "$LOCAL_FLAG" ]] && APPR="--approve"
   printf "  %-30s " "$pkg"
-  if pi uninstall "npm:@mrclrchtr/$pkg" $LOCAL_FLAG $APPR &>/dev/null; then
+  if OUT=$(pi uninstall "npm:@mrclrchtr/$pkg" $LOCAL_FLAG $APPR 2>&1); then
     echo "✓"
   else
     echo "✗"
     FAILED+=("$pkg")
+    printf '%s\n' "$OUT" | sed 's/^/      /'
   fi
 done
 

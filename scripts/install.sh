@@ -38,12 +38,15 @@ echo ""
 
 FAILED=()
 for pkg in "${PACKAGES[@]}"; do
+  APPR=""
+  [[ -n "$LOCAL_FLAG" ]] && APPR="--approve"
   printf "  %-30s " "$pkg"
-  if pi install "npm:@mrclrchtr/$pkg" $LOCAL_FLAG &>/dev/null; then
+  if OUT=$(pi install "npm:@mrclrchtr/$pkg" $LOCAL_FLAG $APPR 2>&1); then
     echo "✓"
   else
     echo "✗"
     FAILED+=("$pkg")
+    printf '%s\n' "$OUT" | sed 's/^/      /'
   fi
 done
 
