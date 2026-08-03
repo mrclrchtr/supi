@@ -26,6 +26,21 @@ describe("collectAgentRunUsage", () => {
     expect(collectAgentRunUsage(session)).toBeUndefined();
   });
 
+  it("combines observed model calls with persisted tool-result usage", () => {
+    const session = {
+      sessionManager: {
+        getEntries: () => [
+          { type: "message", message: { role: "assistant", usage: usage(1) } },
+          { type: "message", message: { role: "toolResult", usage: usage(2) } },
+          { type: "compaction", usage: usage(3) },
+        ],
+      },
+      messages: [],
+    } as unknown as AgentSession;
+
+    expect(collectAgentRunUsage(session, [usage(1), usage(3), usage(4)])?.input).toBe(10);
+  });
+
   it("counts every usage-bearing session entry exactly once", () => {
     const session = {
       sessionManager: {

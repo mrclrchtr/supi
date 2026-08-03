@@ -61,7 +61,7 @@ export interface AgentRunMessage {
 export interface AgentRunSessionView {
   readonly cwd: string;
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
-  readonly model: Model<any> | undefined;
+  readonly model: Readonly<Model<any>> | undefined;
   readonly thinkingLevel: ModelThinkingLevel;
   readonly isStreaming: boolean;
   readonly messages: readonly AgentRunMessage[];

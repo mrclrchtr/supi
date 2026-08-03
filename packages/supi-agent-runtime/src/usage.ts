@@ -38,20 +38,34 @@ export function combineAgentRunUsage(usages: readonly (Usage | undefined)[]): Us
 /**
  * Collect every usage-bearing entry owned by the in-memory Agent Run session.
  * This includes assistant turns, tool-result work, compaction, and branch summaries.
+ * When supplied, observed model-call usage also covers responses not persisted by PI after a failed recovery call.
  */
-export function collectAgentRunUsage(session: AgentSession): Usage | undefined {
+export function collectAgentRunUsage(
+  session: AgentSession,
+  observedUsages: readonly Usage[] = [],
+): Usage | undefined {
+  const fromObservedCalls = combineAgentRunUsage(observedUsages);
+
   try {
     const entries = session.sessionManager.getEntries();
     const fromEntries = combineAgentRunUsage(
       entries.map((entry) => {
-        if (entry.type === "message") return readUsage(entry.message);
-        if (entry.type === "compaction" || entry.type === "branch_summary") {
+        if (entry.type === "message") {
+          return observedUsages.length > 0 && entry.message.role !== "toolResult"
+            ? undefined
+            : readUsage(entry.message);
+        }
+        if (
+          observedUsages.length === 0 &&
+          (entry.type === "compaction" || entry.type === "branch_summary")
+        ) {
           return readUsage(entry);
         }
         return undefined;
       }),
     );
-    if (fromEntries) return fromEntries;
+    const combined = combineAgentRunUsage([combineAgentRunUsage(observedUsages), fromEntries]);
+    if (combined) return combined;
   } catch {
     // Test doubles and older PI versions may not expose session entries.
   }
@@ -59,12 +73,21 @@ export function collectAgentRunUsage(session: AgentSession): Usage | undefined {
   try {
     const messages = session.messages;
     if (Array.isArray(messages)) {
-      const fromMessages = combineAgentRunUsage(messages.map((message) => readUsage(message)));
-      if (fromMessages) return fromMessages;
+      const fromMessages = combineAgentRunUsage(
+        messages.map((message) =>
+          observedUsages.length > 0 && message.role !== "toolResult"
+            ? undefined
+            : readUsage(message),
+        ),
+      );
+      const combined = combineAgentRunUsage([fromObservedCalls, fromMessages]);
+      if (combined) return combined;
     }
   } catch {
     // Fall through to the best-effort stats snapshot.
   }
+
+  if (fromObservedCalls) return fromObservedCalls;
 
   try {
     const stats = session.getSessionStats();

@@ -23,7 +23,7 @@ describe("Agent Run diagnostics", () => {
             { type: "toolCall", name: "private_tool" },
           ],
           stopReason: "error",
-          errorMessage: `\u001b[31mAuthorization: Bearer private-token {"apiKey":"private-json-key"}\nAuthorization: Basic dXNlcjpwYXNz ${"x".repeat(700)}`,
+          errorMessage: `\u001b[31mAuthorization: Bearer private-token {"apiKey":"private-json-key"}\nAuthorization: Basic dXNlcjpwYXNz\nAuthorization: Digest username="a;b", response="private-digest" ${"x".repeat(700)}`,
         },
       ],
       getActiveToolNames: () => ["read"],
@@ -38,6 +38,7 @@ describe("Agent Run diagnostics", () => {
     expect(JSON.stringify(diagnostics)).not.toContain("private-token");
     expect(JSON.stringify(diagnostics)).not.toContain("private-json-key");
     expect(JSON.stringify(diagnostics)).not.toContain("dXNlcjpwYXNz");
+    expect(JSON.stringify(diagnostics)).not.toContain("private-digest");
     expect(JSON.stringify(diagnostics)).not.toContain("private_tool");
     expect(JSON.stringify(diagnostics)).not.toContain("\u001b");
   });

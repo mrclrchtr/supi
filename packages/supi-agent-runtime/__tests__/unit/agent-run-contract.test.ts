@@ -34,6 +34,7 @@ function createHarness(entries: unknown[] = []) {
   const listeners = new Set<(event: { type: string; [key: string]: unknown }) => void>();
   const session = {
     modelRuntime: {},
+    agent: { streamFunction: vi.fn() },
     model: {},
     thinkingLevel: "low",
     isStreaming: false,
@@ -97,6 +98,10 @@ describe("Agent Run public lifecycle seam", () => {
       readinessCheck: () => false,
       observer: (view) => {
         viewKeys = Object.keys(view);
+        expect(Object.isFrozen(view.model)).toBe(true);
+        expect(Object.isFrozen(view.messages)).toBe(true);
+        expect(Object.isFrozen(view.messages[0])).toBe(true);
+        expect(Object.isFrozen(view.messages[0]?.content)).toBe(true);
         return teardown;
       },
       completionResolver: () => "done",
@@ -112,6 +117,24 @@ describe("Agent Run public lifecycle seam", () => {
     expect(viewKeys).not.toContain("session");
     expect(viewKeys).not.toContain("abort");
     expect(viewKeys).not.toContain("dispose");
+  });
+
+  it("snapshots callback events instead of forwarding session-owned objects", async () => {
+    const _harness = createHarness();
+    let observedEvent: object | undefined;
+    const run = startAgentRun({
+      inputs: inputs(),
+      prompt: "event snapshot",
+      observer: (view) => {
+        view.subscribe((event) => {
+          observedEvent = event;
+        });
+      },
+      completionResolver: () => "done",
+    });
+
+    await expect(run.result).resolves.toMatchObject({ kind: "success", value: "done" });
+    expect(Object.isFrozen(observedEvent)).toBe(true);
   });
 
   it("classifies observer setup errors as an unready session", async () => {
@@ -186,7 +209,25 @@ describe("Agent Run public lifecycle seam", () => {
     });
 
     await expect(run.result).resolves.toMatchObject({ kind: "success", value: "done" });
+    await expect(run.steer("too late")).resolves.toBe("not-running");
     expect(harness.runtime.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not steer during the running transition before prompting starts", async () => {
+    const harness = createHarness();
+    let earlySteer: Promise<"accepted" | "not-running"> | undefined;
+    const run = startAgentRun({
+      inputs: inputs(),
+      prompt: "early steer",
+      completionResolver: () => "done",
+    });
+    run.subscribe((progress) => {
+      if (progress.status === "running" && !earlySteer) earlySteer = run.steer("too early");
+    });
+
+    await expect(run.result).resolves.toMatchObject({ kind: "success", value: "done" });
+    await expect(earlySteer).resolves.toBe("not-running");
+    expect(harness.session.steer).not.toHaveBeenCalled();
   });
 
   it("distinguishes prompt rejection and missing completion", async () => {
@@ -368,6 +409,34 @@ describe("Agent Run public lifecycle seam", () => {
     expect(harness.session.abort).toHaveBeenCalledTimes(1);
   });
 
+  it("does not start a prompt accepted after cancellation", async () => {
+    const harness = createHarness();
+    let acceptPreflight!: () => void;
+    harness.session.prompt.mockImplementationOnce(
+      async (_prompt, options) =>
+        new Promise<void>(() => {
+          acceptPreflight = () => {
+            try {
+              options?.preflightResult?.(true);
+            } catch {
+              // The runtime rejects a late preflight acceptance to stop PI prompting.
+            }
+          };
+        }),
+    );
+    const run = startAgentRun({
+      inputs: inputs(),
+      prompt: "cancel before acceptance",
+      completionResolver: () => "done",
+    });
+    await vi.waitFor(() => expect(harness.session.prompt).toHaveBeenCalled());
+    const stopped = run.stop();
+    acceptPreflight();
+
+    await stopped;
+    await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
+  });
+
   it("lets cancellation own a later prompt rejection", async () => {
     const harness = createHarness();
     let rejectPreflight!: () => void;
@@ -481,6 +550,46 @@ describe("Agent Run public lifecycle seam", () => {
 
     await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
     expect(harness.session.prompt).not.toHaveBeenCalled();
+  });
+
+  it("includes usage from an observed model response before persistence", async () => {
+    const harness = createHarness();
+    const observed = usage(7);
+    harness.session.agent.streamFunction.mockResolvedValueOnce({
+      result: vi.fn(async () => ({ usage: observed })),
+    });
+    harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
+      options?.preflightResult?.(true);
+      const stream = await harness.session.agent.streamFunction({}, {}, undefined);
+      await stream.result();
+      harness.session.emit({ type: "agent_settled" });
+    });
+    const run = startAgentRun({
+      inputs: inputs(),
+      prompt: "observed usage",
+      completionResolver: () => "done",
+    });
+
+    const outcome = await run.result;
+    expect(outcome.kind).toBe("success");
+    expect(outcome.usage?.input).toBe(7);
+  });
+
+  it("refreshes usage after disposal work adds a billed entry", async () => {
+    const entries = [{ type: "message", message: { role: "assistant", usage: usage(1) } }];
+    const harness = createHarness(entries);
+    harness.runtime.dispose.mockImplementationOnce(async () => {
+      entries.push({ type: "message", message: { role: "assistant", usage: usage(2) } });
+    });
+    const run = startAgentRun({
+      inputs: inputs(),
+      prompt: "late usage",
+      completionResolver: () => "done",
+    });
+
+    const outcome = await run.result;
+    expect(outcome.kind).toBe("success");
+    expect(outcome.usage?.input).toBe(3);
   });
 
   it("aggregates assistant, tool-result, compaction, and branch-summary usage", async () => {

@@ -49,6 +49,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     toolErrors: 0,
   };
   let lifecycle = new AgentRunLifecycleTraceCollector();
+  const observedUsages: Usage[] = [];
   let runtime: AgentSessionRuntime | undefined;
   let session: AgentSession | undefined;
   let view: AgentRunSessionView | undefined;
@@ -56,6 +57,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
   let observerCleanup: (() => void) | undefined;
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   let promptStarted = false;
+  let promptActive = false;
   let promptAccepted = false;
   let promptPromiseSettled = false;
   let settledEventObserved = false;
@@ -112,7 +114,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
 
   const refreshUsage = (): Usage | undefined => {
     if (!session) return progressState.usage;
-    const usage = collectAgentRunUsage(session);
+    const usage = collectAgentRunUsage(session, observedUsages);
     if (usage) progressState.usage = usage;
     return progressState.usage;
   };
@@ -127,9 +129,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
 
   const outcomeWithUsage = <TOutcome extends AgentRunOutcome<T>>(outcome: TOutcome): TOutcome => {
     const usage = refreshUsage();
-    return usage && !("usage" in outcome && outcome.usage)
-      ? ({ ...outcome, usage } as TOutcome)
-      : outcome;
+    return usage ? ({ ...outcome, usage } as TOutcome) : outcome;
   };
 
   const disposeRuntime = async (): Promise<void> => {
@@ -281,6 +281,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     }
     if (event.type !== "agent_settled" || aborting || terminal || finalizing) return;
     settledEventObserved = true;
+    promptActive = false;
     if (!promptAccepted || !promptPromiseSettled) {
       deferredSettlement = true;
       return;
@@ -324,16 +325,21 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
   const startPrompt = (): void => {
     if (cancelRequested || terminal || finalizing || !session) return;
     promptStarted = true;
+    promptActive = true;
     if (options.timeoutMs !== undefined) {
       timeoutId = setTimeout(requestTimeout, options.timeoutMs);
       timeoutId.unref?.();
     }
     const onPreflight = (accepted: boolean): void => {
       if (!accepted) {
+        promptActive = false;
         if (cancelRequested || timeoutRequested || aborting || terminal || finalizing) return;
         lifecycle.recordHostMarker({ type: "prompt_rejected" });
         void finishFailed("prompt-rejected");
         return;
+      }
+      if (cancelRequested || timeoutRequested || aborting || terminal || finalizing) {
+        throw new Error("Agent Run prompt canceled before acceptance");
       }
       promptAccepted = true;
       flushSettlement();
@@ -343,16 +349,19 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       void Promise.resolve(promptPromise).then(
         () => {
           promptPromiseSettled = true;
+          promptActive = false;
           promptAccepted = true;
           if (settledEventObserved) flushSettlement();
           else if (!cancelRequested && !timeoutRequested && !aborting) void resolveCompletion();
         },
         () => {
           promptPromiseSettled = true;
+          promptActive = false;
           if (!terminal && !finalizing && !aborting) void finishFailed("unexpected-runner-failure");
         },
       );
     } catch {
+      promptActive = false;
       void finishFailed("unexpected-runner-failure");
     }
   };
@@ -377,6 +386,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
             sessionManager,
             sessionStartEvent,
           });
+          observeSessionModelUsage(created.session, observedUsages);
           return {
             ...created,
             services: {
@@ -460,6 +470,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       if (
         progressState.status !== "running" ||
         !session ||
+        !promptActive ||
         settledEventObserved ||
         terminal ||
         finalizing ||
@@ -489,6 +500,27 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
   }
   void setup();
   return handle;
+}
+
+/** Capture model responses before PI decides whether to persist their usage. */
+function observeSessionModelUsage(session: AgentSession, observedUsages: Usage[]): void {
+  const agent = session.agent;
+  if (!agent || typeof agent.streamFunction !== "function") return;
+  const originalStreamFunction = agent.streamFunction;
+  agent.streamFunction = async (...args) => {
+    const stream = await originalStreamFunction(...args);
+    const originalResult = stream.result.bind(stream);
+    let captured = false;
+    stream.result = async () => {
+      const response = await originalResult();
+      if (!captured) {
+        captured = true;
+        if (response.usage) observedUsages.push(response.usage);
+      }
+      return response;
+    };
+    return stream;
+  };
 }
 
 function usageFields(usage: Usage | undefined): { usage?: Usage } {

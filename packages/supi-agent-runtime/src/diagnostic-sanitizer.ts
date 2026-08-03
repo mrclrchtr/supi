@@ -4,7 +4,7 @@ import { redactDebugData } from "@mrclrchtr/supi-core/debug";
 export const MAX_AGENT_RUN_ERROR_CHARACTERS = 500;
 
 const ANSI_ESCAPE_RE = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, "g");
-const AUTH_HEADER_RE = /\b(authorization\s*[:=]\s*)[^\r\n;&|]*/gi;
+const AUTH_HEADER_RE = /\b(authorization\s*[:=]\s*)[^\r\n]*/gi;
 const BEARER_TOKEN_RE = /\b(bearer\s+)[^\s;&|]+/gi;
 const JSON_SECRET_RE =
   /(["']?(?:token|password|passwd|secret|api[_-]?key|authorization|credential)["']?\s*:\s*)(["'])[^"']*\2/gi;
