@@ -55,11 +55,8 @@ export function collectAgentRunUsage(
             ? undefined
             : readUsage(entry.message);
         }
-        if (
-          observedUsages.length === 0 &&
-          (entry.type === "compaction" || entry.type === "branch_summary")
-        ) {
-          return readUsage(entry);
+        if (entry.type === "compaction" || entry.type === "branch_summary") {
+          return observedUsages.length === 0 || entry.fromHook ? readUsage(entry) : undefined;
         }
         return undefined;
       }),

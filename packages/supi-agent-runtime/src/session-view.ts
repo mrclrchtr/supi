@@ -3,7 +3,7 @@ import type { AgentRunMessage, AgentRunSessionView } from "./types.ts";
 
 /** Build the narrowed, control-free view supplied to runtime callbacks. */
 export function createAgentRunSessionView(session: AgentSession, cwd: string): AgentRunSessionView {
-  return {
+  const view: AgentRunSessionView = {
     get cwd() {
       return cwd;
     },
@@ -37,6 +37,7 @@ export function createAgentRunSessionView(session: AgentSession, cwd: string): A
         }
       }),
   };
+  return Object.freeze(view);
 }
 
 function snapshot<T>(value: T): T {

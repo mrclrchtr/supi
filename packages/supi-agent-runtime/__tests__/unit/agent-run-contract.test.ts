@@ -98,6 +98,7 @@ describe("Agent Run public lifecycle seam", () => {
       readinessCheck: () => false,
       observer: (view) => {
         viewKeys = Object.keys(view);
+        expect(Object.isFrozen(view)).toBe(true);
         expect(Object.isFrozen(view.model)).toBe(true);
         expect(Object.isFrozen(view.messages)).toBe(true);
         expect(Object.isFrozen(view.messages[0])).toBe(true);

@@ -33,12 +33,13 @@ describe("collectAgentRunUsage", () => {
           { type: "message", message: { role: "assistant", usage: usage(1) } },
           { type: "message", message: { role: "toolResult", usage: usage(2) } },
           { type: "compaction", usage: usage(3) },
+          { type: "branch_summary", usage: usage(5), fromHook: true },
         ],
       },
       messages: [],
     } as unknown as AgentSession;
 
-    expect(collectAgentRunUsage(session, [usage(1), usage(3), usage(4)])?.input).toBe(10);
+    expect(collectAgentRunUsage(session, [usage(1), usage(3), usage(4)])?.input).toBe(15);
   });
 
   it("counts every usage-bearing session entry exactly once", () => {

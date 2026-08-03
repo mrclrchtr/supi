@@ -325,7 +325,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
   const startPrompt = (): void => {
     if (cancelRequested || terminal || finalizing || !session) return;
     promptStarted = true;
-    promptActive = true;
+    promptActive = false;
     if (options.timeoutMs !== undefined) {
       timeoutId = setTimeout(requestTimeout, options.timeoutMs);
       timeoutId.unref?.();
@@ -341,6 +341,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       if (cancelRequested || timeoutRequested || aborting || terminal || finalizing) {
         throw new Error("Agent Run prompt canceled before acceptance");
       }
+      promptActive = true;
       promptAccepted = true;
       flushSettlement();
     };

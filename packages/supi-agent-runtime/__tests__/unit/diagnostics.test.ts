@@ -1,6 +1,10 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import { buildAgentRunDiagnostics, formatAgentRunDiagnostics } from "../../src/api.ts";
+import {
+  buildAgentRunDiagnostics,
+  formatAgentRunDiagnostics,
+  sanitizeAgentRunErrorText,
+} from "../../src/api.ts";
 
 function build(session: unknown) {
   return buildAgentRunDiagnostics({
@@ -41,6 +45,18 @@ describe("Agent Run diagnostics", () => {
     expect(JSON.stringify(diagnostics)).not.toContain("private-digest");
     expect(JSON.stringify(diagnostics)).not.toContain("private_tool");
     expect(JSON.stringify(diagnostics)).not.toContain("\u001b");
+  });
+
+  it("redacts escaped JSON credentials and ANSI-split authorization headers", () => {
+    const text = sanitizeAgentRunErrorText(
+      '{"authorization":"Digest username=\\"u\\", response=\\"private-digest\\"}"',
+    );
+    const ansiText = sanitizeAgentRunErrorText(
+      `\u001b[31mAuthorization\u001b[0m: Basic private-ansi-credential`,
+    );
+
+    expect(text).not.toContain("private-digest");
+    expect(ansiText).not.toContain("private-ansi-credential");
   });
 
   it("bounds assistant tool metadata and discloses omitted calls", () => {
