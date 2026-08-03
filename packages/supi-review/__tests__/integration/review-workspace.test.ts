@@ -2,9 +2,12 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveReviewSnapshot } from "../../src/git.ts";
 import { materializeReviewWorkspace } from "../../src/workspace/review-workspace.ts";
+
+// The global 2s timeout is too tight for tests spawning real git.
+vi.setConfig({ testTimeout: 20000 });
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
