@@ -390,6 +390,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: setup orders uncancelable resource, session, binding, readiness, and prompt phases.
   const setup = async (): Promise<void> => {
     try {
+      if (cancelRequested) return;
       await options.inputs.resourceLoader.reload();
       if (cancelRequested) return;
       const agentDir = options.inputs.agentDir ?? process.env.PI_CODING_AGENT_DIR ?? getAgentDir();

@@ -59,11 +59,17 @@ describe("Agent Run diagnostics", () => {
       `\u001b[31mAuthorization\u001b[0m: Basic private-ansi-credential`,
     );
     const splitBearerText = sanitizeAgentRunErrorText(`Bearer abc\u001b[0mdef`);
+    const naturalLabelText = sanitizeAgentRunErrorText(
+      `API key: ${"api-value"}; credential = ${"credential-value"}`,
+    );
 
     expect(text).not.toContain("private-digest");
     expect(escapedKeyText).not.toContain("escaped-value");
     expect(ansiText).not.toContain("private-ansi-credential");
     expect(splitBearerText).not.toContain("abcdef");
+    expect(splitBearerText).not.toContain("def");
+    expect(naturalLabelText).not.toContain("api-value");
+    expect(naturalLabelText).not.toContain("credential-value");
   });
 
   it("bounds assistant tool metadata and discloses omitted calls", () => {

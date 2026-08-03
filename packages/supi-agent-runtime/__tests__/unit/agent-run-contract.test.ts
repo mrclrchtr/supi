@@ -594,16 +594,18 @@ describe("Agent Run public lifecycle seam", () => {
 
   it("does not create or prompt a session when the signal is already aborted", async () => {
     const harness = createHarness();
+    const reload = vi.fn(async () => undefined);
     const controller = new AbortController();
     controller.abort();
     const run = startAgentRun({
-      inputs: inputs(),
+      inputs: inputs({ reload }),
       prompt: "pre-aborted",
       signal: controller.signal,
       completionResolver: () => "done",
     });
 
     await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
+    expect(reload).not.toHaveBeenCalled();
     expect(harness.session.prompt).not.toHaveBeenCalled();
   });
 
