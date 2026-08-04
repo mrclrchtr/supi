@@ -6,6 +6,7 @@ const viewDeactivators = new WeakMap<object, () => void>();
 /** Build the narrowed, control-free view supplied to runtime callbacks. */
 export function createAgentRunSessionView(session: AgentSession, cwd: string): AgentRunSessionView {
   let active = true;
+  let activeSession: AgentSession | undefined = session;
   const subscriptions = new Set<() => void>();
   const inactiveStats = Object.freeze({
     sessionFile: undefined,
@@ -24,44 +25,60 @@ export function createAgentRunSessionView(session: AgentSession, cwd: string): A
       return cwd;
     },
     get model() {
-      return active ? snapshot(session.model) : undefined;
+      const current = activeSession;
+      return active && current ? snapshot(current.model) : undefined;
     },
     get thinkingLevel() {
-      return active ? session.thinkingLevel : "off";
+      const current = activeSession;
+      return active && current ? current.thinkingLevel : "off";
     },
     get isStreaming() {
-      return active && session.isStreaming;
+      const current = activeSession;
+      return active && current ? current.isStreaming : false;
     },
     get messages() {
-      return active
-        ? (snapshot(session.messages) as unknown as readonly AgentRunMessage[])
+      const current = activeSession;
+      return active && current
+        ? (snapshot(current.messages) as unknown as readonly AgentRunMessage[])
         : Object.freeze([] as readonly AgentRunMessage[]);
     },
     getActiveToolNames: () => {
-      if (!active) return Object.freeze([] as string[]);
+      const current = activeSession;
+      if (!active || !current) return Object.freeze([] as string[]);
       try {
-        return Object.freeze([...session.getActiveToolNames()]);
+        return Object.freeze([...current.getActiveToolNames()]);
       } catch {
         return Object.freeze([] as string[]);
       }
     },
-    getSessionStats: () => (active ? snapshot(session.getSessionStats()) : inactiveStats),
-    getLastAssistantText: () => (active ? session.getLastAssistantText() : undefined),
+    getSessionStats: () => {
+      const current = activeSession;
+      return active && current ? snapshot(current.getSessionStats()) : inactiveStats;
+    },
+    getLastAssistantText: () => {
+      const current = activeSession;
+      return active && current ? current.getLastAssistantText() : undefined;
+    },
     subscribe: (listener) => {
-      if (!active) return () => undefined;
-      const unsubscribe = session.subscribe((event) => {
-        if (!active) return;
+      const current = activeSession;
+      if (!active || !current) return () => undefined;
+      let sessionUnsubscribe: (() => void) | undefined;
+      const cleanup = (): void => {
+        subscriptions.delete(cleanup);
+        const unsubscribe = sessionUnsubscribe;
+        sessionUnsubscribe = undefined;
+        unsubscribe?.();
+      };
+      sessionUnsubscribe = current.subscribe((event) => {
+        if (!active || activeSession === undefined) return;
         try {
           listener(snapshot(event));
         } catch {
           // Observer failures must not change Agent Run lifecycle semantics.
         }
       });
-      subscriptions.add(unsubscribe);
-      return () => {
-        subscriptions.delete(unsubscribe);
-        unsubscribe();
-      };
+      subscriptions.add(cleanup);
+      return cleanup;
     },
   };
   viewDeactivators.set(view, () => {
@@ -69,6 +86,7 @@ export function createAgentRunSessionView(session: AgentSession, cwd: string): A
     active = false;
     for (const unsubscribe of subscriptions) unsubscribe();
     subscriptions.clear();
+    activeSession = undefined;
   });
   return Object.freeze(view);
 }

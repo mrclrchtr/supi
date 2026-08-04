@@ -1,5 +1,4 @@
 import type { SessionContext } from "@earendil-works/pi-coding-agent";
-import { extractVisibleText } from "../tool/runner-helpers.ts";
 
 const MAX_PLANNER_CONTEXT_CHARS = 8_000;
 const MAX_SUMMARY_WITH_VISIBLE_CHARS = 3_000;
@@ -8,6 +7,19 @@ type Message = SessionContext["messages"][number];
 interface PlannerRow {
   kind: "summary" | "visible";
   text: string;
+}
+
+function extractVisibleText(content: unknown): string | undefined {
+  if (typeof content === "string") return content || undefined;
+  if (!Array.isArray(content)) return undefined;
+  const texts = content
+    .map((part) => {
+      if (typeof part !== "object" || !part) return "";
+      const text = (part as { text?: unknown }).text;
+      return typeof text === "string" ? text : "";
+    })
+    .filter((value) => value.length > 0);
+  return texts.length > 0 ? texts.join("\n") : undefined;
 }
 
 function toPlannerRow(message: Message): PlannerRow | undefined {
