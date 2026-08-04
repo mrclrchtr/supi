@@ -1,7 +1,7 @@
 <div align="center">
   <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-test-utils">
     <picture>
-      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-test-utils/assets/logo.png" alt="SuPi" width="50%">
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-test-utils/assets/social-preview.png" alt="SuPi Test Utils" width="100%">
     </picture>
   </a>
 </div>

@@ -1,4 +1,4 @@
-![SuPi](assets/supi-logo.png)
+![SuPi — Pi code intelligence powered by LSP and Tree-sitter](assets/social-preview.png)
 
 # SuPi — Pi Coding Agent Extensions with LSP and Tree-sitter Code Intelligence
 

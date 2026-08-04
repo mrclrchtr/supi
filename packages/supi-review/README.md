@@ -1,3 +1,9 @@
+<div align="center">
+  <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-review">
+    <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-review/assets/social-preview.png" alt="SuPi Review" width="100%">
+  </a>
+</div>
+
 # @mrclrchtr/supi-review — Code Review for Pi
 
 Code review extension for the [Pi coding agent](https://github.com/earendil-works/pi) that runs parallel, isolated review tasks against a working tree, branch, or commit.

@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-settings">
-    <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-settings/assets/logo.png" alt="SuPi" width="50%">
+    <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-settings/assets/social-preview.png" alt="SuPi Settings" width="100%">
   </a>
 </div>
 

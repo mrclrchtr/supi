@@ -1,7 +1,7 @@
 <div align="center">
   <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-cache">
     <picture>
-      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-cache/assets/logo.png" alt="SuPi" width="50%">
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-cache/assets/social-preview.png" alt="SuPi Cache" width="100%">
     </picture>
   </a>
 </div>

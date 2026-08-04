@@ -1,3 +1,9 @@
+<div align="center">
+  <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-code-runtime">
+    <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-code-runtime/assets/social-preview.png" alt="SuPi Code Runtime" width="100%">
+  </a>
+</div>
+
 # @mrclrchtr/supi-code-runtime
 
 Shared workspace context, capability contracts, and canonical types for the SuPi code-understanding stack.

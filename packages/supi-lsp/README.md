@@ -1,7 +1,7 @@
 <div align="center">
   <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-lsp">
     <picture>
-      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-lsp/assets/logo.png" alt="SuPi" width="50%">
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-lsp/assets/social-preview.png" alt="SuPi LSP" width="100%">
     </picture>
   </a>
 </div>

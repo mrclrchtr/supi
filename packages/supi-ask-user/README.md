@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-ask-user">
-    <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/logo.png" alt="SuPi" width="50%">
+    <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/social-preview.png" alt="SuPi Ask User" width="100%">
   </a>
 </div>
 

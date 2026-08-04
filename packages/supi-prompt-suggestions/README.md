@@ -1,7 +1,7 @@
 <div align="center">
   <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-prompt-suggestions">
     <picture>
-      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-prompt-suggestions/assets/logo.png" alt="SuPi" width="50%">
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-prompt-suggestions/assets/social-preview.png" alt="SuPi Prompt Suggestions" width="100%">
     </picture>
   </a>
 </div>

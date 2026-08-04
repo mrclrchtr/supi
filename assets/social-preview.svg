@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">SuPi social preview</title>
+  <desc id="desc">SuPi — LSP and Tree-sitter code intelligence for the Pi coding agent.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#181926"/>
+      <stop offset="1" stop-color="#24273a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(320 318) rotate(90) scale(330)">
+      <stop stop-color="#8aadf4" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#8aadf4" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#cad3f5" stroke-opacity=".04"/>
+    </pattern>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#background)"/>
+  <rect width="1280" height="640" fill="url(#grid)"/>
+  <rect width="700" height="640" fill="url(#glow)"/>
+  <circle cx="1150" cy="-30" r="230" fill="#c6a0f6" opacity=".07"/>
+  <circle cx="1230" cy="610" r="190" fill="#8bd5ca" opacity=".06"/>
+
+  <rect x="72" y="72" width="360" height="496" rx="32" fill="#24273a" stroke="#5b6078" stroke-width="2"/>
+  <g fill="#cad3f5">
+    <rect x="132" y="142" width="240" height="50" rx="8"/>
+    <rect x="154" y="182" width="46" height="170" rx="8"/>
+    <rect x="304" y="182" width="46" height="170" rx="8"/>
+  </g>
+  <text x="252" y="440" fill="#cad3f5" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="62" font-weight="700" text-anchor="middle">SuPi</text>
+  <text x="252" y="478" fill="#a5adcb" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="17" font-weight="600" letter-spacing="3" text-anchor="middle">SUPER PI</text>
+
+  <circle cx="512" cy="128" r="6" fill="#8aadf4"/>
+  <text x="532" y="136" fill="#a5adcb" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="20" font-weight="700" letter-spacing="2">PI EXTENSION STACK</text>
+
+  <text x="506" y="225" fill="#cad3f5" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-size="62" font-weight="750">Code intelligence</text>
+  <text x="506" y="296" fill="#cad3f5" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-size="50" font-weight="650">for the Pi coding agent</text>
+  <text x="508" y="366" fill="#b8c0e0" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-size="27" font-weight="500">LSP semantics <tspan fill="#6e738d">+</tspan> Tree-sitter structure</text>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="17" font-weight="650">
+    <g>
+      <rect x="506" y="414" width="146" height="48" rx="24" fill="#363a4f" stroke="#494d64"/>
+      <circle cx="532" cy="438" r="5" fill="#8aadf4"/>
+      <text x="549" y="444" fill="#cad3f5">NAVIGATE</text>
+    </g>
+    <g>
+      <rect x="668" y="414" width="144" height="48" rx="24" fill="#363a4f" stroke="#494d64"/>
+      <circle cx="694" cy="438" r="5" fill="#a6da95"/>
+      <text x="711" y="444" fill="#cad3f5">REFACTOR</text>
+    </g>
+    <g>
+      <rect x="828" y="414" width="124" height="48" rx="24" fill="#363a4f" stroke="#494d64"/>
+      <circle cx="854" cy="438" r="5" fill="#c6a0f6"/>
+      <text x="871" y="444" fill="#cad3f5">REVIEW</text>
+    </g>
+  </g>
+
+  <path d="M508 520h660" stroke="#494d64"/>
+  <text x="508" y="556" fill="#a5adcb" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="19">github.com/mrclrchtr/supi</text>
+</svg>
