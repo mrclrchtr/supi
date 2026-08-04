@@ -1,14 +1,14 @@
 {
-  "name": "@mrclrchtr/supi-agents",
+  "name": "@mrclrchtr/supi-agent",
   "version": "4.5.1",
   "description": "Profile-based foreground Agent Runs for the Pi coding agent",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mrclrchtr/supi.git",
-    "directory": "packages/supi-agents"
+    "directory": "packages/supi-agent"
   },
-  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-agents#readme",
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-agent#readme",
   "bugs": {
     "url": "https://github.com/mrclrchtr/supi/issues"
   },
@@ -73,7 +73,7 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-agents/assets/social-preview.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-agent/assets/social-preview.png"
   },
   "main": "src/api.ts",
   "exports": {

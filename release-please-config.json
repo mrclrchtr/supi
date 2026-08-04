@@ -5,8 +5,8 @@
       "include-component-in-tag": false,
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
+        "packages/supi-agent/package.json",
         "packages/supi-agent-runtime/package.json",
-        "packages/supi-agents/package.json",
         "packages/supi-ask-user/package.json",
         "packages/supi-bash-timeout/package.json",
         "packages/supi-cache/package.json",

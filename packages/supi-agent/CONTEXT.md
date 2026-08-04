@@ -1,4 +1,4 @@
-# supi-agents
+# supi-agent
 
 Runs user-requested delegation through managed Agent Runs while keeping profiles, workspace policy, and results explicit.
 

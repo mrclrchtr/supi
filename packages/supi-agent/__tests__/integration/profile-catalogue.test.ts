@@ -17,7 +17,7 @@ afterEach(async () => {
 });
 
 async function temporaryDirectory(): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), "supi-agents-test-"));
+  const directory = await mkdtemp(join(tmpdir(), "supi-agent-test-"));
   temporaryDirectories.push(directory);
   return directory;
 }

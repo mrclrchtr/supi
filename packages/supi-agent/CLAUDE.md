@@ -2,7 +2,7 @@
 
 ## Scope
 
-`@mrclrchtr/supi-agents` owns Agent Profile discovery, validation, resource policy, and the fixed child capability catalogue. It is an installable PI extension; Agent Run lifecycle mechanics belong to `@mrclrchtr/supi-agent-runtime`.
+`@mrclrchtr/supi-agent` owns Agent Profile discovery, validation, resource policy, and the fixed child capability catalogue. It is an installable PI extension; Agent Run lifecycle mechanics belong to `@mrclrchtr/supi-agent-runtime`.
 
 ## Guidelines
 

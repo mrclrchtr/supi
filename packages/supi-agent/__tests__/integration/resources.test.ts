@@ -25,7 +25,7 @@ async function setup(): Promise<{
   project: string;
   profile: AgentProfile;
 }> {
-  const root = await mkdtemp(join(tmpdir(), "supi-agents-resources-"));
+  const root = await mkdtemp(join(tmpdir(), "supi-agent-resources-"));
   temporaryDirectories.push(root);
   const agentDir = join(root, "agent");
   const project = join(root, "project");

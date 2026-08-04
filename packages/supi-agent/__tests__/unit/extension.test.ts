@@ -4,16 +4,16 @@ import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createPiMock, getHandlerOrThrow } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it, vi } from "vitest";
-import agentsExtension from "../../src/extension.ts";
+import agentExtension from "../../src/extension.ts";
 import { agentProfileCatalogueStore } from "../../src/session.ts";
 
-describe("supi-agents extension", () => {
+describe("supi-agent extension", () => {
   it("refreshes the immutable profile catalogue on session start and clears it on shutdown", async () => {
-    const agentDir = await mkdtemp(join(tmpdir(), "supi-agents-extension-"));
+    const agentDir = await mkdtemp(join(tmpdir(), "supi-agent-extension-"));
     vi.stubEnv("PI_CODING_AGENT_DIR", agentDir);
     try {
       const pi = createPiMock();
-      agentsExtension(pi as unknown as ExtensionAPI);
+      agentExtension(pi as unknown as ExtensionAPI);
       const sessionStart = getHandlerOrThrow(pi, "session_start");
       const sessionShutdown = getHandlerOrThrow(pi, "session_shutdown");
 

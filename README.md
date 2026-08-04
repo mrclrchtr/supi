@@ -29,7 +29,7 @@ Tree-sitter support is bundled. Full LSP features require the matching language-
 - **Focused library docs** — search Context7 for the right project and version, then retrieve documentation narrowed to the current task.
 - **Structured decisions** — ask you focused choice or text questions through a keyboard-driven form with [`supi-ask-user`](packages/supi-ask-user/README.md).
 - **Review workflows** — run independent, inspection-only reviews over a working tree, branch comparison, or commit with [`supi-review`](packages/supi-review/README.md).
-- **Agent Profile policy** — discover explicit `explore` and `general` profiles with bounded resource envelopes through [`supi-agents`](packages/supi-agents/README.md).
+- **Agent Profile policy** — discover explicit `explore` and `general` profiles with bounded resource envelopes through [`supi-agent`](packages/supi-agent/README.md).
 - **Operational awareness** — inspect context pressure, prompt-cache health, and SuPi debug events with `supi-context`, `supi-cache`, and `supi-debug`.
 - **Repository guidance** — maintain `CLAUDE.md` and `AGENTS.md` files with the skills in [`supi-claude-md`](packages/supi-claude-md/README.md).
 - **Skills on your terms** — use [`supi-skills`](packages/supi-skills/README.md) to choose, globally or per project, whether Pi can select each skill automatically, whether only you can start it, or whether it is disabled. Type `$` to search and start installed skills without remembering their full command names.
@@ -121,7 +121,7 @@ Installed by `install-all.sh` on top of the release stack:
 | Package | What it adds | Install |
 |---|---|---|
 | [`supi-review`](packages/supi-review/README.md) | Caller-defined, inspection-only reviews in managed child sessions | `pi install npm:@mrclrchtr/supi-review` |
-| [`supi-agents`](packages/supi-agents/README.md) | Explicit Agent Profile catalogue and child resource policy | `pi install npm:@mrclrchtr/supi-agents` |
+| [`supi-agent`](packages/supi-agent/README.md) | Explicit Agent Profile catalogue and child resource policy | `pi install npm:@mrclrchtr/supi-agent` |
 | [`supi-cache`](packages/supi-cache/README.md) | Prompt-cache monitoring and cross-session regression forensics | `pi install npm:@mrclrchtr/supi-cache` |
 | [`supi-insights`](packages/supi-insights/README.md) | Historical session analytics and shareable HTML reports | `pi install npm:@mrclrchtr/supi-insights` |
 | [`supi-claude-md`](packages/supi-claude-md/README.md) | Skills for auditing and revising repository instruction files | `pi install npm:@mrclrchtr/supi-claude-md` |

@@ -21,7 +21,7 @@ export class AgentProfileCatalogueStore {
     this.#catalogue = catalogue;
     for (const diagnostic of catalogue.diagnostics) {
       recordDebugEvent({
-        source: "supi-agents",
+        source: "supi-agent",
         level: "warning",
         category: "profile",
         message: `Profile configuration is unavailable: ${diagnostic.message}`,

@@ -2,8 +2,8 @@
 
 Multi-context monorepo. Each package is an independent context with its own `CONTEXT.md` and optionally `docs/adr/`.
 
+- **supi-agent** → `packages/supi-agent/CONTEXT.md`
 - **supi-agent-runtime** → `packages/supi-agent-runtime/CONTEXT.md`
-- **supi-agents** → `packages/supi-agents/CONTEXT.md`
 - **supi-ask-user** → `packages/supi-ask-user/CONTEXT.md`
 - **supi-bash-timeout** → `packages/supi-bash-timeout/CONTEXT.md`
 - **supi-cache** → `packages/supi-cache/CONTEXT.md`
@@ -26,7 +26,7 @@ Multi-context monorepo. Each package is an independent context with its own `CON
 - **supi-web** → `packages/supi-web/CONTEXT.md`
 
 Relationships:
-- **supi-agents → supi-agent-runtime**: Agent Profiles compile Delegation Tasks into Agent Runs.
+- **supi-agent → supi-agent-runtime**: Agent Profiles compile Delegation Tasks into Agent Runs.
 - **supi-review → supi-agent-runtime**: Reviewer and Planner adapters resolve structured completions through Agent Runs.
 
 System-wide context lives in root `CONTEXT.md` and `docs/adr/`.

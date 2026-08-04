@@ -1,10 +1,10 @@
 <div align="center">
-  <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-agents">
-    <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-agents/assets/social-preview.png" alt="SuPi Agents" width="100%">
+  <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-agent">
+    <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-agent/assets/social-preview.png" alt="SuPi Agent" width="100%">
   </a>
 </div>
 
-# @mrclrchtr/supi-agents
+# @mrclrchtr/supi-agent
 
 Profile catalogue and resource policy for foreground Agent Runs in PI.
 

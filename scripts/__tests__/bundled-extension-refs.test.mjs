@@ -8,7 +8,7 @@ const PACKAGES_DIR = new URL("../../packages", import.meta.url).pathname;
 // factory into managed child sessions. Loading its full interactive extension in
 // the parent would duplicate the separately installed Code Intelligence surface.
 const CHILD_ONLY_BUNDLED_DEPENDENCIES = new Map([
-  ["@mrclrchtr/supi-agents", new Set(["@mrclrchtr/supi-code-intelligence"])],
+  ["@mrclrchtr/supi-agent", new Set(["@mrclrchtr/supi-code-intelligence"])],
   ["@mrclrchtr/supi-review", new Set(["@mrclrchtr/supi-code-intelligence"])],
 ]);
 
@@ -79,7 +79,7 @@ describe("bundled extension references", () => {
   }
 
   it("keeps child-only Code Intelligence profiles out of parent extensions", () => {
-    for (const packageName of ["supi-agents", "supi-review"]) {
+    for (const packageName of ["supi-agent", "supi-review"]) {
       const pkg = readJson(join(PACKAGES_DIR, packageName, "package.json"));
       expect(pkg.pi?.extensions).not.toContain(
         "node_modules/@mrclrchtr/supi-code-intelligence/src/extension.ts",

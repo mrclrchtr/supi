@@ -1,8 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { agentProfileCatalogueStore } from "./session.ts";
 
-/** Register session-scoped Agent Profile discovery for the agents extension. */
-export default function agentsExtension(pi: ExtensionAPI): void {
+/** Register session-scoped Agent Profile discovery for the agent extension. */
+export default function agentExtension(pi: ExtensionAPI): void {
   pi.on("session_start", async (_event, ctx) => {
     await agentProfileCatalogueStore.reload({
       cwd: ctx.cwd,

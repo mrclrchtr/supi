@@ -26,13 +26,14 @@ PACKAGES=(
   supi-cache
   supi-insights
   supi-review
-  supi-agents
+  supi-agent
   supi-prompt-suggestions
 )
 
 # Deprecated or removed packages — best-effort cleanup, not counted as failures.
 REMOVED_PACKAGES=(
   supi
+  supi-agents
   supi-rtk
   supi-lsp
   supi-tree-sitter

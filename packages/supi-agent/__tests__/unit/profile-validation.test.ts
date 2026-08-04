@@ -16,7 +16,7 @@ afterEach(async () => {
 });
 
 async function roots() {
-  const root = await mkdtemp(join(tmpdir(), "supi-agents-validation-"));
+  const root = await mkdtemp(join(tmpdir(), "supi-agent-validation-"));
   temporaryDirectories.push(root);
   return {
     root,

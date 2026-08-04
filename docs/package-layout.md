@@ -120,8 +120,8 @@ When multiple SuPi packages need the same path, URI, config, or session helper s
 | `supi-claude-md` | skills-only behavior with thin `resources_discover` extension; keep flat |
 | `supi-code-intelligence` | hybrid: root surfaces + `app/` + `session/` + `substrate/` + `analysis/` + `tool/` + `ui/` |
 | `supi-code-runtime` | library-only: flat source with `capability/` + `workspace/`; no pi extension |
+| `supi-agent` | stay flat for the catalogue/resource-policy slice; add `config/`, `session/`, `tool/`, or `ui/` only as later slices earn them |
 | `supi-agent-runtime` | library-only: flat lifecycle/diagnostics source; no pi extension |
-| `supi-agents` | stay flat for the catalogue/resource-policy slice; add `config/`, `session/`, `tool/`, or `ui/` only as later slices earn them |
 | `supi-context` | stay flat unless it grows |
 | `supi-core` | domain-first if reorganized: `config/`, `context/`, `settings/` |
 | `supi-debug` | stay flat unless it grows; optional `ui/` if renderer concerns expand |

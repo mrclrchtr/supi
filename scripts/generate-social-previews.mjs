@@ -24,6 +24,8 @@ const SPECIAL_NAMES = {
 };
 // Real registered surfaces (tools, commands, skills, exports) — verified against src/.
 const SOCIAL_BADGES = {
+  agent: ["./api", "AgentProfile", "ProfileCatalogue"],
+  "agent-runtime": ["./api", "startAgentRun()", "AgentRunHandle"],
   "ask-user": ["ask_user", "choice forms", "text forms"],
   "bash-timeout": ["bash hook", "120s default", "/supi-settings"],
   cache: ["/supi-cache-history", "supi_cache_forensics"],
@@ -48,6 +50,11 @@ const SOCIAL_BADGES = {
 // Flagship agent tools surfaced on the repository-level preview.
 const ROOT_BADGES = ["code_resolve", "supi_review_run", "web_fetch_md"];
 const SOCIAL_TAGLINES = {
+  agent: ["Discovers explicit Agent Profiles and builds", "bounded child-session resource policy."],
+  "agent-runtime": [
+    "Owns one in-memory Agent Run from session",
+    "creation through bounded teardown.",
+  ],
   "ask-user": ["Blocking choice & text forms let the agent", "ask you instead of guessing."],
   "bash-timeout": [
     "Injects a default timeout into bash calls",
