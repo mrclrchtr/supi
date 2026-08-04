@@ -14,6 +14,8 @@ const UNQUOTED_SECRET_RE =
   /(["']?(?:token|password|passwd|secret|api[_-]?key|authorization|credential)["']?\s*:\s*)(?!["'])[^\s,}\]]+/gi;
 const LABEL_SECRET_RE =
   /(\b(?:api[\s_-]?key|token|password|passwd|secret|authorization|credential)\s*[:=]\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s;&|]+)/gi;
+const PHRASED_LABEL_SECRET_RE =
+  /(\b(?:api[\s_-]?key|token|password|passwd|secret|authorization|credential)\b[^\r\n]{0,80}?[=:]\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s;&|]+)/gi;
 
 function stripControlCharacters(value: string): string {
   return Array.from(value, (character) => {
@@ -33,7 +35,8 @@ export function sanitizeAgentRunErrorText(value: unknown): string | undefined {
     .replace(JSON_DOUBLE_SECRET_RE, (_match, prefix: string) => `${prefix}"[REDACTED]"`)
     .replace(JSON_SINGLE_SECRET_RE, (_match, prefix: string) => `${prefix}'[REDACTED]'`)
     .replace(UNQUOTED_SECRET_RE, (_match, prefix: string) => `${prefix}[REDACTED]`)
-    .replace(LABEL_SECRET_RE, (_match, prefix: string) => `${prefix}[REDACTED]`);
+    .replace(LABEL_SECRET_RE, (_match, prefix: string) => `${prefix}[REDACTED]`)
+    .replace(PHRASED_LABEL_SECRET_RE, (_match, prefix: string) => `${prefix}[REDACTED]`);
   const normalized = stripControlCharacters(redacted.replace(ANSI_ESCAPE_RE, " "))
     .replace(/\s+/g, " ")
     .trim();

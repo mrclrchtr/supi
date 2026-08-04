@@ -464,6 +464,32 @@ describe("Agent Run public lifecycle seam", () => {
     expect(harness.session.abort).toHaveBeenCalledTimes(1);
   });
 
+  it("waits for an in-flight completion resolver before cancellation teardown", async () => {
+    const harness = createHarness();
+    let releaseCompletion!: (value: string) => void;
+    const completion = new Promise<string>((resolve) => {
+      releaseCompletion = resolve;
+    });
+    const resolverStarted = vi.fn();
+    const run = startAgentRun({
+      inputs: inputs(),
+      prompt: "completion teardown",
+      completionResolver: () => {
+        resolverStarted();
+        return completion;
+      },
+    });
+    await vi.waitFor(() => expect(resolverStarted).toHaveBeenCalled());
+    const stopped = run.stop();
+    await Promise.resolve();
+    expect(harness.runtime.dispose).not.toHaveBeenCalled();
+    releaseCompletion("done");
+
+    await stopped;
+    await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
+    expect(harness.runtime.dispose).toHaveBeenCalledTimes(1);
+  });
+
   it("does not start a prompt accepted after cancellation", async () => {
     const harness = createHarness();
     let acceptPreflight!: () => void;

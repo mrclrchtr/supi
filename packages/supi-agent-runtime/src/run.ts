@@ -68,6 +68,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
   let timeoutRequested = false;
   let cancellationMarkerRecorded = false;
   let resolvingCompletion = false;
+  let completionResolution: Promise<void> | undefined;
   let aborting = false;
   let setupFinished = false;
   let finalizing = false;
@@ -219,7 +220,13 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
         .then(() => activeSession.abort())
         .catch(() => undefined);
       await Promise.race([abortPromise, wait(AGENT_RUN_ABORT_GRACE_MS)]);
-      if (!promptPreflightSettled) await promptPreflightCompletion;
+      if (!promptPreflightSettled) {
+        await Promise.race([
+          promptPreflightCompletion ?? Promise.resolve(),
+          wait(AGENT_RUN_ABORT_GRACE_MS),
+        ]);
+      }
+      if (completionResolution) await completionResolution;
       if (kind === "timeout") await finishTimeout();
       else await finishCanceled();
     })();
@@ -293,7 +300,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       deferredSettlement = true;
       return;
     }
-    void resolveCompletion();
+    startCompletionResolution();
   };
 
   const flushSettlement = (): void => {
@@ -308,7 +315,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       return;
     }
     deferredSettlement = false;
-    void resolveCompletion();
+    startCompletionResolution();
   };
 
   async function resolveCompletion(): Promise<void> {
@@ -328,6 +335,20 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       resolvingCompletion = false;
     }
   }
+
+  const startCompletionResolution = (): void => {
+    if (completionResolution || resolvingCompletion) return;
+    const resolution = resolveCompletion();
+    completionResolution = resolution;
+    void resolution.then(
+      () => {
+        if (completionResolution === resolution) completionResolution = undefined;
+      },
+      () => {
+        if (completionResolution === resolution) completionResolution = undefined;
+      },
+    );
+  };
 
   const startPrompt = (): void => {
     if (cancelRequested || terminal || finalizing || !session) return;
@@ -371,7 +392,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
           promptActive = false;
           promptAccepted = true;
           if (settledEventObserved) flushSettlement();
-          else if (!cancelRequested && !timeoutRequested && !aborting) void resolveCompletion();
+          else if (!cancelRequested && !timeoutRequested && !aborting) startCompletionResolution();
         },
         () => {
           settlePromptPreflight();

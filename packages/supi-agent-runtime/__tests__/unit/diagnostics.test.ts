@@ -62,6 +62,9 @@ describe("Agent Run diagnostics", () => {
     const naturalLabelText = sanitizeAgentRunErrorText(
       `API key: ${"api-value"}; credential = ${"credential-value"}`,
     );
+    const phrasedLabelText = sanitizeAgentRunErrorText(
+      `Incorrect API key provided: ${["sk", "example", "value"].join("-")}`,
+    );
 
     expect(text).not.toContain("private-digest");
     expect(escapedKeyText).not.toContain("escaped-value");
@@ -70,6 +73,7 @@ describe("Agent Run diagnostics", () => {
     expect(splitBearerText).not.toContain("def");
     expect(naturalLabelText).not.toContain("api-value");
     expect(naturalLabelText).not.toContain("credential-value");
+    expect(phrasedLabelText).not.toContain("sk-example-value");
   });
 
   it("bounds assistant tool metadata and discloses omitted calls", () => {
