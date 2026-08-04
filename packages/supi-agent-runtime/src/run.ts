@@ -13,7 +13,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { buildAgentRunDiagnostics } from "./diagnostics.ts";
 import { AgentRunLifecycleTraceCollector, getRegisteredToolNames } from "./lifecycle-trace.ts";
-import { createAgentRunSessionView } from "./session-view.ts";
+import { createAgentRunSessionView, deactivateAgentRunSessionView } from "./session-view.ts";
 import type {
   AgentRunFailureCode,
   AgentRunHandle,
@@ -175,6 +175,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
         // Observer teardown cannot change the already selected outcome.
       }
       observerCleanup = undefined;
+      if (view) deactivateAgentRunSessionView(view);
       await disposeRuntime();
       const finalOutcome = outcomeWithUsage(outcome);
       terminal = true;
@@ -236,7 +237,9 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
           wait(AGENT_RUN_ABORT_GRACE_MS),
         ]);
       }
-      if (completionResolution) await completionResolution;
+      if (completionResolution) {
+        await Promise.race([completionResolution, wait(AGENT_RUN_ABORT_GRACE_MS)]);
+      }
       if (kind === "timeout") await finishTimeout();
       else await finishCanceled();
     })();
