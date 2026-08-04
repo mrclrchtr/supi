@@ -44,6 +44,8 @@ const SOCIAL_BADGES = {
   "tree-sitter": ["./api", "AST queries", "bundled parsers"],
   web: ["web_fetch_md", "web_docs_search", "web_docs_fetch"],
 };
+// Flagship agent tools surfaced on the repository-level preview.
+const ROOT_BADGES = ["code_resolve", "supi_review_run", "web_fetch_md"];
 const SOCIAL_TAGLINES = {
   "ask-user": ["Blocking choice & text forms let the agent", "ask you instead of guessing."],
   "bash-timeout": [
@@ -141,10 +143,10 @@ ${tagline.map((line, index) => `    <text x="508" y="${322 + index * 30}">${esca
   </g>`;
 }
 
-function renderSvg({ badges, description, display, kind, packageName, tagline }) {
+function frameSvg({ title, desc, content }) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
-  <title id="title">SuPi ${escapeXml(display)}</title>
-  <desc id="desc">${escapeXml(description)}</desc>
+  <title id="title">${title}</title>
+  <desc id="desc">${desc}</desc>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#181926"/>
@@ -174,19 +176,64 @@ function renderSvg({ badges, description, display, kind, packageName, tagline })
   <text x="252" y="440" fill="#cad3f5" font-family="Futura, Avenir Next, ui-sans-serif, sans-serif" font-size="62" font-weight="700" text-anchor="middle">SuPi</text>
   <text x="252" y="478" fill="#a5adcb" font-family="Futura, Avenir Next, ui-sans-serif, sans-serif" font-size="17" font-weight="600" letter-spacing="3" text-anchor="middle">SUPER PI</text>
 
-  <circle cx="512" cy="128" r="6" fill="#8aadf4"/>
-  <text x="532" y="136" fill="#a5adcb" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="20" font-weight="700" letter-spacing="2">${escapeXml(kind)}</text>
-  <text x="506" y="228" fill="#cad3f5" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-size="62" font-weight="750">${escapeXml(display)}</text>
-  <text x="508" y="278" fill="#8aadf4" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="20" font-weight="650">${escapeXml(packageName)}</text>
-
-${taglineSvg(tagline)}
-
-${badgesSvg(badges)}
+${content}
 
   <path d="M508 480h660" stroke="#494d64"/>
   <text x="508" y="516" fill="#a5adcb" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="19">github.com/mrclrchtr/supi</text>
 </svg>
 `;
+}
+
+function kindSvg(kind) {
+  return `  <circle cx="512" cy="128" r="6" fill="#8aadf4"/>
+  <text x="532" y="136" fill="#a5adcb" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="20" font-weight="700" letter-spacing="2">${escapeXml(kind)}</text>`;
+}
+
+function renderSvg({ badges, description, display, kind, packageName, tagline }) {
+  return frameSvg({
+    title: `SuPi ${escapeXml(display)}`,
+    desc: escapeXml(description),
+    content: `${kindSvg(kind)}
+  <text x="506" y="228" fill="#cad3f5" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-size="62" font-weight="750">${escapeXml(display)}</text>
+  <text x="508" y="278" fill="#8aadf4" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="20" font-weight="650">${escapeXml(packageName)}</text>
+
+${taglineSvg(tagline)}
+
+${badgesSvg(badges)}`,
+  });
+}
+
+/** Repository-level preview for the root README banner and the root package.json image. */
+function renderRootSvg() {
+  return frameSvg({
+    title: "SuPi — extensions for the Pi coding agent",
+    desc: "SuPi — code intelligence, documentation, reviews, and context tools for the Pi coding agent.",
+    content: `${kindSvg("PI EXTENSION STACK")}
+  <text x="506" y="225" fill="#cad3f5" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-size="56" font-weight="750">A developer tool belt</text>
+  <text x="506" y="296" fill="#cad3f5" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-size="50" font-weight="650">for the Pi coding agent</text>
+
+${badgesSvg(ROOT_BADGES)}`,
+  });
+}
+
+/** Rasterize an SVG string to a 1280×640 PNG8 via Inkscape + ImageMagick. */
+function rasterizeSvg(svg, output) {
+  const temporarySvg = `${output}.tmp.svg`;
+  const temporaryPng = `${output}.tmp.png`;
+  try {
+    writeFileSync(temporarySvg, svg);
+    execFileSync("inkscape", [
+      temporarySvg,
+      `--export-filename=${temporaryPng}`,
+      "--export-width=1280",
+      "--export-height=640",
+    ]);
+    execFileSync("magick", [temporaryPng, "-strip", "-colors", "256", `PNG8:${output}`]);
+  } finally {
+    for (const temporaryFile of [temporarySvg, temporaryPng]) {
+      if (existsSync(temporaryFile)) unlinkSync(temporaryFile);
+    }
+  }
 }
 
 function main() {
@@ -204,10 +251,7 @@ function main() {
 
     const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
     const shortName = packageJson.name.replace(/^@mrclrchtr\/supi-/, "");
-    const assetsDir = resolve(packageRoot, "assets");
-    const temporarySvg = resolve(assetsDir, ".tmp-social-preview.svg");
-    const temporaryPng = resolve(assetsDir, ".tmp-social-preview.png");
-    const output = resolve(assetsDir, "social-preview.png");
+    const output = resolve(packageRoot, "assets", "social-preview.png");
     const badges = SOCIAL_BADGES[shortName];
     assert.ok(badges, `Missing social badges: ${packageJson.name}`);
     const tagline = SOCIAL_TAGLINES[shortName];
@@ -227,22 +271,12 @@ function main() {
       tagline,
     });
 
-    try {
-      writeFileSync(temporarySvg, svg);
-      execFileSync("inkscape", [
-        temporarySvg,
-        `--export-filename=${temporaryPng}`,
-        "--export-width=1280",
-        "--export-height=640",
-      ]);
-      execFileSync("magick", [temporaryPng, "-strip", "-colors", "256", `PNG8:${output}`]);
-      console.log(`  ${packageDir}/assets/social-preview.png`);
-    } finally {
-      for (const temporaryFile of [temporarySvg, temporaryPng]) {
-        if (existsSync(temporaryFile)) unlinkSync(temporaryFile);
-      }
-    }
+    rasterizeSvg(svg, output);
+    console.log(`  ${packageDir}/assets/social-preview.png`);
   }
+
+  rasterizeSvg(renderRootSvg(), resolve(ROOT, "assets", "social-preview.png"));
+  console.log("  assets/social-preview.png");
 }
 
 main();
