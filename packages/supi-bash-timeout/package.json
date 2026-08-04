@@ -57,7 +57,7 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-bash-timeout/assets/logo.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-bash-timeout/assets/social-preview.png"
   },
   "main": "src/api.ts",
   "exports": {

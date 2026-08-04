@@ -43,7 +43,9 @@
   "pi": {
     "extensions": [
       "./src/extension.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-prompt-suggestions/assets/social-preview.png",
+    "video": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-prompt-suggestions/assets/demo.mp4"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "*",

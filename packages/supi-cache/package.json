@@ -64,7 +64,7 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-cache-history.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-cache/assets/social-preview.png"
   },
   "main": "src/api.ts",
   "exports": {

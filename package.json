@@ -89,6 +89,6 @@
       "./packages/supi-insights/src/extension.ts",
       "./packages/supi-prompt-suggestions/src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/assets/supi-logo.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/assets/social-preview.png"
   }
 }

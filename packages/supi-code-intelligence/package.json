@@ -76,7 +76,7 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-code-intelligence.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-code-intelligence/assets/social-preview.png"
   },
   "main": "src/index.ts",
   "exports": {

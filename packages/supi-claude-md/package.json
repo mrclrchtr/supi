@@ -49,7 +49,7 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-claude-md/assets/logo.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-claude-md/assets/social-preview.png"
   },
   "main": "src/api.ts",
   "exports": {

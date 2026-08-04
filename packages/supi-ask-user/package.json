@@ -61,7 +61,7 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-choice-details.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/social-preview.png"
   },
   "main": "src/api.ts",
   "exports": {
