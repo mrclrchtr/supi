@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.5.1](https://github.com/mrclrchtr/supi/compare/v4.5.0...v4.5.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* **deps:** lock file maintenance ([76f8af2](https://github.com/mrclrchtr/supi/commit/76f8af2f6ac760fbf02b88c01817e494d2ad1fd0))
+
 ## [4.5.0](https://github.com/mrclrchtr/supi/compare/v4.4.0...v4.5.0) (2026-08-04)
 
 

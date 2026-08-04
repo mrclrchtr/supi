@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-review",
-  "version": "4.5.0",
+  "version": "4.5.1",
   "description": "Code review extension for the Pi coding agent — parallel, isolated reviews of working trees, branches, and commits",
   "license": "MIT",
   "repository": {
