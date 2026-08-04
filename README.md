@@ -35,6 +35,8 @@ Tree-sitter support is bundled. Full LSP features require the matching language-
 
 ## Install
 
+After any installation, run `/reload` or restart Pi.
+
 ### Recommended release stack
 
 Global installation:
@@ -51,11 +53,17 @@ curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install
 
 ### Release stack plus beta packages
 
+Global installation:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install-all.sh | bash
 ```
 
-Append `-s -- -l` for a project-local full-stack install. Run `/reload` or restart Pi after installation.
+Project-local installation into `.pi/settings.json`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install-all.sh | bash -s -- -l
+```
 
 > Pi extensions run with your user permissions. Review [`install.sh`](scripts/install.sh) or [`install-all.sh`](scripts/install-all.sh) before piping either script to a shell.
 
@@ -65,6 +73,9 @@ Every extension package is independently installable:
 
 ```bash
 pi install npm:@mrclrchtr/supi-code-intelligence
+```
+
+```bash
 pi install npm:@mrclrchtr/supi-web
 ```
 
@@ -129,14 +140,25 @@ Update installed Pi packages:
 pi update --extensions
 ```
 
-Remove the release stack or the release-plus-beta stack:
+Remove the release stack:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/uninstall.sh | bash
+```
+
+Remove the release-plus-beta stack:
+
+```bash
 curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/uninstall-all.sh | bash
 ```
 
-Append `-s -- -l` for project-local removal. Remove one package with:
+For project-local removal, add `-s -- -l` to either command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/uninstall.sh | bash -s -- -l
+```
+
+Remove one package:
 
 ```bash
 pi uninstall npm:@mrclrchtr/supi-web
