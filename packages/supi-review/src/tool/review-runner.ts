@@ -45,6 +45,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
   let reviewerExtensionSetStatus: ReviewerExtensionSetStatus = "unobserved";
   let session: AgentRunSessionView | undefined;
   let trace: ReviewAuditTraceCollector | undefined;
+  let capturedReplay: ReturnType<ReviewAuditTraceCollector["snapshot"]> | undefined;
   let unsubscribe: (() => void) | undefined;
 
   const outcome = await runIsolatedChild<ReviewSubmission>({
@@ -69,13 +70,17 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
       const active = new Set(created.getActiveToolNames());
       if (HEADLESS_INSPECTION_TOOL_NAMES.every((name) => active.has(name))) {
         reviewerExtensionSetStatus = "active";
-        return;
+      } else {
+        reviewerExtensionSetStatus = "degraded";
+        warnings.push({
+          message:
+            "Headless Code Intelligence was unavailable; this reviewer continued with read, bash, and grep inspection.",
+        });
       }
-      reviewerExtensionSetStatus = "degraded";
-      warnings.push({
-        message:
-          "Headless Code Intelligence was unavailable; this reviewer continued with read, bash, and grep inspection.",
-      });
+      if (!invocation.audit || !trace) return;
+      return () => {
+        capturedReplay ??= trace?.snapshot(created);
+      };
     },
     onProgress: invocation.onProgress,
   });
@@ -89,7 +94,15 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
   if (!invocation.audit || !session || !trace) return result;
 
   try {
-    const replay = trace.snapshot(session, result.usage);
+    const replay = capturedReplay
+      ? {
+          ...capturedReplay,
+          trace: {
+            ...capturedReplay.trace,
+            ...(result.usage ? { usage: result.usage } : {}),
+          },
+        }
+      : trace.snapshot(session, result.usage);
     const audit = await invocation.audit.store.create({
       task: invocation.task,
       modelId: invocation.model.canonicalId,

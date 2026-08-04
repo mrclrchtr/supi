@@ -25,7 +25,7 @@ export interface IsolatedRunConfig<T> {
   holder: { value?: T };
   headlessInspection?: boolean;
   projectTrusted?: boolean;
-  onSessionCreated?: (session: AgentRunSessionView) => void;
+  onSessionCreated?: (session: AgentRunSessionView) => undefined | (() => void);
   onProgress?: (progress: ReviewProgress) => void;
 }
 
@@ -114,7 +114,8 @@ export async function runIsolatedChild<T>(
     signal: config.signal,
     completionResolver: (_session) => config.holder.value,
     observer: (session) => {
-      config.onSessionCreated?.(session);
+      const cleanup = config.onSessionCreated?.(session);
+      return typeof cleanup === "function" ? cleanup : undefined;
     },
   });
   const unsubscribe = config.onProgress

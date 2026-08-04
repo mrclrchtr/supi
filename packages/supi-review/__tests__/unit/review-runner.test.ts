@@ -96,7 +96,8 @@ describe("runReviewer", () => {
     });
     const view = createView();
     mocks.runIsolatedChild.mockImplementation(async (config) => {
-      config.onSessionCreated?.(view);
+      const cleanup = config.onSessionCreated?.(view);
+      cleanup?.();
       return {
         kind: "success",
         value: { summary: "Done", findings: [], criteriaCoverage: { status: "complete" } },
@@ -124,6 +125,9 @@ describe("runReviewer", () => {
       expect.objectContaining({ packet: "exact packet bytes", packetHash: "c".repeat(64) }),
     );
     expect(JSON.stringify(create.mock.calls[0]?.[0])).not.toContain("private");
+    expect(create.mock.calls[0]?.[0].messages).toEqual([
+      { role: "assistant", content: [{ type: "text", text: "visible" }] },
+    ]);
     expect(result.audit?.artifactId).toMatch(/^review-audit-/);
   });
 
