@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-ask-user",
   "version": "4.4.0",
-  "description": "SuPi ask-user extension — rich questionnaire UI for structured agent-user decisions",
+  "description": "Ask-user tool for the Pi coding agent — structured questionnaires for focused agent-user decisions",
   "license": "MIT",
   "repository": {
     "type": "git",

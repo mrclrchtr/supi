@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-web",
   "version": "4.4.0",
-  "description": "SuPi Web extension — fetch web pages as clean Markdown (web_fetch_md) and library docs via Context7 (web_docs_search, web_docs_fetch)",
+  "description": "Web fetch and Context7 documentation extension for the Pi coding agent",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-code-intelligence",
   "version": "4.4.0",
-  "description": "SuPi Code Intelligence extension — workspace orientation, target resolution and inspection, relationship analysis, code-aware search, live health, and semantic refactoring for pi",
+  "description": "LSP and Tree-sitter AST code intelligence for the Pi coding agent — semantic navigation, structural search, diagnostics, and safe refactoring",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -26,7 +26,8 @@
     "impact-analysis",
     "refactoring",
     "lsp",
-    "tree-sitter"
+    "tree-sitter",
+    "ast"
   ],
   "type": "module",
   "files": [

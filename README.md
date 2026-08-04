@@ -1,8 +1,8 @@
 ![SuPi](assets/supi-logo.png)
 
-# SuPi (Super Pi)
+# SuPi — Pi Coding Agent Extensions with LSP and Tree-sitter Code Intelligence
 
-A curated extension stack that gives the [Pi coding agent](https://github.com/earendil-works/pi) stronger code understanding, direct access to public web sources and library docs, structured collaboration, review workflows, observability, and session polish.
+SuPi (short for **Super Pi**) is an open-source TypeScript extension stack for the [Pi coding agent](https://github.com/earendil-works/pi). It adds LSP and Tree-sitter code intelligence, semantic refactoring, parallel code review, web and Context7 documentation access, structured ask-user forms, and context/cache observability.
 
 Install the recommended stack or pick only the packages you need. You keep prompting Pi normally; SuPi gives the agent additional tools and context it can use directly.
 

@@ -6,9 +6,9 @@
   </a>
 </div>
 
-# @mrclrchtr/supi-code-intelligence
+# @mrclrchtr/supi-code-intelligence — LSP and Tree-sitter AST Code Intelligence for Pi
 
-Gives the [Pi coding agent](https://github.com/earendil-works/pi) direct, model-callable access to **LSP-backed semantic intelligence** and **AST-backed structural analysis**.
+Gives the [Pi coding agent](https://github.com/earendil-works/pi) direct, model-callable LSP semantic navigation and Tree-sitter AST structural code analysis.
 
 ## LSP + AST, directly available to the agent
 

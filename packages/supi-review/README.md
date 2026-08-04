@@ -1,6 +1,6 @@
-# @mrclrchtr/supi-review
+# @mrclrchtr/supi-review — Code Review for Pi
 
-Runs caller-defined, Inspection-only code review tasks in managed Pi child sessions.
+Code review extension for the [Pi coding agent](https://github.com/earendil-works/pi) that runs parallel, isolated review tasks against a working tree, branch, or commit.
 
 ## Install
 

@@ -6,9 +6,9 @@
   </a>
 </div>
 
-# @mrclrchtr/supi-web
+# @mrclrchtr/supi-web — Web Fetch and Context7 for Pi
 
-Gives the [Pi coding agent](https://github.com/earendil-works/pi) direct, model-callable access to public web pages and focused library documentation—without making you paste sources into chat.
+Adds web fetch and Context7 documentation tools to the [Pi coding agent](https://github.com/earendil-works/pi), without making you paste sources into chat.
 
 ## What your agent gets
 

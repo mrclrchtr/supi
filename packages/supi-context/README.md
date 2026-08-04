@@ -6,9 +6,9 @@
   </a>
 </div>
 
-# @mrclrchtr/supi-context
+# @mrclrchtr/supi-context — Context Window and Token Usage Monitor for Pi
 
-Adds context-capacity observability to the [pi coding agent](https://github.com/earendil-works/pi).
+Adds context window and token usage monitoring to the [Pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 

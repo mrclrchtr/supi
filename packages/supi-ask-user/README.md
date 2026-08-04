@@ -4,9 +4,9 @@
   </a>
 </div>
 
-# @mrclrchtr/supi-ask-user
+# @mrclrchtr/supi-ask-user — Ask-User Tool for Pi
 
-Gives the [Pi coding agent](https://github.com/earendil-works/pi) a direct, model-callable decision form for the moments when it needs your input before continuing.
+Adds a structured ask-user tool to the [Pi coding agent](https://github.com/earendil-works/pi) for moments when it needs your input before continuing.
 
 Instead of guessing or scattering questions across chat, the agent can pause, present one focused form, and resume with structured answers.
 
