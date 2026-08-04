@@ -171,8 +171,8 @@ function renderSvg({ badges, description, display, kind, packageName, tagline })
     <rect x="154" y="182" width="46" height="170" rx="8"/>
     <rect x="304" y="182" width="46" height="170" rx="8"/>
   </g>
-  <text x="252" y="440" fill="#cad3f5" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="62" font-weight="700" text-anchor="middle">SuPi</text>
-  <text x="252" y="478" fill="#a5adcb" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="17" font-weight="600" letter-spacing="3" text-anchor="middle">SUPER PI</text>
+  <text x="252" y="440" fill="#cad3f5" font-family="Futura, Avenir Next, ui-sans-serif, sans-serif" font-size="62" font-weight="700" text-anchor="middle">SuPi</text>
+  <text x="252" y="478" fill="#a5adcb" font-family="Futura, Avenir Next, ui-sans-serif, sans-serif" font-size="17" font-weight="600" letter-spacing="3" text-anchor="middle">SUPER PI</text>
 
   <circle cx="512" cy="128" r="6" fill="#8aadf4"/>
   <text x="532" y="136" fill="#a5adcb" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="20" font-weight="700" letter-spacing="2">${escapeXml(kind)}</text>
