@@ -52,7 +52,7 @@ This repo has two install surfaces:
 All runtime packages are published independently. There is no meta-package — each published package ships its own dependencies directly. `supi-skill-patches` is private maintenance tooling.
 
 - Packages that depend on other `@mrclrchtr/supi-*` packages must list them in both `dependencies` and `bundledDependencies`. This applies to packages that still ship `pi.extensions` (installable pi packages). Library-only packages (no `pi.extensions`, no `./extension` export) are regular npm dependencies and do not need bundling — transitive npm resolution is sufficient for them.
-- Installable packages that bundle `@mrclrchtr/supi-*` dependencies must reference their extension entrypoints in `pi.extensions`.
+- Installable packages that bundle extension-bearing `@mrclrchtr/supi-*` dependencies must reference those dependencies' extension entrypoints in `pi.extensions`.
 
 New installable extension packages should be added to the root `package.json` `pi.extensions` array for development convenience; library-only packages must not be added there.
 
@@ -62,7 +62,7 @@ New installable extension packages should be added to the root `package.json` `p
 - `supi-core` and `supi-agent-runtime` are library-only packages with no pi extension surface, no `./extension` export, and no `pi.extensions` entry. Library-only dependencies use normal npm resolution; installable packages bundle them when required by the pi package boundary.
 - `pi.extensions` / `pi.prompts` / `pi.skills` / `pi.themes` manifest entries must remain **real package-relative file paths**. Do not replace them with `exports` aliases.
 - Any installable SuPi package that depends on another `@mrclrchtr/supi-*` package must list it in both `dependencies` and `bundledDependencies`. Library-only packages use normal npm resolution. Per [pi packages docs](https://github.com/earendil-works/pi/blob/main/docs/packages.md), pi packages that depend on other pi packages must be bundled in the tarball — npm transitive dependency resolution is not guaranteed by pi's module isolation.
-- When a package bundles another `@mrclrchtr/supi-*` package, reference that package's extension in `pi.extensions` via `node_modules/<pkg>/src/extension.ts`. Otherwise, standalone `pi install npm:@mrclrchtr/supi-<name>` won't load the bundled extension — pi only reads the top-level installed package's `pi.extensions`.
+- When a package bundles another extension-bearing `@mrclrchtr/supi-*` package, reference that package's extension in `pi.extensions` via `node_modules/<pkg>/src/extension.ts`. Library-only dependencies have no extension to forward. Otherwise, standalone `pi install npm:@mrclrchtr/supi-<name>` won't load the bundled extension — pi only reads the top-level installed package's `pi.extensions`.
 - Adding bundled extension references breaks `expectExplicitSurface` in `scripts/__tests__/pack-staged.test.mjs` — use `.toContain`, not `.toEqual`.
 - Root `package.json` is `"private": true` — runtime dependencies belong in sub-packages or in root `devDependencies`, not in root `dependencies`.
 - For the publish pipeline (staging, manifest export, npm pack, verification), see the **Publish pipeline** section.

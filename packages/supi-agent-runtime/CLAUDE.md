@@ -17,6 +17,7 @@
 - Keep Agent Runs context-isolated but permission-shared; this package is not a sandbox.
 - Never expose the owned `AgentSession` or its lifecycle controls through callback views.
 - Keep startup cancellation uncancelable but awaited: do not detach late resource/session setup.
+- Keep the lifecycle state machine in one audited closure; prefer targeted state-machine edits over a generic coordinator abstraction that would obscure teardown ordering.
 - Keep normal diagnostics bounded and free of conversation, tool arguments/results, and raw errors.
 - Test through `startAgentRun()` and its returned Handle; use controlled PI session factories and fake timers.
 
