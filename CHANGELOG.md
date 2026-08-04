@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.6.0](https://github.com/mrclrchtr/supi/compare/v4.5.1...v4.6.0) (2026-08-04)
+
+
+### Features
+
+* **supi-debug:** inspect persisted session events ([baeba47](https://github.com/mrclrchtr/supi/commit/baeba476337cffa4b1049b51c422a9340aa87d0e))
+
 ## [4.5.1](https://github.com/mrclrchtr/supi/compare/v4.5.0...v4.5.1) (2026-08-04)
 
 
