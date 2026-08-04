@@ -5,9 +5,12 @@ const mockFns = vi.hoisted(() => ({
   configureDebugRegistry: vi.fn(),
   getDebugEvents: vi.fn(),
   getDebugSummary: vi.fn(),
+  isDebugLevel: vi.fn(),
   loadSupiConfig: vi.fn(),
   registerDeclarativeSettings: vi.fn(),
   registerContextProvider: vi.fn(),
+  subscribeDebugEvents: vi.fn<(listener: (event: unknown) => void) => () => void>(() => vi.fn()),
+  readSessionDebugEvents: vi.fn(),
 }));
 
 vi.mock("@mrclrchtr/supi-core/config", () => ({
@@ -32,6 +35,13 @@ vi.mock("@mrclrchtr/supi-core/debug", () => ({
   },
   getDebugEvents: mockFns.getDebugEvents,
   getDebugSummary: mockFns.getDebugSummary,
+  isDebugLevel: mockFns.isDebugLevel,
+  subscribeDebugEvents: mockFns.subscribeDebugEvents,
+}));
+
+vi.mock("../../src/session-events.ts", () => ({
+  DEBUG_EVENT_ENTRY_TYPE: "supi-debug-event",
+  readSessionDebugEvents: mockFns.readSessionDebugEvents,
 }));
 
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
@@ -43,7 +53,7 @@ function setup(config = { enabled: true, agentAccess: "sanitized", maxEvents: 10
   mockFns.getDebugEvents.mockReturnValue({ events: [], rawAccessDenied: false });
   mockFns.getDebugSummary.mockReturnValue(null);
   const pi = createPiMock();
-  debugExtension(pi as never);
+  void debugExtension(pi as never);
   return pi;
 }
 
@@ -67,6 +77,96 @@ describe("supi-debug tool output", () => {
     await expect(tool.execute("id", {}, undefined, undefined, { cwd: "/repo" })).rejects.toThrow(
       "SuPi debug event capture is disabled",
     );
+  });
+
+  it("persists sanitized events as session entries", () => {
+    const pi = setup();
+    const listener = mockFns.subscribeDebugEvents.mock.calls[0]?.[0] as (event: unknown) => void;
+    const event = {
+      id: 1,
+      timestamp: 1_700_000_000_000,
+      source: "lsp",
+      level: "warning",
+      category: "fallback",
+      message: "timeout",
+      data: { command: "git status" },
+    };
+
+    listener(event);
+
+    expect(pi.entries).toEqual([{ type: "supi-debug-event", data: event }]);
+  });
+
+  it("reads persisted events from another session", async () => {
+    const pi = setup({ enabled: false, agentAccess: "raw", maxEvents: 100 });
+    mockFns.readSessionDebugEvents.mockResolvedValue({
+      events: [
+        {
+          id: 1,
+          timestamp: 1_700_000_000_000,
+          source: "lsp",
+          level: "warning",
+          category: "fallback",
+          message: "timeout",
+        },
+      ],
+      persistedEventCount: 1,
+    });
+    const tool = makeTool(pi);
+
+    const result = (await tool.execute(
+      "id",
+      { sessionFile: "/sessions/other.jsonl", source: "lsp", includeRaw: true },
+      undefined,
+      undefined,
+      { cwd: "/repo" },
+    )) as {
+      content: Array<{ text: string }>;
+      details: { enabled: boolean; rawDataUnavailable: boolean };
+    };
+
+    expect(mockFns.readSessionDebugEvents).toHaveBeenCalledWith("/sessions/other.jsonl", {
+      source: "lsp",
+      level: undefined,
+      category: undefined,
+      limit: undefined,
+    });
+    expect(result.content[0]?.text).toContain("Raw debug data is not persisted");
+    expect(result.details.enabled).toBe(false);
+    expect(result.details.rawDataUnavailable).toBe(true);
+  });
+
+  it("identifies sessions recorded before debug persistence", async () => {
+    const pi = setup({ enabled: false, agentAccess: "sanitized", maxEvents: 100 });
+    mockFns.readSessionDebugEvents.mockResolvedValue({ events: [], persistedEventCount: 0 });
+    const tool = makeTool(pi);
+
+    const result = (await tool.execute(
+      "id",
+      { sessionFile: "/sessions/old.jsonl" },
+      undefined,
+      undefined,
+      { cwd: "/repo" },
+    )) as { content: Array<{ text: string }> };
+
+    expect(result.content[0]?.text).toContain("cannot be backfilled");
+  });
+
+  it("accepts sessionFile for historical command inspection", async () => {
+    const pi = setup({ enabled: false, agentAccess: "sanitized", maxEvents: 100 });
+    mockFns.readSessionDebugEvents.mockResolvedValue({ events: [], persistedEventCount: 0 });
+    const command = pi.commands.get("supi-debug") as {
+      handler: (args: string, ctx: { cwd: string }) => Promise<void>;
+    };
+
+    await command.handler("sessionFile=/sessions/old.jsonl", { cwd: "/repo" });
+
+    expect(mockFns.readSessionDebugEvents).toHaveBeenCalledWith("/sessions/old.jsonl", {
+      source: undefined,
+      level: undefined,
+      category: undefined,
+      limit: undefined,
+    });
   });
 
   it("truncates large tool output and reports truncation metadata", async () => {

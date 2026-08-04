@@ -64,6 +64,9 @@ export interface DebugEventQueryResult {
   rawAccessDenied: boolean;
 }
 
+/** Receives a sanitized event whenever the registry records one. */
+export type DebugEventListener = (event: DebugEventView) => void;
+
 export interface DebugSummary {
   total: number;
   byLevel: Partial<Record<DebugLevel, number>>;
@@ -73,6 +76,7 @@ export interface DebugSummary {
 interface DebugRegistryState {
   config: DebugRegistryConfig;
   events: DebugEvent[];
+  listeners: Set<DebugEventListener>;
   nextId: number;
 }
 
@@ -97,10 +101,14 @@ function getState(): DebugRegistryState {
     state = {
       config: cloneConfig(DEBUG_REGISTRY_DEFAULTS),
       events: [],
+      listeners: new Set(),
       nextId: 1,
     };
     (globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = state;
   }
+  // Keep the shared registry compatible with extension reloads that reuse an
+  // instance created before listeners existed.
+  if (!state.listeners) state.listeners = new Set();
   return state;
 }
 
@@ -119,7 +127,16 @@ function trimToMaxEvents(state: DebugRegistryState): void {
   state.events.splice(0, state.events.length - maxEvents);
 }
 
-function matchesQuery(event: DebugEvent, query: DebugEventQuery): boolean {
+/** Return whether a debug level is recognized by the registry. */
+export function isDebugLevel(value: unknown): value is DebugLevel {
+  return value === "debug" || value === "info" || value === "warning" || value === "error";
+}
+
+/** Match a debug event against the supported source, level, and category filters. */
+export function matchesDebugEventQuery(
+  event: Pick<DebugEventView, "source" | "level" | "category">,
+  query: Pick<DebugEventQuery, "source" | "level" | "category">,
+): boolean {
   if (query.source && event.source !== query.source) return false;
   if (query.level && event.level !== query.level) return false;
   if (query.category && event.category !== query.category) return false;
@@ -168,6 +185,26 @@ export function redactDebugData<T>(value: T): T {
   return redactValue(value, 8) as T;
 }
 
+function toSanitizedView(event: DebugEvent): DebugEventView {
+  return {
+    id: event.id,
+    timestamp: event.timestamp,
+    source: event.source,
+    level: event.level,
+    category: event.category,
+    message: event.message,
+    cwd: event.cwd,
+    data: event.data,
+  };
+}
+
+/** Subscribe to sanitized events. Listeners are isolated so diagnostics cannot disrupt producers. */
+export function subscribeDebugEvents(listener: DebugEventListener): () => void {
+  const state = getState();
+  state.listeners.add(listener);
+  return () => state.listeners.delete(listener);
+}
+
 /** Record a session-local debug event if debugging is enabled. */
 export function recordDebugEvent(input: DebugEventInput): DebugEvent | null {
   const state = getState();
@@ -183,6 +220,14 @@ export function recordDebugEvent(input: DebugEventInput): DebugEvent | null {
   };
   state.events.push(event);
   trimToMaxEvents(state);
+  const view = toSanitizedView(event);
+  for (const listener of state.listeners) {
+    try {
+      listener(view);
+    } catch {
+      // Debug-event consumers must not alter producer behavior.
+    }
+  }
   return { ...event };
 }
 
@@ -196,21 +241,12 @@ export function getDebugEvents(query: DebugEventQuery = {}): DebugEventQueryResu
   const limit = query.limit && query.limit > 0 ? Math.floor(query.limit) : state.config.maxEvents;
 
   const events = state.events
-    .filter((event) => matchesQuery(event, query))
+    .filter((event) => matchesDebugEventQuery(event, query))
     .slice()
     .reverse()
     .slice(0, limit)
     .map((event): DebugEventView => {
-      const view: DebugEventView = {
-        id: event.id,
-        timestamp: event.timestamp,
-        source: event.source,
-        level: event.level,
-        category: event.category,
-        message: event.message,
-        cwd: event.cwd,
-        data: event.data,
-      };
+      const view = toSanitizedView(event);
       if (allowRaw && event.rawData !== undefined) {
         view.rawData = event.rawData;
       }
@@ -246,5 +282,6 @@ export function resetDebugRegistry(): void {
   const state = getState();
   state.config = cloneConfig(DEBUG_REGISTRY_DEFAULTS);
   state.events = [];
+  state.listeners.clear();
   state.nextId = 1;
 }

@@ -6,8 +6,8 @@ Session-local debug event capture, querying, and reporting for SuPi extensions.
 
 Registers three surfaces:
 
-1. **`supi_debug` tool** — agent-callable tool for querying recent debug events with source/level/category filters
-2. **`/supi-debug` command** — user-facing command for browsing debug events in the TUI
+1. **`supi_debug` tool** — agent-callable tool for querying recent or persisted-session debug events with filters
+2. **`/supi-debug` command** — user-facing command for browsing live or persisted-session debug events in the TUI
 3. **Settings** — `/supi-settings` integration for enable/disable, agent access level (off/sanitized/raw), and max events
 
 Uses `supi-core`'s shared debug registry (`configureDebugRegistry`, `getDebugEvents`, `getDebugSummary`) and `registerContextProvider` for the TUI context summary.
@@ -23,6 +23,7 @@ Stays flat per convention — no domain folders until responsibilities grow.
 | `src/debug.ts` | Extension factory, settings, tool + command registration |
 | `src/format.ts` | Event formatting + data serialization |
 | `src/renderer.ts` | Custom message renderer for `supi-debug-report` type |
+| `src/session-events.ts` | Session-JSONL persistence and historical event reading |
 | `src/status-log.ts` | Optional load-status logging (`$SUPI_LOG_STATUS`) |
 | `src/api.ts` | Entry point re-exporting `src/debug.ts` default |
 | `src/index.ts` | Package-root re-export surface |
@@ -33,6 +34,6 @@ Stays flat per convention — no domain folders until responsibilities grow.
 
 ## Gotchas
 
-- Agent access defaults to `sanitized`; raw data requires explicit opt-in via settings. The tool returns a clear message when raw access is denied.
+- Agent access defaults to `sanitized`; raw data requires explicit opt-in via settings. Historical records are always sanitized.
 - `applyDebugConfig()` must be called synchronously at extension load and on each `session_start` — config changes via settings also call `syncLiveDebugRegistry()` immediately.
 - When debug is disabled, `clearDebugEvents()` is called to flush the buffer. Re-enabling starts fresh.

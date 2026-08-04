@@ -37,6 +37,7 @@ It also registers a **Debug** provider section for `/supi-context`.
 ## Event behavior
 
 - events are session-local
+- sanitized events are also persisted in the session JSONL for later inspection
 - the event buffer is cleared on `session_start`
 - if debug capture is disabled, no events are retained
 - agent-facing access is blocked, sanitized, or raw depending on settings
@@ -86,9 +87,9 @@ Both `/supi-debug` and `supi_debug` support the same basic filters:
 - `category`
 - `limit`
 
-The tool also accepts:
-
-- `includeRaw` — request raw event data when settings allow it
+For historical sessions, pass `sessionFile` to `supi_debug`, or
+`sessionFile=<path>` to `/supi-debug`. Historical sessions never retain raw data.
+The tool also accepts `includeRaw` for live-session data when settings allow it.
 
 ## Settings
 
@@ -99,6 +100,9 @@ Available settings:
 - `enabled` — turn session-local event capture on or off
 - `agentAccess` — `off`, `sanitized`, or `raw`
 - `maxEvents` — maximum retained events in memory
+
+Historical inspection works for events captured after this version is loaded. For example, an
+agent can call `supi_debug` with `sessionFile` set to a PI session JSONL path.
 
 Defaults come from the shared debug registry:
 

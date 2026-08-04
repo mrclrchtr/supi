@@ -6,15 +6,29 @@ import {
   getDebugEvents,
   getDebugRegistryConfig,
   getDebugSummary,
+  isDebugLevel,
+  matchesDebugEventQuery,
   recordDebugEvent,
   redactDebugData,
   resetDebugRegistry,
+  subscribeDebugEvents,
 } from "../../src/debug-registry.ts";
 
 describe("debug registry", () => {
   beforeEach(() => {
     resetDebugRegistry();
     vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+  });
+
+  it("shares debug-level recognition and filter matching", () => {
+    expect(isDebugLevel("warning")).toBe(true);
+    expect(isDebugLevel("notice")).toBe(false);
+    expect(
+      matchesDebugEventQuery(
+        { source: "lsp", level: "warning", category: "fallback" },
+        { source: "lsp", level: "warning" },
+      ),
+    ).toBe(true);
   });
 
   it("does not retain events when disabled", () => {
@@ -55,6 +69,35 @@ describe("debug registry", () => {
         data: { reason: "timeout" },
       },
     ]);
+  });
+
+  it("notifies listeners with sanitized events and supports unsubscribe", () => {
+    configureDebugRegistry({ enabled: true });
+    const listener = vi.fn();
+    const unsubscribe = subscribeDebugEvents(listener);
+
+    recordDebugEvent({
+      source: "lsp",
+      level: "warning",
+      category: "fallback",
+      message: "first",
+      data: { token: "secret" },
+      rawData: { token: "secret" },
+    });
+    unsubscribe();
+    recordDebugEvent({ source: "lsp", level: "warning", category: "fallback", message: "second" });
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect(listener).toHaveBeenCalledWith({
+      id: 1,
+      timestamp: 1_700_000_000_000,
+      source: "lsp",
+      level: "warning",
+      category: "fallback",
+      message: "first",
+      cwd: undefined,
+      data: { token: "[REDACTED]" },
+    });
   });
 
   it("trims oldest events when maxEvents is exceeded", () => {

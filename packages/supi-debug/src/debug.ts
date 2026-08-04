@@ -16,14 +16,16 @@ import {
   type DebugAgentAccess,
   type DebugEventQuery,
   type DebugEventView,
-  type DebugLevel,
   getDebugEvents,
   getDebugSummary,
+  isDebugLevel,
+  subscribeDebugEvents,
 } from "@mrclrchtr/supi-core/debug";
 import { registerDeclarativeSettings } from "@mrclrchtr/supi-core/settings";
 import { Type } from "typebox";
 import { formatDataLines } from "./format.ts";
 import { registerDebugMessageRenderer } from "./renderer.ts";
+import { DEBUG_EVENT_ENTRY_TYPE, readSessionDebugEvents } from "./session-events.ts";
 import { maybeLogLoadStatus } from "./status-log.ts";
 import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
 
@@ -38,7 +40,7 @@ interface DebugConfig extends Record<string, unknown> {
 
 const DEBUG_DEFAULTS: DebugConfig = { ...DEBUG_REGISTRY_DEFAULTS };
 
-type DebugToolParams = DebugEventQuery;
+type DebugToolParams = DebugEventQuery & { sessionFile?: string };
 
 function normalizeAgentAccess(value: string): DebugAgentAccess {
   return value === "off" || value === "raw" ? value : "sanitized";
@@ -138,8 +140,8 @@ function registerDebugSettings(pi: ExtensionAPI): void {
   });
 }
 
-function parseCommandArgs(args: string): DebugEventQuery {
-  const query: DebugEventQuery = {};
+function parseCommandArgs(args: string): DebugToolParams {
+  const query: DebugToolParams = {};
   const parts = args.trim().split(/\s+/).filter(Boolean);
   for (const part of parts) {
     const [key, value] = part.split("=", 2);
@@ -148,12 +150,9 @@ function parseCommandArgs(args: string): DebugEventQuery {
     if (key === "category") query.category = value;
     if (key === "level" && isDebugLevel(value)) query.level = value;
     if (key === "limit") query.limit = normalizeMaxEvents(value);
+    if (key === "sessionFile") query.sessionFile = value;
   }
   return query;
-}
-
-function isDebugLevel(value: string): value is DebugLevel {
-  return value === "debug" || value === "info" || value === "warning" || value === "error";
 }
 
 function pushFormattedData(lines: string[], label: string, value: unknown): void {
@@ -169,9 +168,18 @@ function pushFormattedData(lines: string[], label: string, value: unknown): void
   }
 }
 
-function formatEvents(events: DebugEventView[], rawAccessDenied: boolean): string[] {
+function formatEvents(
+  events: DebugEventView[],
+  rawAccessDenied: boolean,
+  rawDataUnavailable = false,
+  persistedEventCount?: number,
+): string[] {
   if (events.length === 0) {
-    return ["No matching debug events available."];
+    return persistedEventCount === 0
+      ? [
+          "This session has no persisted debug events; sessions recorded before persistence cannot be backfilled.",
+        ]
+      : ["No matching debug events available."];
   }
 
   const lines: string[] = [];
@@ -183,7 +191,10 @@ function formatEvents(events: DebugEventView[], rawAccessDenied: boolean): strin
     pushFormattedData(lines, "data", event.data);
     pushFormattedData(lines, "rawData", event.rawData);
   }
-  if (rawAccessDenied) {
+  if (rawDataUnavailable) {
+    lines.push("");
+    lines.push("Raw debug data is not persisted for historical sessions.");
+  } else if (rawAccessDenied) {
     lines.push("");
     lines.push("Raw debug data was requested but is not enabled in SuPi Debug settings.");
   }
@@ -225,40 +236,55 @@ function buildSummaryData(): Record<string, string | number> | null {
   return data;
 }
 
-function toolAccessAllowed(config: DebugConfig): boolean {
-  return config.enabled && config.agentAccess !== "off";
-}
-
-function buildToolResult(params: DebugToolParams, config: DebugConfig) {
-  if (!config.enabled) {
+async function buildToolResult(params: DebugToolParams, config: DebugConfig) {
+  if (!config.enabled && !params.sessionFile) {
     throw new Error(
       "SuPi debug event capture is disabled. Enable Debug in /supi-settings to retain events.",
     );
   }
 
-  if (!toolAccessAllowed(config)) {
+  if (config.agentAccess === "off") {
     throw new Error("Agent access to SuPi debug events is disabled.");
   }
 
-  const query: DebugEventQuery = {
+  const filters = {
     source: params.source,
     level: params.level,
     category: params.category,
     limit: params.limit,
+  };
+  const query: DebugEventQuery = {
+    ...filters,
     includeRaw: params.includeRaw,
     allowRaw: config.agentAccess === "raw",
   };
-  const result = getDebugEvents(query);
+  let events: DebugEventView[];
+  let rawAccessDenied: boolean;
+  let rawDataUnavailable = false;
+  let persistedEventCount: number | undefined;
+  if (params.sessionFile) {
+    const persisted = await readSessionDebugEvents(params.sessionFile, filters);
+    events = persisted.events;
+    persistedEventCount = persisted.persistedEventCount;
+    rawAccessDenied = Boolean(params.includeRaw);
+    rawDataUnavailable = rawAccessDenied;
+  } else {
+    const result = getDebugEvents(query);
+    events = result.events;
+    rawAccessDenied = result.rawAccessDenied;
+  }
   const output = truncateDebugOutput(
-    formatEvents(result.events, result.rawAccessDenied).join("\n"),
+    formatEvents(events, rawAccessDenied, rawDataUnavailable, persistedEventCount).join("\n"),
   );
   return {
     content: [{ type: "text" as const, text: output.text }],
     details: {
-      enabled: true,
+      enabled: config.enabled,
       agentAccess: config.agentAccess,
-      rawAccessDenied: result.rawAccessDenied,
-      events: result.events,
+      sessionFile: params.sessionFile,
+      rawAccessDenied,
+      rawDataUnavailable,
+      events,
       truncation: output.truncation,
     },
   };
@@ -269,6 +295,9 @@ export default function debugExtension(pi: ExtensionAPI) {
   applyDebugConfig(process.cwd());
   registerDebugSettings(pi);
   registerDebugMessageRenderer(pi);
+  const unsubscribeDebugEvents = subscribeDebugEvents((event) => {
+    pi.appendEntry(DEBUG_EVENT_ENTRY_TYPE, event);
+  });
 
   registerContextProvider({
     id: "debug",
@@ -287,11 +316,16 @@ export default function debugExtension(pi: ExtensionAPI) {
     maybeLogLoadStatus(pi, ctx.cwd, "resources_discover");
   });
 
+  pi.on("session_shutdown", () => {
+    unsubscribeDebugEvents();
+  });
+
   pi.registerCommand("supi-debug", {
     description: "Show recent SuPi debug events",
     handler: async (args, ctx) => {
       const config = applyDebugConfig(ctx.cwd);
-      if (!config.enabled) {
+      const query = parseCommandArgs(args);
+      if (!config.enabled && !query.sessionFile) {
         pi.sendMessage({
           customType: DEBUG_REPORT_TYPE,
           content: "SuPi debug event capture is disabled. Enable Debug in /supi-settings.",
@@ -300,7 +334,29 @@ export default function debugExtension(pi: ExtensionAPI) {
         return;
       }
 
-      const query = parseCommandArgs(args);
+      if (query.sessionFile) {
+        const persisted = await readSessionDebugEvents(query.sessionFile, {
+          source: query.source,
+          level: query.level,
+          category: query.category,
+          limit: query.limit,
+        });
+        const output = truncateDebugOutput(
+          formatEvents(persisted.events, false, false, persisted.persistedEventCount).join("\n"),
+        );
+        pi.sendMessage({
+          customType: DEBUG_REPORT_TYPE,
+          content: output.text,
+          display: true,
+          details: {
+            sessionFile: query.sessionFile,
+            events: persisted.events,
+            truncation: output.truncation,
+          },
+        });
+        return;
+      }
+
       const { events, rawAccessDenied } = getDebugEvents(query);
       const output = truncateDebugOutput(formatEvents(events, rawAccessDenied).join("\n"));
       pi.sendMessage({
@@ -327,6 +383,9 @@ export default function debugExtension(pi: ExtensionAPI) {
       ),
       category: Type.Optional(Type.String({ description: "Filter by event category" })),
       limit: Type.Optional(Type.Number({ description: "Maximum number of events to return" })),
+      sessionFile: Type.Optional(
+        Type.String({ description: "PI session JSONL file containing persisted debug events" }),
+      ),
       includeRaw: Type.Optional(
         Type.Boolean({ description: "Request raw event data when settings permit it" }),
       ),

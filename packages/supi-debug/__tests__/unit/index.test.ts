@@ -5,9 +5,13 @@ const mockFns = vi.hoisted(() => ({
   configureDebugRegistry: vi.fn(),
   getDebugEvents: vi.fn(),
   getDebugSummary: vi.fn(),
+  isDebugLevel: vi.fn((value) => value === "warning"),
+  matchesDebugEventQuery: vi.fn(() => true),
   loadSupiConfig: vi.fn(),
   registerDeclarativeSettings: vi.fn(),
   registerContextProvider: vi.fn(),
+  redactDebugData: vi.fn((value) => value),
+  subscribeDebugEvents: vi.fn(() => vi.fn()),
   maybeLogLoadStatus: vi.fn(),
 }));
 
@@ -37,6 +41,10 @@ vi.mock("@mrclrchtr/supi-core/debug", () => ({
   },
   getDebugEvents: mockFns.getDebugEvents,
   getDebugSummary: mockFns.getDebugSummary,
+  isDebugLevel: mockFns.isDebugLevel,
+  matchesDebugEventQuery: mockFns.matchesDebugEventQuery,
+  redactDebugData: mockFns.redactDebugData,
+  subscribeDebugEvents: mockFns.subscribeDebugEvents,
 }));
 
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
@@ -60,7 +68,7 @@ function setup(config: MockDebugConfig = ENABLED_CONFIG) {
   mockFns.getDebugEvents.mockReturnValue({ events: [], rawAccessDenied: false });
   mockFns.getDebugSummary.mockReturnValue(null);
   const pi = createPiMock();
-  debugExtension(pi as never);
+  void debugExtension(pi as never);
   return pi;
 }
 
