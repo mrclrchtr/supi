@@ -26,6 +26,7 @@ PACKAGES=(
   supi-cache
   supi-insights
   supi-review
+  supi-agents
   supi-prompt-suggestions
 )
 

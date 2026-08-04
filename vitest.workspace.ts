@@ -1,5 +1,6 @@
 export default [
   "packages/supi-agent-runtime",
+  "packages/supi-agents",
   "packages/supi-ask-user",
   "packages/supi-bash-timeout",
   "packages/supi-cache",

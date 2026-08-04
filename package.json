@@ -87,6 +87,7 @@
       "./packages/supi-skills/src/extension.ts",
       "./packages/supi-debug/src/extension.ts",
       "./packages/supi-review/src/extension.ts",
+      "./packages/supi-agents/src/extension.ts",
       "./packages/supi-cache/src/extension.ts",
       "./packages/supi-code-intelligence/src/extension.ts",
       "./packages/supi-web/src/extension.ts",

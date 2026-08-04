@@ -4,9 +4,11 @@ import { describe, expect, it } from "vitest";
 
 const PACKAGES_DIR = new URL("../../packages", import.meta.url).pathname;
 
-// Review imports this dependency only as an isolated child-session profile. Loading
-// its full extension in the parent duplicates a separately installed Code Intelligence.
-const BUNDLED_LIBRARY_DEPENDENCIES = new Map([
+// These packages bundle Code Intelligence only to pass its headless inspection
+// factory into managed child sessions. Loading its full interactive extension in
+// the parent would duplicate the separately installed Code Intelligence surface.
+const CHILD_ONLY_BUNDLED_DEPENDENCIES = new Map([
+  ["@mrclrchtr/supi-agents", new Set(["@mrclrchtr/supi-code-intelligence"])],
   ["@mrclrchtr/supi-review", new Set(["@mrclrchtr/supi-code-intelligence"])],
 ]);
 
@@ -40,7 +42,7 @@ describe("bundled extension references", () => {
     const bundled = (pkg.bundledDependencies ?? []).filter(
       (dependency) =>
         dependency.startsWith("@mrclrchtr/") &&
-        !BUNDLED_LIBRARY_DEPENDENCIES.get(pkg.name)?.has(dependency),
+        !CHILD_ONLY_BUNDLED_DEPENDENCIES.get(pkg.name)?.has(dependency),
     );
     if (bundled.length === 0) continue;
 
@@ -76,10 +78,12 @@ describe("bundled extension references", () => {
     });
   }
 
-  it("keeps Review's child-only Code Intelligence profile out of parent extensions", () => {
-    const review = readJson(join(PACKAGES_DIR, "supi-review", "package.json"));
-    expect(review.pi?.extensions).not.toContain(
-      "node_modules/@mrclrchtr/supi-code-intelligence/src/extension.ts",
-    );
+  it("keeps child-only Code Intelligence profiles out of parent extensions", () => {
+    for (const packageName of ["supi-agents", "supi-review"]) {
+      const pkg = readJson(join(PACKAGES_DIR, packageName, "package.json"));
+      expect(pkg.pi?.extensions).not.toContain(
+        "node_modules/@mrclrchtr/supi-code-intelligence/src/extension.ts",
+      );
+    }
   });
 });

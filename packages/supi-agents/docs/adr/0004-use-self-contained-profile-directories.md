@@ -1,0 +1,3 @@
+# Use self-contained profile directories
+
+Agent Profiles are discovered as self-contained Profile Directories with a `profile.json` manifest rather than stored as dynamic entries in shared SuPi configuration. User profiles live under `~/.pi/agent/supi/agents/`; the nearest `.pi/supi/agents/` from cwd through the Git root supplies project profiles only when PI project trust is active, with no second confirmation prompt. Outside Git, only the exact cwd project directory is considered. Package, global, and project sources override by Profile ID through whole-directory replacement, never field or asset merging. An invalid higher-precedence directory shadows lower definitions and leaves that Profile ID unavailable with a bounded Profile Diagnostic.

@@ -1,0 +1,84 @@
+{
+  "name": "@mrclrchtr/supi-agents",
+  "version": "4.5.1",
+  "description": "Profile-based foreground Agent Runs for the Pi coding agent",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrclrchtr/supi.git",
+    "directory": "packages/supi-agents"
+  },
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-agents#readme",
+  "bugs": {
+    "url": "https://github.com/mrclrchtr/supi/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "supi",
+    "agent-profile",
+    "delegation",
+    "agent-run"
+  ],
+  "type": "module",
+  "files": [
+    "src/**/*.ts",
+    "profiles/**/*.json",
+    "profiles/**/*.md",
+    "README.md",
+    "CLAUDE.md",
+    "CONTEXT.md",
+    "docs/adr/*.md"
+  ],
+  "dependencies": {
+    "@mrclrchtr/supi-agent-runtime": "workspace:*",
+    "@mrclrchtr/supi-code-intelligence": "workspace:*",
+    "@mrclrchtr/supi-core": "workspace:*"
+  },
+  "bundledDependencies": [
+    "@mrclrchtr/supi-agent-runtime",
+    "@mrclrchtr/supi-code-intelligence",
+    "@mrclrchtr/supi-core"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-ai": {
+      "optional": true
+    },
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    },
+    "@earendil-works/pi-tui": {
+      "optional": true
+    },
+    "typebox": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@mrclrchtr/supi-test-utils": "workspace:*",
+    "@types/node": "25.9.5",
+    "vitest": "4.1.10"
+  },
+  "pi": {
+    "extensions": [
+      "./src/extension.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-agents/assets/social-preview.png"
+  },
+  "main": "src/api.ts",
+  "exports": {
+    "./api": "./src/api.ts",
+    "./extension": "./src/extension.ts",
+    "./package.json": "./package.json"
+  }
+}

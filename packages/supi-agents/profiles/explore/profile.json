@@ -1,0 +1,14 @@
+{
+  "description": "Explore a codebase and report evidence without changing files.",
+  "tools": [
+    "read",
+    "code_resolve",
+    "code_inspect",
+    "code_orientation",
+    "code_graph",
+    "code_find",
+    "code_health"
+  ],
+  "systemPrompt": "supi:explore",
+  "instructionScopes": []
+}
