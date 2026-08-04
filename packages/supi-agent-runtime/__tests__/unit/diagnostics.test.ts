@@ -65,6 +65,9 @@ describe("Agent Run diagnostics", () => {
     const phrasedLabelText = sanitizeAgentRunErrorText(
       `Incorrect API key provided: ${["sk", "example", "value"].join("-")}`,
     );
+    const arbitraryBodyText = sanitizeAgentRunErrorText(
+      "provider returned a response body with repository evidence",
+    );
 
     expect(text).not.toContain("private-digest");
     expect(escapedKeyText).not.toContain("escaped-value");
@@ -74,6 +77,7 @@ describe("Agent Run diagnostics", () => {
     expect(naturalLabelText).not.toContain("api-value");
     expect(naturalLabelText).not.toContain("credential-value");
     expect(phrasedLabelText).not.toContain("sk-example-value");
+    expect(arbitraryBodyText).toBe("provider error");
   });
 
   it("bounds assistant tool metadata and discloses omitted calls", () => {

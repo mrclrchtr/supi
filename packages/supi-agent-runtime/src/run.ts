@@ -49,7 +49,6 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     toolErrors: 0,
   };
   let lifecycle = new AgentRunLifecycleTraceCollector();
-  const observedUsages: Usage[] = [];
   let runtime: AgentSessionRuntime | undefined;
   let session: AgentSession | undefined;
   let view: AgentRunSessionView | undefined;
@@ -117,7 +116,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
 
   const refreshUsage = (): Usage | undefined => {
     if (!session) return progressState.usage;
-    const usage = collectAgentRunUsage(session, observedUsages);
+    const usage = collectAgentRunUsage(session);
     if (usage) progressState.usage = usage;
     return progressState.usage;
   };
@@ -146,8 +145,19 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     }
     const disposal = Promise.resolve()
       .then(() => runtime?.dispose())
-      .catch(() => undefined);
-    await Promise.race([disposal, wait(AGENT_RUN_SHUTDOWN_GRACE_MS)]);
+      .then(() => true)
+      .catch(() => false);
+    const disposedGracefully = await Promise.race([
+      disposal,
+      wait(AGENT_RUN_SHUTDOWN_GRACE_MS).then(() => false),
+    ]);
+    if (!disposedGracefully) {
+      try {
+        session?.dispose();
+      } catch {
+        // Forced disposal is best effort after graceful shutdown fails or times out.
+      }
+    }
   };
 
   const finish = (outcome: AgentRunOutcome<T>): Promise<void> => {
@@ -429,7 +439,6 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
             sessionManager,
             sessionStartEvent,
           });
-          observeSessionModelUsage(created.session, observedUsages);
           return {
             ...created,
             services: {
@@ -514,6 +523,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
         progressState.status !== "running" ||
         !session ||
         !promptActive ||
+        !session.isStreaming ||
         settledEventObserved ||
         terminal ||
         finalizing ||
@@ -543,27 +553,6 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
   }
   void setup();
   return handle;
-}
-
-/** Capture model responses before PI decides whether to persist their usage. */
-function observeSessionModelUsage(session: AgentSession, observedUsages: Usage[]): void {
-  const agent = session.agent;
-  if (!agent || typeof agent.streamFunction !== "function") return;
-  const originalStreamFunction = agent.streamFunction;
-  agent.streamFunction = async (...args) => {
-    const stream = await originalStreamFunction(...args);
-    const originalResult = stream.result.bind(stream);
-    let captured = false;
-    stream.result = async () => {
-      const response = await originalResult();
-      if (!captured) {
-        captured = true;
-        if (response.usage) observedUsages.push(response.usage);
-      }
-      return response;
-    };
-    return stream;
-  };
 }
 
 function usageFields(usage: Usage | undefined): { usage?: Usage } {
