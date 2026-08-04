@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-lsp",
-  "version": "4.5.1",
+  "version": "4.6.0",
   "description": "Language Server Protocol runtime for SuPi code intelligence",
   "license": "MIT",
   "repository": {
