@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-web",
-  "version": "4.4.0",
+  "version": "4.5.0",
   "description": "Web fetch and Context7 documentation extension for the Pi coding agent",
   "license": "MIT",
   "repository": {

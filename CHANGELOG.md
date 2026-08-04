@@ -1,5 +1,29 @@
 # Changelog
 
+## [4.5.0](https://github.com/mrclrchtr/supi/compare/v4.4.0...v4.5.0) (2026-08-04)
+
+
+### Features
+
+* **supi-review:** prefer managed reviews ([6516145](https://github.com/mrclrchtr/supi/commit/6516145be9cb6bb37c7d7a3b133665b2ca86f29a))
+
+
+### Bug Fixes
+
+* **deps:** lock file maintenance ([a6bfbfb](https://github.com/mrclrchtr/supi/commit/a6bfbfb628ba009bb98b8f01c3d0f173202d5536))
+* **deps:** lock file maintenance ([803a963](https://github.com/mrclrchtr/supi/commit/803a96366a16851a6c27b384cb6241cefbc18239))
+* **deps:** update dependency @biomejs/biome to v2.5.6 ([068972c](https://github.com/mrclrchtr/supi/commit/068972cfd1dfaf9cdf479ea982205766c40b691a))
+* **deps:** update dependency hk to v1.54.0 ([29b41e9](https://github.com/mrclrchtr/supi/commit/29b41e9cb73ecffb7a5bebf83ee188fb455f1e11))
+* **deps:** update dependency tree-sitter to v0.25.1 ([1776667](https://github.com/mrclrchtr/supi/commit/17766677ba32627909419e96ea46a61cbbb7edd6))
+* **deps:** update dependency typebox to v1.3.10 ([96c05b3](https://github.com/mrclrchtr/supi/commit/96c05b33efd6915253ec93f6250238488f40d131))
+* **deps:** update pnpm to v11.18.0 ([41bfe25](https://github.com/mrclrchtr/supi/commit/41bfe254239d31190ee8cdb5a3735f27ee2d9563))
+* **deps:** update pnpm to v11.19.0 ([3e175f2](https://github.com/mrclrchtr/supi/commit/3e175f2af35da8eae584731e8232aeccc3b1c467))
+* **deps:** update pnpm to v11.20.0 ([d7487cf](https://github.com/mrclrchtr/supi/commit/d7487cf38b4c2b6deed63091caf41673ef960a74))
+* **deps:** update pnpm/action-setup action to v6.0.10 ([3406b6f](https://github.com/mrclrchtr/supi/commit/3406b6fded3ebd6356a34d9004ec3e9dc6332637))
+* **hk:** run commitlint via pnpm exec ([c0e6e82](https://github.com/mrclrchtr/supi/commit/c0e6e82e6fe892ad2bb99a58005097220324b415))
+* mark intentional fire-and-forget promises for biome 2.5.6 ([76634ae](https://github.com/mrclrchtr/supi/commit/76634ae747a1814790b0448d4c61386adba52fbf))
+* **scripts:** approve local installs and surface command failures ([c3718ac](https://github.com/mrclrchtr/supi/commit/c3718ac420eef3008a6689f42a4e4e254dcfae60))
+
 ## [4.4.0](https://github.com/mrclrchtr/supi/compare/v4.3.0...v4.4.0) (2026-07-30)
 
 
