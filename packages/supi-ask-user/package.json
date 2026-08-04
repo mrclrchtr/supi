@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-ask-user",
-  "version": "4.5.0",
+  "version": "4.5.1",
   "description": "Ask-user tool for the Pi coding agent — structured questionnaires for focused agent-user decisions",
   "license": "MIT",
   "repository": {
