@@ -6,7 +6,71 @@
 
 # @mrclrchtr/supi-ask-user
 
-SuPi Ask-User brings structured decision forms to your [pi](https://github.com/earendil-works/pi) sessions. When the agent needs your input, you get a clear, keyboard-driven form instead of a chat message.
+Gives the [Pi coding agent](https://github.com/earendil-works/pi) a direct, model-callable decision form for the moments when it needs your input before continuing.
+
+Instead of guessing or scattering questions across chat, the agent can pause, present one focused form, and resume with structured answers.
+
+## What you and your agent get
+
+- **One decision handoff** — combine up to ten related questions in one blocking form rather than interrupting repeatedly.
+- **Choice and text questions** — choose one option, select several, or write a free-form answer.
+- **Useful recommendations** — the agent can preselect or prefill a suggested answer without preventing you from changing it.
+- **Trade-offs beside the options** — focused options can show descriptions, consequences, code samples, or other decision context.
+- **Comments at every level** — explain an answer, annotate an option you selected or rejected, or leave context for the whole form.
+- **Review before submission** — inspect every answer, edit any question, and see unanswered items before sending the decision back.
+- **A structured outcome** — complete forms return `submitted`; forms with unanswered questions return `needs_discussion` so the agent follows up instead of assuming.
+
+## Example requests
+
+You can tell Pi when you want a structured handoff:
+
+- “Before scaffolding the project, ask me about the package manager, test runner, and linting.”
+- “If you find product decisions during implementation, collect the related questions into one form.”
+- “Show the trade-offs beside each migration option before I choose.”
+- “Ask me which findings to fix, and let me comment on individual choices.”
+
+The agent is also guided to use `ask_user` only after inspecting what it can inspect itself—not for status updates, broad surveys, or facts it can determine from the repository.
+
+## How it works
+
+1. The agent calls `ask_user` with one focused decision and related questions.
+2. Pi opens a keyboard-driven form and pauses the agent.
+3. You answer, comment, or deliberately mark a question unanswered.
+4. The review screen lets you edit the form before submitting.
+5. The agent receives ordered, structured responses and continues from your decision.
+
+Completed forms are labeled `decision` in Pi's session tree. The result remains available in chat history; press `Ctrl+O` to expand it for read-only review.
+
+## See it in action
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-choice-details.png" width="100%" alt="Single-choice decision with a recommendation and side-by-side details" />
+      <br/>Single choice with recommendation and details
+    </td>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-multi-choice-details.png" width="100%" alt="Multi-select decision with recommendations and side-by-side details" />
+      <br/>Multi-select with recommendation and details
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-text-input.png" width="100%" alt="Free-form text answer prefilled with a recommendation" />
+      <br/>Text answer with a recommendation
+    </td>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-question-comment.png" width="100%" alt="Question comment editor" />
+      <br/>Question comment
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-review-form-comment.png" width="70%" alt="Review screen showing answers, an unanswered question, and a form comment" />
+      <br/>Review answers, comments, and unanswered questions
+    </td>
+  </tr>
+</table>
 
 ## Install
 
@@ -14,104 +78,33 @@ SuPi Ask-User brings structured decision forms to your [pi](https://github.com/e
 pi install npm:@mrclrchtr/supi-ask-user
 ```
 
-For local development:
+To try it for one run without installing:
 
 ```bash
-pi install ./packages/supi-ask-user
+pi -e npm:@mrclrchtr/supi-ask-user
 ```
 
-## What to expect
+## Keyboard essentials
 
-During a session, the agent may pause and open a small form when it needs an explicit decision from you. The form appears directly in the TUI and blocks the agent until you respond.
-
-Each form can contain up to ten questions. A question is either a **choice** (pick one or more from a list) or a **text** (type a short answer). The agent can suggest a recommended answer, which is preselected or prefilled for you.
-
-All questions are expected to be answered before the form can be submitted. If you leave any question unanswered, the agent receives a "needs discussion" outcome so it can follow up.
-
-You can also add comments to individual questions, options, or the whole form if you want to explain your thinking.
-
-If you have configured a custom Pi editor, such as a Vim or Emacs editor, Ask User creates one editor instance per form and reuses it for text answers and all comment fields. If the custom editor cannot be initialized or does not satisfy Pi's editor contract, Ask User warns and uses the default editor for that form. The decision form keeps ownership of its navigation shortcuts; main-prompt actions such as model switching are not reproduced inside the form.
-
-## Agent-facing behavior
-
-`ask_user` is an interactive TUI-only handoff. The agent should use one form for one focused decision, combine related questions instead of opening multiple forms, and wait for the result before doing work that depends on your answer. Only one form can be active at a time.
-
-The model-visible result summary is bounded to Pi's default tool-output limits: 2,000 lines or 50KB, whichever is hit first. If a very large response is truncated, the agent is told to ask a focused follow-up for any omitted text it still needs.
-
-## Preview
-
-<table>
-  <tr>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-choice-details.png" width="100%" alt="Choice question with side details" />
-      <br/>Choice question with side details
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-question-comment.png" width="100%" alt="Question comment editor" />
-      <br/>Question comment editor
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-multi-choice-details.png" width="100%" alt="Multi-select with details" />
-      <br/>Multi-select with details
-    </td>
-    <td align="center">
-      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-text-input.png" width="100%" alt="Text input with recommendation" />
-      <br/>Text input with recommendation
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center">
-      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-review-form-comment.png" width="70%" alt="Review screen with form comment" />
-      <br/>Review screen with form comment
-    </td>
-  </tr>
-</table>
-
-## Keyboard reference
-
-### Choice questions
+The form always shows context-specific key hints at the bottom.
 
 | Key | Action |
-|-----|--------|
-| `↑` `↓` | Move between options |
-| `Space` | Select / toggle an option |
-| `Enter` | Confirm and advance |
-| `Tab` / `→` | Next question (last question goes to review) |
-| `Shift+Tab` / `←` | Previous question |
-| `n` | Comment on the focused option |
-| `c` | Comment on the current question |
-| `u` | Mark the current question unanswered |
-| `Esc` | Cancel the whole form |
+|---|---|
+| `↑` `↓` | Move through choices or review rows |
+| `Space` | Select a single choice or toggle a multi-select option |
+| `Enter` | Accept the current answer, save text/comments, or submit from review |
+| `Tab` / `Shift+Tab` | Move forward or backward between questions |
+| `c` / `Alt+C` | Comment on the current question (`Alt+C` in text questions) |
+| `n` | Comment on the focused choice option |
+| `u` / `Alt+U` | Deliberately mark the question unanswered (`Alt+U` in text questions) |
+| `Esc` | Cancel the form; inside a comment editor, discard unsaved comment edits |
 
-### Text questions
+On wide terminals, option details appear beside the choices; on narrow terminals, they stack underneath.
 
-| Key | Action |
-|-----|--------|
-| `Enter` | Submit text and advance |
-| `Tab` | Next question |
-| `Alt+C` | Comment on the current question |
-| `Alt+U` | Mark the current question unanswered |
-| `Esc` | Cancel the whole form |
+## Good to know
 
-### Review screen
-
-| Key | Action |
-|-----|--------|
-| `↑` `↓` | Move between questions and Submit |
-| `Enter` | Open a question for editing, or submit the form |
-| `←` / `Shift+Tab` | Return to the last question |
-| `c` | Edit the form-level comment |
-| `Esc` | Cancel the whole form |
-
-### Comment editors
-
-| Key | Action |
-|-----|--------|
-| `Enter` | Save comment and return |
-| `Esc` | Discard comment edits and return |
-
-With a modal custom editor, `Esc` is offered to the editor first so it can leave insert mode. When the editor delegates the interrupt, Ask User performs the cancel or discard action shown above.
-
-The recommended option is labeled `[recommended]`. On wide terminals, option details render side-by-side with the list; on narrow terminals they stack below.
+- `ask_user` requires Pi's interactive TUI; there is no degraded non-interactive form.
+- Only one form can be active; sibling tool calls do not run beside a live form.
+- Cancelling a form cancels the current agent turn rather than recording a fake answer.
+- All questions are expected for a complete submission, but you can mark any question unanswered to request discussion.
+- Ask User reuses your configured Pi editor for text and comments when compatible, with the default editor as a fallback.

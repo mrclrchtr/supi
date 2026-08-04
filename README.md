@@ -2,365 +2,150 @@
 
 # SuPi (Super Pi)
 
-SuPi is a curated extension toolkit for the [PI coding agent](https://github.com/earendil-works/pi): code understanding, external knowledge lookup, context and cache observability, structured decisions, review/reporting workflows, and quality-of-life in one package family.
+A curated extension stack that gives the [Pi coding agent](https://github.com/earendil-works/pi) stronger code understanding, direct access to public web sources and library docs, structured collaboration, review workflows, observability, and session polish.
 
-It is also my daily PI setup, shared as installable packages so you can use the full stack or only the parts that fit your workflow.
+Install the recommended stack or pick only the packages you need. You keep prompting Pi normally; SuPi gives the agent additional tools and context it can use directly.
 
-## What SuPi is trying to achieve
+> SuPi is pre-release. Packages marked beta are the fastest-moving parts of the stack.
 
-- Make PI stronger in real coding sessions: code understanding, external docs lookup, caller-defined review, reporting, diagnostics, and quality-of-life.
-- Bring IDE-like navigation and tool-supported refactorings into agent workflows.
-- Build with the initial context window in mind: focused tools, concise descriptions, and short guidelines.
-- Make agent-user decisions structured when free-form chat would be ambiguous.
-- Make sessions observable with context usage monitors, prompt-cache health, debug events, and usage insights.
-- Stay modular: install the recommended stack or only the packages you want.
+## The key difference: LSP + AST for the agent
 
-## Quick Start
+Most coding agents can read files and search text. [`@mrclrchtr/supi-code-intelligence`](packages/supi-code-intelligence/README.md) gives Pi direct, model-callable access to two complementary sources of code intelligence:
 
-Install the release SuPi stack globally:
+- **Language servers (LSP)** provide types, definitions, references, implementations, diagnostics, workspace symbols, and semantic refactoring.
+- **Tree-sitter ASTs** provide syntax, outlines, source structure, structural search, and outgoing calls.
+
+The agent receives focused `code_*` tools for workspace orientation, precise symbol inspection, relationship analysis, code-aware search, live health, and safe refactor previews. Results disclose their evidence and say when semantic or structural analysis is unavailable instead of silently guessing.
+
+Tree-sitter support is bundled. Full LSP features require the matching language-server binary on `PATH`; see the [Code Intelligence setup and screenshots](packages/supi-code-intelligence/README.md#language-support).
+
+[![Code Intelligence showing LSP references and AST calls][code-intelligence]][code-intelligence]
+
+[See all Code Intelligence screenshots →](packages/supi-code-intelligence/README.md#see-it-in-action)
+
+## What else your agent gets
+
+- **Web access built for agents** — [`supi-web`](packages/supi-web/README.md) prefers source Markdown, extracts readable content from public HTML, fences plain-text files, and moves long pages to temporary files instead of flooding the context window.
+- **Focused library docs** — search Context7 for the right project and version, then retrieve documentation narrowed to the current task.
+- **Structured decisions** — ask you focused choice or text questions through a keyboard-driven form with [`supi-ask-user`](packages/supi-ask-user/README.md).
+- **Review workflows** — run independent, inspection-only reviews over a working tree, branch comparison, or commit with [`supi-review`](packages/supi-review/README.md).
+- **Operational awareness** — inspect context pressure, prompt-cache health, and SuPi debug events with `supi-context`, `supi-cache`, and `supi-debug`.
+- **Repository guidance** — maintain `CLAUDE.md` and `AGENTS.md` files with the skills in [`supi-claude-md`](packages/supi-claude-md/README.md).
+- **Session polish** — prompt stashing, shortcuts, activity indicators, advisory prompt suggestions, and default shell timeouts.
+
+## Install
+
+### Recommended release stack
+
+Global installation:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install.sh | bash
 ```
 
-Or install it project-locally into `.pi/settings.json`:
+Project-local installation into `.pi/settings.json`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install.sh | bash -s -- -l
 ```
 
-Want everything including beta packages? Use `install-all.sh` instead. Prefer a single package? Use any install command from the package cards below, for example:
-
-```bash
-pi install npm:@mrclrchtr/supi-code-intelligence
-```
-
-Run `/reload` in PI after installing new extensions.
-
-## What you get
-
-### Code understanding & IDE-like navigation
-
-High-level code briefs, impact analysis, semantic navigation, AST-level structural inspection, and tool-supported refactorings.
-
-Install [`@mrclrchtr/supi-code-intelligence`](packages/supi-code-intelligence#readme) for the full code-understanding stack. [`@mrclrchtr/supi-lsp`](packages/supi-lsp#readme) and [`@mrclrchtr/supi-tree-sitter`](packages/supi-tree-sitter#readme) are linked for lower-level details and direct use.
-
-### External knowledge & project context
-
-Fetch public web pages as clean Markdown, look up focused library docs, and keep repository-specific context close to the files where it matters.
-
-Packages: [`supi-web`](packages/supi-web#readme), [`supi-claude-md`](packages/supi-claude-md#readme)
-
-### Observability
-
-See how the current session spends context, watch prompt-cache health, inspect cache regressions across sessions, and debug extension behavior when something looks wrong.
-
-Packages: [`supi-context`](packages/supi-context#readme), [`supi-cache`](packages/supi-cache#readme), [`supi-debug`](packages/supi-debug#readme)
-
-### Review & reporting
-
-Run caller-defined review tasks over Git changes and generate reports from historical PI sessions.
-
-Packages: [`supi-review`](packages/supi-review#readme), [`supi-insights`](packages/supi-insights#readme)
-
-### Quality-of-life & structured decisions
-
-Give the agent a richer way to ask focused questions, prevent hung shell commands from stalling a session, add ghost-text prompt suggestions, and small PI conveniences like aliases, prompt stashing, and activity indicators.
-
-Packages: [`supi-ask-user`](packages/supi-ask-user#readme), [`supi-bash-timeout`](packages/supi-bash-timeout#readme), [`supi-extras`](packages/supi-extras#readme), [`supi-prompt-suggestions`](packages/supi-prompt-suggestions#readme)
-
-## Configure SuPi
-
-[`@mrclrchtr/supi-settings`](packages/supi-settings#readme) provides the shared `/supi-settings` TUI for project/global configuration exposed by SuPi packages.
-
-```bash
-pi install npm:@mrclrchtr/supi-settings
-```
-
-[Read package README →](packages/supi-settings#readme)
-
-## Packages
-
-Badges: <kbd>Agent</kbd> means PI can use the package directly through tools, injected context, or tool-call hooks. <kbd>Human</kbd> means the user drives it through commands, reports, shortcuts, or UI. <kbd>Beta</kbd> marks packages that are still stabilizing. <kbd>DevTool</kbd> marks packages primarily for debugging or extension development.
-
-### Code understanding & IDE-like navigation
-
-#### [@mrclrchtr/supi-code-intelligence](packages/supi-code-intelligence#readme)
-
-<kbd>Agent</kbd>
-
-Workspace orientation, target resolution and inspection, relationship analysis, code-aware search, live health, and semantic refactoring. Recommended entry point for the full code-understanding stack.
-
-```bash
-pi install npm:@mrclrchtr/supi-code-intelligence
-```
-
-[Read package README →](packages/supi-code-intelligence#readme)
-
-#### [@mrclrchtr/supi-lsp](packages/supi-lsp#readme)
-
-<kbd>Agent</kbd> <kbd>Human</kbd>
-
-Language Server Protocol support for semantic navigation, references, diagnostics, hover types, rename, and an LSP status view.
-
-```bash
-pi install npm:@mrclrchtr/supi-lsp
-```
-
-[Read package README →](packages/supi-lsp#readme)
-
-#### [@mrclrchtr/supi-tree-sitter](packages/supi-tree-sitter#readme)
-
-<kbd>Agent</kbd>
-
-AST-level structural analysis for outlines, imports/exports, syntax nodes, custom queries, and outgoing callees.
-
-```bash
-pi install npm:@mrclrchtr/supi-tree-sitter
-```
-
-[Read package README →](packages/supi-tree-sitter#readme)
-
-### External knowledge & project context
-
-#### [@mrclrchtr/supi-web](packages/supi-web#readme)
-
-<kbd>Agent</kbd>
-
-Clean Markdown web fetching and focused library-documentation lookup for grounded agent research.
-
-```bash
-pi install npm:@mrclrchtr/supi-web
-```
-
-[Read package README →](packages/supi-web#readme)
-
-#### [@mrclrchtr/supi-claude-md](packages/supi-claude-md#readme)
-
-<kbd>Agent</kbd> <kbd>Beta</kbd>
-
-Bundled skills for auditing and revising repository-specific `CLAUDE.md`/`AGENTS.md` guidance.
-
-```bash
-pi install npm:@mrclrchtr/supi-claude-md
-```
-
-[Read package README →](packages/supi-claude-md#readme)
-
-### Observability
-
-#### [@mrclrchtr/supi-context](packages/supi-context#readme)
-
-<kbd>Human</kbd>
-
-Detailed current-session context usage monitor for token budgets, active skills, guidelines, tool definitions, and injected context.
-
-```bash
-pi install npm:@mrclrchtr/supi-context
-```
-
-[Read package README →](packages/supi-context#readme)
-
-#### [@mrclrchtr/supi-cache](packages/supi-cache#readme)
-
-<kbd>Agent</kbd> <kbd>Human</kbd> <kbd>Beta</kbd>
-
-Prompt-cache health monitoring and cross-session cache-regression forensics.
-
-```bash
-pi install npm:@mrclrchtr/supi-cache
-```
-
-[Read package README →](packages/supi-cache#readme)
-
-#### [@mrclrchtr/supi-debug](packages/supi-debug#readme)
-
-<kbd>Agent</kbd> <kbd>Human</kbd> <kbd>DevTool</kbd>
-
-Shared debug-event capture, inspection commands, and an agent tool for troubleshooting SuPi/PI extension behavior.
-
-```bash
-pi install npm:@mrclrchtr/supi-debug
-```
-
-[Read package README →](packages/supi-debug#readme)
-
-### Review & reporting
-
-#### [@mrclrchtr/supi-review](packages/supi-review#readme)
-
-<kbd>Human</kbd> <kbd>Agent</kbd> <kbd>Beta</kbd>
-
-Caller-defined Direct or one-shot Prepared review tasks with optional advisory planning, target-aware read-only reviewers, packet hashes, and separate per-task results.
-
-```bash
-pi install npm:@mrclrchtr/supi-review
-```
-
-[Read package README →](packages/supi-review#readme)
-
-#### [@mrclrchtr/supi-insights](packages/supi-insights#readme)
-
-<kbd>Human</kbd> <kbd>Beta</kbd>
-
-Historical PI session analytics and shareable HTML reports for usage patterns.
-
-```bash
-pi install npm:@mrclrchtr/supi-insights
-```
-
-[Read package README →](packages/supi-insights#readme)
-
-### Quality-of-life & structured decisions
-
-#### [@mrclrchtr/supi-ask-user](packages/supi-ask-user#readme)
-
-<kbd>Agent</kbd> <kbd>Human</kbd>
-
-Keyboard-driven questionnaire UI for structured decisions when the agent needs focused input before continuing.
-
-```bash
-pi install npm:@mrclrchtr/supi-ask-user
-```
-
-[Read package README →](packages/supi-ask-user#readme)
-
-#### [@mrclrchtr/supi-bash-timeout](packages/supi-bash-timeout#readme)
-
-<kbd>Agent</kbd> <kbd>Beta</kbd>
-
-Default timeouts for bash tool calls so a hung shell command does not stall the session.
-
-```bash
-pi install npm:@mrclrchtr/supi-bash-timeout
-```
-
-[Read package README →](packages/supi-bash-timeout#readme)
-
-#### [@mrclrchtr/supi-extras](packages/supi-extras#readme)
-
-<kbd>Agent</kbd> <kbd>Human</kbd>
-
-Aliases, skill shorthand, prompt stash overlay, activity indicators, and other PI session polish.
-
-```bash
-pi install npm:@mrclrchtr/supi-extras
-```
-
-[Read package README →](packages/supi-extras#readme)
-
-#### [@mrclrchtr/supi-prompt-suggestions](packages/supi-prompt-suggestions#readme)
-
-<kbd>Human</kbd>
-
-Advisory ghost-text prompt suggestions after each assistant response, generated by a cheap model you choose.
-
-```bash
-pi install npm:@mrclrchtr/supi-prompt-suggestions
-```
-
-[Read package README →](packages/supi-prompt-suggestions#readme)
-
-## Infrastructure packages
-
-These packages support the extension stack and are linked for maintainers and extension authors. They are not promoted as standalone PI extensions.
-
-- [`@mrclrchtr/supi-core`](packages/supi-core#readme) — shared infrastructure for SuPi extensions, including configuration, settings, path helpers, reporting, and session utilities.
-- [`@mrclrchtr/supi-code-runtime`](packages/supi-code-runtime#readme) — shared workspace context, capability contracts, and canonical types for the code-understanding stack.
-- [`@mrclrchtr/supi-test-utils`](packages/supi-test-utils#readme) — shared test helpers for SuPi extension packages.
-
-## Install details
-
-### Release stack
-
-Global install:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install.sh | bash
-```
-
-Project-local install into `.pi/settings.json`:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install.sh | bash -s -- -l
-```
-
-The release script installs the stable SuPi packages from npm.
-
-### Full stack (release + beta)
-
-Global install:
+### Release stack plus beta packages
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install-all.sh | bash
 ```
 
-Project-local install into `.pi/settings.json`:
+Append `-s -- -l` for a project-local full-stack install. Run `/reload` or restart Pi after installation.
+
+> Pi extensions run with your user permissions. Review [`install.sh`](scripts/install.sh) or [`install-all.sh`](scripts/install-all.sh) before piping either script to a shell.
+
+### One package
+
+Every extension package is independently installable:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install-all.sh | bash -s -- -l
-```
-
-The full-stack script adds beta packages on top of the release set. Run `/reload` in PI after installation.
-
-### Individual packages
-
-```bash
+pi install npm:@mrclrchtr/supi-code-intelligence
 pi install npm:@mrclrchtr/supi-web
-pi install npm:@mrclrchtr/supi-review
 ```
 
-Use any package name from the catalog above.
-
-### Full workspace from git or local path
-
-```bash
-pi install git:github.com/mrclrchtr/supi
-```
-
-```bash
-pi install /path/to/supi
-```
-
-The repo root includes the workspace extension manifest for development and full-stack local installs. When installed from a local path, PI loads the working tree directly; after edits, use `/reload` or restart PI.
-
-## Uninstall
+## Package catalog
 
 ### Release stack
 
-Global uninstall:
+| Package | What it adds |
+|---|---|
+| [`supi-code-intelligence`](packages/supi-code-intelligence/README.md) | Direct LSP- and AST-backed code understanding, navigation, search, health, and refactoring tools |
+| [`supi-web`](packages/supi-web/README.md) | Direct public-page-to-Markdown fetching, context-safe large output, and focused Context7 documentation |
+| [`supi-ask-user`](packages/supi-ask-user/README.md) | Structured questionnaires for focused agent-user decisions |
+| [`supi-context`](packages/supi-context/README.md) | Context-pressure snapshots and detailed TUI usage reports |
+| [`supi-settings`](packages/supi-settings/README.md) | One project/global settings UI for SuPi packages |
+| [`supi-debug`](packages/supi-debug/README.md) | Shared debug-event capture and bounded troubleshooting tools |
+| [`supi-extras`](packages/supi-extras/README.md) | Prompt stash, shortcuts, activity indicators, and other session conveniences |
+| [`supi-prompt-suggestions`](packages/supi-prompt-suggestions/README.md) | Advisory ghost-text suggestions from a model you choose |
+
+### Beta additions
+
+Installed by `install-all.sh` on top of the release stack:
+
+| Package | What it adds |
+|---|---|
+| [`supi-review`](packages/supi-review/README.md) | Caller-defined, inspection-only reviews in managed child sessions |
+| [`supi-cache`](packages/supi-cache/README.md) | Prompt-cache monitoring and cross-session regression forensics |
+| [`supi-insights`](packages/supi-insights/README.md) | Historical session analytics and shareable HTML reports |
+| [`supi-claude-md`](packages/supi-claude-md/README.md) | Skills for auditing and revising repository instruction files |
+| [`supi-bash-timeout`](packages/supi-bash-timeout/README.md) | Default timeouts so forgotten shell limits do not stall the session |
+
+### Internal libraries
+
+These packages power the stack and are not standalone Pi extensions:
+
+- [`supi-lsp`](packages/supi-lsp/README.md) — Language Server Protocol runtime bundled by Code Intelligence.
+- [`supi-tree-sitter`](packages/supi-tree-sitter/README.md) — structural AST analysis bundled by Code Intelligence.
+- [`supi-code-runtime`](packages/supi-code-runtime/README.md) — shared code-intelligence contracts and workspace capability state.
+- [`supi-core`](packages/supi-core/README.md) — common configuration, settings, reporting, and session infrastructure.
+- [`supi-test-utils`](packages/supi-test-utils/README.md) — shared test helpers for SuPi packages.
+
+## Configure
+
+The release stack includes [`supi-settings`](packages/supi-settings/README.md). Open the shared settings UI with:
+
+```text
+/supi-settings
+```
+
+Press Tab to switch between project and global scope. Settings show whether each value comes from the project, global configuration, or its default.
+
+If you install packages individually and want this UI, install it separately:
+
+```bash
+pi install npm:@mrclrchtr/supi-settings
+```
+
+## Update and remove
+
+Update installed Pi packages:
+
+```bash
+pi update --extensions
+```
+
+Remove the release stack or the release-plus-beta stack:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/uninstall.sh | bash
-```
-
-Project-local uninstall from `.pi/settings.json`:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/uninstall.sh | bash -s -- -l
-```
-
-### Full stack (release + beta)
-
-Global uninstall:
-
-```bash
 curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/uninstall-all.sh | bash
 ```
 
-Project-local uninstall from `.pi/settings.json`:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/uninstall-all.sh | bash -s -- -l
-```
-
-The uninstall scripts also attempt to remove deprecated (`@mrclrchtr/supi`, `@mrclrchtr/supi-rtk`) and formerly-standalone (`@mrclrchtr/supi-lsp`, `@mrclrchtr/supi-tree-sitter`) packages as a best-effort cleanup — they show `—` instead of `✗` when not installed.
-
-### Individual packages
+Append `-s -- -l` for project-local removal. Remove one package with:
 
 ```bash
 pi uninstall npm:@mrclrchtr/supi-web
-pi uninstall npm:@mrclrchtr/supi-review
 ```
 
-Run `/reload` in PI after uninstalling extensions.
+Run `/reload` or restart Pi after removing extensions.
+
+## License
+
+[MIT](LICENSE)
+
+[code-intelligence]: https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-code-intelligence/assets/relationship-graph.png
