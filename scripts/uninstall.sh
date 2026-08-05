@@ -17,18 +17,19 @@ PACKAGES=(
   supi-ask-user
   supi-context
   supi-settings
-  supi-debug
   supi-extras
   supi-web
   supi-prompt-suggestions
 )
 
-# Deprecated or removed packages — best-effort cleanup, not counted as failures.
+# Deprecated packages, removed packages, and packages no longer in the default
+# stack — best-effort cleanup, not counted as failures.
 REMOVED_PACKAGES=(
   supi
   supi-rtk
   supi-lsp
   supi-tree-sitter
+  supi-debug
 )
 
 if ! command -v pi &>/dev/null; then
@@ -58,10 +59,10 @@ for pkg in "${PACKAGES[@]}"; do
   fi
 done
 
-# Clean up deprecated / removed packages (best-effort).
+# Clean up deprecated / removed / non-default packages (best-effort).
 if [[ ${#REMOVED_PACKAGES[@]} -gt 0 ]]; then
   echo ""
-  echo "Removing deprecated / removed packages…"
+  echo "Removing deprecated / removed / non-default packages…"
   for pkg in "${REMOVED_PACKAGES[@]}"; do
     APPR=""
     [[ -n "$LOCAL_FLAG" ]] && APPR="--approve"

@@ -54,6 +54,10 @@ _Avoid_: human-only
 A package-catalog badge for SuPi features aimed primarily at debugging, inspecting, or developing SuPi/PI extension behavior rather than ordinary coding workflow.
 _Avoid_: DevTools, developer tools
 
+**DevTool Package**:
+A released Extension Package that is not part of the recommended stack. It is aimed at debugging, inspecting, or developing SuPi/PI extension behavior rather than ordinary coding workflow, and users opt in to it instead of receiving it by default.
+_Avoid_: beta package, Infrastructure Package, release stack package
+
 **Quality-of-Life**:
 Small PI session improvements that reduce friction without becoming the central reason to install SuPi, such as aliases, prompt stashing, activity indicators, and default bash timeouts.
 _Avoid_: workflow guardrails, workflow quality-of-life

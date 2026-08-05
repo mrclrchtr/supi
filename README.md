@@ -90,9 +90,20 @@ pi install npm:@mrclrchtr/supi-web
 | [`supi-ask-user`](packages/supi-ask-user/README.md) | Structured questionnaires for focused agent-user decisions |
 | [`supi-context`](packages/supi-context/README.md) | Context-pressure snapshots and detailed TUI usage reports |
 | [`supi-settings`](packages/supi-settings/README.md) | One project/global settings UI for SuPi packages |
-| [`supi-debug`](packages/supi-debug/README.md) | Shared debug-event capture and bounded troubleshooting tools |
 | [`supi-extras`](packages/supi-extras/README.md) | Prompt stash, shortcuts, activity indicators, and other session conveniences |
 | [`supi-prompt-suggestions`](packages/supi-prompt-suggestions/README.md) | Advisory ghost-text suggestions from a model you choose |
+
+### DevTools
+
+Not part of the recommended release stack. Included in the full-stack installer (`install-all.sh`), or install separately:
+
+| Package | What it adds |
+|---|---|
+| [`supi-debug`](packages/supi-debug/README.md) | Shared debug-event capture and bounded troubleshooting tools |
+
+```bash
+pi install npm:@mrclrchtr/supi-debug
+```
 
 ### Beta additions
 
