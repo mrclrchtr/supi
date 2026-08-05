@@ -292,6 +292,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     void abortPromise;
   };
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: event dispatch coordinates progress and settlement.
   const dispatchEvent = (event: AgentSessionEvent): void => {
     lifecycle.observe(event);
     if (event.type === "turn_end") progressState.turns++;
