@@ -1,8 +1,6 @@
 <div align="center">
   <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-insights">
-    <picture>
-      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-insights/assets/social-preview.png" alt="SuPi Insights" width="100%">
-    </picture>
+    <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-insights/assets/social-preview.png" alt="SuPi Insights" width="100%">
   </a>
 </div>
 

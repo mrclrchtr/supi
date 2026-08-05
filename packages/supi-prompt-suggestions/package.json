@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-prompt-suggestions",
   "version": "4.5.1",
-  "description": "Advisory ghost-text prompt suggestions for the pi coding agent",
+  "description": "Optional model-powered ghost-text prompt suggestions",
   "license": "MIT",
   "repository": {
     "type": "git",

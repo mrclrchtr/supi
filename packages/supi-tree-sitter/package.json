@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-tree-sitter",
   "version": "4.5.1",
-  "description": "SuPi Tree-sitter library — structural AST analysis for pi",
+  "description": "Structural AST analysis for SuPi code intelligence",
   "license": "MIT",
   "repository": {
     "type": "git",

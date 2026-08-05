@@ -1,8 +1,6 @@
 <div align="center">
   <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-claude-md">
-    <picture>
-      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-claude-md/assets/social-preview.png" alt="SuPi Claude.md" width="100%">
-    </picture>
+    <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-claude-md/assets/social-preview.png" alt="SuPi Claude.md" width="100%">
   </a>
 </div>
 

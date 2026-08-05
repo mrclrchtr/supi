@@ -2,7 +2,7 @@
   "name": "@mrclrchtr/supi-test-utils",
   "private": true,
   "version": "0.1.0",
-  "description": "Shared test utilities for SuPi extensions.",
+  "description": "Shared mocks and test helpers for SuPi packages",
   "license": "MIT",
   "type": "module",
   "main": "src/api.ts",

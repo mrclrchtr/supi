@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-settings",
   "version": "4.5.1",
-  "description": "SuPi Settings extension — unified settings command for SuPi extensions via /supi-settings",
+  "description": "One project/global settings UI for SuPi packages",
   "license": "MIT",
   "repository": {
     "type": "git",

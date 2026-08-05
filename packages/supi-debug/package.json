@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-debug",
   "version": "4.5.1",
-  "description": "SuPi Debug extension — shared debug event inspection for SuPi extensions",
+  "description": "Capture and inspect SuPi debug events",
   "license": "MIT",
   "repository": {
     "type": "git",

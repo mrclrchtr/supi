@@ -1,8 +1,6 @@
 <div align="center">
   <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-tree-sitter">
-    <picture>
-      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-tree-sitter/assets/social-preview.png" alt="SuPi Tree-sitter" width="100%">
-    </picture>
+    <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-tree-sitter/assets/social-preview.png" alt="SuPi Tree-sitter" width="100%">
   </a>
 </div>
 

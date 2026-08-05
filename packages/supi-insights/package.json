@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-insights",
   "version": "4.5.1",
-  "description": "SuPi Insights extension — generate usage reports analyzing your PI sessions",
+  "description": "Historical Pi-session reports and shareable HTML",
   "license": "MIT",
   "repository": {
     "type": "git",

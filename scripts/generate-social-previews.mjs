@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Generate branded 1280×640 README banners for every workspace package.
+ * Generate branded 1280×640 social previews for every workspace package.
  *
  * Requires Inkscape and ImageMagick.
  *
@@ -22,6 +22,74 @@ const SPECIAL_NAMES = {
   lsp: "LSP",
   "tree-sitter": "Tree-sitter",
 };
+// Real registered surfaces (tools, commands, skills, exports) — verified against src/.
+const SOCIAL_BADGES = {
+  "ask-user": ["ask_user", "choice forms", "text forms"],
+  "bash-timeout": ["bash hook", "120s default", "/supi-settings"],
+  cache: ["/supi-cache-history", "supi_cache_forensics"],
+  "claude-md": ["claude-md-improver", "claude-md-revision"],
+  "code-intelligence": ["code_resolve", "code_graph", "code_refactor_plan"],
+  "code-runtime": ["./api", "CodeQueryResult", "workspace registry"],
+  context: ["/supi-context", "supi_context"],
+  core: ["./api", "./settings", "./report"],
+  debug: ["/supi-debug", "supi_debug"],
+  extras: ["/supi-stash", "/clone-session", "shortcuts"],
+  insights: ["/supi-insights", "shareable HTML"],
+  lsp: ["./api", "server lifecycle", "diagnostics"],
+  "prompt-suggestions": ["ghost text", "/supi-settings"],
+  review: ["/supi-review", "supi_review_run", "supi_review_audit"],
+  settings: ["/supi-settings", "project/global"],
+  // biome-ignore lint/security/noSecrets: public test-util API names, not secrets
+  "test-utils": ["createPiMock()", "makeCtx()", "getHandlerOrThrow()"],
+  "tree-sitter": ["./api", "AST queries", "bundled parsers"],
+  web: ["web_fetch_md", "web_docs_search", "web_docs_fetch"],
+};
+const SOCIAL_TAGLINES = {
+  "ask-user": ["Blocking choice & text forms let the agent", "ask you instead of guessing."],
+  "bash-timeout": [
+    "Injects a default timeout into bash calls",
+    "so hung commands can't stall a session.",
+  ],
+  cache: [
+    "Monitors prompt-cache hit rates and explains",
+    "regressions: what dropped, when, and why.",
+  ],
+  "claude-md": [
+    "Skills that audit and revise CLAUDE.md and",
+    "AGENTS.md with durable session learnings.",
+  ],
+  "code-intelligence": [
+    "Model-callable LSP + AST tools: orient,",
+    "inspect, graph, diagnose, and refactor.",
+  ],
+  "code-runtime": [
+    "Shared workspace & capability contracts",
+    "behind the code-intelligence stack.",
+  ],
+  context: ["Live context-window pressure for the agent,", "token-use reports for you."],
+  core: ["Config, settings registry, and report", "helpers shared by every SuPi package."],
+  debug: ["Captures SuPi debug events and renders them", "inline, filterable by source and level."],
+  extras: ["Session comforts: prompt stash, tab spinner,", "shortcuts, clone, titles, git safety."],
+  insights: ["Historical session reports — usage, cost,", "cache health — shareable as HTML."],
+  lsp: ["Language-server lifecycle, live diagnostics,", "and semantic ops for code intelligence."],
+  "prompt-suggestions": [
+    "Ghost-text next-prompt suggestions you can",
+    "edit before sending. Optional.",
+  ],
+  review: ["Runs independent inspection-only reviewers", "over a frozen copy of your change."],
+  settings: ["One searchable /supi-settings overlay for", "project & global SuPi configuration."],
+  "test-utils": ["Shared pi mocks and test helpers used by", "every SuPi package's test suite."],
+  "tree-sitter": ["Structural AST search, outlines, and calls —", "no language server required."],
+  web: [
+    "Public pages as clean Markdown, plus focused",
+    "Context7 docs, sized for context windows.",
+  ],
+};
+const TAGLINE_MAX_CHARS = 58;
+const BADGE_COLORS = ["#8aadf4", "#a6da95", "#c6a0f6"];
+const BADGE_GAP = 14;
+const BADGE_MAX_WIDTH = 660;
+const BADGE_X = 506;
 
 function escapeXml(value) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
@@ -37,26 +105,43 @@ function displayName(shortName) {
   );
 }
 
-function wrapText(value, maxLength = 48) {
-  const lines = [];
-  for (const word of value.split(/\s+/)) {
-    const current = lines.at(-1);
-    if (!current || `${current} ${word}`.length > maxLength) {
-      lines.push(word);
-    } else {
-      lines[lines.length - 1] = `${current} ${word}`;
-    }
-  }
-  return lines;
+function badgeWidth(label) {
+  // +64: 43px left (dot + gap) and ~21px right padding, so the label reads centered despite the dot.
+  return label.length * 10 + 64;
 }
 
-function descriptionText(lines) {
-  return lines
-    .map((line, index) => `<tspan x="508" dy="${index === 0 ? 0 : 38}">${escapeXml(line)}</tspan>`)
-    .join("");
+function badgesSvg(badges) {
+  const totalWidth =
+    badges.reduce((width, badge) => width + badgeWidth(badge), 0) + BADGE_GAP * (badges.length - 1);
+  assert.ok(
+    totalWidth <= BADGE_MAX_WIDTH,
+    `Badges exceed ${BADGE_MAX_WIDTH}px: ${badges.join(", ")}`,
+  );
+
+  let x = BADGE_X;
+  const rendered = badges.map((badge, index) => {
+    const width = badgeWidth(badge);
+    const svg = `    <g>
+      <rect x="${x}" y="402" width="${width}" height="48" rx="24" fill="#363a4f" stroke="#494d64"/>
+      <circle cx="${x + 26}" cy="426" r="5" fill="${BADGE_COLORS[index]}"/>
+      <text x="${x + 43}" y="432" fill="#cad3f5">${escapeXml(badge)}</text>
+    </g>`;
+    x += width + BADGE_GAP;
+    return svg;
+  });
+
+  return `<g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16" font-weight="600">
+${rendered.join("\n")}
+  </g>`;
 }
 
-function renderSvg({ description, display, kind, packageName }) {
+function taglineSvg(tagline) {
+  return `<g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="20" font-weight="500" fill="#a5adcb">
+${tagline.map((line, index) => `    <text x="508" y="${322 + index * 30}">${escapeXml(line)}</text>`).join("\n")}
+  </g>`;
+}
+
+function renderSvg({ badges, description, display, kind, packageName, tagline }) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
   <title id="title">SuPi ${escapeXml(display)}</title>
   <desc id="desc">${escapeXml(description)}</desc>
@@ -93,16 +178,19 @@ function renderSvg({ description, display, kind, packageName }) {
   <text x="532" y="136" fill="#a5adcb" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="20" font-weight="700" letter-spacing="2">${escapeXml(kind)}</text>
   <text x="506" y="228" fill="#cad3f5" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-size="62" font-weight="750">${escapeXml(display)}</text>
   <text x="508" y="278" fill="#8aadf4" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="20" font-weight="650">${escapeXml(packageName)}</text>
-  <text x="508" y="344" fill="#b8c0e0" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-size="26" font-weight="500">${descriptionText(wrapText(description))}</text>
 
-  <path d="M508 520h660" stroke="#494d64"/>
-  <text x="508" y="556" fill="#a5adcb" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="19">github.com/mrclrchtr/supi</text>
+${taglineSvg(tagline)}
+
+${badgesSvg(badges)}
+
+  <path d="M508 480h660" stroke="#494d64"/>
+  <text x="508" y="516" fill="#a5adcb" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="19">github.com/mrclrchtr/supi</text>
 </svg>
 `;
 }
 
 function main() {
-  assert.deepEqual(wrapText("one two three", 7), ["one two", "three"]);
+  assert.equal(badgeWidth("LSP + AST"), 154);
 
   const packageDirs = readdirSync(PACKAGES_DIR, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name.startsWith("supi-"))
@@ -120,11 +208,23 @@ function main() {
     const temporarySvg = resolve(assetsDir, ".tmp-social-preview.svg");
     const temporaryPng = resolve(assetsDir, ".tmp-social-preview.png");
     const output = resolve(assetsDir, "social-preview.png");
+    const badges = SOCIAL_BADGES[shortName];
+    assert.ok(badges, `Missing social badges: ${packageJson.name}`);
+    const tagline = SOCIAL_TAGLINES[shortName];
+    assert.ok(tagline, `Missing social tagline: ${packageJson.name}`);
+    for (const line of tagline) {
+      assert.ok(
+        line.length <= TAGLINE_MAX_CHARS,
+        `Tagline line too long in ${packageJson.name}: ${line}`,
+      );
+    }
     const svg = renderSvg({
+      badges,
       description: packageJson.description,
       display: displayName(shortName),
       kind: packageJson.pi?.extensions?.length ? "PI EXTENSION" : "SUPI LIBRARY",
       packageName: packageJson.name,
+      tagline,
     });
 
     try {

@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-lsp",
   "version": "4.5.1",
-  "description": "SuPi LSP runtime — Language Server Protocol integration library for pi",
+  "description": "Language Server Protocol runtime for SuPi code intelligence",
   "license": "MIT",
   "repository": {
     "type": "git",

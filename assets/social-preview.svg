@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
-  <title id="title">SuPi social preview</title>
-  <desc id="desc">SuPi — LSP and Tree-sitter code intelligence for the Pi coding agent.</desc>
+  <title id="title">SuPi — extensions for the Pi coding agent</title>
+  <desc id="desc">SuPi — code intelligence, documentation, reviews, and context tools for the Pi coding agent.</desc>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#181926"/>
@@ -33,28 +33,26 @@
   <circle cx="512" cy="128" r="6" fill="#8aadf4"/>
   <text x="532" y="136" fill="#a5adcb" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="20" font-weight="700" letter-spacing="2">PI EXTENSION STACK</text>
 
-  <text x="506" y="225" fill="#cad3f5" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-size="62" font-weight="750">Code intelligence</text>
+  <text x="506" y="225" fill="#cad3f5" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-size="56" font-weight="750">A developer tool belt</text>
   <text x="506" y="296" fill="#cad3f5" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-size="50" font-weight="650">for the Pi coding agent</text>
-  <text x="508" y="366" fill="#b8c0e0" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-size="27" font-weight="500">LSP semantics <tspan fill="#6e738d">+</tspan> Tree-sitter structure</text>
-
   <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="17" font-weight="650">
     <g>
-      <rect x="506" y="414" width="146" height="48" rx="24" fill="#363a4f" stroke="#494d64"/>
-      <circle cx="532" cy="438" r="5" fill="#8aadf4"/>
-      <text x="549" y="444" fill="#cad3f5">NAVIGATE</text>
+      <rect x="506" y="350" width="159" height="48" rx="24" fill="#363a4f" stroke="#494d64"/>
+      <circle cx="532" cy="374" r="5" fill="#8aadf4"/>
+      <text x="549" y="380" fill="#cad3f5">LSP + AST</text>
     </g>
     <g>
-      <rect x="668" y="414" width="144" height="48" rx="24" fill="#363a4f" stroke="#494d64"/>
-      <circle cx="694" cy="438" r="5" fill="#a6da95"/>
-      <text x="711" y="444" fill="#cad3f5">REFACTOR</text>
+      <rect x="681" y="350" width="225" height="48" rx="24" fill="#363a4f" stroke="#494d64"/>
+      <circle cx="707" cy="374" r="5" fill="#a6da95"/>
+      <text x="724" y="380" fill="#cad3f5">PARALLEL REVIEW</text>
     </g>
     <g>
-      <rect x="828" y="414" width="124" height="48" rx="24" fill="#363a4f" stroke="#494d64"/>
-      <circle cx="854" cy="438" r="5" fill="#c6a0f6"/>
-      <text x="871" y="444" fill="#cad3f5">REVIEW</text>
+      <rect x="922" y="350" width="225" height="48" rx="24" fill="#363a4f" stroke="#494d64"/>
+      <circle cx="948" cy="374" r="5" fill="#c6a0f6"/>
+      <text x="965" y="380" fill="#cad3f5">CACHE FORENSICS</text>
     </g>
   </g>
 
-  <path d="M508 520h660" stroke="#494d64"/>
-  <text x="508" y="556" fill="#a5adcb" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="19">github.com/mrclrchtr/supi</text>
+  <path d="M508 480h660" stroke="#494d64"/>
+  <text x="508" y="516" fill="#a5adcb" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="19">github.com/mrclrchtr/supi</text>
 </svg>
