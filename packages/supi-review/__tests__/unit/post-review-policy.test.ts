@@ -29,6 +29,7 @@ function makeDetails(options: { findings?: boolean; partial?: boolean } = {}): R
         byImpact: { low: 0, medium: 0, high: hasFindings ? 1 : 0 },
       },
       summary: hasFindings ? "One issue." : "No issues.",
+      criteriaCoverage: { status: "complete" },
       findings: hasFindings
         ? [
             {

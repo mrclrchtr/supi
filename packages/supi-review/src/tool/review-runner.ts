@@ -5,6 +5,7 @@ import { ReviewAuditTraceCollector } from "../audit/review-audit.ts";
 import { summarizeReviewSnapshot } from "../git.ts";
 import type {
   ReviewerCapabilityWarning,
+  ReviewerExtensionSetStatus,
   ReviewerInvocation,
   ReviewerRunResult,
   ReviewSubmission,
@@ -30,6 +31,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     return {
       kind: "canceled",
       modelId: invocation.model.canonicalId,
+      reviewerExtensionSetStatus: "unobserved",
       diagnostics: createEarlyCancellationDiagnostics(),
     };
   }
@@ -38,6 +40,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
   const warnings: ReviewerCapabilityWarning[] = [];
   const protocolPrompt = buildReviewerSystemPrompt(invocation.dependencyBootstrapConfigured);
   const thinkingLevel = clampThinkingLevel(invocation.model.model, "max");
+  let reviewerExtensionSetStatus: ReviewerExtensionSetStatus = "unobserved";
   let session: AgentSession | undefined;
   let trace: ReviewAuditTraceCollector | undefined;
   let unsubscribe: (() => void) | undefined;
@@ -62,7 +65,11 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
         unsubscribe = created.subscribe((event) => trace?.observe(event));
       }
       const active = new Set(created.getActiveToolNames());
-      if (HEADLESS_INSPECTION_TOOL_NAMES.every((name) => active.has(name))) return;
+      if (HEADLESS_INSPECTION_TOOL_NAMES.every((name) => active.has(name))) {
+        reviewerExtensionSetStatus = "active";
+        return;
+      }
+      reviewerExtensionSetStatus = "degraded";
       warnings.push({
         message:
           "Headless Code Intelligence was unavailable; this reviewer continued with read, bash, and grep inspection.",
@@ -74,6 +81,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
   const result: ReviewerRunResult = {
     ...outcome,
     modelId: invocation.model.canonicalId,
+    reviewerExtensionSetStatus,
     ...(warnings.length > 0 ? { capabilityWarnings: warnings } : {}),
   };
   if (!invocation.audit || !session || !trace) return result;

@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { readReviewDiff } from "../git.ts";
 import { runGit, runGitAllowExit } from "../git-command.ts";
+import { resolveReviewPath } from "../review-path.ts";
 import type { ReviewSnapshot, ReviewWorkspaceReceipt } from "../types.ts";
 
 const WORKSPACE_MARKER = "supi-review:";
@@ -30,6 +31,7 @@ function afterCommit(snapshot: ReviewSnapshot): string {
   if (snapshot.target.kind === "working-tree") {
     return snapshot.target.mergeBaseCommit ?? snapshot.target.headCommit;
   }
+  if (snapshot.target.kind === "current-state") return snapshot.target.headCommit;
   return snapshot.target.kind === "comparison"
     ? snapshot.target.headCommit
     : snapshot.target.commit;
@@ -47,6 +49,7 @@ function baselineRevision(snapshot: ReviewSnapshot): string {
   if (snapshot.target.kind === "working-tree") {
     return snapshot.target.mergeBaseCommit ?? snapshot.target.headCommit;
   }
+  if (snapshot.target.kind === "current-state") return snapshot.target.headCommit;
   if (snapshot.target.kind === "comparison") return snapshot.target.mergeBaseCommit;
   return snapshot.target.parentCommit ?? "empty-tree";
 }
@@ -60,11 +63,34 @@ function workspaceSnapshot(snapshot: ReviewSnapshot, cwd: string): ReviewSnapsho
   };
 }
 
+async function verifyReviewScope(snapshot: ReviewSnapshot, cwd: string): Promise<void> {
+  if (snapshot.requestedTarget.kind !== "current-state") return;
+  for (const path of snapshot.requestedTarget.paths ?? []) {
+    try {
+      await lstat(resolveReviewPath(cwd, path).absolute);
+    } catch (error) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        ((error as { code?: unknown }).code === "ENOENT" ||
+          (error as { code?: unknown }).code === "ENOTDIR")
+      ) {
+        throw new Error(`Review Workspace does not contain Review Scope path: ${path}.`, {
+          cause: error,
+        });
+      }
+      throw error;
+    }
+  }
+}
+
 /** Re-read the frozen workspace through the canonical patch compiler before children can inspect it. */
 async function verifyWorkspace(
   snapshot: ReviewSnapshot,
   cwd: string,
 ): Promise<ReviewWorkspaceReceipt> {
+  await verifyReviewScope(snapshot, cwd);
   const expectedWorkspaceHead = afterCommit(snapshot);
   const observedWorkspaceHead = (
     await runGit(cwd, [
@@ -77,7 +103,7 @@ async function verifyWorkspace(
   if (observedWorkspaceHead !== expectedWorkspaceHead) {
     throw new Error("Review Workspace checked out an unexpected commit.");
   }
-  if (snapshot.target.kind !== "working-tree") {
+  if (snapshot.target.kind !== "working-tree" && snapshot.target.kind !== "current-state") {
     const status = await runGit(cwd, ["status", "--porcelain"]);
     if (status) throw new Error("Review Workspace was not clean after checkout.");
   }
@@ -123,14 +149,17 @@ export async function materializeReviewWorkspace(
     cwd = await realpath(workspacePath);
     await runGit(snapshot.repositoryRoot, ["worktree", "lock", "--reason", lockReason(), cwd]);
 
-    if (snapshot.target.kind === "working-tree") {
+    if (snapshot.target.kind === "working-tree" || snapshot.target.kind === "current-state") {
       const patch = await readReviewDiff(snapshot.repositoryRoot, snapshot);
       if (sha256(patch) !== snapshot.diffHash) {
-        throw new Error("The working-tree target changed before its Review Workspace was frozen.");
+        throw new Error("The review target changed before its Review Workspace was frozen.");
       }
-      const patchPath = join(parent, "target.patch");
-      await writeFile(patchPath, patch, "utf8");
-      await runGit(cwd, ["apply", "--index", "--binary", "--whitespace=nowarn", patchPath]);
+      // An unchanged current state freezes to its HEAD checkout without a patch.
+      if (patch) {
+        const patchPath = join(parent, "target.patch");
+        await writeFile(patchPath, patch, "utf8");
+        await runGit(cwd, ["apply", "--index", "--binary", "--whitespace=nowarn", patchPath]);
+      }
     }
     receipt = await verifyWorkspace(snapshot, cwd);
   } catch (error) {

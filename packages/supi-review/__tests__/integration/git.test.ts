@@ -45,6 +45,74 @@ describe("review targets", () => {
     await expect(readReviewDiff(nested, snapshot, "a.txt")).resolves.toContain("+changed at root");
   });
 
+  it("audits the current state including uncommitted and untracked work", async () => {
+    writeFileSync(join(cwd, "a.txt"), "dirty\n");
+    writeFileSync(join(cwd, "untracked.txt"), "untracked\n");
+
+    const snapshot = await resolveReviewSnapshot(cwd, { kind: "current-state" });
+
+    expect(snapshot?.target).toEqual({
+      kind: "current-state",
+      headCommit: git(cwd, "rev-parse", "HEAD"),
+    });
+    expect(snapshot?.title).toBe("Current state audit");
+    expect(snapshot?.changes.map((change) => change.path)).toEqual(["a.txt", "untracked.txt"]);
+    if (!snapshot) return;
+    const fullDiff = await readReviewDiff(cwd, snapshot);
+    expect(fullDiff).toContain("+dirty");
+    expect(fullDiff).toContain("+untracked");
+  });
+
+  it("audits an unchanged current state instead of reporting no target", async () => {
+    const snapshot = await resolveReviewSnapshot(cwd, { kind: "current-state" });
+
+    expect(snapshot).toBeDefined();
+    expect(snapshot?.changes).toEqual([]);
+    if (!snapshot) return;
+    expect(await readReviewDiff(cwd, snapshot)).toBe("");
+  });
+
+  it("validates advisory Review Scope paths against the frozen state", async () => {
+    mkdirSync(join(cwd, "docs"));
+    writeFileSync(join(cwd, "docs/spec.md"), "spec\n");
+
+    const snapshot = await resolveReviewSnapshot(cwd, {
+      kind: "current-state",
+      paths: ["docs/spec.md", "a.txt"],
+    });
+    expect(snapshot?.requestedTarget).toEqual({
+      kind: "current-state",
+      paths: ["docs/spec.md", "a.txt"],
+    });
+
+    const deduplicated = await resolveReviewSnapshot(cwd, {
+      kind: "current-state",
+      paths: ["docs/spec.md", "docs/./spec.md", "a.txt"],
+    });
+    expect(deduplicated?.requestedTarget).toEqual({
+      kind: "current-state",
+      paths: ["docs/spec.md", "a.txt"],
+    });
+
+    await expect(
+      resolveReviewSnapshot(cwd, { kind: "current-state", paths: ["missing.ts"] }),
+    ).rejects.toThrow(/does not exist/);
+    await expect(
+      resolveReviewSnapshot(cwd, { kind: "current-state", paths: ["../escape"] }),
+    ).rejects.toThrow(/inside the repository/);
+  });
+
+  it("requires at least one commit before auditing the current state", async () => {
+    const empty = join(cwd, "empty-repo");
+    mkdirSync(empty);
+    initializeRepository(empty);
+    writeFileSync(join(empty, "a.txt"), "work\n");
+
+    await expect(resolveReviewSnapshot(empty, { kind: "current-state" })).rejects.toThrow(
+      /requires at least one commit/i,
+    );
+  });
+
   it("reviews committed and uncommitted current work against a base commit", async () => {
     const baseCommit = git(cwd, "rev-parse", "HEAD");
     writeFileSync(join(cwd, "a.txt"), "committed\n");

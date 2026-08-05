@@ -32,15 +32,30 @@ const DEFAULT_REVIEW: ReviewInput = {
   ],
 };
 
+const CURRENT_STATE_DEFAULT_REVIEW: ReviewInput = {
+  tasks: [
+    {
+      id: "general",
+      instructions: "Review the current state against the requested criteria.",
+    },
+  ],
+};
+
+function defaultReviewFor(target: ReviewTargetSpec): ReviewInput {
+  return target.kind === "current-state" ? CURRENT_STATE_DEFAULT_REVIEW : DEFAULT_REVIEW;
+}
+
 async function selectTarget(ctx: CommandContext): Promise<ReviewTargetSpec | undefined> {
   const kind = await ctx.ui.select("Review target", [
     "Uncommitted changes against HEAD",
     "Current work against a base branch",
     "Committed changes against a base branch",
     "Single commit",
+    "Current state audit",
   ]);
   if (!kind) return undefined;
   if (kind === "Uncommitted changes against HEAD") return { kind: "working-tree" };
+  if (kind === "Current state audit") return { kind: "current-state" };
   const choices =
     kind === "Single commit" ? await listRecentCommits(ctx.cwd) : await listLocalBranches(ctx.cwd);
   const label = await ctx.ui.select(
@@ -116,6 +131,7 @@ async function editReviewInteractive(
       id,
       instructions,
       ...(existing?.findingScope ? { findingScope: existing.findingScope } : {}),
+      ...(existing?.criteriaSources?.length ? { criteriaSources: existing.criteriaSources } : {}),
     });
   }
 
@@ -197,7 +213,7 @@ async function prepareInteractiveReview(
     ctx.ui.notify("Planner unavailable; edit replacement tasks to continue.", "warning");
   }
   return {
-    review: outcome.plan.plannerDraft ?? DEFAULT_REVIEW,
+    review: outcome.plan.plannerDraft ?? defaultReviewFor(target),
     planId: outcome.plan.id,
   };
 }
@@ -268,8 +284,19 @@ async function runCommand(ctx: CommandContext, services: ReviewCommandServices):
       ? await prepareInteractiveReview(ctx, target, reviewerModel, planStore)
       : undefined;
   if (planning === "AI suggests tasks" && !prepared) return;
-  const review = prepared?.review ?? DEFAULT_REVIEW;
+  const baseReview = prepared?.review ?? defaultReviewFor(target);
   const planId = prepared?.planId;
+
+  // Current-State Audit fixes criteria-only scope; strip planner-default findingScope
+  // before the editor copies it into user-facing tasks. Copy rather than mutate so the
+  // plan store's planner draft is never edited in place.
+  const review =
+    target.kind === "current-state"
+      ? {
+          ...baseReview,
+          tasks: baseReview.tasks.map(({ findingScope: _stripped, ...rest }) => rest),
+        }
+      : baseReview;
 
   const edited = await editReviewInteractive(ctx, review, {
     allowResize: planning === "Write my own tasks",

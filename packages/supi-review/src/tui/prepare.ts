@@ -7,29 +7,31 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import { formatReviewUsage } from "../tool/usage-format.ts";
-import type { FindingScope, PreparedReviewDetails } from "../types.ts";
+import type { PreparedReviewDetails } from "../types.ts";
 import { renderError, renderPartial, renderReviewToolCall } from "./common.ts";
 
 /** Plan details shape extracted from execute's details return. */
-interface PrepareDetails extends PreparedReviewDetails {
-  plannerDraft?: {
-    sharedContext?: string;
-    tasks: Array<{ id: string; instructions: string; findingScope?: FindingScope }>;
-  };
-}
+type PrepareDetails = PreparedReviewDetails;
 
 // ── renderCall ───────────────────────────────────────────────────
 
 export function renderPrepareCall(args: unknown, theme: Theme): Text {
   const params = (args ?? {}) as {
     planning?: string;
-    target?: { workingTree?: unknown; comparison?: unknown; commit?: unknown };
+    target?: {
+      workingTree?: unknown;
+      comparison?: unknown;
+      commit?: unknown;
+      currentState?: unknown;
+    };
   };
   const targetKind = params.target?.comparison
     ? "comparison"
     : params.target?.commit
       ? "commit"
-      : "working-tree";
+      : params.target?.currentState
+        ? "current-state"
+        : "working-tree";
 
   return renderReviewToolCall("supi_review_prepare", params.planning ?? "none", theme, targetKind);
 }
@@ -70,7 +72,16 @@ function buildCollapsed(details: PrepareDetails, theme: Theme): Text {
   const segments: string[] = [];
   segments.push(theme.fg("accent", "Plan ready"));
   segments.push(theme.fg("muted", targetKind));
-  segments.push(theme.fg("dim", `${fileCount} file${fileCount !== 1 ? "s" : ""} changed`));
+  segments.push(
+    theme.fg(
+      "dim",
+      targetKind === "current-state"
+        ? details.snapshot.requestedTarget.paths?.length
+          ? `${details.snapshot.requestedTarget.paths.length} focus paths`
+          : "repository-wide"
+        : `${fileCount} file${fileCount !== 1 ? "s" : ""} changed`,
+    ),
+  );
   if (hasPlanner) segments.push(theme.fg("muted", "with draft"));
   else if (details.plannerFailure) segments.push(theme.fg("warning", "planner unavailable"));
 
@@ -116,6 +127,7 @@ function addPlannerMetadata(container: Container, details: PrepareDetails, theme
 function addPlannerDraft(container: Container, details: PrepareDetails, theme: Theme): void {
   const draft = details.plannerDraft;
   if (!draft) return;
+  const currentState = details.snapshot.requestedTarget.kind === "current-state";
   container.addChild(new Spacer(1));
   container.addChild(new Text(theme.fg("accent", theme.bold("Planner Draft")), 1, 0));
   if (draft.sharedContext) {
@@ -127,11 +139,16 @@ function addPlannerDraft(container: Container, details: PrepareDetails, theme: T
   for (const task of draft.tasks) {
     container.addChild(
       new Text(
-        `${theme.fg("accent", task.id)} ${theme.fg("dim", `(${task.findingScope ?? "change-only"})`)}: ${theme.fg("muted", task.instructions)}`,
+        `${theme.fg("accent", task.id)} ${theme.fg("dim", `(${currentState ? "criteria-only" : (task.findingScope ?? "change-only")})`)}: ${theme.fg("muted", task.instructions)}`,
         1,
         0,
       ),
     );
+    for (const source of task.criteriaSources ?? []) {
+      container.addChild(
+        new Text(theme.fg("dim", `criteria: ${source.reference} — ${source.summary}`), 1, 0),
+      );
+    }
     container.addChild(new Text(theme.fg("dim", "─".repeat(40)), 1, 0));
   }
 }
@@ -155,7 +172,9 @@ function buildExpanded(details: PrepareDetails, theme: Theme): Container {
     new Text(
       theme.fg(
         "dim",
-        `${snapshot.changes.length} file${snapshot.changes.length !== 1 ? "s" : ""} changed · +${snapshot.stats.additions} / -${snapshot.stats.deletions}`,
+        snapshot.requestedTarget.kind === "current-state"
+          ? `review scope: ${snapshot.requestedTarget.paths?.map((path) => JSON.stringify(path)).join(", ") ?? "repository-wide discovery"}`
+          : `${snapshot.changes.length} file${snapshot.changes.length !== 1 ? "s" : ""} changed · +${snapshot.stats.additions} / -${snapshot.stats.deletions}`,
       ),
       1,
       0,

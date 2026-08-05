@@ -1,6 +1,6 @@
 import type {
+  EffectiveFindingScope,
   FindingCounts,
-  FindingScope,
   ReviewBatchDetails,
   ReviewTaskResult,
 } from "../types.ts";
@@ -31,7 +31,7 @@ function appendTaskStatus(
   if (result.diagnostics) lines.push("", ...formatChildFailureDiagnostics(result.diagnostics));
 }
 
-function formatTaskResult(result: ReviewTaskResult, findingScope: FindingScope): string[] {
+function formatTaskResult(result: ReviewTaskResult, findingScope: EffectiveFindingScope): string[] {
   const lines = [
     "",
     `## ${result.taskId}`,
@@ -49,12 +49,13 @@ function formatTaskResult(result: ReviewTaskResult, findingScope: FindingScope):
     return lines;
   }
 
-  lines.push(
-    `Verdict: ${result.verdict.toUpperCase()}`,
-    formatFindingCounts(result.findingCounts),
-    "",
-    result.summary,
-  );
+  lines.push(`Verdict: ${result.verdict.toUpperCase()}`, formatFindingCounts(result.findingCounts));
+  if (result.criteriaCoverage?.status === "incomplete") {
+    lines.push(
+      `Criteria coverage: incomplete — ${result.criteriaCoverage.reason ?? "unspecified"}`,
+    );
+  }
+  lines.push("", result.summary);
   for (const finding of result.findings) {
     lines.push(
       "",
@@ -72,13 +73,17 @@ function formatTaskResult(result: ReviewTaskResult, findingScope: FindingScope):
 
 /** Format complete Review Engine output for parent-facing Markdown and continuation storage. */
 export function formatReviewBatch(details: ReviewBatchDetails): string {
+  const currentState = details.snapshot.target.kind === "current-state";
+  const workspaceReceipt = currentState
+    ? `Workspace receipt: ${details.workspaceReceipt.status} · current-state · frozen filesystem verified`
+    : `Workspace receipt: ${details.workspaceReceipt.status} · ${details.workspaceReceipt.targetKind} · ${details.workspaceReceipt.changedPathCount} changed paths · ${details.workspaceReceipt.observedDiffHash}`;
   const lines = [
     "# Review Finished",
     "",
     `Mode: ${details.mode}`,
     `Provenance: ${details.provenance}`,
     `Target: ${details.snapshot.title}`,
-    `Workspace receipt: ${details.workspaceReceipt.status} · ${details.workspaceReceipt.targetKind} · ${details.workspaceReceipt.changedPathCount} changed paths · ${details.workspaceReceipt.observedDiffHash}`,
+    workspaceReceipt,
   ];
   if (details.planning) {
     lines.push(
@@ -97,8 +102,11 @@ export function formatReviewBatch(details: ReviewBatchDetails): string {
       `Recovery: ${details.cleanupWarning.recoveryCommand}`,
     );
   }
-  const findingScopes = new Map(
-    details.review.tasks.map((task) => [task.id, task.findingScope ?? "change-only"]),
+  const findingScopes = new Map<string, EffectiveFindingScope>(
+    details.review.tasks.map((task) => [
+      task.id,
+      currentState ? "criteria-only" : (task.findingScope ?? "change-only"),
+    ]),
   );
   for (const result of details.results) {
     lines.push(...formatTaskResult(result, findingScopes.get(result.taskId) ?? "change-only"));

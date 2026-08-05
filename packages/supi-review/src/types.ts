@@ -7,13 +7,17 @@ import type { ReviewWorkspaceCleanupWarning } from "./workspace/review-workspace
 export type CommitId = string;
 
 /**
- * The Git change selected for review. A working-tree target may use an optional
- * base commit to include committed branch work and current filesystem changes.
+ * The item selected for review: a Git change, a single commit, or a one-state
+ * Current-State Audit of the complete filesystem. A working-tree target may
+ * use an optional base commit to include committed branch work and current
+ * filesystem changes; a current-state target may optionally focus inspection
+ * with advisory workspace-relative paths.
  */
 export type ReviewTargetSpec =
   | { kind: "working-tree"; baseCommit?: CommitId }
   | { kind: "comparison"; baseCommit: CommitId }
-  | { kind: "commit"; commit: CommitId };
+  | { kind: "commit"; commit: CommitId }
+  | { kind: "current-state"; paths?: string[] };
 
 /** Resolved identity of a selected review target. */
 export type ResolvedReviewTarget =
@@ -29,7 +33,8 @@ export type ResolvedReviewTarget =
       mergeBaseCommit: CommitId;
       headCommit: CommitId;
     }
-  | { kind: "commit"; commit: CommitId; parentCommit?: CommitId };
+  | { kind: "commit"; commit: CommitId; parentCommit?: CommitId }
+  | { kind: "current-state"; headCommit: CommitId };
 
 export interface DiffStats {
   files: number;
@@ -87,12 +92,27 @@ export interface ReviewAuditReference {
 /** Eligibility policy for findings produced by one Review Task. */
 export type FindingScope = "change-only" | "boy-scout";
 
+/**
+ * Effective finding scope rendered for one task. Current-State Audit fixes
+ * `criteria-only`; Git change reviews use the task's caller-selected scope.
+ */
+export type EffectiveFindingScope = FindingScope | "criteria-only";
+
+/** Caller-identified authoritative issue or repository document for Review Criteria. */
+export interface CriteriaSource {
+  /** Identifier such as an issue reference, URL, or repository-relative path. */
+  reference: string;
+  /** Caller summary used before the reviewer retrieves the source itself. */
+  summary: string;
+}
+
 /** One independent caller-defined review objective. */
 export interface ReviewTask {
   id: string;
   instructions: string;
-  /** Defaults to change-only when omitted. */
+  /** Defaults to change-only when omitted; fixed criteria-only for Current-State Audit. */
   findingScope?: FindingScope;
+  criteriaSources?: CriteriaSource[];
 }
 
 /** Semantic input shared with the reviewer tasks in one run. */
@@ -106,7 +126,10 @@ export type PlannerDraft = ReviewInput;
 
 export type FindingImpact = "low" | "medium" | "high";
 export type FindingEffort = "small" | "medium" | "large";
-export type TaskVerdict = "pass" | "pass_with_findings" | "issues";
+export type TaskVerdict = "pass" | "pass_with_findings" | "issues" | "incomplete";
+
+/** A reviewer's structured statement about Review Criteria Source coverage. */
+export type CriteriaCoverage = { status: "complete" } | { status: "incomplete"; reason: string };
 
 /** Machine-derived count of all findings, including their acceptance and impact split. */
 export interface FindingCounts {
@@ -137,6 +160,7 @@ export interface ReviewFinding {
 export interface ReviewSubmission {
   summary: string;
   findings: ReviewFinding[];
+  criteriaCoverage: CriteriaCoverage;
 }
 
 export interface NormalizedReviewSubmission extends ReviewSubmission {
@@ -198,6 +222,7 @@ export type ChildRunOutcome<T> =
 export interface ReviewProgress {
   turns: number;
   toolUses: number;
+  toolErrors?: number;
   tokens?: {
     input: number;
     output: number;
@@ -243,8 +268,11 @@ export interface ReviewerInvocation {
   onProgress?: (progress: ReviewProgress) => void;
 }
 
+export type ReviewerExtensionSetStatus = "active" | "degraded" | "unobserved";
+
 export type ReviewerRunResult = ChildRunOutcome<ReviewSubmission> & {
   modelId: string;
+  reviewerExtensionSetStatus: ReviewerExtensionSetStatus;
   capabilityWarnings?: ReviewerCapabilityWarning[];
   audit?: ReviewAuditReference;
 };
@@ -270,6 +298,7 @@ export type ReviewTaskResult = ReviewTaskResultIdentity &
         findingCounts: FindingCounts;
         summary: string;
         findings: ReviewFinding[];
+        criteriaCoverage: CriteriaCoverage;
       }
     | {
         status: "failed";

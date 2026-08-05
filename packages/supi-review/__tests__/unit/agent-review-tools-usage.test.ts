@@ -79,6 +79,7 @@ const details: ReviewBatchDetails = {
       },
       summary: "No issues.",
       findings: [],
+      criteriaCoverage: { status: "complete" },
     },
   ],
 };
@@ -100,6 +101,7 @@ function detailsWithFinding(): ReviewBatchDetails {
           byImpact: { low: 0, medium: 0, high: 1 },
         },
         summary: "One issue.",
+        criteriaCoverage: { status: "complete" },
         findings: [
           {
             title: "Bug",
@@ -231,6 +233,59 @@ describe("agent review tool usage", () => {
     expect(mocks.runReview).toHaveBeenCalledWith(
       expect.objectContaining({ auditStore: localAuditStore }),
     );
+  });
+
+  it("renders Current-State scope and Criteria Sources in prepared output", async () => {
+    mocks.prepareReview.mockResolvedValueOnce({
+      kind: "prepared",
+      plan: {
+        id: "review-plan-current-state",
+        snapshot: {
+          repositoryRoot: "/repo",
+          requestedTarget: { kind: "current-state", paths: ["packages/supi-review"] },
+          target: { kind: "current-state", headCommit: "a".repeat(40) },
+          title: "Current state audit",
+          changes: [],
+          diffHash: "b".repeat(64),
+          stats: { files: 0, additions: 0, deletions: 0 },
+        },
+        reviewerModel: { canonicalId: "provider/model", model: {} },
+        plannerDraft: {
+          tasks: [
+            {
+              id: "spec",
+              instructions: "Check the criteria.",
+              criteriaSources: [{ reference: "#42", summary: "Acceptance criteria." }],
+            },
+          ],
+        },
+      },
+    });
+    const pi = createPiMock();
+    registerAgentReviewTools(
+      pi as unknown as ExtensionAPI,
+      new ReviewPlanStore(),
+      new ReviewArtifactStore(),
+    );
+    const ctx = makeCtx({
+      sessionManager: {
+        getEntries: vi.fn(() => []),
+        getLeafId: vi.fn(() => null),
+      },
+    });
+
+    const result = (await getTool(pi, "supi_review_prepare").execute(
+      "call",
+      { target: { currentState: { paths: ["packages/supi-review"] } }, planning: "suggest" },
+      undefined,
+      undefined,
+      ctx,
+    )) as { content?: Array<{ text: string }> };
+
+    expect(result.content?.[0]?.text).toContain('Review scope: "packages/supi-review"');
+    expect(result.content?.[0]?.text).toContain("### spec (criteria-only)");
+    expect(result.content?.[0]?.text).toContain("- #42: Acceptance criteria.");
+    expect(result.content?.[0]?.text).not.toContain("Files changed:");
   });
 
   it("returns Planner usage on the preparation tool result", async () => {

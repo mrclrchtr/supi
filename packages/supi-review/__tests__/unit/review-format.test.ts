@@ -53,6 +53,7 @@ describe("formatReviewBatch", () => {
             byImpact: { low: 0, medium: 0, high: 1 },
           },
           summary: "Found one.",
+          criteriaCoverage: { status: "complete" },
           capabilityWarnings: [{ message: "Code Intelligence unavailable." }],
           findings: [
             {
@@ -78,6 +79,7 @@ describe("formatReviewBatch", () => {
             byImpact: { low: 1, medium: 0, high: 0 },
           },
           summary: "One advisory.",
+          criteriaCoverage: { status: "complete" },
           findings: [
             {
               title: "Advisory",
@@ -120,5 +122,55 @@ describe("formatReviewBatch", () => {
     expect(output).toContain("Reviewer capability warning: Code Intelligence unavailable.");
     expect(output).toContain("Review Workspace cleanup warning: Cleanup failed.");
     expect(output).not.toMatch(/overall|run-level/i);
+  });
+
+  it("describes Current-State workspace verification without change metadata", () => {
+    const details: ReviewBatchDetails = {
+      kind: "review-batch",
+      mode: "direct",
+      provenance: "caller-supplied",
+      snapshot: {
+        requestedTarget: { kind: "current-state" },
+        target: { kind: "current-state", headCommit: "b".repeat(40) },
+        title: "Current state audit",
+        changes: [{ status: "M", path: "src/a.ts", additions: 1, deletions: 0 }],
+        diffHash: "c".repeat(64),
+        stats: { files: 1, additions: 1, deletions: 0 },
+      },
+      review: { tasks: [{ id: "task", instructions: "Review." }] },
+      workspaceReceipt: {
+        status: "verified",
+        targetKind: "current-state",
+        baselineRevision: "b".repeat(40),
+        expectedWorkspaceHead: "b".repeat(40),
+        observedWorkspaceHead: "b".repeat(40),
+        expectedDiffHash: "c".repeat(64),
+        observedDiffHash: "c".repeat(64),
+        changedPathCount: 1,
+      },
+      results: [
+        {
+          ...base,
+          status: "completed",
+          verdict: "pass",
+          findingCounts: {
+            total: 0,
+            blocking: 0,
+            nonBlocking: 0,
+            byImpact: { low: 0, medium: 0, high: 0 },
+          },
+          summary: "Clean.",
+          findings: [],
+          criteriaCoverage: { status: "complete" },
+        },
+      ],
+    };
+
+    const output = formatReviewBatch(details);
+    expect(output).toContain(
+      "Workspace receipt: verified · current-state · frozen filesystem verified",
+    );
+    expect(output).not.toContain("changed paths");
+    expect(output).not.toContain(details.workspaceReceipt.observedDiffHash);
   });
 });

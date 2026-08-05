@@ -122,6 +122,7 @@ export function runWithLifecycle<TResult>(
   const progress: ReviewProgress = {
     turns: 0,
     toolUses: 0,
+    toolErrors: 0,
     tokens: undefined,
   };
   const state: { settled: boolean; aborting: boolean } = {

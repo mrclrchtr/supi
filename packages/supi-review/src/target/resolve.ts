@@ -1,9 +1,11 @@
+import { lstat } from "node:fs/promises";
 import {
   runGit as git,
   runGitAllowExit as gitAllowExit,
   resolveGitRepositoryRoot,
   withReviewIndex,
 } from "../git-command.ts";
+import { resolveReviewPath } from "../review-path.ts";
 import type { ReviewSnapshot, ReviewSnapshotSummary, ReviewTargetSpec } from "../types.ts";
 import {
   buildReviewChanges,
@@ -111,6 +113,77 @@ async function workingTreeSnapshot(
   });
 }
 
+function isMissingPath(error: unknown): boolean {
+  return (
+    !!error &&
+    typeof error === "object" &&
+    "code" in error &&
+    ((error as { code?: unknown }).code === "ENOENT" ||
+      (error as { code?: unknown }).code === "ENOTDIR")
+  );
+}
+
+/** Validate advisory Review Scope paths against the frozen current filesystem. */
+async function validateReviewScopePaths(
+  root: string,
+  paths: string[] | undefined,
+): Promise<string[] | undefined> {
+  if (!paths?.length) return undefined;
+  const validated: string[] = [];
+  const seen = new Set<string>();
+  for (const path of paths) {
+    const safe = resolveReviewPath(root, path);
+    if (seen.has(safe.path)) continue;
+    try {
+      await lstat(safe.absolute);
+    } catch (error) {
+      if (isMissingPath(error)) {
+        throw new Error(`Review Scope path does not exist in the current state: ${safe.path}`, {
+          cause: error,
+        });
+      }
+      throw error;
+    }
+    seen.add(safe.path);
+    validated.push(safe.path);
+  }
+  return validated;
+}
+
+async function currentStateSnapshot(
+  cwd: string,
+  requested: Extract<ReviewTargetSpec, { kind: "current-state" }>,
+): Promise<ReviewSnapshot> {
+  const head = await headCommit(cwd);
+  if (!head) throw new Error("Current-State Audit requires at least one commit.");
+  const paths = await validateReviewScopePaths(cwd, requested.paths);
+  return withReviewIndex(cwd, head, head, async (indexFile) => {
+    const [nameStatus, numstat, trackedDiff, untrackedText] = await Promise.all([
+      git(cwd, ["diff", ...DIFF_FLAGS, "--name-status", "-z", head], indexFile),
+      git(cwd, ["diff", ...DIFF_FLAGS, "--numstat", "-z", head], indexFile),
+      git(cwd, ["diff", ...DIFF_FLAGS, head], indexFile),
+      git(cwd, ["ls-files", "--others", "--exclude-standard", "-z"], indexFile),
+    ]);
+    const changes = buildReviewChanges(nameStatus, numstat);
+    const diff = createDiffAccumulator();
+    diff.append(trackedDiff);
+    for (const path of parseNullList(untrackedText)) {
+      const patch = await diffUntrackedFile(cwd, path);
+      diff.append(patch);
+      changes.push(untrackedPatchChange(path, patch));
+    }
+    changes.sort((left, right) => left.path.localeCompare(right.path));
+    return {
+      repositoryRoot: cwd,
+      requestedTarget: { kind: "current-state", ...(paths ? { paths } : {}) },
+      target: { kind: "current-state", headCommit: head },
+      title: "Current state audit",
+      changes,
+      ...diff.finish(changes.length),
+    };
+  });
+}
+
 async function comparisonSnapshot(
   cwd: string,
   requested: Extract<ReviewTargetSpec, { kind: "comparison" }>,
@@ -199,6 +272,8 @@ export async function resolveReviewSnapshot(
       return comparisonSnapshot(root, target);
     case "commit":
       return commitSnapshot(root, target);
+    case "current-state":
+      return currentStateSnapshot(root, target);
   }
 }
 

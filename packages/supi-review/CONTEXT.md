@@ -19,7 +19,7 @@ A managed child agent that executes exactly one Review Task in the batch's share
 _Avoid_: reviewer sub-agent, review sandbox
 
 **Review Workspace**:
-A clean, disposable registered Git worktree that freezes one verified Review Target's after-state for a concurrent review batch. It is visible in Git while active and removed best-effort afterward; later caller edits and reviewer-generated dependency state are not Target Evidence.
+A clean, disposable registered Git worktree that freezes one verified Review Target's reviewed state for a concurrent review batch. It is visible in Git while active and removed best-effort afterward; later caller edits and reviewer-generated dependency state are not Target Evidence.
 _Avoid_: live worktree, per-reviewer checkout, child sandbox
 
 **Review Workspace Receipt**:
@@ -39,8 +39,8 @@ An external operating-system or container boundary around the whole Pi process, 
 _Avoid_: child sandbox, in-process sandbox
 
 **Inspection-only**:
-A behavioral protocol that permits repository inspection and Dependency Bootstrap but forbids intentional changes to Target Evidence or Git history. It is not an access-control guarantee; the Reviewer Session's shell remains technically capable of writing inside the shared Review Workspace.
-_Avoid_: read-only, sandboxed, write-protected
+A behavioral protocol that permits repository inspection, read-only retrieval of identified Review Criteria Sources, and Dependency Bootstrap, but forbids intentional changes to Target Evidence or Git history. Test verification means inspecting test code and requirement coverage; runtime checks are delegated to the containing Agent. It is not an access-control guarantee.
+_Avoid_: read-only, sandboxed, write-protected, runtime verification, general web research
 
 **Reviewer Extension Set**:
 The fixed, package-owned extensions requested for every Reviewer Session: currently only the headless Code Intelligence inspection profile under the containing session's project-trust decision. Registration failure falls back to direct read and shell inspection with a Reviewer Capability Warning; unrelated extensions and non-extension resources remain excluded.
@@ -55,12 +55,24 @@ One independent, caller-defined review objective identified by a stable id, free
 _Avoid_: Reviewer Assignment, Review Track, instruction block
 
 **Review Criteria**:
-Caller-authorized repository standards or specifications used to evaluate Target Evidence. They never have authority over the Reviewer Protocol or Review Task.
-_Avoid_: repository instructions, ambient context
+Caller-authorized requirements used to evaluate Target Evidence. They may be summarized in a Reviewer Packet but derive from identified authoritative sources, and they never have authority over the Reviewer Protocol or Review Task.
+_Avoid_: repository instructions, ambient context, task summary
+
+**Review Criteria Source**:
+A caller-identified authoritative issue or repository document from which Review Criteria derive. A reviewer may retrieve it when the supplied summary is insufficient; unavailable required source content makes Criteria Coverage incomplete.
+_Avoid_: shared context, Reviewer Packet, Review Scope
+
+**Criteria Coverage**:
+A required completed Review Task statement that the supplied Review Criteria were sufficient for the audit, or that unavailable source detail left coverage incomplete for a stated reason. Incomplete coverage preserves concrete findings but cannot support a definitive pass.
+_Avoid_: proof that every source was fetched, task failure, Reviewer Capability Warning, finding count
+
+**Review Scope**:
+Caller-supplied workspace-relative file or directory paths that focus a Current-State Audit without restricting inspection or finding eligibility. Reviewers may inspect any related code and report any finding relevant to the Review Criteria.
+_Avoid_: module identifier, test-suite identifier, access boundary, finding boundary, Review Criteria, Finding Scope
 
 **Finding Scope**:
-Per-Review Task eligibility policy: `change-only` limits findings to issues attributable to the Review Target, while `boy-scout` also admits pre-existing issues in changed files or reviewer-judged directly affected symbols. Purely pre-existing Boy Scout findings are advisory.
-_Avoid_: review mode, repository audit
+The finding-eligibility policy for a Review Task. Git change reviews choose `change-only` or `boy-scout`; Current-State Audit uses fixed `criteria-only`, where any criterion-relevant finding may block acceptance regardless of when it was introduced.
+_Avoid_: review mode, Review Scope, repository audit
 
 **Finding Verification**:
 The containing Agent's independent confirmation or refutation of each reported finding against Target Evidence before any mutation. It concludes by presenting the verified findings and asking the user what to do next.
@@ -91,15 +103,19 @@ An optional advisory proposal of shared context and Review Tasks generated from 
 _Avoid_: generated prompt, synthesized brief, reviewer output
 
 **Target Evidence**:
-Repository evidence belonging to the resolved before and after states of a Review Target. Git objects establish the resolved states, and the Review Workspace materializes the after-state so direct filesystem and Code Intelligence observations refer to the same target.
+Repository evidence belonging to the resolved state or states of a Review Target. Change reviews have before and after states; a Current-State Audit has one reviewed state materialized by the Review Workspace.
 _Avoid_: caller-checkout evidence, tool-dependent evidence authority
 
 **Working-Tree Review**:
 A review target comparing `HEAD`, or the merge base of an optional base commit and captured `HEAD`, with all current non-ignored worktree files as one net change. Caller staging is not evidence; its Review Workspace checks out the baseline and stages the canonical patch only as a materialization detail.
 _Avoid_: layered index review, commit-candidate review, cwd-scoped review
 
+**Current-State Audit**:
+A one-state review of the frozen current filesystem, including unstaged and uncommitted work, against Review Criteria without attributing findings to a Git change. Reviewers may inspect unchanged related code as context.
+_Avoid_: Current-Tree Audit, Working-Tree Review, scoped diff, HEAD review
+
 **Task Verdict**:
-The Review Engine-derived `pass` (no findings), `pass_with_findings` (advisory findings only), or `issues` (one or more blocking findings) result for one completed Review Task. It includes structured finding counts by blocking status and impact.
+The Review Engine-derived result for one completed Review Task: `issues` when any finding blocks acceptance; otherwise `incomplete` when Criteria Coverage is incomplete; otherwise `pass_with_findings` for advisory findings or `pass` for none. It includes structured finding counts by blocking status and impact.
 _Avoid_: reviewer verdict, run-level verdict, proof of correctness
 
 **Post-Review Disposition**:
@@ -117,6 +133,10 @@ _Avoid_: review result, transcript, permanent report
 **Child Lifecycle Trace**:
 A bounded, ordered diagnostic record of lifecycle transitions for one child session. It contains allowlisted control metadata and may contain bounded, redacted provider-owned error summaries. It never contains assistant conversation, repository evidence, tool arguments, or tool results.
 _Avoid_: recent events, event log, child transcript, telemetry
+
+**Review Debug Summary**:
+A compact per-task Debug Event containing trustworthy lifecycle, usage, outcome, and explicit Reviewer Extension Set status without repository evidence or tool arguments. It does not claim which resources were inspected or that an LSP provider was ready.
+_Avoid_: Local Reviewer Replay, reviewer conduct audit, LSP readiness report
 
 **Child Run Outcome**:
 The typed result of running one isolated child session (planner or reviewer): a `success` carrying the structured `value` and aggregate usage, or a `canceled`, `timeout`, or `failed` outcome carrying bounded Child Failure diagnostics. It is substrate-level — it carries no model id, Reviewer Capability Warning, or audit reference; adapters attach those when mapping it to a run result. `session-creation-failed` is a diagnostics-free `failed`.

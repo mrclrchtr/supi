@@ -90,10 +90,10 @@ describe("runReviewer", () => {
     });
 
     const lifecycle = mocks.runWithLifecycle.mock.calls[0]?.[0] as {
-      onEvent: (event: { type: string }, ctx: Record<string, unknown>) => void;
+      onEvent: (event: { type: string; isError?: boolean }, ctx: Record<string, unknown>) => void;
     };
     const ctx = {
-      progress: { turns: 0, toolUses: 0 },
+      progress: { turns: 0, toolUses: 0, toolErrors: 0 },
       session: {
         getSessionStats: () => ({ tokens: { input: 1, output: 2, total: 3 } }),
       },
@@ -105,6 +105,15 @@ describe("runReviewer", () => {
     expect(onProgress).toHaveBeenCalledWith({
       turns: 1,
       toolUses: 0,
+      toolErrors: 0,
+      tokens: { input: 1, output: 2, total: 3, cacheRead: undefined, cacheWrite: undefined },
+    });
+
+    lifecycle.onEvent({ type: "tool_execution_end", isError: true }, ctx);
+    expect(onProgress).toHaveBeenLastCalledWith({
+      turns: 1,
+      toolUses: 0,
+      toolErrors: 1,
       tokens: { input: 1, output: 2, total: 3, cacheRead: undefined, cacheWrite: undefined },
     });
   });
@@ -116,7 +125,7 @@ describe("runReviewer", () => {
     });
     mocks.runWithLifecycle.mockResolvedValue({
       kind: "success",
-      value: { summary: "Done", findings: [] },
+      value: { summary: "Done", findings: [], criteriaCoverage: { status: "complete" } },
     });
 
     const result = await runReviewer({
@@ -194,12 +203,13 @@ describe("runReviewer", () => {
     // success: value preserved, modelId attached, no capability warnings when tools are present.
     mocks.runWithLifecycle.mockResolvedValueOnce({
       kind: "success",
-      value: { summary: "Done", findings: [] },
+      value: { summary: "Done", findings: [], criteriaCoverage: { status: "complete" } },
     });
     await expect(runReviewer(invocation)).resolves.toEqual({
       kind: "success",
-      value: { summary: "Done", findings: [] },
+      value: { summary: "Done", findings: [], criteriaCoverage: { status: "complete" } },
       modelId: model.canonicalId,
+      reviewerExtensionSetStatus: "active",
     });
 
     // timeout built by runIsolatedChild's factory, enriched with modelId.
@@ -217,6 +227,7 @@ describe("runReviewer", () => {
       timeoutMs: 1234,
       diagnostics,
       modelId: model.canonicalId,
+      reviewerExtensionSetStatus: "active",
     });
 
     // session-creation-failed stays diagnostics-free but still carries modelId.
@@ -226,6 +237,7 @@ describe("runReviewer", () => {
       kind: "failed",
       failureCode: "session-creation-failed",
       modelId: model.canonicalId,
+      reviewerExtensionSetStatus: "unobserved",
     });
     expect(created).not.toHaveProperty("diagnostics");
     expect(created).not.toHaveProperty("capabilityWarnings");

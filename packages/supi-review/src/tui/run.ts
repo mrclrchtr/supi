@@ -12,7 +12,7 @@ import type {
 } from "../tool/review-execution.ts";
 import { formatReviewUsage } from "../tool/usage-format.ts";
 import type {
-  FindingScope,
+  EffectiveFindingScope,
   ReviewBatchDetails,
   ReviewProgress,
   ReviewTaskResult,
@@ -28,12 +28,17 @@ import {
 
 // ── Helpers ──────────────────────────────────────────────────────
 
-function findingScope(details: ReviewBatchDetails, taskId: string): FindingScope {
+function findingScope(details: ReviewBatchDetails, taskId: string): EffectiveFindingScope {
+  if (details.snapshot.target.kind === "current-state") return "criteria-only";
   return details.review.tasks.find((task) => task.id === taskId)?.findingScope ?? "change-only";
 }
 
 /** Format one task without collapsing independent verdicts into a batch verdict. */
-function formatTaskCollapsed(result: ReviewTaskResult, scope: FindingScope, theme: Theme): string {
+function formatTaskCollapsed(
+  result: ReviewTaskResult,
+  scope: EffectiveFindingScope,
+  theme: Theme,
+): string {
   const warnings = result.capabilityWarnings?.length ?? 0;
   const warningLabel =
     warnings > 0 ? ` · ${warnings} capability warning${warnings === 1 ? "" : "s"}` : "";
@@ -54,7 +59,14 @@ function formatTaskCollapsed(result: ReviewTaskResult, scope: FindingScope, them
 
 export function renderRunCall(args: unknown, theme: Theme): Text {
   const params = (args ?? {}) as {
-    direct?: { target?: { workingTree?: unknown; comparison?: unknown; commit?: unknown } };
+    direct?: {
+      target?: {
+        workingTree?: unknown;
+        comparison?: unknown;
+        commit?: unknown;
+        currentState?: unknown;
+      };
+    };
     prepared?: unknown;
   };
   const target = params.direct?.target;
@@ -64,7 +76,9 @@ export function renderRunCall(args: unknown, theme: Theme): Text {
       ? "comparison"
       : target?.commit
         ? "commit"
-        : "working-tree";
+        : target?.currentState
+          ? "current-state"
+          : "working-tree";
 
   return renderReviewToolCall(
     "supi_review_run",
@@ -202,11 +216,17 @@ function buildCollapsed(details: ReviewBatchDetails, theme: Theme): Text {
   const tasks = details.results
     .map((result) => formatTaskCollapsed(result, findingScope(details, result.taskId), theme))
     .join(` ${theme.fg("dim", "·")} `);
+  const currentStateTarget =
+    details.snapshot.requestedTarget.kind === "current-state"
+      ? details.snapshot.requestedTarget
+      : undefined;
   const { additions, deletions, files } = details.snapshot.stats;
-  const target = theme.fg(
-    "dim",
-    `${details.snapshot.title} (${files} file${files !== 1 ? "s" : ""} · +${additions.toLocaleString("en-US")} / -${deletions.toLocaleString("en-US")})`,
-  );
+  const targetDetail = currentStateTarget
+    ? currentStateTarget.paths?.length
+      ? `${currentStateTarget.paths.length} focus path${currentStateTarget.paths.length === 1 ? "" : "s"}`
+      : "repository-wide"
+    : `${files} file${files !== 1 ? "s" : ""} · +${additions.toLocaleString("en-US")} / -${deletions.toLocaleString("en-US")}`;
+  const target = theme.fg("dim", `${details.snapshot.title} (${targetDetail})`);
   return new Text(`${tasks}\n${target}`, 0, 0);
 }
 
@@ -232,12 +252,18 @@ function buildExpanded(details: ReviewBatchDetails, theme: Theme): Container {
   container.addChild(
     new Text(`${theme.fg("dim", "target:")} ${theme.fg("muted", details.snapshot.title)}`, 1, 0),
   );
+  const currentStateTarget =
+    details.snapshot.requestedTarget.kind === "current-state"
+      ? details.snapshot.requestedTarget
+      : undefined;
   const fileCount = details.snapshot.changes.length;
   container.addChild(
     new Text(
       theme.fg(
         "dim",
-        `${fileCount} file${fileCount !== 1 ? "s" : ""} changed · +${details.snapshot.stats.additions} / -${details.snapshot.stats.deletions}`,
+        currentStateTarget
+          ? `review scope: ${currentStateTarget.paths?.map((path) => JSON.stringify(path)).join(", ") ?? "repository-wide discovery"}`
+          : `${fileCount} file${fileCount !== 1 ? "s" : ""} changed · +${details.snapshot.stats.additions} / -${details.snapshot.stats.deletions}`,
       ),
       1,
       0,
@@ -247,7 +273,9 @@ function buildExpanded(details: ReviewBatchDetails, theme: Theme): Container {
     new Text(
       theme.fg(
         "dim",
-        `workspace: ${details.workspaceReceipt.status} · ${details.workspaceReceipt.targetKind} · ${details.workspaceReceipt.changedPathCount} paths`,
+        currentStateTarget
+          ? `workspace: ${details.workspaceReceipt.status} · current-state · frozen filesystem`
+          : `workspace: ${details.workspaceReceipt.status} · ${details.workspaceReceipt.targetKind} · ${details.workspaceReceipt.changedPathCount} paths`,
       ),
       1,
       0,

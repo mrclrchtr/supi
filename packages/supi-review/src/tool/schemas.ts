@@ -22,8 +22,36 @@ export const reviewTaskSchema = Type.Object(
       StringEnum(["change-only", "boy-scout"] as const, {
         default: "change-only",
         description:
-          "change-only reports issues attributable to the target. boy-scout may also report directly related pre-existing issues, which stay advisory unless the target worsens or newly exposes them.",
+          "change-only reports issues attributable to the target. boy-scout may also report directly related pre-existing issues, which stay advisory unless the target worsens or newly exposes them. Current-State Audit fixes criteria-only; omit this field for currentState targets.",
       }),
+    ),
+    criteriaSources: Type.Optional(
+      Type.Array(
+        Type.Object(
+          {
+            reference: Type.String({
+              minLength: 1,
+              maxLength: REVIEW_LIMITS.criteriaReferenceCharacters,
+              pattern: "\\S",
+              description:
+                "Authoritative source identifier, such as an issue reference, URL, or repository-relative document path.",
+            }),
+            summary: Type.String({
+              minLength: 1,
+              maxLength: REVIEW_LIMITS.criteriaSummaryCharacters,
+              pattern: "\\S",
+              description:
+                "Caller summary of the source used before the reviewer retrieves the source itself.",
+            }),
+          },
+          { additionalProperties: false },
+        ),
+        {
+          minItems: 1,
+          maxItems: REVIEW_LIMITS.criteriaSourcesPerTask,
+          description: "Authoritative issues or documents this task's Review Criteria derive from.",
+        },
+      ),
     ),
   },
   { additionalProperties: false },
@@ -68,7 +96,8 @@ export const reviewFindingSchema = Type.Object(
       description: "Concrete evidence, consequence, and needed correction.",
     }),
     blocksAcceptance: Type.Boolean({
-      description: "True only when the change should not be accepted until this is corrected.",
+      description:
+        "True only when the reviewed target should not be accepted as satisfying the Review Task until this is corrected.",
     }),
     impact: StringEnum(["low", "medium", "high"] as const, {
       description: "Downside if unfixed, not the size of the correction.",
@@ -121,6 +150,27 @@ export const reviewSubmissionSchema = Type.Object(
       maxItems: REVIEW_LIMITS.findingsPerTask,
       description: "Findings in intended order; use [] after a clean review (at most 20 findings).",
     }),
+    criteriaCoverage: Type.Object(
+      {
+        status: StringEnum(["complete", "incomplete"] as const, {
+          description:
+            "complete when the supplied Review Criteria were sufficient; incomplete when unavailable source detail limited the audit.",
+        }),
+        reason: Type.Optional(
+          Type.String({
+            minLength: 1,
+            maxLength: REVIEW_LIMITS.criteriaCoverageReasonCharacters,
+            pattern: "\\S",
+            description: "Required only when status is incomplete; names the unavailable detail.",
+          }),
+        ),
+      },
+      {
+        additionalProperties: false,
+        description:
+          "Required structured criteria coverage statement; incomplete coverage cannot support a definitive pass.",
+      },
+    ),
   },
   { additionalProperties: false },
 );

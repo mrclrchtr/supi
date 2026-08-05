@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -42,6 +42,59 @@ describe("Review Workspace", () => {
     writeFileSync(join(cwd, "tracked.txt"), "changed target\n");
 
     await expect(materializeReviewWorkspace(snapshot)).rejects.toThrow(/target changed/i);
+  });
+
+  it("materializes a Current-State Audit including unchanged state with no patch", async () => {
+    const unchanged = await resolveReviewSnapshot(cwd, { kind: "current-state" });
+    expect(unchanged).toBeDefined();
+    if (!unchanged) return;
+
+    const workspace = await materializeReviewWorkspace(unchanged);
+    expect(workspace.receipt).toMatchObject({
+      status: "verified",
+      targetKind: "current-state",
+      expectedDiffHash: unchanged.diffHash,
+      observedDiffHash: unchanged.diffHash,
+      changedPathCount: 0,
+    });
+    expect(readFileSync(join(workspace.cwd, "tracked.txt"), "utf8")).toBe("base\n");
+    await workspace.cleanup();
+  });
+
+  it("freezes current-state work including untracked files for inspection", async () => {
+    writeFileSync(join(cwd, "tracked.txt"), "reviewed\n");
+    writeFileSync(join(cwd, "untracked.txt"), "also reviewed\n");
+    const snapshot = await resolveReviewSnapshot(cwd, { kind: "current-state" });
+    expect(snapshot).toBeDefined();
+    if (!snapshot) return;
+
+    const workspace = await materializeReviewWorkspace(snapshot);
+    expect(workspace.receipt).toMatchObject({
+      status: "verified",
+      targetKind: "current-state",
+      changedPathCount: 2,
+    });
+    expect(readFileSync(join(workspace.cwd, "tracked.txt"), "utf8")).toBe("reviewed\n");
+    expect(readFileSync(join(workspace.cwd, "untracked.txt"), "utf8")).toBe("also reviewed\n");
+    await workspace.cleanup();
+  });
+
+  it("rejects Review Scope paths absent from the frozen current state", async () => {
+    writeFileSync(join(cwd, ".gitignore"), "ignored.txt\n");
+    git(cwd, "add", ".gitignore");
+    git(cwd, "commit", "-m", "ignore fixture");
+    writeFileSync(join(cwd, "ignored.txt"), "not frozen\n");
+
+    const snapshot = await resolveReviewSnapshot(cwd, {
+      kind: "current-state",
+      paths: ["ignored.txt"],
+    });
+    expect(snapshot).toBeDefined();
+    if (!snapshot) return;
+
+    await expect(materializeReviewWorkspace(snapshot)).rejects.toThrow(
+      /does not contain Review Scope path/i,
+    );
   });
 
   it("stages one frozen working-tree patch over its baseline and removes it after cleanup", async () => {

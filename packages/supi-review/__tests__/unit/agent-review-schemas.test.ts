@@ -187,12 +187,115 @@ describe("agent review schemas", () => {
     expect(
       Value.Check(reviewSubmissionSchema, {
         summary: "Review finished.",
+        criteriaCoverage: { status: "complete" },
         findings: [
           {
             ...finding,
             location: { path: "src/file.ts", startLine: 10 },
           },
         ],
+      }),
+    ).toBe(true);
+  });
+
+  it("parses a Current-State Audit target with optional advisory paths", () => {
+    expect(parseRunReviewToolInput({ direct: { target: { currentState: {} }, tasks } })).toEqual({
+      mode: "direct",
+      target: { kind: "current-state" },
+      review: { tasks },
+    });
+    expect(
+      parseRunReviewToolInput({
+        direct: {
+          target: { currentState: { paths: ["packages/supi-review", "docs/adr/0012.md"] } },
+          tasks,
+        },
+      }),
+    ).toEqual({
+      mode: "direct",
+      target: { kind: "current-state", paths: ["packages/supi-review", "docs/adr/0012.md"] },
+      review: { tasks },
+    });
+
+    expect(() =>
+      parseRunReviewToolInput({
+        direct: { target: { currentState: { paths: [" "] } }, tasks },
+      }),
+    ).toThrow();
+    expect(() =>
+      parseRunReviewToolInput({
+        direct: { target: { currentState: { paths: [] } }, tasks },
+      }),
+    ).toThrow();
+    expect(() =>
+      parseRunReviewToolInput({
+        direct: { target: { currentState: {}, workingTree: {} }, tasks },
+      }),
+    ).toThrow();
+  });
+
+  it("accepts per-task criteria sources and bounds them", () => {
+    const source = { reference: "#123", summary: "Acceptance criteria." };
+    expect(
+      parseRunReviewToolInput({
+        direct: {
+          target: { currentState: {} },
+          tasks: [{ id: "spec", instructions: "Check.", criteriaSources: [source] }],
+        },
+      }),
+    ).toEqual({
+      mode: "direct",
+      target: { kind: "current-state" },
+      review: { tasks: [{ id: "spec", instructions: "Check.", criteriaSources: [source] }] },
+    });
+
+    expect(
+      Value.Check(reviewInputSchema, {
+        tasks: [{ id: "spec", instructions: "Check.", criteriaSources: [{ reference: " " }] }],
+      }),
+    ).toBe(false);
+    expect(
+      Value.Check(reviewInputSchema, {
+        tasks: [
+          {
+            id: "spec",
+            instructions: "Check.",
+            criteriaSources: Array.from({ length: 6 }, (_, index) => ({
+              reference: `#ref-${index}`,
+              summary: "Summary",
+            })),
+          },
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  it("requires structured criteria coverage in reviewer submissions", () => {
+    const base = { summary: "Review finished.", findings: [] };
+    expect(Value.Check(reviewSubmissionSchema, base)).toBe(false);
+    expect(
+      Value.Check(reviewSubmissionSchema, {
+        ...base,
+        criteriaCoverage: { status: "complete" },
+      }),
+    ).toBe(true);
+    expect(
+      Value.Check(reviewSubmissionSchema, {
+        ...base,
+        criteriaCoverage: { status: "incomplete", reason: "Issue #42 unreachable" },
+      }),
+    ).toBe(true);
+    expect(
+      Value.Check(reviewSubmissionSchema, {
+        ...base,
+        criteriaCoverage: { status: "partial" },
+      }),
+    ).toBe(false);
+    // Schema-level reason is optional; normalizeReviewSubmission enforces it for incomplete.
+    expect(
+      Value.Check(reviewSubmissionSchema, {
+        ...base,
+        criteriaCoverage: { status: "incomplete" },
       }),
     ).toBe(true);
   });

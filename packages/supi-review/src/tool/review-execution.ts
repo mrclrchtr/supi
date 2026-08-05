@@ -3,6 +3,7 @@ import { normalizeReviewSubmission } from "../review-result.ts";
 import { buildReviewPacket } from "../target/packet.ts";
 import type {
   ReviewerAuditRequest,
+  ReviewerExtensionSetStatus,
   ReviewInput,
   ReviewModelSelection,
   ReviewProgress,
@@ -11,6 +12,7 @@ import type {
   ReviewTaskResult,
 } from "../types.ts";
 import { createUnobservedChildFailureDiagnostics } from "./child-failure-diagnostics.ts";
+import { recordReviewTaskDebugSummary } from "./review-debug-summary.ts";
 import { runReviewer } from "./review-runner.ts";
 
 /** One task's compact state while a review batch is still running. */
@@ -60,6 +62,7 @@ function toTaskResult(
       findingCounts: normalized.findingCounts,
       summary: normalized.summary,
       findings: normalized.findings,
+      criteriaCoverage: normalized.criteriaCoverage,
     };
   }
   if (result.kind === "failed") {
@@ -134,6 +137,23 @@ export async function executeReviewTasks(
   return Promise.all(
     review.tasks.map(async (task) => {
       const packet = buildReviewPacket(snapshot, review, task, model);
+      const packetBytes = Buffer.byteLength(packet.prompt, "utf8");
+      const startedAt = Date.now();
+      const debugSummary = (
+        taskResult: ReviewTaskResult,
+        reviewerExtensionSetStatus: ReviewerExtensionSetStatus,
+      ): void => {
+        recordReviewTaskDebugSummary({
+          taskId: task.id,
+          targetKind: snapshot.target.kind,
+          targetTitle: snapshot.title,
+          packetBytes,
+          durationMs: Date.now() - startedAt,
+          reviewerExtensionSetStatus,
+          progress: taskStates[task.id].progress,
+          result: taskResult,
+        });
+      };
       taskStates[task.id] = { status: "running" };
       emitUpdate(onUpdate, {
         content: [{ type: "text", text: `Task ${task.id} started` }],
@@ -165,6 +185,7 @@ export async function executeReviewTasks(
           },
         });
         const taskResult = toTaskResult(task.id, packet.packetHash, result);
+        debugSummary(taskResult, result.reviewerExtensionSetStatus);
         taskStates[task.id] = { status: taskResult.status };
         completedCount++;
         const verb = taskResult.status === "completed" ? "complete" : taskResult.status;
@@ -184,6 +205,7 @@ export async function executeReviewTasks(
           failureCode: "unexpected-runner-failure",
           diagnostics: createUnobservedChildFailureDiagnostics(),
         };
+        debugSummary(taskResult, "unobserved");
         taskStates[task.id] = { status: "failed" };
         completedCount++;
         emitUpdate(onUpdate, {

@@ -11,26 +11,33 @@ import type { ResolvedReviewTarget, ReviewSnapshot } from "./types.ts";
 
 export { resolveReviewSnapshot, summarizeReviewSnapshot } from "./target/resolve.ts";
 
+type FilesystemDiffTarget = Extract<
+  ResolvedReviewTarget,
+  { kind: "working-tree" | "current-state" }
+>;
+
+/** Pinned diff baseline for a filesystem target; current-state audits diff against HEAD. */
+function baselineFor(target: FilesystemDiffTarget): string {
+  return "mergeBaseCommit" in target
+    ? (target.mergeBaseCommit ?? target.headCommit)
+    : target.headCommit;
+}
+
 function withWorkingTreeIndex<T>(
   cwd: string,
-  target: Extract<ResolvedReviewTarget, { kind: "working-tree" }>,
+  target: FilesystemDiffTarget,
   operation: (indexFile: string) => Promise<T>,
 ): Promise<T> {
-  return withReviewIndex(
-    cwd,
-    target.headCommit,
-    target.mergeBaseCommit ?? target.headCommit,
-    operation,
-  );
+  return withReviewIndex(cwd, target.headCommit, baselineFor(target), operation);
 }
 
 async function readWorkingTreeDiff(
   root: string,
-  target: Extract<ResolvedReviewTarget, { kind: "working-tree" }>,
+  target: FilesystemDiffTarget,
   path?: string,
 ): Promise<string> {
   return withWorkingTreeIndex(root, target, async (indexFile) => {
-    const baseline = target.mergeBaseCommit ?? target.headCommit;
+    const baseline = baselineFor(target);
     const pathArgs = path ? ["--", path] : [];
     const [tracked, untrackedText] = await Promise.all([
       git(root, literalPathspec(["diff", ...DIFF_FLAGS, baseline, ...pathArgs]), indexFile),
@@ -60,11 +67,16 @@ export async function readReviewDiff(
 ): Promise<string> {
   const root = snapshot.repositoryRoot;
   const safe = path ? resolveReviewPath(root, path) : undefined;
-  if (safe && !snapshot.changes.some((change) => change.path === safe.path)) {
+  // Current-State Audit has no change attribution; every state path is evidence.
+  if (
+    safe &&
+    snapshot.target.kind !== "current-state" &&
+    !snapshot.changes.some((change) => change.path === safe.path)
+  ) {
     throw new Error(`${safe.path} is not changed by this target.`);
   }
   const target = snapshot.target;
-  if (target.kind === "working-tree") {
+  if (target.kind === "working-tree" || target.kind === "current-state") {
     return readWorkingTreeDiff(root, target, safe?.path);
   }
   const pathArgs = safe ? ["--", safe.path] : [];

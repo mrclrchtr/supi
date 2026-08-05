@@ -3,6 +3,7 @@ import { resolveReviewSnapshot, summarizeReviewSnapshot } from "../git.ts";
 import { normalizeReviewInput } from "../review-input.ts";
 import type { ReviewPlanLease, ReviewPlanStore } from "../session/review-plan-store.ts";
 import { buildFileManifest } from "../target/file-manifest.ts";
+import { snapshotsMatch } from "../target/snapshot-match.ts";
 import type {
   PlannerDraft,
   PlannerRunResult,
@@ -21,6 +22,7 @@ import {
   createUnobservedChildFailureDiagnostics,
 } from "./child-failure-diagnostics.ts";
 import { combineUsage } from "./child-usage.ts";
+import { enforceCriteriaOnlyScope } from "./criteria-only-scope.ts";
 import { PLANNER_PROMPT_VERSION, runPlanner } from "./planner-runner.ts";
 import { executeReviewTasks, type ReviewExecutionUpdate } from "./review-execution.ts";
 
@@ -76,6 +78,29 @@ export interface PreparedRunInput {
 export type RunReviewInput = DirectRunInput | PreparedRunInput;
 
 function plannerPrompt(snapshot: ReviewSnapshot, context: string): string {
+  const conversation = [
+    "",
+    "## Bounded session conversation",
+    context || "No session conversation was available.",
+  ];
+  if (snapshot.requestedTarget.kind === "current-state") {
+    return [
+      "# Review Planning Input",
+      "",
+      `Target: ${snapshot.title}`,
+      "Finding Scope: criteria-only",
+      "This is a one-state audit without Git-change attribution.",
+      "",
+      "## Review scope",
+      ...(snapshot.requestedTarget.paths?.length
+        ? [
+            "Advisory focus paths; they do not restrict inspection or finding eligibility.",
+            ...snapshot.requestedTarget.paths.map((path) => `- ${JSON.stringify(path)}`),
+          ]
+        : ["Repository-wide discovery; no advisory focus paths were supplied."]),
+      ...conversation,
+    ].join("\n");
+  }
   return [
     "# Review Planning Input",
     "",
@@ -85,9 +110,7 @@ function plannerPrompt(snapshot: ReviewSnapshot, context: string): string {
     "",
     "## Changed-path inventory",
     ...buildFileManifest(snapshot.changes),
-    "",
-    "## Bounded session conversation",
-    context || "No session conversation was available.",
+    ...conversation,
   ].join("\n");
 }
 
@@ -185,34 +208,6 @@ export async function prepareReview(input: PrepareReviewInput) {
   return { kind: "prepared" as const, plan, ...(planning.usage ? { usage: planning.usage } : {}) };
 }
 
-function targetsMatch(left: ReviewSnapshot["target"], right: ReviewSnapshot["target"]): boolean {
-  if (left.kind !== right.kind) return false;
-  if (left.kind === "working-tree" && right.kind === "working-tree") {
-    return (
-      left.headCommit === right.headCommit &&
-      left.requestedBaseCommit === right.requestedBaseCommit &&
-      left.mergeBaseCommit === right.mergeBaseCommit
-    );
-  }
-  if (left.kind === "comparison" && right.kind === "comparison") {
-    return (
-      left.requestedBaseCommit === right.requestedBaseCommit &&
-      left.mergeBaseCommit === right.mergeBaseCommit &&
-      left.headCommit === right.headCommit
-    );
-  }
-  return (
-    left.kind === "commit" &&
-    right.kind === "commit" &&
-    left.commit === right.commit &&
-    left.parentCommit === right.parentCommit
-  );
-}
-
-function snapshotsMatch(left: ReviewSnapshot, right: ReviewSnapshot): boolean {
-  return left.diffHash === right.diffHash && targetsMatch(left.target, right.target);
-}
-
 function workspaceFailureReason(error: unknown): string {
   if (error instanceof Error && error.message.startsWith("Review Workspace ")) {
     return error.message;
@@ -262,6 +257,9 @@ export async function runReview(input: RunReviewInput) {
     snapshot = resolved;
     review = normalizeReviewInput(input.review);
     model = input.reviewerModel;
+    const scoped = enforceCriteriaOnlyScope(review, snapshot.target.kind, "caller-supplied");
+    if ("reason" in scoped) return { kind: "invalid" as const, reason: scoped.reason };
+    review = scoped.review;
   } else {
     const plan = input.planStore.peek(input.planId);
     if (!plan) {
@@ -306,9 +304,14 @@ export async function runReview(input: RunReviewInput) {
       };
     }
     snapshot = refreshed;
-    review = selectedReview;
     model = lease.plan.reviewerModel;
     provenance = input.decision.kind === "accept-draft" ? "planner-assisted" : "caller-supplied";
+    const scoped = enforceCriteriaOnlyScope(selectedReview, refreshed.target.kind, provenance);
+    if ("reason" in scoped) {
+      input.planStore.release(lease);
+      return { kind: "invalid" as const, reason: scoped.reason };
+    }
+    review = scoped.review;
     if (lease.plan.plannerDraft && lease.plan.plannerModelId && lease.plan.plannerPromptVersion) {
       planning = {
         promptVersion: lease.plan.plannerPromptVersion,

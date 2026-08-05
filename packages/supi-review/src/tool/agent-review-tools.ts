@@ -10,7 +10,7 @@ import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
 import type { ReviewPlanStore } from "../session/review-plan-store.ts";
 import { renderPrepareCall, renderPrepareResult } from "../tui/prepare.ts";
 import { renderRunCall, renderRunResult } from "../tui/run.ts";
-import type { FindingScope, ReviewInput, ReviewTargetSpec } from "../types.ts";
+import type { ReviewInput, ReviewSnapshot, ReviewTargetSpec, ReviewTask } from "../types.ts";
 import {
   type PrepareReviewToolInput,
   parsePrepareReviewToolInput,
@@ -41,30 +41,51 @@ function plannerFailureReason(failure: {
   return failure.kind;
 }
 
+type PreparedSnapshot = Pick<ReviewSnapshot, "title" | "changes" | "requestedTarget">;
+
+function preparedTargetDetail(snapshot: PreparedSnapshot): string {
+  if (snapshot.requestedTarget.kind === "current-state") {
+    return `Review scope: ${snapshot.requestedTarget.paths?.map((path) => JSON.stringify(path)).join(", ") ?? "repository-wide discovery"}`;
+  }
+  return `Files changed: ${snapshot.changes.length}`;
+}
+
+function preparedTaskLines(task: ReviewTask, currentState: boolean): string[] {
+  const lines = [
+    "",
+    `### ${task.id} (${currentState ? "criteria-only" : (task.findingScope ?? "change-only")})`,
+    task.instructions,
+  ];
+  if (task.criteriaSources?.length) {
+    lines.push(
+      "Criteria sources:",
+      ...task.criteriaSources.map((source) => `- ${source.reference}: ${source.summary}`),
+    );
+  }
+  return lines;
+}
+
 function formatPrepared(plan: {
   id: string;
-  snapshot: { title: string; changes: Array<{ path: string }> };
-  plannerDraft?: {
-    sharedContext?: string;
-    tasks: Array<{ id: string; instructions: string; findingScope?: FindingScope }>;
-  };
+  snapshot: PreparedSnapshot;
+  plannerDraft?: ReviewInput;
   plannerFailure?: { kind: string; failureCode?: string; timeoutMs?: number };
   plannerUsage?: Usage;
 }): string {
+  const currentState = plan.snapshot.requestedTarget.kind === "current-state";
   const lines = [
     "# Review Plan Prepared",
     "",
     `Plan ID: ${plan.id}`,
     `Target: ${plan.snapshot.title}`,
-    `Files changed: ${plan.snapshot.changes.length}`,
+    preparedTargetDetail(plan.snapshot),
   ];
   if (plan.plannerUsage) lines.push(`Planner usage: ${formatReviewUsage(plan.plannerUsage)}`);
   if (plan.plannerDraft) {
     lines.push("", "## Planner Draft");
     if (plan.plannerDraft.sharedContext) lines.push("", plan.plannerDraft.sharedContext);
-    for (const task of plan.plannerDraft.tasks) {
-      lines.push("", `### ${task.id} (${task.findingScope ?? "change-only"})`, task.instructions);
-    }
+    for (const task of plan.plannerDraft.tasks)
+      lines.push(...preparedTaskLines(task, currentState));
     lines.push(
       "",
       "Call supi_review_run with prepared: { planId, draftDecision: { useDraft: {} } } to use this draft.",
@@ -243,7 +264,7 @@ export function registerAgentReviewTools(
     name: "supi_review_prepare",
     label: "Prepare Review",
     description:
-      "Create a session-scoped, one-shot Review Plan for a Git change; optionally draft tasks from bounded context and target metadata without inspecting code. Use only before a Prepared Review. Large output is paged.",
+      "Create a session-scoped, one-shot Review Plan for a Git change or a Current-State Audit; optionally draft tasks from bounded context and target metadata without inspecting code. Use only before a Prepared Review. Large output is paged.",
     promptSnippet: "Prepare an optional one-shot review plan",
     promptGuidelines: [
       "Use supi_review_prepare only when the caller asks for a Review Plan or Planner Draft; otherwise call supi_review_run directly.",
@@ -305,7 +326,7 @@ export function registerAgentReviewTools(
     name: "supi_review_run",
     label: "Run Review",
     description:
-      "Run one to four independent Inspection-only review tasks concurrently against one frozen Git change, directly or from a prepared plan. Creates a disposable linked Git worktree; large output is paged.",
+      "Run one to four independent Inspection-only review tasks concurrently against one frozen Git change or Current-State Audit, directly or from a prepared plan. Creates a disposable linked Git worktree; large output is paged.",
     promptSnippet: "Run independent inspection-only review tasks",
     promptGuidelines: [
       "Unless explicitly requested otherwise, use `supi_review_run` for reviews instead of `Agent` or generic subagents.",

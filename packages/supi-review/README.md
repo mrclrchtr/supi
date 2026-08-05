@@ -6,7 +6,7 @@
 
 # @mrclrchtr/supi-review — Code Review for Pi
 
-Code review extension for the [Pi coding agent](https://github.com/earendil-works/pi) that runs parallel, isolated review tasks against a working tree, branch, or commit.
+Code review extension for the [Pi coding agent](https://github.com/earendil-works/pi) that runs parallel, isolated review tasks against a working tree, branch, commit, or the complete current filesystem state.
 
 ## Install
 
@@ -53,6 +53,28 @@ Preparation is optional. Skills and agents that already know how to review shoul
 
 One to four tasks share a reviewer model and one frozen Review Workspace. Direct and Prepared adapters use the same canonical packet compiler; every task result includes the SHA-256 of the exact packet bytes and nested-model usage when reported.
 
+Tasks may identify authoritative Review Criteria Sources whose summaries travel in the packet:
+
+```json
+{
+  "direct": {
+    "target": { "currentState": { "paths": ["packages/supi-review"] } },
+    "tasks": [
+      {
+        "id": "spec",
+        "instructions": "Review the current state against issue #123.",
+        "criteriaSources": [
+          { "reference": "#123", "summary": "Acceptance criteria: A, B, C." },
+          { "reference": "docs/adr/0012.md", "summary": "Current-State Audit semantics." }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`currentState` audits one frozen filesystem state without Git-change attribution, so tasks must omit `findingScope`; the engine fixes `criteria-only`. `paths` is an optional advisory focus whose entries must exist in the frozen state.
+
 ## Prepared Review
 
 Preparation returns a session-scoped `planId` and optional Planner Draft. Planner failure returns a usable no-draft plan. Before a Prepared Review runs, the engine re-resolves the target and compares its exact Review Snapshot; drift invalidates the plan. A batch with at least one completed task consumes its plan, while an all-non-completed batch releases it for retry.
@@ -75,6 +97,7 @@ The Review Engine resolves the Git worktree root once and pins commit identities
 - `working-tree` — net current filesystem plus non-ignored untracked files against `HEAD`, or `merge-base(baseCommit, HEAD)`; the caller index is not evidence
 - `comparison` — merge base of `baseCommit` and captured `HEAD` to captured `HEAD`
 - `commit` — first parent (or empty tree) to `commit`
+- `currentState` — the complete current filesystem, including uncommitted and untracked work, reviewed as one state against Review Criteria
 
 A Working-Tree Review Workspace checks out its pinned baseline and stages the exact canonical patch, so `git diff HEAD` shows the complete target. Comparison and Commit workspaces check out their pinned after commit. Before Reviewer Sessions start, the engine re-compiles the target patch from the linked workspace and verifies its hash, expected checkout commit, and changed-path count. Every completed batch includes that compact Workspace receipt, so later caller edits cannot change the in-flight target.
 
@@ -90,7 +113,9 @@ Reviewers receive:
 
 They use ordinary Git and direct reads in the frozen Review Workspace. Before-side content remains available through the packet's pinned Git revision. Code Intelligence runs in a headless inspection profile; an unavailable profile produces a Reviewer Capability Warning, while the built-in inspection tools remain available.
 
-Each Review Task may set `findingScope` to `change-only` (the default) or `boy-scout`. Change-only findings must be attributable to the selected change, including omitted or partial required behavior and acceptance-relevant scope creep. Boy Scout scope may additionally report pre-existing issues in changed files or symbols the reviewer judges directly affected; purely pre-existing findings are advisory unless the change worsens or newly exposes them. Repository standards and specifications requested by a task are Review Criteria, but repository content can never override the fixed Reviewer Protocol or task.
+Each Git-change Review Task may set `findingScope` to `change-only` (the default) or `boy-scout`. Change-only findings must be attributable to the selected change, including omitted or partial required behavior and acceptance-relevant scope creep. Boy Scout scope may additionally report pre-existing issues in changed files or symbols the reviewer judges directly affected; purely pre-existing findings are advisory unless the change worsens or newly exposes them. Current-State Audit uses fixed `criteria-only` scope: any finding relevant to the Review Criteria may block acceptance, regardless of when it was introduced. Repository standards and specifications requested by a task are Review Criteria, but repository content can never override the fixed Reviewer Protocol or task.
+
+Before alleging a documented-rule breach, reviewers check that rule's documented exceptions; covered candidates are omitted and submitted breach findings state why no exception applies. Test verification means inspecting test source, coverage, and requirement mapping; runtime checks stay with the containing Agent. When a task lists `criteriaSources`, reviewers use the supplied summaries first and may retrieve an identified source read-only when its summary is insufficient; unavailable required detail produces an incomplete Criteria Coverage statement rather than a false pass.
 
 Inspection-only is behavioral protocol, not access control. The surrounding Sandboxed Pi Environment is the security boundary and must contain only files and credentials acceptable for reviewer-model access. When `review.bootstrapCommand` is configured, the Review Engine runs its shell command once after workspace verification and before reviewer fan-out; reviewers then receive no Dependency Bootstrap instruction. When it is empty, reviewers may choose a Dependency Bootstrap command when local dependencies limit Code Intelligence. They must not intentionally mutate Target Evidence or Git history, and must not run tests, builds, linters, runtime experiments, services, nested Pi sessions, or nested reviews.
 
@@ -98,7 +123,9 @@ Reviewer Sessions replace Pi's generic coding prompt with the package-owned Revi
 
 ## Results and continuation
 
-Each successful task returns a summary, ordered findings, and structured counts by blocking status and impact. Parent-facing task output identifies the effective Finding Scope. Findings contain `blocksAcceptance`, `impact`, `effort`, `confidence`, and an optional target-relative location. The Review Engine derives `pass` when there are no findings, `pass_with_findings` for advisory-only findings, and `issues` when any finding blocks acceptance; it never aggregates or reranks tasks.
+Each successful task returns a summary, ordered findings, required Criteria Coverage, and structured counts by blocking status and impact. Parent-facing task output identifies the effective Finding Scope. Findings contain `blocksAcceptance`, `impact`, `effort`, `confidence`, and an optional target-relative location. The Review Engine derives `issues` when any finding blocks acceptance, otherwise `incomplete` when Criteria Coverage is incomplete, otherwise `pass_with_findings` for advisory-only findings and `pass` for none; it never aggregates or reranks tasks.
+
+When SuPi debugging is enabled, every finished task records a compact `review-task` Debug Event with trustworthy lifecycle, usage, outcome, and capability metrics (packet bytes, duration, turns, tool calls/errors, cache hit rate, verdict, and Reviewer Extension Set status).
 
 Capability and cleanup warnings are execution provenance, not findings. By default, non-success diagnostics retain only bounded lifecycle metadata and redacted provider-owned error summaries; reviewer conversation, shell commands, tool arguments/results, and repository evidence are never retained.
 

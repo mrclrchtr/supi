@@ -39,6 +39,7 @@ export function formatVerdictBadge(verdict: TaskVerdict, theme: Theme): string {
   if (verdict === "pass_with_findings") {
     return theme.fg("warning", theme.bold("PASS WITH FINDINGS"));
   }
+  if (verdict === "incomplete") return theme.fg("warning", theme.bold("INCOMPLETE"));
   return theme.fg("error", theme.bold("ISSUES"));
 }
 
@@ -183,6 +184,25 @@ function appendCapabilityWarnings(
   }
 }
 
+function appendCriteriaCoverage(
+  container: Container,
+  result: ReviewTaskResult & { status: "completed" },
+  theme: Theme,
+): void {
+  if (result.criteriaCoverage?.status !== "incomplete") return;
+  container.addChild(new Spacer(1));
+  container.addChild(
+    new Text(
+      theme.fg(
+        "warning",
+        `criteria coverage: incomplete — ${result.criteriaCoverage.reason ?? "unspecified"}`,
+      ),
+      1,
+      0,
+    ),
+  );
+}
+
 /** Build an expanded-view section for a single review task result. */
 export function buildTaskSection(
   container: Container,
@@ -233,6 +253,8 @@ export function buildTaskSection(
     buildNonCompletedSection(container, result, theme);
     return;
   }
+
+  appendCriteriaCoverage(container, result, theme);
 
   if (result.summary) {
     container.addChild(new Spacer(1));

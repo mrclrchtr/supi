@@ -34,10 +34,11 @@ describe("runPlanner", () => {
   it("constrains drafts to the reviewers' static target-aware capabilities", () => {
     const prompt = buildPlannerSystemPrompt();
 
-    expect(PLANNER_PROMPT_VERSION).toBe("3");
+    expect(PLANNER_PROMPT_VERSION).toBe("4");
     expect(prompt).toContain("code_orientation");
     expect(prompt).toContain("read, bash, grep");
-    expect(prompt).toMatch(/findingScope.*change-only.*boy-scout/is);
+    expect(prompt).toMatch(/Current-State Audit.*omit findingScope.*criteria-only/is);
+    expect(prompt).toMatch(/Git-change target.*findingScope.*change-only.*boy-scout/is);
     expect(prompt).not.toContain("concrete regressions introduced");
     expect(prompt).toContain("Do not request tests, builds, linters");
   });

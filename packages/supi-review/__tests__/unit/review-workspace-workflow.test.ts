@@ -37,7 +37,8 @@ describe("runReview Review Workspace boundary", () => {
     mocks.runReviewer.mockResolvedValue({
       kind: "success",
       modelId: model.canonicalId,
-      value: { summary: "Done", findings: [] },
+      reviewerExtensionSetStatus: "active",
+      value: { summary: "Done", findings: [], criteriaCoverage: { status: "complete" } },
     });
 
     await runReview({

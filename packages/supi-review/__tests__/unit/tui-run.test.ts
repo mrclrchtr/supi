@@ -1,9 +1,9 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 import { formatVerdictBadge } from "../../src/tui/common.ts";
-import { renderPrepareCall } from "../../src/tui/prepare.ts";
+import { renderPrepareCall, renderPrepareResult } from "../../src/tui/prepare.ts";
 import { renderRunCall, renderRunResult } from "../../src/tui/run.ts";
-import type { ReviewBatchDetails } from "../../src/types.ts";
+import type { PreparedReviewDetails, ReviewBatchDetails } from "../../src/types.ts";
 
 const theme = {
   fg: (_color: string, text: string) => text,
@@ -61,6 +61,7 @@ const details: ReviewBatchDetails = {
       },
       summary: "Frozen workspace review completed successfully.",
       findings: [],
+      criteriaCoverage: { status: "complete" },
     },
   ],
 };
@@ -96,6 +97,44 @@ describe("supi_review_run TUI", () => {
     ).toContain("supi_review_prepare suggest — commit");
   });
 
+  it("shows Current-State scope and Criteria Sources in prepared details", () => {
+    const prepared: PreparedReviewDetails = {
+      kind: "review-prepared",
+      planId: "plan-current-state",
+      snapshot: {
+        requestedTarget: { kind: "current-state", paths: ["packages/supi-review"] },
+        target: { kind: "current-state", headCommit: "a".repeat(40) },
+        title: "Current state audit",
+        changes: [],
+        diffHash: "b".repeat(64),
+        stats: { files: 0, additions: 0, deletions: 0 },
+      },
+      reviewerModelId: "provider/reviewer",
+      plannerDraft: {
+        tasks: [
+          {
+            id: "spec",
+            instructions: "Check the criteria.",
+            criteriaSources: [{ reference: "#42", summary: "Acceptance criteria." }],
+          },
+        ],
+      },
+    };
+
+    const output = renderPrepareResult(
+      { content: [], details: prepared },
+      { expanded: true, isPartial: false },
+      theme,
+    )
+      .render(160)
+      .join("\n");
+
+    expect(output).toContain('review scope: "packages/supi-review"');
+    expect(output).toContain("spec (criteria-only): Check the criteria.");
+    expect(output).toContain("criteria: #42 — Acceptance criteria.");
+    expect(output).not.toContain("files changed");
+  });
+
   it("keeps the collapsed result informative", () => {
     const output = renderRunResult(
       { content: [], details },
@@ -124,6 +163,65 @@ describe("supi_review_run TUI", () => {
 
     expect(output).toContain("workspace: verified · commit · 2 paths");
     expect(output).toContain("live-smoke (boy-scout)");
+  });
+
+  it("renders Current-State results as one-state audits instead of Git changes", () => {
+    const currentState: ReviewBatchDetails = {
+      ...details,
+      snapshot: {
+        requestedTarget: { kind: "current-state" },
+        target: { kind: "current-state", headCommit: "a".repeat(40) },
+        title: "Current state audit",
+        changes: details.snapshot.changes,
+        diffHash: "c".repeat(64),
+        stats: details.snapshot.stats,
+      },
+      workspaceReceipt: { ...details.workspaceReceipt, targetKind: "current-state" },
+    };
+    const collapsed = renderRunResult(
+      { content: [], details: currentState },
+      { expanded: false, isPartial: false },
+      theme,
+    )
+      .render(160)
+      .join("\n");
+    const expanded = renderRunResult(
+      { content: [], details: currentState },
+      { expanded: true, isPartial: false },
+      theme,
+    )
+      .render(160)
+      .join("\n");
+
+    expect(collapsed).toContain("Current state audit (repository-wide)");
+    expect(collapsed).not.toContain("+3 / -1");
+    expect(expanded).toContain("review scope: repository-wide discovery");
+    expect(expanded).toContain("workspace: verified · current-state · frozen filesystem");
+    expect(expanded).not.toContain("files changed");
+  });
+
+  it("shows the reason for incomplete Criteria Coverage", () => {
+    const completed = details.results[0];
+    if (completed?.status !== "completed") throw new Error("Expected fixture result.");
+    const incompleteDetails: ReviewBatchDetails = {
+      ...details,
+      results: [
+        {
+          ...completed,
+          verdict: "incomplete",
+          criteriaCoverage: { status: "incomplete", reason: "Issue #42 was unavailable." },
+        },
+      ],
+    };
+    const output = renderRunResult(
+      { content: [], details: incompleteDetails },
+      { expanded: true, isPartial: false },
+      theme,
+    )
+      .render(160)
+      .join("\n");
+
+    expect(output).toContain("criteria coverage: incomplete — Issue #42 was unavailable.");
   });
 
   it("shows a workspace placeholder while freezing", () => {

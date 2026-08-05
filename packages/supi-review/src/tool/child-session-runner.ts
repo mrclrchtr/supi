@@ -115,9 +115,13 @@ export async function runIsolatedChild<T>(
         const reportsProgress =
           event.type === "turn_end" ||
           event.type === "tool_execution_start" ||
+          event.type === "tool_execution_end" ||
           event.type === "agent_settled";
         if (event.type === "turn_end") ctx.progress.turns++;
         if (event.type === "tool_execution_start") ctx.progress.toolUses++;
+        if (event.type === "tool_execution_end" && event.isError) {
+          ctx.progress.toolErrors = (ctx.progress.toolErrors ?? 0) + 1;
+        }
         if (reportsProgress) {
           ctx.progress.tokens = buildProgressTokens(() => ctx.session.getSessionStats());
           config.onProgress?.({ ...ctx.progress });

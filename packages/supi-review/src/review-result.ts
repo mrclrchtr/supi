@@ -1,6 +1,7 @@
 import { REVIEW_LIMITS } from "./review-limits.ts";
 import { normalizeRepositoryRelativePath } from "./review-path.ts";
 import type {
+  CriteriaCoverage,
   FindingCounts,
   NormalizedReviewSubmission,
   ReviewFinding,
@@ -44,6 +45,22 @@ function countFindings(
   return counts;
 }
 
+function normalizeCriteriaCoverage(coverage: CriteriaCoverage): CriteriaCoverage {
+  if (!coverage) throw new Error("Review submissions must include criteria coverage.");
+  const reason = ("reason" in coverage ? coverage.reason : undefined)?.trim();
+  if (coverage.status === "complete") {
+    if (reason) throw new Error("Complete criteria coverage must not include a reason.");
+    return { status: "complete" };
+  }
+  if (!reason) throw new Error("Incomplete criteria coverage needs a criteria coverage reason.");
+  if (reason.length > REVIEW_LIMITS.criteriaCoverageReasonCharacters) {
+    throw new Error(
+      `Criteria coverage reason must not exceed ${REVIEW_LIMITS.criteriaCoverageReasonCharacters} characters.`,
+    );
+  }
+  return { status: "incomplete", reason };
+}
+
 /** Derive an acceptance verdict and structured finding counts without reordering findings. */
 export function normalizeReviewSubmission(
   submission: ReviewSubmissionInput,
@@ -52,8 +69,10 @@ export function normalizeReviewSubmission(
     throw new Error(`A review task may submit at most ${REVIEW_LIMITS.findingsPerTask} findings.`);
   }
   const findingCounts = countFindings(submission.findings);
+  const criteriaCoverage = normalizeCriteriaCoverage(submission.criteriaCoverage);
   return {
     summary: requireText(submission.summary, "Review summary", REVIEW_LIMITS.summaryCharacters),
+    criteriaCoverage,
     findings: submission.findings.map((finding, index) => {
       if (
         !Number.isFinite(finding.confidence) ||
@@ -104,8 +123,10 @@ export function normalizeReviewSubmission(
     verdict:
       findingCounts.blocking > 0
         ? "issues"
-        : findingCounts.total > 0
-          ? "pass_with_findings"
-          : "pass",
+        : criteriaCoverage?.status === "incomplete"
+          ? "incomplete"
+          : findingCounts.total > 0
+            ? "pass_with_findings"
+            : "pass",
   };
 }

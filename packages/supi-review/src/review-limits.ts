@@ -8,4 +8,10 @@ export const REVIEW_LIMITS = {
   findingTitleCharacters: 200,
   findingDescriptionCharacters: 8_000,
   locationPathCharacters: 4_096,
+  criteriaSourcesPerTask: 5,
+  criteriaReferenceCharacters: 256,
+  criteriaSummaryCharacters: 2_000,
+  criteriaCoverageReasonCharacters: 500,
+  reviewScopePathsPerTarget: 16,
+  reviewScopePathCharacters: 4_096,
 } as const;
