@@ -3,10 +3,16 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createAgentSession: vi.fn(),
   createAgentSessionRuntime: vi.fn(),
+  createModelRuntime: vi.fn(async () => ({
+    getProviders: vi.fn(() => []),
+    registerNativeProvider: vi.fn(),
+    refresh: vi.fn(async () => undefined),
+  })),
 }));
 
 vi.mock("@earendil-works/pi-coding-agent", async (original) => ({
   ...(await original()),
+  ModelRuntime: { create: mocks.createModelRuntime },
   createAgentSession: mocks.createAgentSession,
   createAgentSessionRuntime: mocks.createAgentSessionRuntime,
 }));
@@ -54,6 +60,30 @@ it("starts timeout measurement only immediately before prompting", async () => {
     { type: "abort_requested", reason: "timeout" },
   ]);
   expect(harness.session.abort).toHaveBeenCalledTimes(1);
+});
+
+it("clears queued messages and rejects extension sends at the cancellation fence", async () => {
+  const harness = createHarness(mocks);
+  harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
+    harness.session.isStreaming = true;
+    options?.preflightResult?.(true);
+    harness.session.emit({ type: "queue_update", steering: ["queued"], followUp: ["later"] });
+    await new Promise<undefined>(() => {});
+  });
+  const run = startAgentRun({
+    inputs: inputs(),
+    prompt: "fenced",
+    completionResolver: () => "done",
+  });
+  await vi.waitFor(() => expect(harness.session.prompt).toHaveBeenCalled());
+
+  const stopped = run.stop();
+  expect(harness.session.clearQueue).toHaveBeenCalledTimes(1);
+  expect(() => harness.extensionRuntime.sendUserMessage("late")).toThrow(/closed|stale|active/i);
+
+  await stopped;
+  expect(() => harness.extensionRuntime.assertActive()).toThrow(/closed|stale|active/i);
+  await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
 });
 
 it("allows active steering, makes stop idempotent, and settles after disposal", async () => {
@@ -180,8 +210,7 @@ it("forces session disposal when graceful runtime shutdown exceeds its grace", a
     prompt: "forced disposal",
     completionResolver: () => "done",
   });
-  await flushMicrotasks();
-  expect(harness.runtime.dispose).toHaveBeenCalledTimes(1);
+  await vi.waitFor(() => expect(harness.runtime.dispose).toHaveBeenCalledTimes(1));
   await vi.advanceTimersByTimeAsync(AGENT_RUN_SHUTDOWN_GRACE_MS);
 
   await expect(run.result).resolves.toMatchObject({ kind: "success", value: "done" });

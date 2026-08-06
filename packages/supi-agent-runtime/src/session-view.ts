@@ -16,7 +16,7 @@ export function createAgentRunSessionView(session: AgentSession, cwd: string): A
     toolCalls: 0,
     toolResults: 0,
     totalMessages: 0,
-    tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    tokens: Object.freeze({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }),
     cost: 0,
     contextUsage: undefined,
   }) as SessionStats;

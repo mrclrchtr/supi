@@ -37,58 +37,96 @@ export function combineAgentRunUsage(usages: readonly (Usage | undefined)[]): Us
 
 /**
  * Collect every usage-bearing entry owned by the in-memory Agent Run session.
- * This includes assistant turns, tool-result work, compaction, and branch summaries.
+ * This includes assistant turns, tool-result work, compaction, branch summaries, and
+ * finalized/live messages that have not reached session persistence yet.
  */
 export function collectAgentRunUsage(session: AgentSession): Usage | undefined {
+  const knownMessages = new Set<object>();
+  const usages = [
+    ...collectEntryUsage(session, knownMessages),
+    ...collectLiveMessageUsage(session, knownMessages),
+    collectStreamingUsage(session, knownMessages),
+  ];
+  return combineAgentRunUsage(usages) ?? collectStatsUsage(session);
+}
+
+function collectEntryUsage(session: AgentSession, knownMessages: Set<object>): Usage[] {
+  const usages: Usage[] = [];
   try {
-    const entries = session.sessionManager.getEntries();
-    const fromEntries = combineAgentRunUsage(
-      entries.map((entry) => {
-        if (entry.type === "message") return readUsage(entry.message);
-        if (entry.type === "compaction" || entry.type === "branch_summary") {
-          return readUsage(entry);
-        }
-        return undefined;
-      }),
-    );
-    if (fromEntries) return fromEntries;
+    for (const entry of session.sessionManager.getEntries()) {
+      if (entry.type === "message") {
+        if (isObject(entry.message)) knownMessages.add(entry.message);
+        pushUsage(usages, entry.message);
+      } else if (entry.type === "compaction" || entry.type === "branch_summary") {
+        pushUsage(usages, entry);
+      }
+    }
   } catch {
     // Test doubles and older PI versions may not expose session entries.
   }
+  return usages;
+}
 
+function collectLiveMessageUsage(session: AgentSession, knownMessages: Set<object>): Usage[] {
+  const usages: Usage[] = [];
   try {
-    const messages = session.messages;
-    if (Array.isArray(messages)) {
-      const fromMessages = combineAgentRunUsage(messages.map((message) => readUsage(message)));
-      if (fromMessages) return fromMessages;
+    for (const message of session.messages) {
+      if (isObject(message) && knownMessages.has(message)) continue;
+      if (isObject(message)) knownMessages.add(message);
+      pushUsage(usages, message);
     }
   } catch {
-    // Fall through to the best-effort stats snapshot.
+    // Continue with streaming state and the best-effort stats snapshot.
   }
+  return usages;
+}
 
+function collectStreamingUsage(
+  session: AgentSession,
+  knownMessages: Set<object>,
+): Usage | undefined {
+  try {
+    const message = session.agent.state.streamingMessage;
+    if (isObject(message) && !knownMessages.has(message)) return readUsage(message);
+  } catch {
+    // Continue with the best-effort stats snapshot.
+  }
+  return undefined;
+}
+
+function collectStatsUsage(session: AgentSession): Usage | undefined {
   try {
     const stats = session.getSessionStats();
     const tokens = stats.tokens;
-    if (tokens.input || tokens.output || tokens.cacheRead || tokens.cacheWrite) {
-      return {
-        input: tokens.input,
-        output: tokens.output,
-        cacheRead: tokens.cacheRead,
-        cacheWrite: tokens.cacheWrite,
-        totalTokens: tokens.total,
-        cost: {
-          input: 0,
-          output: 0,
-          cacheRead: 0,
-          cacheWrite: 0,
-          total: stats.cost,
-        },
-      };
-    }
+    if (!tokens.input && !tokens.output && !tokens.cacheRead && !tokens.cacheWrite)
+      return undefined;
+    return {
+      input: tokens.input,
+      output: tokens.output,
+      cacheRead: tokens.cacheRead,
+      cacheWrite: tokens.cacheWrite,
+      totalTokens: tokens.total,
+      cost: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        total: stats.cost,
+      },
+    };
   } catch {
     // Usage is optional when PI cannot expose a stable snapshot.
+    return undefined;
   }
-  return undefined;
+}
+
+function pushUsage(usages: Usage[], value: unknown): void {
+  const usage = readUsage(value);
+  if (usage) usages.push(usage);
+}
+
+function isObject(value: unknown): value is object {
+  return typeof value === "object" && value !== null;
 }
 
 function readUsage(value: unknown): Usage | undefined {

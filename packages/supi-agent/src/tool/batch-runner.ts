@@ -5,7 +5,11 @@ import type {
   AgentRunOutcome,
   AgentRunSessionView,
 } from "@mrclrchtr/supi-agent-runtime/api";
-import { combineAgentRunUsage, startAgentRun } from "@mrclrchtr/supi-agent-runtime/api";
+import {
+  combineAgentRunUsage,
+  createAgentRunProviderAuthority,
+  startAgentRun,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import { isReadOnlyCapabilitySet, toAgentToolNames } from "../capabilities.ts";
 import { resolveAgentProfile } from "../model-policy.ts";
 import { resolveAgentDirectory } from "../resources.ts";
@@ -87,6 +91,7 @@ function buildChildPrompt(input: { sharedContext?: string; instructions: string 
 
 function buildModelContext(ctx: ExtensionContext): AgentModelContext {
   return {
+    providerAuthority: createAgentRunProviderAuthority(ctx.modelRegistry),
     currentModel: ctx.model,
     currentThinkingLevel: ctx.thinkingLevel,
     scopedModels: ctx.scopedModels.map((entry) => ({
@@ -136,6 +141,7 @@ function preflight(
       cwd: ctx.cwd,
       agentDir,
       projectTrusted: ctx.isProjectTrusted(),
+      providerAuthority: modelContext.providerAuthority,
     });
     if ("code" in resolvedProfile) {
       errors.push({ taskId: task.id, profileId: task.profile, message: resolvedProfile.message });

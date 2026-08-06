@@ -1,3 +1,4 @@
+import type { AgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/api";
 import {
   combineAgentRunUsage,
   createEarlyCancellationDiagnostics,
@@ -25,10 +26,10 @@ import { materializeReviewWorkspace } from "../workspace/review-workspace.ts";
 import { enforceCriteriaOnlyScope } from "./criteria-only-scope.ts";
 import { PLANNER_PROMPT_VERSION, runPlanner } from "./planner-runner.ts";
 import { executeReviewTasks, type ReviewExecutionUpdate } from "./review-execution.ts";
-
 /** Input required by the prepare workflow: target resolution plus optional Planner run. */
 export interface PrepareReviewInput {
   cwd: string;
+  providerAuthority?: AgentRunProviderAuthority;
   target: ReviewTargetSpec;
   planning: "none" | "suggest";
   plannerContext: string;
@@ -41,11 +42,11 @@ export interface PrepareReviewInput {
 
 /** Tool update callback signature shared across workflow adapters. */
 type OnUpdate = ReviewExecutionUpdate;
-
 /** Complete Direct Review request: target, full review input, and reviewer model. */
 export interface DirectRunInput {
   mode: "direct";
   cwd: string;
+  providerAuthority?: AgentRunProviderAuthority;
   target: ReviewTargetSpec;
   review: ReviewInput;
   reviewerModel: ReviewModelSelection;
@@ -57,11 +58,11 @@ export interface DirectRunInput {
   signal?: AbortSignal;
   onUpdate?: OnUpdate;
 }
-
 /** One-shot Prepared Review request: plan id, explicit decision, and plan store. */
 export interface PreparedRunInput {
   mode: "prepared";
   cwd: string;
+  providerAuthority?: AgentRunProviderAuthority;
   planId: string;
   decision: { kind: "accept-draft" } | { kind: "use-review"; review: ReviewInput };
   planStore: ReviewPlanStore;
@@ -73,7 +74,6 @@ export interface PreparedRunInput {
   signal?: AbortSignal;
   onUpdate?: OnUpdate;
 }
-
 /** Discriminated union accepted by `runReview` for both Direct and Prepared paths. */
 export type RunReviewInput = DirectRunInput | PreparedRunInput;
 
@@ -113,7 +113,6 @@ function plannerPrompt(snapshot: ReviewSnapshot, context: string): string {
     ...conversation,
   ].join("\n");
 }
-
 /** Translate a resolveReviewSnapshot error to a no-target reason. */
 function snapshotErrorReason(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -128,7 +127,6 @@ interface PlannerPreparation {
   modelId?: string;
   promptVersion?: string;
 }
-
 async function preparePlanner(
   input: PrepareReviewInput,
   snapshot: ReviewSnapshot,
@@ -148,6 +146,7 @@ async function preparePlanner(
     result = await runPlanner({
       cwd: snapshot.repositoryRoot,
       model: input.plannerModel.model,
+      ...(input.providerAuthority ? { providerAuthority: input.providerAuthority } : {}),
       prompt: plannerPrompt(snapshot, input.plannerContext),
       signal: input.signal,
     });
@@ -373,6 +372,7 @@ export async function runReview(input: RunReviewInput) {
         ? { store: input.auditStore, workspaceReceipt: workspace.receipt }
         : undefined,
       dependencyBootstrapConfigured,
+      input.providerAuthority,
     );
   } catch (error) {
     if (lease && planStore) planStore.release(lease);

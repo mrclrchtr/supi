@@ -1,5 +1,8 @@
 import type { Model, Usage } from "@earendil-works/pi-ai";
-import type { AgentRunDiagnostics } from "@mrclrchtr/supi-agent-runtime/api";
+import type {
+  AgentRunDiagnostics,
+  AgentRunProviderAuthority,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import type { LocalReviewAuditStore } from "./audit/local-review-audit-store.ts";
 import type { ReviewWorkspaceCleanupWarning } from "./workspace/review-workspace.ts";
 
@@ -217,6 +220,7 @@ export interface ReviewProgress {
 
 export interface PlannerInvocation {
   prompt: string;
+  providerAuthority?: AgentRunProviderAuthority;
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
   model: Model<any>;
   cwd: string;
@@ -238,6 +242,7 @@ export interface ReviewerAuditRequest {
 
 export interface ReviewerInvocation {
   prompt: string;
+  providerAuthority?: AgentRunProviderAuthority;
   packetHash: string;
   task: ReviewTask;
   model: ReviewModelSelection;

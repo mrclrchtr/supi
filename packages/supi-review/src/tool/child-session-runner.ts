@@ -4,6 +4,7 @@ import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import {
   type AgentRunOutcome,
   type AgentRunProgress,
+  type AgentRunProviderAuthority,
   type AgentRunSessionView,
   startAgentRun,
 } from "@mrclrchtr/supi-agent-runtime/api";
@@ -13,6 +14,7 @@ import { createIsolatedChildResources } from "./child-resource-loader.ts";
 /** Configuration for one review adapter over the neutral Agent Run runtime. */
 export interface IsolatedRunConfig<T> {
   cwd: string;
+  providerAuthority?: AgentRunProviderAuthority;
   protocolPrompt: string;
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
   model: Model<any>;
@@ -98,10 +100,14 @@ export async function runIsolatedChild<T>(
       projectTrusted: config.projectTrusted,
     },
   );
+  if (!config.providerAuthority) {
+    return { kind: "failed", failureCode: "session-creation-failed" };
+  }
   const run = startAgentRun<T>({
     inputs: {
       cwd: config.cwd,
       model: config.model,
+      providerAuthority: config.providerAuthority,
       thinkingLevel: config.thinkingLevel,
       tools: [...config.tools],
       customTools: [...config.customTools],

@@ -10,6 +10,10 @@ import {
 } from "../../src/api.ts";
 
 const temporaryDirectories: string[] = [];
+const providerAuthority = {
+  getProvider: () => undefined,
+  getProviderAuth: async () => undefined,
+};
 
 afterEach(async () => {
   await Promise.all(
@@ -72,6 +76,7 @@ describe("profile resource policy", () => {
       cwd: setupState.project,
       agentDir: setupState.agentDir,
       projectTrusted: true,
+      providerAuthority,
       model: { provider: "openai", id: "gpt-5", reasoning: false } as never,
       thinkingLevel: "off",
       profile: setupState.profile,
@@ -91,6 +96,7 @@ describe("profile resource policy", () => {
       cwd: setupState.project,
       agentDir: setupState.agentDir,
       projectTrusted: true,
+      providerAuthority,
       model: inputs.model,
       thinkingLevel: inputs.thinkingLevel,
       profile: {
@@ -119,6 +125,7 @@ describe("profile resource policy", () => {
       cwd: "/project",
       agentDir: "/agent",
       projectTrusted: false,
+      providerAuthority,
       model: { provider: "openai", id: "gpt-5", reasoning: false } as never,
       thinkingLevel: "off",
       profile,

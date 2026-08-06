@@ -6,6 +6,7 @@ import type {
   SettingsManager,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
+import type { AgentRunProviderAuthority } from "./provider-authority.ts";
 
 /** The host-owned failure stages of one Agent Run. */
 export type AgentRunFailureCode =
@@ -35,6 +36,8 @@ export interface AgentSessionInputs {
   /** Effective model selected by the caller. */
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
   model: Model<any>;
+  /** Caller-owned provider and credential authority borrowed for this run. */
+  providerAuthority: AgentRunProviderAuthority;
   /** Effective thinking level, normally clamped by the caller. */
   thinkingLevel: ModelThinkingLevel;
   /** Complete built-in and custom-tool allowlist for the run. */
@@ -85,7 +88,7 @@ export type SessionReadinessCheck = (
   session: AgentRunSessionView,
 ) => boolean | undefined | Promise<boolean | undefined>;
 
-/** Caller-owned evidence hook. Its returned disposer runs before session disposal. */
+/** Caller-owned evidence hook. Its disposer runs before normal disposal; forced teardown may run it later. */
 export type AgentRunObserver = (
   session: AgentRunSessionView,
 ) => undefined | (() => void) | Promise<undefined | (() => void)>;

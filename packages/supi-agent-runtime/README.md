@@ -2,13 +2,19 @@
 
 Neutral lifecycle management for one context-isolated, permission-shared in-process pi Agent Run.
 
-The package is library-only. Use `@mrclrchtr/supi-agent-runtime/api` to start a run with caller-owned resources, completion, readiness, and evidence policy:
+The package is library-only. Use `@mrclrchtr/supi-agent-runtime/api` to start a run with caller-owned resources, provider authority, completion, readiness, and evidence policy:
 
 ```ts
+import {
+  createAgentRunProviderAuthority,
+  startAgentRun,
+} from "@mrclrchtr/supi-agent-runtime/api";
+
 const run = startAgentRun({
   inputs: {
     cwd,
     model,
+    providerAuthority: createAgentRunProviderAuthority(ctx.modelRegistry),
     thinkingLevel,
     tools,
     customTools,

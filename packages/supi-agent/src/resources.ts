@@ -54,6 +54,7 @@ export function createAgentSessionInputs(options: AgentSessionInputOptions): Age
   return {
     cwd: options.cwd,
     model: options.model,
+    providerAuthority: options.providerAuthority,
     thinkingLevel: options.thinkingLevel,
     tools: Object.freeze(toAgentToolNames(options.profile.manifest.tools)),
     resourceLoader: loader,

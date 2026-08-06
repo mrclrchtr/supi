@@ -50,6 +50,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
 
   const outcome = await runIsolatedChild<ReviewSubmission>({
     cwd: invocation.cwd,
+    ...(invocation.providerAuthority ? { providerAuthority: invocation.providerAuthority } : {}),
     protocolPrompt,
     model: invocation.model.model,
     thinkingLevel,

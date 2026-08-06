@@ -12,6 +12,10 @@ const mockHandles: Array<{
 }> = [];
 
 vi.mock("@mrclrchtr/supi-agent-runtime/api", () => ({
+  createAgentRunProviderAuthority: vi.fn(() => ({
+    getProvider: () => undefined,
+    getProviderAuth: async () => undefined,
+  })),
   startAgentRun: vi.fn(
     (options: { prompt: string; readinessCheck?: (session: unknown) => boolean }) => {
       const handle = {

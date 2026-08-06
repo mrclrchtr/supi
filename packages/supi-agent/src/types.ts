@@ -1,5 +1,8 @@
 import type { Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
-import type { AgentSessionInputs } from "@mrclrchtr/supi-agent-runtime/api";
+import type {
+  AgentRunProviderAuthority,
+  AgentSessionInputs,
+} from "@mrclrchtr/supi-agent-runtime/api";
 
 /** Maximum effective Profile IDs exposed to a session's model-facing catalogue. */
 export const MAX_PROFILE_COUNT = 32;
@@ -100,6 +103,7 @@ export interface ProfileCatalogue {
 
 /** Parent model context needed to resolve a profile's effective execution policy. */
 export interface AgentModelContext {
+  readonly providerAuthority: AgentRunProviderAuthority;
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is PI's canonical type
   readonly currentModel: Model<any> | undefined;
   readonly currentThinkingLevel: AgentThinkingLevel | undefined;
@@ -131,6 +135,7 @@ export interface AgentSessionInputOptions {
   readonly cwd: string;
   readonly agentDir: string;
   readonly projectTrusted: boolean;
+  readonly providerAuthority: AgentRunProviderAuthority;
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is PI's canonical type
   readonly model: Model<any>;
   readonly thinkingLevel: AgentThinkingLevel;

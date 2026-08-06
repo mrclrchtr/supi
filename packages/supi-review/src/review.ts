@@ -5,6 +5,7 @@ import {
   getAgentDir,
 } from "@earendil-works/pi-coding-agent";
 import { Box } from "@earendil-works/pi-tui";
+import { createAgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/api";
 import { LocalReviewAuditStore } from "./audit/local-review-audit-store.ts";
 import { loadReviewConfig, registerReviewSettings } from "./config.ts";
 import { listLocalBranches, listRecentCommits } from "./git-choices.ts";
@@ -191,6 +192,7 @@ async function prepareInteractiveReview(
   const outcome = await withCancellableLoader(ctx, "Planning review…", (signal) =>
     prepareReview({
       cwd: ctx.cwd,
+      providerAuthority: createAgentRunProviderAuthority(ctx.modelRegistry),
       target,
       planning: "suggest",
       plannerContext: collectPlannerContext(session.messages),
@@ -237,6 +239,7 @@ async function executeInteractiveReview(
       ? runReview({
           mode: "prepared",
           cwd: ctx.cwd,
+          providerAuthority: createAgentRunProviderAuthority(ctx.modelRegistry),
           planId: input.planId,
           decision: { kind: "use-review", review: input.review },
           planStore: input.planStore,
@@ -248,6 +251,7 @@ async function executeInteractiveReview(
       : runReview({
           mode: "direct",
           cwd: ctx.cwd,
+          providerAuthority: createAgentRunProviderAuthority(ctx.modelRegistry),
           target: input.target,
           review: input.review,
           reviewerModel: input.reviewerModel,

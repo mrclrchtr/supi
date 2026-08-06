@@ -17,6 +17,10 @@ import { runIsolatedChild } from "../../src/tool/child-session-runner.ts";
 const diagnostics = { lifecycleTrace: { entries: [], droppedCount: 0 }, turns: 1, toolUses: 1 };
 const config = {
   cwd: "/repo",
+  providerAuthority: {
+    getProvider: () => undefined,
+    getProviderAuth: async () => undefined,
+  },
   protocolPrompt: "protocol",
   model: {} as never,
   thinkingLevel: "low" as never,

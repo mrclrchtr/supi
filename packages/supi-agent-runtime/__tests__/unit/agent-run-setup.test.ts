@@ -3,10 +3,16 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createAgentSession: vi.fn(),
   createAgentSessionRuntime: vi.fn(),
+  createModelRuntime: vi.fn(async () => ({
+    getProviders: vi.fn(() => []),
+    registerNativeProvider: vi.fn(),
+    refresh: vi.fn(async () => undefined),
+  })),
 }));
 
 vi.mock("@earendil-works/pi-coding-agent", async (original) => ({
   ...(await original()),
+  ModelRuntime: { create: mocks.createModelRuntime },
   createAgentSession: mocks.createAgentSession,
   createAgentSessionRuntime: mocks.createAgentSessionRuntime,
 }));
@@ -127,6 +133,38 @@ it("cancels instead of reporting readiness failure", async () => {
   expect(harness.session.prompt).not.toHaveBeenCalled();
 });
 
+it("waits for a continuation started by a handled prompt", async () => {
+  const harness = createHarness(mocks);
+  let releaseContinuation!: () => void;
+  const continuation = new Promise<void>((resolve) => {
+    releaseContinuation = resolve;
+  });
+  harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
+    options?.preflightResult?.(true);
+    void harness.extensionRuntime.sendUserMessage("continuation");
+  });
+  harness.session.sendUserMessage.mockImplementationOnce(async () => continuation);
+  const run = startAgentRun({
+    inputs: inputs(),
+    prompt: "/handled-command",
+    completionResolver: () => "done",
+  });
+
+  await vi.waitFor(() =>
+    expect(harness.session.sendUserMessage).toHaveBeenCalledWith("continuation", undefined),
+  );
+  let settled = false;
+  void run.result.then(() => {
+    settled = true;
+  });
+  await Promise.resolve();
+  expect(settled).toBe(false);
+
+  releaseContinuation();
+  await expect(run.result).resolves.toMatchObject({ kind: "success", value: "done" });
+  expect(harness.runtime.dispose).toHaveBeenCalledTimes(1);
+});
+
 it("settles handled prompts even when no agent_settled event is emitted", async () => {
   const harness = createHarness(mocks);
   harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
@@ -191,6 +229,30 @@ it("distinguishes prompt rejection and missing completion", async () => {
   expect(second.session.prompt).toHaveBeenCalledTimes(1);
 });
 
+it("calls a late observer cleanup after cancellation and never prompts", async () => {
+  const harness = createHarness(mocks);
+  let releaseObserver!: (cleanup: () => void) => void;
+  const observerReady = new Promise<() => void>((resolve) => {
+    releaseObserver = resolve;
+  });
+  const cleanup = vi.fn();
+  const run = startAgentRun({
+    inputs: inputs(),
+    prompt: "must not prompt",
+    observer: async () => observerReady,
+    completionResolver: () => "done",
+  });
+
+  await vi.waitFor(() => expect(harness.session.bindExtensions).toHaveBeenCalled());
+  const stopped = run.stop();
+  releaseObserver(cleanup);
+
+  await stopped;
+  await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
+  expect(cleanup).toHaveBeenCalledTimes(1);
+  expect(harness.session.prompt).not.toHaveBeenCalled();
+});
+
 it("waits through uncancelable setup, suppresses the prompt, and disposes late setup", async () => {
   let releaseRuntime!: () => void;
   const runtimeReady = new Promise<void>((resolve) => {
@@ -215,7 +277,7 @@ it("waits through uncancelable setup, suppresses the prompt, and disposes late s
   releaseRuntime();
 
   await stopped;
-  expect(harness.runtime.dispose).toHaveBeenCalledTimes(1);
+  expect(harness.session.dispose).toHaveBeenCalledTimes(1);
   await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
   expect(harness.session.prompt).not.toHaveBeenCalled();
 });

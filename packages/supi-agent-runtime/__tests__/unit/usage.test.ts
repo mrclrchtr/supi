@@ -26,6 +26,19 @@ describe("collectAgentRunUsage", () => {
     expect(collectAgentRunUsage(session)).toBeUndefined();
   });
 
+  it("unions persisted and live messages by message identity", () => {
+    const persisted = { role: "assistant", usage: usage(1) };
+    const liveOnly = { role: "assistant", usage: usage(2) };
+    const session = {
+      sessionManager: {
+        getEntries: () => [{ type: "message", message: persisted }],
+      },
+      messages: [persisted, liveOnly],
+    } as unknown as AgentSession;
+
+    expect(collectAgentRunUsage(session)?.input).toBe(3);
+  });
+
   it("includes extension-provided summary usage", () => {
     const session = {
       sessionManager: {

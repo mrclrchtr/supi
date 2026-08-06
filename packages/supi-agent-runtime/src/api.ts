@@ -26,6 +26,11 @@ export {
   getRegisteredToolNames,
   toSafeAssistantStopReason,
 } from "./lifecycle-trace.ts";
+export type {
+  AgentRunProviderAuthority,
+  AgentRunRequestAuth,
+} from "./provider-authority.ts";
+export { createAgentRunProviderAuthority } from "./provider-authority.ts";
 export {
   AGENT_RUN_ABORT_GRACE_MS,
   AGENT_RUN_SHUTDOWN_GRACE_MS,

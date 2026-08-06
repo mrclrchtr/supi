@@ -3,10 +3,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createAgentSession: vi.fn(),
   createAgentSessionRuntime: vi.fn(),
+  createModelRuntime: vi.fn(async () => ({
+    getProviders: vi.fn(() => []),
+    registerNativeProvider: vi.fn(),
+    refresh: vi.fn(async () => undefined),
+  })),
 }));
 
 vi.mock("@earendil-works/pi-coding-agent", async (original) => ({
   ...(await original()),
+  ModelRuntime: { create: mocks.createModelRuntime },
   createAgentSession: mocks.createAgentSession,
   createAgentSessionRuntime: mocks.createAgentSessionRuntime,
 }));
@@ -16,6 +22,8 @@ import { startAgentRun } from "../../src/api.ts";
 function createSession() {
   let listener: ((event: { type: string }) => void) | undefined;
   const session = {
+    agent: { waitForIdle: vi.fn(async () => undefined) },
+    extensionRunner: { invalidate: vi.fn() },
     bindExtensions: vi.fn(async () => undefined),
     subscribe: vi.fn((callback: (event: { type: string }) => void) => {
       listener = callback;
@@ -26,9 +34,15 @@ function createSession() {
     }),
     abort: vi.fn(async () => undefined),
     steer: vi.fn(async () => undefined),
+    sendUserMessage: vi.fn(async () => undefined),
+    sendCustomMessage: vi.fn(async () => undefined),
+    clearQueue: vi.fn(() => ({ steering: [], followUp: [] })),
+    pendingMessageCount: 0,
+    waitForIdle: vi.fn(async () => undefined),
     getActiveToolNames: vi.fn(() => ["read"]),
     getSessionStats: vi.fn(() => ({ tokens: { input: 1, output: 2, total: 3 } })),
     messages: [{ role: "assistant", content: [{ type: "text", text: "done" }] }],
+    isIdle: true,
     dispose: vi.fn(),
   };
   return session;
@@ -42,7 +56,10 @@ describe("startAgentRun", () => {
   it("returns a handle, resolves caller completion, and exposes active steering", async () => {
     const session = createSession();
     const runtime = { session, dispose: vi.fn(async () => undefined) };
-    mocks.createAgentSession.mockResolvedValue({ session });
+    mocks.createAgentSession.mockResolvedValue({
+      session,
+      extensionsResult: { runtime: {} as never },
+    });
     mocks.createAgentSessionRuntime.mockImplementation(async (factory) => {
       await factory({ cwd: "/repo", agentDir: "/agent", sessionManager: {} });
       return runtime;
@@ -53,7 +70,32 @@ describe("startAgentRun", () => {
     const run = startAgentRun({
       inputs: {
         cwd: "/repo",
-        model: {} as never,
+        model: {
+          provider: "test-provider",
+          id: "test-model",
+          api: "openai-completions",
+          reasoning: false,
+          input: ["text"],
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: 10_000,
+          maxTokens: 1_000,
+        } as never,
+        providerAuthority: {
+          getProvider: () => ({
+            id: "test-provider",
+            name: "Test Provider",
+            auth: {
+              apiKey: {
+                name: "Test key",
+                resolve: async () => ({ auth: { apiKey: "test-key" } }),
+              },
+            },
+            getModels: () => [],
+            stream: vi.fn(),
+            streamSimple: vi.fn(),
+          }),
+          getProviderAuth: async () => ({ auth: { apiKey: "test-key" } }),
+        },
         thinkingLevel: "low",
         tools: ["read"],
         customTools: [],
@@ -67,7 +109,8 @@ describe("startAgentRun", () => {
     });
 
     const unsubscribe = run.subscribe(progress);
-    await expect(run.result).resolves.toMatchObject({ kind: "success", value: "complete" });
+    const outcome = await run.result;
+    expect(outcome).toMatchObject({ kind: "success", value: "complete" });
     expect(await run.steer("redirect")).toBe("not-running");
     expect(observer).toHaveBeenCalledTimes(1);
     expect(progress.mock.calls[0]?.[0].status).toBe("starting");

@@ -6,6 +6,10 @@ import type { AgentModelContext, AgentProfile } from "../../src/api.ts";
 import { resolveAgentProfile } from "../../src/api.ts";
 
 const temporaryDirectories: string[] = [];
+const providerAuthority = {
+  getProvider: () => undefined,
+  getProviderAuth: async () => undefined,
+};
 
 afterEach(async () => {
   await Promise.all(
@@ -65,6 +69,7 @@ function context(
 ): AgentModelContext {
   return {
     currentModel,
+    providerAuthority,
     currentThinkingLevel: "high",
     scopedModels: [],
     modelRegistry: {
@@ -89,7 +94,7 @@ describe("resolveAgentProfile", () => {
         timeoutMinutes: 2,
       }),
       context(current),
-      { cwd, agentDir: cwd, projectTrusted: false },
+      { cwd, agentDir: cwd, projectTrusted: false, providerAuthority },
     );
 
     expect(result).toMatchObject({
@@ -114,7 +119,7 @@ describe("resolveAgentProfile", () => {
         model: `openai/${"x".repeat(1_000)}`,
       }),
       context(model("openai", "gpt-5")),
-      { cwd, agentDir: cwd, projectTrusted: false },
+      { cwd, agentDir: cwd, projectTrusted: false, providerAuthority },
     );
 
     expect("message" in result ? result.message.length : 0).toBeLessThanOrEqual(240);
@@ -140,7 +145,12 @@ describe("resolveAgentProfile", () => {
     });
 
     expect(
-      resolveAgentProfile(selected, base, { cwd, agentDir: cwd, projectTrusted: false }),
+      resolveAgentProfile(selected, base, {
+        cwd,
+        agentDir: cwd,
+        projectTrusted: false,
+        providerAuthority,
+      }),
     ).toMatchObject({
       code: "model-out-of-scope",
     });
@@ -155,7 +165,7 @@ describe("resolveAgentProfile", () => {
             hasConfiguredAuth: () => false,
           },
         },
-        { cwd, agentDir: cwd, projectTrusted: false },
+        { cwd, agentDir: cwd, projectTrusted: false, providerAuthority },
       ),
     ).toMatchObject({ code: "model-unauthenticated" });
   });

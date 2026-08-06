@@ -54,6 +54,7 @@ export async function runPlanner(invocation: PlannerInvocation): Promise<Planner
   });
   return runIsolatedChild<PlannerDraft>({
     cwd: invocation.cwd,
+    ...(invocation.providerAuthority ? { providerAuthority: invocation.providerAuthority } : {}),
     protocolPrompt: buildPlannerSystemPrompt(),
     model: invocation.model,
     thinkingLevel: clampThinkingLevel(invocation.model, "low"),

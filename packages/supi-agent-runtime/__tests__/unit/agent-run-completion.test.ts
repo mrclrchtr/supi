@@ -3,10 +3,16 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createAgentSession: vi.fn(),
   createAgentSessionRuntime: vi.fn(),
+  createModelRuntime: vi.fn(async () => ({
+    getProviders: vi.fn(() => []),
+    registerNativeProvider: vi.fn(),
+    refresh: vi.fn(async () => undefined),
+  })),
 }));
 
 vi.mock("@earendil-works/pi-coding-agent", async (original) => ({
   ...(await original()),
+  ModelRuntime: { create: mocks.createModelRuntime },
   createAgentSession: mocks.createAgentSession,
   createAgentSessionRuntime: mocks.createAgentSessionRuntime,
 }));

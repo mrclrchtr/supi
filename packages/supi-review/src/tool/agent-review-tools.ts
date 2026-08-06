@@ -1,5 +1,6 @@
 import type { Usage } from "@earendil-works/pi-ai";
 import { buildSessionContext, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createAgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/api";
 import { StatusSpinner } from "@mrclrchtr/supi-core/status-spinner";
 import type { LocalReviewAuditStore } from "../audit/local-review-audit-store.ts";
 import { loadReviewConfig } from "../config.ts";
@@ -197,6 +198,7 @@ function makeRunReviewExecute(
           ? await runReview({
               mode: "direct",
               cwd: ctx.cwd,
+              providerAuthority: createAgentRunProviderAuthority(ctx.modelRegistry),
               target: input.target,
               review: input.review,
               reviewerModel: resolveModels(ctx).reviewer,
@@ -209,6 +211,7 @@ function makeRunReviewExecute(
           : await runReview({
               mode: "prepared",
               cwd: ctx.cwd,
+              providerAuthority: createAgentRunProviderAuthority(ctx.modelRegistry),
               planId: input.planId,
               decision: input.decision,
               planStore,
@@ -289,6 +292,7 @@ export function registerAgentReviewTools(
         );
         const outcome = await prepareReview({
           cwd: ctx.cwd,
+          providerAuthority: createAgentRunProviderAuthority(ctx.modelRegistry),
           target: target(input.target),
           planning: input.planning ?? "none",
           plannerContext: collectPlannerContext(session.messages),

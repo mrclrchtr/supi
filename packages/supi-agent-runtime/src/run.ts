@@ -1,9 +1,10 @@
 // biome-ignore lint/style/noExcessiveLinesPerFile: the Agent Run state machine keeps lifecycle ownership auditable in one closure.
-import type { Usage } from "@earendil-works/pi-ai";
+import type { Api, Model, Usage } from "@earendil-works/pi-ai";
 import type {
   AgentSession,
   AgentSessionEvent,
   AgentSessionRuntime,
+  ExtensionRuntime,
 } from "@earendil-works/pi-coding-agent";
 import {
   createAgentSession,
@@ -13,6 +14,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { buildAgentRunDiagnostics } from "./diagnostics.ts";
 import { AgentRunLifecycleTraceCollector, getRegisteredToolNames } from "./lifecycle-trace.ts";
+import { createAgentRunModelRuntime } from "./provider-authority.ts";
 import { createAgentRunSessionView, deactivateAgentRunSessionView } from "./session-view.ts";
 import type {
   AgentRunFailureCode,
@@ -59,26 +61,42 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
   let promptActive = false;
   let promptPreflightSettled = false;
   let promptPreflightCompletion: Promise<void> | undefined;
-  let promptAccepted = false;
   let promptPromiseSettled = false;
+  let promptFailureCode: "prompt-rejected" | "unexpected-runner-failure" | undefined;
   let settledEventObserved = false;
-  let deferredSettlement = false;
+  let promptSettlement: Promise<void> | undefined;
   let cancelRequested = false;
   let timeoutRequested = false;
   let cancellationMarkerRecorded = false;
   let resolvingCompletion = false;
   let completionResolution: Promise<void> | undefined;
   let aborting = false;
-  let setupFinished = false;
+  let sessionSetupFinished = false;
+  let extensionsBound = false;
   let finalizing = false;
   let terminal = false;
   let finalization: Promise<void> | undefined;
+  let abortPromise: Promise<void> | undefined;
   let abortCompletion: Promise<void> | undefined;
   let stopRequest: Promise<void> | undefined;
-  let resolveSetupFinished!: () => void;
-  const setupDone = new Promise<void>((resolve) => {
-    resolveSetupFinished = resolve;
+  let extensionRuntime: ExtensionRuntime | undefined;
+  let extensionAdmissionOpen = true;
+  let admissionGeneration = 0;
+  let fencedSession: AgentSession | undefined;
+  const extensionWork = new Set<Promise<unknown>>();
+  let resolveSessionSetupFinished!: () => void;
+  const sessionSetupDone = new Promise<void>((resolve) => {
+    resolveSessionSetupFinished = resolve;
   });
+  let resolveSetupCallbacksFinished!: () => void;
+  const setupCallbacksDone = new Promise<void>((resolve) => {
+    resolveSetupCallbacksFinished = resolve;
+  });
+  const markSessionSetupFinished = (): void => {
+    if (sessionSetupFinished) return;
+    sessionSetupFinished = true;
+    resolveSessionSetupFinished();
+  };
   let resolveResult!: (outcome: AgentRunOutcome<T>) => void;
   const result = new Promise<AgentRunOutcome<T>>((resolve) => {
     resolveResult = resolve;
@@ -134,17 +152,77 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     return usage ? ({ ...outcome, usage } as TOutcome) : outcome;
   };
 
+  const trackExtensionWork = (start: () => Promise<unknown>): void => {
+    let resolveWork!: () => void;
+    let rejectWork!: (error: unknown) => void;
+    const work = new Promise<void>((resolve, reject) => {
+      resolveWork = resolve;
+      rejectWork = reject;
+    });
+    extensionWork.add(work);
+    void work.then(
+      () => extensionWork.delete(work),
+      () => extensionWork.delete(work),
+    );
+    try {
+      Promise.resolve(start()).then(resolveWork, rejectWork);
+    } catch (error) {
+      rejectWork(error);
+      throw error;
+    }
+  };
+
+  const closeSessionAdmission = (): void => {
+    extensionAdmissionOpen = false;
+    const activeSession = session;
+    if (!activeSession || activeSession === fencedSession) return;
+    fencedSession = activeSession;
+    admissionGeneration++;
+    try {
+      activeSession.clearQueue();
+    } catch {
+      // Queue clearing is best effort before disposal.
+    }
+  };
+
+  const beginAbort = (): void => {
+    if (abortPromise || !session) return;
+    try {
+      // AgentSession.abort() calls the synchronous lower-level abort before its first await.
+      abortPromise = Promise.resolve(session.abort()).catch(() => undefined);
+    } catch {
+      abortPromise = Promise.resolve();
+    }
+  };
+
+  const installExtensionSendGuards = (activeSession: AgentSession): void => {
+    const actions = extensionRuntime;
+    if (!actions) return;
+    actions.sendMessage = (message, options) => {
+      if (!extensionAdmissionOpen) throw new Error("Agent Run extension activity is closed");
+      trackExtensionWork(() => activeSession.sendCustomMessage(message, options));
+    };
+    actions.sendUserMessage = (content, options) => {
+      if (!extensionAdmissionOpen) throw new Error("Agent Run extension activity is closed");
+      trackExtensionWork(() => activeSession.sendUserMessage(content, options));
+    };
+  };
+
   const disposeRuntime = async (): Promise<void> => {
-    if (!runtime) {
+    const activeRuntime = runtime;
+    const activeSession = session;
+    if (!activeSession) return;
+    if (!activeRuntime || !extensionsBound) {
       try {
-        session?.dispose();
+        // An unbound session has no matching session_start/session_shutdown lifecycle.
+        activeSession.dispose();
       } catch {
         // Disposal is best effort after the outcome has been chosen.
       }
       return;
     }
     const disposal = Promise.resolve()
-      .then(() => runtime?.dispose())
+      .then(() => activeRuntime.dispose())
       .then(() => true)
       .catch(() => false);
     const disposedGracefully = await Promise.race([
@@ -153,7 +231,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     ]);
     if (!disposedGracefully) {
       try {
-        session?.dispose();
+        activeSession.dispose();
       } catch {
         // Forced disposal is best effort after graceful shutdown fails or times out.
       }
@@ -164,6 +242,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     if (terminal) return finalization ?? Promise.resolve();
     if (finalizing) return finalization ?? Promise.resolve();
     finalizing = true;
+    closeSessionAdmission();
     finalization = (async () => {
       if (timeoutId) clearTimeout(timeoutId);
       timeoutId = undefined;
@@ -218,24 +297,24 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
 
   const abortAndFinish = (kind: "canceled" | "timeout"): Promise<void> => {
     if (abortCompletion !== undefined) return abortCompletion;
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: abort waits for provider, preflight, and bounded disposal races.
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: abort waits for provider, setup callbacks, and bounded disposal races.
     abortCompletion = (async () => {
       if (terminal || finalizing) return;
-      const activeSession = session;
-      if (!activeSession) {
-        if (kind === "timeout") await finishTimeout();
-        else await finishCanceled();
-        return;
+      if (!sessionSetupFinished) await sessionSetupDone;
+      if (terminal || finalizing) return;
+      beginAbort();
+      await Promise.race([abortPromise ?? Promise.resolve(), wait(AGENT_RUN_ABORT_GRACE_MS)]);
+      if (extensionsBound) {
+        await Promise.race([setupCallbacksDone, wait(AGENT_RUN_ABORT_GRACE_MS)]);
       }
-      const abortPromise = Promise.resolve()
-        .then(() => activeSession.abort())
-        .catch(() => undefined);
-      await Promise.race([abortPromise, wait(AGENT_RUN_ABORT_GRACE_MS)]);
       if (!promptPreflightSettled) {
         await Promise.race([
           promptPreflightCompletion ?? Promise.resolve(),
           wait(AGENT_RUN_ABORT_GRACE_MS),
         ]);
+      }
+      if (promptSettlement) {
+        await Promise.race([promptSettlement, wait(AGENT_RUN_ABORT_GRACE_MS)]);
       }
       if (completionResolution) {
         await Promise.race([completionResolution, wait(AGENT_RUN_ABORT_GRACE_MS)]);
@@ -252,47 +331,39 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     lifecycle.recordHostMarker({ type: "abort_requested", reason: "canceled" });
   };
 
-  const requestCancellation = (): Promise<void> => {
+  const requestStop = (kind: "canceled" | "timeout"): Promise<void> => {
     if (stopRequest !== undefined) return stopRequest;
-    // Memoize before publishing `stopping`; progress listeners may call stop() reentrantly.
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: cancellation coordinates setup, abort, and timeout races.
-    stopRequest = (async () => {
-      await Promise.resolve();
-      if (!setupFinished) {
-        await setupDone;
-        if (terminal) return;
-      }
-      if (terminal) return;
-      if (finalizing) {
-        await (finalization ?? Promise.resolve());
-        return;
-      }
-      if (aborting || timeoutRequested) {
-        await (abortCompletion ?? finalization ?? Promise.resolve());
-        return;
-      }
-      aborting = true;
-      recordCancellationMarker();
-      if (promptStarted) await abortAndFinish("canceled");
-      else await finishCanceled();
-    })();
+    if (terminal || finalizing || aborting) return finalization ?? Promise.resolve();
+
     cancelRequested = true;
+    timeoutRequested = kind === "timeout";
+    aborting = true;
+    if (kind === "timeout") {
+      lifecycle.recordHostMarker({ type: "timeout_expired" });
+      lifecycle.recordHostMarker({ type: "abort_requested", reason: kind });
+    } else {
+      recordCancellationMarker();
+    }
+    // Memoize before the fence publishes queue and status events; stop() can be reentrant.
+    let resolveStopRequest!: () => void;
+    stopRequest = new Promise<void>((resolve) => {
+      resolveStopRequest = resolve;
+    });
+    // This is the Cancellation Fence: no await occurs before admission closes.
+    closeSessionAdmission();
+    beginAbort();
+    void abortAndFinish(kind).then(resolveStopRequest, resolveStopRequest);
     if (!terminal && !finalizing) setStatus("stopping");
     return stopRequest;
   };
 
+  const requestCancellation = (): Promise<void> => requestStop("canceled");
+
   const requestTimeout = (): void => {
     if (terminal || finalizing || aborting || !promptStarted) return;
-    timeoutRequested = true;
-    aborting = true;
-    lifecycle.recordHostMarker({ type: "timeout_expired" });
-    lifecycle.recordHostMarker({ type: "abort_requested", reason: "timeout" });
-    const abortPromise = abortAndFinish("timeout");
-    setStatus("stopping");
-    void abortPromise;
+    void requestStop("timeout");
   };
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: event dispatch coordinates progress and settlement.
   const dispatchEvent = (event: AgentSessionEvent): void => {
     lifecycle.observe(event);
     if (event.type === "turn_end") progressState.turns++;
@@ -310,26 +381,89 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     if (event.type !== "agent_settled" || aborting || terminal || finalizing) return;
     settledEventObserved = true;
     promptActive = false;
-    if (!promptAccepted || !promptPromiseSettled) {
-      deferredSettlement = true;
-      return;
-    }
-    startCompletionResolution();
   };
 
-  const flushSettlement = (): void => {
-    if (
-      !deferredSettlement ||
-      !promptAccepted ||
-      !promptPromiseSettled ||
-      aborting ||
-      terminal ||
-      finalizing
-    ) {
+  const pendingMessageCount = (activeSession: AgentSession): number | undefined => {
+    try {
+      return activeSession.pendingMessageCount;
+    } catch {
+      return undefined;
+    }
+  };
+
+  const hasNoPendingMessages = (activeSession: AgentSession): boolean => {
+    const pending = pendingMessageCount(activeSession);
+    if (pending === undefined) throw new Error("Unable to inspect Agent Run queues");
+    return pending === 0;
+  };
+
+  const isQuiescent = (activeSession: AgentSession): boolean =>
+    extensionWork.size === 0 && activeSession.isIdle && hasNoPendingMessages(activeSession);
+
+  const awaitSessionQuiescence = async (activeSession: AgentSession): Promise<void> => {
+    for (;;) {
+      const pending = [...extensionWork];
+      if (pending.length > 0) await Promise.allSettled(pending);
+      await activeSession.agent.waitForIdle();
+      await activeSession.waitForIdle();
+      await Promise.resolve();
+      if (!isQuiescent(activeSession)) continue;
+      await Promise.resolve();
+      if (isQuiescent(activeSession)) return;
+    }
+  };
+
+  const startPromptSettlement = (): void => {
+    if (promptSettlement || !promptPromiseSettled || aborting || terminal || finalizing) return;
+    const activeSession = session;
+    if (!activeSession) return;
+    const settlement = (async () => {
+      try {
+        await awaitSessionQuiescence(activeSession);
+      } catch {
+        if (!aborting && !terminal && !finalizing) await finishFailed("unexpected-runner-failure");
+        return;
+      }
+      if (!aborting && !terminal && !finalizing) startCompletionResolution();
+    })();
+    promptSettlement = settlement;
+    void settlement.then(
+      () => {
+        if (promptSettlement === settlement) promptSettlement = undefined;
+      },
+      () => {
+        if (promptSettlement === settlement) promptSettlement = undefined;
+      },
+    );
+  };
+
+  const startPromptFailureSettlement = (
+    failureCode: "prompt-rejected" | "unexpected-runner-failure",
+  ): void => {
+    if (promptSettlement || aborting || terminal || finalizing) return;
+    const activeSession = session;
+    if (!activeSession) {
+      void finishFailed(failureCode);
       return;
     }
-    deferredSettlement = false;
-    startCompletionResolution();
+    closeSessionAdmission();
+    const settlement = (async () => {
+      try {
+        await awaitSessionQuiescence(activeSession);
+      } catch {
+        // The prompt already failed; select its failure even if idle inspection fails.
+      }
+      if (!aborting && !terminal && !finalizing) await finishFailed(failureCode);
+    })();
+    promptSettlement = settlement;
+    void settlement.then(
+      () => {
+        if (promptSettlement === settlement) promptSettlement = undefined;
+      },
+      () => {
+        if (promptSettlement === settlement) promptSettlement = undefined;
+      },
+    );
   };
 
   async function resolveCompletion(): Promise<void> {
@@ -387,15 +521,13 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
         promptActive = false;
         if (cancelRequested || timeoutRequested || aborting || terminal || finalizing) return;
         lifecycle.recordHostMarker({ type: "prompt_rejected" });
-        void finishFailed("prompt-rejected");
+        promptFailureCode = "prompt-rejected";
         return;
       }
       if (cancelRequested || timeoutRequested || aborting || terminal || finalizing) {
         throw new Error("Agent Run prompt canceled before acceptance");
       }
       promptActive = true;
-      promptAccepted = true;
-      flushSettlement();
     };
     try {
       const promptPromise = session.prompt(options.prompt, { preflightResult: onPreflight });
@@ -404,21 +536,23 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
           settlePromptPreflight();
           promptPromiseSettled = true;
           promptActive = false;
-          promptAccepted = true;
-          if (settledEventObserved) flushSettlement();
-          else if (!cancelRequested && !timeoutRequested && !aborting) startCompletionResolution();
+          if (promptFailureCode) startPromptFailureSettlement(promptFailureCode);
+          else startPromptSettlement();
         },
         () => {
           settlePromptPreflight();
           promptPromiseSettled = true;
           promptActive = false;
-          if (!terminal && !finalizing && !aborting) void finishFailed("unexpected-runner-failure");
+          promptFailureCode ??= "unexpected-runner-failure";
+          startPromptFailureSettlement(promptFailureCode);
         },
       );
     } catch {
       settlePromptPreflight();
+      promptPromiseSettled = true;
       promptActive = false;
-      void finishFailed("unexpected-runner-failure");
+      promptFailureCode ??= "unexpected-runner-failure";
+      startPromptFailureSettlement(promptFailureCode);
     }
   };
 
@@ -427,14 +561,22 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     try {
       if (cancelRequested) return;
       await options.inputs.resourceLoader.reload();
-      if (cancelRequested) return;
+      if (cancelRequested) {
+        markSessionSetupFinished();
+        return;
+      }
       const agentDir = options.inputs.agentDir ?? process.env.PI_CODING_AGENT_DIR ?? getAgentDir();
       runtime = await createAgentSessionRuntime(
         async ({ cwd, agentDir: runtimeAgentDir, sessionManager, sessionStartEvent }) => {
+          const modelRuntime = await createAgentRunModelRuntime(
+            options.inputs.providerAuthority,
+            options.inputs.model as Model<Api>,
+          );
           const created = await createAgentSession({
             cwd,
             agentDir: runtimeAgentDir,
             model: options.inputs.model,
+            modelRuntime,
             thinkingLevel: options.inputs.thinkingLevel,
             tools: [...options.inputs.tools],
             customTools: options.inputs.customTools ? [...options.inputs.customTools] : undefined,
@@ -443,12 +585,13 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
             sessionManager,
             sessionStartEvent,
           });
+          extensionRuntime = created.extensionsResult.runtime;
           return {
             ...created,
             services: {
               cwd,
               agentDir: runtimeAgentDir,
-              modelRuntime: created.session.modelRuntime,
+              modelRuntime,
               settingsManager: options.inputs.settingsManager,
               resourceLoader: options.inputs.resourceLoader,
               diagnostics: [],
@@ -463,14 +606,37 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
         },
       );
       session = runtime.session;
-      await session.bindExtensions({ mode: "print" });
+      installExtensionSendGuards(session);
+      if (cancelRequested || terminal || finalizing) {
+        markSessionSetupFinished();
+        closeSessionAdmission();
+        return;
+      }
+      try {
+        await session.bindExtensions({ mode: "print" });
+        extensionsBound = true;
+      } finally {
+        markSessionSetupFinished();
+      }
+      if (cancelRequested || terminal || finalizing) return;
       lifecycle = new AgentRunLifecycleTraceCollector(getRegisteredToolNames(session));
       unsubscribe = session.subscribe(dispatchEvent);
-      view = createAgentRunSessionView(session, options.inputs.cwd);
+      const activeView = createAgentRunSessionView(session, options.inputs.cwd);
+      view = activeView;
       if (options.observer) {
         try {
-          const cleanup = await options.observer(view);
-          if (typeof cleanup === "function") observerCleanup = cleanup;
+          const cleanup = await options.observer(activeView);
+          if (typeof cleanup === "function") {
+            if (cancelRequested || terminal || finalizing) {
+              try {
+                cleanup();
+              } catch {
+                // A late observer disposer cannot change the selected outcome.
+              }
+            } else {
+              observerCleanup = cleanup;
+            }
+          }
         } catch {
           if (cancelRequested) return;
           await finishFailed("session-not-ready");
@@ -481,32 +647,27 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       if (options.readinessCheck) {
         let ready = true;
         try {
-          ready = (await options.readinessCheck(view)) !== false;
+          ready = (await options.readinessCheck(activeView)) !== false;
         } catch {
           ready = false;
         }
+        if (cancelRequested) return;
         if (!ready) {
-          if (cancelRequested) return;
           await finishFailed("session-not-ready");
           return;
         }
       }
       if (cancelRequested) return;
       setStatus("running");
-      setupFinished = true;
-      resolveSetupFinished();
       startPrompt();
     } catch {
       if (cancelRequested) return;
       await finishFailed(session ? "session-not-ready" : "session-creation-failed");
     } finally {
-      setupFinished = true;
-      resolveSetupFinished();
+      markSessionSetupFinished();
+      resolveSetupCallbacksFinished();
       if (cancelRequested && !terminal && !finalizing) {
-        aborting = true;
-        if (!timeoutRequested) recordCancellationMarker();
-        if (promptStarted) await abortAndFinish(timeoutRequested ? "timeout" : "canceled");
-        else await finishCanceled();
+        await abortAndFinish(timeoutRequested ? "timeout" : "canceled");
       }
     }
   };
@@ -534,8 +695,18 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
         aborting
       )
         return "not-running";
+      const activeSession = session;
+      const admissionAtStart = admissionGeneration;
       try {
-        await session.steer(message);
+        await activeSession.steer(message);
+        if (!extensionAdmissionOpen || admissionGeneration !== admissionAtStart) {
+          try {
+            activeSession.clearQueue();
+          } catch {
+            // A late queue write is inert once the session is closing.
+          }
+          return "not-running";
+        }
         return "accepted";
       } catch {
         return "not-running";

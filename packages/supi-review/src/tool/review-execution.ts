@@ -1,4 +1,7 @@
-import { createUnobservedAgentRunDiagnostics } from "@mrclrchtr/supi-agent-runtime/api";
+import {
+  type AgentRunProviderAuthority,
+  createUnobservedAgentRunDiagnostics,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import { normalizeReviewInput } from "../review-input.ts";
 import { normalizeReviewSubmission } from "../review-result.ts";
 import { buildReviewPacket } from "../target/packet.ts";
@@ -107,6 +110,7 @@ export async function executeReviewTasks(
   onUpdate?: ReviewExecutionUpdate,
   audit?: ReviewerAuditRequest,
   dependencyBootstrapConfigured = false,
+  providerAuthority?: AgentRunProviderAuthority,
 ): Promise<ReviewTaskResult[]> {
   const review = normalizeReviewInput(reviewInput);
   let completedCount = 0;
@@ -167,6 +171,7 @@ export async function executeReviewTasks(
           prompt: packet.prompt,
           packetHash: packet.packetHash,
           model,
+          providerAuthority,
           projectTrusted,
           ...(audit ? { audit } : {}),
           ...(dependencyBootstrapConfigured ? { dependencyBootstrapConfigured } : {}),
