@@ -20,11 +20,25 @@ function makeCatalogue(
   profiles: AgentProfile[],
   diagnostics: ProfileDiagnostic[] = [],
 ): ProfileCatalogue {
+  const entries = profiles.map((profile) => ({
+    id: profile.id,
+    description: profile.manifest.description,
+    sources: [
+      {
+        id: profile.id,
+        source: profile.source,
+        directory: profile.directory,
+        manifest: profile.manifest,
+      },
+    ],
+    diagnostics: [],
+  }));
   return {
-    profiles,
+    profiles: entries,
     diagnostics,
     profileIds: profiles.map((profile) => profile.id).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
     omittedProfileCount: 0,
+    sourceDirectories: { package: "/profiles", global: "/global" },
   };
 }
 

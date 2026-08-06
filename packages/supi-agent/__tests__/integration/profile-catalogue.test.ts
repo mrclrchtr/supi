@@ -3,7 +3,11 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { discoverProfileCatalogue, findProjectProfilesDirectory } from "../../src/api.ts";
+import {
+  discoverProfileCatalogue,
+  findProjectProfilesDirectory,
+  resolveProfileDefinition,
+} from "../../src/api.ts";
 import { manifest, writeProfile } from "../helpers/profile-fixtures.ts";
 
 const temporaryDirectories: string[] = [];
@@ -37,11 +41,15 @@ async function sourceRoots() {
 }
 
 describe("discoverProfileCatalogue", () => {
-  it("replaces complete definitions by source precedence and preserves invalid shadowing", async () => {
+  it("overlays fields by source precedence and falls through invalid sources", async () => {
     const roots = await sourceRoots();
-    await writeProfile(roots.packageDirectory, "shared", manifest({ description: "package" }));
+    await writeProfile(
+      roots.packageDirectory,
+      "shared",
+      manifest({ description: "package", model: "openai/package" }),
+    );
     await writeProfile(roots.packageDirectory, "blocked", manifest({ description: "fallback" }));
-    await writeProfile(roots.globalDirectory, "shared", manifest({ description: "global" }));
+    await writeProfile(roots.globalDirectory, "shared", { model: "openai/global" });
     await writeProfile(roots.globalDirectory, "blocked", {
       description: "invalid",
       tools: ["unknown" as never],
@@ -50,11 +58,9 @@ describe("discoverProfileCatalogue", () => {
     });
     await mkdir(join(roots.root, ".git"));
     await mkdir(join(roots.root, ".pi", "supi", "agents"), { recursive: true });
-    await writeProfile(
-      join(roots.root, ".pi", "supi", "agents"),
-      "shared",
-      manifest({ description: "project" }),
-    );
+    await writeProfile(join(roots.root, ".pi", "supi", "agents"), "shared", {
+      thinking: "high",
+    });
     execFileSync("git", ["init", "--quiet", roots.root]);
 
     const catalogue = await discoverProfileCatalogue({
@@ -63,17 +69,27 @@ describe("discoverProfileCatalogue", () => {
       packageDirectory: roots.packageDirectory,
       projectTrusted: true,
     });
+    const shared = catalogue.profiles.find((profile) => profile.id === "shared");
+    const resolved = shared && resolveProfileDefinition(shared);
 
-    expect(
-      catalogue.profiles.map((profile) => [
-        profile.id,
-        profile.source,
-        profile.manifest.description,
-      ]),
-    ).toEqual([["shared", "project", "project"]]);
+    expect(resolved).toMatchObject({
+      id: "shared",
+      source: "project",
+      manifest: {
+        description: "package",
+        model: "openai/global",
+        thinking: "high",
+        tools: [],
+      },
+    });
     expect(catalogue.diagnostics).toEqual([
       expect.objectContaining({ profileId: "blocked", source: "global", code: "invalid-manifest" }),
     ]);
+    expect(
+      resolveProfileDefinition(catalogue.profiles.find((p) => p.id === "blocked")!),
+    ).toMatchObject({
+      manifest: { description: "fallback" },
+    });
   });
 
   it("ignores untrusted ancestors and only checks the exact cwd outside Git", async () => {

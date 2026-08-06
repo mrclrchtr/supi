@@ -11,7 +11,13 @@ const registry = new AgentRunRegistry();
 function buildSchema(catalogue: ReturnType<typeof agentProfileCatalogueStore.get>): TSchema {
   if (!catalogue || catalogue.profiles.length === 0) {
     return buildAgentRunSchema(
-      catalogue ?? { profiles: [], diagnostics: [], profileIds: [], omittedProfileCount: 0 },
+      catalogue ?? {
+        profiles: [],
+        diagnostics: [],
+        profileIds: [],
+        omittedProfileCount: 0,
+        sourceDirectories: { package: "", global: "" },
+      },
     );
   }
   return buildAgentRunSchema(catalogue);

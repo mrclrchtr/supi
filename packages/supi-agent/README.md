@@ -6,13 +6,13 @@
 
 # @mrclrchtr/supi-agent
 
-Profile catalogue and resource policy for foreground Agent Runs in PI.
+Profile catalogue, field-level profile settings, and resource policy for foreground Agent Runs in PI.
 
-This package is the policy layer for `@mrclrchtr/supi-agent-runtime`. It discovers self-contained profiles from package defaults, `~/.pi/agent/supi/agents/`, and trusted project `.pi/supi/agents/` directories. It currently registers the session-scoped catalogue; foreground delegation is delivered by the next slice.
+This package is the policy layer for `@mrclrchtr/supi-agent-runtime`. It discovers Profile Directory sources from package defaults, `~/.pi/agent/supi/agents/`, and trusted project `.pi/supi/agents/` directories. It also contributes per-profile Model and Thinking rows to `/supi-settings`.
 
 Built-in profiles:
 
 - `explore` — read and headless Code Intelligence tools, no instruction files, read-only.
 - `general` — read, bash, edit, write, and headless Code Intelligence tools, global/project instruction files, mutation-capable.
 
-Profile sources replace complete directories by ID. Invalid higher-precedence profiles shadow lower definitions and remain unavailable with bounded diagnostics. Profiles are context-isolated, not permission- or filesystem-sandboxed.
+Profile sources overlay fields by ID with project → global → package precedence. A partial user manifest can pin only `model` or `thinking`; package tools and prompts continue to flow through. An invalid source falls through with a bounded diagnostic. Profiles are context-isolated, not permission- or filesystem-sandboxed.

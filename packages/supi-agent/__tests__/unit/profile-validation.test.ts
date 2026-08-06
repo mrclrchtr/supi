@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { discoverProfileCatalogue } from "../../src/api.ts";
+import { discoverProfileCatalogue, resolveProfileDefinition } from "../../src/api.ts";
 import { manifest, writeProfile } from "../helpers/profile-fixtures.ts";
 
 const temporaryDirectories: string[] = [];
@@ -43,8 +43,14 @@ describe("profile validation", () => {
     });
 
     expect(catalogue.diagnostics).toEqual([]);
-    expect(catalogue.profiles[0]).toMatchObject({
-      id: "custom",
+    expect(catalogue.profiles[0]?.id).toBe("custom");
+    expect(catalogue.profiles[0]?.sources[0]).toMatchObject({
+      customSystemPrompt: "Complete prompt",
+      manifest: { tools: [], systemPrompt: "custom" },
+    });
+    const custom = catalogue.profiles[0];
+    if (!custom) throw new Error("expected custom profile");
+    expect(resolveProfileDefinition(custom)).toMatchObject({
       customSystemPrompt: "Complete prompt",
       manifest: { tools: [], systemPrompt: "custom" },
     });
@@ -80,7 +86,7 @@ describe("profile validation", () => {
     ["long-description", { description: "x".repeat(201) }],
     ["duplicate-tools", { tools: ["read", "read"] }],
     ["duplicate-scopes", { instructionScopes: ["global", "global"] }],
-  ])("rejects %s without a lower-policy fallback", async (_name, extra) => {
+  ])("rejects %s as an unavailable source", async (_name, extra) => {
     const paths = await roots();
     await writeProfile(paths.packageDirectory, "invalid", { ...manifest(), ...extra });
 
@@ -91,7 +97,10 @@ describe("profile validation", () => {
       projectTrusted: false,
     });
 
-    expect(catalogue.profiles).toEqual([]);
+    expect(catalogue.profiles).toHaveLength(1);
+    expect(catalogue.profiles[0]?.sources[0]?.diagnostic).toEqual(
+      expect.objectContaining({ profileId: "invalid", code: "invalid-manifest" }),
+    );
     expect(catalogue.diagnostics).toEqual([
       expect.objectContaining({ profileId: "invalid", code: "invalid-manifest" }),
     ]);
@@ -113,7 +122,50 @@ describe("profile validation", () => {
     });
 
     expect(catalogue.diagnostics).toEqual([]);
-    expect(catalogue.profiles[0]?.manifest.model).toBe("openrouter/moonshotai/kimi-k2");
+    expect(catalogue.profiles[0]?.sources[0]?.manifest?.model).toBe(
+      "openrouter/moonshotai/kimi-k2",
+    );
+  });
+
+  it("accepts a partial manifest and resolves required fields from the package source", async () => {
+    const paths = await roots();
+    await writeProfile(paths.packageDirectory, "partial", manifest({ tools: ["read"] }));
+    await writeProfile(`${paths.agentDirectory}/supi/agents`, "partial", {
+      model: "openai/test",
+    });
+
+    const catalogue = await discoverProfileCatalogue({
+      cwd: paths.root,
+      agentDir: paths.agentDirectory,
+      packageDirectory: paths.packageDirectory,
+      projectTrusted: false,
+    });
+    const profile = catalogue.profiles[0];
+    expect(profile?.sources).toHaveLength(2);
+    expect(profile && resolveProfileDefinition(profile)).toMatchObject({
+      manifest: { description: "Test profile", tools: ["read"], model: "openai/test" },
+    });
+  });
+
+  it("defers completeness failure until profile resolution", async () => {
+    const paths = await roots();
+    await writeProfile(`${paths.agentDirectory}/supi/agents`, "partial", {
+      model: "openai/test",
+    });
+
+    const catalogue = await discoverProfileCatalogue({
+      cwd: paths.root,
+      agentDir: paths.agentDirectory,
+      packageDirectory: paths.packageDirectory,
+      projectTrusted: false,
+    });
+    const profile = catalogue.profiles[0];
+    if (!profile) throw new Error("expected partial profile");
+    expect(catalogue.diagnostics).toEqual([]);
+    expect(resolveProfileDefinition(profile)).toMatchObject({
+      code: "incomplete-manifest",
+      message: expect.stringContaining("description"),
+    });
   });
 
   it("requires the complete custom prompt and bounds diagnostics", async () => {

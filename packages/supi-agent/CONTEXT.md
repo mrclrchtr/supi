@@ -9,19 +9,19 @@ A named user or trusted-project policy that supplies an Agent Run's instructions
 _Avoid_: Agent type, role, preset
 
 **Profile Directory**:
-A self-contained Agent Profile definition containing a `profile.json` settings manifest and optional Markdown prompt assets. Package, global, and trusted-project Profile Directories are separate sources rather than entries in shared SuPi configuration.
+A Profile Directory definition containing a partial `profile.json` settings manifest and optional Markdown prompt assets. Package, global, and trusted-project Profile Directories are separate sources rather than entries in shared SuPi configuration.
 _Avoid_: Profile file, agents config entry, profile bundle
 
 **Profile ID**:
-The stable name of a Profile Directory and the identifier used by Delegation Tasks. A higher-precedence package, global, or trusted-project source replaces the complete lower definition with the same ID; profiles never merge across sources.
+The stable name of a Profile Directory and the identifier used by Delegation Tasks. Project, global, and package sources are resolved per field; omitted fields fall through to lower-precedence sources while lists remain whole-field values.
 _Avoid_: Profile name field, agent name, source-qualified profile
 
 **Profile Catalogue**:
-The immutable, maximum-32 set of effective Agent Profiles and Profile Diagnostics resolved for one extension runtime at session start or reload. The first 32 sorted Profile IDs enter the model-facing schema; additional IDs are unavailable with diagnostics, and source provenance remains human-facing metadata.
+The immutable, maximum-32 set of Profile IDs, source entries, and Profile Diagnostics retained for one extension runtime at session start or reload. Complete manifests are resolved during task preflight; the first 32 sorted IDs enter the model-facing schema and additional IDs are unavailable with diagnostics.
 _Avoid_: Live profile registry, discovered agents
 
 **Profile Diagnostic**:
-A bounded configuration error that makes one discovered Profile ID unavailable. An invalid higher-precedence definition continues to shadow lower definitions; diagnostics appear in the planned `/agents` overlay and SuPi debug events, not model-facing guidance or startup notifications.
+A bounded configuration error for one unavailable Profile Directory source or incomplete resolved Profile ID. Invalid sources are skipped as a whole, lower-precedence fields may supply the effective profile, and diagnostics appear in settings, startup warnings, and SuPi debug events without entering model-facing guidance.
 _Avoid_: Profile warning, fallback notice, Agent Run failure
 
 **Agent Capability Set**:

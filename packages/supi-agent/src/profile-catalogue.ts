@@ -11,21 +11,32 @@ import {
 } from "./profile-validation.ts";
 import {
   type AgentProfile,
+  type AgentProfileManifest,
   MAX_PROFILE_COUNT,
+  PROFILE_MANIFEST_FIELDS,
   type ProfileCatalogue,
+  type ProfileCatalogueEntry,
   type ProfileDiagnostic,
   type ProfileSource,
+  type ProfileSourceDirectories,
 } from "./types.ts";
 
 const execFileAsync = promisify(execFile);
 const packageProfilesDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../profiles");
+const SOURCE_ORDER: readonly ProfileSource[] = ["package", "global", "project"];
+const REQUIRED_FIELDS: readonly (keyof AgentProfileManifest)[] = [
+  "description",
+  "tools",
+  "systemPrompt",
+  "instructionScopes",
+];
 
-interface ProfileSourceDirectory {
+type ProfileSourceDirectory = {
   readonly source: ProfileSource;
   readonly directory: string | undefined;
-}
+};
 
-/** Inputs for one immutable profile catalogue snapshot. */
+/** Inputs for one immutable Profile Catalogue snapshot. */
 export interface DiscoverProfileCatalogueOptions {
   /** Session cwd used for trusted-project profile lookup. */
   readonly cwd: string;
@@ -37,53 +48,131 @@ export interface DiscoverProfileCatalogueOptions {
   readonly packageDirectory?: string;
 }
 
-/** Discover package, global, and trusted-project profiles with whole-directory precedence. */
+/** Resolve one catalogue entry into a complete effective Agent Profile. */
+export function resolveProfileDefinition(
+  entry: ProfileCatalogueEntry,
+): AgentProfile | ProfileDiagnostic {
+  const selected = new Map<
+    keyof AgentProfileManifest,
+    { value: unknown; candidate: ProfileCandidate }
+  >();
+
+  for (const field of PROFILE_MANIFEST_FIELDS) {
+    const value = resolveField(entry.sources, field);
+    if (value) selected.set(field, value);
+  }
+
+  const missing = REQUIRED_FIELDS.filter((field) => !selected.has(field));
+  if (missing.length > 0) {
+    const fallback = strongestAvailableSource(entry.sources);
+    return makeDiagnostic(
+      entry.id,
+      fallback?.source ?? "package",
+      "incomplete-manifest",
+      `Profile is missing required field${missing.length === 1 ? "" : "s"}: ${missing.join(", ")}.`,
+      fallback?.directory,
+    );
+  }
+
+  const promptSelection = selected.get("systemPrompt");
+  const customSystemPrompt =
+    promptSelection?.value === "custom" ? promptSelection.candidate.customSystemPrompt : undefined;
+  if (promptSelection?.value === "custom" && customSystemPrompt === undefined) {
+    return makeDiagnostic(
+      entry.id,
+      promptSelection.candidate.source,
+      "invalid-prompt",
+      "systemPrompt=custom requires a sibling SYSTEM.md file.",
+      promptSelection.candidate.directory,
+    );
+  }
+
+  const strongest = strongestSelectedSource(selected) ?? strongestAvailableSource(entry.sources);
+  if (!strongest) {
+    return makeDiagnostic(
+      entry.id,
+      "package",
+      "incomplete-manifest",
+      "Profile has no available source.",
+    );
+  }
+
+  const manifest = buildResolvedManifest(selected);
+
+  return Object.freeze({
+    id: entry.id,
+    source: strongest.source,
+    directory: strongest.directory,
+    manifest,
+    ...(customSystemPrompt === undefined ? {} : { customSystemPrompt }),
+  });
+}
+
+/** Discover package, global, and trusted-project profile sources. */
 export async function discoverProfileCatalogue(
   options: DiscoverProfileCatalogueOptions,
 ): Promise<ProfileCatalogue> {
   const projectDirectory = options.projectTrusted
     ? await findProjectProfilesDirectory(options.cwd)
     : undefined;
+  const projectWriteDirectory = options.projectTrusted
+    ? await findProjectProfilesDirectoryForWrite(options.cwd)
+    : undefined;
+  const sourceDirectories: ProfileSourceDirectories = Object.freeze({
+    package: options.packageDirectory ?? packageProfilesDirectory,
+    global: join(options.agentDir, "supi", "agents"),
+    ...(projectWriteDirectory === undefined ? {} : { project: projectWriteDirectory }),
+  });
   const sources: readonly ProfileSourceDirectory[] = [
-    { source: "package", directory: options.packageDirectory ?? packageProfilesDirectory },
-    { source: "global", directory: join(options.agentDir, "supi", "agents") },
+    { source: "package", directory: sourceDirectories.package },
+    { source: "global", directory: sourceDirectories.global },
     { source: "project", directory: projectDirectory },
   ];
-  const selected = selectEffectiveCandidates(sources);
-  const sortedProfileIds = [...selected.keys()].sort(compareProfileIds);
-  const profileIds = sortedProfileIds.slice(0, MAX_PROFILE_COUNT);
-  const profiles: AgentProfile[] = [];
+  const grouped = new Map<string, ProfileCandidate[]>();
   const diagnostics: ProfileDiagnostic[] = [];
 
-  for (const id of profileIds) {
-    const candidate = selected.get(id);
-    if (!candidate) continue;
-    if (candidate.profile) profiles.push(candidate.profile);
-    if (candidate.diagnostic) diagnostics.push(candidate.diagnostic);
+  for (const source of sources) {
+    for (const candidate of readProfileSource(source)) {
+      if (candidate.diagnostic?.code === "invalid-profile-id") {
+        diagnostics.push(candidate.diagnostic);
+        continue;
+      }
+      const entries = grouped.get(candidate.id) ?? [];
+      entries.push(candidate);
+      grouped.set(candidate.id, entries);
+    }
   }
+
+  const sortedProfileIds = [...grouped.keys()].sort(compareProfileIds);
+  const profileIds = sortedProfileIds.slice(0, MAX_PROFILE_COUNT);
+  const profiles = profileIds.map((id) => createCatalogueEntry(id, grouped.get(id) ?? []));
+  for (const profile of profiles) diagnostics.push(...profile.diagnostics);
 
   const omittedProfileCount = Math.max(0, sortedProfileIds.length - profileIds.length);
   if (omittedProfileCount > 0) {
-    const firstOmitted = selected.get(sortedProfileIds[profileIds.length]);
+    const firstOmitted = grouped.get(sortedProfileIds[profileIds.length])?.at(-1);
     diagnostics.push(
       makeDiagnostic(
         "(overflow)",
         firstOmitted?.source ?? "package",
         "catalogue-overflow",
         `${omittedProfileCount} additional profile IDs were omitted by the ${MAX_PROFILE_COUNT}-profile catalogue limit.`,
+        firstOmitted?.directory,
       ),
     );
   }
 
+  const frozenProfiles = Object.freeze(profiles);
   return Object.freeze({
-    profiles: Object.freeze(profiles),
+    profiles: frozenProfiles,
     diagnostics: Object.freeze(diagnostics),
     profileIds: Object.freeze(profileIds),
     omittedProfileCount,
+    sourceDirectories,
   });
 }
 
-/** Locate the nearest trusted project profile directory. */
+/** Locate the nearest existing trusted project profile directory. */
 export async function findProjectProfilesDirectory(cwd: string): Promise<string | undefined> {
   const resolvedCwd = realpathOrResolve(cwd);
   const gitRoot = await findGitRoot(resolvedCwd);
@@ -103,14 +192,111 @@ export async function findProjectProfilesDirectory(cwd: string): Promise<string 
   }
 }
 
-function selectEffectiveCandidates(
-  sources: readonly ProfileSourceDirectory[],
-): Map<string, ProfileCandidate> {
-  const selected = new Map<string, ProfileCandidate>();
-  for (const source of sources) {
-    for (const candidate of readProfileSource(source)) selected.set(candidate.id, candidate);
+/** Return the trusted project profile destination, even before it exists. */
+export async function findProjectProfilesDirectoryForWrite(
+  cwd: string,
+): Promise<string | undefined> {
+  const resolvedCwd = realpathOrResolve(cwd);
+  const existing = await findProjectProfilesDirectory(resolvedCwd);
+  if (existing) return existing;
+  const gitRoot = await findGitRoot(resolvedCwd);
+  return join(gitRoot ?? resolvedCwd, ".pi", "supi", "agents");
+}
+
+function createCatalogueEntry(
+  id: string,
+  candidates: readonly ProfileCandidate[],
+): ProfileCatalogueEntry {
+  const sources = Object.freeze([...candidates]);
+  const description = resolveField(sources, "description")?.value;
+  const diagnostics = Object.freeze(
+    candidates.flatMap((candidate) => (candidate.diagnostic ? [candidate.diagnostic] : [])),
+  );
+  return Object.freeze({
+    id,
+    description: typeof description === "string" ? description : id,
+    sources,
+    diagnostics,
+  });
+}
+
+function buildResolvedManifest(
+  selected: ReadonlyMap<
+    keyof AgentProfileManifest,
+    { value: unknown; candidate: ProfileCandidate }
+  >,
+): AgentProfileManifest {
+  return Object.freeze({
+    description: selectedValue<string>(selected, "description"),
+    tools: Object.freeze([
+      ...selectedValue<readonly string[]>(selected, "tools"),
+    ]) as AgentProfileManifest["tools"],
+    systemPrompt: selectedValue<AgentProfileManifest["systemPrompt"]>(selected, "systemPrompt"),
+    instructionScopes: Object.freeze([
+      ...selectedValue<readonly string[]>(selected, "instructionScopes"),
+    ]) as AgentProfileManifest["instructionScopes"],
+    ...(selected.has("model") ? { model: selectedValue<string>(selected, "model") } : {}),
+    ...(selected.has("thinking")
+      ? { thinking: selectedValue<AgentProfileManifest["thinking"]>(selected, "thinking") }
+      : {}),
+    ...(selected.has("timeoutMinutes")
+      ? { timeoutMinutes: selectedValue<number>(selected, "timeoutMinutes") }
+      : {}),
+  });
+}
+
+function selectedValue<T>(
+  selected: ReadonlyMap<
+    keyof AgentProfileManifest,
+    { value: unknown; candidate: ProfileCandidate }
+  >,
+  field: keyof AgentProfileManifest,
+): T {
+  const selection = selected.get(field);
+  if (!selection) throw new Error(`Missing resolved profile field: ${field}.`);
+  return selection.value as T;
+}
+
+function resolveField(
+  sources: readonly ProfileCandidate[],
+  field: keyof AgentProfileManifest,
+): { value: unknown; candidate: ProfileCandidate } | undefined {
+  for (const candidate of sourcesByPrecedence(sources)) {
+    if (candidate.diagnostic || !candidate.manifest) continue;
+    if (Object.hasOwn(candidate.manifest, field)) {
+      return { value: candidate.manifest[field], candidate };
+    }
   }
-  return selected;
+  return undefined;
+}
+
+function strongestAvailableSource(
+  sources: readonly ProfileCandidate[],
+): ProfileCandidate | undefined {
+  return sourcesByPrecedence(sources).find(
+    (candidate) => !candidate.diagnostic && candidate.manifest,
+  );
+}
+
+function sourcesByPrecedence(sources: readonly ProfileCandidate[]): ProfileCandidate[] {
+  return [...SOURCE_ORDER]
+    .reverse()
+    .flatMap((source) => sources.filter((candidate) => candidate.source === source));
+}
+
+function strongestSelectedSource(
+  selected: ReadonlyMap<
+    keyof AgentProfileManifest,
+    { value: unknown; candidate: ProfileCandidate }
+  >,
+): ProfileCandidate | undefined {
+  return [...selected.values()]
+    .map((value) => value.candidate)
+    .sort((left, right) => sourceRank(right.source) - sourceRank(left.source))[0];
+}
+
+function sourceRank(source: ProfileSource): number {
+  return SOURCE_ORDER.indexOf(source);
 }
 
 function readProfileSource(source: ProfileSourceDirectory): ProfileCandidate[] {

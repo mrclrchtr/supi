@@ -11,7 +11,15 @@ export type { DiscoverProfileCatalogueOptions } from "./profile-catalogue.ts";
 export {
   discoverProfileCatalogue,
   findProjectProfilesDirectory,
+  findProjectProfilesDirectoryForWrite,
+  resolveProfileDefinition,
 } from "./profile-catalogue.ts";
+export {
+  createProfileSettingsSection,
+  createProfileSettingsSections,
+  PROFILE_THINKING_LEVELS,
+  registerProfileSettings,
+} from "./profile-settings.ts";
 export {
   createAgentSessionInputs,
   packagePromptPath,
@@ -33,9 +41,13 @@ export type {
   AgentSystemPrompt,
   AgentThinkingLevel,
   PackagePromptId,
+  PartialAgentProfileManifest,
   ProfileCatalogue,
+  ProfileCatalogueEntry,
   ProfileDiagnostic,
   ProfileSource,
+  ProfileSourceDirectories,
+  ProfileSourceEntry,
   ResolvedAgentProfile,
 } from "./types.ts";
 export {

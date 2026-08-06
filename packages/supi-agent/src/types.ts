@@ -45,7 +45,7 @@ export type AgentCapabilityId =
 /** Values accepted by PI's model thinking policy. */
 export type AgentThinkingLevel = ModelThinkingLevel;
 
-/** Closed profile.json manifest after validation. */
+/** Closed profile.json manifest after field-level source resolution. */
 export interface AgentProfileManifest {
   /** Human-facing description, non-empty and capped at 200 characters. */
   readonly description: string;
@@ -63,11 +63,57 @@ export interface AgentProfileManifest {
   readonly timeoutMinutes?: number;
 }
 
-/** One valid effective Profile Directory. */
-export interface AgentProfile {
+/** Every field accepted in a profile.json manifest. */
+export const PROFILE_MANIFEST_FIELDS: readonly (keyof AgentProfileManifest)[] = [
+  "description",
+  "tools",
+  "systemPrompt",
+  "instructionScopes",
+  "model",
+  "thinking",
+  "timeoutMinutes",
+];
+
+/** Partial profile.json manifest stored by one profile source. */
+export type PartialAgentProfileManifest = Partial<AgentProfileManifest>;
+
+/** One source entry retained by the Profile Catalogue. */
+export interface ProfileSourceEntry {
   readonly id: string;
   readonly source: ProfileSource;
-  /** Absolute source directory; human diagnostics may use it, model guidance must not. */
+  /** Absolute source directory; human diagnostics may use it, model-facing guidance must not. */
+  readonly directory: string;
+  /** A partial manifest. Invalid sources omit this field and carry a diagnostic. */
+  readonly manifest?: PartialAgentProfileManifest;
+  /** Custom prompt content belonging to this source's systemPrompt field. */
+  readonly customSystemPrompt?: string;
+  readonly diagnostic?: ProfileDiagnostic;
+}
+
+/** One Profile ID and all of its source entries. */
+export interface ProfileCatalogueEntry {
+  readonly id: string;
+  /** Human-facing description resolved from the available source fields. */
+  readonly description: string;
+  /** Source entries in package → global → project order. */
+  readonly sources: readonly ProfileSourceEntry[];
+  readonly diagnostics: readonly ProfileDiagnostic[];
+}
+
+/** Source directories used for discovery and settings persistence. */
+export interface ProfileSourceDirectories {
+  readonly package: string;
+  readonly global: string;
+  /** Trusted project destination, including a path that does not exist yet. */
+  readonly project?: string;
+}
+
+/** One valid effective Agent Profile after field-level resolution. */
+export interface AgentProfile {
+  readonly id: string;
+  /** Strongest available source contributing to the effective profile. */
+  readonly source: ProfileSource;
+  /** Absolute source directory for the strongest available source. */
   readonly directory: string;
   readonly manifest: AgentProfileManifest;
   readonly customSystemPrompt?: string;
@@ -82,23 +128,28 @@ export interface ProfileDiagnostic {
     | "invalid-manifest"
     | "missing-profile-manifest"
     | "invalid-prompt"
+    | "incomplete-manifest"
     | "model-unavailable"
     | "model-unauthenticated"
     | "model-out-of-scope"
     | "catalogue-overflow";
   readonly message: string;
+  /** Absolute source directory for human-only diagnostics and settings UI. */
+  readonly directory?: string;
 }
 
-/** Immutable effective catalogue snapshot. */
+/** Immutable Profile Catalogue snapshot retained until the next session start/reload. */
 export interface ProfileCatalogue {
-  /** Valid profiles inside the bounded catalogue. */
-  readonly profiles: readonly AgentProfile[];
+  /** Discovered Profile IDs with all package/global/project source entries. */
+  readonly profiles: readonly ProfileCatalogueEntry[];
   /** Bounded invalid/overflow diagnostics for the visible catalogue snapshot. */
   readonly diagnostics: readonly ProfileDiagnostic[];
   /** Sorted IDs considered for this snapshot, capped at MAX_PROFILE_COUNT. */
   readonly profileIds: readonly string[];
   /** Number of additional effective IDs omitted by the catalogue cap. */
   readonly omittedProfileCount: number;
+  /** Source roots used by discovery and field-level settings persistence. */
+  readonly sourceDirectories: ProfileSourceDirectories;
 }
 
 /** Parent model context needed to resolve a profile's effective execution policy. */

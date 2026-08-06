@@ -30,6 +30,7 @@ export class AgentProfileCatalogueStore {
           profileId: diagnostic.profileId,
           source: diagnostic.source,
           code: diagnostic.code,
+          ...(diagnostic.directory === undefined ? {} : { directory: diagnostic.directory }),
         },
       });
     }

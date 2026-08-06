@@ -2,7 +2,6 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import { getAgentCapability } from "./capabilities.ts";
 import {
-  type AgentProfile,
   type AgentProfileManifest,
   type AgentSystemPrompt,
   type AgentThinkingLevel,
@@ -11,8 +10,11 @@ import {
   MAX_PROFILE_DIAGNOSTIC_CHARS,
   MAX_PROFILE_ID_LENGTH,
   MAX_PROFILE_MODEL_REFERENCE_CHARS,
+  type PartialAgentProfileManifest,
+  PROFILE_MANIFEST_FIELDS,
   type ProfileDiagnostic,
   type ProfileSource,
+  type ProfileSourceEntry,
 } from "./types.ts";
 
 const PROFILE_ID_PATTERN = /^[a-z](?:[a-z0-9]|-(?=[a-z0-9])){0,63}$/;
@@ -26,24 +28,19 @@ const THINKING_LEVELS = new Set<AgentThinkingLevel>([
   "max",
 ]);
 const PACKAGE_PROMPT_IDS = new Set<AgentSystemPrompt>(["supi:explore", "supi:general"]);
+const ALLOWED_FIELDS = new Set<keyof AgentProfileManifest>(PROFILE_MANIFEST_FIELDS);
 
-/** Candidate profile, including an unavailable higher-precedence definition. */
-export interface ProfileCandidate {
-  readonly id: string;
-  readonly source: ProfileSource;
-  readonly directory: string;
-  readonly profile?: AgentProfile;
-  readonly diagnostic?: ProfileDiagnostic;
-}
+/** Candidate profile source, including an unavailable source diagnostic. */
+export type ProfileCandidate = ProfileSourceEntry;
 
-/** Validate one self-contained Profile Directory without falling back to another source. */
+/** Validate one profile source as a partial manifest. */
 export function validateProfileDirectory(
   source: ProfileSource,
   directory: string,
 ): ProfileCandidate {
   const id = basename(directory);
   const identityError = validateProfileId(id);
-  if (identityError)
+  if (identityError) {
     return invalidCandidate({
       id,
       source,
@@ -51,6 +48,7 @@ export function validateProfileDirectory(
       code: "invalid-profile-id",
       message: identityError,
     });
+  }
 
   const manifestPath = join(directory, "profile.json");
   if (!existsSync(manifestPath) || !isFile(manifestPath)) {
@@ -64,7 +62,7 @@ export function validateProfileDirectory(
   }
 
   const raw = readJson(manifestPath);
-  if (!raw.ok)
+  if (!raw.ok) {
     return invalidCandidate({
       id,
       source,
@@ -72,9 +70,10 @@ export function validateProfileDirectory(
       code: "invalid-manifest",
       message: raw.message,
     });
+  }
 
   const manifest = validateManifest(raw.value);
-  if (!manifest.ok)
+  if (!manifest.ok) {
     return invalidCandidate({
       id,
       source,
@@ -82,9 +81,10 @@ export function validateProfileDirectory(
       code: manifest.code,
       message: manifest.message,
     });
+  }
 
   const customPrompt = readCustomPrompt(directory, manifest.value.systemPrompt);
-  if (!customPrompt.ok)
+  if (!customPrompt.ok) {
     return invalidCandidate({
       id,
       source,
@@ -92,33 +92,32 @@ export function validateProfileDirectory(
       code: "invalid-prompt",
       message: customPrompt.message,
     });
+  }
 
-  return {
+  return Object.freeze({
     id,
     source,
     directory,
-    profile: Object.freeze({
-      id,
-      source,
-      directory,
-      manifest: manifest.value,
-      ...(customPrompt.value === undefined ? {} : { customSystemPrompt: customPrompt.value }),
-    }),
-  };
+    manifest: manifest.value,
+    ...(customPrompt.value === undefined ? {} : { customSystemPrompt: customPrompt.value }),
+  });
 }
 
 /** Create a bounded diagnostic for profile/configuration output. */
+// biome-ignore lint/complexity/useMaxParams: diagnostics are a small public boundary with stable positional fields.
 export function makeDiagnostic(
   profileId: string,
   source: ProfileSource,
   code: ProfileDiagnostic["code"],
   message: string,
+  directory?: string,
 ): ProfileDiagnostic {
   return Object.freeze({
     profileId: sanitizeDiagnosticText(profileId).slice(0, MAX_PROFILE_ID_LENGTH) || "(invalid)",
     source,
     code,
     message: sanitizeDiagnosticText(message).slice(0, MAX_PROFILE_DIAGNOSTIC_CHARS),
+    ...(directory === undefined ? {} : { directory }),
   });
 }
 
@@ -146,12 +145,19 @@ function invalidCandidate(options: {
   readonly code: ProfileDiagnostic["code"];
   readonly message: string;
 }): ProfileCandidate {
-  return {
+  const diagnostic = makeDiagnostic(
+    options.id,
+    options.source,
+    options.code,
+    options.message,
+    options.directory,
+  );
+  return Object.freeze({
     id: options.id,
     source: options.source,
     directory: options.directory,
-    diagnostic: makeDiagnostic(options.id, options.source, options.code, options.message),
-  };
+    diagnostic,
+  });
 }
 
 function readJson(
@@ -167,14 +173,16 @@ function readJson(
 }
 
 function validateManifest(value: unknown):
-  | { readonly ok: true; readonly value: AgentProfileManifest }
+  | { readonly ok: true; readonly value: PartialAgentProfileManifest }
   | {
       readonly ok: false;
       readonly code: "invalid-manifest" | "invalid-prompt";
       readonly message: string;
     } {
   if (!isRecord(value)) return invalidManifest("Manifest must be an object.");
-  const unknownField = Object.keys(value).find((key) => !ALLOWED_FIELDS.has(key));
+  const unknownField = Object.keys(value).find(
+    (key) => !ALLOWED_FIELDS.has(key as keyof AgentProfileManifest),
+  );
   if (unknownField) return invalidManifest("Manifest contains an unknown field.");
 
   const basic = validateBasicFields(value);
@@ -189,49 +197,54 @@ function validateManifest(value: unknown):
   return {
     ok: true,
     value: Object.freeze({
-      description: (value.description as string).trim(),
-      tools: Object.freeze([...(value.tools as string[])]) as AgentProfileManifest["tools"],
-      systemPrompt: value.systemPrompt as AgentSystemPrompt,
-      instructionScopes: Object.freeze([
-        ...(value.instructionScopes as string[]),
-      ]) as AgentProfileManifest["instructionScopes"],
-      ...(value.model === undefined ? {} : { model: value.model as string }),
-      ...(value.thinking === undefined ? {} : { thinking: value.thinking as AgentThinkingLevel }),
-      ...(value.timeoutMinutes === undefined
-        ? {}
-        : { timeoutMinutes: value.timeoutMinutes as number }),
+      ...(hasOwn(value, "description")
+        ? { description: (value.description as string).trim() }
+        : {}),
+      ...(hasOwn(value, "tools")
+        ? {
+            tools: Object.freeze([...(value.tools as string[])]) as AgentProfileManifest["tools"],
+          }
+        : {}),
+      ...(hasOwn(value, "systemPrompt")
+        ? { systemPrompt: value.systemPrompt as AgentSystemPrompt }
+        : {}),
+      ...(hasOwn(value, "instructionScopes")
+        ? {
+            instructionScopes: Object.freeze([
+              ...(value.instructionScopes as string[]),
+            ]) as AgentProfileManifest["instructionScopes"],
+          }
+        : {}),
+      ...(hasOwn(value, "model") ? { model: value.model as string } : {}),
+      ...(hasOwn(value, "thinking") ? { thinking: value.thinking as AgentThinkingLevel } : {}),
+      ...(hasOwn(value, "timeoutMinutes")
+        ? { timeoutMinutes: value.timeoutMinutes as number }
+        : {}),
     }),
   };
 }
-
-const ALLOWED_FIELDS = new Set([
-  "description",
-  "tools",
-  "systemPrompt",
-  "instructionScopes",
-  "model",
-  "thinking",
-  "timeoutMinutes",
-]);
 
 function validateBasicFields(
   value: Record<string, unknown>,
 ): { readonly ok: false; readonly code: "invalid-manifest"; readonly message: string } | undefined {
   if (
-    typeof value.description !== "string" ||
-    value.description.trim().length === 0 ||
-    value.description.length > MAX_PROFILE_DESCRIPTION_LENGTH
+    hasOwn(value, "description") &&
+    (typeof value.description !== "string" ||
+      value.description.trim().length === 0 ||
+      value.description.length > MAX_PROFILE_DESCRIPTION_LENGTH)
   ) {
     return invalidManifest("description must be non-empty and at most 200 characters.");
   }
-  if (!Array.isArray(value.tools) || value.tools.some((tool) => typeof tool !== "string")) {
-    return invalidManifest("tools must be an array of capability IDs.");
-  }
-  if (
-    new Set(value.tools).size !== value.tools.length ||
-    value.tools.some((tool) => !getAgentCapability(tool))
-  ) {
-    return invalidManifest("tools contains an unknown or duplicate capability.");
+  if (hasOwn(value, "tools")) {
+    if (!Array.isArray(value.tools) || value.tools.some((tool) => typeof tool !== "string")) {
+      return invalidManifest("tools must be an array of capability IDs.");
+    }
+    if (
+      new Set(value.tools).size !== value.tools.length ||
+      value.tools.some((tool) => !getAgentCapability(tool))
+    ) {
+      return invalidManifest("tools contains an unknown or duplicate capability.");
+    }
   }
   return undefined;
 }
@@ -239,6 +252,7 @@ function validateBasicFields(
 function validatePrompt(
   value: unknown,
 ): { readonly ok: false; readonly code: "invalid-prompt"; readonly message: string } | undefined {
+  if (value === undefined) return undefined;
   return isSystemPrompt(value)
     ? undefined
     : {
@@ -251,6 +265,7 @@ function validatePrompt(
 function validateInstructionScopes(
   value: unknown,
 ): { readonly ok: false; readonly code: "invalid-manifest"; readonly message: string } | undefined {
+  if (value === undefined) return undefined;
   if (!Array.isArray(value) || value.some((scope) => scope !== "global" && scope !== "project")) {
     return invalidManifest("instructionScopes must contain only global and project.");
   }
@@ -263,22 +278,20 @@ function validateOptionalFields(
   value: Record<string, unknown>,
 ): { readonly ok: false; readonly code: "invalid-manifest"; readonly message: string } | undefined {
   if (
-    value.model !== undefined &&
-    (typeof value.model !== "string" ||
-      value.model.length > MAX_PROFILE_MODEL_REFERENCE_CHARS ||
-      !isCanonicalModel(value.model))
+    hasOwn(value, "model") &&
+    (typeof value.model !== "string" || !isCanonicalModel(value.model))
   ) {
     return invalidManifest("model must use the canonical provider/model-id form.");
   }
   if (
-    value.thinking !== undefined &&
+    hasOwn(value, "thinking") &&
     (typeof value.thinking !== "string" ||
       !THINKING_LEVELS.has(value.thinking as AgentThinkingLevel))
   ) {
     return invalidManifest("thinking is not a supported PI thinking level.");
   }
   if (
-    value.timeoutMinutes !== undefined &&
+    hasOwn(value, "timeoutMinutes") &&
     (typeof value.timeoutMinutes !== "number" ||
       !Number.isInteger(value.timeoutMinutes) ||
       value.timeoutMinutes < 1 ||
@@ -299,7 +312,7 @@ function invalidManifest(message: string): {
 
 function readCustomPrompt(
   directory: string,
-  selector: AgentSystemPrompt,
+  selector: AgentSystemPrompt | undefined,
 ):
   | { readonly ok: true; readonly value?: string }
   | { readonly ok: false; readonly message: string } {
@@ -328,14 +341,20 @@ function isSystemPrompt(value: unknown): value is AgentSystemPrompt {
   );
 }
 
-function isCanonicalModel(value: string): boolean {
+/** Return whether a model reference uses the bounded provider/model-id form. */
+export function isCanonicalModel(value: string): boolean {
   const slash = value.indexOf("/");
   return (
+    value.length <= MAX_PROFILE_MODEL_REFERENCE_CHARS &&
     slash > 0 &&
     slash < value.length - 1 &&
     !/\s/.test(value.slice(0, slash)) &&
     !/\s/.test(value.slice(slash + 1))
   );
+}
+
+function hasOwn(value: Record<string, unknown>, key: string): boolean {
+  return Object.hasOwn(value, key);
 }
 
 function isFile(path: string): boolean {

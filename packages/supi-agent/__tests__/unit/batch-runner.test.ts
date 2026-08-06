@@ -72,22 +72,38 @@ function mockCtx(overrides: Partial<ExtensionContext> = {}): ExtensionContext {
   } as unknown as ExtensionContext;
 }
 
-function makeCatalogue(ids: string[]): ProfileCatalogue {
+function makeEntry(
+  id: string,
+  tools: readonly ["read"] | readonly ["edit"] = ["read"],
+): ProfileCatalogue["profiles"][number] {
   return {
-    profiles: ids.map((id) => ({
-      id,
-      source: "package" as const,
-      directory: `/profiles/${id}`,
-      manifest: {
-        description: id,
-        tools: ["read"] as const,
-        systemPrompt: "native" as const,
-        instructionScopes: [] as const,
+    id,
+    description: id,
+    sources: [
+      {
+        id,
+        source: "package",
+        directory: `/profiles/${id}`,
+        manifest: {
+          description: id,
+          tools,
+          systemPrompt: "native",
+          instructionScopes: [],
+        },
       },
-    })),
+    ],
+    diagnostics: [],
+  };
+}
+
+function makeCatalogue(ids: string[]): ProfileCatalogue {
+  const profiles = ids.map((id) => makeEntry(id));
+  return {
+    profiles,
     diagnostics: [],
     profileIds: [...ids].sort(),
     omittedProfileCount: 0,
+    sourceDirectories: { package: "/profiles", global: "/global" },
   };
 }
 
@@ -121,23 +137,13 @@ describe("runDelegationBatch", () => {
 
   it("rejects mutation-capable multi-task batches", async () => {
     // "edit" is mutation-capable
+    const profiles = [makeEntry("impl", ["edit"])] as const;
     const catalogue: ProfileCatalogue = {
-      profiles: [
-        {
-          id: "impl",
-          source: "package" as const,
-          directory: "/profiles/impl",
-          manifest: {
-            description: "impl",
-            tools: ["edit"] as const,
-            systemPrompt: "native" as const,
-            instructionScopes: [] as const,
-          },
-        },
-      ],
+      profiles,
       diagnostics: [],
       profileIds: ["impl"],
       omittedProfileCount: 0,
+      sourceDirectories: { package: "/profiles", global: "/global" },
     };
     await expect(
       runDelegationBatch(

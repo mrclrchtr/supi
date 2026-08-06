@@ -12,6 +12,7 @@ import {
 } from "@mrclrchtr/supi-agent-runtime/api";
 import { isReadOnlyCapabilitySet, toAgentToolNames } from "../capabilities.ts";
 import { resolveAgentProfile } from "../model-policy.ts";
+import { resolveProfileDefinition } from "../profile-catalogue.ts";
 import { resolveAgentDirectory } from "../resources.ts";
 import type { AgentModelContext, AgentProfile, ProfileCatalogue } from "../types.ts";
 import type { AgentConversationView, ConversationTaskMetadata } from "./conversation-view.ts";
@@ -128,13 +129,18 @@ function preflight(
   const agentDir = resolveAgentDirectory();
 
   for (const task of params.tasks) {
-    const profile = catalogue.profiles.find((profile) => profile.id === task.profile);
-    if (!profile) {
+    const profileEntry = catalogue.profiles.find((profile) => profile.id === task.profile);
+    if (!profileEntry) {
       errors.push({
         taskId: task.id,
         profileId: task.profile,
         message: `Unknown profile "${task.profile}".`,
       });
+      continue;
+    }
+    const profile = resolveProfileDefinition(profileEntry);
+    if ("code" in profile) {
+      errors.push({ taskId: task.id, profileId: task.profile, message: profile.message });
       continue;
     }
     const resolvedProfile = resolveAgentProfile(profile, modelContext, {
