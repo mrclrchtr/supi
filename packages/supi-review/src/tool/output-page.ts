@@ -23,6 +23,19 @@ function lineBoundedEnd(text: string, start: number, proposedEnd: number): numbe
   return proposedEnd;
 }
 
+/** Replace the raw paging footer with a model-facing continuation instruction for one tool. */
+export function modelFacingPage(toolName: string, artifactId: string, page: TextPage): string {
+  if (page.nextOffset === undefined) return page.text;
+  const marker = "\n\n[output paged;";
+  const body = page.text.slice(0, page.text.lastIndexOf(marker));
+  const call = JSON.stringify({ artifactId, offset: page.nextOffset });
+  return [
+    body,
+    "",
+    `[output paged; call ${toolName} with ${call}; total characters: ${page.totalCharacters}]`,
+  ].join("\n");
+}
+
 /** Page tool/output text by UTF-16 offsets while staying below Pi's line/byte envelope. */
 export function pageText(text: string, offset = 0, limit = DEFAULT_PAGE_CHARACTERS): TextPage {
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > text.length) {

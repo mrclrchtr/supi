@@ -5,8 +5,8 @@ import { renderAuditCall, renderAuditResult } from "../tui/paged-output.ts";
 import {
   DEFAULT_PAGE_CHARACTERS,
   MAX_PAGE_CHARACTERS,
+  modelFacingPage,
   pageText,
-  type TextPage,
 } from "./output-page.ts";
 
 const reviewAuditSchema = Type.Object(
@@ -52,16 +52,6 @@ function formatAuditList(audits: Awaited<ReturnType<LocalReviewAuditStore["list"
   ].join("\n");
 }
 
-function modelFacingPage(artifactId: string, page: TextPage): string {
-  if (page.nextOffset === undefined) return page.text;
-  const body = page.text.slice(0, page.text.lastIndexOf("\n\n[output paged;"));
-  return [
-    body,
-    "",
-    `[output paged; call supi_review_audit with ${JSON.stringify({ artifactId, offset: page.nextOffset })}; total characters: ${page.totalCharacters}]`,
-  ].join("\n");
-}
-
 /** Register explicit retrieval for opt-in, local-only reviewer replay artifacts. */
 export function registerReviewAuditTool(pi: ExtensionAPI, store: LocalReviewAuditStore): void {
   pi.registerTool({
@@ -90,7 +80,7 @@ export function registerReviewAuditTool(pi: ExtensionAPI, store: LocalReviewAudi
         content: [
           {
             type: "text" as const,
-            text: modelFacingPage(params.artifactId, page),
+            text: modelFacingPage("supi_review_audit", params.artifactId, page),
           },
         ],
         details: {

@@ -3,7 +3,7 @@ import { Type } from "typebox";
 import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
 import { renderOutputCall, renderOutputResult } from "../tui/paged-output.ts";
 import type { ReviewOutputReference } from "../types.ts";
-import { DEFAULT_PAGE_CHARACTERS, MAX_PAGE_CHARACTERS, type TextPage } from "./output-page.ts";
+import { DEFAULT_PAGE_CHARACTERS, MAX_PAGE_CHARACTERS, modelFacingPage } from "./output-page.ts";
 
 const outputPageSchema = Type.Object(
   {
@@ -36,18 +36,6 @@ const outputPageSchema = Type.Object(
   },
 );
 
-function modelFacingPage(artifactId: string, page: TextPage): string {
-  if (page.nextOffset === undefined) return page.text;
-  const marker = "\n\n[output paged;";
-  const body = page.text.slice(0, page.text.lastIndexOf(marker));
-  const call = JSON.stringify({ artifactId, offset: page.nextOffset });
-  return [
-    body,
-    "",
-    `[output paged; call supi_review_output with ${call}; total characters: ${page.totalCharacters}]`,
-  ].join("\n");
-}
-
 /** Store complete output and return its first bounded model-facing page. */
 export function createReviewOutput(
   store: ReviewArtifactStore,
@@ -57,7 +45,7 @@ export function createReviewOutput(
   const page = store.read(artifact.id);
   if (!page) throw new Error("Review output expired before it could be returned.");
   return {
-    text: modelFacingPage(artifact.id, page),
+    text: modelFacingPage("supi_review_output", artifact.id, page),
     reference: {
       artifactId: artifact.id,
       offset: page.offset,
@@ -85,7 +73,12 @@ export function registerReviewOutputTool(pi: ExtensionAPI, store: ReviewArtifact
         );
       }
       return {
-        content: [{ type: "text" as const, text: modelFacingPage(params.artifactId, page) }],
+        content: [
+          {
+            type: "text" as const,
+            text: modelFacingPage("supi_review_output", params.artifactId, page),
+          },
+        ],
         details: {
           kind: "review-output-page" as const,
           artifactId: params.artifactId,
