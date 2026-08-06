@@ -82,7 +82,7 @@ export function createProfileSettingsSection(
 ): SettingsSection {
   return {
     id: `agent-profile-${entry.id}`,
-    label: entry.description,
+    label: `Agent ${entry.id}`,
     loadValues: (scope) => loadProfileSettings(entry, catalogue, scope),
     handleAction: (scope, _cwd, fieldKey, action) => {
       if (fieldKey !== "model" && fieldKey !== "thinking") return;

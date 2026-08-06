@@ -40,7 +40,7 @@ describe("profile settings", () => {
     const section = createProfileSettingsSection(entry, catalogue);
 
     expect(section.id).toBe("agent-profile-explore");
-    expect(section.label).toBe("Explore profile");
+    expect(section.label).toBe("Agent explore");
     expect(section.loadValues("global", paths.root).map((row) => row.field.kind)).toEqual([
       "modelPicker",
       "enum",
