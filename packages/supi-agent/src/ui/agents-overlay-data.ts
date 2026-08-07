@@ -2,7 +2,7 @@ import type { ModelThinkingLevel, Usage } from "@earendil-works/pi-ai";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { AgentConversationView } from "../tool/conversation-view.ts";
 import type { BatchTaskStatus } from "../tool/registry.ts";
-import type { ProfileDiagnostic, ProfileSource } from "../types.ts";
+import type { AgentProfileFieldSources, ProfileDiagnostic, ProfileSource } from "../types.ts";
 
 /** Number of Conversation View entries shown on one overlay page. */
 export const AGENTS_CONVERSATION_PAGE_SIZE = 10;
@@ -34,9 +34,11 @@ export interface AgentsOverlayProfile {
   readonly directory?: string;
   readonly model?: string;
   readonly thinking?: string;
+  readonly timeoutMinutes?: number;
   readonly tools?: readonly string[];
   readonly systemPrompt?: string;
   readonly instructionScopes?: readonly string[];
+  readonly fieldSources?: AgentProfileFieldSources;
   readonly unavailable?: string;
 }
 

@@ -139,9 +139,13 @@ function profileView(entry: ProfileCatalogue["profiles"][number]): AgentsOverlay
     directory: profile.directory,
     model: profile.manifest.model ?? "inherit",
     thinking: profile.manifest.thinking ?? "inherit",
+    ...(profile.manifest.timeoutMinutes === undefined
+      ? {}
+      : { timeoutMinutes: profile.manifest.timeoutMinutes }),
     tools: profile.manifest.tools,
     systemPrompt: profile.manifest.systemPrompt,
     instructionScopes: profile.manifest.instructionScopes,
+    ...(profile.fieldSources === undefined ? {} : { fieldSources: profile.fieldSources }),
   };
 }
 

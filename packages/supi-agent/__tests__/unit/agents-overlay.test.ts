@@ -59,11 +59,19 @@ function data(overrides: Partial<AgentsOverlayData> = {}): AgentsOverlayData {
         description: "Read-only code exploration",
         source: "package",
         directory: "/profiles/explore",
-        model: "inherit",
-        thinking: "inherit",
+        model: "openai/gpt-5",
+        thinking: "high",
         tools: ["read", "code_find"],
         systemPrompt: "supi:explore",
         instructionScopes: [],
+        fieldSources: {
+          description: "package",
+          tools: "package",
+          systemPrompt: "package",
+          instructionScopes: "package",
+          model: "global",
+          thinking: "project",
+        },
       },
     ],
     diagnostics: [
@@ -117,7 +125,10 @@ describe("AgentsDialog", () => {
     dialog.handleInput("\t");
     const profiles = dialog.render(100).join("\n");
     expect(profiles).toContain("Read-only code exploration");
-    expect(profiles).toContain("Source: package — /profiles/explore");
+    expect(profiles).toContain("Strongest source: package — /profiles/explore");
+    expect(profiles).toContain("Model (global): openai/gpt-5");
+    expect(profiles).toContain("Thinking (project): high");
+    expect(profiles).toContain("Tools (package): read, code_find");
     expect(profiles).toContain("1 additional profile omitted");
 
     dialog.handleInput("\t");

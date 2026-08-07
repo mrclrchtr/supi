@@ -204,23 +204,53 @@ function renderProfileDetails(
   theme: Theme,
 ): void {
   container.addChild(new Spacer(1));
-  container.addChild(new Text(profile.description, 1, 0));
+  container.addChild(
+    new Text(
+      `Description (${profile.fieldSources?.description ?? "unavailable"}): ${profile.description}`,
+      1,
+      0,
+    ),
+  );
   if (profile.unavailable) {
     container.addChild(new Text(theme.fg("error", `Unavailable: ${profile.unavailable}`), 1, 0));
     return;
   }
-  container.addChild(new Text(`Source: ${profile.source} — ${profile.directory}`, 1, 0));
+  container.addChild(new Text(`Strongest source: ${profile.source} — ${profile.directory}`, 1, 0));
   container.addChild(
-    new Text(theme.fg("dim", `Model: ${profile.model} · Thinking: ${profile.thinking}`), 1, 0),
-  );
-  container.addChild(
-    new Text(theme.fg("dim", `Tools: ${profile.tools?.join(", ") || "none"}`), 1, 0),
+    new Text(
+      theme.fg(
+        "dim",
+        `Model (${profile.fieldSources?.model ?? "session"}): ${profile.model} · Thinking (${profile.fieldSources?.thinking ?? "session"}): ${profile.thinking}`,
+      ),
+      1,
+      0,
+    ),
   );
   container.addChild(
     new Text(
       theme.fg(
         "dim",
-        `Prompt: ${profile.systemPrompt} · Instructions: ${profile.instructionScopes?.join(", ") || "none"}`,
+        `Timeout (${profile.fieldSources?.timeoutMinutes ?? "default"}): ${profile.timeoutMinutes ?? "none"}`,
+      ),
+      1,
+      0,
+    ),
+  );
+  container.addChild(
+    new Text(
+      theme.fg(
+        "dim",
+        `Tools (${profile.fieldSources?.tools ?? "unavailable"}): ${profile.tools?.join(", ") || "none"}`,
+      ),
+      1,
+      0,
+    ),
+  );
+  container.addChild(
+    new Text(
+      theme.fg(
+        "dim",
+        `Prompt (${profile.fieldSources?.systemPrompt ?? "unavailable"}): ${profile.systemPrompt} · Instructions (${profile.fieldSources?.instructionScopes ?? "unavailable"}): ${profile.instructionScopes?.join(", ") || "none"}`,
       ),
       1,
       0,

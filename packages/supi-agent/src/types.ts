@@ -108,6 +108,11 @@ export interface ProfileSourceDirectories {
   readonly project?: string;
 }
 
+/** Source provenance for each field in one resolved profile manifest. */
+export type AgentProfileFieldSources = Readonly<
+  Partial<Record<keyof AgentProfileManifest, ProfileSource>>
+>;
+
 /** One valid effective Agent Profile after field-level resolution. */
 export interface AgentProfile {
   readonly id: string;
@@ -116,6 +121,8 @@ export interface AgentProfile {
   /** Absolute source directory for the strongest available source. */
   readonly directory: string;
   readonly manifest: AgentProfileManifest;
+  /** Human-facing source provenance for resolved manifest fields. */
+  readonly fieldSources?: AgentProfileFieldSources;
   readonly customSystemPrompt?: string;
 }
 
@@ -144,7 +151,7 @@ export interface ProfileCatalogue {
   readonly profiles: readonly ProfileCatalogueEntry[];
   /** Bounded invalid/overflow diagnostics for the visible catalogue snapshot. */
   readonly diagnostics: readonly ProfileDiagnostic[];
-  /** Sorted IDs considered for this snapshot, capped at MAX_PROFILE_COUNT. */
+  /** Sorted effective IDs exposed to execution, capped at MAX_PROFILE_COUNT. */
   readonly profileIds: readonly string[];
   /** Number of additional effective IDs omitted by the catalogue cap. */
   readonly omittedProfileCount: number;

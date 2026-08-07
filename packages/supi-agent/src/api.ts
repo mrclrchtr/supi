@@ -36,6 +36,7 @@ export type {
   AgentInstructionScope,
   AgentModelContext,
   AgentProfile,
+  AgentProfileFieldSources,
   AgentProfileManifest,
   AgentSessionInputOptions,
   AgentSystemPrompt,
