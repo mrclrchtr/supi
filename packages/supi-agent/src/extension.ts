@@ -2,10 +2,12 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerProfileSettings } from "./profile-settings.ts";
 import { agentProfileCatalogueStore } from "./session.ts";
 import { registerAgentRunTool, registry } from "./tool/agent-run-tool.ts";
+import { registerAgentsCommand } from "./ui/agents-command.ts";
 
 /** Register session-scoped Agent Profile discovery and foreground delegation tool. */
 export default function agentExtension(pi: ExtensionAPI): void {
   let disposeProfileSettings: (() => void) | undefined;
+  registerAgentsCommand(pi, registry);
 
   // Catalogue, settings sections, and tool schema refresh on every session start/reload.
   pi.on("session_start", async (_event, ctx) => {

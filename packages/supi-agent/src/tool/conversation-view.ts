@@ -33,6 +33,8 @@ export interface ConversationViewOptions {
   taskId: string;
   profileId: string;
   messages: readonly AgentRunMessage[];
+  /** Steering accepted by the overlay, including messages not yet present in the child session. */
+  acceptedSteering?: readonly string[];
   taskMetadata: ConversationTaskMetadata;
 }
 
@@ -112,6 +114,21 @@ export function buildConversationView(options: ConversationViewOptions): AgentCo
                 .join("\n")
             : "";
       if (text.trim()) entries.push({ kind: "steering", text: text.trim() });
+    }
+  }
+
+  const observedSteering = new Map<string, number>();
+  for (const entry of entries) {
+    if (entry.kind === "steering") {
+      observedSteering.set(entry.text, (observedSteering.get(entry.text) ?? 0) + 1);
+    }
+  }
+  for (const text of options.acceptedSteering ?? []) {
+    const observedCount = observedSteering.get(text) ?? 0;
+    if (observedCount > 0) {
+      observedSteering.set(text, observedCount - 1);
+    } else if (text.trim()) {
+      entries.push({ kind: "steering", text: text.trim() });
     }
   }
 

@@ -166,7 +166,8 @@ function renderCollapsed(details: BatchDetails, theme: Theme): Text {
   return new Text(parts.join(` ${theme.fg("dim", "·")} `), 0, 0);
 }
 
-function renderConversationEntry(entry: ConversationEntry, theme: Theme): string {
+/** Format one safe Conversation View entry for human-facing renderers. */
+export function renderConversationEntry(entry: ConversationEntry, theme: Theme): string {
   switch (entry.kind) {
     case "assistant":
       return `${theme.fg("muted", "assistant: ")}${entry.text}`;

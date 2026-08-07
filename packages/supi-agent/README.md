@@ -16,3 +16,16 @@ Built-in profiles:
 - `general` — read, bash, edit, write, and headless Code Intelligence tools, global/project instruction files, mutation-capable.
 
 Profile sources overlay fields by ID with project → global → package precedence. A partial user manifest can pin only `model` or `thinking`; package tools and prompts continue to flow through. An invalid source falls through with a bounded diagnostic. Profiles are context-isolated, not permission- or filesystem-sandboxed.
+
+## `/agents`
+
+Use `/agents` in TUI mode to inspect active Agent Runs, the last completed Delegation Batch, effective Agent Profiles, and bounded Profile Diagnostics. The Runs view keeps task metadata separate from the bounded Conversation View. It shows lifecycle status, model, thinking level, turns, tool uses, Usage, safe tool activity, steering, assistant text, and retention notices.
+
+- Use Tab or Left/Right to change sections.
+- Use Up/Down to select a run, profile, or diagnostic.
+- Use Page Up/Page Down to inspect retained conversation entries.
+- Press `s` to steer the selected running Agent Run.
+- Press `x` to stop only the selected starting or running Agent Run. A startup stop can wait for PI setup to finish.
+- Press Esc to close the overlay. PI's normal outer-tool cancellation still stops the full Delegation Batch.
+
+Other PI modes show only an unavailable notice. The overlay does not add a text control protocol, persistent child history, child JSONL, or replay files. Session shutdown clears its active and last-batch state.

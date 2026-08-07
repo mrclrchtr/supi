@@ -4,18 +4,12 @@ import type {
   AgentRunHandle,
   AgentRunOutcome,
   AgentRunSessionView,
-  AgentSessionInputs,
 } from "@mrclrchtr/supi-agent-runtime/api";
-import {
-  combineAgentRunUsage,
-  createAgentRunProviderAuthority,
-  startAgentRun,
-} from "@mrclrchtr/supi-agent-runtime/api";
-import { isReadOnlyCapabilitySet, toAgentToolNames } from "../capabilities.ts";
-import { resolveAgentProfile } from "../model-policy.ts";
-import { resolveProfileDefinition } from "../profile-catalogue.ts";
-import { resolveAgentDirectory } from "../resources.ts";
-import type { AgentModelContext, AgentProfile, ProfileCatalogue } from "../types.ts";
+import { combineAgentRunUsage, startAgentRun } from "@mrclrchtr/supi-agent-runtime/api";
+import { toAgentToolNames } from "../capabilities.ts";
+import type { AgentProfile, ProfileCatalogue } from "../types.ts";
+import type { ResolvedTask } from "./batch-preflight.ts";
+import { preflightDelegationBatch } from "./batch-preflight.ts";
 import type { AgentConversationView, ConversationTaskMetadata } from "./conversation-view.ts";
 import { buildConversationView } from "./conversation-view.ts";
 import { capHumanText, capModelText, humanTextOverflow, modelTextOverflow } from "./output.ts";
@@ -32,24 +26,6 @@ import { summarizeToolActivity } from "./tool-summary.ts";
 // ── Progress ─────────────────────────────────────────────────────
 
 type OnUpdate = (details: BatchProgressState) => void;
-
-// ── Validation ───────────────────────────────────────────────────
-
-interface PreflightError {
-  taskId?: string;
-  profileId: string;
-  message: string;
-}
-
-interface ResolvedTask {
-  taskId: string;
-  profileId: string;
-  profile: AgentProfile;
-  instructions: string;
-  timeoutMs?: number;
-  model: AgentSessionInputs["model"];
-  inputs: AgentSessionInputs;
-}
 
 // ── Mapper helpers ───────────────────────────────────────────────
 
@@ -79,98 +55,6 @@ function buildChildPrompt(input: { sharedContext?: string; instructions: string 
   return `${input.sharedContext.trim()}\n\n${input.instructions}`;
 }
 
-// ── Preflight ────────────────────────────────────────────────────
-
-function buildModelContext(ctx: ExtensionContext): AgentModelContext {
-  return {
-    providerAuthority: createAgentRunProviderAuthority(ctx.modelRegistry),
-    currentModel: ctx.model,
-    currentThinkingLevel: ctx.thinkingLevel,
-    scopedModels: ctx.scopedModels.map((entry) => ({
-      model: entry.model,
-      thinkingLevel: entry.thinkingLevel,
-    })),
-    modelRegistry: ctx.modelRegistry,
-  };
-}
-
-function preflight(
-  params: AgentRunToolParams,
-  catalogue: ProfileCatalogue,
-  ctx: ExtensionContext,
-): { tasks: ResolvedTask[] } | { errors: PreflightError[] } {
-  const errors: PreflightError[] = [];
-  const ids = new Set<string>();
-
-  for (const task of params.tasks) {
-    if (ids.has(task.id)) {
-      errors.push({
-        taskId: task.id,
-        profileId: task.profile,
-        message: `Duplicate task ID "${task.id}".`,
-      });
-    }
-    ids.add(task.id);
-  }
-
-  if (errors.length > 0) return { errors };
-
-  const resolved: ResolvedTask[] = [];
-  const modelContext = buildModelContext(ctx);
-  const agentDir = resolveAgentDirectory();
-
-  for (const task of params.tasks) {
-    const profileEntry = catalogue.profiles.find((profile) => profile.id === task.profile);
-    if (!profileEntry) {
-      errors.push({
-        taskId: task.id,
-        profileId: task.profile,
-        message: `Unknown profile "${task.profile}".`,
-      });
-      continue;
-    }
-    const profile = resolveProfileDefinition(profileEntry);
-    if ("code" in profile) {
-      errors.push({ taskId: task.id, profileId: task.profile, message: profile.message });
-      continue;
-    }
-    const resolvedProfile = resolveAgentProfile(profile, modelContext, {
-      cwd: ctx.cwd,
-      agentDir,
-      projectTrusted: ctx.isProjectTrusted(),
-      providerAuthority: modelContext.providerAuthority,
-    });
-    if ("code" in resolvedProfile) {
-      errors.push({ taskId: task.id, profileId: task.profile, message: resolvedProfile.message });
-      continue;
-    }
-    resolved.push({
-      taskId: task.id,
-      profileId: task.profile,
-      profile,
-      instructions: task.instructions,
-      timeoutMs: resolvedProfile.timeoutMs,
-      model: resolvedProfile.model,
-      inputs: resolvedProfile.inputs,
-    });
-  }
-
-  // Mutation-capable profiles require single-task batch.
-  const anyMutation = resolved.some(
-    (task) => !isReadOnlyCapabilitySet(task.profile.manifest.tools),
-  );
-  if (anyMutation && params.tasks.length > 1) {
-    errors.push({
-      profileId: "(batch)",
-      message:
-        "Mutation-capable profiles require a single-task batch. Reduce to one task or use only read-only profiles.",
-    });
-  }
-
-  if (errors.length > 0) return { errors };
-  return { tasks: resolved };
-}
-
 // ── Execute batch ────────────────────────────────────────────────
 
 /**
@@ -178,6 +62,7 @@ function preflight(
  * with aggregate usage. The caller owns the registry for active-run tracking and shutdown.
  */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: batch execution stays in one audited function.
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: batch lifecycle orchestration stays in one audited function.
 // biome-ignore lint/complexity/useMaxParams: batch orchestration needs catalogue, context, registry.
 export async function runDelegationBatch(
   params: AgentRunToolParams,
@@ -191,7 +76,7 @@ export async function runDelegationBatch(
   aggregateUsage?: Usage;
   conversationViews: Map<string, AgentConversationView>;
 }> {
-  const preflightResult = preflight(params, catalogue, ctx);
+  const preflightResult = preflightDelegationBatch(params, catalogue, ctx);
   if ("errors" in preflightResult) {
     const message = preflightResult.errors
       .map((err) => `${err.taskId ? `${err.taskId}: ` : ""}${err.message}`)
@@ -238,24 +123,54 @@ export async function runDelegationBatch(
   };
 
   // Start all runs.
-  const handles: Array<{ taskId: string; profileId: string; handle: AgentRunHandle<string> }> = [];
+  const handles: Array<{
+    taskId: string;
+    profileId: string;
+    modelId: string;
+    thinkingLevel: ResolvedTask["inputs"]["thinkingLevel"];
+    handle: AgentRunHandle<string>;
+  }> = [];
   for (const task of resolved) {
     const taskMetadata: ConversationTaskMetadata = {
       instructions: task.instructions,
       sharedContext: params.sharedContext,
     };
+    const modelId = `${task.model.provider}/${task.model.id}`;
     setProgress({
       taskId: task.taskId,
       profileId: task.profileId,
       status: "starting",
       turns: 0,
       toolUses: 0,
+      modelId,
+      thinkingLevel: task.inputs.thinkingLevel,
     });
     const recentActivity: string[] = [];
     const prompt = buildChildPrompt({
       sharedContext: params.sharedContext,
       instructions: task.instructions,
     });
+    let liveSession: AgentRunSessionView | undefined;
+    const currentConversationView = (
+      acceptedSteering: readonly string[] = [],
+    ): AgentConversationView =>
+      liveSession
+        ? buildConversationView({
+            taskId: task.taskId,
+            profileId: task.profileId,
+            messages: liveSession.messages,
+            acceptedSteering,
+            taskMetadata,
+          })
+        : (conversationViews.get(task.taskId) ?? {
+            taskId: task.taskId,
+            profileId: task.profileId,
+            entries: [],
+            omittedEntryCount: 0,
+            omittedCharacterCount: 0,
+            textTruncated: false,
+            taskMetadata,
+          });
 
     const handle = startAgentRun<string>({
       inputs: task.inputs,
@@ -265,46 +180,57 @@ export async function runDelegationBatch(
       readinessCheck: makeReadinessCheck(task.profile),
       completionResolver: (session) => session.getLastAssistantText() ?? "",
       observer: (session) => {
+        liveSession = session;
+        registry?.refresh();
         const unsubscribe = session.subscribe((event) => {
           const activity = summarizeToolActivity(event);
-          if (!activity) return;
-          recentActivity.push(activity);
-          if (recentActivity.length > 5) recentActivity.shift();
-          const current = progressMap.get(task.taskId);
-          if (!current) return;
-          setProgress({
-            taskId: task.taskId,
-            profileId: task.profileId,
-            status: current.status,
-            turns: current.turns,
-            toolUses: current.toolUses,
-            usage: current.usage,
-            recentActivity,
-          });
+          if (activity) {
+            recentActivity.push(activity);
+            if (recentActivity.length > 5) recentActivity.shift();
+            const current = progressMap.get(task.taskId);
+            if (current) {
+              setProgress({
+                ...current,
+                recentActivity,
+              });
+            }
+          }
+          registry?.refresh();
         });
 
         // The cleanup runs during finish, before result resolves.
         return () => {
           unsubscribe();
           try {
-            const messages = session.messages;
-            const view = buildConversationView({
-              taskId: task.taskId,
-              profileId: task.profileId,
-              messages,
-              taskMetadata,
-            });
+            const view = currentConversationView(registry?.acceptedSteering(task.taskId));
             conversationViews.set(task.taskId, view);
             registry?.setConversationView(task.taskId, view);
           } catch {
             // Conversation View is presentation-only.
+          } finally {
+            liveSession = undefined;
           }
         };
       },
     });
 
-    handles.push({ taskId: task.taskId, profileId: task.profileId, handle });
-    registry?.register(task.taskId, handle);
+    handles.push({
+      taskId: task.taskId,
+      profileId: task.profileId,
+      modelId,
+      thinkingLevel: task.inputs.thinkingLevel,
+      handle,
+    });
+    registry?.register({
+      taskId: task.taskId,
+      profileId: task.profileId,
+      modelId,
+      thinkingLevel: task.inputs.thinkingLevel,
+      taskMetadata,
+      handle,
+      getConversationView: currentConversationView,
+      getRecentActivity: () => recentActivity,
+    });
 
     handle.subscribe((progress) => {
       setProgress({
@@ -315,6 +241,8 @@ export async function runDelegationBatch(
         toolUses: progress.toolUses,
         usage: progress.usage,
         recentActivity,
+        modelId,
+        thinkingLevel: task.inputs.thinkingLevel,
       });
     });
   }
@@ -326,7 +254,7 @@ export async function runDelegationBatch(
   const usageList: Usage[] = [];
 
   for (let index = 0; index < handles.length; index++) {
-    const { taskId, profileId } = handles[index];
+    const { taskId, profileId, modelId, thinkingLevel } = handles[index];
     const outcome = settled[index];
 
     if (outcome.status === "rejected") {
@@ -339,8 +267,24 @@ export async function runDelegationBatch(
         toolUses: 0,
         humanTruncated: false,
         modelTruncated: false,
+        modelId,
+        thinkingLevel,
+        taskMetadata: resolved[index]?.instructions
+          ? {
+              instructions: resolved[index].instructions,
+              sharedContext: params.sharedContext,
+            }
+          : undefined,
       });
-      setProgress({ taskId, profileId, status: "failed", turns: 0, toolUses: 0 });
+      setProgress({
+        taskId,
+        profileId,
+        status: "failed",
+        turns: 0,
+        toolUses: 0,
+        modelId,
+        thinkingLevel,
+      });
       continue;
     }
 
@@ -365,6 +309,14 @@ export async function runDelegationBatch(
       failureCode: failureCodeFromOutcome(agentOutcome),
       turns: progressMap.get(taskId)?.turns ?? 0,
       toolUses: progressMap.get(taskId)?.toolUses ?? 0,
+      modelId,
+      thinkingLevel,
+      taskMetadata: resolved[index]?.instructions
+        ? {
+            instructions: resolved[index].instructions,
+            sharedContext: params.sharedContext,
+          }
+        : undefined,
     });
 
     setProgress({
@@ -374,6 +326,8 @@ export async function runDelegationBatch(
       turns: progressMap.get(taskId)?.turns ?? 0,
       toolUses: progressMap.get(taskId)?.toolUses ?? 0,
       usage,
+      modelId,
+      thinkingLevel,
     });
   }
 
