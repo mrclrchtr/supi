@@ -1,5 +1,10 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { describe, expect, it, vi } from "vitest";
+import {
+  configureDebugRegistry,
+  getDebugEvents,
+  resetDebugRegistry,
+} from "@mrclrchtr/supi-core/debug";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { runDelegationBatch } from "../../src/tool/batch-runner.ts";
 import type { ProfileCatalogue } from "../../src/types.ts";
 
@@ -108,6 +113,8 @@ function makeCatalogue(ids: string[]): ProfileCatalogue {
 }
 
 describe("runDelegationBatch", () => {
+  afterEach(() => resetDebugRegistry());
+
   it("throws on duplicate task IDs", async () => {
     const catalogue = makeCatalogue(["explore"]);
     await expect(
@@ -217,6 +224,63 @@ describe("runDelegationBatch", () => {
     expect(results[0].status).toBe("failed");
     expect(modelText).toContain("failed");
     // Should not throw — returns normal result.
+  });
+
+  it("records bounded Agent Run diagnostics for a failed task", async () => {
+    configureDebugRegistry({ enabled: true });
+    const { startAgentRun } = await import("@mrclrchtr/supi-agent-runtime/api");
+    (startAgentRun as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+      result: Promise.resolve({
+        kind: "failed",
+        failureCode: "missing-completion",
+        diagnostics: {
+          lifecycleTrace: {
+            entries: [
+              { type: "auto_retry_start", attempt: 1, maxAttempts: 3, delayMs: 1_000 },
+              {
+                type: "auto_retry_end",
+                success: false,
+                attempt: 1,
+                hasFinalError: true,
+                finalErrorText: "provider rate-limit error",
+              },
+            ],
+            droppedCount: 0,
+          },
+          turns: 1,
+          toolUses: 0,
+          lastAssistantStopReason: "error",
+          lastLifecycleErrorText: "provider rate-limit error",
+        },
+      }),
+      subscribe: vi.fn(() => () => undefined),
+      steer: vi.fn(async () => "not-running" as const),
+      stop: vi.fn(async () => undefined),
+    }));
+
+    await runDelegationBatch(
+      { tasks: [{ id: "t1", profile: "explore", instructions: "finish" }] },
+      makeCatalogue(["explore"]),
+      mockCtx(),
+    );
+
+    expect(getDebugEvents({ source: "supi-agent", category: "agent-run" }).events).toEqual([
+      expect.objectContaining({
+        level: "warning",
+        message: "Agent Run t1 failed",
+        data: expect.objectContaining({
+          taskId: "t1",
+          profileId: "explore",
+          modelId: "test/model",
+          status: "failed",
+          failureCode: "missing-completion",
+          diagnostics: expect.objectContaining({
+            lastAssistantStopReason: "error",
+            lastLifecycleErrorText: "provider rate-limit error",
+          }),
+        }),
+      }),
+    ]);
   });
 
   it("preserves missing assistant text as missing completion", async () => {

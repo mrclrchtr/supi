@@ -6,6 +6,7 @@ import type {
   AgentRunSessionView,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import { combineAgentRunUsage, startAgentRun } from "@mrclrchtr/supi-agent-runtime/api";
+import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import { toAgentToolNames } from "../capabilities.ts";
 import type { AgentProfile, ProfileCatalogue } from "../types.ts";
 import type { ResolvedTask } from "./batch-preflight.ts";
@@ -46,6 +47,37 @@ function batchTaskStatus(outcome: AgentRunOutcome<string>): BatchTaskStatus {
     case "timeout":
       return "timeout";
   }
+}
+
+function recordAgentRunOutcomeDebug(
+  input: {
+    cwd: string;
+    taskId: string;
+    profileId: string;
+    modelId: string;
+  },
+  outcome: AgentRunOutcome<string>,
+): void {
+  if (outcome.kind === "success") return;
+  const status = batchTaskStatus(outcome);
+  recordDebugEvent({
+    source: "supi-agent",
+    level: status === "canceled" ? "info" : "warning",
+    category: "agent-run",
+    message: `Agent Run ${input.taskId} ${status}`,
+    cwd: input.cwd,
+    data: {
+      taskId: input.taskId,
+      profileId: input.profileId,
+      modelId: input.modelId,
+      status,
+      failureCode: failureCodeFromOutcome(outcome),
+      ...(outcome.kind === "timeout" ? { timeoutMs: outcome.timeoutMs } : {}),
+      ...(outcome.kind === "failed" && outcome.failureCode === "session-creation-failed"
+        ? {}
+        : { diagnostics: outcome.diagnostics }),
+    },
+  });
 }
 
 // ── Build child prompt ──────────────────────────────────────────
@@ -289,6 +321,7 @@ export async function runDelegationBatch(
 
     const agentOutcome = outcome.value;
     const status = batchTaskStatus(agentOutcome);
+    recordAgentRunOutcomeDebug({ cwd: ctx.cwd, taskId, profileId, modelId }, agentOutcome);
     const usage = agentOutcome.usage;
     if (usage) usageList.push(usage);
 
