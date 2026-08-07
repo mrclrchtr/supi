@@ -86,7 +86,14 @@ function buildOverlayData(
 
   return {
     runs: [...activeRuns, ...lastRuns],
-    profiles: catalogue?.profiles.map(profileView) ?? [],
+    profiles:
+      catalogue?.profiles
+        .filter(
+          (profile) =>
+            catalogue.profileIds.includes(profile.id) ||
+            "code" in resolveProfileDefinition(profile),
+        )
+        .map(profileView) ?? [],
     diagnostics: diagnostics.visible,
     omittedDiagnosticCount: diagnostics.omitted,
     omittedProfileCount: catalogue?.omittedProfileCount ?? 0,

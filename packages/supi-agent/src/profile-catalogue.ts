@@ -98,12 +98,18 @@ export function resolveProfileDefinition(
   }
 
   const manifest = buildResolvedManifest(selected);
+  const fieldSources = Object.freeze(
+    Object.fromEntries(
+      [...selected].map(([field, selection]) => [field, selection.candidate.source]),
+    ),
+  );
 
   return Object.freeze({
     id: entry.id,
     source: strongest.source,
     directory: strongest.directory,
     manifest,
+    fieldSources,
     ...(customSystemPrompt === undefined ? {} : { customSystemPrompt }),
   });
 }
@@ -144,20 +150,20 @@ export async function discoverProfileCatalogue(
   }
 
   const sortedProfileIds = [...grouped.keys()].sort(compareProfileIds);
-  const profileIds = sortedProfileIds.slice(0, MAX_PROFILE_COUNT);
-  const profiles = profileIds.map((id) => createCatalogueEntry(id, grouped.get(id) ?? []));
-  for (const profile of profiles) diagnostics.push(...profile.diagnostics);
-
-  const omittedProfileCount = Math.max(0, sortedProfileIds.length - profileIds.length);
+  const profiles = sortedProfileIds.map((id) => createCatalogueEntry(id, grouped.get(id) ?? []));
+  const effectiveProfiles = collectEffectiveProfiles(profiles, diagnostics);
+  const profileIds = effectiveProfiles.slice(0, MAX_PROFILE_COUNT).map((profile) => profile.id);
+  const omittedProfileCount = Math.max(0, effectiveProfiles.length - profileIds.length);
   if (omittedProfileCount > 0) {
-    const firstOmitted = grouped.get(sortedProfileIds[profileIds.length])?.at(-1);
+    const firstOmitted = effectiveProfiles[MAX_PROFILE_COUNT];
+    const strongest = firstOmitted && strongestAvailableSource(firstOmitted.sources);
     diagnostics.push(
       makeDiagnostic(
         "(overflow)",
-        firstOmitted?.source ?? "package",
+        strongest?.source ?? "package",
         "catalogue-overflow",
         `${omittedProfileCount} additional profile IDs were omitted by the ${MAX_PROFILE_COUNT}-profile catalogue limit.`,
-        firstOmitted?.directory,
+        strongest?.directory,
       ),
     );
   }
@@ -201,6 +207,18 @@ export async function findProjectProfilesDirectoryForWrite(
   if (existing) return existing;
   const gitRoot = await findGitRoot(resolvedCwd);
   return join(gitRoot ?? resolvedCwd, ".pi", "supi", "agents");
+}
+
+function collectEffectiveProfiles(
+  profiles: readonly ProfileCatalogueEntry[],
+  diagnostics: ProfileDiagnostic[],
+): ProfileCatalogueEntry[] {
+  const effective: ProfileCatalogueEntry[] = [];
+  for (const profile of profiles) {
+    diagnostics.push(...profile.diagnostics);
+    if (!("code" in resolveProfileDefinition(profile))) effective.push(profile);
+  }
+  return effective;
 }
 
 function createCatalogueEntry(

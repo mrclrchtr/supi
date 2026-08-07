@@ -81,6 +81,14 @@ describe("discoverProfileCatalogue", () => {
         thinking: "high",
         tools: [],
       },
+      fieldSources: {
+        description: "package",
+        tools: "package",
+        systemPrompt: "package",
+        instructionScopes: "package",
+        model: "global",
+        thinking: "project",
+      },
     });
     expect(catalogue.diagnostics).toEqual([
       expect.objectContaining({ profileId: "blocked", source: "global", code: "invalid-manifest" }),
@@ -149,15 +157,35 @@ describe("discoverProfileCatalogue", () => {
       projectTrusted: false,
     });
 
-    expect(catalogue.profiles).toHaveLength(32);
+    expect(catalogue.profiles).toHaveLength(34);
+    expect(catalogue.profileIds).toHaveLength(32);
     expect(
       catalogue.diagnostics.filter((diagnostic) => diagnostic.code === "catalogue-overflow"),
     ).toHaveLength(1);
     expect(catalogue.omittedProfileCount).toBe(2);
     expect(catalogue.profileIds).toEqual(
-      [...catalogue.profiles]
-        .map((profile) => profile.id)
-        .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)),
+      catalogue.profiles.slice(0, 32).map((profile) => profile.id),
     );
+  });
+
+  it("does not let invalid IDs consume effective catalogue slots", async () => {
+    const roots = await sourceRoots();
+    for (let index = 0; index < 32; index += 1) {
+      await writeProfile(roots.packageDirectory, `a-invalid-${String(index).padStart(2, "0")}`, {
+        tools: ["unknown" as never],
+      });
+    }
+    await writeProfile(roots.packageDirectory, "z-valid-a", manifest());
+    await writeProfile(roots.packageDirectory, "z-valid-b", manifest());
+
+    const catalogue = await discoverProfileCatalogue({
+      cwd: roots.root,
+      agentDir: roots.agentDirectory,
+      packageDirectory: roots.packageDirectory,
+      projectTrusted: false,
+    });
+
+    expect(catalogue.profileIds).toEqual(["z-valid-a", "z-valid-b"]);
+    expect(catalogue.omittedProfileCount).toBe(0);
   });
 });

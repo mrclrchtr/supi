@@ -1,6 +1,5 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
-import { resolveProfileDefinition } from "../profile-catalogue.ts";
 import type { ProfileCatalogue } from "../types.ts";
 import {
   MAX_INSTRUCTIONS_CHARS,
@@ -11,9 +10,7 @@ import {
 
 /** Build the model-facing tool parameter schema from the current Profile Catalogue. */
 export function buildAgentRunSchema(catalogue: ProfileCatalogue): TSchema {
-  const ids = catalogue.profiles
-    .filter((profile) => !("code" in resolveProfileDefinition(profile)))
-    .map((profile) => profile.id);
+  const ids = catalogue.profileIds;
   const profileEnum =
     ids.length > 0
       ? StringEnum(ids as unknown as readonly string[] & [string, ...string[]], {

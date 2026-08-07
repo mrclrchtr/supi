@@ -10,18 +10,15 @@ import { type AgentRunToolParams, buildAgentRunSchema } from "./schema.ts";
 const registry = new AgentRunRegistry();
 
 function buildSchema(catalogue: ReturnType<typeof agentProfileCatalogueStore.get>): TSchema {
-  if (!catalogue || catalogue.profiles.length === 0) {
-    return buildAgentRunSchema(
-      catalogue ?? {
-        profiles: [],
-        diagnostics: [],
-        profileIds: [],
-        omittedProfileCount: 0,
-        sourceDirectories: { package: "", global: "" },
-      },
-    );
-  }
-  return buildAgentRunSchema(catalogue);
+  return buildAgentRunSchema(
+    catalogue ?? {
+      profiles: [],
+      diagnostics: [],
+      profileIds: [],
+      omittedProfileCount: 0,
+      sourceDirectories: { package: "", global: "" },
+    },
+  );
 }
 
 /** Register the foreground supi_agent_run tool on a PI extension. */
@@ -42,7 +39,7 @@ export function registerAgentRunTool(pi: ExtensionAPI): void {
       if (!catalogue) {
         throw new Error("Agent Profile catalogue is not yet loaded. Wait for session start.");
       }
-      if (catalogue.profiles.length === 0) {
+      if (catalogue.profileIds.length === 0) {
         throw new Error("No valid Agent Profiles are available.");
       }
       if (!Value.Check(parameters, params)) {

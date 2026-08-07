@@ -38,12 +38,14 @@ export function preflightDelegationBatch(
   const modelContext = buildModelContext(ctx);
   const agentDir = resolveAgentDirectory();
   for (const task of params.tasks) {
-    const profileEntry = catalogue.profiles.find((profile) => profile.id === task.profile);
+    const profileEntry = catalogue.profileIds.includes(task.profile)
+      ? catalogue.profiles.find((profile) => profile.id === task.profile)
+      : undefined;
     if (!profileEntry) {
       errors.push({
         taskId: task.id,
         profileId: task.profile,
-        message: `Unknown profile "${task.profile}".`,
+        message: `Unknown profile "${task.profile}" or profile is unavailable.`,
       });
       continue;
     }
