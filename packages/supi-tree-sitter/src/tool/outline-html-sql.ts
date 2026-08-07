@@ -60,7 +60,7 @@ function htmlId(tag: SyntaxNodeLike): string | null {
     if (attribute.type !== "attribute") continue;
     const name = directChild(attribute, "attribute_name");
     if (name?.text.toLowerCase() !== "id") continue;
-    return firstDescendant(attribute, "attribute_value")?.text || null;
+    return firstDescendant(attribute, "attribute_value")?.text ?? null;
   }
   return null;
 }
