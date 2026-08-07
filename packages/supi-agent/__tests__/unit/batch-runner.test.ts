@@ -218,4 +218,37 @@ describe("runDelegationBatch", () => {
     expect(modelText).toContain("failed");
     // Should not throw — returns normal result.
   });
+
+  it("preserves missing assistant text as missing completion", async () => {
+    const { startAgentRun } = await import("@mrclrchtr/supi-agent-runtime/api");
+    (startAgentRun as ReturnType<typeof vi.fn>).mockImplementationOnce(
+      (options: { completionResolver: (session: unknown) => string | undefined }) => ({
+        result: Promise.resolve(
+          options.completionResolver({ getLastAssistantText: () => undefined }),
+        ).then((value) =>
+          value === undefined
+            ? {
+                kind: "failed" as const,
+                failureCode: "missing-completion" as const,
+                diagnostics: {},
+              }
+            : { kind: "success" as const, value },
+        ),
+        subscribe: vi.fn(() => () => undefined),
+        steer: vi.fn(async () => "not-running" as const),
+        stop: vi.fn(async () => undefined),
+      }),
+    );
+
+    const { results } = await runDelegationBatch(
+      { tasks: [{ id: "t1", profile: "explore", instructions: "finish" }] },
+      makeCatalogue(["explore"]),
+      mockCtx(),
+    );
+
+    expect(results[0]).toMatchObject({
+      status: "failed",
+      failureCode: "missing-completion",
+    });
+  });
 });

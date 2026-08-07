@@ -178,7 +178,7 @@ export async function runDelegationBatch(
       signal: ctx.signal ?? undefined,
       timeoutMs: task.timeoutMs,
       readinessCheck: makeReadinessCheck(task.profile),
-      completionResolver: (session) => session.getLastAssistantText() ?? "",
+      completionResolver: (session) => session.getLastAssistantText(),
       observer: (session) => {
         liveSession = session;
         registry?.refresh();
