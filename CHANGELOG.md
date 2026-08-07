@@ -1,5 +1,21 @@
 # Changelog
 
+## [4.7.0](https://github.com/mrclrchtr/supi/compare/v4.6.0...v4.7.0) (2026-08-07)
+
+
+### Features
+
+* **supi-review:** add Current-State Audit ([59eedac](https://github.com/mrclrchtr/supi/commit/59eedaca20cf1636b37e02b2acde21dbbc13e7b4))
+
+
+### Bug Fixes
+
+* comply with biome 2.5.7 useNullishCoalescing rule ([ab2816b](https://github.com/mrclrchtr/supi/commit/ab2816b7e4ca487fbb76cc9cbc02c4ca5fd5c5ec))
+* **deps:** lock file maintenance ([f5ffcbc](https://github.com/mrclrchtr/supi/commit/f5ffcbc0348fa5dcdebadbe0f0d88b4004db1aed))
+* **deps:** update dependency @biomejs/biome to v2.5.7 ([6686752](https://github.com/mrclrchtr/supi/commit/66867529a0121370df98cec18ab2e188867f26b9))
+* **deps:** update dependency hk to v1.54.1 ([d99fc3e](https://github.com/mrclrchtr/supi/commit/d99fc3ed2abd991696cd9be5d57c09a91eb4dee0))
+* **prompt-suggestions:** declare pi core packages as peer deps ([c95d177](https://github.com/mrclrchtr/supi/commit/c95d1779b697647877e760c79fbbe2059bfa310e)), closes [#282](https://github.com/mrclrchtr/supi/issues/282)
+
 ## [4.6.0](https://github.com/mrclrchtr/supi/compare/v4.5.1...v4.6.0) (2026-08-04)
 
 
