@@ -204,5 +204,5 @@ Multi-context — `CONTEXT-MAP.md` at root pointing to per-package `CONTEXT.md` 
 - Adding exports to `supi-core/index.ts` or deleting source files breaks every downstream `vi.mock` factory — audit all consuming test files for stale mocks after module changes
 - **Removing code may leave `// biome-ignore` suppression comments unused** — Biome flags these; remove them
 - **Changing state shape requires updating every `createInitialState` mock in test files** — keep mock shapes in sync with real types
-- New installable extension package: add `package.json` + `tsconfig.json` + `__tests__/tsconfig.json` (`{"extends": "../../../tsconfig.json", "include": ["*.ts"], "exclude": []}`), wire it into root `pi.extensions`, and run `pnpm install`. Library-only packages use the same package/test configs but must not enter `pi.extensions`.
+- New installable extension package: add `package.json` + `tsconfig.json` + `__tests__/tsconfig.json` (`{"extends": "../../../tsconfig.json", "include": ["**/*.ts", "../src/**/*.ts"], "exclude": []}`), wire it into root `pi.extensions`, and run `pnpm install`. Library-only packages use the same package/test configs but must not enter `pi.extensions`.
 - Module-level `let`/`const` state persists across Vitest tests (ES modules are cached) — use behavioral verification instead of counting constructor invocations

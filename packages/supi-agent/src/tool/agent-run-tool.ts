@@ -1,8 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { TSchema } from "typebox";
+import { Value } from "typebox/value";
 import { agentProfileCatalogueStore } from "../session.ts";
 import { runDelegationBatch } from "./batch-runner.ts";
-import { AgentRunRegistry } from "./registry.ts";
+import { AgentRunRegistry, type BatchProgressState } from "./registry.ts";
 import { renderCall, renderResult } from "./render.ts";
 import { type AgentRunToolParams, buildAgentRunSchema } from "./schema.ts";
 
@@ -25,13 +26,14 @@ function buildSchema(catalogue: ReturnType<typeof agentProfileCatalogueStore.get
 
 /** Register the foreground supi_agent_run tool on a PI extension. */
 export function registerAgentRunTool(pi: ExtensionAPI): void {
+  const parameters = buildSchema(agentProfileCatalogueStore.get());
   pi.registerTool({
     name: "supi_agent_run",
     label: "Agent Run",
     description:
       "Delegate one or more tasks to Agent Profiles in foreground. Read-only profiles may run concurrently (1-4 tasks); mutation-capable profiles require a single-task batch. Returns ordered results with attribution. All runs are foreground-awaited; no background or recursive delegation.",
     executionMode: "sequential",
-    parameters: buildSchema(agentProfileCatalogueStore.get()),
+    parameters,
     renderCall,
     renderResult,
     // biome-ignore lint/complexity/useMaxParams: Pi execute contract requires 5 parameters.
@@ -43,22 +45,14 @@ export function registerAgentRunTool(pi: ExtensionAPI): void {
       if (catalogue.profiles.length === 0) {
         throw new Error("No valid Agent Profiles are available.");
       }
+      if (!Value.Check(parameters, params)) {
+        throw new Error("Invalid supi_agent_run input.");
+      }
 
       const toolParams = params as AgentRunToolParams;
 
       const onBatchUpdate = onUpdate
-        ? (state: {
-            tasks: readonly {
-              taskId: string;
-              profileId: string;
-              status: string;
-              turns: number;
-              toolUses: number;
-              usage?: { totalTokens?: number };
-            }[];
-            completedCount: number;
-            totalCount: number;
-          }) => {
+        ? (state: BatchProgressState) => {
             onUpdate({
               content: [{ type: "text" as const, text: "Working…" }],
               details: state,

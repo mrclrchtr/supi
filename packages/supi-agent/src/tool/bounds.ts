@@ -5,7 +5,7 @@ export const MAX_TASKS = 4;
 /** Maximum length of a task identifier. */
 export const MAX_TASK_ID_LENGTH = 64;
 /** Maximum instructions text length per task. */
-export const MAX_INSTRUCTIONS_CHARS = 32_000;
+export const MAX_INSTRUCTIONS_CHARS = 16_000;
 /** Maximum shared context text length. */
 export const MAX_SHARED_CONTEXT_CHARS = 16_000;
 

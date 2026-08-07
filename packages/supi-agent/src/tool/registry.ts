@@ -5,7 +5,32 @@ import type { AgentConversationView } from "./conversation-view.ts";
 // ── Domain types ─────────────────────────────────────────────────
 
 /** Per-task status tracked during live execution. */
-export type BatchTaskStatus = "running" | "completed" | "failed" | "canceled" | "timeout";
+export type BatchTaskStatus =
+  | "starting"
+  | "running"
+  | "stopping"
+  | "completed"
+  | "failed"
+  | "canceled"
+  | "timeout";
+
+/** Live progress for one Delegation Task. */
+export interface BatchTaskProgress {
+  taskId: string;
+  profileId: string;
+  status: BatchTaskStatus;
+  turns: number;
+  toolUses: number;
+  usage?: Usage;
+  recentActivity?: readonly string[];
+}
+
+/** Live progress for one Delegation Batch. */
+export interface BatchProgressState {
+  tasks: readonly BatchTaskProgress[];
+  completedCount: number;
+  totalCount: number;
+}
 
 /** Public view of one task's execution outcome. */
 export interface BatchTaskResult {

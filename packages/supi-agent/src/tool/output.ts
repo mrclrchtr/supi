@@ -4,10 +4,15 @@ function truncationMarker(originalLength: number): string {
   return `\n\n[truncated: ${originalLength.toLocaleString("en-US")} total characters]`;
 }
 
+function capText(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  const marker = truncationMarker(text.length);
+  return text.slice(0, Math.max(0, limit - marker.length)) + marker;
+}
+
 /** Cap model-visible text. Discloses truncation when applied. */
 export function capModelText(text: string): string {
-  if (text.length <= MODEL_LANE_MAX_CHARS) return text;
-  return text.slice(0, MODEL_LANE_MAX_CHARS) + truncationMarker(text.length);
+  return capText(text, MODEL_LANE_MAX_CHARS);
 }
 
 /** Return the number of characters by which text exceeded the cap. */
@@ -17,8 +22,7 @@ export function modelTextOverflow(text: string): number {
 
 /** Cap human-visible text. Discloses truncation when applied. */
 export function capHumanText(text: string): string {
-  if (text.length <= HUMAN_LANE_MAX_CHARS) return text;
-  return text.slice(0, HUMAN_LANE_MAX_CHARS) + truncationMarker(text.length);
+  return capText(text, HUMAN_LANE_MAX_CHARS);
 }
 
 /** Return the number of characters by which text exceeded the human cap. */

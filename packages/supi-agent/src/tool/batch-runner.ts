@@ -4,6 +4,7 @@ import type {
   AgentRunHandle,
   AgentRunOutcome,
   AgentRunSessionView,
+  AgentSessionInputs,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import {
   combineAgentRunUsage,
@@ -18,25 +19,17 @@ import type { AgentModelContext, AgentProfile, ProfileCatalogue } from "../types
 import type { AgentConversationView, ConversationTaskMetadata } from "./conversation-view.ts";
 import { buildConversationView } from "./conversation-view.ts";
 import { capHumanText, capModelText, humanTextOverflow, modelTextOverflow } from "./output.ts";
-import type { AgentRunRegistry, BatchTaskResult, BatchTaskStatus } from "./registry.ts";
+import type {
+  AgentRunRegistry,
+  BatchProgressState,
+  BatchTaskProgress,
+  BatchTaskResult,
+  BatchTaskStatus,
+} from "./registry.ts";
 import type { AgentRunToolParams } from "./schema.ts";
+import { summarizeToolActivity } from "./tool-summary.ts";
 
 // ── Progress ─────────────────────────────────────────────────────
-
-interface TaskProgress {
-  taskId: string;
-  profileId: string;
-  status: BatchTaskStatus;
-  turns: number;
-  toolUses: number;
-  usage?: Usage;
-}
-
-interface BatchProgressState {
-  tasks: readonly TaskProgress[];
-  completedCount: number;
-  totalCount: number;
-}
 
 type OnUpdate = (details: BatchProgressState) => void;
 
@@ -54,10 +47,8 @@ interface ResolvedTask {
   profile: AgentProfile;
   instructions: string;
   timeoutMs?: number;
-  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
-  model: any;
-  // biome-ignore lint/suspicious/noExplicitAny: AgentSessionInputs has dynamic tools shape
-  inputs: any;
+  model: AgentSessionInputs["model"];
+  inputs: AgentSessionInputs;
 }
 
 // ── Mapper helpers ───────────────────────────────────────────────
@@ -210,7 +201,7 @@ export async function runDelegationBatch(
 
   const resolved = preflightResult.tasks;
   const totalCount = resolved.length;
-  const progressMap = new Map<string, TaskProgress>();
+  const progressMap = new Map<string, BatchTaskProgress>();
   const conversationViews = new Map<string, AgentConversationView>();
 
   const publishProgress = (): void => {
@@ -226,16 +217,11 @@ export async function runDelegationBatch(
     onUpdate({ tasks, completedCount, totalCount });
   };
 
-  // biome-ignore lint/complexity/useMaxParams: progress helper with discrete fields.
-  const setProgress = (
-    taskId: string,
-    profileId: string,
-    status: BatchTaskStatus,
-    turns = 0,
-    toolUses = 0,
-    usage?: Usage,
-  ): void => {
-    progressMap.set(taskId, { taskId, profileId, status, turns, toolUses, usage });
+  const setProgress = (progress: BatchTaskProgress): void => {
+    progressMap.set(progress.taskId, {
+      ...progress,
+      recentActivity: progress.recentActivity ? [...progress.recentActivity] : undefined,
+    });
     publishProgress();
   };
 
@@ -258,7 +244,14 @@ export async function runDelegationBatch(
       instructions: task.instructions,
       sharedContext: params.sharedContext,
     };
-    setProgress(task.taskId, task.profileId, "running");
+    setProgress({
+      taskId: task.taskId,
+      profileId: task.profileId,
+      status: "starting",
+      turns: 0,
+      toolUses: 0,
+    });
+    const recentActivity: string[] = [];
     const prompt = buildChildPrompt({
       sharedContext: params.sharedContext,
       instructions: task.instructions,
@@ -272,8 +265,27 @@ export async function runDelegationBatch(
       readinessCheck: makeReadinessCheck(task.profile),
       completionResolver: (session) => session.getLastAssistantText() ?? "",
       observer: (session) => {
+        const unsubscribe = session.subscribe((event) => {
+          const activity = summarizeToolActivity(event);
+          if (!activity) return;
+          recentActivity.push(activity);
+          if (recentActivity.length > 5) recentActivity.shift();
+          const current = progressMap.get(task.taskId);
+          if (!current) return;
+          setProgress({
+            taskId: task.taskId,
+            profileId: task.profileId,
+            status: current.status,
+            turns: current.turns,
+            toolUses: current.toolUses,
+            usage: current.usage,
+            recentActivity,
+          });
+        });
+
         // The cleanup runs during finish, before result resolves.
         return () => {
+          unsubscribe();
           try {
             const messages = session.messages;
             const view = buildConversationView({
@@ -294,24 +306,16 @@ export async function runDelegationBatch(
     handles.push({ taskId: task.taskId, profileId: task.profileId, handle });
     registry?.register(task.taskId, handle);
 
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: state-machine status mapping.
     handle.subscribe((progress) => {
-      setProgress(
-        task.taskId,
-        task.profileId,
-        progress.status === "completed"
-          ? "completed"
-          : progress.status === "failed"
-            ? "failed"
-            : progress.status === "canceled"
-              ? "canceled"
-              : progress.status === "timeout"
-                ? "timeout"
-                : "running",
-        progress.turns,
-        progress.toolUses,
-        progress.usage,
-      );
+      setProgress({
+        taskId: task.taskId,
+        profileId: task.profileId,
+        status: progress.status,
+        turns: progress.turns,
+        toolUses: progress.toolUses,
+        usage: progress.usage,
+        recentActivity,
+      });
     });
   }
 
@@ -336,7 +340,7 @@ export async function runDelegationBatch(
         humanTruncated: false,
         modelTruncated: false,
       });
-      setProgress(taskId, profileId, "failed", 0, 0);
+      setProgress({ taskId, profileId, status: "failed", turns: 0, toolUses: 0 });
       continue;
     }
 
@@ -363,14 +367,14 @@ export async function runDelegationBatch(
       toolUses: progressMap.get(taskId)?.toolUses ?? 0,
     });
 
-    setProgress(
+    setProgress({
       taskId,
       profileId,
       status,
-      progressMap.get(taskId)?.turns ?? 0,
-      progressMap.get(taskId)?.toolUses ?? 0,
+      turns: progressMap.get(taskId)?.turns ?? 0,
+      toolUses: progressMap.get(taskId)?.toolUses ?? 0,
       usage,
-    );
+    });
   }
 
   const aggregateUsage = usageList.length > 0 ? combineAgentRunUsage(usageList) : undefined;

@@ -1,3 +1,4 @@
+import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { MAX_BASH_PREVIEW_CHARS } from "./bounds.ts";
 
 /** Tool summary returned per known capability. */
@@ -93,6 +94,30 @@ export function summarizeToolCall(toolName: string, args: unknown): AgentToolSum
   return summarizer.summarize(safeArgs, toolName);
 }
 
+const MAX_LIVE_ACTIVITY_CHARS = 160;
+
+/** Return one safe live activity label from a child session event. */
+export function summarizeToolActivity(event: AgentSessionEvent): string | undefined {
+  if (event.type === "turn_start") return "turn:start";
+  if (event.type === "turn_end") return "turn:end";
+  if (event.type === "message_end") {
+    return event.message.role === "assistant" ? "assistant:end" : undefined;
+  }
+  if (event.type !== "tool_execution_start" && event.type !== "tool_execution_end")
+    return undefined;
+
+  const suffix =
+    event.type === "tool_execution_start" ? "start" : event.isError ? "end:error" : "end";
+  const summary =
+    event.type === "tool_execution_start"
+      ? (summarizeToolCall(event.toolName, event.args).summary ?? event.toolName)
+      : event.toolName;
+  const activity = `tool:${suffix}:${summary}`;
+  return activity.length <= MAX_LIVE_ACTIVITY_CHARS
+    ? activity
+    : `${activity.slice(0, MAX_LIVE_ACTIVITY_CHARS - 1)}…`;
+}
+
 // ── Bash preview ─────────────────────────────────────────────────
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional ANSI escape detection.
@@ -104,6 +129,11 @@ const API_KEY_ENV_RE =
   /(\b(?:[A-Z][A-Z0-9_]*?(?:TOKEN|KEY|SECRET|PASSWORD|PASSWD))\s*=\s*)([^\s;&|]+)/gi;
 const EXPORT_SECRET_RE =
   /(export\s+[A-Z][A-Z0-9_]*?(?:TOKEN|KEY|SECRET|PASSWORD|PASSWD)\s*=\s*)([^\s;&|]+)/gi;
+const HEADER_SECRET_RE =
+  /(\b(?:authorization|proxy-authorization|x-api-key|api-key|x-auth-token|x-access-token)\s*[:=]\s*(?:(?:bearer|basic)\s+)?)([^\s;&|'"`]+)/gi;
+const AUTH_SCHEME_RE = /(\b(?:bearer|basic)\s+)([^\s;&|'"`]+)/gi;
+const USER_CREDENTIAL_RE =
+  /((?:^|\s)(?:-u|--user)(?:\s+|=))(?:(?:"[^"]*:[^"]*")|(?:'[^']*:[^']*')|(?:[^\s;&|'"`]+:[^\s;&|'"`]+))/gi;
 
 function stripControlCharacters(value: string): string {
   return Array.from(value, (character) => {
@@ -118,12 +148,12 @@ function redactSecrets(value: string): string {
     .replace(SECRET_ASSIGNMENT_RE, (_m, prefix: string) => `${prefix}[REDACTED]`)
     .replace(SECRET_FLAG_RE, (_m, prefix: string) => `${prefix}[REDACTED]`)
     .replace(API_KEY_ENV_RE, (_m, prefix: string) => `${prefix}[REDACTED]`)
-    .replace(EXPORT_SECRET_RE, (_m, prefix: string) => `${prefix}[REDACTED]`);
+    .replace(EXPORT_SECRET_RE, (_m, prefix: string) => `${prefix}[REDACTED]`)
+    .replace(HEADER_SECRET_RE, (_m, prefix: string) => `${prefix}[REDACTED]`)
+    .replace(AUTH_SCHEME_RE, (_m, prefix: string) => `${prefix}[REDACTED]`)
+    .replace(USER_CREDENTIAL_RE, (_m, prefix: string) => `${prefix}[REDACTED]`);
 }
 
-// ponytail: use regex-based credential redaction; inline secrets with no known-key prefix
-// (like bare `-X POST -H "Authorization: Bearer s3cr3t"`) pass through. Add a shell-level
-// credential scanner if user reports leakage.
 /** Return one safe, control-stripped, secret-redacted, whitespace-collapsed first-line preview. */
 export function firstLineBashPreview(command: string): string | undefined {
   if (!command.trim()) return undefined;

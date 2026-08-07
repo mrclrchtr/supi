@@ -22,6 +22,8 @@ export interface AgentConversationView {
   profileId: string;
   entries: readonly ConversationEntry[];
   omittedEntryCount: number;
+  /** Number of visible entry characters omitted by the retention bounds. */
+  omittedCharacterCount: number;
   textTruncated: boolean;
   taskMetadata: ConversationTaskMetadata;
 }
@@ -120,10 +122,12 @@ export function buildConversationView(options: ConversationViewOptions): AgentCo
   // Bound by visible text: keep newest entries up to the character cap.
   let visibleChars = 0;
   let textKeepFrom = boundedEntries.length;
+  let textTruncated = false;
   for (let i = boundedEntries.length - 1; i >= 0; i--) {
     const len = entryCharLength(boundedEntries[i]);
     if (visibleChars + len > MAX_CONVERSATION_TEXT_CHARS) {
       textKeepFrom = i + 1;
+      textTruncated = true;
       break;
     }
     visibleChars += len;
@@ -132,13 +136,17 @@ export function buildConversationView(options: ConversationViewOptions): AgentCo
 
   const finalEntries = boundedEntries.slice(textKeepFrom);
   const totalOmissions = entryOmissions + textKeepFrom;
+  const omittedCharacterCount =
+    entryCharacterCount(entries.slice(0, entryOmissions)) +
+    entryCharacterCount(boundedEntries.slice(0, textKeepFrom));
 
   return {
     taskId: options.taskId,
     profileId: options.profileId,
     entries: finalEntries,
     omittedEntryCount: totalOmissions,
-    textTruncated: totalOmissions > 0,
+    omittedCharacterCount,
+    textTruncated,
     taskMetadata: options.taskMetadata,
   };
 }
@@ -152,4 +160,8 @@ function entryCharLength(entry: ConversationEntry): number {
     case "tool":
       return (entry.summary ?? entry.toolName).length;
   }
+}
+
+function entryCharacterCount(entries: readonly ConversationEntry[]): number {
+  return entries.reduce((total, entry) => total + entryCharLength(entry), 0);
 }
