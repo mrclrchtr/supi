@@ -202,16 +202,12 @@ function renderConversationView(
   }
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: expanded final rendering shows bounded task and conversation details.
 function renderExpanded(details: BatchDetails, theme: Theme): Container {
   const container = new Container();
   container.addChild(new Text(`${theme.fg("accent", theme.bold("Agent Run Finished"))}`, 1, 0));
 
-  const sharedContext =
-    details.sharedContext ??
-    Object.values(details.conversationViews ?? {})[0]?.taskMetadata.sharedContext;
-  if (sharedContext) {
-    container.addChild(new Text(theme.fg("dim", `context: ${sharedContext}`), 1, 0));
+  if (details.sharedContext) {
+    container.addChild(new Text(theme.fg("dim", `context: ${details.sharedContext}`), 1, 0));
   }
 
   for (const task of details.tasks ?? []) {

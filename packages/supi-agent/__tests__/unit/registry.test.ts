@@ -24,7 +24,7 @@ function makeRegistration(taskId: string, handle = makeHandle()): ActiveRunRegis
     profileId: "explore",
     modelId: "test/model",
     thinkingLevel: "medium",
-    taskMetadata: { instructions: "Inspect the code", sharedContext: "Shared" },
+    taskMetadata: { instructions: "Inspect the code" },
     handle,
     getConversationView: () => ({
       taskId,
@@ -33,7 +33,7 @@ function makeRegistration(taskId: string, handle = makeHandle()): ActiveRunRegis
       omittedEntryCount: 0,
       omittedCharacterCount: 0,
       textTruncated: false,
-      taskMetadata: { instructions: "Inspect the code", sharedContext: "Shared" },
+      taskMetadata: { instructions: "Inspect the code" },
     }),
   };
 }
@@ -54,8 +54,10 @@ function makeResult(overrides: Partial<BatchTaskResult> = {}): BatchTaskResult {
 describe("AgentRunRegistry", () => {
   it("exposes active run metadata and progress", () => {
     const registry = new AgentRunRegistry();
+    registry.beginBatch("Shared");
     registry.register(makeRegistration("t1"));
 
+    expect(registry.snapshot().activeSharedContext).toBe("Shared");
     expect(registry.snapshot().activeRuns).toMatchObject([
       {
         taskId: "t1",

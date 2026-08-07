@@ -13,7 +13,6 @@ export type ConversationEntry =
 /** Task metadata displayed separately from the conversation stream. */
 export interface ConversationTaskMetadata {
   instructions: string;
-  sharedContext?: string;
 }
 
 /** Bounded, redacted Agent Conversation View retained for one Agent Run. */

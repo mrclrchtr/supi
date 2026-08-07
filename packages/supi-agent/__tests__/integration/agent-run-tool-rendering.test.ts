@@ -226,6 +226,7 @@ describe("registered supi_agent_run rendering boundary", () => {
       context(),
     )) as {
       details: {
+        sharedContext?: string;
         conversationViews: Record<
           string,
           {
@@ -233,6 +234,7 @@ describe("registered supi_agent_run rendering boundary", () => {
             omittedEntryCount: number;
             omittedCharacterCount: number;
             textTruncated: boolean;
+            taskMetadata: { instructions: string };
           }
         >;
       };
@@ -243,6 +245,8 @@ describe("registered supi_agent_run rendering boundary", () => {
     expect(view.omittedEntryCount).toBe(1);
     expect(view.omittedCharacterCount).toBe(oldText.length);
     expect(view.textTruncated).toBe(true);
+    expect(view.taskMetadata).toEqual({ instructions: "inspect the repository" });
+    expect(result.details.sharedContext).toBe("shared context");
 
     const expanded = tool.renderResult(result, { expanded: true, isPartial: false }, theme, {});
     const text = render(expanded);

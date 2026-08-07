@@ -23,6 +23,7 @@ export interface AgentsOverlayRun {
   readonly humanTruncated: boolean;
   readonly modelTruncated: boolean;
   readonly taskMetadata?: AgentConversationView["taskMetadata"];
+  readonly sharedContext?: string;
   readonly conversationView?: AgentConversationView;
 }
 

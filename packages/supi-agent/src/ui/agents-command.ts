@@ -76,11 +76,19 @@ function buildOverlayData(
     humanTruncated: false,
     modelTruncated: false,
     taskMetadata: run.taskMetadata,
+    ...(snapshot.activeSharedContext === undefined
+      ? {}
+      : { sharedContext: snapshot.activeSharedContext }),
     conversationView: run.conversationView,
   }));
   const lastRuns =
     snapshot.lastBatch?.tasks.map((task, index) =>
-      completedRun(task, index, snapshot.lastBatch?.conversationViews[task.taskId]),
+      completedRun(
+        task,
+        index,
+        snapshot.lastBatch?.conversationViews[task.taskId],
+        snapshot.lastBatch?.sharedContext,
+      ),
     ) ?? [];
   const diagnostics = boundedDiagnostics(catalogue?.diagnostics ?? []);
 
@@ -104,6 +112,7 @@ function completedRun(
   task: BatchTaskResult,
   index: number,
   conversationView: AgentsOverlayRun["conversationView"],
+  sharedContext?: string,
 ): AgentsOverlayRun {
   return {
     key: `last:${index}:${task.taskId}`,
@@ -119,6 +128,7 @@ function completedRun(
     humanTruncated: task.humanTruncated,
     modelTruncated: task.modelTruncated,
     taskMetadata: task.taskMetadata ?? conversationView?.taskMetadata,
+    ...(sharedContext === undefined ? {} : { sharedContext }),
     conversationView,
   };
 }

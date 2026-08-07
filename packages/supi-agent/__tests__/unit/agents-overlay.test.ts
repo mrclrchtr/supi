@@ -22,7 +22,7 @@ const conversationView = {
   omittedEntryCount: 2,
   omittedCharacterCount: 80,
   textTruncated: true,
-  taskMetadata: { instructions: "Inspect the execution path", sharedContext: "Repository context" },
+  taskMetadata: { instructions: "Inspect the execution path" },
 };
 
 function data(overrides: Partial<AgentsOverlayData> = {}): AgentsOverlayData {
@@ -50,6 +50,7 @@ function data(overrides: Partial<AgentsOverlayData> = {}): AgentsOverlayData {
         humanTruncated: true,
         modelTruncated: false,
         taskMetadata: conversationView.taskMetadata,
+        sharedContext: "Repository context",
         conversationView,
       },
     ],

@@ -85,6 +85,7 @@ export async function runDelegationBatch(
   }
 
   const resolved = preflightResult.tasks;
+  registry?.beginBatch(params.sharedContext);
   const totalCount = resolved.length;
   const progressMap = new Map<string, BatchTaskProgress>();
   const conversationViews = new Map<string, AgentConversationView>();
@@ -133,7 +134,6 @@ export async function runDelegationBatch(
   for (const task of resolved) {
     const taskMetadata: ConversationTaskMetadata = {
       instructions: task.instructions,
-      sharedContext: params.sharedContext,
     };
     const modelId = `${task.model.provider}/${task.model.id}`;
     setProgress({
@@ -272,7 +272,6 @@ export async function runDelegationBatch(
         taskMetadata: resolved[index]?.instructions
           ? {
               instructions: resolved[index].instructions,
-              sharedContext: params.sharedContext,
             }
           : undefined,
       });
@@ -314,7 +313,6 @@ export async function runDelegationBatch(
       taskMetadata: resolved[index]?.instructions
         ? {
             instructions: resolved[index].instructions,
-            sharedContext: params.sharedContext,
           }
         : undefined,
     });

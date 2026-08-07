@@ -88,6 +88,7 @@ export interface ActiveRunSnapshot extends BatchTaskProgress {
 /** Current session-local state exposed to the /agents overlay. */
 export interface AgentRunRegistrySnapshot {
   activeRuns: readonly ActiveRunSnapshot[];
+  activeSharedContext?: string;
   lastBatch?: CompletedBatch;
 }
 
@@ -108,6 +109,13 @@ export class AgentRunRegistry {
   #conversationViews = new Map<string, AgentConversationView>();
   #listeners = new Set<RegistryListener>();
   #lastBatch: CompletedBatch | undefined;
+  #activeSharedContext: string | undefined;
+
+  /** Start one batch-level metadata scope before its Agent Runs register. */
+  beginBatch(sharedContext?: string): void {
+    this.#activeSharedContext = sharedContext;
+    this.#publish();
+  }
 
   /** Register one active run with the human-facing metadata needed by the overlay. */
   register(registration: ActiveRunRegistration): void {
@@ -156,6 +164,7 @@ export class AgentRunRegistry {
     };
     this.#lastBatch = batch;
     this.#clearActive();
+    this.#activeSharedContext = undefined;
     this.#conversationViews.clear();
     this.#publish();
     return batch;
@@ -165,6 +174,9 @@ export class AgentRunRegistry {
   snapshot(): AgentRunRegistrySnapshot {
     return {
       activeRuns: [...this.#active.values()].map((run) => this.#snapshotRun(run)),
+      ...(this.#activeSharedContext === undefined
+        ? {}
+        : { activeSharedContext: this.#activeSharedContext }),
       lastBatch: this.#lastBatch,
     };
   }
@@ -223,6 +235,7 @@ export class AgentRunRegistry {
   async cancelAll(): Promise<void> {
     await Promise.allSettled([...this.#active.values()].map((run) => run.handle.stop()));
     this.#clearActive();
+    this.#activeSharedContext = undefined;
     this.#publish();
   }
 
@@ -231,6 +244,7 @@ export class AgentRunRegistry {
     this.#clearActive();
     this.#conversationViews.clear();
     this.#lastBatch = undefined;
+    this.#activeSharedContext = undefined;
     this.#publish();
   }
 

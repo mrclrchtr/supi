@@ -140,9 +140,9 @@ function renderRunMetadata(container: Container, run: AgentsOverlayRun, theme: T
   );
   if (run.taskMetadata) {
     container.addChild(new Text(`Instructions: ${run.taskMetadata.instructions}`, 1, 0));
-    if (run.taskMetadata.sharedContext) {
-      container.addChild(new Text(`Shared context: ${run.taskMetadata.sharedContext}`, 1, 0));
-    }
+  }
+  if (run.sharedContext) {
+    container.addChild(new Text(`Shared context: ${run.sharedContext}`, 1, 0));
   }
   const activity = run.recentActivity?.at(-1);
   if (activity) {

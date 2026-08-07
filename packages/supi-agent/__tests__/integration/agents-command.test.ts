@@ -55,7 +55,7 @@ function runRegistration(
       profileId: "explore",
       modelId: "test/model",
       thinkingLevel: "medium",
-      taskMetadata: { instructions: `Inspect ${taskId}`, sharedContext: "Shared context" },
+      taskMetadata: { instructions: `Inspect ${taskId}` },
       handle,
       getConversationView: (acceptedSteering) => ({
         taskId,
@@ -67,7 +67,7 @@ function runRegistration(
         omittedEntryCount: 0,
         omittedCharacterCount: 0,
         textTruncated: false,
-        taskMetadata: { instructions: `Inspect ${taskId}`, sharedContext: "Shared context" },
+        taskMetadata: { instructions: `Inspect ${taskId}` },
       }),
       getRecentActivity: () => ["read src/index.ts"],
     },
