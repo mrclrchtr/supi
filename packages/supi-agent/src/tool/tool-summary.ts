@@ -124,11 +124,12 @@ export function summarizeToolActivity(event: AgentSessionEvent): string | undefi
 const ANSI_ESCAPE_RE = /(\x1b\[[0-?]*[ -/]*[@-~])/g;
 const SECRET_ASSIGNMENT_RE =
   /(\b(?:token|password|passwd|secret|api[_-]?key|authorization|credential)\s*=\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s;&|]+)/gi;
-const SECRET_FLAG_RE = /(\b(?:--password|--passwd|--token|--api-key|--secret)\s*=\s*)([^\s;&|]+)/gi;
+const SECRET_FLAG_RE =
+  /((?:^|\s)(?:--password|--passwd|--token|--api-key|--secret)(?:\s*=\s*|\s+))(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s;&|]+)/gi;
 const API_KEY_ENV_RE =
-  /(\b(?:[A-Z][A-Z0-9_]*?(?:TOKEN|KEY|SECRET|PASSWORD|PASSWD))\s*=\s*)([^\s;&|]+)/gi;
+  /(\b(?:[A-Z][A-Z0-9_]*?(?:TOKEN|KEY|SECRET|PASSWORD|PASSWD))\s*=\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s;&|]+)/gi;
 const EXPORT_SECRET_RE =
-  /(export\s+[A-Z][A-Z0-9_]*?(?:TOKEN|KEY|SECRET|PASSWORD|PASSWD)\s*=\s*)([^\s;&|]+)/gi;
+  /(export\s+[A-Z][A-Z0-9_]*?(?:TOKEN|KEY|SECRET|PASSWORD|PASSWD)\s*=\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s;&|]+)/gi;
 const HEADER_SECRET_RE =
   /(\b(?:authorization|proxy-authorization|x-api-key|api-key|x-auth-token|x-access-token)\s*[:=]\s*(?:(?:bearer|basic)\s+)?)([^\s;&|'"`]+)/gi;
 const AUTH_SCHEME_RE = /(\b(?:bearer|basic)\s+)([^\s;&|'"`]+)/gi;

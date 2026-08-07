@@ -61,10 +61,22 @@ describe("firstLineBashPreview", () => {
     expect(preview).not.toContain("abc123");
   });
 
-  it("redacts --password flags", () => {
-    const preview = firstLineBashPreview("curl --password=s3cr3t https://example.com");
+  it("redacts secret flags with equals or space separators", () => {
+    for (const command of [
+      "curl --password=s3cr3t https://example.com",
+      "curl --token s3cr3t https://example.com",
+    ]) {
+      const preview = firstLineBashPreview(command);
+      expect(preview).toContain("[REDACTED]");
+      expect(preview).not.toContain("s3cr3t");
+    }
+  });
+
+  it("fully redacts quoted environment secrets", () => {
+    const preview = firstLineBashPreview('GITHUB_TOKEN="two secret words" curl example.com');
     expect(preview).toContain("[REDACTED]");
-    expect(preview).not.toContain("s3cr3t");
+    expect(preview).not.toContain("two secret words");
+    expect(preview).not.toContain('words"');
   });
 
   it("caps at 120 characters", () => {
