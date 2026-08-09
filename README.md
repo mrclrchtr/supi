@@ -83,39 +83,35 @@ pi install npm:@mrclrchtr/supi-web
 
 ### Release stack
 
-| Package | What it adds |
-|---|---|
-| [`supi-code-intelligence`](packages/supi-code-intelligence/README.md) | Direct LSP- and AST-backed code understanding, navigation, search, health, and refactoring tools |
-| [`supi-web`](packages/supi-web/README.md) | Direct public-page-to-Markdown fetching, context-safe large output, and focused Context7 documentation |
-| [`supi-ask-user`](packages/supi-ask-user/README.md) | Structured questionnaires for focused agent-user decisions |
-| [`supi-context`](packages/supi-context/README.md) | Context-pressure snapshots and detailed TUI usage reports |
-| [`supi-settings`](packages/supi-settings/README.md) | One project/global settings UI for SuPi packages |
-| [`supi-extras`](packages/supi-extras/README.md) | Prompt stash, shortcuts, activity indicators, and other session conveniences |
-| [`supi-prompt-suggestions`](packages/supi-prompt-suggestions/README.md) | Advisory ghost-text suggestions from a model you choose |
+| Package | What it adds | Install |
+|---|---|---|
+| [`supi-code-intelligence`](packages/supi-code-intelligence/README.md) | Direct LSP- and AST-backed code understanding, navigation, search, health, and refactoring tools | `pi install npm:@mrclrchtr/supi-code-intelligence` |
+| [`supi-web`](packages/supi-web/README.md) | Direct public-page-to-Markdown fetching, context-safe large output, and focused Context7 documentation | `pi install npm:@mrclrchtr/supi-web` |
+| [`supi-ask-user`](packages/supi-ask-user/README.md) | Structured questionnaires for focused agent-user decisions | `pi install npm:@mrclrchtr/supi-ask-user` |
+| [`supi-context`](packages/supi-context/README.md) | Context-pressure snapshots and detailed TUI usage reports | `pi install npm:@mrclrchtr/supi-context` |
+| [`supi-settings`](packages/supi-settings/README.md) | One project/global settings UI for SuPi packages | `pi install npm:@mrclrchtr/supi-settings` |
+| [`supi-extras`](packages/supi-extras/README.md) | Prompt stash, shortcuts, activity indicators, and other session conveniences | `pi install npm:@mrclrchtr/supi-extras` |
+| [`supi-prompt-suggestions`](packages/supi-prompt-suggestions/README.md) | Advisory ghost-text suggestions from a model you choose | `pi install npm:@mrclrchtr/supi-prompt-suggestions` |
 
 ### DevTools
 
 Not part of the recommended release stack. Included in the full-stack installer (`install-all.sh`), or install separately:
 
-| Package | What it adds |
-|---|---|
-| [`supi-debug`](packages/supi-debug/README.md) | Shared debug-event capture and bounded troubleshooting tools |
-
-```bash
-pi install npm:@mrclrchtr/supi-debug
-```
+| Package | What it adds | Install |
+|---|---|---|
+| [`supi-debug`](packages/supi-debug/README.md) | Shared debug-event capture and bounded troubleshooting tools | `pi install npm:@mrclrchtr/supi-debug` |
 
 ### Beta additions
 
 Installed by `install-all.sh` on top of the release stack:
 
-| Package | What it adds |
-|---|---|
-| [`supi-review`](packages/supi-review/README.md) | Caller-defined, inspection-only reviews in managed child sessions |
-| [`supi-cache`](packages/supi-cache/README.md) | Prompt-cache monitoring and cross-session regression forensics |
-| [`supi-insights`](packages/supi-insights/README.md) | Historical session analytics and shareable HTML reports |
-| [`supi-claude-md`](packages/supi-claude-md/README.md) | Skills for auditing and revising repository instruction files |
-| [`supi-bash-timeout`](packages/supi-bash-timeout/README.md) | Default timeouts so forgotten shell limits do not stall the session |
+| Package | What it adds | Install |
+|---|---|---|
+| [`supi-review`](packages/supi-review/README.md) | Caller-defined, inspection-only reviews in managed child sessions | `pi install npm:@mrclrchtr/supi-review` |
+| [`supi-cache`](packages/supi-cache/README.md) | Prompt-cache monitoring and cross-session regression forensics | `pi install npm:@mrclrchtr/supi-cache` |
+| [`supi-insights`](packages/supi-insights/README.md) | Historical session analytics and shareable HTML reports | `pi install npm:@mrclrchtr/supi-insights` |
+| [`supi-claude-md`](packages/supi-claude-md/README.md) | Skills for auditing and revising repository instruction files | `pi install npm:@mrclrchtr/supi-claude-md` |
+| [`supi-bash-timeout`](packages/supi-bash-timeout/README.md) | Default timeouts so forgotten shell limits do not stall the session | `pi install npm:@mrclrchtr/supi-bash-timeout` |
 
 ### Internal libraries
 
