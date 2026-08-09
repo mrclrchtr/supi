@@ -180,6 +180,34 @@ describe("runDelegationBatch", () => {
     expect(modelText).toContain("## t1 (profile: explore) — completed");
   });
 
+  it("records timing telemetry for a successful task", async () => {
+    configureDebugRegistry({ enabled: true });
+
+    await runDelegationBatch(
+      { tasks: [{ id: "t1", profile: "explore", instructions: "do work" }] },
+      makeCatalogue(["explore"]),
+      mockCtx(),
+    );
+
+    expect(getDebugEvents({ source: "supi-agent", category: "agent-run" }).events).toEqual([
+      expect.objectContaining({
+        level: "info",
+        message: "Agent Run t1 completed",
+        data: expect.objectContaining({
+          taskId: "t1",
+          status: "completed",
+          turns: 0,
+          toolUses: 0,
+          timing: expect.objectContaining({
+            elapsedMs: expect.any(Number),
+            incompleteToolCount: 0,
+            tools: [],
+          }),
+        }),
+      }),
+    ]);
+  });
+
   it("runs a read-only multi-task batch concurrently", async () => {
     const catalogue = makeCatalogue(["explore"]);
     // Both "explore" profile: read-only.

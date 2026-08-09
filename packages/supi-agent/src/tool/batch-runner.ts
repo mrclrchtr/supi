@@ -1,12 +1,7 @@
 import type { Usage } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type {
-  AgentRunHandle,
-  AgentRunOutcome,
-  AgentRunSessionView,
-} from "@mrclrchtr/supi-agent-runtime/api";
+import type { AgentRunHandle, AgentRunSessionView } from "@mrclrchtr/supi-agent-runtime/api";
 import { combineAgentRunUsage, startAgentRun } from "@mrclrchtr/supi-agent-runtime/api";
-import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import { toAgentToolNames } from "../capabilities.ts";
 import type { AgentProfile, ProfileCatalogue } from "../types.ts";
 import type { ResolvedTask } from "./batch-preflight.ts";
@@ -19,8 +14,13 @@ import type {
   BatchProgressState,
   BatchTaskProgress,
   BatchTaskResult,
-  BatchTaskStatus,
 } from "./registry.ts";
+import {
+  AgentRunTelemetry,
+  failureCodeFromOutcome,
+  recordAgentRunOutcomeDebug,
+  statusFromOutcome,
+} from "./run-telemetry.ts";
 import type { AgentRunToolParams } from "./schema.ts";
 import { summarizeToolActivity } from "./tool-summary.ts";
 
@@ -29,56 +29,6 @@ import { summarizeToolActivity } from "./tool-summary.ts";
 type OnUpdate = (details: BatchProgressState) => void;
 
 // ── Mapper helpers ───────────────────────────────────────────────
-
-function failureCodeFromOutcome(outcome: AgentRunOutcome<string>): string | undefined {
-  if (outcome.kind === "failed") return outcome.failureCode;
-  if (outcome.kind === "canceled" || outcome.kind === "timeout") return outcome.kind;
-  return undefined;
-}
-
-function batchTaskStatus(outcome: AgentRunOutcome<string>): BatchTaskStatus {
-  switch (outcome.kind) {
-    case "success":
-      return "completed";
-    case "failed":
-      return "failed";
-    case "canceled":
-      return "canceled";
-    case "timeout":
-      return "timeout";
-  }
-}
-
-function recordAgentRunOutcomeDebug(
-  input: {
-    cwd: string;
-    taskId: string;
-    profileId: string;
-    modelId: string;
-  },
-  outcome: AgentRunOutcome<string>,
-): void {
-  if (outcome.kind === "success") return;
-  const status = batchTaskStatus(outcome);
-  recordDebugEvent({
-    source: "supi-agent",
-    level: status === "canceled" ? "info" : "warning",
-    category: "agent-run",
-    message: `Agent Run ${input.taskId} ${status}`,
-    cwd: input.cwd,
-    data: {
-      taskId: input.taskId,
-      profileId: input.profileId,
-      modelId: input.modelId,
-      status,
-      failureCode: failureCodeFromOutcome(outcome),
-      ...(outcome.kind === "timeout" ? { timeoutMs: outcome.timeoutMs } : {}),
-      ...(outcome.kind === "failed" && outcome.failureCode === "session-creation-failed"
-        ? {}
-        : { diagnostics: outcome.diagnostics }),
-    },
-  });
-}
 
 // ── Build child prompt ──────────────────────────────────────────
 
@@ -162,6 +112,7 @@ export async function runDelegationBatch(
     modelId: string;
     thinkingLevel: ResolvedTask["inputs"]["thinkingLevel"];
     handle: AgentRunHandle<string>;
+    telemetry: AgentRunTelemetry;
   }> = [];
   for (const task of resolved) {
     const taskMetadata: ConversationTaskMetadata = {
@@ -183,6 +134,7 @@ export async function runDelegationBatch(
       instructions: task.instructions,
     });
     let liveSession: AgentRunSessionView | undefined;
+    const telemetry = new AgentRunTelemetry();
     const currentConversationView = (
       acceptedSteering: readonly string[] = [],
     ): AgentConversationView =>
@@ -215,6 +167,7 @@ export async function runDelegationBatch(
         liveSession = session;
         registry?.refresh();
         const unsubscribe = session.subscribe((event) => {
+          telemetry.observe(event);
           const activity = summarizeToolActivity(event);
           if (activity) {
             recentActivity.push(activity);
@@ -252,6 +205,7 @@ export async function runDelegationBatch(
       modelId,
       thinkingLevel: task.inputs.thinkingLevel,
       handle,
+      telemetry,
     });
     registry?.register({
       taskId: task.taskId,
@@ -265,6 +219,7 @@ export async function runDelegationBatch(
     });
 
     handle.subscribe((progress) => {
+      if (progress.status === "running") telemetry.markRunning();
       setProgress({
         taskId: task.taskId,
         profileId: task.profileId,
@@ -286,7 +241,7 @@ export async function runDelegationBatch(
   const usageList: Usage[] = [];
 
   for (let index = 0; index < handles.length; index++) {
-    const { taskId, profileId, modelId, thinkingLevel } = handles[index];
+    const { taskId, profileId, modelId, thinkingLevel, telemetry } = handles[index];
     const outcome = settled[index];
 
     if (outcome.status === "rejected") {
@@ -320,8 +275,21 @@ export async function runDelegationBatch(
     }
 
     const agentOutcome = outcome.value;
-    const status = batchTaskStatus(agentOutcome);
-    recordAgentRunOutcomeDebug({ cwd: ctx.cwd, taskId, profileId, modelId }, agentOutcome);
+    const status = statusFromOutcome(agentOutcome);
+    const progress = progressMap.get(taskId);
+    recordAgentRunOutcomeDebug(
+      {
+        cwd: ctx.cwd,
+        taskId,
+        profileId,
+        modelId,
+        thinkingLevel,
+        turns: progress?.turns ?? 0,
+        toolUses: progress?.toolUses ?? 0,
+        timing: telemetry.snapshot(),
+      },
+      agentOutcome,
+    );
     const usage = agentOutcome.usage;
     if (usage) usageList.push(usage);
 
