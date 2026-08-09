@@ -33,6 +33,7 @@ describe("review config", () => {
     const homeDir = makeTempDir();
     try {
       expect(loadReviewConfig(path.join(homeDir, "repo"), homeDir)).toEqual({
+        agentToolEnabled: true,
         agentModel: CURRENT_SESSION_REVIEW_MODEL,
         plannerModel: CURRENT_SESSION_REVIEW_MODEL,
         auditEnabled: false,
@@ -52,6 +53,7 @@ describe("review config", () => {
       writeSupiConfig(
         { section: REVIEW_CONFIG_SECTION, scope: "project", cwd },
         {
+          agentToolEnabled: false,
           agentModel: "  openai/reviewer  ",
           plannerModel: "  openai/planner  ",
           bootstrapCommand: " pnpm install --frozen-lockfile ",
@@ -61,6 +63,7 @@ describe("review config", () => {
       );
 
       expect(loadReviewConfig(cwd, homeDir)).toEqual({
+        agentToolEnabled: false,
         agentModel: "openai/reviewer",
         plannerModel: "openai/planner",
         auditEnabled: false,
@@ -97,6 +100,7 @@ describe("review config", () => {
         id: REVIEW_CONFIG_SECTION,
         defaults: REVIEW_DEFAULTS,
         fields: [
+          expect.objectContaining({ kind: "boolean", key: "agentToolEnabled" }),
           expect.objectContaining({ kind: "modelPicker", key: "agentModel" }),
           expect.objectContaining({ kind: "modelPicker", key: "plannerModel" }),
           expect.objectContaining({ kind: "string", key: "bootstrapCommand" }),

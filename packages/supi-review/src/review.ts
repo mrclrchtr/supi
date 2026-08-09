@@ -346,9 +346,12 @@ export default function reviewExtension(pi: ExtensionAPI): void {
     agentDir: process.env.PI_CODING_AGENT_DIR || getAgentDir(),
   });
   registerReviewSettings(pi);
-  registerAgentReviewTools(pi, planStore, artifactStore, auditStore);
+  const config = loadReviewConfig(process.cwd());
   registerReviewOutputTool(pi, artifactStore);
-  if (loadReviewConfig(process.cwd()).auditEnabled) registerReviewAuditTool(pi, auditStore);
+  if (config.agentToolEnabled) {
+    registerAgentReviewTools(pi, planStore, artifactStore, auditStore);
+    if (config.auditEnabled) registerReviewAuditTool(pi, auditStore);
+  }
   registerReviewWorkspaceCleanupCommand(pi);
 
   // Message renderer for the /supi-review slash command output.

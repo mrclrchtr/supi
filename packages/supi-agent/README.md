@@ -17,6 +17,8 @@ Built-in profiles:
 
 Profile sources overlay fields by ID with project → global → package precedence. A partial user manifest can pin only `model` or `thinking`; package tools and prompts continue to flow through. An invalid source falls through with a bounded diagnostic. Profiles are context-isolated, not permission- or filesystem-sandboxed.
 
+Set **Agent Run tool** to off in `/supi-settings`, then run `/reload`, to remove `supi_agent_run` from agent tools. `/agents` stays available to the user.
+
 ## `/agents`
 
 Use `/agents` in TUI mode to inspect active Agent Runs, the last completed Delegation Batch, effective Agent Profiles, and bounded Profile Diagnostics. The Runs view keeps task metadata separate from the bounded Conversation View. It shows lifecycle status, model, thinking level, turns, tool uses, Usage, safe tool activity, steering, assistant text, and retention notices.

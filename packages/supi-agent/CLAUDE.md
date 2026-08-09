@@ -15,7 +15,7 @@
 - Resolve explicit profile models against the containing session's authenticated scoped-model policy before any Agent Run starts.
 - Use the existing headless Code Intelligence profile only; do not load the full interactive extension into children.
 - Keep diagnostics bounded and omit profile prompt contents, credentials, and raw filesystem errors.
-- Register Model and Thinking profile settings at session start; settings write only partial user `profile.json` manifests and never package profile files.
+- Register the Agent Run setting in the factory. Register Model and Thinking profile settings at session start; profile settings write only partial user `profile.json` manifests and never package profile files.
 
 ## Verification
 

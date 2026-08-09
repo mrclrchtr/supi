@@ -10,6 +10,8 @@ export type PostReviewPolicy = (typeof POST_REVIEW_POLICIES)[number];
 
 /** Persisted review settings. */
 export interface ReviewConfig extends Record<string, unknown> {
+  /** Enable tools that start reviews and retrieve audits. */
+  agentToolEnabled: boolean;
   /** Canonical reviewer model id, or `current` for the active session model. */
   agentModel: string;
   /** Canonical Planner model id, or `current` for the active session model. */
@@ -26,6 +28,7 @@ export interface ReviewConfig extends Record<string, unknown> {
 export const REVIEW_CONFIG_SECTION = "review";
 /** Availability-safe defaults; users can configure a separate lightweight Planner model. */
 export const REVIEW_DEFAULTS: ReviewConfig = {
+  agentToolEnabled: true,
   agentModel: CURRENT_SESSION_REVIEW_MODEL,
   plannerModel: CURRENT_SESSION_REVIEW_MODEL,
   auditEnabled: false,
@@ -47,6 +50,7 @@ export function loadReviewConfig(cwd: string, homeDir?: string): ReviewConfig {
   const readPostReviewPolicy = (value: unknown) =>
     POST_REVIEW_POLICIES.find((policy) => policy === value) ?? REVIEW_DEFAULTS.postReviewPolicy;
   return {
+    agentToolEnabled: readBoolean(raw.agentToolEnabled, REVIEW_DEFAULTS.agentToolEnabled),
     agentModel: readModel(raw.agentModel, REVIEW_DEFAULTS.agentModel),
     plannerModel: readModel(raw.plannerModel, REVIEW_DEFAULTS.plannerModel),
     auditEnabled: readBoolean(raw.auditEnabled, REVIEW_DEFAULTS.auditEnabled),
@@ -69,6 +73,12 @@ export function registerReviewSettings(pi: ExtensionAPI, homeDir?: string): void
       section: REVIEW_CONFIG_SECTION,
       defaults: REVIEW_DEFAULTS,
       fields: [
+        {
+          kind: "boolean",
+          key: "agentToolEnabled",
+          label: "Agent tools",
+          description: "Enable review start and audit tools for agents. Requires /reload.",
+        },
         {
           kind: "modelPicker",
           key: "agentModel",

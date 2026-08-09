@@ -1,8 +1,12 @@
 {
   "review": {
-    "bootstrapCommand": "pnpm install"
+    "bootstrapCommand": "pnpm install",
+    "agentToolEnabled": false
   },
   "context": {
+    "agentToolEnabled": false
+  },
+  "agent": {
     "agentToolEnabled": false
   }
 }

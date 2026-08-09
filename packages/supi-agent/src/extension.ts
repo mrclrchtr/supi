@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { loadAgentConfig, registerAgentSettings } from "./config.ts";
 import { registerProfileSettings } from "./profile-settings.ts";
 import { agentProfileCatalogueStore } from "./session.ts";
 import { registerAgentRunTool, registry } from "./tool/agent-run-tool.ts";
@@ -27,7 +28,7 @@ export default function agentExtension(pi: ExtensionAPI): void {
         "warning",
       );
     }
-    registerAgentRunTool(pi);
+    if (loadAgentConfig(ctx.cwd).agentToolEnabled) registerAgentRunTool(pi);
   });
 
   pi.on("session_shutdown", async () => {
@@ -37,4 +38,6 @@ export default function agentExtension(pi: ExtensionAPI): void {
     agentProfileCatalogueStore.clear();
     registry.clear();
   });
+
+  registerAgentSettings(pi);
 }

@@ -27,6 +27,8 @@ This is a beta package with intentionally unstable interfaces.
 
 Preparation is optional. Skills and agents that already know how to review should use Direct Review.
 
+Set **Agent tools** to off in `/supi-settings`, then run `/reload`, to remove the review start and audit tools from agents. `supi_review_output`, `/supi-review`, and `/supi-review-cleanup` stay available.
+
 ## Direct Review
 
 ```json
@@ -158,6 +160,7 @@ Configure post-review behavior and a single dependency setup command:
 ```json
 {
   "review": {
+    "agentToolEnabled": true,
     "postReviewPolicy": "ask",
     "bootstrapCommand": "pnpm install --frozen-lockfile"
   }
