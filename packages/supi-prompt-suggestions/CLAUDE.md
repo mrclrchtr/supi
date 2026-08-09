@@ -62,9 +62,10 @@ cursor rendering changes, that helper must be updated.
 ### Right Arrow acceptance
 
 The editor intercepts Right Arrow (ANSI `\x1b[C`, application `\x1bOC`, and Kitty keyboard protocol
-forms) to accept the suggestion. Escape dismisses the suggestion and is consumed; a later Escape
-without ghost text reaches PI's normal interrupt/double-escape handling. Any other input dismisses
-it and falls through to the parent `CustomEditor` handling.
+forms) to accept the visible suggestion. Escape dismisses the visible suggestion and is consumed; a
+later Escape without ghost text reaches PI's normal interrupt/double-escape handling. Editor text
+suppresses the suggestion without destroying it. Any editor operation that makes the text exactly
+empty restores the suggestion.
 
 ### Abort signal combination
 

@@ -14,6 +14,10 @@ _Avoid_: next prompt, auto prompt, generated prompt, prefilled prompt
 A presentation of a prompt suggestion as dim inline preview text in the editor that is not part of the editor contents until accepted. Ghost text may truncate the visual preview for display, but accepting it inserts the underlying prompt suggestion rather than the truncated preview.
 _Avoid_: treating ghost text as editor text, autocomplete item, prefill, treating visual truncation as prompt content
 
+**Suppressed prompt suggestion**:
+A ready prompt suggestion retained while its ghost text is hidden because the user entered editor text. It remains recoverable and is not an explicit dismissal.
+_Avoid_: dismissed suggestion, cached suggestion
+
 **Suggestion source**:
 The component responsible for producing prompt suggestions. A suggestion source may be model-backed, heuristic, disabled, or test-only, and is distinct from PI model providers and autocomplete providers.
 _Avoid_: suggestion provider, ghost text provider, model provider

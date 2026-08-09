@@ -140,14 +140,24 @@ describe("GhostTextEditor input handling", () => {
     expect(cbs.onAccept).toHaveBeenCalledWith(suggestion);
   });
 
-  it("dismisses suggestion on any other input", () => {
+  it("suppresses a suggestion during edits and restores it when the editor is empty", () => {
     const cbs = makeCallbacks();
     const editor = makeEditor(cbs);
+    editor.focused = true;
     editor.setSuggestion("suggest");
 
     editor.handleInput("h");
-    expect(cbs.onDismiss).toHaveBeenCalled();
-    expect(cbs.onAccept).not.toHaveBeenCalled();
+    expect(editor.render(80).some((line) => line.includes("suggest"))).toBe(false);
+    expect(cbs.onDismiss).not.toHaveBeenCalled();
+
+    editor.handleInput("\x7f");
+    expect(editor.render(80).some((line) => line.includes("suggest"))).toBe(true);
+
+    editor.setText("draft");
+    expect(editor.render(80).some((line) => line.includes("suggest"))).toBe(false);
+
+    editor.setText("");
+    expect(editor.render(80).some((line) => line.includes("suggest"))).toBe(true);
   });
 
   it("consumes Escape after dismissing a suggestion", () => {

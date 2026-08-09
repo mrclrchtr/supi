@@ -34,6 +34,7 @@ export interface GhostTextEditorOptions extends EditorOptions {
 
 export class GhostTextEditor extends CustomEditor {
   private suggestion: string | null = null;
+  private isSuppressed = false;
   private callbacks: GhostTextCallbacks;
 
   constructor(
@@ -51,18 +52,20 @@ export class GhostTextEditor extends CustomEditor {
 
   setSuggestion(suggestion: string | null): void {
     this.suggestion = suggestion;
+    this.isSuppressed = suggestion !== null && this.getText() !== "";
     this.tui.requestRender();
   }
 
   clearGhost(): void {
     this.suggestion = null;
+    this.isSuppressed = false;
     this.tui.requestRender();
   }
 
   // ── Input handling ──────────────────────────────────────────
 
   override handleInput(data: string): void {
-    if (this.suggestion) {
+    if (this.suggestion && !this.isSuppressed) {
       // Use PI's matchesKey (not raw escape sequences) — it handles
       // CSI (\x1b[C), SS3 (\x1bOC), and Kitty keyboard protocol correctly.
       if (matchesKey(data, "right")) {
@@ -71,22 +74,44 @@ export class GhostTextEditor extends CustomEditor {
         this.clearGhost();
         return;
       }
-      this.clearGhost();
-      this.callbacks.onDismiss();
       if (matchesKey(data, "escape")) {
+        this.clearGhost();
+        this.callbacks.onDismiss();
         return;
       }
-    } else {
+    } else if (!this.suggestion) {
       this.callbacks.onInput?.();
     }
+
     super.handleInput(data);
+    this.syncSuppression();
+  }
+
+  override setText(text: string): void {
+    super.setText(text);
+    this.syncSuppression();
+  }
+
+  override insertTextAtCursor(text: string): void {
+    super.insertTextAtCursor(text);
+    this.syncSuppression();
+  }
+
+  private syncSuppression(): void {
+    if (!this.suggestion) return;
+
+    const isSuppressed = this.getText() !== "";
+    if (isSuppressed === this.isSuppressed) return;
+
+    this.isSuppressed = isSuppressed;
+    this.tui.requestRender();
   }
 
   // ── Rendering ───────────────────────────────────────────────
 
   override render(width: number): string[] {
     const lines = super.render(width);
-    if (!this.suggestion || !this.focused) return lines;
+    if (!this.suggestion || this.isSuppressed || !this.focused) return lines;
 
     const markerIndex = findCursorMarkerLine(lines);
     if (markerIndex === -1) return lines;

@@ -35,10 +35,11 @@ Suggestions only appear when:
 | Key | Action |
 |-----|--------|
 | `→` / Right Arrow | Accept the suggestion into the editor without submitting it |
-| `Esc` | Dismiss the suggestion |
-| Any text input | Dismiss the suggestion and continue typing |
+| `Esc` | Dismiss the visible suggestion |
+| Any text input | Hide the suggestion and continue typing |
+| Delete all editor text | Restore the hidden suggestion |
 
-Accepted suggestions are inserted into the editor so you can edit them before sending.
+Accepted suggestions are inserted into the editor so you can edit them before sending. A hidden suggestion remains available until you accept it, dismiss it, or start new agent work.
 
 ## Configuration
 
