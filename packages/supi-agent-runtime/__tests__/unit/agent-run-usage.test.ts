@@ -56,6 +56,40 @@ it("refreshes usage after disposal work adds a billed entry", async () => {
   expect(outcome.usage?.input).toBe(3);
 });
 
+it("omits usage when session messages are unavailable", async () => {
+  const harness = createHarness(mocks);
+  Object.defineProperty(harness.session, "messages", {
+    get() {
+      throw new Error("private transcript error");
+    },
+  });
+  const run = startAgentRun({
+    inputs: inputs(),
+    prompt: "unavailable usage",
+    completionResolver: () => "done",
+  });
+
+  await expect(run.result).resolves.toMatchObject({ kind: "success", value: "done" });
+  expect((await run.result).usage).toBeUndefined();
+});
+
+it("counts persisted and live messages once by identity", async () => {
+  const persisted = { role: "assistant", usage: usage(1) };
+  const liveOnly = { role: "assistant", usage: usage(2) };
+  const harness = createHarness(mocks, [{ type: "message", message: persisted }]);
+  harness.session.messages = [persisted, liveOnly];
+  const run = startAgentRun({
+    inputs: inputs(),
+    prompt: "deduplicated usage",
+    completionResolver: () => "done",
+  });
+
+  await expect(run.result).resolves.toMatchObject({
+    kind: "success",
+    usage: { input: 3 },
+  });
+});
+
 it("aggregates assistant, tool-result, compaction, and branch-summary usage", async () => {
   createHarness(mocks, [
     { type: "message", message: { role: "assistant", usage: usage(1) } },

@@ -17,11 +17,7 @@ vi.mock("@earendil-works/pi-coding-agent", async (original) => ({
   createAgentSessionRuntime: mocks.createAgentSessionRuntime,
 }));
 
-import {
-  AGENT_RUN_ABORT_GRACE_MS,
-  AGENT_RUN_SHUTDOWN_GRACE_MS,
-  startAgentRun,
-} from "../../src/api.ts";
+import { startAgentRun } from "../../src/api.ts";
 import { createHarness, inputs } from "../helpers/agent-run-harness.ts";
 
 beforeEach(() => vi.clearAllMocks());
@@ -191,7 +187,7 @@ it("lets cancellation win a timeout race and records one abort request", async (
   controller.abort();
   await vi.advanceTimersByTimeAsync(10);
   expect(harness.session.abort).toHaveBeenCalledTimes(1);
-  await vi.advanceTimersByTimeAsync(AGENT_RUN_ABORT_GRACE_MS);
+  await vi.advanceTimersToNextTimerAsync();
 
   const outcome = await run.result;
   expect(outcome.kind).toBe("canceled");
@@ -211,7 +207,7 @@ it("forces session disposal when graceful runtime shutdown exceeds its grace", a
     completionResolver: () => "done",
   });
   await vi.waitFor(() => expect(harness.runtime.dispose).toHaveBeenCalledTimes(1));
-  await vi.advanceTimersByTimeAsync(AGENT_RUN_SHUTDOWN_GRACE_MS);
+  await vi.advanceTimersToNextTimerAsync();
 
   await expect(run.result).resolves.toMatchObject({ kind: "success", value: "done" });
   expect(harness.session.dispose).toHaveBeenCalledTimes(1);
@@ -235,7 +231,7 @@ it("settles cancellation after abort grace when the provider never resolves", as
   expect(harness.session.prompt).toHaveBeenCalled();
   harness.session.abort.mockImplementationOnce(() => new Promise<undefined>(() => {}));
   const stopped = run.stop();
-  await vi.advanceTimersByTimeAsync(AGENT_RUN_ABORT_GRACE_MS);
+  await vi.advanceTimersToNextTimerAsync();
   await stopped;
   await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
   expect(harness.session.abort).toHaveBeenCalledTimes(1);

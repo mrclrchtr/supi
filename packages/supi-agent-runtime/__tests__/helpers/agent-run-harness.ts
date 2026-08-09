@@ -33,7 +33,7 @@ export function createHarness(mocks: AgentRunMocks, entries: unknown[] = []) {
     thinkingLevel: "low",
     isStreaming: false,
     isIdle: true,
-    messages: [{ role: "assistant", content: [{ type: "text", text: "done" }] }],
+    messages: [{ role: "assistant", content: [{ type: "text", text: "done" }] }] as unknown[],
     sessionManager: { getEntries: () => entries },
     bindExtensions: vi.fn(async () => undefined),
     subscribe: vi.fn((listener: (event: { type: string; [key: string]: unknown }) => void) => {

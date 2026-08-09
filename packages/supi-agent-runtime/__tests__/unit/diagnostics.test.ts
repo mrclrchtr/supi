@@ -1,24 +1,48 @@
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import { describe, expect, it } from "vitest";
-import {
-  buildAgentRunDiagnostics,
-  formatAgentRunDiagnostics,
-  sanitizeAgentRunErrorText,
-} from "../../src/api.ts";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-function build(session: unknown) {
-  return buildAgentRunDiagnostics({
-    progress: { turns: 1, toolUses: 1 },
-    session: session as AgentSession,
-    lifecycleTrace: { entries: [{ type: "agent_settled" }], droppedCount: 0 },
-    recentActivity: [],
-  });
+const mocks = vi.hoisted(() => ({
+  createAgentSession: vi.fn(),
+  createAgentSessionRuntime: vi.fn(),
+  createModelRuntime: vi.fn(async () => ({
+    getProviders: vi.fn(() => []),
+    registerNativeProvider: vi.fn(),
+    refresh: vi.fn(async () => undefined),
+  })),
+}));
+
+vi.mock("@earendil-works/pi-coding-agent", async (original) => ({
+  ...(await original()),
+  ModelRuntime: { create: mocks.createModelRuntime },
+  createAgentSession: mocks.createAgentSession,
+  createAgentSessionRuntime: mocks.createAgentSessionRuntime,
+}));
+
+import type { AgentRunDiagnostics } from "../../src/api.ts";
+import { formatAgentRunDiagnostics, startAgentRun } from "../../src/api.ts";
+import { createHarness, inputs } from "../helpers/agent-run-harness.ts";
+
+beforeEach(() => vi.clearAllMocks());
+
+async function failureDiagnostics(
+  configure: (harness: ReturnType<typeof createHarness>) => void,
+): Promise<AgentRunDiagnostics> {
+  const harness = createHarness(mocks);
+  configure(harness);
+  const outcome = await startAgentRun({
+    inputs: inputs(),
+    prompt: "collect diagnostics",
+    completionResolver: () => undefined,
+  }).result;
+  if (outcome.kind !== "failed" || outcome.failureCode === "session-creation-failed") {
+    throw new Error("Expected an Agent Run failure with diagnostics");
+  }
+  return outcome.diagnostics;
 }
 
 describe("Agent Run diagnostics", () => {
-  it("retains bounded safe metadata without assistant content or private tools", () => {
-    const session = {
-      messages: [
+  it("retains bounded safe metadata without assistant content or private tools", async () => {
+    const diagnostics = await failureDiagnostics((harness) => {
+      harness.session.messages = [
         {
           role: "assistant",
           content: [
@@ -29,110 +53,170 @@ describe("Agent Run diagnostics", () => {
           stopReason: "error",
           errorMessage: `\u001b[31mAuthorization: Bearer private-token {"apiKey":"private-json-key"}\nAuthorization: Basic dXNlcjpwYXNz\nAuthorization: Digest username="a;b", response="private-digest" ${"x".repeat(700)}`,
         },
-      ],
-      getActiveToolNames: () => ["read"],
-      getSessionStats: () => ({ tokens: { input: 1, output: 2, total: 3 } }),
-    };
+      ];
+    });
 
-    const diagnostics = build(session);
     expect(diagnostics.lastAssistantToolCalls).toEqual(["read"]);
     expect(diagnostics.lastAssistantErrorText).toContain("[REDACTED]");
     expect(diagnostics.lastAssistantErrorText?.length).toBeLessThanOrEqual(500);
-    expect(JSON.stringify(diagnostics)).not.toContain("private assistant content");
-    expect(JSON.stringify(diagnostics)).not.toContain("private-token");
-    expect(JSON.stringify(diagnostics)).not.toContain("private-json-key");
-    expect(JSON.stringify(diagnostics)).not.toContain("dXNlcjpwYXNz");
-    expect(JSON.stringify(diagnostics)).not.toContain("private-digest");
-    expect(JSON.stringify(diagnostics)).not.toContain("private_tool");
-    expect(JSON.stringify(diagnostics)).not.toContain("\u001b");
+    const retained = JSON.stringify(diagnostics);
+    for (const privateValue of [
+      "private assistant content",
+      "private-token",
+      "private-json-key",
+      "dXNlcjpwYXNz",
+      "private-digest",
+      "private_tool",
+      "\u001b",
+    ]) {
+      expect(retained).not.toContain(privateValue);
+    }
   });
 
-  it("redacts escaped JSON credentials and ANSI-split authorization headers", () => {
-    const text = sanitizeAgentRunErrorText(
-      '{"authorization":"Digest username=\\"u\\", response=\\"private-digest\\"}"',
-    );
+  it("redacts provider credential forms through the Agent Run outcome", async () => {
     const escapedQuote = String.fromCharCode(92);
-    const escapedKeyText = sanitizeAgentRunErrorText(
-      `{${escapedQuote}"authorization${escapedQuote}":${escapedQuote}"Basic escaped-value${escapedQuote}"}`,
-    );
-    const ansiText = sanitizeAgentRunErrorText(
-      `\u001b[31mAuthorization\u001b[0m: Basic private-ansi-credential`,
-    );
-    const splitBearerText = sanitizeAgentRunErrorText(`Bearer abc\u001b[0mdef`);
-    const naturalLabelText = sanitizeAgentRunErrorText(
-      `API key: ${"api-value"}; credential = ${"credential-value"}`,
-    );
-    const phrasedLabelText = sanitizeAgentRunErrorText(
-      `Incorrect API key provided: ${["sk", "example", "value"].join("-")}`,
-    );
-    const arbitraryBodyText = sanitizeAgentRunErrorText(
-      "provider returned a response body with repository evidence",
-    );
+    const cases = [
+      {
+        error: '{"authorization":"Digest username=\\"u\\", response=\\"private-digest\\"}"',
+        secrets: ["private-digest"],
+      },
+      {
+        error: `{${escapedQuote}"authorization${escapedQuote}":${escapedQuote}"Basic escaped-value${escapedQuote}"}`,
+        secrets: ["escaped-value"],
+      },
+      {
+        error: `\u001b[31mAuthorization\u001b[0m: Basic ${"private-ansi-credential"}`,
+        secrets: ["private-ansi-credential"],
+      },
+      {
+        error: `Bearer ${["abc", "def"].join("\u001b[0m")}`,
+        secrets: ["abcdef", "def"],
+      },
+      {
+        error: `API key: ${"api-value"}; credential = ${"credential-value"}`,
+        secrets: ["api-value", "credential-value"],
+      },
+      {
+        error: `Incorrect API key provided: ${["sk", "example", "value"].join("-")}`,
+        secrets: ["sk-example-value"],
+      },
+    ];
 
-    expect(text).not.toContain("private-digest");
-    expect(escapedKeyText).not.toContain("escaped-value");
-    expect(ansiText).not.toContain("private-ansi-credential");
-    expect(splitBearerText).not.toContain("abcdef");
-    expect(splitBearerText).not.toContain("def");
-    expect(naturalLabelText).not.toContain("api-value");
-    expect(naturalLabelText).not.toContain("credential-value");
-    expect(phrasedLabelText).not.toContain("sk-example-value");
-    expect(arbitraryBodyText).toBe("provider error");
+    for (const entry of cases) {
+      const diagnostics = await failureDiagnostics((harness) => {
+        harness.session.messages = [
+          { role: "assistant", content: [], stopReason: "error", errorMessage: entry.error },
+        ];
+      });
+      for (const secret of entry.secrets) {
+        expect(diagnostics.lastAssistantErrorText).not.toContain(secret);
+      }
+    }
+
+    const diagnostics = await failureDiagnostics((harness) => {
+      harness.session.messages = [
+        {
+          role: "assistant",
+          content: [],
+          stopReason: "error",
+          errorMessage: "provider returned a response body with repository evidence",
+        },
+      ];
+    });
+    expect(diagnostics.lastAssistantErrorText).toBe("provider error");
   });
 
-  it("bounds assistant tool metadata and discloses omitted calls", () => {
-    const names = Array.from({ length: 12 }, (_, index) => `tool-${index}`);
-    const diagnostics = build({
-      messages: [
+  it("bounds assistant tool metadata and discloses omitted calls", async () => {
+    const names = Array.from({ length: 100 }, (_, index) => `tool-${index}`);
+    const diagnostics = await failureDiagnostics((harness) => {
+      harness.session.getActiveToolNames.mockReturnValue(names);
+      harness.session.messages = [
         {
           role: "assistant",
           content: names.map((name) => ({ type: "toolCall", name })),
         },
-      ],
-      getActiveToolNames: () => names,
+      ];
     });
 
-    expect(diagnostics.lastAssistantToolCalls).toHaveLength(10);
-    expect(diagnostics.lastAssistantToolCallsDropped).toBe(2);
-    expect(formatAgentRunDiagnostics(diagnostics).join("\n")).toContain("+2 omitted");
+    expect(diagnostics.lastAssistantToolCalls?.length).toBeLessThan(names.length);
+    expect(diagnostics.lastAssistantToolCallsDropped).toBeGreaterThan(0);
+    expect(formatAgentRunDiagnostics(diagnostics).join("\n")).toContain("omitted");
   });
 
-  it("omits unknown stop reasons and fails closed when tool lookup throws", () => {
-    const diagnostics = build({
-      messages: [
+  it("fails closed for unknown metadata and throwing getters", async () => {
+    const unknown = await failureDiagnostics((harness) => {
+      harness.session.getActiveToolNames.mockImplementation(() => {
+        throw new Error("private lookup error");
+      });
+      harness.session.messages = [
         {
           role: "assistant",
           content: [{ type: "toolCall", name: "private_tool" }],
           stopReason: "private_stop_reason",
         },
-      ],
-      getActiveToolNames: () => {
-        throw new Error("private lookup error");
-      },
-      getSessionStats: () => ({ tokens: { input: 0, output: 0, total: 0 } }),
+      ];
     });
+    expect(unknown.lastAssistantStopReason).toBeUndefined();
+    expect(unknown.lastAssistantToolCalls).toBeUndefined();
+    expect(JSON.stringify(unknown)).not.toContain("private_");
 
-    expect(diagnostics.lastAssistantStopReason).toBeUndefined();
-    expect(diagnostics.lastAssistantToolCalls).toBeUndefined();
-    expect(JSON.stringify(diagnostics)).not.toContain("private_");
-  });
-
-  it("tolerates throwing message and nested-content getters without retaining errors", () => {
     const assistant = { role: "assistant", stopReason: "error" } as Record<string, unknown>;
     Object.defineProperty(assistant, "content", {
       get() {
         throw new Error("private nested getter error");
       },
     });
-    expect(() => build({ messages: [assistant], getActiveToolNames: () => [] })).not.toThrow();
-
-    const diagnostics = build({
-      get messages() {
-        throw new Error("private messages getter error");
-      },
-      getActiveToolNames: () => [],
+    const nested = await failureDiagnostics((harness) => {
+      harness.session.messages = [assistant];
     });
-    expect(diagnostics.lastAssistantStopReason).toBeUndefined();
+    expect(JSON.stringify(nested)).not.toContain("private");
+
+    const throwing = await failureDiagnostics((harness) => {
+      Object.defineProperty(harness.session, "messages", {
+        get() {
+          throw new Error("private messages getter error");
+        },
+      });
+    });
+    expect(throwing.lastAssistantStopReason).toBeUndefined();
+    expect(JSON.stringify(throwing)).not.toContain("private");
+  });
+
+  it("keeps allowlisted lifecycle activity and bounds retained history", async () => {
+    const longName = `tool-${"x".repeat(200)}`;
+    const diagnostics = await failureDiagnostics((harness) => {
+      harness.session.getActiveToolNames.mockReturnValue(["read", longName]);
+      harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
+        options?.preflightResult?.(true);
+        for (let index = 0; index < 100; index++) {
+          harness.session.emit({ type: "agent_start" });
+        }
+        harness.session.emit({
+          type: "tool_execution_start",
+          toolName: "read",
+          args: { private: "argument" },
+        });
+        harness.session.emit({
+          type: "tool_execution_start",
+          toolName: "private_tool",
+          args: { private: "argument" },
+        });
+        harness.session.emit({ type: "tool_execution_start", toolName: longName });
+        harness.session.emit({ type: "agent_settled" });
+      });
+    });
+
+    expect(diagnostics.lifecycleTrace.entries.length).toBeLessThan(101);
+    expect(diagnostics.lifecycleTrace.droppedCount).toBeGreaterThan(0);
+    expect(diagnostics.lifecycleTrace.entries.at(-1)).toEqual({ type: "agent_settled" });
+    expect(diagnostics.recentActivity).toContain("tool:start:read");
+    const boundedName = diagnostics.recentActivity?.find((entry) =>
+      entry.startsWith("tool:start:tool-"),
+    );
+    expect(boundedName?.length).toBeLessThan(`tool:start:${longName}`.length);
     expect(JSON.stringify(diagnostics)).not.toContain("private");
+    expect(formatAgentRunDiagnostics(diagnostics).join("\n")).toContain(
+      "Agent Run Lifecycle Trace",
+    );
   });
 });

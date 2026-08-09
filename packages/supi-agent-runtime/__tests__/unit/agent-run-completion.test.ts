@@ -18,7 +18,7 @@ vi.mock("@earendil-works/pi-coding-agent", async (original) => ({
 }));
 
 import type { AgentRunSessionView } from "../../src/api.ts";
-import { AGENT_RUN_ABORT_GRACE_MS, startAgentRun } from "../../src/api.ts";
+import { startAgentRun } from "../../src/api.ts";
 import { createHarness, inputs } from "../helpers/agent-run-harness.ts";
 
 beforeEach(() => vi.clearAllMocks());
@@ -64,7 +64,7 @@ it("bounds a hung completion resolver and deactivates its view", async () => {
   });
   await vi.waitFor(() => expect(harness.session.prompt).toHaveBeenCalled());
   const stopped = run.stop();
-  await vi.advanceTimersByTimeAsync(AGENT_RUN_ABORT_GRACE_MS);
+  await vi.advanceTimersToNextTimerAsync();
 
   await stopped;
   await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
