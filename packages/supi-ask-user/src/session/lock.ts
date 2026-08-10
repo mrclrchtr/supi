@@ -12,8 +12,4 @@ export class ActiveQuestionnaireLock {
   release(): void {
     this.active = false;
   }
-
-  isActive(): boolean {
-    return this.active;
-  }
 }

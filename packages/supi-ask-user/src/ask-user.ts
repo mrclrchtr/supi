@@ -203,7 +203,6 @@ function asFunction<T extends (...args: never[]) => unknown>(value: unknown): T 
 
 export { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
 export { AskUserController } from "./session/controller.ts";
-export { ActiveQuestionnaireLock } from "./session/lock.ts";
 export {
   promptGuidelines as askUserPromptGuidelines,
   promptSnippet as askUserPromptSnippet,

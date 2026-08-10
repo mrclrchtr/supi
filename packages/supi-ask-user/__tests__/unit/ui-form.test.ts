@@ -136,6 +136,17 @@ const textQuestionnaire: NormalizedQuestionnaire = {
   ],
 };
 
+const wordQuestionnaire: NormalizedQuestionnaire = {
+  questions: [
+    {
+      type: "text",
+      id: "word",
+      header: "Word",
+      prompt: "Type a word.",
+    },
+  ],
+};
+
 const multiQuestionnaire: NormalizedQuestionnaire = {
   title: "Checks",
   intro: "Need all required checks.",
@@ -568,21 +579,9 @@ describe("runFormQuestionnaire", () => {
 
     it("Alt+C edits text question comments without stealing printable c", async () => {
       const { captured, ctx, outcomePromise } = makeFormCtx();
-      void runFormQuestionnaire(
-        {
-          questions: [
-            {
-              type: "text",
-              id: "word",
-              header: "Word",
-              prompt: "Type a word.",
-            },
-          ],
-        },
-        {
-          ui: ctx.ui as unknown as AskUserUiContext,
-        },
-      );
+      void runFormQuestionnaire(wordQuestionnaire, {
+        ui: ctx.ui as unknown as AskUserUiContext,
+      });
 
       await Promise.resolve();
       if (!captured.value) throw new Error("form component was not created");
@@ -602,23 +601,37 @@ describe("runFormQuestionnaire", () => {
       });
     });
 
+    it("keeps a text answer after the user discards a comment edit", async () => {
+      const { captured, ctx, outcomePromise } = makeFormCtx();
+      void runFormQuestionnaire(wordQuestionnaire, {
+        ui: ctx.ui as unknown as AskUserUiContext,
+      });
+
+      await Promise.resolve();
+      if (!captured.value) throw new Error("runFormQuestionnaire did not create a form component");
+
+      for (const char of "draft") captured.value.handleInput?.(char);
+      captured.value.handleInput?.(altCKey());
+      for (const char of "discarded note") captured.value.handleInput?.(char);
+      captured.value.handleInput?.(escKey());
+      captured.value.handleInput?.(enterKey());
+      captured.value.handleInput?.(enterKey());
+
+      const outcome = await outcomePromise;
+      if (!("outcome" in outcome)) {
+        throw new Error("The form did not produce a submitted outcome.");
+      }
+      expect(outcome.responses[0]).toMatchObject({
+        answer: { kind: "text", answered: true, value: "draft" },
+      });
+      expect(outcome.responses[0]?.questionComment).toBeUndefined();
+    });
+
     it("lets printable c and u characters pass through to the text editor", async () => {
       const { captured, ctx, outcomePromise } = makeFormCtx();
-      void runFormQuestionnaire(
-        {
-          questions: [
-            {
-              type: "text",
-              id: "word",
-              header: "Word",
-              prompt: "Type a word.",
-            },
-          ],
-        },
-        {
-          ui: ctx.ui as unknown as AskUserUiContext,
-        },
-      );
+      void runFormQuestionnaire(wordQuestionnaire, {
+        ui: ctx.ui as unknown as AskUserUiContext,
+      });
 
       await Promise.resolve();
       if (!captured.value) throw new Error("form component was not created");

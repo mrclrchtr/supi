@@ -11,13 +11,31 @@ import {
 } from "@earendil-works/pi-tui";
 import type { NormalizedChoiceQuestion } from "../types.ts";
 import { renderFormFrame } from "./form-render.ts";
-import { defaultChoiceRowIndex, type FocusTarget, type FormMode } from "./form-view.ts";
+import { defaultChoiceRowIndex, type FormMode, focusForMode } from "./form-view.ts";
 import type { FormArgs } from "./types.ts";
+
+type QuestionnaireMode = "choice" | "text" | "review";
+
+type CommentEdit =
+  | { kind: "form"; context: string }
+  | {
+      kind: "question";
+      questionId: string;
+      context: string;
+      returnChoiceFocusIndex: number;
+    }
+  | {
+      kind: "option";
+      questionId: string;
+      optionValue: string;
+      context: string;
+      returnChoiceFocusIndex: number;
+    };
 
 export class AskUserForm implements Component, Focusable {
   focused: boolean = false;
-  private mode: FormMode = "choice";
-  private focus: FocusTarget = "choices";
+  /** The base screen remains active while a temporary comment editor overlays it. */
+  private baseMode: QuestionnaireMode = "choice";
   private readonly editor: EditorComponent;
   private readonly editorHandlesEscape: boolean;
   private settingEditorText: boolean = false;
@@ -28,10 +46,7 @@ export class AskUserForm implements Component, Focusable {
   private cachedWidth: number | undefined;
   private cachedEditorFocused: boolean | undefined;
   private cachedLines: string[] | undefined;
-  private commentQuestionId: string | undefined;
-  private commentOptionValue: string | undefined;
-  private returnChoiceFocusIndex: number | undefined;
-  private editorContext: string | undefined;
+  private commentEdit: CommentEdit | undefined;
   private returnToReviewAfterEdit: boolean = false;
   private pendingEsc: boolean = false;
   private readonly onAbort: () => void;
@@ -57,7 +72,9 @@ export class AskUserForm implements Component, Focusable {
   }
 
   render(width: number): string[] {
-    const editorFocused = this.focused && this.focus === "editor";
+    const mode = this.currentMode();
+    const focus = focusForMode(mode);
+    const editorFocused = this.focused && focus === "editor";
     if (isFocusable(this.editor)) this.editor.focused = editorFocused;
 
     if (
@@ -74,14 +91,14 @@ export class AskUserForm implements Component, Focusable {
       width,
       theme: this.args.theme,
       controller: this.args.controller,
-      mode: this.mode,
-      focus: this.focus,
+      mode,
+      focus,
       editor: this.editor,
       choiceFocusIndex: this.choiceFocusIndex,
       reviewFocusIndex: this.reviewFocusIndex,
       detailsText: this.currentDetailsText(),
       editorLabel: this.currentEditorLabel(),
-      editorContext: this.editorContext,
+      editorContext: this.commentEdit?.context,
     });
     return this.cachedLines;
   }
@@ -97,13 +114,13 @@ export class AskUserForm implements Component, Focusable {
     if (this.handleEscapeKey(data)) return;
     if (this.handleNavigationKey(data)) return;
 
-    if (this.mode === "review") {
-      this.handleReviewInput(data);
+    if (this.isCommentEditorMode()) {
+      this.handleCommentEditorKey(data);
       return;
     }
 
-    if (this.isCommentEditorMode()) {
-      this.handleCommentEditorKey(data);
+    if (this.baseMode === "review") {
+      this.handleReviewInput(data);
       return;
     }
 
@@ -119,7 +136,7 @@ export class AskUserForm implements Component, Focusable {
   private handleEscapeKey(data: string): boolean {
     if (!matchesKey(data, Key.escape)) return false;
 
-    if (this.editorHandlesEscape && (this.mode === "text" || this.isCommentEditorMode())) {
+    if (this.editorHandlesEscape && (this.baseMode === "text" || this.isCommentEditorMode())) {
       this.editor.handleInput(data);
       if (!this.closed) this.refresh();
       return true;
@@ -131,7 +148,7 @@ export class AskUserForm implements Component, Focusable {
       return true;
     }
 
-    if (this.mode === "text") {
+    if (this.baseMode === "text") {
       this.pendingEsc = true;
       setTimeout(() => {
         if (this.pendingEsc) {
@@ -154,7 +171,7 @@ export class AskUserForm implements Component, Focusable {
       this.refresh();
       return;
     }
-    if (this.mode === "text") {
+    if (this.baseMode === "text") {
       this.args.controller.cancel();
       this.finish();
     }
@@ -166,10 +183,10 @@ export class AskUserForm implements Component, Focusable {
     const direction = this.navigationDirectionFor(data);
     if (!direction) return false;
 
-    if (direction === "forward" && this.mode !== "review") {
+    if (direction === "forward" && this.baseMode !== "review") {
       this.navigateForward();
     } else if (direction === "backward") {
-      if (this.mode === "review") {
+      if (this.baseMode === "review") {
         this.saveCurrentChoiceFocus();
         this.goToLastQuestion();
         this.syncCurrentQuestion();
@@ -184,7 +201,7 @@ export class AskUserForm implements Component, Focusable {
   private navigationDirectionFor(data: string): "forward" | "backward" | undefined {
     if (matchesKey(data, Key.tab)) return "forward";
     if (matchesKey(data, Key.shift("tab"))) return "backward";
-    if (this.mode === "text") return undefined;
+    if (this.baseMode === "text") return undefined;
     if (matchesKey(data, Key.left)) return "backward";
     if (matchesKey(data, Key.right)) return "forward";
     return undefined;
@@ -205,11 +222,7 @@ export class AskUserForm implements Component, Focusable {
   }
 
   private isCommentEditorMode(): boolean {
-    return (
-      this.mode === "question-comment" ||
-      this.mode === "option-comment" ||
-      this.mode === "form-comment"
-    );
+    return this.commentEdit !== undefined;
   }
 
   invalidate(): void {
@@ -349,101 +362,93 @@ export class AskUserForm implements Component, Focusable {
   }
 
   private handleEditorSubmit(value: string): void {
-    if (this.mode === "text") {
-      this.args.controller.setTextAnswer(this.args.controller.currentQuestion.id, value);
-      this.goNext();
-      return;
-    }
-
-    if (this.mode === "form-comment") {
-      this.args.controller.setComment(value);
-      this.returnFromCommentEditor();
-      this.refresh();
-      return;
-    }
-
-    if (this.mode === "question-comment" && this.commentQuestionId) {
-      this.args.controller.setQuestionComment(this.commentQuestionId, value);
-      this.returnFromCommentEditor();
-      this.refresh();
-      return;
-    }
-
-    if (
-      this.mode === "option-comment" &&
-      this.commentQuestionId &&
-      this.commentOptionValue !== undefined
-    ) {
-      const question = this.args.controller.questionnaire.questions.find(
-        (q) => q.id === this.commentQuestionId,
-      );
-      if (question?.type === "choice") {
-        const optIndex = question.options.findIndex((o) => o.value === this.commentOptionValue);
-        if (optIndex >= 0) {
-          this.args.controller.setChoiceOptionComment(question, optIndex, value);
-        }
+    const edit = this.commentEdit;
+    if (!edit) {
+      if (this.baseMode === "text") {
+        this.args.controller.setTextAnswer(this.args.controller.currentQuestion.id, value);
+        this.goNext();
       }
-      this.returnFromCommentEditor();
-      this.refresh();
+      return;
     }
+
+    switch (edit.kind) {
+      case "form":
+        this.args.controller.setComment(value);
+        break;
+      case "question":
+        this.args.controller.setQuestionComment(edit.questionId, value);
+        break;
+      case "option": {
+        const question = this.args.controller.questionnaire.questions.find(
+          (candidate) => candidate.id === edit.questionId,
+        );
+        if (question?.type === "choice") {
+          const optionIndex = question.options.findIndex(
+            (option) => option.value === edit.optionValue,
+          );
+          if (optionIndex >= 0) {
+            this.args.controller.setChoiceOptionComment(question, optionIndex, value);
+          }
+        }
+        break;
+      }
+    }
+
+    this.returnFromCommentEditor();
+    this.refresh();
   }
 
   private openFormCommentEditor(): void {
-    this.commentQuestionId = undefined;
-    this.commentOptionValue = undefined;
-    this.returnChoiceFocusIndex = undefined;
-    this.editorContext = this.args.controller.questionnaire.title ?? "Form";
-    this.mode = "form-comment";
-    this.focus = "editor";
+    this.commentEdit = {
+      kind: "form",
+      context: this.args.controller.questionnaire.title ?? "Form",
+    };
     this.setEditorText(this.args.controller.comment ?? "");
     this.refresh();
   }
 
   private openQuestionCommentEditor(questionId: string): void {
-    this.commentQuestionId = questionId;
-    this.commentOptionValue = undefined;
-    this.returnChoiceFocusIndex = this.choiceFocusIndex;
-    this.editorContext = this.args.controller.currentQuestion.header;
-    this.mode = "question-comment";
-    this.focus = "editor";
+    this.commentEdit = {
+      kind: "question",
+      questionId,
+      context: this.args.controller.currentQuestion.header,
+      returnChoiceFocusIndex: this.choiceFocusIndex,
+    };
     this.setEditorText(this.args.controller.getQuestionComment(questionId) ?? "");
     this.refresh();
   }
 
   private openOptionCommentEditor(question: NormalizedChoiceQuestion, optionIndex: number): void {
-    const opt = question.options[optionIndex];
-    if (!opt) return;
-    this.commentQuestionId = question.id;
-    this.commentOptionValue = opt.value;
-    this.returnChoiceFocusIndex = optionIndex;
-    this.editorContext = opt.label;
-    this.mode = "option-comment";
-    this.focus = "editor";
-    this.setEditorText(this.args.controller.getOptionComment(question.id, opt.value) ?? "");
+    const option = question.options[optionIndex];
+    if (!option) return;
+    this.commentEdit = {
+      kind: "option",
+      questionId: question.id,
+      optionValue: option.value,
+      context: option.label,
+      returnChoiceFocusIndex: optionIndex,
+    };
+    this.setEditorText(this.args.controller.getOptionComment(question.id, option.value) ?? "");
     this.refresh();
   }
 
   private returnFromCommentEditor(): void {
-    const prevMode = this.mode;
-    const questionId = this.commentQuestionId;
-    const optionValue = this.commentOptionValue;
-    const returnChoiceFocusIndex = this.returnChoiceFocusIndex;
+    const edit = this.commentEdit;
+    if (!edit) return;
+    this.commentEdit = undefined;
 
-    this.commentQuestionId = undefined;
-    this.commentOptionValue = undefined;
-    this.returnChoiceFocusIndex = undefined;
-    this.editorContext = undefined;
-
-    if (prevMode === "form-comment") {
-      this.mode = "review";
-      this.focus = "review";
-      this.setEditorText("");
-      return;
-    }
-
-    if (prevMode === "question-comment" || prevMode === "option-comment") {
-      this.syncCurrentQuestion();
-      this.restoreChoiceFocus(questionId, optionValue, returnChoiceFocusIndex);
+    switch (edit.kind) {
+      case "form":
+        this.baseMode = "review";
+        this.setEditorText("");
+        return;
+      case "question":
+        this.syncCurrentQuestion();
+        this.restoreChoiceFocus(edit.questionId, undefined, edit.returnChoiceFocusIndex);
+        return;
+      case "option":
+        this.syncCurrentQuestion();
+        this.restoreChoiceFocus(edit.questionId, edit.optionValue, edit.returnChoiceFocusIndex);
     }
   }
 
@@ -453,8 +458,7 @@ export class AskUserForm implements Component, Focusable {
     this.saveCurrentChoiceFocus();
     if (this.returnToReviewAfterEdit) {
       this.returnToReviewAfterEdit = false;
-      this.mode = "review";
-      this.focus = "review";
+      this.baseMode = "review";
       this.reviewFocusIndex = this.args.controller.questionnaire.questions.length;
       this.setEditorText("");
       this.refresh();
@@ -464,8 +468,7 @@ export class AskUserForm implements Component, Focusable {
       this.args.controller.currentIndex >=
       this.args.controller.questionnaire.questions.length - 1
     ) {
-      this.mode = "review";
-      this.focus = "review";
+      this.baseMode = "review";
       // Focus the Submit row by default so Enter submits immediately.
       this.reviewFocusIndex = this.args.controller.questionnaire.questions.length;
       this.refresh();
@@ -486,9 +489,6 @@ export class AskUserForm implements Component, Focusable {
     this.saveCurrentChoiceFocus();
     this.returnToReviewAfterEdit = opts.returnToReviewAfterEdit ?? false;
     this.args.controller.goTo(index);
-    const q = this.args.controller.currentQuestion;
-    this.mode = q.type === "text" ? "text" : "choice";
-    this.focus = q.type === "text" ? "editor" : "choices";
     this.syncCurrentQuestion();
     this.refresh();
   }
@@ -497,14 +497,12 @@ export class AskUserForm implements Component, Focusable {
     const question = this.args.controller.currentQuestion;
 
     if (question.type === "text") {
-      this.mode = "text";
-      this.focus = "editor";
+      this.baseMode = "text";
       this.setEditorText(this.args.controller.getTextAnswer(question.id));
       return;
     }
 
-    this.mode = "choice";
-    this.focus = "choices";
+    this.baseMode = "choice";
     this.setEditorText("");
     this.choiceFocusIndex =
       this.choiceFocusByQuestionId.get(question.id) ??
@@ -519,7 +517,7 @@ export class AskUserForm implements Component, Focusable {
   }
 
   private syncTextAnswerFromEditor(): void {
-    if (this.mode !== "text") return;
+    if (this.currentMode() !== "text") return;
     const question = this.args.controller.currentQuestion;
     if (question.type !== "text") return;
     this.args.controller.setTextAnswer(
@@ -567,20 +565,25 @@ export class AskUserForm implements Component, Focusable {
     this.args.tui.requestRender();
   }
 
+  private currentMode(): FormMode {
+    if (!this.commentEdit) return this.baseMode;
+    return `${this.commentEdit.kind}-comment`;
+  }
+
   private currentDetailsText(): string | undefined {
-    if (this.mode !== "choice") return undefined;
+    if (this.currentMode() !== "choice") return undefined;
     const question = this.args.controller.currentQuestion;
     if (question.type !== "choice") return undefined;
     return question.options[this.choiceFocusIndex]?.details;
   }
 
   private currentEditorLabel(): string | undefined {
-    switch (this.mode) {
-      case "question-comment":
+    switch (this.commentEdit?.kind) {
+      case "question":
         return "Question comment";
-      case "option-comment":
+      case "option":
         return "Option comment";
-      case "form-comment":
+      case "form":
         return "Form comment";
       default:
         return undefined;

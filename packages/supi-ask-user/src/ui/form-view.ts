@@ -10,6 +10,12 @@ export type FormMode =
   | "form-comment"
   | "option-comment";
 
+/** Return the only valid focus target for a form mode. */
+export function focusForMode(mode: FormMode): FocusTarget {
+  if (mode === "choice") return "choices";
+  return mode === "review" ? "review" : "editor";
+}
+
 export function defaultChoiceRowIndex(
   controller: AskUserController,
   question: NormalizedChoiceQuestion,
