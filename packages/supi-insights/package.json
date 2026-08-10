@@ -34,8 +34,7 @@
     "README.md"
   ],
   "dependencies": {
-    "@mrclrchtr/supi-core": "workspace:*",
-    "diff": "^9.0.0"
+    "@mrclrchtr/supi-core": "workspace:*"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-core"

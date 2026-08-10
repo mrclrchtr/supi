@@ -2,108 +2,29 @@
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { callWithJsonResponse } from "@mrclrchtr/supi-core/llm";
-import { Type } from "typebox";
+import {
+  INSIGHT_SCHEMAS,
+  type InsightResultMap,
+  type InsightSchemaMap,
+} from "./insight-schemas.ts";
 import type { AggregatedData, InsightResults, SessionFacets } from "./types.ts";
-
-// ── TypeBox schemas for each insight section ───────────────────────────────
-
-const ProjectAreasSchema = Type.Object({
-  areas: Type.Array(
-    Type.Object({
-      name: Type.String(),
-      sessionCount: Type.Number(),
-      description: Type.String(),
-    }),
-  ),
-});
-
-const InteractionStyleSchema = Type.Object({
-  narrative: Type.String(),
-  keyPattern: Type.String(),
-});
-
-const WhatWorksSchema = Type.Object({
-  intro: Type.String(),
-  impressiveWorkflows: Type.Array(
-    Type.Object({
-      title: Type.String(),
-      description: Type.String(),
-    }),
-  ),
-});
-
-const FrictionAnalysisSchema = Type.Object({
-  intro: Type.String(),
-  categories: Type.Array(
-    Type.Object({
-      category: Type.String(),
-      description: Type.String(),
-      examples: Type.Array(Type.String()),
-    }),
-  ),
-});
-
-const SuggestionsSchema = Type.Object({
-  claudeMdAdditions: Type.Array(
-    Type.Object({
-      addition: Type.String(),
-      why: Type.String(),
-      promptScaffold: Type.String(),
-    }),
-  ),
-  featuresToTry: Type.Array(
-    Type.Object({
-      feature: Type.String(),
-      oneLiner: Type.String(),
-      whyForYou: Type.String(),
-      exampleCode: Type.String(),
-    }),
-  ),
-  usagePatterns: Type.Array(
-    Type.Object({
-      title: Type.String(),
-      suggestion: Type.String(),
-      detail: Type.String(),
-      copyablePrompt: Type.String(),
-    }),
-  ),
-});
-
-const OnTheHorizonSchema = Type.Object({
-  intro: Type.String(),
-  opportunities: Type.Array(
-    Type.Object({
-      title: Type.String(),
-      whatsPossible: Type.String(),
-      howToTry: Type.String(),
-      copyablePrompt: Type.String(),
-    }),
-  ),
-});
-
-const FunEndingSchema = Type.Object({
-  headline: Type.String(),
-  detail: Type.String(),
-});
-
-const AtAGlanceSchema = Type.Object({
-  whatsWorking: Type.String(),
-  whatsHindering: Type.String(),
-  quickWins: Type.String(),
-  ambitiousWorkflows: Type.String(),
-});
 
 // ── Section definitions ──────────────────────────────────────────────────
 
-type InsightSection = {
-  name: keyof InsightResults;
+type ParallelInsightSectionName = Exclude<keyof InsightResultMap, "atAGlance">;
+
+type InsightSection<Name extends ParallelInsightSectionName> = {
+  name: Name;
   prompt: string;
-  // biome-ignore lint/suspicious/noExplicitAny: TypeBox schema union
-  schema: ReturnType<typeof Type.Object<any>>;
+  schema: InsightSchemaMap[Name];
   maxTokens: number;
 };
 
-const INSIGHT_SECTIONS: InsightSection[] = [
+type ParallelInsightSection = {
+  [Name in ParallelInsightSectionName]: InsightSection<Name>;
+}[ParallelInsightSectionName];
+
+const INSIGHT_SECTIONS = [
   {
     name: "projectAreas",
     prompt: `Analyze this PI usage data and identify project areas.
@@ -116,7 +37,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
 }
 
 Include 4-5 areas.`,
-    schema: ProjectAreasSchema,
+    schema: INSIGHT_SCHEMAS.projectAreas,
     maxTokens: 4096,
   },
   {
@@ -128,7 +49,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
   "narrative": "2-3 paragraphs analyzing HOW the user interacts with PI. Use second person 'you'. Describe patterns: iterate quickly vs detailed upfront specs? Interrupt often or let the agent run? Include specific examples. Use **bold** for key insights.",
   "keyPattern": "One sentence summary of most distinctive interaction style"
 }`,
-    schema: InteractionStyleSchema,
+    schema: INSIGHT_SCHEMAS.interactionStyle,
     maxTokens: 4096,
   },
   {
@@ -144,7 +65,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
 }
 
 Include 3 impressive workflows.`,
-    schema: WhatWorksSchema,
+    schema: INSIGHT_SCHEMAS.whatWorks,
     maxTokens: 4096,
   },
   {
@@ -160,7 +81,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
 }
 
 Include 3 friction categories with 2 examples each.`,
-    schema: FrictionAnalysisSchema,
+    schema: INSIGHT_SCHEMAS.frictionAnalysis,
     maxTokens: 4096,
   },
   {
@@ -181,7 +102,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
 }
 
 IMPORTANT: PRIORITIZE instructions that appear MULTIPLE TIMES in the user data.`,
-    schema: SuggestionsSchema,
+    schema: INSIGHT_SCHEMAS.suggestions,
     maxTokens: 4096,
   },
   {
@@ -197,7 +118,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
 }
 
 Include 3 opportunities. Think BIG - autonomous workflows, parallel agents, iterating against tests.`,
-    schema: OnTheHorizonSchema,
+    schema: INSIGHT_SCHEMAS.onTheHorizon,
     maxTokens: 4096,
   },
   {
@@ -211,10 +132,10 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
 }
 
 Find something genuinely interesting or amusing from the session summaries.`,
-    schema: FunEndingSchema,
+    schema: INSIGHT_SCHEMAS.funEnding,
     maxTokens: 2048,
   },
-];
+] satisfies readonly ParallelInsightSection[];
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
@@ -232,13 +153,11 @@ export async function generateInsights(
 
   const insights: InsightResults = {};
   for (const { name, result } of results) {
-    if (result) {
-      insights[name] = result;
-    }
+    if (result) Object.assign(insights, { [name]: result });
   }
 
   // Generate at_a_glance sequentially (needs other sections)
-  const atAGlance = await generateAtAGlance(data, insights, dataContext, ctx);
+  const atAGlance = await generateAtAGlance(insights, dataContext, ctx);
   if (atAGlance) {
     insights.atAGlance = atAGlance;
   }
@@ -248,11 +167,11 @@ export async function generateInsights(
 
 // ── Section generators ────────────────────────────────────────────────────
 
-async function generateSectionInsight(
-  section: InsightSection,
+async function generateSectionInsight<Name extends ParallelInsightSectionName>(
+  section: InsightSection<Name>,
   dataContext: string,
   ctx: ExtensionContext,
-): Promise<{ name: keyof InsightResults; result: unknown }> {
+) {
   const result = await callWithJsonResponse(
     ctx,
     {
@@ -268,55 +187,33 @@ async function generateSectionInsight(
 }
 
 async function generateAtAGlance(
-  _data: AggregatedData,
   insights: InsightResults,
   dataContext: string,
   ctx: ExtensionContext,
-): Promise<unknown> {
+): Promise<InsightResultMap["atAGlance"] | null> {
   const projectAreasText =
-    (
-      insights.projectAreas as {
-        areas?: Array<{ name: string; description: string }>;
-      }
-    )?.areas
-      ?.map((a) => `- ${a.name}: ${a.description}`)
-      .join("\n") || "";
+    insights.projectAreas?.areas.map((area) => `- ${area.name}: ${area.description}`).join("\n") ??
+    "";
 
   const bigWinsText =
-    (
-      insights.whatWorks as {
-        impressiveWorkflows?: Array<{ title: string; description: string }>;
-      }
-    )?.impressiveWorkflows
-      ?.map((w) => `- ${w.title}: ${w.description}`)
-      .join("\n") || "";
+    insights.whatWorks?.impressiveWorkflows
+      .map((workflow) => `- ${workflow.title}: ${workflow.description}`)
+      .join("\n") ?? "";
 
   const frictionText =
-    (
-      insights.frictionAnalysis as {
-        categories?: Array<{ category: string; description: string }>;
-      }
-    )?.categories
-      ?.map((c) => `- ${c.category}: ${c.description}`)
-      .join("\n") || "";
+    insights.frictionAnalysis?.categories
+      .map((category) => `- ${category.category}: ${category.description}`)
+      .join("\n") ?? "";
 
   const featuresText =
-    (
-      insights.suggestions as {
-        featuresToTry?: Array<{ feature: string; oneLiner: string }>;
-      }
-    )?.featuresToTry
-      ?.map((f) => `- ${f.feature}: ${f.oneLiner}`)
-      .join("\n") || "";
+    insights.suggestions?.featuresToTry
+      .map((feature) => `- ${feature.feature}: ${feature.oneLiner}`)
+      .join("\n") ?? "";
 
   const horizonText =
-    (
-      insights.onTheHorizon as {
-        opportunities?: Array<{ title: string; whatsPossible: string }>;
-      }
-    )?.opportunities
-      ?.map((o) => `- ${o.title}: ${o.whatsPossible}`)
-      .join("\n") || "";
+    insights.onTheHorizon?.opportunities
+      .map((opportunity) => `- ${opportunity.title}: ${opportunity.whatsPossible}`)
+      .join("\n") ?? "";
 
   const prompt = `You're writing an "At a Glance" summary for a PI usage insights report.
 
@@ -365,7 +262,7 @@ ${horizonText}`;
       maxTokens: 4096,
       retries: 2,
     },
-    AtAGlanceSchema,
+    INSIGHT_SCHEMAS.atAGlance,
   );
 
   return result?.parsed ?? null;

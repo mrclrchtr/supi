@@ -1,6 +1,7 @@
 // Session parser — extract metadata and transcripts from PI session entries.
 
 import { readFile } from "node:fs/promises";
+import { diff } from "node:util";
 import type {
   AssistantMessage,
   Message,
@@ -10,7 +11,6 @@ import type {
 import type { FileEntry, SessionEntry, SessionHeader } from "@earendil-works/pi-coding-agent";
 import { migrateSessionEntries, parseSessionEntries } from "@earendil-works/pi-coding-agent";
 import { getActiveBranchEntries } from "@mrclrchtr/supi-core/session";
-import { diffLines } from "diff";
 import type { SessionMeta } from "./types.ts";
 import { getLanguageFromPath } from "./utils.ts";
 
@@ -40,6 +40,26 @@ const TASK_AGENT_TOOLS = new Set(["agent", "subagent"]);
 const MCP_PREFIX = "mcp__";
 const WEB_SEARCH_TOOL = "web_search";
 const WEB_FETCH_TOOL = "web_fetch";
+
+/** Count added and removed lines while preserving final-newline changes. */
+export function countChangedLines(
+  oldText: string,
+  newText: string,
+): { added: number; removed: number } {
+  if (oldText === newText) return { added: 0, removed: 0 };
+
+  let added = 0;
+  let removed = 0;
+  for (const [operation] of diff(splitLines(oldText), splitLines(newText))) {
+    if (operation === -1) added++;
+    if (operation === 1) removed++;
+  }
+  return { added, removed };
+}
+
+function splitLines(text: string): string[] {
+  return text.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+}
 
 export async function parseSessionFile(path: string): Promise<FileEntry[]> {
   const content = await readFile(path, { encoding: "utf-8" });
@@ -191,10 +211,9 @@ function extractToolStats(entries: SessionEntry[]) {
                 typeof input.old_string === "string" &&
                 typeof input.new_string === "string"
               ) {
-                for (const change of diffLines(input.old_string, input.new_string)) {
-                  if (change.added) linesAdded += change.count || 0;
-                  if (change.removed) linesRemoved += change.count || 0;
-                }
+                const changedLines = countChangedLines(input.old_string, input.new_string);
+                linesAdded += changedLines.added;
+                linesRemoved += changedLines.removed;
               }
 
               if (toolName === "write" && typeof input.content === "string") {

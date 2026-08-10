@@ -26,14 +26,7 @@ function generateReportJs(hourCountsJson: string): string {
 }
 
 function renderAtAGlanceHtml(insights: InsightResults): string {
-  const atAGlance = insights.atAGlance as
-    | {
-        whatsWorking?: string;
-        whatsHindering?: string;
-        quickWins?: string;
-        ambitiousWorkflows?: string;
-      }
-    | undefined;
+  const atAGlance = insights.atAGlance;
 
   if (!atAGlance) return "";
 
@@ -51,12 +44,7 @@ function renderAtAGlanceHtml(insights: InsightResults): string {
 }
 
 function renderProjectAreasHtml(insights: InsightResults): string {
-  const projectAreas =
-    (
-      insights.projectAreas as
-        | { areas?: Array<{ name: string; sessionCount: number; description: string }> }
-        | undefined
-    )?.areas ?? [];
+  const projectAreas = insights.projectAreas?.areas ?? [];
 
   if (projectAreas.length === 0) return "";
 
@@ -81,9 +69,7 @@ function renderProjectAreasHtml(insights: InsightResults): string {
 }
 
 function renderInteractionHtml(insights: InsightResults): string {
-  const interactionStyle = insights.interactionStyle as
-    | { narrative?: string; keyPattern?: string }
-    | undefined;
+  const interactionStyle = insights.interactionStyle;
 
   if (!interactionStyle?.narrative) return "";
 
@@ -97,9 +83,7 @@ function renderInteractionHtml(insights: InsightResults): string {
 }
 
 function renderWhatWorksHtml(insights: InsightResults): string {
-  const whatWorks = insights.whatWorks as
-    | { intro?: string; impressiveWorkflows?: Array<{ title: string; description: string }> }
-    | undefined;
+  const whatWorks = insights.whatWorks;
 
   if (!whatWorks?.impressiveWorkflows?.length) return "";
 
@@ -122,12 +106,7 @@ function renderWhatWorksHtml(insights: InsightResults): string {
 }
 
 function renderFrictionHtml(insights: InsightResults): string {
-  const frictionAnalysis = insights.frictionAnalysis as
-    | {
-        intro?: string;
-        categories?: Array<{ category: string; description: string; examples?: string[] }>;
-      }
-    | undefined;
+  const frictionAnalysis = insights.frictionAnalysis;
 
   if (!frictionAnalysis?.categories?.length) return "";
 
@@ -151,23 +130,7 @@ function renderFrictionHtml(insights: InsightResults): string {
 }
 
 function renderSuggestionsHtml(insights: InsightResults): string {
-  const suggestions = insights.suggestions as
-    | {
-        claudeMdAdditions?: Array<{ addition: string; why: string; promptScaffold?: string }>;
-        featuresToTry?: Array<{
-          feature: string;
-          oneLiner: string;
-          whyForYou: string;
-          exampleCode?: string;
-        }>;
-        usagePatterns?: Array<{
-          title: string;
-          suggestion: string;
-          detail?: string;
-          copyablePrompt?: string;
-        }>;
-      }
-    | undefined;
+  const suggestions = insights.suggestions;
 
   if (!suggestions) return "";
 
@@ -237,17 +200,7 @@ function renderSuggestionsHtml(insights: InsightResults): string {
 }
 
 function renderHorizonHtml(insights: InsightResults): string {
-  const horizonData = insights.onTheHorizon as
-    | {
-        intro?: string;
-        opportunities?: Array<{
-          title: string;
-          whatsPossible: string;
-          howToTry?: string;
-          copyablePrompt?: string;
-        }>;
-      }
-    | undefined;
+  const horizonData = insights.onTheHorizon;
 
   if (!horizonData?.opportunities?.length) return "";
 
@@ -272,7 +225,7 @@ function renderHorizonHtml(insights: InsightResults): string {
 }
 
 function renderFunEndingHtml(insights: InsightResults): string {
-  const funEnding = insights.funEnding as { headline?: string; detail?: string } | undefined;
+  const funEnding = insights.funEnding;
 
   if (!funEnding?.headline) return "";
 

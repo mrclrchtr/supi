@@ -155,9 +155,7 @@ export default function insightsExtension(pi: ExtensionAPI) {
 
         const header = `# PI Insights\n\n${stats}\n${report.data.dateRange.start} to ${report.data.dateRange.end}\n`;
 
-        const atAGlance = report.insights.atAGlance as
-          | { whatsWorking?: string; quickWins?: string }
-          | undefined;
+        const atAGlance = report.insights.atAGlance;
 
         const summaryText = atAGlance
           ? `## At a Glance\n\n${atAGlance.whatsWorking ? `**What's working:** ${atAGlance.whatsWorking}` : ""}\n\n${atAGlance.quickWins ? `**Quick wins:** ${atAGlance.quickWins}` : ""}`

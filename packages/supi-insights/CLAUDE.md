@@ -16,6 +16,7 @@ src/
 ├── cache.ts          # Facet and metadata caching
 ├── extractor.ts      # LLM facet extraction via @earendil-works/pi-ai/complete()
 ├── generator.ts      # Parallel narrative insight generation (7 sections)
+├── insight-schemas.ts # TypeBox schemas and derived result types
 ├── html.ts           # HTML report renderer with CSS bar charts
 ├── parser.ts         # JSONL parsing, transcript extraction, tool stat aggregation
 ├── scanner.ts        # Session discovery via SessionManager.listAll()
@@ -27,6 +28,7 @@ __tests__/
 ├── tsconfig.json
 └── unit/
     ├── aggregator.test.ts
+    ├── parser.test.ts
     └── utils.test.ts
 ```
 

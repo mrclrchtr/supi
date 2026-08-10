@@ -1,5 +1,7 @@
 // Shared types for supi-insights
 
+import type { InsightResultMap } from "./insight-schemas.ts";
+
 export type SessionMeta = {
   sessionId: string;
   projectPath: string;
@@ -101,14 +103,6 @@ export type AggregatedData = {
   insightSectionsFailed: string[];
 };
 
-export type InsightSectionName =
-  | "projectAreas"
-  | "interactionStyle"
-  | "whatWorks"
-  | "frictionAnalysis"
-  | "suggestions"
-  | "onTheHorizon"
-  | "atAGlance"
-  | "funEnding";
+export type InsightSectionName = keyof InsightResultMap;
 
-export type InsightResults = Partial<Record<InsightSectionName, unknown>>;
+export type InsightResults = Partial<InsightResultMap>;
