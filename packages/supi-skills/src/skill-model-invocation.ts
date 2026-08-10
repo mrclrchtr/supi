@@ -9,7 +9,7 @@ import {
 } from "@mrclrchtr/supi-core/config";
 import type { SettingsScope, ValueSource } from "@mrclrchtr/supi-core/settings";
 
-const CONFIG_SECTION = "skill-states";
+const CONFIG_SECTION = "skills";
 const MODEL_INVOCATION_KEY = "modelInvocation";
 
 export const ENABLED = "Enabled";
