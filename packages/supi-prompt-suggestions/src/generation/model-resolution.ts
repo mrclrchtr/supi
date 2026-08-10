@@ -8,6 +8,7 @@
  * @module
  */
 
+import type { ProviderHeaders } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getSelectableModels } from "@mrclrchtr/supi-core/model-selection";
 
@@ -17,7 +18,7 @@ export interface ResolvedAuth {
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
   model: any;
   apiKey: string;
-  headers?: Record<string, string>;
+  headers?: ProviderHeaders;
   env?: Record<string, string>;
 }
 

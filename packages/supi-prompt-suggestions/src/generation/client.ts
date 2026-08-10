@@ -7,6 +7,7 @@
  * @module
  */
 
+import type { ProviderHeaders } from "@earendil-works/pi-ai";
 import { completeSimple } from "@earendil-works/pi-ai/compat";
 
 // ── Constants ──────────────────────────────────────────────────────────
@@ -60,7 +61,7 @@ export type SuggestionClientOutput = SuggestionClientResult | SuggestionClientEr
 export interface SuggestionClientOptions {
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
   model: any;
-  auth: { apiKey: string; headers?: Record<string, string>; env?: Record<string, string> };
+  auth: { apiKey: string; headers?: ProviderHeaders; env?: Record<string, string> };
   tail: string;
   signal: AbortSignal;
 }

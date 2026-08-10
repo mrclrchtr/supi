@@ -22,14 +22,14 @@ importers:
         specifier: 21.2.0
         version: 21.2.0
       '@earendil-works/pi-ai':
-        specifier: ^0.83.0
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        specifier: ^0.84.1
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
-        specifier: ^0.83.0
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        specifier: ^0.84.1
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-tui':
-        specifier: ^0.83.0
-        version: 0.83.0
+        specifier: ^0.84.1
+        version: 0.84.1
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
         version: link:packages/supi-test-utils
@@ -65,10 +65,10 @@ importers:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.83.0
+        version: 0.84.1
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -87,10 +87,10 @@ importers:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.83.0
+        version: 0.84.1
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -109,13 +109,13 @@ importers:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.83.0
+        version: 0.84.1
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -134,7 +134,7 @@ importers:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
     devDependencies:
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
@@ -150,13 +150,13 @@ importers:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.83.0
+        version: 0.84.1
       '@mrclrchtr/supi-code-runtime':
         specifier: workspace:*
         version: link:../supi-code-runtime
@@ -190,7 +190,7 @@ importers:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -206,13 +206,13 @@ importers:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.83.0
+        version: 0.84.1
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -231,13 +231,13 @@ importers:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.83.0
+        version: 0.84.1
       typebox:
         specifier: '*'
         version: 1.3.11
@@ -253,13 +253,13 @@ importers:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.83.0
+        version: 0.84.1
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -278,10 +278,10 @@ importers:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.83.0
+        version: 0.84.1
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -300,10 +300,10 @@ importers:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -356,13 +356,13 @@ importers:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.83.0
+        version: 0.84.1
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -378,13 +378,13 @@ importers:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.83.0
+        version: 0.84.1
       '@mrclrchtr/supi-code-intelligence':
         specifier: workspace:*
         version: link:../supi-code-intelligence
@@ -406,14 +406,14 @@ importers:
     dependencies:
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.83.0
+        version: 0.84.1
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
     devDependencies:
       '@earendil-works/pi-coding-agent':
-        specifier: ^0.83.0
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        specifier: ^0.84.1
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
         version: link:../supi-test-utils
@@ -428,7 +428,7 @@ importers:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       vitest:
         specifier: ^4.1.5
         version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.1(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
@@ -511,13 +511,13 @@ importers:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.83.0
+        version: 0.84.1
       '@mozilla/readability':
         specifier: ^0.6.0
         version: 0.6.0
@@ -877,22 +877,34 @@ packages:
       tree_sitter:
         optional: true
 
-  '@earendil-works/pi-agent-core@0.83.0':
-    resolution: {integrity: sha512-RorGp9OH5l3ElpuC5a5ZQ2eWcchZGXflXRzVGkV99y3y6tT+LLNyxoYIdVKvTKWEObwhExeQbTH0fI2tE4iX4g==}
+  '@earendil-works/pi-agent-core@0.84.1':
+    resolution: {integrity: sha512-evyzXYWCLQGmcaBYHlmSku02r8qoN4SGI60GZABo6iV+H+nqX+P9ud8fEZ4GmRq9mUSREvvfX+w9dA9ThF9C6w==}
     engines: {node: '>=22.19.0'}
 
-  '@earendil-works/pi-ai@0.83.0':
-    resolution: {integrity: sha512-m3IZD4g3er0V8TC9+Vpgw/sjTKqcJlkcIBy/JvsgRubuuik3tAVzyugUg4rVrShIkkOT69mEd34NEqKUIsl6JQ==}
-    engines: {node: '>=22.19.0'}
-    hasBin: true
-
-  '@earendil-works/pi-coding-agent@0.83.0':
-    resolution: {integrity: sha512-uYhF+FsZxogoSX/AxBcUdiY+ZklubwaXyAoEGA2eQwsHcyEAhUYIKh/WLXe/a8+k8eTCmxb+ZN2Zo9mzQtzbWw==}
+  '@earendil-works/pi-ai@0.84.1':
+    resolution: {integrity: sha512-wMsAdJMxuNri08vLqTyYVI201DQQezGhPSTkzYsHdw5dYX3rCNwEmSvpaAwhi7ELKI/2tE/CEgSWg/6iRxSgdQ==}
     engines: {node: '>=22.19.0'}
     hasBin: true
 
-  '@earendil-works/pi-tui@0.83.0':
-    resolution: {integrity: sha512-IoYrb0rORjELmEpNtoCA/U8je3KopMkRAVJRdSzvXRvgb+Huo1gNh8Q5CSZvNOiYtDxJdj2tYZZHZ4B3+IN3hA==}
+  '@earendil-works/pi-client@0.84.1':
+    resolution: {integrity: sha512-/V5hGHE4Zq+jG0GtwIB9PyBUOGd6gBLZ7lkQYFKchKnxYHeH3rmWC5xw4kpnZKKBuBuFTdLVbU9vEjlAGMMb2A==}
+    engines: {node: '>=22.19.0'}
+
+  '@earendil-works/pi-coding-agent@0.84.1':
+    resolution: {integrity: sha512-ncAqFrG+iybuPGOhMiZoEHkEzTpJgz3guYD32pD+M7ucc0WeHmauP6wa7qwP8V/KWvsZDVNa5XGsdZ7fkC7w7A==}
+    engines: {node: '>=22.19.0'}
+    hasBin: true
+
+  '@earendil-works/pi-protocol@0.84.1':
+    resolution: {integrity: sha512-Ox1pciyeSPGEEUcxvR0/dJcrY7C6hrEGA8y71rOsvSIUlXN1Cbp/be/eoL71OGDBk5O97TeQPfWN6Ju/2Ehjww==}
+    engines: {node: '>=22.19.0'}
+
+  '@earendil-works/pi-telemetry@0.84.1':
+    resolution: {integrity: sha512-180/xGJtsq7IoR3p9EKWjRd0e9M4DkxInhlo9xyD7prDC7Qrhqq+nhvwrW0lFjPfXcEI2FSHmGCSyvSJE9GsaQ==}
+    engines: {node: '>=22.19.0'}
+
+  '@earendil-works/pi-tui@0.84.1':
+    resolution: {integrity: sha512-udeXFbgEhJ6JiB0uguwNVNkDy2FENfmtQwPcY+/iJ8GWeq18wkal1tKqa5YyeH0IqtX1vG0cGh8zfSYzyzVuLA==}
     engines: {node: '>=22.19.0'}
 
   '@exodus/bytes@1.15.1':
@@ -1597,6 +1609,10 @@ packages:
 
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
+
+  grok-mermaid@0.2.2:
+    resolution: {integrity: sha512-XcJEP5dDC8liHBh52mlLjU18fNvu1ckFsu0QpIG3+APZ270fsj9wxpiA6cOURmbUEuoMVgjbC2+UYgTdCqqgzA==}
+    engines: {node: '>=18'}
 
   highlight.js@10.7.3:
     resolution: {integrity: sha512-tzcUFauisWKNHaRkN4Wjl/ZA07gENAjFl3J/c480dprkGTg5EQstgaNFqBfUqCq54kZRIEcreTsAgF/m2quD7A==}
@@ -2306,8 +2322,8 @@ packages:
     resolution: {integrity: sha512-HvltHd7avK13QIw/oLe4qoOLyoVSoafqJ2jYOrtMRBkbYT31eiBQ8O0ehRKZiEZCMEyLFQNIADpgCWC5fALvYQ==}
     engines: {node: '>=22.19.0'}
 
-  undici@8.5.0:
-    resolution: {integrity: sha512-xamtWoB1EshgjpmlXd7GGm2VfdDtw1+rD8uhry8pSNW3If6S8E0m2T2+orSKeZXEn/aPJMviCpDBA65WJt8zhg==}
+  undici@8.9.0:
+    resolution: {integrity: sha512-aWZpUj7XoGonMClx4gdDRfgBjqeA+F473aDmROQQbM9n6PRfK/u1q/a0X4wMTgcHfT8H6fpbt98PFuDUwFg2YA==}
     engines: {node: '>=22.19.0'}
 
   unicorn-magic@0.3.0:
@@ -2575,7 +2591,7 @@ snapshots:
       '@aws-sdk/types': 3.974.2
       '@smithy/core': 3.31.1
       '@smithy/fetch-http-handler': 5.6.13
-      '@smithy/node-http-handler': 4.7.3
+      '@smithy/node-http-handler': 4.9.13
       '@smithy/types': 4.16.1
       tslib: 2.8.1
 
@@ -2955,9 +2971,10 @@ snapshots:
       node-gyp-build: 4.8.4
       tree-sitter: 0.25.1
 
-  '@earendil-works/pi-agent-core@0.83.0(ws@8.21.3)(zod@4.4.3)':
+  '@earendil-works/pi-agent-core@0.84.1(ws@8.21.3)(zod@4.4.3)':
     dependencies:
-      '@earendil-works/pi-ai': 0.83.0(ws@8.21.3)(zod@4.4.3)
+      '@earendil-works/pi-ai': 0.84.1(ws@8.21.3)(zod@4.4.3)
+      '@earendil-works/pi-telemetry': 0.84.1
       diff: 8.0.4
       ignore: 7.0.5
       typebox: 1.3.7
@@ -2970,10 +2987,11 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-ai@0.83.0(ws@8.21.3)(zod@4.4.3)':
+  '@earendil-works/pi-ai@0.84.1(ws@8.21.3)(zod@4.4.3)':
     dependencies:
       '@anthropic-ai/sdk': 0.91.1(zod@4.4.3)
       '@aws-sdk/client-bedrock-runtime': 3.1048.0
+      '@earendil-works/pi-telemetry': 0.84.1
       '@google/genai': 1.52.0
       '@mistralai/mistralai': 2.2.6(@opentelemetry/api@1.9.0)
       '@opentelemetry/api': 1.9.0
@@ -2991,16 +3009,23 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-coding-agent@0.83.0(ws@8.21.3)(zod@4.4.3)':
+  '@earendil-works/pi-client@0.84.1':
     dependencies:
-      '@earendil-works/pi-agent-core': 0.83.0(ws@8.21.3)(zod@4.4.3)
-      '@earendil-works/pi-ai': 0.83.0(ws@8.21.3)(zod@4.4.3)
-      '@earendil-works/pi-tui': 0.83.0
+      '@earendil-works/pi-protocol': 0.84.1
+
+  '@earendil-works/pi-coding-agent@0.84.1(ws@8.21.3)(zod@4.4.3)':
+    dependencies:
+      '@earendil-works/pi-agent-core': 0.84.1(ws@8.21.3)(zod@4.4.3)
+      '@earendil-works/pi-ai': 0.84.1(ws@8.21.3)(zod@4.4.3)
+      '@earendil-works/pi-client': 0.84.1
+      '@earendil-works/pi-protocol': 0.84.1
+      '@earendil-works/pi-tui': 0.84.1
       '@silvia-odwyer/photon-node': 0.3.4
       chalk: 5.6.2
       cross-spawn: 7.0.6
       diff: 8.0.4
       glob: 13.0.6
+      grok-mermaid: 0.2.2
       highlight.js: 10.7.3
       hosted-git-info: 9.0.3
       ignore: 7.0.5
@@ -3009,7 +3034,7 @@ snapshots:
       proper-lockfile: 4.1.2
       semver: 7.8.0
       typebox: 1.3.7
-      undici: 8.5.0
+      undici: 8.9.0
       yaml: 2.9.0
     optionalDependencies:
       '@mariozechner/clipboard': 0.3.9
@@ -3021,7 +3046,13 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-tui@0.83.0':
+  '@earendil-works/pi-protocol@0.84.1':
+    dependencies:
+      typebox: 1.3.7
+
+  '@earendil-works/pi-telemetry@0.84.1': {}
+
+  '@earendil-works/pi-tui@0.84.1':
     dependencies:
       get-east-asian-width: 1.6.0
       marked: 18.0.5
@@ -3665,6 +3696,8 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
+  grok-mermaid@0.2.2: {}
+
   highlight.js@10.7.3: {}
 
   hosted-git-info@9.0.3:
@@ -4260,7 +4293,7 @@ snapshots:
 
   undici@8.10.0: {}
 
-  undici@8.5.0: {}
+  undici@8.9.0: {}
 
   unicorn-magic@0.3.0: {}
 

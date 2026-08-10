@@ -43,6 +43,27 @@ describe("callSuggestionModel", () => {
     expect(result).toEqual({ ok: false, message: "Suggestion model failed: boom" });
   });
 
+  it("preserves null header deletion markers", async () => {
+    const signal = new AbortController().signal;
+    mockCompleteSimple.mockResolvedValue({
+      stopReason: "stop",
+      content: [{ type: "text", text: "next" }],
+    });
+
+    await callSuggestionModel({
+      model: { provider: "test", id: "model" },
+      auth: { apiKey: "key", headers: { authorization: null } },
+      tail: "assistant text",
+      signal,
+    });
+
+    expect(mockCompleteSimple).toHaveBeenCalledWith(
+      { provider: "test", id: "model" },
+      expect.any(Object),
+      { apiKey: "key", headers: { authorization: null }, signal },
+    );
+  });
+
   it("passes auth environment through to completeSimple", async () => {
     const signal = new AbortController().signal;
     mockCompleteSimple.mockResolvedValue({
