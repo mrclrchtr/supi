@@ -1,5 +1,26 @@
 # Changelog
 
+## [4.8.0](https://github.com/mrclrchtr/supi/compare/v4.7.0...v4.8.0) (2026-08-10)
+
+
+### Features
+
+* **prompt-suggestions:** restore suppressed suggestions ([db733b8](https://github.com/mrclrchtr/supi/commit/db733b8d6809ff5f8e021ffeed2d2ae7fc615b2b))
+* **settings:** group settings in unified UI ([d925939](https://github.com/mrclrchtr/supi/commit/d925939a6c8c837b100b79ff268986f8f48055cc))
+* **skills:** add scoped skill management ([c078a8d](https://github.com/mrclrchtr/supi/commit/c078a8d52bcac396801fb8e83aa8bb0cc4f3c021))
+
+
+### Bug Fixes
+
+* **ask-user:** wrap mini-box body text ([2c018ae](https://github.com/mrclrchtr/supi/commit/2c018ae154c46bc73f03f7369e5f97d3b676ccd0))
+* **deps:** lock file maintenance ([bd7be34](https://github.com/mrclrchtr/supi/commit/bd7be34f77dd61969374dc55a42fae9bccf1f3fe))
+* **deps:** update dependency @types/jsdom to v30 ([f81eb14](https://github.com/mrclrchtr/supi/commit/f81eb147056644901742896b6a4e83cd9433897c))
+* **deps:** update dependency typebox to v1.3.11 ([0c04150](https://github.com/mrclrchtr/supi/commit/0c041506e1a7f72d0f0b2f62b6d893601fa42f15))
+* **deps:** update pi to v0.84.1 ([84bf770](https://github.com/mrclrchtr/supi/commit/84bf770ab35b1c6d64d86dcaeded2724761e0f98))
+* **prompt-suggestions:** wrap full ghost suggestions ([81169c1](https://github.com/mrclrchtr/supi/commit/81169c1b173d23b6c7f18c2afab36923c31bf882))
+* **skills:** use package name for config section ([5e287e8](https://github.com/mrclrchtr/supi/commit/5e287e8f4e5ec0fb17bdf7f78c3d9699deef15e5))
+* **web:** validate fetch timeout range ([8d192e8](https://github.com/mrclrchtr/supi/commit/8d192e808fbe360211b23045f9b6255605a1793e))
+
 ## [4.7.0](https://github.com/mrclrchtr/supi/compare/v4.6.0...v4.7.0) (2026-08-07)
 
 

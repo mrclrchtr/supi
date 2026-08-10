@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-core",
-  "version": "4.7.0",
+  "version": "4.8.0",
   "description": "Shared settings, configuration, reporting, and session infrastructure",
   "license": "MIT",
   "repository": {
