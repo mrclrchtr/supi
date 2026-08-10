@@ -2,7 +2,11 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createProfileSettingsSection, discoverProfileCatalogue } from "../../src/api.ts";
+import {
+  createProfileSettingsSection,
+  discoverProfileCatalogue,
+  resolveProfileDefinition,
+} from "../../src/api.ts";
 import { manifest, writeProfile } from "../helpers/profile-fixtures.ts";
 
 const temporaryDirectories: string[] = [];
@@ -129,6 +133,36 @@ describe("profile settings", () => {
       action: { kind: "unset" },
     });
     await expect(stat(join(projectRoot, "explore"))).rejects.toThrow();
+  });
+
+  it("applies saved model and thinking settings without a catalogue reload", async () => {
+    const paths = await roots();
+    const catalogue = await discoverProfileCatalogue({
+      cwd: paths.root,
+      agentDir: paths.agentDirectory,
+      packageDirectory: paths.packageDirectory,
+      projectTrusted: false,
+    });
+    const entry = catalogue.profiles[0];
+    if (!entry) throw new Error("expected explore profile");
+    const section = createProfileSettingsSection(entry, catalogue);
+
+    await section.apply({
+      scope: "global",
+      cwd: paths.root,
+      fieldKey: "model",
+      action: { kind: "set", value: "openai/gpt-5" },
+    });
+    await section.apply({
+      scope: "global",
+      cwd: paths.root,
+      fieldKey: "thinking",
+      action: { kind: "set", value: "high" },
+    });
+
+    expect(resolveProfileDefinition(entry, catalogue.sourceDirectories)).toMatchObject({
+      manifest: { model: "openai/gpt-5", thinking: "high" },
+    });
   });
 
   it("preserves existing manifest fields during a settings write", async () => {

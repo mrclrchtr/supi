@@ -24,7 +24,7 @@ This package is beta software. Its interfaces can change.
 - `supi_review_output` — read more parent-facing output
 - `supi_review_audit` — read local reviewer replays when audit is enabled
 
-Set **Agent tools** to off in `/supi-settings`, then run `/reload`, to remove the agent start and audit tools. The output tool and the commands stay available.
+Changes to **Agent tools** apply immediately. Turning this setting off removes the agent start and audit tools from the active tool set. The output tool and the commands stay available.
 
 ## Review input
 
@@ -127,7 +127,7 @@ Parent-facing output from `supi_review_run` or `/supi-review` is stored as a bou
 
 ## Local reviewer replay
 
-`review.auditEnabled` is off by default. Enable it, then run `/reload`, to record a protected local replay for each Reviewer Session. Replays expire after seven days. Normal review output includes only an opaque artifact id.
+`review.auditEnabled` is off by default. When **Agent tools** are on, enabling **Local reviewer replay** records a protected local replay for each Reviewer Session and activates `supi_review_audit` immediately. Replays expire after seven days. Normal review output includes only an opaque artifact id.
 
 ## Post-review behavior
 

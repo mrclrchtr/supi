@@ -19,12 +19,8 @@ import {
   type SettingsScope,
   SUPI_SETTINGS_COLLECT_EVENT,
 } from "@mrclrchtr/supi-core/settings";
-import { resolveProfileDefinition } from "./profile-catalogue.ts";
-import {
-  isCanonicalModel,
-  type ProfileCandidate,
-  validateProfileDirectory,
-} from "./profile-validation.ts";
+import { readCurrentProfileSources, resolveProfileDefinition } from "./profile-catalogue.ts";
+import { isCanonicalModel, type ProfileCandidate } from "./profile-validation.ts";
 import type {
   AgentThinkingLevel,
   ProfileCatalogue,
@@ -166,14 +162,12 @@ function resolveProfileSettings(
   thinkingInheritanceSource?: "global" | "default";
   diagnostics: ProfileDiagnostic[];
 } {
-  const candidates: ProfileCandidate[] = [];
-  const diagnostics: ProfileDiagnostic[] = [];
-  for (const source of applicableSources(scope)) {
-    const candidate = readSourceCandidate(entry, catalogue, source);
-    if (!candidate) continue;
-    candidates.push(candidate);
-    if (candidate.diagnostic) diagnostics.push(candidate.diagnostic);
-  }
+  const candidates = readCurrentProfileSources(entry.id, catalogue.sourceDirectories).filter(
+    (candidate) => applicableSources(scope).includes(candidate.source),
+  );
+  const diagnostics = candidates.flatMap((candidate) =>
+    candidate.diagnostic ? [candidate.diagnostic] : [],
+  );
 
   const model = resolveSetting(candidates, "model");
   const thinking = resolveSetting(candidates, "thinking");
@@ -196,28 +190,8 @@ function applicableSources(scope: SettingsScope): readonly ProfileSource[] {
   return scope === "project" ? ["package", "global", "project"] : ["package", "global"];
 }
 
-function readSourceCandidate(
-  entry: ProfileCatalogueEntry,
-  catalogue: ProfileCatalogue,
-  source: ProfileSource,
-): ProfileCandidate | undefined {
-  const root = sourceRoot(catalogue, source);
-  if (!root) return undefined;
-  const directory = entry.sources.find((candidate) => candidate.source === source)?.directory;
-  const profileDirectory = directory ?? join(root, entry.id);
-  if (!existsSync(profileDirectory)) return undefined;
-  return validateProfileDirectory(source, profileDirectory);
-}
-
 function sourceRoot(catalogue: ProfileCatalogue, source: ProfileSource): string | undefined {
-  switch (source) {
-    case "package":
-      return catalogue.sourceDirectories.package;
-    case "global":
-      return catalogue.sourceDirectories.global;
-    case "project":
-      return catalogue.sourceDirectories.project;
-  }
+  return catalogue.sourceDirectories[source];
 }
 
 function resolveSetting(

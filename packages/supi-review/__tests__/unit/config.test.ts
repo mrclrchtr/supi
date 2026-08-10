@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { writeSupiConfig } from "@mrclrchtr/supi-core/config";
+import { createPiMock } from "@mrclrchtr/supi-test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const settingsMocks = vi.hoisted(() => ({
@@ -118,5 +119,51 @@ describe("review config", () => {
       }),
     );
     expect(settingsMocks.register).toHaveBeenCalledOnce();
+  });
+
+  it("applies review tool availability changes to the current session", () => {
+    const homeDir = makeTempDir();
+    const cwd = path.join(homeDir, "repo");
+    fs.mkdirSync(cwd, { recursive: true });
+    const pi = createPiMock();
+    pi.setActiveTools(["read", "supi_review_output", "supi_review_run", "supi_review_audit"]);
+
+    try {
+      registerReviewSettings(pi as never, homeDir);
+      const options = settingsMocks.define.mock.calls.at(-1)?.[0] as
+        | { afterPersist?: (change: { cwd: string }) => void }
+        | undefined;
+
+      writeSupiConfig(
+        { section: REVIEW_CONFIG_SECTION, scope: "project", cwd },
+        { agentToolEnabled: false, auditEnabled: true },
+        { homeDir },
+      );
+      options?.afterPersist?.({ cwd });
+      expect(pi.getActiveTools()).toEqual(["read", "supi_review_output"]);
+
+      writeSupiConfig(
+        { section: REVIEW_CONFIG_SECTION, scope: "project", cwd },
+        { agentToolEnabled: true, auditEnabled: false },
+        { homeDir },
+      );
+      options?.afterPersist?.({ cwd });
+      expect(pi.getActiveTools()).toEqual(["read", "supi_review_output", "supi_review_run"]);
+
+      writeSupiConfig(
+        { section: REVIEW_CONFIG_SECTION, scope: "project", cwd },
+        { auditEnabled: true },
+        { homeDir },
+      );
+      options?.afterPersist?.({ cwd });
+      expect(pi.getActiveTools()).toEqual([
+        "read",
+        "supi_review_output",
+        "supi_review_run",
+        "supi_review_audit",
+      ]);
+    } finally {
+      fs.rmSync(homeDir, { recursive: true, force: true });
+    }
   });
 });

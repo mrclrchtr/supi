@@ -6,13 +6,13 @@ import { createPiMock, getHandlerOrThrow, getTools } from "@mrclrchtr/supi-test-
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  loadAgentConfig: vi.fn(() => ({ agentToolEnabled: true })),
   registerAgentSettings: vi.fn(),
+  syncAgentRunTool: vi.fn(),
 }));
 
 vi.mock("../../src/config.ts", () => ({
-  loadAgentConfig: mocks.loadAgentConfig,
   registerAgentSettings: mocks.registerAgentSettings,
+  syncAgentRunTool: mocks.syncAgentRunTool,
 }));
 
 import agentExtension from "../../src/extension.ts";
@@ -21,7 +21,6 @@ import { agentProfileCatalogueStore } from "../../src/session.ts";
 describe("supi-agent extension", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.loadAgentConfig.mockReturnValue({ agentToolEnabled: true });
   });
 
   it("warns about unavailable profile sources at startup", async () => {
@@ -54,8 +53,7 @@ describe("supi-agent extension", () => {
     }
   });
 
-  it("does not register supi_agent_run when Agent Run tools are disabled", async () => {
-    mocks.loadAgentConfig.mockReturnValue({ agentToolEnabled: false });
+  it("registers the Agent Run tool before it syncs current availability", async () => {
     const pi = createPiMock();
     agentExtension(pi as unknown as ExtensionAPI);
     const sessionStart = getHandlerOrThrow(pi, "session_start");
@@ -67,7 +65,8 @@ describe("supi-agent extension", () => {
       ui: { notify: vi.fn() },
     } as never);
 
-    expect(getTools(pi).some((tool) => tool.name === "supi_agent_run")).toBe(false);
+    expect(getTools(pi).some((tool) => tool.name === "supi_agent_run")).toBe(true);
+    expect(mocks.syncAgentRunTool).toHaveBeenCalledWith(pi, process.cwd());
     await sessionShutdown({ type: "session_shutdown", reason: "quit" }, {} as never);
   });
 

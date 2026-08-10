@@ -131,5 +131,5 @@ The typed result of running one isolated child session (planner or reviewer): a 
 _Avoid_: reviewer output, run result, result-builder callbacks
 
 **Local Reviewer Replay**:
-A private local artifact for tuning a Reviewer Session. It retains provider-visible messages and tool output, packet/protocol text, timing, usage, and the Review Workspace Receipt for seven days; thinking blocks and thought signatures are omitted. It is disabled by default; enabling `review.auditEnabled` records every task and registers `supi_review_audit` after reload.
+A private local artifact for tuning a Reviewer Session. It retains provider-visible messages and tool output, packet/protocol text, timing, usage, and the Review Workspace Receipt for seven days; thinking blocks and thought signatures are omitted. It is disabled by default; enabling `review.auditEnabled` records every task and activates `supi_review_audit` immediately while Agent tools are on.
 _Avoid_: normal review output, child diagnostics, permanent transcript

@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   resolveAgentReviewModel: vi.fn(),
   loadReviewConfig: vi.fn(),
   registerReviewSettings: vi.fn(),
+  syncReviewAgentTools: vi.fn(),
   queuePostReviewTurn: vi.fn(),
   listLocalBranches: vi.fn(),
   listRecentCommits: vi.fn(),
@@ -34,6 +35,7 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
 vi.mock("../../src/config.ts", () => ({
   loadReviewConfig: mocks.loadReviewConfig,
   registerReviewSettings: mocks.registerReviewSettings,
+  syncReviewAgentTools: mocks.syncReviewAgentTools,
 }));
 vi.mock("../../src/model.ts", () => ({
   getSelectableReviewModels: mocks.getSelectableReviewModels,

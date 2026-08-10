@@ -26,6 +26,8 @@ export interface ReviewConfig extends Record<string, unknown> {
 
 /** Shared SuPi configuration section owned by this package. */
 export const REVIEW_CONFIG_SECTION = "review";
+const REVIEW_RUN_TOOL_NAME = "supi_review_run";
+const REVIEW_AUDIT_TOOL_NAME = "supi_review_audit";
 /** Availability-safe defaults; users can configure a separate lightweight Planner model. */
 export const REVIEW_DEFAULTS: ReviewConfig = {
   agentToolEnabled: true,
@@ -59,6 +61,23 @@ export function loadReviewConfig(cwd: string, homeDir?: string): ReviewConfig {
   };
 }
 
+/** Apply configured Review tool availability to the current PI session. */
+export function syncReviewAgentTools(pi: ExtensionAPI, cwd: string, homeDir?: string): void {
+  const currentTools = pi.getActiveTools();
+  const nextTools = currentTools.filter(
+    (name) => name !== REVIEW_RUN_TOOL_NAME && name !== REVIEW_AUDIT_TOOL_NAME,
+  );
+  const config = loadReviewConfig(cwd, homeDir);
+  if (config.agentToolEnabled) nextTools.push(REVIEW_RUN_TOOL_NAME);
+  if (config.agentToolEnabled && config.auditEnabled) nextTools.push(REVIEW_AUDIT_TOOL_NAME);
+  if (
+    nextTools.length !== currentTools.length ||
+    nextTools.some((name, index) => name !== currentTools[index])
+  ) {
+    pi.setActiveTools(nextTools);
+  }
+}
+
 /** Contribute reviewer and Planner model pickers to `/supi-settings`. */
 export function registerReviewSettings(pi: ExtensionAPI, homeDir?: string): void {
   const currentOption = {
@@ -77,7 +96,7 @@ export function registerReviewSettings(pi: ExtensionAPI, homeDir?: string): void
           kind: "boolean",
           key: "agentToolEnabled",
           label: "Agent tools",
-          description: "Enable review start and audit tools for agents. Requires /reload.",
+          description: "Enable review start and audit tools for agents.",
         },
         {
           kind: "modelPicker",
@@ -113,10 +132,10 @@ export function registerReviewSettings(pi: ExtensionAPI, homeDir?: string): void
           kind: "boolean" as const,
           key: "auditEnabled",
           label: "Local reviewer replay",
-          description:
-            "Record every reviewer's raw messages and tool output locally for seven days. Requires /reload.",
+          description: "Record every reviewer's raw messages and tool output for seven days.",
         },
       ],
+      afterPersist: ({ cwd }) => syncReviewAgentTools(pi, cwd, homeDir),
       ...(homeDir ? { homeDir } : {}),
     }),
   );

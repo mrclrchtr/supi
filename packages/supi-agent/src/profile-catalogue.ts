@@ -48,17 +48,26 @@ export interface DiscoverProfileCatalogueOptions {
   readonly packageDirectory?: string;
 }
 
-/** Resolve one catalogue entry into a complete effective Agent Profile. */
+/**
+ * Resolve one catalogue entry into a complete effective Agent Profile.
+ *
+ * When source directories are supplied, Model and Thinking settings are read
+ * again so changes from `/supi-settings` apply to the next Agent Run.
+ */
 export function resolveProfileDefinition(
   entry: ProfileCatalogueEntry,
+  sourceDirectories?: ProfileSourceDirectories,
 ): AgentProfile | ProfileDiagnostic {
   const selected = new Map<
     keyof AgentProfileManifest,
     { value: unknown; candidate: ProfileCandidate }
   >();
+  const currentSettingsSources = sourceDirectories
+    ? readCurrentProfileSources(entry.id, sourceDirectories)
+    : entry.sources;
 
   for (const field of PROFILE_MANIFEST_FIELDS) {
-    const value = resolveField(entry.sources, field);
+    const value = resolveField(profileSourcesForField(entry, currentSettingsSources, field), field);
     if (value) selected.set(field, value);
   }
 
@@ -275,6 +284,14 @@ function selectedValue<T>(
   return selection.value as T;
 }
 
+function profileSourcesForField(
+  entry: ProfileCatalogueEntry,
+  currentSettingsSources: readonly ProfileCandidate[],
+  field: keyof AgentProfileManifest,
+): readonly ProfileCandidate[] {
+  return field === "model" || field === "thinking" ? currentSettingsSources : entry.sources;
+}
+
 function resolveField(
   sources: readonly ProfileCandidate[],
   field: keyof AgentProfileManifest,
@@ -332,6 +349,33 @@ function readProfileSource(source: ProfileSourceDirectory): ProfileCandidate[] {
 
 function compareProfileIds(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
+}
+
+/** Read the current package, global, and trusted-project sources for one Profile ID. */
+export function readCurrentProfileSources(
+  profileId: string,
+  sourceDirectories: ProfileSourceDirectories,
+): ProfileCandidate[] {
+  return SOURCE_ORDER.flatMap((source) => {
+    const root = sourceDirectory(sourceDirectories, source);
+    if (!root) return [];
+    const directory = join(root, profileId);
+    return isDirectory(directory) ? [validateProfileDirectory(source, directory)] : [];
+  });
+}
+
+function sourceDirectory(
+  directories: ProfileSourceDirectories,
+  source: ProfileSource,
+): string | undefined {
+  switch (source) {
+    case "package":
+      return directories.package;
+    case "global":
+      return directories.global;
+    case "project":
+      return directories.project;
+  }
 }
 
 function isDirectory(path: string): boolean {

@@ -6,7 +6,7 @@ import type {
   AgentRunRegistrySnapshot,
   BatchTaskResult,
 } from "../tool/registry.ts";
-import type { ProfileCatalogue, ProfileDiagnostic } from "../types.ts";
+import type { ProfileCatalogue, ProfileDiagnostic, ProfileSourceDirectories } from "../types.ts";
 import { AgentsDialog } from "./agents-overlay.ts";
 import type {
   AgentsOverlayData,
@@ -101,7 +101,7 @@ function buildOverlayData(
             catalogue.profileIds.includes(profile.id) ||
             "code" in resolveProfileDefinition(profile),
         )
-        .map(profileView) ?? [],
+        .map((profile) => profileView(profile, catalogue.sourceDirectories)) ?? [],
     diagnostics: diagnostics.visible,
     omittedDiagnosticCount: diagnostics.omitted,
     omittedProfileCount: catalogue?.omittedProfileCount ?? 0,
@@ -133,8 +133,11 @@ function completedRun(
   };
 }
 
-function profileView(entry: ProfileCatalogue["profiles"][number]): AgentsOverlayProfile {
-  const profile = resolveProfileDefinition(entry);
+function profileView(
+  entry: ProfileCatalogue["profiles"][number],
+  sourceDirectories: ProfileSourceDirectories,
+): AgentsOverlayProfile {
+  const profile = resolveProfileDefinition(entry, sourceDirectories);
   if ("code" in profile) {
     return {
       id: entry.id,

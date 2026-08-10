@@ -49,7 +49,7 @@ export function preflightDelegationBatch(
       });
       continue;
     }
-    const profile = resolveProfileDefinition(profileEntry);
+    const profile = resolveProfileDefinition(profileEntry, catalogue.sourceDirectories);
     if ("code" in profile) {
       errors.push({ taskId: task.id, profileId: task.profile, message: profile.message });
       continue;
