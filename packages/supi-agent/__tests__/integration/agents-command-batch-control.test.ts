@@ -79,10 +79,12 @@ afterEach(async () => {
   agentProfileCatalogueStore.clear();
   mocks.handles.length = 0;
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
 });
 
 describe("/agents selected-run control with an active Delegation Batch", () => {
   it("stops only the selected run while the outer tool waits for its sibling", async () => {
+    vi.stubEnv("HOME", "/tmp/supi-agent-batch-control-test-home");
     const pi = createPiMock();
     agentExtension(pi as unknown as ExtensionAPI);
     const start = getHandlerOrThrow(pi, "session_start");

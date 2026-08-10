@@ -134,6 +134,7 @@ export async function registerAgentRunToolForTest(
   shutdowns: Shutdown[],
 ): Promise<RegisteredAgentRunTool> {
   vi.stubEnv("PI_CODING_AGENT_DIR", "/tmp/supi-agent-boundary-test-agent-dir");
+  vi.stubEnv("HOME", "/tmp/supi-agent-boundary-test-home");
   const pi = createPiMock();
   extension(pi as unknown as ExtensionAPI);
   const sessionStart = getHandlerOrThrow(pi, "session_start");
