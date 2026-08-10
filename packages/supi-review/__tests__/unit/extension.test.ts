@@ -15,7 +15,7 @@ vi.mock("../../src/config.ts", () => ({
 import reviewExtension from "../../src/review.ts";
 
 describe("supi-review extension", () => {
-  it("registers Review tools before it syncs current availability", () => {
+  it("waits for session start before it syncs Review tool availability", async () => {
     const pi = createPiMock();
     reviewExtension(pi as unknown as ExtensionAPI);
 
@@ -26,8 +26,11 @@ describe("supi-review extension", () => {
     ]);
     expect(getTools(pi).some((tool) => tool.name === "supi_review_prepare")).toBe(false);
     expect(getTool(pi, "supi_review_output")).toBeDefined();
-    expect(mocks.syncReviewAgentTools).toHaveBeenCalledWith(pi, process.cwd());
+    expect(mocks.syncReviewAgentTools).not.toHaveBeenCalled();
     expect(pi.commands.has("supi-review")).toBe(true);
     expect(pi.commands.has("supi-review-cleanup")).toBe(true);
+
+    await pi.emit("session_start", { type: "session_start", reason: "startup" }, { cwd: "/repo" });
+    expect(mocks.syncReviewAgentTools).toHaveBeenCalledWith(pi, "/repo");
   });
 });

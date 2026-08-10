@@ -20,7 +20,7 @@ export default function reviewExtension(pi: ExtensionAPI): void {
   registerReviewOutputTool(pi, artifactStore);
   registerAgentReviewTools(pi, artifactStore, auditStore);
   registerReviewAuditTool(pi, auditStore);
-  syncReviewAgentTools(pi, process.cwd());
+  pi.on("session_start", (_event, ctx) => syncReviewAgentTools(pi, ctx.cwd));
   registerReviewWorkspaceCleanupCommand(pi);
 
   pi.registerMessageRenderer("supi-review", (message, options, theme) => {
