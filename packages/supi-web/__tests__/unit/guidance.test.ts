@@ -1,3 +1,4 @@
+import { Value } from "typebox/value";
 import { describe, expect, it, vi } from "vitest";
 
 const { spawnSync } = vi.hoisted(() => ({
@@ -8,8 +9,9 @@ vi.mock("node:child_process", () => ({
   spawnSync,
 }));
 
+import { FETCH_TIMEOUT_MAX_MS } from "../../src/fetch.ts";
 import { getWebToolPromptSurface } from "../../src/tool/guidance.ts";
-import { WEB_TOOL_SPECS } from "../../src/tool/tool-specs.ts";
+import { WEB_FETCH_MD_TOOL_NAME, WEB_TOOL_SPECS } from "../../src/tool/tool-specs.ts";
 
 const MODEL_SURFACE_CHAR_BUDGET = 950;
 
@@ -38,5 +40,17 @@ describe("web tool guidance", () => {
         expect(guideline).toContain(spec.name);
       }
     }
+  });
+
+  it("accepts only supported fetch timeout values", () => {
+    const fetchSpec = WEB_TOOL_SPECS.find((spec) => spec.name === WEB_FETCH_MD_TOOL_NAME);
+    if (!fetchSpec) throw new Error("The web fetch tool specification is missing.");
+
+    const input = (timeout_ms: number) => ({ url: "https://example.com", timeout_ms });
+    expect(Value.Check(fetchSpec.parameters, input(0))).toBe(true);
+    expect(Value.Check(fetchSpec.parameters, input(FETCH_TIMEOUT_MAX_MS))).toBe(true);
+    expect(Value.Check(fetchSpec.parameters, input(-1))).toBe(false);
+    expect(Value.Check(fetchSpec.parameters, input(1.5))).toBe(false);
+    expect(Value.Check(fetchSpec.parameters, input(FETCH_TIMEOUT_MAX_MS + 1))).toBe(false);
   });
 });

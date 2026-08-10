@@ -6,6 +6,8 @@
 const USER_AGENT = "Mozilla/5.0 (compatible; supi-web/1.0; +https://github.com/mrclrchtr/supi)";
 const ACCEPT_SIBLING = "text/markdown,text/plain;q=0.9,*/*;q=0.1";
 const DEFAULT_TIMEOUT_MS = 30_000;
+/** Largest timeout accepted by {@link AbortSignal.timeout}. */
+export const FETCH_TIMEOUT_MAX_MS = 4_294_967_295;
 const SNIFF_BYTES = 8192;
 
 /** Validated URL result. */
@@ -24,6 +26,7 @@ export interface FetchResult {
 
 /** Fetch options. */
 export interface FetchOptions {
+  /** Integer timeout from 0 through 4,294,967,295 milliseconds. */
   timeoutMs?: number;
   signal?: AbortSignal;
 }
@@ -48,6 +51,7 @@ export async function fetchWithNegotiation(
   options: FetchOptions = {},
 ): Promise<FetchResult> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  validateTimeoutMs(timeoutMs);
   const { signal } = options;
 
   // 1. Try HEAD negotiation for Markdown
@@ -298,6 +302,14 @@ export class FetchError extends Error {
     super(message, options);
     this.name = "FetchError";
     this.status = options.status;
+  }
+}
+
+function validateTimeoutMs(timeoutMs: number): void {
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 0 || timeoutMs > FETCH_TIMEOUT_MAX_MS) {
+    throw new FetchError(
+      `Fetch timeout must be an integer from 0 through ${FETCH_TIMEOUT_MAX_MS}ms`,
+    );
   }
 }
 

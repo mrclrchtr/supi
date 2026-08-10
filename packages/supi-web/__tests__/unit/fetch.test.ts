@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  FETCH_TIMEOUT_MAX_MS,
   FetchError,
   fetchWithNegotiation,
   guessLanguage,
@@ -156,6 +157,22 @@ describe("fetchWithNegotiation", () => {
       message: "Fetch timed out after 5ms",
     });
   });
+
+  it.each([-1, 1.5, FETCH_TIMEOUT_MAX_MS + 1])(
+    "rejects unsupported timeout %s before fetching",
+    async (timeoutMs) => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(
+        fetchWithNegotiation("https://example.com/readme", { timeoutMs }),
+      ).rejects.toMatchObject({
+        name: "FetchError",
+        message: `Fetch timeout must be an integer from 0 through ${FETCH_TIMEOUT_MAX_MS}ms`,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("isPlainTextContentType", () => {

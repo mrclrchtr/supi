@@ -1,5 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, type TSchema, Type } from "typebox";
+import { FETCH_TIMEOUT_MAX_MS } from "../fetch.ts";
 import { MODEL_OUTPUT_LIMIT_DESCRIPTION } from "./output.ts";
 
 export const WEB_FETCH_MD_TOOL_NAME = "web_fetch_md";
@@ -27,7 +28,14 @@ const WebFetchMdParameters = Type.Object(
     url: Type.String({ description: "Public http(s) URL" }),
     output_mode: Type.Optional(OutputModeEnum),
     abs_links: Type.Optional(Type.Boolean({ description: "Absolute links/images", default: true })),
-    timeout_ms: Type.Optional(Type.Number({ description: "Fetch timeout (ms)", default: 30_000 })),
+    timeout_ms: Type.Optional(
+      Type.Integer({
+        description: "Fetch timeout (ms)",
+        default: 30_000,
+        minimum: 0,
+        maximum: FETCH_TIMEOUT_MAX_MS,
+      }),
+    ),
   },
   { additionalProperties: false },
 );
