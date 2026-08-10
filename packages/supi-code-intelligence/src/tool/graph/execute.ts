@@ -3,8 +3,8 @@
 import type { GraphWorkflowInput, RequestedGraphRelation } from "../../session/graph-types.ts";
 import type { GraphTargetInput } from "../../session/target-input.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
-import { searchErrorResult } from "../infra/error-results.ts";
 import { toWorkflowControl } from "../infra/workflow-control.ts";
+import { searchErrorResult } from "../result/errors.ts";
 import { assembleGraphResult } from "../result/graph.ts";
 import { renderGraphResult } from "./markdown.ts";
 

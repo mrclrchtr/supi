@@ -2,8 +2,8 @@
 
 import type { HealthSection, HealthWorkflowInput } from "../../session/health-types.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
-import { unavailableHealthDetails } from "../infra/error-results.ts";
 import { toWorkflowControl } from "../infra/workflow-control.ts";
+import { healthErrorResult } from "../result/errors.ts";
 import { assembleHealthResult } from "../result/health.ts";
 import { renderHealthResult } from "./markdown.ts";
 
@@ -21,10 +21,7 @@ export async function executeHealthTool(
   const outcome = await ctx.session.health(params as HealthWorkflowInput, toWorkflowControl(ctx));
   if (outcome.kind === "unavailable") throw new Error(outcome.reason);
   if (outcome.kind === "invalid-input") {
-    return {
-      content: `**Error:** ${outcome.message}`,
-      details: unavailableHealthDetails("invalid input"),
-    };
+    return healthErrorResult(`**Error:** ${outcome.message}`, "invalid input");
   }
 
   const assembly = assembleHealthResult(outcome.data);

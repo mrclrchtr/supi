@@ -6,8 +6,8 @@ import type {
 } from "../../session/refactor-types.ts";
 import type { RefactorTargetInput } from "../../session/target-input.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
-import { unavailableSearchDetails } from "../infra/error-results.ts";
 import { toWorkflowControl } from "../infra/workflow-control.ts";
+import { searchErrorResult } from "../result/errors.ts";
 import { assembleRefactorPlanDetails } from "../result/refactor.ts";
 import { renderRefactorPlanResult } from "./markdown.ts";
 
@@ -27,10 +27,9 @@ export async function executeRefactorPlanTool(
   );
   if (outcome.kind === "unavailable") throw new Error(outcome.reason);
   if (outcome.kind === "invalid-input") {
-    return {
-      content: `**Error:** ${outcome.message}`,
-      details: unavailableSearchDetails(null, ["Fix the target or operation and retry"]),
-    };
+    return searchErrorResult(`**Error:** ${outcome.message}`, {
+      nextQueries: ["Fix the target or operation and retry"],
+    });
   }
   if (outcome.kind === "ambiguous") {
     const candidates = outcome.candidates
@@ -39,10 +38,9 @@ export async function executeRefactorPlanTool(
           `${index + 1}. ${candidate.description} (${candidate.file}:${candidate.line})`,
       )
       .join("\n");
-    return {
-      content: `**Refactor ambiguous:**\n${candidates}`,
-      details: unavailableSearchDetails(null, ["Use a precise target handle or anchor"]),
-    };
+    return searchErrorResult(`**Refactor ambiguous:**\n${candidates}`, {
+      nextQueries: ["Use a precise target handle or anchor"],
+    });
   }
 
   const assembly = assembleRefactorPlanDetails(outcome.plan, ctx.cwd);

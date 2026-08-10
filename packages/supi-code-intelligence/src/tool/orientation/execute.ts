@@ -5,8 +5,8 @@ import type {
   OrientationWorkflowInput,
 } from "../../session/orientation-types.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
-import { unavailableContextDetails } from "../infra/error-results.ts";
 import { toWorkflowControl } from "../infra/workflow-control.ts";
+import { contextErrorResult } from "../result/errors.ts";
 import { assembleOrientationDetails, assembleOrientationResult } from "../result/orientation.ts";
 import { renderOrientationResult } from "./markdown.ts";
 
@@ -25,10 +25,9 @@ export async function executeOrientationTool(
   );
   if (outcome.kind === "unavailable") throw new Error(outcome.reason);
   if (outcome.kind === "invalid-input") {
-    return {
-      content: `**Error:** ${outcome.message}`,
-      details: unavailableContextDetails(["Choose an existing path, module, or precise target"]),
-    };
+    return contextErrorResult(`**Error:** ${outcome.message}`, {
+      nextQueries: ["Choose an existing path, module, or precise target"],
+    });
   }
   if (outcome.kind === "disambiguation" || outcome.kind === "kind-mismatch") {
     const candidates = outcome.candidates ?? [];

@@ -3,8 +3,8 @@
 import type { InspectWorkflowInput } from "../../session/inspect-types.ts";
 import type { SourcePointInput } from "../../session/target-input.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
-import { unavailableInspectDetails } from "../infra/error-results.ts";
 import { toWorkflowControl } from "../infra/workflow-control.ts";
+import { inspectErrorResult } from "../result/errors.ts";
 import { assembleInspectResult } from "../result/inspect.ts";
 import { renderInspectResult } from "./markdown.ts";
 
@@ -20,12 +20,10 @@ export async function executeInspectTool(
   const outcome = await ctx.session.inspect(params as InspectWorkflowInput, toWorkflowControl(ctx));
   if (outcome.kind === "unavailable") throw new Error(outcome.reason);
   if (outcome.kind === "invalid-input") {
-    return {
-      content: `**Error:** ${outcome.message}`,
-      details: unavailableInspectDetails("invalid input", [
-        "Provide an existing file and exact 1-based point",
-      ]),
-    };
+    return inspectErrorResult(`**Error:** ${outcome.message}`, {
+      focusTarget: "invalid input",
+      nextQueries: ["Provide an existing file and exact 1-based point"],
+    });
   }
 
   const assembly = assembleInspectResult(outcome.data, outcome.nextQueries);

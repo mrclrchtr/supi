@@ -7,16 +7,9 @@
  * capability failures may still throw so PI marks the tool call as failed.
  */
 
-import type {
-  CodeIntelResult,
-  ContextDetails,
-  HealthDetails,
-  InspectDetails,
-  ResolveDetails,
-  SearchDetails,
-} from "../../types/index.ts";
+import type { CodeIntelResult } from "../../types/index.ts";
 
-// ── Combined error-result factories (preferred) ──────────────────────
+// ── Error-result factories ──────────────────────────────────────────
 
 /** Full error result for search-family tools (code_find, code_graph, code_refactor_plan). */
 export function searchErrorResult(
@@ -54,27 +47,6 @@ export function contextErrorResult(
         requestedSections: [],
         renderedSections: [],
         omittedCount: 0,
-        nextQueries: opts?.nextQueries ?? [],
-      },
-    },
-  };
-}
-
-/** Full error result for code_resolve. */
-export function resolveErrorResult(
-  content: string,
-  opts?: { nextQueries?: string[] },
-): CodeIntelResult {
-  return {
-    content,
-    details: {
-      type: "resolve" as const,
-      data: {
-        resultKind: "unavailable" as const,
-        confidence: "unavailable" as const,
-        targetCount: 0,
-        omittedCount: 0,
-        targets: [],
         nextQueries: opts?.nextQueries ?? [],
       },
     },
@@ -129,57 +101,5 @@ export function healthErrorResult(content: string, reason?: string): CodeIntelRe
         serverCount: 0,
       },
     },
-  };
-}
-
-// ── Details-only helpers (thin wrappers — prefer combined factories above) ─
-
-export function unavailableSearchDetails(
-  scope: string | null,
-  nextQueries: string[],
-): { type: "search"; data: SearchDetails } {
-  return searchErrorResult("", { scope, nextQueries }).details as {
-    type: "search";
-    data: SearchDetails;
-  };
-}
-
-export function unavailableContextDetails(nextQueries: string[]): {
-  type: "context";
-  data: ContextDetails;
-} {
-  return contextErrorResult("", { nextQueries }).details as {
-    type: "context";
-    data: ContextDetails;
-  };
-}
-
-export function unavailableResolveDetails(nextQueries: string[]): {
-  type: "resolve";
-  data: ResolveDetails;
-} {
-  return resolveErrorResult("", { nextQueries }).details as {
-    type: "resolve";
-    data: ResolveDetails;
-  };
-}
-
-export function unavailableInspectDetails(
-  focusTarget: string,
-  nextQueries: string[],
-): { type: "inspect"; data: InspectDetails } {
-  return inspectErrorResult("", { focusTarget, nextQueries }).details as {
-    type: "inspect";
-    data: InspectDetails;
-  };
-}
-
-export function unavailableHealthDetails(reason: string): {
-  type: "health";
-  data: HealthDetails;
-} {
-  return healthErrorResult("", reason).details as {
-    type: "health";
-    data: HealthDetails;
   };
 }

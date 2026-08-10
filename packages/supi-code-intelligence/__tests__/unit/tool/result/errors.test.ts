@@ -3,19 +3,12 @@ import {
   contextErrorResult,
   healthErrorResult,
   inspectErrorResult,
-  resolveErrorResult,
   searchErrorResult,
-  unavailableContextDetails,
-  unavailableHealthDetails,
-  unavailableInspectDetails,
-  unavailableResolveDetails,
-  unavailableSearchDetails,
 } from "../../../../src/tool/result/errors.ts";
 import type {
   ContextDetails,
   HealthDetails,
   InspectDetails,
-  ResolveDetails,
   SearchDetails,
 } from "../../../../src/types/index.ts";
 
@@ -54,19 +47,6 @@ describe("error result factories", () => {
       expect(data.requestedSections).toEqual([]);
       expect(data.renderedSections).toEqual([]);
       expect(data.omittedCount).toBe(0);
-      expect(data.nextQueries).toEqual(["next"]);
-    });
-
-    it("resolveErrorResult sets resolve-type details", () => {
-      const result = resolveErrorResult("msg", { nextQueries: ["next"] });
-      const data = result.details!.data as ResolveDetails;
-
-      expect(result.content).toBe("msg");
-      expect(result.details?.type).toBe("resolve");
-      expect(data.confidence).toBe("unavailable");
-      expect(data.targetCount).toBe(0);
-      expect(data.omittedCount).toBe(0);
-      expect(data.targets).toEqual([]);
       expect(data.nextQueries).toEqual(["next"]);
     });
 
@@ -117,50 +97,6 @@ describe("error result factories", () => {
         kind: "unavailable",
         reason: "upstream failure",
       });
-    });
-  });
-
-  describe("details-only wrappers", () => {
-    it("unavailableSearchDetails delegates to searchErrorResult with empty content", () => {
-      const details = unavailableSearchDetails("src", ["retry"]);
-      const data = details.data as SearchDetails;
-
-      expect(details.type).toBe("search");
-      expect(data.confidence).toBe("unavailable");
-      expect(data.scope).toBe("src");
-      expect(data.nextQueries).toEqual(["retry"]);
-    });
-
-    it("unavailableContextDetails delegates to contextErrorResult", () => {
-      const details = unavailableContextDetails(["next"]);
-      const data = details.data as ContextDetails;
-
-      expect(details.type).toBe("context");
-      expect(data.nextQueries).toEqual(["next"]);
-    });
-
-    it("unavailableResolveDetails delegates to resolveErrorResult", () => {
-      const details = unavailableResolveDetails(["next"]);
-      const data = details.data as ResolveDetails;
-
-      expect(details.type).toBe("resolve");
-      expect(data.targets).toEqual([]);
-    });
-
-    it("unavailableInspectDetails delegates to inspectErrorResult", () => {
-      const details = unavailableInspectDetails("src/a.ts:2:4", ["next"]);
-      const data = details.data as InspectDetails;
-
-      expect(details.type).toBe("inspect");
-      expect(data.focusTarget).toBe("src/a.ts:2:4");
-    });
-
-    it("unavailableHealthDetails delegates to healthErrorResult", () => {
-      const details = unavailableHealthDetails("no LSP");
-      const data = details.data as HealthDetails;
-
-      expect(details.type).toBe("health");
-      expect(data.semanticState).toEqual({ kind: "unavailable", reason: "no LSP" });
     });
   });
 });
