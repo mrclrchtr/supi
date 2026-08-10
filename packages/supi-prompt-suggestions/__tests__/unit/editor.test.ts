@@ -1,4 +1,4 @@
-import { CURSOR_MARKER } from "@earendil-works/pi-tui";
+import { CURSOR_MARKER, visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it, vi } from "vitest";
 import { GhostTextEditor } from "../../src/editor/editor.ts";
 
@@ -83,17 +83,34 @@ describe("GhostTextEditor rendering", () => {
     expect(line).toContain("\x1b[2msuggest\x1b[0m");
   });
 
-  it("truncates only the visual ghost preview with an ellipsis", () => {
+  it("wraps a long suggestion and renders all of it", () => {
     const editor = makeEditor();
     editor.focused = true;
     const suggestion = "alpha beta gamma delta epsilon";
     editor.setSuggestion(suggestion);
 
     const result = editor.render(20);
-    const line = result.find((l) => l.includes(CURSOR_MARKER));
 
-    expect(line).toContain("…");
-    expect(line).not.toContain(suggestion);
+    expect(result.length).toBeGreaterThan(3);
+    for (const word of suggestion.split(" ")) {
+      expect(result.some((line) => line.includes(word))).toBe(true);
+    }
+    expect(result.some((line) => line.includes("…"))).toBe(false);
+    expect(result.slice(1, -1).every((line) => visibleWidth(line) <= 20)).toBe(true);
+  });
+
+  it("renders explicit suggestion line breaks", () => {
+    const editor = makeEditor();
+    editor.focused = true;
+    editor.setSuggestion("first line\nsecond line");
+
+    const result = editor.render(80);
+    const firstLine = result.findIndex((line) => line.includes("first line"));
+    const secondLine = result.findIndex((line) => line.includes("second line"));
+
+    expect(firstLine).toBeGreaterThan(0);
+    expect(secondLine).toBe(firstLine + 1);
+    expect(result.some((line) => line.includes("\n"))).toBe(false);
   });
 
   it("does not inject ghost when CURSOR_MARKER is absent", () => {
@@ -129,7 +146,7 @@ describe("GhostTextEditor input handling", () => {
     expect(cbs.onAccept).toHaveBeenCalledWith("suggest");
   });
 
-  it("inserts the full suggestion even when the visual preview would be truncated", () => {
+  it("inserts the full suggestion after a wrapped preview", () => {
     const cbs = makeCallbacks();
     const editor = makeEditor(cbs);
     const suggestion = "alpha beta gamma delta epsilon";

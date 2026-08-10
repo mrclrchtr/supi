@@ -11,8 +11,8 @@ A generated candidate user prompt offered after an assistant response for the us
 _Avoid_: next prompt, auto prompt, generated prompt, prefilled prompt
 
 **Ghost text**:
-A presentation of a prompt suggestion as dim inline preview text in the editor that is not part of the editor contents until accepted. Ghost text may truncate the visual preview for display, but accepting it inserts the underlying prompt suggestion rather than the truncated preview.
-_Avoid_: treating ghost text as editor text, autocomplete item, prefill, treating visual truncation as prompt content
+A presentation of a prompt suggestion as dim preview text in the editor that is not part of the editor contents until accepted. Ghost text can wrap across visual lines to show the full prompt suggestion. Accepting it inserts the underlying prompt suggestion.
+_Avoid_: treating ghost text as editor text, autocomplete item, or prefill
 
 **Suppressed prompt suggestion**:
 A ready prompt suggestion retained while its ghost text is hidden because the user entered editor text. It remains recoverable and is not an explicit dismissal.

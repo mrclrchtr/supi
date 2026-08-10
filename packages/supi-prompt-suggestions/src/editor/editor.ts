@@ -14,8 +14,7 @@ import {
   type EditorTheme,
   matchesKey,
   type TUI,
-  truncateToWidth,
-  visibleWidth,
+  wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -119,73 +118,15 @@ export class GhostTextEditor extends CustomEditor {
     const markerLine = lines[markerIndex];
     if (!markerLine) return lines;
 
-    // Cap ghost text to at most half the terminal width.
-    const cursorPos = markerLine.indexOf(CURSOR_MARKER);
-    const available = width - visibleWidth(markerLine.slice(0, cursorPos));
-    const maxGhost = Math.min(available - 1, Math.floor(width / 2));
-    if (maxGhost <= 0) return lines;
-    const plainSuggestion = truncateGhostPreview(this.suggestion, maxGhost);
-    if (!plainSuggestion) return lines;
-    const ghost = `\x1b[2m${plainSuggestion}\x1b[0m`;
-    const gw = visibleWidth(plainSuggestion);
-
-    // Shrink the line first so ghost addition stays within terminal width.
-    const shrunk = truncateToWidth(markerLine, width - gw, "");
-    if (!shrunk.includes(CURSOR_MARKER)) return lines;
-
-    const insertPos = ghostInsertPosition(shrunk);
-
-    lines[markerIndex] = shrunk.slice(0, insertPos) + ghost + shrunk.slice(insertPos);
+    const ghost = `\x1b[2m${this.suggestion}\x1b[0m`;
+    const wrapped = wrapTextWithAnsi(`${markerLine.trimEnd()}${ghost}`, width);
+    lines.splice(markerIndex, 1, ...wrapped);
     return lines;
   }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-/**
- * Find the character position where ghost text should be inserted on
- * a line containing {@link CURSOR_MARKER}.
- *
- * The ghost text is inserted after the visual cursor block emitted by
- * `CustomEditor`.  Since the cursor is rendered as an inverse-video span
- * bounded by `\x1b[7m` … `\x1b[0m`, we search for the reset escape after
- * the cursor marker to skip the entire block.
- *
- * @remarks
- * This depends on `CustomEditor`'s internal ANSI encoding of the cursor.
- * If the upstream cursor rendering changes, this helper must be updated.
- */
-function ghostInsertPosition(line: string): number {
-  const cursorIdx = line.indexOf(CURSOR_MARKER);
-  if (cursorIdx === -1) return 0;
-
-  const afterMarker = line.slice(cursorIdx + CURSOR_MARKER.length);
-  const inverseEnd = afterMarker.indexOf("\x1b[0m");
-  return cursorIdx + CURSOR_MARKER.length + (inverseEnd >= 0 ? inverseEnd + 4 : 0);
-}
-
 function findCursorMarkerLine(lines: string[]): number {
-  return lines.findIndex((l) => l.includes(CURSOR_MARKER));
-}
-
-function truncateGhostPreview(text: string, maxWidth: number): string {
-  if (maxWidth <= 0) return "";
-  if (visibleWidth(text) <= maxWidth) return text;
-
-  const ellipsis = "…";
-  const ellipsisWidth = visibleWidth(ellipsis);
-  if (maxWidth <= ellipsisWidth) return "";
-
-  const targetWidth = maxWidth - ellipsisWidth;
-  let preview = "";
-  let width = 0;
-  const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-  for (const { segment } of segmenter.segment(text)) {
-    const segmentWidth = visibleWidth(segment);
-    if (width + segmentWidth > targetWidth) break;
-    preview += segment;
-    width += segmentWidth;
-  }
-
-  return preview ? `${preview}${ellipsis}` : "";
+  return lines.findIndex((line) => line.includes(CURSOR_MARKER));
 }

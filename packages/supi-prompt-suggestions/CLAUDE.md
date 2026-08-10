@@ -55,9 +55,9 @@ The ghost text is injected into the editor's rendered output by post-processing 
 `super.render()`. It uses the dim ANSI escape (`\x1b[2m`) directly rather than going through the
 theme system because the ghost text needs independent color control outside the editor theme.
 
-Ghost text insertion position depends on `CustomEditor`'s internal ANSI encoding of the cursor
-(inverse-video `\x1b[7m` … `\x1b[0m`). See `ghostInsertPosition()` in `editor.ts` — if upstream
-cursor rendering changes, that helper must be updated.
+Ghost text uses PI TUI's `wrapTextWithAnsi()` to wrap the full suggestion. Because ghost text is
+visible only when the editor is empty, the extension appends it to the rendered cursor line. It uses
+the public `CURSOR_MARKER` to find that line and does not parse the cursor's internal ANSI encoding.
 
 ### Right Arrow acceptance
 
