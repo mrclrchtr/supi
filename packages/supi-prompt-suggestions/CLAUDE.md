@@ -29,9 +29,9 @@ line (question, answer, or directive) or return the `NO_SUGGESTION` sentinel. Th
 the assistant text in `<assistant_message>...</assistant_message>` tags and appends `Suggestion:` —
 no PI, SuPi, project, or conversation context is included.
 
-### Settings use registerDeclarativeSettings
+### Settings use the fixed config adapter
 
-The settings section uses `registerDeclarativeSettings` from `supi-core/settings` with a
+The settings module uses `defineConfigSettings` and `registerSettings` from `supi-core/settings` with a
 `modelPicker` field. Selecting `disabled` persists `model: "disabled"` explicitly so project scope
 can override a globally enabled suggestion model; only the Inherit/Reset actions delete scoped
 config keys.

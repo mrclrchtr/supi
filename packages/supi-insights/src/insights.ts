@@ -13,7 +13,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
-import { registerDeclarativeSettings } from "@mrclrchtr/supi-core/settings";
+import { defineConfigSettings, registerSettings } from "@mrclrchtr/supi-core/settings";
 import { aggregateData } from "./aggregator.ts";
 import {
   loadCachedFacets,
@@ -77,35 +77,38 @@ function getConfig(cwd: string): InsightsConfig {
 
 export default function insightsExtension(pi: ExtensionAPI) {
   // Register config-backed settings for /supi-settings
-  registerDeclarativeSettings(pi, {
-    id: "insights",
-    label: "Insights",
-    section: "insights",
-    defaults: {
-      enabled: true,
-      maxSessions: MAX_SESSIONS_TO_ANALYZE,
-      maxFacets: MAX_FACET_EXTRACTIONS,
-    },
-    fields: [
-      {
-        kind: "boolean" as const,
-        key: "enabled",
-        label: "Enable insights",
+  registerSettings(
+    pi,
+    defineConfigSettings({
+      id: "insights",
+      label: "Insights",
+      section: "insights",
+      defaults: {
+        enabled: true,
+        maxSessions: MAX_SESSIONS_TO_ANALYZE,
+        maxFacets: MAX_FACET_EXTRACTIONS,
       },
-      {
-        kind: "number" as const,
-        key: "maxSessions",
-        label: "Max sessions to analyze",
-        values: ["50", "100", "200", "500"],
-      },
-      {
-        kind: "number" as const,
-        key: "maxFacets",
-        label: "Max facet extractions",
-        values: ["20", "50", "100"],
-      },
-    ],
-  });
+      fields: [
+        {
+          kind: "boolean" as const,
+          key: "enabled",
+          label: "Enable insights",
+        },
+        {
+          kind: "number" as const,
+          key: "maxSessions",
+          label: "Max sessions to analyze",
+          values: ["50", "100", "200", "500"],
+        },
+        {
+          kind: "number" as const,
+          key: "maxFacets",
+          label: "Max facet extractions",
+          values: ["20", "50", "100"],
+        },
+      ],
+    }),
+  );
 
   // ── /supi-insights command ──────────────────────────────────
 

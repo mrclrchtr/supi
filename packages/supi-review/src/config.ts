@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
-import { registerDeclarativeSettings } from "@mrclrchtr/supi-core/settings";
+import { defineConfigSettings, registerSettings } from "@mrclrchtr/supi-core/settings";
 import { CURRENT_SESSION_REVIEW_MODEL } from "./model.ts";
 
 /** Supported containing-Agent behaviors after a review returns findings. */
@@ -61,50 +61,53 @@ export function registerReviewSettings(pi: ExtensionAPI, homeDir?: string): void
     value: CURRENT_SESSION_REVIEW_MODEL,
     label: "current session model",
   };
-  registerDeclarativeSettings(pi, {
-    id: REVIEW_CONFIG_SECTION,
-    label: "Review",
-    section: REVIEW_CONFIG_SECTION,
-    defaults: REVIEW_DEFAULTS,
-    fields: [
-      {
-        kind: "modelPicker",
-        key: "agentModel",
-        label: "Reviewer model",
-        description: "Model shared by all tasks in an agent-triggered review run.",
-        includeDisabled: false,
-        staticOptions: [currentOption],
-      },
-      {
-        kind: "modelPicker",
-        key: "plannerModel",
-        label: "Planner model",
-        description: "Lightweight model used only when planning is set to suggest.",
-        includeDisabled: false,
-        staticOptions: [currentOption],
-      },
-      {
-        kind: "string",
-        key: "bootstrapCommand",
-        label: "Bootstrap command",
-        description:
-          "Run once in the frozen Review Workspace before reviewers start. Empty lets reviewers bootstrap when needed.",
-      },
-      {
-        kind: "enum",
-        key: "postReviewPolicy",
-        label: "After review",
-        description: "Default Agent behavior when a completed review returns findings.",
-        values: [...POST_REVIEW_POLICIES],
-      },
-      {
-        kind: "boolean" as const,
-        key: "auditEnabled",
-        label: "Local reviewer replay",
-        description:
-          "Record every reviewer's raw messages and tool output locally for seven days. Requires /reload.",
-      },
-    ],
-    ...(homeDir ? { homeDir } : {}),
-  });
+  registerSettings(
+    pi,
+    defineConfigSettings({
+      id: REVIEW_CONFIG_SECTION,
+      label: "Review",
+      section: REVIEW_CONFIG_SECTION,
+      defaults: REVIEW_DEFAULTS,
+      fields: [
+        {
+          kind: "modelPicker",
+          key: "agentModel",
+          label: "Reviewer model",
+          description: "Model shared by all tasks in an agent-triggered review run.",
+          includeDisabled: false,
+          staticOptions: [currentOption],
+        },
+        {
+          kind: "modelPicker",
+          key: "plannerModel",
+          label: "Planner model",
+          description: "Lightweight model used only when planning is set to suggest.",
+          includeDisabled: false,
+          staticOptions: [currentOption],
+        },
+        {
+          kind: "string",
+          key: "bootstrapCommand",
+          label: "Bootstrap command",
+          description:
+            "Run once in the frozen Review Workspace before reviewers start. Empty lets reviewers bootstrap when needed.",
+        },
+        {
+          kind: "enum",
+          key: "postReviewPolicy",
+          label: "After review",
+          description: "Default Agent behavior when a completed review returns findings.",
+          values: [...POST_REVIEW_POLICIES],
+        },
+        {
+          kind: "boolean" as const,
+          key: "auditEnabled",
+          label: "Local reviewer replay",
+          description:
+            "Record every reviewer's raw messages and tool output locally for seven days. Requires /reload.",
+        },
+      ],
+      ...(homeDir ? { homeDir } : {}),
+    }),
+  );
 }

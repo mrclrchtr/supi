@@ -80,6 +80,7 @@
       "./packages/supi-claude-md/src/extension.ts",
       "./packages/supi-context/src/extension.ts",
       "./packages/supi-settings/src/extension.ts",
+      "./packages/supi-skills/src/extension.ts",
       "./packages/supi-debug/src/extension.ts",
       "./packages/supi-review/src/extension.ts",
       "./packages/supi-cache/src/extension.ts",

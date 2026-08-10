@@ -21,7 +21,7 @@ import {
   isDebugLevel,
   subscribeDebugEvents,
 } from "@mrclrchtr/supi-core/debug";
-import { registerDeclarativeSettings } from "@mrclrchtr/supi-core/settings";
+import { defineConfigSettings, registerSettings } from "@mrclrchtr/supi-core/settings";
 import { Type } from "typebox";
 import { formatDataLines } from "./format.ts";
 import { registerDebugMessageRenderer } from "./renderer.ts";
@@ -107,37 +107,40 @@ function syncLiveDebugRegistry(cwd: string): DebugConfig {
 }
 
 function registerDebugSettings(pi: ExtensionAPI): void {
-  registerDeclarativeSettings(pi, {
-    id: "debug",
-    label: "Debug",
-    section: DEBUG_SECTION,
-    defaults: DEBUG_DEFAULTS,
-    fields: [
-      {
-        kind: "boolean" as const,
-        key: "enabled",
-        label: "Enabled",
-        description: "Enable/disable session-local SuPi debug event capture",
+  registerSettings(
+    pi,
+    defineConfigSettings({
+      id: "debug",
+      label: "Debug",
+      section: DEBUG_SECTION,
+      defaults: DEBUG_DEFAULTS,
+      fields: [
+        {
+          kind: "boolean" as const,
+          key: "enabled",
+          label: "Enabled",
+          description: "Enable/disable session-local SuPi debug event capture",
+        },
+        {
+          kind: "enum" as const,
+          key: "agentAccess",
+          label: "Agent Access",
+          description: "Control whether the agent can fetch sanitized or raw debug events",
+          values: ["off", "sanitized", "raw"],
+        },
+        {
+          kind: "number" as const,
+          key: "maxEvents",
+          label: "Max Events",
+          description: "Maximum session-local debug events retained in memory",
+          values: ["50", "100", "250", "500"],
+        },
+      ],
+      afterPersist: ({ cwd }) => {
+        syncLiveDebugRegistry(cwd);
       },
-      {
-        kind: "enum" as const,
-        key: "agentAccess",
-        label: "Agent Access",
-        description: "Control whether the agent can fetch sanitized or raw debug events",
-        values: ["off", "sanitized", "raw"],
-      },
-      {
-        kind: "number" as const,
-        key: "maxEvents",
-        label: "Max Events",
-        description: "Maximum session-local debug events retained in memory",
-        values: ["50", "100", "250", "500"],
-      },
-    ],
-    afterPersist: ({ cwd }) => {
-      syncLiveDebugRegistry(cwd);
-    },
-  });
+    }),
+  );
 }
 
 function parseCommandArgs(args: string): DebugToolParams {
@@ -310,8 +313,6 @@ export default function debugExtension(pi: ExtensionAPI) {
     applyDebugConfig(ctx.cwd);
   });
 
-  // Commands registered during every extension's session_start handler are
-  // available before resource discovery, so this inventory is load-order safe.
   pi.on("resources_discover", async (_event, ctx) => {
     maybeLogLoadStatus(pi, ctx.cwd, "resources_discover");
   });

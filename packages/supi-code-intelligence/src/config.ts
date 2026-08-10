@@ -2,7 +2,7 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
-import { registerDeclarativeSettings } from "@mrclrchtr/supi-core/settings";
+import { defineConfigSettings, registerSettings } from "@mrclrchtr/supi-core/settings";
 
 const CODE_INTELLIGENCE_SECTION = "code-intelligence";
 
@@ -24,19 +24,22 @@ export function loadCodeIntelligenceConfig(cwd: string, homeDir?: string): CodeI
 
 /** Register code-intelligence settings with the shared SuPi settings registry. */
 export function registerCodeIntelligenceSettings(pi: ExtensionAPI, homeDir?: string): void {
-  registerDeclarativeSettings(pi, {
-    id: CODE_INTELLIGENCE_SECTION,
-    label: "Code Intelligence",
-    section: CODE_INTELLIGENCE_SECTION,
-    defaults: CODE_INTELLIGENCE_DEFAULTS,
-    fields: [
-      {
-        kind: "stringList" as const,
-        key: "instructionFileNames",
-        label: "Instruction File Names",
-        description: "Directory-local instruction file names shown by directory orientation",
-      },
-    ],
-    ...(homeDir ? { homeDir } : {}),
-  });
+  registerSettings(
+    pi,
+    defineConfigSettings({
+      id: CODE_INTELLIGENCE_SECTION,
+      label: "Code Intelligence",
+      section: CODE_INTELLIGENCE_SECTION,
+      defaults: CODE_INTELLIGENCE_DEFAULTS,
+      fields: [
+        {
+          kind: "stringList" as const,
+          key: "instructionFileNames",
+          label: "Instruction File Names",
+          description: "Directory-local instruction file names shown by directory orientation",
+        },
+      ],
+      ...(homeDir ? { homeDir } : {}),
+    }),
+  );
 }

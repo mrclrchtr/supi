@@ -9,25 +9,16 @@ import {
   visibleWidth,
   wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
-import type {
-  ScopedFieldValue,
-  SettingsFieldAction,
-  SettingsScope,
-  SettingsSection,
-} from "@mrclrchtr/supi-core/settings";
+import type { SettingsAction, SettingsModule, SettingsScope } from "@mrclrchtr/supi-core/settings";
 import type { ThemeAccessor } from "./settings-action-menu.ts";
 import {
   buildActionMenu,
   createActionMenuComponent,
   getConcreteChoices,
 } from "./settings-action-menu.ts";
+import { type LoadedSettingsModule, readSettingsModules } from "./settings-module-reader.ts";
+import { filterSettingsRows, rowsFromModules, type ScopedRow } from "./settings-row-model.ts";
 import { createInputSubmenu, createModelPickerSubmenu } from "./settings-submenus.ts";
-
-interface ScopedRow {
-  flatId: string;
-  sectionLabel: string;
-  field: ScopedFieldValue;
-}
 
 interface SubmenuState {
   component: {
@@ -38,7 +29,7 @@ interface SubmenuState {
 }
 
 export class ScopedSettingsList {
-  private sections: SettingsSection[];
+  private modules: SettingsModule[];
   private scope: SettingsScope;
   private cwd: string;
   private ctx: ExtensionContext | undefined;
@@ -51,12 +42,14 @@ export class ScopedSettingsList {
   private submenu: SubmenuState | null = null;
   private searchInput?: Input;
   private searchQuery = "";
+  private actionPending = false;
   private cachedWidth?: number;
   private cachedLines?: string[];
 
   // biome-ignore lint/complexity/useMaxParams: component constructor needs all dependencies upfront for immutable wiring
   constructor(
-    sections: SettingsSection[],
+    modules: SettingsModule[],
+    initial: LoadedSettingsModule[],
     scope: SettingsScope,
     cwd: string,
     ctx: ExtensionContext | undefined,
@@ -65,7 +58,7 @@ export class ScopedSettingsList {
     onCancel: () => void,
     onError?: (message: string) => void,
   ) {
-    this.sections = sections;
+    this.modules = modules;
     this.scope = scope;
     this.cwd = cwd;
     this.ctx = ctx;
@@ -73,21 +66,30 @@ export class ScopedSettingsList {
     this.tui = tui;
     this.onCancel = onCancel;
     this.onError = onError;
-    this.rebuildRows();
+    this.rebuildRows(initial);
   }
 
-  reload(scope: SettingsScope, cwd: string, ctx?: ExtensionContext): void {
+  async reload(scope: SettingsScope, cwd: string, ctx?: ExtensionContext): Promise<void> {
     this.scope = scope;
     this.cwd = cwd;
     this.ctx = ctx;
-    this.rebuildRows();
-    this.selectedIndex = Math.min(this.selectedIndex, Math.max(0, this.filteredRows().length - 1));
-    this.invalidate();
+    this.actionPending = true;
+    try {
+      await this.refreshRows();
+      this.selectedIndex = Math.min(
+        this.selectedIndex,
+        Math.max(0, this.filteredRows().length - 1),
+      );
+    } finally {
+      this.actionPending = false;
+      this.invalidate();
+      this.tui.requestRender();
+    }
   }
 
-  /** Return true while a setting editor or action menu has input focus. */
+  /** Return true while a setting editor, action menu, or persistence action owns input. */
   hasOpenSubmenu(): boolean {
-    return this.submenu !== null;
+    return this.submenu !== null || this.actionPending;
   }
 
   invalidate(): void {
@@ -140,11 +142,11 @@ export class ScopedSettingsList {
     for (let i = start; i < end; i++) {
       const row = displayRows[i];
       if (!row) continue;
-      if (row.sectionLabel !== previousSection) {
+      if (row.moduleLabel !== previousSection) {
         lines.push(
-          truncateToWidth(`  ${this.theme.fg("muted", this.theme.bold(row.sectionLabel))}`, width),
+          truncateToWidth(`  ${this.theme.fg("muted", this.theme.bold(row.moduleLabel))}`, width),
         );
-        previousSection = row.sectionLabel;
+        previousSection = row.moduleLabel;
       }
       const isSelected = i === this.selectedIndex;
       const prefix = isSelected ? `  ${this.theme.fg("accent", "→ ")}` : "    ";
@@ -180,6 +182,7 @@ export class ScopedSettingsList {
   }
 
   handleInput(data: string): void {
+    if (this.actionPending) return;
     if (this.submenu) {
       this.submenu.component.handleInput?.(data);
       this.invalidate();
@@ -237,30 +240,22 @@ export class ScopedSettingsList {
     if (!this.searchInput) this.searchInput = new Input();
   }
 
-  private rebuildRows(): void {
-    const rows: ScopedRow[] = [];
-    for (const section of this.sections) {
-      for (const value of section.loadValues(this.scope, this.cwd, this.ctx)) {
-        rows.push({
-          flatId: `${section.id}.${value.field.key}`,
-          sectionLabel: section.label,
-          field: value,
-        });
-      }
-    }
-    this.rows = rows;
+  private rebuildRows(loaded: LoadedSettingsModule[]): void {
+    this.rows = rowsFromModules(loaded);
+  }
+
+  private async refreshRows(): Promise<void> {
+    const result = await readSettingsModules(this.modules, {
+      scope: this.scope,
+      cwd: this.cwd,
+      ctx: this.ctx,
+    });
+    this.rebuildRows(result.loaded);
+    for (const error of result.errors) this.onError?.(error);
   }
 
   private filteredRows(): ScopedRow[] {
-    if (!this.searchQuery) return this.rows;
-    const q = this.searchQuery.toLowerCase();
-    return this.rows.filter(
-      (r) =>
-        r.sectionLabel.toLowerCase().includes(q) ||
-        r.field.field.label.toLowerCase().includes(q) ||
-        r.field.field.key.toLowerCase().includes(q) ||
-        r.field.displayValue.toLowerCase().includes(q),
-    );
+    return filterSettingsRows(this.rows, this.searchQuery);
   }
 
   private activateSelected(): void {
@@ -285,10 +280,8 @@ export class ScopedSettingsList {
         this.tui.requestRender();
         return;
       }
-      if (action === "inherit") {
-        this.dispatchAction(row.flatId, { kind: "inherit" });
-      } else if (action === "resetToDefault") {
-        this.dispatchAction(row.flatId, { kind: "resetToDefault" });
+      if (action === "inherit" || action === "resetToDefault") {
+        this.dispatchAction(row.flatId, { kind: "unset" });
       } else if (action === "edit") {
         this.openFreeInputSubmenu(row);
       } else if (action.startsWith("set:")) {
@@ -320,7 +313,7 @@ export class ScopedSettingsList {
           if (selectedValue !== undefined) {
             this.dispatchAction(row.flatId, { kind: "set", value: selectedValue });
           } else {
-            this.reload(this.scope, this.cwd, this.ctx);
+            void this.reload(this.scope, this.cwd, this.ctx);
           }
           this.invalidate();
           this.tui.requestRender();
@@ -362,19 +355,38 @@ export class ScopedSettingsList {
     this.tui.requestRender();
   }
 
-  private dispatchAction(flatId: string, action: SettingsFieldAction): void {
+  private dispatchAction(flatId: string, action: SettingsAction): void {
+    void this.runAction(flatId, action);
+  }
+
+  private async runAction(flatId: string, action: SettingsAction): Promise<void> {
     const dotIndex = flatId.indexOf(".");
     if (dotIndex === -1) return;
-    const sectionId = flatId.slice(0, dotIndex);
+    const moduleId = flatId.slice(0, dotIndex);
     const fieldKey = flatId.slice(dotIndex + 1);
-    const section = this.sections.find((s) => s.id === sectionId);
-    if (!section) return;
+    const module = this.modules.find((candidate) => candidate.id === moduleId);
+    if (!module) return;
+
+    this.actionPending = true;
     try {
-      section.handleAction(this.scope, this.cwd, fieldKey, action, this.ctx);
+      const result = await module.apply({
+        scope: this.scope,
+        cwd: this.cwd,
+        ctx: this.ctx,
+        fieldKey,
+        action,
+      });
+      if (result?.notice) {
+        this.ctx?.ui.notify(result.notice.message, result.notice.level);
+      }
+      await this.refreshRows();
     } catch (err) {
       this.onError?.(err instanceof Error ? err.message : String(err));
+      await this.refreshRows();
+    } finally {
+      this.actionPending = false;
+      this.invalidate();
+      this.tui.requestRender();
     }
-    this.reload(this.scope, this.cwd, this.ctx);
-    this.tui.requestRender();
   }
 }

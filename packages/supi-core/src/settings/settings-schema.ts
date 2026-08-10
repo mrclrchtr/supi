@@ -1,26 +1,19 @@
-// Declarative settings schema for SuPi extensions.
+// Fixed SuPi-config adapter for the canonical settings module interface.
 //
-// Replaces the imperative config-backed buildItems/persistChange contribution
-// with a declarative field descriptor model. The shared settings module owns
-// scope inheritance, source-state resolution, value rendering, persistence,
-// and Inherit/Reset-to-default actions.
+// Declarative field descriptors let the adapter own scope inheritance,
+// source-state resolution, value rendering, persistence, and Unset actions.
 //
 // Custom fields remain for nested or unusual config; they report the same
 // source state as declarative flat fields.
 
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 import {
   loadSupiConfigSectionForScope,
   removeSupiConfigKey,
   writeSupiConfig,
 } from "../config/config.ts";
-import {
-  isSettingsContributionCollector,
-  type SettingsScope,
-  type SettingsSection,
-  SUPI_SETTINGS_COLLECT_EVENT,
-} from "./settings-registry.ts";
+import type { SettingsApplyResult, SettingsModule, SettingsScope } from "./settings-registry.ts";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -52,10 +45,7 @@ export interface ConfigHelpers {
 // ── Field actions ─────────────────────────────────────────────────────────
 
 /** A user-initiated action on a settings row. */
-export type SettingsFieldAction =
-  | { kind: "set"; value: string }
-  | { kind: "inherit" }
-  | { kind: "resetToDefault" };
+export type SettingsAction = { kind: "set"; value: string } | { kind: "unset" };
 
 // ── Field descriptors ─────────────────────────────────────────────────────
 
@@ -153,15 +143,15 @@ export interface CustomField extends BaseField {
     ctx?: ExtensionContext,
   ) => Component;
   /**
-   * Persist handler called on set/inherit/resetToDefault actions.
+   * Persist handler called on set or unset actions.
    * Required for custom fields so they can write their nested config.
    */
   persist: (
     scope: SettingsScope,
     cwd: string,
-    action: SettingsFieldAction,
+    action: SettingsAction,
     helpers: ConfigHelpers,
-  ) => void;
+  ) => void | Promise<void>;
 }
 
 /** Union of all supported field kinds. */
@@ -176,8 +166,8 @@ export type SettingsField =
 
 // ── Contribution options ──────────────────────────────────────────────────
 
-/** Options for registerDeclarativeSettings. */
-export interface DeclarativeSettingsOptions {
+/** Options for the fixed SuPi-config settings adapter. */
+export interface ConfigSettingsOptions {
   /** Stable contribution identifier — e.g. "lsp", "claude-md". */
   id: string;
   /** Human-readable label shown in the UI. */
@@ -194,7 +184,7 @@ export interface DeclarativeSettingsOptions {
   homeDir?: string;
 }
 
-// ── Scoped section interface ─────────────────────────────────────────────
+// ── Source-aware row interface ───────────────────────────────────────────
 
 /** Resolved value for one field in one scope. */
 export interface ScopedFieldValue {
@@ -305,14 +295,14 @@ function createConfigHelpers(
   };
 }
 
-// ── Scoped section factory ────────────────────────────────────────────────
+// ── Fixed config adapter ─────────────────────────────────────────────────
 
 interface NotifyAfterPersistInput {
-  options: DeclarativeSettingsOptions;
+  options: ConfigSettingsOptions;
   field: SettingsField;
   scope: SettingsScope;
   cwd: string;
-  action: SettingsFieldAction;
+  action: SettingsAction;
   storedValue: unknown;
   ctx?: ExtensionContext;
 }
@@ -354,86 +344,86 @@ function notifyAfterPersist(input: NotifyAfterPersistInput): void {
   options.afterPersist(change);
 }
 
-function toDeclarativeSection(options: DeclarativeSettingsOptions): SettingsSection {
+function resolveConfigRows(
+  options: ConfigSettingsOptions,
+  scope: SettingsScope,
+  cwd: string,
+  ctx?: ExtensionContext,
+): ScopedFieldValue[] {
   const defaults = options.defaults as Record<string, unknown>;
+  const projectRaw = loadSupiConfigSectionForScope(options.section, cwd, {
+    scope: "project",
+    homeDir: options.homeDir,
+  });
+  const globalRaw = loadSupiConfigSectionForScope(options.section, cwd, {
+    scope: "global",
+    homeDir: options.homeDir,
+  });
+
+  return options.fields.map((field) => {
+    if (field.kind === "custom") {
+      const resolved = field.resolve(scope, cwd, ctx);
+      return {
+        field,
+        displayValue: resolved.displayValue
+          ? sourceBadge(resolved.displayValue, resolved.source)
+          : "",
+        editValue: resolved.editValue ?? resolved.displayValue,
+        source: resolved.source,
+        inheritanceSource: resolved.inheritanceSource,
+      };
+    }
+
+    const { value, source } = resolveValue(field.key, defaults, projectRaw, globalRaw, scope);
+    const displayValue = formatValue(value, field);
+    const inheritanceSource =
+      scope === "project" && source === "project"
+        ? globalRaw && field.key in globalRaw
+          ? "global"
+          : "default"
+        : undefined;
+
+    return {
+      field,
+      displayValue: sourceBadge(displayValue, source),
+      editValue: formatEditValue(value, field),
+      source,
+      inheritanceSource,
+    };
+  });
+}
+
+async function applyConfigAction(
+  options: ConfigSettingsOptions,
+  request: Parameters<SettingsModule["apply"]>[0],
+): Promise<SettingsApplyResult> {
+  const { scope, cwd, fieldKey, action, ctx } = request;
+  const field = options.fields.find((candidate) => candidate.key === fieldKey);
+  if (!field) return {};
+
+  const helpers = createConfigHelpers(options.section, scope, cwd, options.homeDir);
+  let storedValue: unknown;
+  if (field.kind === "custom") {
+    await field.persist(scope, cwd, action, helpers);
+    storedValue = action.kind === "set" ? action.value : undefined;
+  } else if (action.kind === "set") {
+    storedValue = parseTypedValue(action.value, field);
+    helpers.set(field.key, storedValue);
+  } else {
+    helpers.unset(field.key);
+  }
+  notifyAfterPersist({ options, field, scope, cwd, action, storedValue, ctx });
+  return {};
+}
+
+/** Adapt one fixed SuPi config section to the canonical settings interface. */
+export function defineConfigSettings(options: ConfigSettingsOptions): SettingsModule {
   return {
     id: options.id,
     label: options.label,
-    loadValues: (scope, cwd, ctx) => {
-      // Load raw section data for both scopes (no defaults)
-      const projectRaw = loadSupiConfigSectionForScope(options.section, cwd, {
-        scope: "project",
-        homeDir: options.homeDir,
-      });
-      const globalRaw = loadSupiConfigSectionForScope(options.section, cwd, {
-        scope: "global",
-        homeDir: options.homeDir,
-      });
-
-      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: natural discriminator on field kind and source
-      return options.fields.map((field) => {
-        if (field.kind === "custom") {
-          const resolved = field.resolve(scope, cwd, ctx);
-          return {
-            field,
-            displayValue: resolved.displayValue
-              ? sourceBadge(resolved.displayValue, resolved.source)
-              : "",
-            editValue: resolved.editValue ?? resolved.displayValue,
-            source: resolved.source,
-            inheritanceSource: resolved.inheritanceSource,
-          };
-        }
-
-        const { value, source } = resolveValue(field.key, defaults, projectRaw, globalRaw, scope);
-        const displayValue = formatValue(value, field);
-
-        // Compute inheritanceSource for project-scope overrides
-        let inheritanceSource: "global" | "default" | undefined;
-        if (scope === "project" && source === "project") {
-          inheritanceSource = globalRaw && field.key in globalRaw ? "global" : "default";
-        }
-
-        return {
-          field,
-          displayValue: sourceBadge(displayValue, source),
-          editValue: formatEditValue(value, field),
-          source,
-          inheritanceSource,
-        };
-      });
-    },
-    // biome-ignore lint/complexity/useMaxParams: SettingsSection action handlers receive scope, cwd, field, action, and optional context
-    handleAction: (scope, cwd, fieldKey, action, ctx) => {
-      const field = options.fields.find((f) => f.key === fieldKey);
-      if (!field) return;
-
-      const section = options.section;
-      const helpers = createConfigHelpers(section, scope, cwd, options.homeDir);
-      let storedValue: unknown;
-
-      if (field.kind === "custom") {
-        field.persist(scope, cwd, action, helpers);
-        storedValue = action.kind === "set" ? action.value : undefined;
-        notifyAfterPersist({ options, field, scope, cwd, action, storedValue, ctx });
-        return;
-      }
-
-      switch (action.kind) {
-        case "set": {
-          storedValue = parseTypedValue(action.value, field);
-          helpers.set(field.key, storedValue);
-          break;
-        }
-        case "inherit":
-        case "resetToDefault": {
-          helpers.unset(field.key);
-          break;
-        }
-      }
-
-      notifyAfterPersist({ options, field, scope, cwd, action, storedValue, ctx });
-    },
+    read: ({ scope, cwd, ctx }) =>
+      Promise.resolve({ rows: resolveConfigRows(options, scope, cwd, ctx) }),
+    apply: (request) => applyConfigAction(options, request),
   };
 }
 
@@ -460,28 +450,4 @@ export function parseTypedValue(value: string, field: SettingsField): unknown {
     default:
       return value;
   }
-}
-
-// ── Registration ──────────────────────────────────────────────────────────
-
-/**
- * Register a declarative settings contribution for `/supi-settings`.
- *
- * Contributions are collected through PI's process-local event bus. Call this
- * during the extension factory function, not in async session handlers.
- */
-export function registerDeclarativeSettings(
-  pi: ExtensionAPI,
-  options: DeclarativeSettingsOptions,
-): void {
-  const section = toDeclarativeSection(options);
-  const dispose = pi.events.on(SUPI_SETTINGS_COLLECT_EVENT, (collector) => {
-    if (isSettingsContributionCollector(collector)) {
-      collector.add(section);
-    }
-  });
-
-  pi.on("session_shutdown", () => {
-    dispose();
-  });
 }

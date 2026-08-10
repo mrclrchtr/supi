@@ -11,12 +11,16 @@ The stable namespace for one SuPi package's shared configuration values.
 _Avoid_: config category, settings group
 
 **Settings Contribution**:
-A SuPi extension's runtime-declared, config-backed settings section for a Configuration Surface to collect and render. A contribution describes editable SuPi config values and scoped persistence behavior; it is not itself the stored configuration.
+A SuPi extension's runtime registration of one Settings Module for a Configuration Surface to collect and render. It is not itself stored configuration.
 _Avoid_: global settings singleton, arbitrary settings UI registry, assuming one shared package instance
 
-**Declarative Settings Schema**:
-A Settings Contribution shape where an extension describes configurable values and edit controls, while the shared settings module owns scope inheritance, persistence, and rendering semantics.
-_Avoid_: per-package settings UI logic, raw SettingItem factory for config-backed values
+**Settings Module**:
+The owner of one source-aware settings group. It reads a scoped snapshot and applies user actions after all durable writes and refresh work complete.
+_Avoid_: settings section, package-owned settings UI, storage adapter exposed to the UI
+
+**Config Settings Definition**:
+A fixed set of SuPi config fields and edit controls that the shared config adapter turns into a Settings Module. The adapter owns scope inheritance, typed persistence, and source-state resolution.
+_Avoid_: using dynamic-resource logic in the fixed config definition, raw SettingItem factory
 
 **Project Override**:
 A project-scoped SuPi configuration value that intentionally replaces the value inherited from broader configuration for the current workspace. It remains an override even when its value text matches a package default.
@@ -45,6 +49,10 @@ _Avoid_: reset if it may not restore a default, unset as user-facing copy
 **Reset to Default Action**:
 A settings UI action that removes a Global configuration value so package defaults supply the setting again.
 _Avoid_: inherit when no broader user scope exists, unset as user-facing copy
+
+**Unset Action**:
+The storage-neutral Settings Module action behind both Inherit and Reset to Default. It removes the explicit value in the selected scope; the settings UI owns the source-aware user-facing label.
+_Avoid_: showing unset as user-facing copy, separate persistence semantics for inherit and reset
 
 **Debug Registry**:
 The session-local SuPi buffer that stores diagnostic events emitted by extension packages for later inspection.

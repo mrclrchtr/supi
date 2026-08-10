@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { SettingsSection } from "@mrclrchtr/supi-core/settings";
+import type { SettingsModule } from "@mrclrchtr/supi-core/settings";
 import { SUPI_SETTINGS_COLLECT_EVENT } from "@mrclrchtr/supi-core/settings";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -32,15 +32,15 @@ function makePi() {
   };
 }
 
-function collectSection(pi: ReturnType<typeof makePi>): SettingsSection {
-  let captured: SettingsSection | undefined;
+function collectModule(pi: ReturnType<typeof makePi>): SettingsModule {
+  let captured: SettingsModule | undefined;
   pi.events.emit(SUPI_SETTINGS_COLLECT_EVENT, {
-    add(section: SettingsSection) {
-      captured = section;
+    add(module: SettingsModule) {
+      captured = module;
     },
   });
   expect(captured).toBeDefined();
-  return captured as SettingsSection;
+  return captured as SettingsModule;
 }
 
 const tempDirs: string[] = [];
@@ -75,17 +75,17 @@ describe("registerCodeIntelligenceSettings", () => {
     const pi = makePi();
     registerCodeIntelligenceSettings(pi as never);
 
-    const section = collectSection(pi);
+    const module = collectModule(pi);
 
-    expect(section).toMatchObject({ id: "code-intelligence", label: "Code Intelligence" });
+    expect(module).toMatchObject({ id: "code-intelligence", label: "Code Intelligence" });
   });
 
-  it("loads instructionFileNames as a declarative field with default source", () => {
+  it("reads instructionFileNames with the default source", async () => {
     const pi = makePi();
     registerCodeIntelligenceSettings(pi as never);
 
-    const section = collectSection(pi);
-    const values = section.loadValues("project", "/tmp");
+    const module = collectModule(pi);
+    const { rows: values } = await module.read({ scope: "project", cwd: "/tmp" });
 
     expect(values).toHaveLength(1);
     expect(values[0]).toMatchObject({
@@ -94,16 +94,18 @@ describe("registerCodeIntelligenceSettings", () => {
     });
   });
 
-  it("persists instructionFileNames via handleAction", () => {
+  it("persists instructionFileNames through apply", async () => {
     const tmpDir = makeTempDir();
     tempDirs.push(tmpDir);
     const pi = makePi();
     registerCodeIntelligenceSettings(pi as never, tmpDir);
 
-    const section = collectSection(pi);
-    section.handleAction("project", tmpDir, "instructionFileNames", {
-      kind: "set",
-      value: "RULES.md, NOTES.md",
+    const module = collectModule(pi);
+    await module.apply({
+      scope: "project",
+      cwd: tmpDir,
+      fieldKey: "instructionFileNames",
+      action: { kind: "set", value: "RULES.md, NOTES.md" },
     });
 
     const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, ".pi/supi/config.json"), "utf-8"));

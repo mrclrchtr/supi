@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
-const mockRegisterDeclarativeSettings = vi.hoisted(() => vi.fn());
+const settingsMocks = vi.hoisted(() => ({
+  define: vi.fn((options) => options),
+  register: vi.fn(),
+}));
 
 vi.mock("@mrclrchtr/supi-core/settings", () => ({
-  registerDeclarativeSettings: mockRegisterDeclarativeSettings,
+  defineConfigSettings: settingsMocks.define,
+  registerSettings: settingsMocks.register,
 }));
 
 import { registerPromptSuggestionsSettings } from "../../src/config/settings.ts";
@@ -12,8 +16,9 @@ describe("registerPromptSuggestionsSettings", () => {
   it("uses declarative modelPicker so disabled is an explicit value, not a signal to unset", () => {
     registerPromptSuggestionsSettings({} as never);
 
-    expect(mockRegisterDeclarativeSettings).toHaveBeenCalledOnce();
-    const options = mockRegisterDeclarativeSettings.mock.calls[0][1];
+    expect(settingsMocks.define).toHaveBeenCalledOnce();
+    expect(settingsMocks.register).toHaveBeenCalledOnce();
+    const options = settingsMocks.define.mock.calls[0][0];
 
     expect(options.fields).toHaveLength(1);
     expect(options.fields[0]).toMatchObject({

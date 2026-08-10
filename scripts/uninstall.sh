@@ -17,6 +17,7 @@ PACKAGES=(
   supi-ask-user
   supi-context
   supi-settings
+  supi-skills
   supi-extras
   supi-web
   supi-prompt-suggestions

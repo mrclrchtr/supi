@@ -19,6 +19,7 @@ PACKAGES=(
   supi-claude-md
   supi-context
   supi-settings
+  supi-skills
   supi-extras
   supi-bash-timeout
   supi-web

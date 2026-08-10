@@ -8,7 +8,8 @@ const mockFns = vi.hoisted(() => ({
   isDebugLevel: vi.fn((value) => value === "warning"),
   matchesDebugEventQuery: vi.fn(() => true),
   loadSupiConfig: vi.fn(),
-  registerDeclarativeSettings: vi.fn(),
+  defineConfigSettings: vi.fn((options) => options),
+  registerSettings: vi.fn(),
   registerContextProvider: vi.fn(),
   redactDebugData: vi.fn((value) => value),
   subscribeDebugEvents: vi.fn(() => vi.fn()),
@@ -20,7 +21,8 @@ vi.mock("@mrclrchtr/supi-core/config", () => ({
 }));
 
 vi.mock("@mrclrchtr/supi-core/settings", () => ({
-  registerDeclarativeSettings: mockFns.registerDeclarativeSettings,
+  defineConfigSettings: mockFns.defineConfigSettings,
+  registerSettings: mockFns.registerSettings,
 }));
 
 vi.mock("@mrclrchtr/supi-core/context", () => ({
@@ -80,7 +82,8 @@ describe("supi-debug extension setup", () => {
   it("registers settings, context provider, command, tool, and lifecycle handlers", () => {
     const pi = setup();
 
-    expect(mockFns.registerDeclarativeSettings).toHaveBeenCalledOnce();
+    expect(mockFns.defineConfigSettings).toHaveBeenCalledOnce();
+    expect(mockFns.registerSettings).toHaveBeenCalledOnce();
     expect(mockFns.registerContextProvider).toHaveBeenCalledOnce();
     expect(pi.handlers.has("session_start")).toBe(true);
     expect(pi.handlers.has("resources_discover")).toBe(true);
@@ -160,7 +163,7 @@ describe("supi-debug settings", () => {
   it("registers declarative settings with expected fields and type-driven persistence", () => {
     setup({ enabled: false, agentAccess: "raw", maxEvents: 250 });
 
-    const options = mockFns.registerDeclarativeSettings.mock.calls[0][1];
+    const options = mockFns.defineConfigSettings.mock.calls[0][0];
 
     // Verify fields are declared declaratively
     expect(options.fields).toHaveLength(3);
@@ -197,7 +200,7 @@ describe("supi-debug settings", () => {
   it("reconfigures the live registry on afterPersist", () => {
     setup();
 
-    const options = mockFns.registerDeclarativeSettings.mock.calls[0][1];
+    const options = mockFns.defineConfigSettings.mock.calls[0][0];
     mockFns.configureDebugRegistry.mockClear();
     mockFns.clearDebugEvents.mockClear();
     mockFns.loadSupiConfig.mockReturnValue({

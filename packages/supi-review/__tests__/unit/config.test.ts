@@ -4,10 +4,14 @@ import * as path from "node:path";
 import { writeSupiConfig } from "@mrclrchtr/supi-core/config";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockRegisterDeclarativeSettings = vi.hoisted(() => vi.fn());
+const settingsMocks = vi.hoisted(() => ({
+  define: vi.fn((options) => options),
+  register: vi.fn(),
+}));
 
 vi.mock("@mrclrchtr/supi-core/settings", () => ({
-  registerDeclarativeSettings: mockRegisterDeclarativeSettings,
+  defineConfigSettings: settingsMocks.define,
+  registerSettings: settingsMocks.register,
 }));
 
 import {
@@ -88,8 +92,7 @@ describe("review config", () => {
   it("registers separate scoped model pickers", () => {
     registerReviewSettings({} as never);
 
-    expect(mockRegisterDeclarativeSettings).toHaveBeenCalledWith(
-      expect.anything(),
+    expect(settingsMocks.define).toHaveBeenCalledWith(
       expect.objectContaining({
         id: REVIEW_CONFIG_SECTION,
         defaults: REVIEW_DEFAULTS,
@@ -106,5 +109,6 @@ describe("review config", () => {
         ],
       }),
     );
+    expect(settingsMocks.register).toHaveBeenCalledOnce();
   });
 });

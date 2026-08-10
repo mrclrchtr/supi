@@ -414,6 +414,25 @@ importers:
         specifier: 4.1.10
         version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.1(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
+  packages/supi-skills:
+    dependencies:
+      '@earendil-works/pi-coding-agent':
+        specifier: '*'
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
+      '@earendil-works/pi-tui':
+        specifier: '*'
+        version: 0.84.1
+      '@mrclrchtr/supi-core':
+        specifier: workspace:*
+        version: link:../supi-core
+    devDependencies:
+      '@mrclrchtr/supi-test-utils':
+        specifier: workspace:*
+        version: link:../supi-test-utils
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.1(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+
   packages/supi-test-utils:
     dependencies:
       '@earendil-works/pi-coding-agent':

@@ -20,6 +20,7 @@
         "packages/supi-prompt-suggestions/package.json",
         "packages/supi-review/package.json",
         "packages/supi-settings/package.json",
+        "packages/supi-skills/package.json",
         "packages/supi-tree-sitter/package.json",
         "packages/supi-web/package.json"
       ]

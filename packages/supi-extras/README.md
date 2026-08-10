@@ -24,7 +24,7 @@ pi install ./packages/supi-extras
 
 ## What you get
 
-This package mixes a few commands and shortcuts with a few always-on UI tweaks.
+This package mixes a few commands and shortcuts with a few always-on UI tweaks. Skill controls and `$skill-name` shortcuts live in [`@mrclrchtr/supi-skills`](https://github.com/mrclrchtr/supi/tree/main/packages/supi-skills).
 
 ## Commands
 
@@ -38,9 +38,6 @@ This package mixes a few commands and shortcuts with a few always-on UI tweaks.
 
 - `Alt+S` — stash the current editor text
 - `Alt+C` — copy the current editor text to the system clipboard
-- `$skill-name` — input shorthand that expands to `/skill:skill-name`
-
-The `$skill-name` helper also adds skill-only autocomplete while the cursor is inside a `$...` token.
 
 ## Prompt stash
 
@@ -84,7 +81,6 @@ That prevents git subprocesses from hanging while waiting for an interactive edi
 - `src/aliases.ts` — command aliases
 - `src/clone-session.ts` — cross-worktree session cloning by ID
 - `src/prompt-stash.ts` — prompt stash shortcuts, persistence, and overlay
-- `src/skill-shortcut.ts` — `$skill-name` expansion and autocomplete
 - `src/tab-spinner.ts` — terminal tab-title spinner
 - `src/copy-prompt.ts` and `src/clipboard.ts` — copy-to-clipboard shortcut and helper
 - `src/supi-footer.ts` — footer replacement

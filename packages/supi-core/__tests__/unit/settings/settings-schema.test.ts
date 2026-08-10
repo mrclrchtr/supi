@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
-import type { SettingsSection } from "../../../src/settings/settings-registry.ts";
+import { registerSettings, type SettingsModule } from "../../../src/settings/settings-registry.ts";
 import type {
   BoolField,
   EnumField,
@@ -11,10 +11,10 @@ import type {
   StringListField,
 } from "../../../src/settings/settings-schema.ts";
 import {
+  defineConfigSettings,
   formatEditValue,
   formatValue,
   parseTypedValue,
-  registerDeclarativeSettings,
   resolveValue,
   sourceBadge,
 } from "../../../src/settings/settings-schema.ts";
@@ -237,7 +237,7 @@ describe("parseTypedValue", () => {
   });
 });
 
-// ── registerDeclarativeSettings integration ───────────────────────────────
+// ── Fixed config adapter integration ─────────────────────────────────────
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "supi-settings-schema-test-"));
@@ -261,32 +261,36 @@ function makePi() {
   };
 }
 
-function collectOnlySection(pi: ReturnType<typeof makePi>): SettingsSection {
-  let captured: SettingsSection | undefined;
+function collectOnlyModule(pi: ReturnType<typeof makePi>): SettingsModule {
+  let captured: SettingsModule | undefined;
   pi.events.emit("supi:settings:collect", {
-    add(section: SettingsSection) {
-      captured = section;
+    add(module: SettingsModule) {
+      captured = module;
     },
   });
-  if (!captured) throw new Error("No settings section collected");
+  if (!captured) throw new Error("No settings module collected");
   return captured;
 }
 
-describe("registerDeclarativeSettings", () => {
-  it("keeps display and edit values separate for empty string lists", () => {
+describe("defineConfigSettings", () => {
+  it("keeps display and edit values separate for empty string lists", async () => {
     const tmpDir = makeTempDir();
     try {
       const pi = makePi();
-      registerDeclarativeSettings(pi as never, {
-        homeDir: tmpDir,
-        id: "test",
-        label: "Test",
-        section: "test",
-        defaults: { tags: [] },
-        fields: [{ kind: "stringList", key: "tags", label: "Tags" }],
-      });
+      registerSettings(
+        pi as never,
+        defineConfigSettings({
+          homeDir: tmpDir,
+          id: "test",
+          label: "Test",
+          section: "test",
+          defaults: { tags: [] },
+          fields: [{ kind: "stringList", key: "tags", label: "Tags" }],
+        }),
+      );
 
-      const [value] = collectOnlySection(pi).loadValues("project", tmpDir);
+      const snapshot = await collectOnlyModule(pi).read({ scope: "project", cwd: tmpDir });
+      const [value] = snapshot.rows;
 
       expect(value?.displayValue).toBe("none (default)");
       expect(value?.editValue).toBe("");
@@ -295,24 +299,29 @@ describe("registerDeclarativeSettings", () => {
     }
   });
 
-  it("reports typed stored values after declarative persistence", () => {
+  it("reports typed stored values after config persistence", async () => {
     const tmpDir = makeTempDir();
     try {
       const changes: unknown[] = [];
       const pi = makePi();
-      registerDeclarativeSettings(pi as never, {
-        homeDir: tmpDir,
-        id: "test",
-        label: "Test",
-        section: "test",
-        defaults: { tags: [] },
-        fields: [{ kind: "stringList", key: "tags", label: "Tags" }],
-        afterPersist: (change) => changes.push(change),
-      });
+      registerSettings(
+        pi as never,
+        defineConfigSettings({
+          homeDir: tmpDir,
+          id: "test",
+          label: "Test",
+          section: "test",
+          defaults: { tags: [] },
+          fields: [{ kind: "stringList", key: "tags", label: "Tags" }],
+          afterPersist: (change) => changes.push(change),
+        }),
+      );
 
-      collectOnlySection(pi).handleAction("project", tmpDir, "tags", {
-        kind: "set",
-        value: "",
+      await collectOnlyModule(pi).apply({
+        scope: "project",
+        cwd: tmpDir,
+        fieldKey: "tags",
+        action: { kind: "set", value: "" },
       });
 
       expect(changes).toEqual([
@@ -328,29 +337,34 @@ describe("registerDeclarativeSettings", () => {
     }
   });
 
-  it("reports custom-field afterPersist changes", () => {
+  it("reports custom-field afterPersist changes", async () => {
     const changes: unknown[] = [];
     const pi = makePi();
-    registerDeclarativeSettings(pi as never, {
-      id: "custom",
-      label: "Custom",
-      section: "custom",
-      defaults: {},
-      fields: [
-        {
-          kind: "custom",
-          key: "nested",
-          label: "Nested",
-          resolve: () => ({ displayValue: "saved", source: "project" }),
-          persist: () => {},
-        },
-      ],
-      afterPersist: (change) => changes.push(change),
-    });
+    registerSettings(
+      pi as never,
+      defineConfigSettings({
+        id: "custom",
+        label: "Custom",
+        section: "custom",
+        defaults: {},
+        fields: [
+          {
+            kind: "custom",
+            key: "nested",
+            label: "Nested",
+            resolve: () => ({ displayValue: "saved", source: "project" }),
+            persist: () => {},
+          },
+        ],
+        afterPersist: (change) => changes.push(change),
+      }),
+    );
 
-    collectOnlySection(pi).handleAction("project", "/repo", "nested", {
-      kind: "set",
-      value: "saved",
+    await collectOnlyModule(pi).apply({
+      scope: "project",
+      cwd: "/repo",
+      fieldKey: "nested",
+      action: { kind: "set", value: "saved" },
     });
 
     expect(changes).toEqual([

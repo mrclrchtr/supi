@@ -1,0 +1,3 @@
+# Skill controls as a separate package
+
+Skill controls and `$skill-name` shortcuts will live in `@mrclrchtr/supi-skills` rather than in `supi-extras`. The domain has its own catalog resolution, scoped persistence, PI filter reconciliation, prompt rewriting, tests, and terminology. A dedicated package keeps these related behaviors local and keeps `supi-extras` focused on small session conveniences. The package contributes to `@mrclrchtr/supi-settings` but does not bundle it, because two settings extensions make PI expose numbered duplicate commands; standalone users install the settings package separately.

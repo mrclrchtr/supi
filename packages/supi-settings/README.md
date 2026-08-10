@@ -32,7 +32,7 @@ The screen matches Pi's `/settings` layout and groups settings by extension. It 
 
 `supi-settings` is the command package for the shared settings registry in `@mrclrchtr/supi-core`.
 
-Other SuPi extensions register their settings during extension startup. This package renders those registered sections and persists changes back to the appropriate SuPi config scope.
+Other SuPi extensions register asynchronous Settings Modules during extension startup. This package reads their source-aware snapshots, routes `set` and `unset` actions, and shows module-reported failures or reload notices. Fixed SuPi config sections use the shared config adapter; dynamic modules can own other stores without exposing them to this UI.
 
 If no installed SuPi extension has registered settings, `/supi-settings` reports that there are no settings to edit.
 
@@ -46,6 +46,7 @@ Depending on which SuPi packages are installed, the overlay may include settings
 - `supi-cache` — prompt-cache monitoring and history collection
 - `supi-debug` — debug event capture and retention
 - `supi-insights` — report-generation options
+- `supi-skills` — skill load and model-invocation controls
 
 ## Package surfaces
 

@@ -3,7 +3,6 @@ import cloneSession from "./clone-session.ts";
 import copyPrompt from "./copy-prompt.ts";
 import gitEditor from "./git-editor.ts";
 import promptStash from "./prompt-stash.ts";
-import skillShortcut from "./skill-shortcut.ts";
 import supiFooter from "./supi-footer.ts";
 import tabSpinner from "./tab-spinner.ts";
 
@@ -23,6 +22,5 @@ export default function (pi: Parameters<typeof tabSpinner>[0]) {
   cloneSession(pi);
   gitEditor(pi);
   aliases(pi);
-  skillShortcut(pi);
   supiFooter(pi);
 }

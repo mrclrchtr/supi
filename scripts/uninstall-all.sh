@@ -19,6 +19,7 @@ PACKAGES=(
   supi-context
   supi-settings
   supi-debug
+  supi-skills
   supi-extras
   supi-bash-timeout
   supi-web

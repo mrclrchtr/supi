@@ -1,4 +1,4 @@
-import type { SettingsSection } from "@mrclrchtr/supi-core/settings";
+import type { SettingsModule } from "@mrclrchtr/supi-core/settings";
 import { SUPI_SETTINGS_COLLECT_EVENT } from "@mrclrchtr/supi-core/settings";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -10,11 +10,11 @@ vi.mock("../../src/config.ts", () => ({
   BASH_TIMEOUT_DEFAULTS: { defaultTimeout: 120 },
 }));
 
-function collectSection(pi: ReturnType<typeof createPiMock>): SettingsSection {
-  let captured: SettingsSection | undefined;
+function collectModule(pi: ReturnType<typeof createPiMock>): SettingsModule {
+  let captured: SettingsModule | undefined;
   pi.events.emit(SUPI_SETTINGS_COLLECT_EVENT, {
-    add(s: SettingsSection) {
-      captured = s;
+    add(module: SettingsModule) {
+      captured = module;
     },
   });
   return captured!;
@@ -30,8 +30,8 @@ describe("bashTimeout extension", () => {
     const pi = createPiMock();
     bashTimeout(pi as never);
 
-    const section = collectSection(pi);
-    expect(section).toMatchObject({ id: "bash-timeout", label: "Bash Timeout" });
+    const module = collectModule(pi);
+    expect(module).toMatchObject({ id: "bash-timeout", label: "Bash Timeout" });
   });
 
   it("injects default timeout when LLM omits it", async () => {

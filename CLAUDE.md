@@ -97,9 +97,9 @@ Extension packages with prompts/skills:
 
 ## Settings registry
 
-Extensions register config-backed settings via `registerDeclarativeSettings()` from `@mrclrchtr/supi-core/settings`. Call it during the factory function (not async handlers).
+Extensions register a `SettingsModule` via `registerSettings()` from `@mrclrchtr/supi-core/settings`. Call it during the factory function. Fixed SuPi config sections use `defineConfigSettings()`; catalog-backed or multi-store modules implement the same interface directly.
 
-- The registry stores declarative `SettingsField[]` contributions that `/supi-settings` resolves into source-aware rows.
+- Each module provides asynchronous `read()` and `apply()` operations. The module owns persistence and refresh; the UI owns pending and error presentation.
 - `/supi-settings` (from `supi-settings`) renders all registered sections.
 - Scope toggle (Tab) switches between project/global; rows show source badges such as `(project)`, `(global)`, and `(default)`.
 - Enter opens row actions; Space cycles concrete values; Inherit/Reset actions delete the scoped key. Explicit values are distinct from inherited/default values.
@@ -149,7 +149,7 @@ node scripts/publish.mjs packages/supi-lsp     # pack + verify
 node scripts/publish.mjs packages/supi-lsp --publish  # pack + verify + publish
 ```
 
-`pack:check` runs this pipeline as a dry-run for all publishable packages. `pack:verify` runs the full pack + tarball verification for all 16 packages via a parallel Node.js runner (`scripts/pack-all.mjs`).
+`pack:check` runs this pipeline as a dry-run for all publishable packages. `pack:verify` runs the full pack + tarball verification for all publishable packages via a parallel Node.js runner (`scripts/pack-all.mjs`).
 
 Root cause for the staging pipeline: direct `pnpm pack` on workspace packages produces tarball entries with `../` paths to the root `node_modules`. The staged `cp -RL` + `npm pack` approach avoids this because npm produces correct tarballs from a flat, dereferenced `node_modules`.
 
@@ -191,7 +191,7 @@ Multi-context — `CONTEXT-MAP.md` at root pointing to per-package `CONTEXT.md` 
 - Use `createPiMock()` / `makeCtx()` from `@mrclrchtr/supi-test-utils` for pi mocks instead of defining local factories — includes `events`, `getActiveTools`, `sendMessage`, `registerShortcut`, `exec`, `emit`, and `getAllTools`
 - Extension integration tests: mock internal modules, create fake `pi` object capturing handlers via `Map`, then call handlers directly
 - Package-scoped commands: `pnpm vitest run packages/<pkg>/`, `pnpm exec biome check packages/<pkg>`, `pnpm exec tsc -b packages/<pkg>/tsconfig.json`. For shared-config changes, sweep `packages/supi-core/ packages/supi-lsp/ packages/supi-claude-md/`.
-- Global-scope tests for `registerDeclarativeSettings` should pass `homeDir` in the options object rather than mutating `process.env.HOME`.
+- Global-scope tests for `defineConfigSettings` should pass `homeDir` in the options object rather than mutating `process.env.HOME`.
 - `pnpm exec biome check --write --unsafe <files>` — auto-fix unused imports. `--max-diagnostics=20` caps output when the full check OOMs.
 - `ctx.ui.select()` accepts only `string[]`; use label-encoding (e.g. `"[id] name"`) if you need metadata
 - `vi.useFakeTimers()` + `vi.advanceTimersByTime(ms)` — required to trigger `setInterval` callbacks in vitest

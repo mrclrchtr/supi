@@ -37,7 +37,8 @@ Config file locations:
 
 ### Settings helpers
 
-- `registerDeclarativeSettings(pi, options)` — contribute a config-backed declarative settings section with source-aware scoped persistence
+- `registerSettings(pi, module)` — register one canonical asynchronous settings module
+- `defineConfigSettings(options)` — adapt a fixed SuPi config section to that module interface
 - settings registry helpers and types for the `@mrclrchtr/supi-settings` configuration surface
 
 ### Context helpers
@@ -68,25 +69,33 @@ Config file locations:
 
 ```ts
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { loadSupiConfig, registerDeclarativeSettings, wrapExtensionContext } from "@mrclrchtr/supi-core/api";
+import {
+  defineConfigSettings,
+  loadSupiConfig,
+  registerSettings,
+  wrapExtensionContext,
+} from "@mrclrchtr/supi-core/api";
 
 export default function myExtension(pi: ExtensionAPI) {
   const defaults = { enabled: true };
   const config = loadSupiConfig("my-extension", process.cwd(), defaults);
 
-  registerDeclarativeSettings(pi, {
-    id: "my-extension",
-    label: "My Extension",
-    section: "my-extension",
-    defaults,
-    fields: [
-      {
-        kind: "boolean" as const,
-        key: "enabled",
-        label: "Enabled",
-      },
-    ],
-  });
+  registerSettings(
+    pi,
+    defineConfigSettings({
+      id: "my-extension",
+      label: "My Extension",
+      section: "my-extension",
+      defaults,
+      fields: [
+        {
+          kind: "boolean" as const,
+          key: "enabled",
+          label: "Enabled",
+        },
+      ],
+    }),
+  );
 
   const message = wrapExtensionContext("my-extension", "hello", {
     enabled: config.enabled,

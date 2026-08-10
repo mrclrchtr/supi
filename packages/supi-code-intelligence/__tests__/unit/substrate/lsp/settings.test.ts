@@ -9,13 +9,17 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const registerDeclarativeSettingsSpy = vi.fn();
+const settingsSpies = vi.hoisted(() => ({
+  define: vi.fn((options) => options),
+  register: vi.fn(),
+}));
 
 vi.mock("@mrclrchtr/supi-core/settings", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@mrclrchtr/supi-core/settings")>();
   return {
     ...actual,
-    registerDeclarativeSettings: registerDeclarativeSettingsSpy,
+    defineConfigSettings: settingsSpies.define,
+    registerSettings: settingsSpies.register,
   };
 });
 
@@ -54,8 +58,9 @@ describe("LSP settings UI", () => {
     const { registerLspSettings } = await import("../../../../src/substrate/lsp/settings.ts");
     registerLspSettings({ on: vi.fn(), events: { on: vi.fn(), emit: vi.fn() } } as never);
 
-    expect(registerDeclarativeSettingsSpy).toHaveBeenCalledTimes(1);
-    const callArgs = registerDeclarativeSettingsSpy.mock.calls[0]?.[1] as {
+    expect(settingsSpies.define).toHaveBeenCalledTimes(1);
+    expect(settingsSpies.register).toHaveBeenCalledTimes(1);
+    const callArgs = settingsSpies.define.mock.calls[0]?.[0] as {
       fields?: Array<{ key: string; kind: string; submenu?: unknown }>;
     };
     const fields = callArgs?.fields;

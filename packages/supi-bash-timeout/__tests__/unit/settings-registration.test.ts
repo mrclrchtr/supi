@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { SettingsSection } from "@mrclrchtr/supi-core/settings";
+import type { SettingsModule } from "@mrclrchtr/supi-core/settings";
 import { SUPI_SETTINGS_COLLECT_EVENT } from "@mrclrchtr/supi-core/settings";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { registerBashTimeoutSettings } from "../../src/settings-registration.ts";
@@ -28,11 +28,11 @@ function makePi() {
   };
 }
 
-function collect(pi: ReturnType<typeof makePi>): SettingsSection {
-  let captured: SettingsSection | undefined;
+function collect(pi: ReturnType<typeof makePi>): SettingsModule {
+  let captured: SettingsModule | undefined;
   pi.events.emit(SUPI_SETTINGS_COLLECT_EVENT, {
-    add(s: SettingsSection) {
-      captured = s;
+    add(module: SettingsModule) {
+      captured = module;
     },
   });
   return captured!;
@@ -55,15 +55,15 @@ describe("registerBashTimeoutSettings", () => {
   it("registers a bash-timeout settings section", () => {
     const pi = makePi();
     registerBashTimeoutSettings(pi as never);
-    const section = collect(pi);
-    expect(section).toMatchObject({ id: "bash-timeout", label: "Bash Timeout" });
+    const module = collect(pi);
+    expect(module).toMatchObject({ id: "bash-timeout", label: "Bash Timeout" });
   });
 
-  it("loadValues returns one field value with default source", () => {
+  it("read returns one field value with default source", async () => {
     const pi = makePi();
     registerBashTimeoutSettings(pi as never);
-    const section = collect(pi);
-    const values = section.loadValues("project", "/tmp");
+    const module = collect(pi);
+    const { rows: values } = await module.read({ scope: "project", cwd: "/tmp" });
 
     expect(values).toHaveLength(1);
     expect(values[0]).toMatchObject({
@@ -72,7 +72,7 @@ describe("registerBashTimeoutSettings", () => {
     });
   });
 
-  it("loadValues reads the selected scope instead of merged effective config", () => {
+  it("read uses the selected scope instead of merged effective config", async () => {
     const tmpDir = makeTempDir();
     testFiles.push(tmpDir);
 
@@ -90,10 +90,10 @@ describe("registerBashTimeoutSettings", () => {
 
     const pi = makePi();
     registerBashTimeoutSettings(pi as never, tmpDir);
-    const section = collect(pi);
+    const module = collect(pi);
 
-    const globalValues = section.loadValues("global", tmpDir);
-    const projectValues = section.loadValues("project", tmpDir);
+    const { rows: globalValues } = await module.read({ scope: "global", cwd: tmpDir });
+    const { rows: projectValues } = await module.read({ scope: "project", cwd: tmpDir });
 
     expect(globalValues[0]?.source).toBe("global");
     expect(globalValues[0]?.displayValue).toContain("300");
@@ -101,7 +101,7 @@ describe("registerBashTimeoutSettings", () => {
     expect(projectValues[0]?.displayValue).toContain("60");
   });
 
-  it("project scope falls back to defaults when only global config exists", () => {
+  it("project scope falls back to defaults when only global config exists", async () => {
     const tmpDir = makeTempDir();
     testFiles.push(tmpDir);
 
@@ -113,21 +113,26 @@ describe("registerBashTimeoutSettings", () => {
 
     const pi = makePi();
     registerBashTimeoutSettings(pi as never, tmpDir);
-    const section = collect(pi);
-    const projectValues = section.loadValues("project", tmpDir);
+    const module = collect(pi);
+    const { rows: projectValues } = await module.read({ scope: "project", cwd: tmpDir });
 
     expect(projectValues[0]?.source).toBe("global");
     expect(projectValues[0]?.displayValue).toContain("300");
   });
 
-  it("handleAction set writes numeric value", () => {
+  it("apply writes a numeric value", async () => {
     const tmpDir = makeTempDir();
     testFiles.push(tmpDir);
 
     const pi = makePi();
     registerBashTimeoutSettings(pi as never, tmpDir);
-    const section = collect(pi);
-    section.handleAction("global", tmpDir, "defaultTimeout", { kind: "set", value: "300" });
+    const module = collect(pi);
+    await module.apply({
+      scope: "global",
+      cwd: tmpDir,
+      fieldKey: "defaultTimeout",
+      action: { kind: "set", value: "300" },
+    });
 
     const config = JSON.parse(
       fs.readFileSync(path.join(tmpDir, ".pi/agent/supi/config.json"), "utf-8"),

@@ -13,6 +13,7 @@ import {
   SUPI_SETTINGS_COLLECT_EVENT,
 } from "@mrclrchtr/supi-core/settings";
 import { ScopedSettingsList } from "./scoped-settings-list.ts";
+import { readSettingsModules } from "./settings-module-reader.ts";
 
 interface OverlayStatus {
   kind: "warning" | "error";
@@ -25,7 +26,7 @@ interface OverlayState {
   status?: OverlayStatus;
 }
 
-function collectSettingsSections(pi: ExtensionAPI) {
+function collectSettingsModules(pi: ExtensionAPI) {
   const collector = createSettingsContributionCollector();
   pi.events.emit(SUPI_SETTINGS_COLLECT_EVENT, collector);
   return collector.result();
@@ -36,23 +37,32 @@ function latestStatus(diagnostics: SettingsCollectionDiagnostic[]): OverlayStatu
   return latest ? { kind: latest.kind, message: latest.message } : undefined;
 }
 
-export function openSettingsOverlay(pi: ExtensionAPI, ctx: ExtensionContext): void {
-  const collection = collectSettingsSections(pi);
-  if (collection.sections.length === 0) {
+export async function openSettingsOverlay(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
+  const collection = collectSettingsModules(pi);
+  if (collection.modules.length === 0) {
     ctx.ui.notify("No settings registered by SuPi extensions", "info");
     return;
   }
 
+  const initial = await readSettingsModules(collection.modules, {
+    scope: "project",
+    cwd: ctx.cwd,
+    ctx,
+  });
+  const initialError = initial.errors.at(-1);
   void ctx.ui.custom<void>((tui, theme, _kb, done) => {
     const state: OverlayState = {
       scope: "project",
       cwd: ctx.cwd,
-      status: latestStatus(collection.diagnostics),
+      status: initialError
+        ? { kind: "error", message: initialError }
+        : latestStatus(collection.diagnostics),
     };
 
     const container = new Container();
     const scopedList = new ScopedSettingsList(
-      collection.sections,
+      collection.modules,
+      initial.loaded,
       state.scope,
       state.cwd,
       ctx,
@@ -100,9 +110,10 @@ export function openSettingsOverlay(pi: ExtensionAPI, ctx: ExtensionContext): vo
         if (matchesKey(data, Key.tab) && !scopedList.hasOpenSubmenu()) {
           state.scope = state.scope === "project" ? "global" : "project";
           state.status = undefined;
-          scopedList.reload(state.scope, state.cwd, ctx);
-          rebuildOverlay();
-          tui.requestRender();
+          void scopedList.reload(state.scope, state.cwd, ctx).then(() => {
+            rebuildOverlay();
+            tui.requestRender();
+          });
           return true;
         }
         scopedList.handleInput(data);

@@ -13,7 +13,7 @@ vi.mock("@earendil-works/pi-coding-agent", async () => {
 import {
   type BoolField,
   type ScopedFieldValue,
-  type SettingsSection,
+  type SettingsModule,
   SUPI_SETTINGS_COLLECT_EVENT,
 } from "@mrclrchtr/supi-core/settings";
 import {
@@ -24,29 +24,31 @@ import {
 
 const booleanField: BoolField = { kind: "boolean", key: "enabled", label: "Enable" };
 
-function makeSection(overrides: Partial<SettingsSection> = {}): SettingsSection {
+function makeModuleRow(): ScopedFieldValue {
+  return {
+    field: booleanField,
+    displayValue: "on (default)",
+    editValue: "on",
+    source: "default",
+  };
+}
+
+function makeModule(overrides: Partial<SettingsModule> = {}): SettingsModule {
   return {
     id: "test",
     label: "Test",
-    loadValues: () => [
-      {
-        field: booleanField,
-        displayValue: "on (default)",
-        editValue: "on",
-        source: "default",
-      } satisfies ScopedFieldValue,
-    ],
-    handleAction: vi.fn(),
+    read: async () => ({ rows: [makeModuleRow()] }),
+    apply: vi.fn(async () => ({})),
     ...overrides,
   };
 }
 
-function makePi(sections: SettingsSection[]) {
+function makePi(modules: SettingsModule[]) {
   return {
     events: {
-      emit: vi.fn((channel: string, collector: { add(section: SettingsSection): void }) => {
+      emit: vi.fn((channel: string, collector: { add(module: SettingsModule): void }) => {
         expect(channel).toBe(SUPI_SETTINGS_COLLECT_EVENT);
-        for (const section of sections) collector.add(section);
+        for (const module of modules) collector.add(module);
       }),
     },
   };
@@ -149,31 +151,33 @@ describe("createModelPickerSubmenu", () => {
 });
 
 describe("openSettingsOverlay", () => {
-  it("notifies when no settings are contributed", () => {
+  it("notifies when no settings are contributed", async () => {
     const notify = vi.fn();
     const custom = vi.fn();
     const pi = makePi([]);
 
-    openSettingsOverlay(pi as never, { cwd: "/tmp", ui: { notify, custom } } as never);
+    await openSettingsOverlay(pi as never, { cwd: "/tmp", ui: { notify, custom } } as never);
 
     expect(notify).toHaveBeenCalledWith("No settings registered by SuPi extensions", "info");
     expect(custom).not.toHaveBeenCalled();
   });
 
-  it("starts in project scope and reloads settings on Tab", () => {
-    const loadScopes: Array<"project" | "global"> = [];
+  it("starts in project scope and reloads settings on Tab", async () => {
+    const readScopes: Array<"project" | "global"> = [];
     const pi = makePi([
-      makeSection({
-        loadValues: (scope) => {
-          loadScopes.push(scope);
-          return [
-            {
-              field: booleanField,
-              displayValue: "on (default)",
-              editValue: "on",
-              source: "default",
-            } satisfies ScopedFieldValue,
-          ];
+      makeModule({
+        read: async ({ scope }) => {
+          readScopes.push(scope);
+          return {
+            rows: [
+              {
+                field: booleanField,
+                displayValue: "on (default)",
+                editValue: "on",
+                source: "default",
+              } satisfies ScopedFieldValue,
+            ],
+          };
         },
       }),
     ]);
@@ -187,29 +191,30 @@ describe("openSettingsOverlay", () => {
       return Promise.resolve();
     });
 
-    openSettingsOverlay(pi as never, { cwd: "/tmp", ui: { custom, notify: vi.fn() } } as never);
+    await openSettingsOverlay(
+      pi as never,
+      {
+        cwd: "/tmp",
+        ui: { custom, notify: vi.fn() },
+      } as never,
+    );
 
     expect(custom).toHaveBeenCalledOnce();
-    expect(loadScopes).toEqual(["project"]);
+    expect(readScopes).toEqual(["project"]);
     expect(component?.handleInput?.("\t")).toBe(true);
-    expect(loadScopes).toEqual(["project", "global"]);
-    expect(requestRender).toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(readScopes).toEqual(["project", "global"]);
+      expect(requestRender).toHaveBeenCalled();
+    });
   });
 
-  it("keeps Tab in an open setting menu", () => {
-    const loadScopes: Array<"project" | "global"> = [];
+  it("keeps Tab in an open setting menu", async () => {
+    const readScopes: Array<"project" | "global"> = [];
     const pi = makePi([
-      makeSection({
-        loadValues: (scope) => {
-          loadScopes.push(scope);
-          return [
-            {
-              field: booleanField,
-              displayValue: "on (default)",
-              editValue: "on",
-              source: "default",
-            } satisfies ScopedFieldValue,
-          ];
+      makeModule({
+        read: async ({ scope }) => {
+          readScopes.push(scope);
+          return { rows: [makeModuleRow()] };
         },
       }),
     ]);
@@ -224,15 +229,21 @@ describe("openSettingsOverlay", () => {
       return Promise.resolve();
     });
 
-    openSettingsOverlay(pi as never, { cwd: "/tmp", ui: { custom, notify: vi.fn() } } as never);
+    await openSettingsOverlay(
+      pi as never,
+      {
+        cwd: "/tmp",
+        ui: { custom, notify: vi.fn() },
+      } as never,
+    );
     component?.handleInput?.("\r");
     component?.handleInput?.("\t");
 
-    expect(loadScopes).toEqual(["project"]);
+    expect(readScopes).toEqual(["project"]);
   });
 
-  it("delegates Escape to close", () => {
-    const pi = makePi([makeSection()]);
+  it("delegates Escape to close", async () => {
+    const pi = makePi([makeModule()]);
     let component: { handleInput?: (data: string) => boolean } | undefined;
     const done = vi.fn();
     const custom = vi.fn((factory: (...args: unknown[]) => unknown) => {
@@ -242,14 +253,20 @@ describe("openSettingsOverlay", () => {
       return Promise.resolve();
     });
 
-    openSettingsOverlay(pi as never, { cwd: "/tmp", ui: { custom, notify: vi.fn() } } as never);
+    await openSettingsOverlay(
+      pi as never,
+      {
+        cwd: "/tmp",
+        ui: { custom, notify: vi.fn() },
+      } as never,
+    );
 
     expect(component?.handleInput?.("\u001b")).toBe(true);
     expect(done).toHaveBeenCalled();
   });
 
-  it("renders duplicate contribution warnings in the overlay status line", () => {
-    const pi = makePi([makeSection({ label: "First" }), makeSection({ label: "Second" })]);
+  it("renders duplicate contribution warnings in the overlay status line", async () => {
+    const pi = makePi([makeModule({ label: "First" }), makeModule({ label: "Second" })]);
     let _component: { render(width: number): string[] } | undefined;
     const custom = vi.fn((factory: (...args: unknown[]) => unknown) => {
       _component = factory({ requestRender: vi.fn() }, makeTheme(), undefined, vi.fn()) as {
@@ -258,7 +275,13 @@ describe("openSettingsOverlay", () => {
       return Promise.resolve();
     });
 
-    openSettingsOverlay(pi as never, { cwd: "/tmp", ui: { custom, notify: vi.fn() } } as never);
+    await openSettingsOverlay(
+      pi as never,
+      {
+        cwd: "/tmp",
+        ui: { custom, notify: vi.fn() },
+      } as never,
+    );
 
     expect(custom).toHaveBeenCalledOnce();
   });

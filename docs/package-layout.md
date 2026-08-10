@@ -127,6 +127,7 @@ When multiple SuPi packages need the same path, URI, config, or session helper s
 | `supi-insights` | flat source is fine; move tests to package-level `__tests__/unit/` |
 | `supi-lsp` | hybrid large-package layout with `client/`, `config/`, `diagnostics/`, `manager/`, `provider/`, `session/` |
 | `supi-review` | likely hybrid with `ui/` and `tool/` if reorganized |
+| `supi-skills` | flat skill controls and input shortcuts domain |
 | `supi-test-utils` | stay flat utility package |
 | `supi-tree-sitter` | hybrid: root surfaces + `tool/` + `session/` |
 | `supi-web` | mostly flat; use `tool/` for per-tool guidance files when multiple tools are present |

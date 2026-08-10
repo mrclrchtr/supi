@@ -1,35 +1,53 @@
-// Event-backed settings contribution types for SuPi extensions.
-//
-// Extensions contribute declarative settings sections through PI's shared
-// event bus. The public helper is registerDeclarativeSettings(pi, ...); this module
-// owns the internal collector protocol used by /supi-settings.
+// Event-backed settings module registration and collection.
 
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { ScopedFieldValue, SettingsFieldAction } from "./settings-schema.ts";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ScopedFieldValue, SettingsAction } from "./settings-schema.ts";
 
 export const SUPI_SETTINGS_COLLECT_EVENT = "supi:settings:collect";
 
 export type SettingsScope = "project" | "global";
 
-export interface SettingsSection {
-  /** Stable contribution identifier — e.g. "lsp", "claude-md". */
+/** Scope and PI runtime state supplied for each settings read. */
+export interface SettingsContext {
+  scope: SettingsScope;
+  cwd: string;
+  ctx?: ExtensionContext;
+}
+
+/** A resolved, source-aware settings view. */
+export interface SettingsSnapshot {
+  rows: ScopedFieldValue[];
+}
+
+/** One user action routed to its owning settings module. */
+export interface SettingsActionRequest extends SettingsContext {
+  fieldKey: string;
+  action: SettingsAction;
+}
+
+/** Optional user-facing result from a successful settings action. */
+export interface SettingsApplyResult {
+  notice?: {
+    message: string;
+    level: "info" | "warning" | "error";
+  };
+}
+
+/**
+ * Canonical settings interface consumed by `/supi-settings`.
+ *
+ * Reads are always asynchronous. Apply resolves only after durable writes and
+ * module-owned refresh work complete. Implementations throw on failed writes.
+ */
+export interface SettingsModule {
   id: string;
-  /** Human-readable label shown in the UI. */
   label: string;
-  /** Load current ScopedFieldValue[] for the given scope. */
-  loadValues: (scope: SettingsScope, cwd: string, ctx?: ExtensionContext) => ScopedFieldValue[];
-  /** Handle a user action on a field in the selected scope. */
-  handleAction: (
-    scope: SettingsScope,
-    cwd: string,
-    fieldKey: string,
-    action: SettingsFieldAction,
-    ctx?: ExtensionContext,
-  ) => void;
+  read(context: SettingsContext): Promise<SettingsSnapshot>;
+  apply(request: SettingsActionRequest): Promise<SettingsApplyResult>;
 }
 
 export interface SettingsContributionCollector {
-  add(section: SettingsSection): void;
+  add(module: SettingsModule): void;
 }
 
 export interface SettingsCollectionDiagnostic {
@@ -38,7 +56,7 @@ export interface SettingsCollectionDiagnostic {
 }
 
 export interface SettingsCollectionResult {
-  sections: SettingsSection[];
+  modules: SettingsModule[];
   diagnostics: SettingsCollectionDiagnostic[];
 }
 
@@ -56,21 +74,29 @@ export function isSettingsContributionCollector(
 export function createSettingsContributionCollector(): SettingsContributionCollector & {
   result(): SettingsCollectionResult;
 } {
-  const sections = new Map<string, SettingsSection>();
+  const modules = new Map<string, SettingsModule>();
   const diagnostics: SettingsCollectionDiagnostic[] = [];
 
   return {
-    add(section: SettingsSection): void {
-      if (sections.has(section.id)) {
+    add(module: SettingsModule): void {
+      if (modules.has(module.id)) {
         diagnostics.push({
           kind: "warning",
-          message: `Duplicate SuPi settings contribution "${section.id}"; using the last contribution.`,
+          message: `Duplicate SuPi settings contribution "${module.id}"; using the last contribution.`,
         });
       }
-      sections.set(section.id, section);
+      modules.set(module.id, module);
     },
     result(): SettingsCollectionResult {
-      return { sections: Array.from(sections.values()), diagnostics: [...diagnostics] };
+      return { modules: Array.from(modules.values()), diagnostics: [...diagnostics] };
     },
   };
+}
+
+/** Register one settings module during extension factory setup. */
+export function registerSettings(pi: ExtensionAPI, module: SettingsModule): void {
+  const dispose = pi.events.on(SUPI_SETTINGS_COLLECT_EVENT, (collector) => {
+    if (isSettingsContributionCollector(collector)) collector.add(module);
+  });
+  pi.on("session_shutdown", () => dispose());
 }

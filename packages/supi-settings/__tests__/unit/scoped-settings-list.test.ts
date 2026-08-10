@@ -1,6 +1,12 @@
-import type { BoolField, ScopedFieldValue, SettingsSection } from "@mrclrchtr/supi-core/settings";
+import type {
+  BoolField,
+  ScopedFieldValue,
+  SettingsApplyResult,
+  SettingsModule,
+} from "@mrclrchtr/supi-core/settings";
 import { describe, expect, it, vi } from "vitest";
 import { ScopedSettingsList } from "../../src/ui/scoped-settings-list.ts";
+import type { LoadedSettingsModule } from "../../src/ui/settings-module-reader.ts";
 
 const field: BoolField = { kind: "boolean", key: "enabled", label: "Enabled" };
 
@@ -11,48 +17,53 @@ function makeTheme() {
   };
 }
 
-function makeSection(): SettingsSection {
+function settingsRow(fieldOverride: BoolField = field): ScopedFieldValue {
   return {
-    id: "test",
-    label: "Test",
-    loadValues: () =>
-      [
-        {
-          field,
-          displayValue: "on (project)",
-          editValue: "on",
-          source: "project",
-          inheritanceSource: "default",
-        },
-      ] satisfies ScopedFieldValue[],
-    handleAction: vi.fn(),
+    field: fieldOverride,
+    displayValue: "on (project)",
+    editValue: "on",
+    source: "project",
+    inheritanceSource: "default",
   };
 }
 
+function makeModule(rows: ScopedFieldValue[] = [settingsRow()]): SettingsModule {
+  return {
+    id: "test",
+    label: "Test",
+    read: vi.fn(async () => ({ rows })),
+    apply: vi.fn(async () => ({})),
+  };
+}
+
+function loaded(module: SettingsModule, rows: ScopedFieldValue[]): LoadedSettingsModule {
+  return { module, snapshot: { rows } };
+}
+
+function makeList(module: SettingsModule, rows: ScopedFieldValue[], requestRender = vi.fn()) {
+  return new ScopedSettingsList(
+    [module],
+    [loaded(module, rows)],
+    "project",
+    "/repo",
+    undefined,
+    makeTheme() as never,
+    { requestRender },
+    vi.fn(),
+  );
+}
+
 describe("ScopedSettingsList", () => {
-  it("groups settings by section and shows the selected description", () => {
+  it("groups settings by module and shows the selected description", () => {
     const describedField: BoolField = {
       ...field,
       description: "Controls the test feature",
     };
-    const sections: SettingsSection[] = [
-      {
-        ...makeSection(),
-        id: "alpha",
-        label: "Alpha",
-        loadValues: () => [
-          {
-            field: describedField,
-            displayValue: "on (project)",
-            editValue: "on",
-            source: "project",
-          },
-        ],
-      },
-      { ...makeSection(), id: "beta", label: "Beta" },
-    ];
+    const alpha = { ...makeModule(), id: "alpha", label: "Alpha" };
+    const beta = { ...makeModule(), id: "beta", label: "Beta" };
     const list = new ScopedSettingsList(
-      sections,
+      [alpha, beta],
+      [loaded(alpha, [settingsRow(describedField)]), loaded(beta, [settingsRow()])],
       "project",
       "/repo",
       undefined,
@@ -69,17 +80,31 @@ describe("ScopedSettingsList", () => {
     expect(rendered).toContain("Controls the test feature");
   });
 
+  it("awaits asynchronous persistence before reading a fresh snapshot", async () => {
+    let finish: (() => void) | undefined;
+    const rows = [settingsRow()];
+    const module: SettingsModule = {
+      ...makeModule(rows),
+      apply: vi.fn(
+        () =>
+          new Promise<SettingsApplyResult>((resolve) => {
+            finish = () => resolve({});
+          }),
+      ),
+    };
+    const list = makeList(module, rows);
+
+    list.handleInput(" ");
+    expect(module.read).not.toHaveBeenCalled();
+    finish?.();
+
+    await vi.waitFor(() => expect(module.read).toHaveBeenCalledOnce());
+  });
+
   it("requests a re-render after delegated submenu input", () => {
     const requestRender = vi.fn();
-    const list = new ScopedSettingsList(
-      [makeSection()],
-      "project",
-      "/repo",
-      undefined,
-      makeTheme() as never,
-      { requestRender },
-      vi.fn(),
-    );
+    const module = makeModule();
+    const list = makeList(module, [settingsRow()], requestRender);
 
     list.handleInput("\r");
     requestRender.mockClear();
