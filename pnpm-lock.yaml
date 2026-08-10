@@ -68,13 +68,13 @@ importers:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.83.0
+        version: 0.84.1
       '@mrclrchtr/supi-agent-runtime':
         specifier: workspace:*
         version: link:../supi-agent-runtime
@@ -102,10 +102,10 @@ importers:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core

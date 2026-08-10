@@ -1,5 +1,3 @@
-// Source-aware settings list with scope actions and custom submenus.
-
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Input, Key, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { SettingsAction, SettingsModule, SettingsScope } from "@mrclrchtr/supi-core/settings";
@@ -13,7 +11,7 @@ import { renderDescriptionViewport } from "./settings-list-layout.ts";
 import { type LoadedSettingsModule, readSettingsModules } from "./settings-module-reader.ts";
 import {
   filterSettingsRows,
-  maxVisibleSectionCount,
+  maxVisibleHeaderCount,
   rowsFromModules,
   type ScopedRow,
 } from "./settings-row-model.ts";
@@ -66,7 +64,6 @@ export class ScopedSettingsList {
     this.onError = onError;
     this.rebuildRows(initial);
   }
-
   async reload(scope: SettingsScope, cwd: string, ctx?: ExtensionContext): Promise<void> {
     this.scope = scope;
     this.cwd = cwd;
@@ -89,12 +86,10 @@ export class ScopedSettingsList {
   hasOpenSubmenu(): boolean {
     return this.submenu !== null || this.actionPending;
   }
-
   invalidate(): void {
     this.cachedWidth = undefined;
     this.cachedLines = undefined;
   }
-
   render(width: number): string[] {
     if (this.cachedLines && this.cachedWidth === width) return this.cachedLines;
     if (this.submenu) {
@@ -106,7 +101,6 @@ export class ScopedSettingsList {
     this.cachedLines = this.renderList(width);
     return this.cachedLines;
   }
-
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: One pass handles filtering, grouping, selection, scrolling, and descriptions.
   private renderList(width: number): string[] {
     const lines: string[] = [];
@@ -137,7 +131,8 @@ export class ScopedSettingsList {
       Math.max(...displayRows.map((row) => visibleWidth(row.field.field.label))),
     );
     let previousSection: string | undefined;
-    let visibleSectionCount = 0;
+    let previousSubsection: string | undefined;
+    let visibleHeaderCount = 0;
     for (let i = start; i < end; i++) {
       const row = displayRows[i];
       if (!row) continue;
@@ -145,22 +140,33 @@ export class ScopedSettingsList {
         lines.push(
           truncateToWidth(`  ${this.theme.fg("muted", this.theme.bold(row.moduleLabel))}`, width),
         );
-        visibleSectionCount++;
+        visibleHeaderCount++;
         previousSection = row.moduleLabel;
+        previousSubsection = undefined;
+      }
+      if (row.subsectionLabel !== previousSubsection) {
+        previousSubsection = row.subsectionLabel;
+        if (row.subsectionLabel) {
+          lines.push(truncateToWidth(`    ${this.theme.fg("dim", row.subsectionLabel)}`, width));
+          visibleHeaderCount++;
+        }
       }
       const isSelected = i === this.selectedIndex;
-      const prefix = isSelected ? `  ${this.theme.fg("accent", "→ ")}` : "    ";
+      const indent = row.subsectionLabel ? 6 : 4;
+      const prefix = isSelected
+        ? `${" ".repeat(indent - 2)}${this.theme.fg("accent", "→ ")}`
+        : " ".repeat(indent);
       const label = row.field.field.label.padEnd(
         row.field.field.label.length + maxLabelWidth - visibleWidth(row.field.field.label),
       );
       const labelText = this.theme.fg(isSelected ? "accent" : "text", label);
-      const valueWidth = Math.max(0, width - 4 - maxLabelWidth - 2);
+      const valueWidth = Math.max(0, width - indent - maxLabelWidth - 2);
       const value = truncateToWidth(row.field.displayValue, valueWidth, "");
       const valueText = this.theme.fg(isSelected ? "accent" : "muted", value);
       lines.push(truncateToWidth(`${prefix}${labelText}  ${valueText}`, width));
     }
-    const reservedSectionCount = maxVisibleSectionCount(displayRows, maxVisible);
-    for (let i = visibleSectionCount; i < reservedSectionCount; i++) lines.push("");
+    const reservedHeaderCount = maxVisibleHeaderCount(displayRows, maxVisible);
+    for (let i = visibleHeaderCount; i < reservedHeaderCount; i++) lines.push("");
     if (start > 0 || end < displayRows.length) {
       lines.push(this.theme.fg("dim", `  (${this.selectedIndex + 1}/${displayRows.length})`));
     }

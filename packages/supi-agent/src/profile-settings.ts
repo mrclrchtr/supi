@@ -14,9 +14,9 @@ import {
   isSettingsContributionCollector,
   type ModelPickerField,
   type ScopedFieldValue,
-  type SettingsFieldAction,
+  type SettingsAction,
+  type SettingsModule,
   type SettingsScope,
-  type SettingsSection,
   SUPI_SETTINGS_COLLECT_EVENT,
 } from "@mrclrchtr/supi-core/settings";
 import { resolveProfileDefinition } from "./profile-catalogue.ts";
@@ -61,32 +61,34 @@ const THINKING_FIELD: EnumField = {
 
 /** Register one dynamic settings contribution per discovered Profile ID. */
 export function registerProfileSettings(pi: ExtensionAPI, catalogue: ProfileCatalogue): () => void {
-  const sections = createProfileSettingsSections(catalogue);
+  const modules = createProfileSettingsSections(catalogue);
   return pi.events.on(SUPI_SETTINGS_COLLECT_EVENT, (collector) => {
     if (!isSettingsContributionCollector(collector)) return;
-    for (const section of sections) collector.add(section);
+    for (const module of modules) collector.add(module);
   });
 }
 
-/** Build the profile settings sections for one immutable catalogue snapshot. */
+/** Build the profile settings modules for one immutable catalogue snapshot. */
 export function createProfileSettingsSections(
   catalogue: ProfileCatalogue,
-): readonly SettingsSection[] {
+): readonly SettingsModule[] {
   return catalogue.profiles.map((entry) => createProfileSettingsSection(entry, catalogue));
 }
 
-/** Build one Profile ID's Model and Thinking settings section. */
+/** Build one Profile ID's Model and Thinking settings module. */
 export function createProfileSettingsSection(
   entry: ProfileCatalogueEntry,
   catalogue: ProfileCatalogue,
-): SettingsSection {
+): SettingsModule {
   return {
     id: `agent-profile-${entry.id}`,
-    label: `Agent ${entry.id}`,
-    loadValues: (scope) => loadProfileSettings(entry, catalogue, scope),
-    handleAction: (scope, _cwd, fieldKey, action) => {
-      if (fieldKey !== "model" && fieldKey !== "thinking") return;
+    label: "Agent",
+    subsection: entry.id,
+    read: async ({ scope }) => ({ rows: loadProfileSettings(entry, catalogue, scope) }),
+    apply: async ({ scope, fieldKey, action }) => {
+      if (fieldKey !== "model" && fieldKey !== "thinking") return {};
       persistProfileField({ entry, catalogue, scope, field: fieldKey, action });
+      return {};
     },
   };
 }
@@ -262,7 +264,7 @@ function persistProfileField(options: {
   catalogue: ProfileCatalogue;
   scope: SettingsScope;
   field: "model" | "thinking";
-  action: SettingsFieldAction;
+  action: SettingsAction;
 }): void {
   const { entry, catalogue, scope, field, action } = options;
   const directory = writableProfileDirectory(entry, catalogue, scope);

@@ -61,9 +61,20 @@ describe("ScopedSettingsList", () => {
     };
     const alpha = { ...makeModule(), id: "alpha", label: "Alpha" };
     const beta = { ...makeModule(), id: "beta", label: "Beta" };
+    const alphaProfile = {
+      ...makeModule(),
+      id: "alpha-profile-explore",
+      label: "Alpha",
+      subsection: "explore",
+    };
+    const profileRow = settingsRow({ ...field, key: "model", label: "Model" });
     const list = new ScopedSettingsList(
-      [alpha, beta],
-      [loaded(alpha, [settingsRow(describedField)]), loaded(beta, [settingsRow()])],
+      [alpha, beta, alphaProfile],
+      [
+        loaded(alpha, [settingsRow(describedField)]),
+        loaded(beta, [settingsRow()]),
+        loaded(alphaProfile, [profileRow]),
+      ],
       "project",
       "/repo",
       undefined,
@@ -75,18 +86,24 @@ describe("ScopedSettingsList", () => {
     const rendered = list.render(80).join("\n");
 
     expect(rendered).toContain("  Alpha\n  → Enabled");
+    expect(rendered).toContain("    explore\n      Model");
     expect(rendered).toContain("  Beta\n    Enabled");
     expect(rendered).not.toContain("Alpha: Enabled");
     expect(rendered).toContain("Controls the test feature");
   });
 
-  it("keeps its height stable when a section header enters the viewport", () => {
+  it("keeps its height stable when group headers enter the viewport", () => {
     const alphaRows = Array.from({ length: 11 }, (_, index) =>
       settingsRow({ ...field, key: `alpha-${index}`, label: `Alpha ${index}` }),
     );
     const betaRows = [settingsRow({ ...field, key: "beta", label: "Beta" })];
     const alpha = { ...makeModule(alphaRows), id: "alpha", label: "Alpha section" };
-    const beta = { ...makeModule(betaRows), id: "beta", label: "Beta section" };
+    const beta = {
+      ...makeModule(betaRows),
+      id: "beta",
+      label: "Beta section",
+      subsection: "explore",
+    };
     const list = new ScopedSettingsList(
       [alpha, beta],
       [loaded(alpha, alphaRows), loaded(beta, betaRows)],
@@ -103,7 +120,7 @@ describe("ScopedSettingsList", () => {
     const laterLines = list.render(80);
 
     expect(firstLines.join("\n")).not.toContain("Beta section");
-    expect(laterLines.join("\n")).toContain("Beta section");
+    expect(laterLines.join("\n")).toContain("Beta section\n    explore");
     expect(laterLines).toHaveLength(firstLines.length);
   });
 

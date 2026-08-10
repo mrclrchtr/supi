@@ -41,7 +41,10 @@ export interface SettingsApplyResult {
  */
 export interface SettingsModule {
   id: string;
+  /** Human-readable section label shown in the UI. */
   label: string;
+  /** Optional label that groups this module within its section. */
+  subsection?: string;
   read(context: SettingsContext): Promise<SettingsSnapshot>;
   apply(request: SettingsActionRequest): Promise<SettingsApplyResult>;
 }
