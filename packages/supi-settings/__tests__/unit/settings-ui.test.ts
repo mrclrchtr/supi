@@ -196,6 +196,41 @@ describe("openSettingsOverlay", () => {
     expect(requestRender).toHaveBeenCalled();
   });
 
+  it("keeps Tab in an open setting menu", () => {
+    const loadScopes: Array<"project" | "global"> = [];
+    const pi = makePi([
+      makeSection({
+        loadValues: (scope) => {
+          loadScopes.push(scope);
+          return [
+            {
+              field: booleanField,
+              displayValue: "on (default)",
+              editValue: "on",
+              source: "default",
+            } satisfies ScopedFieldValue,
+          ];
+        },
+      }),
+    ]);
+    let component: { handleInput?: (data: string) => boolean } | undefined;
+    const custom = vi.fn((factory: (...args: unknown[]) => unknown) => {
+      component = factory(
+        { requestRender: vi.fn() },
+        makeTheme(),
+        undefined,
+        vi.fn(),
+      ) as typeof component;
+      return Promise.resolve();
+    });
+
+    openSettingsOverlay(pi as never, { cwd: "/tmp", ui: { custom, notify: vi.fn() } } as never);
+    component?.handleInput?.("\r");
+    component?.handleInput?.("\t");
+
+    expect(loadScopes).toEqual(["project"]);
+  });
+
   it("delegates Escape to close", () => {
     const pi = makePi([makeSection()]);
     let component: { handleInput?: (data: string) => boolean } | undefined;

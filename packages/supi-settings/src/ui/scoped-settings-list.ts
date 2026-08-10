@@ -1,11 +1,14 @@
-// Scoped settings list component for SuPi settings overlay.
-//
-// Replaces pi-tui's generic SettingsList with a source-aware list that
-// renders source badges, dispatches Enter / Space / action-menu semantics,
-// and delegates custom-field submenus.
+// Source-aware settings list with scope actions and custom submenus.
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Input, Key, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
+import {
+  Input,
+  Key,
+  matchesKey,
+  truncateToWidth,
+  visibleWidth,
+  wrapTextWithAnsi,
+} from "@earendil-works/pi-tui";
 import type {
   ScopedFieldValue,
   SettingsFieldAction,
@@ -20,10 +23,6 @@ import {
 } from "./settings-action-menu.ts";
 import { createInputSubmenu, createModelPickerSubmenu } from "./settings-submenus.ts";
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Scoped settings list
-// ═══════════════════════════════════════════════════════════════════════════
-
 interface ScopedRow {
   flatId: string;
   sectionLabel: string;
@@ -36,7 +35,6 @@ interface SubmenuState {
     invalidate?: () => void;
     handleInput?: (data: string) => void;
   };
-  onDone: () => void;
 }
 
 export class ScopedSettingsList {
@@ -83,8 +81,13 @@ export class ScopedSettingsList {
     this.cwd = cwd;
     this.ctx = ctx;
     this.rebuildRows();
-    this.selectedIndex = Math.min(this.selectedIndex, Math.max(0, this.rows.length - 1));
+    this.selectedIndex = Math.min(this.selectedIndex, Math.max(0, this.filteredRows().length - 1));
     this.invalidate();
+  }
+
+  /** Return true while a setting editor or action menu has input focus. */
+  hasOpenSubmenu(): boolean {
+    return this.submenu !== null;
   }
 
   invalidate(): void {
@@ -104,6 +107,7 @@ export class ScopedSettingsList {
     return this.cachedLines;
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: One pass handles filtering, grouping, selection, scrolling, and descriptions.
   private renderList(width: number): string[] {
     const lines: string[] = [];
     if (this.searchInput) {
@@ -122,36 +126,57 @@ export class ScopedSettingsList {
       lines.push(this.renderHint(width));
       return lines;
     }
-    const maxVisible = Math.min(displayRows.length + 2, 20);
+    const maxVisible = Math.min(displayRows.length, 10);
     const start = Math.max(
       0,
       Math.min(this.selectedIndex - Math.floor(maxVisible / 2), displayRows.length - maxVisible),
     );
     const end = Math.min(start + maxVisible, displayRows.length);
+    const maxLabelWidth = Math.min(
+      30,
+      Math.max(...displayRows.map((row) => visibleWidth(row.field.field.label))),
+    );
+    let previousSection: string | undefined;
     for (let i = start; i < end; i++) {
       const row = displayRows[i];
       if (!row) continue;
+      if (row.sectionLabel !== previousSection) {
+        lines.push(
+          truncateToWidth(`  ${this.theme.fg("muted", this.theme.bold(row.sectionLabel))}`, width),
+        );
+        previousSection = row.sectionLabel;
+      }
       const isSelected = i === this.selectedIndex;
-      const prefix = isSelected ? "› " : "  ";
-      const section = this.theme.fg("dim", `${row.sectionLabel}: `);
-      const label = isSelected
-        ? this.theme.fg("accent", row.field.field.label)
-        : this.theme.fg("text", row.field.field.label);
-      lines.push(truncateToWidth(`${prefix}${section}${label}  ${row.field.displayValue}`, width));
+      const prefix = isSelected ? `  ${this.theme.fg("accent", "→ ")}` : "    ";
+      const label = row.field.field.label.padEnd(
+        row.field.field.label.length + maxLabelWidth - visibleWidth(row.field.field.label),
+      );
+      const labelText = this.theme.fg(isSelected ? "accent" : "text", label);
+      const valueWidth = Math.max(0, width - 4 - maxLabelWidth - 2);
+      const value = truncateToWidth(row.field.displayValue, valueWidth, "");
+      const valueText = this.theme.fg(isSelected ? "accent" : "muted", value);
+      lines.push(truncateToWidth(`${prefix}${labelText}  ${valueText}`, width));
     }
     if (start > 0 || end < displayRows.length) {
       lines.push(this.theme.fg("dim", `  (${this.selectedIndex + 1}/${displayRows.length})`));
+    }
+    const description = displayRows[this.selectedIndex]?.field.field.description;
+    if (description) {
+      lines.push("");
+      for (const line of wrapTextWithAnsi(description, Math.max(1, width - 4))) {
+        lines.push(this.theme.fg("dim", `  ${line}`));
+      }
     }
     lines.push("");
     lines.push(this.renderHint(width));
     return lines;
   }
 
-  private renderHint(_width: number): string {
+  private renderHint(width: number): string {
     const hints = [];
     if (this.searchInput) hints.push("Type to search");
-    hints.push("Enter actions", "Space cycle", "Esc close");
-    return this.theme.fg("dim", hints.join(" · "));
+    hints.push("Enter for actions", "Space to cycle", "Tab for scope", "Esc to close");
+    return truncateToWidth(this.theme.fg("dim", hints.join(" · ")), width);
   }
 
   handleInput(data: string): void {
@@ -231,6 +256,7 @@ export class ScopedSettingsList {
     const q = this.searchQuery.toLowerCase();
     return this.rows.filter(
       (r) =>
+        r.sectionLabel.toLowerCase().includes(q) ||
         r.field.field.label.toLowerCase().includes(q) ||
         r.field.field.key.toLowerCase().includes(q) ||
         r.field.displayValue.toLowerCase().includes(q),
@@ -246,11 +272,6 @@ export class ScopedSettingsList {
     if (menu.length === 0) return;
     this.submenu = {
       component: createActionMenuComponent(menu, this.doneAction(row), this.theme),
-      onDone: () => {
-        this.submenu = null;
-        this.invalidate();
-        this.tui.requestRender();
-      },
     };
     this.invalidate();
     this.tui.requestRender();
@@ -308,15 +329,7 @@ export class ScopedSettingsList {
         this.cwd,
         this.ctx,
       );
-      this.submenu = {
-        component: comp,
-        onDone: () => {
-          this.submenu = null;
-          this.reload(this.scope, this.cwd, this.ctx);
-          this.invalidate();
-          this.tui.requestRender();
-        },
-      };
+      this.submenu = { component: comp };
     } else if (row.field.field.kind === "modelPicker") {
       this.submenu = {
         component: createModelPickerSubmenu(
@@ -330,11 +343,6 @@ export class ScopedSettingsList {
           this.ctx,
           row.field.field,
         ),
-        onDone: () => {
-          this.submenu = null;
-          this.invalidate();
-          this.tui.requestRender();
-        },
       };
     } else {
       const label =
@@ -348,11 +356,6 @@ export class ScopedSettingsList {
           this.invalidate();
           this.tui.requestRender();
         }),
-        onDone: () => {
-          this.submenu = null;
-          this.invalidate();
-          this.tui.requestRender();
-        },
       };
     }
     this.invalidate();

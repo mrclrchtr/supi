@@ -30,6 +30,45 @@ function makeSection(): SettingsSection {
 }
 
 describe("ScopedSettingsList", () => {
+  it("groups settings by section and shows the selected description", () => {
+    const describedField: BoolField = {
+      ...field,
+      description: "Controls the test feature",
+    };
+    const sections: SettingsSection[] = [
+      {
+        ...makeSection(),
+        id: "alpha",
+        label: "Alpha",
+        loadValues: () => [
+          {
+            field: describedField,
+            displayValue: "on (project)",
+            editValue: "on",
+            source: "project",
+          },
+        ],
+      },
+      { ...makeSection(), id: "beta", label: "Beta" },
+    ];
+    const list = new ScopedSettingsList(
+      sections,
+      "project",
+      "/repo",
+      undefined,
+      makeTheme() as never,
+      { requestRender: vi.fn() },
+      vi.fn(),
+    );
+
+    const rendered = list.render(80).join("\n");
+
+    expect(rendered).toContain("  Alpha\n  → Enabled");
+    expect(rendered).toContain("  Beta\n    Enabled");
+    expect(rendered).not.toContain("Alpha: Enabled");
+    expect(rendered).toContain("Controls the test feature");
+  });
+
   it("requests a re-render after delegated submenu input", () => {
     const requestRender = vi.fn();
     const list = new ScopedSettingsList(
