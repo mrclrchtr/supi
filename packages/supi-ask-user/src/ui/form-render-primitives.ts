@@ -17,7 +17,9 @@ export function renderMiniBox(
   const lines = [
     border(`╭${"─".repeat(safe - 2)}╮`),
     `${border("│")} ${padRight(theme.fg("accent", theme.bold(title)), innerWidth)} ${border("│")}`,
-    ...bodyLines.map((line) => `${border("│")} ${padRight(line, innerWidth)} ${border("│")}`),
+    ...bodyLines
+      .flatMap((line) => wrapTextWithAnsi(line, innerWidth))
+      .map((line) => `${border("│")} ${padRight(line, innerWidth)} ${border("│")}`),
     border(`╰${"─".repeat(safe - 2)}╯`),
   ];
 
