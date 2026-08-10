@@ -44,6 +44,32 @@ describe("LspManager concurrency guard", () => {
     vi.restoreAllMocks();
   });
 
+  it("uses the resolved project route for availability state", () => {
+    const sessionCwd = makeTempRoot();
+    const manager = new LspManager(
+      {
+        servers: {
+          typescript: {
+            command: "node",
+            args: [],
+            fileTypes: ["ts"],
+            rootMarkers: ["package.json"],
+          },
+        },
+      },
+      sessionCwd,
+    );
+    const key = `typescript:${sessionCwd}`;
+
+    try {
+      expect(manager.canServeFile("src/index.ts")).toBe(true);
+      getUnavailable(manager).set(key, "start-failed");
+      expect(manager.canServeFile("src/index.ts")).toBe(false);
+    } finally {
+      rmSync(sessionCwd, { recursive: true, force: true });
+    }
+  });
+
   it("deduplicates concurrent starts for the same server:root pair", async () => {
     const sessionCwd = makeTempRoot();
     const manager = new LspManager(

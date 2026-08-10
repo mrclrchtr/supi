@@ -12,6 +12,7 @@ import type {
   FileEvent,
   LspConfig,
   ProjectServerInfo,
+  ServerConfig,
   SymbolInformation,
   WorkspaceSymbol,
 } from "../config/types.ts";
@@ -65,6 +66,13 @@ import {
 
 type UnavailableReason = "missing-command" | "start-failed" | "runtime-error";
 
+type FileRoute = {
+  serverName: string;
+  serverConfig: ServerConfig;
+  root: string;
+  key: string;
+};
+
 // ── LspManager ────────────────────────────────────────────────────────
 export class LspManager {
   /** Active clients keyed by "serverName:root" */
@@ -96,30 +104,16 @@ export class LspManager {
     this.excludePatterns = patterns;
   }
 
-  /** Check whether any configured language server handles the given file's extension. */
-  hasServerForExtension(filePath: string): boolean {
-    return getServerForFile(this.config, resolveSessionPath(this.cwd, filePath)) !== null;
-  }
   // ── Public API ────────────────────────────────────────────────────
   registerDetectedServers(detected: DetectedProjectServer[]): void {
     this.knownRoots = projectRoots.buildKnownRootsMap(detected);
   }
   /** Check whether a file path has an available LSP server for explicit semantic operations. */
   canServeFile(filePath: string): boolean {
-    const resolvedPath = resolveSessionPath(this.cwd, filePath);
-    const match = getServerForFile(this.config, resolvedPath);
-    if (!match) return false;
-    const [serverName, serverConfig] = match;
-    // Mirror getClientForFile's root resolution so the unavailable check stays
-    // root-specific. A failed startup in one workspace must not suppress
-    // activation for unrelated roots served by the same language server.
-    const root = resolveRootForFile(resolvedPath, serverName, serverConfig.rootMarkers, {
-      knownRoots: this.knownRoots,
-      cwd: this.cwd,
-    });
-    const key = clientKey(serverName, root);
-    if (this.getUnavailableReason(key, serverConfig.command)) return false;
-    return this.isServerCommandAvailable(serverConfig.command);
+    const route = this.resolveFileRoute(filePath);
+    if (!route) return false;
+    if (this.getUnavailableReason(route.key, route.serverConfig.command)) return false;
+    return this.isServerCommandAvailable(route.serverConfig.command);
   }
 
   /**
@@ -160,15 +154,8 @@ export class LspManager {
   }
   /** Get or create an LSP client for the given file. */
   async getClientForFile(filePath: string): Promise<LspClient | null> {
-    const resolvedPath = resolveSessionPath(this.cwd, filePath);
-    const match = getServerForFile(this.config, resolvedPath);
-    if (!match) return null;
-    const [serverName, serverConfig] = match;
-    const root = resolveRootForFile(resolvedPath, serverName, serverConfig.rootMarkers, {
-      knownRoots: this.knownRoots,
-      cwd: this.cwd,
-    });
-    return this.startServerForRoot(serverName, root);
+    const route = this.resolveFileRoute(filePath);
+    return route ? this.startServerForRoot(route.serverName, route.root) : null;
   }
   async startServerForRoot(serverName: string, root: string): Promise<LspClient | null> {
     const serverConfig = this.config.servers[serverName];
@@ -213,7 +200,7 @@ export class LspManager {
    */
   private async performStart(
     serverName: string,
-    serverConfig: import("../config/types.ts").ServerConfig,
+    serverConfig: ServerConfig,
     root: string,
     key: string,
   ): Promise<LspClient | null> {
@@ -241,8 +228,8 @@ export class LspManager {
     }
   }
 
-  /** Find an already-started client for a file without spawning a new server. */
-  private getExistingClientForFile(filePath: string): LspClient | null {
+  /** Resolve a file to its configured server and workspace-specific client key. */
+  private resolveFileRoute(filePath: string): FileRoute | null {
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
     const match = getServerForFile(this.config, resolvedPath);
     if (!match) return null;
@@ -251,7 +238,13 @@ export class LspManager {
       knownRoots: this.knownRoots,
       cwd: this.cwd,
     });
-    return this.clients.get(clientKey(serverName, root)) ?? null;
+    return { serverName, serverConfig, root, key: clientKey(serverName, root) };
+  }
+
+  /** Find an already-started client for a file without spawning a new server. */
+  private getExistingClientForFile(filePath: string): LspClient | null {
+    const route = this.resolveFileRoute(filePath);
+    return route ? (this.clients.get(route.key) ?? null) : null;
   }
 
   /** Restart the clients that own the supplied file paths, if any are active. */
@@ -260,8 +253,7 @@ export class LspManager {
     const seen = new Set<string>();
 
     for (const filePath of filePaths) {
-      const resolvedPath = resolveSessionPath(this.cwd, filePath);
-      const client = this.getExistingClientForFile(resolvedPath);
+      const client = this.getExistingClientForFile(filePath);
       if (!client) continue;
 
       const key = clientKey(client.name, client.root);

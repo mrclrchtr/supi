@@ -28,7 +28,7 @@ Runtime positions are raw 0-based LSP coordinates. Use `toLspPosition()` when st
 
 - `src/client/` — protocol client, transport, refresh, and request handling
 - `src/config/` — server definitions, settings, capabilities, actions, protocol types, and tsconfig scope
-- `src/diagnostics/` — stale/suppression diagnostics and workspace sentinels
+- `src/diagnostics/` — diagnostic summaries, stale diagnostics, and workspace sentinels
 - `src/manager/manager.ts` + `manager-*.ts` — package-internal server pool, routing, diagnostics, and recovery mechanics
 - `src/provider/lsp-semantic-provider.ts` — semantic-provider adapter
 - `src/provider/refactor-planning.ts` — precise rename/code-action edit conversion
@@ -96,7 +96,7 @@ Focused commands:
 pnpm exec vitest run packages/supi-lsp/__tests__/unit/runtime-registry.test.ts
 pnpm exec vitest run packages/supi-lsp/__tests__/unit/runtime-controller.test.ts
 pnpm exec vitest run packages/supi-lsp/__tests__/unit/client-refresh.test.ts packages/supi-lsp/__tests__/unit/client-pull-diagnostics.test.ts packages/supi-lsp/__tests__/unit/transport.test.ts
-pnpm exec vitest run packages/supi-lsp/__tests__/unit/diagnostic-sync.test.ts packages/supi-lsp/__tests__/unit/suppression-diagnostics.test.ts packages/supi-lsp/__tests__/unit/stale-diagnostics.test.ts
+pnpm exec vitest run packages/supi-lsp/__tests__/unit/diagnostic-summary.test.ts packages/supi-lsp/__tests__/unit/stale-diagnostics.test.ts packages/supi-lsp/__tests__/unit/workspace-sentinels.test.ts
 pnpm exec vitest run packages/supi-lsp/__tests__/integration/*.integration.*.test.ts
 ```
 
