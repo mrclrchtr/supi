@@ -1,6 +1,6 @@
 // supi-core — shared infrastructure for SuPi extensions.
-// Provides XML context tag wrapping, unified config system, context-message utilities,
-// settings registry for supi-wide TUI settings, and a shared tool-spec/registration framework.
+// Provides XML context tag wrapping, unified config, prompt-surface resolution,
+// and shared settings, reporting, and session utilities.
 //
 // Convenience barrel — re-exports all domain entry points.
 // For lighter imports, use one of the domain subpaths directly
@@ -21,6 +21,8 @@ export * from "./path.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./project.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./prompt-surface.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./report.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./session.ts";
@@ -30,5 +32,3 @@ export * from "./settings.ts";
 export * from "./status-spinner.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./terminal.ts";
-// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
-export * from "./tool-framework.ts";

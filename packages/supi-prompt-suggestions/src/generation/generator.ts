@@ -10,7 +10,7 @@
  */
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { loadSectionConfig } from "@mrclrchtr/supi-core/config";
+import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
 import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import { CONFIG_SECTION, DEFAULTS } from "../config/config.ts";
 import {
@@ -66,7 +66,7 @@ export class SuggestionGenerator {
     // Cancel any in-flight generation
     this.dismiss();
 
-    const config = loadSectionConfig(CONFIG_SECTION, ctx.cwd, DEFAULTS);
+    const config = loadSupiConfig(CONFIG_SECTION, ctx.cwd, DEFAULTS);
     if (config.model === "disabled") {
       recordDebugEvent({
         source: "prompt-suggestions",

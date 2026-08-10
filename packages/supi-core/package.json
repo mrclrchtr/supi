@@ -64,15 +64,13 @@
     "./model-selection": "./src/model-selection.ts",
     "./package.json": "./package.json",
     "./path": "./src/path.ts",
-    "./report": "./src/report.ts",
-    "./progress-widget": "./src/progress-widget.ts",
     "./project": "./src/project.ts",
+    "./prompt-surface": "./src/prompt-surface.ts",
+    "./report": "./src/report.ts",
     "./session": "./src/session.ts",
     "./settings": "./src/settings.ts",
     "./spinner-frames": "./src/spinner-frames.ts",
     "./status-spinner": "./src/status-spinner.ts",
-    "./terminal": "./src/terminal.ts",
-    "./tool-framework": "./src/tool-framework.ts",
-    "./prompt-surface": "./src/prompt-surface.ts"
+    "./terminal": "./src/terminal.ts"
   }
 }

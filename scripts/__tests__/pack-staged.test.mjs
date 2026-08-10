@@ -54,7 +54,6 @@ const CORE_EXPORTS = {
   "./package.json": "./package.json",
   "./path": "./src/path.ts",
   "./report": "./src/report.ts",
-  "./progress-widget": "./src/progress-widget.ts",
   "./project": "./src/project.ts",
   "./prompt-surface": "./src/prompt-surface.ts",
   "./session": "./src/session.ts",
@@ -62,7 +61,6 @@ const CORE_EXPORTS = {
   "./spinner-frames": "./src/spinner-frames.ts",
   "./status-spinner": "./src/status-spinner.ts",
   "./terminal": "./src/terminal.ts",
-  "./tool-framework": "./src/tool-framework.ts",
 };
 
 const MINIMAL_EXPORTS = {

@@ -43,11 +43,6 @@ Config file locations:
 ### Context helpers
 
 - `wrapExtensionContext()` — wrap injected text in SuPi's `<extension-context>` tag
-- `findLastUserMessageIndex()`
-- `getContextToken()`
-- `getPromptContent()`
-- `pruneAndReorderContextMessages()`
-- `restorePromptContent()`
 
 ### Shared registries
 

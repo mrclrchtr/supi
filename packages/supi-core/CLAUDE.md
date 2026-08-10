@@ -2,7 +2,7 @@
 
 ## Scope
 
-`@mrclrchtr/supi-core` is a pure library package. It provides shared config, context, settings, project-root helpers, and the shared tool-spec/registration framework. There is no pi extension. `@mrclrchtr/supi-settings` owns the `/supi-settings` command and its TUI.
+`@mrclrchtr/supi-core` is a pure library package. It provides shared config, context, settings, project-root helpers, and prompt-surface resolution. There is no pi extension. `@mrclrchtr/supi-settings` owns the `/supi-settings` command and its TUI.
 
 Other SuPi packages should import the library surface via `@mrclrchtr/supi-core/api`.
 
@@ -16,16 +16,15 @@ src/
   llm.ts              — shared LLM utilities (withRetry, callWithJsonResponse)
   path-utils.ts       — shared tool-path and file-URI normalization helpers
   report.ts           — shared text/report rendering helpers
-  progress-widget.ts  — generic TUI progress widget
   project-roots.ts    — directory walking, root discovery (flat utility)
+  prompt-surface.ts   — configurable tool prompt-surface package boundary
   registry-utils.ts   — globalThis-backed shared registries, including session-state helpers (flat utility)
   session-utils.ts    — session utilities (flat utility)
   terminal.ts         — terminal formatting utilities (flat utility)
-  tool-framework.ts   — shared tool-spec/registration framework + runWithProgressWidget
   config/
     config.ts         — loadSupiConfig*(), writeSupiConfig(), removeSupiConfigKey()
+    prompt-surface.ts — trusted configurable tool prompt-surface resolution
   context/
-    context-messages.ts   — context token/prompt-content helpers
     context-provider-registry.ts — context provider registry
     context-tag.ts        — extension-context wrapping
   settings/
@@ -41,8 +40,7 @@ src/
 - `report.ts` — preferred shared location for reusable themed report/text helpers such as section headers, preview overflow hints, key/value rows, and wrapped report blocks
 - `registry-utils.ts` — preferred shared location for global registries and normalized-cwd session-state registries used by peer substrate packages
 - `llm.ts` — shared LLM utilities: `withRetry()` (exponential-backoff retry with AbortSignal), `extractJsonFromResponse()`, `callWithJsonResponse()` (model resolution → completion → JSON extraction → TypeBox validation)
-- `progress-widget.ts` — generic `ProgressWidget` for long-running TUI operations (used by `runWithProgressWidget`)
-- `tool-framework.ts` — shared `SuiPiToolSpec`, `SuiPiToolPromptSurface`, `derivePromptSurface()`, `registerSuiPiTools()`, `runWithProgressWidget()`, and shared TypeBox param builders (`FileParam`, `LineParam`, etc.) for SuPi tool packages; packages keep their own execute logic
+- `prompt-surface.ts` — configurable tool prompt-surface resolution and its public types
 
 ## Config gotchas
 
@@ -61,7 +59,5 @@ src/
 - `modelPicker` fields include `disabled` by default; use `staticOptions` for host-owned sentinels and `includeDisabled: false` when disabling is not valid.
 - `ScopedFieldValue.displayValue` includes the source badge for rendering; use `editValue` for editor prefills and concrete-choice comparisons. Do not parse the badge back out of display text.
 - Adding a new runtime export to `supi-core/index.ts` requires updating every `vi.mock("@mrclrchtr/supi-core")` factory in downstream test files; missing exports cause cryptic "No X export is defined on the mock" errors.
-- Extensions using custom message renderers should keep display text in `content` and raw model text in `details.promptContent`; `restorePromptContent()` swaps the raw text back before the model sees it.
-- `pruneAndReorderContextMessages()` keeps only the active token for a `customType` and moves the live context message before the last user message.
 - `walkProject()` intentionally skips `node_modules`, `.git`, and `.pnpm`.
 

@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resolveToolPromptSurface } from "../../src/tool-framework.ts";
+import { resolveToolPromptSurface } from "../../src/config/prompt-surface.ts";
 
 const DEFAULTS = {
   description: "Default description",

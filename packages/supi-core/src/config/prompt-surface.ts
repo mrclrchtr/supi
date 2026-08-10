@@ -8,10 +8,16 @@ import {
   type ExtensionContext,
   hasTrustRequiringProjectResources,
 } from "@earendil-works/pi-coding-agent";
-import type { SuiPiToolPromptSurface } from "../tool-framework.ts";
 import { loadSupiConfigSectionForScope, type SupiConfigOptions } from "./config.ts";
 
 // ── Public types ───────────────────────────────────────────────────────────
+
+/** Model-facing text that PI adds to one registered tool's prompt surface. */
+export interface SuiPiToolPromptSurface {
+  description: string;
+  promptSnippet: string;
+  promptGuidelines: string[];
+}
 
 export type ToolPromptSurfaceDiagnosticCode =
   | "invalidPromptSurfaceConfig"

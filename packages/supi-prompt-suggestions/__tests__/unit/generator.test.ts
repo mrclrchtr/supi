@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
-const mockLoadSectionConfig = vi.hoisted(() => vi.fn());
+const mockLoadSupiConfig = vi.hoisted(() => vi.fn());
 const mockRecordDebugEvent = vi.hoisted(() => vi.fn());
 const mockResolveSuggestionAuth = vi.hoisted(() => vi.fn());
 const mockCallSuggestionModel = vi.hoisted(() => vi.fn());
 
 vi.mock("@mrclrchtr/supi-core/config", () => ({
-  loadSectionConfig: mockLoadSectionConfig,
+  loadSupiConfig: mockLoadSupiConfig,
 }));
 
 vi.mock("@mrclrchtr/supi-core/debug", () => ({
@@ -69,14 +69,14 @@ describe("SuggestionGenerator", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     generator = new SuggestionGenerator();
-    mockLoadSectionConfig.mockReturnValue({ model: "disabled" });
+    mockLoadSupiConfig.mockReturnValue({ model: "disabled" });
   });
 
   // ── Skip paths (synchronous) ─────────────────────────────────
 
   it("reports idle when model is disabled", () => {
     const onStatus = vi.fn();
-    mockLoadSectionConfig.mockReturnValue({ model: "disabled" });
+    mockLoadSupiConfig.mockReturnValue({ model: "disabled" });
 
     generator.start(makeCtx() as never, "some assistant text", { onStatus });
 
@@ -88,7 +88,7 @@ describe("SuggestionGenerator", () => {
 
   it("reports idle when lastAssistantText is empty", () => {
     const onStatus = vi.fn();
-    mockLoadSectionConfig.mockReturnValue({ model: "anthropic/some-model" });
+    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/some-model" });
 
     generator.start(makeCtx() as never, "   ", { onStatus });
 
@@ -100,7 +100,7 @@ describe("SuggestionGenerator", () => {
 
   it("reports idle when lastAssistantText is empty string", () => {
     const onStatus = vi.fn();
-    mockLoadSectionConfig.mockReturnValue({ model: "anthropic/some-model" });
+    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/some-model" });
 
     generator.start(makeCtx() as never, "", { onStatus });
 
@@ -111,7 +111,7 @@ describe("SuggestionGenerator", () => {
 
   it("reports idle when auth resolution fails", async () => {
     const onStatus = vi.fn();
-    mockLoadSectionConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
+    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
     mockResolveSuggestionAuth.mockResolvedValue({
       kind: "error",
       message: 'Suggestion model "anthropic/nonexistent" not in scoped set',
@@ -133,7 +133,7 @@ describe("SuggestionGenerator", () => {
 
   it("reports ready when suggestion is successfully generated", async () => {
     const onStatus = vi.fn();
-    mockLoadSectionConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
+    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
     mockResolveSuggestionAuth.mockResolvedValue(mockAuthOk);
     mockCallSuggestionModel.mockResolvedValue({ ok: true, text: "fix the bug" });
 
@@ -159,7 +159,7 @@ describe("SuggestionGenerator", () => {
 
   it("passes provider-scoped auth environment to the model call", async () => {
     const onStatus = vi.fn();
-    mockLoadSectionConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
+    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
     mockResolveSuggestionAuth.mockResolvedValue({
       kind: "ok",
       auth: {
@@ -190,7 +190,7 @@ describe("SuggestionGenerator", () => {
 
   it("reports error when model call fails", async () => {
     const onStatus = vi.fn();
-    mockLoadSectionConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
+    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
     mockResolveSuggestionAuth.mockResolvedValue(mockAuthOk);
     mockCallSuggestionModel.mockResolvedValue({
       ok: false,
@@ -213,7 +213,7 @@ describe("SuggestionGenerator", () => {
 
   it("reports idle when normalized suggestion is empty", async () => {
     const onStatus = vi.fn();
-    mockLoadSectionConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
+    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
     mockResolveSuggestionAuth.mockResolvedValue(mockAuthOk);
     mockCallSuggestionModel.mockResolvedValue({ ok: true, text: "" });
 
@@ -230,7 +230,7 @@ describe("SuggestionGenerator", () => {
 
   it("cancels previous generation when start is called again", async () => {
     const onStatus = vi.fn();
-    mockLoadSectionConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
+    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
 
     // First generation: auth hangs
     const auth1 = deferred<typeof mockAuthOk>();
@@ -264,7 +264,7 @@ describe("SuggestionGenerator", () => {
 
   it("dismiss cancels in-flight generation and invalidates generation ID", async () => {
     const onStatus = vi.fn();
-    mockLoadSectionConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
+    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
 
     const auth = deferred<typeof mockAuthOk>();
     mockResolveSuggestionAuth.mockReturnValue(auth.promise);
@@ -288,7 +288,7 @@ describe("SuggestionGenerator", () => {
 
   it("skips model call when abort signal is already set", async () => {
     const onStatus = vi.fn();
-    mockLoadSectionConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
+    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
 
     // First generation with a blocking auth
     const auth1 = deferred<typeof mockAuthOk>();
