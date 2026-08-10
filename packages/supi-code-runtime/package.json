@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-code-runtime",
-  "version": "4.7.0",
+  "version": "4.8.0",
   "description": "Shared workspace context and capability contracts for code intelligence",
   "license": "MIT",
   "repository": {
