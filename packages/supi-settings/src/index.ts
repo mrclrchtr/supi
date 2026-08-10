@@ -1,1 +1,1 @@
-export { default } from "./extension.ts";
+export { createInputSubmenu, createModelPickerSubmenu, openSettingsOverlay } from "./api.ts";

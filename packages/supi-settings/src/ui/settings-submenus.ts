@@ -13,8 +13,8 @@ import {
   SelectList,
   Text,
 } from "@earendil-works/pi-tui";
-import { getSelectableModels } from "../model-selection.ts";
-import type { ModelPickerField } from "./settings-schema.ts";
+import { getSelectableModels } from "@mrclrchtr/supi-core/model-selection";
+import type { ModelPickerField } from "@mrclrchtr/supi-core/settings";
 
 /**
  * Creates a pi-tui Input-backed submenu component with enter-to-confirm

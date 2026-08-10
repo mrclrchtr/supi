@@ -6,14 +6,18 @@
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Input, Key, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
+import type {
+  ScopedFieldValue,
+  SettingsFieldAction,
+  SettingsScope,
+  SettingsSection,
+} from "@mrclrchtr/supi-core/settings";
 import type { ThemeAccessor } from "./settings-action-menu.ts";
 import {
   buildActionMenu,
   createActionMenuComponent,
   getConcreteChoices,
 } from "./settings-action-menu.ts";
-import type { SettingsScope, SettingsSection } from "./settings-registry.ts";
-import type { ScopedFieldValue, SettingsFieldAction } from "./settings-schema.ts";
 import { createInputSubmenu, createModelPickerSubmenu } from "./settings-submenus.ts";
 
 // ═══════════════════════════════════════════════════════════════════════════

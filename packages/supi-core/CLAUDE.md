@@ -2,7 +2,7 @@
 
 ## Scope
 
-`@mrclrchtr/supi-core` is a pure library package. It provides shared config, context, settings, project-root helpers, and the shared tool-spec/registration framework. There is no pi extension — the `/supi-settings` command is now registered by `@mrclrchtr/supi-settings`.
+`@mrclrchtr/supi-core` is a pure library package. It provides shared config, context, settings, project-root helpers, and the shared tool-spec/registration framework. There is no pi extension. `@mrclrchtr/supi-settings` owns the `/supi-settings` command and its TUI.
 
 Other SuPi packages should import the library surface via `@mrclrchtr/supi-core/api`.
 
@@ -31,16 +31,12 @@ src/
   settings/
     settings-registry.ts    — settings contribution collector protocol
     settings-schema.ts      — registerDeclarativeSettings() and source-aware field resolution
-    scoped-settings-list.ts — SuPi-owned source-aware settings list component
-    settings-action-menu.ts — row action menu construction
-    settings-submenus.ts    — reusable input/model picker submenus
-    settings-command.ts     — /supi-settings command wiring
-    settings-ui.ts          — settings overlay orchestration
 ```
 
 ### Key paths
 
 - `api.ts`, `index.ts` — public export surface; keep the shared API deliberate and small
+- `settings/` — data and persistence seam used by the TUI in `@mrclrchtr/supi-settings`
 - `path-utils.ts` — preferred shared location for leading `@` stripping, cwd resolution, and file URI conversion used across SuPi tool packages
 - `report.ts` — preferred shared location for reusable themed report/text helpers such as section headers, preview overflow hints, key/value rows, and wrapped report blocks
 - `registry-utils.ts` — preferred shared location for global registries and normalized-cwd session-state registries used by peer substrate packages

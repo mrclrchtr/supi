@@ -10,14 +10,17 @@ vi.mock("@earendil-works/pi-coding-agent", async () => {
   };
 });
 
-import type { SettingsSection } from "../../../src/settings/settings-registry.ts";
-import { SUPI_SETTINGS_COLLECT_EVENT } from "../../../src/settings/settings-registry.ts";
-import type { BoolField, ScopedFieldValue } from "../../../src/settings/settings-schema.ts";
+import {
+  type BoolField,
+  type ScopedFieldValue,
+  type SettingsSection,
+  SUPI_SETTINGS_COLLECT_EVENT,
+} from "@mrclrchtr/supi-core/settings";
 import {
   createInputSubmenu,
   createModelPickerSubmenu,
   openSettingsOverlay,
-} from "../../../src/settings/settings-ui.ts";
+} from "../../src/api.ts";
 
 const booleanField: BoolField = { kind: "boolean", key: "enabled", label: "Enable" };
 

@@ -59,7 +59,6 @@ const CORE_EXPORTS = {
   "./prompt-surface": "./src/prompt-surface.ts",
   "./session": "./src/session.ts",
   "./settings": "./src/settings.ts",
-  "./settings-ui": "./src/settings-ui.ts",
   "./spinner-frames": "./src/spinner-frames.ts",
   "./status-spinner": "./src/status-spinner.ts",
   "./terminal": "./src/terminal.ts",

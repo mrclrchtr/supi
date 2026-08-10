@@ -1,6 +1,6 @@
+import type { ScopedFieldValue } from "@mrclrchtr/supi-core/settings";
 import { describe, expect, it } from "vitest";
-import { buildActionMenu } from "../../../src/settings/settings-action-menu.ts";
-import type { ScopedFieldValue } from "../../../src/settings/settings-schema.ts";
+import { buildActionMenu } from "../../src/ui/settings-action-menu.ts";
 
 describe("buildActionMenu", () => {
   it("offers a free-form editor for strings", () => {

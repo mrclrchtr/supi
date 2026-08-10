@@ -50,10 +50,11 @@ Depending on which SuPi packages are installed, the overlay may include settings
 ## Package surfaces
 
 - `@mrclrchtr/supi-settings/extension` — pi extension entrypoint, registers `/supi-settings`
-- `@mrclrchtr/supi-settings/api` — public package surface for future settings helpers
+- `@mrclrchtr/supi-settings/api` — settings UI and submenu helpers
 
 ## Source layout
 
 - `src/extension.ts` — pi extension entrypoint
-- `src/api.ts` — package API surface
-- shared implementation lives in `@mrclrchtr/supi-core/settings` and `@mrclrchtr/supi-core/settings-ui`
+- `src/api.ts` — reusable settings UI surface
+- `src/ui/` — settings screen, scoped list, action menu, and submenus
+- `@mrclrchtr/supi-core/settings` owns the registry, schema, scope resolution, and persistence

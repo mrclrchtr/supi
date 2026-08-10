@@ -1,7 +1,6 @@
+import type { BoolField, ScopedFieldValue, SettingsSection } from "@mrclrchtr/supi-core/settings";
 import { describe, expect, it, vi } from "vitest";
-import { ScopedSettingsList } from "../../../src/settings/scoped-settings-list.ts";
-import type { SettingsSection } from "../../../src/settings/settings-registry.ts";
-import type { BoolField, ScopedFieldValue } from "../../../src/settings/settings-schema.ts";
+import { ScopedSettingsList } from "../../src/ui/scoped-settings-list.ts";
 
 const field: BoolField = { kind: "boolean", key: "enabled", label: "Enabled" };
 

@@ -5,15 +5,13 @@
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Container, Key, matchesKey, Text } from "@earendil-works/pi-tui";
-import { ScopedSettingsList } from "./scoped-settings-list.ts";
-import type { SettingsCollectionDiagnostic, SettingsScope } from "./settings-registry.ts";
 import {
   createSettingsContributionCollector,
+  type SettingsCollectionDiagnostic,
+  type SettingsScope,
   SUPI_SETTINGS_COLLECT_EVENT,
-} from "./settings-registry.ts";
-
-// Re-export submenu helpers
-export { createInputSubmenu, createModelPickerSubmenu } from "./settings-submenus.ts";
+} from "@mrclrchtr/supi-core/settings";
+import { ScopedSettingsList } from "./scoped-settings-list.ts";
 
 // ── Overlay ────────────────────────────────────────────────────────────────
 

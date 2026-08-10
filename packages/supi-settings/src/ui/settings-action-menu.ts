@@ -5,8 +5,7 @@
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Container, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
-import type { SettingsScope } from "./settings-registry.ts";
-import type { ScopedFieldValue, SettingsField } from "./settings-schema.ts";
+import type { ScopedFieldValue, SettingsField, SettingsScope } from "@mrclrchtr/supi-core/settings";
 
 /** Theme accessor type matching the TUI custom() theme parameter. */
 export type ThemeAccessor = Parameters<Parameters<ExtensionContext["ui"]["custom"]>[0]>[1];

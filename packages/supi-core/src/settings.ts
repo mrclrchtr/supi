@@ -1,6 +1,4 @@
-// supi-core settings domain — event-backed declarative settings contributions and command wiring.
-
-export { registerSettingsCommand } from "./settings/settings-command.ts";
+// supi-core settings domain — event-backed declarative settings contributions.
 export type {
   SettingsCollectionDiagnostic,
   SettingsCollectionResult,

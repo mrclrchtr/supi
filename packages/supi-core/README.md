@@ -38,18 +38,7 @@ Config file locations:
 ### Settings helpers
 
 - `registerDeclarativeSettings(pi, options)` — contribute a config-backed declarative settings section with source-aware scoped persistence
-- `registerSettingsCommand(pi)` — register `/supi-settings` (used by `@mrclrchtr/supi-settings`)
-- `openSettingsOverlay(pi, ctx)` — open the shared settings UI directly
-- `createInputSubmenu()` — helper for simple text-entry submenus
-- `createModelPickerSubmenu()` — helper for scoped model selection submenus, with optional host-owned choices and `disabled` control
-
-The built-in settings UI supports:
-
-- project/global scope toggle
-- source badges for project, global, and default values
-- Inherit/Reset actions that delete scoped config keys
-- grouped extension sections
-- searchable setting lists
+- settings registry helpers and types for the `@mrclrchtr/supi-settings` configuration surface
 
 ### Context helpers
 
@@ -115,6 +104,5 @@ export default function myExtension(pi: ExtensionAPI) {
 
 - `src/api.ts` — exported library surface
 - `src/config.ts` — shared config loading and writing
-- `src/config-settings.ts` — config-backed settings registration helper
-- `src/settings-ui.ts` — shared settings overlay
+- `src/settings/` — settings registry, schema, scope resolution, and persistence
 - `src/report.ts` — shared text/report rendering helpers
