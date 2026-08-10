@@ -38,7 +38,11 @@ export function isValidHttpUrl(url: string): boolean {
   }
 }
 
-/** Fetch a URL with full content negotiation and sniffing. */
+/**
+ * Fetch a URL with full content negotiation and sniffing.
+ *
+ * Parent cancellation keeps its reason. Request timeouts throw {@link FetchError}.
+ */
 export async function fetchWithNegotiation(
   url: string,
   options: FetchOptions = {},
@@ -303,25 +307,16 @@ async function timedFetch(
   timeoutMs: number,
   signal?: AbortSignal,
 ): Promise<Response> {
-  const controller = new AbortController();
-  let timedOut = false;
-  const abortFromParent = () => controller.abort();
-  if (signal?.aborted) abortFromParent();
-  else signal?.addEventListener("abort", abortFromParent, { once: true });
-
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, timeoutMs);
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const fetchSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
 
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    return await fetch(url, { ...init, signal: fetchSignal });
   } catch (err) {
-    if (timedOut) throw new FetchError(`Fetch timed out after ${timeoutMs}ms`, { cause: err });
+    if (timeoutSignal.aborted && fetchSignal.reason === timeoutSignal.reason) {
+      throw new FetchError(`Fetch timed out after ${timeoutMs}ms`, { cause: err });
+    }
     throw err;
-  } finally {
-    clearTimeout(timer);
-    signal?.removeEventListener("abort", abortFromParent);
   }
 }
 

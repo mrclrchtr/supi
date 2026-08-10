@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   FetchError,
   fetchWithNegotiation,
@@ -8,6 +8,17 @@ import {
   isValidHttpUrl,
   looksLikeMarkdown,
 } from "../../src/fetch.ts";
+
+afterEach(() => vi.unstubAllGlobals());
+
+function makeFetchThatRejectsOnAbort() {
+  return vi.fn((_url: string | URL | Request, init?: RequestInit) => {
+    const requestSignal = init?.signal;
+    return new Promise<Response>((_resolve, reject) => {
+      requestSignal?.addEventListener("abort", () => reject(requestSignal.reason), { once: true });
+    });
+  });
+}
 
 // biome-ignore lint/security/noSecrets: test describe name
 describe("isValidHttpUrl", () => {
@@ -96,8 +107,6 @@ describe("fetchWithNegotiation", () => {
     const result = await fetchWithNegotiation("https://example.com/readme");
     expect(result.isMarkdown).toBe(true);
     expect(result.text).toBe("# Hello\n\nWorld");
-
-    vi.unstubAllGlobals();
   });
 
   it("throws FetchError on non-ok response", async () => {
@@ -107,8 +116,6 @@ describe("fetchWithNegotiation", () => {
     );
 
     await expect(fetchWithNegotiation("https://example.com/missing")).rejects.toThrow(FetchError);
-
-    vi.unstubAllGlobals();
   });
 
   it("honors an already-aborted signal without trying fallbacks", async () => {
@@ -124,8 +131,30 @@ describe("fetchWithNegotiation", () => {
       fetchWithNegotiation("https://example.com/readme", { signal: controller.signal }),
     ).rejects.toThrow("Aborted");
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 
-    vi.unstubAllGlobals();
+  it("keeps parent cancellation distinct from a timeout", async () => {
+    const controller = new AbortController();
+    const abortError = new DOMException("The parent signal canceled the request.", "AbortError");
+    vi.stubGlobal("fetch", makeFetchThatRejectsOnAbort());
+
+    const pending = fetchWithNegotiation("https://example.com/readme", {
+      signal: controller.signal,
+    });
+    controller.abort(abortError);
+
+    await expect(pending).rejects.toBe(abortError);
+  });
+
+  it("reports request timeouts as FetchError", async () => {
+    vi.stubGlobal("fetch", makeFetchThatRejectsOnAbort());
+
+    await expect(
+      fetchWithNegotiation("https://example.com/readme", { timeoutMs: 5 }),
+    ).rejects.toMatchObject({
+      name: "FetchError",
+      message: "Fetch timed out after 5ms",
+    });
   });
 });
 
