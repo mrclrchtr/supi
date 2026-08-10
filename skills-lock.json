@@ -7,12 +7,6 @@
       "skillPath": "skills/engineering/ask-matt/SKILL.md",
       "computedHash": "b2e8ef5ffc2f142022c1e1e1bba68073f0821356a8e1cf1b23670f61d13fe50b"
     },
-    "bx": {
-      "source": "brave/brave-search-skills",
-      "sourceType": "github",
-      "skillPath": "skills/bx/SKILL.md",
-      "computedHash": "b846bd21e3476a10f262d40a765e65149e339e85b37d7dfa8f128317e7cbf090"
-    },
     "code-review": {
       "source": "mattpocock/skills",
       "sourceType": "github",
