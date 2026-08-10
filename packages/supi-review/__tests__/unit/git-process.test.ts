@@ -20,7 +20,7 @@ describe("Git process boundary", () => {
   });
 
   it("applies a finite timeout and strips inherited GIT_* variables", async () => {
-    await resolveReviewSnapshot(process.cwd(), { kind: "working-tree" });
+    await resolveReviewSnapshot(process.cwd(), {});
 
     expect(execFileMock).toHaveBeenCalled();
     for (const call of execFileMock.mock.calls) {
@@ -35,11 +35,19 @@ describe("Git process boundary", () => {
     }
   });
 
+  it("passes cancellation to every target-resolution Git process", async () => {
+    const signal = new AbortController().signal;
+
+    await resolveReviewSnapshot(process.cwd(), {}, signal);
+
+    for (const call of execFileMock.mock.calls) {
+      expect(call[2]).toEqual(expect.objectContaining({ signal }));
+    }
+  });
+
   it("propagates operational failures instead of reporting no changes", async () => {
     execFileMock.mockRejectedValue(Object.assign(new Error("git unavailable"), { code: "ENOENT" }));
 
-    await expect(resolveReviewSnapshot(process.cwd(), { kind: "working-tree" })).rejects.toThrow(
-      "git unavailable",
-    );
+    await expect(resolveReviewSnapshot(process.cwd(), {})).rejects.toThrow("git unavailable");
   });
 });

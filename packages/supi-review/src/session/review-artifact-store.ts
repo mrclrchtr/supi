@@ -64,10 +64,10 @@ export class ReviewArtifactStore {
   }
 
   /** Read one page without consuming the artifact so callers may retry pages. */
-  read(id: string, offset?: number, limit?: number): TextPage | undefined {
+  read(id: string, offset?: number, limit?: number, maxLines?: number): TextPage | undefined {
     this.#pruneExpired();
     const entry = this.#entries.get(id);
-    return entry ? pageText(entry.text, offset, limit) : undefined;
+    return entry ? pageText(entry.text, offset, limit, maxLines) : undefined;
   }
 
   clear(): void {

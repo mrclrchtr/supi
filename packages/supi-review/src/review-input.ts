@@ -52,7 +52,7 @@ export function normalizeReviewInput(review: ReviewInput): ReviewInput {
     return {
       id: task.id.trim(),
       instructions: task.instructions.trim(),
-      ...(task.findingScope !== undefined ? { findingScope: task.findingScope } : {}),
+      mode: task.mode,
       ...(criteriaSources ? { criteriaSources } : {}),
     };
   });
@@ -62,15 +62,8 @@ export function normalizeReviewInput(review: ReviewInput): ReviewInput {
   if (tasks.some((task) => !task.id || !task.instructions)) {
     throw new Error("Review task ids and instructions must not be blank.");
   }
-  if (
-    tasks.some(
-      (task) =>
-        task.findingScope !== undefined &&
-        task.findingScope !== "change-only" &&
-        task.findingScope !== "boy-scout",
-    )
-  ) {
-    throw new Error('Review task findingScope must be "change-only" or "boy-scout".');
+  if (tasks.some((task) => task.mode !== "change" && task.mode !== "state")) {
+    throw new Error('Review task mode must be "change" or "state".');
   }
   if (tasks.some((task) => task.id.length > REVIEW_LIMITS.taskIdCharacters)) {
     throw new Error(

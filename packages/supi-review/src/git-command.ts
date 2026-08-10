@@ -8,21 +8,56 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const GIT_TIMEOUT_MS = 30_000;
 
-function gitOptions(cwd: string, indexFile?: string) {
+function gitOptions(cwd: string, indexFile?: string, signal?: AbortSignal) {
   const env = { ...process.env };
   for (const key of Object.keys(env)) if (key.startsWith("GIT_")) delete env[key];
   if (indexFile) env.GIT_INDEX_FILE = indexFile;
-  return { cwd, env, timeout: GIT_TIMEOUT_MS, maxBuffer: 50 * 1024 * 1024 };
+  return {
+    cwd,
+    env,
+    timeout: GIT_TIMEOUT_MS,
+    maxBuffer: 50 * 1024 * 1024,
+    ...(signal ? { signal } : {}),
+  };
 }
 
 /** Run Git with bounded resources and a sanitized environment. */
-export async function runGit(cwd: string, args: string[], indexFile?: string): Promise<string> {
-  return (await execFileAsync("git", args, gitOptions(cwd, indexFile))).stdout;
+export async function runGit(
+  cwd: string,
+  args: string[],
+  indexFile?: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  return (await execFileAsync("git", args, gitOptions(cwd, indexFile, signal))).stdout;
+}
+
+/** Run Git with bounded resources and NUL-safe standard input. */
+export function runGitWithInput(
+  cwd: string,
+  args: string[],
+  input: string,
+  options: { indexFile?: string; signal?: AbortSignal } = {},
+): Promise<string> {
+  return new Promise((resolveOutput, rejectOutput) => {
+    const child = execFile(
+      "git",
+      args,
+      gitOptions(cwd, options.indexFile, options.signal),
+      (error, stdout) => {
+        if (error) {
+          rejectOutput(error);
+          return;
+        }
+        resolveOutput(stdout);
+      },
+    );
+    child.stdin?.end(input);
+  });
 }
 
 /** Resolve the canonical top-level worktree containing an invocation directory. */
-export async function resolveGitRepositoryRoot(cwd: string): Promise<string> {
-  const root = (await runGit(cwd, ["rev-parse", "--show-toplevel"])).trim();
+export async function resolveGitRepositoryRoot(cwd: string, signal?: AbortSignal): Promise<string> {
+  const root = (await runGit(cwd, ["rev-parse", "--show-toplevel"], undefined, signal)).trim();
   if (!root) throw new Error(`No Git worktree contains ${cwd}.`);
   return realpath(root);
 }
@@ -53,12 +88,28 @@ export async function runGitAllowExit(
   cwd: string,
   args: string[],
   allowedCodes: number[],
-  indexFile?: string,
+  options: { indexFile?: string; signal?: AbortSignal } = {},
 ): Promise<string> {
   try {
-    return await runGit(cwd, args, indexFile);
+    return await runGit(cwd, args, options.indexFile, options.signal);
   } catch (error) {
     const stdout = expectedGitExitOutput(error, allowedCodes);
+    if (stdout !== undefined) return stdout;
+    throw error;
+  }
+}
+
+/** Run Git with standard input and allow only documented non-zero outcomes. */
+export async function runGitWithInputAllowExit(
+  cwd: string,
+  args: string[],
+  input: string,
+  options: { allowedCodes: number[]; indexFile?: string; signal?: AbortSignal },
+): Promise<string> {
+  try {
+    return await runGitWithInput(cwd, args, input, options);
+  } catch (error) {
+    const stdout = expectedGitExitOutput(error, options.allowedCodes);
     if (stdout !== undefined) return stdout;
     throw error;
   }
@@ -69,11 +120,12 @@ export async function withHeadIndex<T>(
   cwd: string,
   head: string,
   operation: (indexFile: string) => Promise<T>,
+  signal?: AbortSignal,
 ): Promise<T> {
   const directory = await mkdtemp(join(tmpdir(), "supi-review-index-"));
   const indexFile = join(directory, "index");
   try {
-    await runGit(cwd, ["read-tree", head], indexFile);
+    await runGit(cwd, ["read-tree", head], indexFile, signal);
     return await operation(indexFile);
   } finally {
     await rm(directory, { recursive: true, force: true });
@@ -164,9 +216,14 @@ function chunkByArgumentSize<T>(values: T[], sizeOf: (value: T) => number): T[][
   return chunks;
 }
 
-async function removeIndexEntries(cwd: string, indexFile: string, paths: string[]): Promise<void> {
+async function removeIndexEntries(
+  cwd: string,
+  indexFile: string,
+  paths: string[],
+  signal?: AbortSignal,
+): Promise<void> {
   for (const chunk of chunkByArgumentSize(paths, (path) => path.length + 1)) {
-    await runGit(cwd, ["update-index", "--force-remove", "--", ...chunk], indexFile);
+    await runGit(cwd, ["update-index", "--force-remove", "--", ...chunk], indexFile, signal);
   }
 }
 
@@ -174,6 +231,7 @@ async function addIndexEntries(
   cwd: string,
   indexFile: string,
   entries: TreeIndexEntry[],
+  signal?: AbortSignal,
 ): Promise<void> {
   for (const chunk of chunkByArgumentSize(
     entries,
@@ -183,19 +241,50 @@ async function addIndexEntries(
     for (const entry of chunk) {
       args.push("--cacheinfo", entry.mode, entry.objectId, entry.path);
     }
-    await runGit(cwd, args, indexFile);
+    await runGit(cwd, args, indexFile, signal);
   }
+}
+
+function currentPathExists(cwd: string, path: string): boolean {
+  try {
+    lstatSync(resolve(cwd, path));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function ignoredCurrentPaths(
+  cwd: string,
+  paths: string[],
+  signal?: AbortSignal,
+): Promise<Set<string>> {
+  const ignored = new Set<string>();
+  const presentPaths = paths.filter((path) => currentPathExists(cwd, path));
+  for (const chunk of chunkByArgumentSize(presentPaths, (path) => path.length + 3)) {
+    const input = chunk.map((path) => `./${path}\0`).join("");
+    const output = await runGitWithInputAllowExit(
+      cwd,
+      ["check-ignore", "--no-index", "--stdin", "-z"],
+      input,
+      { allowedCodes: [1], signal },
+    );
+    for (const path of output.split("\0")) {
+      if (path.startsWith("./")) ignored.add(path.slice(2));
+    }
+  }
+  return ignored;
 }
 
 async function addBaselineOnlyEntries(
   cwd: string,
   indexFile: string,
-  baseline: string,
-  head: string,
+  options: { baseline: string; head: string; signal?: AbortSignal },
 ): Promise<void> {
+  const { baseline, head, signal } = options;
   const [baselineTree, headTree] = await Promise.all([
-    runGit(cwd, ["ls-tree", "-r", "-z", baseline]),
-    runGit(cwd, ["ls-tree", "-r", "-z", head]),
+    runGit(cwd, ["ls-tree", "-r", "-z", baseline], undefined, signal),
+    runGit(cwd, ["ls-tree", "-r", "-z", head], undefined, signal),
   ]);
   const headEntries = parseTreeIndexEntries(headTree).sort(pathOrder);
   const headByPath = new Map(headEntries.map((entry) => [entry.path, entry]));
@@ -203,10 +292,16 @@ async function addBaselineOnlyEntries(
   const baselineOnly = parseTreeIndexEntries(baselineTree).filter(
     (entry) => !headPaths.has(entry.path),
   );
+  const ignoredPaths = await ignoredCurrentPaths(
+    cwd,
+    baselineOnly.map((entry) => entry.path),
+    signal,
+  );
   const additions: TreeIndexEntry[] = [];
   const removals = new Set<string>();
 
   for (const entry of baselineOnly) {
+    if (ignoredPaths.has(entry.path)) continue;
     const conflicts = findPathConflicts(entry, headEntries, headByPath);
     if (conflicts.length === 0) {
       additions.push(entry);
@@ -221,8 +316,8 @@ async function addBaselineOnlyEntries(
     additions.push(entry);
   }
 
-  await removeIndexEntries(cwd, indexFile, Array.from(removals));
-  await addIndexEntries(cwd, indexFile, additions);
+  await removeIndexEntries(cwd, indexFile, Array.from(removals), signal);
+  await addIndexEntries(cwd, indexFile, additions, signal);
 }
 
 /**
@@ -234,12 +329,20 @@ export async function withReviewIndex<T>(
   cwd: string,
   head: string,
   baseline: string,
-  operation: (indexFile: string) => Promise<T>,
+  options: { operation: (indexFile: string) => Promise<T>; signal?: AbortSignal },
 ): Promise<T> {
-  return withHeadIndex(cwd, head, async (indexFile) => {
-    if (baseline !== head) await addBaselineOnlyEntries(cwd, indexFile, baseline, head);
-    return operation(indexFile);
-  });
+  const { operation, signal } = options;
+  return withHeadIndex(
+    cwd,
+    head,
+    async (indexFile) => {
+      if (baseline !== head) {
+        await addBaselineOnlyEntries(cwd, indexFile, { baseline, head, signal });
+      }
+      return operation(indexFile);
+    },
+    signal,
+  );
 }
 
 /** Disable Git pathspec magic for a path-taking command. */

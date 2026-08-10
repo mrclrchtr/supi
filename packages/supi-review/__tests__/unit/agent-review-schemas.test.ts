@@ -1,166 +1,172 @@
 import { Value } from "typebox/value";
 import { describe, expect, it } from "vitest";
-import {
-  parsePrepareReviewToolInput,
-  parseRunReviewToolInput,
-  runReviewSchema,
-} from "../../src/tool/agent-review-schemas.ts";
+import { parseRunReviewToolInput, runReviewSchema } from "../../src/tool/agent-review-schemas.ts";
 import { reviewInputSchema, reviewSubmissionSchema } from "../../src/tool/schemas.ts";
 
-const commit = "a".repeat(40);
-const tasks = [{ id: "spec", instructions: "Check the spec." }];
-const direct = {
-  direct: {
-    target: { comparison: { baseCommit: commit } },
-    tasks,
-  },
-};
+const tasks = [{ id: "spec", instructions: "Check the spec.", mode: "change" }];
 
 describe("agent review schemas", () => {
-  it("advertises provider-compatible exact-one selectors", () => {
+  it("publishes one flat exact-target request without a direct wrapper", () => {
     const publishedSchema = JSON.stringify(runReviewSchema);
 
-    expect(publishedSchema).toContain('"type":"object"');
-    expect(publishedSchema).toContain('"direct"');
-    expect(publishedSchema).toContain('"prepared"');
-    expect(publishedSchema).toContain('"minProperties":1');
-    expect(publishedSchema).toContain('"maxProperties":1');
-    expect(publishedSchema).not.toContain('"mode"');
-    expect(publishedSchema).not.toContain('"anyOf"');
-    expect(publishedSchema).not.toContain('"const"');
+    expect(publishedSchema).toContain('"target"');
+    expect(publishedSchema).toContain('"paths"');
+    expect(publishedSchema).toContain('"from"');
+    expect(publishedSchema).toContain('"to"');
+    // biome-ignore lint/security/noSecrets: Schema field name assertion.
+    expect(publishedSchema).toContain('"includeUncommittedChanges"');
+    expect(publishedSchema).not.toContain('"direct"');
+    expect(publishedSchema).not.toContain('"kind"');
+    expect(publishedSchema).not.toContain("workingTree");
+    expect(publishedSchema).not.toContain("comparison");
+    expect(publishedSchema).not.toContain("currentState");
+    expect(publishedSchema).not.toContain("prepared");
+    expect(publishedSchema).not.toContain("planId");
+    expect(publishedSchema).not.toContain("findingScope");
   });
 
-  it("makes task payload and draft decisions clear to agents", () => {
-    const publishedSchema = JSON.stringify({
-      runReviewSchema,
-      reviewInputSchema,
-      reviewSubmissionSchema,
-    });
-
-    expect(publishedSchema).toContain("replaceDraft");
-    expect(publishedSchema).toContain("Tasks run independently");
-    expect(publishedSchema).toContain("must be at least startLine");
-  });
-
-  it("uses the same target selector when preparing a plan", () => {
+  it("requires a Review Mode for every task", () => {
+    expect(Value.Check(reviewInputSchema, { tasks })).toBe(true);
     expect(
-      parsePrepareReviewToolInput({
-        target: { commit: { commit: "9510d68" } },
-        planning: "suggest",
+      Value.Check(reviewInputSchema, { tasks: [{ id: "spec", instructions: "Check." }] }),
+    ).toBe(false);
+    expect(() =>
+      parseRunReviewToolInput({ tasks: [{ id: "spec", instructions: "Check." }] }),
+    ).toThrow("Review task mode is required: change or state.");
+    expect(
+      Value.Check(reviewInputSchema, {
+        tasks: [{ id: "spec", instructions: "Check.", mode: "change-only" }],
       }),
-    ).toEqual({
-      target: { kind: "commit", commit: "9510d68" },
-      planning: "suggest",
-    });
+    ).toBe(false);
   });
 
-  it("narrows valid Direct and Prepared requests", () => {
-    expect(parseRunReviewToolInput(direct)).toEqual({
-      mode: "direct",
-      target: { kind: "comparison", baseCommit: commit },
+  it("accepts omitted and empty targets as the current filesystem", () => {
+    expect(parseRunReviewToolInput({ tasks })).toEqual({
+      target: {},
+      scope: {},
       review: { tasks },
     });
+    expect(parseRunReviewToolInput({ target: {}, tasks })).toEqual({
+      target: {},
+      scope: {},
+      review: { tasks },
+    });
+  });
+
+  it("preserves a flat exact target for later endpoint resolution", () => {
     expect(
       parseRunReviewToolInput({
-        prepared: { planId: "plan-1", draftDecision: { useDraft: {} } },
+        target: { from: "topic~1", to: "release", includeUncommittedChanges: false },
+        sharedContext: "Issue #287.",
+        tasks,
       }),
     ).toEqual({
-      mode: "prepared",
-      planId: "plan-1",
-      decision: { kind: "accept-draft" },
+      target: { from: "topic~1", to: "release", includeUncommittedChanges: false },
+      scope: {},
+      review: { sharedContext: "Issue #287.", tasks },
     });
+  });
+
+  it("normalizes and bounds optional batch Review Scope paths", () => {
     expect(
       parseRunReviewToolInput({
-        prepared: {
-          planId: "plan-1",
-          draftDecision: { replaceDraft: { tasks } },
-        },
+        paths: [" ./src/a.ts ", "src/a.ts", "@docs", "docs/"],
+        tasks,
       }),
-    ).toEqual({
-      mode: "prepared",
-      planId: "plan-1",
-      decision: { kind: "use-review", review: { tasks } },
-    });
+    ).toMatchObject({ scope: { paths: ["src/a.ts", "docs"] } });
+    expect(() =>
+      parseRunReviewToolInput({
+        paths: Array.from({ length: 17 }, (_, index) => `src/${index}`),
+        tasks,
+      }),
+    ).toThrow();
+    expect(() => parseRunReviewToolInput({ paths: ["../outside"], tasks })).toThrow(/stay inside/i);
   });
 
   it.each([
-    {},
-    { direct, prepared: { planId: "plan-1", draftDecision: { useDraft: {} } } },
-    { prepared: { draftDecision: { useDraft: {} } } },
-    { prepared: { planId: "plan-1", draftDecision: {} } },
-    {
-      prepared: {
-        planId: "plan-1",
-        draftDecision: { useDraft: {}, replaceDraft: { tasks } },
-      },
+    { workingTree: {} },
+    { comparison: { baseCommit: "main" } },
+    { commit: { commit: "HEAD" } },
+    { currentState: {} },
+    { kind: "working-tree" },
+  ])("rejects the old Review Target %o", (target) => {
+    expect(() => parseRunReviewToolInput({ target, tasks })).toThrow(
+      "Review Target must use only from, to, and includeUncommittedChanges.",
+    );
+  });
+
+  it.each(["change-only", "boy-scout", "criteria-only"])(
+    "rejects the removed Finding Scope value %s",
+    (findingScope) => {
+      const input = {
+        tasks: [{ id: "state", instructions: "Check.", mode: "state", findingScope }],
+      };
+      expect(Value.Check(reviewInputSchema, input)).toBe(false);
+      expect(() => parseRunReviewToolInput(input)).toThrow(
+        "Review task findingScope is removed; set mode to change or state.",
+      );
     },
-    { prepared: { planId: "plan-1", draftDecision: { accept: {} } } },
-    { mode: "direct", target: { kind: "working-tree" }, review: { tasks } },
-  ])("rejects invalid or legacy execution shapes", (input) => {
-    expect(() => parseRunReviewToolInput(input)).toThrow();
+  );
+
+  it("rejects the removed direct wrapper", () => {
+    expect(() => parseRunReviewToolInput({ direct: { tasks } })).toThrow(
+      "Review input must not use the removed direct wrapper.",
+    );
   });
 
-  it("defaults a Direct Review target to the working tree", () => {
-    expect(parseRunReviewToolInput({ direct: { tasks } })).toEqual({
-      mode: "direct",
-      target: { kind: "working-tree" },
-      review: { tasks },
-    });
+  it.each([
+    { prepared: { planId: "plan-1" }, tasks },
+    { planId: "plan-1", tasks },
+  ])("rejects removed Prepared Review input", (input) => {
+    expect(() => parseRunReviewToolInput(input)).toThrow(
+      "Review input must not use removed Prepared Review fields.",
+    );
   });
 
-  it("requires exactly one structurally valid target", () => {
+  it.each(["from", "to"] as const)(
+    "reports a blank Review Target %s endpoint before target normalization",
+    (endpoint) => {
+      const input = { target: { [endpoint]: " ", includeUncommittedChanges: false }, tasks };
+
+      expect(Value.Check(runReviewSchema, input)).toBe(false);
+      expect(() => parseRunReviewToolInput(input)).toThrow(
+        `Review Target ${endpoint} must not be blank.`,
+      );
+    },
+  );
+
+  it("rejects target and task cross-field conflicts", () => {
+    expect(() =>
+      parseRunReviewToolInput({
+        target: { to: "HEAD" },
+        tasks,
+      }),
+    ).toThrow(/includeUncommittedChanges/i);
+    expect(() =>
+      parseRunReviewToolInput({
+        target: { includeUncommittedChanges: false },
+        tasks,
+      }),
+    ).toThrow(/explicit from/i);
+    expect(() =>
+      parseRunReviewToolInput({
+        target: { from: "HEAD" },
+        tasks: [{ id: "state", instructions: "Check.", mode: "state" }],
+      }),
+    ).toThrow(/all-state/i);
+  });
+
+  it("rejects blank caller and reviewer text in provider-visible schemas", () => {
     expect(
-      parseRunReviewToolInput({
-        direct: { target: { workingTree: { baseCommit: "9510d68" } }, tasks },
+      Value.Check(reviewInputSchema, {
+        tasks: [{ id: " ", instructions: "Review.", mode: "change" }],
       }),
-    ).toEqual({
-      mode: "direct",
-      target: { kind: "working-tree", baseCommit: "9510d68" },
-      review: { tasks },
-    });
+    ).toBe(false);
     expect(
-      parseRunReviewToolInput({
-        direct: { target: { commit: { commit: "9510d68" } }, tasks },
+      Value.Check(reviewInputSchema, {
+        tasks: [{ id: "spec", instructions: " \n", mode: "change" }],
       }),
-    ).toEqual({
-      mode: "direct",
-      target: { kind: "commit", commit: "9510d68" },
-      review: { tasks },
-    });
-
-    expect(() =>
-      parseRunReviewToolInput({
-        direct: {
-          target: { workingTree: {}, comparison: { baseCommit: commit } },
-          tasks,
-        },
-      }),
-    ).toThrow();
-    expect(() =>
-      parseRunReviewToolInput({
-        direct: { target: { comparison: { commit } }, tasks },
-      }),
-    ).toThrow();
-  });
-
-  it("rejects blank caller and reviewer text in the provider-visible schemas", () => {
-    expect(() =>
-      parseRunReviewToolInput({
-        direct: {
-          target: { workingTree: {} },
-          tasks: [{ id: " ", instructions: "Review." }],
-        },
-      }),
-    ).toThrow();
-    expect(() =>
-      parseRunReviewToolInput({
-        direct: {
-          target: { workingTree: {} },
-          tasks: [{ id: "spec", instructions: " \n" }],
-        },
-      }),
-    ).toThrow();
-
+    ).toBe(false);
     expect(Value.Check(reviewInputSchema, { sharedContext: " \n", tasks })).toBe(false);
 
     const finding = {
@@ -178,163 +184,5 @@ describe("agent review schemas", () => {
         findings: [{ ...finding, title: " " }],
       }),
     ).toBe(false);
-    expect(
-      Value.Check(reviewSubmissionSchema, {
-        summary: "Review finished.",
-        findings: [{ ...finding, description: " \n" }],
-      }),
-    ).toBe(false);
-    expect(
-      Value.Check(reviewSubmissionSchema, {
-        summary: "Review finished.",
-        criteriaCoverage: { status: "complete" },
-        findings: [
-          {
-            ...finding,
-            location: { path: "src/file.ts", startLine: 10 },
-          },
-        ],
-      }),
-    ).toBe(true);
-  });
-
-  it("parses a Current-State Audit target with optional advisory paths", () => {
-    expect(parseRunReviewToolInput({ direct: { target: { currentState: {} }, tasks } })).toEqual({
-      mode: "direct",
-      target: { kind: "current-state" },
-      review: { tasks },
-    });
-    expect(
-      parseRunReviewToolInput({
-        direct: {
-          target: { currentState: { paths: ["packages/supi-review", "docs/adr/0012.md"] } },
-          tasks,
-        },
-      }),
-    ).toEqual({
-      mode: "direct",
-      target: { kind: "current-state", paths: ["packages/supi-review", "docs/adr/0012.md"] },
-      review: { tasks },
-    });
-
-    expect(() =>
-      parseRunReviewToolInput({
-        direct: { target: { currentState: { paths: [" "] } }, tasks },
-      }),
-    ).toThrow();
-    expect(() =>
-      parseRunReviewToolInput({
-        direct: { target: { currentState: { paths: [] } }, tasks },
-      }),
-    ).toThrow();
-    expect(() =>
-      parseRunReviewToolInput({
-        direct: { target: { currentState: {}, workingTree: {} }, tasks },
-      }),
-    ).toThrow();
-  });
-
-  it("accepts per-task criteria sources and bounds them", () => {
-    const source = { reference: "#123", summary: "Acceptance criteria." };
-    expect(
-      parseRunReviewToolInput({
-        direct: {
-          target: { currentState: {} },
-          tasks: [{ id: "spec", instructions: "Check.", criteriaSources: [source] }],
-        },
-      }),
-    ).toEqual({
-      mode: "direct",
-      target: { kind: "current-state" },
-      review: { tasks: [{ id: "spec", instructions: "Check.", criteriaSources: [source] }] },
-    });
-
-    expect(
-      Value.Check(reviewInputSchema, {
-        tasks: [{ id: "spec", instructions: "Check.", criteriaSources: [{ reference: " " }] }],
-      }),
-    ).toBe(false);
-    expect(
-      Value.Check(reviewInputSchema, {
-        tasks: [
-          {
-            id: "spec",
-            instructions: "Check.",
-            criteriaSources: Array.from({ length: 6 }, (_, index) => ({
-              reference: `#ref-${index}`,
-              summary: "Summary",
-            })),
-          },
-        ],
-      }),
-    ).toBe(false);
-  });
-
-  it("requires structured criteria coverage in reviewer submissions", () => {
-    const base = { summary: "Review finished.", findings: [] };
-    expect(Value.Check(reviewSubmissionSchema, base)).toBe(false);
-    expect(
-      Value.Check(reviewSubmissionSchema, {
-        ...base,
-        criteriaCoverage: { status: "complete" },
-      }),
-    ).toBe(true);
-    expect(
-      Value.Check(reviewSubmissionSchema, {
-        ...base,
-        criteriaCoverage: { status: "incomplete", reason: "Issue #42 unreachable" },
-      }),
-    ).toBe(true);
-    expect(
-      Value.Check(reviewSubmissionSchema, {
-        ...base,
-        criteriaCoverage: { status: "partial" },
-      }),
-    ).toBe(false);
-    // Schema-level reason is optional; normalizeReviewSubmission enforces it for incomplete.
-    expect(
-      Value.Check(reviewSubmissionSchema, {
-        ...base,
-        criteriaCoverage: { status: "incomplete" },
-      }),
-    ).toBe(true);
-  });
-
-  it("accepts per-task finding scope and rejects unknown values", () => {
-    expect(
-      parseRunReviewToolInput({
-        direct: {
-          target: { workingTree: {} },
-          tasks: [
-            {
-              id: "cleanup",
-              instructions: "Take Boy Scout responsibility.",
-              findingScope: "boy-scout",
-            },
-          ],
-        },
-      }),
-    ).toEqual({
-      mode: "direct",
-      target: { kind: "working-tree" },
-      review: {
-        tasks: [
-          {
-            id: "cleanup",
-            instructions: "Take Boy Scout responsibility.",
-            findingScope: "boy-scout",
-          },
-        ],
-      },
-    });
-
-    expect(() =>
-      parseRunReviewToolInput({
-        direct: {
-          target: { workingTree: {} },
-          tasks: [{ id: "cleanup", instructions: "Review.", findingScope: "repository-wide" }],
-        },
-      }),
-    ).toThrow();
   });
 });

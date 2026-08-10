@@ -1,33 +1,14 @@
 import type { ReviewSnapshot } from "../types.ts";
 
-/** Compare two resolved Review Target identities for drift detection. */
+/** Compare two resolved exact Review Targets for interactive drift detection. */
 export function targetsMatch(
   left: ReviewSnapshot["target"],
   right: ReviewSnapshot["target"],
 ): boolean {
-  if (left.kind !== right.kind) return false;
-  if (left.kind === "working-tree" && right.kind === "working-tree") {
-    return (
-      left.headCommit === right.headCommit &&
-      left.requestedBaseCommit === right.requestedBaseCommit &&
-      left.mergeBaseCommit === right.mergeBaseCommit
-    );
-  }
-  if (left.kind === "comparison" && right.kind === "comparison") {
-    return (
-      left.requestedBaseCommit === right.requestedBaseCommit &&
-      left.mergeBaseCommit === right.mergeBaseCommit &&
-      left.headCommit === right.headCommit
-    );
-  }
-  if (left.kind === "current-state" && right.kind === "current-state") {
-    return left.headCommit === right.headCommit;
-  }
   return (
-    left.kind === "commit" &&
-    right.kind === "commit" &&
-    left.commit === right.commit &&
-    left.parentCommit === right.parentCommit
+    left.fromCommit === right.fromCommit &&
+    left.toCommit === right.toCommit &&
+    left.includeUncommittedChanges === right.includeUncommittedChanges
   );
 }
 

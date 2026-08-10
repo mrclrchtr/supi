@@ -14,8 +14,8 @@ import type { ReviewModelSelection, ReviewSnapshot } from "../../src/types.ts";
 
 const snapshot: ReviewSnapshot = {
   repositoryRoot: "/repo",
-  requestedTarget: { kind: "working-tree" },
-  target: { kind: "working-tree", headCommit: "a".repeat(40) },
+  requestedTarget: {},
+  target: { fromCommit: "a".repeat(40), toCommit: "a".repeat(40), includeUncommittedChanges: true },
   title: "Working tree",
   changes: [{ status: "M", path: "a.ts", additions: 1, deletions: 0 }],
   diffHash: "b".repeat(64),
@@ -71,7 +71,7 @@ describe("runReviewer", () => {
   const invocation = {
     cwd: "/repo",
     snapshot,
-    task: { id: "spec", instructions: "Review." },
+    task: { id: "spec", instructions: "Review.", mode: "change" as const },
     prompt: "exact packet bytes",
     packetHash: "c".repeat(64),
     model,
@@ -110,8 +110,9 @@ describe("runReviewer", () => {
         store: { create } as never,
         workspaceReceipt: {
           status: "verified",
-          targetKind: "working-tree",
-          baselineRevision: "a".repeat(40),
+          fromCommit: "a".repeat(40),
+          toCommit: "a".repeat(40),
+          includeUncommittedChanges: true,
           expectedWorkspaceHead: "a".repeat(40),
           observedWorkspaceHead: "a".repeat(40),
           expectedDiffHash: "b".repeat(64),

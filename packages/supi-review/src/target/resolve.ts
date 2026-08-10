@@ -1,11 +1,9 @@
-import { lstat } from "node:fs/promises";
 import {
   runGit as git,
   runGitAllowExit as gitAllowExit,
   resolveGitRepositoryRoot,
   withReviewIndex,
 } from "../git-command.ts";
-import { resolveReviewPath } from "../review-path.ts";
 import type { ReviewSnapshot, ReviewSnapshotSummary, ReviewTargetSpec } from "../types.ts";
 import {
   buildReviewChanges,
@@ -14,16 +12,58 @@ import {
 } from "./change-metadata.ts";
 import { DIFF_FLAGS, diffUntrackedFile, parseNullList } from "./diff.ts";
 
-async function resolveCommit(cwd: string, value: string): Promise<string | undefined> {
-  const canonical = (await gitAllowExit(cwd, ["rev-parse", "--verify", value], [1, 128])).trim();
-  if (!canonical) return undefined;
-  const type = (await gitAllowExit(cwd, ["cat-file", "-t", canonical], [128])).trim();
-  if (type !== "commit") return undefined;
-  return canonical.toLowerCase();
+function normalizedEndpoint(value: string | undefined, name: "from" | "to"): string | undefined {
+  if (value === undefined) return undefined;
+  const endpoint = value.trim();
+  if (!endpoint) throw new Error(`Review Target ${name} must not be blank.`);
+  if (endpoint.includes("..") || /\^[@!]|\^-/.test(endpoint)) {
+    throw new Error(`Review Target ${name} must name one commit, not a commit range.`);
+  }
+  return endpoint;
 }
 
-async function headCommit(cwd: string): Promise<string | undefined> {
-  const value = (
+async function describeInvalidEndpoint(
+  cwd: string,
+  endpoint: string,
+  signal?: AbortSignal,
+): Promise<string | undefined> {
+  const object = (
+    await gitAllowExit(cwd, ["rev-parse", "--verify", "--end-of-options", endpoint], [1, 128], {
+      signal,
+    })
+  ).trim();
+  if (!object) return undefined;
+  const type = (await gitAllowExit(cwd, ["cat-file", "-t", object], [128], { signal })).trim();
+  return type || undefined;
+}
+
+/** Resolve one endpoint syntax string to one exact full commit id. */
+async function resolveEndpoint(
+  cwd: string,
+  endpoint: string | undefined,
+  name: "from" | "to",
+  signal?: AbortSignal,
+): Promise<string | undefined> {
+  if (endpoint === undefined) return undefined;
+  const commit = (
+    await gitAllowExit(
+      cwd,
+      ["rev-parse", "--verify", "--end-of-options", `${endpoint}^{commit}`],
+      [1, 128],
+      { signal },
+    )
+  ).trim();
+  if (commit) return commit.toLowerCase();
+
+  const type = await describeInvalidEndpoint(cwd, endpoint, signal);
+  if (type === "tree" || type === "blob") {
+    throw new Error(`Review Target ${name} must resolve to a commit, not a ${type}.`);
+  }
+  throw new Error(`Review Target ${name} does not resolve to one commit in this repository.`);
+}
+
+async function capturedHead(cwd: string, signal?: AbortSignal): Promise<string> {
+  const head = (
     await gitAllowExit(
       cwd,
       [
@@ -33,248 +73,162 @@ async function headCommit(cwd: string): Promise<string | undefined> {
         "HEAD^{commit}",
       ],
       [1, 128],
+      { signal },
     )
   ).trim();
-  return value || undefined;
-}
-
-async function commitParent(cwd: string, commit: string): Promise<string | undefined> {
-  const body = await git(cwd, ["cat-file", "-p", commit]);
-  const parent = body.match(/^parent ([0-9a-f]+)$/m)?.[1];
-  if (!parent) return undefined;
-  const type = (await gitAllowExit(cwd, ["cat-file", "-t", parent], [128])).trim();
-  if (type !== "commit") {
-    throw new Error(`First parent ${parent} for ${commit} is unavailable.`);
-  }
-  return parent;
-}
-
-async function resolveWorkingTreeBase(
-  cwd: string,
-  requested: Extract<ReviewTargetSpec, { kind: "working-tree" }>,
-  head: string,
-): Promise<{
-  baseline: string;
-  requestedBaseCommit?: string;
-  mergeBaseCommit?: string;
-}> {
-  if (!requested.baseCommit) return { baseline: head };
-  const base = await resolveCommit(cwd, requested.baseCommit);
-  if (!base) {
-    throw new Error(`Commit ${requested.baseCommit.slice(0, 7)} not found in this repository.`);
-  }
-  const mergeBase = (await gitAllowExit(cwd, ["merge-base", base, head], [1])).trim();
-  if (!mergeBase) {
-    throw new Error(`No common ancestor between ${base.slice(0, 7)} and ${head.slice(0, 7)}.`);
-  }
-  return { baseline: mergeBase, requestedBaseCommit: base, mergeBaseCommit: mergeBase };
-}
-
-async function workingTreeSnapshot(
-  cwd: string,
-  requested: Extract<ReviewTargetSpec, { kind: "working-tree" }>,
-): Promise<ReviewSnapshot | undefined> {
-  const head = await headCommit(cwd);
-  if (!head) return undefined;
-  const base = await resolveWorkingTreeBase(cwd, requested, head);
-  return withReviewIndex(cwd, head, base.baseline, async (indexFile) => {
-    const [nameStatus, numstat, trackedDiff, untrackedText] = await Promise.all([
-      git(cwd, ["diff", ...DIFF_FLAGS, "--name-status", "-z", base.baseline], indexFile),
-      git(cwd, ["diff", ...DIFF_FLAGS, "--numstat", "-z", base.baseline], indexFile),
-      git(cwd, ["diff", ...DIFF_FLAGS, base.baseline], indexFile),
-      git(cwd, ["ls-files", "--others", "--exclude-standard", "-z"], indexFile),
-    ]);
-    const changes = buildReviewChanges(nameStatus, numstat);
-    const diff = createDiffAccumulator();
-    diff.append(trackedDiff);
-    for (const path of parseNullList(untrackedText)) {
-      const patch = await diffUntrackedFile(cwd, path);
-      diff.append(patch);
-      changes.push(untrackedPatchChange(path, patch));
-    }
-    changes.sort((left, right) => left.path.localeCompare(right.path));
-    if (changes.length === 0) return undefined;
-
-    return {
-      repositoryRoot: cwd,
-      requestedTarget: requested,
-      target: {
-        kind: "working-tree",
-        headCommit: head,
-        ...(base.requestedBaseCommit ? { requestedBaseCommit: base.requestedBaseCommit } : {}),
-        ...(base.mergeBaseCommit ? { mergeBaseCommit: base.mergeBaseCommit } : {}),
-      },
-      title: base.mergeBaseCommit
-        ? `Working tree changes ${base.mergeBaseCommit.slice(0, 7)}..filesystem`
-        : "Working tree changes",
-      changes,
-      ...diff.finish(changes.length),
-    };
-  });
-}
-
-function isMissingPath(error: unknown): boolean {
-  return (
-    !!error &&
-    typeof error === "object" &&
-    "code" in error &&
-    ((error as { code?: unknown }).code === "ENOENT" ||
-      (error as { code?: unknown }).code === "ENOTDIR")
-  );
-}
-
-/** Validate advisory Review Scope paths against the frozen current filesystem. */
-async function validateReviewScopePaths(
-  root: string,
-  paths: string[] | undefined,
-): Promise<string[] | undefined> {
-  if (!paths?.length) return undefined;
-  const validated: string[] = [];
-  const seen = new Set<string>();
-  for (const path of paths) {
-    const safe = resolveReviewPath(root, path);
-    if (seen.has(safe.path)) continue;
-    try {
-      await lstat(safe.absolute);
-    } catch (error) {
-      if (isMissingPath(error)) {
-        throw new Error(`Review Scope path does not exist in the current state: ${safe.path}`, {
-          cause: error,
-        });
-      }
-      throw error;
-    }
-    seen.add(safe.path);
-    validated.push(safe.path);
-  }
-  return validated;
-}
-
-async function currentStateSnapshot(
-  cwd: string,
-  requested: Extract<ReviewTargetSpec, { kind: "current-state" }>,
-): Promise<ReviewSnapshot> {
-  const head = await headCommit(cwd);
-  if (!head) throw new Error("Current-State Audit requires at least one commit.");
-  const paths = await validateReviewScopePaths(cwd, requested.paths);
-  return withReviewIndex(cwd, head, head, async (indexFile) => {
-    const [nameStatus, numstat, trackedDiff, untrackedText] = await Promise.all([
-      git(cwd, ["diff", ...DIFF_FLAGS, "--name-status", "-z", head], indexFile),
-      git(cwd, ["diff", ...DIFF_FLAGS, "--numstat", "-z", head], indexFile),
-      git(cwd, ["diff", ...DIFF_FLAGS, head], indexFile),
-      git(cwd, ["ls-files", "--others", "--exclude-standard", "-z"], indexFile),
-    ]);
-    const changes = buildReviewChanges(nameStatus, numstat);
-    const diff = createDiffAccumulator();
-    diff.append(trackedDiff);
-    for (const path of parseNullList(untrackedText)) {
-      const patch = await diffUntrackedFile(cwd, path);
-      diff.append(patch);
-      changes.push(untrackedPatchChange(path, patch));
-    }
-    changes.sort((left, right) => left.path.localeCompare(right.path));
-    return {
-      repositoryRoot: cwd,
-      requestedTarget: { kind: "current-state", ...(paths ? { paths } : {}) },
-      target: { kind: "current-state", headCommit: head },
-      title: "Current state audit",
-      changes,
-      ...diff.finish(changes.length),
-    };
-  });
-}
-
-async function comparisonSnapshot(
-  cwd: string,
-  requested: Extract<ReviewTargetSpec, { kind: "comparison" }>,
-): Promise<ReviewSnapshot | undefined> {
-  const [base, head] = await Promise.all([
-    resolveCommit(cwd, requested.baseCommit),
-    headCommit(cwd),
-  ]);
-  if (!base) {
-    throw new Error(`Commit ${requested.baseCommit.slice(0, 7)} not found in this repository.`);
-  }
   if (!head) throw new Error("No HEAD commit found in this repository.");
-  const mergeBase = (await gitAllowExit(cwd, ["merge-base", base, head], [1])).trim();
-  if (!mergeBase) {
-    throw new Error(`No common ancestor between ${base.slice(0, 7)} and ${head.slice(0, 7)}.`);
-  }
-  const [diffText, nameStatus, numstat] = await Promise.all([
-    git(cwd, ["diff", ...DIFF_FLAGS, mergeBase, head]),
-    git(cwd, ["diff", ...DIFF_FLAGS, "--name-status", "-z", mergeBase, head]),
-    git(cwd, ["diff", ...DIFF_FLAGS, "--numstat", "-z", mergeBase, head]),
-  ]);
-  const changes = buildReviewChanges(nameStatus, numstat);
-  if (changes.length === 0) return undefined;
-  const diff = createDiffAccumulator();
-  diff.append(diffText);
-  return {
-    repositoryRoot: cwd,
-    requestedTarget: requested,
-    target: {
-      kind: "comparison",
-      requestedBaseCommit: base,
-      mergeBaseCommit: mergeBase,
-      headCommit: head,
-    },
-    title: `Changes ${mergeBase.slice(0, 7)}..${head.slice(0, 7)}`,
-    changes,
-    ...diff.finish(changes.length),
-  };
+  return head.toLowerCase();
 }
 
-async function commitSnapshot(
+/** True when this exact commit has no parent. A shallow boundary is not a root. */
+export async function isRootCommit(
   cwd: string,
-  requested: Extract<ReviewTargetSpec, { kind: "commit" }>,
-): Promise<ReviewSnapshot | undefined> {
-  const commit = await resolveCommit(cwd, requested.commit);
-  if (!commit) {
-    throw new Error(`Commit ${requested.commit.slice(0, 7)} not found in this repository.`);
-  }
-  const parent = await commitParent(cwd, commit);
-  const baseArgs = ["diff-tree", ...DIFF_FLAGS, "--root", "--no-commit-id"];
-  const [diffText, nameStatus, numstat] = await Promise.all([
-    parent
-      ? git(cwd, ["diff", ...DIFF_FLAGS, parent, commit])
-      : git(cwd, ["show", ...DIFF_FLAGS, "--format=", "--root", commit]),
-    parent
-      ? git(cwd, ["diff", ...DIFF_FLAGS, "--name-status", "-z", parent, commit])
-      : git(cwd, [...baseArgs, "--name-status", "-r", "-z", commit]),
-    parent
-      ? git(cwd, ["diff", ...DIFF_FLAGS, "--numstat", "-z", parent, commit])
-      : git(cwd, [...baseArgs, "--numstat", "-r", "-z", commit]),
-  ]);
-  const changes = buildReviewChanges(nameStatus, numstat);
-  if (changes.length === 0) return undefined;
-  const diff = createDiffAccumulator();
-  diff.append(diffText);
-  return {
-    repositoryRoot: cwd,
-    requestedTarget: requested,
-    target: { kind: "commit", commit, ...(parent ? { parentCommit: parent } : {}) },
-    title: `Commit ${commit.slice(0, 7)}`,
-    changes,
-    ...diff.finish(changes.length),
-  };
+  commit: string,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  const body = await git(cwd, ["cat-file", "-p", commit], undefined, signal);
+  const headerEnd = body.indexOf("\n\n");
+  const header = headerEnd < 0 ? body : body.slice(0, headerEnd);
+  return !/^parent [0-9a-f]+$/m.test(header);
 }
 
-/** Pin target identities and capture the target's changed paths, patch hash, and stats. */
+async function filesystemSnapshot(
+  repositoryRoot: string,
+  target: ReviewSnapshot["target"],
+  signal?: AbortSignal,
+): Promise<Pick<ReviewSnapshot, "changes" | "diffHash" | "stats">> {
+  const baseline = target.fromCommit ?? target.toCommit;
+  return withReviewIndex(repositoryRoot, target.toCommit, baseline, {
+    signal,
+    operation: async (indexFile) => {
+      const [nameStatus, numstat, trackedDiff, untrackedText] = await Promise.all([
+        git(
+          repositoryRoot,
+          ["diff", ...DIFF_FLAGS, "--name-status", "-z", baseline],
+          indexFile,
+          signal,
+        ),
+        git(
+          repositoryRoot,
+          ["diff", ...DIFF_FLAGS, "--numstat", "-z", baseline],
+          indexFile,
+          signal,
+        ),
+        git(repositoryRoot, ["diff", ...DIFF_FLAGS, baseline], indexFile, signal),
+        git(
+          repositoryRoot,
+          ["ls-files", "--others", "--exclude-standard", "-z"],
+          indexFile,
+          signal,
+        ),
+      ]);
+      const changes = buildReviewChanges(nameStatus, numstat);
+      const diff = createDiffAccumulator();
+      diff.append(trackedDiff);
+      for (const path of parseNullList(untrackedText)) {
+        signal?.throwIfAborted();
+        const patch = await diffUntrackedFile(repositoryRoot, path);
+        diff.append(patch);
+        changes.push(untrackedPatchChange(path, patch));
+      }
+      changes.sort((left, right) => left.path.localeCompare(right.path));
+      return { changes, ...diff.finish(changes.length) };
+    },
+  });
+}
+
+async function committedSnapshot(
+  repositoryRoot: string,
+  target: ReviewSnapshot["target"],
+  signal?: AbortSignal,
+): Promise<Pick<ReviewSnapshot, "changes" | "diffHash" | "stats">> {
+  if (!target.fromCommit) {
+    return { changes: [], ...createDiffAccumulator().finish(0) };
+  }
+  const [diffText, nameStatus, numstat] = await Promise.all([
+    git(
+      repositoryRoot,
+      ["diff", ...DIFF_FLAGS, target.fromCommit, target.toCommit],
+      undefined,
+      signal,
+    ),
+    git(
+      repositoryRoot,
+      ["diff", ...DIFF_FLAGS, "--name-status", "-z", target.fromCommit, target.toCommit],
+      undefined,
+      signal,
+    ),
+    git(
+      repositoryRoot,
+      ["diff", ...DIFF_FLAGS, "--numstat", "-z", target.fromCommit, target.toCommit],
+      undefined,
+      signal,
+    ),
+  ]);
+  const changes = buildReviewChanges(nameStatus, numstat);
+  const diff = createDiffAccumulator();
+  diff.append(diffText);
+  return { changes, ...diff.finish(changes.length) };
+}
+
+function titleFor(target: ReviewSnapshot["target"]): string {
+  if (target.includeUncommittedChanges) {
+    return target.fromCommit
+      ? `Filesystem changes ${target.fromCommit.slice(0, 7)}..filesystem`
+      : "Current filesystem";
+  }
+  return target.fromCommit
+    ? `Changes ${target.fromCommit.slice(0, 7)}..${target.toCommit.slice(0, 7)}`
+    : `State ${target.toCommit.slice(0, 7)}`;
+}
+
+/**
+ * Pin a Review Target to exact commits and capture its canonical patch metadata.
+ * This public resolver does not compute a merge base.
+ */
 export async function resolveReviewSnapshot(
   cwd: string,
-  target: ReviewTargetSpec,
-): Promise<ReviewSnapshot | undefined> {
-  const root = await resolveGitRepositoryRoot(cwd);
-  switch (target.kind) {
-    case "working-tree":
-      return workingTreeSnapshot(root, target);
-    case "comparison":
-      return comparisonSnapshot(root, target);
-    case "commit":
-      return commitSnapshot(root, target);
-    case "current-state":
-      return currentStateSnapshot(root, target);
+  requested: ReviewTargetSpec = {},
+  signal?: AbortSignal,
+): Promise<ReviewSnapshot> {
+  const repositoryRoot = await resolveGitRepositoryRoot(cwd, signal);
+  const from = normalizedEndpoint(requested.from, "from");
+  const to = normalizedEndpoint(requested.to, "to");
+  const includeUncommittedChanges = requested.includeUncommittedChanges ?? true;
+  if (includeUncommittedChanges && to !== undefined) {
+    throw new Error("Review Target to is not valid when includeUncommittedChanges is true.");
   }
+
+  const head = await capturedHead(repositoryRoot, signal);
+  const [fromCommit, explicitToCommit] = await Promise.all([
+    resolveEndpoint(repositoryRoot, from, "from", signal),
+    resolveEndpoint(repositoryRoot, to, "to", signal),
+  ]);
+  const toCommit = includeUncommittedChanges ? head : (explicitToCommit ?? head);
+  const target = {
+    ...(includeUncommittedChanges
+      ? { fromCommit: fromCommit ?? head }
+      : fromCommit
+        ? { fromCommit }
+        : {}),
+    toCommit,
+    includeUncommittedChanges,
+  };
+  const requestedTarget = {
+    ...(from ? { from } : {}),
+    ...(to ? { to } : {}),
+    includeUncommittedChanges,
+  };
+  const metadata = includeUncommittedChanges
+    ? await filesystemSnapshot(repositoryRoot, target, signal)
+    : await committedSnapshot(repositoryRoot, target, signal);
+  return {
+    repositoryRoot,
+    requestedTarget,
+    target,
+    title: titleFor(target),
+    ...metadata,
+  };
 }
 
 /** Return the public, patch-free snapshot summary. */

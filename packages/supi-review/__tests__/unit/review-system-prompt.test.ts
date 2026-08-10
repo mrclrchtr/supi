@@ -30,11 +30,18 @@ describe("reviewer system prompt", () => {
     expect(prompt).toMatch(/runtime checks are delegated to the containing Agent/i);
   });
 
-  it("defines criteria-only scope and criteria-source retrieval semantics", () => {
+  it("defines Review Mode and criteria-source retrieval semantics", () => {
     const prompt = buildReviewerSystemPrompt();
 
-    expect(prompt).toMatch(/criteria-only permits findings relevant to the Review Criteria/i);
-    expect(prompt).toMatch(/pre-existing findings may block acceptance/i);
+    expect(prompt).toMatch(/change permits findings attributable to the selected change/i);
+    expect(prompt).toMatch(
+      /pre-existing issue is permitted only in a changed file or a directly affected symbol/i,
+    );
+    expect(prompt).toMatch(
+      /stays advisory unless the selected change worsens or newly exposes it/i,
+    );
+    expect(prompt).toMatch(/state permits findings relevant to the Review Criteria/i);
+    expect(prompt).toMatch(/pre-existing finding may block acceptance/i);
     expect(prompt).toMatch(/Always submit criteriaCoverage/i);
     expect(prompt).toMatch(/complete when the supplied Review Criteria were sufficient/i);
     expect(prompt).toMatch(/otherwise incomplete with the reason/i);

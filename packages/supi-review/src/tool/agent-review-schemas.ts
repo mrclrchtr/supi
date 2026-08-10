@@ -1,273 +1,161 @@
-import { StringEnum } from "@earendil-works/pi-ai";
-import { type TSchema, Type } from "typebox";
+import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { REVIEW_LIMITS } from "../review-limits.ts";
-import type { ReviewInput, ReviewTargetSpec } from "../types.ts";
+import { normalizeReviewScope } from "../review-scope.ts";
+import type { ReviewInput, ReviewScope, ReviewTargetSpec } from "../types.ts";
 import { reviewInputSchema } from "./schemas.ts";
 
-/** Build a provider-compatible selector that accepts exactly one named payload. */
-function exactOneSelector(properties: Record<string, TSchema>, description: string): TSchema {
-  const optionalProperties: Record<string, TSchema> = {};
-  for (const [key, schema] of Object.entries(properties)) {
-    optionalProperties[key] = Type.Optional(schema);
-  }
-  return Type.Object(optionalProperties, {
-    additionalProperties: false,
-    minProperties: 1,
-    maxProperties: 1,
-    description,
+function endpointSchema(role: "before" | "after") {
+  return Type.String({
+    minLength: 1,
+    maxLength: 512,
+    pattern: "\\S",
+    description: `Git revision for the exact ${role} state. Branches, hashes, ~, ^, and lightweight or annotated tags are valid. It must resolve to one commit; ranges, trees, blobs, and blank values are not valid.`,
   });
 }
 
-const commitId = {
-  minLength: 7,
-  maxLength: 64,
-  pattern: "^[0-9a-fA-F]{7,64}$",
-} as const;
-const targetSchema = exactOneSelector(
+const scopePathsSchema = Type.Array(
+  Type.String({
+    minLength: 1,
+    maxLength: REVIEW_LIMITS.reviewScopePathCharacters,
+    pattern: "\\S",
+    description:
+      "Repository-relative path that focuses every Review Task. A leading @ is accepted. The path must exist in the frozen after state.",
+  }),
   {
-    workingTree: Type.Object(
-      {
-        baseCommit: Type.Optional(
-          Type.String({
-            ...commitId,
-            description:
-              "Optional base commit hash. Omit to compare the current filesystem with HEAD; set to include committed branch work since merge-base(baseCommit, HEAD).",
-          }),
-        ),
-      },
-      {
-        additionalProperties: false,
-        description:
-          "Review current filesystem changes, including non-ignored untracked files. Omit baseCommit to compare with HEAD.",
-      },
-    ),
-    comparison: Type.Object(
-      {
-        baseCommit: Type.String({
-          ...commitId,
-          description:
-            "Base commit hash. Review committed changes from merge-base(baseCommit, HEAD) through HEAD; current filesystem changes are excluded.",
-        }),
-      },
-      { additionalProperties: false, description: "Review committed work since a base commit." },
-    ),
-    commit: Type.Object(
-      {
-        commit: Type.String({
-          ...commitId,
-          description: "Commit to review against its first parent.",
-        }),
-      },
-      { additionalProperties: false, description: "Review one commit." },
-    ),
-    currentState: Type.Object(
-      {
-        paths: Type.Optional(
-          Type.Array(
-            Type.String({
-              minLength: 1,
-              maxLength: REVIEW_LIMITS.reviewScopePathCharacters,
-              pattern: "\\S",
-              description: "Workspace-relative file or directory path.",
-            }),
-            {
-              minItems: 1,
-              maxItems: REVIEW_LIMITS.reviewScopePathsPerTarget,
-              description:
-                "Advisory Review Scope focus; every path must exist in the frozen state. Omit for repository-wide discovery.",
-            },
-          ),
-        ),
-      },
-      {
-        additionalProperties: false,
-        description:
-          "Audit the complete current filesystem, including uncommitted and untracked work, against Review Criteria without Git-change attribution.",
-      },
-    ),
+    minItems: 1,
+    maxItems: REVIEW_LIMITS.reviewScopePathsPerTarget,
+    description:
+      "Optional advisory path focus for this batch. It does not limit repository inspection, changed-path evidence, or findings.",
   },
-  "Exactly one review target: workingTree, comparison, commit, or currentState.",
 );
 
-export const prepareReviewSchema = Type.Object(
+const targetSchema = Type.Object(
   {
-    target: Type.Optional(targetSchema),
-    planning: Type.Optional(
-      StringEnum(["none", "suggest"] as const, {
-        default: "none",
+    from: Type.Optional(endpointSchema("before")),
+    to: Type.Optional(endpointSchema("after")),
+    includeUncommittedChanges: Type.Optional(
+      Type.Boolean({
+        default: true,
         description:
-          "none creates a plan without drafting tasks; suggest asks the advisory Planner to draft tasks from bounded context and target metadata.",
+          "Include the current filesystem and non-ignored untracked files. Defaults to true. When true, omit to.",
       }),
     ),
   },
   {
     additionalProperties: false,
-    description: "Prepare a Review Plan; target defaults to workingTree when omitted.",
+    description:
+      "Exact Review Target. Omit it, or use {}, for the current filesystem. Endpoints resolve once to full commits.",
   },
 );
 
-const directRunSchema = Type.Object(
+/** Object-rooted provider-compatible schema for caller-defined Review execution. */
+export const runReviewSchema = Type.Object(
   {
     target: Type.Optional(targetSchema),
+    paths: Type.Optional(scopePathsSchema),
     ...reviewInputSchema.properties,
   },
   {
     additionalProperties: false,
-    description:
-      "Run a complete caller-defined task set; target defaults to workingTree when omitted.",
+    description: "Run one complete caller-defined Review against one exact Review Target.",
   },
 );
 
-const draftDecisionSchema = exactOneSelector(
-  {
-    useDraft: Type.Object(
-      {},
-      {
-        additionalProperties: false,
-        description: "Use the Planner Draft unchanged; valid only when preparation returned one.",
-      },
-    ),
-    replaceDraft: Type.Object(reviewInputSchema.properties, {
-      additionalProperties: false,
-      description:
-        "Supply the complete replacement task set when no draft was returned or the draft needs changes.",
-    }),
-  },
-  "Exactly one Planner Draft decision: useDraft or replaceDraft.",
-);
-
-const preparedRunSchema = Type.Object(
-  {
-    planId: Type.String({
-      minLength: 1,
-      maxLength: 128,
-      description: "Session-scoped one-shot plan id returned by supi_review_prepare.",
-    }),
-    draftDecision: draftDecisionSchema,
-  },
-  {
-    additionalProperties: false,
-    description:
-      "Execute one prepared Review Plan with an explicit decision about its Planner Draft.",
-  },
-);
-
-/** Object-rooted provider-compatible schema for the two exact-one execution paths. */
-export const runReviewSchema = exactOneSelector(
-  {
-    direct: directRunSchema,
-    prepared: preparedRunSchema,
-  },
-  "Exactly one execution path: direct supplies Review Tasks and an optional target; prepared supplies a plan id and draft decision.",
-);
-
-type RawTarget =
-  | {
-      workingTree: { baseCommit?: string };
-      comparison?: never;
-      commit?: never;
-      currentState?: never;
-    }
-  | {
-      workingTree?: never;
-      comparison: { baseCommit: string };
-      commit?: never;
-      currentState?: never;
-    }
-  | { workingTree?: never; comparison?: never; commit: { commit: string }; currentState?: never }
-  | { workingTree?: never; comparison?: never; commit?: never; currentState: { paths?: string[] } };
-type RawReviewInput = ReviewInput;
-interface RawPrepareReviewInput {
-  target?: RawTarget;
-  planning?: "none" | "suggest";
-}
-interface RawRunReviewInput {
-  direct?: RawReviewInput & { target?: RawTarget };
-  prepared?: {
-    planId: string;
-    draftDecision:
-      | { useDraft: Record<string, never>; replaceDraft?: never }
-      | { useDraft?: never; replaceDraft: RawReviewInput };
-  };
-}
-
-export interface PrepareReviewToolInput {
+interface RawRunReviewInput extends ReviewInput {
   target?: ReviewTargetSpec;
-  planning?: "none" | "suggest";
+  paths?: string[];
 }
 
-export type RunReviewToolInput =
-  | { mode: "direct"; target: ReviewTargetSpec; review: ReviewInput }
-  | {
-      mode: "prepared";
-      planId: string;
-      decision: { kind: "accept-draft" } | { kind: "use-review"; review: ReviewInput };
-    };
-
-function parseTarget(input: RawTarget): ReviewTargetSpec {
-  if (input.workingTree !== undefined) {
-    return {
-      kind: "working-tree",
-      ...(input.workingTree.baseCommit ? { baseCommit: input.workingTree.baseCommit } : {}),
-    };
-  }
-  if (input.comparison !== undefined) {
-    return { kind: "comparison", baseCommit: input.comparison.baseCommit };
-  }
-  if (input.commit !== undefined) {
-    return { kind: "commit", commit: input.commit.commit };
-  }
-  if (input.currentState !== undefined) {
-    const paths = input.currentState.paths?.map((path) => path.trim()).filter(Boolean);
-    if (paths && paths.length === 0) throw new Error("Choose one review target.");
-    return { kind: "current-state", ...(paths ? { paths } : {}) };
-  }
-  throw new Error("Choose one review target.");
+export interface RunReviewToolInput {
+  target: ReviewTargetSpec;
+  scope: ReviewScope;
+  review: ReviewInput;
 }
 
-function toReviewInput(input: RawReviewInput): ReviewInput {
-  return input;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** Validate and narrow preparation input after provider-level JSON parsing. */
-export function parsePrepareReviewToolInput(input: unknown): PrepareReviewToolInput {
-  if (!Value.Check(prepareReviewSchema, input))
-    throw new Error("Invalid review preparation input.");
-  const parsed = input as RawPrepareReviewInput;
+function blankEndpointError(target: unknown): Error | undefined {
+  if (!isRecord(target)) return undefined;
+  for (const name of ["from", "to"] as const) {
+    const endpoint = target[name];
+    if (typeof endpoint === "string" && !endpoint.trim()) {
+      return new Error(`Review Target ${name} must not be blank.`);
+    }
+  }
+  return undefined;
+}
+
+function oldTargetError(target: unknown): Error | undefined {
+  if (!isRecord(target)) return undefined;
+  const oldTarget = ["workingTree", "comparison", "commit", "currentState", "kind"].some(
+    (key) => key in target,
+  );
+  return oldTarget
+    ? new Error("Review Target must use only from, to, and includeUncommittedChanges.")
+    : undefined;
+}
+
+function taskModeError(tasks: unknown): Error | undefined {
+  if (!Array.isArray(tasks)) return undefined;
+  for (const task of tasks) {
+    if (!isRecord(task)) continue;
+    if ("findingScope" in task) {
+      return new Error("Review task findingScope is removed; set mode to change or state.");
+    }
+    if (!("mode" in task)) return new Error("Review task mode is required: change or state.");
+  }
+  return undefined;
+}
+
+function invalidInputError(input: unknown): Error {
+  if (!isRecord(input)) return new Error("Invalid review execution input.");
+  if ("direct" in input) return new Error("Review input must not use the removed direct wrapper.");
+  if ("prepared" in input || "planId" in input) {
+    return new Error("Review input must not use removed Prepared Review fields.");
+  }
+  return (
+    blankEndpointError(input.target) ??
+    oldTargetError(input.target) ??
+    taskModeError(input.tasks) ??
+    new Error("Invalid review execution input.")
+  );
+}
+
+function normalizeTarget(target: ReviewTargetSpec | undefined): ReviewTargetSpec {
+  if (!target) return {};
+  const from = target.from?.trim();
+  const to = target.to?.trim();
+  if (target.from !== undefined && !from) throw new Error("Review Target from must not be blank.");
+  if (target.to !== undefined && !to) throw new Error("Review Target to must not be blank.");
   return {
-    ...(parsed.target ? { target: parseTarget(parsed.target) } : {}),
-    ...(parsed.planning ? { planning: parsed.planning } : {}),
+    ...(from ? { from } : {}),
+    ...(to ? { to } : {}),
+    ...(target.includeUncommittedChanges !== undefined
+      ? { includeUncommittedChanges: target.includeUncommittedChanges }
+      : {}),
   };
 }
 
-/** Validate and narrow exact-one execution paths into the internal Review Engine contract. */
+/** Validate and narrow a caller-defined Review request after provider-level JSON parsing. */
 export function parseRunReviewToolInput(input: unknown): RunReviewToolInput {
-  if (!Value.Check(runReviewSchema, input)) throw new Error("Invalid review execution input.");
+  if (!Value.Check(runReviewSchema, input)) throw invalidInputError(input);
   const parsed = input as RawRunReviewInput;
-  if (parsed.direct !== undefined) {
-    const { target, ...review } = parsed.direct;
-    return {
-      mode: "direct",
-      target: target ? parseTarget(target) : { kind: "working-tree" },
-      review: toReviewInput(review),
-    };
+  const { target, paths, ...review } = parsed;
+  const normalizedTarget = normalizeTarget(target);
+  const scope = normalizeReviewScope(paths ? { paths } : undefined);
+  const includeUncommittedChanges = normalizedTarget.includeUncommittedChanges ?? true;
+  if (includeUncommittedChanges && normalizedTarget.to !== undefined) {
+    throw new Error("Review Target to is not valid when includeUncommittedChanges is true.");
   }
-
-  const prepared = parsed.prepared;
-  if (!prepared) throw new Error("Choose one review execution path.");
-  if (prepared.draftDecision.useDraft !== undefined) {
-    return { mode: "prepared", planId: prepared.planId, decision: { kind: "accept-draft" } };
+  const change = review.tasks.some((task) => task.mode === "change");
+  if (!change && normalizedTarget.from !== undefined) {
+    throw new Error("Review Targets for all-state tasks must not set from.");
   }
-  if (prepared.draftDecision.replaceDraft !== undefined) {
-    return {
-      mode: "prepared",
-      planId: prepared.planId,
-      decision: {
-        kind: "use-review",
-        review: toReviewInput(prepared.draftDecision.replaceDraft),
-      },
-    };
+  if (!includeUncommittedChanges && change && normalizedTarget.from === undefined) {
+    throw new Error("A committed change Review Target requires an explicit from endpoint.");
   }
-  throw new Error("Choose one Planner Draft decision.");
+  return { target: normalizedTarget, scope, review };
 }

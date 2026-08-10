@@ -8,6 +8,7 @@ describe("normalizeReviewInput criteria sources", () => {
         {
           id: "spec",
           instructions: "Check the spec.",
+          mode: "change",
           criteriaSources: [{ reference: " #123 ", summary: " Acceptance criteria. " }],
         },
       ],
@@ -25,6 +26,7 @@ describe("normalizeReviewInput criteria sources", () => {
           {
             id: "spec",
             instructions: "Check the spec.",
+            mode: "change",
             criteriaSources: [{ reference: " ", summary: "Summary" }],
           },
         ],
@@ -39,7 +41,7 @@ describe("normalizeReviewInput criteria sources", () => {
     }));
     expect(() =>
       normalizeReviewInput({
-        tasks: [{ id: "spec", instructions: "Check.", criteriaSources: sources }],
+        tasks: [{ id: "spec", instructions: "Check.", mode: "change", criteriaSources: sources }],
       }),
     ).toThrow(/criteria sources/i);
   });
@@ -51,6 +53,7 @@ describe("normalizeReviewInput criteria sources", () => {
           {
             id: "spec",
             instructions: "Check.",
+            mode: "change",
             criteriaSources: [
               { reference: " #1 ", summary: " Summary " },
               { reference: "#1", summary: "Summary" },
@@ -66,6 +69,7 @@ describe("normalizeReviewInput criteria sources", () => {
           {
             id: "spec",
             instructions: "Check.",
+            mode: "change",
             criteriaSources: [
               { reference: "#1", summary: "First" },
               { reference: "#1", summary: "Second" },
@@ -83,6 +87,7 @@ describe("normalizeReviewInput criteria sources", () => {
           {
             id: "spec",
             instructions: "Check.",
+            mode: "change",
             criteriaSources: [{ reference: "x".repeat(257), summary: "Summary" }],
           },
         ],
@@ -94,6 +99,7 @@ describe("normalizeReviewInput criteria sources", () => {
           {
             id: "spec",
             instructions: "Check.",
+            mode: "change",
             criteriaSources: [{ reference: "#1", summary: "x".repeat(2001) }],
           },
         ],

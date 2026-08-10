@@ -1,8 +1,4 @@
-/**
- * TUI renderer for supi_review_run — renderCall + renderResult.
- *
- * Dual-surface rendering: chrome built from details, markdown body excluded.
- */
+/** TUI renderer for supi_review_run. */
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
@@ -10,11 +6,12 @@ import type {
   ReviewExecutionPartialTaskState,
   ReviewExecutionProgressDetails,
 } from "../tool/review-execution.ts";
+import { REVIEW_TOOL_SPECS } from "../tool/tool-specs.ts";
 import { formatReviewUsage } from "../tool/usage-format.ts";
 import type {
-  EffectiveFindingScope,
   ReviewBatchDetails,
   ReviewProgress,
+  ReviewScope,
   ReviewTaskResult,
 } from "../types.ts";
 import {
@@ -26,69 +23,80 @@ import {
   renderReviewToolCall,
 } from "./common.ts";
 
-// ── Helpers ──────────────────────────────────────────────────────
-
-function findingScope(details: ReviewBatchDetails, taskId: string): EffectiveFindingScope {
-  if (details.snapshot.target.kind === "current-state") return "criteria-only";
-  return details.review.tasks.find((task) => task.id === taskId)?.findingScope ?? "change-only";
-}
-
-/** Format one task without collapsing independent verdicts into a batch verdict. */
-function formatTaskCollapsed(
-  result: ReviewTaskResult,
-  scope: EffectiveFindingScope,
-  theme: Theme,
-): string {
+function formatTaskCollapsed(result: ReviewTaskResult, theme: Theme): string {
   const warnings = result.capabilityWarnings?.length ?? 0;
   const warningLabel =
     warnings > 0 ? ` · ${warnings} capability warning${warnings === 1 ? "" : "s"}` : "";
   if (result.status === "completed") {
     const findings = result.findings.length;
     const findingLabel = findings > 0 ? ` · ${findings} finding${findings === 1 ? "" : "s"}` : "";
-    return `${result.taskId}: ${formatVerdictBadge(result.verdict, theme)}${theme.fg("dim", ` · ${scope}${findingLabel}${warningLabel}`)}`;
+    return `${result.taskId}: ${formatVerdictBadge(result.verdict, theme)}${theme.fg("dim", ` · ${result.mode}${findingLabel}${warningLabel}`)}`;
   }
   const label = formatStatusLabel(
     result.status,
     result.status === "failed" ? result.failureCode : undefined,
     result.status === "timeout" ? result.timeoutMs : undefined,
   );
-  return `${result.taskId}: ${theme.fg("warning", label)}${theme.fg("dim", ` · ${scope}${warningLabel}`)}`;
+  return `${result.taskId}: ${theme.fg("warning", label)}${theme.fg("dim", ` · ${result.mode}${warningLabel}`)}`;
 }
 
-// ── renderCall ───────────────────────────────────────────────────
+function formatScopeFocus(scope: ReviewScope | undefined): string {
+  const count = scope?.paths?.length ?? 0;
+  if (count === 0) return "repository-wide";
+  return `path focus: ${count} ${count === 1 ? "path" : "paths"}`;
+}
 
-export function renderRunCall(args: unknown, theme: Theme): Text {
-  const params = (args ?? {}) as {
-    direct?: {
-      target?: {
-        workingTree?: unknown;
-        comparison?: unknown;
-        commit?: unknown;
-        currentState?: unknown;
-      };
-    };
-    prepared?: unknown;
-  };
-  const target = params.direct?.target;
-  const targetKind = target?.workingTree
-    ? "working-tree"
-    : target?.comparison
-      ? "comparison"
-      : target?.commit
-        ? "commit"
-        : target?.currentState
-          ? "current-state"
-          : "working-tree";
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
-  return renderReviewToolCall(
-    "supi_review_run",
-    params.prepared ? "prepared" : "direct",
-    theme,
-    params.prepared ? "from plan" : targetKind,
+function quotedEndpoint(value: unknown): string | undefined {
+  return typeof value === "string" ? JSON.stringify(value) : undefined;
+}
+
+function formatRequestedTarget(target: unknown): string {
+  if (!isRecord(target)) return "requested target: current filesystem";
+  const from = quotedEndpoint(target.from);
+  const to = quotedEndpoint(target.to);
+  const includeUncommittedChanges = target.includeUncommittedChanges !== false;
+  if (!from && !to && includeUncommittedChanges) return "requested target: current filesystem";
+
+  const endpoints = [
+    ...(from ? [`from ${from}`] : []),
+    ...(to ? [`to ${to}`] : []),
+    ...(!to && !includeUncommittedChanges ? ['default to "HEAD"'] : []),
+  ];
+  return `requested target: ${endpoints.join(" · ")} · ${includeUncommittedChanges ? "uncommitted changes included" : "uncommitted changes excluded"}`;
+}
+
+function formatBatchMode(tasks: unknown): string {
+  if (!Array.isArray(tasks)) return "batch mode: unspecified";
+  const modes = new Set(
+    tasks.flatMap((task) =>
+      isRecord(task) && (task.mode === "change" || task.mode === "state") ? [task.mode] : [],
+    ),
   );
+  if (modes.size === 2) return "batch mode: mixed";
+  if (modes.has("change")) return "batch mode: change";
+  if (modes.has("state")) return "batch mode: state";
+  return "batch mode: unspecified";
 }
 
-// ── renderResult ─────────────────────────────────────────────────
+/** Render requested Review Target facts, batch Review Mode, and Review Scope. */
+export function renderRunCall(args: unknown, theme: Theme): Text {
+  const params = isRecord(args) ? args : {};
+  const paths = params.paths;
+  const scope =
+    Array.isArray(paths) && paths.every((path): path is string => typeof path === "string")
+      ? { paths }
+      : undefined;
+  const detail = [
+    formatRequestedTarget(params.target),
+    formatBatchMode(params.tasks),
+    formatScopeFocus(scope),
+  ].join(" · ");
+  return renderReviewToolCall(REVIEW_TOOL_SPECS.run.name, "review", theme, detail);
+}
 
 type PartialReviewDetails = ReviewExecutionProgressDetails;
 
@@ -119,6 +127,7 @@ function addPartialPreamble(
   if (details.sharedContext) {
     container.addChild(new Text(theme.fg("dim", `context: ${details.sharedContext}`), 1, 0));
   }
+  container.addChild(new Text(theme.fg("dim", `focus: ${formatScopeFocus(details.scope)}`), 1, 0));
 }
 
 function formatPartialTask(
@@ -149,8 +158,10 @@ function addPartialTasks(container: Container, details: PartialReviewDetails, th
     container.addChild(
       new Text(formatPartialTask(taskId, details.taskStates?.[taskId], theme), 1, 0),
     );
-    const instructions = details.tasks?.find((task) => task.id === taskId)?.instructions;
-    if (instructions) container.addChild(new Text(theme.fg("dim", instructions), 1, 0));
+    const task = details.tasks?.find((candidate) => candidate.id === taskId);
+    if (task) {
+      container.addChild(new Text(theme.fg("dim", `${task.mode}: ${task.instructions}`), 1, 0));
+    }
   }
 }
 
@@ -161,10 +172,8 @@ function partialLabel(completed: number, total: number): string {
 function buildExpandedPartial(details: PartialReviewDetails, theme: Theme): Container {
   const completed = details.completedCount ?? 0;
   const total = details.totalCount ?? 0;
-  const label = partialLabel(completed, total);
   const container = new Container();
-  container.addChild(renderPartial(label, theme));
-
+  container.addChild(renderPartial(partialLabel(completed, total), theme));
   if (
     !details.targetTitle &&
     !details.workspacePath &&
@@ -173,69 +182,55 @@ function buildExpandedPartial(details: PartialReviewDetails, theme: Theme): Cont
   ) {
     return container;
   }
-
   container.addChild(new Spacer(1));
   addPartialPreamble(container, details, theme);
   addPartialTasks(container, details, theme);
   return container;
 }
 
+/** Render either progressing or completed review state. */
 export function renderRunResult(
   result: {
     content?: Array<{ type: string; text?: string }>;
     details?: unknown;
-    isError?: boolean;
   },
   options: { expanded: boolean; isPartial: boolean },
   theme: Theme,
+  context: { isError: boolean } = { isError: false },
 ): Container | Text {
   if (options.isPartial) {
     const details = result.details as PartialReviewDetails | undefined;
     if (options.expanded) return buildExpandedPartial(details ?? {}, theme);
-    const completed = details?.completedCount ?? 0;
-    const total = details?.totalCount ?? 0;
-    return renderPartial(partialLabel(completed, total), theme);
+    return renderPartial(
+      partialLabel(details?.completedCount ?? 0, details?.totalCount ?? 0),
+      theme,
+    );
   }
-
   const details = result.details as ReviewBatchDetails | undefined;
-
-  if (result.isError || !details) {
-    return renderError("supi_review_run failed", theme);
+  if (context.isError || !details) {
+    return renderError(`${REVIEW_TOOL_SPECS.run.name} failed`, theme);
   }
-
-  if (!options.expanded) {
-    return buildCollapsed(details, theme);
-  }
-
-  return buildExpanded(details, theme);
+  return options.expanded ? buildExpanded(details, theme) : buildCollapsed(details, theme);
 }
-
-// ── Collapsed ────────────────────────────────────────────────────
 
 function buildCollapsed(details: ReviewBatchDetails, theme: Theme): Text {
   const tasks = details.results
-    .map((result) => formatTaskCollapsed(result, findingScope(details, result.taskId), theme))
+    .map((result) => formatTaskCollapsed(result, theme))
     .join(` ${theme.fg("dim", "·")} `);
-  const currentStateTarget =
-    details.snapshot.requestedTarget.kind === "current-state"
-      ? details.snapshot.requestedTarget
-      : undefined;
+  const anyChange = details.results.some((result) => result.mode === "change");
   const { additions, deletions, files } = details.snapshot.stats;
-  const targetDetail = currentStateTarget
-    ? currentStateTarget.paths?.length
-      ? `${currentStateTarget.paths.length} focus path${currentStateTarget.paths.length === 1 ? "" : "s"}`
-      : "repository-wide"
-    : `${files} file${files !== 1 ? "s" : ""} · +${additions.toLocaleString("en-US")} / -${deletions.toLocaleString("en-US")}`;
-  const target = theme.fg("dim", `${details.snapshot.title} (${targetDetail})`);
-  return new Text(`${tasks}\n${target}`, 0, 0);
+  const targetDetail = anyChange
+    ? `${files} file${files !== 1 ? "s" : ""} · +${additions.toLocaleString("en-US")} / -${deletions.toLocaleString("en-US")}`
+    : "frozen after state";
+  return new Text(
+    `${tasks}\n${theme.fg("dim", `${details.snapshot.title} · ${formatScopeFocus(details.scope)} (${targetDetail})`)}`,
+    0,
+    0,
+  );
 }
-
-// ── Expanded ─────────────────────────────────────────────────────
 
 function buildExpanded(details: ReviewBatchDetails, theme: Theme): Container {
   const container = new Container();
-
-  // Header
   const provenanceLabel =
     details.provenance === "planner-assisted"
       ? theme.fg("muted", "(planner-assisted)")
@@ -244,44 +239,21 @@ function buildExpanded(details: ReviewBatchDetails, theme: Theme): Container {
     new Text(`${theme.fg("accent", theme.bold("Review Finished"))}  ${provenanceLabel}`, 1, 0),
   );
   container.addChild(new Spacer(1));
-
-  // Preamble: mode + target
-  container.addChild(
-    new Text(`${theme.fg("dim", "mode:")} ${theme.fg("muted", details.mode)}`, 1, 0),
-  );
   container.addChild(
     new Text(`${theme.fg("dim", "target:")} ${theme.fg("muted", details.snapshot.title)}`, 1, 0),
   );
-  const currentStateTarget =
-    details.snapshot.requestedTarget.kind === "current-state"
-      ? details.snapshot.requestedTarget
-      : undefined;
-  const fileCount = details.snapshot.changes.length;
+  container.addChild(new Text(theme.fg("dim", `focus: ${formatScopeFocus(details.scope)}`), 1, 0));
+  const receipt = details.workspaceReceipt;
   container.addChild(
     new Text(
       theme.fg(
         "dim",
-        currentStateTarget
-          ? `review scope: ${currentStateTarget.paths?.map((path) => JSON.stringify(path)).join(", ") ?? "repository-wide discovery"}`
-          : `${fileCount} file${fileCount !== 1 ? "s" : ""} changed · +${details.snapshot.stats.additions} / -${details.snapshot.stats.deletions}`,
+        `workspace: ${receipt.status} · from ${receipt.fromCommit ?? "none"} · to ${receipt.toCommit} · ${receipt.includeUncommittedChanges ? "filesystem frozen" : "committed state"}`,
       ),
       1,
       0,
     ),
   );
-  container.addChild(
-    new Text(
-      theme.fg(
-        "dim",
-        currentStateTarget
-          ? `workspace: ${details.workspaceReceipt.status} · current-state · frozen filesystem`
-          : `workspace: ${details.workspaceReceipt.status} · ${details.workspaceReceipt.targetKind} · ${details.workspaceReceipt.changedPathCount} paths`,
-      ),
-      1,
-      0,
-    ),
-  );
-
   if (details.cleanupWarning) {
     container.addChild(new Spacer(1));
     container.addChild(
@@ -289,13 +261,11 @@ function buildExpanded(details: ReviewBatchDetails, theme: Theme): Container {
     );
     container.addChild(new Text(theme.fg("dim", details.cleanupWarning.workspacePath), 1, 0));
   }
-
-  // Planning info
   if (details.planning) {
     container.addChild(new Spacer(1));
     container.addChild(
       new Text(
-        `${theme.fg("dim", "planner:")} ${theme.fg("muted", details.planning.modelId)} · ${theme.fg("dim", "decision:")} ${theme.fg("muted", details.planning.decision)}`,
+        `${theme.fg("dim", "planner:")} ${theme.fg("muted", details.planning.modelId)} · ${theme.fg("dim", `protocol ${details.planning.promptVersion}`)}`,
         1,
         0,
       ),
@@ -310,15 +280,13 @@ function buildExpanded(details: ReviewBatchDetails, theme: Theme): Container {
       );
     }
   }
-
-  // Per-task sections
   for (const result of details.results) {
     container.addChild(new Spacer(1));
-    const taskLabel = `${result.taskId} (${findingScope(details, result.taskId)})`;
-    container.addChild(new Text(theme.fg("accent", theme.bold(taskLabel)), 1, 0));
+    container.addChild(
+      new Text(theme.fg("accent", theme.bold(`${result.taskId} (${result.mode})`)), 1, 0),
+    );
     container.addChild(new Text(theme.fg("dim", "─".repeat(40)), 1, 0));
     buildTaskSection(container, result, theme);
   }
-
   return container;
 }

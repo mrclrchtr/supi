@@ -11,8 +11,9 @@ import {
 
 const receipt = {
   status: "verified" as const,
-  targetKind: "working-tree" as const,
-  baselineRevision: "a".repeat(40),
+  fromCommit: "a".repeat(40),
+  toCommit: "a".repeat(40),
+  includeUncommittedChanges: true,
   expectedWorkspaceHead: "a".repeat(40),
   observedWorkspaceHead: "a".repeat(40),
   expectedDiffHash: "b".repeat(64),
@@ -22,16 +23,20 @@ const receipt = {
 
 function recordInput() {
   return {
-    task: { id: "spec", instructions: "Review the contract." },
+    task: { id: "spec", instructions: "Review the contract.", mode: "change" as const },
     modelId: "provider/model",
     thinkingLevel: "max",
     protocolPrompt: "Review protocol",
     packet: "Exact review packet",
     packetHash: "c".repeat(64),
     snapshot: {
-      requestedTarget: { kind: "working-tree" as const },
-      target: { kind: "working-tree" as const, headCommit: "a".repeat(40) },
-      title: "Working tree changes",
+      requestedTarget: {},
+      target: {
+        fromCommit: "a".repeat(40),
+        toCommit: "a".repeat(40),
+        includeUncommittedChanges: true,
+      },
+      title: "Filesystem changes",
       changes: [{ status: "M", path: "a.ts", additions: 1, deletions: 0 }],
       diffHash: "b".repeat(64),
       stats: { files: 1, additions: 1, deletions: 0 },

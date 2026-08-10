@@ -28,7 +28,7 @@ Tree-sitter support is bundled. Full LSP features require the matching language-
 - **Web access built for agents** — [`supi-web`](packages/supi-web/README.md) prefers source Markdown, extracts readable content from public HTML, fences plain-text files, and moves long pages to temporary files instead of flooding the context window.
 - **Focused library docs** — search Context7 for the right project and version, then retrieve documentation narrowed to the current task.
 - **Structured decisions** — ask you focused choice or text questions through a keyboard-driven form with [`supi-ask-user`](packages/supi-ask-user/README.md).
-- **Review workflows** — run independent, inspection-only reviews over a working tree, branch comparison, or commit with [`supi-review`](packages/supi-review/README.md).
+- **Review workflows** — run independent, inspection-only reviews of exact Git targets with [`supi-review`](packages/supi-review/README.md).
 - **Agent Profile policy** — discover explicit `explore` and `general` profiles with bounded resource envelopes through [`supi-agent`](packages/supi-agent/README.md).
 - **Operational awareness** — inspect context pressure, prompt-cache health, and SuPi debug events with `supi-context`, `supi-cache`, and `supi-debug`.
 - **Repository guidance** — maintain `CLAUDE.md` and `AGENTS.md` files with the skills in [`supi-claude-md`](packages/supi-claude-md/README.md).

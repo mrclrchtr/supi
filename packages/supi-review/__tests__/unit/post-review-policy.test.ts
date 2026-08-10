@@ -19,6 +19,7 @@ function makeDetails(options: { findings?: boolean; partial?: boolean } = {}): R
     {
       status: "completed",
       taskId: "spec",
+      mode: "change",
       modelId: "provider/model",
       packetHash: "c".repeat(64),
       verdict: hasFindings ? "issues" : "pass",
@@ -48,6 +49,7 @@ function makeDetails(options: { findings?: boolean; partial?: boolean } = {}): R
     results.push({
       status: "failed",
       taskId: "standards",
+      mode: "state",
       modelId: "provider/model",
       packetHash: "d".repeat(64),
       failureCode: "missing-structured-output",
@@ -55,21 +57,25 @@ function makeDetails(options: { findings?: boolean; partial?: boolean } = {}): R
   }
   return {
     kind: "review-batch",
-    mode: "direct",
     provenance: "caller-supplied",
     snapshot: {
-      requestedTarget: { kind: "working-tree" },
-      target: { kind: "working-tree", headCommit: "a".repeat(40) },
-      title: "Working tree changes",
+      requestedTarget: {},
+      target: {
+        fromCommit: "a".repeat(40),
+        toCommit: "a".repeat(40),
+        includeUncommittedChanges: true,
+      },
+      title: "Filesystem changes",
       changes: [{ status: "M", path: "src/a.ts", additions: 1, deletions: 0 }],
       diffHash: "b".repeat(64),
       stats: { files: 1, additions: 1, deletions: 0 },
     },
-    review: { tasks: [{ id: "spec", instructions: "Review." }] },
+    review: { tasks: [{ id: "spec", instructions: "Review.", mode: "change" }] },
     workspaceReceipt: {
       status: "verified",
-      targetKind: "working-tree",
-      baselineRevision: "a".repeat(40),
+      fromCommit: "a".repeat(40),
+      toCommit: "a".repeat(40),
+      includeUncommittedChanges: true,
       expectedWorkspaceHead: "a".repeat(40),
       observedWorkspaceHead: "a".repeat(40),
       expectedDiffHash: "b".repeat(64),

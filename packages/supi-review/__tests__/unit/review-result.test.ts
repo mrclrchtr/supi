@@ -134,7 +134,7 @@ describe("normalizeReviewSubmission unchanged grammar", () => {
           impact: "high",
           effort: "small",
           confidence: 1,
-          location: { path: "src/file.ts", startLine: 10 },
+          location: { path: "@src/file.ts", startLine: 10 },
         },
       ],
     });

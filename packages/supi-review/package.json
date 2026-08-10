@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-review",
   "version": "4.10.0",
-  "description": "Parallel isolated reviews of trees, comparisons, and commits",
+  "description": "Parallel inspection-only reviews of exact Git targets",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -42,6 +42,11 @@ describe("paged review tool TUI", () => {
     expect(
       rendered(renderOutputResult(result, { expanded: true, isPartial: false }, theme)),
     ).toContain("private review body");
+    expect(
+      rendered(
+        renderOutputResult(result, { expanded: false, isPartial: false }, theme, { isError: true }),
+      ),
+    ).toContain("supi_review_output failed");
   });
 
   it("renders audit lists from structured details rather than agent-facing markdown", () => {
@@ -62,5 +67,10 @@ describe("paged review tool TUI", () => {
     expect(
       rendered(renderAuditResult(result, { expanded: true, isPartial: false }, theme)),
     ).toContain("review-audit-1 expires 2026-01-08T00:00:00.000Z");
+    expect(
+      rendered(
+        renderAuditResult(result, { expanded: false, isPartial: false }, theme, { isError: true }),
+      ),
+    ).toContain("supi_review_audit failed");
   });
 });

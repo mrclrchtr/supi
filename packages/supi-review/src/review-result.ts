@@ -1,5 +1,5 @@
 import { REVIEW_LIMITS } from "./review-limits.ts";
-import { normalizeRepositoryRelativePath } from "./review-path.ts";
+import { normalizeRepositoryRelativePath, normalizeReviewPathArgument } from "./review-path.ts";
 import type {
   CriteriaCoverage,
   FindingCounts,
@@ -109,10 +109,12 @@ export function normalizeReviewSubmission(
               ...finding.location,
               endLine: finding.location.endLine ?? finding.location.startLine,
               path: normalizeRepositoryRelativePath(
-                requireText(
-                  finding.location.path,
-                  `Finding ${index + 1} location path`,
-                  REVIEW_LIMITS.locationPathCharacters,
+                normalizeReviewPathArgument(
+                  requireText(
+                    finding.location.path,
+                    `Finding ${index + 1} location path`,
+                    REVIEW_LIMITS.locationPathCharacters,
+                  ),
                 ),
               ),
             }

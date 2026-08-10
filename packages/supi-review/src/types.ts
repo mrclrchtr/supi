@@ -6,38 +6,28 @@ import type {
 import type { LocalReviewAuditStore } from "./audit/local-review-audit-store.ts";
 import type { ReviewWorkspaceCleanupWarning } from "./workspace/review-workspace.ts";
 
-/** A 7-64 character hexadecimal Git commit id, pinned to its full object id during resolution. */
+/** A full Git commit id after target resolution. */
 export type CommitId = string;
 
-/**
- * The item selected for review: a Git change, a single commit, or a one-state
- * Current-State Audit of the complete filesystem. A working-tree target may
- * use an optional base commit to include committed branch work and current
- * filesystem changes; a current-state target may optionally focus inspection
- * with advisory workspace-relative paths.
- */
-export type ReviewTargetSpec =
-  | { kind: "working-tree"; baseCommit?: CommitId }
-  | { kind: "comparison"; baseCommit: CommitId }
-  | { kind: "commit"; commit: CommitId }
-  | { kind: "current-state"; paths?: string[] };
+/** Public Review Target input. Omitted fields use the current filesystem target. */
+export interface ReviewTargetSpec {
+  /** Optional before commit syntax. The Review Engine resolves it once. */
+  from?: string;
+  /** Optional after commit syntax. It is valid only when uncommitted changes are excluded. */
+  to?: string;
+  /** Include the current filesystem and non-ignored untracked files. Defaults to true. */
+  includeUncommittedChanges?: boolean;
+}
 
-/** Resolved identity of a selected review target. */
-export type ResolvedReviewTarget =
-  | {
-      kind: "working-tree";
-      headCommit: CommitId;
-      requestedBaseCommit?: CommitId;
-      mergeBaseCommit?: CommitId;
-    }
-  | {
-      kind: "comparison";
-      requestedBaseCommit: CommitId;
-      mergeBaseCommit: CommitId;
-      headCommit: CommitId;
-    }
-  | { kind: "commit"; commit: CommitId; parentCommit?: CommitId }
-  | { kind: "current-state"; headCommit: CommitId };
+/** Exact target state used by the Review Engine after endpoint resolution. */
+export interface ResolvedReviewTarget {
+  /** Exact before commit or the filesystem freeze base. */
+  fromCommit?: CommitId;
+  /** Exact captured HEAD for a filesystem target, or exact committed after state. */
+  toCommit: CommitId;
+  /** True when the after state is the frozen current filesystem. */
+  includeUncommittedChanges: boolean;
+}
 
 export interface DiffStats {
   files: number;
@@ -77,8 +67,9 @@ export type ReviewSnapshotSummary = Omit<ReviewSnapshot, "repositoryRoot">;
 /** Post-materialization proof that a Review Workspace matches its pinned target. */
 export interface ReviewWorkspaceReceipt {
   status: "verified";
-  targetKind: ReviewTargetSpec["kind"];
-  baselineRevision: string;
+  fromCommit?: CommitId;
+  toCommit: CommitId;
+  includeUncommittedChanges: boolean;
   expectedWorkspaceHead: CommitId;
   observedWorkspaceHead: CommitId;
   expectedDiffHash: string;
@@ -92,14 +83,8 @@ export interface ReviewAuditReference {
   expiresAt: string;
 }
 
-/** Eligibility policy for findings produced by one Review Task. */
-export type FindingScope = "change-only" | "boy-scout";
-
-/**
- * Effective finding scope rendered for one task. Current-State Audit fixes
- * `criteria-only`; Git change reviews use the task's caller-selected scope.
- */
-export type EffectiveFindingScope = FindingScope | "criteria-only";
+/** Required evidence view and finding policy for one Review Task. */
+export type ReviewMode = "change" | "state";
 
 /** Caller-identified authoritative issue or repository document for Review Criteria. */
 export interface CriteriaSource {
@@ -113,9 +98,15 @@ export interface CriteriaSource {
 export interface ReviewTask {
   id: string;
   instructions: string;
-  /** Defaults to change-only when omitted; fixed criteria-only for Current-State Audit. */
-  findingScope?: FindingScope;
+  /** Required evidence view and finding policy. */
+  mode: ReviewMode;
   criteriaSources?: CriteriaSource[];
+}
+
+/** Optional batch-level path focus that remains separate from the Review Target. */
+export interface ReviewScope {
+  /** Repository-relative paths that focus every task without restricting inspection. */
+  paths?: string[];
 }
 
 /** Semantic input shared with the reviewer tasks in one run. */
@@ -191,14 +182,7 @@ export type ChildFailedResult =
       diagnostics: ChildFailureDiagnostics;
     };
 
-/**
- * Typed result of running one isolated child session (planner or reviewer).
- *
- * Substrate-level: it carries the structured `value` on success, aggregate
- * `usage`, and bounded failure diagnostics — but no modelId, capability
- * warnings, or audit. Adapters attach those domain facts. `session-creation-failed`
- * stays a diagnostics-free `failed` via {@link ChildFailedResult}.
- */
+/** Typed result of running one isolated child session. */
 export type ChildRunOutcome<T> =
   | { kind: "success"; value: T; usage?: Usage }
   | ({ kind: "failed"; usage?: Usage } & ChildFailedResult)
@@ -267,6 +251,7 @@ export type ReviewerRunResult = ChildRunOutcome<ReviewSubmission> & {
 
 interface ReviewTaskResultIdentity {
   taskId: string;
+  mode: ReviewMode;
   modelId: string;
   /** SHA-256 of the exact reviewer packet bytes. */
   packetHash: string;
@@ -304,14 +289,13 @@ export type ReviewTaskResult = ReviewTaskResultIdentity &
       }
   );
 
+/** Metadata for a transient Planner Draft offered by an interactive Review. */
 export interface PlanningRecord {
   promptVersion: string;
   modelId: string;
-  /** Planner usage is informational here and is not charged again by the run tool. */
+  /** Planner usage is included with the final interactive Review result. */
   usage?: Usage;
   draft: PlannerDraft;
-  effectiveReview: ReviewInput;
-  decision: "accept-draft" | "use-review";
 }
 
 /** Retrieval metadata for a bounded parent-facing review output page. */
@@ -324,28 +308,16 @@ export interface ReviewOutputReference {
 
 export interface ReviewBatchDetails {
   kind: "review-batch";
-  mode: "direct" | "prepared";
   provenance: "caller-supplied" | "planner-assisted";
   snapshot: ReviewSnapshotSummary;
   review: ReviewInput;
+  /** Optional path focus validated against the frozen after state. */
+  scope?: ReviewScope;
   /** Verification receipt for the shared frozen Review Workspace. */
   workspaceReceipt: ReviewWorkspaceReceipt;
   planning?: PlanningRecord;
   results: ReviewTaskResult[];
   cleanupWarning?: ReviewWorkspaceCleanupWarning;
-  output?: ReviewOutputReference;
-}
-
-export interface PreparedReviewDetails {
-  kind: "review-prepared";
-  planId: string;
-  snapshot: ReviewSnapshotSummary;
-  reviewerModelId: string;
-  plannerDraft?: PlannerDraft;
-  plannerModelId?: string;
-  plannerPromptVersion?: string;
-  plannerUsage?: Usage;
-  plannerFailure?: Exclude<PlannerRunResult, { kind: "success" }>;
   output?: ReviewOutputReference;
 }
 

@@ -60,7 +60,7 @@ _Avoid_: repository instructions, ambient context, task summary
 
 **Review Criteria Source**:
 A caller-identified authoritative issue or repository document from which Review Criteria derive. A reviewer may retrieve it when the supplied summary is insufficient; unavailable required source content makes Criteria Coverage incomplete.
-_Avoid_: shared context, Reviewer Packet, Review Scope
+_Avoid_: shared context, Reviewer Packet
 
 **Criteria Coverage**:
 A required completed Review Task statement that the supplied Review Criteria were sufficient for the audit, or that unavailable source detail left coverage incomplete for a stated reason. Incomplete coverage preserves concrete findings but cannot support a definitive pass.
@@ -71,8 +71,8 @@ Caller-supplied workspace-relative file or directory paths that focus every task
 _Avoid_: access boundary, finding boundary, Review Criteria, Review Mode
 
 **Review Mode**:
-The required per-task policy that selects the evidence view and finding eligibility. `change` requires a non-empty change and permits pre-existing issues only in changed files or directly affected symbols as advisory unless the change worsens or exposes them; `state` audits only the frozen after state and lets any criterion-relevant finding block.
-_Avoid_: Finding Scope, Review Scope, target kind
+The required per-task policy that selects the evidence view. `change` requires one non-empty canonical change. `state` audits only the frozen after state. The Reviewer Protocol defines finding eligibility.
+_Avoid_: Finding Scope, target kind
 
 **Finding Verification**:
 The containing Agent's independent confirmation or refutation of each reported finding against Target Evidence before any mutation. It concludes by presenting the verified findings and asking the user what to do next.
@@ -80,7 +80,7 @@ _Avoid_: Reviewer Session, review rerun, fixing
 
 **Review**:
 One execution request that supplies a Review Target and a complete set of Review Tasks.
-_Avoid_: Direct Review, Prepared Review
+_Avoid_: separate execution mode, Planner Draft
 
 **Reviewer Packet**:
 The canonical, protocol-versioned input compiled for one Review Task from its resolved target, review input, and reviewer model. Each result carries the SHA-256 of the exact packet bytes.
@@ -95,8 +95,8 @@ An optional advisory proposal of shared context and Review Tasks generated for t
 _Avoid_: Review Plan, generated prompt, reviewer output
 
 **Review Target**:
-A selected repository after state with an exact before state when a `change` task needs one. It can include the caller's staged, unstaged, and non-ignored untracked changes; advisory Review Scope is separate.
-_Avoid_: target kind, Review Mode, Review Scope, Current-State Audit, Working-Tree Review
+A selected repository after state with optional `from`, `to`, and `includeUncommittedChanges` input. The Review Engine resolves endpoints to exact commits. It can include staged, unstaged, and non-ignored untracked changes.
+_Avoid_: target kind, Review Mode, Current-State Audit, Working-Tree Review
 
 **Target Evidence**:
 Repository evidence in a resolved Review Target. A `change` task receives the before and after states; a `state` task receives only the frozen after state.

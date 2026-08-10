@@ -1,9 +1,4 @@
-import type {
-  EffectiveFindingScope,
-  FindingCounts,
-  ReviewBatchDetails,
-  ReviewTaskResult,
-} from "../types.ts";
+import type { FindingCounts, ReviewBatchDetails, ReviewScope, ReviewTaskResult } from "../types.ts";
 import { formatChildFailureDiagnostics } from "./child-failure-diagnostics.ts";
 import { formatReviewUsage } from "./usage-format.ts";
 
@@ -15,6 +10,13 @@ function appendCapabilityWarnings(lines: string[], result: ReviewTaskResult): vo
 
 function formatFindingCounts(counts: FindingCounts): string {
   return `Findings: ${counts.total} total · ${counts.blocking} blocking · ${counts.nonBlocking} non-blocking · impact: ${counts.byImpact.high} high, ${counts.byImpact.medium} medium, ${counts.byImpact.low} low`;
+}
+
+function formatScopeFocus(scope: ReviewScope | undefined): string {
+  const count = scope?.paths?.length ?? 0;
+  return count === 0
+    ? "repository-wide review"
+    : `path focus: ${count} ${count === 1 ? "path" : "paths"}`;
 }
 
 function appendTaskStatus(
@@ -31,11 +33,11 @@ function appendTaskStatus(
   if (result.diagnostics) lines.push("", ...formatChildFailureDiagnostics(result.diagnostics));
 }
 
-function formatTaskResult(result: ReviewTaskResult, findingScope: EffectiveFindingScope): string[] {
+function formatTaskResult(result: ReviewTaskResult): string[] {
   const lines = [
     "",
     `## ${result.taskId}`,
-    `Finding Scope: ${findingScope}`,
+    `Review Mode: ${result.mode}`,
     `Model: ${result.modelId}`,
     `Packet SHA-256: ${result.packetHash}`,
   ];
@@ -50,10 +52,8 @@ function formatTaskResult(result: ReviewTaskResult, findingScope: EffectiveFindi
   }
 
   lines.push(`Verdict: ${result.verdict.toUpperCase()}`, formatFindingCounts(result.findingCounts));
-  if (result.criteriaCoverage?.status === "incomplete") {
-    lines.push(
-      `Criteria coverage: incomplete — ${result.criteriaCoverage.reason ?? "unspecified"}`,
-    );
+  if (result.criteriaCoverage.status === "incomplete") {
+    lines.push(`Criteria coverage: incomplete — ${result.criteriaCoverage.reason}`);
   }
   lines.push("", result.summary);
   for (const finding of result.findings) {
@@ -73,22 +73,26 @@ function formatTaskResult(result: ReviewTaskResult, findingScope: EffectiveFindi
 
 /** Format complete Review Engine output for parent-facing Markdown and continuation storage. */
 export function formatReviewBatch(details: ReviewBatchDetails): string {
-  const currentState = details.snapshot.target.kind === "current-state";
-  const workspaceReceipt = currentState
-    ? `Workspace receipt: ${details.workspaceReceipt.status} · current-state · frozen filesystem verified`
-    : `Workspace receipt: ${details.workspaceReceipt.status} · ${details.workspaceReceipt.targetKind} · ${details.workspaceReceipt.changedPathCount} changed paths · ${details.workspaceReceipt.observedDiffHash}`;
+  const receipt = details.workspaceReceipt;
+  const workspaceReceipt = [
+    `Workspace receipt: ${receipt.status}`,
+    `from ${receipt.fromCommit ?? "none"}`,
+    `to ${receipt.toCommit}`,
+    receipt.includeUncommittedChanges ? "uncommitted changes included" : "committed state only",
+    `${receipt.changedPathCount} changed paths`,
+    receipt.observedDiffHash,
+  ].join(" · ");
   const lines = [
     "# Review Finished",
     "",
-    `Mode: ${details.mode}`,
     `Provenance: ${details.provenance}`,
     `Target: ${details.snapshot.title}`,
+    `Focus: ${formatScopeFocus(details.scope)}`,
     workspaceReceipt,
   ];
   if (details.planning) {
     lines.push(
       `Planner: ${details.planning.modelId} (protocol ${details.planning.promptVersion})`,
-      `Planner decision: ${details.planning.decision}`,
       ...(details.planning.usage
         ? [`Planner usage: ${formatReviewUsage(details.planning.usage)}`]
         : []),
@@ -102,14 +106,6 @@ export function formatReviewBatch(details: ReviewBatchDetails): string {
       `Recovery: ${details.cleanupWarning.recoveryCommand}`,
     );
   }
-  const findingScopes = new Map<string, EffectiveFindingScope>(
-    details.review.tasks.map((task) => [
-      task.id,
-      currentState ? "criteria-only" : (task.findingScope ?? "change-only"),
-    ]),
-  );
-  for (const result of details.results) {
-    lines.push(...formatTaskResult(result, findingScopes.get(result.taskId) ?? "change-only"));
-  }
+  for (const result of details.results) lines.push(...formatTaskResult(result));
   return lines.join("\n");
 }

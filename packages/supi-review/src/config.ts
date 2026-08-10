@@ -91,7 +91,7 @@ export function registerReviewSettings(pi: ExtensionAPI, homeDir?: string): void
           kind: "modelPicker",
           key: "plannerModel",
           label: "Planner model",
-          description: "Lightweight model used only when planning is set to suggest.",
+          description: "Powers the optional Planner Draft in /supi-review.",
           includeDisabled: false,
           staticOptions: [currentOption],
         },

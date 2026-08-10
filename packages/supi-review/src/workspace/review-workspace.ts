@@ -1,10 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { readReviewDiff } from "../git.ts";
 import { runGit, runGitAllowExit } from "../git-command.ts";
-import { resolveReviewPath } from "../review-path.ts";
 import type { ReviewSnapshot, ReviewWorkspaceReceipt } from "../types.ts";
 
 const WORKSPACE_MARKER = "supi-review:";
@@ -27,14 +26,13 @@ function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
-function afterCommit(snapshot: ReviewSnapshot): string {
-  if (snapshot.target.kind === "working-tree") {
-    return snapshot.target.mergeBaseCommit ?? snapshot.target.headCommit;
+function workspaceHead(snapshot: ReviewSnapshot): string {
+  if (snapshot.target.includeUncommittedChanges) {
+    if (!snapshot.target.fromCommit)
+      throw new Error("Filesystem Review Target has no freeze base.");
+    return snapshot.target.fromCommit;
   }
-  if (snapshot.target.kind === "current-state") return snapshot.target.headCommit;
-  return snapshot.target.kind === "comparison"
-    ? snapshot.target.headCommit
-    : snapshot.target.commit;
+  return snapshot.target.toCommit;
 }
 
 function lockReason(): string {
@@ -45,76 +43,48 @@ function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\"'\"")}'`;
 }
 
-function baselineRevision(snapshot: ReviewSnapshot): string {
-  if (snapshot.target.kind === "working-tree") {
-    return snapshot.target.mergeBaseCommit ?? snapshot.target.headCommit;
-  }
-  if (snapshot.target.kind === "current-state") return snapshot.target.headCommit;
-  if (snapshot.target.kind === "comparison") return snapshot.target.mergeBaseCommit;
-  return snapshot.target.parentCommit ?? "empty-tree";
-}
-
 function workspaceSnapshot(snapshot: ReviewSnapshot, cwd: string): ReviewSnapshot {
-  if (snapshot.target.kind !== "working-tree") return { ...snapshot, repositoryRoot: cwd };
-  return {
-    ...snapshot,
-    repositoryRoot: cwd,
-    target: { kind: "working-tree", headCommit: afterCommit(snapshot) },
-  };
-}
-
-async function verifyReviewScope(snapshot: ReviewSnapshot, cwd: string): Promise<void> {
-  if (snapshot.requestedTarget.kind !== "current-state") return;
-  for (const path of snapshot.requestedTarget.paths ?? []) {
-    try {
-      await lstat(resolveReviewPath(cwd, path).absolute);
-    } catch (error) {
-      if (
-        error &&
-        typeof error === "object" &&
-        "code" in error &&
-        ((error as { code?: unknown }).code === "ENOENT" ||
-          (error as { code?: unknown }).code === "ENOTDIR")
-      ) {
-        throw new Error(`Review Workspace does not contain Review Scope path: ${path}.`, {
-          cause: error,
-        });
-      }
-      throw error;
-    }
-  }
+  return { ...snapshot, repositoryRoot: cwd };
 }
 
 /** Re-read the frozen workspace through the canonical patch compiler before children can inspect it. */
 async function verifyWorkspace(
   snapshot: ReviewSnapshot,
   cwd: string,
+  signal?: AbortSignal,
 ): Promise<ReviewWorkspaceReceipt> {
-  await verifyReviewScope(snapshot, cwd);
-  const expectedWorkspaceHead = afterCommit(snapshot);
+  const expectedWorkspaceHead = workspaceHead(snapshot);
   const observedWorkspaceHead = (
-    await runGit(cwd, [
-      "rev-parse",
-      "--verify",
-      // biome-ignore lint/security/noSecrets: Git revision syntax, not a secret
-      "HEAD^{commit}",
-    ])
+    await runGit(
+      cwd,
+      [
+        "rev-parse",
+        "--verify",
+        // biome-ignore lint/security/noSecrets: Git revision syntax, not a secret
+        "HEAD^{commit}",
+      ],
+      undefined,
+      signal,
+    )
   ).trim();
   if (observedWorkspaceHead !== expectedWorkspaceHead) {
     throw new Error("Review Workspace checked out an unexpected commit.");
   }
-  if (snapshot.target.kind !== "working-tree" && snapshot.target.kind !== "current-state") {
-    const status = await runGit(cwd, ["status", "--porcelain"]);
+  if (!snapshot.target.includeUncommittedChanges) {
+    const status = await runGit(cwd, ["status", "--porcelain"], undefined, signal);
     if (status) throw new Error("Review Workspace was not clean after checkout.");
   }
-  const observedDiffHash = sha256(await readReviewDiff(cwd, workspaceSnapshot(snapshot, cwd)));
+  const observedDiffHash = sha256(
+    await readReviewDiff(cwd, workspaceSnapshot(snapshot, cwd), undefined, signal),
+  );
   if (observedDiffHash !== snapshot.diffHash) {
     throw new Error("Review Workspace does not match the pinned target patch.");
   }
   return {
     status: "verified",
-    targetKind: snapshot.target.kind,
-    baselineRevision: baselineRevision(snapshot),
+    ...(snapshot.target.fromCommit ? { fromCommit: snapshot.target.fromCommit } : {}),
+    toCommit: snapshot.target.toCommit,
+    includeUncommittedChanges: snapshot.target.includeUncommittedChanges,
     expectedWorkspaceHead,
     observedWorkspaceHead,
     expectedDiffHash: snapshot.diffHash,
@@ -125,12 +95,14 @@ async function verifyWorkspace(
 
 /**
  * Materialize one exact Review Snapshot as a disposable linked worktree.
- * Working-tree targets replay the already-hashed canonical patch over their
- * pinned baseline and stage it so `git diff HEAD` exposes the full after-state.
+ * Filesystem targets replay one already-hashed canonical patch over the exact
+ * freeze base and stage it so each Reviewer Session sees the frozen after state.
  */
 export async function materializeReviewWorkspace(
   snapshot: ReviewSnapshot,
+  signal?: AbortSignal,
 ): Promise<ReviewWorkspace> {
+  signal?.throwIfAborted();
   const parent = await mkdtemp(join(tmpdir(), "supi-review-workspace-"));
   const workspacePath = join(parent, "workspace");
   let cwd = workspacePath;
@@ -138,30 +110,38 @@ export async function materializeReviewWorkspace(
   let receipt: ReviewWorkspaceReceipt | undefined;
 
   try {
-    await runGit(snapshot.repositoryRoot, [
-      "worktree",
-      "add",
-      "--detach",
-      workspacePath,
-      afterCommit(snapshot),
-    ]);
+    await runGit(
+      snapshot.repositoryRoot,
+      ["worktree", "add", "--detach", workspacePath, workspaceHead(snapshot)],
+      undefined,
+      signal,
+    );
     created = true;
     cwd = await realpath(workspacePath);
-    await runGit(snapshot.repositoryRoot, ["worktree", "lock", "--reason", lockReason(), cwd]);
+    await runGit(
+      snapshot.repositoryRoot,
+      ["worktree", "lock", "--reason", lockReason(), cwd],
+      undefined,
+      signal,
+    );
 
-    if (snapshot.target.kind === "working-tree" || snapshot.target.kind === "current-state") {
-      const patch = await readReviewDiff(snapshot.repositoryRoot, snapshot);
+    if (snapshot.target.includeUncommittedChanges) {
+      const patch = await readReviewDiff(snapshot.repositoryRoot, snapshot, undefined, signal);
       if (sha256(patch) !== snapshot.diffHash) {
         throw new Error("The review target changed before its Review Workspace was frozen.");
       }
-      // An unchanged current state freezes to its HEAD checkout without a patch.
       if (patch) {
         const patchPath = join(parent, "target.patch");
-        await writeFile(patchPath, patch, "utf8");
-        await runGit(cwd, ["apply", "--index", "--binary", "--whitespace=nowarn", patchPath]);
+        await writeFile(patchPath, patch, { encoding: "utf8", signal });
+        await runGit(
+          cwd,
+          ["apply", "--index", "--binary", "--whitespace=nowarn", patchPath],
+          undefined,
+          signal,
+        );
       }
     }
-    receipt = await verifyWorkspace(snapshot, cwd);
+    receipt = await verifyWorkspace(snapshot, cwd, signal);
   } catch (error) {
     if (created) {
       await runGitAllowExit(snapshot.repositoryRoot, ["worktree", "unlock", cwd], [128]).catch(

@@ -1,36 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { buildReviewPacket } from "../../src/target/packet.ts";
-import { buildReviewerSystemPrompt } from "../../src/tool/review-system-prompt.ts";
 import type { ReviewModelSelection, ReviewSnapshot } from "../../src/types.ts";
 
 const snapshot: ReviewSnapshot = {
   repositoryRoot: "/repo",
-  requestedTarget: { kind: "working-tree" },
-  target: { kind: "working-tree", headCommit: "a".repeat(40) },
-  title: "Working tree changes",
-  changes: [{ status: "M", path: "src/a.ts", additions: 1, deletions: 0 }],
+  requestedTarget: {},
+  target: { fromCommit: "a".repeat(40), toCommit: "a".repeat(40), includeUncommittedChanges: true },
+  title: "Filesystem changes",
+  changes: [{ status: "M", path: "a.ts", additions: 1, deletions: 1 }],
   diffHash: "b".repeat(64),
-  stats: { files: 1, additions: 1, deletions: 0 },
+  stats: { files: 1, additions: 1, deletions: 1 },
 };
 const model = { canonicalId: "provider/model", model: {} } as ReviewModelSelection;
 
-describe("reviewer instruction composition", () => {
-  it("keeps dynamic protocol policy out of the target packet", () => {
-    const task = {
-      id: "standards",
-      instructions: "Apply the documented repository standards.",
-      findingScope: "boy-scout" as const,
-    };
-    const packet = buildReviewPacket(snapshot, { tasks: [task] }, task, model).prompt;
-    const configuredProtocol = buildReviewerSystemPrompt(true);
-    const reviewerInstructions = `${configuredProtocol}\n${packet}`;
+describe("review instruction composition", () => {
+  it("keeps Review Mode in the packet and finding policy in the Reviewer Protocol", () => {
+    const task = { id: "task", instructions: "Check.", mode: "change" as const };
+    const packet = buildReviewPacket(snapshot, { tasks: [task] }, {}, task, model).prompt;
 
-    expect(reviewerInstructions).not.toContain("Dependency Bootstrap");
-    expect(packet).toContain("Finding Scope: boy-scout");
-    expect(packet).not.toMatch(/Do not run tests|submit_review exactly once/i);
-    expect(configuredProtocol).toMatch(/Review Criteria/i);
-    expect(configuredProtocol).toMatch(/change-only.*boy-scout/is);
-    expect(configuredProtocol).toMatch(/rejected.*correct.*retry/is);
-    expect(buildReviewerSystemPrompt()).toContain("optional Dependency Bootstrap");
+    expect(packet).toContain("Review Mode: change");
+    expect(packet).not.toContain("change-only");
+    expect(packet).not.toContain("boy-scout");
+    expect(packet).not.toContain("criteria-only");
   });
 });

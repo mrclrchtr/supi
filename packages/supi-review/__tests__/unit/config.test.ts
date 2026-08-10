@@ -102,7 +102,11 @@ describe("review config", () => {
         fields: [
           expect.objectContaining({ kind: "boolean", key: "agentToolEnabled" }),
           expect.objectContaining({ kind: "modelPicker", key: "agentModel" }),
-          expect.objectContaining({ kind: "modelPicker", key: "plannerModel" }),
+          expect.objectContaining({
+            kind: "modelPicker",
+            key: "plannerModel",
+            description: "Powers the optional Planner Draft in /supi-review.",
+          }),
           expect.objectContaining({ kind: "string", key: "bootstrapCommand" }),
           expect.objectContaining({
             kind: "enum",

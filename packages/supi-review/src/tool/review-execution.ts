@@ -11,6 +11,7 @@ import type {
   ReviewInput,
   ReviewModelSelection,
   ReviewProgress,
+  ReviewScope,
   ReviewSnapshot,
   ReviewTask,
   ReviewTaskResult,
@@ -32,6 +33,7 @@ export interface ReviewExecutionProgressDetails extends Record<string, unknown> 
   workspacePath?: string;
   reviewerModelId?: string;
   sharedContext?: string;
+  scope?: ReviewScope;
   tasks?: ReviewTask[];
   taskIds?: string[];
   taskStates?: Record<string, ReviewExecutionPartialTaskState>;
@@ -44,12 +46,13 @@ export type ReviewExecutionUpdate = (result: {
 }) => void;
 
 function toTaskResult(
-  taskId: string,
+  task: ReviewTask,
   packetHash: string,
   result: Awaited<ReturnType<typeof runReviewer>>,
 ): ReviewTaskResult {
   const identity = {
-    taskId,
+    taskId: task.id,
+    mode: task.mode,
     packetHash,
     modelId: result.modelId,
     ...(result.usage ? { usage: result.usage } : {}),
@@ -104,6 +107,7 @@ export async function executeReviewTasks(
   workspaceCwd: string,
   snapshot: ReviewSnapshot,
   reviewInput: ReviewInput,
+  scope: ReviewScope,
   model: ReviewModelSelection,
   projectTrusted?: boolean,
   signal?: AbortSignal,
@@ -121,6 +125,7 @@ export async function executeReviewTasks(
     workspacePath: workspaceCwd,
     reviewerModelId: model.canonicalId,
     ...(review.sharedContext ? { sharedContext: review.sharedContext } : {}),
+    ...(scope.paths?.length ? { scope } : {}),
     tasks: review.tasks,
     taskIds: review.tasks.map((task) => task.id),
   };
@@ -140,7 +145,7 @@ export async function executeReviewTasks(
 
   return Promise.all(
     review.tasks.map(async (task) => {
-      const packet = buildReviewPacket(snapshot, review, task, model);
+      const packet = buildReviewPacket(snapshot, review, scope, task, model);
       const packetBytes = Buffer.byteLength(packet.prompt, "utf8");
       const startedAt = Date.now();
       const debugSummary = (
@@ -149,7 +154,7 @@ export async function executeReviewTasks(
       ): void => {
         recordReviewTaskDebugSummary({
           taskId: task.id,
-          targetKind: snapshot.target.kind,
+          mode: task.mode,
           targetTitle: snapshot.title,
           packetBytes,
           durationMs: Date.now() - startedAt,
@@ -189,7 +194,7 @@ export async function executeReviewTasks(
             });
           },
         });
-        const taskResult = toTaskResult(task.id, packet.packetHash, result);
+        const taskResult = toTaskResult(task, packet.packetHash, result);
         debugSummary(taskResult, result.reviewerExtensionSetStatus);
         taskStates[task.id] = { status: taskResult.status };
         completedCount++;
@@ -205,6 +210,7 @@ export async function executeReviewTasks(
         const taskResult: ReviewTaskResult = {
           status: "failed",
           taskId: task.id,
+          mode: task.mode,
           packetHash: packet.packetHash,
           modelId: model.canonicalId,
           failureCode: "unexpected-runner-failure",

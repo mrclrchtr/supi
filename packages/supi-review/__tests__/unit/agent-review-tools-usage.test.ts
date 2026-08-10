@@ -2,61 +2,51 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   runReview: vi.fn(),
-  prepareReview: vi.fn(),
   resolveAgentReviewModel: vi.fn(),
   loadReviewConfig: vi.fn(),
+  spinnerStart: vi.fn(),
 }));
-
 vi.mock("@mrclrchtr/supi-core/status-spinner", () => ({
   StatusSpinner: class {
-    start() {}
+    start() {
+      mocks.spinnerStart();
+    }
     update() {}
     stop() {}
   },
 }));
-vi.mock("../../src/config.ts", () => ({
-  loadReviewConfig: mocks.loadReviewConfig,
-}));
-vi.mock("../../src/model.ts", () => ({
-  resolveAgentReviewModel: mocks.resolveAgentReviewModel,
-}));
-vi.mock("../../src/tool/review-workflow.ts", () => ({
-  prepareReview: mocks.prepareReview,
-  runReview: mocks.runReview,
-}));
+vi.mock("../../src/config.ts", () => ({ loadReviewConfig: mocks.loadReviewConfig }));
+vi.mock("../../src/model.ts", () => ({ resolveAgentReviewModel: mocks.resolveAgentReviewModel }));
+vi.mock("../../src/tool/review-workflow.ts", () => ({ runReview: mocks.runReview }));
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { ReviewArtifactStore } from "../../src/session/review-artifact-store.ts";
-import { ReviewPlanStore } from "../../src/session/review-plan-store.ts";
 import { registerAgentReviewTools } from "../../src/tool/agent-review-tools.ts";
+import { MAX_PAGE_CHARACTERS, MAX_PAGE_LINES } from "../../src/tool/output-page.ts";
 import type { ReviewBatchDetails, ReviewModelSelection } from "../../src/types.ts";
 
-const usage = {
-  input: 10,
-  output: 5,
-  cacheRead: 2,
-  cacheWrite: 1,
-  totalTokens: 18,
-  cost: { input: 1, output: 2, cacheRead: 3, cacheWrite: 4, total: 10 },
-};
 const details: ReviewBatchDetails = {
   kind: "review-batch",
-  mode: "direct",
   provenance: "caller-supplied",
   snapshot: {
-    requestedTarget: { kind: "working-tree" },
-    target: { kind: "working-tree", headCommit: "a".repeat(40) },
-    title: "Working tree",
+    requestedTarget: {},
+    target: {
+      fromCommit: "a".repeat(40),
+      toCommit: "a".repeat(40),
+      includeUncommittedChanges: true,
+    },
+    title: "Filesystem changes",
     changes: [{ status: "M", path: "a.ts", additions: 1, deletions: 0 }],
     diffHash: "b".repeat(64),
     stats: { files: 1, additions: 1, deletions: 0 },
   },
-  review: { tasks: [{ id: "spec", instructions: "Review." }] },
+  review: { tasks: [{ id: "spec", instructions: "Review.", mode: "change" }] },
   workspaceReceipt: {
     status: "verified",
-    targetKind: "working-tree",
-    baselineRevision: "a".repeat(40),
+    fromCommit: "a".repeat(40),
+    toCommit: "a".repeat(40),
+    includeUncommittedChanges: true,
     expectedWorkspaceHead: "a".repeat(40),
     observedWorkspaceHead: "a".repeat(40),
     expectedDiffHash: "b".repeat(64),
@@ -67,9 +57,9 @@ const details: ReviewBatchDetails = {
     {
       status: "completed",
       taskId: "spec",
+      mode: "change",
       modelId: "provider/model",
       packetHash: "c".repeat(64),
-      usage,
       verdict: "pass",
       findingCounts: {
         total: 0,
@@ -84,45 +74,11 @@ const details: ReviewBatchDetails = {
   ],
 };
 
-function detailsWithFinding(): ReviewBatchDetails {
-  return {
-    ...details,
-    results: [
-      {
-        status: "completed",
-        taskId: "spec",
-        modelId: "provider/model",
-        packetHash: "c".repeat(64),
-        verdict: "issues",
-        findingCounts: {
-          total: 1,
-          blocking: 1,
-          nonBlocking: 0,
-          byImpact: { low: 0, medium: 0, high: 1 },
-        },
-        summary: "One issue.",
-        criteriaCoverage: { status: "complete" },
-        findings: [
-          {
-            title: "Bug",
-            description: "Broken.",
-            blocksAcceptance: true,
-            impact: "high",
-            effort: "small",
-            confidence: 1,
-          },
-        ],
-      },
-    ],
-  };
-}
-
 describe("agent review tool usage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.loadReviewConfig.mockReturnValue({
       agentModel: "provider/model",
-      plannerModel: "provider/model",
       auditEnabled: false,
       bootstrapCommand: "",
       postReviewPolicy: "ask",
@@ -131,99 +87,34 @@ describe("agent review tool usage", () => {
       canonicalId: "provider/model",
       model: {},
     } as ReviewModelSelection);
-    mocks.runReview.mockResolvedValue({ kind: "completed", details, usage });
-    mocks.prepareReview.mockResolvedValue({
-      kind: "prepared",
-      usage,
-      plan: {
-        id: "review-plan-test",
-        snapshot: { repositoryRoot: "/repo", ...details.snapshot },
-        reviewerModel: { canonicalId: "provider/model", model: {} },
-        plannerDraft: details.review,
-        plannerModelId: "provider/model",
-        plannerPromptVersion: "2",
-        plannerUsage: usage,
-      },
-    });
+    mocks.runReview.mockResolvedValue({ kind: "completed", details });
   });
 
-  it("returns combined child usage on the persisted tool result", async () => {
+  it("does not start status UI when the execution context has no UI", async () => {
     const pi = createPiMock();
-    registerAgentReviewTools(
-      pi as unknown as ExtensionAPI,
-      new ReviewPlanStore(),
-      new ReviewArtifactStore(),
-    );
-    const tool = getTool(pi, "supi_review_run");
-
-    const result = (await tool.execute(
-      "call",
-      {
-        direct: {
-          target: { workingTree: {} },
-          tasks: [{ id: "spec", instructions: "Review." }],
-        },
-      },
-      undefined,
-      undefined,
-      makeCtx(),
-    )) as { usage?: unknown; details?: ReviewBatchDetails };
-
-    expect(result.usage).toBe(usage);
-    expect(result.details?.results[0]?.usage).toBe(usage);
-    expect(result.details?.output?.artifactId).toMatch(/^review-output-/);
-  });
-
-  it("returns the configured post-review instruction with findings", async () => {
-    mocks.runReview.mockResolvedValueOnce({ kind: "completed", details: detailsWithFinding() });
-    const pi = createPiMock();
-    registerAgentReviewTools(
-      pi as unknown as ExtensionAPI,
-      new ReviewPlanStore(),
-      new ReviewArtifactStore(),
-    );
-
-    const result = (await getTool(pi, "supi_review_run").execute(
-      "call",
-      {
-        direct: {
-          target: { workingTree: {} },
-          tasks: [{ id: "spec", instructions: "Review." }],
-        },
-      },
-      undefined,
-      undefined,
-      makeCtx(),
-    )) as { content?: Array<{ text: string }> };
-
-    expect(result.content?.[0]?.text).toContain('kind="post-review-policy" policy="ask"');
-    expect(result.content?.[0]?.text).toContain("Fix selected");
-  });
-
-  it("passes the local replay store into every review when enabled", async () => {
-    const pi = createPiMock();
-    const localAuditStore = { create: vi.fn() } as never;
-    mocks.loadReviewConfig.mockReturnValue({
-      agentModel: "provider/model",
-      plannerModel: "provider/model",
-      auditEnabled: true,
-      bootstrapCommand: "",
-      postReviewPolicy: "ask",
-    });
-    registerAgentReviewTools(
-      pi as unknown as ExtensionAPI,
-      new ReviewPlanStore(),
-      new ReviewArtifactStore(),
-      localAuditStore,
-    );
+    registerAgentReviewTools(pi as unknown as ExtensionAPI, new ReviewArtifactStore());
+    const ctx = { ...makeCtx(), hasUI: false };
 
     await getTool(pi, "supi_review_run").execute(
       "call",
+      { tasks: [{ id: "spec", instructions: "Review.", mode: "change" }] },
+      undefined,
+      undefined,
+      ctx,
+    );
+
+    expect(mocks.spinnerStart).not.toHaveBeenCalled();
+  });
+
+  it("passes the flat target and task mode into the Review workflow", async () => {
+    const pi = createPiMock();
+    registerAgentReviewTools(pi as unknown as ExtensionAPI, new ReviewArtifactStore());
+    await getTool(pi, "supi_review_run").execute(
+      "call",
       {
-        direct: {
-          target: { workingTree: {} },
-          tasks: [{ id: "spec", instructions: "Review." }],
-        },
+        target: {},
+        paths: ["src/a.ts"],
+        tasks: [{ id: "spec", instructions: "Review.", mode: "change" }],
       },
       undefined,
       undefined,
@@ -231,93 +122,58 @@ describe("agent review tool usage", () => {
     );
 
     expect(mocks.runReview).toHaveBeenCalledWith(
-      expect.objectContaining({ auditStore: localAuditStore }),
+      expect.objectContaining({
+        target: {},
+        scope: { paths: ["src/a.ts"] },
+        review: { tasks: [{ id: "spec", instructions: "Review.", mode: "change" }] },
+      }),
     );
   });
 
-  it("renders Current-State scope and Criteria Sources in prepared output", async () => {
-    mocks.prepareReview.mockResolvedValueOnce({
-      kind: "prepared",
-      plan: {
-        id: "review-plan-current-state",
-        snapshot: {
-          repositoryRoot: "/repo",
-          requestedTarget: { kind: "current-state", paths: ["packages/supi-review"] },
-          target: { kind: "current-state", headCommit: "a".repeat(40) },
-          title: "Current state audit",
-          changes: [],
-          diffHash: "b".repeat(64),
-          stats: { files: 0, additions: 0, deletions: 0 },
-        },
-        reviewerModel: { canonicalId: "provider/model", model: {} },
-        plannerDraft: {
-          tasks: [
-            {
-              id: "spec",
-              instructions: "Check the criteria.",
-              criteriaSources: [{ reference: "#42", summary: "Acceptance criteria." }],
+  it("reserves the output envelope for post-review guidance", async () => {
+    const findings = Array.from({ length: 20 }, (_, index) => ({
+      title: `Finding ${index}`,
+      description: "evidence\n".repeat(150),
+      blocksAcceptance: true,
+      impact: "medium" as const,
+      effort: "small" as const,
+      confidence: 1,
+    }));
+    const result = details.results[0];
+    if (result?.status !== "completed") throw new Error("Expected completed fixture.");
+    mocks.runReview.mockResolvedValueOnce({
+      kind: "completed",
+      details: {
+        ...details,
+        results: [
+          {
+            ...result,
+            verdict: "issues",
+            findings,
+            findingCounts: {
+              total: findings.length,
+              blocking: findings.length,
+              nonBlocking: 0,
+              byImpact: { low: 0, medium: findings.length, high: 0 },
             },
-          ],
-        },
+          },
+        ],
       },
     });
     const pi = createPiMock();
-    registerAgentReviewTools(
-      pi as unknown as ExtensionAPI,
-      new ReviewPlanStore(),
-      new ReviewArtifactStore(),
-    );
-    const ctx = makeCtx({
-      sessionManager: {
-        getEntries: vi.fn(() => []),
-        getLeafId: vi.fn(() => null),
-      },
-    });
+    registerAgentReviewTools(pi as unknown as ExtensionAPI, new ReviewArtifactStore());
 
-    const result = (await getTool(pi, "supi_review_prepare").execute(
+    const output = (await getTool(pi, "supi_review_run").execute(
       "call",
-      { target: { currentState: { paths: ["packages/supi-review"] } }, planning: "suggest" },
+      { tasks: [{ id: "spec", instructions: "Review.", mode: "change" }] },
       undefined,
       undefined,
-      ctx,
-    )) as { content?: Array<{ text: string }> };
+      makeCtx(),
+    )) as { content: Array<{ text: string }> };
+    const text = output.content[0]?.text ?? "";
 
-    expect(result.content?.[0]?.text).toContain('Review scope: "packages/supi-review"');
-    expect(result.content?.[0]?.text).toContain("### spec (criteria-only)");
-    expect(result.content?.[0]?.text).toContain("- #42: Acceptance criteria.");
-    expect(result.content?.[0]?.text).not.toContain("Files changed:");
-  });
-
-  it("returns Planner usage on the preparation tool result", async () => {
-    const pi = createPiMock();
-    registerAgentReviewTools(
-      pi as unknown as ExtensionAPI,
-      new ReviewPlanStore(),
-      new ReviewArtifactStore(),
-    );
-    const tool = getTool(pi, "supi_review_prepare");
-    const ctx = makeCtx({
-      sessionManager: {
-        getEntries: vi.fn(() => []),
-        getLeafId: vi.fn(() => null),
-      },
-    });
-
-    const result = (await tool.execute(
-      "call",
-      { planning: "suggest" },
-      undefined,
-      undefined,
-      ctx,
-    )) as {
-      content?: Array<{ text: string }>;
-      usage?: unknown;
-      details?: { plannerUsage?: unknown; output?: { artifactId: string } };
-    };
-
-    expect(result.usage).toBe(usage);
-    expect(result.details?.plannerUsage).toBe(usage);
-    expect(result.details?.output?.artifactId).toMatch(/^review-output-/);
-    expect(result.content?.[0]?.text).toContain("draftDecision: { useDraft: {} }");
+    expect(text.length).toBeLessThanOrEqual(MAX_PAGE_CHARACTERS);
+    expect(text.split("\n").length).toBeLessThanOrEqual(MAX_PAGE_LINES);
+    expect(text).toContain("post-review-policy");
   });
 });

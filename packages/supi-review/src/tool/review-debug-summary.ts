@@ -1,10 +1,15 @@
 import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
-import type { ReviewerExtensionSetStatus, ReviewProgress, ReviewTaskResult } from "../types.ts";
+import type {
+  ReviewerExtensionSetStatus,
+  ReviewMode,
+  ReviewProgress,
+  ReviewTaskResult,
+} from "../types.ts";
 
 /** Lifecycle facts observed for one finished review task. */
 export interface ReviewTaskDebugSummaryInput {
   taskId: string;
-  targetKind: string;
+  mode: ReviewMode;
   targetTitle: string;
   packetBytes: number;
   durationMs: number;
@@ -35,7 +40,7 @@ export function recordReviewTaskDebugSummary(input: ReviewTaskDebugSummaryInput)
   const hitRate = cacheHitRate(tokens);
   const data = {
     taskId: input.taskId,
-    targetKind: input.targetKind,
+    mode: input.mode,
     targetTitle: input.targetTitle,
     modelId: result.modelId,
     packetBytes: input.packetBytes,

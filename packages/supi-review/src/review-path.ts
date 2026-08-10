@@ -1,13 +1,18 @@
 import { lstat, readFile, readlink, realpath } from "node:fs/promises";
 import { dirname, posix, relative, resolve, sep, win32 } from "node:path";
 
-/** Maximum working-tree file size materialized by one review read. */
+/** Maximum filesystem file size materialized by one review read. */
 export const MAX_REVIEW_FILE_BYTES = 16 * 1024 * 1024;
 
 /** Verified repository-relative review path that cannot lexically escape the worktree. */
 export interface SafeReviewPath {
   absolute: string;
   path: string;
+}
+
+/** Strip PI's model-facing path sigil before repository-relative validation. */
+export function normalizeReviewPathArgument(path: string): string {
+  return path.startsWith("@") ? path.slice(1) : path;
 }
 
 /** Normalize a portable repository-relative path without touching the filesystem. */
@@ -50,7 +55,7 @@ function assertInsideRepository(repository: string, candidate: string, originalP
   }
 }
 
-/** Read a working-tree file without following an intermediate symlink outside the repository. */
+/** Read a filesystem file without following an intermediate symlink outside the repository. */
 export async function readWorkingTreeFile(cwd: string, path: string): Promise<string | undefined> {
   const safe = resolveReviewPath(cwd, path);
   try {
@@ -64,7 +69,7 @@ export async function readWorkingTreeFile(cwd: string, path: string): Promise<st
     if (!stat.isFile()) return undefined;
     if (stat.size > MAX_REVIEW_FILE_BYTES) {
       throw new Error(
-        `${safe.path} exceeds the ${MAX_REVIEW_FILE_BYTES}-byte working-tree review read limit.`,
+        `${safe.path} exceeds the ${MAX_REVIEW_FILE_BYTES}-byte filesystem review read limit.`,
       );
     }
     const resolvedFile = await realpath(safe.absolute);

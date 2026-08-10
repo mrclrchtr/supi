@@ -5,51 +5,61 @@ import {
   createUnobservedAgentRunDiagnostics,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import type { LocalReviewAuditStore } from "../audit/local-review-audit-store.ts";
-import { resolveReviewSnapshot, summarizeReviewSnapshot } from "../git.ts";
+import { isRootCommit, resolveReviewSnapshot, summarizeReviewSnapshot } from "../git.ts";
 import { normalizeReviewInput } from "../review-input.ts";
-import type { ReviewPlanLease, ReviewPlanStore } from "../session/review-plan-store.ts";
-import { buildFileManifest } from "../target/file-manifest.ts";
+import { normalizeReviewScope, validateReviewScope } from "../review-scope.ts";
 import { snapshotsMatch } from "../target/snapshot-match.ts";
 import type {
-  PlannerDraft,
   PlannerRunResult,
   PlanningRecord,
   ReviewBatchDetails,
   ReviewInput,
   ReviewModelSelection,
+  ReviewScope,
   ReviewSnapshot,
   ReviewTargetSpec,
+  ReviewTask,
   ReviewTaskResult,
 } from "../types.ts";
 import { runDependencyBootstrap } from "../workspace/dependency-bootstrap.ts";
 import { materializeReviewWorkspace } from "../workspace/review-workspace.ts";
-import { enforceCriteriaOnlyScope } from "./criteria-only-scope.ts";
+import { buildPlannerPrompt } from "./planner-input.ts";
 import { PLANNER_PROMPT_VERSION, runPlanner } from "./planner-runner.ts";
 import { executeReviewTasks, type ReviewExecutionUpdate } from "./review-execution.ts";
-/** Input required by the prepare workflow: target resolution plus optional Planner run. */
-export interface PrepareReviewInput {
+
+/** Tool update callback signature shared across workflow adapters. */
+type OnUpdate = ReviewExecutionUpdate;
+
+/** Input for a transient interactive Planner Draft. */
+export interface DraftReviewTasksInput {
   cwd: string;
   providerAuthority?: AgentRunProviderAuthority;
   target: ReviewTargetSpec;
-  planning: "none" | "suggest";
+  /** Optional advisory path focus included in the Planner input. */
+  scope?: ReviewScope;
   plannerContext: string;
-  reviewerModel: ReviewModelSelection;
   plannerModel?: ReviewModelSelection;
-  planStore: ReviewPlanStore;
   signal?: AbortSignal;
   onUpdate?: OnUpdate;
 }
 
-/** Tool update callback signature shared across workflow adapters. */
-type OnUpdate = ReviewExecutionUpdate;
-/** Complete Direct Review request: target, full review input, and reviewer model. */
-export interface DirectRunInput {
-  mode: "direct";
+/** Complete caller-defined Review request. */
+export interface RunReviewInput {
   cwd: string;
   providerAuthority?: AgentRunProviderAuthority;
   target: ReviewTargetSpec;
   review: ReviewInput;
+  /** Optional batch-level path focus, validated in the frozen after state. */
+  scope?: ReviewScope;
   reviewerModel: ReviewModelSelection;
+  /** Snapshot captured when the interactive target was selected. A mismatch stops before workspace creation. */
+  expectedSnapshot?: ReviewSnapshot;
+  /** Target that produced `expectedSnapshot` when edited modes finalize a different public target. */
+  expectedSnapshotTarget?: ReviewTargetSpec;
+  /** Planner metadata retained only for the interactive Review result. */
+  planning?: PlanningRecord;
+  /** The interactive flow marks a valid draft as planner-assisted. */
+  provenance?: ReviewBatchDetails["provenance"];
   /** Shell command run once before reviewer fan-out. */
   bootstrapCommand?: string;
   projectTrusted?: boolean;
@@ -58,153 +68,120 @@ export interface DirectRunInput {
   signal?: AbortSignal;
   onUpdate?: OnUpdate;
 }
-/** One-shot Prepared Review request: plan id, explicit decision, and plan store. */
-export interface PreparedRunInput {
-  mode: "prepared";
-  cwd: string;
-  providerAuthority?: AgentRunProviderAuthority;
-  planId: string;
-  decision: { kind: "accept-draft" } | { kind: "use-review"; review: ReviewInput };
-  planStore: ReviewPlanStore;
-  /** Shell command run once before reviewer fan-out. */
-  bootstrapCommand?: string;
-  projectTrusted?: boolean;
-  /** Present when local reviewer replay is enabled. */
-  auditStore?: LocalReviewAuditStore;
-  signal?: AbortSignal;
-  onUpdate?: OnUpdate;
-}
-/** Discriminated union accepted by `runReview` for both Direct and Prepared paths. */
-export type RunReviewInput = DirectRunInput | PreparedRunInput;
 
-function plannerPrompt(snapshot: ReviewSnapshot, context: string): string {
-  const conversation = [
-    "",
-    "## Bounded session conversation",
-    context || "No session conversation was available.",
-  ];
-  if (snapshot.requestedTarget.kind === "current-state") {
-    return [
-      "# Review Planning Input",
-      "",
-      `Target: ${snapshot.title}`,
-      "Finding Scope: criteria-only",
-      "This is a one-state audit without Git-change attribution.",
-      "",
-      "## Review scope",
-      ...(snapshot.requestedTarget.paths?.length
-        ? [
-            "Advisory focus paths; they do not restrict inspection or finding eligibility.",
-            ...snapshot.requestedTarget.paths.map((path) => `- ${JSON.stringify(path)}`),
-          ]
-        : ["Repository-wide discovery; no advisory focus paths were supplied."]),
-      ...conversation,
-    ].join("\n");
-  }
-  return [
-    "# Review Planning Input",
-    "",
-    `Target: ${snapshot.title}`,
-    `Changed files: ${snapshot.changes.length}`,
-    `Diff stats: +${snapshot.stats.additions} / -${snapshot.stats.deletions}`,
-    "",
-    "## Changed-path inventory",
-    ...buildFileManifest(snapshot.changes),
-    ...conversation,
-  ].join("\n");
-}
 /** Translate a resolveReviewSnapshot error to a no-target reason. */
 function snapshotErrorReason(error: unknown): string {
   if (error instanceof Error) return error.message;
-  return "No reviewable changes found.";
+  return "Could not resolve the Review Target.";
 }
 
-interface PlannerPreparation {
-  draft?: PlannerDraft;
-  failure?: Exclude<PlannerRunResult, { kind: "success" }>;
-  canceled?: Extract<PlannerRunResult, { kind: "canceled" }>;
-  usage?: PlannerRunResult["usage"];
-  modelId?: string;
-  promptVersion?: string;
-}
-async function preparePlanner(
-  input: PrepareReviewInput,
-  snapshot: ReviewSnapshot,
-): Promise<PlannerPreparation> {
-  if (input.planning === "none") return {};
-  if (!input.plannerModel) {
-    return { failure: { kind: "failed", failureCode: "session-creation-failed" } };
+/** Capture one selected interactive target before task editing begins. */
+export async function captureReviewTarget(cwd: string, target: ReviewTargetSpec) {
+  try {
+    return { kind: "captured" as const, snapshot: await resolveReviewSnapshot(cwd, target) };
+  } catch (error) {
+    return { kind: "no-target" as const, reason: snapshotErrorReason(error) };
   }
+}
+
+type PlannerFailure = Exclude<PlannerRunResult, { kind: "success" }>;
+
+/** Normalize a Planner Draft without changing its required task modes. */
+function normalizePlannerDraft(snapshot: ReviewSnapshot, value: ReviewInput): ReviewInput {
+  const draft = normalizeReviewInput(value);
+  if (hasChangeTask(draft.tasks) && snapshot.changes.length === 0) {
+    throw new Error("Invalid Planner Draft.");
+  }
+  return draft;
+}
+
+/** Resolve the target and create one transient Planner Draft for `/supi-review`. */
+export async function draftReviewTasks(input: DraftReviewTasksInput) {
+  const scope = normalizeReviewScope(input.scope);
+  input.onUpdate?.({
+    content: [{ type: "text", text: "Resolving target…" }],
+    details: {},
+  });
+  let snapshot: ReviewSnapshot;
+  try {
+    snapshot = await resolveReviewSnapshot(input.cwd, input.target, input.signal);
+  } catch (error) {
+    input.signal?.throwIfAborted();
+    return { kind: "no-target" as const, reason: snapshotErrorReason(error) };
+  }
+
+  const promptVersion = PLANNER_PROMPT_VERSION;
+  if (!input.plannerModel) {
+    return {
+      kind: "planner-failed" as const,
+      result: { kind: "failed", failureCode: "session-creation-failed" } satisfies PlannerFailure,
+      promptVersion,
+    };
+  }
+  const modelId = input.plannerModel.canonicalId;
+
   input.onUpdate?.({
     content: [{ type: "text", text: "Running planner…" }],
     details: {},
   });
-  const modelId = input.plannerModel.canonicalId;
-  const promptVersion = PLANNER_PROMPT_VERSION;
   let result: PlannerRunResult;
   try {
     result = await runPlanner({
       cwd: snapshot.repositoryRoot,
       model: input.plannerModel.model,
       ...(input.providerAuthority ? { providerAuthority: input.providerAuthority } : {}),
-      prompt: plannerPrompt(snapshot, input.plannerContext),
+      prompt: buildPlannerPrompt(snapshot, scope, input.plannerContext),
       signal: input.signal,
     });
   } catch {
-    if (input.signal?.aborted) {
-      return {
-        canceled: { kind: "canceled", diagnostics: createEarlyCancellationDiagnostics() },
-        modelId,
-        promptVersion,
-      };
-    }
+    const failure: PlannerFailure = input.signal?.aborted
+      ? { kind: "canceled", diagnostics: createEarlyCancellationDiagnostics() }
+      : {
+          kind: "failed",
+          failureCode: "unexpected-runner-failure",
+          diagnostics: createUnobservedAgentRunDiagnostics(),
+        };
     return {
-      failure: {
-        kind: "failed",
-        failureCode: "unexpected-runner-failure",
-        diagnostics: createUnobservedAgentRunDiagnostics(),
-      },
+      kind: "planner-failed" as const,
+      result: failure,
       modelId,
       promptVersion,
     };
   }
-  const identity = {
-    ...(result.usage ? { usage: result.usage } : {}),
-    modelId,
-    promptVersion,
-  };
-  if (result.kind === "canceled") return { canceled: result, ...identity };
-  if (result.kind === "success") {
-    return { draft: normalizeReviewInput(result.value), ...identity };
-  }
-  return { failure: result, ...identity };
-}
 
-/** Resolve and store a one-shot plan, optionally asking the advisory Planner for tasks. */
-export async function prepareReview(input: PrepareReviewInput) {
-  input.onUpdate?.({
-    content: [{ type: "text", text: "Resolving target…" }],
-    details: {},
-  });
-  let snapshot: Awaited<ReturnType<typeof resolveReviewSnapshot>>;
-  try {
-    snapshot = await resolveReviewSnapshot(input.cwd, input.target);
-  } catch (error) {
-    return { kind: "no-target" as const, reason: snapshotErrorReason(error) };
+  if (result.kind !== "success") {
+    return {
+      kind: "planner-failed" as const,
+      result,
+      modelId,
+      promptVersion,
+      ...(result.usage ? { usage: result.usage } : {}),
+    };
   }
-  if (!snapshot) return { kind: "no-target" as const, reason: "No reviewable changes found." };
-  const planning = await preparePlanner(input, snapshot);
-  if (planning.canceled) return { kind: "canceled" as const, result: planning.canceled };
-  const plan = input.planStore.create({
-    snapshot,
-    reviewerModel: input.reviewerModel,
-    ...(planning.draft ? { plannerDraft: planning.draft } : {}),
-    ...(planning.failure ? { plannerFailure: planning.failure } : {}),
-    ...(planning.usage ? { plannerUsage: planning.usage } : {}),
-    ...(planning.modelId ? { plannerModelId: planning.modelId } : {}),
-    ...(planning.promptVersion ? { plannerPromptVersion: planning.promptVersion } : {}),
-  });
-  return { kind: "prepared" as const, plan, ...(planning.usage ? { usage: planning.usage } : {}) };
+
+  try {
+    const draft = normalizePlannerDraft(snapshot, result.value);
+    const planning: PlanningRecord = {
+      promptVersion,
+      modelId,
+      draft,
+      ...(result.usage ? { usage: result.usage } : {}),
+    };
+    return { kind: "planned" as const, snapshot, planning };
+  } catch {
+    return {
+      kind: "planner-failed" as const,
+      result: {
+        kind: "failed",
+        failureCode: "unexpected-runner-failure",
+        diagnostics: createUnobservedAgentRunDiagnostics(),
+        ...(result.usage ? { usage: result.usage } : {}),
+      } satisfies PlannerFailure,
+      modelId,
+      promptVersion,
+      ...(result.usage ? { usage: result.usage } : {}),
+    };
+  }
 }
 
 function workspaceFailureReason(error: unknown): string {
@@ -212,6 +189,39 @@ function workspaceFailureReason(error: unknown): string {
     return error.message;
   }
   return "Could not create the Review Workspace.";
+}
+
+type MaterializedReviewWorkspace =
+  | { kind: "ready"; workspace: Awaited<ReturnType<typeof materializeReviewWorkspace>> }
+  | { kind: "invalid"; reason: string };
+
+/** Materialize the frozen after state and validate its batch Review Scope before fan-out. */
+async function materializeReviewWorkspaceWithScope(
+  snapshot: ReviewSnapshot,
+  scope: ReviewScope,
+  signal?: AbortSignal,
+): Promise<MaterializedReviewWorkspace> {
+  let workspace: Awaited<ReturnType<typeof materializeReviewWorkspace>>;
+  try {
+    workspace = await materializeReviewWorkspace(snapshot, signal);
+  } catch (error) {
+    signal?.throwIfAborted();
+    return { kind: "invalid", reason: workspaceFailureReason(error) };
+  }
+  try {
+    await validateReviewScope(snapshot, workspace.cwd, scope, signal);
+  } catch (error) {
+    signal?.throwIfAborted();
+    const reason = error instanceof Error ? error.message : "Could not validate the Review Scope.";
+    const cleanupWarning = await workspace.cleanup();
+    return {
+      kind: "invalid",
+      reason: cleanupWarning
+        ? `${reason} Review Workspace cleanup warning: ${cleanupWarning.message} Recovery: ${cleanupWarning.recoveryCommand}`
+        : reason,
+    };
+  }
+  return { kind: "ready", workspace };
 }
 
 interface DependencyBootstrapInput {
@@ -233,115 +243,109 @@ async function bootstrapReviewWorkspace(input: DependencyBootstrapInput): Promis
   return true;
 }
 
-/** Execute a Direct Review or atomically consume and execute a Prepared Review. */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: direct/prepared orchestration stays at one public seam
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: direct/prepared orchestration stays at one public seam
-export async function runReview(input: RunReviewInput) {
-  let snapshot: ReviewSnapshot;
-  let review: ReviewInput;
-  let model: ReviewModelSelection;
-  let planning: PlanningRecord | undefined;
-  let lease: ReviewPlanLease | undefined;
-  let planStore: ReviewPlanStore | undefined;
-  let provenance: ReviewBatchDetails["provenance"] = "caller-supplied";
+function hasChangeTask(tasks: ReviewTask[]): boolean {
+  return tasks.some((task) => task.mode === "change");
+}
 
-  if (input.mode === "direct") {
-    let resolved: Awaited<ReturnType<typeof resolveReviewSnapshot>>;
-    try {
-      resolved = await resolveReviewSnapshot(input.cwd, input.target);
-    } catch (error) {
-      return { kind: "no-target" as const, reason: snapshotErrorReason(error) };
-    }
-    if (!resolved) return { kind: "no-target" as const, reason: "No reviewable changes found." };
-    snapshot = resolved;
-    review = normalizeReviewInput(input.review);
-    model = input.reviewerModel;
-    const scoped = enforceCriteriaOnlyScope(review, snapshot.target.kind, "caller-supplied");
-    if ("reason" in scoped) return { kind: "invalid" as const, reason: scoped.reason };
-    review = scoped.review;
-  } else {
-    const plan = input.planStore.peek(input.planId);
-    if (!plan) {
-      return {
-        kind: "invalid" as const,
-        reason: `Review Plan ${input.planId} was not found, is already running, or was consumed.`,
-      };
-    }
-    if (input.decision.kind === "accept-draft" && !plan.plannerDraft) {
-      return { kind: "invalid" as const, reason: "This plan has no Planner Draft." };
-    }
-    const selectedReview =
-      input.decision.kind === "accept-draft"
-        ? plan.plannerDraft
-        : normalizeReviewInput(input.decision.review);
-    if (!selectedReview) {
-      return { kind: "invalid" as const, reason: "This plan has no Planner Draft." };
-    }
-    planStore = input.planStore;
-    lease = planStore.acquire(input.planId);
-    if (!lease) {
-      return {
-        kind: "invalid" as const,
-        reason: `Review Plan ${input.planId} is already running.`,
-      };
-    }
-    let refreshed: Awaited<ReturnType<typeof resolveReviewSnapshot>>;
-    try {
-      refreshed = await resolveReviewSnapshot(input.cwd, lease.plan.snapshot.requestedTarget);
-    } catch {
-      input.planStore.invalidate(lease);
-      return {
-        kind: "invalid" as const,
-        reason: "Could not revalidate this Review Plan target. Prepare a new plan.",
-      };
-    }
-    if (!refreshed || !snapshotsMatch(lease.plan.snapshot, refreshed)) {
-      input.planStore.invalidate(lease);
-      return {
-        kind: "invalid" as const,
-        reason: "This Review Plan is stale because its target changed. Prepare a new plan.",
-      };
-    }
-    snapshot = refreshed;
-    model = lease.plan.reviewerModel;
-    provenance = input.decision.kind === "accept-draft" ? "planner-assisted" : "caller-supplied";
-    const scoped = enforceCriteriaOnlyScope(selectedReview, refreshed.target.kind, provenance);
-    if ("reason" in scoped) {
-      input.planStore.release(lease);
-      return { kind: "invalid" as const, reason: scoped.reason };
-    }
-    review = scoped.review;
-    if (lease.plan.plannerDraft && lease.plan.plannerModelId && lease.plan.plannerPromptVersion) {
-      planning = {
-        promptVersion: lease.plan.plannerPromptVersion,
-        modelId: lease.plan.plannerModelId,
-        ...(lease.plan.plannerUsage ? { usage: lease.plan.plannerUsage } : {}),
-        draft: lease.plan.plannerDraft,
-        effectiveReview: review,
-        decision: input.decision.kind,
-      };
-    }
+/** Use an after-state title when every task audits the current filesystem state. */
+function reviewModeSnapshot(snapshot: ReviewSnapshot, review: ReviewInput): ReviewSnapshot {
+  if (!hasChangeTask(review.tasks) && snapshot.target.includeUncommittedChanges) {
+    return { ...snapshot, title: "Current filesystem" };
   }
+  return snapshot;
+}
 
+async function targetRuleError(
+  snapshot: ReviewSnapshot,
+  review: ReviewInput,
+  signal?: AbortSignal,
+): Promise<string | undefined> {
+  const change = hasChangeTask(review.tasks);
+  if (!change && snapshot.requestedTarget.from !== undefined) {
+    return "Review Targets for all-state tasks must not set from.";
+  }
+  if (!snapshot.target.includeUncommittedChanges && change && !snapshot.requestedTarget.from) {
+    return "A committed change Review Target requires an explicit from endpoint.";
+  }
+  if (!snapshot.target.includeUncommittedChanges && change) {
+    const root = await isRootCommit(snapshot.repositoryRoot, snapshot.target.toCommit, signal);
+    if (root) return "A committed change Review Target cannot use a root commit as to.";
+  }
+  if (change && snapshot.changes.length === 0) {
+    return "Every change Review Task requires a non-empty canonical change.";
+  }
+  return undefined;
+}
+
+type ResolvedReviewInput =
+  | { kind: "ready"; snapshot: ReviewSnapshot; review: ReviewInput; scope: ReviewScope }
+  | { kind: "no-target"; reason: string }
+  | { kind: "invalid"; reason: string };
+
+function reviewTargetsMatch(left: ReviewTargetSpec, right: ReviewTargetSpec): boolean {
+  return (
+    left.from === right.from &&
+    left.to === right.to &&
+    (left.includeUncommittedChanges ?? true) === (right.includeUncommittedChanges ?? true)
+  );
+}
+
+/** Resolve Review input and revalidate any target captured before task editing. */
+async function resolveReviewInput(input: RunReviewInput): Promise<ResolvedReviewInput> {
+  try {
+    const review = normalizeReviewInput(input.review);
+    const scope = normalizeReviewScope(input.scope);
+    // Resolve the execution target first. Materialization later verifies this exact snapshot.
+    const snapshot = await resolveReviewSnapshot(input.cwd, input.target, input.signal);
+    if (input.expectedSnapshot) {
+      const snapshotTarget = input.expectedSnapshotTarget ?? input.target;
+      const revalidatedSnapshot = reviewTargetsMatch(input.target, snapshotTarget)
+        ? snapshot
+        : await resolveReviewSnapshot(input.cwd, snapshotTarget, input.signal);
+      if (!snapshotsMatch(input.expectedSnapshot, revalidatedSnapshot)) {
+        return {
+          kind: "invalid",
+          reason: "The review target changed while tasks were edited. Start a new review.",
+        };
+      }
+    }
+    return { kind: "ready", snapshot, review, scope };
+  } catch (error) {
+    input.signal?.throwIfAborted();
+    return { kind: "no-target", reason: snapshotErrorReason(error) };
+  }
+}
+
+/** Execute one caller-defined Review. */
+export async function runReview(input: RunReviewInput) {
+  const resolved = await resolveReviewInput(input);
+  if (resolved.kind !== "ready") return resolved;
+  const { snapshot: resolvedSnapshot, review, scope } = resolved;
+  const ruleError = await targetRuleError(resolvedSnapshot, review, input.signal);
+  if (ruleError) return { kind: "invalid" as const, reason: ruleError };
+  const snapshot = reviewModeSnapshot(resolvedSnapshot, review);
+
+  const provenance = input.provenance ?? "caller-supplied";
   input.onUpdate?.({
     content: [{ type: "text", text: "Freezing Review Workspace…" }],
     details: {
       completedCount: 0,
       totalCount: review.tasks.length,
       targetTitle: snapshot.title,
-      reviewerModelId: model.canonicalId,
+      reviewerModelId: input.reviewerModel.canonicalId,
       ...(review.sharedContext ? { sharedContext: review.sharedContext } : {}),
+      ...(scope.paths?.length ? { scope } : {}),
       tasks: review.tasks,
       taskIds: review.tasks.map((task) => task.id),
     },
   });
-  let workspace: Awaited<ReturnType<typeof materializeReviewWorkspace>>;
-  try {
-    workspace = await materializeReviewWorkspace(snapshot);
-  } catch (error) {
-    if (lease && planStore) planStore.release(lease);
-    return { kind: "invalid" as const, reason: workspaceFailureReason(error) };
-  }
+  const materializedWorkspace = await materializeReviewWorkspaceWithScope(
+    snapshot,
+    scope,
+    input.signal,
+  );
+  if (materializedWorkspace.kind === "invalid") return materializedWorkspace;
+  const { workspace } = materializedWorkspace;
 
   let dependencyBootstrapConfigured: boolean;
   try {
@@ -352,8 +356,8 @@ export async function runReview(input: RunReviewInput) {
       onUpdate: input.onUpdate,
     });
   } catch {
-    if (lease && planStore) planStore.release(lease);
     await workspace.cleanup();
+    input.signal?.throwIfAborted();
     return { kind: "invalid" as const, reason: "Configured Dependency Bootstrap failed." };
   }
 
@@ -364,7 +368,8 @@ export async function runReview(input: RunReviewInput) {
       workspace.cwd,
       snapshot,
       review,
-      model,
+      scope,
+      input.reviewerModel,
       input.projectTrusted,
       input.signal,
       input.onUpdate,
@@ -374,24 +379,17 @@ export async function runReview(input: RunReviewInput) {
       dependencyBootstrapConfigured,
       input.providerAuthority,
     );
-  } catch (error) {
-    if (lease && planStore) planStore.release(lease);
-    throw error;
   } finally {
     cleanupWarning = await workspace.cleanup();
   }
-  if (lease && planStore) {
-    if (results.some((result) => result.status === "completed")) planStore.consume(lease);
-    else planStore.release(lease);
-  }
   const details: ReviewBatchDetails = {
     kind: "review-batch",
-    mode: input.mode,
     provenance,
     snapshot: summarizeReviewSnapshot(snapshot),
     review,
+    ...(scope.paths?.length ? { scope } : {}),
     workspaceReceipt: workspace.receipt,
-    ...(planning ? { planning } : {}),
+    ...(input.planning ? { planning: input.planning } : {}),
     ...(cleanupWarning ? { cleanupWarning } : {}),
     results,
   };

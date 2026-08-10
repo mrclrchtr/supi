@@ -1,51 +1,31 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
 import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
 import { renderOutputCall, renderOutputResult } from "../tui/paged-output.ts";
 import type { ReviewOutputReference } from "../types.ts";
-import { DEFAULT_PAGE_CHARACTERS, MAX_PAGE_CHARACTERS, modelFacingPage } from "./output-page.ts";
+import { modelFacingPage } from "./output-page.ts";
+import { REVIEW_TOOL_SPECS } from "./tool-specs.ts";
 
-const outputPageSchema = Type.Object(
-  {
-    artifactId: Type.String({
-      minLength: 1,
-      maxLength: 128,
-      description:
-        "Opaque session-scoped id returned by supi_review_prepare or supi_review_run, not a file path.",
-    }),
-    offset: Type.Optional(
-      Type.Integer({
-        minimum: 0,
-        default: 0,
-        description:
-          "UTF-16 character offset; omit for the first page, then use returned nextOffset.",
-      }),
-    ),
-    limit: Type.Optional(
-      Type.Integer({
-        minimum: 1,
-        maximum: MAX_PAGE_CHARACTERS,
-        default: DEFAULT_PAGE_CHARACTERS,
-        description: "Maximum characters for this page; omit for the default.",
-      }),
-    ),
-  },
-  {
-    additionalProperties: false,
-    description: "Read one page of an output artifact returned by a review or preparation call.",
-  },
-);
+interface ReviewOutputOptions {
+  firstPageCharacters?: number;
+  firstPageLines?: number;
+}
 
 /** Store complete output and return its first bounded model-facing page. */
 export function createReviewOutput(
   store: ReviewArtifactStore,
   text: string,
+  options: ReviewOutputOptions = {},
 ): { text: string; reference: ReviewOutputReference } {
   const artifact = store.create(text);
-  const page = store.read(artifact.id);
+  const page = store.read(
+    artifact.id,
+    undefined,
+    options.firstPageCharacters,
+    options.firstPageLines,
+  );
   if (!page) throw new Error("Review output expired before it could be returned.");
   return {
-    text: modelFacingPage("supi_review_output", artifact.id, page),
+    text: modelFacingPage(REVIEW_TOOL_SPECS.output.name, { artifactId: artifact.id }, page),
     reference: {
       artifactId: artifact.id,
       offset: page.offset,
@@ -55,14 +35,12 @@ export function createReviewOutput(
   };
 }
 
-/** Register resumable retrieval for preparation and review output artifacts. */
+/** Register resumable retrieval for agent and interactive Review output artifacts. */
 export function registerReviewOutputTool(pi: ExtensionAPI, store: ReviewArtifactStore): void {
+  const spec = REVIEW_TOOL_SPECS.output;
   pi.registerTool({
-    name: "supi_review_output",
-    label: "Read Review Output",
-    description: `Read up to ${MAX_PAGE_CHARACTERS} UTF-16 characters from a session-scoped review or preparation output continuation. Use only with an artifact id returned by supi_review_prepare or supi_review_run.`,
-    promptSnippet: "Continue paged review output",
-    parameters: outputPageSchema,
+    ...spec,
+    promptGuidelines: [...spec.promptGuidelines],
     renderCall: renderOutputCall,
     renderResult: renderOutputResult,
     async execute(_id, params) {
@@ -76,7 +54,7 @@ export function registerReviewOutputTool(pi: ExtensionAPI, store: ReviewArtifact
         content: [
           {
             type: "text" as const,
-            text: modelFacingPage("supi_review_output", params.artifactId, page),
+            text: modelFacingPage(spec.name, { artifactId: params.artifactId }, page),
           },
         ],
         details: {
@@ -91,5 +69,6 @@ export function registerReviewOutputTool(pi: ExtensionAPI, store: ReviewArtifact
   });
 
   pi.on("session_start", () => store.clear());
+  pi.on("session_tree", () => store.clear());
   pi.on("session_shutdown", () => store.clear());
 }

@@ -18,13 +18,10 @@ export const reviewTaskSchema = Type.Object(
       description:
         "Self-contained review objective and criteria. Tasks run independently and cannot see each other's progress.",
     }),
-    findingScope: Type.Optional(
-      StringEnum(["change-only", "boy-scout"] as const, {
-        default: "change-only",
-        description:
-          "change-only reports issues attributable to the target. boy-scout may also report directly related pre-existing issues, which stay advisory unless the target worsens or newly exposes them. Current-State Audit fixes criteria-only; omit this field for currentState targets.",
-      }),
-    ),
+    mode: StringEnum(["change", "state"] as const, {
+      description:
+        "Required evidence view. change reviews one non-empty before-and-after change. state reviews only the frozen after state.",
+    }),
     criteriaSources: Type.Optional(
       Type.Array(
         Type.Object(
@@ -116,7 +113,8 @@ export const reviewFindingSchema = Type.Object(
           path: Type.String({
             minLength: 1,
             maxLength: REVIEW_LIMITS.locationPathCharacters,
-            description: "Target-relative path only; do not use absolute paths or .. segments.",
+            description:
+              "Target-relative path only; a leading @ is accepted. Do not use absolute paths or .. segments.",
           }),
           startLine: Type.Integer({ minimum: 1, description: "First 1-based inclusive line." }),
           endLine: Type.Optional(
@@ -175,5 +173,29 @@ export const reviewSubmissionSchema = Type.Object(
   { additionalProperties: false },
 );
 
-/** Planner Draft uses the same shape as review input (shared context + tasks). */
-export const plannerDraftSchema = reviewInputSchema;
+/** Provider-visible Planner Draft task. Criteria sources remain caller-authored. */
+const plannerDraftTaskSchema = Type.Object(
+  {
+    id: reviewTaskSchema.properties.id,
+    instructions: reviewTaskSchema.properties.instructions,
+    mode: reviewTaskSchema.properties.mode,
+  },
+  { additionalProperties: false },
+);
+
+/** Provider-visible Planner Draft input without caller-only criteria sources. */
+export const plannerDraftSchema = Type.Object(
+  {
+    sharedContext: reviewInputSchema.properties.sharedContext,
+    tasks: Type.Array(plannerDraftTaskSchema, {
+      minItems: 1,
+      maxItems: 4,
+      description:
+        "One to four independent Planner Draft tasks, in caller order. Tasks run concurrently after the caller edits them.",
+    }),
+  },
+  {
+    additionalProperties: false,
+    description: "Optional shared context and one to four Planner Draft tasks.",
+  },
+);

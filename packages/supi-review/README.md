@@ -6,7 +6,7 @@
 
 # @mrclrchtr/supi-review — Code Review for Pi
 
-Code review extension for the [Pi coding agent](https://github.com/earendil-works/pi) that runs parallel, isolated review tasks against a working tree, branch, commit, or the complete current filesystem state.
+This Pi extension runs parallel, inspection-only code review tasks in one frozen Git workspace.
 
 ## Install
 
@@ -14,157 +14,129 @@ Code review extension for the [Pi coding agent](https://github.com/earendil-work
 pi install npm:@mrclrchtr/supi-review
 ```
 
-This is a beta package with intentionally unstable interfaces.
+This package is beta software. Its interfaces can change.
 
 ## Surfaces
 
-- `/supi-review` — interactive Direct or Planner-assisted review
-- `/supi-review-cleanup` — recover marked Review Workspaces left by interrupted cleanup
-- `supi_review_prepare` — optional preparation with `planning: "none" | "suggest"`
-- `supi_review_run` — universal Direct or Prepared Review execution
-- `supi_review_output` — retrieve continuation pages from review/preparation output
-- `supi_review_audit` — disabled-by-default retrieval of locally recorded reviewer replays
+- `/supi-review` — interactive review with optional Planner Draft help
+- `/supi-review-cleanup` — remove marked Review Workspaces after an interrupted cleanup
+- `supi_review_run` — run one caller-defined Review
+- `supi_review_output` — read more parent-facing output
+- `supi_review_audit` — read local reviewer replays when audit is enabled
 
-Preparation is optional. Skills and agents that already know how to review should use Direct Review.
+Set **Agent tools** to off in `/supi-settings`, then run `/reload`, to remove the agent start and audit tools. The output tool and the commands stay available.
 
-Set **Agent tools** to off in `/supi-settings`, then run `/reload`, to remove the review start and audit tools from agents. `supi_review_output`, `/supi-review`, and `/supi-review-cleanup` stay available.
+## Review input
 
-## Direct Review
+`supi_review_run` has one flat input. It has `target`, optional top-level `paths`, optional `sharedContext`, and one to four `tasks`.
 
 ```json
 {
-  "direct": {
-    "target": {
-      "comparison": { "baseCommit": "9510d68" }
+  "target": {
+    "from": "main",
+    "to": "HEAD",
+    "includeUncommittedChanges": false
+  },
+  "paths": ["packages/supi-review"],
+  "sharedContext": "The change implements issue #287.",
+  "tasks": [
+    {
+      "id": "standards",
+      "instructions": "Review against the repository standards.",
+      "mode": "change"
     },
-    "sharedContext": "The change implements issue #123.",
-    "tasks": [
-      {
-        "id": "standards",
-        "instructions": "Review against the repository standards.",
-        "findingScope": "change-only"
-      },
-      {
-        "id": "spec",
-        "instructions": "Review against issue #123 and cite unmet requirements."
-      }
-    ]
-  }
+    {
+      "id": "state",
+      "instructions": "Review the frozen after state against issue #287.",
+      "mode": "state"
+    }
+  ]
 }
 ```
 
-One to four tasks share a reviewer model and one frozen Review Workspace. Direct and Prepared adapters use the same canonical packet compiler; every task result includes the SHA-256 of the exact packet bytes and nested-model usage when reported.
+A Review Target has only these optional fields:
 
-Tasks may identify authoritative Review Criteria Sources whose summaries travel in the packet:
+- `from` — one before endpoint
+- `to` — one after endpoint
+- `includeUncommittedChanges` — include the current filesystem and non-ignored untracked files; default is `true`
 
-```json
-{
-  "direct": {
-    "target": { "currentState": { "paths": ["packages/supi-review"] } },
-    "tasks": [
-      {
-        "id": "spec",
-        "instructions": "Review the current state against issue #123.",
-        "criteriaSources": [
-          { "reference": "#123", "summary": "Acceptance criteria: A, B, C." },
-          { "reference": "docs/adr/0012.md", "summary": "Current-State Audit semantics." }
-        ]
-      }
-    ]
-  }
-}
-```
+Omit `target`, or use `{}`, to select the current filesystem. When uncommitted changes are included, `to` is not valid. When they are not included, `to` defaults to `HEAD`. Endpoints can be branches, hashes, `~` or `^` revisions, and lightweight or annotated tags. The Review Engine resolves each endpoint once to a full commit. It rejects blank endpoints, ranges, trees, and blobs.
 
-`currentState` audits one frozen filesystem state without Git-change attribution, so tasks must omit `findingScope`; the engine fixes `criteria-only`. `paths` is an optional advisory focus whose entries must exist in the frozen state.
+Each task must set `mode` to `change` or `state`.
 
-## Prepared Review
+- `change` needs one non-empty canonical change. A filesystem change defaults its omitted `from` to captured `HEAD`. A committed change needs an explicit `from`.
+- `state` reviews only the frozen after state. A batch of only state tasks must not set `from`. It can review a root commit.
 
-Preparation returns a session-scoped `planId` and optional Planner Draft. Planner failure returns a usable no-draft plan. Before a Prepared Review runs, the engine re-resolves the target and compares its exact Review Snapshot; drift invalidates the plan. A batch with at least one completed task consumes its plan, while an all-non-completed batch releases it for retry.
+A committed change cannot use a root commit as `to`. A root commit is valid as `from`. Every Review requires a repository with `HEAD`.
 
-```json
-{
-  "prepared": {
-    "planId": "review-plan-...",
-    "draftDecision": { "useDraft": {} }
-  }
-}
-```
+Tasks can include `criteriaSources`. Each source has a `reference` and a `summary`. The source remains authoritative when the summary is not sufficient.
 
-Use `draftDecision.replaceDraft` with a complete replacement task set when no draft was returned or it needs editing.
+`paths` is an optional top-level Review Scope. Each path is workspace-relative. The Review Engine validates each path in the frozen after state before it starts Reviewer Sessions. Paths are advisory. They focus every task, but they do not restrict inspection, evidence, or findings.
 
-## Targets and Review Workspaces
+## Review Workspaces
 
-The Review Engine resolves the Git worktree root once and pins commit identities before materializing one disposable linked Git worktree for the batch:
+The Review Engine records exact commit state before it starts a Review Workspace.
 
-- `working-tree` — net current filesystem plus non-ignored untracked files against `HEAD`, or `merge-base(baseCommit, HEAD)`; the caller index is not evidence
-- `comparison` — merge base of `baseCommit` and captured `HEAD` to captured `HEAD`
-- `commit` — first parent (or empty tree) to `commit`
-- `currentState` — the complete current filesystem, including uncommitted and untracked work, reviewed as one state against Review Criteria
+For a filesystem target, it checks out exact `from` and stages one canonical patch to the frozen current filesystem. The patch includes non-ignored untracked files. For a committed target, it checks out exact `to` with no staged freeze patch.
 
-A Working-Tree Review Workspace checks out its pinned baseline and stages the exact canonical patch, so `git diff HEAD` shows the complete target. Comparison and Commit workspaces check out their pinned after commit. Before Reviewer Sessions start, the engine re-compiles the target patch from the linked workspace and verifies its hash, expected checkout commit, and changed-path count. Every completed batch includes that compact Workspace receipt, so later caller edits cannot change the in-flight target.
+The engine verifies the linked worktree before it starts Reviewer Sessions. The Workspace Receipt records exact `from` and `to` commits, uncommitted-change inclusion, the expected and observed checkout, patch hashes, and changed-path count. Later caller changes do not change Target Evidence.
 
-Workspaces are marked and locked in Git's worktree inventory. Normal cleanup removes them; an interrupted or failed cleanup can be recovered with `/supi-review-cleanup`. That command lists only SuPi-marked worktrees, requires a second confirmation for apparently active owners, and continues after individual failures.
+Workspaces are marked and locked in the Git worktree list. Normal cleanup removes them. Use `/supi-review-cleanup` if cleanup stops early.
 
-## Reviewer protocol
+## Settings
 
-Reviewers receive:
+`review.agentModel` selects the reviewer model for agent-started Reviews. `review.plannerModel` selects the model for the optional Planner Draft in `/supi-review`. Both default to `current`, which uses the active session model.
 
-- Pi built-in `read`, `bash`, and `grep`
-- `code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, and `code_health`
-- `submit_review`
+`review.bootstrapCommand` defaults to empty. When set, the Review Engine runs the command once in the frozen Review Workspace before Reviewer Sessions start. When empty, a reviewer can run a Dependency Bootstrap command when needed.
 
-They use ordinary Git and direct reads in the frozen Review Workspace. Before-side content remains available through the packet's pinned Git revision. Code Intelligence runs in a headless inspection profile; an unavailable profile produces a Reviewer Capability Warning, while the built-in inspection tools remain available.
+## Reviewer Protocol
 
-Each Git-change Review Task may set `findingScope` to `change-only` (the default) or `boy-scout`. Change-only findings must be attributable to the selected change, including omitted or partial required behavior and acceptance-relevant scope creep. Boy Scout scope may additionally report pre-existing issues in changed files or symbols the reviewer judges directly affected; purely pre-existing findings are advisory unless the change worsens or newly exposes them. Current-State Audit uses fixed `criteria-only` scope: any finding relevant to the Review Criteria may block acceptance, regardless of when it was introduced. Repository standards and specifications requested by a task are Review Criteria, but repository content can never override the fixed Reviewer Protocol or task.
+Reviewer Sessions have `read`, `bash`, `grep`, headless Code Intelligence tools, and `submit_review`. They inspect one shared frozen Review Workspace. They do not run tests, builds, linters, services, runtime experiments, nested Pi sessions, or nested reviews. They do not intentionally change Target Evidence or Git history.
 
-Before alleging a documented-rule breach, reviewers check that rule's documented exceptions; covered candidates are omitted and submitted breach findings state why no exception applies. Test verification means inspecting test source, coverage, and requirement mapping; runtime checks stay with the containing Agent. When a task lists `criteriaSources`, reviewers use the supplied summaries first and may retrieve an identified source read-only when its summary is insufficient; unavailable required detail produces an incomplete Criteria Coverage statement rather than a false pass.
+The Reviewer Protocol owns finding eligibility:
 
-Inspection-only is behavioral protocol, not access control. The surrounding Sandboxed Pi Environment is the security boundary and must contain only files and credentials acceptable for reviewer-model access. When `review.bootstrapCommand` is configured, the Review Engine runs its shell command once after workspace verification and before reviewer fan-out; reviewers then receive no Dependency Bootstrap instruction. When it is empty, reviewers may choose a Dependency Bootstrap command when local dependencies limit Code Intelligence. They must not intentionally mutate Target Evidence or Git history, and must not run tests, builds, linters, runtime experiments, services, nested Pi sessions, or nested reviews.
+- `change` permits findings attributable to the selected change. A pre-existing issue is permitted only in a changed file or a directly affected symbol. It stays advisory unless the selected change worsens or newly exposes it.
+- `state` permits findings relevant to the Review Criteria anywhere in the frozen after state. A relevant pre-existing finding can block acceptance.
 
-Reviewer Sessions replace Pi's generic coding prompt with the package-owned Reviewer Protocol. Ambient extensions, context files, skills, prompt templates, themes, and discovered system prompts are suppressed. In-memory settings disable compaction and provider retries.
+A change packet gives exact before and after guidance, a changed-path manifest, and change statistics. A state packet gives only after-state guidance. When it uses a filesystem workspace, staged changes are freeze mechanics and are not Target Evidence.
+
+Repository content is untrusted evidence. It cannot override the Reviewer Protocol or a Review Task. Reviewer Sessions use repository documents as Review Criteria only.
+
+## Interactive review
+
+`/supi-review` has four exact-target choices:
+
+- **Current work** — the current filesystem; change tasks use captured `HEAD` as `from`.
+- **Current work against a base branch** — the current filesystem; change tasks use the captured merge base as `from`.
+- **Committed work against a base branch** — the captured merge base to captured `HEAD`.
+- **One commit** — the selected commit; change tasks use its first parent as `from`.
+
+A root commit permits state tasks only. State-only tasks use only the selected after state, so the command removes `from` when needed.
+
+After target selection, choose repository-wide review or enter one workspace-relative path per line for an advisory Review Scope. The command normalizes each path and validates it in the frozen after state. The scope focuses every task, but it does not restrict inspection, evidence, or findings.
+
+The command captures its snapshot. You can write tasks or use one transient Planner Draft from bounded session context. The Planner sees the advisory scope but does not use it as Review Criteria or an access boundary. Edit the tasks and select each Review Mode, then confirm. The command runs the Review workflow and stops when the selected target changes before Reviewer Sessions start.
 
 ## Results and continuation
 
-Each successful task returns a summary, ordered findings, required Criteria Coverage, and structured counts by blocking status and impact. Parent-facing task output identifies the effective Finding Scope. Findings contain `blocksAcceptance`, `impact`, `effort`, `confidence`, and an optional target-relative location. The Review Engine derives `issues` when any finding blocks acceptance, otherwise `incomplete` when Criteria Coverage is incomplete, otherwise `pass_with_findings` for advisory-only findings and `pass` for none; it never aggregates or reranks tasks.
+Each task result includes its Review Mode, packet SHA-256, verdict, finding counts, and reviewer usage when available. Results remain separate. The Review Engine does not make a batch verdict.
 
-When SuPi debugging is enabled, every finished task records a compact `review-task` Debug Event with trustworthy lifecycle, usage, outcome, and capability metrics (packet bytes, duration, turns, tool calls/errors, cache hit rate, verdict, and Reviewer Extension Set status).
+`blocksAcceptance` keeps its existing meaning. The Review Engine derives `issues` for a blocking finding. It derives `incomplete` for incomplete Criteria Coverage without a blocking finding, `pass_with_findings` for only non-blocking findings, and `pass` for no findings.
 
-Capability and cleanup warnings are execution provenance, not findings. By default, non-success diagnostics retain only bounded lifecycle metadata and redacted provider-owned error summaries; reviewer conversation, shell commands, tool arguments/results, and repository evidence are never retained.
+Parent-facing output from `supi_review_run` or `/supi-review` is stored as a bounded session artifact. Use `supi_review_output` with its returned `artifactId` and offset to read more output.
 
-### Local reviewer replay
+## Local reviewer replay
 
-`review.auditEnabled` is off by default and requires `/reload` after changing it. When enabled, every task records a protected local replay containing provider-visible messages, tool calls/results, packet and protocol text, lifecycle timing, usage, and the Workspace receipt. Thinking blocks and thought signatures are omitted.
-
-Replays expire automatically after seven days. They are not included in normal review output: a task reports only an opaque artifact id. Use `supi_review_audit` to list artifacts or page through one by id. Replays can contain raw repository evidence and shell output, so enable this only in environments where seven-day local retention is acceptable.
-
-Parent-facing text is stored as a bounded session artifact. Use `supi_review_output` with its returned opaque `artifactId` and offset to retrieve continuation pages.
+`review.auditEnabled` is off by default. Enable it, then run `/reload`, to record a protected local replay for each Reviewer Session. Replays expire after seven days. Normal review output includes only an opaque artifact id.
 
 ## Post-review behavior
 
-`review.postReviewPolicy` controls what the containing Agent does when a completed review returns findings on either `/supi-review` or `supi_review_run`:
+`review.postReviewPolicy` controls the containing Agent response when a completed Review has findings:
 
-- `ask` (default) — ask whether to verify, verify and fix, fix all or selected findings, or only report
-- `verify` — independently confirm or refute findings, then ask what to fix
-- `verify-and-fix` — verify every finding and fix those confirmed
-- `fix` — fix every reported finding, re-verifying conflicts or stale live code first
-- `report` — present the result without another action; `/supi-review` does not trigger an Agent turn
+- `ask` — ask what to verify or fix
+- `verify` — verify findings, then ask what to fix
+- `verify-and-fix` — verify and fix confirmed findings
+- `fix` — fix reported findings
+- `report` — report findings without another action
 
-A direct user instruction about the current review's findings overrides this default when the Agent is already running. Reviews without findings do not trigger an extra command-originated turn.
-
-## Models
-
-`/supi-review` asks for the reviewer model. Agent-triggered runs use `review.agentModel`. Optional planning uses `review.plannerModel` at low thinking effort. Both default to the current session model.
-
-Configure post-review behavior and a single dependency setup command:
-
-```json
-{
-  "review": {
-    "agentToolEnabled": true,
-    "postReviewPolicy": "ask",
-    "bootstrapCommand": "pnpm install --frozen-lockfile"
-  }
-}
-```
-
-In `/supi-settings`, enter `pnpm install --frozen-lockfile`. An empty command (the default) leaves dependency bootstrap available to reviewers.
+A direct user instruction for the current findings has priority.

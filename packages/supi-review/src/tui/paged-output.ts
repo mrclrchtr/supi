@@ -1,12 +1,12 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
+import { REVIEW_TOOL_SPECS } from "../tool/tool-specs.ts";
 import type { ReviewAuditReference, ReviewOutputReference } from "../types.ts";
 import { renderError, renderPartial, renderReviewToolCall } from "./common.ts";
 
 interface TextResult {
   content?: Array<{ type: string; text?: string }>;
   details?: unknown;
-  isError?: boolean;
 }
 
 interface PageDetails extends ReviewOutputReference {
@@ -17,6 +17,10 @@ interface AuditListDetails {
   kind: "review-audit";
   mode: "list";
   audits: ReviewAuditReference[];
+  totalAudits?: number;
+  offset?: number;
+  nextOffset?: number;
+  totalCharacters?: number;
 }
 
 interface AuditPageDetails extends ReviewOutputReference {
@@ -56,7 +60,7 @@ function expandedPage(
 export function renderOutputCall(args: unknown, theme: Theme): Text {
   const params = (args ?? {}) as { artifactId?: string; offset?: number };
   return renderReviewToolCall(
-    "supi_review_output",
+    REVIEW_TOOL_SPECS.output.name,
     params.artifactId ?? "output",
     theme,
     `offset ${params.offset ?? 0}`,
@@ -67,11 +71,12 @@ export function renderOutputResult(
   result: TextResult,
   options: { expanded: boolean; isPartial: boolean },
   theme: Theme,
+  context: { isError: boolean } = { isError: false },
 ): Container | Text {
   if (options.isPartial) return renderPartial("Reading review output…", theme);
   const details = result.details as PageDetails | undefined;
-  if (result.isError || details?.kind !== "review-output-page") {
-    return renderError("supi_review_output failed", theme);
+  if (context.isError || details?.kind !== "review-output-page") {
+    return renderError(`${REVIEW_TOOL_SPECS.output.name} failed`, theme);
   }
   if (options.expanded) return expandedPage("Review output", details, result, theme);
   return new Text(pageSummary("Review output", details, theme), 0, 0);
@@ -80,7 +85,7 @@ export function renderOutputResult(
 export function renderAuditCall(args: unknown, theme: Theme): Text {
   const params = (args ?? {}) as { artifactId?: string; offset?: number };
   return renderReviewToolCall(
-    "supi_review_audit",
+    REVIEW_TOOL_SPECS.audit.name,
     params.artifactId ?? "list",
     theme,
     params.artifactId ? `offset ${params.offset ?? 0}` : undefined,
@@ -92,9 +97,10 @@ function renderAuditList(
   expanded: boolean,
   theme: Theme,
 ): Container | Text {
+  const totalAudits = details.totalAudits ?? details.audits.length;
   const summary = theme.fg(
-    details.audits.length === 0 ? "dim" : "accent",
-    `${details.audits.length} local reviewer replay${details.audits.length === 1 ? "" : "s"}`,
+    totalAudits === 0 ? "dim" : "accent",
+    `${totalAudits} local reviewer replay${totalAudits === 1 ? "" : "s"}`,
   );
   if (!expanded || details.audits.length === 0) return new Text(summary, 0, 0);
 
@@ -117,11 +123,12 @@ export function renderAuditResult(
   result: TextResult,
   options: { expanded: boolean; isPartial: boolean },
   theme: Theme,
+  context: { isError: boolean } = { isError: false },
 ): Container | Text {
   if (options.isPartial) return renderPartial("Reading reviewer replays…", theme);
   const details = result.details as AuditDetails | undefined;
-  if (result.isError || details?.kind !== "review-audit") {
-    return renderError("supi_review_audit failed", theme);
+  if (context.isError || details?.kind !== "review-audit") {
+    return renderError(`${REVIEW_TOOL_SPECS.audit.name} failed`, theme);
   }
   if (details.mode === "list") return renderAuditList(details, options.expanded, theme);
   if (options.expanded) return expandedPage("Reviewer replay", details, result, theme);

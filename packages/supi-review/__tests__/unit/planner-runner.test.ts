@@ -1,3 +1,4 @@
+import { Value } from "typebox/value";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -25,11 +26,11 @@ describe("runPlanner", () => {
   it("constrains drafts to the reviewers' static target-aware capabilities", () => {
     const prompt = buildPlannerSystemPrompt();
 
-    expect(PLANNER_PROMPT_VERSION).toBe("4");
+    expect(PLANNER_PROMPT_VERSION).toBe("6");
     expect(prompt).toContain("code_orientation");
     expect(prompt).toContain("read, bash, grep");
-    expect(prompt).toMatch(/Current-State Audit.*omit findingScope.*criteria-only/is);
-    expect(prompt).toMatch(/Git-change target.*findingScope.*change-only.*boy-scout/is);
+    expect(prompt).toMatch(/required mode to change.*required mode to state/is);
+    expect(prompt).toMatch(/Do not define finding eligibility/i);
     expect(prompt).not.toContain("concrete regressions introduced");
     expect(prompt).toContain("Do not request tests, builds, linters");
   });
@@ -42,7 +43,7 @@ describe("runPlanner", () => {
     });
   });
 
-  it("rejects semantically invalid Planner Drafts before accepting submission", async () => {
+  it("rejects invalid Planner Drafts before accepting submission", async () => {
     await runPlanner(args);
 
     const config = mocks.runIsolatedChild.mock.calls[0]?.[0] as {
@@ -52,26 +53,51 @@ describe("runPlanner", () => {
     expect(submit).toBeDefined();
     await expect(
       submit?.execute("call", { tasks: [{ id: " ", instructions: " " }] }),
-    ).rejects.toThrow(/blank/i);
+    ).rejects.toThrow("Invalid Planner Draft.");
     await expect(
       submit?.execute("call", {
-        tasks: [{ id: "scope", instructions: "Review.", findingScope: "repository-wide" }],
+        tasks: [{ id: "scope", instructions: "Review.", mode: "repository-wide" }],
       }),
-    ).rejects.toThrow(/findingScope/i);
+    ).rejects.toThrow("Invalid Planner Draft.");
   });
 
-  it("preserves a valid Finding Scope through Planner Draft normalization", async () => {
+  it("rejects caller-only criteria sources in the Planner Draft tool schema", async () => {
+    await runPlanner(args);
+
+    const config = mocks.runIsolatedChild.mock.calls[0]?.[0] as {
+      customTools?: Array<{
+        execute: (...args: unknown[]) => Promise<unknown>;
+        parameters?: unknown;
+      }>;
+    };
+    const submit = config.customTools?.[0];
+    const draft = {
+      tasks: [
+        {
+          id: "spec",
+          instructions: "Review the specification.",
+          mode: "state",
+          criteriaSources: [{ reference: "#291", summary: "Acceptance criteria." }],
+        },
+      ],
+    };
+
+    expect(Value.Check(submit?.parameters as never, draft)).toBe(false);
+    await expect(submit?.execute("call", draft)).rejects.toThrow("Invalid Planner Draft.");
+  });
+
+  it("preserves a valid Review Mode through Planner Draft normalization", async () => {
     await runPlanner(args);
 
     const config = mocks.runIsolatedChild.mock.calls[0]?.[0] as {
       customTools?: Array<{ execute: (...args: unknown[]) => Promise<{ details?: unknown }> }>;
     };
     const result = await config.customTools?.[0]?.execute("call", {
-      tasks: [{ id: "scope", instructions: "Review.", findingScope: "boy-scout" }],
+      tasks: [{ id: "scope", instructions: "Review.", mode: "state" }],
     });
 
     expect(result?.details).toEqual({
-      tasks: [{ id: "scope", instructions: "Review.", findingScope: "boy-scout" }],
+      tasks: [{ id: "scope", instructions: "Review.", mode: "state" }],
     });
   });
 
@@ -82,13 +108,13 @@ describe("runPlanner", () => {
       expect.objectContaining({
         prompt: "bounded input",
         timeoutMs: 5 * 60 * 1_000,
-        tools: ["submit_review_plan"],
+        tools: ["submit_planner_draft"],
       }),
     );
   });
 
   it("preserves runtime outcomes, including diagnostics-free session creation failure", async () => {
-    const draft = { tasks: [{ id: "t", instructions: "Review." }] };
+    const draft = { tasks: [{ id: "t", instructions: "Review.", mode: "change" as const }] };
     mocks.runIsolatedChild.mockResolvedValueOnce({ kind: "success", value: draft });
     await expect(runPlanner(args)).resolves.toEqual({ kind: "success", value: draft });
 

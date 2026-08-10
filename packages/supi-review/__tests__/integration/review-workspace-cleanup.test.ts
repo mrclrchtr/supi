@@ -40,7 +40,7 @@ describe("Review Workspace cleanup", () => {
 
   it("lists only marked workspaces and removes a selected candidate", async () => {
     writeFileSync(join(cwd, "tracked.txt"), "reviewed\n");
-    const snapshot = await resolveReviewSnapshot(cwd, { kind: "working-tree" });
+    const snapshot = await resolveReviewSnapshot(cwd, {});
     expect(snapshot).toBeDefined();
     if (!snapshot) return;
     const workspace = await materializeReviewWorkspace(snapshot);

@@ -66,19 +66,24 @@ export class LocalReviewAuditStore {
   }
 
   /** List non-expired local replay identities without loading their raw content. */
-  async list(): Promise<ReviewAuditReference[]> {
-    await this.#prune();
+  async list(signal?: AbortSignal): Promise<ReviewAuditReference[]> {
+    signal?.throwIfAborted();
+    await this.#prune(signal);
     let entries: string[];
     try {
       entries = await readdir(this.#directory);
     } catch {
+      signal?.throwIfAborted();
       return [];
     }
+    signal?.throwIfAborted();
     const records = await Promise.all(
       entries
         .filter((entry) => entry.endsWith(".json") && AUDIT_ID_RE.test(entry.slice(0, -5)))
         .map(async (entry) => {
+          signal?.throwIfAborted();
           const info = await stat(join(this.#directory, entry));
+          signal?.throwIfAborted();
           return {
             artifactId: entry.slice(0, -5),
             createdAt: info.mtimeMs,
@@ -92,12 +97,14 @@ export class LocalReviewAuditStore {
   }
 
   /** Return one raw replay file when it exists and has not expired. */
-  async read(artifactId: string): Promise<string | undefined> {
+  async read(artifactId: string, signal?: AbortSignal): Promise<string | undefined> {
     if (!AUDIT_ID_RE.test(artifactId)) return undefined;
-    await this.#prune();
+    signal?.throwIfAborted();
+    await this.#prune(signal);
     try {
-      return await readFile(this.#path(artifactId), "utf8");
+      return await readFile(this.#path(artifactId), { encoding: "utf8", signal });
     } catch {
+      signal?.throwIfAborted();
       return undefined;
     }
   }
@@ -112,23 +119,29 @@ export class LocalReviewAuditStore {
     await this.#prune();
   }
 
-  async #prune(): Promise<void> {
+  async #prune(signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
     let entries: string[];
     try {
       entries = await readdir(this.#directory);
     } catch {
+      signal?.throwIfAborted();
       return;
     }
+    signal?.throwIfAborted();
     const cutoff = this.#now() - REVIEW_AUDIT_MAX_AGE_MS;
     await Promise.all(
       entries
         .filter((entry) => entry.endsWith(".json") || entry.endsWith(".tmp"))
         .map(async (entry) => {
+          signal?.throwIfAborted();
           const path = join(this.#directory, entry);
           try {
             const info = await stat(path);
+            signal?.throwIfAborted();
             if (info.mtimeMs <= cutoff) await rm(path, { force: true });
           } catch {
+            signal?.throwIfAborted();
             // A concurrent cleanup or write does not affect review execution.
           }
         }),
