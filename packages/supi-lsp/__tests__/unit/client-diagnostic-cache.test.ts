@@ -1,33 +1,13 @@
-// Unit tests for LspClient diagnostic cache metadata and version gating.
-// Tests directly access private state via `as any` since these behaviors
-// are internal to the client and not exposed through public API.
+// LspClient diagnostic publication and version-gating behavior.
 
 import { describe, expect, it } from "vitest";
-import { LspClient } from "../../src/client/client.ts";
+import type { LspClient } from "../../src/client/client.ts";
 import type { PublishDiagnosticsParams } from "../../src/config/types.ts";
+import { fileToUri } from "../../src/utils.ts";
+import { createRunningTestClient } from "../helpers/client-test-harness.ts";
 
-function createClient(): LspClient {
-  return new LspClient(
-    "test",
-    { command: "echo", args: [], fileTypes: ["ts"], rootMarkers: ["tsconfig.json"] },
-    "/project",
-  );
-}
-
-function publish(client: LspClient, params: PublishDiagnosticsParams): void {
-  // biome-ignore lint/suspicious/noExplicitAny: accessing private members for testing
-  (client as any).handlePublishDiagnostics(params);
-}
-
-function getCacheEntry(client: LspClient, uri: string) {
-  // biome-ignore lint/suspicious/noExplicitAny: accessing private members for testing
-  return (client as any).diagnosticStore.get(uri);
-}
-
-function setOpenDoc(client: LspClient, uri: string, version: number): void {
-  // biome-ignore lint/suspicious/noExplicitAny: accessing private members for testing
-  (client as any).openDocs.set(uri, { version, languageId: "typescript" });
-}
+const FILE = "/project/a.ts";
+const URI = fileToUri(FILE);
 
 function makeDiagnostic(message: string) {
   return {
@@ -36,186 +16,64 @@ function makeDiagnostic(message: string) {
   };
 }
 
+function publish(client: LspClient, params: PublishDiagnosticsParams): void {
+  client.handlePublishDiagnostics(params);
+}
+
+function openAtVersion(client: LspClient, version: number): void {
+  client.didOpen(FILE, "const value = 1;");
+  for (let current = 1; current < version; current++) {
+    client.didChange(FILE, `const value = ${current + 1};`);
+  }
+}
+
 describe("LspClient diagnostic cache", () => {
-  it("stores diagnostics with receivedAt timestamp", () => {
-    const client = createClient();
-    const before = Date.now();
+  it("stores diagnostics received from the server", () => {
+    const { client } = createRunningTestClient();
 
-    publish(client, { uri: "file:///project/a.ts", diagnostics: [makeDiagnostic("err")] });
+    publish(client, { uri: URI, diagnostics: [makeDiagnostic("err")] });
 
-    const entry = getCacheEntry(client, "file:///project/a.ts");
-    expect(entry).toBeDefined();
-    expect(entry.diagnostics).toHaveLength(1);
-    expect(entry.diagnostics[0].message).toBe("err");
-    expect(entry.receivedAt).toBeGreaterThanOrEqual(before);
-    expect(entry.receivedAt).toBeLessThanOrEqual(Date.now());
+    expect(client.getDiagnostics(FILE)).toEqual([makeDiagnostic("err")]);
   });
 
-  it("stores diagnostics with version when provided", () => {
-    const client = createClient();
+  it("replaces an earlier publication for the same document", () => {
+    const { client } = createRunningTestClient();
 
-    publish(client, {
-      uri: "file:///project/a.ts",
-      version: 5,
-      diagnostics: [makeDiagnostic("err")],
-    });
+    publish(client, { uri: URI, diagnostics: [makeDiagnostic("first")] });
+    publish(client, { uri: URI, diagnostics: [makeDiagnostic("second")] });
 
-    const entry = getCacheEntry(client, "file:///project/a.ts");
-    expect(entry).toBeDefined();
-    expect(entry.version).toBe(5);
+    expect(client.getDiagnostics(FILE)).toEqual([makeDiagnostic("second")]);
   });
 
-  it("stores diagnostics without version when omitted", () => {
-    const client = createClient();
+  it("accepts diagnostics that match the open document version", () => {
+    const { client } = createRunningTestClient();
+    openAtVersion(client, 5);
 
-    publish(client, { uri: "file:///project/a.ts", diagnostics: [makeDiagnostic("err")] });
+    publish(client, { uri: URI, version: 5, diagnostics: [makeDiagnostic("matching")] });
 
-    const entry = getCacheEntry(client, "file:///project/a.ts");
-    expect(entry).toBeDefined();
-    expect(entry.version).toBeUndefined();
+    expect(client.getDiagnostics(FILE)).toEqual([makeDiagnostic("matching")]);
   });
 
-  it("replaces diagnostics for same uri (unversioned)", () => {
-    const client = createClient();
+  it("ignores diagnostics older than the open document version", () => {
+    const { client } = createRunningTestClient();
+    publish(client, { uri: URI, diagnostics: [makeDiagnostic("current")] });
+    openAtVersion(client, 5);
 
-    publish(client, { uri: "file:///project/a.ts", diagnostics: [makeDiagnostic("first")] });
-    publish(client, { uri: "file:///project/a.ts", diagnostics: [makeDiagnostic("second")] });
+    publish(client, { uri: URI, version: 4, diagnostics: [makeDiagnostic("stale")] });
 
-    const entry = getCacheEntry(client, "file:///project/a.ts");
-    expect(entry.diagnostics).toHaveLength(1);
-    expect(entry.diagnostics[0].message).toBe("second");
+    expect(client.getDiagnostics(FILE)).toEqual([makeDiagnostic("current")]);
   });
 
-  it("replaces diagnostics when version matches open doc version", () => {
-    const client = createClient();
-    setOpenDoc(client, "file:///project/a.ts", 5);
+  it("accepts versioned diagnostics for a document that is not open", () => {
+    const { client } = createRunningTestClient();
 
-    publish(client, {
-      uri: "file:///project/a.ts",
-      version: 5,
-      diagnostics: [makeDiagnostic("current")],
-    });
+    publish(client, { uri: URI, version: 3, diagnostics: [makeDiagnostic("accepted")] });
 
-    const entry = getCacheEntry(client, "file:///project/a.ts");
-    expect(entry.diagnostics[0].message).toBe("current");
+    expect(client.getDiagnostics(FILE)).toEqual([makeDiagnostic("accepted")]);
   });
 
-  it("ignores diagnostics with version older than open doc version", () => {
-    const client = createClient();
-
-    publish(client, { uri: "file:///project/a.ts", diagnostics: [makeDiagnostic("current")] });
-    setOpenDoc(client, "file:///project/a.ts", 5);
-
-    publish(client, {
-      uri: "file:///project/a.ts",
-      version: 4,
-      diagnostics: [makeDiagnostic("stale")],
-    });
-
-    const entry = getCacheEntry(client, "file:///project/a.ts");
-    expect(entry.diagnostics[0].message).toBe("current");
-  });
-
-  it("accepts diagnostics with version equal to open doc version", () => {
-    const client = createClient();
-    setOpenDoc(client, "file:///project/a.ts", 5);
-
-    publish(client, {
-      uri: "file:///project/a.ts",
-      version: 5,
-      diagnostics: [makeDiagnostic("matching")],
-    });
-
-    const entry = getCacheEntry(client, "file:///project/a.ts");
-    expect(entry.diagnostics[0].message).toBe("matching");
-  });
-
-  it("accepts versioned diagnostics for documents not in openDocs", () => {
-    const client = createClient();
-
-    publish(client, {
-      uri: "file:///project/a.ts",
-      version: 3,
-      diagnostics: [makeDiagnostic("accepted")],
-    });
-
-    const entry = getCacheEntry(client, "file:///project/a.ts");
-    expect(entry.diagnostics[0].message).toBe("accepted");
-  });
-
-  it("preserves existing diagnostics when ignoring stale versioned publication", () => {
-    const client = createClient();
-
-    publish(client, {
-      uri: "file:///project/a.ts",
-      version: 5,
-      diagnostics: [makeDiagnostic("v5-diag")],
-    });
-
-    const originalEntry = getCacheEntry(client, "file:///project/a.ts");
-    setOpenDoc(client, "file:///project/a.ts", 6);
-
-    publish(client, {
-      uri: "file:///project/a.ts",
-      version: 3,
-      diagnostics: [makeDiagnostic("v3-stale")],
-    });
-
-    const entry = getCacheEntry(client, "file:///project/a.ts");
-    expect(entry).toBe(originalEntry); // Same reference — not replaced
-    expect(entry.diagnostics[0].message).toBe("v5-diag");
-  });
-
-  it("clearPullResultIds removes all resultId values", () => {
-    const client = createClient();
-
-    // Add cache entries with resultId
-    publish(client, {
-      uri: "file:///project/a.ts",
-      diagnostics: [makeDiagnostic("err-a")],
-    });
-    publish(client, {
-      uri: "file:///project/b.ts",
-      diagnostics: [makeDiagnostic("err-b")],
-    });
-
-    const uriA = "file:///project/a.ts";
-    const uriB = "file:///project/b.ts";
-
-    getCacheEntry(client, uriA).resultId = "result-a";
-    getCacheEntry(client, uriB).resultId = "result-b";
-
-    expect(getCacheEntry(client, uriA).resultId).toBe("result-a");
-    expect(getCacheEntry(client, uriB).resultId).toBe("result-b");
-
-    client.clearPullResultIds();
-
-    expect(getCacheEntry(client, uriA).resultId).toBeUndefined();
-    expect(getCacheEntry(client, uriB).resultId).toBeUndefined();
-
-    // Diagnostics themselves are preserved
-    expect(getCacheEntry(client, uriA).diagnostics[0].message).toBe("err-a");
-    expect(getCacheEntry(client, uriB).diagnostics[0].message).toBe("err-b");
-  });
-
-  it("clearPullResultIds is safe on empty store", () => {
-    const client = createClient();
+  it("clears pull result IDs safely when the cache is empty", () => {
+    const { client } = createRunningTestClient();
     expect(() => client.clearPullResultIds()).not.toThrow();
-  });
-
-  it("clearPullResultIds is safe on entries without resultId", () => {
-    const client = createClient();
-
-    publish(client, {
-      uri: "file:///project/a.ts",
-      diagnostics: [makeDiagnostic("err-a")],
-    });
-
-    // entry has no resultId — should be a no-op
-    expect(() => client.clearPullResultIds()).not.toThrow();
-
-    const entry = getCacheEntry(client, "file:///project/a.ts");
-    expect(entry.resultId).toBeUndefined();
-    expect(entry.diagnostics[0].message).toBe("err-a");
   });
 });

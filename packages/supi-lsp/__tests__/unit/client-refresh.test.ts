@@ -1,23 +1,20 @@
-// Unit tests for LspClient refreshOpenDiagnostics — settle, timeout, and deleted-file behavior.
+// LspClient refreshOpenDiagnostics settle, timeout, and deleted-file behavior.
 
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, type vi } from "vitest";
 import { LspClient } from "../../src/client/client.ts";
-
-// biome-ignore lint/suspicious/noExplicitAny: accessing private members for testing
-type AnyClient = any;
+import { uriToFile } from "../../src/utils.ts";
+import { createRunningTestClient } from "../helpers/client-test-harness.ts";
 
 function createStartedClient(): LspClient {
-  const client = new LspClient(
-    "test",
-    { command: "echo", args: [], fileTypes: ["ts"], rootMarkers: ["tsconfig.json"] },
-    "/project",
-  );
-  (client as AnyClient)._status = "running";
-  (client as AnyClient).rpc = { sendNotification: vi.fn() };
-  return client;
+  return createRunningTestClient().client;
+}
+
+function notificationMock(client: LspClient): ReturnType<typeof vi.fn> {
+  return (client as unknown as { rpc: { sendNotification: ReturnType<typeof vi.fn> } }).rpc
+    .sendNotification;
 }
 
 function makeDiagnostic(message: string) {
@@ -28,11 +25,11 @@ function makeDiagnostic(message: string) {
 }
 
 function simulatePublish(client: LspClient, uri: string, diagnostics = [makeDiagnostic("err")]) {
-  (client as AnyClient).handlePublishDiagnostics({ uri, diagnostics });
+  client.handlePublishDiagnostics({ uri, diagnostics });
 }
 
-function setOpenDoc(client: LspClient, uri: string, version: number) {
-  (client as AnyClient).openDocs.set(uri, { version, languageId: "typescript" });
+function openDocument(client: LspClient, uri: string): void {
+  client.didOpen(uriToFile(uri), "const value = 1;");
 }
 
 function createTempFileUri(): { tmpDir: string; uri: string } {
@@ -52,21 +49,20 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
 
     const start = Date.now();
     await client.refreshOpenDiagnostics({ maxWaitMs: 1000, quietMs: 50 });
-    const elapsed = Date.now() - start;
 
-    expect(elapsed).toBeLessThan(500);
+    expect(Date.now() - start).toBeLessThan(500);
   });
 
-  it("waits for quiet window after last diagnostic", async () => {
+  it("waits for a quiet window after the last diagnostic", async () => {
     const client = createStartedClient();
     const { tmpDir, uri } = createTempFileUri();
-    setOpenDoc(client, uri, 1);
+    openDocument(client, uri);
 
     try {
       const publishDelay = 30;
       setTimeout(() => simulatePublish(client, uri), publishDelay);
-
       const start = Date.now();
+
       await client.refreshOpenDiagnostics({ maxWaitMs: 2000, quietMs: 80 });
       const elapsed = Date.now() - start;
 
@@ -77,10 +73,10 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
     }
   });
 
-  it("settles after quiet window when no diagnostics arrive", async () => {
+  it("settles after the quiet window when no diagnostics arrive", async () => {
     const client = createStartedClient();
     const { tmpDir, uri } = createTempFileUri();
-    setOpenDoc(client, uri, 1);
+    openDocument(client, uri);
 
     try {
       const start = Date.now();
@@ -97,8 +93,7 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
   it("times out when diagnostics keep arriving", async () => {
     const client = createStartedClient();
     const { tmpDir, uri } = createTempFileUri();
-    setOpenDoc(client, uri, 1);
-
+    openDocument(client, uri);
     const interval = setInterval(() => simulatePublish(client, uri), 30);
 
     try {
@@ -114,7 +109,7 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
     }
   });
 
-  it("does nothing when client is not running", async () => {
+  it("does nothing when the client is not running", async () => {
     const client = new LspClient(
       "test",
       { command: "echo", args: [], fileTypes: ["ts"], rootMarkers: ["tsconfig.json"] },
@@ -123,20 +118,18 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
     await client.refreshOpenDiagnostics({ maxWaitMs: 50, quietMs: 20 });
   });
 
-  it("uses default maxWaitMs and quietMs", async () => {
-    const client = createStartedClient();
-    await client.refreshOpenDiagnostics();
+  it("uses default wait options", async () => {
+    await createStartedClient().refreshOpenDiagnostics();
   });
 });
 
 describe("LspClient refreshOpenDiagnostics — file handling", () => {
-  let tmpDir: string;
+  let tmpDir = "";
 
   afterEach(() => {
-    if (tmpDir) {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-      tmpDir = "" as string;
-    }
+    if (!tmpDir) return;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    tmpDir = "";
   });
 
   it("re-syncs open documents from disk", async () => {
@@ -144,11 +137,9 @@ describe("LspClient refreshOpenDiagnostics — file handling", () => {
     const filePath = path.join(tmpDir, "test.ts");
     fs.writeFileSync(filePath, "const x = 1;");
     const uri = `file://${filePath}`;
-
     const client = createStartedClient();
-    setOpenDoc(client, uri, 1);
-
-    const sendNotification = (client as AnyClient).rpc.sendNotification;
+    openDocument(client, uri);
+    const sendNotification = notificationMock(client);
 
     await client.refreshOpenDiagnostics({ maxWaitMs: 50, quietMs: 20 });
 
@@ -165,20 +156,18 @@ describe("LspClient refreshOpenDiagnostics — file handling", () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-refresh-test-"));
     const filePath = path.join(tmpDir, "deleted.ts");
     const uri = `file://${filePath}`;
-
     const client = createStartedClient();
-    setOpenDoc(client, uri, 1);
+    openDocument(client, uri);
     simulatePublish(client, uri);
+    const sendNotification = notificationMock(client);
 
-    expect((client as AnyClient).openDocs.has(uri)).toBe(true);
-    expect((client as AnyClient).diagnosticStore.has(uri)).toBe(true);
-
-    const sendNotification = (client as AnyClient).rpc.sendNotification;
+    expect(client.openFiles).toContain(filePath);
+    expect(client.getDiagnostics(filePath)).toHaveLength(1);
 
     await client.refreshOpenDiagnostics({ maxWaitMs: 50, quietMs: 20 });
 
-    expect((client as AnyClient).openDocs.has(uri)).toBe(false);
-    expect((client as AnyClient).diagnosticStore.has(uri)).toBe(false);
+    expect(client.openFiles).not.toContain(filePath);
+    expect(client.getDiagnostics(filePath)).toEqual([]);
     expect(sendNotification).toHaveBeenCalledWith(
       "textDocument/didClose",
       expect.objectContaining({ textDocument: { uri } }),
@@ -188,21 +177,20 @@ describe("LspClient refreshOpenDiagnostics — file handling", () => {
   it("closes non-existent files as deleted", async () => {
     const client = createStartedClient();
     const uri = "file:///nonexistent/path.ts";
-    setOpenDoc(client, uri, 1);
+    openDocument(client, uri);
 
     await client.refreshOpenDiagnostics({ maxWaitMs: 50, quietMs: 20 });
 
-    expect((client as AnyClient).openDocs.has(uri)).toBe(false);
+    expect(client.openFiles).not.toContain(uriToFile(uri));
   });
 
-  it("resolves pending diagnostic waiters when refresh removes deleted files", async () => {
+  it("resolves pending waiters when refresh removes deleted files", async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-refresh-test-"));
     const filePath = path.join(tmpDir, "deleted-with-waiter.ts");
     fs.writeFileSync(filePath, "const x = 1;");
     const uri = `file://${filePath}`;
-
     const client = createStartedClient();
-    setOpenDoc(client, uri, 1);
+    openDocument(client, uri);
     const pending = client.syncAndWaitForDiagnostics(filePath, "const x = 2;");
 
     fs.rmSync(filePath);

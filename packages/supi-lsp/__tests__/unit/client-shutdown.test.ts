@@ -22,6 +22,10 @@ function createExitedProcess(): ChildProcess {
   return proc;
 }
 
+function timeoutAfter(ms: number): Promise<never> {
+  return new Promise((_, reject) => setTimeout(() => reject(new Error("timed out")), ms));
+}
+
 describe("LspClient shutdown", () => {
   it("waits for the final exit notification before disposing the RPC transport", async () => {
     const client = createRunningClient();
@@ -83,5 +87,20 @@ describe("LspClient shutdown", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("releases pending diagnostic waiters during shutdown", async () => {
+    const client = createRunningClient();
+    (client as AnyClient).rpc = {
+      sendRequest: vi.fn(async () => null),
+      sendNotification: vi.fn(async () => {}),
+      dispose: vi.fn(),
+    };
+    (client as AnyClient).process = createExitedProcess();
+    const pending = client.syncAndWaitForDiagnostics("/project/pending.ts", "const value = 1;");
+
+    await client.shutdown();
+
+    await expect(Promise.race([pending, timeoutAfter(250)])).resolves.toEqual([]);
   });
 });

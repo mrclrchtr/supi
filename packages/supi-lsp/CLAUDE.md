@@ -26,7 +26,7 @@ Runtime positions are raw 0-based LSP coordinates. Use `toLspPosition()` when st
 
 ## Key files
 
-- `src/client/` — protocol client, transport, refresh, and request handling
+- `src/client/` — protocol client, transport, document/diagnostic state, refresh, and request handling
 - `src/config/` — server definitions, settings, capabilities, actions, protocol types, and tsconfig scope
 - `src/diagnostics/` — diagnostic summaries, stale diagnostics, and workspace sentinels
 - `src/manager/manager.ts` + `manager-*.ts` — package-internal server pool, routing, diagnostics, and recovery mechanics
@@ -59,6 +59,7 @@ During shutdown, `vscode-jsonrpc` may emit `Cannot call write after a stream was
 
 ## Diagnostic behavior
 
+- `ClientDiagnostics` owns open documents, diagnostic cache entries, pending diagnostic waiters, pull refresh, and push-settle behavior. `LspClient` delegates through behavioral methods and does not expose these maps.
 - Session startup uses prune → refresh → prune because late `publishDiagnostics` can recreate stale entries.
 - Diagnostic reads also filter missing files with `existsSync`.
 - Workspace sentinels include `package.json`, root lockfiles, `tsconfig*`, and generated `*.d.ts` files.

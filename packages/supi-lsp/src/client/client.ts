@@ -1,9 +1,8 @@
 // LSP Client — wraps a server process + JsonRpcClient.
 // Handles initialize handshake, document sync, shutdown, and crash recovery.
 
-// biome-ignore lint/style/noExcessiveLinesPerFile: LspClient remains a cohesive stateful wrapper; refresh logic is already split out.
+// biome-ignore lint/style/noExcessiveLinesPerFile: process lifecycle, readiness, and protocol requests stay in one client wrapper; document and diagnostic state is delegated.
 import { type ChildProcess, execSync, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 import * as path from "node:path";
 import {
   type CodeQueryResult,
@@ -18,6 +17,7 @@ import type {
   CodeActionContext,
   Diagnostic,
   DidChangeWatchedFilesParams,
+  DocumentDiagnosticReport,
   DocumentSymbol,
   FileEvent,
   Hover,
@@ -30,17 +30,14 @@ import type {
   ServerCapabilities,
   ServerConfig,
   SymbolInformation,
-  TextDocumentIdentifier,
-  TextDocumentItem,
-  VersionedTextDocumentIdentifier,
   WorkspaceEdit,
   WorkspaceSymbol,
 } from "../config/types.ts";
-import { detectLanguageId, fileToUri, uriToFile } from "../utils.ts";
+import { fileToUri } from "../utils.ts";
+import { ClientDiagnostics, type DiagnosticEntry } from "./client-diagnostics.ts";
 import { JsonRpcClient, JsonRpcRequestError } from "./transport.ts";
 
 const SHUTDOWN_TIMEOUT_MS = 5_000;
-const DIAGNOSTIC_WAIT_MS = 3_000;
 
 /** Race an operation against a timeout without retaining the timer after settlement. */
 async function withTimeout<T>(
@@ -89,19 +86,6 @@ function killProcessTree(pid: number): void {
 // ── Types ─────────────────────────────────────────────────────────────
 export type ClientStatus = "initializing" | "running" | "error" | "shutdown";
 
-export interface DiagnosticEntry {
-  uri: string;
-  diagnostics: Diagnostic[];
-}
-
-/** Internal metadata tracked alongside cached diagnostics. */
-export interface DiagnosticCacheEntry {
-  diagnostics: Diagnostic[];
-  receivedAt: number;
-  version?: number;
-  resultId?: string;
-}
-
 // ── LspClient ─────────────────────────────────────────────────────────
 export class LspClient {
   readonly name: string;
@@ -111,13 +95,7 @@ export class LspClient {
   private rpc: JsonRpcClient | null = null;
   private _status: ClientStatus = "initializing";
   private capabilities: ServerCapabilities | null = null;
-
-  /** Open documents: uri → { version, languageId } */
-  private openDocs = new Map<string, { version: number; languageId: string }>();
-  /** Per-file diagnostics with freshness metadata */
-  private diagnosticStore = new Map<string, DiagnosticCacheEntry>();
-  /** Listeners waiting for diagnostics on a specific uri */
-  private diagnosticWaiters = new Map<string, Array<() => void>>();
+  private readonly diagnostics: ClientDiagnostics;
 
   // ── Readiness (work-done-progress) ──────────────────────────────────
   private trackedTokens = new Map<ProgressToken, "begin-seen" | "ended">();
@@ -135,6 +113,23 @@ export class LspClient {
   ) {
     this.name = name;
     this.root = root;
+    this.diagnostics = new ClientDiagnostics({
+      isOperational: () => this.rpc !== null && this._status === "running",
+      supportsPullDiagnostics: () => this.hasDiagnosticProvider,
+      sendNotification: (method, params) => {
+        if (this.rpc) void this.rpc.sendNotification(method, params);
+      },
+      pullDocumentDiagnostics: async (uri, previousResultId, timeoutMs) => {
+        const rpc = this.rpc;
+        if (!rpc || this._status !== "running") throw new Error("client not running");
+        await this.getReady();
+        return rpc.sendRequest(
+          "textDocument/diagnostic",
+          { textDocument: { uri }, previousResultId },
+          { timeoutMs },
+        ) as Promise<DocumentDiagnosticReport>;
+      },
+    });
   }
 
   get status(): ClientStatus {
@@ -142,7 +137,7 @@ export class LspClient {
   }
 
   get openFiles(): string[] {
-    return Array.from(this.openDocs.keys()).map(uriToFile);
+    return this.diagnostics.openFiles;
   }
 
   get serverCapabilities(): ServerCapabilities | null {
@@ -277,9 +272,7 @@ export class LspClient {
       }
     }
 
-    this.openDocs.clear();
-    this.diagnosticStore.clear();
-    this.releaseAllDiagnosticWaiters();
+    this.diagnostics.clear();
 
     // Clear readiness state
     if (this.noProgressTimer) {
@@ -291,126 +284,40 @@ export class LspClient {
     this.rejectReady(new Error("Client shutdown"));
   }
 
-  // ── Document Synchronization ────────────────────────────────────────
-  /** Open a document (or re-sync if already open). */
+  // ── Document Synchronization and Diagnostics ────────────────────────
+  /** Open a document, or update it when it is already open. */
   didOpen(filePath: string, content: string): void {
-    if (!this.rpc || this._status !== "running") return;
-
-    const uri = fileToUri(filePath);
-    const languageId = detectLanguageId(filePath);
-
-    if (this.openDocs.has(uri)) {
-      // Already open — send didChange instead
-      this.didChange(filePath, content);
-      return;
-    }
-
-    this.openDocs.set(uri, { version: 1, languageId });
-    void this.rpc.sendNotification("textDocument/didOpen", {
-      textDocument: {
-        uri,
-        languageId,
-        version: 1,
-        text: content,
-      } satisfies TextDocumentItem,
-    });
+    this.diagnostics.didOpen(filePath, content);
   }
 
-  /** Notify the server of a content change (full document sync). */
+  /** Update a document, or open it when it is not tracked yet. */
   didChange(filePath: string, content: string): void {
-    if (!this.rpc || this._status !== "running") return;
-
-    const uri = fileToUri(filePath);
-    const doc = this.openDocs.get(uri);
-
-    if (!doc) {
-      // Not yet open — do a didOpen
-      this.didOpen(filePath, content);
-      return;
-    }
-
-    doc.version++;
-    void this.rpc.sendNotification("textDocument/didChange", {
-      textDocument: { uri, version: doc.version } satisfies VersionedTextDocumentIdentifier,
-      contentChanges: [{ text: content }],
-    });
+    this.diagnostics.didChange(filePath, content);
   }
 
-  /** Close a document and clear any cached state for it. */
+  /** Close a document and remove its cached diagnostic state. */
   didClose(filePath: string): void {
-    const uri = fileToUri(filePath);
-    const wasOpen = this.openDocs.has(uri);
-
-    this.clearFileState(uri);
-
-    if (!wasOpen || !this.rpc || this._status !== "running") return;
-
-    void this.rpc.sendNotification("textDocument/didClose", {
-      textDocument: { uri } satisfies TextDocumentIdentifier,
-    });
+    this.diagnostics.didClose(filePath);
   }
 
-  /** Prune missing files from open documents and cached diagnostics. */
+  /** Remove missing document and diagnostic state, and return the removed paths. */
   pruneMissingFiles(): string[] {
-    const uris = new Set([...this.openDocs.keys(), ...this.diagnosticStore.keys()]);
-    const removedFiles: string[] = [];
-
-    for (const uri of uris) {
-      const filePath = uriToFile(uri);
-      if (existsSync(filePath)) continue;
-
-      const wasOpen = this.openDocs.has(uri);
-      this.clearFileState(uri);
-      removedFiles.push(filePath);
-
-      if (wasOpen && this.rpc && this._status === "running") {
-        void this.rpc.sendNotification("textDocument/didClose", {
-          textDocument: { uri } satisfies TextDocumentIdentifier,
-        });
-      }
-    }
-
-    return removedFiles;
+    return this.diagnostics.pruneMissingFiles();
   }
 
-  // ── Diagnostics ─────────────────────────────────────────────────────
-  /** Get stored diagnostics for a file. */
+  /** Return stored diagnostics for one file. */
   getDiagnostics(filePath: string): Diagnostic[] {
-    return this.diagnosticStore.get(fileToUri(filePath))?.diagnostics ?? [];
+    return this.diagnostics.getDiagnostics(filePath);
   }
 
-  /**
-   * Get all stored diagnostics across all files.
-   *
-   * Filters out empty entries and — defensively — files that no longer exist
-   * on disk. The latter guards against a race where a `publishDiagnostics`
-   * notification (already in-flight) arrives *after* `pruneMissingFiles()`
-   * has removed the file from `openDocs`, recreating a stale cache entry.
-   */
+  /** Return non-empty diagnostics for files that still exist. */
   getAllDiagnostics(): DiagnosticEntry[] {
-    const result: DiagnosticEntry[] = [];
-    for (const [uri, entry] of this.diagnosticStore) {
-      if (entry.diagnostics.length === 0) continue;
-      // Defensive: drop diagnostics for files deleted after prune. Late
-      // in-flight publishDiagnostics notifications can recreate stale entries.
-      if (!existsSync(uriToFile(uri))) continue;
-      result.push({ uri, diagnostics: entry.diagnostics });
-    }
-    return result;
+    return this.diagnostics.getAllDiagnostics();
   }
 
-  /**
-   * Clear all pull-diagnostic result IDs, forcing full (not `unchanged`)
-   * pull diagnostic responses on the next refresh cycle.
-   *
-   * Use this after file creation/write operations so that cross-file
-   * diagnostics (e.g., `Cannot find module` errors in importing files)
-   * are fully re-computed instead of returned as `unchanged`.
-   */
+  /** Force the next pull refresh to request complete diagnostic reports. */
   clearPullResultIds(): void {
-    for (const entry of this.diagnosticStore.values()) {
-      delete entry.resultId;
-    }
+    this.diagnostics.clearPullResultIds();
   }
 
   /** Check if server supports pull diagnostics. */
@@ -426,46 +333,16 @@ export class LspClient {
     } satisfies DidChangeWatchedFilesParams);
   }
 
-  /**
-   * Re-read and re-sync all currently open, existing documents.
-   * Delegates to client-refresh module.
-   */
+  /** Re-read open documents, then collect pull diagnostics or wait for push diagnostics. */
   async refreshOpenDiagnostics(
     options: { maxWaitMs?: number; quietMs?: number } = {},
   ): Promise<void> {
-    const { refreshClientOpenDiagnostics } = await import("./client-refresh.ts");
-    return refreshClientOpenDiagnostics(this, options);
+    return this.diagnostics.refreshOpenDiagnostics(options);
   }
 
-  /**
-   * Sync a file and wait for diagnostics (up to timeout).
-   * Returns diagnostics for the file.
-   */
+  /** Sync one file and return its diagnostics after pull or push collection. */
   async syncAndWaitForDiagnostics(filePath: string, content: string): Promise<Diagnostic[]> {
-    const uri = fileToUri(filePath);
-    const syncStart = Date.now();
-
-    // Sync the content
-    this.didChange(filePath, content);
-
-    // Prefer pull diagnostics when available, but fall back to push notifications.
-    if (this.hasDiagnosticProvider) {
-      const remaining = DIAGNOSTIC_WAIT_MS - (Date.now() - syncStart);
-      if (remaining > 0) {
-        try {
-          const { pullDiagnosticsForUri } = await import("./client-refresh.ts");
-          const pulled = await pullDiagnosticsForUri(this, uri, remaining);
-          if (pulled) {
-            return this.getDiagnostics(filePath);
-          }
-        } catch {
-          // Pull diagnostics failed — fall back to push wait
-        }
-      }
-    }
-
-    await this.waitForDiagnostics(uri, Math.max(0, DIAGNOSTIC_WAIT_MS - (Date.now() - syncStart)));
-    return this.getDiagnostics(filePath);
+    return this.diagnostics.syncAndWaitForDiagnostics(filePath, content);
   }
 
   // ── LSP Requests ───────────────────────────────────────────────────
@@ -611,78 +488,9 @@ export class LspClient {
     return items.map(() => null);
   }
 
-  private handlePublishDiagnostics(params: PublishDiagnosticsParams): void {
-    // If the publication includes a version and we have a newer synced
-    // version for this open document, ignore the stale publication.
-    if (params.version !== undefined && params.version !== null) {
-      const openDoc = this.openDocs.get(params.uri);
-      if (openDoc && params.version < openDoc.version) {
-        return;
-      }
-    }
-
-    this.diagnosticStore.set(params.uri, {
-      diagnostics: params.diagnostics,
-      receivedAt: Date.now(),
-      version: params.version ?? undefined,
-    });
-    this.releaseDiagnosticWaiters(params.uri);
-  }
-
-  /** Wait for diagnostics on a URI, resolving on publication or timeout. */
-  private waitForDiagnostics(uri: string, timeoutMs: number): Promise<void> {
-    if (timeoutMs <= 0) return Promise.resolve();
-
-    return new Promise<void>((resolve) => {
-      const waiter = () => {
-        clearTimeout(timer);
-        this.removeDiagnosticWaiter(uri, waiter);
-        resolve();
-      };
-      const timer = setTimeout(() => {
-        this.removeDiagnosticWaiter(uri, waiter);
-        resolve();
-      }, timeoutMs);
-      const waiters = this.diagnosticWaiters.get(uri) ?? [];
-      waiters.push(waiter);
-      this.diagnosticWaiters.set(uri, waiters);
-    });
-  }
-
-  /** Clear all per-file state and wake any diagnostics callers waiting on this URI. */
-  private clearFileState(uri: string): void {
-    this.openDocs.delete(uri);
-    this.diagnosticStore.delete(uri);
-    this.releaseDiagnosticWaiters(uri);
-  }
-
-  /** Remove a single pending diagnostics waiter, usually after its timeout fires. */
-  private removeDiagnosticWaiter(uri: string, waiter: () => void): void {
-    const waiters = this.diagnosticWaiters.get(uri);
-    if (!waiters) return;
-
-    const next = waiters.filter((entry) => entry !== waiter);
-    if (next.length > 0) {
-      this.diagnosticWaiters.set(uri, next);
-    } else {
-      this.diagnosticWaiters.delete(uri);
-    }
-  }
-
-  /** Wake every pending diagnostics waiter during shutdown or bulk cleanup. */
-  private releaseAllDiagnosticWaiters(): void {
-    for (const uri of Array.from(this.diagnosticWaiters.keys())) {
-      this.releaseDiagnosticWaiters(uri);
-    }
-  }
-
-  /** Wake all diagnostics waiters for a URI and remove them from the waiter map. */
-  private releaseDiagnosticWaiters(uri: string): void {
-    const waiters = this.diagnosticWaiters.get(uri);
-    if (!waiters) return;
-
-    this.diagnosticWaiters.delete(uri);
-    for (const waiter of waiters) waiter();
+  /** Apply a diagnostic publication received from the LSP transport. */
+  handlePublishDiagnostics(params: PublishDiagnosticsParams): void {
+    this.diagnostics.handlePublishDiagnostics(params);
   }
 
   // ── Readiness (work-done-progress) ──────────────────────────────────
