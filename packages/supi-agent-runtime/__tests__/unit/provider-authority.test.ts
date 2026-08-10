@@ -69,7 +69,11 @@ describe("createAgentRunProviderAuthority", () => {
     const registry = {
       getProvider: vi.fn(() => parentProvider),
       getProviderAuth: vi.fn(async () => ({ auth: { apiKey: "runtime-key" } })),
-      getApiKeyAndHeaders: vi.fn(async () => ({ ok: true as const, apiKey: "runtime-key" })),
+      getApiKeyAndHeaders: vi.fn(async () => ({
+        ok: true as const,
+        apiKey: "runtime-key",
+        headers: { "x-parent": null },
+      })),
     };
     const run = startAgentRun({
       inputs: inputs(undefined, {
@@ -93,7 +97,7 @@ describe("createAgentRunProviderAuthority", () => {
       name: parentProvider.name,
     });
     await expect(createOptions.modelRuntime?.getAuth(model)).resolves.toMatchObject({
-      auth: { apiKey: "runtime-key" },
+      auth: { apiKey: "runtime-key", headers: { "x-parent": null } },
     });
     expect(harness.runtime.dispose).toHaveBeenCalledTimes(1);
   });

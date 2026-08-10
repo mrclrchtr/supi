@@ -5,6 +5,7 @@ import {
   InMemoryModelsStore,
   type Model,
   type Provider,
+  type ProviderHeaders,
 } from "@earendil-works/pi-ai";
 import { type ModelRegistry, ModelRuntime } from "@earendil-works/pi-coding-agent";
 
@@ -20,7 +21,7 @@ export interface AgentRunProviderAuthority {
 
 /** Model-specific request auth returned by PI's compatibility registry facade. */
 export type AgentRunRequestAuth =
-  | { ok: true; apiKey?: string; headers?: Record<string, string>; env?: Record<string, string> }
+  | { ok: true; apiKey?: string; headers?: ProviderHeaders; env?: Record<string, string> }
   | { ok: false; error: string };
 
 /** Adapt PI's public model registry to the narrow Agent Run authority interface. */
