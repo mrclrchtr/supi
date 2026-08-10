@@ -10,8 +10,6 @@ Source stays flat per convention. Tests are organized into `__tests__/unit/`.
 
 ```
 src/
-├── api.ts            # Re-export surface
-├── index.ts          # Package-root re-exports
 ├── extension.ts      # PI extension entrypoint
 ├── insights.ts       # Extension factory — registers /supi-insights and settings
 ├── aggregator.ts     # Pure data aggregation + multi-clauding detection

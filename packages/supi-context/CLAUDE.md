@@ -4,8 +4,7 @@ Observability for how a pi session occupies and approaches its context-window li
 
 ## Scope
 
-- `@mrclrchtr/supi-context/extension` → `src/extension.ts`
-- `@mrclrchtr/supi-context/api` → `src/api.ts`
+`@mrclrchtr/supi-context/extension` → `src/extension.ts`
 
 ## Concepts and surfaces
 

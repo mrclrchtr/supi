@@ -28,20 +28,6 @@
     "src/**/*.ts",
     "!__tests__"
   ],
-  "dependencies": {
-    "@mrclrchtr/supi-core": "workspace:*"
-  },
-  "bundledDependencies": [
-    "@mrclrchtr/supi-core"
-  ],
-  "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*"
-  },
-  "peerDependenciesMeta": {
-    "@earendil-works/pi-coding-agent": {
-      "optional": true
-    }
-  },
   "devDependencies": {
     "@types/node": "25.9.5",
     "vitest": "4.1.10"

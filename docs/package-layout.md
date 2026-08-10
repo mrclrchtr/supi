@@ -35,7 +35,7 @@ packages/<pkg>/
 Notes:
 - `src/api.ts` exists **only** when the package exposes a reusable `/api` surface — omit it for packages with no library API.
   When present, it must re-export actual API symbols (types, utilities), never the extension factory function.
-- `src/index.ts` is the package-root re-export surface.
+- `src/index.ts` exists when a package exports a package-root (`.`) surface or uses the file as its package centerpiece. Omit pass-through indexes that only duplicate `api.ts` or `extension.ts`.
 - `src/extension.ts` exists when the package installs into pi.
 - `<main>.ts` is the package centerpiece, usually named after the package or primary tool.
 - `__tests__/unit` and `__tests__/integration` are the default test buckets once a package has more than a trivial number of tests.
@@ -125,7 +125,7 @@ When multiple SuPi packages need the same path, URI, config, or session helper s
 | `supi-debug` | stay flat unless it grows; optional `ui/` if renderer concerns expand |
 | `supi-extras` | mostly flat; split only if coherent domains emerge |
 | `supi-insights` | flat source is fine; move tests to package-level `__tests__/unit/` |
-| `supi-lsp` | hybrid large-package layout with `config/`, `client/`, `manager/`, `diagnostics/`, `tool/`, `ui/`, `session/` |
+| `supi-lsp` | hybrid large-package layout with `client/`, `config/`, `diagnostics/`, `manager/`, `provider/`, `session/` |
 | `supi-review` | likely hybrid with `ui/` and `tool/` if reorganized |
 | `supi-test-utils` | stay flat utility package |
 | `supi-tree-sitter` | hybrid: root surfaces + `tool/` + `session/` |
@@ -144,15 +144,15 @@ Use the hybrid structure below without forcing every file into a folder:
 ```text
 src/
   api.ts
-  index.ts
-  extension.ts
-  lsp.ts
-  config/
+  coordinates.ts
+  pattern-matcher.ts
+  summary.ts
+  utils.ts
   client/
-  manager/
+  config/
   diagnostics/
-  tool/
-  ui/
+  manager/
+  provider/
   session/
 ```
 

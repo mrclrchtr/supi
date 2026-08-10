@@ -25,8 +25,6 @@ Stays flat per convention — no domain folders until responsibilities grow.
 | `src/renderer.ts` | Custom message renderer for `supi-debug-report` type |
 | `src/session-events.ts` | Session-JSONL persistence and historical event reading |
 | `src/status-log.ts` | Optional load-status logging (`$SUPI_LOG_STATUS`) |
-| `src/api.ts` | Entry point re-exporting `src/debug.ts` default |
-| `src/index.ts` | Package-root re-export surface |
 | `src/extension.ts` | Pi extension entry, re-exports `src/debug.ts` default |
 | `__tests__/unit/` | Unit tests |
 | `__tests__/helpers/` | Shared test utilities |

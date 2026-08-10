@@ -187,13 +187,6 @@ importers:
         version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.1(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-code-runtime:
-    dependencies:
-      '@earendil-works/pi-coding-agent':
-        specifier: '*'
-        version: 0.84.1(ws@8.21.3)(zod@4.4.3)
-      '@mrclrchtr/supi-core':
-        specifier: workspace:*
-        version: link:../supi-core
     devDependencies:
       '@types/node':
         specifier: 25.9.5
@@ -521,9 +514,6 @@ importers:
       '@mozilla/readability':
         specifier: ^0.6.0
         version: 0.6.0
-      '@mrclrchtr/supi-core':
-        specifier: workspace:*
-        version: link:../supi-core
       jsdom:
         specifier: ^30.0.0
         version: 30.0.1

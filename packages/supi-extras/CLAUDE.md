@@ -8,7 +8,6 @@ Source stays flat per convention. Tests are organized into `unit/` and `integrat
 
 ```
 src/
-├── api.ts
 ├── index.ts
 ├── extension.ts
 ├── aliases.ts

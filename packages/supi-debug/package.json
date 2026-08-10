@@ -66,9 +66,7 @@
     ],
     "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-debug/assets/social-preview.png"
   },
-  "main": "src/api.ts",
   "exports": {
-    "./api": "./src/api.ts",
     "./extension": "./src/extension.ts",
     "./package.json": "./package.json"
   }

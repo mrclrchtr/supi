@@ -8,7 +8,7 @@
 
 import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
-import { formatEvidenceBadge } from "@mrclrchtr/supi-code-runtime/api";
+import { formatEvidenceBadge } from "@mrclrchtr/supi-core/evidence-badge";
 
 // ── Result type ──────────────────────────────────────────────────
 

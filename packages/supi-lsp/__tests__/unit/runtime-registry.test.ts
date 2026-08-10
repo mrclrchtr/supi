@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getWorkspaceLspRuntime } from "../../src/index.ts";
+import { getWorkspaceLspRuntime } from "../../src/api.ts";
 import type { LspManager } from "../../src/manager/manager.ts";
 import {
   clearWorkspaceLspRuntime,

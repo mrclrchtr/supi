@@ -1,4 +1,3 @@
-export { default } from "./ask-user.ts";
 export { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
 export { AskUserParamsSchema } from "./schema.ts";
 export { AskUserController } from "./session/controller.ts";

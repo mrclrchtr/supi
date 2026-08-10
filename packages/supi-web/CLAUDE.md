@@ -7,7 +7,7 @@ query library documentation via Context7 using `web_docs_search` + `web_docs_fet
 
 `@mrclrchtr/supi-web` now has two explicit surfaces:
 - `@mrclrchtr/supi-web/extension` → `src/extension.ts` registers all three tools
-- `@mrclrchtr/supi-web/api` → `src/api.ts` / `src/index.ts` exposes the programmatic helpers
+- `@mrclrchtr/supi-web/api` → `src/api.ts` exposes the programmatic helpers
 
 The package registers three agent-callable tools:
 
@@ -31,7 +31,6 @@ src/
 │   ├── tool-specs.ts # single source of truth for tool metadata, schemas, and input types
 │   ├── guidance.ts   # prompt surfaces derived from specs (+ runtime gh guidance)
 │   └── output.ts     # model-visible truncation helpers
-└── index.ts           # Programmatic API exports reused by src/api.ts
 ```
 
 ## Content negotiation pipeline (web_fetch_md)

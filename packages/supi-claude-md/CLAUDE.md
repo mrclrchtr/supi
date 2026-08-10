@@ -12,7 +12,6 @@ Runtime instruction-file surfacing is owned by `@mrclrchtr/supi-code-intelligenc
 
 - `src/claude-md.ts`: resource-discovery-only extension entry point
 - `src/extension.ts`: package extension export
-- `src/index.ts` / `src/api.ts`: package re-export surfaces
 - `skills/claude-md-improver`: bulk audit and scoring workflow for CLAUDE.md files
 - `skills/claude-md-revision`: targeted session-capture additions to CLAUDE.md/AGENTS.md
 

@@ -2,12 +2,10 @@
  * Public API surface for @mrclrchtr/supi-code-runtime.
  *
  * This package exports shared canonical types, capability interfaces,
- * workspace runtime primitives, and typed request context helpers.
+ * and workspace runtime primitives.
  * It is a library-only package with no pi extension entrypoint.
  */
 
-// Evidence display — re-exported from supi-core
-export { type EvidenceBadgeInput, formatEvidenceBadge } from "@mrclrchtr/supi-core/evidence-badge";
 // Capability interfaces and availability states
 export type {
   CapabilityState,
@@ -47,9 +45,6 @@ export type {
   SourceRange,
   WorkspaceEdit,
 } from "./types.ts";
-export type { WorkspaceContext } from "./workspace/context.ts";
-// Workspace context
-export { createWorkspaceContext } from "./workspace/context.ts";
 export type { WorkspaceCapabilities } from "./workspace/runtime.ts";
 // Workspace runtime
 export { getDefaultWorkspaceRuntime, WorkspaceRuntime } from "./workspace/runtime.ts";

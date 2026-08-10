@@ -12,7 +12,7 @@ This is a **library-only package** — it has no pi extension surface, no user-f
 
 ## Package surfaces
 
-- `@mrclrchtr/supi-code-runtime/api` — shared canonical types, capability interfaces, workspace runtime registry, and typed request context
+- `@mrclrchtr/supi-code-runtime/api` — shared canonical types, capability interfaces, and the workspace runtime registry
 
 Read-only provider methods return `CodeQueryResult<T>`:
 

@@ -4,7 +4,6 @@
 
 export type { Context7RequestOptions } from "./context7-client.ts";
 export { htmlToMarkdown, wrapAsCodeBlock } from "./convert.ts";
-export { default as docsExtension } from "./docs.ts";
 export {
   FetchError,
   type FetchOptions,
@@ -21,4 +20,3 @@ export {
   type WebFetchMdInput,
   type WebToolName,
 } from "./tool/tool-specs.ts";
-export { default } from "./web.ts";
