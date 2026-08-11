@@ -7,7 +7,7 @@
 
 import { readFileSync } from "node:fs";
 import type { FileEdit, WorkspaceEdit } from "@mrclrchtr/supi-code-runtime/api";
-import { compareCodePositions } from "./position.ts";
+import { compareCodePositions, createLogicalLineIndex, type LogicalLineIndex } from "./position.ts";
 
 export type ValidationResult = { safe: true } | { safe: false; reason: string };
 
@@ -76,12 +76,12 @@ export function validateEditAgainstFiles(edit: WorkspaceEdit): ValidationResult 
       };
     }
 
-    const lines = content.split("\n");
+    const lineIndex = createLogicalLineIndex(content);
     for (const fileEdit of fileEdits) {
-      const lineValidation = validateLineBounds(file, fileEdit, lines);
+      const lineValidation = validateLineBounds(file, fileEdit, lineIndex);
       if (!lineValidation.safe) return lineValidation;
 
-      const characterValidation = validateCharacterBounds(file, fileEdit, lines);
+      const characterValidation = validateCharacterBounds(file, fileEdit, lineIndex);
       if (!characterValidation.safe) return characterValidation;
     }
   }
@@ -89,19 +89,27 @@ export function validateEditAgainstFiles(edit: WorkspaceEdit): ValidationResult 
   return { safe: true };
 }
 
-function validateLineBounds(file: string, edit: FileEdit, lines: string[]): ValidationResult {
-  const maxLine = lines.length - 1;
+function validateLineBounds(
+  file: string,
+  edit: FileEdit,
+  lineIndex: LogicalLineIndex,
+): ValidationResult {
+  const maxLine = lineIndex.lineCount - 1;
   if (edit.range.start.line > maxLine || edit.range.end.line > maxLine) {
     return {
       safe: false,
-      reason: `Edit in file "${file}" references line ${Math.max(edit.range.start.line, edit.range.end.line)}, but the file has only ${lines.length} line${lines.length === 1 ? "" : "s"}`,
+      reason: `Edit in file "${file}" references line ${Math.max(edit.range.start.line, edit.range.end.line)}, but the file has only ${lineIndex.lineCount} line${lineIndex.lineCount === 1 ? "" : "s"}`,
     };
   }
   return { safe: true };
 }
 
-function validateCharacterBounds(file: string, edit: FileEdit, lines: string[]): ValidationResult {
-  const startLineLength = lines[edit.range.start.line]?.length ?? 0;
+function validateCharacterBounds(
+  file: string,
+  edit: FileEdit,
+  lineIndex: LogicalLineIndex,
+): ValidationResult {
+  const startLineLength = lineIndex.lineLength(edit.range.start.line) ?? 0;
   if (edit.range.start.character > startLineLength) {
     return {
       safe: false,
@@ -109,7 +117,7 @@ function validateCharacterBounds(file: string, edit: FileEdit, lines: string[]):
     };
   }
 
-  const endLineLength = lines[edit.range.end.line]?.length ?? 0;
+  const endLineLength = lineIndex.lineLength(edit.range.end.line) ?? 0;
   if (edit.range.end.character > endLineLength) {
     return {
       safe: false,

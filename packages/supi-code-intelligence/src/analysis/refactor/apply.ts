@@ -16,7 +16,7 @@ import { readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:
 import { basename, dirname, join } from "node:path";
 import { withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import type { FileEdit, WorkspaceEdit } from "@mrclrchtr/supi-code-runtime/api";
-import { compareCodePositions } from "./position.ts";
+import { compareCodePositions, createLogicalLineIndex } from "./position.ts";
 import { validateEditAgainstFiles } from "./safety.ts";
 
 export type ApplyResult =
@@ -158,18 +158,21 @@ function buildTransformedContents(
 }
 
 function applyEditsToContent(content: string, edits: FileEdit[]): string {
-  const lines = content.split("\n");
-  const sortedEdits = [...edits].sort(
-    (left, right) =>
-      // Descending by start position so later edits don't shift earlier ones.
-      compareCodePositions(right.range.start, left.range.start) ||
-      compareCodePositions(right.range.end, left.range.end),
-  );
+  const lineIndex = createLogicalLineIndex(content);
+  const sortedEdits = edits
+    .map((edit, protocolIndex) => ({ edit, protocolIndex }))
+    .sort(
+      (left, right) =>
+        // Descending positions prevent shifts. Reverse protocol order at one
+        // position so sequential inserts appear in their supplied order.
+        compareCodePositions(right.edit.range.start, left.edit.range.start) ||
+        right.protocolIndex - left.protocolIndex,
+    );
 
   let updated = content;
-  for (const fileEdit of sortedEdits) {
-    const startOffset = toOffset(lines, fileEdit.range.start.line, fileEdit.range.start.character);
-    const endOffset = toOffset(lines, fileEdit.range.end.line, fileEdit.range.end.character);
+  for (const { edit: fileEdit } of sortedEdits) {
+    const startOffset = lineIndex.offsetAt(fileEdit.range.start);
+    const endOffset = lineIndex.offsetAt(fileEdit.range.end);
     updated = updated.slice(0, startOffset) + fileEdit.newText + updated.slice(endOffset);
   }
 
@@ -264,14 +267,6 @@ function rollbackCommittedFiles(
   } catch (error) {
     return toErrorMessage(error);
   }
-}
-
-function toOffset(lines: string[], line: number, character: number): number {
-  let offset = 0;
-  for (let index = 0; index < line && index < lines.length; index++) {
-    offset += lines[index].length + 1;
-  }
-  return offset + character;
 }
 
 function toErrorMessage(error: unknown): string {
