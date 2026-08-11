@@ -146,6 +146,16 @@ describe("GhostTextEditor input handling", () => {
     expect(cbs.onAccept).toHaveBeenCalledWith("suggest");
   });
 
+  it("accepts suggestion on Tab", () => {
+    const cbs = makeCallbacks();
+    const editor = makeEditor(cbs);
+    editor.setSuggestion("suggest");
+
+    editor.handleInput("\t");
+    expect(cbs.onAccept).toHaveBeenCalledWith("suggest");
+    expect(cbs.onDismiss).not.toHaveBeenCalled();
+  });
+
   it("inserts the full suggestion after a wrapped preview", () => {
     const cbs = makeCallbacks();
     const editor = makeEditor(cbs);
