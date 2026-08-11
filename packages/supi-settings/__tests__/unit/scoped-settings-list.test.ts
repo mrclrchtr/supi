@@ -80,6 +80,54 @@ describe("ScopedSettingsList", () => {
     expect(rendered).toContain("Controls the test feature");
   });
 
+  it("keeps its height stable when a section header enters the viewport", () => {
+    const alphaRows = Array.from({ length: 11 }, (_, index) =>
+      settingsRow({ ...field, key: `alpha-${index}`, label: `Alpha ${index}` }),
+    );
+    const betaRows = [settingsRow({ ...field, key: "beta", label: "Beta" })];
+    const alpha = { ...makeModule(alphaRows), id: "alpha", label: "Alpha section" };
+    const beta = { ...makeModule(betaRows), id: "beta", label: "Beta section" };
+    const list = new ScopedSettingsList(
+      [alpha, beta],
+      [loaded(alpha, alphaRows), loaded(beta, betaRows)],
+      "project",
+      "/repo",
+      undefined,
+      makeTheme() as never,
+      { requestRender: vi.fn() },
+      vi.fn(),
+    );
+
+    const firstLines = list.render(80);
+    for (let index = 0; index < 7; index++) list.handleInput("\u001b[B");
+    const laterLines = list.render(80);
+
+    expect(firstLines.join("\n")).not.toContain("Beta section");
+    expect(laterLines.join("\n")).toContain("Beta section");
+    expect(laterLines).toHaveLength(firstLines.length);
+  });
+
+  it("keeps its height stable and limits long descriptions", () => {
+    const rows = [
+      settingsRow({
+        ...field,
+        key: "described",
+        label: "Described",
+        description:
+          "This description has enough words to use more than four lines in a narrow menu and must end with an ellipsis.",
+      }),
+      settingsRow({ ...field, key: "plain", label: "Plain" }),
+    ];
+    const list = makeList(makeModule(rows), rows);
+
+    const describedLines = list.render(30);
+    list.handleInput("\u001b[B");
+    const plainLines = list.render(30);
+
+    expect(describedLines.join("\n")).toContain("…");
+    expect(plainLines).toHaveLength(describedLines.length);
+  });
+
   it("awaits asynchronous persistence before reading a fresh snapshot", async () => {
     let finish: (() => void) | undefined;
     const rows = [settingsRow()];

@@ -1,14 +1,7 @@
 // Source-aware settings list with scope actions and custom submenus.
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import {
-  Input,
-  Key,
-  matchesKey,
-  truncateToWidth,
-  visibleWidth,
-  wrapTextWithAnsi,
-} from "@earendil-works/pi-tui";
+import { Input, Key, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { SettingsAction, SettingsModule, SettingsScope } from "@mrclrchtr/supi-core/settings";
 import type { ThemeAccessor } from "./settings-action-menu.ts";
 import {
@@ -16,8 +9,14 @@ import {
   createActionMenuComponent,
   getConcreteChoices,
 } from "./settings-action-menu.ts";
+import { renderDescriptionViewport } from "./settings-list-layout.ts";
 import { type LoadedSettingsModule, readSettingsModules } from "./settings-module-reader.ts";
-import { filterSettingsRows, rowsFromModules, type ScopedRow } from "./settings-row-model.ts";
+import {
+  filterSettingsRows,
+  maxVisibleSectionCount,
+  rowsFromModules,
+  type ScopedRow,
+} from "./settings-row-model.ts";
 import { createInputSubmenu, createModelPickerSubmenu } from "./settings-submenus.ts";
 
 interface SubmenuState {
@@ -27,7 +26,6 @@ interface SubmenuState {
     handleInput?: (data: string) => void;
   };
 }
-
 export class ScopedSettingsList {
   private modules: SettingsModule[];
   private scope: SettingsScope;
@@ -139,6 +137,7 @@ export class ScopedSettingsList {
       Math.max(...displayRows.map((row) => visibleWidth(row.field.field.label))),
     );
     let previousSection: string | undefined;
+    let visibleSectionCount = 0;
     for (let i = start; i < end; i++) {
       const row = displayRows[i];
       if (!row) continue;
@@ -146,6 +145,7 @@ export class ScopedSettingsList {
         lines.push(
           truncateToWidth(`  ${this.theme.fg("muted", this.theme.bold(row.moduleLabel))}`, width),
         );
+        visibleSectionCount++;
         previousSection = row.moduleLabel;
       }
       const isSelected = i === this.selectedIndex;
@@ -159,14 +159,16 @@ export class ScopedSettingsList {
       const valueText = this.theme.fg(isSelected ? "accent" : "muted", value);
       lines.push(truncateToWidth(`${prefix}${labelText}  ${valueText}`, width));
     }
+    const reservedSectionCount = maxVisibleSectionCount(displayRows, maxVisible);
+    for (let i = visibleSectionCount; i < reservedSectionCount; i++) lines.push("");
     if (start > 0 || end < displayRows.length) {
       lines.push(this.theme.fg("dim", `  (${this.selectedIndex + 1}/${displayRows.length})`));
     }
     const description = displayRows[this.selectedIndex]?.field.field.description;
-    if (description) {
+    if (displayRows.some((row) => row.field.field.description)) {
       lines.push("");
-      for (const line of wrapTextWithAnsi(description, Math.max(1, width - 4))) {
-        lines.push(this.theme.fg("dim", `  ${line}`));
+      for (const line of renderDescriptionViewport(description, width)) {
+        lines.push(line ? this.theme.fg("dim", `  ${line}`) : "");
       }
     }
     lines.push("");
