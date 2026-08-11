@@ -67,7 +67,7 @@ export class GhostTextEditor extends CustomEditor {
     if (this.suggestion && !this.isSuppressed) {
       // Use PI's matchesKey (not raw escape sequences) — it handles
       // CSI (\x1b[C), SS3 (\x1bOC), and Kitty keyboard protocol correctly.
-      if (matchesKey(data, "right")) {
+      if (matchesKey(data, "right") || matchesKey(data, "tab")) {
         this.insertTextAtCursor(this.suggestion);
         this.callbacks.onAccept(this.suggestion);
         this.clearGhost();

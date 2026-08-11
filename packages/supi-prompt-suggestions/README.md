@@ -34,7 +34,7 @@ Suggestions only appear when:
 
 | Key | Action |
 |-----|--------|
-| `→` / Right Arrow | Accept the suggestion into the editor without submitting it |
+| `→` / Right Arrow / `Tab` | Accept the suggestion into the editor without submitting it |
 | `Esc` | Dismiss the visible suggestion |
 | Any text input | Hide the suggestion and continue typing |
 | Delete all editor text | Restore the hidden suggestion |
