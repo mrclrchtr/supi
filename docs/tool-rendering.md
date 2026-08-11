@@ -100,4 +100,4 @@ PI users know `ctrl+o` expands/collapses tool output. Including a `keyHint("app.
 
 - **Simple text tools**: `packages/supi-web/src/tool/render.ts` — `renderToolCall` and `renderCollapsibleTextResult`
 - **Structured widget tools**: `packages/supi-code-intelligence/src/presentation/tui/` — per-tool renderers sharing `common.ts` (`renderSimpleResult`, `renderEvidenceLines`, `renderMarkdownDetail`)
-- **Fullscreen interactive**: `packages/supi-ask-user/src/ask-user.ts` — `renderShell: "self"`, exempt from this convention
+- **Blocking interactive form**: `packages/supi-ask-user/src/ui/form.ts` opens a custom TUI component during tool execution; `packages/supi-ask-user/src/render/transcript.ts` follows the details contract for transcript rendering

@@ -6,19 +6,17 @@
 
 # @mrclrchtr/supi-ask-user — Ask-User Tool for Pi
 
-Adds a structured ask-user tool to the [Pi coding agent](https://github.com/earendil-works/pi) for moments when it needs your input before continuing.
+Adds `ask_user`, a structured decision-form tool for the [Pi coding agent](https://github.com/earendil-works/pi). The agent can stop at one decision, show a keyboard form, and continue with structured answers.
 
-Instead of guessing or scattering questions across chat, the agent can pause, present one focused form, and resume with structured answers.
+## What it adds
 
-## What you and your agent get
-
-- **One decision handoff** — combine up to ten related questions in one blocking form rather than interrupting repeatedly.
-- **Choice and text questions** — choose one option, select several, or write a free-form answer.
-- **Useful recommendations** — the agent can preselect or prefill a suggested answer without preventing you from changing it.
-- **Trade-offs beside the options** — focused options can show descriptions, consequences, code samples, or other decision context.
-- **Comments at every level** — explain an answer, annotate an option you selected or rejected, or leave context for the whole form.
-- **Review before submission** — inspect every answer, edit any question, and see unanswered items before sending the decision back.
-- **A structured outcome** — complete forms return `submitted`; forms with unanswered questions return `needs_discussion` so the agent follows up instead of assuming.
+- **One focused decision** — one blocking form contains 1-10 related questions.
+- **Choice and text questions** — choose one option, choose multiple options, or enter free-form text.
+- **Recommendations** — the agent can select or prefill a suggested answer. You can change it.
+- **Option context** — focused options can show descriptions, trade-offs, consequences, or code samples.
+- **Comments at each level** — add a form comment, a question comment, or a comment on a selected or unselected option.
+- **Review before submission** — inspect each answer, edit a question, and see unanswered items.
+- **Structured results** — complete forms return `submitted`. Forms with unanswered questions return `needs_discussion`.
 
 ## Example requests
 
@@ -39,7 +37,7 @@ The agent is also guided to use `ask_user` only after inspecting what it can ins
 4. The review screen lets you edit the form before submitting.
 5. The agent receives ordered, structured responses and continues from your decision.
 
-Completed forms are labeled `decision` in Pi's session tree. The result remains available in chat history; press `Ctrl+O` to expand it for read-only review.
+Completed forms have the `decision` label in Pi's session tree. The result remains in chat history. Use the `app.tools.expand` keybinding (`Ctrl+O` by default) to expand it for read-only review.
 
 ## See it in action
 
@@ -74,37 +72,121 @@ Completed forms are labeled `decision` in Pi's session tree. The result remains 
 
 ## Install
 
+This package is in the recommended SuPi release stack. SuPi is pre-release.
+
+Install it globally:
+
 ```bash
 pi install npm:@mrclrchtr/supi-ask-user
 ```
 
-To try it for one run without installing:
+Install it for one project:
+
+```bash
+pi install npm:@mrclrchtr/supi-ask-user -l
+```
+
+Try it for one run without a persistent install:
 
 ```bash
 pi -e npm:@mrclrchtr/supi-ask-user
 ```
 
-## Keyboard essentials
+## Keyboard controls
 
-The form always shows context-specific key hints at the bottom.
+The form shows context-specific key hints at the bottom.
 
 | Key | Action |
 |---|---|
 | `↑` `↓` | Move through choices or review rows |
 | `Space` | Select a single choice or toggle a multi-select option |
-| `Enter` | Accept the current answer, save text/comments, or submit from review |
+| `Enter` | Accept an answer, save text or comments, edit a review row, or submit the form |
+| `←` `→` | Move between choice questions; `←` returns from review |
 | `Tab` / `Shift+Tab` | Move forward or backward between questions |
-| `c` / `Alt+C` | Comment on the current question (`Alt+C` in text questions) |
+| `c` / `Alt+C` | Comment on the current question (`Alt+C` for text questions) |
 | `n` | Comment on the focused choice option |
-| `u` / `Alt+U` | Deliberately mark the question unanswered (`Alt+U` in text questions) |
-| `Esc` | Cancel the form; inside a comment editor, discard unsaved comment edits |
+| `u` / `Alt+U` | Mark the question unanswered (`Alt+U` for text questions) |
+| `Esc` | Cancel the form; in a comment editor, discard unsaved comment text |
 
-On wide terminals, option details appear beside the choices; on narrow terminals, they stack underneath.
+On wide terminals, option details appear beside the choices. On narrow terminals, they appear below the choices.
 
-## Good to know
+## Requirements, defaults, and limits
 
-- `ask_user` requires Pi's interactive TUI; there is no degraded non-interactive form.
-- Only one form can be active; sibling tool calls do not run beside a live form.
-- Cancelling a form cancels the current agent turn rather than recording a fake answer.
-- All questions are expected for a complete submission, but you can mark any question unanswered to request discussion.
-- Ask User reuses your configured Pi editor for text and comments when compatible, with the default editor as a fallback.
+- `ask_user` requires Pi's interactive TUI and custom component support. It does not run in RPC, JSON, or print mode.
+- The package needs no additional binary, service, or API key.
+- Only one form can be active. The tool uses sequential execution, so sibling tool calls do not run beside a live form.
+- Cancelling a form cancels the current agent turn. It does not record a user response.
+- All questions are expected for a complete submission. Mark a question unanswered to request discussion.
+- A form contains 1-10 questions. A choice question contains 2-12 options with unique values.
+- If a single-choice question has no recommendation, the first option is selected. A multi-select question has no selection by default.
+- Titles can contain 120 characters. Headers can contain 60 characters. Intros and prompts can contain 4,000 characters. Text placeholders can contain 200 characters.
+- Ask User reuses a compatible Pi custom editor for text and comments. It uses the default editor if the custom editor is not compatible.
+- The model-visible result is limited to Pi's default 2,000 lines or 50 KB. The structured result remains available in the session transcript.
+
+## Model guidance configuration
+
+You can change the model-facing tool description, prompt snippet, and guidelines. This configuration changes the instructions that Pi sends to the model. It does not change form behavior.
+
+Use `~/.pi/agent/supi/config.json` for global configuration or `.pi/supi/config.json` for project configuration:
+
+```json
+{
+  "ask-user": {
+    "tools": {
+      "ask_user": {
+        "promptSurface": {
+          "appendPromptGuidelines": [
+            "Use ask_user for release decisions that need maintainer approval."
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+The extension applies package defaults, then global values, then trusted project values. It ignores project prompt overrides unless Pi trusts the project and finds a trust-requiring project resource, such as `.pi/settings.json`.
+
+`promptSurface` accepts `description`, `promptSnippet`, `promptGuidelines`, `prependPromptGuidelines`, and `appendPromptGuidelines`. Use `$reset` with an array of `description`, `promptSnippet`, or `promptGuidelines` to restore those fields to package defaults. Run `/reload` after you edit the file.
+
+## Public API
+
+The package also provides a headless TypeScript API. Install the package and its schema dependency with your package manager:
+
+```bash
+pnpm add @mrclrchtr/supi-ask-user typebox
+```
+
+Import the explicit API subpath:
+
+```ts
+import {
+  AskUserController,
+  normalizeQuestionnaire,
+  type AskUserOutcome,
+} from "@mrclrchtr/supi-ask-user/api";
+
+const questionnaire = normalizeQuestionnaire({
+  questions: [
+    {
+      type: "text",
+      id: "notes",
+      header: "Notes",
+      prompt: "What must the agent know?",
+    },
+  ],
+});
+
+const controller = new AskUserController(questionnaire);
+const outcome: AskUserOutcome = controller.outcome();
+```
+
+The API exports `AskUserParamsSchema`, `normalizeQuestionnaire`, `AskUserValidationError`, and `AskUserController`. It also exports types for normalized questions, responses, outcomes, tool details, and cancel or abort interaction results. The package root is not an import surface. Use `/api` for the library or `/extension` for the Pi extension entrypoint.
+
+The package ships TypeScript source. A standalone consumer must use a runtime or build tool that can load TypeScript.
+
+## Privacy and security
+
+Pi stores the tool result in the session. The active model receives a text summary of answers and comments. This package does not send a separate network request or start an external process.
+
+Like all Pi extensions, this package runs with your user permissions. Review the package source before installation.
