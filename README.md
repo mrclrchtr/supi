@@ -2,7 +2,7 @@
 
 # SuPi — Extension Stack for the Pi Coding Agent
 
-SuPi (short for **Super Pi**) is an open-source TypeScript extension stack for the [Pi coding agent](https://github.com/earendil-works/pi). It adds LSP and Tree-sitter code intelligence, semantic refactoring, parallel code review, web and Context7 documentation access, structured ask-user forms, and context/cache observability.
+SuPi (short for **Super Pi**) is an open-source TypeScript extension stack for the [Pi coding agent](https://github.com/earendil-works/pi). It adds LSP and Tree-sitter code intelligence, semantic refactoring, parallel code review, web and Context7 documentation access, structured ask-user forms, scoped skill controls, quick skill input, and context/cache observability.
 
 Install the recommended stack or pick only the packages you need. You keep prompting Pi normally; SuPi gives the agent additional tools and context it can use directly.
 
@@ -31,6 +31,7 @@ Tree-sitter support is bundled. Full LSP features require the matching language-
 - **Review workflows** — run independent, inspection-only reviews over a working tree, branch comparison, or commit with [`supi-review`](packages/supi-review/README.md).
 - **Operational awareness** — inspect context pressure, prompt-cache health, and SuPi debug events with `supi-context`, `supi-cache`, and `supi-debug`.
 - **Repository guidance** — maintain `CLAUDE.md` and `AGENTS.md` files with the skills in [`supi-claude-md`](packages/supi-claude-md/README.md).
+- **Skills on your terms** — use [`supi-skills`](packages/supi-skills/README.md) to choose, globally or per project, whether Pi can select each skill automatically, whether only you can start it, or whether it is disabled. Type `$` to search and start installed skills without remembering their full command names.
 - **Session polish** — prompt stashing, shortcuts, activity indicators, advisory prompt suggestions, and default shell timeouts.
 
 ## Install
@@ -134,10 +135,27 @@ The release stack includes [`supi-settings`](packages/supi-settings/README.md). 
 
 Press Tab to switch between project and global scope. Settings show whether each value comes from the project, global configuration, or its default.
 
-If you install packages individually and want this UI, install it separately:
+### Control skills
+
+[`supi-skills`](packages/supi-skills/README.md) adds a searchable **Skills** section to `/supi-settings`. Each installed skill can be:
+
+- **Enabled** — Pi can select the skill automatically, and you can start it explicitly.
+- **Model invocation disabled** — only you can start the skill explicitly.
+- **Disabled** — Pi does not load the skill or its command.
+
+At the prompt, type `$` and part of a skill name. Select a result to insert `$skill-name`; SuPi runs it as `/skill:skill-name` when you submit. For example, if `code-review` is installed:
+
+```text
+$code-review Review the current changes.
+```
+
+Project choices inherit your global choices. Run `/reload` after you change whether a skill loads, or after you add or remove skills.
+
+The release installers include both `supi-skills` and `supi-settings`. For a standalone installation with skill controls, install both packages:
 
 ```bash
 pi install npm:@mrclrchtr/supi-settings
+pi install npm:@mrclrchtr/supi-skills
 ```
 
 ## Update and remove
