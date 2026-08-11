@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.9.0](https://github.com/mrclrchtr/supi/compare/v4.8.0...v4.9.0) (2026-08-11)
+
+
+### Features
+
+* **debug:** add generic operation timing ([2e52016](https://github.com/mrclrchtr/supi/commit/2e52016c6086581cf69ece6e4f9f43896118677b))
+* **supi-prompt-suggestions:** accept suggestion with Tab ([ff837d5](https://github.com/mrclrchtr/supi/commit/ff837d5b52a58a1cb1de0215489789465db035ce)), closes [#295](https://github.com/mrclrchtr/supi/issues/295)
+
 ## [4.8.0](https://github.com/mrclrchtr/supi/compare/v4.7.0...v4.8.0) (2026-08-10)
 
 
