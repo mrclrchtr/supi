@@ -62,6 +62,10 @@ _Avoid_: log sink, event log, telemetry store
 A SuPi extension package that records diagnostic events into the Debug Registry while doing its own primary work. Producers emit events only; they do not own registry reset, retention, or exposure policy.
 _Avoid_: logger, debug source, registry owner
 
+**Debug Timing**:
+Monotonic duration evidence attached to one Debug Event. It can contain a total and named sequential phases for diagnostic comparison.
+_Avoid_: telemetry, benchmark result, profiler trace
+
 **Debug Surface**:
 The SuPi extension package role that owns debug-event configuration, user/model inspection surfaces, and registry reset policy.
 _Avoid_: debug producer, generic observability package

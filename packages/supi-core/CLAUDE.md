@@ -12,7 +12,8 @@ Other SuPi packages should import the library surface via `@mrclrchtr/supi-core/
 src/
   api.ts              — public export surface
   index.ts            — public export surface (identical to api.ts)
-  debug-registry.ts   — debug event registry (flat utility)
+  debug-registry.ts   — public debug surface, event state, retention, redaction, and queries
+  debug-timing.ts     — monotonic one-shot debug timers
   llm.ts              — shared LLM utilities (withRetry, callWithJsonResponse)
   path-utils.ts       — shared tool-path and file-URI normalization helpers
   report.ts           — shared text/report rendering helpers
@@ -39,6 +40,8 @@ src/
 - `path-utils.ts` — preferred shared location for leading `@` stripping, cwd resolution, and file URI conversion used across SuPi tool packages
 - `report.ts` — preferred shared location for reusable themed report/text helpers such as section headers, preview overflow hints, key/value rows, and wrapped report blocks
 - `registry-utils.ts` — preferred shared location for global registries and normalized-cwd session-state registries used by peer substrate packages
+- `debug-registry.ts` — stable `@mrclrchtr/supi-core/debug` domain surface plus Debug Registry state, retention, redaction, listeners, and queries; producers own event meaning while `supi-debug` owns retention and display policy
+- `debug-timing.ts` — `startDebugTimer()` for one-shot total and sequential phase timings; the timer is a no-op when Debug is disabled, and a `finish()` factory prevents event-data construction on disabled hot paths
 - `llm.ts` — shared LLM utilities: `withRetry()` (exponential-backoff retry with AbortSignal), `extractJsonFromResponse()`, `callWithJsonResponse()` (model resolution → completion → JSON extraction → TypeBox validation)
 - `prompt-surface.ts` — configurable tool prompt-surface resolution and its public types
 

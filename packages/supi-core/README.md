@@ -48,7 +48,7 @@ Config file locations:
 ### Shared registries
 
 - context-provider registry for `/supi-context`
-- debug-event registry for producers that want shared debug capture
+- debug-event registry and monotonic phase timers for producers that want shared debug capture
 - settings registry used by `/supi-settings`
 
 ### Project and session helpers
@@ -108,5 +108,7 @@ export default function myExtension(pi: ExtensionAPI) {
 
 - `src/api.ts` — exported library surface
 - `src/config.ts` — shared config loading and writing
+- `src/debug-registry.ts` — Debug domain surface, event state, retention, redaction, listeners, and queries
+- `src/debug-timing.ts` — monotonic total and phase timers for Debug Event Producers
 - `src/settings/` — settings registry, schema, scope resolution, and persistence
 - `src/report.ts` — shared text/report rendering helpers
