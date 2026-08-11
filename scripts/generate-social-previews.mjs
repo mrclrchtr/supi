@@ -39,7 +39,7 @@ const SOCIAL_BADGES = {
   "prompt-suggestions": ["ghost text", "/supi-settings"],
   review: ["/supi-review", "supi_review_run", "supi_review_audit"],
   settings: ["/supi-settings", "project/global"],
-  skills: ["/supi-settings", "$skill-name", "project/global"],
+  skills: ["model-invocation-disabled", "$skill-name shortcut"],
   // biome-ignore lint/security/noSecrets: public test-util API names, not secrets
   "test-utils": ["createPiMock()", "makeCtx()", "getHandlerOrThrow()"],
   "tree-sitter": ["./api", "AST queries", "bundled parsers"],
@@ -82,8 +82,8 @@ const SOCIAL_TAGLINES = {
   review: ["Runs independent inspection-only reviewers", "over a frozen copy of your change."],
   settings: ["One searchable /supi-settings overlay for", "project & global SuPi configuration."],
   skills: [
-    "Control which skills PI loads and which skills",
-    "the model can invoke, at either scope.",
+    "Keep skills available for explicit commands,",
+    "but omit them from the model catalog by scope.",
   ],
   "test-utils": ["Shared pi mocks and test helpers used by", "every SuPi package's test suite."],
   "tree-sitter": ["Structural AST search, outlines, and calls —", "no language server required."],
