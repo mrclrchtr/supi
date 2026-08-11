@@ -9,6 +9,7 @@ import { Container, Key, matchesKey, Text } from "@earendil-works/pi-tui";
 import {
   createSettingsContributionCollector,
   type SettingsCollectionDiagnostic,
+  type SettingsModule,
   type SettingsScope,
   SUPI_SETTINGS_COLLECT_EVENT,
 } from "@mrclrchtr/supi-core/settings";
@@ -37,14 +38,22 @@ function latestStatus(diagnostics: SettingsCollectionDiagnostic[]): OverlayStatu
   return latest ? { kind: latest.kind, message: latest.message } : undefined;
 }
 
+/** Keep the skill catalog after the smaller fixed settings sections. */
+function orderSettingsModules(modules: SettingsModule[]): SettingsModule[] {
+  const skills = modules.find((module) => module.id === "skills");
+  if (!skills) return modules;
+  return [...modules.filter((module) => module.id !== skills.id), skills];
+}
+
 export async function openSettingsOverlay(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
   const collection = collectSettingsModules(pi);
-  if (collection.modules.length === 0) {
+  const modules = orderSettingsModules(collection.modules);
+  if (modules.length === 0) {
     ctx.ui.notify("No settings registered by SuPi extensions", "info");
     return;
   }
 
-  const initial = await readSettingsModules(collection.modules, {
+  const initial = await readSettingsModules(modules, {
     scope: "project",
     cwd: ctx.cwd,
     ctx,
@@ -61,7 +70,7 @@ export async function openSettingsOverlay(pi: ExtensionAPI, ctx: ExtensionContex
 
     const container = new Container();
     const scopedList = new ScopedSettingsList(
-      collection.modules,
+      modules,
       initial.loaded,
       state.scope,
       state.cwd,

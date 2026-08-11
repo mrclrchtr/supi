@@ -162,6 +162,34 @@ describe("openSettingsOverlay", () => {
     expect(custom).not.toHaveBeenCalled();
   });
 
+  it("renders Skills after all other settings modules", async () => {
+    const pi = makePi([
+      makeModule({ id: "skills", label: "Skills" }),
+      makeModule({ id: "other", label: "Other" }),
+    ]);
+    let component: { render(width: number): string[] } | undefined;
+    const custom = vi.fn((factory: (...args: unknown[]) => unknown) => {
+      component = factory(
+        { requestRender: vi.fn() },
+        makeTheme(),
+        undefined,
+        vi.fn(),
+      ) as typeof component;
+      return Promise.resolve();
+    });
+
+    await openSettingsOverlay(
+      pi as never,
+      {
+        cwd: "/tmp",
+        ui: { custom, notify: vi.fn() },
+      } as never,
+    );
+
+    const rendered = component?.render(80).join("\n") ?? "";
+    expect(rendered.indexOf("Other")).toBeLessThan(rendered.indexOf("Skills"));
+  });
+
   it("starts in project scope and reloads settings on Tab", async () => {
     const readScopes: Array<"project" | "global"> = [];
     const pi = makePi([
