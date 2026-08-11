@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-review",
-  "version": "4.8.0",
+  "version": "4.9.0",
   "description": "Parallel isolated reviews of trees, comparisons, and commits",
   "license": "MIT",
   "repository": {
