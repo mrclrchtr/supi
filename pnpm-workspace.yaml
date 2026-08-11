@@ -36,3 +36,7 @@ minimumReleaseAgeExclude:
   - '@earendil-works/pi-ai'
   - '@earendil-works/pi-coding-agent'
   - '@earendil-works/pi-tui'
+
+patchedDependencies:
+  # Apply the patch to new upstream versions and fail when it no longer applies.
+  "mattpocock-skills@*": packages/supi-skill-patches/patches/mattpocock-skills/combined.patch

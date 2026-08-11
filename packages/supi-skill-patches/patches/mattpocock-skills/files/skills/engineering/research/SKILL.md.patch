@@ -1,0 +1,18 @@
+diff --git a/skills/engineering/research/SKILL.md b/skills/engineering/research/SKILL.md
+index 0ba594a07f306479baa67104381f48e209ab6aae..c54c3805b811ca3ec64e784843c8d96b29da066c 100644
+--- a/skills/engineering/research/SKILL.md
++++ b/skills/engineering/research/SKILL.md
+@@ -1,11 +1,9 @@
+ ---
+ name: research
+-description: Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.
++description: Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork completed.
+ ---
+
+-Spin up a **background agent** to do the research, so you keep working while it reads.
+-
+-Its job:
++Do the research in the current session with the available search and retrieval tools. SuPi has no generic background-agent contract, so never claim that research continues after the response.
+
+ 1. Investigate the question against **primary sources** — official docs, source code, specs, first-party APIs — not a secondary write-up of them. Follow every claim back to the source that owns it.
+ 2. Write the findings to a single Markdown file, citing each claim's source.

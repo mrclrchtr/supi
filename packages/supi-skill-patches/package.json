@@ -1,0 +1,19 @@
+{
+  "name": "@mrclrchtr/supi-skill-patches",
+  "version": "4.9.0",
+  "private": true,
+  "description": "Maintains SuPi-compatible copies of upstream agent skills",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "check": "pnpm exec jiti src/cli.ts check",
+    "patches:compose": "pnpm exec jiti src/cli.ts compose",
+    "patches:split": "pnpm exec jiti src/cli.ts split",
+    "skills:sync": "pnpm exec jiti src/cli.ts sync"
+  },
+  "devDependencies": {
+    "jiti": "2.7.0",
+    "mattpocock-skills": "github:mattpocock/skills#v1.2.3",
+    "vitest": "4.1.10"
+  }
+}

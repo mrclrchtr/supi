@@ -1,0 +1,52 @@
+diff --git a/skills/engineering/codebase-design/DESIGN-IT-TWICE.md b/skills/engineering/codebase-design/DESIGN-IT-TWICE.md
+index 8419ad6fa966be2e9e435c932b3584df56cb1af6..5770722c8af6ea24b596fa21f6c5c01d67721945 100644
+--- a/skills/engineering/codebase-design/DESIGN-IT-TWICE.md
++++ b/skills/engineering/codebase-design/DESIGN-IT-TWICE.md
+@@ -1,6 +1,6 @@
+ # Design It Twice
+
+-When the user wants to explore alternative interfaces for a chosen deepening candidate, use this parallel sub-agent pattern. Based on "Design It Twice" (Ousterhout) — your first idea is unlikely to be the best.
++When the user wants to explore alternative interfaces for a chosen deepening candidate, use parallel isolated SuPi reviews. This follows "Design It Twice" (Ousterhout): your first idea is unlikely to be the best.
+
+ Uses the vocabulary in [SKILL.md](SKILL.md) — **module**, **interface**, **seam**, **adapter**, **leverage**.
+
+@@ -8,28 +8,28 @@ Uses the vocabulary in [SKILL.md](SKILL.md) — **module**, **interface**, **sea
+
+ ### 1. Frame the problem space
+
+-Before spawning sub-agents, write a user-facing explanation of the problem space for the chosen candidate:
++Before you run the isolated reviews, write a user-facing explanation of the problem space for the chosen candidate:
+
+ - The constraints any new interface would need to satisfy
+ - The dependencies it would rely on, and which category they fall into (see [DEEPENING.md](DEEPENING.md))
+ - A rough illustrative code sketch to ground the constraints — not a proposal, just a way to make the constraints concrete
+
+-Show this to the user, then immediately proceed to Step 2. The user reads and thinks while the sub-agents work in parallel.
++Show this to the user, then immediately proceed to Step 2. The user reads and thinks while the reviews run in parallel.
+
+-### 2. Spawn sub-agents
++### 2. Run isolated design reviews
+
+-Spawn 3+ sub-agents in parallel. Each must produce a **radically different** interface for the deepened module.
++Call `supi_review_run` once with `direct`, a `currentState` target scoped to the candidate paths, and three or four tasks. Put the shared technical brief in `sharedContext`: file paths, coupling details, the dependency category from [DEEPENING.md](DEEPENING.md), and what sits behind the seam. Each task must inspect without changing files and produce a **radically different** interface.
+
+-Prompt each sub-agent with a separate technical brief (file paths, coupling details, dependency category from [DEEPENING.md](DEEPENING.md), what sits behind the seam). The brief is independent of the user-facing problem-space explanation in Step 1. Give each agent a different design constraint:
++Give each task a different constraint:
+
+-- Agent 1: "Minimize the interface — aim for 1–3 entry points max. Maximise leverage per entry point."
+-- Agent 2: "Maximise flexibility — support many use cases and extension."
+-- Agent 3: "Optimise for the most common caller — make the default case trivial."
+-- Agent 4 (if applicable): "Design around ports & adapters for cross-seam dependencies."
++- Task 1: "Minimize the interface. Use no more than 1–3 entry points. Maximize leverage per entry point."
++- Task 2: "Maximize flexibility. Support many use cases and extension."
++- Task 3: "Optimize for the most common caller. Make the default case trivial."
++- Task 4, when applicable: "Design around ports and adapters for cross-seam dependencies."
+
+-Include both [SKILL.md](SKILL.md) vocabulary and CONTEXT.md vocabulary in the brief so each sub-agent names things consistently with the architecture language and the project's domain language.
++Include both [SKILL.md](SKILL.md) vocabulary and `CONTEXT.md` vocabulary in the brief so each task uses the project's architecture and domain language. If `supi_review_run` is unavailable, produce the designs sequentially in the current session and state that isolated review was unavailable.
+
+-Each sub-agent outputs:
++Each task outputs:
+
+ 1. Interface (types, methods, params — plus invariants, ordering, error modes)
+ 2. Usage example showing how callers use it

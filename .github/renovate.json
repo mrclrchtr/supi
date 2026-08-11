@@ -7,6 +7,18 @@
     ":semanticCommitTypeAll(fix)"
   ],
   "labels": ["dependencies"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/packages/supi-skill-patches/package\\.json$/"],
+      "matchStrings": [
+        "\\\"mattpocock-skills\\\"\\s*:\\s*\\\"github:mattpocock/skills#v(?<currentValue>[^\\\"]+)\\\""
+      ],
+      "depNameTemplate": "mattpocock/skills",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    }
+  ],
   "packageRules": [
     {
       "matchManagers": ["github-actions"],
@@ -24,6 +36,11 @@
         "vscode-languageserver-protocol",
         "vscode-languageserver-types"
       ]
+    },
+    {
+      "description": "Require review for upstream skill synchronization",
+      "automerge": false,
+      "matchPackageNames": ["mattpocock/skills"]
     },
     {
       "description": "Pi core peer deps use '*' ranges and must not be auto-updated by Renovate",

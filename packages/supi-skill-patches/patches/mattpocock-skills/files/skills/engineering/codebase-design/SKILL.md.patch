@@ -1,0 +1,10 @@
+diff --git a/skills/engineering/codebase-design/SKILL.md b/skills/engineering/codebase-design/SKILL.md
+index 16620c24528b737408e78d95dd6a0e01a98d3d63..15830fd5bea19366c92e805849d8f30a72b9cc36 100644
+--- a/skills/engineering/codebase-design/SKILL.md
++++ b/skills/engineering/codebase-design/SKILL.md
+@@ -111,4 +111,4 @@ Good interfaces make testing natural:
+ ## Going deeper
+
+ - **Deepening a cluster given its dependencies** — see [DEEPENING.md](DEEPENING.md): dependency categories, seam discipline, and replace-don't-layer testing.
+-- **Exploring alternative interfaces** — see [DESIGN-IT-TWICE.md](DESIGN-IT-TWICE.md): spin up parallel sub-agents to design the interface several radically different ways, then compare on depth, locality, and seam placement.
++- **Exploring alternative interfaces** — see [DESIGN-IT-TWICE.md](DESIGN-IT-TWICE.md): run parallel isolated SuPi reviews to design several radically different interfaces, then compare depth, locality, and seam placement.

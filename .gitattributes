@@ -1,0 +1,2 @@
+# Patch context uses one leading space on otherwise blank lines.
+packages/supi-skill-patches/patches/**/*.patch -whitespace

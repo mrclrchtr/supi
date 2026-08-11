@@ -95,6 +95,16 @@ pi install npm:@mrclrchtr/supi-web
 | [`supi-extras`](packages/supi-extras/README.md) | Prompt stash, shortcuts, activity indicators, and other session conveniences | `pi install npm:@mrclrchtr/supi-extras` |
 | [`supi-prompt-suggestions`](packages/supi-prompt-suggestions/README.md) | Advisory ghost-text suggestions from a model you choose | `pi install npm:@mrclrchtr/supi-prompt-suggestions` |
 
+### Adapted skills
+
+The root [`skills/`](skills) catalog contains SuPi-compatible editions of selected third-party skills. Install only the skills you need:
+
+```bash
+npx skills add mrclrchtr/supi --skill code-review research
+```
+
+[`supi-skill-patches`](packages/supi-skill-patches/README.md) is the private maintenance workspace that synchronizes and validates this catalog.
+
 ### DevTools
 
 Not part of the recommended release stack. Included in the full-stack installer (`install-all.sh`), or install separately:

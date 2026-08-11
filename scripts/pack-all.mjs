@@ -1,12 +1,17 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(__dirname, "..");
+
+function isPublishablePackage(packageDir) {
+  const manifest = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8"));
+  return manifest.private !== true;
+}
 
 function runPackage(pkgDir) {
   return new Promise((resolvePromise) => {
@@ -42,7 +47,8 @@ async function main() {
       (dirent) =>
         dirent.isDirectory() &&
         dirent.name.startsWith("supi-") &&
-        existsSync(join(pkgsDir, dirent.name, "package.json")),
+        existsSync(join(pkgsDir, dirent.name, "package.json")) &&
+        isPublishablePackage(join(pkgsDir, dirent.name)),
     )
     .map((dirent) => join("packages", dirent.name));
 

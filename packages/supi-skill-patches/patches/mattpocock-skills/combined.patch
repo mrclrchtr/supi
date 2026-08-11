@@ -1,0 +1,459 @@
+diff --git a/skills/engineering/ask-matt/PHASE-BOUNDARIES.md b/skills/engineering/ask-matt/PHASE-BOUNDARIES.md
+index cb31e6abf5c3fce903f1f4ed554cf541c9354977..c5bac6cbff9bc166439e639653cde1367d2c3139 100644
+--- a/skills/engineering/ask-matt/PHASE-BOUNDARIES.md
++++ b/skills/engineering/ask-matt/PHASE-BOUNDARIES.md
+@@ -2,7 +2,7 @@
+
+ A **phase** is a chunk of work inside a session — the grilling, the implementation, the QA. The definition is fuzzy on purpose: a phase ends when you think *"ok, we're done with that"*.
+
+-The **phase boundary** is the gap between two phases, and it is the only place this decision belongs. Mid-phase there is no decision to make — continue, or split the work that's left into subagents. Compacting mid-phase makes the agent lose the thread.
++The **phase boundary** is the gap between two phases, and it is the only place this decision belongs. Mid-phase there is no decision to make: continue, or use isolated reviews for inspection work. Compacting mid-phase makes the agent lose the thread.
+
+ ## The five options
+
+@@ -11,7 +11,7 @@ The **phase boundary** is the gap between two phases, and it is the only place t
+ | **Continue** | Stay in the session. No context switch at all.                    |
+ | **`/clear`** | Empty the context window and start from nothing.                  |
+ | **`/handoff`** | Write a portable markdown file and seed a session anywhere with it. |
+-| **Subagent** | Send the task to its own context window and get a report back.     |
++| **Isolated review** | Use `supi_review_run` for inspection in a separate context. |
+ | **`/compact`** | Compress this context and seed a fresh session with the summary.  |
+
+ ## The tree
+@@ -33,7 +33,7 @@ The cost of getting this wrong is one-way. Clear a *relevant* context and you lo
+
+ That list is the whole clause. What `/handoff` buys is **portability** — a file that travels. If nothing is travelling, you don't need it.
+
+-**4. Can the task be done AFK?** Is it scoped tightly enough to run with you away from the keyboard, no steering? Then send it to a **subagent** and leave this session untouched. Automated review is the standard case: the agent reads the diff and reports, and you aren't needed while it does.
++**4. Is the task inspection-only and safe to run AFK?** If yes, use `supi_review_run` and leave this session untouched. Automated code review is the standard case. For work that changes files or needs user interaction, use a handoff and another session instead.
+
+ **5. Otherwise, `/compact`.** Relevant context, same harness, same directory, and you need to stay in the loop — this is where the tree lands, and it lands here often. Pass it an instruction (`/compact we're going to QA this area`) so the summary keeps what the next phase needs.
+
+diff --git a/skills/engineering/ask-matt/SKILL.md b/skills/engineering/ask-matt/SKILL.md
+index 7f3ab7829fba2321ac9e5b2ff9d58b8321734aa8..eb73fc2852d915d6b176d8fae481c89e357679d3 100644
+--- a/skills/engineering/ask-matt/SKILL.md
++++ b/skills/engineering/ask-matt/SKILL.md
+@@ -8,6 +8,8 @@ disable-model-invocation: true
+
+ You don't remember every skill, so ask.
+
++**SuPi syntax:** A reference such as `/tdd` names a skill. Invoke it as `$tdd` or `/skill:tdd`. Native PI commands such as `/clear` and `/compact` keep their normal syntax.
++
+ A **flow** is a path through the skills. Most paths run along one **main flow**, and two **on-ramps** merge onto it. Everything else is standalone, or a vocabulary layer that runs underneath.
+
+ ## The main flow: idea → ship
+@@ -65,10 +67,10 @@ A **phase** is a chunk of work inside a session — the grilling, the implementa
+ - **Continue** — stay put. Costs nothing, loses nothing.
+ - **`/clear`** — empty the window, when nothing here matters to what's next.
+ - **`/handoff`** — write a portable markdown file. Narrow: only for a **new harness**, a **new directory**, a **colleague**, or forking a side task **mid-phase**. What it buys is portability.
+-- **Subagent** — send a tightly-scoped task to its own window and get a report back.
++- **Isolated review** — use `supi_review_run` for a tightly-scoped inspection or review and get a report from a separate context. Use a handoff and another session for work that changes files or needs user interaction.
+ - **`/compact`** — compress this context and seed a fresh session with it. The **default**, at the bottom of the tree rather than the first reach.
+
+-Read [PHASE-BOUNDARIES.md](PHASE-BOUNDARIES.md) for the ordered tree — the five questions, the reasoning behind each branch, and why the primary-source cost makes **Continue** the one to rule out first. Make the decision **at** a boundary; mid-phase, continue or split the rest into subagents.
++Read [PHASE-BOUNDARIES.md](PHASE-BOUNDARIES.md) for the ordered tree — the five questions, the reasoning behind each branch, and why the primary-source cost makes **Continue** the one to rule out first. Make the decision **at** a boundary. Mid-phase, continue or use isolated reviews only for inspection work.
+
+ ## Standalone
+
+@@ -78,7 +80,7 @@ Off the main flow entirely.
+ - **`/grilling`** — the interview primitive itself: rounds, the frontier, facts are the agent's job and decisions are yours. `/grill-me` and `/grill-with-docs` are the two named ways in, and `/triage`, `/wayfinder` and `/improve-codebase-architecture` all run it internally. Reach for it directly only when you want the interview with no wrapper around it.
+ - **`/resolving-merge-conflicts`** — work an in-progress merge or rebase conflict hunk by hunk, resolving by **intent** traced to each side's primary source rather than by picking lines, then finish the operation. It never runs `--abort`. Standalone and off every flow: reach for it when you are already mid-conflict.
+ - **`/prototype`** — a small, throwaway program that answers one design question: does this state model feel right, or what should this UI look like. Throwaway is a constraint on how the code is written, not a promise to destroy it: the answer folds into the real code, and the prototype itself is kept as a **primary source** on a `prototype/<name>` branch out of main, pointed at from the implementation issue. It's the detour in step 2 of the main flow, but reach for it any time a design question is hard to settle on paper.
+-- **`/research`** — delegate reading legwork to a **background agent**: it investigates a question against **primary sources**, then leaves a cited Markdown file in the repo. Keep working while it reads. The file it produces is something to take *into* the main flow at `/grill-with-docs` — research feeds the thinking, it doesn't replace it.
++- **`/research`** — investigate a question against **primary sources** in the current SuPi session, then leave a cited Markdown file in the repo. The file feeds the main flow at `/grill-with-docs`; research does not replace the thinking.
+ - **`/to-questionnaire`** — when the thing blocking you isn't in your head or the codebase but in **someone else's**, this writes them a questionnaire to fill in. It's the inverse of `/grill-me`: instead of interviewing you about the subject, it interviews you about the **send** — who it's going to, what you need back — and aims the questions at the gap. What comes back is material for `/grill-with-docs` or `/to-spec`.
+ - **`/wizard`** — for the steps only a **human** can take: provisioning infrastructure, setting up credentials or CI secrets, clicking through an unfamiliar third-party dashboard, running a one-off migration or cutover. It generates an interactive bash script that opens each URL, captures each value, and writes it into `.env` and GitHub secrets — so the procedure stops being something you re-explain to an agent every time. Model-invoked, so the agent reaches for it the moment it hits a wall only you can pass. If the agent could just do it itself, it should; this is for where a human is genuinely in the loop.
+ - **`/wait-what`** — the corrective for a message that didn't land. Use it mid-conversation, inside any other skill, and the agent re-pitches what it just said with the context you were missing, in plain English, using the `CONTEXT.md` vocabulary. It works after the fact; `/grill-with-docs` is the upfront cure, because a shared language agreed early is what stops the jargon arriving at all.
+diff --git a/skills/engineering/code-review/SKILL.md b/skills/engineering/code-review/SKILL.md
+index 2d276fe88bddd363395b4887a555769222a34975..a165c323972bcd5b3aba52777328131b6bef0685 100644
+--- a/skills/engineering/code-review/SKILL.md
++++ b/skills/engineering/code-review/SKILL.md
+@@ -1,6 +1,6 @@
+ ---
+ name: code-review
+-description: Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X".
++description: Review changes since a fixed point along two axes — Standards and Spec. Runs isolated reviews in parallel with SuPi and reports them side by side. Use for branches, pull requests, work-in-progress changes, or requests to "review since X".
+ ---
+
+ Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
+@@ -8,9 +8,9 @@ Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
+ - **Standards** — does the code conform to this repo's documented coding standards?
+ - **Spec** — does the code faithfully implement the originating issue / spec?
+
+-Both axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings.
++Both axes run as isolated `supi_review_run` tasks so they do not affect each other's context. This skill then aggregates their findings.
+
+-The issue tracker should have been provided to you — run `/setup-matt-pocock-skills` if `docs/agents/issue-tracker.md` is missing.
++The issue tracker should have been provided to you. If `docs/agents/issue-tracker.md` is missing, ask the user to run `/skill:setup-matt-pocock-skills`.
+
+ ## Process
+
+@@ -18,9 +18,9 @@ The issue tracker should have been provided to you — run `/setup-matt-pocock-s
+
+ Whatever the user said is the fixed point — a commit SHA, branch name, tag, `main`, `HEAD~5`, etc. If they didn't specify one, ask for it.
+
+-Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so the comparison is against the merge-base). Also note the list of commits via `git log <fixed-point>..HEAD --oneline`.
++Capture the diff command once. For committed changes, use `git diff <fixed-point>...HEAD` so the comparison uses the merge base. For work-in-progress changes, use `git diff <fixed-point>` so the command also includes the current filesystem. Also note the commit list with `git log <fixed-point>..HEAD --oneline`.
+
+-Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here — not inside two parallel sub-agents.
++Before going further, resolve the fixed point to a commit SHA (`git rev-parse <fixed-point>`) and confirm that the selected diff is not empty. A bad ref or empty diff must fail here, not inside the review tasks.
+
+ ### 2. Identify the spec source
+
+@@ -29,7 +29,7 @@ Look for the originating spec, in this order:
+ 1. Issue references in the commit messages (`#123`, `Closes #45`, GitLab `!67`, etc.) — fetch via the workflow in `docs/agents/issue-tracker.md`.
+ 2. A path the user passed as an argument.
+ 3. A spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
+-4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent will skip and report "no spec available".
++4. If nothing is found, ask the user where the spec is. If they say there is no spec, omit the **Spec** task and report "no spec available".
+
+ ### 3. Identify the standards sources
+
+@@ -55,21 +55,29 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
+ - **Middle Man** — a class or function that mostly just delegates onward. → cut it, call the real target direct.
+ - **Refused Bequest** — a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
+
+-### 4. Spawn both sub-agents in parallel
++### 4. Run the isolated reviews
+
+-**Standards sub-agent prompt** — include:
++Call `supi_review_run` once with `direct` tasks so both axes run concurrently against one frozen state.
+
+-- The full diff command and commit list.
+-- The list of standards-source files you found in step 3, **plus the smell baseline from step 3** pasted in full — the sub-agent has no other access to it.
+-- The brief: "Report — per file/hunk where relevant — (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls — documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words."
++Choose the target from the user's intent:
+
+-**Spec sub-agent prompt** — include:
++- Work-in-progress changes, including uncommitted files: `workingTree` with the resolved fixed-point SHA as `baseCommit`.
++- Committed branch or pull-request changes: `comparison` with the resolved fixed-point SHA as `baseCommit`.
++- One named commit: `commit` with its resolved SHA.
+
+-- The diff command and commit list.
+-- The path or fetched contents of the spec.
+-- The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the spec line for each finding. Under 400 words."
++Put the diff command and commit list in `sharedContext`. Use `findingScope: "change-only"` for each task.
+
+-If the spec is missing, skip the Spec sub-agent and note this in the final report.
++**`standards` task** — include:
++
++- The standards-source paths and the complete smell baseline from step 3.
++- This brief: "Report, per file or hunk: (a) each documented-standard violation, with the source file and rule; and (b) each baseline smell, with its name and evidence. Distinguish hard violations from judgement calls. Baseline smells are always judgement calls, and a documented project standard overrides the baseline. Skip checks that tooling enforces. Use no more than 400 words."
++
++**`spec` task** — include:
++
++- The spec path or fetched contents.
++- This brief: "Report: (a) missing or partial requirements; (b) unrequested behavior or scope creep; and (c) requirements that appear implemented incorrectly. Quote the spec for each finding. Use no more than 400 words."
++
++Add repository documents as `criteriaSources` when they are authoritative and the tool limit permits it. If there is no spec, run only the `standards` task and note the missing axis. If `supi_review_run` is unavailable, run the two axes sequentially in the current session and state that isolation was unavailable.
+
+ ### 5. Aggregate
+
+diff --git a/skills/engineering/codebase-design/DESIGN-IT-TWICE.md b/skills/engineering/codebase-design/DESIGN-IT-TWICE.md
+index 8419ad6fa966be2e9e435c932b3584df56cb1af6..5770722c8af6ea24b596fa21f6c5c01d67721945 100644
+--- a/skills/engineering/codebase-design/DESIGN-IT-TWICE.md
++++ b/skills/engineering/codebase-design/DESIGN-IT-TWICE.md
+@@ -1,6 +1,6 @@
+ # Design It Twice
+
+-When the user wants to explore alternative interfaces for a chosen deepening candidate, use this parallel sub-agent pattern. Based on "Design It Twice" (Ousterhout) — your first idea is unlikely to be the best.
++When the user wants to explore alternative interfaces for a chosen deepening candidate, use parallel isolated SuPi reviews. This follows "Design It Twice" (Ousterhout): your first idea is unlikely to be the best.
+
+ Uses the vocabulary in [SKILL.md](SKILL.md) — **module**, **interface**, **seam**, **adapter**, **leverage**.
+
+@@ -8,28 +8,28 @@ Uses the vocabulary in [SKILL.md](SKILL.md) — **module**, **interface**, **sea
+
+ ### 1. Frame the problem space
+
+-Before spawning sub-agents, write a user-facing explanation of the problem space for the chosen candidate:
++Before you run the isolated reviews, write a user-facing explanation of the problem space for the chosen candidate:
+
+ - The constraints any new interface would need to satisfy
+ - The dependencies it would rely on, and which category they fall into (see [DEEPENING.md](DEEPENING.md))
+ - A rough illustrative code sketch to ground the constraints — not a proposal, just a way to make the constraints concrete
+
+-Show this to the user, then immediately proceed to Step 2. The user reads and thinks while the sub-agents work in parallel.
++Show this to the user, then immediately proceed to Step 2. The user reads and thinks while the reviews run in parallel.
+
+-### 2. Spawn sub-agents
++### 2. Run isolated design reviews
+
+-Spawn 3+ sub-agents in parallel. Each must produce a **radically different** interface for the deepened module.
++Call `supi_review_run` once with `direct`, a `currentState` target scoped to the candidate paths, and three or four tasks. Put the shared technical brief in `sharedContext`: file paths, coupling details, the dependency category from [DEEPENING.md](DEEPENING.md), and what sits behind the seam. Each task must inspect without changing files and produce a **radically different** interface.
+
+-Prompt each sub-agent with a separate technical brief (file paths, coupling details, dependency category from [DEEPENING.md](DEEPENING.md), what sits behind the seam). The brief is independent of the user-facing problem-space explanation in Step 1. Give each agent a different design constraint:
++Give each task a different constraint:
+
+-- Agent 1: "Minimize the interface — aim for 1–3 entry points max. Maximise leverage per entry point."
+-- Agent 2: "Maximise flexibility — support many use cases and extension."
+-- Agent 3: "Optimise for the most common caller — make the default case trivial."
+-- Agent 4 (if applicable): "Design around ports & adapters for cross-seam dependencies."
++- Task 1: "Minimize the interface. Use no more than 1–3 entry points. Maximize leverage per entry point."
++- Task 2: "Maximize flexibility. Support many use cases and extension."
++- Task 3: "Optimize for the most common caller. Make the default case trivial."
++- Task 4, when applicable: "Design around ports and adapters for cross-seam dependencies."
+
+-Include both [SKILL.md](SKILL.md) vocabulary and CONTEXT.md vocabulary in the brief so each sub-agent names things consistently with the architecture language and the project's domain language.
++Include both [SKILL.md](SKILL.md) vocabulary and `CONTEXT.md` vocabulary in the brief so each task uses the project's architecture and domain language. If `supi_review_run` is unavailable, produce the designs sequentially in the current session and state that isolated review was unavailable.
+
+-Each sub-agent outputs:
++Each task outputs:
+
+ 1. Interface (types, methods, params — plus invariants, ordering, error modes)
+ 2. Usage example showing how callers use it
+diff --git a/skills/engineering/codebase-design/SKILL.md b/skills/engineering/codebase-design/SKILL.md
+index 16620c24528b737408e78d95dd6a0e01a98d3d63..15830fd5bea19366c92e805849d8f30a72b9cc36 100644
+--- a/skills/engineering/codebase-design/SKILL.md
++++ b/skills/engineering/codebase-design/SKILL.md
+@@ -111,4 +111,4 @@ Good interfaces make testing natural:
+ ## Going deeper
+
+ - **Deepening a cluster given its dependencies** — see [DEEPENING.md](DEEPENING.md): dependency categories, seam discipline, and replace-don't-layer testing.
+-- **Exploring alternative interfaces** — see [DESIGN-IT-TWICE.md](DESIGN-IT-TWICE.md): spin up parallel sub-agents to design the interface several radically different ways, then compare on depth, locality, and seam placement.
++- **Exploring alternative interfaces** — see [DESIGN-IT-TWICE.md](DESIGN-IT-TWICE.md): run parallel isolated SuPi reviews to design several radically different interfaces, then compare depth, locality, and seam placement.
+diff --git a/skills/engineering/grill-with-docs/SKILL.md b/skills/engineering/grill-with-docs/SKILL.md
+index bed05d2bd3245306267cea57cd696b5dd94d50fe..134096accf369d2e1b1888a4b9da913b2654a574 100644
+--- a/skills/engineering/grill-with-docs/SKILL.md
++++ b/skills/engineering/grill-with-docs/SKILL.md
+@@ -4,4 +4,4 @@ description: A relentless interview to sharpen a plan or design, which also crea
+ disable-model-invocation: true
+ ---
+
+-Run a `/grilling` session, using the `/domain-modeling` skill.
++Load and follow the `grilling` and `domain-modeling` skills together.
+diff --git a/skills/engineering/implement/SKILL.md b/skills/engineering/implement/SKILL.md
+index 7a0b11f5f4fe9505ea5c7983c3083ba1bf754f69..dff98b427a9e69c06352fabcb7ae1289d28cb16c 100644
+--- a/skills/engineering/implement/SKILL.md
++++ b/skills/engineering/implement/SKILL.md
+@@ -6,10 +6,10 @@ disable-model-invocation: true
+
+ Implement the work described by the user in the spec or tickets.
+
+-Use /tdd where possible, at pre-agreed seams.
++Load and follow the `tdd` skill where possible, at pre-agreed seams.
+
+ Run typechecking regularly, single test files regularly, and the full test suite once at the end.
+
+-Once done, use /code-review to review the work.
++Once done, load and follow the `code-review` skill.
+
+ Commit your work to the current branch.
+diff --git a/skills/engineering/improve-codebase-architecture/SKILL.md b/skills/engineering/improve-codebase-architecture/SKILL.md
+index 529761a3a01d35996018f27530b3c3cc0ab18d41..c1289baec75bd32012851030e8246b126372d3c6 100644
+--- a/skills/engineering/improve-codebase-architecture/SKILL.md
++++ b/skills/engineering/improve-codebase-architecture/SKILL.md
+@@ -10,7 +10,7 @@ Surface architectural friction and propose **deepening opportunities** — refac
+
+ This command is _informed_ by the project's domain model and built on a shared design vocabulary:
+
+-- Run the `/codebase-design` skill for the architecture vocabulary (**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**) and its principles (the deletion test, "the interface is the test surface", "one adapter = hypothetical seam, two = real"). Use these terms exactly in every suggestion — don't drift into "component," "service," "API," or "boundary."
++- Load and follow the `codebase-design` skill for the architecture vocabulary (**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**) and its principles (the deletion test, "the interface is the test surface", "one adapter = hypothetical seam, two = real"). Use these terms exactly in every suggestion.
+ - The domain language in `CONTEXT.md` gives names to good seams; ADRs in `docs/adr/` record decisions this command should not re-litigate.
+
+ ## Process
+@@ -24,7 +24,9 @@ This command is _informed_ by the project's domain model and built on a shared d
+
+ Read the project's domain glossary (`CONTEXT.md`) and any ADRs in the area you're touching first.
+
+-Then spawn a sub-agent to walk the codebase. Don't follow rigid heuristics — explore organically and note where you experience friction:
++Then call `supi_review_run` once with `direct` and a `currentState` target scoped to the selected paths. Give one `architecture-scan` task the domain glossary, applicable ADR paths, design vocabulary, and the inspection questions below. The task must inspect without changing files and report evidence for each candidate. If `supi_review_run` is unavailable, inspect in the current session with `code_orientation` and `code_graph`.
++
++Do not follow rigid heuristics. Explore organically and note where you experience friction:
+
+ - Where does understanding one concept require bouncing between many small modules?
+ - Where are modules **shallow** — interface nearly as complex as the implementation?
+@@ -51,21 +53,21 @@ For each candidate, render a card with:
+
+ End the report with a **Top recommendation** section: which candidate you'd tackle first and why.
+
+-**Use CONTEXT.md vocabulary for the domain, and the `/codebase-design` vocabulary for the architecture.** If `CONTEXT.md` defines "Order," talk about "the Order intake module" — not "the FooBarHandler," and not "the Order service."
++**Use `CONTEXT.md` vocabulary for the domain, and the `codebase-design` vocabulary for the architecture.** If `CONTEXT.md` defines "Order," talk about "the Order intake module" — not "the FooBarHandler," and not "the Order service."
+
+ **ADR conflicts**: if a candidate contradicts an existing ADR, only surface it when the friction is real enough to warrant revisiting the ADR. Mark it clearly in the card (e.g. a warning callout: _"contradicts ADR-0007 — but worth reopening because…"_). Don't list every theoretical refactor an ADR forbids.
+
+ See [HTML-REPORT.md](HTML-REPORT.md) for the full HTML scaffold, diagram patterns, and styling guidance.
+
+-Do NOT propose interfaces yet. After the file is written, ask the user: "Which of these would you like to explore?"
++Do not propose interfaces yet. After the file is written, use `ask_user` to ask which candidate the user wants to explore. If `ask_user` is unavailable, ask in plain text.
+
+ ### 3. Grilling loop
+
+-Once the user picks a candidate, run the `/grilling` skill to walk the decision tree with them — constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.
++Once the user picks a candidate, load and follow the `grilling` skill to walk the decision tree with them: constraints, dependencies, the deepened module's shape, what sits behind the seam, and which tests survive.
+
+-Side effects happen inline as decisions crystallize — run the `/domain-modeling` skill to keep the domain model current as you go:
++Load and follow the `domain-modeling` skill as decisions become clear:
+
+ - **Naming a deepened module after a concept not in `CONTEXT.md`?** Add the term to `CONTEXT.md`. Create the file lazily if it doesn't exist.
+ - **Sharpening a fuzzy term during the conversation?** Update `CONTEXT.md` right there.
+ - **User rejects the candidate with a load-bearing reason?** Offer an ADR, framed as: _"Want me to record this as an ADR so future architecture reviews don't re-suggest it?"_ Only offer when the reason would actually be needed by a future explorer to avoid re-suggesting the same thing — skip ephemeral reasons ("not worth it right now") and self-evident ones.
+-- **Want to explore alternative interfaces for the deepened module?** Run the `/codebase-design` skill and use its design-it-twice parallel sub-agent pattern.
++- **Want to explore alternative interfaces for the deepened module?** Load and follow the `codebase-design` skill and use its isolated Design It Twice reviews.
+diff --git a/skills/engineering/research/SKILL.md b/skills/engineering/research/SKILL.md
+index 0ba594a07f306479baa67104381f48e209ab6aae..c54c3805b811ca3ec64e784843c8d96b29da066c 100644
+--- a/skills/engineering/research/SKILL.md
++++ b/skills/engineering/research/SKILL.md
+@@ -1,11 +1,9 @@
+ ---
+ name: research
+-description: Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.
++description: Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork completed.
+ ---
+
+-Spin up a **background agent** to do the research, so you keep working while it reads.
+-
+-Its job:
++Do the research in the current session with the available search and retrieval tools. SuPi has no generic background-agent contract, so never claim that research continues after the response.
+
+ 1. Investigate the question against **primary sources** — official docs, source code, specs, first-party APIs — not a secondary write-up of them. Follow every claim back to the source that owns it.
+ 2. Write the findings to a single Markdown file, citing each claim's source.
+diff --git a/skills/engineering/to-spec/SKILL.md b/skills/engineering/to-spec/SKILL.md
+index 3fd64959895b7eb095a13d797e1c7544f1f08c8f..368e71e80124262c4581df1299b656096b43d6a4 100644
+--- a/skills/engineering/to-spec/SKILL.md
++++ b/skills/engineering/to-spec/SKILL.md
+@@ -6,7 +6,7 @@ disable-model-invocation: true
+
+ This skill takes the current conversation context and codebase understanding and produces a spec. Do NOT interview the user — just synthesize what you already know.
+
+-The issue tracker and triage label vocabulary should have been provided to you — run `/setup-matt-pocock-skills` if not.
++The issue tracker and triage label vocabulary should have been provided to you. If they are missing, ask the user to run `/skill:setup-matt-pocock-skills`.
+
+ ## Process
+
+diff --git a/skills/engineering/to-tickets/SKILL.md b/skills/engineering/to-tickets/SKILL.md
+index 96deac51d4391a3f691478d48f85f43261516c08..1d6f50ee44a2a76b109c32d8c0b4856accf68234 100644
+--- a/skills/engineering/to-tickets/SKILL.md
++++ b/skills/engineering/to-tickets/SKILL.md
+@@ -8,7 +8,7 @@ disable-model-invocation: true
+
+ Break a plan, spec, or conversation into a set of **tickets** — tracer-bullet vertical slices, each declaring the tickets that **block** it.
+
+-The issue tracker and triage label vocabulary should have been provided to you — run `/setup-matt-pocock-skills` if not.
++The issue tracker and triage label vocabulary should have been provided to you. If they are missing, ask the user to run `/skill:setup-matt-pocock-skills`.
+
+ ## Process
+
+diff --git a/skills/engineering/triage/SKILL.md b/skills/engineering/triage/SKILL.md
+index e67b7bbabf5215b52f135c7e58b8da5f91337a86..1a7f760fcdc698fb5ad91045b56652730efe95aa 100644
+--- a/skills/engineering/triage/SKILL.md
++++ b/skills/engineering/triage/SKILL.md
+@@ -40,7 +40,7 @@ For a PR, the same states read against the attached code: `ready-for-agent` mean
+
+ Every triaged issue should carry exactly one category role and one state role. If state roles conflict, flag it and ask the maintainer before doing anything else.
+
+-These are canonical role names — the actual label strings used in the issue tracker may differ. The mapping should have been provided to you - run `/setup-matt-pocock-skills` if not.
++These are canonical role names. The actual label strings used in the issue tracker can differ. If the mapping is missing, ask the user to run `/skill:setup-matt-pocock-skills`.
+
+ State transitions: an unlabeled issue normally goes to `needs-triage` first; from there it moves to `needs-info`, `ready-for-agent`, `ready-for-human`, or `wontfix`. `needs-info` returns to `needs-triage` once the reporter replies. The maintainer can override at any time — flag transitions that look unusual and ask before proceeding.
+
+@@ -73,7 +73,7 @@ Show counts and a one-line summary per item. Let the maintainer pick.
+
+ 3. **Verify the claim.** Before any grilling, check that the claim holds up. For a bug, reproduce it from the reporter's steps. For a PR, confirm the diff does what it claims — check it out, run the relevant tests or commands. Report what happened: confirmed (with code path), failed, or insufficient detail (a strong `needs-info` signal). A confirmed verification makes a much stronger agent brief.
+
+-4. **Grill (if needed).** If the request needs fleshing out, run the `/grilling` and `/domain-modeling` skills together — grill it into shape a round of questions at a time, sharpening domain terms and updating `CONTEXT.md`/ADRs inline as decisions land.
++4. **Grill (if needed).** If the request needs more detail, load and follow the `grilling` and `domain-modeling` skills together. Ask one round of questions at a time, sharpen domain terms, and update `CONTEXT.md` and ADRs as decisions become clear.
+
+ 5. **Apply the outcome:**
+    - `ready-for-agent` — post an agent brief comment ([AGENT-BRIEF.md](AGENT-BRIEF.md)).
+diff --git a/skills/engineering/wayfinder/SKILL.md b/skills/engineering/wayfinder/SKILL.md
+index e4984ed327e12ba65303f4b5de2eb75c01e99c16..e7a01cff2d0b2cecc2f4e4925ccaf6ef16addefa 100644
+--- a/skills/engineering/wayfinder/SKILL.md
++++ b/skills/engineering/wayfinder/SKILL.md
+@@ -22,7 +22,7 @@ The map is a single issue on this repo's issue tracker, labelled `wayfinder:map`
+
+ The map is an **index**, not a store. It lists the decisions made and points at the tickets that hold their detail; a decision lives in exactly one place — its ticket — so the map never restates it, only gists it and links.
+
+-**Where the map, its child tickets, blocking, and frontier queries physically live is tracker-specific.** The issue tracker should have been provided to you — run `/setup-matt-pocock-skills` if not. Consult the tracker doc's "Wayfinding operations" section for how _this_ repo expresses them. If no tracker has been provided, default to the local-markdown tracker.
++**Where the map, its child tickets, blocking, and frontier queries physically live is tracker-specific.** The issue tracker should have been provided to you. If it is missing, ask the user to run `/skill:setup-matt-pocock-skills`. Consult the tracker doc's "Wayfinding operations" section for how _this_ repo expresses them. If no tracker has been provided, default to the local-markdown tracker.
+
+ ### The map body
+
+@@ -74,9 +74,9 @@ The answer isn't part of the body — it's recorded on resolution (see [Work thr
+
+ Every ticket is either **HITL** — human in the loop, worked _with_ a human who speaks for themselves — or **AFK**, driven by the agent alone. A HITL ticket only resolves through that live exchange; the agent never stands in for the human's side of it (a grilling agent that answers its own questions has broken this).
+
+-- **Research** (AFK): Reading documentation, third-party APIs, or local resources like knowledge bases to surface a fact a decision waits on. Resolved by a `/research` **subagent**. Use when knowledge outside the current working directory is required.
+-- **Prototype** (HITL): Raise the fidelity of the discussion by making a cheap, rough, concrete artifact to react to — an outline, a rough take, a stub, or UI/logic code via the /prototype skill. Links the prototype as an asset. Use when "how should it look" or "how should it behave" is the key question.
+-- **Grilling** (HITL): Conversation. The default case. Always invoke the /grilling and /domain-modeling skills.
++- **Research** (AFK): Read documentation, third-party APIs, or local knowledge bases to surface a fact that a decision needs. Resolve it by loading and following the `research` skill in its own SuPi session. Use when knowledge outside the current working directory is required.
++- **Prototype** (HITL): Raise the fidelity of the discussion by making a cheap, rough, concrete artifact to react to — an outline, a rough take, a stub, or UI/logic code through the `prototype` skill. Link the prototype as an asset. Use when "how should it look" or "how should it behave" is the key question.
++- **Grilling** (HITL): Conversation. The default case. Always load and follow the `grilling` and `domain-modeling` skills.
+ - **Task** (HITL or AFK): Manual work that must happen before a _decision_ can be made — nothing to decide, prototype, or research, but the discussion is blocked until it's done. Signing up for a service so its API can be judged, provisioning access, moving data so its shape can be seen. This is the one type that _does_ rather than decides — and it earns its place by unblocking a decision, not by delivering the destination. The agent drives it alone where it can (AFK); otherwise it hands the human a precise checklist (HITL). Resolved when the work is done; the answer records what was done and any resulting facts (credentials location, new URLs, row counts) later tickets depend on.
+
+ ## Fog of war
+@@ -102,18 +102,18 @@ Ruling something out of scope is a scoping act, not a step on the route. When a
+
+ ## Invocation
+
+-Two modes. Either way, **never resolve more than one ticket per session** — with the exception of research tickets.
++Two modes. Either way, **never resolve more than one ticket per session**. Independent research tickets can run in separate SuPi sessions.
+
+ ### Chart the map
+
+ User invokes with a loose idea.
+
+-1. **Name the destination.** Run a `/grilling` and `/domain-modeling` session to pin down what this map is finding its way to — the spec, decision, or change. The destination fixes the scope, so it's settled first.
++1. **Name the destination.** Load and follow the `grilling` and `domain-modeling` skills to pin down what this map is finding its way to: the spec, decision, or change. The destination fixes the scope, so settle it first.
+ 2. **Map the frontier.** Grill again, **breadth-first** this time: fan out across the whole space rather than deep on any one thread, surfacing the open decisions and the first steps takeable now. **If this surfaces no fog** — the way to the destination is already clear, the whole journey small enough for one session — you don't need a map. Stop and ask the user how they'd like to proceed.
+ 3. **Create the map** (label `wayfinder:map`): Destination and Notes filled in, Decisions-so-far empty, the fog sketched into **Not yet specified**.
+ 4. **Create the tickets you can specify now** as child issues of the map — then wire blocking edges in a **second pass** (issues need ids before they can reference each other). Wiring sorts them into the frontier and the blocked; everything you can't yet specify stays in the fog — the **Not yet specified** section.
+-5. **Fire the research subagents.** For each `research` ticket you just created, spin up a `/research` subagent to resolve it in parallel, capturing its findings on a throwaway `research/<name>` branch with a context pointer from the ticket.
+-6. Stop — charting is one session's work; it hand-resolves nothing.
++5. **Prepare research sessions.** Mark each new `research` ticket as ready for a separate SuPi session. Do not claim that background work has started. Each research session loads and follows the `research` skill, records its findings in a Markdown file, and links that file from the ticket.
++6. Stop. Charting is one session's work and resolves no tickets.
+
+ ### Work through the map
+
+@@ -121,7 +121,7 @@ User invokes with a map (URL or number). A ticket is **optional** — without on
+
+ 1. Load the **map** — the low-res view, not every ticket body.
+ 2. Choose the ticket. If the user named one, use it. Otherwise take the first frontier ticket in order. **Claim it**: assign it to yourself before any work.
+-3. Resolve it — **zoom as needed**: fetch the full body of any related or closed ticket on demand; invoke the skills the `## Notes` block names. If in doubt, use `/grilling` and `/domain-modeling`.
++3. Resolve it — **zoom as needed**: fetch the full body of any related or closed ticket on demand; load the skills that the `## Notes` block names. If in doubt, load and follow `grilling` and `domain-modeling`.
+ 4. Record the resolution: post the answer as a **resolution comment**, **close** the issue, and **append a context pointer** to the map's Decisions-so-far.
+ 5. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. If the answer reveals a ticket — this one or another — sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets.
+
+diff --git a/skills/productivity/grill-me/SKILL.md b/skills/productivity/grill-me/SKILL.md
+index 9470cfcfe231a35e46494cddbacdd395991afb1e..3a4e6ac40cfb00f6c08388739319b7453f7aa788 100644
+--- a/skills/productivity/grill-me/SKILL.md
++++ b/skills/productivity/grill-me/SKILL.md
+@@ -4,4 +4,4 @@ description: A relentless interview to sharpen a plan or design.
+ disable-model-invocation: true
+ ---
+
+-Run a `/grilling` session.
++Load and follow the `grilling` skill.
+diff --git a/skills/productivity/grilling/SKILL.md b/skills/productivity/grilling/SKILL.md
+index 95bd01ee9049a7e08120d54af9cd6ceeef282335..2f74dc970abcd543ed73a62c39a8c250ba593488 100644
+--- a/skills/productivity/grilling/SKILL.md
++++ b/skills/productivity/grilling/SKILL.md
+@@ -7,7 +7,7 @@ Interview the user relentlessly until you reach a shared understanding. Map this
+
+ Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled — the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask the whole frontier in one round: number each question and give your recommended answer. Then wait for the user's answers before the next round.
+
+-Each question should be formatted like so:
++On SuPi, use `ask_user` for each round. Put all frontier questions in one form, with a stable id and a recommendation for each question. A form supports at most 10 questions; if the frontier is larger, ask the first 10 and recompute it from the answers. If `ask_user` is unavailable, use this format:
+
+ ```
+ ❓ **Q1** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
+@@ -17,6 +17,6 @@ Each question should be formatted like so:
+
+ Each round the user answers reshapes the tree — settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
+
+-Finding _facts_ is your job, never the user's. When a frontier question needs a fact from the environment (filesystem, tools, etc.), dispatch a sub-agent to find it — don't ask the user for anything you could look up yourself. Don't block on it: a running exploration is an unsettled prerequisite, so only the questions downstream of it wait for the sub-agent to report — ask the rest of the frontier now. The _decisions_ are the user's — put each to them and wait.
++Finding _facts_ is your job, never the user's. When a frontier question needs a fact from the environment, use the available tools to find it before you ask the next round. Resolve independent lookups in parallel when the tools permit it. The _decisions_ are the user's — put each to them and wait.
+
+ The session is done when the frontier is empty: every branch of the design tree visited, nothing left silently assumed. Do not act on it until the user confirms you have reached a shared understanding.
+diff --git a/skills/productivity/writing-for-agents/SKILL.md b/skills/productivity/writing-for-agents/SKILL.md
+index c059d48cd70cfd1494bde74afcc426010b1c10e3..ded7dccdf74b514673df0d518faf293263b87eb7 100644
+--- a/skills/productivity/writing-for-agents/SKILL.md
++++ b/skills/productivity/writing-for-agents/SKILL.md
+@@ -46,7 +46,7 @@ Push too little down and the top bloats; push too much and you hide material the
+
+ Every step ends on a **completion criterion** — the condition that tells the agent the work is done. Two properties make it a lever:
+
+-- **Clarity** — can the agent tell done from not-done? A vague bound ("understanding reached") invites **premature completion**: ending the step before it is genuinely done, attention slipping to _being done_. The visible steps still ahead — the **post-completion steps** — supply the pull; the criterion's clarity is the resistance. Defend in order: **sharpen the bound first** (local and cheap); only if it is irreducibly fuzzy _and_ you observe the rush, hide the later steps by splitting the sequence — and hiding only works across a real context boundary (a hand-off or a subagent dispatch; an inline call leaves the later steps in context and clears nothing).
++- **Clarity** — can the agent tell done from not-done? A vague bound ("understanding reached") invites **premature completion**: ending the step before it is genuinely done, attention slipping to _being done_. The visible steps still ahead — the **post-completion steps** — supply the pull; the criterion's clarity is the resistance. Defend in order: **sharpen the bound first** (local and cheap); only if it is irreducibly fuzzy _and_ you observe the rush, hide the later steps by splitting the sequence — and hiding only works across a real context boundary (a handoff or an isolated review task; an inline call leaves the later steps in context and clears nothing).
+ - **Demand** — how much it requires. "Every modified model accounted for" forces thorough work where "produce a change list" does not. Demand drives **legwork** — the digging the agent does within the work, latent in the wording rather than written as its own step — and it is not step-bound: "every rule applied" binds a body of flat reference just as "every step done" binds a sequence, which is how an all-reference document still carries an exhaustiveness bar.
+
+ The strongest criteria are both checkable and exhaustive.

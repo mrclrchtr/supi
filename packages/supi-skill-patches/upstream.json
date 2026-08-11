@@ -1,0 +1,54 @@
+{
+  "repository": "mattpocock/skills",
+  "tag": "v1.2.3",
+  "includedGroups": {
+    "engineering": true,
+    "productivity": true
+  },
+  "groups": {
+    "deprecated": [],
+    "engineering": [
+      "ask-matt",
+      "code-review",
+      "codebase-design",
+      "diagnosing-bugs",
+      "domain-modeling",
+      "grill-with-docs",
+      "implement",
+      "improve-codebase-architecture",
+      "prototype",
+      "research",
+      "resolving-merge-conflicts",
+      "setup-matt-pocock-skills",
+      "tdd",
+      "to-spec",
+      "to-tickets",
+      "triage",
+      "wayfinder",
+      "wizard"
+    ],
+    "in-progress": [
+      "claude-handoff",
+      "loop-me",
+      "setup-ts-deep-modules",
+      "writing-beats",
+      "writing-fragments",
+      "writing-shape"
+    ],
+    "misc": [
+      "git-guardrails-claude-code",
+      "migrate-to-shoehorn",
+      "scaffold-exercises",
+      "setup-pre-commit"
+    ],
+    "productivity": [
+      "grill-me",
+      "grilling",
+      "handoff",
+      "teach",
+      "to-questionnaire",
+      "wait-what",
+      "writing-for-agents"
+    ]
+  }
+}

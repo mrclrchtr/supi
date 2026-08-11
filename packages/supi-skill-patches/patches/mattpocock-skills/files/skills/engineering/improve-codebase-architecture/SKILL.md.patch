@@ -1,0 +1,51 @@
+diff --git a/skills/engineering/improve-codebase-architecture/SKILL.md b/skills/engineering/improve-codebase-architecture/SKILL.md
+index 529761a3a01d35996018f27530b3c3cc0ab18d41..c1289baec75bd32012851030e8246b126372d3c6 100644
+--- a/skills/engineering/improve-codebase-architecture/SKILL.md
++++ b/skills/engineering/improve-codebase-architecture/SKILL.md
+@@ -10,7 +10,7 @@ Surface architectural friction and propose **deepening opportunities** — refac
+
+ This command is _informed_ by the project's domain model and built on a shared design vocabulary:
+
+-- Run the `/codebase-design` skill for the architecture vocabulary (**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**) and its principles (the deletion test, "the interface is the test surface", "one adapter = hypothetical seam, two = real"). Use these terms exactly in every suggestion — don't drift into "component," "service," "API," or "boundary."
++- Load and follow the `codebase-design` skill for the architecture vocabulary (**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**) and its principles (the deletion test, "the interface is the test surface", "one adapter = hypothetical seam, two = real"). Use these terms exactly in every suggestion.
+ - The domain language in `CONTEXT.md` gives names to good seams; ADRs in `docs/adr/` record decisions this command should not re-litigate.
+
+ ## Process
+@@ -24,7 +24,9 @@ This command is _informed_ by the project's domain model and built on a shared d
+
+ Read the project's domain glossary (`CONTEXT.md`) and any ADRs in the area you're touching first.
+
+-Then spawn a sub-agent to walk the codebase. Don't follow rigid heuristics — explore organically and note where you experience friction:
++Then call `supi_review_run` once with `direct` and a `currentState` target scoped to the selected paths. Give one `architecture-scan` task the domain glossary, applicable ADR paths, design vocabulary, and the inspection questions below. The task must inspect without changing files and report evidence for each candidate. If `supi_review_run` is unavailable, inspect in the current session with `code_orientation` and `code_graph`.
++
++Do not follow rigid heuristics. Explore organically and note where you experience friction:
+
+ - Where does understanding one concept require bouncing between many small modules?
+ - Where are modules **shallow** — interface nearly as complex as the implementation?
+@@ -51,21 +53,21 @@ For each candidate, render a card with:
+
+ End the report with a **Top recommendation** section: which candidate you'd tackle first and why.
+
+-**Use CONTEXT.md vocabulary for the domain, and the `/codebase-design` vocabulary for the architecture.** If `CONTEXT.md` defines "Order," talk about "the Order intake module" — not "the FooBarHandler," and not "the Order service."
++**Use `CONTEXT.md` vocabulary for the domain, and the `codebase-design` vocabulary for the architecture.** If `CONTEXT.md` defines "Order," talk about "the Order intake module" — not "the FooBarHandler," and not "the Order service."
+
+ **ADR conflicts**: if a candidate contradicts an existing ADR, only surface it when the friction is real enough to warrant revisiting the ADR. Mark it clearly in the card (e.g. a warning callout: _"contradicts ADR-0007 — but worth reopening because…"_). Don't list every theoretical refactor an ADR forbids.
+
+ See [HTML-REPORT.md](HTML-REPORT.md) for the full HTML scaffold, diagram patterns, and styling guidance.
+
+-Do NOT propose interfaces yet. After the file is written, ask the user: "Which of these would you like to explore?"
++Do not propose interfaces yet. After the file is written, use `ask_user` to ask which candidate the user wants to explore. If `ask_user` is unavailable, ask in plain text.
+
+ ### 3. Grilling loop
+
+-Once the user picks a candidate, run the `/grilling` skill to walk the decision tree with them — constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.
++Once the user picks a candidate, load and follow the `grilling` skill to walk the decision tree with them: constraints, dependencies, the deepened module's shape, what sits behind the seam, and which tests survive.
+
+-Side effects happen inline as decisions crystallize — run the `/domain-modeling` skill to keep the domain model current as you go:
++Load and follow the `domain-modeling` skill as decisions become clear:
+
+ - **Naming a deepened module after a concept not in `CONTEXT.md`?** Add the term to `CONTEXT.md`. Create the file lazily if it doesn't exist.
+ - **Sharpening a fuzzy term during the conversation?** Update `CONTEXT.md` right there.
+ - **User rejects the candidate with a load-bearing reason?** Offer an ADR, framed as: _"Want me to record this as an ADR so future architecture reviews don't re-suggest it?"_ Only offer when the reason would actually be needed by a future explorer to avoid re-suggesting the same thing — skip ephemeral reasons ("not worth it right now") and self-evident ones.
+-- **Want to explore alternative interfaces for the deepened module?** Run the `/codebase-design` skill and use its design-it-twice parallel sub-agent pattern.
++- **Want to explore alternative interfaces for the deepened module?** Load and follow the `codebase-design` skill and use its isolated Design It Twice reviews.
