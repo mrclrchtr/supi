@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { walkFiles } from "./file-walk.ts";
@@ -10,14 +10,20 @@ const combinedPath = join(patchRoot, "combined.patch");
 
 /** Compose the deterministic pnpm patch from its per-file fragments. */
 export function composePatch(): string {
-  const files = walkFiles(filesRoot).filter((path) => path.endsWith(".patch"));
-  if (files.length === 0) throw new Error("No patch fragments found");
+  const files = existsSync(filesRoot)
+    ? walkFiles(filesRoot).filter((path) => path.endsWith(".patch"))
+    : [];
   return files.map((path) => readFileSync(path, "utf8")).join("");
 }
 
-/** Write the combined patch consumed by pnpm. */
+/** Write the combined patch consumed by pnpm, or remove it when no fragments exist. */
 export function writeCombinedPatch(): void {
-  writeFileSync(combinedPath, composePatch());
+  const patch = composePatch();
+  if (patch.length === 0) {
+    rmSync(combinedPath, { force: true });
+    return;
+  }
+  writeFileSync(combinedPath, patch);
 }
 
 function fragmentPath(chunk: string): string {
@@ -53,8 +59,13 @@ export function splitCombinedPatch(): void {
 /** Return errors when the checked-in pnpm patch differs from its fragments. */
 export function validatePatchBundle(): string[] {
   const expected = composePatch();
+  if (!existsSync(combinedPath)) {
+    return expected.length === 0
+      ? []
+      : [`Missing ${relative(packageRoot, combinedPath).split(sep).join("/")}`];
+  }
   const actual = readFileSync(combinedPath, "utf8");
-  if (actual === expected) return [];
+  if (actual === expected && expected.length > 0) return [];
   return [
     `Patch fragments do not match ${relative(packageRoot, combinedPath).split(sep).join("/")}`,
   ];

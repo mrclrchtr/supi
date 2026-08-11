@@ -80,7 +80,7 @@ function formatInventory(inventory: UpstreamInventory): string {
   return `${JSON.stringify(inventory, null, 2)}\n`;
 }
 
-/** Copy the patched stable upstream skills into the root skills catalog. */
+/** Copy the selected pinned upstream skills into the root skills catalog. */
 export function syncSkillMirror(): void {
   const inventory = readInventory();
   const groups = discoverGroups(groupNames());
@@ -148,7 +148,7 @@ function validateSkill(group: string, name: string): string[] {
   return errors;
 }
 
-/** Return drift between the pinned patched dependency and the committed skills catalog. */
+/** Return drift between the pinned dependency and the committed skills catalog. */
 export function validateSkillMirror(): string[] {
   const inventory = readInventory();
   const actualGroups = discoverGroups(groupNames());

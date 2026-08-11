@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Review changes since a fixed point along two axes — Standards and Spec. Runs isolated reviews in parallel with SuPi and reports them side by side. Use for branches, pull requests, work-in-progress changes, or requests to "review since X".
+description: Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X".
 ---
 
 Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
@@ -8,9 +8,9 @@ Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
 - **Standards** — does the code conform to this repo's documented coding standards?
 - **Spec** — does the code faithfully implement the originating issue / spec?
 
-Both axes run as isolated `supi_review_run` tasks so they do not affect each other's context. This skill then aggregates their findings.
+Both axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings.
 
-The issue tracker should have been provided to you. If `docs/agents/issue-tracker.md` is missing, ask the user to run `/skill:setup-matt-pocock-skills`.
+The issue tracker should have been provided to you — run `/setup-matt-pocock-skills` if `docs/agents/issue-tracker.md` is missing.
 
 ## Process
 
@@ -18,9 +18,9 @@ The issue tracker should have been provided to you. If `docs/agents/issue-tracke
 
 Whatever the user said is the fixed point — a commit SHA, branch name, tag, `main`, `HEAD~5`, etc. If they didn't specify one, ask for it.
 
-Capture the diff command once. For committed changes, use `git diff <fixed-point>...HEAD` so the comparison uses the merge base. For work-in-progress changes, use `git diff <fixed-point>` so the command also includes the current filesystem. Also note the commit list with `git log <fixed-point>..HEAD --oneline`.
+Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so the comparison is against the merge-base). Also note the list of commits via `git log <fixed-point>..HEAD --oneline`.
 
-Before going further, resolve the fixed point to a commit SHA (`git rev-parse <fixed-point>`) and confirm that the selected diff is not empty. A bad ref or empty diff must fail here, not inside the review tasks.
+Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here — not inside two parallel sub-agents.
 
 ### 2. Identify the spec source
 
@@ -29,7 +29,7 @@ Look for the originating spec, in this order:
 1. Issue references in the commit messages (`#123`, `Closes #45`, GitLab `!67`, etc.) — fetch via the workflow in `docs/agents/issue-tracker.md`.
 2. A path the user passed as an argument.
 3. A spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
-4. If nothing is found, ask the user where the spec is. If they say there is no spec, omit the **Spec** task and report "no spec available".
+4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent will skip and report "no spec available".
 
 ### 3. Identify the standards sources
 
@@ -55,29 +55,21 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 - **Middle Man** — a class or function that mostly just delegates onward. → cut it, call the real target direct.
 - **Refused Bequest** — a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
 
-### 4. Run the isolated reviews
+### 4. Spawn both sub-agents in parallel
 
-Call `supi_review_run` once with `direct` tasks so both axes run concurrently against one frozen state.
+**Standards sub-agent prompt** — include:
 
-Choose the target from the user's intent:
+- The full diff command and commit list.
+- The list of standards-source files you found in step 3, **plus the smell baseline from step 3** pasted in full — the sub-agent has no other access to it.
+- The brief: "Report — per file/hunk where relevant — (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls — documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words."
 
-- Work-in-progress changes, including uncommitted files: `workingTree` with the resolved fixed-point SHA as `baseCommit`.
-- Committed branch or pull-request changes: `comparison` with the resolved fixed-point SHA as `baseCommit`.
-- One named commit: `commit` with its resolved SHA.
+**Spec sub-agent prompt** — include:
 
-Put the diff command and commit list in `sharedContext`. Use `findingScope: "change-only"` for each task.
+- The diff command and commit list.
+- The path or fetched contents of the spec.
+- The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the spec line for each finding. Under 400 words."
 
-**`standards` task** — include:
-
-- The standards-source paths and the complete smell baseline from step 3.
-- This brief: "Report, per file or hunk: (a) each documented-standard violation, with the source file and rule; and (b) each baseline smell, with its name and evidence. Distinguish hard violations from judgement calls. Baseline smells are always judgement calls, and a documented project standard overrides the baseline. Skip checks that tooling enforces. Use no more than 400 words."
-
-**`spec` task** — include:
-
-- The spec path or fetched contents.
-- This brief: "Report: (a) missing or partial requirements; (b) unrequested behavior or scope creep; and (c) requirements that appear implemented incorrectly. Quote the spec for each finding. Use no more than 400 words."
-
-Add repository documents as `criteriaSources` when they are authoritative and the tool limit permits it. If there is no spec, run only the `standards` task and note the missing axis. If `supi_review_run` is unavailable, run the two axes sequentially in the current session and state that isolation was unavailable.
+If the spec is missing, skip the Spec sub-agent and note this in the final report.
 
 ### 5. Aggregate
 
