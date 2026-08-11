@@ -14,17 +14,18 @@ This package is not a PI extension and is not published to npm. Skills installed
 
 `upstream.json` records every upstream skill group and uses `includedGroups` to mark the stable groups mirrored to the root catalog. The `mattpocock-skills` development dependency pins the upstream release.
 
-No patches are active. The root catalog is an exact mirror of the selected upstream skill groups.
+One patch fragment exists for each changed upstream file under `patches/mattpocock-skills/files/`. pnpm consumes the generated `patches/mattpocock-skills/combined.patch`. The `grilling` patch uses `ask_user` from `@mrclrchtr/supi-ask-user` for each question round.
 
 ```bash
-pnpm install      # install the pinned dependency
-pnpm skills:sync  # refresh root skills and upstream.json
-pnpm skills:check # check generated-skill drift
+pnpm skills:patches:compose # rebuild the pnpm patch from fragments
+pnpm install                # apply the patch to the pinned dependency
+pnpm skills:sync            # refresh root skills and upstream.json
+pnpm skills:check           # check patch and generated-skill drift
 ```
 
-The maintenance test reports upstream skill additions and removals.
+A dependency update fails when a patch no longer applies. The maintenance test also reports upstream skill additions and removals.
 
-When a SuPi change becomes necessary, add and review one patch fragment for one upstream file. Compose the combined patch, register it in `pnpm-workspace.yaml`, run `pnpm install`, and sync the root catalog. Do not add speculative patches.
+Add and review one patch fragment for one upstream file. Do not add speculative patches.
 
 ## Credit
 

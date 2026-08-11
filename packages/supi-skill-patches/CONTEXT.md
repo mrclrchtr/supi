@@ -8,7 +8,7 @@ Maintenance boundary for the root skills.sh catalog.
 A third-party collection consumed from a pinned release.
 
 **Skill Patch Fragment**:
-An optional SuPi change for one upstream file. No fragments are active. Add and review fragments one at a time when they are necessary.
+The change for one upstream file. Fragments are the source of truth for SuPi compatibility changes.
 
 **Combined Patch**:
 The generated patch that pnpm applies when one or more fragments are active.

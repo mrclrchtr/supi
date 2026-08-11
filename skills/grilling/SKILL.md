@@ -7,13 +7,18 @@ Interview the user relentlessly until you reach a shared understanding. Map this
 
 Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled — the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask the whole frontier in one round: number each question and give your recommended answer. Then wait for the user's answers before the next round.
 
-Each question should be formatted like so:
+Use `ask_user` for each round. Put all frontier questions in one form. Fill the fields as follows:
 
-```
-❓ **Q1** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
-
-➡️ <your recommended answer>
-```
+- `title`: Name the subject and the round.
+- `intro`: Summarize what is settled and why this frontier is open.
+- `questions`: Include the current frontier, up to the form limit of 10. If the frontier is larger, ask the first 10 and recompute it from the answers.
+- `id`: Use the question number, such as `Q1`.
+- `header`: Start with the question number and add a title.
+- `prompt`: State the decision and the context that the user needs.
+- `type`: Use `choice` when the answer set is known. Use `text` only for an open answer.
+- `options`: For a choice question, use stable `value` ids, concise `label` text, and a brief `description`. Set `multi` to `true` only when the user can select more than one option.
+- `details`: Explain trade-offs or consequences for a choice option. It can also contain a sketch.
+- `recommendation`: For a choice question, use the recommended option `value`, or an array of values when `multi` is `true`. For a text question, give the recommended answer. Also give text questions a `placeholder` that shows the expected answer shape.
 
 Each round the user answers reshapes the tree — settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
 
