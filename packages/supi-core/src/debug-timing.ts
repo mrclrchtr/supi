@@ -46,13 +46,21 @@ export interface DebugTimer {
  * names are accumulated. Event data reserves the `timing` field. When Debug is
  * disabled at start, this returns a no-op timer and does not read the clock.
  * Pass a factory to `finish()` to avoid event-data construction when disabled.
+ * Clock, event-construction, and registry failures are isolated from the
+ * measured operation and make the timer a no-op.
  */
 export function startDebugTimer(options: DebugTimerOptions = {}): DebugTimer {
   if (!isDebugRegistryEnabled()) return DISABLED_DEBUG_TIMER;
   const now = options.now ?? performance.now.bind(performance);
-  const startedAt = now();
+  let startedAt: number;
+  try {
+    startedAt = now();
+  } catch {
+    return DISABLED_DEBUG_TIMER;
+  }
   let previousAt = startedAt;
   let finished = false;
+  let failed = false;
   const phases = new Map<string, number>();
 
   const markAt = (phase: string, current: number): void => {
@@ -65,30 +73,35 @@ export function startDebugTimer(options: DebugTimerOptions = {}): DebugTimer {
   return {
     enabled: true,
     mark(phase) {
-      if (finished) return;
-      markAt(phase, now());
+      if (finished || failed) return;
+      try {
+        markAt(phase, now());
+      } catch {
+        failed = true;
+      }
     },
     finish(input, finalPhase) {
-      if (finished) return null;
-      if (!isDebugRegistryEnabled()) {
-        finished = true;
+      if (finished || failed) return null;
+      finished = true;
+      try {
+        if (!isDebugRegistryEnabled()) return null;
+        const completedAt = now();
+        if (finalPhase) markAt(finalPhase, completedAt);
+        const phasesMs = Object.fromEntries(
+          [...phases.entries()].map(([name, value]) => [name, duration(value)]),
+        );
+        const timing: DebugTiming = {
+          durationMs: duration(completedAt - startedAt),
+          phasesMs,
+        };
+        const eventInput = typeof input === "function" ? input() : input;
+        return recordDebugEvent({
+          ...eventInput,
+          data: { ...eventInput.data, timing },
+        });
+      } catch {
         return null;
       }
-      const completedAt = now();
-      if (finalPhase) markAt(finalPhase, completedAt);
-      finished = true;
-      const phasesMs = Object.fromEntries(
-        [...phases.entries()].map(([name, value]) => [name, duration(value)]),
-      );
-      const timing: DebugTiming = {
-        durationMs: duration(completedAt - startedAt),
-        phasesMs,
-      };
-      const eventInput = typeof input === "function" ? input() : input;
-      return recordDebugEvent({
-        ...eventInput,
-        data: { ...eventInput.data, timing },
-      });
     },
   };
 }

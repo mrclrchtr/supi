@@ -1,4 +1,9 @@
 import { PassThrough } from "node:stream";
+import {
+  configureDebugRegistry,
+  getDebugEvents,
+  resetDebugRegistry,
+} from "@mrclrchtr/supi-core/debug";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createMessageConnection,
@@ -47,6 +52,7 @@ describe("JsonRpcClient", () => {
   let serverOut: PassThrough;
 
   beforeEach(() => {
+    configureDebugRegistry({ enabled: true, maxEvents: 100 });
     const pair = createServerPair();
     client = pair.client;
     server = pair.server;
@@ -70,6 +76,39 @@ describe("JsonRpcClient", () => {
     serverIn.removeAllListeners();
     serverOut.removeAllListeners();
     vi.restoreAllMocks();
+    resetDebugRegistry();
+  });
+
+  it("records a sanitized request timing observation", async () => {
+    server.onRequest("textDocument/hover", () => ({ contents: "ok" }));
+
+    await client.sendRequest("textDocument/hover", {
+      textDocument: { uri: "file:///private/source.ts" },
+      source: "secret source text",
+      command: "private-command --token=secret",
+    });
+
+    const events = getDebugEvents({ source: "lsp", category: "request.timing" }).events;
+    expect(events).toEqual([
+      expect.objectContaining({
+        message: "LSP semantic request completed",
+        data: {
+          methodClass: "semantic",
+          outcome: "completed",
+          timeoutMs: 30_000,
+          timedOut: false,
+          cancelled: false,
+          timing: {
+            durationMs: expect.any(Number),
+            phasesMs: { request: expect.any(Number) },
+          },
+        },
+      }),
+    ]);
+    expect(JSON.stringify(events)).not.toContain("/private/source.ts");
+    expect(JSON.stringify(events)).not.toContain("secret source text");
+    expect(JSON.stringify(events)).not.toContain("private-command");
+    expect(JSON.stringify(events)).not.toContain("textDocument/hover");
   });
 
   it("correlates response by id", async () => {
@@ -101,6 +140,14 @@ describe("JsonRpcClient", () => {
     });
 
     await expect(client.sendRequest("bad/method")).rejects.toThrow("Method not found");
+    expect(getDebugEvents({ source: "lsp", category: "request.timing" }).events[0]?.data).toEqual(
+      expect.objectContaining({
+        methodClass: "other",
+        outcome: "failed",
+        timedOut: false,
+        cancelled: false,
+      }),
+    );
   });
 
   it("dispatches notifications to handler", async () => {
@@ -139,10 +186,19 @@ describe("JsonRpcClient", () => {
     );
   });
 
-  it("rejects pending requests on dispose", async () => {
-    const promise = client.sendRequest("will/dispose");
+  it("records cancellation when dispose rejects a pending request", async () => {
+    const promise = client.sendRequest("textDocument/references");
     client.dispose();
     await expect(promise).rejects.toThrow();
+
+    expect(getDebugEvents({ source: "lsp", category: "request.timing" }).events[0]?.data).toEqual(
+      expect.objectContaining({
+        methodClass: "semantic",
+        outcome: "cancelled",
+        timedOut: false,
+        cancelled: true,
+      }),
+    );
   });
 
   it("handles per-request timeout overrides", async () => {
@@ -166,6 +222,15 @@ describe("JsonRpcClient", () => {
         timeoutMs: 50,
       });
       await expect(promise).rejects.toThrow("timed out");
+      expect(getDebugEvents({ source: "lsp", category: "request.timing" }).events[0]?.data).toEqual(
+        expect.objectContaining({
+          methodClass: "other",
+          outcome: "timed-out",
+          timeoutMs: 50,
+          timedOut: true,
+          cancelled: true,
+        }),
+      );
     } finally {
       shortClient.dispose();
       deadInput.destroy();

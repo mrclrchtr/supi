@@ -1,0 +1,155 @@
+import { startDebugTimer } from "@mrclrchtr/supi-core/debug";
+
+type DiagnosticCollection = "fallback" | "none" | "pull" | "push";
+type DiagnosticFreshness = "not-observed" | "observed";
+type DiagnosticOutcome = "completed" | "skipped" | "timed-out";
+type DiagnosticPullOutcome = "completed" | "failed" | "not-supported" | "not-used" | "timed-out";
+type DiagnosticPushOutcome = "not-used" | "published" | "released" | "settled" | "timed-out";
+type DiagnosticSettleOutcome = "not-used" | "published" | "quiet" | "released" | "timed-out";
+type DiagnosticTimingOperation = "refresh-open" | "sync-file";
+
+/** Result of waiting for a quiet push-diagnostic window. */
+export interface DiagnosticSettleResult {
+  readonly outcome: "quiet" | "timed-out";
+  readonly freshness: DiagnosticFreshness;
+}
+
+/** Result of waiting for one file's push diagnostics. */
+export type DiagnosticPushWaitOutcome = "published" | "released" | "timed-out";
+
+interface DiagnosticTimingData {
+  readonly collection: DiagnosticCollection;
+  readonly documentCount: number;
+  readonly fallback: boolean;
+  readonly freshness: DiagnosticFreshness;
+  readonly outcome: DiagnosticOutcome;
+  readonly pull: DiagnosticPullOutcome;
+  readonly push: DiagnosticPushOutcome;
+  readonly settle: DiagnosticSettleOutcome;
+  readonly timedOut: boolean;
+}
+
+/** Internal pull failure that retains only whether a timeout occurred. */
+export class DiagnosticPullError extends Error {
+  constructor(readonly timedOut: boolean) {
+    super("pull diagnostics incomplete");
+  }
+}
+
+/**
+ * Record one diagnostic operation without document identifiers or diagnostic text.
+ *
+ * The observer owns result classification so diagnostic control flow does not
+ * duplicate the event shape.
+ */
+export class DiagnosticObserver {
+  readonly #timer = startDebugTimer();
+  #pull: "failed" | "not-supported" | "timed-out";
+
+  constructor(
+    readonly operation: DiagnosticTimingOperation,
+    readonly supportsPull: boolean,
+  ) {
+    this.#pull = supportsPull ? "failed" : "not-supported";
+  }
+
+  synchronized(): void {
+    this.#timer.mark("synchronize");
+  }
+
+  skipped(documentCount: number): void {
+    this.#finish({
+      collection: "none",
+      documentCount,
+      fallback: false,
+      freshness: "not-observed",
+      outcome: "skipped",
+      pull: "not-used",
+      push: "not-used",
+      settle: "not-used",
+      timedOut: false,
+    });
+  }
+
+  pullCompleted(documentCount: number): void {
+    this.#finish(
+      {
+        collection: "pull",
+        documentCount,
+        fallback: false,
+        freshness: "observed",
+        outcome: "completed",
+        pull: "completed",
+        push: "not-used",
+        settle: "not-used",
+        timedOut: false,
+      },
+      "pull",
+    );
+  }
+
+  pullFailed(error: unknown): void {
+    this.#pull = isDiagnosticTimeout(error) ? "timed-out" : "failed";
+    this.#timer.mark("pull");
+  }
+
+  pullTimedOut(): void {
+    this.#pull = "timed-out";
+    this.#timer.mark("pull");
+  }
+
+  pushSettled(documentCount: number, settle: DiagnosticSettleResult): void {
+    const timedOut = settle.outcome === "timed-out";
+    this.#finish(
+      {
+        collection: this.supportsPull ? "fallback" : "push",
+        documentCount,
+        fallback: this.supportsPull,
+        freshness: settle.freshness,
+        outcome: timedOut ? "timed-out" : "completed",
+        pull: this.#pull,
+        push: timedOut ? "timed-out" : "settled",
+        settle: settle.outcome,
+        timedOut: timedOut || this.#pull === "timed-out",
+      },
+      "push-settle",
+    );
+  }
+
+  pushWaitCompleted(documentCount: number, push: DiagnosticPushWaitOutcome): void {
+    const timedOut = push === "timed-out";
+    this.#finish(
+      {
+        collection: this.supportsPull ? "fallback" : "push",
+        documentCount,
+        fallback: this.supportsPull,
+        freshness: push === "published" ? "observed" : "not-observed",
+        outcome: timedOut ? "timed-out" : "completed",
+        pull: this.#pull,
+        push,
+        settle: push,
+        timedOut: timedOut || this.#pull === "timed-out",
+      },
+      "push-settle",
+    );
+  }
+
+  #finish(data: DiagnosticTimingData, finalPhase?: "pull" | "push-settle" | "synchronize"): void {
+    this.#timer.finish(
+      () => ({
+        source: "lsp",
+        level: "debug",
+        category: "diagnostics.timing",
+        message: `LSP diagnostic ${this.operation} ${data.outcome}`,
+        data: { operation: this.operation, ...data },
+      }),
+      finalPhase,
+    );
+  }
+}
+
+/** Return whether a diagnostic failure represents a timeout without retaining its message. */
+export function isDiagnosticTimeout(error: unknown): boolean {
+  if (error instanceof DiagnosticPullError) return error.timedOut;
+  return error instanceof Error && /\btimed? ?out\b|\btimeout\b/i.test(error.message);
+}

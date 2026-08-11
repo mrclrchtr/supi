@@ -96,6 +96,16 @@ if (state.kind === "ready") {
 }
 ```
 
+## Structural performance baseline
+
+Run the stable outline fixture on the same machine and dependency versions:
+
+```bash
+pnpm --filter @mrclrchtr/supi-tree-sitter bench:structural
+```
+
+The benchmark reports a cold session parser baseline and a repeated parser baseline. Debug capture is active, so the baseline includes the internal timing observation cost. The benchmark records measurements but does not set a pass or fail threshold.
+
 ## Source
 
 - `src/api.ts` — public library entrypoint

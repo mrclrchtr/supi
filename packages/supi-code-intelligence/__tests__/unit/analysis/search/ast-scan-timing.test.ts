@@ -75,6 +75,6 @@ describe("AST scan timing events", () => {
         },
       }),
     ]);
-    expect(JSON.stringify(events[0]?.data)).not.toContain(tmpDir);
+    expect(JSON.stringify(events)).not.toContain(tmpDir);
   });
 });

@@ -10,10 +10,18 @@ import type {
   VersionedTextDocumentIdentifier,
 } from "../config/types.ts";
 import { detectLanguageId, fileToUri, uriToFile } from "../utils.ts";
+import {
+  DiagnosticObserver,
+  DiagnosticPullError,
+  type DiagnosticPushWaitOutcome,
+  type DiagnosticSettleResult,
+  isDiagnosticTimeout,
+} from "./client-diagnostic-timing.ts";
 
 const DIAGNOSTIC_WAIT_MS = 3_000;
 
 type OpenDocument = { version: number };
+type DiagnosticWaiter = (outcome: "published" | "released") => void;
 
 type DiagnosticCacheEntry = {
   diagnostics: Diagnostic[];
@@ -48,7 +56,7 @@ interface ClientDiagnosticsHost {
 export class ClientDiagnostics {
   readonly #openDocs = new Map<string, OpenDocument>();
   readonly #diagnosticStore = new Map<string, DiagnosticCacheEntry>();
-  readonly #diagnosticWaiters = new Map<string, Array<() => void>>();
+  readonly #diagnosticWaiters = new Map<string, DiagnosticWaiter[]>();
 
   constructor(private readonly host: ClientDiagnosticsHost) {}
 
@@ -160,53 +168,72 @@ export class ClientDiagnostics {
       receivedAt: Date.now(),
       version: params.version ?? undefined,
     });
-    this.#releaseDiagnosticWaiters(params.uri);
+    this.#releaseDiagnosticWaiters(params.uri, "published");
   }
 
   /** Re-read open documents, then collect pull diagnostics or wait for push diagnostics. */
   async refreshOpenDiagnostics(
     options: { maxWaitMs?: number; quietMs?: number } = {},
   ): Promise<void> {
-    if (!this.host.isOperational()) return;
+    const supportsPull = this.host.supportsPullDiagnostics();
+    const observer = new DiagnosticObserver("refresh-open", supportsPull);
+    if (!this.host.isOperational()) {
+      observer.skipped(0);
+      return;
+    }
 
     const maxWaitMs = options.maxWaitMs ?? 3_000;
     const quietMs = options.quietMs ?? 200;
     const syncStart = Date.now();
-
     this.#resyncOpenDocuments();
-    if (this.#openDocs.size === 0) return;
+    observer.synchronized();
+    const documentCount = this.#openDocs.size;
+    if (documentCount === 0) {
+      observer.skipped(0);
+      return;
+    }
 
-    if (this.host.supportsPullDiagnostics()) {
+    if (supportsPull) {
       try {
         await this.#pullDiagnosticsForOpenDocuments(syncStart, maxWaitMs);
+        observer.pullCompleted(documentCount);
         return;
-      } catch {
-        // Pull diagnostics failed. Wait for push diagnostics instead.
+      } catch (error) {
+        observer.pullFailed(error);
       }
     }
 
-    await this.#waitForDiagnosticSettle(syncStart, maxWaitMs, quietMs);
+    const settle = await this.#waitForDiagnosticSettle(syncStart, maxWaitMs, quietMs);
+    observer.pushSettled(documentCount, settle);
   }
 
   /** Sync one file and return its diagnostics after pull or push collection. */
   async syncAndWaitForDiagnostics(filePath: string, content: string): Promise<Diagnostic[]> {
+    const supportsPull = this.host.supportsPullDiagnostics();
+    const observer = new DiagnosticObserver("sync-file", supportsPull);
     const uri = fileToUri(filePath);
     const syncStart = Date.now();
     this.didChange(filePath, content);
+    observer.synchronized();
 
-    if (this.host.supportsPullDiagnostics()) {
+    if (supportsPull) {
       const remaining = DIAGNOSTIC_WAIT_MS - (Date.now() - syncStart);
-      if (remaining > 0) {
-        try {
-          const pulled = await this.#pullDiagnosticsForUri(uri, remaining);
-          if (pulled) return this.getDiagnostics(filePath);
-        } catch {
-          // Pull diagnostics failed. Wait for push diagnostics instead.
-        }
+      try {
+        if (remaining <= 0) observer.pullTimedOut();
+        else if (await this.#pullDiagnosticsForUri(uri, remaining)) {
+          observer.pullCompleted(1);
+          return this.getDiagnostics(filePath);
+        } else observer.pullFailed(undefined);
+      } catch (error) {
+        observer.pullFailed(error);
       }
     }
 
-    await this.#waitForDiagnostics(uri, Math.max(0, DIAGNOSTIC_WAIT_MS - (Date.now() - syncStart)));
+    const push = await this.#waitForDiagnostics(
+      uri,
+      Math.max(0, DIAGNOSTIC_WAIT_MS - (Date.now() - syncStart)),
+    );
+    observer.pushWaitCompleted(1, push);
     return this.getDiagnostics(filePath);
   }
 
@@ -240,9 +267,9 @@ export class ClientDiagnostics {
     );
 
     const anySuccess = results.some((result) => result.status === "fulfilled" && result.value);
-    const hadFailure = results.some((result) => result.status === "rejected");
-    if ((hadFailure || !anySuccess) && uris.length > 0) {
-      throw new Error("pull diagnostics incomplete");
+    const failures = results.filter((result) => result.status === "rejected");
+    if ((failures.length > 0 || !anySuccess) && uris.length > 0) {
+      throw new DiagnosticPullError(failures.some((result) => isDiagnosticTimeout(result.reason)));
     }
   }
 
@@ -280,16 +307,25 @@ export class ClientDiagnostics {
     syncStart: number,
     maxWaitMs: number,
     quietMs: number,
-  ): Promise<void> {
+  ): Promise<DiagnosticSettleResult> {
     const deadline = syncStart + maxWaitMs;
     while (Date.now() < deadline) {
-      const lastReceived = this.#lastDiagnosticReceivedAfter(syncStart) || syncStart;
-      const elapsed = Date.now() - lastReceived;
-      if (elapsed >= quietMs) return;
+      const observedAt = this.#lastDiagnosticReceivedAfter(syncStart);
+      const elapsed = Date.now() - (observedAt || syncStart);
+      if (elapsed >= quietMs) {
+        return {
+          outcome: "quiet",
+          freshness: observedAt > 0 ? "observed" : "not-observed",
+        };
+      }
       await new Promise((resolve) =>
         setTimeout(resolve, Math.min(quietMs - elapsed, deadline - Date.now(), 50)),
       );
     }
+    return {
+      outcome: "timed-out",
+      freshness: this.#lastDiagnosticReceivedAfter(syncStart) > 0 ? "observed" : "not-observed",
+    };
   }
 
   #lastDiagnosticReceivedAfter(afterTime: number): number {
@@ -319,18 +355,18 @@ export class ClientDiagnostics {
     this.#releaseDiagnosticWaiters(uri);
   }
 
-  #waitForDiagnostics(uri: string, timeoutMs: number): Promise<void> {
-    if (timeoutMs <= 0) return Promise.resolve();
+  #waitForDiagnostics(uri: string, timeoutMs: number): Promise<DiagnosticPushWaitOutcome> {
+    if (timeoutMs <= 0) return Promise.resolve("timed-out");
 
-    return new Promise<void>((resolve) => {
-      const waiter = () => {
+    return new Promise<DiagnosticPushWaitOutcome>((resolve) => {
+      const waiter: DiagnosticWaiter = (outcome) => {
         clearTimeout(timer);
         this.#removeDiagnosticWaiter(uri, waiter);
-        resolve();
+        resolve(outcome);
       };
       const timer = setTimeout(() => {
         this.#removeDiagnosticWaiter(uri, waiter);
-        resolve();
+        resolve("timed-out");
       }, timeoutMs);
       const waiters = this.#diagnosticWaiters.get(uri) ?? [];
       waiters.push(waiter);
@@ -338,7 +374,7 @@ export class ClientDiagnostics {
     });
   }
 
-  #removeDiagnosticWaiter(uri: string, waiter: () => void): void {
+  #removeDiagnosticWaiter(uri: string, waiter: DiagnosticWaiter): void {
     const waiters = this.#diagnosticWaiters.get(uri);
     if (!waiters) return;
     const next = waiters.filter((entry) => entry !== waiter);
@@ -352,10 +388,10 @@ export class ClientDiagnostics {
     }
   }
 
-  #releaseDiagnosticWaiters(uri: string): void {
+  #releaseDiagnosticWaiters(uri: string, outcome: "published" | "released" = "released"): void {
     const waiters = this.#diagnosticWaiters.get(uri);
     if (!waiters) return;
     this.#diagnosticWaiters.delete(uri);
-    for (const waiter of waiters) waiter();
+    for (const waiter of waiters) waiter(outcome);
   }
 }

@@ -3,7 +3,6 @@ import type { StructuralSearchOperation } from "@mrclrchtr/supi-tree-sitter/api"
 import type { StructuredFileAnalysis, StructuredPatternParams } from "./pattern-analysis.ts";
 
 interface ScanContext {
-  readonly cwd: string;
   readonly params: StructuredPatternParams;
 }
 
@@ -40,7 +39,6 @@ export function startAstScanTimer(): AstScanTimer {
           level: "debug",
           category: "ast-scan.timing",
           message: `AST ${input.context.params.kind} scan analyzed ${input.analysis.analyzedFileCount} files`,
-          cwd: input.context.cwd,
           data: {
             kind: input.context.params.kind,
             operation: input.operation,

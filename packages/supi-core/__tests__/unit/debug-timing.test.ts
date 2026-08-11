@@ -29,6 +29,31 @@ describe("debug timing", () => {
     expect(eventFactory).not.toHaveBeenCalled();
   });
 
+  it("isolates clock and event-recording failures from the measured operation", () => {
+    configureDebugRegistry({ enabled: true });
+    const brokenClock = startDebugTimer({
+      now: () => {
+        throw new Error("clock failed");
+      },
+    });
+
+    expect(brokenClock.enabled).toBe(false);
+    expect(() => brokenClock.mark("work")).not.toThrow();
+    expect(
+      brokenClock.finish(() => {
+        throw new Error("event failed");
+      }),
+    ).toBeNull();
+
+    const timer = startDebugTimer({ now: () => 1 });
+    expect(() =>
+      timer.finish(() => {
+        throw new Error("event failed");
+      }),
+    ).not.toThrow();
+    expect(getDebugEvents().events).toEqual([]);
+  });
+
   it("records monotonic total and phase timings once", () => {
     configureDebugRegistry({ enabled: true });
     const now = vi

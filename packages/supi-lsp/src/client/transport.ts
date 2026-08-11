@@ -3,6 +3,7 @@
 // and notification/request dispatching through vscode-jsonrpc's MessageConnection.
 
 import type { Readable, Writable } from "node:stream";
+import { startDebugTimer } from "@mrclrchtr/supi-core/debug";
 import {
   CancellationTokenSource,
   createMessageConnection,
@@ -19,6 +20,9 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 
 export type NotificationHandler = (method: string, params: unknown) => void;
 export type RequestHandler = (method: string, params: unknown) => Promise<unknown> | unknown;
+
+type RequestMethodClass = "diagnostic" | "lifecycle" | "other" | "refactor" | "semantic";
+type RequestOutcome = "cancelled" | "completed" | "failed" | "timed-out";
 
 /** Re-export ResponseError so callers don't need a separate vscode-jsonrpc import. */
 const JsonRpcRequestError = ResponseError;
@@ -83,14 +87,23 @@ export class JsonRpcClient {
     params?: unknown,
     options?: { timeoutMs?: number },
   ): Promise<unknown> {
+    const timeoutMs = options?.timeoutMs ?? this.timeoutMs;
+    const methodClass = classifyRequestMethod(method);
+    const timer = startDebugTimer();
     if (this.closed || !this.connection) {
+      recordRequestTiming(timer, {
+        methodClass,
+        outcome: "cancelled",
+        timeoutMs,
+        timedOut: false,
+        cancelled: true,
+      });
       return Promise.reject(new Error("JSON-RPC client is closed"));
     }
 
-    const timeoutMs = options?.timeoutMs ?? this.timeoutMs;
     const tokenSource = new CancellationTokenSource();
-
     let timeout: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
     const timeoutError = new Error(`Request ${method} timed out after ${timeoutMs}ms`);
 
     const request = this.connection.sendRequest(method, params, tokenSource.token);
@@ -106,13 +119,43 @@ export class JsonRpcClient {
       request,
       new Promise<never>((_resolve, reject) => {
         timeout = setTimeout(() => {
+          timedOut = true;
           tokenSource.cancel();
           reject(timeoutError);
         }, timeoutMs);
       }),
-    ]).finally(() => {
-      if (timeout !== undefined) clearTimeout(timeout);
-    });
+    ])
+      .then(
+        (result) => {
+          recordRequestTiming(timer, {
+            methodClass,
+            outcome: "completed",
+            timeoutMs,
+            timedOut: false,
+            cancelled: false,
+          });
+          return result;
+        },
+        (error: unknown) => {
+          const cancelled = timedOut || this.closed || isCancellationError(error);
+          const outcome: RequestOutcome = timedOut
+            ? "timed-out"
+            : cancelled
+              ? "cancelled"
+              : "failed";
+          recordRequestTiming(timer, {
+            methodClass,
+            outcome,
+            timeoutMs,
+            timedOut,
+            cancelled,
+          });
+          throw error;
+        },
+      )
+      .finally(() => {
+        if (timeout !== undefined) clearTimeout(timeout);
+      });
 
     // Prevent unhandled rejection when dispose() cancels requests
     promise.catch(() => {});
@@ -141,4 +184,60 @@ export class JsonRpcClient {
       this.connection = null;
     }
   }
+}
+
+const SEMANTIC_REQUESTS = new Set([
+  "textDocument/definition",
+  "textDocument/documentSymbol",
+  "textDocument/hover",
+  "textDocument/implementation",
+  "textDocument/references",
+  "workspace/symbol",
+]);
+
+/** Classify requests into bounded groups without retaining the raw method. */
+function classifyRequestMethod(method: string): RequestMethodClass {
+  if (method === "initialize" || method === "shutdown") return "lifecycle";
+  if (method === "textDocument/diagnostic" || method === "workspace/diagnostic") {
+    return "diagnostic";
+  }
+  if (method === "textDocument/codeAction" || method === "textDocument/rename") {
+    return "refactor";
+  }
+  return SEMANTIC_REQUESTS.has(method) ? "semantic" : "other";
+}
+
+function isCancellationError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const code = (error as Error & { code?: unknown }).code;
+  return (
+    code === -32_800 ||
+    code === -32_802 ||
+    error.name === "CancellationError" ||
+    /\bcancell?ed\b/i.test(error.message)
+  );
+}
+
+interface RequestTimingObservation {
+  readonly methodClass: RequestMethodClass;
+  readonly outcome: RequestOutcome;
+  readonly timeoutMs: number;
+  readonly timedOut: boolean;
+  readonly cancelled: boolean;
+}
+
+function recordRequestTiming(
+  timer: ReturnType<typeof startDebugTimer>,
+  observation: RequestTimingObservation,
+): void {
+  timer.finish(
+    () => ({
+      source: "lsp",
+      level: "debug",
+      category: "request.timing",
+      message: `LSP ${observation.methodClass} request ${observation.outcome}`,
+      data: { ...observation },
+    }),
+    "request",
+  );
 }
