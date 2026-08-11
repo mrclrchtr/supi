@@ -71,6 +71,22 @@ describe("Review Workspace materialization", () => {
     await workspace.cleanup();
   });
 
+  it("preserves invalid UTF-8 bytes in a text patch", async () => {
+    const expected = Buffer.from([
+      0x70, 0x72, 0x65, 0x66, 0x69, 0x78, 0xff, 0x73, 0x75, 0x66, 0x66, 0x69, 0x78, 0x0a,
+    ]);
+    writeFileSync(join(cwd, "tracked.txt"), expected);
+    const snapshot = await resolveReviewSnapshot(cwd, {});
+
+    const workspace = await materializeReviewWorkspace(snapshot);
+    try {
+      expect(readFileSync(join(workspace.cwd, "tracked.txt"))).toEqual(expected);
+      expect(workspace.receipt.observedDiffHash).toBe(snapshot.diffHash);
+    } finally {
+      await workspace.cleanup();
+    }
+  });
+
   it("checks out an exact committed after state without staged freeze data", async () => {
     const from = git(cwd, "rev-parse", "HEAD");
     writeFileSync(join(cwd, "tracked.txt"), "committed\n");

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   isRootCommit: vi.fn(),
@@ -36,6 +36,11 @@ const snapshot: ReviewSnapshot = {
 const model = { canonicalId: "provider/reviewer", model: {} } as ReviewModelSelection;
 
 describe("Review Scope cleanup warnings", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.isRootCommit.mockResolvedValue(false);
+  });
+
   it("returns the cleanup recovery command when frozen-scope validation fails", async () => {
     const cleanup = vi.fn().mockResolvedValue({
       workspacePath: "/tmp/review-workspace",
@@ -66,5 +71,33 @@ describe("Review Scope cleanup warnings", () => {
       reason:
         "Review Scope path \"missing.ts\" does not exist in the frozen after state. Review Workspace cleanup warning: Review Workspace cleanup failed; completed review findings remain valid. Recovery: git worktree remove --force '/tmp/review-workspace'",
     });
+  });
+
+  it("cleans the Review Workspace before it propagates scope-validation cancellation", async () => {
+    const cleanup = vi.fn().mockResolvedValue(undefined);
+    const controller = new AbortController();
+    mocks.resolveReviewSnapshot.mockResolvedValue(snapshot);
+    mocks.materializeReviewWorkspace.mockResolvedValue({
+      cwd: "/tmp/review-workspace",
+      receipt: {},
+      cleanup,
+    });
+    mocks.validateReviewScope.mockImplementation(async () => {
+      controller.abort();
+      controller.signal.throwIfAborted();
+    });
+
+    await expect(
+      runReview({
+        cwd: "/repo",
+        target: {},
+        scope: { paths: ["src"] },
+        review: { tasks: [{ id: "state", instructions: "Review state.", mode: "state" }] },
+        reviewerModel: model,
+        signal: controller.signal,
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+
+    expect(cleanup).toHaveBeenCalledOnce();
   });
 });

@@ -90,6 +90,9 @@ function mapOutcome<T>(outcome: AgentRunOutcome<T>): ChildRunOutcome<T> {
 export async function runIsolatedChild<T>(
   config: IsolatedRunConfig<T>,
 ): Promise<ChildRunOutcome<T>> {
+  if (!config.providerAuthority) {
+    return { kind: "failed", failureCode: "session-creation-failed" };
+  }
   const agentDir = process.env.PI_CODING_AGENT_DIR || getAgentDir();
   const { loader, settingsManager } = createIsolatedChildResources(
     config.cwd,
@@ -100,9 +103,6 @@ export async function runIsolatedChild<T>(
       projectTrusted: config.projectTrusted,
     },
   );
-  if (!config.providerAuthority) {
-    return { kind: "failed", failureCode: "session-creation-failed" };
-  }
   const run = startAgentRun<T>({
     inputs: {
       cwd: config.cwd,

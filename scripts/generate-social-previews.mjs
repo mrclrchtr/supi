@@ -86,7 +86,7 @@ const SOCIAL_TAGLINES = {
     "Ghost-text next-prompt suggestions you can",
     "edit before sending. Optional.",
   ],
-  review: ["Runs independent inspection-only reviewers", "over a frozen copy of your change."],
+  review: ["Runs independent inspection-only reviewers", "against one exact frozen Review Target."],
   settings: ["One searchable /supi-settings overlay for", "project & global SuPi configuration."],
   skills: [
     "Keep skills available for explicit commands,",

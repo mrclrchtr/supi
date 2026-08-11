@@ -1,6 +1,7 @@
 import {
   runGit as git,
   runGitAllowExit as gitAllowExit,
+  runGitBuffer as gitBuffer,
   resolveGitRepositoryRoot,
   withReviewIndex,
 } from "../git-command.ts";
@@ -114,7 +115,7 @@ async function filesystemSnapshot(
           indexFile,
           signal,
         ),
-        git(repositoryRoot, ["diff", ...DIFF_FLAGS, baseline], indexFile, signal),
+        gitBuffer(repositoryRoot, ["diff", ...DIFF_FLAGS, baseline], indexFile, signal),
         git(
           repositoryRoot,
           ["ls-files", "--others", "--exclude-standard", "-z"],
@@ -146,7 +147,7 @@ async function committedSnapshot(
     return { changes: [], ...createDiffAccumulator().finish(0) };
   }
   const [diffText, nameStatus, numstat] = await Promise.all([
-    git(
+    gitBuffer(
       repositoryRoot,
       ["diff", ...DIFF_FLAGS, target.fromCommit, target.toCommit],
       undefined,

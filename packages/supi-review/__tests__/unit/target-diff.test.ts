@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
-import {
-  assertFullDiffCharacters,
-  joinDiffParts,
-  MAX_FULL_DIFF_CHARACTERS,
-} from "../../src/target/diff.ts";
+import { assertFullDiffBytes, joinDiffParts, MAX_FULL_DIFF_BYTES } from "../../src/target/diff.ts";
 
 describe("target diff assembly", () => {
-  it("joins non-empty patch parts with canonical trailing newlines", () => {
-    expect(joinDiffParts(["first", "", "second\n"])).toBe("first\nsecond\n");
+  it("joins non-empty patch parts as exact bytes with canonical trailing newlines", () => {
+    const invalidUtf8 = Buffer.from([0x66, 0x69, 0x72, 0x73, 0x74, 0xff]);
+
+    expect(joinDiffParts([invalidUtf8, Buffer.alloc(0), Buffer.from("second\n")])).toEqual(
+      Buffer.concat([invalidUtf8, Buffer.from("\nsecond\n")]),
+    );
   });
 
   it("rejects oversized aggregate full-diff materialization", () => {
-    expect(() => assertFullDiffCharacters(MAX_FULL_DIFF_CHARACTERS + 1)).toThrow(
-      /read changed paths individually/,
+    expect(() => assertFullDiffBytes(MAX_FULL_DIFF_BYTES + 1)).toThrow(
+      /inspect changed paths individually/,
     );
   });
 });

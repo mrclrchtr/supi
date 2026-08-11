@@ -31,6 +31,20 @@ export async function runGit(
   return (await execFileAsync("git", args, gitOptions(cwd, indexFile, signal))).stdout;
 }
 
+/** Run Git with bounded resources and preserve standard output bytes exactly. */
+export async function runGitBuffer(
+  cwd: string,
+  args: string[],
+  indexFile?: string,
+  signal?: AbortSignal,
+): Promise<Buffer> {
+  const result = await execFileAsync("git", args, {
+    ...gitOptions(cwd, indexFile, signal),
+    encoding: "buffer",
+  });
+  return Buffer.isBuffer(result.stdout) ? result.stdout : Buffer.from(result.stdout);
+}
+
 /** Run Git with bounded resources and NUL-safe standard input. */
 export function runGitWithInput(
   cwd: string,
@@ -62,6 +76,7 @@ export async function resolveGitRepositoryRoot(cwd: string, signal?: AbortSignal
   return realpath(root);
 }
 
+/** Return Git standard output only when an execution error has an allowed exit code. */
 export function expectedGitExitOutput(error: unknown, allowedCodes: number[]): string | undefined {
   if (!error || typeof error !== "object") return undefined;
   const failure = error as {
@@ -83,6 +98,28 @@ export function expectedGitExitOutput(error: unknown, allowedCodes: number[]): s
   return "";
 }
 
+/** Return exact Git output bytes only when an execution error has an allowed exit code. */
+export function expectedGitExitBuffer(error: unknown, allowedCodes: number[]): Buffer | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const failure = error as {
+    code?: unknown;
+    killed?: unknown;
+    signal?: unknown;
+    stdout?: unknown;
+  };
+  if (
+    typeof failure.code !== "number" ||
+    !allowedCodes.includes(failure.code) ||
+    failure.killed === true ||
+    failure.signal
+  ) {
+    return undefined;
+  }
+  if (Buffer.isBuffer(failure.stdout)) return failure.stdout;
+  if (typeof failure.stdout === "string") return Buffer.from(failure.stdout);
+  return Buffer.alloc(0);
+}
+
 /** Allow only documented non-zero Git outcomes while preserving operational failures. */
 export async function runGitAllowExit(
   cwd: string,
@@ -94,6 +131,22 @@ export async function runGitAllowExit(
     return await runGit(cwd, args, options.indexFile, options.signal);
   } catch (error) {
     const stdout = expectedGitExitOutput(error, allowedCodes);
+    if (stdout !== undefined) return stdout;
+    throw error;
+  }
+}
+
+/** Preserve output bytes for allowed non-zero Git outcomes. */
+export async function runGitBufferAllowExit(
+  cwd: string,
+  args: string[],
+  allowedCodes: number[],
+  options: { indexFile?: string; signal?: AbortSignal } = {},
+): Promise<Buffer> {
+  try {
+    return await runGitBuffer(cwd, args, options.indexFile, options.signal);
+  } catch (error) {
+    const stdout = expectedGitExitBuffer(error, allowedCodes);
     if (stdout !== undefined) return stdout;
     throw error;
   }

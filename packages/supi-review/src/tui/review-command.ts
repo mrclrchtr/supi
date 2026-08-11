@@ -187,7 +187,7 @@ async function captureInteractiveTarget(
   const outcome = await withCancellableLoader(
     ctx,
     "Resolving target…",
-    () => captureReviewTarget(ctx.cwd, target),
+    (signal) => captureReviewTarget(ctx.cwd, target, signal),
     { finishOnAbort: true },
   );
   if (!outcome) return undefined;

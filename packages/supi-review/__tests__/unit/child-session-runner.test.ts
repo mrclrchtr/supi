@@ -46,6 +46,16 @@ describe("runIsolatedChild", () => {
     mocks.createResources.mockReturnValue({ loader: {}, settingsManager: {} });
   });
 
+  it("returns before resource allocation when provider authority is unavailable", async () => {
+    await expect(runIsolatedChild({ ...config, providerAuthority: undefined })).resolves.toEqual({
+      kind: "failed",
+      failureCode: "session-creation-failed",
+    });
+
+    expect(mocks.createResources).not.toHaveBeenCalled();
+    expect(mocks.startAgentRun).not.toHaveBeenCalled();
+  });
+
   it("maps every runtime failure branch to review vocabulary", async () => {
     const cases = [
       [

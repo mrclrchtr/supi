@@ -16,7 +16,7 @@ const snapshot: ReviewSnapshot = {
   repositoryRoot: "/repo",
   requestedTarget: {},
   target: { fromCommit: "a".repeat(40), toCommit: "a".repeat(40), includeUncommittedChanges: true },
-  title: "Working tree",
+  title: "Filesystem changes",
   changes: [{ status: "M", path: "a.ts", additions: 1, deletions: 0 }],
   diffHash: "b".repeat(64),
   stats: { files: 1, additions: 1, deletions: 0 },

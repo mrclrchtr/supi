@@ -74,16 +74,18 @@ function snapshotErrorReason(error: unknown): string {
   if (error instanceof Error) return error.message;
   return "Could not resolve the Review Target.";
 }
-
 /** Capture one selected interactive target before task editing begins. */
-export async function captureReviewTarget(cwd: string, target: ReviewTargetSpec) {
+export async function captureReviewTarget(
+  cwd: string,
+  spec: ReviewTargetSpec,
+  signal?: AbortSignal,
+) {
   try {
-    return { kind: "captured" as const, snapshot: await resolveReviewSnapshot(cwd, target) };
+    return { kind: "captured" as const, snapshot: await resolveReviewSnapshot(cwd, spec, signal) };
   } catch (error) {
     return { kind: "no-target" as const, reason: snapshotErrorReason(error) };
   }
 }
-
 type PlannerFailure = Exclude<PlannerRunResult, { kind: "success" }>;
 
 /** Normalize a Planner Draft without changing its required task modes. */
@@ -155,7 +157,6 @@ export async function draftReviewTasks(input: DraftReviewTasksInput) {
       result,
       modelId,
       promptVersion,
-      ...(result.usage ? { usage: result.usage } : {}),
     };
   }
 
@@ -179,7 +180,6 @@ export async function draftReviewTasks(input: DraftReviewTasksInput) {
       } satisfies PlannerFailure,
       modelId,
       promptVersion,
-      ...(result.usage ? { usage: result.usage } : {}),
     };
   }
 }
@@ -211,9 +211,9 @@ async function materializeReviewWorkspaceWithScope(
   try {
     await validateReviewScope(snapshot, workspace.cwd, scope, signal);
   } catch (error) {
+    const cleanupWarning = await workspace.cleanup();
     signal?.throwIfAborted();
     const reason = error instanceof Error ? error.message : "Could not validate the Review Scope.";
-    const cleanupWarning = await workspace.cleanup();
     return {
       kind: "invalid",
       reason: cleanupWarning

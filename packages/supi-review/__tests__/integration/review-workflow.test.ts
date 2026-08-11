@@ -102,6 +102,7 @@ describe("runReview exact Review Target workflow", () => {
     for (const target of [
       { from: base.slice(0, 12), to: "review-tip", includeUncommittedChanges: false },
       { from: "HEAD^", to: "light-tip", includeUncommittedChanges: false },
+      { from: "HEAD~1", to: "HEAD", includeUncommittedChanges: false },
       { from: "annotated-base", to: tip, includeUncommittedChanges: false },
       { from: base, includeUncommittedChanges: false },
     ]) {

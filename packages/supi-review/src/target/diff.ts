@@ -1,14 +1,14 @@
-import { runGitAllowExit as gitAllowExit, literalPathspec } from "../git-command.ts";
+import { runGitBufferAllowExit as gitBufferAllowExit, literalPathspec } from "../git-command.ts";
 import { resolveReviewPath } from "../review-path.ts";
 
-/** Maximum aggregate full-diff text materialized by one reviewer tool call. */
-export const MAX_FULL_DIFF_CHARACTERS = 50 * 1024 * 1024;
+/** Maximum aggregate full-diff bytes materialized by one Review operation. */
+export const MAX_FULL_DIFF_BYTES = 50 * 1024 * 1024;
 
-/** Reject aggregate full-diff materialization above the process-safe tool bound. */
-export function assertFullDiffCharacters(totalCharacters: number): void {
-  if (totalCharacters > MAX_FULL_DIFF_CHARACTERS) {
+/** Reject aggregate full-diff materialization above the process-safe byte bound. */
+export function assertFullDiffBytes(totalBytes: number): void {
+  if (totalBytes > MAX_FULL_DIFF_BYTES) {
     throw new Error(
-      `Full target diff exceeds ${MAX_FULL_DIFF_CHARACTERS} characters; read changed paths individually.`,
+      `Full target diff exceeds ${MAX_FULL_DIFF_BYTES} bytes; inspect changed paths individually.`,
     );
   }
 }
@@ -24,20 +24,23 @@ export function parseNullList(text: string): string[] {
     .sort((left, right) => left.localeCompare(right));
 }
 
-/** Render one untracked path as a deterministic `/dev/null`-to-file patch. */
-export async function diffUntrackedFile(cwd: string, path: string): Promise<string> {
+/** Render one untracked path as an exact `/dev/null`-to-file patch. */
+export async function diffUntrackedFile(cwd: string, path: string): Promise<Buffer> {
   const safe = resolveReviewPath(cwd, path);
-  return gitAllowExit(
+  return gitBufferAllowExit(
     cwd,
     literalPathspec(["diff", ...DIFF_FLAGS, "--no-index", "--", "/dev/null", safe.path]),
     [1],
   );
 }
 
-/** Join canonical patch parts with exactly one required trailing newline per non-empty part. */
-export function joinDiffParts(parts: string[]): string {
-  const populated = parts.filter(Boolean);
-  const totalCharacters = populated.reduce((total, part) => total + part.length + 1, 0);
-  assertFullDiffCharacters(totalCharacters);
-  return populated.map((part) => (part.endsWith("\n") ? part : `${part}\n`)).join("");
+/** Join canonical patch parts and add one required trailing newline to each part. */
+export function joinDiffParts(parts: Buffer[]): Buffer {
+  const populated = parts.filter((part) => part.length > 0);
+  const normalized = populated.map((part) =>
+    part.at(-1) === 0x0a ? part : Buffer.concat([part, Buffer.from("\n")]),
+  );
+  const totalBytes = normalized.reduce((total, part) => total + part.length, 0);
+  assertFullDiffBytes(totalBytes);
+  return Buffer.concat(normalized, totalBytes);
 }

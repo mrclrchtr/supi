@@ -12,7 +12,11 @@ const mocks = vi.hoisted(() => ({
   queuePostReviewTurn: vi.fn(),
   listLocalBranches: vi.fn(),
   listRecentCommits: vi.fn(),
-  loaders: [] as Array<{ message?: string; onAbort?: () => void }>,
+  loaders: [] as Array<{
+    message?: string;
+    onAbort?: () => void;
+    signal: AbortSignal;
+  }>,
   runGit: vi.fn(),
 }));
 
@@ -302,6 +306,7 @@ describe("/supi-review task editing", () => {
     await runCommand(command);
 
     expect(mocks.captureReviewTarget).toHaveBeenCalledOnce();
+    expect(mocks.captureReviewTarget.mock.calls[0]?.[2]).toBe(mocks.loaders.at(-1)?.signal);
     expect(mocks.runReview).not.toHaveBeenCalled();
     expect(command.editor).not.toHaveBeenCalled();
   });

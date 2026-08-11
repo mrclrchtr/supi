@@ -1,5 +1,6 @@
 import type { ReviewChange } from "../types.ts";
 
+/** Bounds for one changed-path manifest rendered in a Reviewer Packet. */
 export interface FileManifestOptions {
   maxFiles?: number;
   maxCharacters?: number;

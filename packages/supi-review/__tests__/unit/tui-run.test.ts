@@ -61,7 +61,7 @@ describe("supi_review_run TUI", () => {
     [
       "a current filesystem state batch",
       { tasks: [{ mode: "state" }] },
-      "requested target: current filesystem · batch mode: state · repository-wide",
+      "requested target: current filesystem · task modes: state · repository-wide",
     ],
     [
       "a committed requested range",
@@ -69,28 +69,28 @@ describe("supi_review_run TUI", () => {
         target: { from: "base", to: "HEAD", includeUncommittedChanges: false },
         tasks: [{ mode: "change" }],
       },
-      'requested target: from "base" · to "HEAD" · uncommitted changes excluded · batch mode: change · repository-wide',
+      'requested target: from "base" · to "HEAD" · uncommitted changes excluded · task modes: change · repository-wide',
     ],
     [
       "a committed range with a default after endpoint",
       { target: { from: "main", includeUncommittedChanges: false }, tasks: [{ mode: "change" }] },
-      'requested target: from "main" · default to "HEAD" · uncommitted changes excluded · batch mode: change · repository-wide',
+      'requested target: from "main" · default to "HEAD" · uncommitted changes excluded · task modes: change · repository-wide',
     ],
     [
       "a historical requested state",
       { target: { to: "v1.2.3", includeUncommittedChanges: false }, tasks: [{ mode: "state" }] },
-      'requested target: to "v1.2.3" · uncommitted changes excluded · batch mode: state · repository-wide',
+      'requested target: to "v1.2.3" · uncommitted changes excluded · task modes: state · repository-wide',
     ],
     [
-      "a mixed batch",
+      "a batch with both task modes",
       {
         target: { from: "base", includeUncommittedChanges: true },
         paths: ["src/a.ts", "docs"],
         tasks: [{ mode: "change" }, { mode: "state" }],
       },
-      'requested target: from "base" · uncommitted changes included · batch mode: mixed · path focus: 2 paths',
+      'requested target: from "base" · uncommitted changes included · task modes: change, state · path focus: 2 paths',
     ],
-  ])("renders requested target facts, batch mode, and scope for %s", (_name, args, expected) => {
+  ])("renders requested target facts, task modes, and scope for %s", (_name, args, expected) => {
     const output = renderRunCall(args, theme).render(200).join("\n");
 
     expect(output).toContain(expected);

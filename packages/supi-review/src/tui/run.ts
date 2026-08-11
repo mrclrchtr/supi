@@ -69,20 +69,20 @@ function formatRequestedTarget(target: unknown): string {
   return `requested target: ${endpoints.join(" · ")} · ${includeUncommittedChanges ? "uncommitted changes included" : "uncommitted changes excluded"}`;
 }
 
-function formatBatchMode(tasks: unknown): string {
-  if (!Array.isArray(tasks)) return "batch mode: unspecified";
+function formatTaskModes(tasks: unknown): string {
+  if (!Array.isArray(tasks)) return "task modes: unspecified";
   const modes = new Set(
     tasks.flatMap((task) =>
       isRecord(task) && (task.mode === "change" || task.mode === "state") ? [task.mode] : [],
     ),
   );
-  if (modes.size === 2) return "batch mode: mixed";
-  if (modes.has("change")) return "batch mode: change";
-  if (modes.has("state")) return "batch mode: state";
-  return "batch mode: unspecified";
+  const orderedModes = ["change", "state"].filter((mode) => modes.has(mode));
+  return orderedModes.length > 0
+    ? `task modes: ${orderedModes.join(", ")}`
+    : "task modes: unspecified";
 }
 
-/** Render requested Review Target facts, batch Review Mode, and Review Scope. */
+/** Render requested Review Target facts, task-owned Review Modes, and Review Scope. */
 export function renderRunCall(args: unknown, theme: Theme): Text {
   const params = isRecord(args) ? args : {};
   const paths = params.paths;
@@ -92,7 +92,7 @@ export function renderRunCall(args: unknown, theme: Theme): Text {
       : undefined;
   const detail = [
     formatRequestedTarget(params.target),
-    formatBatchMode(params.tasks),
+    formatTaskModes(params.tasks),
     formatScopeFocus(scope),
   ].join(" · ");
   return renderReviewToolCall(REVIEW_TOOL_SPECS.run.name, "review", theme, detail);

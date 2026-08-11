@@ -1,7 +1,12 @@
-import { runGit as git, literalPathspec, withReviewIndex } from "./git-command.ts";
+import {
+  runGit as git,
+  runGitBuffer as gitBuffer,
+  literalPathspec,
+  withReviewIndex,
+} from "./git-command.ts";
 import { resolveReviewPath } from "./review-path.ts";
 import {
-  assertFullDiffCharacters,
+  assertFullDiffBytes,
   DIFF_FLAGS,
   diffUntrackedFile,
   joinDiffParts,
@@ -28,7 +33,7 @@ async function readFilesystemDiff(
   target: ResolvedReviewTarget,
   path?: string,
   signal?: AbortSignal,
-): Promise<string> {
+): Promise<Buffer> {
   const baseline = target.fromCommit ?? target.toCommit;
   return withFilesystemIndex(
     root,
@@ -36,7 +41,7 @@ async function readFilesystemDiff(
     async (indexFile) => {
       const pathArgs = path ? ["--", path] : [];
       const [tracked, untrackedText] = await Promise.all([
-        git(
+        gitBuffer(
           root,
           literalPathspec(["diff", ...DIFF_FLAGS, baseline, ...pathArgs]),
           indexFile,
@@ -50,12 +55,12 @@ async function readFilesystemDiff(
         ),
       ]);
       const parts = [tracked];
-      let totalCharacters = tracked.length;
+      let totalBytes = tracked.length;
       for (const untrackedPath of parseNullList(untrackedText)) {
         signal?.throwIfAborted();
         const patch = await diffUntrackedFile(root, untrackedPath);
-        totalCharacters += patch.length;
-        assertFullDiffCharacters(totalCharacters);
+        totalBytes += patch.length;
+        assertFullDiffBytes(totalBytes);
         parts.push(patch);
       }
       return joinDiffParts(parts);
@@ -64,13 +69,13 @@ async function readFilesystemDiff(
   );
 }
 
-/** Read the full canonical change patch, or one changed path patch. */
+/** Read the exact canonical change patch, or one changed-path patch. */
 export async function readReviewDiff(
   _cwd: string,
   snapshot: ReviewSnapshot,
   path?: string,
   signal?: AbortSignal,
-): Promise<string> {
+): Promise<Buffer> {
   const root = snapshot.repositoryRoot;
   const safe = path ? resolveReviewPath(root, path) : undefined;
   if (safe && !snapshot.changes.some((change) => change.path === safe.path)) {
@@ -80,8 +85,8 @@ export async function readReviewDiff(
   if (target.includeUncommittedChanges) {
     return readFilesystemDiff(root, target, safe?.path, signal);
   }
-  if (!target.fromCommit) return "";
-  return git(
+  if (!target.fromCommit) return Buffer.alloc(0);
+  return gitBuffer(
     root,
     literalPathspec([
       "diff",

@@ -90,17 +90,18 @@ export function parseDiffStats(text: string, fileCount?: number): DiffStats {
 }
 
 /** Derive metadata for one non-ignored untracked path from its exact patch. */
-export function untrackedPatchChange(path: string, patch: string): ReviewChange {
-  if (patch.includes("GIT binary patch") || patch.includes("Binary files")) {
+export function untrackedPatchChange(path: string, patch: Buffer): ReviewChange {
+  const text = patch.toString("utf8");
+  if (text.includes("GIT binary patch") || text.includes("Binary files")) {
     return { status: "A", path, additions: null, deletions: null };
   }
-  const stats = parseDiffStats(patch);
+  const stats = parseDiffStats(text);
   return { status: "A", path, additions: stats.additions, deletions: stats.deletions };
 }
 
-/** Incrementally hash and count canonical patch parts without retaining their aggregate text. */
+/** Incrementally hash exact patch bytes and count their text change markers. */
 export function createDiffAccumulator(): {
-  append(diff: string): void;
+  append(diff: Buffer): void;
   finish(fileCount: number): { diffHash: string; stats: DiffStats };
 } {
   const hash = createHash("sha256");
@@ -108,10 +109,10 @@ export function createDiffAccumulator(): {
   let deletions = 0;
   return {
     append(diff) {
-      if (!diff) return;
-      hash.update(diff, "utf8");
-      if (!diff.endsWith("\n")) hash.update("\n", "utf8");
-      const stats = parseDiffStats(diff);
+      if (diff.length === 0) return;
+      hash.update(diff);
+      if (diff.at(-1) !== 0x0a) hash.update("\n", "utf8");
+      const stats = parseDiffStats(diff.toString("utf8"));
       additions += stats.additions;
       deletions += stats.deletions;
     },

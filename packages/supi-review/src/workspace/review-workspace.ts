@@ -22,8 +22,8 @@ export interface ReviewWorkspace {
   cleanup(): Promise<ReviewWorkspaceCleanupWarning | undefined>;
 }
 
-function sha256(value: string): string {
-  return createHash("sha256").update(value, "utf8").digest("hex");
+function sha256(value: Buffer): string {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 function workspaceHead(snapshot: ReviewSnapshot): string {
@@ -130,9 +130,9 @@ export async function materializeReviewWorkspace(
       if (sha256(patch) !== snapshot.diffHash) {
         throw new Error("The review target changed before its Review Workspace was frozen.");
       }
-      if (patch) {
+      if (patch.length > 0) {
         const patchPath = join(parent, "target.patch");
-        await writeFile(patchPath, patch, { encoding: "utf8", signal });
+        await writeFile(patchPath, patch, { signal });
         await runGit(
           cwd,
           ["apply", "--index", "--binary", "--whitespace=nowarn", patchPath],
