@@ -20,11 +20,26 @@ All grammar WASM files are **vendored** in `resources/grammars/<id>/` and shippe
 - **Kotlin** (`tree-sitter-kotlin`) does not ship `.wasm` — built from source by `scripts/generate-kotlin-wasm.mjs` using `tree-sitter-cli`
 - **SQL** (`@derekstride/tree-sitter-sql`) does not ship `.wasm` — built from source by `scripts/generate-sql-wasm.mjs` using `tree-sitter-cli`
 
-### When to regnerate
+### When to regenerate
 
 Run `node scripts/vendor-wasm.mjs` whenever `tree-sitter-*` devDependencies are bumped. Run `pnpm --filter @mrclrchtr/supi-tree-sitter check:wasm` in CI to verify checksums match.
 
 Vendored WASM metadata (`.wasm.json`) tracks the source npm package version and SHA256 so stale WASM is detected on CI.
+
+### Generator dependency updates
+
+Before you regenerate WASM after a generator dependency update, verify the resolved version. For `tree-sitter-cli`:
+
+```bash
+pnpm --filter @mrclrchtr/supi-tree-sitter exec node -p "require('tree-sitter-cli/package.json').version"
+```
+
+If it is old, rebuild the package dependencies, then verify again:
+
+```bash
+rm -rf packages/supi-tree-sitter/node_modules
+pnpm install --force
+```
 
 ## Source layout
 
