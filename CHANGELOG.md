@@ -1,5 +1,29 @@
 # Changelog
 
+## [4.10.0](https://github.com/mrclrchtr/supi/compare/v4.9.0...v4.10.0) (2026-08-12)
+
+
+### Features
+
+* **code-intelligence:** add substrate performance baselines ([90238b7](https://github.com/mrclrchtr/supi/commit/90238b702ba2c170e5cd9a9f9b8168aea2c3355c)), closes [#302](https://github.com/mrclrchtr/supi/issues/302)
+* **skills:** publish adapted skills through skills.sh ([372e0bc](https://github.com/mrclrchtr/supi/commit/372e0bc9684f1610723ccba61b52e40c60e7529f))
+* **skills:** use ask_user for grilling rounds ([931c9e4](https://github.com/mrclrchtr/supi/commit/931c9e44384cfbee1db320b3d67cac83d9f70f30))
+
+
+### Bug Fixes
+
+* **code-intelligence:** follow LSP text-edit rules ([ab4dd5e](https://github.com/mrclrchtr/supi/commit/ab4dd5e5a2d35b456eaa37a434f64440a51c9472)), closes [#303](https://github.com/mrclrchtr/supi/issues/303)
+* **deps:** update dependency hk to v1.55.0 ([0e91e67](https://github.com/mrclrchtr/supi/commit/0e91e6781f2a6431a5d1dfa1f4f39f9008b536f0))
+* **deps:** update dependency tree-sitter-cli to v0.26.12 ([b9fe9a6](https://github.com/mrclrchtr/supi/commit/b9fe9a6dab34ce905dab77507a632fb4e59cf961))
+* **deps:** update dependency web-tree-sitter to v0.26.12 ([bd76fc3](https://github.com/mrclrchtr/supi/commit/bd76fc37d3cdc7422e1cbc35bbe2003a2e6bd455))
+* **deps:** update dependency web-tree-sitter to v0.26.12 ([52b9d34](https://github.com/mrclrchtr/supi/commit/52b9d345df1069301d84f48b6b7f70b49c4e7d66))
+* **deps:** update pnpm to v11.21.0 ([00a45ff](https://github.com/mrclrchtr/supi/commit/00a45ff72dd4196ff887757c7105c929ffe68ed7))
+* **settings:** keep skills section last ([ca765d7](https://github.com/mrclrchtr/supi/commit/ca765d7ea6167e96e824c4f6476b412f6d8c3b8c))
+* **settings:** stabilize settings menu height ([6a481e4](https://github.com/mrclrchtr/supi/commit/6a481e48497668681ebc6bdf94e55ca8eee5295a))
+* **skills:** sync generated patch hash ([80b2e1b](https://github.com/mrclrchtr/supi/commit/80b2e1b8c0a36b82d83d9c51760f3a01a1a9ffb3))
+* **skills:** sync generated patch hash ([3c27c21](https://github.com/mrclrchtr/supi/commit/3c27c21277815bb73d3aaf1c74c5774d73ef9757))
+* **tree-sitter:** refresh CLI metadata ([2a7e897](https://github.com/mrclrchtr/supi/commit/2a7e897721a6b7e1d95c970990ce2d2a50ec8fd0))
+
 ## [4.9.0](https://github.com/mrclrchtr/supi/compare/v4.8.0...v4.9.0) (2026-08-11)
 
 
