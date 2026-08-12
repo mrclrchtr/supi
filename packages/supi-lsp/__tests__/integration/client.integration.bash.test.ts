@@ -78,7 +78,8 @@ describe.skipIf(!HAS_BASH_LSP)("LspClient integration (bash-language-server)", (
   it("returns diagnostics (may be empty for valid syntax)", async () => {
     const content = fs.readFileSync(validFile, "utf-8");
     const diagnostics = await client.syncAndWaitForDiagnostics(validFile, content);
-    expect(Array.isArray(diagnostics)).toBe(true);
+    expect(diagnostics.kind).toBe("completed");
+    if (diagnostics.kind === "completed") expect(Array.isArray(diagnostics.data)).toBe(true);
     // bash-language-server may or may not report diagnostics for valid syntax
   }, 15_000);
 

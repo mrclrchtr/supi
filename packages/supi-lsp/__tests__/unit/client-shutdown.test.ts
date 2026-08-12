@@ -101,6 +101,61 @@ describe("LspClient shutdown", () => {
 
     await client.shutdown();
 
-    await expect(Promise.race([pending, timeoutAfter(250)])).resolves.toEqual([]);
+    await expect(Promise.race([pending, timeoutAfter(250)])).resolves.toMatchObject({
+      kind: "unavailable",
+    });
+  });
+
+  it("releases an in-flight pull diagnostic request during shutdown", async () => {
+    const client = createRunningClient();
+    (client as AnyClient).capabilities = {
+      diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false },
+    };
+    const sendRequest = vi.fn((method: string) =>
+      method === "textDocument/diagnostic" ? new Promise(() => {}) : Promise.resolve(null),
+    );
+    (client as AnyClient).rpc = {
+      sendRequest,
+      sendNotification: vi.fn(async () => {}),
+      dispose: vi.fn(),
+    };
+    (client as AnyClient).process = createExitedProcess();
+    const pending = client.syncAndWaitForDiagnostics(
+      "/project/pending-pull.ts",
+      "const value = 1;",
+    );
+    await vi.waitFor(() => {
+      expect(sendRequest).toHaveBeenCalledWith(
+        "textDocument/diagnostic",
+        expect.any(Object),
+        expect.any(Object),
+      );
+    });
+
+    await client.shutdown();
+
+    await expect(Promise.race([pending, timeoutAfter(250)])).resolves.toMatchObject({
+      kind: "unavailable",
+    });
+  });
+
+  it("releases diagnostics when shutdown has no live process", async () => {
+    const client = createRunningClient();
+    (client as AnyClient).rpc = {
+      sendNotification: vi.fn(async () => {}),
+      sendRequest: vi.fn(),
+      dispose: vi.fn(),
+    };
+    const pending = client.syncAndWaitForDiagnostics(
+      "/project/transport-ended.ts",
+      "const value = 1;",
+    );
+    (client as AnyClient).process = null;
+
+    await client.shutdown();
+
+    await expect(Promise.race([pending, timeoutAfter(250)])).resolves.toMatchObject({
+      kind: "unavailable",
+    });
   });
 });

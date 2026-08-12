@@ -398,10 +398,7 @@ export class LspManager {
       return unavailableCodeQuery(`No LSP client can collect diagnostics for ${resolvedPath}.`);
     }
     try {
-      return {
-        kind: "completed",
-        data: await syncClientFileAndGetDiagnostics(client, resolvedPath, maxSeverity),
-      };
+      return await syncClientFileAndGetDiagnostics(client, resolvedPath, maxSeverity);
     } catch (error) {
       this.closeFile(resolvedPath);
       const detail = error instanceof Error ? error.message : String(error);

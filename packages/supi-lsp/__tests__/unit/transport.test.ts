@@ -281,6 +281,25 @@ describe("JsonRpcClient", () => {
     expect(clearTimeoutSpy).toHaveBeenCalledWith(timer);
   });
 
+  it("cancels an in-flight request and clears its timer when aborted", async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+    const controller = new AbortController();
+    server.onRequest("slow/abort", () => new Promise(() => {}));
+    const request = client.sendRequest("slow/abort", undefined, {
+      timeoutMs: 12_348,
+      signal: controller.signal,
+    });
+    const timerIndex = setTimeoutSpy.mock.calls.findIndex((call) => call[1] === 12_348);
+    const timer = setTimeoutSpy.mock.results[timerIndex]?.value;
+
+    controller.abort();
+
+    await expect(request).rejects.toThrow("cancelled");
+    expect(timer).toBeDefined();
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(timer);
+  });
+
   it("clears the request timer when the client is disposed", async () => {
     const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
     const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");

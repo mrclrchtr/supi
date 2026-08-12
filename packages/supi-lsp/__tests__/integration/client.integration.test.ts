@@ -25,6 +25,14 @@ function queryData<T>(result: CodeQueryResult<T>): T | null {
   return result.kind === "unavailable" ? null : result.data;
 }
 
+function completedDiagnostics(result: CodeQueryResult<Diagnostic[]>): Diagnostic[] {
+  expect(result.kind).toBe("completed");
+  if (result.kind !== "completed") {
+    throw new Error(`Expected completed diagnostics, got ${result.kind}.`);
+  }
+  return result.data;
+}
+
 const TS_SERVER_CONFIG: ServerConfig = {
   command: "typescript-language-server",
   args: ["--stdio"],
@@ -154,24 +162,27 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
 
   it("collects diagnostics for file with type error", async () => {
     const content = fs.readFileSync(badFile, "utf-8");
-    const diagnostics = await waitFor(
+    const result = await waitFor(
       () => client.syncAndWaitForDiagnostics(badFile, content),
-      (items) => items.length > 0,
+      (diagnostics) => diagnostics.kind !== "unavailable" && diagnostics.data.length > 0,
       { timeoutMs: 10_000, retryDelayMs: 200, label: "diagnostics for bad.ts" },
     );
+    const diagnostics = completedDiagnostics(result);
     expect(diagnostics.length).toBeGreaterThan(0);
     // Should report a type error
     const hasError = diagnostics.some((d: Diagnostic) => d.severity === 1);
     expect(hasError).toBe(true);
   }, 15_000);
 
-  it("returns no diagnostics for valid file", async () => {
+  it("does not claim a clean result when the server stays silent", async () => {
     const content = fs.readFileSync(goodFile, "utf-8");
-    const diagnostics = await client.syncAndWaitForDiagnostics(goodFile, content);
+    const result = await client.syncAndWaitForDiagnostics(goodFile, content);
 
-    // Filter to errors only (warnings about unused vars, etc. are ok)
-    const errors = diagnostics.filter((d: Diagnostic) => d.severity === 1);
-    expect(errors).toHaveLength(0);
+    expect(result).toMatchObject({
+      kind: "partial",
+      data: [],
+      reason: expect.stringContaining("not confirmed"),
+    });
   }, 10_000);
 
   it("updates diagnostics after fixing a file", async () => {
@@ -179,15 +190,19 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
     const badContent = 'export const y: number = "wrong";\n';
     const fixFile = path.join(tmpDir, "fixme.ts");
     fs.writeFileSync(fixFile, badContent);
-    const diagsBefore = await client.syncAndWaitForDiagnostics(fixFile, badContent);
-    const errorsBefore = diagsBefore.filter((d: Diagnostic) => d.severity === 1);
+    const beforeResult = await client.syncAndWaitForDiagnostics(fixFile, badContent);
+    const errorsBefore = completedDiagnostics(beforeResult).filter(
+      (d: Diagnostic) => d.severity === 1,
+    );
     expect(errorsBefore.length).toBeGreaterThan(0);
 
     // Now fix it
     const goodContent = "export const y: number = 42;\n";
     fs.writeFileSync(fixFile, goodContent);
-    const diagsAfter = await client.syncAndWaitForDiagnostics(fixFile, goodContent);
-    const errorsAfter = diagsAfter.filter((d: Diagnostic) => d.severity === 1);
+    const afterResult = await client.syncAndWaitForDiagnostics(fixFile, goodContent);
+    const errorsAfter = completedDiagnostics(afterResult).filter(
+      (d: Diagnostic) => d.severity === 1,
+    );
     expect(errorsAfter).toHaveLength(0);
   }, 15_000);
 

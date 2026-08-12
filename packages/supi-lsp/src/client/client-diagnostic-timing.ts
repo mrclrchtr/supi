@@ -2,7 +2,7 @@ import { startDebugTimer } from "@mrclrchtr/supi-core/debug";
 
 type DiagnosticCollection = "fallback" | "none" | "pull" | "push";
 type DiagnosticFreshness = "not-observed" | "observed";
-type DiagnosticOutcome = "completed" | "skipped" | "timed-out";
+type DiagnosticOutcome = "completed" | "incomplete" | "skipped" | "timed-out";
 type DiagnosticPullOutcome = "completed" | "failed" | "not-supported" | "not-used" | "timed-out";
 type DiagnosticPushOutcome = "not-used" | "published" | "released" | "settled" | "timed-out";
 type DiagnosticSettleOutcome = "not-used" | "published" | "quiet" | "released" | "timed-out";
@@ -10,7 +10,7 @@ type DiagnosticTimingOperation = "refresh-open" | "sync-file";
 
 /** Result of waiting for a quiet push-diagnostic window. */
 export interface DiagnosticSettleResult {
-  readonly outcome: "quiet" | "timed-out";
+  readonly outcome: "quiet" | "released" | "timed-out";
   readonly freshness: DiagnosticFreshness;
 }
 
@@ -100,15 +100,16 @@ export class DiagnosticObserver {
 
   pushSettled(documentCount: number, settle: DiagnosticSettleResult): void {
     const timedOut = settle.outcome === "timed-out";
+    const completed = settle.outcome === "quiet" && settle.freshness === "observed";
     this.#finish(
       {
         collection: this.supportsPull ? "fallback" : "push",
         documentCount,
         fallback: this.supportsPull,
         freshness: settle.freshness,
-        outcome: timedOut ? "timed-out" : "completed",
+        outcome: completed ? "completed" : timedOut ? "timed-out" : "incomplete",
         pull: this.#pull,
-        push: timedOut ? "timed-out" : "settled",
+        push: timedOut ? "timed-out" : settle.outcome === "released" ? "released" : "settled",
         settle: settle.outcome,
         timedOut: timedOut || this.#pull === "timed-out",
       },
@@ -124,7 +125,7 @@ export class DiagnosticObserver {
         documentCount,
         fallback: this.supportsPull,
         freshness: push === "published" ? "observed" : "not-observed",
-        outcome: timedOut ? "timed-out" : "completed",
+        outcome: push === "published" ? "completed" : timedOut ? "timed-out" : "incomplete",
         pull: this.#pull,
         push,
         settle: push,

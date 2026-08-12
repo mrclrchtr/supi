@@ -14,6 +14,14 @@ function queryData<T>(result: CodeQueryResult<T>): T | null {
   return result.kind === "unavailable" ? null : result.data;
 }
 
+function completedDiagnostics(result: CodeQueryResult<Diagnostic[]>): Diagnostic[] {
+  expect(result.kind).toBe("completed");
+  if (result.kind !== "completed") {
+    throw new Error(`Expected completed diagnostics, got ${result.kind}.`);
+  }
+  return result.data;
+}
+
 const PY_SERVER_CONFIG: ServerConfig = {
   command: "pyright-langserver",
   args: ["--stdio"],
@@ -139,11 +147,12 @@ describe.skipIf(!HAS_PYRIGHT)("LspClient integration (pyright-langserver)", () =
 
   it("collects diagnostics for file with type errors", async () => {
     const content = fs.readFileSync(badFile, "utf-8");
-    const diagnostics = await waitFor(
+    const result = await waitFor(
       () => client.syncAndWaitForDiagnostics(badFile, content),
-      (items: Diagnostic[]) => items.length > 0,
+      (diagnostics) => diagnostics.kind !== "unavailable" && diagnostics.data.length > 0,
       { timeoutMs: 10_000, retryDelayMs: 200, label: "diagnostics for errors.py" },
     );
+    const diagnostics = completedDiagnostics(result);
     expect(diagnostics.length).toBeGreaterThan(0);
 
     // Should report type errors (severity === 1)
@@ -153,8 +162,8 @@ describe.skipIf(!HAS_PYRIGHT)("LspClient integration (pyright-langserver)", () =
 
   it("returns no errors for valid file", async () => {
     const content = fs.readFileSync(goodFile, "utf-8");
-    const diagnostics = await client.syncAndWaitForDiagnostics(goodFile, content);
-    const errors = diagnostics.filter((d: Diagnostic) => d.severity === 1);
+    const result = await client.syncAndWaitForDiagnostics(goodFile, content);
+    const errors = completedDiagnostics(result).filter((d: Diagnostic) => d.severity === 1);
     expect(errors).toHaveLength(0);
   }, 10_000);
 
@@ -163,15 +172,19 @@ describe.skipIf(!HAS_PYRIGHT)("LspClient integration (pyright-langserver)", () =
     const fixFile = path.join(tmpDir, "fixme.py");
     const badContent = 'y: int = "string"\n';
     fs.writeFileSync(fixFile, badContent);
-    const diagsBefore = await client.syncAndWaitForDiagnostics(fixFile, badContent);
-    const errorsBefore = diagsBefore.filter((d: Diagnostic) => d.severity === 1);
+    const beforeResult = await client.syncAndWaitForDiagnostics(fixFile, badContent);
+    const errorsBefore = completedDiagnostics(beforeResult).filter(
+      (d: Diagnostic) => d.severity === 1,
+    );
     expect(errorsBefore.length).toBeGreaterThan(0);
 
     // Now fix it
     const goodContent = "y: int = 42\n";
     fs.writeFileSync(fixFile, goodContent);
-    const diagsAfter = await client.syncAndWaitForDiagnostics(fixFile, goodContent);
-    const errorsAfter = diagsAfter.filter((d: Diagnostic) => d.severity === 1);
+    const afterResult = await client.syncAndWaitForDiagnostics(fixFile, goodContent);
+    const errorsAfter = completedDiagnostics(afterResult).filter(
+      (d: Diagnostic) => d.severity === 1,
+    );
     expect(errorsAfter).toHaveLength(0);
   }, 15_000);
 
@@ -208,14 +221,14 @@ describe.skipIf(!HAS_PYRIGHT)("LspClient python shutdown-after-error", () => {
     const shutdownClient = new LspClient("pyright", PY_SERVER_CONFIG, tmpDir2);
     await shutdownClient.start();
     const content = fs.readFileSync(errorFile, "utf-8");
-    const diags = await waitFor(
+    const result = await waitFor(
       () => shutdownClient.syncAndWaitForDiagnostics(errorFile, content),
-      (items: Diagnostic[]) => items.length > 0,
+      (diagnostics) => diagnostics.kind !== "unavailable" && diagnostics.data.length > 0,
       { timeoutMs: 10_000, retryDelayMs: 200, label: "shutdown diagnostics for err.py" },
     );
 
     // Verify diagnostics were collected and shutdown works
-    expect(diags.length).toBeGreaterThan(0);
+    expect(completedDiagnostics(result).length).toBeGreaterThan(0);
 
     await shutdownClient.shutdown();
     expect(shutdownClient.status).toBe("shutdown");

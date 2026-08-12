@@ -85,9 +85,10 @@ export class JsonRpcClient {
   sendRequest(
     method: string,
     params?: unknown,
-    options?: { timeoutMs?: number },
+    options?: { timeoutMs?: number; signal?: AbortSignal },
   ): Promise<unknown> {
     const timeoutMs = options?.timeoutMs ?? this.timeoutMs;
+    const signal = options?.signal;
     const methodClass = classifyRequestMethod(method);
     const timer = startDebugTimer();
     if (this.closed || !this.connection) {
@@ -104,7 +105,9 @@ export class JsonRpcClient {
     const tokenSource = new CancellationTokenSource();
     let timeout: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
+    let aborted = false;
     const timeoutError = new Error(`Request ${method} timed out after ${timeoutMs}ms`);
+    const abortError = new Error(`Request ${method} was cancelled`);
 
     const request = this.connection.sendRequest(method, params, tokenSource.token);
     // Catch the raw request promise to prevent unhandled rejections when
@@ -115,6 +118,16 @@ export class JsonRpcClient {
     // the JSON-RPC token and rejects the caller. Using one timer avoids
     // a leak where the rejecting timer in a second Promise stays alive
     // after a successful response.
+    let abortHandler: (() => void) | undefined;
+    const abort = new Promise<never>((_resolve, reject) => {
+      abortHandler = () => {
+        aborted = true;
+        tokenSource.cancel();
+        reject(abortError);
+      };
+      if (signal?.aborted) abortHandler();
+      else signal?.addEventListener("abort", abortHandler, { once: true });
+    });
     const promise = Promise.race([
       request,
       new Promise<never>((_resolve, reject) => {
@@ -124,6 +137,7 @@ export class JsonRpcClient {
           reject(timeoutError);
         }, timeoutMs);
       }),
+      abort,
     ])
       .then(
         (result) => {
@@ -137,7 +151,7 @@ export class JsonRpcClient {
           return result;
         },
         (error: unknown) => {
-          const cancelled = timedOut || this.closed || isCancellationError(error);
+          const cancelled = timedOut || aborted || this.closed || isCancellationError(error);
           const outcome: RequestOutcome = timedOut
             ? "timed-out"
             : cancelled
@@ -155,6 +169,7 @@ export class JsonRpcClient {
       )
       .finally(() => {
         if (timeout !== undefined) clearTimeout(timeout);
+        if (abortHandler) signal?.removeEventListener("abort", abortHandler);
       });
 
     // Prevent unhandled rejection when dispose() cancels requests

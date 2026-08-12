@@ -73,18 +73,18 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
     }
   });
 
-  it("settles after the quiet window when no diagnostics arrive", async () => {
+  it("waits to the deadline when no diagnostic observation arrives", async () => {
     const client = createStartedClient();
     const { tmpDir, uri } = createTempFileUri();
     openDocument(client, uri);
 
     try {
       const start = Date.now();
-      await client.refreshOpenDiagnostics({ maxWaitMs: 1000, quietMs: 80 });
+      await client.refreshOpenDiagnostics({ maxWaitMs: 200, quietMs: 80 });
       const elapsed = Date.now() - start;
 
-      expect(elapsed).toBeGreaterThanOrEqual(60);
-      expect(elapsed).toBeLessThan(500);
+      expect(elapsed).toBeGreaterThanOrEqual(180);
+      expect(elapsed).toBeLessThan(600);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -196,6 +196,8 @@ describe("LspClient refreshOpenDiagnostics — file handling", () => {
     fs.rmSync(filePath);
     await client.refreshOpenDiagnostics({ maxWaitMs: 1000, quietMs: 50 });
 
-    await expect(Promise.race([pending, timeoutAfter(250)])).resolves.toEqual([]);
+    await expect(Promise.race([pending, timeoutAfter(250)])).resolves.toMatchObject({
+      kind: "unavailable",
+    });
   });
 });

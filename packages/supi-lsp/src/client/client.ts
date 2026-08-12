@@ -119,14 +119,14 @@ export class LspClient {
       sendNotification: (method, params) => {
         if (this.rpc) void this.rpc.sendNotification(method, params);
       },
-      pullDocumentDiagnostics: async (uri, previousResultId, timeoutMs) => {
+      pullDocumentDiagnostics: async (uri, previousResultId, timeoutMs, signal) => {
         const rpc = this.rpc;
         if (!rpc || this._status !== "running") throw new Error("client not running");
         await this.getReady();
         return rpc.sendRequest(
           "textDocument/diagnostic",
           { textDocument: { uri }, previousResultId },
-          { timeoutMs },
+          { timeoutMs, signal },
         ) as Promise<DocumentDiagnosticReport>;
       },
     });
@@ -190,19 +190,11 @@ export class LspClient {
 
     // Handle crashes
     this.process.on("exit", (_code) => {
-      if (this._status !== "shutdown") {
-        this._status = "error";
-        this.cancelNoProgressTimer();
-        this.rejectReady(new Error("Client crashed"));
-      }
-      this.rpc?.dispose();
+      this.handleProcessFailure(new Error("Client crashed"));
     });
 
     this.process.on("error", (_err) => {
-      if (this._status !== "shutdown") {
-        this._status = "error";
-        this.rejectReady(new Error("Client process error"));
-      }
+      this.handleProcessFailure(new Error("Client process error"));
     });
 
     // Suppress stderr to avoid noise in the agent
@@ -237,6 +229,7 @@ export class LspClient {
   async shutdown(): Promise<void> {
     if (this._status === "shutdown") return;
     this._status = "shutdown";
+    this.diagnostics.clear();
 
     if (!this.rpc || !this.process) return;
 
@@ -276,8 +269,6 @@ export class LspClient {
       }
     }
 
-    this.diagnostics.clear();
-
     // Clear readiness state
     if (this.noProgressTimer) {
       clearTimeout(this.noProgressTimer);
@@ -286,6 +277,16 @@ export class LspClient {
     for (const timer of this.tokenTimeouts.values()) clearTimeout(timer);
     this.tokenTimeouts.clear();
     this.rejectReady(new Error("Client shutdown"));
+  }
+
+  private handleProcessFailure(reason: Error): void {
+    if (this._status !== "shutdown") {
+      this._status = "error";
+      this.cancelNoProgressTimer();
+      this.rejectReady(reason);
+    }
+    this.diagnostics.clear();
+    this.rpc?.dispose();
   }
 
   // ── Document Synchronization and Diagnostics ────────────────────────
@@ -349,8 +350,11 @@ export class LspClient {
     return this.diagnostics.refreshOpenDiagnostics(options);
   }
 
-  /** Sync one file and return its diagnostics after pull or push collection. */
-  async syncAndWaitForDiagnostics(filePath: string, content: string): Promise<Diagnostic[]> {
+  /** Sync one file and return diagnostics with explicit evidence availability. */
+  async syncAndWaitForDiagnostics(
+    filePath: string,
+    content: string,
+  ): Promise<CodeQueryResult<Diagnostic[]>> {
     return this.diagnostics.syncAndWaitForDiagnostics(filePath, content);
   }
 

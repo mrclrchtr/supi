@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { type CodeQueryResult, mapCodeQueryResult } from "@mrclrchtr/supi-code-runtime/api";
 import type { LspClient } from "../client/client.ts";
 import type { Diagnostic } from "../config/types.ts";
 import { relativeFilePathFromUri } from "../diagnostics/diagnostic-summary.ts";
@@ -10,10 +11,10 @@ export async function syncClientFileAndGetDiagnostics(
   client: Pick<LspClient, "syncAndWaitForDiagnostics">,
   filePath: string,
   maxSeverity: number,
-): Promise<Diagnostic[]> {
-  return filterDiagnosticsBySeverity(
-    await client.syncAndWaitForDiagnostics(filePath, readFileSync(filePath, "utf-8")),
-    maxSeverity,
+): Promise<CodeQueryResult<Diagnostic[]>> {
+  const result = await client.syncAndWaitForDiagnostics(filePath, readFileSync(filePath, "utf-8"));
+  return mapCodeQueryResult(result, (diagnostics) =>
+    filterDiagnosticsBySeverity(diagnostics, maxSeverity),
   );
 }
 

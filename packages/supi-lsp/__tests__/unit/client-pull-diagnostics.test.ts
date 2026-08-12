@@ -6,7 +6,11 @@ import * as path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { LspClient } from "../../src/client/client.ts";
 import type { Diagnostic } from "../../src/config/types.ts";
-import { createPullTestClient, createRunningTestClient } from "../helpers/client-test-harness.ts";
+import {
+  createPullTestClient,
+  createRunningTestClient,
+  createDiagnosticTestFile as createTempTsFile,
+} from "../helpers/client-test-harness.ts";
 
 function makeDiagnostic(message: string): Diagnostic {
   return {
@@ -17,13 +21,6 @@ function makeDiagnostic(message: string): Diagnostic {
 
 function simulatePublish(client: LspClient, uri: string, diagnostics = [makeDiagnostic("err")]) {
   client.handlePublishDiagnostics({ uri, diagnostics });
-}
-
-function createTempTsFile(fileName = "test.ts", content = "const x = 1;") {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-pull-test-"));
-  const filePath = path.join(tmpDir, fileName);
-  fs.writeFileSync(filePath, content);
-  return { tmpDir, filePath, uri: `file://${filePath}` };
 }
 
 function openDocument(client: LspClient, filePath: string): void {
@@ -140,17 +137,20 @@ describe("LSP pull diagnostics — refresh requests", () => {
     const relatedFile = "/project/related-from-unchanged.ts";
     const { client, rpc } = createPullTestClient();
     openDocument(client, file.filePath);
-    rpc.sendRequest.mockResolvedValue({
-      kind: "unchanged",
-      resultId: "abc",
-      relatedDocuments: {
-        [`file://${relatedFile}`]: {
-          kind: "full",
-          items: [makeDiagnostic("related-diag")],
+    rpc.sendRequest
+      .mockResolvedValueOnce({ kind: "full", items: [], resultId: "before" })
+      .mockResolvedValueOnce({
+        kind: "unchanged",
+        resultId: "after",
+        relatedDocuments: {
+          [`file://${relatedFile}`]: {
+            kind: "full",
+            items: [makeDiagnostic("related-diag")],
+          },
         },
-      },
-    });
+      });
 
+    await client.refreshOpenDiagnostics({ maxWaitMs: 500, quietMs: 50 });
     await client.refreshOpenDiagnostics({ maxWaitMs: 500, quietMs: 50 });
 
     expect(client.getDiagnostics(relatedFile)[0]?.message).toBe("related-diag");
@@ -180,46 +180,6 @@ describe("LSP pull diagnostics — refresh requests", () => {
       expect.objectContaining({ timeoutMs: expect.any(Number) }),
     );
     expect(client.getDiagnostics(file.filePath)[0]?.message).toBe("after-clear");
-  });
-});
-
-describe("LSP pull diagnostics — single-file syncs", () => {
-  let tmpDir = "";
-
-  afterEach(() => {
-    cleanupTmpDir(tmpDir);
-    tmpDir = "";
-  });
-
-  it("uses pull diagnostics for a single-file sync", async () => {
-    const file = createTempTsFile("single-sync.ts");
-    tmpDir = file.tmpDir;
-    const { client, rpc } = createPullTestClient();
-    rpc.sendRequest.mockResolvedValue({
-      kind: "full",
-      items: [makeDiagnostic("single-sync-pull")],
-    });
-
-    const diagnostics = await client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
-
-    expect(rpc.sendRequest).toHaveBeenCalledWith(
-      "textDocument/diagnostic",
-      expect.objectContaining({ textDocument: { uri: file.uri } }),
-      expect.objectContaining({ timeoutMs: expect.any(Number) }),
-    );
-    expect(diagnostics[0]?.message).toBe("single-sync-pull");
-  });
-
-  it("falls back to push diagnostics when a pull fails", async () => {
-    const file = createTempTsFile("single-sync-fallback.ts");
-    tmpDir = file.tmpDir;
-    const { client, rpc } = createPullTestClient();
-    rpc.sendRequest.mockRejectedValue(new Error("pull failed"));
-    setTimeout(() => simulatePublish(client, file.uri, [makeDiagnostic("single-sync-push")]), 20);
-
-    const diagnostics = await client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
-
-    expect(diagnostics[0]?.message).toBe("single-sync-push");
   });
 });
 

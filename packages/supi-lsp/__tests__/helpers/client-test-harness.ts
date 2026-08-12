@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { vi } from "vitest";
 import { LspClient } from "../../src/client/client.ts";
 import type { ServerCapabilities } from "../../src/config/types.ts";
@@ -31,6 +34,16 @@ export function createRunningTestClient(
     rpc,
   });
   return { client, rpc };
+}
+
+export function createDiagnosticTestFile(
+  fileName = "test.ts",
+  content = "const x = 1;",
+): { tmpDir: string; filePath: string; uri: string } {
+  const tmpDir = mkdtempSync(join(tmpdir(), "lsp-diagnostic-test-"));
+  const filePath = join(tmpDir, fileName);
+  writeFileSync(filePath, content);
+  return { tmpDir, filePath, uri: `file://${filePath}` };
 }
 
 export function createPullTestClient(): { client: LspClient; rpc: TestRpc } {

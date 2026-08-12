@@ -101,6 +101,34 @@ describe("LSP diagnostic timing observations", () => {
     });
   });
 
+  it("does not complete a multi-file refresh when one document has no fresh evidence", async () => {
+    const first = join(cwd, "first.ts");
+    const second = join(cwd, "second.ts");
+    writeFileSync(first, "const first = true;\n");
+    writeFileSync(second, "const second = true;\n");
+    const { client, rpc } = createPullTestClient();
+    client.didOpen(first, "const first = true;\n");
+    client.didOpen(second, "const second = true;\n");
+    rpc.sendRequest.mockImplementation(
+      (_method: string, params: { textDocument: { uri: string } }) =>
+        params.textDocument.uri.endsWith("first.ts")
+          ? Promise.resolve({ kind: "full", items: [] })
+          : Promise.resolve({ kind: "unchanged", resultId: "unlinked" }),
+    );
+
+    await client.refreshOpenDiagnostics({ maxWaitMs: 80, quietMs: 20 });
+
+    expect(
+      getDebugEvents({ source: "lsp", category: "diagnostics.timing" }).events[0]?.data,
+    ).toEqual(
+      expect.objectContaining({
+        collection: "fallback",
+        freshness: "observed",
+        outcome: "timed-out",
+      }),
+    );
+  });
+
   it("records push settle timeout separately from observed freshness", async () => {
     const file = join(cwd, "timeout.ts");
     writeFileSync(file, "const timeout = true;\n");
@@ -154,7 +182,7 @@ describe("LSP diagnostic timing observations", () => {
         settle: "released",
         timedOut: false,
         freshness: "not-observed",
-        outcome: "completed",
+        outcome: "incomplete",
       }),
     );
   });

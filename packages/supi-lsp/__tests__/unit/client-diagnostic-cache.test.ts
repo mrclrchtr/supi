@@ -64,6 +64,30 @@ describe("LspClient diagnostic cache", () => {
     expect(client.getDiagnostics(FILE)).toEqual([makeDiagnostic("current")]);
   });
 
+  it("ignores diagnostics newer than the open document version", () => {
+    const { client } = createRunningTestClient();
+    publish(client, { uri: URI, diagnostics: [makeDiagnostic("current")] });
+    openAtVersion(client, 5);
+
+    publish(client, { uri: URI, version: 6, diagnostics: [makeDiagnostic("future")] });
+
+    expect(client.getDiagnostics(FILE)).toEqual([makeDiagnostic("current")]);
+  });
+
+  it("ignores a null diagnostic version as an unsupported protocol value", () => {
+    const { client } = createRunningTestClient();
+    publish(client, { uri: URI, diagnostics: [makeDiagnostic("current")] });
+    openAtVersion(client, 1);
+
+    publish(client, {
+      uri: URI,
+      version: null,
+      diagnostics: [makeDiagnostic("invalid")],
+    } as unknown as PublishDiagnosticsParams);
+
+    expect(client.getDiagnostics(FILE)).toEqual([makeDiagnostic("current")]);
+  });
+
   it("accepts versioned diagnostics for a document that is not open", () => {
     const { client } = createRunningTestClient();
 

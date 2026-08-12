@@ -1,6 +1,5 @@
-// LSP client document synchronization and diagnostic state.
-
 import { existsSync, readFileSync } from "node:fs";
+import { type CodeQueryResult, unavailableCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import type {
   Diagnostic,
   DocumentDiagnosticReport,
@@ -10,25 +9,28 @@ import type {
   VersionedTextDocumentIdentifier,
 } from "../config/types.ts";
 import { detectLanguageId, fileToUri, uriToFile } from "../utils.ts";
+import { collectSynchronizedFileDiagnostics } from "./client-diagnostic-collection.ts";
+import {
+  applyPullReport,
+  type DiagnosticCacheEntry,
+  type DiagnosticSynchronization,
+  hasFreshEvidence,
+  hasFreshPush,
+  isCurrentSynchronization,
+  latestFreshEvidenceReceivedAt,
+  nextDocumentVersion,
+  raceDiagnosticPull,
+} from "./client-diagnostic-evidence.ts";
 import {
   DiagnosticObserver,
   DiagnosticPullError,
-  type DiagnosticPushWaitOutcome,
-  type DiagnosticSettleResult,
   isDiagnosticTimeout,
 } from "./client-diagnostic-timing.ts";
+import { DiagnosticWaitRegistry } from "./client-diagnostic-waiters.ts";
 
 const DIAGNOSTIC_WAIT_MS = 3_000;
 
-type OpenDocument = { version: number };
-type DiagnosticWaiter = (outcome: "published" | "released") => void;
-
-type DiagnosticCacheEntry = {
-  diagnostics: Diagnostic[];
-  receivedAt: number;
-  version?: number;
-  resultId?: string;
-};
+type OpenDocument = { version: number; synchronizationId: number };
 
 /** One file's stored diagnostics as consumed by manager-level collection. */
 export interface DiagnosticEntry {
@@ -44,6 +46,7 @@ interface ClientDiagnosticsHost {
     uri: string,
     previousResultId: string | undefined,
     timeoutMs: number,
+    signal?: AbortSignal,
   ): Promise<DocumentDiagnosticReport | null>;
 }
 
@@ -56,7 +59,9 @@ interface ClientDiagnosticsHost {
 export class ClientDiagnostics {
   readonly #openDocs = new Map<string, OpenDocument>();
   readonly #diagnosticStore = new Map<string, DiagnosticCacheEntry>();
-  readonly #diagnosticWaiters = new Map<string, DiagnosticWaiter[]>();
+  readonly #waiters = new DiagnosticWaitRegistry();
+  readonly #versionHistory = new Map<string, number>();
+  #nextSynchronizationId = 0;
 
   constructor(private readonly host: ClientDiagnosticsHost) {}
 
@@ -68,7 +73,9 @@ export class ClientDiagnostics {
   clear(): void {
     this.#openDocs.clear();
     this.#diagnosticStore.clear();
-    this.#releaseAllDiagnosticWaiters();
+    this.#versionHistory.clear();
+    this.#waiters.releaseAll();
+    this.#waiters.cancelSettle();
   }
 
   /** Open a document, or update it when it is already open. */
@@ -82,12 +89,14 @@ export class ClientDiagnostics {
     }
 
     const languageId = detectLanguageId(filePath);
-    this.#openDocs.set(uri, { version: 1 });
+    this.#waiters.cancelSettle();
+    const version = nextDocumentVersion(this.#versionHistory, uri);
+    this.#openDocs.set(uri, { version, synchronizationId: ++this.#nextSynchronizationId });
     this.host.sendNotification("textDocument/didOpen", {
       textDocument: {
         uri,
         languageId,
-        version: 1,
+        version,
         text: content,
       } satisfies TextDocumentItem,
     });
@@ -104,7 +113,10 @@ export class ClientDiagnostics {
       return;
     }
 
-    doc.version++;
+    this.#waiters.releaseFile(uri);
+    this.#waiters.cancelSettle();
+    doc.version = nextDocumentVersion(this.#versionHistory, uri);
+    doc.synchronizationId = ++this.#nextSynchronizationId;
     this.#sendDidChange(uri, doc.version, content);
   }
 
@@ -163,17 +175,22 @@ export class ClientDiagnostics {
 
   /** Apply diagnostics received through `textDocument/publishDiagnostics`. */
   handlePublishDiagnostics(params: PublishDiagnosticsParams): void {
-    if (params.version !== undefined && params.version !== null) {
-      const openDoc = this.#openDocs.get(params.uri);
-      if (openDoc && params.version < openDoc.version) return;
+    const openDoc = this.#openDocs.get(params.uri);
+    if (params.version !== undefined) {
+      if (!Number.isInteger(params.version)) return;
+      if (openDoc && params.version !== openDoc.version) return;
     }
+    if (!Array.isArray(params.diagnostics)) return;
 
     this.#diagnosticStore.set(params.uri, {
       diagnostics: params.diagnostics,
       receivedAt: Date.now(),
-      version: params.version ?? undefined,
+      source: "push",
+      synchronizationId: openDoc?.synchronizationId,
+      version: params.version,
     });
-    this.#releaseDiagnosticWaiters(params.uri, "published");
+    this.#waiters.releaseFile(params.uri, "published");
+    this.#waiters.notifySettle();
   }
 
   /** Re-read open documents, then collect pull diagnostics or wait for push diagnostics. */
@@ -190,9 +207,10 @@ export class ClientDiagnostics {
     const maxWaitMs = options.maxWaitMs ?? 3_000;
     const quietMs = options.quietMs ?? 200;
     const syncStart = Date.now();
-    this.#resyncOpenDocuments();
+    const synchronizations = this.#resyncOpenDocuments();
+    const settleEpoch = this.#waiters.settleEpoch;
     observer.synchronized();
-    const documentCount = this.#openDocs.size;
+    const documentCount = synchronizations.length;
     if (documentCount === 0) {
       observer.skipped(0);
       return;
@@ -200,7 +218,7 @@ export class ClientDiagnostics {
 
     if (supportsPull) {
       try {
-        await this.#pullDiagnosticsForOpenDocuments(syncStart, maxWaitMs);
+        await this.#pullDiagnosticsForOpenDocuments(synchronizations, syncStart, maxWaitMs);
         observer.pullCompleted(documentCount);
         return;
       } catch (error) {
@@ -208,41 +226,54 @@ export class ClientDiagnostics {
       }
     }
 
-    const settle = await this.#waitForDiagnosticSettle(syncStart, maxWaitMs, quietMs);
+    const settle = await this.#waiters.waitForSettle({
+      syncStart,
+      maxWaitMs,
+      quietMs,
+      settleEpoch,
+      isComplete: () =>
+        synchronizations.every((item) => hasFreshEvidence(this.#diagnosticStore, item)),
+      latestReceived: () => latestFreshEvidenceReceivedAt(this.#diagnosticStore, synchronizations),
+    });
     observer.pushSettled(documentCount, settle);
   }
 
-  /** Sync one file and return its diagnostics after pull or push collection. */
-  async syncAndWaitForDiagnostics(filePath: string, content: string): Promise<Diagnostic[]> {
+  /** Sync one file and return diagnostics with explicit evidence availability. */
+  async syncAndWaitForDiagnostics(
+    filePath: string,
+    content: string,
+  ): Promise<CodeQueryResult<Diagnostic[]>> {
     const supportsPull = this.host.supportsPullDiagnostics();
     const observer = new DiagnosticObserver("sync-file", supportsPull);
     const uri = fileToUri(filePath);
+    const cached = this.#diagnosticStore.get(uri);
+    const cachedDiagnostics = cached ? [...cached.diagnostics] : null;
     const syncStart = Date.now();
     this.didChange(filePath, content);
+    const synchronization = this.#openDocs.get(uri);
     observer.synchronized();
-
-    if (supportsPull) {
-      const remaining = DIAGNOSTIC_WAIT_MS - (Date.now() - syncStart);
-      try {
-        if (remaining <= 0) observer.pullTimedOut();
-        else if (await this.#pullDiagnosticsForUri(uri, remaining)) {
-          observer.pullCompleted(1);
-          return this.getDiagnostics(filePath);
-        } else observer.pullFailed(undefined);
-      } catch (error) {
-        observer.pullFailed(error);
-      }
+    if (!synchronization) {
+      return unavailableCodeQuery("The document could not be synchronized for diagnostics.");
     }
-
-    const push = await this.#waitForDiagnostics(
-      uri,
-      Math.max(0, DIAGNOSTIC_WAIT_MS - (Date.now() - syncStart)),
-    );
-    observer.pushWaitCompleted(1, push);
-    return this.getDiagnostics(filePath);
+    const request = { uri, synchronizationId: synchronization.synchronizationId };
+    return collectSynchronizedFileDiagnostics({
+      supportsPull,
+      syncStart,
+      maxWaitMs: DIAGNOSTIC_WAIT_MS,
+      request,
+      cachedDiagnostics,
+      observer,
+      waiters: this.#waiters,
+      current: () => isCurrentSynchronization(this.#openDocs, request),
+      freshPush: () => hasFreshPush(this.#diagnosticStore, request),
+      diagnostics: () => this.getDiagnostics(filePath),
+      pullDiagnostics: (timeoutMs, signal) =>
+        this.#pullDiagnosticsForUri(uri, timeoutMs, request.synchronizationId, signal),
+    });
   }
 
-  #resyncOpenDocuments(): void {
+  #resyncOpenDocuments(): DiagnosticSynchronization[] {
+    const synchronizations: DiagnosticSynchronization[] = [];
     for (const [uri, doc] of this.#openDocs) {
       const filePath = uriToFile(uri);
       try {
@@ -252,93 +283,85 @@ export class ClientDiagnostics {
           continue;
         }
         const content = readFileSync(filePath, "utf-8");
-        doc.version++;
+        this.#waiters.releaseFile(uri);
+        this.#waiters.cancelSettle();
+        doc.version = nextDocumentVersion(this.#versionHistory, uri);
+        doc.synchronizationId = ++this.#nextSynchronizationId;
         this.#sendDidChange(uri, doc.version, content);
+        synchronizations.push({ uri, synchronizationId: doc.synchronizationId });
       } catch {
         // Keep the document open when a transient read fails.
       }
     }
+    return synchronizations;
   }
 
-  async #pullDiagnosticsForOpenDocuments(syncStart: number, maxWaitMs: number): Promise<void> {
+  async #pullDiagnosticsForOpenDocuments(
+    requests: DiagnosticSynchronization[],
+    syncStart: number,
+    maxWaitMs: number,
+  ): Promise<void> {
     const deadline = syncStart + maxWaitMs;
-    const uris = Array.from(this.#openDocs.keys());
     const results = await Promise.allSettled(
-      uris.map(async (uri) => {
+      requests.map(async (request) => {
         const remaining = deadline - Date.now();
         if (remaining <= 0) throw new Error("pull diagnostic timeout");
-        return this.#pullDiagnosticsForUri(uri, remaining);
+        const pullController = new AbortController();
+        const outcome = await raceDiagnosticPull({
+          pull: this.#pullDiagnosticsForUri(
+            request.uri,
+            remaining,
+            request.synchronizationId,
+            pullController.signal,
+          ),
+          waitForChange: () => this.#waiters.waitForChange(),
+          freshPush: () => hasFreshPush(this.#diagnosticStore, request),
+          current: () => isCurrentSynchronization(this.#openDocs, request),
+        });
+        if (outcome !== "pull") pullController.abort();
+        return outcome === "pull";
       }),
     );
 
-    const anySuccess = results.some((result) => result.status === "fulfilled" && result.value);
-    const failures = results.filter((result) => result.status === "rejected");
-    if ((failures.length > 0 || !anySuccess) && uris.length > 0) {
-      throw new DiagnosticPullError(failures.some((result) => isDiagnosticTimeout(result.reason)));
-    }
-  }
-
-  async #pullDiagnosticsForUri(uri: string, timeoutMs: number): Promise<boolean> {
-    const previousResultId = this.#diagnosticStore.get(uri)?.resultId;
-    const report = await this.host.pullDocumentDiagnostics(uri, previousResultId, timeoutMs);
-    if (!report) return false;
-    this.#applyPullReport(uri, report);
-    return true;
-  }
-
-  #applyPullReport(uri: string, report: DocumentDiagnosticReport): void {
-    if (report.kind === "full") {
-      this.#diagnosticStore.set(uri, {
-        diagnostics: report.items,
-        receivedAt: Date.now(),
-        resultId: report.resultId,
-      });
-    } else {
-      const current = this.#diagnosticStore.get(uri);
-      if (current) current.resultId = report.resultId;
-    }
-
-    for (const [relatedUri, relatedReport] of Object.entries(report.relatedDocuments ?? {})) {
-      if (relatedReport.kind !== "full") continue;
-      this.#diagnosticStore.set(relatedUri, {
-        diagnostics: relatedReport.items,
-        receivedAt: Date.now(),
-        resultId: relatedReport.resultId,
-      });
-    }
-  }
-
-  async #waitForDiagnosticSettle(
-    syncStart: number,
-    maxWaitMs: number,
-    quietMs: number,
-  ): Promise<DiagnosticSettleResult> {
-    const deadline = syncStart + maxWaitMs;
-    while (Date.now() < deadline) {
-      const observedAt = this.#lastDiagnosticReceivedAfter(syncStart);
-      const elapsed = Date.now() - (observedAt || syncStart);
-      if (elapsed >= quietMs) {
-        return {
-          outcome: "quiet",
-          freshness: observedAt > 0 ? "observed" : "not-observed",
-        };
-      }
-      await new Promise((resolve) =>
-        setTimeout(resolve, Math.min(quietMs - elapsed, deadline - Date.now(), 50)),
+    const incomplete = results.some((result) => result.status === "rejected" || !result.value);
+    if (incomplete && requests.length > 0) {
+      throw new DiagnosticPullError(
+        results.some(
+          (result) => result.status === "rejected" && isDiagnosticTimeout(result.reason),
+        ),
       );
     }
-    return {
-      outcome: "timed-out",
-      freshness: this.#lastDiagnosticReceivedAfter(syncStart) > 0 ? "observed" : "not-observed",
-    };
   }
 
-  #lastDiagnosticReceivedAfter(afterTime: number): number {
-    let latest = 0;
-    for (const entry of this.#diagnosticStore.values()) {
-      if (entry.receivedAt > afterTime && entry.receivedAt > latest) latest = entry.receivedAt;
+  async #pullDiagnosticsForUri(
+    uri: string,
+    timeoutMs: number,
+    synchronizationId?: number,
+    signal?: AbortSignal,
+  ): Promise<boolean> {
+    const previous = this.#diagnosticStore.get(uri);
+    const previousResultId = previous?.resultId;
+    const report = await this.host.pullDocumentDiagnostics(
+      uri,
+      previousResultId,
+      timeoutMs,
+      signal,
+    );
+    if (!report) return false;
+    if (
+      synchronizationId !== undefined &&
+      !isCurrentSynchronization(this.#openDocs, { uri, synchronizationId })
+    ) {
+      return false;
     }
-    return latest;
+    return applyPullReport({
+      store: this.#diagnosticStore,
+      uri,
+      report,
+      previous,
+      previousResultId,
+      synchronizationId,
+    });
   }
 
   #sendDidChange(uri: string, version: number, content: string): void {
@@ -357,46 +380,7 @@ export class ClientDiagnostics {
   #clearFileState(uri: string): void {
     this.#openDocs.delete(uri);
     this.#diagnosticStore.delete(uri);
-    this.#releaseDiagnosticWaiters(uri);
-  }
-
-  #waitForDiagnostics(uri: string, timeoutMs: number): Promise<DiagnosticPushWaitOutcome> {
-    if (timeoutMs <= 0) return Promise.resolve("timed-out");
-
-    return new Promise<DiagnosticPushWaitOutcome>((resolve) => {
-      const waiter: DiagnosticWaiter = (outcome) => {
-        clearTimeout(timer);
-        this.#removeDiagnosticWaiter(uri, waiter);
-        resolve(outcome);
-      };
-      const timer = setTimeout(() => {
-        this.#removeDiagnosticWaiter(uri, waiter);
-        resolve("timed-out");
-      }, timeoutMs);
-      const waiters = this.#diagnosticWaiters.get(uri) ?? [];
-      waiters.push(waiter);
-      this.#diagnosticWaiters.set(uri, waiters);
-    });
-  }
-
-  #removeDiagnosticWaiter(uri: string, waiter: DiagnosticWaiter): void {
-    const waiters = this.#diagnosticWaiters.get(uri);
-    if (!waiters) return;
-    const next = waiters.filter((entry) => entry !== waiter);
-    if (next.length > 0) this.#diagnosticWaiters.set(uri, next);
-    else this.#diagnosticWaiters.delete(uri);
-  }
-
-  #releaseAllDiagnosticWaiters(): void {
-    for (const uri of Array.from(this.#diagnosticWaiters.keys())) {
-      this.#releaseDiagnosticWaiters(uri);
-    }
-  }
-
-  #releaseDiagnosticWaiters(uri: string, outcome: "published" | "released" = "released"): void {
-    const waiters = this.#diagnosticWaiters.get(uri);
-    if (!waiters) return;
-    this.#diagnosticWaiters.delete(uri);
-    for (const waiter of waiters) waiter(outcome);
+    this.#waiters.releaseFile(uri);
+    this.#waiters.cancelSettle();
   }
 }

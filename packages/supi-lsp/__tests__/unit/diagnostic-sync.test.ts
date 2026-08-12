@@ -23,7 +23,10 @@ describe("syncClientFileAndGetDiagnostics", () => {
       { message: "warning", range, severity: 2 },
       { message: "unknown", range },
     ] as Diagnostic[];
-    const syncAndWaitForDiagnostics = vi.fn().mockResolvedValue(diagnostics);
+    const syncAndWaitForDiagnostics = vi.fn().mockResolvedValue({
+      kind: "completed",
+      data: diagnostics,
+    });
     const clearPullResultIds = vi.fn();
     const client = {
       syncAndWaitForDiagnostics,
@@ -31,11 +34,36 @@ describe("syncClientFileAndGetDiagnostics", () => {
     } as unknown as LspClient;
 
     try {
-      await expect(syncClientFileAndGetDiagnostics(client, file, 1)).resolves.toEqual([
-        diagnostics[0],
-      ]);
+      await expect(syncClientFileAndGetDiagnostics(client, file, 1)).resolves.toEqual({
+        kind: "completed",
+        data: [diagnostics[0]],
+      });
       expect(syncAndWaitForDiagnostics).toHaveBeenCalledWith(file, content);
       expect(clearPullResultIds).not.toHaveBeenCalled();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves partial cached evidence and its reason", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "supi-lsp-diagnostics-"));
+    const file = join(directory, "partial.ts");
+    writeFileSync(file, "const partial = true;\n");
+    const diagnostic = { message: "cached", range, severity: 1 } as Diagnostic;
+    const client = {
+      syncAndWaitForDiagnostics: vi.fn().mockResolvedValue({
+        kind: "partial",
+        data: [diagnostic],
+        reason: "fresh evidence was not confirmed",
+      }),
+    } as unknown as LspClient;
+
+    try {
+      await expect(syncClientFileAndGetDiagnostics(client, file, 1)).resolves.toEqual({
+        kind: "partial",
+        data: [diagnostic],
+        reason: "fresh evidence was not confirmed",
+      });
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
