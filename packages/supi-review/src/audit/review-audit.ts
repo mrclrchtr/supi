@@ -7,7 +7,7 @@ const OMIT = Symbol("omit-audit-value");
 /** Maximum compact lifecycle entries retained alongside one raw replay. */
 export const REVIEW_AUDIT_TIMELINE_MAX = 2_000;
 
-type ReplayValue =
+export type ReplayValue =
   | null
   | boolean
   | number

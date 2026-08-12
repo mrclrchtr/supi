@@ -1,6 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 import {
+  renderAuditCall,
   renderAuditResult,
   renderOutputCall,
   renderOutputResult,
@@ -47,6 +48,38 @@ describe("paged review tool TUI", () => {
         renderOutputResult(result, { expanded: false, isPartial: false }, theme, { isError: true }),
       ),
     ).toContain("supi_review_output failed");
+  });
+
+  it("identifies outline, message, and raw audit views", () => {
+    const modes = [
+      ["outline", "Replay Outline", {}],
+      ["message", "Replay message 3", { messageIndex: 3 }],
+      ["raw", "Raw reviewer replay", {}],
+    ] as const;
+    for (const [mode, label, extra] of modes) {
+      const result = {
+        content: [{ type: "text", text: "private replay body" }],
+        details: {
+          kind: "review-audit",
+          mode,
+          artifactId: "review-audit-1",
+          offset: 0,
+          totalCharacters: 10,
+          ...extra,
+        },
+      };
+      expect(
+        rendered(renderAuditResult(result, { expanded: false, isPartial: false }, theme)),
+      ).toContain(label);
+    }
+    expect(rendered(renderAuditCall({ artifactId: "review-audit-1" }, theme))).toContain(
+      "outline · offset 0",
+    );
+    expect(
+      rendered(
+        renderAuditCall({ artifactId: "review-audit-1", view: "message", messageIndex: 3 }, theme),
+      ),
+    ).toContain("message 3 · offset 0");
   });
 
   it("renders audit lists from structured details rather than agent-facing markdown", () => {

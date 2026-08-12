@@ -58,13 +58,25 @@ const reviewAuditSchema = Type.Object(
           "Local replay id returned by an audited supi_review_run task or /supi-review; omit to list replays.",
       }),
     ),
+    view: Type.Optional(
+      Type.Union([Type.Literal("outline"), Type.Literal("message"), Type.Literal("raw")], {
+        description:
+          "Artifact view. Omit for Replay Outline; message needs messageIndex; raw returns exact persisted JSON.",
+      }),
+    ),
+    messageIndex: Type.Optional(
+      Type.Integer({
+        minimum: 0,
+        description: "Zero-based persisted message array position; valid only with view: message.",
+      }),
+    ),
     offset: pageOffsetSchema,
     limit: pageLimitSchema,
   },
   {
     additionalProperties: false,
     description:
-      "Omit artifactId to list local replays. Supply artifactId to read one replay. Offset and limit page either result.",
+      "Omit artifactId to list replays. Artifact access defaults to bounded Replay Outline; select one message or explicit raw JSON when needed.",
   },
 );
 
@@ -91,9 +103,12 @@ export const REVIEW_TOOL_SPECS = {
   audit: {
     name: "supi_review_audit",
     label: "Inspect Review Replay",
-    description: `List local reviewer replays or read one replay page of at most ${MAX_PAGE_CHARACTERS} UTF-16 characters and ${MAX_PAGE_LINES.toLocaleString("en-US")} lines. Available only when review auditing is enabled; replay content can contain raw repository evidence and tool output.`,
-    promptSnippet: "List or inspect local reviewer replays",
-    promptGuidelines: ["Do not repeat raw supi_review_audit replay content unless necessary."],
+    description: `List local reviewer replays or inspect one through bounded Replay Outline, selected-message, or raw views. Outline is metadata-only. Message and raw views can contain repository evidence and tool output. Pages are at most ${MAX_PAGE_CHARACTERS} UTF-16 characters and ${MAX_PAGE_LINES.toLocaleString("en-US")} lines. Available only when review auditing is enabled.`,
+    promptSnippet: "List or navigate local reviewer replays",
+    promptGuidelines: [
+      "Use supi_review_audit Replay Outline before selected-message or raw replay access.",
+      "Do not repeat raw supi_review_audit replay content unless necessary.",
+    ],
     parameters: reviewAuditSchema,
   },
   submitReview: {

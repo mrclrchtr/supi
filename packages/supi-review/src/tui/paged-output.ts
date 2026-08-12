@@ -25,7 +25,8 @@ interface AuditListDetails {
 
 interface AuditPageDetails extends ReviewOutputReference {
   kind: "review-audit";
-  mode: "replay";
+  mode: "outline" | "message" | "raw";
+  messageIndex?: number;
 }
 
 type AuditDetails = AuditListDetails | AuditPageDetails;
@@ -83,12 +84,21 @@ export function renderOutputResult(
 }
 
 export function renderAuditCall(args: unknown, theme: Theme): Text {
-  const params = (args ?? {}) as { artifactId?: string; offset?: number };
+  const params = (args ?? {}) as {
+    artifactId?: string;
+    view?: "outline" | "message" | "raw";
+    messageIndex?: number;
+    offset?: number;
+  };
+  const view = params.artifactId ? (params.view ?? "outline") : "list";
+  const detail = params.artifactId
+    ? `${view}${view === "message" ? ` ${params.messageIndex ?? "?"}` : ""} · offset ${params.offset ?? 0}`
+    : undefined;
   return renderReviewToolCall(
     REVIEW_TOOL_SPECS.audit.name,
     params.artifactId ?? "list",
     theme,
-    params.artifactId ? `offset ${params.offset ?? 0}` : undefined,
+    detail,
   );
 }
 
@@ -131,6 +141,12 @@ export function renderAuditResult(
     return renderError(`${REVIEW_TOOL_SPECS.audit.name} failed`, theme);
   }
   if (details.mode === "list") return renderAuditList(details, options.expanded, theme);
-  if (options.expanded) return expandedPage("Reviewer replay", details, result, theme);
-  return new Text(pageSummary("Reviewer replay", details, theme), 0, 0);
+  const label =
+    details.mode === "outline"
+      ? "Replay Outline"
+      : details.mode === "message"
+        ? `Replay message ${details.messageIndex ?? "?"}`
+        : "Raw reviewer replay";
+  if (options.expanded) return expandedPage(label, details, result, theme);
+  return new Text(pageSummary(label, details, theme), 0, 0);
 }

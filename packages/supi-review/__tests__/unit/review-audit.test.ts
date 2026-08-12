@@ -161,6 +161,11 @@ describe("LocalReviewAuditStore", () => {
         expect.objectContaining({ artifactId: reference.artifactId }),
       ]);
       expect(await store.read(reference.artifactId)).toContain("Exact review packet");
+      await expect(store.readRecord(reference.artifactId)).resolves.toMatchObject({
+        format: "supi-review-audit/v1",
+        artifactId: reference.artifactId,
+        messages: recordInput().messages,
+      });
 
       const expired = new Date(Date.now() - 8 * 24 * 60 * 60 * 1_000);
       utimesSync(path, expired, expired);

@@ -13,6 +13,7 @@ import {
 import { join } from "node:path";
 import type { ReviewAuditReference } from "../types.ts";
 import type { ReviewAuditRecord, ReviewAuditRecordInput } from "./review-audit.ts";
+import { parseReviewAuditRecord } from "./review-audit-record.ts";
 
 /** Local replay files expire automatically after seven days. */
 export const REVIEW_AUDIT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -107,6 +108,16 @@ export class LocalReviewAuditStore {
       signal?.throwIfAborted();
       return undefined;
     }
+  }
+
+  /** Return one validated replay record while preserving the immutable message order. */
+  async readRecord(
+    artifactId: string,
+    signal?: AbortSignal,
+  ): Promise<ReviewAuditRecord | undefined> {
+    const text = await this.read(artifactId, signal);
+    if (text === undefined) return undefined;
+    return parseReviewAuditRecord(text);
   }
 
   #path(artifactId: string): string {

@@ -115,7 +115,7 @@ One same-session, history-only attempt to submit or decline a review after a Rec
 _Avoid_: review retry, new reviewer, partial-result extraction
 
 **Replay Outline**:
-A bounded message index for one Local Reviewer Replay. It exposes navigation metadata without message text, tool arguments, or tool results; selected-message and raw views remain explicit replay access.
+A bounded stable zero-based message index for one Local Reviewer Replay. It is the default artifact view and exposes navigation metadata without message text, provider error text, tool arguments, tool results, arbitrary message fields, or file paths; selected-message and exact raw JSON views remain explicit private replay access.
 _Avoid_: replay summary, failure digest, review result
 
 **Post-Review Disposition**:

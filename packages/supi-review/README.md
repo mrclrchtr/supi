@@ -22,7 +22,7 @@ This package is beta software. Its interfaces can change.
 - `/supi-review-cleanup` — remove marked Review Workspaces after an interrupted cleanup
 - `supi_review_run` — run one caller-defined Review
 - `supi_review_output` — read more parent-facing output
-- `supi_review_audit` — read local reviewer replays when audit is enabled
+- `supi_review_audit` — navigate local reviewer replays when audit is enabled
 
 Changes to **Agent tools** apply immediately. Turning this setting off removes the agent start and audit tools from the active tool set. The output tool and the commands stay available.
 
@@ -138,6 +138,10 @@ Parent-facing output from `supi_review_run` or `/supi-review` is stored as a bou
 ## Local reviewer replay
 
 `review.auditEnabled` is off by default. When **Agent tools** are on, enabling **Local reviewer replay** records a protected local replay for each Reviewer Session and activates `supi_review_audit` immediately. Replays expire after seven days. Normal review output includes only an opaque artifact id.
+
+With an artifact id, the audit tool now returns **Replay Outline** by default. The outline gives one metadata-only row for each stable zero-based position in the persisted captured-message array. It includes role, content kinds and size, tool names, stop reason, and error presence. It does not include message prose, provider error text, tool arguments, tool results, arbitrary message fields, or file paths.
+
+Use `view: "message"` with `messageIndex` to page one selected persisted message. Use `view: "raw"` to page the exact complete replay JSON. Message and raw views remain private opt-in audit access and can contain repository evidence, provider errors, tool arguments, and tool output.
 
 ## Post-review behavior
 
