@@ -36,13 +36,13 @@ describe("structural timing observations", () => {
         grammar: "typescript",
         parserState: "reused",
         outcome: "completed",
+        cache: { state: "hit", retained: true, evictionCount: 0 },
         timing: {
           durationMs: expect.any(Number),
           phasesMs: {
             "file-read": expect.any(Number),
             "content-hash": expect.any(Number),
-            "parser-setup": expect.any(Number),
-            parse: expect.any(Number),
+            "cache-lookup": expect.any(Number),
           },
         },
       },
@@ -51,6 +51,7 @@ describe("structural timing observations", () => {
         grammar: "typescript",
         parserState: "cold",
         outcome: "completed",
+        cache: { state: "miss", retained: true, evictionCount: 0 },
         timing: {
           durationMs: expect.any(Number),
           phasesMs: {
@@ -70,7 +71,9 @@ describe("structural timing observations", () => {
   it("separates query compilation and execution time", async () => {
     const runtime = new TreeSitterRuntime(FIXTURE_DIR);
 
-    await runtime.queryFile("sample.ts", "(function_declaration name: (identifier) @fn-name)");
+    const query = "(function_declaration name: (identifier) @fn-name)";
+    await runtime.queryFile("sample.ts", query);
+    await runtime.queryFile("sample.ts", query);
 
     const events = getDebugEvents({
       source: "tree-sitter",
@@ -84,6 +87,19 @@ describe("structural timing observations", () => {
           grammar: "typescript",
           outcome: "completed",
           captureCount: 1,
+          cache: { state: "hit", retained: true, evictionCount: 0 },
+          timing: {
+            durationMs: expect.any(Number),
+            phasesMs: {
+              "query-cache": expect.any(Number),
+              "query-execution": expect.any(Number),
+            },
+          },
+        },
+      }),
+      expect.objectContaining({
+        data: expect.objectContaining({
+          cache: { state: "miss", retained: true, evictionCount: 0 },
           timing: {
             durationMs: expect.any(Number),
             phasesMs: {
@@ -91,7 +107,7 @@ describe("structural timing observations", () => {
               "query-execution": expect.any(Number),
             },
           },
-        },
+        }),
       }),
     ]);
     expect(JSON.stringify(events)).not.toContain("function_declaration");

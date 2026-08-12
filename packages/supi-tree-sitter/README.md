@@ -104,13 +104,16 @@ Run the stable outline fixture on the same machine and dependency versions:
 pnpm --filter @mrclrchtr/supi-tree-sitter bench:structural
 ```
 
-The benchmark reports a cold session parser baseline and a repeated parser baseline. Debug capture is active, so the baseline includes the internal timing observation cost. The benchmark records measurements but does not set a pass or fail threshold.
+The benchmark reports cold and repeated outline results. It also reports cold and repeated call-site query results. Repeated operations reuse unchanged parsed trees and compiled queries. Debug capture is active, so the baseline includes the internal timing observation cost. The benchmark records measurements but does not set a pass or fail threshold.
+
+The session runtime reads files asynchronously. It identifies fresh parsed files by canonical path, grammar, and SHA-256 content hash. Cached trees use true least-recently-used eviction with limits of 128 files and 32 MiB of retained UTF-8 source bytes. Compiled queries use the same policy with limits of 128 queries and 512 KiB of retained UTF-8 query text. Source and query byte counts are memory-related proxies because `web-tree-sitter` does not report WASM resource sizes. Cached canonical trees stay private. Structural consumers receive owned shallow copies.
 
 ## Source
 
 - `src/api.ts` — public library entrypoint
 - `src/index.ts` — re-export surface
 - `src/session/runtime.ts` — parser and query runtime
+- `src/session/parsed-file-store.ts` — bounded parsed-file and compiled-query reuse
 - `src/session/session.ts` — runtime-backed service helpers and owned session API
 - `src/operation-support.ts` — authoritative operation-specific extension support
 - `src/session/service-registry.ts` — shared session-scoped structural service registry

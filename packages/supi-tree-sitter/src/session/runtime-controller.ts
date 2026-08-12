@@ -110,9 +110,10 @@ export class TreeSitterRuntimeController {
     }
 
     this.#state = { kind: "unavailable", reason: "Initializing Tree-sitter" };
+    let treeSitterRuntime: TreeSitterRuntime | undefined;
 
     try {
-      const treeSitterRuntime = new TreeSitterRuntime(this.#cwd);
+      treeSitterRuntime = new TreeSitterRuntime(this.#cwd);
 
       // Probe WASM initialization by loading the JavaScript grammar
       // (always vendored). This catches missing web-tree-sitter or
@@ -130,6 +131,10 @@ export class TreeSitterRuntimeController {
       return { kind: "ready" };
     } catch (error: unknown) {
       const reason = error instanceof Error ? error.message : String(error);
+      treeSitterRuntime?.dispose();
+      if (this.#runtime) {
+        unregisterTreeSitterCapabilities(this.#runtime, this.#cwd);
+      }
       this.#state = { kind: "unavailable", reason };
       clearSessionTreeSitterService(this.#cwd);
       return { kind: "unavailable", reason };

@@ -12,8 +12,14 @@ let repeatedSession: TreeSitterSession;
 beforeAll(async () => {
   configureDebugRegistry({ enabled: true, maxEvents: 10_000 });
   repeatedSession = createTreeSitterSession(FIXTURE_DIR);
-  const warmup = await repeatedSession.outline(FIXTURE_FILE);
-  if (warmup.kind !== "success") throw new Error(`Structural warmup failed: ${warmup.message}`);
+  const outlineWarmup = await repeatedSession.outline(FIXTURE_FILE);
+  if (outlineWarmup.kind !== "success") {
+    throw new Error(`Structural outline warmup failed: ${outlineWarmup.message}`);
+  }
+  const queryWarmup = await repeatedSession.callSites(FIXTURE_FILE);
+  if (queryWarmup.kind !== "success") {
+    throw new Error(`Structural query warmup failed: ${queryWarmup.message}`);
+  }
 });
 
 afterAll(() => {
@@ -21,7 +27,7 @@ afterAll(() => {
   resetDebugRegistry();
 });
 
-describe("representative structural outline baselines", () => {
+describe("representative structural operation baselines", () => {
   bench(
     "cold parser and outline",
     async () => {
@@ -37,10 +43,35 @@ describe("representative structural outline baselines", () => {
   );
 
   bench(
-    "repeated parser and outline",
+    "repeated parsed tree and outline",
     async () => {
       const result = await repeatedSession.outline(FIXTURE_FILE);
       if (result.kind !== "success") throw new Error(`Repeated outline failed: ${result.message}`);
+    },
+    BENCHMARK_OPTIONS,
+  );
+
+  bench(
+    "cold parser, query compilation, and call sites",
+    async () => {
+      const session = createTreeSitterSession(FIXTURE_DIR);
+      try {
+        const result = await session.callSites(FIXTURE_FILE);
+        if (result.kind !== "success") throw new Error(`Cold call sites failed: ${result.message}`);
+      } finally {
+        session.dispose();
+      }
+    },
+    BENCHMARK_OPTIONS,
+  );
+
+  bench(
+    "repeated parsed tree, compiled query, and call sites",
+    async () => {
+      const result = await repeatedSession.callSites(FIXTURE_FILE);
+      if (result.kind !== "success") {
+        throw new Error(`Repeated call sites failed: ${result.message}`);
+      }
     },
     BENCHMARK_OPTIONS,
   );

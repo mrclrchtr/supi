@@ -1,7 +1,7 @@
 // Structural callee extraction — enclosing-scope lookup with per-language queries.
 
 import { detectGrammar } from "../language.ts";
-import type { TreeSitterRuntime } from "../session/runtime.ts";
+import { queryParsedFile, type TreeSitterRuntime } from "../session/runtime.ts";
 import type { GrammarId, SourceRange, TreeSitterResult } from "../types.ts";
 
 /** Result shape returned by lookupCalleesAt. */
@@ -184,7 +184,7 @@ export async function lookupCalleesAt(
   const parseResult = await runtime.parseFile(filePath);
   if (parseResult.kind !== "success") return parseResult;
 
-  const { tree } = parseResult.data;
+  const { tree, source } = parseResult.data;
 
   try {
     const scopes = ENCLOSING_SCOPE_TYPES[grammarId];
@@ -214,7 +214,12 @@ export async function lookupCalleesAt(
       };
     }
 
-    const queryResult = await runtime.queryFile(filePath, queryStr);
+    const queryResult = await queryParsedFile(runtime, {
+      grammarId,
+      tree,
+      source,
+      queryString: queryStr,
+    });
     if (queryResult.kind !== "success") {
       return {
         kind: "runtime-error",

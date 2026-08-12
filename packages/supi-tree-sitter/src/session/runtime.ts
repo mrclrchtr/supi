@@ -1,18 +1,35 @@
 // Tree-sitter runtime — parser management, parse, and query services.
 
-import { createHash } from "node:crypto";
-import * as fs from "node:fs";
 import * as path from "node:path";
-import { startDebugTimer } from "@mrclrchtr/supi-core/debug";
 import { resolveToolPath } from "@mrclrchtr/supi-core/path";
-import type { Language, Parser, Tree } from "web-tree-sitter";
+import type { Language, Parser, QueryMatch, Tree } from "web-tree-sitter";
 import { nodeToRange } from "../coordinates.ts";
 import { detectGrammar, resolveGrammarWasmPath } from "../language.ts";
 import type { GrammarId, QueryCapture, TreeSitterResult } from "../types.ts";
+import {
+  ParsedFileReadError,
+  ParsedFileStore,
+  type StructuralCacheObservation,
+} from "./parsed-file-store.ts";
+import {
+  finishStructuralTiming,
+  type ParseTimingPhase,
+  type QueryTimingPhase,
+  startStructuralTiming,
+} from "./structural-timing.ts";
 
 interface ParserEntry {
   parser: Parser;
   language: Language;
+}
+
+const QUERY_PARSED_FILE = Symbol("query-parsed-file");
+
+interface ParsedQueryInput {
+  readonly grammarId: GrammarId;
+  readonly tree: Tree;
+  readonly source: string;
+  readonly queryString: string;
 }
 
 /**
@@ -25,6 +42,7 @@ interface ParserEntry {
 export class TreeSitterRuntime {
   private parserModule: typeof import("web-tree-sitter") | undefined;
   private parsers = new Map<GrammarId, ParserEntry>();
+  private parsedFiles = new ParsedFileStore();
   private parserPromises = new Map<GrammarId, Promise<ParserEntry>>();
   private initPromise: Promise<typeof import("web-tree-sitter")> | undefined;
   private initializing = false;
@@ -93,12 +111,12 @@ export class TreeSitterRuntime {
     try {
       parser.setLanguage(language);
     } catch (err) {
-      parser.delete();
+      deleteWasmResource(parser);
       throw err;
     }
 
     if (this.disposed) {
-      parser.delete();
+      deleteWasmResource(parser);
       throw new Error("Tree-sitter runtime has been disposed");
     }
 
@@ -107,7 +125,12 @@ export class TreeSitterRuntime {
     return entry;
   }
 
-  /** Read and parse a file. Returns structured result. */
+  /**
+   * Read and parse a file.
+   *
+   * The returned tree is an owned shallow copy. The caller must delete it.
+   * Canonical cached trees never leave the parsed-file store.
+   */
   async parseFile(filePath: string): Promise<
     TreeSitterResult<{
       tree: Tree;
@@ -117,8 +140,6 @@ export class TreeSitterRuntime {
     }>
   > {
     const resolvedPath = resolveToolPath(this.cwd, filePath);
-
-    // Check language support first
     const grammarId = detectGrammar(filePath);
     if (!grammarId) {
       return {
@@ -128,67 +149,67 @@ export class TreeSitterRuntime {
       };
     }
 
-    const timer = startDebugTimer();
+    const timer = startStructuralTiming();
     const parserState = this.parsers.has(grammarId)
       ? "reused"
       : this.parserPromises.has(grammarId)
         ? "initializing"
         : "cold";
+    let finalPhase: ParseTimingPhase = "file-read";
 
-    // Read the file
-    let source: string;
     try {
-      source = fs.readFileSync(resolvedPath, "utf-8");
-    } catch (err: unknown) {
-      finishStructuralTiming(timer, {
-        operation: "parse",
-        grammar: grammarId,
-        parserState,
-        outcome: "file-access-error",
-        finalPhase: "file-read",
+      const parsed = await this.parsedFiles.acquireParsedFile({
+        resolvedPath,
+        grammarId,
+        onPhase: (phase) => {
+          timer.mark(phase);
+          finalPhase = phase === "file-read" ? "content-hash" : "cache-lookup";
+        },
+        parse: async (source) => {
+          finalPhase = "parser-setup";
+          const entry = await this.ensureGrammarParser(grammarId);
+          this.assertActive();
+          timer.mark("parser-setup");
+          finalPhase = "parse";
+          const tree = entry.parser.parse(source);
+          if (!tree) throw new Error("Tree-sitter parser did not produce a tree");
+          return tree;
+        },
       });
-      const message = err instanceof Error ? err.message : "File could not be read";
-      return {
-        kind: "file-access-error",
-        file: filePath,
-        message,
-      };
-    }
-    timer.mark("file-read");
-
-    if (timer.enabled) {
-      try {
-        createHash("sha256").update(source).digest();
-      } catch {
-        // Timing-only hashing must not change structural behavior.
-      }
-    }
-    timer.mark("content-hash");
-
-    let parserReady = false;
-    try {
-      const entry = await this.ensureGrammarParser(grammarId);
-      timer.mark("parser-setup");
-      parserReady = true;
-      const tree = entry.parser.parse(source);
       finishStructuralTiming(timer, {
         operation: "parse",
         grammar: grammarId,
         parserState,
         outcome: "completed",
-        finalPhase: "parse",
+        cache: parsed.cache,
+        finalPhase,
       });
       return {
         kind: "success",
-        data: { tree: tree as Tree, source, resolvedPath, grammarId },
+        data: {
+          tree: parsed.tree,
+          source: parsed.source,
+          resolvedPath: parsed.resolvedPath,
+          grammarId: parsed.grammarId,
+        },
       };
     } catch (err: unknown) {
+      if (err instanceof ParsedFileReadError) {
+        finishStructuralTiming(timer, {
+          operation: "parse",
+          grammar: grammarId,
+          parserState,
+          outcome: "file-access-error",
+          finalPhase: "file-read",
+        });
+        return { kind: "file-access-error", file: filePath, message: err.message };
+      }
       finishStructuralTiming(timer, {
         operation: "parse",
         grammar: grammarId,
         parserState,
         outcome: "runtime-error",
-        finalPhase: parserReady ? "parse" : "parser-setup",
+        finalPhase,
       });
       return { kind: "runtime-error", message: formatError(err, "Parser initialization failed") };
     }
@@ -199,78 +220,85 @@ export class TreeSitterRuntime {
     filePath: string,
     queryString: string,
   ): Promise<TreeSitterResult<QueryCapture[]>> {
-    if (!queryString || queryString.trim().length === 0) {
-      return { kind: "validation-error", message: "query is required and must be non-empty" };
-    }
-    if (queryString.length > MAX_QUERY_LENGTH) {
-      return {
-        kind: "validation-error",
-        message: `query exceeds maximum length of ${MAX_QUERY_LENGTH} characters`,
-      };
-    }
+    const validation = validateQueryString(queryString);
+    if (validation) return validation;
 
     const parseResult = await this.parseFile(filePath);
     if (parseResult.kind !== "success") return parseResult;
 
     const { grammarId, tree, source } = parseResult.data;
-    const timer = startDebugTimer();
-    let compiled = false;
+    try {
+      return await this[QUERY_PARSED_FILE](grammarId, tree, source, queryString);
+    } finally {
+      tree.delete();
+    }
+  }
+
+  /** Execute a query against one caller-owned parsed tree without parsing again. */
+  async [QUERY_PARSED_FILE](
+    grammarId: GrammarId,
+    tree: Tree,
+    source: string,
+    queryString: string,
+  ): Promise<TreeSitterResult<QueryCapture[]>> {
+    const validation = validateQueryString(queryString);
+    if (validation) return validation;
+
+    const timer = startStructuralTiming();
+    let phase: QueryTimingPhase = "query-compilation";
+    let compilationStarted = false;
+    let cache: StructuralCacheObservation = {
+      state: "miss",
+      retained: false,
+      evictionCount: 0,
+    };
 
     try {
       const entry = await this.ensureGrammarParser(grammarId);
+      this.assertActive();
       const mod = await this.ensureParserInit();
-      let query: InstanceType<typeof mod.Query>;
-
-      try {
-        query = new mod.Query(entry.language, queryString);
-        compiled = true;
-        timer.mark("query-compilation");
-      } catch (err: unknown) {
-        finishStructuralTiming(timer, {
-          operation: "query",
-          grammar: grammarId,
-          outcome: "validation-error",
-          captureCount: 0,
-          finalPhase: "query-compilation",
-        });
-        return { kind: "validation-error", message: `Invalid query: ${formatError(err)}` };
-      }
-
-      try {
-        const matches = query.matches(tree.rootNode);
-        const captures: QueryCapture[] = [];
-        for (const match of matches) {
-          for (const { name, node } of match.captures) {
-            captures.push({
-              name,
-              nodeType: node.type,
-              range: nodeToRange(node, source),
-              text: node.text,
-            });
+      this.assertActive();
+      compilationStarted = true;
+      const execution = this.parsedFiles.withQuery(
+        grammarId,
+        queryString,
+        () => {
+          const query = new mod.Query(entry.language, queryString);
+          timer.mark("query-compilation");
+          phase = "query-execution";
+          return query;
+        },
+        (query, observation) => {
+          cache = observation;
+          if (observation.state === "hit") {
+            timer.mark("query-cache");
+            phase = "query-execution";
           }
-        }
-        finishStructuralTiming(timer, {
-          operation: "query",
-          grammar: grammarId,
-          outcome: "completed",
-          captureCount: captures.length,
-          finalPhase: "query-execution",
-        });
-        return { kind: "success", data: captures };
-      } finally {
-        query.delete();
-      }
-    } catch (err: unknown) {
+          return collectQueryCaptures(query.matches(tree.rootNode), source);
+        },
+      );
       finishStructuralTiming(timer, {
         operation: "query",
         grammar: grammarId,
-        outcome: "runtime-error",
-        captureCount: 0,
-        finalPhase: compiled ? "query-execution" : "query-compilation",
+        outcome: "completed",
+        captureCount: execution.data.length,
+        cache: execution.cache,
+        finalPhase: "query-execution",
       });
-      return { kind: "runtime-error", message: formatError(err, "Query execution failed") };
-    } finally {
-      tree.delete();
+      return { kind: "success", data: execution.data };
+    } catch (err: unknown) {
+      const validationError = compilationStarted && phase === "query-compilation";
+      finishStructuralTiming(timer, {
+        operation: "query",
+        grammar: grammarId,
+        outcome: validationError ? "validation-error" : "runtime-error",
+        captureCount: 0,
+        cache,
+        finalPhase: phase,
+      });
+      return validationError
+        ? { kind: "validation-error", message: `Invalid query: ${formatError(err)}` }
+        : { kind: "runtime-error", message: formatError(err, "Query execution failed") };
     }
   }
 
@@ -284,11 +312,13 @@ export class TreeSitterRuntime {
     return resolveToolPath(this.cwd, filePath);
   }
 
-  /** Dispose all held parser resources. */
+  /** Dispose all held tree, query, and parser resources. */
   dispose(): void {
+    if (this.disposed) return;
     this.disposed = true;
+    this.parsedFiles.dispose();
     for (const [, entry] of this.parsers) {
-      entry.parser.delete();
+      deleteWasmResource(entry.parser);
     }
     this.parsers.clear();
     this.parserPromises.clear();
@@ -304,44 +334,52 @@ export class TreeSitterRuntime {
   }
 }
 
+/** Package-internal query execution for consumers that already own a parsed tree. */
+export function queryParsedFile(
+  runtime: TreeSitterRuntime,
+  input: ParsedQueryInput,
+): Promise<TreeSitterResult<QueryCapture[]>> {
+  return runtime[QUERY_PARSED_FILE](input.grammarId, input.tree, input.source, input.queryString);
+}
+
+function deleteWasmResource(resource: { delete(): void }): void {
+  try {
+    resource.delete();
+  } catch {
+    // Continue cleanup so one failed release does not retain other resources.
+  }
+}
+
+function validateQueryString(queryString: string): TreeSitterResult<QueryCapture[]> | null {
+  if (!queryString || queryString.trim().length === 0) {
+    return { kind: "validation-error", message: "query is required and must be non-empty" };
+  }
+  if (queryString.length > MAX_QUERY_LENGTH) {
+    return {
+      kind: "validation-error",
+      message: `query exceeds maximum length of ${MAX_QUERY_LENGTH} characters`,
+    };
+  }
+  return null;
+}
+
+function collectQueryCaptures(matches: QueryMatch[], source: string): QueryCapture[] {
+  const captures: QueryCapture[] = [];
+  for (const match of matches) {
+    for (const { name, node } of match.captures) {
+      captures.push({
+        name,
+        nodeType: node.type,
+        range: nodeToRange(node, source),
+        text: node.text,
+      });
+    }
+  }
+  return captures;
+}
+
 /** Max query string length to prevent ReDoS via overly complex Tree-sitter patterns. */
 const MAX_QUERY_LENGTH = 10_000;
-
-type StructuralTimer = ReturnType<typeof startDebugTimer>;
-type ParserState = "cold" | "initializing" | "reused";
-
-type StructuralTimingObservation =
-  | {
-      readonly operation: "parse";
-      readonly grammar: GrammarId;
-      readonly parserState: ParserState;
-      readonly outcome: "completed" | "file-access-error" | "runtime-error";
-      readonly finalPhase: "file-read" | "parse" | "parser-setup";
-    }
-  | {
-      readonly operation: "query";
-      readonly grammar: GrammarId;
-      readonly outcome: "completed" | "runtime-error" | "validation-error";
-      readonly captureCount: number;
-      readonly finalPhase: "query-compilation" | "query-execution";
-    };
-
-function finishStructuralTiming(
-  timer: StructuralTimer,
-  observation: StructuralTimingObservation,
-): void {
-  const { finalPhase, ...data } = observation;
-  timer.finish(
-    () => ({
-      source: "tree-sitter",
-      level: "debug",
-      category: `structural.${data.operation}.timing`,
-      message: `Tree-sitter ${data.operation} ${data.outcome}`,
-      data: { ...data },
-    }),
-    finalPhase,
-  );
-}
 
 /** Format errors with their cause chain's first message for user-facing tool output. */
 function formatError(err: unknown, fallback = "Operation failed"): string {

@@ -65,6 +65,73 @@ describe("TreeSitterRuntime retry behavior", () => {
     expect(initAttempts).toBe(2);
   });
 
+  it("deletes a parser when disposal wins during grammar loading", async () => {
+    let finishLoad: ((language: { id: string }) => void) | undefined;
+    const load = vi.fn(
+      () =>
+        new Promise<{ id: string }>((resolve) => {
+          finishLoad = resolve;
+        }),
+    );
+    const parserInstances: ParserMock[] = [];
+    class ParserMock {
+      static init = vi.fn(async () => undefined);
+      delete = vi.fn();
+      setLanguage = vi.fn();
+
+      constructor() {
+        parserInstances.push(this);
+      }
+    }
+
+    vi.doMock("web-tree-sitter", () => ({
+      Language: { load },
+      Parser: ParserMock,
+      Query: class {},
+    }));
+
+    const { TreeSitterRuntime } = await import("../src/session/runtime.ts");
+    const runtime = new TreeSitterRuntime("/tmp");
+    const pending = runtime.ensureGrammarParser("typescript");
+    await vi.waitFor(() => expect(load).toHaveBeenCalledOnce());
+
+    runtime.dispose();
+    finishLoad?.({ id: "typescript" });
+
+    await expect(pending).rejects.toThrow("disposed");
+    expect(parserInstances[0]?.delete).toHaveBeenCalledOnce();
+  });
+
+  it("continues parser cleanup when one parser delete fails", async () => {
+    const parserInstances: ParserMock[] = [];
+    class ParserMock {
+      static init = vi.fn(async () => undefined);
+      delete = vi.fn(() => {
+        if (parserInstances[0] === this) throw new Error("delete failed");
+      });
+      setLanguage = vi.fn();
+
+      constructor() {
+        parserInstances.push(this);
+      }
+    }
+
+    vi.doMock("web-tree-sitter", () => ({
+      Language: { load: vi.fn(async (id: string) => ({ id })) },
+      Parser: ParserMock,
+      Query: class {},
+    }));
+
+    const { TreeSitterRuntime } = await import("../src/session/runtime.ts");
+    const runtime = new TreeSitterRuntime("/tmp");
+    await runtime.ensureGrammarParser("typescript");
+    await runtime.ensureGrammarParser("javascript");
+
+    expect(() => runtime.dispose()).not.toThrow();
+    expect(parserInstances[0]?.delete).toHaveBeenCalledOnce();
+    expect(parserInstances[1]?.delete).toHaveBeenCalledOnce();
+  });
+
   it("deduplicates concurrent first-use grammar initialization", async () => {
     const parserInstances: ParserMock[] = [];
     const load = vi.fn(async () => {

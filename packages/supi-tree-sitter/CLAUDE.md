@@ -54,6 +54,8 @@ src/
   syntax-node.ts      # syntax node interface
   session/
     runtime.ts        # grammar initialization, parser reuse, parse/query services
+    parsed-file-store.ts # private bounded LRU ownership for parsed files and compiled queries
+    structural-timing.ts # sanitized parse/query timing observations
     service-registry.ts # shared session-scoped structural service registry (backed by core helper)
     session.ts        # runtime-backed service helpers and owned session factory
     runtime-controller.ts # Tree-sitter runtime lifecycle controller
@@ -79,6 +81,7 @@ src/
 
 - `resources/grammars/<id>/` — vendored WASM files for all 15 supported grammars
 - `src/session/runtime.ts` — grammar initialization, parser reuse, parse/query services
+- `src/session/parsed-file-store.ts` — private parsed-file and compiled-query LRU ownership
 - `src/session/service-registry.ts` — shared session-scoped structural service registry
 - `src/session/session.ts` — runtime-backed service helpers and owned session factory
 - `src/provider/tree-sitter-provider.ts` — StructuralProvider impl consumed by supi-code-intelligence
@@ -102,7 +105,7 @@ pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json
 ## Gotchas
 
 - `web-tree-sitter` query construction errors are validation errors; avoid broad runtime-error string heuristics.
-- `TreeSitterSession.canParse()` is a parseability check only; raw trees stay internal and must be deleted by owners.
+- `TreeSitterSession.canParse()` is a parseability check only. The parsed-file store keeps canonical trees private and gives runtime consumers owned shallow copies. Delete each owned copy. The installed `web-tree-sitter` `Language` type has no release method; runtime disposal deletes trees, queries, and parsers, then drops language references.
 - `extractExports()` reports file-level exports only; nested `declare namespace/module` exports are scope-local.
 - `declare module "foo"` parses as a string-named `module` node; keep outline shallow and preserve the module name.
 - CRLF input needs normalized line splitting in coordinate helpers and `node_at` bounds to stay LSP-compatible.
