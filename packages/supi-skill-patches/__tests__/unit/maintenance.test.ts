@@ -16,7 +16,7 @@ describe("skill patch maintenance", () => {
   });
 
   it("uses Ask User for grilling rounds", () => {
-    const skill = readFileSync(join(root, "skills/grilling/SKILL.md"), "utf8");
+    const skill = readFileSync(join(root, "skills/productivity/grilling/SKILL.md"), "utf8");
 
     expect(skill).toContain("Use `ask_user` for each round");
     expect(skill).toContain("- `title`:");

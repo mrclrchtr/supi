@@ -8,7 +8,7 @@ Private maintenance workspace for SuPi-compatible third-party skills.
 - `patches/mattpocock-skills/files/` is the source of truth for SuPi changes. Keep one patch fragment for each changed upstream file.
 - `patches/mattpocock-skills/combined.patch` is generated for pnpm. Run `pnpm skills:patches:compose` after a fragment changes.
 - `upstream.json` records every upstream group and skill name. Its `includedGroups` map selects the stable groups mirrored to root `skills/`.
-- Root `skills/<name>/` directories are generated outputs for skills.sh. Run `pnpm skills:sync` after the dependency changes.
+- Each selected root `skills/<group>/` directory is a generated output for skills.sh and is replaced as one unit. Do not put unmanaged files in these directories. Run `pnpm skills:sync` after the dependency changes.
 
 ## Update sequence
 

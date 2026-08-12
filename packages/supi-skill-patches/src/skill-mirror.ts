@@ -7,6 +7,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
@@ -68,8 +69,14 @@ function relativeFiles(directory: string): string[] {
   return walkFiles(directory).map((path) => relative(directory, path));
 }
 
+/** Treat missing, unreadable, and non-file paths as drift instead of aborting validation. */
 function sameFile(left: string, right: string): boolean {
-  return readFileSync(left).equals(readFileSync(right));
+  try {
+    if (!statSync(left).isFile() || !statSync(right).isFile()) return false;
+    return readFileSync(left).equals(readFileSync(right));
+  } catch {
+    return false;
+  }
 }
 
 function includedGroupNames(inventory: UpstreamInventory): string[] {
@@ -80,7 +87,7 @@ function formatInventory(inventory: UpstreamInventory): string {
   return `${JSON.stringify(inventory, null, 2)}\n`;
 }
 
-/** Copy the selected pinned upstream skills into the root skills catalog. */
+/** Copy each selected pinned upstream skill group into the root skills catalog. */
 export function syncSkillMirror(): void {
   const inventory = readInventory();
   const groups = discoverGroups(groupNames());
@@ -88,28 +95,20 @@ export function syncSkillMirror(): void {
   for (const group of includedGroups) {
     if (!groups[group]) throw new Error(`Included upstream group disappeared: ${group}`);
   }
-  const oldNames = new Set(includedGroups.flatMap((group) => inventory.groups[group] ?? []));
-  const currentEntries = includedGroups.flatMap((group) =>
-    (groups[group] ?? []).map((name) => ({ group, name })),
-  );
   mkdirSync(skillsRoot, { recursive: true });
-  for (const { name } of currentEntries) {
-    if (!oldNames.has(name) && existsSync(join(skillsRoot, name))) {
-      throw new Error(`Skill output collides with unmanaged skill: ${name}`);
-    }
-  }
 
   const stagingRoot = mkdtempSync(join(workspaceRoot, ".supi-skills-sync-"));
   try {
-    for (const { group, name } of currentEntries) {
-      const target = join(stagingRoot, name);
-      if (existsSync(target)) throw new Error(`Duplicate included skill name: ${name}`);
-      cpSync(join(upstreamSkillsRoot, group, name), target, { recursive: true });
-      cpSync(licensePath, join(target, "LICENSE.mattpocock"));
+    for (const group of includedGroups) {
+      const target = join(stagingRoot, group);
+      cpSync(join(upstreamSkillsRoot, group), target, { recursive: true });
+      for (const name of groups[group] ?? []) {
+        cpSync(licensePath, join(target, name, "LICENSE.mattpocock"));
+      }
     }
-    for (const name of oldNames) rmSync(join(skillsRoot, name), { recursive: true, force: true });
-    for (const { name } of currentEntries) {
-      renameSync(join(stagingRoot, name), join(skillsRoot, name));
+    for (const group of includedGroups) {
+      rmSync(join(skillsRoot, group), { recursive: true, force: true });
+      renameSync(join(stagingRoot, group), join(skillsRoot, group));
     }
   } finally {
     rmSync(stagingRoot, { recursive: true, force: true });
@@ -126,24 +125,30 @@ export function syncSkillMirror(): void {
   );
 }
 
-function validateSkill(group: string, name: string): string[] {
-  const source = join(upstreamSkillsRoot, group, name);
-  const target = join(skillsRoot, name);
-  if (!existsSync(target)) return [`Missing root skill: ${name}`];
+function validateGroup(group: string, names: string[]): string[] {
+  const source = join(upstreamSkillsRoot, group);
+  const target = join(skillsRoot, group);
+  if (!existsSync(target)) return [`Missing root skill group: ${group}`];
 
+  const generatedLicenses = new Set(names.map((name) => join(name, "LICENSE.mattpocock")));
   const sourceFiles = relativeFiles(source);
-  const targetFiles = relativeFiles(target).filter((path) => path !== "LICENSE.mattpocock");
-  if (JSON.stringify(sourceFiles) !== JSON.stringify(targetFiles)) {
-    return [`File inventory differs for skill: ${name}`];
-  }
-
-  const errors = sourceFiles.flatMap((path) =>
-    sameFile(join(source, path), join(target, path))
+  const targetFiles = relativeFiles(target).filter((path) => !generatedLicenses.has(path));
+  const errors =
+    JSON.stringify(sourceFiles) === JSON.stringify(targetFiles)
       ? []
-      : [`Generated skill is stale: ${name}/${path}`],
-  );
-  if (!sameFile(licensePath, join(target, "LICENSE.mattpocock"))) {
-    errors.push(`Upstream license is stale for skill: ${name}`);
+      : [`File inventory differs for skill group: ${group}`];
+
+  for (const path of sourceFiles) {
+    const targetPath = join(target, path);
+    if (existsSync(targetPath) && !sameFile(join(source, path), targetPath)) {
+      errors.push(`Generated skill group file is stale: ${group}/${path}`);
+    }
+  }
+  for (const name of names) {
+    const targetLicense = join(target, name, "LICENSE.mattpocock");
+    if (!existsSync(targetLicense) || !sameFile(licensePath, targetLicense)) {
+      errors.push(`Upstream license is stale for skill: ${group}/${name}`);
+    }
   }
   return errors;
 }
@@ -157,7 +162,7 @@ export function validateSkillMirror(): string[] {
       ? []
       : ["Upstream added or removed stable skills; run skills:sync and review the inventory"];
   const skillErrors = includedGroupNames(inventory).flatMap((group) =>
-    (inventory.groups[group] ?? []).flatMap((name) => validateSkill(group, name)),
+    validateGroup(group, inventory.groups[group] ?? []),
   );
   return [...inventoryErrors, ...skillErrors];
 }

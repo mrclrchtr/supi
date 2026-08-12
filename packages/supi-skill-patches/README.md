@@ -12,7 +12,7 @@ This package is not a PI extension and is not published to npm. Skills installed
 
 ## Maintenance
 
-`upstream.json` records every upstream skill group and uses `includedGroups` to mark the stable groups mirrored to the root catalog. The `mattpocock-skills` development dependency pins the upstream release.
+`upstream.json` records every upstream skill group and uses `includedGroups` to mark the stable groups mirrored to the root catalog. Each skill keeps its upstream `skills/<group>/<name>/` path. Sync replaces each selected group directory as one generated unit, so these directories cannot contain unmanaged files. The `mattpocock-skills` development dependency pins the upstream release.
 
 One patch fragment exists for each changed upstream file under `patches/mattpocock-skills/files/`. pnpm consumes the generated `patches/mattpocock-skills/combined.patch`. The `grilling` patch uses `ask_user` from `@mrclrchtr/supi-ask-user` for each question round.
 
