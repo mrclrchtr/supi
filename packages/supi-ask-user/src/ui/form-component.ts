@@ -12,6 +12,7 @@ import {
 import type { NormalizedChoiceQuestion } from "../types.ts";
 import { renderFormFrame } from "./form-render.ts";
 import { defaultChoiceRowIndex, type FormMode, focusForMode } from "./form-view.ts";
+import { calculateFormHeightLimit } from "./form-viewport.ts";
 import type { FormArgs } from "./types.ts";
 
 type QuestionnaireMode = "choice" | "text" | "review";
@@ -44,8 +45,14 @@ export class AskUserForm implements Component, Focusable {
   private reviewFocusIndex = 0;
   private closed: boolean = false;
   private cachedWidth: number | undefined;
+  private cachedTerminalRows: number | undefined;
   private cachedEditorFocused: boolean | undefined;
   private cachedLines: string[] | undefined;
+  private scrollOffset = 0;
+  private viewportPageSize = 1;
+  private viewportMaxScrollOffset = 0;
+  private viewportOverflow = false;
+  private revealFocusedContent = true;
   private commentEdit: CommentEdit | undefined;
   private returnToReviewAfterEdit: boolean = false;
   private pendingEsc: boolean = false;
@@ -75,10 +82,15 @@ export class AskUserForm implements Component, Focusable {
     const mode = this.currentMode();
     const focus = focusForMode(mode);
     const editorFocused = this.focused && focus === "editor";
+    const terminalRows = this.args.tui.terminal.rows;
+    const dimensionsChanged =
+      this.cachedWidth !== undefined &&
+      (this.cachedWidth !== width || this.cachedTerminalRows !== terminalRows);
     if (isFocusable(this.editor)) this.editor.focused = editorFocused;
 
     if (
       this.cachedWidth === width &&
+      this.cachedTerminalRows === terminalRows &&
       this.cachedEditorFocused === editorFocused &&
       this.cachedLines
     ) {
@@ -86,9 +98,13 @@ export class AskUserForm implements Component, Focusable {
     }
 
     this.cachedWidth = width;
+    this.cachedTerminalRows = terminalRows;
     this.cachedEditorFocused = editorFocused;
-    this.cachedLines = renderFormFrame({
+    const frame = renderFormFrame({
       width,
+      maxHeight: calculateFormHeightLimit(terminalRows),
+      scrollOffset: this.scrollOffset,
+      revealFocus: this.revealFocusedContent || dimensionsChanged,
       theme: this.args.theme,
       controller: this.args.controller,
       mode,
@@ -100,6 +116,12 @@ export class AskUserForm implements Component, Focusable {
       editorLabel: this.currentEditorLabel(),
       editorContext: this.commentEdit?.context,
     });
+    this.scrollOffset = frame.viewport.scrollOffset;
+    this.viewportPageSize = frame.viewport.pageSize;
+    this.viewportMaxScrollOffset = frame.viewport.maxScrollOffset;
+    this.viewportOverflow = frame.viewport.overflow;
+    this.revealFocusedContent = false;
+    this.cachedLines = frame.lines;
     return this.cachedLines;
   }
 
@@ -112,6 +134,7 @@ export class AskUserForm implements Component, Focusable {
     }
 
     if (this.handleEscapeKey(data)) return;
+    if (this.handleViewportKey(data)) return;
     if (this.handleNavigationKey(data)) return;
 
     if (this.isCommentEditorMode()) {
@@ -138,7 +161,7 @@ export class AskUserForm implements Component, Focusable {
 
     if (this.editorHandlesEscape && (this.baseMode === "text" || this.isCommentEditorMode())) {
       this.editor.handleInput(data);
-      if (!this.closed) this.refresh();
+      if (!this.closed) this.refreshWithFocusReveal();
       return true;
     }
 
@@ -175,6 +198,19 @@ export class AskUserForm implements Component, Focusable {
       this.args.controller.cancel();
       this.finish();
     }
+  }
+
+  private handleViewportKey(data: string): boolean {
+    if (!this.viewportOverflow) return false;
+    const editorFocused = focusForMode(this.currentMode()) === "editor";
+    const pageUp = editorFocused ? Key.alt("pageUp") : Key.pageUp;
+    const pageDown = editorFocused ? Key.alt("pageDown") : Key.pageDown;
+    const direction = matchesKey(data, pageUp) ? -1 : matchesKey(data, pageDown) ? 1 : 0;
+    if (direction === 0) return false;
+
+    const pageDelta = Math.max(1, this.viewportPageSize - 1);
+    this.scrollViewportByLines(direction * pageDelta);
+    return true;
   }
 
   private handleNavigationKey(data: string): boolean {
@@ -251,14 +287,22 @@ export class AskUserForm implements Component, Focusable {
     }
 
     if (matchesKey(data, Key.up)) {
-      this.reviewFocusIndex = Math.max(0, this.reviewFocusIndex - 1);
-      this.refresh();
+      if (this.reviewFocusIndex === 0) {
+        this.scrollViewportByLines(-1);
+        return;
+      }
+      this.reviewFocusIndex -= 1;
+      this.refreshWithFocusReveal();
       return;
     }
 
     if (matchesKey(data, Key.down)) {
-      this.reviewFocusIndex = Math.min(submitIndex, this.reviewFocusIndex + 1);
-      this.refresh();
+      if (this.reviewFocusIndex === submitIndex) {
+        this.scrollViewportByLines(1);
+        return;
+      }
+      this.reviewFocusIndex += 1;
+      this.refreshWithFocusReveal();
       return;
     }
 
@@ -272,18 +316,7 @@ export class AskUserForm implements Component, Focusable {
   private handleChoiceKey(data: string): void {
     const question = this.args.controller.currentQuestion;
     if (question.type !== "choice") return;
-
-    if (matchesKey(data, Key.up)) {
-      this.choiceFocusIndex = Math.max(0, this.choiceFocusIndex - 1);
-      this.refresh();
-      return;
-    }
-
-    if (matchesKey(data, Key.down)) {
-      this.choiceFocusIndex = Math.min(question.options.length - 1, this.choiceFocusIndex + 1);
-      this.refresh();
-      return;
-    }
+    if (this.handleChoiceNavigation(data, question.options.length)) return;
 
     if (matchesKey(data, Key.space)) {
       if (question.multi) {
@@ -291,7 +324,7 @@ export class AskUserForm implements Component, Focusable {
       } else {
         this.args.controller.selectChoiceOption(question, this.choiceFocusIndex);
       }
-      this.refresh();
+      this.refreshWithFocusReveal();
       return;
     }
 
@@ -305,7 +338,7 @@ export class AskUserForm implements Component, Focusable {
 
     if (data === "u") {
       this.args.controller.markCurrentQuestionUnanswered();
-      this.refresh();
+      this.refreshWithFocusReveal();
       return;
     }
 
@@ -319,6 +352,28 @@ export class AskUserForm implements Component, Focusable {
     }
   }
 
+  private handleChoiceNavigation(data: string, optionCount: number): boolean {
+    if (matchesKey(data, Key.up)) {
+      if (this.choiceFocusIndex === 0) this.scrollViewportByLines(-1);
+      else {
+        this.choiceFocusIndex -= 1;
+        this.refreshWithFocusReveal();
+      }
+      return true;
+    }
+
+    if (matchesKey(data, Key.down)) {
+      if (this.choiceFocusIndex === optionCount - 1) this.scrollViewportByLines(1);
+      else {
+        this.choiceFocusIndex += 1;
+        this.refreshWithFocusReveal();
+      }
+      return true;
+    }
+
+    return false;
+  }
+
   // ── Text screen ─────────────────────────────────────────────────
 
   private handleTextKey(data: string): void {
@@ -327,7 +382,7 @@ export class AskUserForm implements Component, Focusable {
       if (data === "u") {
         this.args.controller.markCurrentQuestionUnanswered();
         this.setEditorText("");
-        this.refresh();
+        this.refreshWithFocusReveal();
         return;
       }
       if (data === "c") {
@@ -346,10 +401,11 @@ export class AskUserForm implements Component, Focusable {
     if (matchesKey(data, Key.alt("u"))) {
       this.args.controller.markCurrentQuestionUnanswered();
       this.setEditorText("");
-      this.refresh();
+      this.refreshWithFocusReveal();
       return;
     }
 
+    if (isFocusable(this.editor)) this.requestFocusReveal();
     this.editor.handleInput(data);
     this.refresh();
   }
@@ -357,6 +413,7 @@ export class AskUserForm implements Component, Focusable {
   // ── Comment editors ─────────────────────────────────────────────
 
   private handleCommentEditorKey(data: string): void {
+    if (isFocusable(this.editor)) this.requestFocusReveal();
     this.editor.handleInput(data);
     this.refresh();
   }
@@ -404,6 +461,7 @@ export class AskUserForm implements Component, Focusable {
       context: this.args.controller.questionnaire.title ?? "Form",
     };
     this.setEditorText(this.args.controller.comment ?? "");
+    this.resetViewport();
     this.refresh();
   }
 
@@ -415,6 +473,7 @@ export class AskUserForm implements Component, Focusable {
       returnChoiceFocusIndex: this.choiceFocusIndex,
     };
     this.setEditorText(this.args.controller.getQuestionComment(questionId) ?? "");
+    this.resetViewport();
     this.refresh();
   }
 
@@ -429,6 +488,7 @@ export class AskUserForm implements Component, Focusable {
       returnChoiceFocusIndex: optionIndex,
     };
     this.setEditorText(this.args.controller.getOptionComment(question.id, option.value) ?? "");
+    this.resetViewport();
     this.refresh();
   }
 
@@ -441,6 +501,7 @@ export class AskUserForm implements Component, Focusable {
       case "form":
         this.baseMode = "review";
         this.setEditorText("");
+        this.resetViewport();
         return;
       case "question":
         this.syncCurrentQuestion();
@@ -461,6 +522,7 @@ export class AskUserForm implements Component, Focusable {
       this.baseMode = "review";
       this.reviewFocusIndex = this.args.controller.questionnaire.questions.length;
       this.setEditorText("");
+      this.resetViewport();
       this.refresh();
       return;
     }
@@ -471,6 +533,7 @@ export class AskUserForm implements Component, Focusable {
       this.baseMode = "review";
       // Focus the Submit row by default so Enter submits immediately.
       this.reviewFocusIndex = this.args.controller.questionnaire.questions.length;
+      this.resetViewport();
       this.refresh();
       return;
     }
@@ -499,6 +562,7 @@ export class AskUserForm implements Component, Focusable {
     if (question.type === "text") {
       this.baseMode = "text";
       this.setEditorText(this.args.controller.getTextAnswer(question.id));
+      this.resetViewport();
       return;
     }
 
@@ -507,6 +571,7 @@ export class AskUserForm implements Component, Focusable {
     this.choiceFocusIndex =
       this.choiceFocusByQuestionId.get(question.id) ??
       defaultChoiceRowIndex(this.args.controller, question);
+    this.resetViewport();
   }
 
   private saveCurrentChoiceFocus(): void {
@@ -550,6 +615,32 @@ export class AskUserForm implements Component, Focusable {
     } finally {
       this.settingEditorText = false;
     }
+  }
+
+  private scrollViewportByLines(lines: number): void {
+    if (!this.viewportOverflow) return;
+    const nextOffset = Math.max(
+      0,
+      Math.min(this.viewportMaxScrollOffset, this.scrollOffset + lines),
+    );
+    if (nextOffset === this.scrollOffset) return;
+    this.scrollOffset = nextOffset;
+    this.revealFocusedContent = false;
+    this.refresh();
+  }
+
+  private resetViewport(): void {
+    this.scrollOffset = 0;
+    this.revealFocusedContent = true;
+  }
+
+  private requestFocusReveal(): void {
+    this.revealFocusedContent = true;
+  }
+
+  private refreshWithFocusReveal(): void {
+    this.requestFocusReveal();
+    this.refresh();
   }
 
   private finish(): void {

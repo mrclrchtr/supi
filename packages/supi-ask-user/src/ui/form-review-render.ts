@@ -8,12 +8,14 @@ import {
   safeWidth,
   wrapLines,
 } from "./form-render-primitives.ts";
+import type { FormLineRange, RenderedFormSection } from "./form-viewport.ts";
 
-export function renderReviewScreen(args: RenderFormFrameArgs): string[] {
+export function renderReviewScreen(args: RenderFormFrameArgs): RenderedFormSection {
   const lines: string[] = [];
   const outcome = args.controller.outcome();
   const questionCount = args.controller.questionnaire.questions.length;
   const submitIndex = questionCount;
+  let focusedRange: FormLineRange | undefined;
 
   lines.push(args.theme.fg("accent", "Review your answers"));
   lines.push(
@@ -24,7 +26,10 @@ export function renderReviewScreen(args: RenderFormFrameArgs): string[] {
   for (let i = 0; i < outcome.responses.length; i += 1) {
     const resp = outcome.responses[i];
     const question = args.controller.questionnaire.questions[i];
-    lines.push(...renderReviewQuestionCard(args, question, resp, i === args.reviewFocusIndex));
+    const focused = i === args.reviewFocusIndex;
+    const start = lines.length;
+    lines.push(...renderReviewQuestionCard(args, question, resp, focused));
+    if (focused) focusedRange = { start, end: lines.length };
   }
 
   if (outcome.comment) {
@@ -33,9 +38,12 @@ export function renderReviewScreen(args: RenderFormFrameArgs): string[] {
   }
 
   lines.push("");
-  lines.push(...renderSubmitCard(args, args.reviewFocusIndex === submitIndex));
+  const submitFocused = args.reviewFocusIndex === submitIndex;
+  const submitStart = lines.length;
+  lines.push(...renderSubmitCard(args, submitFocused));
+  if (submitFocused) focusedRange = { start: submitStart, end: lines.length };
 
-  return lines;
+  return { lines, focusedRange };
 }
 
 function renderReviewQuestionCard(

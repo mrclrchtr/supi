@@ -6,16 +6,22 @@ import type { AskUserInteractionResult, AskUserOutcome } from "../../src/types.t
 export interface FormFixture {
   captured: { value: Component | undefined };
   ctx: ReturnType<typeof makeCtx>;
+  terminal: { rows: number };
   outcomePromise: Promise<AskUserOutcome | AskUserInteractionResult>;
 }
 
 export interface MakeFormCtxOptions {
   keybindingMatches?: (binding: string) => boolean;
+  terminalRows?: number;
 }
 
 export function makeFormCtx(options?: MakeFormCtxOptions): FormFixture {
   const captured: { value: Component | undefined } = { value: undefined };
-  const tuiStub = { requestRender: () => {}, terminal: { rows: 40 } } as unknown as TUI;
+  const terminal = { rows: options?.terminalRows ?? 40 };
+  const tuiStub = {
+    requestRender: () => {},
+    terminal,
+  } as unknown as TUI;
   const themeStub = {
     fg: (_color: string, text: string) => text,
     bg: (_color: string, text: string) => text,
@@ -47,5 +53,5 @@ export function makeFormCtx(options?: MakeFormCtxOptions): FormFixture {
     return outcomePromise;
   }) as typeof ctx.ui.custom;
 
-  return { captured, ctx, outcomePromise };
+  return { captured, ctx, terminal, outcomePromise };
 }
