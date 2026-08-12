@@ -28,6 +28,10 @@ Inspection-only is a prompt protocol, not access control. The surrounding Sandbo
 
 Reviewer resource loading replaces Pi's generic coding prompt with the package-owned Reviewer Protocol and suppresses ambient extensions, context files, skills, prompt templates, themes, and discovered system prompts. The fixed Reviewer Extension Set is only the Code Intelligence Headless inspection profile, under the containing session's project-trust decision. Its registration failure leaves `read`/`bash`/`grep` available and produces a Reviewer Capability Warning separate from findings.
 
+## Submission Recovery
+
+After an accepted Reviewer Packet settles with usable history but no valid structured submission, Agent Run can perform one low-thinking same-session turn on the original model and one optional turn on `review.recoveryModel`. Recovery uses exactly `submit_review` and `decline_review_recovery`. It must not start after creation, readiness, preflight, cancellation, or timeout failure. Declined or exhausted recovery keeps the original failure and has no Task Verdict.
+
 ## Result grammar
 
 `submit_review` returns a summary, ordered findings, and required structured Criteria Coverage. Parent-facing task output identifies Review Mode. Each finding has title, description, `blocksAcceptance`, impact, effort, confidence, and optional target-relative location. The Reviewer Protocol permits change findings attributable to the target and state findings relevant to the Review Criteria in the frozen after state. The Review Engine keeps `blocksAcceptance` unchanged and derives `issues` for any blocking finding, otherwise `incomplete` when Criteria Coverage is incomplete, otherwise `pass_with_findings` for advisory-only findings and `pass` for none, with structured finding counts by blocking status and impact.

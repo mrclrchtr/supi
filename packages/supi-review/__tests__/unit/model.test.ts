@@ -4,6 +4,7 @@ import {
   getCurrentReviewModel,
   getSelectableReviewModels,
   resolveAgentReviewModel,
+  resolveRecoveryReviewModel,
   toCanonicalModelId,
 } from "../../src/model.ts";
 
@@ -191,6 +192,29 @@ describe("model selection helpers", () => {
         ["claude-*"],
       ),
     ).toBeUndefined();
+  });
+
+  it("resolves only an explicit available recovery model", () => {
+    const configured = {
+      provider: "openai",
+      id: "gpt-5",
+      name: "GPT-5",
+      reasoning: true,
+      contextWindow: 128_000,
+    };
+    const ctx = {
+      cwd: "/project",
+      model: configured,
+      modelRegistry: { getAvailable: () => [configured] },
+    } as never;
+
+    expect(resolveRecoveryReviewModel(ctx, "disabled")).toBeUndefined();
+    expect(resolveRecoveryReviewModel(ctx, "current")).toBeUndefined();
+    expect(resolveRecoveryReviewModel(ctx, "openai/gpt-5", ["gpt-*"])).toMatchObject({
+      canonicalId: "openai/gpt-5",
+      model: configured,
+    });
+    expect(resolveRecoveryReviewModel(ctx, "openai/missing", ["gpt-*"])).toBeUndefined();
   });
 
   it("returns no models when no scoped model patterns are configured", () => {

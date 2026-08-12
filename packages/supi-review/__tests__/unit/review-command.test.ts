@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   runReview: vi.fn(),
   getSelectableReviewModels: vi.fn(),
   resolveAgentReviewModel: vi.fn(),
+  resolveRecoveryReviewModel: vi.fn(),
   loadReviewConfig: vi.fn(),
   registerReviewSettings: vi.fn(),
   syncReviewAgentTools: vi.fn(),
@@ -42,8 +43,10 @@ vi.mock("../../src/config.ts", () => ({
   syncReviewAgentTools: mocks.syncReviewAgentTools,
 }));
 vi.mock("../../src/model.ts", () => ({
+  CURRENT_SESSION_REVIEW_MODEL: "current",
   getSelectableReviewModels: mocks.getSelectableReviewModels,
   resolveAgentReviewModel: mocks.resolveAgentReviewModel,
+  resolveRecoveryReviewModel: mocks.resolveRecoveryReviewModel,
 }));
 vi.mock("../../src/git-choices.ts", () => ({
   listLocalBranches: mocks.listLocalBranches,
@@ -144,6 +147,7 @@ describe("/supi-review task editing", () => {
       agentToolEnabled: false,
       agentModel: "current",
       plannerModel: "provider/planner",
+      recoveryModel: "disabled",
       auditEnabled: false,
       bootstrapCommand: "",
       postReviewPolicy: "report",

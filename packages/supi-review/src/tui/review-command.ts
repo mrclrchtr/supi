@@ -1,3 +1,4 @@
+// biome-ignore lint/style/noExcessiveLinesPerFile: the sequential interactive Review flow stays auditable in one module.
 import {
   BorderedLoader,
   buildSessionContext,
@@ -7,7 +8,12 @@ import { createAgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/a
 import type { LocalReviewAuditStore } from "../audit/local-review-audit-store.ts";
 import { loadReviewConfig } from "../config.ts";
 import { collectPlannerContext } from "../history/collect.ts";
-import { getSelectableReviewModels, resolveAgentReviewModel } from "../model.ts";
+import {
+  CURRENT_SESSION_REVIEW_MODEL,
+  getSelectableReviewModels,
+  resolveAgentReviewModel,
+  resolveRecoveryReviewModel,
+} from "../model.ts";
 import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
 import { formatReviewBatch } from "../tool/agent-review-tools.ts";
 import { queuePostReviewTurn } from "../tool/post-review-policy.ts";
@@ -261,6 +267,7 @@ async function executeInteractiveReview(
 ) {
   const config = loadReviewConfig(ctx.cwd);
   const auditStore = config.auditEnabled ? input.auditStore : undefined;
+  const recoveryModel = resolveRecoveryReviewModel(ctx, config.recoveryModel);
   return withCancellableLoader(
     ctx,
     `Reviewing… (${formatInteractiveReviewScope(input.scope)})`,
@@ -272,6 +279,12 @@ async function executeInteractiveReview(
         review: input.review,
         scope: input.scope,
         reviewerModel: input.reviewerModel,
+        ...(recoveryModel ? { recoveryModel } : {}),
+        ...(config.recoveryModel !== "disabled" &&
+        config.recoveryModel !== CURRENT_SESSION_REVIEW_MODEL &&
+        !recoveryModel
+          ? { recoveryModelId: config.recoveryModel }
+          : {}),
         expectedSnapshot: input.expectedSnapshot,
         expectedSnapshotTarget: input.expectedSnapshotTarget,
         ...(input.planning ? { planning: input.planning } : {}),

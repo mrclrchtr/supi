@@ -107,7 +107,7 @@ The Review Engine-derived result for one completed Review Task: `issues` when an
 _Avoid_: reviewer verdict, run-level verdict, proof of correctness
 
 **Recoverable Submission Failure**:
-A failure after a Reviewer Session was accepted and retained usable history but did not produce a valid structured submission. Session creation, preflight rejection, caller cancellation, and timeout are terminal outcomes outside this category.
+A failure after a Reviewer Session was accepted and retained usable history but did not produce a valid structured submission. History is usable when it retains an assistant message or any tool call or result. Session creation, preflight rejection, caller cancellation, and timeout are terminal outcomes outside this category.
 _Avoid_: partial review, failed verdict, any child failure
 
 **Submission Recovery Turn**:

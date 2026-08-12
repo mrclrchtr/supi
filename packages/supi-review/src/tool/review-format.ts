@@ -19,6 +19,18 @@ function formatScopeFocus(scope: ReviewScope | undefined): string {
     : "repository-wide review";
 }
 
+function appendSubmissionRecovery(lines: string[], result: ReviewTaskResult): void {
+  const recovery = result.submissionRecovery;
+  if (!recovery) return;
+  lines.push(`Submission recovery: ${recovery.status}`);
+  for (const attempt of recovery.attempts) {
+    lines.push(
+      `- ${attempt.modelId}: ${attempt.outcome}${attempt.usage ? ` (${formatReviewUsage(attempt.usage)})` : ""}`,
+    );
+  }
+  if (recovery.declineReason) lines.push(`Recovery decline: ${recovery.declineReason}`);
+}
+
 function appendTaskStatus(
   lines: string[],
   result: ReviewTaskResult & { status: "failed" | "canceled" | "timeout" },
@@ -46,6 +58,7 @@ function formatTaskResult(result: ReviewTaskResult): string[] {
     lines.push(`Local replay: ${result.audit.artifactId} (expires ${result.audit.expiresAt})`);
   }
   appendCapabilityWarnings(lines, result);
+  appendSubmissionRecovery(lines, result);
   if (result.status !== "completed") {
     appendTaskStatus(lines, result);
     return lines;

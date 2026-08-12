@@ -64,6 +64,31 @@ describe("createAgentRunProviderAuthority", () => {
     expect(registry.getProviderAuth).toHaveBeenCalledWith("parent-provider");
   });
 
+  it("resolves request auth for the selected same-provider model before header hooks", async () => {
+    const recoveryModel = { ...model, id: "recovery-model", name: "Recovery Model" };
+    const getApiKeyAndHeaders = vi.fn(async (selected: typeof model) => ({
+      ok: true as const,
+      apiKey: `${selected.id}-key`,
+      headers: { "x-model": selected.id },
+    }));
+    const authority = createAgentRunProviderAuthority({
+      getProvider: () => ({ ...parentProvider, getModels: () => [model, recoveryModel] }),
+      getProviderAuth: async () => ({ auth: { apiKey: "provider-key" } }),
+      getApiKeyAndHeaders,
+    });
+    const { createAgentRunModelRuntime } = await import("../../src/provider-authority.ts");
+    const created = await createAgentRunModelRuntime(authority, [
+      model as never,
+      recoveryModel as never,
+    ]);
+
+    expect(created.selectModel(recoveryModel as never)).toBe(true);
+    await expect(created.runtime.getAuth(recoveryModel as never)).resolves.toMatchObject({
+      auth: { apiKey: "recovery-model-key", headers: { "x-model": "recovery-model" } },
+    });
+    expect(getApiKeyAndHeaders).toHaveBeenLastCalledWith(recoveryModel);
+  });
+
   it("passes the borrowed provider runtime to the child session", async () => {
     const harness = createHarness(mocks);
     const registry = {

@@ -1,3 +1,4 @@
+// biome-ignore lint/style/noExcessiveLinesPerFile: Review Target and Workspace lifecycle remain in one workflow module.
 import type { AgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/api";
 import {
   combineAgentRunUsage,
@@ -52,6 +53,10 @@ export interface RunReviewInput {
   /** Optional batch-level path focus, validated in the frozen after state. */
   scope?: ReviewScope;
   reviewerModel: ReviewModelSelection;
+  /** Optional explicit second model for Submission Recovery. */
+  recoveryModel?: ReviewModelSelection;
+  /** Requested recovery model id when configuration did not resolve. */
+  recoveryModelId?: string;
   /** Snapshot captured when the interactive target was selected. A mismatch stops before workspace creation. */
   expectedSnapshot?: ReviewSnapshot;
   /** Target that produced `expectedSnapshot` when edited modes finalize a different public target. */
@@ -378,6 +383,8 @@ export async function runReview(input: RunReviewInput) {
         : undefined,
       dependencyBootstrapConfigured,
       input.providerAuthority,
+      input.recoveryModel,
+      input.recoveryModelId,
     );
   } finally {
     cleanupWarning = await workspace.cleanup();

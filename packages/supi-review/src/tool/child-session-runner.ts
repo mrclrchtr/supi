@@ -2,6 +2,7 @@ import type { clampThinkingLevel, Model } from "@earendil-works/pi-ai";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import {
+  type AgentRunContinuation,
   type AgentRunOutcome,
   type AgentRunProgress,
   type AgentRunProviderAuthority,
@@ -23,8 +24,17 @@ export interface IsolatedRunConfig<T> {
   prompt: string;
   signal?: AbortSignal;
   tools: string[];
+  initialActiveTools?: string[];
   customTools: ToolDefinition[];
   holder: { value?: T };
+  /** Optional package-owned terminal state kept outside the neutral runtime. */
+  declineHolder?: {
+    choice?: "submitted" | "declined" | "conflict";
+    reason?: string;
+  };
+  continuation?: AgentRunContinuation;
+  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
+  authorizedContinuationModels?: readonly Model<any>[];
   headlessInspection?: boolean;
   projectTrusted?: boolean;
   onSessionCreated?: (session: AgentRunSessionView) => undefined | (() => void);
@@ -110,7 +120,11 @@ export async function runIsolatedChild<T>(
       providerAuthority: config.providerAuthority,
       thinkingLevel: config.thinkingLevel,
       tools: [...config.tools],
+      ...(config.initialActiveTools ? { initialActiveTools: [...config.initialActiveTools] } : {}),
       customTools: [...config.customTools],
+      ...(config.authorizedContinuationModels
+        ? { authorizedContinuationModels: [...config.authorizedContinuationModels] }
+        : {}),
       resourceLoader: loader,
       settingsManager,
       agentDir,
@@ -118,7 +132,11 @@ export async function runIsolatedChild<T>(
     prompt: config.prompt,
     timeoutMs: config.timeoutMs,
     signal: config.signal,
-    completionResolver: (_session) => config.holder.value,
+    completionResolver: (_session) =>
+      config.declineHolder?.choice === "declined" || config.declineHolder?.choice === "conflict"
+        ? undefined
+        : config.holder.value,
+    ...(config.continuation ? { continuation: config.continuation } : {}),
     observer: (session) => {
       const cleanup = config.onSessionCreated?.(session);
       return typeof cleanup === "function" ? cleanup : undefined;

@@ -25,10 +25,16 @@ export interface ReviewAuditTimelineEntry {
     | "turn_start"
     | "turn_end"
     | "tool_start"
-    | "tool_end";
+    | "tool_end"
+    | "recovery_turn_start"
+    | "recovery_turn_end"
+    | "model_switch_succeeded"
+    | "model_switch_failed";
   toolCallId?: string;
   toolName?: string;
   isError?: boolean;
+  modelId?: string;
+  outcome?: string;
 }
 
 /** Bounded metadata that helps diagnose review direction and resource use. */
@@ -139,6 +145,11 @@ export class ReviewAuditTraceCollector {
       default:
         break;
     }
+  }
+
+  /** Add one bounded host-owned recovery marker to the continuous replay timeline. */
+  markRecovery(entry: Omit<ReviewAuditTimelineEntry, "atMs">): void {
+    this.#push({ atMs: Math.max(0, this.now() - this.#startedAt), ...entry });
   }
 
   #push(entry: ReviewAuditTimelineEntry): void {

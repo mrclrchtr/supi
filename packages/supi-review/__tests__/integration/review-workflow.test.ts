@@ -490,6 +490,51 @@ describe("runReview exact Review Target workflow", () => {
     expect(mocks.runReviewer).not.toHaveBeenCalled();
   });
 
+  it("maps recovery provenance without changing the original task model or verdict rules", async () => {
+    writeFileSync(join(cwd, "tracked.txt"), "changed\n");
+    mocks.runReviewer.mockResolvedValueOnce({
+      kind: "failed",
+      failureCode: "missing-structured-output",
+      diagnostics: { lifecycleTrace: { entries: [], droppedCount: 0 }, turns: 2, toolUses: 1 },
+      modelId: model.canonicalId,
+      reviewerExtensionSetStatus: "active",
+      submissionRecovery: {
+        status: "exhausted",
+        attempts: [
+          { modelId: model.canonicalId, outcome: "no-terminal-output" },
+          { modelId: "other/recovery", outcome: "model-switch-failed" },
+        ],
+      },
+    });
+
+    const outcome = await runReview({
+      cwd,
+      target: {},
+      review: { tasks: [changeTask] },
+      reviewerModel: model,
+      recoveryModelId: "other/recovery",
+    });
+
+    expect(outcome.kind).toBe("completed");
+    if (outcome.kind !== "completed") return;
+    expect(outcome.details.results[0]).toMatchObject({
+      status: "failed",
+      modelId: model.canonicalId,
+      packetHash: expect.any(String),
+      submissionRecovery: {
+        status: "exhausted",
+        attempts: [
+          { modelId: model.canonicalId, outcome: "no-terminal-output" },
+          { modelId: "other/recovery", outcome: "model-switch-failed" },
+        ],
+      },
+    });
+    expect(outcome.details.results[0]).not.toHaveProperty("verdict");
+    expect(mocks.runReviewer).toHaveBeenCalledWith(
+      expect.objectContaining({ recoveryModelId: "other/recovery" }),
+    );
+  });
+
   it("runs mixed modes in one non-empty workspace with mode-specific packets", async () => {
     const base = git(cwd, "rev-parse", "HEAD");
     writeFileSync(join(cwd, "tracked.txt"), "changed\n");

@@ -51,6 +51,9 @@ export function createHarness(mocks: AgentRunMocks, entries: unknown[] = []) {
         session.isStreaming = false;
       },
     ),
+    setActiveToolsByName: vi.fn(),
+    setModel: vi.fn(async () => undefined),
+    setThinkingLevel: vi.fn(),
     steer: vi.fn(async () => undefined),
     sendUserMessage: vi.fn(
       async (_content?: unknown, _options?: unknown): Promise<void> => undefined,

@@ -3,6 +3,7 @@ import {
   type AuthResult,
   InMemoryCredentialStore,
   InMemoryModelsStore,
+  lazyStream,
   type Model,
   type Provider,
   type ProviderHeaders,
@@ -35,62 +36,26 @@ export function createAgentRunProviderAuthority(
   };
 }
 
-/** Create a private model runtime that delegates one provider to borrowed authority. */
+/** Private model runtime plus its authorized active-model selector. */
+export interface CreatedAgentRunModelRuntime {
+  runtime: ModelRuntime;
+  selectModel(model: Model<Api>): boolean;
+}
+
+/** Create a private model runtime that delegates only authorized models to borrowed authority. */
 export async function createAgentRunModelRuntime(
   authority: AgentRunProviderAuthority,
-  model: Model<Api>,
-): Promise<ModelRuntime> {
-  const provider = authority.getProvider(model.provider);
-  if (!provider) throw new Error(`Provider is unavailable: ${model.provider}`);
-
-  const borrowedProvider: Provider = {
-    id: provider.id,
-    name: provider.name,
-    get baseUrl() {
-      return authority.getProvider(model.provider)?.baseUrl;
-    },
-    get headers() {
-      const headers = authority.getProvider(model.provider)?.headers;
-      return headers ? { ...headers } : undefined;
-    },
-    auth: {
-      apiKey: {
-        name: `${provider.name} borrowed authority`,
-        resolve: async () => {
-          const auth = await authority.getProviderAuth(model.provider);
-          const requestAuth = await authority.getApiKeyAndHeaders?.(model);
-          if (requestAuth && !requestAuth.ok) throw new Error(requestAuth.error);
-          if (!auth && !requestAuth?.ok) return undefined;
-          return mergeRequestAuth(auth, requestAuth);
-        },
-      },
-    },
-    getModels: () => {
-      const currentProvider = authority.getProvider(model.provider);
-      if (!currentProvider) return [];
-      try {
-        return currentProvider.getModels().filter((candidate) => candidate.id === model.id);
-      } catch {
-        return [];
-      }
-    },
-    stream: (childModel, context, options) => {
-      const currentProvider = requireProvider(authority, model.provider);
-      return currentProvider.stream(
-        resolveParentModel(currentProvider, childModel, model),
-        context,
-        options,
-      );
-    },
-    streamSimple: (childModel, context, options) => {
-      const currentProvider = requireProvider(authority, model.provider);
-      return currentProvider.streamSimple(
-        resolveParentModel(currentProvider, childModel, model),
-        context,
-        options,
-      );
-    },
-  };
+  models: readonly Model<Api>[],
+): Promise<CreatedAgentRunModelRuntime> {
+  const configuredModels = uniqueModels(models);
+  const originalModel = configuredModels[0];
+  if (!originalModel) throw new Error("An Agent Run needs one authorized model");
+  if (!authority.getProvider(originalModel.provider)) {
+    throw new Error(`Provider is unavailable: ${originalModel.provider}`);
+  }
+  const authorizedModels = configuredModels.filter(
+    (model, index) => index === 0 || authority.getProvider(model.provider) !== undefined,
+  );
 
   const runtime = await ModelRuntime.create({
     credentials: new InMemoryCredentialStore(),
@@ -98,13 +63,113 @@ export async function createAgentRunModelRuntime(
     modelsPath: null,
     allowModelNetwork: false,
   });
+  let activeModel = originalModel;
+  const authorizedProviders = new Set(authorizedModels.map((model) => model.provider));
   for (const builtin of runtime.getProviders()) {
-    if (builtin.id !== model.provider)
+    if (!authorizedProviders.has(builtin.id)) {
       runtime.registerNativeProvider(createUnavailableProvider(builtin));
+    }
   }
-  runtime.registerNativeProvider(borrowedProvider);
+  for (const providerId of authorizedProviders) {
+    runtime.registerNativeProvider(
+      createBorrowedProvider(
+        authority,
+        providerId,
+        authorizedModels.filter((model) => model.provider === providerId),
+        () => activeModel,
+      ),
+    );
+  }
   await runtime.refresh({ allowNetwork: false });
-  return runtime;
+  return {
+    runtime,
+    selectModel(model) {
+      const selected = authorizedModels.find(
+        (candidate) => candidate.provider === model.provider && candidate.id === model.id,
+      );
+      if (!selected) return false;
+      activeModel = selected;
+      return true;
+    },
+  };
+}
+
+function createBorrowedProvider(
+  authority: AgentRunProviderAuthority,
+  providerId: string,
+  models: readonly Model<Api>[],
+  getActiveModel: () => Model<Api>,
+): Provider {
+  const provider = requireProvider(authority, providerId);
+  return {
+    id: provider.id,
+    name: provider.name,
+    get baseUrl() {
+      return authority.getProvider(providerId)?.baseUrl;
+    },
+    get headers() {
+      const headers = authority.getProvider(providerId)?.headers;
+      return headers ? { ...headers } : undefined;
+    },
+    auth: {
+      apiKey: {
+        name: `${provider.name} borrowed authority`,
+        resolve: async () => {
+          const auth = await authority.getProviderAuth(providerId);
+          const activeModel = getActiveModel();
+          const requestAuth =
+            activeModel.provider === providerId
+              ? await authority.getApiKeyAndHeaders?.(activeModel)
+              : undefined;
+          if (requestAuth && !requestAuth.ok) throw new Error(requestAuth.error);
+          if (!auth && !requestAuth?.ok) return undefined;
+          return mergeRequestAuth(auth, requestAuth);
+        },
+      },
+    },
+    getModels: () => [...models],
+    stream: (childModel, context, options) =>
+      lazyStream(childModel, async () => {
+        const currentProvider = requireProvider(authority, providerId);
+        const authorizedModel = requireAuthorizedModel(models, childModel);
+        return currentProvider.stream(
+          resolveParentModel(currentProvider, childModel, authorizedModel),
+          context,
+          options,
+        );
+      }),
+    streamSimple: (childModel, context, options) =>
+      lazyStream(childModel, async () => {
+        const currentProvider = requireProvider(authority, providerId);
+        const authorizedModel = requireAuthorizedModel(models, childModel);
+        return currentProvider.streamSimple(
+          resolveParentModel(currentProvider, childModel, authorizedModel),
+          context,
+          options,
+        );
+      }),
+  };
+}
+
+function uniqueModels(models: readonly Model<Api>[]): Model<Api>[] {
+  const seen = new Set<string>();
+  return models.filter((model) => {
+    const id = `${model.provider}/${model.id}`;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+function requireAuthorizedModel(models: readonly Model<Api>[], requested: Model<Api>): Model<Api> {
+  const model = models.find(
+    (candidate) => candidate.provider === requested.provider && candidate.id === requested.id,
+  );
+  if (!model)
+    throw new Error(
+      `Model is not authorized for this Agent Run: ${requested.provider}/${requested.id}`,
+    );
+  return model;
 }
 
 function createUnavailableProvider(provider: Provider): Provider {

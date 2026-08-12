@@ -14,6 +14,12 @@ export type {
 export { createAgentRunProviderAuthority } from "./provider-authority.ts";
 export { startAgentRun } from "./run.ts";
 export type {
+  AgentRunContinuation,
+  AgentRunContinuationContext,
+  AgentRunContinuationEvent,
+  AgentRunContinuationFailureCode,
+  AgentRunContinuationStep,
+  AgentRunContinuationTurn,
   AgentRunDiagnostics,
   AgentRunFailureCode,
   AgentRunHandle,

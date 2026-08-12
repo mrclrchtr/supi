@@ -37,6 +37,17 @@ const outputPageSchema = Type.Object(
   },
 );
 
+const declineReviewRecoverySchema = Type.Object(
+  {
+    reason: Type.String({
+      minLength: 1,
+      maxLength: 2_000,
+      description: "Reason that retained history cannot support a valid structured submission.",
+    }),
+  },
+  { additionalProperties: false },
+);
+
 const reviewAuditSchema = Type.Object(
   {
     artifactId: Type.Optional(
@@ -91,6 +102,13 @@ export const REVIEW_TOOL_SPECS = {
     description:
       "Submit the one final structured result for this review task. A successful call ends the Reviewer Session.",
     parameters: reviewSubmissionSchema,
+  },
+  declineReviewRecovery: {
+    name: "decline_review_recovery",
+    label: "Decline Review Recovery",
+    description:
+      "End Submission Recovery without a Task Verdict when retained history cannot support a valid review submission.",
+    parameters: declineReviewRecoverySchema,
   },
   submitPlannerDraft: {
     name: "submit_planner_draft",

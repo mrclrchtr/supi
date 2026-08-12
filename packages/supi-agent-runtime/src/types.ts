@@ -36,12 +36,17 @@ export interface AgentSessionInputs {
   /** Effective model selected by the caller. */
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
   model: Model<any>;
+  /** Additional models that a finite continuation can select in this Agent Run. */
+  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
+  readonly authorizedContinuationModels?: readonly Model<any>[];
   /** Caller-owned provider and credential authority borrowed for this run. */
   providerAuthority: AgentRunProviderAuthority;
   /** Effective thinking level, normally clamped by the caller. */
   thinkingLevel: ModelThinkingLevel;
   /** Complete built-in and custom-tool allowlist for the run. */
   readonly tools: readonly string[];
+  /** Optional active subset used for the initial prompt. Defaults to the complete allowlist. */
+  readonly initialActiveTools?: readonly string[];
   /** Caller-owned custom tool definitions. */
   readonly customTools?: readonly ToolDefinition[];
   /** Explicit resource policy for this run. */
@@ -92,6 +97,69 @@ export type SessionReadinessCheck = (
 export type AgentRunObserver = (
   session: AgentRunSessionView,
 ) => undefined | (() => void) | Promise<undefined | (() => void)>;
+
+/** Failure that a finite continuation can handle after the accepted initial prompt settles. */
+export type AgentRunContinuationFailureCode = "missing-completion" | "unexpected-runner-failure";
+
+/** One declarative same-session continuation step selected by the caller. */
+export interface AgentRunContinuationStep {
+  /** Prompt sent from retained session history. */
+  prompt: string;
+  /** Complete active-tool replacement for this turn. */
+  readonly activeTools: readonly string[];
+  /** Thinking level applied before this turn. */
+  thinkingLevel: ModelThinkingLevel;
+  /** Optional requested model switch. Omission keeps the current model. */
+  readonly model?: {
+    /** Canonical requested model id retained when model resolution failed. */
+    readonly modelId: string;
+    /** Resolved model. Omission makes the model switch fail closed. */
+    // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
+    readonly value?: Model<any>;
+  };
+}
+
+/** Result of one runtime-owned continuation step. */
+export interface AgentRunContinuationTurn {
+  readonly turn: number;
+  readonly modelId: string;
+  readonly outcome: "settled" | "provider-failed" | "model-switch-failed";
+  readonly promptAccepted: boolean;
+  readonly usage?: Usage;
+}
+
+/** Read-only context used to select the next finite continuation step. */
+export interface AgentRunContinuationContext {
+  readonly session: AgentRunSessionView;
+  readonly initialFailureCode: AgentRunContinuationFailureCode;
+  readonly nextTurn: number;
+  readonly previousTurn?: AgentRunContinuationTurn;
+}
+
+/** Bounded host observation emitted while the runtime performs continuation mechanics. */
+export type AgentRunContinuationEvent =
+  | { type: "turn-start"; turn: number; modelId: string }
+  | { type: "model-switch"; turn: number; modelId: string; success: boolean }
+  | {
+      type: "turn-end";
+      turn: number;
+      modelId: string;
+      outcome: AgentRunContinuationTurn["outcome"];
+    };
+
+/** Caller-owned finite continuation policy. The runtime executes every selected step. */
+export interface AgentRunContinuation {
+  /** Hard upper bound for continuation turns. */
+  maxTurns: number;
+  /** Select the next declarative step, or stop the continuation. */
+  resolveNext(
+    context: AgentRunContinuationContext,
+  ): AgentRunContinuationStep | undefined | Promise<AgentRunContinuationStep | undefined>;
+  /** Optional bounded evidence observer for continuation mechanics. */
+  onEvent?: (event: AgentRunContinuationEvent) => void;
+  /** Optional per-turn observer for domain result mapping and usage provenance. */
+  onTurn?: (turn: AgentRunContinuationTurn) => void;
+}
 
 /** Non-terminal and terminal status exposed through progress snapshots. */
 export type AgentRunStatus =
@@ -200,6 +268,8 @@ export interface StartAgentRunOptions<T> {
   readinessCheck?: SessionReadinessCheck;
   /** Optional caller-owned evidence observer. */
   observer?: AgentRunObserver;
+  /** Optional bounded same-session continuation after an accepted recoverable failure. */
+  continuation?: AgentRunContinuation;
   /** Optional host timeout, measured from immediately before prompting. */
   timeoutMs?: number;
   /** Optional containing-session cancellation signal. */

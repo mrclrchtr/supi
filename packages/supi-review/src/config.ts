@@ -16,6 +16,8 @@ export interface ReviewConfig extends Record<string, unknown> {
   agentModel: string;
   /** Canonical Planner model id, or `current` for the active session model. */
   plannerModel: string;
+  /** Explicit canonical Submission Recovery model id, or `disabled`. */
+  recoveryModel: string;
   /** Record every reviewer's local replay and enable replay retrieval. */
   auditEnabled: boolean;
   /** Shell command run once before reviewers start. */
@@ -33,6 +35,7 @@ export const REVIEW_DEFAULTS: ReviewConfig = {
   agentToolEnabled: true,
   agentModel: CURRENT_SESSION_REVIEW_MODEL,
   plannerModel: CURRENT_SESSION_REVIEW_MODEL,
+  recoveryModel: "disabled",
   auditEnabled: false,
   bootstrapCommand: "",
   postReviewPolicy: "ask",
@@ -55,6 +58,7 @@ export function loadReviewConfig(cwd: string, homeDir?: string): ReviewConfig {
     agentToolEnabled: readBoolean(raw.agentToolEnabled, REVIEW_DEFAULTS.agentToolEnabled),
     agentModel: readModel(raw.agentModel, REVIEW_DEFAULTS.agentModel),
     plannerModel: readModel(raw.plannerModel, REVIEW_DEFAULTS.plannerModel),
+    recoveryModel: readModel(raw.recoveryModel, REVIEW_DEFAULTS.recoveryModel),
     auditEnabled: readBoolean(raw.auditEnabled, REVIEW_DEFAULTS.auditEnabled),
     bootstrapCommand: readCommand(raw.bootstrapCommand),
     postReviewPolicy: readPostReviewPolicy(raw.postReviewPolicy),
@@ -113,6 +117,14 @@ export function registerReviewSettings(pi: ExtensionAPI, homeDir?: string): void
           description: "Powers the optional Planner Draft in /supi-review.",
           includeDisabled: false,
           staticOptions: [currentOption],
+        },
+        {
+          kind: "modelPicker",
+          key: "recoveryModel",
+          label: "Recovery model",
+          description:
+            "Optional explicit model for the final same-session Submission Recovery Turn.",
+          includeDisabled: true,
         },
         {
           kind: "string",

@@ -17,6 +17,10 @@ import { AgentRunLifecycleTraceCollector, getRegisteredToolNames } from "./lifec
 import { createAgentRunModelRuntime } from "./provider-authority.ts";
 import { createAgentRunSessionView, deactivateAgentRunSessionView } from "./session-view.ts";
 import type {
+  AgentRunContinuationEvent,
+  AgentRunContinuationFailureCode,
+  AgentRunContinuationStep,
+  AgentRunContinuationTurn,
   AgentRunFailureCode,
   AgentRunHandle,
   AgentRunOutcome,
@@ -33,6 +37,8 @@ import { collectAgentRunUsage } from "./usage.ts";
 export const AGENT_RUN_ABORT_GRACE_MS = 2_000;
 /** Grace period for AgentSessionRuntime disposal. */
 export const AGENT_RUN_SHUTDOWN_GRACE_MS = 2_000;
+/** Maximum turns accepted from one finite continuation policy. */
+export const AGENT_RUN_MAX_CONTINUATION_TURNS = 8;
 
 /** Start one foreground Agent Run and return its control handle immediately. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: lifecycle state and teardown stay in one audited closure.
@@ -60,11 +66,15 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
   let promptStarted = false;
   let promptActive = false;
   let promptPreflightSettled = false;
+  let promptAccepted = false;
   let promptPreflightCompletion: Promise<void> | undefined;
   let promptPromiseSettled = false;
   let promptFailureCode: "prompt-rejected" | "unexpected-runner-failure" | undefined;
   let settledEventObserved = false;
   let promptSettlement: Promise<void> | undefined;
+  let continuationTurn = 0;
+  let continuationInitialFailure: AgentRunContinuationFailureCode | undefined;
+  let previousContinuationTurn: AgentRunContinuationTurn | undefined;
   let cancelRequested = false;
   let timeoutRequested = false;
   let cancellationMarkerRecorded = false;
@@ -80,6 +90,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
   let abortCompletion: Promise<void> | undefined;
   let stopRequest: Promise<void> | undefined;
   let extensionRuntime: ExtensionRuntime | undefined;
+  let selectAuthorizedModel: ((model: Model<Api>) => boolean) | undefined;
   let extensionAdmissionOpen = true;
   let admissionGeneration = 0;
   let fencedSession: AgentSession | undefined;
@@ -139,6 +150,23 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     return progressState.usage;
   };
 
+  const observeContinuation = (event: AgentRunContinuationEvent): void => {
+    try {
+      options.continuation?.onEvent?.(event);
+    } catch {
+      // Continuation evidence cannot change lifecycle semantics.
+    }
+  };
+
+  const observeContinuationTurn = (turn: AgentRunContinuationTurn): void => {
+    previousContinuationTurn = turn;
+    try {
+      options.continuation?.onTurn?.(turn);
+    } catch {
+      // Continuation evidence cannot change lifecycle semantics.
+    }
+  };
+
   const diagnostics = () =>
     buildAgentRunDiagnostics({
       progress: progressState,
@@ -193,6 +221,16 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     } catch {
       abortPromise = Promise.resolve();
     }
+  };
+
+  const installSingleSessionDisposal = (activeSession: AgentSession): void => {
+    const dispose = activeSession.dispose.bind(activeSession);
+    let disposed = false;
+    activeSession.dispose = () => {
+      if (disposed) return;
+      disposed = true;
+      dispose();
+    };
   };
 
   const installExtensionSendGuards = (activeSession: AgentSession): void => {
@@ -413,6 +451,177 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     }
   };
 
+  const authorizedContinuationModel = (model: Model<Api>): boolean =>
+    [options.inputs.model, ...(options.inputs.authorizedContinuationModels ?? [])].some(
+      (candidate) => candidate.provider === model.provider && candidate.id === model.id,
+    );
+
+  const latestAssistant = (activeSession: AgentSession): object | undefined => {
+    try {
+      return [...activeSession.messages]
+        .reverse()
+        .find((message) => message !== null && message.role === "assistant");
+    } catch {
+      return undefined;
+    }
+  };
+
+  const isProviderError = (activeSession: AgentSession, previous?: object): boolean => {
+    const assistant = latestAssistant(activeSession);
+    if (!assistant || assistant === previous) return false;
+    return (assistant as { stopReason?: unknown }).stopReason === "error";
+  };
+
+  const executeContinuationStep = async (
+    activeSession: AgentSession,
+    step: AgentRunContinuationStep,
+    turn: number,
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one audited step owns model, tool, prompt, and usage mechanics.
+  ): Promise<AgentRunContinuationTurn | undefined> => {
+    if (aborting || terminal || finalizing) return undefined;
+    const currentModelId = activeSession.model
+      ? `${activeSession.model.provider}/${activeSession.model.id}`
+      : `${options.inputs.model.provider}/${options.inputs.model.id}`;
+    const requestedModelId = step.model?.modelId ?? currentModelId;
+    observeContinuation({ type: "turn-start", turn, modelId: requestedModelId });
+    if (aborting || terminal || finalizing) return undefined;
+    const usageBefore = collectAgentRunUsage(activeSession);
+    if (step.model) {
+      const requested = step.model.value as Model<Api> | undefined;
+      const modelIdMatches = requested
+        ? `${requested.provider}/${requested.id}` === requestedModelId
+        : false;
+      let switched = false;
+      if (
+        requested &&
+        modelIdMatches &&
+        authorizedContinuationModel(requested) &&
+        selectAuthorizedModel?.(requested)
+      ) {
+        try {
+          await activeSession.setModel(requested);
+          if (aborting || terminal || finalizing) return undefined;
+          switched = true;
+        } catch {
+          // An unavailable authorized model fails this finite step closed.
+        }
+      }
+      observeContinuation({
+        type: "model-switch",
+        turn,
+        modelId: requestedModelId,
+        success: switched,
+      });
+      if (!switched) {
+        const failed: AgentRunContinuationTurn = {
+          turn,
+          modelId: requestedModelId,
+          outcome: "model-switch-failed",
+          promptAccepted: false,
+          ...usageDeltaFields(usageBefore, collectAgentRunUsage(activeSession)),
+        };
+        observeContinuationTurn(failed);
+        observeContinuation({
+          type: "turn-end",
+          turn,
+          modelId: requestedModelId,
+          outcome: failed.outcome,
+        });
+        return failed;
+      }
+    }
+    if (aborting || terminal || finalizing) return undefined;
+    activeSession.setActiveToolsByName([...step.activeTools]);
+    activeSession.setThinkingLevel(step.thinkingLevel);
+    const previousAssistant = latestAssistant(activeSession);
+    let accepted = false;
+    let promptFailed = false;
+    try {
+      await activeSession.prompt(step.prompt, {
+        preflightResult: (success) => {
+          accepted = success;
+          if (success && (aborting || terminal || finalizing)) {
+            throw new Error("Agent Run continuation canceled before acceptance");
+          }
+        },
+      });
+    } catch {
+      promptFailed = true;
+    }
+    try {
+      await awaitSessionQuiescence(activeSession);
+    } catch {
+      promptFailed = true;
+    }
+    const outcome =
+      !accepted || promptFailed || isProviderError(activeSession, previousAssistant)
+        ? "provider-failed"
+        : "settled";
+    const completed: AgentRunContinuationTurn = {
+      turn,
+      modelId: requestedModelId,
+      outcome,
+      promptAccepted: accepted,
+      ...usageDeltaFields(usageBefore, collectAgentRunUsage(activeSession)),
+    };
+    observeContinuationTurn(completed);
+    observeContinuation({ type: "turn-end", turn, modelId: requestedModelId, outcome });
+    return completed;
+  };
+
+  const runContinuation = async (
+    initialFailureCode: AgentRunContinuationFailureCode,
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: the bounded loop keeps continuation and terminal selection in the lifecycle closure.
+  ): Promise<void> => {
+    const policy = options.continuation;
+    const activeSession = session;
+    const activeView = view;
+    const finiteBound =
+      policy &&
+      Number.isSafeInteger(policy.maxTurns) &&
+      policy.maxTurns >= 1 &&
+      policy.maxTurns <= AGENT_RUN_MAX_CONTINUATION_TURNS;
+    if (!finiteBound || !activeSession || !activeView || !promptAccepted) {
+      await finishFailed(initialFailureCode);
+      return;
+    }
+    continuationInitialFailure ??= initialFailureCode;
+    const maximumTurns = policy.maxTurns;
+    while (continuationTurn < maximumTurns && !aborting && !terminal && !finalizing) {
+      const nextTurn = continuationTurn + 1;
+      let step: AgentRunContinuationStep | undefined;
+      try {
+        step = await policy.resolveNext({
+          session: activeView,
+          initialFailureCode: continuationInitialFailure,
+          nextTurn,
+          ...(previousContinuationTurn ? { previousTurn: previousContinuationTurn } : {}),
+        });
+      } catch {
+        step = undefined;
+      }
+      if (aborting || terminal || finalizing) return;
+      if (!step) break;
+      continuationTurn = nextTurn;
+      const turn = await executeContinuationStep(activeSession, step, nextTurn);
+      if (aborting || terminal || finalizing || !turn) return;
+      if (turn.outcome !== "settled") continue;
+      try {
+        const value = await options.completionResolver(activeView);
+        if (aborting || terminal || finalizing) return;
+        if (value !== undefined) {
+          await finish(outcomeWithUsage({ kind: "success", value }));
+          return;
+        }
+      } catch {
+        // A failed resolver leaves the original failure authoritative.
+      }
+    }
+    if (!aborting && !terminal && !finalizing) {
+      await finishFailed(continuationInitialFailure);
+    }
+  };
+
   const startPromptSettlement = (): void => {
     if (promptSettlement || !promptPromiseSettled || aborting || terminal || finalizing) return;
     const activeSession = session;
@@ -424,7 +633,12 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
         if (!aborting && !terminal && !finalizing) await finishFailed("unexpected-runner-failure");
         return;
       }
-      if (!aborting && !terminal && !finalizing) startCompletionResolution();
+      if (aborting || terminal || finalizing) return;
+      if (isProviderError(activeSession)) {
+        await runContinuation("unexpected-runner-failure");
+        return;
+      }
+      startCompletionResolution();
     })();
     promptSettlement = settlement;
     void settlement.then(
@@ -446,14 +660,19 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       void finishFailed(failureCode);
       return;
     }
-    closeSessionAdmission();
+    if (failureCode === "prompt-rejected" || !promptAccepted) closeSessionAdmission();
     const settlement = (async () => {
       try {
         await awaitSessionQuiescence(activeSession);
       } catch {
         // The prompt already failed; select its failure even if idle inspection fails.
       }
-      if (!aborting && !terminal && !finalizing) await finishFailed(failureCode);
+      if (aborting || terminal || finalizing) return;
+      if (failureCode === "unexpected-runner-failure" && promptAccepted) {
+        await runContinuation(failureCode);
+      } else {
+        await finishFailed(failureCode);
+      }
     })();
     promptSettlement = settlement;
     void settlement.then(
@@ -473,12 +692,14 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       const value = await options.completionResolver(view);
       if (terminal || finalizing || aborting) return;
       if (value === undefined) {
-        await finishFailed("missing-completion");
+        await runContinuation("missing-completion");
       } else {
         await finish(outcomeWithUsage({ kind: "success", value }));
       }
     } catch {
-      if (!terminal && !finalizing && !aborting) await finishFailed("unexpected-runner-failure");
+      if (!terminal && !finalizing && !aborting) {
+        await runContinuation("unexpected-runner-failure");
+      }
     } finally {
       resolvingCompletion = false;
     }
@@ -527,6 +748,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       if (cancelRequested || timeoutRequested || aborting || terminal || finalizing) {
         throw new Error("Agent Run prompt canceled before acceptance");
       }
+      promptAccepted = true;
       promptActive = true;
     };
     try {
@@ -568,10 +790,15 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       const agentDir = options.inputs.agentDir ?? process.env.PI_CODING_AGENT_DIR ?? getAgentDir();
       runtime = await createAgentSessionRuntime(
         async ({ cwd, agentDir: runtimeAgentDir, sessionManager, sessionStartEvent }) => {
-          const modelRuntime = await createAgentRunModelRuntime(
+          const createdModelRuntime = await createAgentRunModelRuntime(
             options.inputs.providerAuthority,
-            options.inputs.model as Model<Api>,
+            [
+              options.inputs.model as Model<Api>,
+              ...((options.inputs.authorizedContinuationModels ?? []) as Model<Api>[]),
+            ],
           );
+          selectAuthorizedModel = createdModelRuntime.selectModel;
+          const modelRuntime = createdModelRuntime.runtime;
           const created = await createAgentSession({
             cwd,
             agentDir: runtimeAgentDir,
@@ -606,6 +833,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
         },
       );
       session = runtime.session;
+      installSingleSessionDisposal(session);
       installExtensionSendGuards(session);
       if (cancelRequested || terminal || finalizing) {
         markSessionSetupFinished();
@@ -619,6 +847,9 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
         markSessionSetupFinished();
       }
       if (cancelRequested || terminal || finalizing) return;
+      if (options.inputs.initialActiveTools) {
+        session.setActiveToolsByName([...options.inputs.initialActiveTools]);
+      }
       lifecycle = new AgentRunLifecycleTraceCollector(getRegisteredToolNames(session));
       unsubscribe = session.subscribe(dispatchEvent);
       const activeView = createAgentRunSessionView(session, options.inputs.cwd);
@@ -732,6 +963,52 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
 
 function usageFields(usage: Usage | undefined): { usage?: Usage } {
   return usage ? { usage } : {};
+}
+
+function usageDeltaFields(before: Usage | undefined, after: Usage | undefined): { usage?: Usage } {
+  const delta = subtractUsage(after, before);
+  return delta ? { usage: delta } : {};
+}
+
+function subtractUsage(after: Usage | undefined, before: Usage | undefined): Usage | undefined {
+  if (!after) return undefined;
+  const nonNegative = (value: number) => Math.max(0, value);
+  const optionalDifference = (next: number | undefined, previous: number | undefined) =>
+    next === undefined && previous === undefined
+      ? undefined
+      : nonNegative((next ?? 0) - (previous ?? 0));
+  const cacheWrite1h = optionalDifference(after.cacheWrite1h, before?.cacheWrite1h);
+  const reasoning = optionalDifference(after.reasoning, before?.reasoning);
+  const usage: Usage = {
+    input: nonNegative(after.input - (before?.input ?? 0)),
+    output: nonNegative(after.output - (before?.output ?? 0)),
+    cacheRead: nonNegative(after.cacheRead - (before?.cacheRead ?? 0)),
+    cacheWrite: nonNegative(after.cacheWrite - (before?.cacheWrite ?? 0)),
+    totalTokens: nonNegative(after.totalTokens - (before?.totalTokens ?? 0)),
+    cost: {
+      input: nonNegative(after.cost.input - (before?.cost.input ?? 0)),
+      output: nonNegative(after.cost.output - (before?.cost.output ?? 0)),
+      cacheRead: nonNegative(after.cost.cacheRead - (before?.cost.cacheRead ?? 0)),
+      cacheWrite: nonNegative(after.cost.cacheWrite - (before?.cost.cacheWrite ?? 0)),
+      total: nonNegative(after.cost.total - (before?.cost.total ?? 0)),
+    },
+    ...(cacheWrite1h === undefined ? {} : { cacheWrite1h }),
+    ...(reasoning === undefined ? {} : { reasoning }),
+  };
+  return hasUsage(usage) ? usage : undefined;
+}
+
+function hasUsage(usage: Usage): boolean {
+  return (
+    usage.input > 0 ||
+    usage.output > 0 ||
+    usage.cacheRead > 0 ||
+    usage.cacheWrite > 0 ||
+    usage.totalTokens > 0 ||
+    usage.cost.total > 0 ||
+    (usage.cacheWrite1h ?? 0) > 0 ||
+    (usage.reasoning ?? 0) > 0
+  );
 }
 
 function cloneUsage(usage: Usage): Usage {

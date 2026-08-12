@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createReviewSubmissionTool } from "../../src/tool/review-tools.ts";
+import {
+  createReviewRecoveryDeclineTool,
+  createReviewSubmissionTool,
+} from "../../src/tool/review-tools.ts";
 import type { ReviewSubmission } from "../../src/types.ts";
 
 describe("submit_review", () => {
@@ -30,5 +33,53 @@ describe("submit_review", () => {
       ),
     ).rejects.toThrow("Invalid review submission");
     expect(submission.value).toBeUndefined();
+  });
+});
+
+describe("decline_review_recovery", () => {
+  it("rejects conflicting recovery terminal choices", async () => {
+    const submission: { value?: ReviewSubmission } = {};
+    const terminal: {
+      choice?: "submitted" | "declined" | "conflict";
+      reason?: string;
+    } = {};
+    const submit = createReviewSubmissionTool(submission, terminal);
+    const decline = createReviewRecoveryDeclineTool(terminal);
+    const args = {
+      summary: "Done.",
+      findings: [],
+      criteriaCoverage: { status: "complete" as const },
+    };
+
+    await submit.execute("submit", args, undefined, undefined, {} as never);
+    await expect(
+      decline.execute("decline", { reason: "cannot recover" }, undefined, undefined, {} as never),
+    ).rejects.toThrow("already has a terminal choice");
+    expect(terminal.choice).toBe("conflict");
+  });
+
+  it("requires one non-empty bounded reason", async () => {
+    const holder: { reason?: string } = {};
+    const tool = createReviewRecoveryDeclineTool(holder);
+
+    await expect(
+      tool.execute("call", { reason: "   " }, undefined, undefined, {} as never),
+    ).rejects.toThrow("must contain visible text");
+    await expect(
+      tool.execute("call", { reason: "\u0000" }, undefined, undefined, {} as never),
+    ).rejects.toThrow("must contain visible text");
+    await expect(
+      tool.execute("call", { reason: "x".repeat(2_001) }, undefined, undefined, {} as never),
+    ).rejects.toThrow("Invalid recovery decline");
+    await expect(
+      tool.execute(
+        "call",
+        { reason: "retained history is insufficient" },
+        undefined,
+        undefined,
+        {} as never,
+      ),
+    ).resolves.toMatchObject({ terminate: true });
+    expect(holder.reason).toBe("retained history is insufficient");
   });
 });

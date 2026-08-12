@@ -26,8 +26,10 @@ vi.mock("../../src/config.ts", () => ({
   syncReviewAgentTools: mocks.syncReviewAgentTools,
 }));
 vi.mock("../../src/model.ts", () => ({
+  CURRENT_SESSION_REVIEW_MODEL: "current",
   getSelectableReviewModels: mocks.getSelectableReviewModels,
   resolveAgentReviewModel: vi.fn(),
+  resolveRecoveryReviewModel: vi.fn(),
 }));
 vi.mock("../../src/git-choices.ts", () => ({
   listLocalBranches: mocks.listLocalBranches,
@@ -111,6 +113,7 @@ describe("/supi-review exact target picker", () => {
       agentToolEnabled: false,
       agentModel: "current",
       plannerModel: "provider/planner",
+      recoveryModel: "disabled",
       auditEnabled: false,
       bootstrapCommand: "",
       postReviewPolicy: "report",

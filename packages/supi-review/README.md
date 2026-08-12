@@ -87,11 +87,13 @@ Workspaces are marked and locked in the Git worktree list. Normal cleanup remove
 
 `review.agentModel` selects the reviewer model for agent-started Reviews. `review.plannerModel` selects the model for the optional Planner Draft in `/supi-review`. Both default to `current`, which uses the active session model.
 
+`review.recoveryModel` selects one optional explicit model for Submission Recovery. It defaults to `disabled`. `current` is not a valid implicit Recovery Model. If the configured model is unavailable, the original review still runs. Recovery records the failed model switch only if the chain reaches that model.
+
 `review.bootstrapCommand` defaults to empty. When set, the Review Engine runs the command once in the frozen Review Workspace before Reviewer Sessions start. When empty, a reviewer can run a Dependency Bootstrap command when needed.
 
 ## Reviewer Protocol
 
-Reviewer Sessions have `read`, `bash`, `grep`, headless Code Intelligence tools, and `submit_review`. They inspect one shared frozen Review Workspace. They do not run tests, builds, linters, services, runtime experiments, nested Pi sessions, or nested reviews. They do not intentionally change Target Evidence or Git history.
+Reviewer Sessions have `read`, `bash`, `grep`, headless Code Intelligence tools, and `submit_review` during inspection. They inspect one shared frozen Review Workspace. They do not run tests, builds, linters, services, runtime experiments, nested Pi sessions, or nested reviews. They do not intentionally change Target Evidence or Git history.
 
 The Reviewer Protocol owns finding eligibility:
 
@@ -116,6 +118,14 @@ A root commit permits state tasks only. State-only tasks use only the selected a
 After target selection, choose repository-wide review or enter one workspace-relative path per line for an advisory Review Scope. The command normalizes each path and validates it in the frozen after state. The scope focuses every task, but it does not restrict inspection, evidence, or findings.
 
 The command captures its snapshot. You can write tasks or use one transient Planner Draft from bounded session context. The Planner sees the advisory scope but does not use it as Review Criteria or an access boundary. Edit the tasks and select each Review Mode, then confirm. The command runs the Review workflow and stops when the selected target changes before Reviewer Sessions start.
+
+## Submission Recovery
+
+If Pi accepted the original Reviewer Packet and the settled session retained an assistant message or any tool call or result, a missing structured submission can start a finite same-session recovery chain. Recovery never starts after creation failure, readiness failure, preflight rejection, cancellation, or timeout.
+
+The first low-thinking turn uses the original reviewer model. One configured Recovery Model can make the final turn in the same session. During each recovery turn, exactly `submit_review` and `decline_review_recovery` are active. Recovery uses only retained history and cannot inspect more Target Evidence.
+
+A valid recovered submission produces the normal Task Verdict. A decline or exhausted chain keeps the original failure and produces no Task Verdict. The task model and packet hash stay attributed to the original reviewer. `submissionRecovery` records the ordered delivery models, outcomes, decline reason when applicable, and per-turn usage. Task usage remains the one final cumulative session total.
 
 ## Results and continuation
 

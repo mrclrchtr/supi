@@ -162,6 +162,25 @@ export interface NormalizedReviewSubmission extends ReviewSubmission {
   findingCounts: FindingCounts;
 }
 
+/** Provenance for one finite same-session Submission Recovery chain. */
+export interface SubmissionRecovery {
+  readonly status: "succeeded" | "declined" | "exhausted";
+  readonly attempts: readonly SubmissionRecoveryAttempt[];
+  readonly declineReason?: string;
+}
+
+/** One model's bounded Submission Recovery Turn. */
+export interface SubmissionRecoveryAttempt {
+  readonly modelId: string;
+  readonly outcome:
+    | "submitted"
+    | "declined"
+    | "no-terminal-output"
+    | "model-switch-failed"
+    | "provider-failed";
+  readonly usage?: Usage;
+}
+
 export type ReviewModelSelection = import("@mrclrchtr/supi-core/model-selection").ModelSelection;
 
 export type ChildStage = "planner" | "reviewer";
@@ -230,6 +249,10 @@ export interface ReviewerInvocation {
   packetHash: string;
   task: ReviewTask;
   model: ReviewModelSelection;
+  /** Optional explicit second model for Submission Recovery. */
+  recoveryModel?: ReviewModelSelection;
+  /** Requested recovery model id when configuration did not resolve. */
+  recoveryModelId?: string;
   cwd: string;
   snapshot: ReviewSnapshot;
   audit?: ReviewerAuditRequest;
@@ -247,6 +270,7 @@ export type ReviewerRunResult = ChildRunOutcome<ReviewSubmission> & {
   reviewerExtensionSetStatus: ReviewerExtensionSetStatus;
   capabilityWarnings?: ReviewerCapabilityWarning[];
   audit?: ReviewAuditReference;
+  submissionRecovery?: SubmissionRecovery;
 };
 
 interface ReviewTaskResultIdentity {
@@ -259,6 +283,8 @@ interface ReviewTaskResultIdentity {
   usage?: Usage;
   /** Reviewer Extension Set capability degradation, kept separate from findings. */
   capabilityWarnings?: ReviewerCapabilityWarning[];
+  /** Provenance for a Submission Recovery chain, when one started. */
+  submissionRecovery?: SubmissionRecovery;
   /** Local-only opt-in reviewer replay, never included inline in review output. */
   audit?: ReviewAuditReference;
 }

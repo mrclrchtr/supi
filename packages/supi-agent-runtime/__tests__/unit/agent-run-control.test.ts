@@ -200,6 +200,7 @@ it("lets cancellation win a timeout race and records one abort request", async (
 it("forces session disposal when graceful runtime shutdown exceeds its grace", async () => {
   vi.useFakeTimers();
   const harness = createHarness(mocks);
+  const physicalDispose = harness.session.dispose;
   harness.runtime.dispose.mockImplementationOnce(() => new Promise<undefined>(() => {}));
   const run = startAgentRun({
     inputs: inputs(),
@@ -210,7 +211,36 @@ it("forces session disposal when graceful runtime shutdown exceeds its grace", a
   await vi.advanceTimersToNextTimerAsync();
 
   await expect(run.result).resolves.toMatchObject({ kind: "success", value: "done" });
-  expect(harness.session.dispose).toHaveBeenCalledTimes(1);
+  expect(physicalDispose).toHaveBeenCalledTimes(1);
+});
+
+it("does not let late graceful shutdown dispose the session twice", async () => {
+  vi.useFakeTimers();
+  const harness = createHarness(mocks);
+  const physicalDispose = harness.session.dispose;
+  let releaseShutdown!: () => void;
+  harness.runtime.dispose.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        releaseShutdown = () => {
+          harness.session.dispose();
+          resolve();
+        };
+      }),
+  );
+  const run = startAgentRun({
+    inputs: inputs(),
+    prompt: "late graceful disposal",
+    completionResolver: () => "done",
+  });
+  await vi.waitFor(() => expect(harness.runtime.dispose).toHaveBeenCalledTimes(1));
+  await vi.advanceTimersToNextTimerAsync();
+  await expect(run.result).resolves.toMatchObject({ kind: "success", value: "done" });
+  expect(physicalDispose).toHaveBeenCalledTimes(1);
+
+  releaseShutdown();
+  await Promise.resolve();
+  expect(physicalDispose).toHaveBeenCalledTimes(1);
 });
 
 it("settles cancellation after abort grace when the provider never resolves", async () => {

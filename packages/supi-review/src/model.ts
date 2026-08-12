@@ -70,3 +70,17 @@ export function resolveAgentReviewModel(
       : false,
   };
 }
+
+/** Resolve one explicit configured Submission Recovery model when it is available. */
+export function resolveRecoveryReviewModel(
+  ctx: Pick<ExtensionContext, "cwd" | "modelRegistry" | "model">,
+  configuredModelId: string,
+  /** Optional override for Pi's scoped model patterns; omit to use configured defaults. */
+  enabledModelPatterns?: string[],
+): ReviewModelSelection | undefined {
+  const modelId = configuredModelId.trim();
+  if (!modelId || modelId === "disabled" || modelId === CURRENT_SESSION_REVIEW_MODEL) {
+    return undefined;
+  }
+  return resolveAgentReviewModel(ctx, modelId, enabledModelPatterns);
+}

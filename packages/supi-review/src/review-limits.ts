@@ -12,6 +12,7 @@ export const REVIEW_LIMITS = {
   criteriaReferenceCharacters: 256,
   criteriaSummaryCharacters: 2_000,
   criteriaCoverageReasonCharacters: 500,
+  recoveryDeclineReasonCharacters: 2_000,
   reviewScopePathsPerTarget: 16,
   reviewScopePathCharacters: 4_096,
 } as const;

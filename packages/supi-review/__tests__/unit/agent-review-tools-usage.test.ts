@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   runReview: vi.fn(),
   resolveAgentReviewModel: vi.fn(),
+  resolveRecoveryReviewModel: vi.fn(),
   loadReviewConfig: vi.fn(),
   spinnerStart: vi.fn(),
 }));
@@ -16,7 +17,11 @@ vi.mock("@mrclrchtr/supi-core/status-spinner", () => ({
   },
 }));
 vi.mock("../../src/config.ts", () => ({ loadReviewConfig: mocks.loadReviewConfig }));
-vi.mock("../../src/model.ts", () => ({ resolveAgentReviewModel: mocks.resolveAgentReviewModel }));
+vi.mock("../../src/model.ts", () => ({
+  CURRENT_SESSION_REVIEW_MODEL: "current",
+  resolveAgentReviewModel: mocks.resolveAgentReviewModel,
+  resolveRecoveryReviewModel: mocks.resolveRecoveryReviewModel,
+}));
 vi.mock("../../src/tool/review-workflow.ts", () => ({ runReview: mocks.runReview }));
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -79,6 +84,7 @@ describe("agent review tool usage", () => {
     vi.clearAllMocks();
     mocks.loadReviewConfig.mockReturnValue({
       agentModel: "provider/model",
+      recoveryModel: "disabled",
       auditEnabled: false,
       bootstrapCommand: "",
       postReviewPolicy: "ask",

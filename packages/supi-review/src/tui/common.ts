@@ -174,6 +174,23 @@ function buildNonCompletedSection(
   }
 }
 
+function appendSubmissionRecovery(
+  container: Container,
+  result: ReviewTaskResult,
+  theme: Theme,
+): void {
+  const recovery = result.submissionRecovery;
+  if (!recovery) return;
+  container.addChild(new Spacer(1));
+  container.addChild(new Text(theme.fg("dim", `submission recovery: ${recovery.status}`), 1, 0));
+  for (const attempt of recovery.attempts) {
+    container.addChild(new Text(theme.fg("dim", `  ${attempt.modelId}: ${attempt.outcome}`), 1, 0));
+  }
+  if (recovery.declineReason) {
+    container.addChild(new Text(theme.fg("warning", recovery.declineReason), 1, 0));
+  }
+}
+
 function appendCapabilityWarnings(
   container: Container,
   result: ReviewTaskResult,
@@ -247,6 +264,7 @@ export function buildTaskSection(
     container.addChild(new Text(theme.fg("dim", `local replay: ${result.audit.artifactId}`), 1, 0));
   }
   appendCapabilityWarnings(container, result, theme);
+  appendSubmissionRecovery(container, result, theme);
 
   // Completed task — show summary and findings
   if (result.status !== "completed") {

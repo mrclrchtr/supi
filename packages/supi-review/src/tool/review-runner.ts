@@ -14,8 +14,9 @@ import type {
   ReviewSubmission,
 } from "../types.ts";
 import { runIsolatedChild } from "./child-session-runner.ts";
+import { ReviewRecoveryPolicy } from "./review-recovery.ts";
 import { buildReviewerSystemPrompt } from "./review-system-prompt.ts";
-import { createReviewSubmissionTool } from "./review-tools.ts";
+import { createReviewRecoveryDeclineTool, createReviewSubmissionTool } from "./review-tools.ts";
 
 function auditOutcome(result: ReviewerRunResult): {
   kind: string;
@@ -28,6 +29,7 @@ function auditOutcome(result: ReviewerRunResult): {
 }
 
 /** Run one caller-defined task in an isolated Inspection-only Reviewer Session. */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: review, recovery, and continuous audit stay in one adapter lifecycle.
 export async function runReviewer(invocation: ReviewerInvocation): Promise<ReviewerRunResult> {
   if (invocation.signal?.aborted) {
     return {
@@ -38,7 +40,12 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     };
   }
   const holder: { value?: ReviewSubmission } = {};
-  const submit = createReviewSubmissionTool(holder);
+  const recoveryTerminal: {
+    choice?: "submitted" | "declined" | "conflict";
+    reason?: string;
+  } = {};
+  const submit = createReviewSubmissionTool(holder, recoveryTerminal);
+  const decline = createReviewRecoveryDeclineTool(recoveryTerminal);
   const warnings: ReviewerCapabilityWarning[] = [];
   const protocolPrompt = buildReviewerSystemPrompt(invocation.dependencyBootstrapConfigured);
   const thinkingLevel = clampThinkingLevel(invocation.model.model, "max");
@@ -47,7 +54,16 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
   let trace: ReviewAuditTraceCollector | undefined;
   let capturedReplay: ReturnType<ReviewAuditTraceCollector["snapshot"]> | undefined;
   let unsubscribe: (() => void) | undefined;
+  const recovery = new ReviewRecoveryPolicy({
+    originalModel: invocation.model,
+    ...(invocation.recoveryModel ? { recoveryModel: invocation.recoveryModel } : {}),
+    ...(invocation.recoveryModelId ? { recoveryModelId: invocation.recoveryModelId } : {}),
+    submission: holder,
+    terminal: recoveryTerminal,
+    trace: () => trace,
+  });
 
+  const originalTools = ["read", "bash", "grep", ...HEADLESS_INSPECTION_TOOL_NAMES, submit.name];
   const outcome = await runIsolatedChild<ReviewSubmission>({
     cwd: invocation.cwd,
     ...(invocation.providerAuthority ? { providerAuthority: invocation.providerAuthority } : {}),
@@ -57,9 +73,15 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     timeoutMs: undefined,
     prompt: invocation.prompt,
     signal: invocation.signal,
-    tools: ["read", "bash", "grep", ...HEADLESS_INSPECTION_TOOL_NAMES, submit.name],
-    customTools: [submit],
+    tools: [...originalTools, decline.name],
+    initialActiveTools: originalTools,
+    customTools: [submit, decline],
     holder,
+    declineHolder: recoveryTerminal,
+    continuation: recovery.continuation,
+    ...(invocation.recoveryModel
+      ? { authorizedContinuationModels: [invocation.recoveryModel.model] }
+      : {}),
     headlessInspection: true,
     projectTrusted: invocation.projectTrusted ?? false,
     onSessionCreated: (created) => {
@@ -86,11 +108,14 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     onProgress: invocation.onProgress,
   });
   unsubscribe?.();
+  const submissionRecovery =
+    outcome.kind === "canceled" || outcome.kind === "timeout" ? undefined : recovery.result();
   const result: ReviewerRunResult = {
     ...outcome,
     modelId: invocation.model.canonicalId,
     reviewerExtensionSetStatus,
     ...(warnings.length > 0 ? { capabilityWarnings: warnings } : {}),
+    ...(submissionRecovery ? { submissionRecovery } : {}),
   };
   if (!invocation.audit || !session || !trace) return result;
 

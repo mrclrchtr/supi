@@ -36,6 +36,10 @@ _Avoid_: Prompt return, settled event, delayed extension work
 A caller-owned function that derives the domain completion value from a settled read-only session view. Returning no value means the Agent Run settled without its required completion.
 _Avoid_: Completion mode, result holder, output parser
 
+**Finite Agent Run Continuation**:
+A bounded caller-owned policy that selects declarative same-session steps after an accepted Agent Run settles without required completion. The runtime, not the caller, performs repeated prompts, exact tool replacement, authorized model switches, thinking changes, usage snapshots, and final disposal.
+_Avoid_: Session controls, retry loop, mutable callback view
+
 **Cancellation Fence**:
 The synchronous point at which stop or timeout claims an Agent Run. The runtime closes extension-send admission, clears PI queues, and starts abort before awaiting. A steering call already inside PI is rechecked and any late queue write is cleared. PI context invalidation occurs during normal or forced disposal after `session_shutdown` gets its bounded attempt. After the fence, no queued turn or tool work may start and completion cannot win; active work proceeds only toward bounded disposal.
 _Avoid_: Best-effort abort, graceful drain

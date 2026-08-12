@@ -259,6 +259,7 @@ it("waits through uncancelable setup, suppresses the prompt, and disposes late s
     releaseRuntime = resolve;
   });
   const harness = createHarness(mocks);
+  const physicalDispose = harness.session.dispose;
   mocks.createAgentSessionRuntime.mockImplementationOnce(async (factory) => {
     await factory({ cwd: "/repo", agentDir: "/agent", sessionManager: {} });
     await runtimeReady;
@@ -277,7 +278,7 @@ it("waits through uncancelable setup, suppresses the prompt, and disposes late s
   releaseRuntime();
 
   await stopped;
-  expect(harness.session.dispose).toHaveBeenCalledTimes(1);
+  expect(physicalDispose).toHaveBeenCalledTimes(1);
   await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
   expect(harness.session.prompt).not.toHaveBeenCalled();
 });

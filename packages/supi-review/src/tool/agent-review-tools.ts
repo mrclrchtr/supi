@@ -3,7 +3,11 @@ import { createAgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/a
 import { StatusSpinner } from "@mrclrchtr/supi-core/status-spinner";
 import type { LocalReviewAuditStore } from "../audit/local-review-audit-store.ts";
 import { loadReviewConfig } from "../config.ts";
-import { resolveAgentReviewModel } from "../model.ts";
+import {
+  CURRENT_SESSION_REVIEW_MODEL,
+  resolveAgentReviewModel,
+  resolveRecoveryReviewModel,
+} from "../model.ts";
 import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
 import { renderRunCall, renderRunResult } from "../tui/run.ts";
 import { parseRunReviewToolInput } from "./agent-review-schemas.ts";
@@ -85,6 +89,7 @@ function makeRunReviewExecute(
   localAuditStore?: LocalReviewAuditStore,
 ): NonNullable<Parameters<ExtensionAPI["registerTool"]>[0]["execute"]> {
   // biome-ignore lint/complexity/useMaxParams: Pi ToolDefinition execute signature
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: tool execution keeps spinner and bounded output cleanup in one closure.
   return async (_id, params, signal, onUpdate, ctx) => {
     const input = parseRunReviewToolInput(params);
     const config = loadReviewConfig(ctx.cwd);
@@ -97,6 +102,7 @@ function makeRunReviewExecute(
     });
 
     try {
+      const recoveryModel = resolveRecoveryReviewModel(ctx, config.recoveryModel);
       const outcome = await runReview({
         cwd: ctx.cwd,
         providerAuthority: createAgentRunProviderAuthority(ctx.modelRegistry),
@@ -104,6 +110,12 @@ function makeRunReviewExecute(
         review: input.review,
         scope: input.scope,
         reviewerModel: resolveReviewerModel(ctx),
+        ...(recoveryModel ? { recoveryModel } : {}),
+        ...(config.recoveryModel !== "disabled" &&
+        config.recoveryModel !== CURRENT_SESSION_REVIEW_MODEL &&
+        !recoveryModel
+          ? { recoveryModelId: config.recoveryModel }
+          : {}),
         bootstrapCommand: config.bootstrapCommand,
         projectTrusted: ctx.isProjectTrusted(),
         ...(auditStore ? { auditStore } : {}),

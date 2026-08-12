@@ -57,6 +57,7 @@ function toTaskResult(
     modelId: result.modelId,
     ...(result.usage ? { usage: result.usage } : {}),
     ...(result.capabilityWarnings ? { capabilityWarnings: result.capabilityWarnings } : {}),
+    ...(result.submissionRecovery ? { submissionRecovery: result.submissionRecovery } : {}),
     ...(result.audit ? { audit: result.audit } : {}),
   };
   if (result.kind === "success") {
@@ -115,6 +116,8 @@ export async function executeReviewTasks(
   audit?: ReviewerAuditRequest,
   dependencyBootstrapConfigured = false,
   providerAuthority?: AgentRunProviderAuthority,
+  recoveryModel?: ReviewModelSelection,
+  recoveryModelId?: string,
 ): Promise<ReviewTaskResult[]> {
   const review = normalizeReviewInput(reviewInput);
   let completedCount = 0;
@@ -176,6 +179,8 @@ export async function executeReviewTasks(
           prompt: packet.prompt,
           packetHash: packet.packetHash,
           model,
+          ...(recoveryModel ? { recoveryModel } : {}),
+          ...(recoveryModelId ? { recoveryModelId } : {}),
           providerAuthority,
           projectTrusted,
           ...(audit ? { audit } : {}),
