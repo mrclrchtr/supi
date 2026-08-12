@@ -13,7 +13,7 @@ import { type LspSettings, loadLspSettings } from "../config/lsp-settings.ts";
 import { clearTsconfigCache } from "../config/tsconfig-scope.ts";
 import type { DetectedProjectServer, LspConfig, ProjectServerInfo } from "../config/types.ts";
 import { scanWorkspaceSentinels } from "../diagnostics/workspace-sentinels.ts";
-import { LspManager } from "../manager/manager.ts";
+import { LspManager, type ManagerLifecycleTransition } from "../manager/manager.ts";
 import {
   markLspCapabilitiesReady,
   registerPendingLspCapabilities,
@@ -72,6 +72,28 @@ export type LspStartResult =
   | { kind: "disabled"; message: string }
   | { kind: "unavailable"; reason: string };
 
+/** Cause of one observable LSP runtime lifecycle transition. */
+export type LspRuntimeTransitionKind =
+  | "startup"
+  | "readiness"
+  | "crash"
+  | "recovery"
+  | "shutdown"
+  | "tracked-files";
+
+/** Immutable aggregate state published when the LSP runtime changes. */
+export interface LspRuntimeTransition {
+  /** Monotonic transition generation for this controller instance. */
+  readonly generation: number;
+  readonly kind: LspRuntimeTransitionKind;
+  /** True only when at least one concrete client is active and ready. */
+  readonly semanticReady: boolean;
+  readonly projectServers: readonly ProjectServerInfo[];
+}
+
+/** Listener for aggregate LSP runtime transitions. */
+export type LspRuntimeTransitionListener = (transition: LspRuntimeTransition) => void;
+
 function supersededStartResult(): LspStartResult {
   return { kind: "unavailable", reason: "LSP startup was superseded by a newer lifecycle event." };
 }
@@ -99,7 +121,13 @@ export class LspRuntimeController {
   readonly #cwd: string;
   #state: LspControllerState;
   #capabilityRuntime: WorkspaceRuntime | null;
-  /** Monotonic ownership token for starts, shutdowns, and async warm-up. */
+  #activeManager: LspManager | null = null;
+  #latestManagerTransition: ManagerLifecycleTransition | null = null;
+  #projectedSemanticReady: boolean | null = null;
+  #lifecycleGeneration = 0;
+  #latestLifecycleTransition: LspRuntimeTransition | null = null;
+  readonly #lifecycleListeners = new Set<LspRuntimeTransitionListener>();
+  /** Monotonic ownership token for starts, shutdowns, and manager callbacks. */
   #readinessGeneration = 0;
 
   constructor(cwd: string, runtime?: WorkspaceRuntime) {
@@ -152,6 +180,22 @@ export class LspRuntimeController {
   }
 
   /**
+   * Subscribe to aggregate runtime transitions.
+   *
+   * A late subscriber immediately receives the latest transition. The returned
+   * function is idempotent and stops all later notifications for this listener.
+   */
+  subscribeLifecycle(listener: LspRuntimeTransitionListener): () => void {
+    this.#lifecycleListeners.add(listener);
+    if (this.#latestLifecycleTransition) {
+      this.notifyLifecycleListener(listener, this.#latestLifecycleTransition);
+    }
+    return () => {
+      this.#lifecycleListeners.delete(listener);
+    };
+  }
+
+  /**
    * Start the LSP session for this controller's cwd.
    *
    * Loads settings, creates the manager, starts detected servers,
@@ -191,8 +235,11 @@ export class LspRuntimeController {
    */
   private async cleanupExistingSession(): Promise<void> {
     if (this.#state.kind !== "ready") return;
+    this.#activeManager = null;
+    this.#latestManagerTransition = null;
     await this.#state.runtimeOwner.shutdown();
     if (this.#capabilityRuntime) unregisterLspCapabilities(this.#capabilityRuntime, this.#cwd);
+    this.#projectedSemanticReady = null;
     clearWorkspaceLspRuntime(this.#cwd);
   }
 
@@ -200,7 +247,10 @@ export class LspRuntimeController {
   private setDisabled(generation: number): LspStartResult {
     if (generation !== this.#readinessGeneration) return supersededStartResult();
     const message = "All language servers are disabled by configuration.";
+    this.#activeManager = null;
+    this.#latestManagerTransition = null;
     if (this.#capabilityRuntime) unregisterLspCapabilities(this.#capabilityRuntime, this.#cwd);
+    this.#projectedSemanticReady = null;
     this.#state = { kind: "disabled", message };
     setWorkspaceLspRuntimeState(this.#cwd, { kind: "disabled" });
     return { kind: "disabled", message };
@@ -210,6 +260,10 @@ export class LspRuntimeController {
   private setUnavailable(error: unknown, generation: number): LspStartResult {
     if (generation !== this.#readinessGeneration) return supersededStartResult();
     const reason = error instanceof Error ? error.message : String(error);
+    this.#activeManager = null;
+    this.#latestManagerTransition = null;
+    if (this.#capabilityRuntime) unregisterLspCapabilities(this.#capabilityRuntime, this.#cwd);
+    this.#projectedSemanticReady = null;
     this.#state = { kind: "unavailable", reason };
     setWorkspaceLspRuntimeState(this.#cwd, { kind: "unavailable", reason });
     return { kind: "unavailable", reason };
@@ -229,7 +283,13 @@ export class LspRuntimeController {
     if (Object.keys(config.servers).length === 0) return this.setDisabled(generation);
     this.#state = { kind: "pending" };
 
-    const manager = new LspManager(config, this.#cwd);
+    let manager: LspManager;
+    manager = new LspManager(config, this.#cwd, (transition) => {
+      this.handleManagerLifecycle(manager, generation, transition);
+    });
+    this.#activeManager = manager;
+    this.#latestManagerTransition = null;
+    this.publishLifecycle("startup", false, []);
     manager.setExcludePatterns(settings.exclude);
     setWorkspaceLspRuntimeState(this.#cwd, { kind: "pending" });
 
@@ -237,6 +297,7 @@ export class LspRuntimeController {
     manager.registerDetectedServers(detectedServers);
     await startDetectedServers(manager, detectedServers);
     if (generation !== this.#readinessGeneration) {
+      if (this.#activeManager === manager) this.#activeManager = null;
       await manager.shutdownAll();
       return supersededStartResult();
     }
@@ -249,9 +310,17 @@ export class LspRuntimeController {
 
     if (this.#capabilityRuntime) {
       registerPendingLspCapabilities(this.#capabilityRuntime, this.#cwd, workspaceRuntime);
+      this.#projectedSemanticReady = false;
     }
 
-    const projectServers = workspaceRuntime.getProjectServers();
+    const latestManagerTransition = this
+      .#latestManagerTransition as ManagerLifecycleTransition | null;
+    const projectServers = [
+      ...(latestManagerTransition?.projectServers ?? workspaceRuntime.getProjectServers()),
+    ];
+    const semanticReady =
+      latestManagerTransition?.semanticReady ??
+      projectServers.some((server) => server.status === "running" && server.ready);
 
     this.#state = {
       kind: "ready",
@@ -262,40 +331,73 @@ export class LspRuntimeController {
       settings,
     };
 
-    void this.promoteSemanticReadiness(workspaceRuntime, generation);
+    this.projectSemanticReadiness(workspaceRuntime, semanticReady);
 
     return { kind: "ready", runtime: workspaceRuntime };
   }
 
-  private async promoteSemanticReadiness(
-    workspaceRuntime: WorkspaceLspRuntime,
+  private handleManagerLifecycle(
+    manager: LspManager,
     readinessGeneration: number,
-  ): Promise<void> {
-    try {
-      const readiness = await workspaceRuntime.waitUntilReadyForWorkspace();
-      if (readiness.kind !== "ready") return;
-    } catch {
+    transition: ManagerLifecycleTransition,
+  ): void {
+    if (readinessGeneration !== this.#readinessGeneration) return;
+    if (this.#activeManager !== manager) return;
+    this.#latestManagerTransition = transition;
+    if (this.#state.kind === "ready") {
+      this.#state.projectServers = [...transition.projectServers];
+      this.projectSemanticReadiness(this.#state.workspaceRuntime, transition.semanticReady);
+    }
+    this.publishLifecycle(transition.kind, transition.semanticReady, transition.projectServers);
+  }
+
+  private projectSemanticReadiness(
+    workspaceRuntime: WorkspaceLspRuntime,
+    semanticReady: boolean,
+  ): void {
+    if (!this.#capabilityRuntime) return;
+    if (semanticReady) {
+      if (this.#projectedSemanticReady === true) return;
+      markLspCapabilitiesReady(this.#capabilityRuntime, this.#cwd);
+      this.#projectedSemanticReady = true;
       return;
     }
+    if (this.#projectedSemanticReady === false) return;
+    registerPendingLspCapabilities(this.#capabilityRuntime, this.#cwd, workspaceRuntime);
+    this.#projectedSemanticReady = false;
+  }
 
-    if (!this.isCurrentRuntime(workspaceRuntime, readinessGeneration)) return;
-    if (this.#state.kind !== "ready") return;
-
-    this.#state.projectServers = workspaceRuntime.getProjectServers();
-    if (this.#capabilityRuntime) {
-      markLspCapabilitiesReady(this.#capabilityRuntime, this.#cwd);
+  private publishLifecycle(
+    kind: LspRuntimeTransitionKind,
+    semanticReady: boolean,
+    projectServers: readonly ProjectServerInfo[],
+  ): void {
+    const transition: LspRuntimeTransition = {
+      generation: ++this.#lifecycleGeneration,
+      kind,
+      semanticReady,
+      projectServers: projectServers.map((server) => ({
+        ...server,
+        fileTypes: [...server.fileTypes],
+        supportedActions: [...server.supportedActions],
+        openFiles: [...server.openFiles],
+      })),
+    };
+    this.#latestLifecycleTransition = transition;
+    for (const listener of this.#lifecycleListeners) {
+      this.notifyLifecycleListener(listener, transition);
     }
   }
 
-  private isCurrentRuntime(
-    workspaceRuntime: WorkspaceLspRuntime,
-    readinessGeneration: number,
-  ): boolean {
-    return (
-      readinessGeneration === this.#readinessGeneration &&
-      this.#state.kind === "ready" &&
-      this.#state.workspaceRuntime === workspaceRuntime
-    );
+  private notifyLifecycleListener(
+    listener: LspRuntimeTransitionListener,
+    transition: LspRuntimeTransition,
+  ): void {
+    try {
+      listener(transition);
+    } catch {
+      // Lifecycle observers must not alter runtime behavior.
+    }
   }
 
   /**
@@ -307,10 +409,13 @@ export class LspRuntimeController {
   async shutdown(): Promise<void> {
     this.#readinessGeneration++;
     clearTsconfigCache();
+    this.#activeManager = null;
+    this.#latestManagerTransition = null;
 
     if (this.#capabilityRuntime) {
       unregisterLspCapabilities(this.#capabilityRuntime, this.#cwd);
     }
+    this.#projectedSemanticReady = null;
 
     if (this.#cwd) {
       clearWorkspaceLspRuntime(this.#cwd);
@@ -321,6 +426,7 @@ export class LspRuntimeController {
     }
 
     this.#state = { kind: "initial" };
+    this.publishLifecycle("shutdown", false, []);
   }
 
   /** Get the missing servers warning (servers whose binary is not on PATH). */

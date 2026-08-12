@@ -18,7 +18,7 @@ npm install @mrclrchtr/supi-lsp
 
 ## What it provides
 
-- `LspRuntimeController` for workspace lifecycle and status
+- `LspRuntimeController` for workspace lifecycle, status, and transition subscriptions
 - `WorkspaceLspRuntime` for routing, readiness, semantic operations, tracked files, diagnostics, and recovery
 - explicit ready, pending, inactive, disabled, and unavailable registry states
 - a `SemanticProvider` adapter for `supi-code-runtime`
@@ -33,7 +33,8 @@ Clients, `LspManager`, and the default runtime implementation remain internal.
 - language-server detection and startup
 - shutdown
 - settings and missing-server inventory
-- publishing workspace runtime state
+- publishing workspace runtime state and aggregate lifecycle transitions
+- projecting concrete client readiness into semantic capability state
 
 `WorkspaceLspRuntime` owns:
 
@@ -43,7 +44,7 @@ Clients, `LspManager`, and the default runtime implementation remain internal.
 - diagnostics, summaries, refresh, and recovery
 - project-server inventory and file support checks
 
-This separation keeps lifecycle/status distinct from workspace operations.
+This separation keeps lifecycle and status distinct from workspace operations. Each controller transition has a monotonic generation and an aggregate server snapshot. Semantic capability is ready while at least one concrete client is ready. A crash or late progress event moves capability back to pending only after the final ready client is lost. The ready runtime owner stays available for lazy routing.
 
 ## Example
 

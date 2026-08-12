@@ -86,6 +86,20 @@ describe("LspClient process failure", () => {
     vi.clearAllMocks();
   });
 
+  it("publishes startup after the initialize handshake", async () => {
+    const transitions: string[] = [];
+    const client = new LspClient(
+      "test",
+      { command: "test-lsp", fileTypes: ["ts"], rootMarkers: ["package.json"] },
+      "/project",
+      (kind) => transitions.push(kind),
+    );
+
+    await client.start();
+
+    expect(transitions).toEqual(["startup"]);
+  });
+
   it("releases a pending file diagnostic waiter when the server process fails", async () => {
     const client = new LspClient(
       "test",

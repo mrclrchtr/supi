@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   clearRuntime: vi.fn(),
   createOwner: vi.fn(),
+  managerListeners: [] as Array<(transition: unknown) => void>,
   markReady: vi.fn(),
   registerPending: vi.fn(),
   setRuntimeState: vi.fn(),
@@ -35,6 +36,10 @@ vi.mock("../../src/manager/manager.ts", () => ({
     setExcludePatterns = vi.fn();
     registerDetectedServers = vi.fn();
     shutdownAll = mocks.shutdownAll;
+
+    constructor(_config: unknown, _cwd: string, listener?: (transition: unknown) => void) {
+      if (listener) mocks.managerListeners.push(listener);
+    }
   },
 }));
 vi.mock("../../src/session/runtime-registration.ts", () => ({
@@ -55,22 +60,8 @@ vi.mock("../../src/session/scanner.ts", () => ({
 
 import { LspRuntimeController } from "../../src/session/runtime-controller.ts";
 
-function deferred<T>() {
-  let reject!: (reason?: unknown) => void;
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise;
-    reject = rejectPromise;
-  });
-  return { promise, reject, resolve };
-}
-
-async function flushAsyncWork(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
-}
-
 afterEach(() => {
+  mocks.managerListeners.length = 0;
   vi.clearAllMocks();
 });
 
@@ -89,7 +80,6 @@ describe("LspRuntimeController warm-up ownership", () => {
 
     const controller = new LspRuntimeController("/project", new WorkspaceRuntime());
     const result = await controller.start();
-    await flushAsyncWork();
 
     expect(result.kind).toBe("ready");
     expect(mocks.registerPending).toHaveBeenCalledOnce();
@@ -103,45 +93,36 @@ describe("LspRuntimeController warm-up ownership", () => {
     await controller.shutdown();
   });
 
-  it("does not retract a newer runtime when an older warm-up fails", async () => {
-    const firstWarmup = deferred<{ kind: "ready" }>();
-    const secondWarmup = deferred<{ kind: "ready" }>();
+  it("ignores a transition from a superseded runtime generation", async () => {
     const firstOwner = {
-      runtime: {
-        getProjectServers: vi.fn().mockReturnValue([]),
-        waitUntilReadyForWorkspace: vi.fn().mockReturnValue(firstWarmup.promise),
-      },
+      runtime: { getProjectServers: vi.fn().mockReturnValue([]) },
       shutdown: vi.fn().mockResolvedValue(undefined),
     };
     const secondOwner = {
-      runtime: {
-        getProjectServers: vi.fn().mockReturnValue([]),
-        waitUntilReadyForWorkspace: vi.fn().mockReturnValue(secondWarmup.promise),
-      },
+      runtime: { getProjectServers: vi.fn().mockReturnValue([]) },
       shutdown: vi.fn().mockResolvedValue(undefined),
     };
     mocks.createOwner.mockReturnValueOnce(firstOwner).mockReturnValueOnce(secondOwner);
 
-    const capabilityRuntime = new WorkspaceRuntime();
-    const controller = new LspRuntimeController("/project", capabilityRuntime);
+    const controller = new LspRuntimeController("/project", new WorkspaceRuntime());
     await controller.start();
     await controller.start();
 
     expect(firstOwner.shutdown).toHaveBeenCalledOnce();
     expect(mocks.unregister).toHaveBeenCalledTimes(1);
-    firstWarmup.reject(new Error("older runtime failed"));
-    await flushAsyncWork();
+    mocks.managerListeners[0]?.({
+      kind: "readiness",
+      semanticReady: true,
+      projectServers: [],
+    });
+    expect(mocks.markReady).not.toHaveBeenCalled();
 
-    expect(mocks.unregister).toHaveBeenCalledTimes(1);
-    const unavailableStates = mocks.setRuntimeState.mock.calls.filter(
-      ([, state]) => (state as { kind?: string }).kind === "unavailable",
-    );
-    expect(unavailableStates).toEqual([]);
-
-    expect(secondOwner.runtime.waitUntilReadyForWorkspace).toHaveBeenCalledOnce();
-    secondWarmup.resolve({ kind: "ready" });
-    await flushAsyncWork();
-    expect(mocks.markReady).toHaveBeenCalledTimes(1);
+    mocks.managerListeners[1]?.({
+      kind: "readiness",
+      semanticReady: true,
+      projectServers: [],
+    });
+    expect(mocks.markReady).toHaveBeenCalledOnce();
 
     await controller.shutdown();
   });

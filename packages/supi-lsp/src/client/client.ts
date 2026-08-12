@@ -86,6 +86,17 @@ function killProcessTree(pid: number): void {
 // ── Types ─────────────────────────────────────────────────────────────
 export type ClientStatus = "initializing" | "running" | "error" | "shutdown";
 
+/** Package-internal facts that the manager projects into workspace lifecycle transitions. */
+export type LspClientLifecycleTransitionKind =
+  | "startup"
+  | "readiness"
+  | "crash"
+  | "shutdown"
+  | "tracked-files";
+
+/** Observer for one concrete client's lifecycle facts. */
+export type LspClientLifecycleListener = (kind: LspClientLifecycleTransitionKind) => void;
+
 // ── LspClient ─────────────────────────────────────────────────────────
 export class LspClient {
   readonly name: string;
@@ -110,6 +121,7 @@ export class LspClient {
     name: string,
     private readonly config: ServerConfig,
     root: string,
+    private readonly onLifecycleTransition?: LspClientLifecycleListener,
   ) {
     this.name = name;
     this.root = root;
@@ -149,6 +161,15 @@ export class LspClient {
     return this._isReady;
   }
 
+  /** Publish one client fact without letting an observer disrupt the client. */
+  private publishLifecycle(kind: LspClientLifecycleTransitionKind): void {
+    try {
+      this.onLifecycleTransition?.(kind);
+    } catch {
+      // Lifecycle observers must not alter protocol behavior.
+    }
+  }
+
   // ── Lifecycle ───────────────────────────────────────────────────────
   /** Spawn the server process and perform the initialize handshake. */
   async start(): Promise<void> {
@@ -166,14 +187,16 @@ export class LspClient {
         detached: true,
       });
     } catch (err) {
-      this._status = "error";
-      throw new Error(`Failed to spawn ${cmd}: ${err}`, { cause: err });
+      const failure = new Error(`Failed to spawn ${cmd}: ${err}`, { cause: err });
+      this.handleProcessFailure(failure);
+      throw failure;
     }
 
     if (!this.process.stdin || !this.process.stdout) {
-      this._status = "error";
+      const failure = new Error(`${cmd}: missing stdin/stdout`);
+      this.handleProcessFailure(failure);
       this.process.kill();
-      throw new Error(`${cmd}: missing stdin/stdout`);
+      throw failure;
     }
 
     this.rpc = new JsonRpcClient(this.process.stdout, this.process.stdin);
@@ -216,12 +239,14 @@ export class LspClient {
       this.capabilities = result.capabilities;
       void this.rpc.sendNotification("initialized", {});
       this._status = "running";
+      this.publishLifecycle("startup");
 
       this.armNoProgressTimer();
     } catch (err) {
-      this._status = "error";
+      const failure = new Error(`${this.name}: initialize failed: ${err}`, { cause: err });
+      this.handleProcessFailure(failure);
       this.process.kill();
-      throw new Error(`${this.name}: initialize failed: ${err}`, { cause: err });
+      throw failure;
     }
   }
 
@@ -230,6 +255,9 @@ export class LspClient {
     if (this._status === "shutdown") return;
     this._status = "shutdown";
     this.diagnostics.clear();
+    this.cancelNoProgressTimer();
+    this.rejectReady(new Error("Client shutdown"));
+    this.publishLifecycle("shutdown");
 
     if (!this.rpc || !this.process) return;
 
@@ -268,46 +296,52 @@ export class LspClient {
         });
       }
     }
-
-    // Clear readiness state
-    if (this.noProgressTimer) {
-      clearTimeout(this.noProgressTimer);
-      this.noProgressTimer = null;
-    }
-    for (const timer of this.tokenTimeouts.values()) clearTimeout(timer);
-    this.tokenTimeouts.clear();
-    this.rejectReady(new Error("Client shutdown"));
   }
 
   private handleProcessFailure(reason: Error): void {
-    if (this._status !== "shutdown") {
+    const didCrash = this._status !== "shutdown" && this._status !== "error";
+    if (didCrash) {
       this._status = "error";
       this.cancelNoProgressTimer();
       this.rejectReady(reason);
     }
     this.diagnostics.clear();
     this.rpc?.dispose();
+    if (didCrash) this.publishLifecycle("crash");
   }
 
   // ── Document Synchronization and Diagnostics ────────────────────────
   /** Open a document, or update it when it is already open. */
   didOpen(filePath: string, content: string): void {
+    const trackedCount = this.openFiles.length;
     this.diagnostics.didOpen(filePath, content);
+    this.publishTrackedFileChange(trackedCount);
   }
 
   /** Update a document, or open it when it is not tracked yet. */
   didChange(filePath: string, content: string): void {
+    const trackedCount = this.openFiles.length;
     this.diagnostics.didChange(filePath, content);
+    this.publishTrackedFileChange(trackedCount);
   }
 
   /** Close a document and remove its cached diagnostic state. */
   didClose(filePath: string): void {
+    const trackedCount = this.openFiles.length;
     this.diagnostics.didClose(filePath);
+    this.publishTrackedFileChange(trackedCount);
   }
 
   /** Remove missing document and diagnostic state, and return the removed paths. */
   pruneMissingFiles(): string[] {
-    return this.diagnostics.pruneMissingFiles();
+    const trackedCount = this.openFiles.length;
+    const removed = this.diagnostics.pruneMissingFiles();
+    this.publishTrackedFileChange(trackedCount);
+    return removed;
+  }
+
+  private publishTrackedFileChange(previousCount: number): void {
+    if (this.openFiles.length !== previousCount) this.publishLifecycle("tracked-files");
   }
 
   /** Return the current client version, or null when the document is not open. */
@@ -476,7 +510,9 @@ export class LspClient {
         const token = (params as { token: ProgressToken }).token;
         this.trackedTokens.set(token, "begin-seen");
         this.cancelNoProgressTimer();
+        const wasReady = this._isReady;
         this._isReady = false;
+        if (wasReady) this.publishLifecycle("readiness");
         if (!this._readyPromise) {
           this._readyPromise = new Promise<void>((resolve, reject) => {
             this._readyResolve = resolve;
@@ -553,7 +589,9 @@ export class LspClient {
       // begin without a prior create is spec-deviant but valid.
       this.cancelNoProgressTimer();
       this.trackedTokens.set(token, "begin-seen");
+      const wasReady = this._isReady;
       this._isReady = false;
+      if (wasReady) this.publishLifecycle("readiness");
       // Re-arm readiness promise if not already pending
       if (!this._readyPromise) {
         this._readyPromise = new Promise<void>((resolve, reject) => {
@@ -598,7 +636,9 @@ export class LspClient {
       this._readyResolve = undefined;
       this._readyReject = undefined;
     }
+    const becameReady = !this._isReady;
     this._isReady = true;
+    if (becameReady) this.publishLifecycle("readiness");
     recordDebugEvent({
       source: "lsp",
       level: "info",

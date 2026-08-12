@@ -35,6 +35,9 @@ export {
 } from "./diagnostics/workspace-sentinels.ts";
 export type {
   LspControllerState,
+  LspRuntimeTransition,
+  LspRuntimeTransitionKind,
+  LspRuntimeTransitionListener,
   LspStartResult,
 } from "./session/runtime-controller.ts";
 export { LspRuntimeController } from "./session/runtime-controller.ts";

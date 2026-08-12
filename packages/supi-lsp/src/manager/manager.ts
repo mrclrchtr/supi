@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { type CodeQueryResult, unavailableCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import * as projectRoots from "@mrclrchtr/supi-core/project";
-import { LspClient } from "../client/client.ts";
+import { LspClient, type LspClientLifecycleTransitionKind } from "../client/client.ts";
 import { getServerForFile } from "../config/config.ts";
 import type {
   DetectedProjectServer,
@@ -73,6 +73,17 @@ type FileRoute = {
   key: string;
 };
 
+export type ManagerLifecycleTransitionKind = LspClientLifecycleTransitionKind | "recovery";
+
+/** Package-internal aggregate lifecycle snapshot for the runtime controller. */
+export interface ManagerLifecycleTransition {
+  readonly kind: ManagerLifecycleTransitionKind;
+  readonly semanticReady: boolean;
+  readonly projectServers: readonly ProjectServerInfo[];
+}
+
+type ManagerLifecycleListener = (transition: ManagerLifecycleTransition) => void;
+
 // ── LspManager ────────────────────────────────────────────────────────
 export class LspManager {
   /** Active clients keyed by "serverName:root" */
@@ -83,6 +94,8 @@ export class LspManager {
   private commandAvailability = new Map<string, boolean>();
   /** Guards against concurrent client creation for the same server:root key */
   private pendingStarts = new Map<string, Promise<LspClient | null>>();
+  /** Monotonic ownership generation for each replaceable client route. */
+  private clientGenerations = new Map<string, number>();
   /** Preferred project roots discovered by proactive scan or lazy startup */
   private knownRoots = new Map<string, string[]>();
   /** User-configured gitignore-style exclude patterns */
@@ -96,6 +109,7 @@ export class LspManager {
   constructor(
     private readonly config: LspConfig,
     private readonly cwd: string,
+    private readonly onLifecycleTransition?: ManagerLifecycleListener,
   ) {}
   getCwd(): string {
     return this.cwd;
@@ -203,6 +217,47 @@ export class LspManager {
     }
   }
 
+  private createClient(
+    serverName: string,
+    serverConfig: ServerConfig,
+    root: string,
+    key: string,
+  ): LspClient {
+    const generation = (this.clientGenerations.get(key) ?? 0) + 1;
+    this.clientGenerations.set(key, generation);
+    let client: LspClient;
+    client = new LspClient(serverName, serverConfig, root, (kind) => {
+      this.handleClientLifecycle(key, generation, client, kind);
+    });
+    return client;
+  }
+
+  private handleClientLifecycle(
+    key: string,
+    generation: number,
+    client: LspClient,
+    kind: LspClientLifecycleTransitionKind,
+  ): void {
+    if (this.clientGenerations.get(key) !== generation) return;
+    if (this.clients.get(key) !== client) return;
+    const aggregateKind =
+      kind === "readiness" && generation > 1 && client.ready ? "recovery" : kind;
+    this.publishLifecycle(aggregateKind);
+  }
+
+  private publishLifecycle(kind: ManagerLifecycleTransitionKind): void {
+    if (!this.onLifecycleTransition) return;
+    const projectServers = this.getKnownProjectServers([]);
+    const semanticReady = projectServers.some(
+      (server) => server.status === "running" && server.ready,
+    );
+    try {
+      this.onLifecycleTransition({ kind, semanticReady, projectServers });
+    } catch {
+      // Runtime lifecycle consumers must not alter manager behavior.
+    }
+  }
+
   /**
    * Perform the actual server start — extracted so the public method can
    * deduplicate via pendingStarts without wrapping the entire body.
@@ -220,7 +275,7 @@ export class LspManager {
     }
 
     // Spawn new client
-    const client = new LspClient(serverName, serverConfig, root);
+    const client = this.createClient(serverName, serverConfig, root, key);
     this.clearWarmedWorkspaceSymbolProjects(serverName, root);
     this.clearWarmedSemanticProjects(serverName, root);
     this.clearPendingWarmProbes(serverName, root);
@@ -295,7 +350,7 @@ export class LspManager {
     this.clearWarmedSemanticProjects(client.name, client.root);
     this.clearPendingWarmProbes(client.name, client.root);
 
-    const replacement = new LspClient(client.name, serverConfig, client.root);
+    const replacement = this.createClient(client.name, serverConfig, client.root, key);
     this.clients.set(key, replacement);
     rememberKnownRoot(this.knownRoots, client.name, client.root);
 
@@ -366,27 +421,40 @@ export class LspManager {
   }
 
   /**
-   * Wait until all started clients are query-ready, then warm one project file per client/root.
-   * Returns the number of concrete clients that reached readiness.
+   * Wait until one started client is query-ready, then warm its project.
+   * Returns the number of concrete clients that are ready after the warm-up.
    */
   async waitUntilWorkspaceReady(): Promise<number> {
     const activeClients = Array.from(this.clients.values()).filter(
       (client) => client.status === "running",
     );
-    await Promise.all(activeClients.map((client) => client.getReady()));
+    if (activeClients.length === 0) return 0;
 
-    for (const client of activeClients) {
-      const serverConfig = this.config.servers[client.name];
-      if (!serverConfig) continue;
+    const alreadyReady = activeClients.find((client) => client.ready);
+    const firstReady =
+      alreadyReady ??
+      (await Promise.any(
+        activeClients.map(async (client) => {
+          await client.getReady();
+          if (client.status !== "running" || !client.ready) {
+            throw new Error("LSP client did not reach concrete readiness.");
+          }
+          return client;
+        }),
+      ).catch(() => null));
+    if (!firstReady) return 0;
+
+    const serverConfig = this.config.servers[firstReady.name];
+    if (serverConfig) {
       const target = findWorkspaceSymbolWarmTargets(
-        client.root,
+        firstReady.root,
         serverConfig.rootMarkers,
         serverConfig.fileTypes,
       )[0];
-      if (!target) continue;
-      await this.warmSemanticProject(client, target.file);
+      if (target) await this.warmSemanticProject(firstReady, target.file);
     }
-    return activeClients.length;
+
+    return activeClients.filter((client) => client.status === "running" && client.ready).length;
   }
   async syncFileAndGetDiagnostics(
     filePath: string,
@@ -455,6 +523,7 @@ export class LspManager {
     const shutdowns = Array.from(this.clients.values()).map((c) => c.shutdown().catch(() => {}));
     await Promise.all(shutdowns);
     this.clients.clear();
+    this.clientGenerations.clear();
     this.unavailable.clear();
     this.knownRoots.clear();
     this.warmedWorkspaceSymbolProjects.clear();
