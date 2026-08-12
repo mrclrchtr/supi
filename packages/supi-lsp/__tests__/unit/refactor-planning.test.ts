@@ -65,7 +65,8 @@ describe("collectCodeActionResults", () => {
     });
     expect(results[1]).toEqual({
       kind: "unavailable",
-      reason: 'Code action "Rewrite" could not produce precise edits',
+      reason:
+        'Code action "Rewrite" could not produce precise edits: Workspace edit contains no file edits.',
     });
   });
 });

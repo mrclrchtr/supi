@@ -34,6 +34,7 @@ export type {
   DeclarationNesting,
   DisambiguationCandidate,
   DocumentCodeSymbol,
+  DocumentEditPrecondition,
   ExportData,
   FileEdit,
   ImportData,

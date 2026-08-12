@@ -147,7 +147,7 @@ export function createLspSemanticProvider(lsp: WorkspaceLspRuntime): SemanticPro
     async codeActions(file: string, position: CodePosition): Promise<RefactorResult[]> {
       const actions = await lsp.codeActions(file, position);
       if (!actions) return [];
-      return collectCodeActionResults(actions);
+      return collectCodeActionResults(actions, lsp);
     },
   };
 }

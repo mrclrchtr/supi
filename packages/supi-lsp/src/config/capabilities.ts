@@ -3,6 +3,9 @@
 import type { ClientCapabilities } from "./types.ts";
 
 export const CLIENT_CAPABILITIES: ClientCapabilities = {
+  general: {
+    positionEncodings: ["utf-16"],
+  },
   textDocument: {
     synchronization: {
       didSave: true,
@@ -58,6 +61,9 @@ export const CLIENT_CAPABILITIES: ClientCapabilities = {
   },
   workspace: {
     workspaceFolders: false,
+    workspaceEdit: {
+      documentChanges: true,
+    },
     diagnostics: {
       refreshSupport: false,
     },

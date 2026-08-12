@@ -1,7 +1,10 @@
 import type { CodePosition, RefactorResult, SourceRange } from "@mrclrchtr/supi-code-runtime/api";
-import { uriToFile } from "@mrclrchtr/supi-core/path";
-import type { CodeAction, TextDocumentEdit, TextEdit, WorkspaceEdit } from "../config/types.ts";
+import type { CodeAction } from "../config/types.ts";
 import type { WorkspaceLspRuntime } from "../session/runtime-registry.ts";
+import {
+  normalizeSemanticEdit,
+  type SemanticEditNormalizationContext,
+} from "./semantic-edit-normalizer.ts";
 
 export async function runRenameRefactor(
   lsp: WorkspaceLspRuntime,
@@ -10,29 +13,19 @@ export async function runRenameRefactor(
   newName: string,
 ): Promise<RefactorResult> {
   const edit = await lsp.rename(file, position, newName);
-  return convertLspWorkspaceEdit(edit);
+  return normalizeSemanticEdit({ kind: "workspace-edit", edit }, lsp);
 }
 
-export function collectCodeActionResults(actions: CodeAction[]): RefactorResult[] {
+/**
+ * Normalize code-action edits. Without document state, versioned changes fail closed.
+ */
+export function collectCodeActionResults(
+  actions: CodeAction[],
+  context: SemanticEditNormalizationContext = { getOpenDocumentVersion: () => null },
+): RefactorResult[] {
   const results: RefactorResult[] = [];
   for (const action of actions) {
-    if (!action.edit) {
-      results.push({
-        kind: "unavailable",
-        reason: `Code action "${action.title}" has no edit`,
-      });
-      continue;
-    }
-
-    const result = convertCodeActionToResult(action);
-    results.push(
-      result?.kind === "precise"
-        ? result
-        : {
-            kind: "unavailable",
-            reason: `Code action "${action.title}" could not produce precise edits`,
-          },
-    );
+    results.push(normalizeSemanticEdit({ kind: "code-action", action }, context));
   }
   return results;
 }
@@ -62,16 +55,18 @@ export async function runFilteredCodeActionRefactor(options: {
     };
   }
 
+  let unavailableReason: string | null = null;
   for (const action of matching) {
-    const converted = convertCodeActionToResult(action);
-    if (converted?.kind === "precise") {
-      return converted;
-    }
+    const converted = normalizeSemanticEdit({ kind: "code-action", action }, lsp);
+    if (converted.kind === "precise") return converted;
+    if (converted.kind === "unavailable") unavailableReason ??= converted.reason;
   }
 
   return {
     kind: "unavailable",
-    reason: `Matching code actions for refactor operation "${operation}" did not produce precise edits.`,
+    reason: unavailableReason
+      ? `Matching code action is unavailable: ${unavailableReason}`
+      : `Matching code actions for refactor operation "${operation}" did not produce precise edits.`,
   };
 }
 
@@ -119,88 +114,4 @@ export function isDeleteDeadCodeCodeAction(action: CodeAction): boolean {
   const titleMatches =
     /(unused|dead code|remove unused|remove unreachable|remove declaration)/.test(title);
   return kindMatches && titleMatches;
-}
-
-function convertCodeActionToResult(action: CodeAction): RefactorResult | null {
-  if (!action.edit) {
-    return null;
-  }
-  return convertLspWorkspaceEdit(action.edit);
-}
-
-function convertLspWorkspaceEdit(edit: WorkspaceEdit | null): RefactorResult {
-  if (!edit) {
-    return { kind: "unavailable", reason: "LSP server returned no edit" };
-  }
-
-  let fileEdits = edit.documentChanges?.length
-    ? collectDocumentChangeEdits(edit.documentChanges)
-    : [];
-  if (fileEdits.length === 0 && edit.changes) {
-    fileEdits = collectChangesEdits(edit.changes);
-  }
-
-  if (fileEdits.length === 0) {
-    return { kind: "unavailable", reason: "Workspace edit contains no file edits" };
-  }
-
-  return { kind: "precise", edits: { edits: fileEdits } };
-}
-
-function collectDocumentChangeEdits(
-  docChanges: NonNullable<WorkspaceEdit["documentChanges"]>,
-): Array<{
-  file: string;
-  range: { start: { line: number; character: number }; end: { line: number; character: number } };
-  newText: string;
-}> {
-  const out: Array<{
-    file: string;
-    range: { start: { line: number; character: number }; end: { line: number; character: number } };
-    newText: string;
-  }> = [];
-  for (const change of docChanges) {
-    const tdEdit = change as TextDocumentEdit;
-    if (!tdEdit.textDocument || !tdEdit.edits) continue;
-    const file = uriToFile(tdEdit.textDocument.uri);
-    for (const singleEdit of tdEdit.edits) {
-      const te = singleEdit as TextEdit;
-      out.push({
-        file,
-        range: {
-          start: { line: te.range.start.line, character: te.range.start.character },
-          end: { line: te.range.end.line, character: te.range.end.character },
-        },
-        newText: te.newText,
-      });
-    }
-  }
-  return out;
-}
-
-function collectChangesEdits(changes: NonNullable<WorkspaceEdit["changes"]>): Array<{
-  file: string;
-  range: { start: { line: number; character: number }; end: { line: number; character: number } };
-  newText: string;
-}> {
-  const out: Array<{
-    file: string;
-    range: { start: { line: number; character: number }; end: { line: number; character: number } };
-    newText: string;
-  }> = [];
-  for (const [uri, textEdits] of Object.entries(changes)) {
-    if (!textEdits || textEdits.length === 0) continue;
-    const file = uriToFile(uri);
-    for (const te of textEdits) {
-      out.push({
-        file,
-        range: {
-          start: { line: te.range.start.line, character: te.range.start.character },
-          end: { line: te.range.end.line, character: te.range.end.character },
-        },
-        newText: te.newText,
-      });
-    }
-  }
-  return out;
 }

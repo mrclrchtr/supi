@@ -23,13 +23,18 @@ function createClientWithCapabilities(caps: Partial<ServerCapabilities>): LspCli
   return client;
 }
 
-describe("LSP pull diagnostic capability advertisement", () => {
+describe("LSP client capability advertisement", () => {
   it("advertises pull diagnostics and related document support", () => {
     expect(CLIENT_CAPABILITIES.textDocument?.diagnostic).toEqual({
       dynamicRegistration: false,
       relatedDocumentSupport: true,
     });
     expect(CLIENT_CAPABILITIES.workspace?.diagnostics).toEqual({ refreshSupport: false });
+  });
+
+  it("advertises only UTF-16 positions and text-only document changes", () => {
+    expect(CLIENT_CAPABILITIES.general?.positionEncodings).toEqual(["utf-16"]);
+    expect(CLIENT_CAPABILITIES.workspace?.workspaceEdit).toEqual({ documentChanges: true });
   });
 });
 

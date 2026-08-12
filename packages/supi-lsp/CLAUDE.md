@@ -31,7 +31,8 @@ Runtime positions are raw 0-based LSP coordinates. Use `toLspPosition()` when st
 - `src/diagnostics/` — diagnostic summaries, stale diagnostics, and workspace sentinels
 - `src/manager/manager.ts` + `manager-*.ts` — package-internal server pool, routing, diagnostics, and recovery mechanics
 - `src/provider/lsp-semantic-provider.ts` — semantic-provider adapter
-- `src/provider/refactor-planning.ts` — precise rename/code-action edit conversion
+- `src/provider/refactor-planning.ts` — refactor request flow and code-action matching
+- `src/provider/semantic-edit-normalizer.ts` — fail-closed edit normalization and document preconditions
 - `src/session/runtime-controller.ts` — lifecycle/status
 - `src/session/runtime-registry.ts` — Workspace runtime implementation and registry
 - `src/session/runtime-registration.ts` — capability-broker registration

@@ -217,6 +217,10 @@ export class LspClient {
         initializationOptions: this.config.initializationOptions,
       })) as InitializeResult;
 
+      const positionEncoding = result.capabilities.positionEncoding ?? "utf-16";
+      if (positionEncoding !== "utf-16") {
+        throw new Error(`Server selected unsupported position encoding "${positionEncoding}".`);
+      }
       this.capabilities = result.capabilities;
       void this.rpc.sendNotification("initialized", {});
       this._status = "running";
@@ -303,6 +307,11 @@ export class LspClient {
   /** Remove missing document and diagnostic state, and return the removed paths. */
   pruneMissingFiles(): string[] {
     return this.diagnostics.pruneMissingFiles();
+  }
+
+  /** Return the current client version, or null when the document is not open. */
+  getOpenDocumentVersion(filePath: string): number | null {
+    return this.diagnostics.getOpenDocumentVersion(filePath);
   }
 
   /** Return stored diagnostics for one file. */

@@ -255,6 +255,13 @@ function immutablePlan(plan: RefactorPlan): Readonly<RefactorPlan> {
     edits: Object.freeze({
       ...plan.edits,
       edits: Object.freeze(plan.edits.edits.map((edit) => Object.freeze({ ...edit }))),
+      documentPreconditions: plan.edits.documentPreconditions
+        ? Object.freeze(
+            plan.edits.documentPreconditions.map((precondition) =>
+              Object.freeze({ ...precondition }),
+            ),
+          )
+        : undefined,
     }),
     fileFingerprints: Object.freeze(
       plan.fileFingerprints.map((fingerprint) => Object.freeze({ ...fingerprint })),

@@ -152,6 +152,15 @@ export class LspManager {
 
     return reason;
   }
+
+  /** Return the open document version without starting a server. */
+  getOpenDocumentVersion(filePath: string): number | null {
+    const resolvedPath = resolveSessionPath(this.cwd, filePath);
+    return (
+      this.getExistingClientForFile(resolvedPath)?.getOpenDocumentVersion(resolvedPath) ?? null
+    );
+  }
+
   /** Get or create an LSP client for the given file. */
   async getClientForFile(filePath: string): Promise<LspClient | null> {
     const route = this.resolveFileRoute(filePath);

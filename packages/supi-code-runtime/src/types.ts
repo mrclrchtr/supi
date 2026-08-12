@@ -149,11 +149,18 @@ export interface FileEdit {
   newText: string;
 }
 
+/** A document-state precondition established when semantic edits are normalized. */
+export type DocumentEditPrecondition =
+  | { file: string; kind: "open-document-version"; version: number }
+  | { file: string; kind: "disk-content" };
+
 /**
  * A precise workspace edit — one or more file edits to apply atomically.
  */
 export interface WorkspaceEdit {
   edits: FileEdit[];
+  /** Document state that the semantic provider validated before it made this plan. */
+  documentPreconditions?: DocumentEditPrecondition[];
 }
 
 /**

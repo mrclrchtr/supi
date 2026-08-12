@@ -26,6 +26,7 @@ describe("LspRefactorProvider", () => {
         staleAssessment: { suspected: false, matchedFiles: [], warning: null },
       }),
       resolveFilePath: vi.fn().mockImplementation((f: string) => f),
+      getOpenDocumentVersion: vi.fn().mockReturnValue(null),
     };
   }
 
@@ -72,6 +73,7 @@ describe("LspRefactorProvider", () => {
       };
       const lsp = createMockLsp({
         rename: vi.fn().mockResolvedValue(lspWorkspaceEdit),
+        getOpenDocumentVersion: vi.fn().mockReturnValue(1),
       });
       const provider = createLspSemanticProvider(lsp);
       const result = (await provider.rename?.(
@@ -85,6 +87,9 @@ describe("LspRefactorProvider", () => {
         expect(result.edits.edits).toHaveLength(1);
         expect(result.edits.edits[0].file).toBe("/src/index.ts");
         expect(result.edits.edits[0].newText).toBe("newName");
+        expect(result.edits.documentPreconditions).toEqual([
+          { file: "/src/index.ts", kind: "open-document-version", version: 1 },
+        ]);
       }
     });
 

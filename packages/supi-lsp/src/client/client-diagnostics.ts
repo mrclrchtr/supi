@@ -137,6 +137,11 @@ export class ClientDiagnostics {
     return removedFiles;
   }
 
+  /** Return the current client version, or null when the document is not open. */
+  getOpenDocumentVersion(filePath: string): number | null {
+    return this.#openDocs.get(fileToUri(filePath))?.version ?? null;
+  }
+
   getDiagnostics(filePath: string): Diagnostic[] {
     return this.#diagnosticStore.get(fileToUri(filePath))?.diagnostics ?? [];
   }

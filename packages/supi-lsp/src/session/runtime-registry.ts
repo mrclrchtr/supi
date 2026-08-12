@@ -99,6 +99,8 @@ export interface WorkspaceLspRuntime {
   workspaceSymbol(query: string): Promise<CodeQueryResult<SymbolInformation[] | WorkspaceSymbol[]>>;
   rename(filePath: string, position: Position, newName: string): Promise<WorkspaceEdit | null>;
   codeActions(filePath: string, positionOrRange: Position | Range): Promise<CodeAction[] | null>;
+  /** Return the current version, or null when no client has the document open. */
+  getOpenDocumentVersion(filePath: string): number | null;
   /** Succeeds only when the concrete routed client exists and is query-ready. */
   waitUntilReadyForFile(
     filePath: string,
@@ -197,6 +199,10 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     const client = await this.manager.ensureFileOpen(resolvedPath);
     if (!client) return null;
     return client.rename(resolvedPath, position, newName);
+  }
+
+  getOpenDocumentVersion(filePath: string): number | null {
+    return this.manager.getOpenDocumentVersion(this.resolveFilePath(filePath));
   }
 
   async codeActions(
