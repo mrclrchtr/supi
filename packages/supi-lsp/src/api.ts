@@ -41,6 +41,7 @@ export { LspRuntimeController } from "./session/runtime-controller.ts";
 export type {
   OutstandingDiagnosticSummaryEntry,
   RecoverDiagnosticsResult,
+  RoutedMutationResponse,
   SemanticReadinessResult,
   WorkspaceDiagnosticSummaryEntry,
   WorkspaceLspRuntime,

@@ -10,9 +10,10 @@ export type SemanticEditResponse =
   | { readonly kind: "workspace-edit"; readonly edit: unknown }
   | { readonly kind: "code-action"; readonly action: unknown };
 
-/** Client document state used to establish edit version preconditions. */
+/** Provider route and client document state used to establish mutation preconditions. */
 export interface SemanticEditNormalizationContext {
   getOpenDocumentVersion(file: string): number | null;
+  authorizedMutationRoots: readonly string[];
 }
 
 /**
@@ -93,10 +94,13 @@ function normalizeWorkspaceEdit(
   }
   return Object.hasOwn(workspaceEdit, "documentChanges")
     ? normalizeDocumentChanges(workspaceEdit.documentChanges, context)
-    : normalizeChanges(workspaceEdit.changes);
+    : normalizeChanges(workspaceEdit.changes, context);
 }
 
-function normalizeChanges(value: unknown): RefactorResult {
+function normalizeChanges(
+  value: unknown,
+  context: SemanticEditNormalizationContext,
+): RefactorResult {
   const changes = asRecord(value);
   if (!changes) {
     return { kind: "unavailable", reason: "Workspace edit contains no supported changes." };
@@ -116,7 +120,7 @@ function normalizeChanges(value: unknown): RefactorResult {
     if (normalized.kind === "unavailable") return normalized;
     edits.push(...normalized.edits);
   }
-  return preciseOrEmpty(edits);
+  return preciseOrEmpty(edits, context);
 }
 
 function normalizeDocumentChanges(
@@ -135,7 +139,7 @@ function normalizeDocumentChanges(
     edits.push(...normalized.edits);
     documentPreconditions.push(normalized.precondition);
   }
-  return preciseOrEmpty(edits, documentPreconditions);
+  return preciseOrEmpty(edits, context, documentPreconditions);
 }
 
 function normalizeDocumentChange(
@@ -258,14 +262,22 @@ function normalizeTextEdits(
 
 function preciseOrEmpty(
   edits: FileEdit[],
+  context: SemanticEditNormalizationContext,
   documentPreconditions?: DocumentEditPrecondition[],
 ): RefactorResult {
   if (edits.length === 0) {
     return { kind: "unavailable", reason: "Workspace edit contains no file edits." };
   }
+  if (context.authorizedMutationRoots.length === 0) {
+    return {
+      kind: "unavailable",
+      reason: "Semantic route did not authorize a mutation root.",
+    };
+  }
+  const authorizedMutationRoots = [...context.authorizedMutationRoots];
   return documentPreconditions
-    ? { kind: "precise", edits: { edits, documentPreconditions } }
-    : { kind: "precise", edits: { edits } };
+    ? { kind: "precise", edits: { edits, documentPreconditions }, authorizedMutationRoots }
+    : { kind: "precise", edits: { edits }, authorizedMutationRoots };
 }
 
 function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {

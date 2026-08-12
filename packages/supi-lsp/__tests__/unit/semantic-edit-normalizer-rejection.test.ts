@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { normalizeSemanticEdit } from "../../src/provider/semantic-edit-normalizer.ts";
 
-const versions = { getOpenDocumentVersion: () => null };
+const versions = {
+  getOpenDocumentVersion: () => null,
+  authorizedMutationRoots: ["/src"],
+};
 const fallbackChanges = {
   "file:///src/fallback.ts": [
     {
@@ -170,10 +173,22 @@ describe("normalizeSemanticEdit rejection", () => {
           ],
         },
       },
-      { getOpenDocumentVersion: testCase.getOpenDocumentVersion },
+      {
+        getOpenDocumentVersion: testCase.getOpenDocumentVersion,
+        authorizedMutationRoots: ["/src"],
+      },
     );
 
     expectUnavailable(result, testCase.reason);
+  });
+
+  it("rejects precise edits when semantic routing provides no mutation root", () => {
+    const result = normalizeSemanticEdit(
+      { kind: "workspace-edit", edit: { changes: fallbackChanges } },
+      { getOpenDocumentVersion: () => null, authorizedMutationRoots: [] },
+    );
+
+    expectUnavailable(result, "mutation root");
   });
 
   it("distinguishes an absent workspace edit from a malformed edit", () => {

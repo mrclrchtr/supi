@@ -19,6 +19,8 @@ export interface RefactorPlan {
   targetLine: number;
   targetCharacter: number;
   edits: WorkspaceEdit;
+  /** Canonical roots that the routed semantic provider authorized. */
+  authorizedMutationRoots: string[];
   fileFingerprints: Array<{ file: string; fingerprint: string }>;
   createdAt: number;
 }

@@ -4,13 +4,14 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { applyWorkspaceEdit } from "../../../../src/analysis/refactor/apply.ts";
+import { applyWorkspaceEdit as applyWorkspaceEditImpl } from "../../../../src/analysis/refactor/apply.ts";
 
 const renameMock = vi.hoisted(() => ({ failDestination: null as string | null }));
 
@@ -47,6 +48,12 @@ describe("applyWorkspaceEdit", () => {
 
   function absPath(file: string): string {
     return path.join(tmpDir, file);
+  }
+
+  function applyWorkspaceEdit(edit: Parameters<typeof applyWorkspaceEditImpl>[0]) {
+    return applyWorkspaceEditImpl(edit, {
+      authorizedMutationRoots: [realpathSync(tmpDir)],
+    });
   }
 
   it("applies a single-file single-edit replacement", async () => {

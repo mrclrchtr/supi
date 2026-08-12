@@ -14,18 +14,21 @@ describe("LSP provider semantic edit normalization", () => {
   it("does not keep text edits beside a resource operation", async () => {
     const lsp = createMockLsp({
       rename: vi.fn().mockResolvedValue({
-        documentChanges: [
-          { kind: "create", uri: "file:///src/new.ts" },
-          {
-            textDocument: { uri: "file:///src/index.ts", version: null },
-            edits: [
-              {
-                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
-                newText: "unsafe subset",
-              },
-            ],
-          },
-        ],
+        value: {
+          documentChanges: [
+            { kind: "create", uri: "file:///src/new.ts" },
+            {
+              textDocument: { uri: "file:///src/index.ts", version: null },
+              edits: [
+                {
+                  range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
+                  newText: "unsafe subset",
+                },
+              ],
+            },
+          ],
+        },
+        authorizedMutationRoots: ["/src"],
       }),
     });
     const provider = createLspSemanticProvider(lsp);
@@ -42,22 +45,25 @@ describe("LSP provider semantic edit normalization", () => {
 
   it("rejects command-bearing code actions as incomplete precise plans", async () => {
     const lsp = createMockLsp({
-      codeActions: vi.fn().mockResolvedValue([
-        {
-          title: "Extract function",
-          edit: {
-            changes: {
-              "file:///src/index.ts": [
-                {
-                  range: { start: { line: 2, character: 0 }, end: { line: 5, character: 0 } },
-                  newText: "helper()",
-                },
-              ],
+      codeActions: vi.fn().mockResolvedValue({
+        value: [
+          {
+            title: "Extract function",
+            edit: {
+              changes: {
+                "file:///src/index.ts": [
+                  {
+                    range: { start: { line: 2, character: 0 }, end: { line: 5, character: 0 } },
+                    newText: "helper()",
+                  },
+                ],
+              },
             },
+            command: { title: "Finish extract", command: "server.finishExtract" },
           },
-          command: { title: "Finish extract", command: "server.finishExtract" },
-        },
-      ]),
+        ],
+        authorizedMutationRoots: ["/src"],
+      }),
     });
     const provider = createLspSemanticProvider(lsp);
 

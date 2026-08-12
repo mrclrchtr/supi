@@ -118,6 +118,7 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
               },
             ],
           },
+          authorizedMutationRoots: [projectDir],
         }),
       }),
     );
@@ -166,6 +167,7 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
                 },
               ],
             },
+            authorizedMutationRoots: [projectDir],
           };
         },
       }),
@@ -212,6 +214,7 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
               newText: `newName${index}`,
             })),
           },
+          authorizedMutationRoots: [projectDir],
         }),
       }),
     );
@@ -274,6 +277,7 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
               },
             ],
           },
+          authorizedMutationRoots: [projectDir],
         }),
       }),
     );
@@ -314,6 +318,7 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
               },
             ],
           },
+          authorizedMutationRoots: [projectDir],
         }),
       }),
     );
@@ -366,6 +371,7 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
               },
             ],
           },
+          authorizedMutationRoots: [projectDir],
         }),
       }),
     );
@@ -410,6 +416,7 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
               },
             ],
           },
+          authorizedMutationRoots: [projectDir],
         }),
       }),
     );

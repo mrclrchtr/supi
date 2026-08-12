@@ -145,9 +145,12 @@ export function createLspSemanticProvider(lsp: WorkspaceLspRuntime): SemanticPro
     },
 
     async codeActions(file: string, position: CodePosition): Promise<RefactorResult[]> {
-      const actions = await lsp.codeActions(file, position);
-      if (!actions) return [];
-      return collectCodeActionResults(actions, lsp);
+      const response = await lsp.codeActions(file, position);
+      if (!response?.value) return [];
+      return collectCodeActionResults(response.value, {
+        getOpenDocumentVersion: (candidate) => lsp.getOpenDocumentVersion(candidate),
+        authorizedMutationRoots: response.authorizedMutationRoots,
+      });
     },
   };
 }

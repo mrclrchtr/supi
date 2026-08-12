@@ -353,6 +353,7 @@ describe("canonical Tool result assembly", () => {
         targetFile: "/repo/src/a.ts",
         targetLine: 1,
         targetCharacter: 1,
+        authorizedMutationRoots: ["/repo"],
         edits: {
           edits: [
             {

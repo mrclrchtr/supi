@@ -129,6 +129,7 @@ describe("capability-broker", () => {
         rename: async (_file, _pos, _newName) => ({
           kind: "precise" as const,
           edits: { edits: [] },
+          authorizedMutationRoots: ["/project"],
         }),
       };
       runtime.registerSemantic("/project", refactorProvider);
@@ -139,7 +140,13 @@ describe("capability-broker", () => {
       runtime = new WorkspaceRuntime();
       const refactorProvider: SemanticProvider = {
         ...createMockSemanticProvider(),
-        codeActions: async (_file, _pos) => [{ kind: "precise" as const, edits: { edits: [] } }],
+        codeActions: async (_file, _pos) => [
+          {
+            kind: "precise" as const,
+            edits: { edits: [] },
+            authorizedMutationRoots: ["/project"],
+          },
+        ],
       };
       runtime.registerSemantic("/project", refactorProvider);
       expect(runtime.getWorkspace("/project").semantic.refactorAvailable).toBe(true);
@@ -149,7 +156,11 @@ describe("capability-broker", () => {
       runtime = new WorkspaceRuntime();
       const refactorProvider: SemanticProvider = {
         ...createMockSemanticProvider(),
-        refactor: async (_request) => ({ kind: "precise" as const, edits: { edits: [] } }),
+        refactor: async (_request) => ({
+          kind: "precise" as const,
+          edits: { edits: [] },
+          authorizedMutationRoots: ["/project"],
+        }),
       };
       runtime.registerSemantic("/project", refactorProvider);
       expect(runtime.getWorkspace("/project").semantic.refactorAvailable).toBe(true);
@@ -167,6 +178,7 @@ describe("capability-broker", () => {
         rename: async (_file, _pos, _newName) => ({
           kind: "precise" as const,
           edits: { edits: [] },
+          authorizedMutationRoots: ["/project"],
         }),
       };
       runtime.registerSemantic("/project", refactorProvider);

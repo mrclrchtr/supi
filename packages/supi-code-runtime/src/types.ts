@@ -209,7 +209,12 @@ export interface DisambiguationCandidate {
  * - `unavailable`: refactoring not possible
  */
 export type RefactorResult =
-  | { kind: "precise"; edits: WorkspaceEdit }
+  | {
+      kind: "precise";
+      edits: WorkspaceEdit;
+      /** Provider roots authorized by the semantic route. Consumers canonicalize before storage. */
+      authorizedMutationRoots: string[];
+    }
   | { kind: "ambiguous"; candidates: DisambiguationCandidate[] }
   | { kind: "unavailable"; reason: string };
 

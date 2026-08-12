@@ -24,6 +24,17 @@ import type {
 import type { LspManager } from "../manager/manager.ts";
 import { resolveSessionPath } from "../utils.ts";
 import { raceReadinessValue } from "./readiness.ts";
+import type {
+  OutstandingDiagnosticSummaryEntry,
+  RecoverDiagnosticsResult,
+  WorkspaceDiagnosticSummaryEntry,
+} from "./runtime-diagnostics.ts";
+
+export type {
+  OutstandingDiagnosticSummaryEntry,
+  RecoverDiagnosticsResult,
+  WorkspaceDiagnosticSummaryEntry,
+} from "./runtime-diagnostics.ts";
 
 function isRange(value: Position | Range): value is Range {
   return "start" in value && "end" in value;
@@ -31,35 +42,6 @@ function isRange(value: Position | Range): value is Range {
 
 function unavailableFileQuery<T>(operation: string, file: string): CodeQueryResult<T> {
   return unavailableCodeQuery(`No routed LSP client could complete ${operation} for ${file}.`);
-}
-
-/** Workspace diagnostic summary grouped by file. */
-export interface WorkspaceDiagnosticSummaryEntry {
-  file: string;
-  errors: number;
-  warnings: number;
-}
-
-/** Outstanding diagnostics grouped by file, including info and hint counts. */
-export interface OutstandingDiagnosticSummaryEntry {
-  file: string;
-  total: number;
-  errors: number;
-  warnings: number;
-  information: number;
-  hints: number;
-}
-
-/** Result from a workspace diagnostic recovery pass. */
-export interface RecoverDiagnosticsResult {
-  /** Active clients targeted by the best-effort refresh, not confirmed successful refreshes. */
-  attemptedClients: number;
-  restartedClients: number;
-  staleAssessment: {
-    suspected: boolean;
-    matchedFiles: Array<{ file: string; diagnostics: Diagnostic[] }>;
-    warning: string | null;
-  };
 }
 
 export type WorkspaceLspRuntimeState =
@@ -73,6 +55,14 @@ export type SemanticReadinessResult =
   | { kind: "ready" }
   | { kind: "timeout" }
   | { kind: "unavailable"; reason: string };
+
+/** One mutation response and the exact provider roots from its semantic route. */
+export interface RoutedMutationResponse<T> {
+  /** Provider response from the routed client. */
+  readonly value: T;
+  /** Roots that the routed client owns for this mutation response. */
+  readonly authorizedMutationRoots: readonly string[];
+}
 
 /**
  * Workspace-scoped LSP interface that owns routing, readiness, semantic operations,
@@ -97,8 +87,15 @@ export interface WorkspaceLspRuntime {
     filePath: string,
   ): Promise<CodeQueryResult<DocumentSymbol[] | SymbolInformation[]>>;
   workspaceSymbol(query: string): Promise<CodeQueryResult<SymbolInformation[] | WorkspaceSymbol[]>>;
-  rename(filePath: string, position: Position, newName: string): Promise<WorkspaceEdit | null>;
-  codeActions(filePath: string, positionOrRange: Position | Range): Promise<CodeAction[] | null>;
+  rename(
+    filePath: string,
+    position: Position,
+    newName: string,
+  ): Promise<RoutedMutationResponse<WorkspaceEdit | null> | null>;
+  codeActions(
+    filePath: string,
+    positionOrRange: Position | Range,
+  ): Promise<RoutedMutationResponse<CodeAction[] | null> | null>;
   /** Return the current version, or null when no client has the document open. */
   getOpenDocumentVersion(filePath: string): number | null;
   /** Succeeds only when the concrete routed client exists and is query-ready. */
@@ -194,11 +191,14 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     filePath: string,
     position: Position,
     newName: string,
-  ): Promise<WorkspaceEdit | null> {
+  ): Promise<RoutedMutationResponse<WorkspaceEdit | null> | null> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
     if (!client) return null;
-    return client.rename(resolvedPath, position, newName);
+    return {
+      value: await client.rename(resolvedPath, position, newName),
+      authorizedMutationRoots: [client.root],
+    };
   }
 
   getOpenDocumentVersion(filePath: string): number | null {
@@ -208,7 +208,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   async codeActions(
     filePath: string,
     positionOrRange: Position | Range,
-  ): Promise<CodeAction[] | null> {
+  ): Promise<RoutedMutationResponse<CodeAction[] | null> | null> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
     if (!client) return null;
@@ -221,7 +221,10 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       .filter((diagnostic) => diagnostic.range.end.line >= range.start.line)
       .filter((diagnostic) => diagnostic.range.start.line <= range.end.line);
 
-    return client.codeActions(resolvedPath, range, { diagnostics });
+    return {
+      value: await client.codeActions(resolvedPath, range, { diagnostics }),
+      authorizedMutationRoots: [client.root],
+    };
   }
 
   /**

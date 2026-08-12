@@ -1,8 +1,8 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { applyWorkspaceEdit } from "../../../../src/analysis/refactor/apply.ts";
+import { applyWorkspaceEdit as applyWorkspaceEditImpl } from "../../../../src/analysis/refactor/apply.ts";
 
 describe("LSP text-edit application", () => {
   let tmpDir: string;
@@ -16,6 +16,12 @@ describe("LSP text-edit application", () => {
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
+
+  function applyWorkspaceEdit(edit: Parameters<typeof applyWorkspaceEditImpl>[0]) {
+    return applyWorkspaceEditImpl(edit, {
+      authorizedMutationRoots: [realpathSync(tmpDir)],
+    });
+  }
 
   it("keeps protocol order for inserts at the same position", async () => {
     writeFileSync(file, "left right");

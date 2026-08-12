@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { normalizeSemanticEdit } from "../../src/provider/semantic-edit-normalizer.ts";
 
-const versions = { getOpenDocumentVersion: () => null };
+const versions = {
+  getOpenDocumentVersion: () => null,
+  authorizedMutationRoots: ["/src"],
+};
 const edit = {
   changes: {
     "file:///src/a.ts": [
@@ -22,6 +25,7 @@ describe("semantic code action normalization", () => {
 
     expect(result).toMatchObject({
       kind: "precise",
+      authorizedMutationRoots: ["/src"],
       edits: { edits: [{ file: "/src/a.ts", newText: "next" }] },
     });
   });

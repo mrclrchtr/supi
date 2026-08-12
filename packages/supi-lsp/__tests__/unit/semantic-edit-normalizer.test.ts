@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { normalizeSemanticEdit } from "../../src/provider/semantic-edit-normalizer.ts";
 
-const versions = { getOpenDocumentVersion: () => null };
+const versions = {
+  getOpenDocumentVersion: () => null,
+  authorizedMutationRoots: ["/src"],
+};
 
 function withOpenVersions(expected: Record<string, number>) {
   return {
     getOpenDocumentVersion: (file: string) => expected[file] ?? null,
+    authorizedMutationRoots: ["/src"],
   };
 }
 
@@ -36,6 +40,7 @@ describe("normalizeSemanticEdit", () => {
 
     expect(result).toEqual({
       kind: "precise",
+      authorizedMutationRoots: ["/src"],
       edits: {
         edits: [
           {
@@ -93,6 +98,7 @@ describe("normalizeSemanticEdit", () => {
 
     expect(result).toEqual({
       kind: "precise",
+      authorizedMutationRoots: ["/src"],
       edits: {
         edits: [
           {

@@ -16,6 +16,7 @@ import { readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:
 import { basename, dirname, join } from "node:path";
 import { withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import type { FileEdit, WorkspaceEdit } from "@mrclrchtr/supi-code-runtime/api";
+import { revalidateMutationAuthority } from "./mutation-authority.ts";
 import { compareCodePositions, createLogicalLineIndex } from "./position.ts";
 import { validateEditAgainstFiles } from "./safety.ts";
 
@@ -24,8 +25,12 @@ export type ApplyResult =
   | { kind: "error"; reason: string };
 
 export interface ApplyOptions {
+  /** Canonical roots authorized by the semantic provider that made the plan. */
+  authorizedMutationRoots: readonly string[];
   /** Expected SHA-256 fingerprints per file, validated after queue acquisition. */
   expectedFingerprints?: ReadonlyMap<string, string>;
+  /** Current LSP document version, or null when the document is not open. */
+  getOpenDocumentVersion?: (file: string) => number | null;
 }
 
 /**
@@ -49,15 +54,23 @@ export interface ApplyOptions {
  */
 export async function applyWorkspaceEdit(
   edit: WorkspaceEdit,
-  options: ApplyOptions = {},
+  options: ApplyOptions,
 ): Promise<ApplyResult> {
   const grouped = groupEditsByFile(edit.edits);
   const files = [...grouped.keys()].sort();
   return withAllMutationQueues(files, async () => {
+    const authority = revalidateMutationAuthority(files, options.authorizedMutationRoots);
+    if (authority.kind === "unavailable") {
+      return { kind: "error", reason: authority.reason };
+    }
+
     if (options.expectedFingerprints) {
       const freshness = validateFingerprints(files, options.expectedFingerprints);
       if (!freshness.ok) return { kind: "error", reason: freshness.reason };
     }
+
+    const documentState = validateDocumentPreconditions(edit, options.getOpenDocumentVersion);
+    if (!documentState.ok) return { kind: "error", reason: documentState.reason };
 
     const validation = validateEditAgainstFiles(edit);
     if (!validation.safe) {
@@ -74,6 +87,37 @@ export async function applyWorkspaceEdit(
       edit.edits.length,
     );
   });
+}
+
+function validateDocumentPreconditions(
+  edit: WorkspaceEdit,
+  getOpenDocumentVersion: ApplyOptions["getOpenDocumentVersion"],
+): { ok: true } | { ok: false; reason: string } {
+  const preconditions = edit.documentPreconditions ?? [];
+  if (preconditions.length === 0) return { ok: true };
+  if (!getOpenDocumentVersion) {
+    return {
+      ok: false,
+      reason: "Stored document preconditions cannot be revalidated.",
+    };
+  }
+
+  for (const precondition of preconditions) {
+    const currentVersion = getOpenDocumentVersion(precondition.file);
+    if (precondition.kind === "open-document-version" && currentVersion !== precondition.version) {
+      return {
+        ok: false,
+        reason: `File ${precondition.file} open document version has changed since the plan was generated.`,
+      };
+    }
+    if (precondition.kind === "disk-content" && currentVersion !== null) {
+      return {
+        ok: false,
+        reason: `File ${precondition.file} is now open and no longer uses disk content as its master.`,
+      };
+    }
+  }
+  return { ok: true };
 }
 
 function validateFingerprints(

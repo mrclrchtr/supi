@@ -12,8 +12,17 @@ export async function runRenameRefactor(
   position: CodePosition,
   newName: string,
 ): Promise<RefactorResult> {
-  const edit = await lsp.rename(file, position, newName);
-  return normalizeSemanticEdit({ kind: "workspace-edit", edit }, lsp);
+  const response = await lsp.rename(file, position, newName);
+  if (!response) {
+    return { kind: "unavailable", reason: "No routed LSP client could plan the rename." };
+  }
+  return normalizeSemanticEdit(
+    { kind: "workspace-edit", edit: response.value },
+    {
+      getOpenDocumentVersion: (candidate) => lsp.getOpenDocumentVersion(candidate),
+      authorizedMutationRoots: response.authorizedMutationRoots,
+    },
+  );
 }
 
 /**
@@ -21,7 +30,7 @@ export async function runRenameRefactor(
  */
 export function collectCodeActionResults(
   actions: CodeAction[],
-  context: SemanticEditNormalizationContext = { getOpenDocumentVersion: () => null },
+  context: SemanticEditNormalizationContext,
 ): RefactorResult[] {
   const results: RefactorResult[] = [];
   for (const action of actions) {
@@ -39,8 +48,9 @@ export async function runFilteredCodeActionRefactor(options: {
   matches: (action: CodeAction) => boolean;
 }): Promise<RefactorResult> {
   const { lsp, file, position, operation, matches } = options;
-  const actions = await lsp.codeActions(file, options.range ?? position);
-  if (!actions || actions.length === 0) {
+  const response = await lsp.codeActions(file, options.range ?? position);
+  const actions = response?.value;
+  if (!response || !actions || actions.length === 0) {
     return {
       kind: "unavailable",
       reason: `No code actions are available for refactor operation "${operation}".`,
@@ -55,9 +65,13 @@ export async function runFilteredCodeActionRefactor(options: {
     };
   }
 
+  const context: SemanticEditNormalizationContext = {
+    getOpenDocumentVersion: (candidate) => lsp.getOpenDocumentVersion(candidate),
+    authorizedMutationRoots: response.authorizedMutationRoots,
+  };
   let unavailableReason: string | null = null;
   for (const action of matching) {
-    const converted = normalizeSemanticEdit({ kind: "code-action", action }, lsp);
+    const converted = normalizeSemanticEdit({ kind: "code-action", action }, context);
     if (converted.kind === "precise") return converted;
     if (converted.kind === "unavailable") unavailableReason ??= converted.reason;
   }

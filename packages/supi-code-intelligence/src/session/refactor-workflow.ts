@@ -8,6 +8,10 @@ import type {
 } from "@mrclrchtr/supi-code-runtime/api";
 import { toLspPosition } from "@mrclrchtr/supi-lsp/api";
 import { applyWorkspaceEdit } from "../analysis/refactor/apply.ts";
+import {
+  establishMutationAuthority,
+  revalidateMutationAuthority,
+} from "../analysis/refactor/mutation-authority.ts";
 import { validateEdit } from "../analysis/refactor/safety.ts";
 import { normalizePath } from "../analysis/search/paths.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
@@ -108,6 +112,11 @@ export async function runRefactorPlanWorkflow(
   if (!validation.safe) {
     return { kind: "invalid-input", message: `Refactor safety check failed: ${validation.reason}` };
   }
+  const authority = establishMutationAuthority(
+    result.edits.edits.map((edit) => edit.file),
+    result.authorizedMutationRoots,
+  );
+  if (authority.kind === "unavailable") return authority;
 
   const plan: RefactorPlan = {
     id: generatePlanId(
@@ -123,6 +132,7 @@ export async function runRefactorPlanWorkflow(
     targetLine: target.entry.displayLine,
     targetCharacter: target.entry.displayCharacter,
     edits: result.edits,
+    authorizedMutationRoots: authority.canonicalRoots,
     fileFingerprints: collectFileFingerprints(result.edits.edits),
     createdAt: Date.now(),
   };
@@ -147,6 +157,11 @@ export async function runRefactorApplyWorkflow(
     };
   }
 
+  const authority = revalidateMutationAuthority(
+    plan.edits.edits.map((edit) => edit.file),
+    plan.authorizedMutationRoots,
+  );
+  if (authority.kind === "unavailable") return authority;
   const freshness = isPlanFresh(plan);
   if (!freshness.fresh) return { kind: "invalid-input", message: freshness.reason };
   const validation = validateEdit(plan.edits);
@@ -161,10 +176,24 @@ export async function runRefactorApplyWorkflow(
   const expectedFingerprints = new Map(
     plan.fileFingerprints.map(({ file, fingerprint }) => [file, fingerprint]),
   );
-  const result = await applyWorkspaceEdit(plan.edits, { expectedFingerprints });
+  const getOpenDocumentVersion = getDocumentVersionReader(deps);
+  const result = await applyWorkspaceEdit(plan.edits, {
+    authorizedMutationRoots: plan.authorizedMutationRoots,
+    expectedFingerprints,
+    getOpenDocumentVersion,
+  });
   if (result.kind === "error") return { kind: "unavailable", reason: result.reason };
   deps.removePlan(plan.id);
   return { kind: "completed", plan: immutablePlan(plan), result };
+}
+
+function getDocumentVersionReader(
+  deps: RefactorWorkflowDeps,
+): ((file: string) => number | null) | undefined {
+  const state = deps.capability.getLspRuntimeState(deps.cwd);
+  if (state.kind !== "ready" && state.kind !== "inactive") return undefined;
+  if (typeof state.runtime.getOpenDocumentVersion !== "function") return undefined;
+  return (file) => state.runtime.getOpenDocumentVersion(file);
 }
 
 function parseOperation(input: RefactorOperationInput):
@@ -263,6 +292,7 @@ function immutablePlan(plan: RefactorPlan): Readonly<RefactorPlan> {
           )
         : undefined,
     }),
+    authorizedMutationRoots: Object.freeze([...plan.authorizedMutationRoots]),
     fileFingerprints: Object.freeze(
       plan.fileFingerprints.map((fingerprint) => Object.freeze({ ...fingerprint })),
     ),

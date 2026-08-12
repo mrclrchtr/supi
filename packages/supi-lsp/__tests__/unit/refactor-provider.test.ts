@@ -4,6 +4,10 @@ import { createLspSemanticProvider } from "../../src/provider/lsp-semantic-provi
 import type { WorkspaceLspRuntime } from "../../src/session/runtime-registry.ts";
 
 describe("LspRefactorProvider", () => {
+  function routed<T>(value: T) {
+    return { value, authorizedMutationRoots: ["/src"] };
+  }
+
   function defaultMockFields(): Record<string, unknown> {
     return {
       references: vi.fn().mockResolvedValue(null),
@@ -72,7 +76,10 @@ describe("LspRefactorProvider", () => {
         ],
       };
       const lsp = createMockLsp({
-        rename: vi.fn().mockResolvedValue(lspWorkspaceEdit),
+        rename: vi.fn().mockResolvedValue({
+          value: lspWorkspaceEdit,
+          authorizedMutationRoots: ["/src"],
+        }),
         getOpenDocumentVersion: vi.fn().mockReturnValue(1),
       });
       const provider = createLspSemanticProvider(lsp);
@@ -90,6 +97,7 @@ describe("LspRefactorProvider", () => {
         expect(result.edits.documentPreconditions).toEqual([
           { file: "/src/index.ts", kind: "open-document-version", version: 1 },
         ]);
+        expect(result.authorizedMutationRoots).toEqual(["/src"]);
       }
     });
 
@@ -111,7 +119,7 @@ describe("LspRefactorProvider", () => {
         },
       };
       const lsp = createMockLsp({
-        rename: vi.fn().mockResolvedValue(lspWorkspaceEdit),
+        rename: vi.fn().mockResolvedValue(routed(lspWorkspaceEdit)),
       });
       const provider = createLspSemanticProvider(lsp);
       const result = (await provider.rename?.(
@@ -145,7 +153,7 @@ describe("LspRefactorProvider", () => {
 
     it("returns unavailable when LSP returns empty edit (no changes, no documentChanges)", async () => {
       const lsp = createMockLsp({
-        rename: vi.fn().mockResolvedValue({} as unknown),
+        rename: vi.fn().mockResolvedValue(routed({} as unknown)),
       });
       const provider = createLspSemanticProvider(lsp);
       const result = (await provider.rename?.(
@@ -170,21 +178,23 @@ describe("LspRefactorProvider", () => {
 
     it("returns precise refactor results from code actions with edits", async () => {
       const lsp = createMockLsp({
-        codeActions: vi.fn().mockResolvedValue([
-          {
-            title: "Extract function",
-            edit: {
-              changes: {
-                "file:///src/index.ts": [
-                  {
-                    range: { start: { line: 2, character: 0 }, end: { line: 5, character: 0 } },
-                    newText: "helper()",
-                  },
-                ],
+        codeActions: vi.fn().mockResolvedValue(
+          routed([
+            {
+              title: "Extract function",
+              edit: {
+                changes: {
+                  "file:///src/index.ts": [
+                    {
+                      range: { start: { line: 2, character: 0 }, end: { line: 5, character: 0 } },
+                      newText: "helper()",
+                    },
+                  ],
+                },
               },
             },
-          },
-        ]),
+          ]),
+        ),
       });
       const provider = createLspSemanticProvider(lsp);
       const results = (await provider.codeActions?.("/src/index.ts", {
@@ -211,7 +221,7 @@ describe("LspRefactorProvider", () => {
 
     it("returns unavailable for code actions without edits", async () => {
       const lsp = createMockLsp({
-        codeActions: vi.fn().mockResolvedValue([{ title: "Organize imports" }]),
+        codeActions: vi.fn().mockResolvedValue(routed([{ title: "Organize imports" }])),
       });
       const provider = createLspSemanticProvider(lsp);
       const results = (await provider.codeActions?.("/src/index.ts", {
@@ -234,9 +244,11 @@ describe("LspRefactorProvider", () => {
     });
 
     it("rename adapter delegates through the LSP service", async () => {
-      const renameSpy = vi.fn().mockResolvedValue({
-        changes: { "file:///src/index.ts": [] },
-      });
+      const renameSpy = vi.fn().mockResolvedValue(
+        routed({
+          changes: { "file:///src/index.ts": [] },
+        }),
+      );
       const lsp = createMockLsp({ rename: renameSpy });
       const provider = createLspSemanticProvider(lsp);
 
@@ -256,17 +268,19 @@ describe("LspRefactorProvider", () => {
     });
 
     it("routes rename_symbol through the rename request instead of code actions", async () => {
-      const renameSpy = vi.fn().mockResolvedValue({
-        changes: {
-          "file:///src/index.ts": [
-            {
-              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 7 } },
-              newText: "newName",
-            },
-          ],
-        },
-      });
-      const codeActionsSpy = vi.fn().mockResolvedValue([]);
+      const renameSpy = vi.fn().mockResolvedValue(
+        routed({
+          changes: {
+            "file:///src/index.ts": [
+              {
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 7 } },
+                newText: "newName",
+              },
+            ],
+          },
+        }),
+      );
+      const codeActionsSpy = vi.fn().mockResolvedValue(routed([]));
       const provider = createLspSemanticProvider(
         createMockLsp({ rename: renameSpy, codeActions: codeActionsSpy }),
       ) as OperationAwareSemanticProvider;
@@ -286,22 +300,24 @@ describe("LspRefactorProvider", () => {
 
     it("routes update_imports through code actions instead of rename", async () => {
       const renameSpy = vi.fn().mockResolvedValue(null);
-      const codeActionsSpy = vi.fn().mockResolvedValue([
-        {
-          title: "Organize Imports",
-          kind: "source.organizeImports",
-          edit: {
-            changes: {
-              "file:///src/index.ts": [
-                {
-                  range: { start: { line: 0, character: 0 }, end: { line: 0, character: 10 } },
-                  newText: "",
-                },
-              ],
+      const codeActionsSpy = vi.fn().mockResolvedValue(
+        routed([
+          {
+            title: "Organize Imports",
+            kind: "source.organizeImports",
+            edit: {
+              changes: {
+                "file:///src/index.ts": [
+                  {
+                    range: { start: { line: 0, character: 0 }, end: { line: 0, character: 10 } },
+                    newText: "",
+                  },
+                ],
+              },
             },
           },
-        },
-      ]);
+        ]),
+      );
       const provider = createLspSemanticProvider(
         createMockLsp({ rename: renameSpy, codeActions: codeActionsSpy }),
       ) as OperationAwareSemanticProvider;
@@ -320,12 +336,9 @@ describe("LspRefactorProvider", () => {
 
     it("routes delete_dead_code through code actions and rejects edit-less actions", async () => {
       const renameSpy = vi.fn().mockResolvedValue(null);
-      const codeActionsSpy = vi.fn().mockResolvedValue([
-        {
-          title: "Remove unused declaration",
-          kind: "quickfix",
-        },
-      ]);
+      const codeActionsSpy = vi
+        .fn()
+        .mockResolvedValue(routed([{ title: "Remove unused declaration", kind: "quickfix" }]));
       const provider = createLspSemanticProvider(
         createMockLsp({ rename: renameSpy, codeActions: codeActionsSpy }),
       ) as OperationAwareSemanticProvider;

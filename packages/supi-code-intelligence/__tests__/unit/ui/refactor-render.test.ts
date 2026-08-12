@@ -28,6 +28,7 @@ function makePlan(): RefactorPlan {
     targetFile: "/repo/src/index.ts",
     targetLine: 1,
     targetCharacter: 1,
+    authorizedMutationRoots: ["/repo"],
     edits: {
       edits: Array.from({ length: 3 }, (_, index) => ({
         file: "/repo/src/index.ts",
