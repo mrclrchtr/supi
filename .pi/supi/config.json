@@ -4,5 +4,10 @@
   },
   "context": {
     "agentToolEnabled": false
+  },
+  "skills": {
+    "modelInvocation": {
+      "implement": false
+    }
   }
 }
