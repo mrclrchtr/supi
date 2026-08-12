@@ -116,12 +116,36 @@ describe("agent review schemas", () => {
 
   it.each([
     { prepared: { planId: "plan-1" }, tasks },
+    { plan: {}, tasks },
     { planId: "plan-1", tasks },
+    { draftDecision: {}, tasks },
+    { planning: {}, tasks },
+    { preparation: {}, tasks },
+    { prepare: {}, tasks },
   ])("rejects removed Prepared Review input", (input) => {
     expect(() => parseRunReviewToolInput(input)).toThrow(
       "Review input must not use removed Prepared Review fields.",
     );
   });
+
+  it.each(["criteriaOnly", "scope"])("rejects the removed task policy field %s", (field) => {
+    const input = {
+      tasks: [{ id: "state", instructions: "Check.", mode: "state", [field]: "criteria-only" }],
+    };
+
+    expect(() => parseRunReviewToolInput(input)).toThrow(
+      "Review task Finding Scope is removed; set mode to change or state.",
+    );
+  });
+
+  it.each(["findingScope", "mode"])(
+    "rejects the removed top-level task policy field %s",
+    (field) => {
+      expect(() => parseRunReviewToolInput({ [field]: "change-only", tasks })).toThrow(
+        "Review input must not use removed Finding Scope fields.",
+      );
+    },
+  );
 
   it.each(["from", "to"] as const)(
     "reports a blank Review Target %s endpoint before target normalization",
@@ -132,6 +156,22 @@ describe("agent review schemas", () => {
       expect(() => parseRunReviewToolInput(input)).toThrow(
         `Review Target ${endpoint} must not be blank.`,
       );
+    },
+  );
+
+  it.each(["from", "to"] as const)(
+    "rejects whitespace inside Review Target %s endpoint syntax",
+    (endpoint) => {
+      for (const revision of ["HEAD ^", "HEAD\n"]) {
+        const input = {
+          target: { [endpoint]: revision, includeUncommittedChanges: false },
+          tasks,
+        };
+
+        expect(() => parseRunReviewToolInput(input)).toThrow(
+          `Review Target ${endpoint} must not contain whitespace.`,
+        );
+      }
     },
   );
 

@@ -9,8 +9,8 @@ function endpointSchema(role: "before" | "after") {
   return Type.String({
     minLength: 1,
     maxLength: 512,
-    pattern: "\\S",
-    description: `Git revision for the exact ${role} state. Branches, hashes, ~, ^, and lightweight or annotated tags are valid. It must resolve to one commit; ranges, trees, blobs, and blank values are not valid.`,
+    pattern: "^\\S+$",
+    description: `Git revision for the exact ${role} state. Branches, hashes, ~, ^, and lightweight or annotated tags are valid. It must resolve to one commit; whitespace, ranges, trees, blobs, and blank values are not valid.`,
   });
 }
 
@@ -98,12 +98,26 @@ function oldTargetError(target: unknown): Error | undefined {
     : undefined;
 }
 
+function endpointWhitespaceError(target: unknown): Error | undefined {
+  if (!isRecord(target)) return undefined;
+  for (const name of ["from", "to"] as const) {
+    const endpoint = target[name];
+    if (typeof endpoint === "string" && /\s/u.test(endpoint) && endpoint.trim()) {
+      return new Error(`Review Target ${name} must not contain whitespace.`);
+    }
+  }
+  return undefined;
+}
+
 function taskModeError(tasks: unknown): Error | undefined {
   if (!Array.isArray(tasks)) return undefined;
   for (const task of tasks) {
     if (!isRecord(task)) continue;
     if ("findingScope" in task) {
       return new Error("Review task findingScope is removed; set mode to change or state.");
+    }
+    if ("criteriaOnly" in task || "scope" in task) {
+      return new Error("Review task Finding Scope is removed; set mode to change or state.");
     }
     if (!("mode" in task)) return new Error("Review task mode is required: change or state.");
   }
@@ -113,11 +127,19 @@ function taskModeError(tasks: unknown): Error | undefined {
 function invalidInputError(input: unknown): Error {
   if (!isRecord(input)) return new Error("Invalid review execution input.");
   if ("direct" in input) return new Error("Review input must not use the removed direct wrapper.");
-  if ("prepared" in input || "planId" in input) {
+  if (
+    ["prepared", "plan", "planId", "draftDecision", "planning", "preparation", "prepare"].some(
+      (field) => field in input,
+    )
+  ) {
     return new Error("Review input must not use removed Prepared Review fields.");
+  }
+  if ("findingScope" in input || "mode" in input) {
+    return new Error("Review input must not use removed Finding Scope fields.");
   }
   return (
     blankEndpointError(input.target) ??
+    endpointWhitespaceError(input.target) ??
     oldTargetError(input.target) ??
     taskModeError(input.tasks) ??
     new Error("Invalid review execution input.")
@@ -130,6 +152,12 @@ function normalizeTarget(target: ReviewTargetSpec | undefined): ReviewTargetSpec
   const to = target.to?.trim();
   if (target.from !== undefined && !from) throw new Error("Review Target from must not be blank.");
   if (target.to !== undefined && !to) throw new Error("Review Target to must not be blank.");
+  if (target.from !== undefined && /\s/u.test(target.from)) {
+    throw new Error("Review Target from must not contain whitespace.");
+  }
+  if (target.to !== undefined && /\s/u.test(target.to)) {
+    throw new Error("Review Target to must not contain whitespace.");
+  }
   return {
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),

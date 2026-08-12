@@ -60,7 +60,7 @@ A Review Target has only these optional fields:
 - `to` — one after endpoint
 - `includeUncommittedChanges` — include the current filesystem and non-ignored untracked files; default is `true`
 
-Omit `target`, or use `{}`, to select the current filesystem. When uncommitted changes are included, `to` is not valid. When they are not included, `to` defaults to `HEAD`. Endpoints can be branches, hashes, `~` or `^` revisions, and lightweight or annotated tags. The Review Engine resolves each endpoint once to a full commit. It rejects blank endpoints, ranges, trees, and blobs.
+Omit `target`, or use `{}`, to select the current filesystem. When uncommitted changes are included, `to` is not valid. When they are not included, `to` defaults to `HEAD`. Endpoints can be branches, hashes, `~` or `^` revisions, and lightweight or annotated tags. The Review Engine resolves each endpoint once to a full commit. It rejects endpoints that contain whitespace and rejects blank endpoints, ranges, trees, and blobs.
 
 Each task must set `mode` to `change` or `state`.
 

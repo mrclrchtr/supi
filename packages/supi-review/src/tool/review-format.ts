@@ -13,10 +13,10 @@ function formatFindingCounts(counts: FindingCounts): string {
 }
 
 function formatScopeFocus(scope: ReviewScope | undefined): string {
-  const count = scope?.paths?.length ?? 0;
-  return count === 0
-    ? "repository-wide review"
-    : `path focus: ${count} ${count === 1 ? "path" : "paths"}`;
+  const paths = scope?.paths;
+  return paths?.length
+    ? `path focus\n${paths.map((path) => `- ${JSON.stringify(path)}`).join("\n")}`
+    : "repository-wide review";
 }
 
 function appendTaskStatus(

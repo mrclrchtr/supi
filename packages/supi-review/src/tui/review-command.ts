@@ -369,7 +369,7 @@ export async function runReviewCommand(
     reviewerModel,
     expectedSnapshot: snapshot,
     expectedSnapshotTarget: selectedTarget.selectedTarget,
-    ...(plannerDraft ? { planning: plannerDraft.planning } : {}),
+    ...(usePlannerDraft && plannerDraft ? { planning: plannerDraft.planning } : {}),
     provenance: usePlannerDraft ? "planner-assisted" : "caller-supplied",
     auditStore,
   });

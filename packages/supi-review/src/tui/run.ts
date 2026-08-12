@@ -40,7 +40,7 @@ function formatTaskCollapsed(result: ReviewTaskResult, theme: Theme): string {
   return `${result.taskId}: ${theme.fg("warning", label)}${theme.fg("dim", ` · ${result.mode}${warningLabel}`)}`;
 }
 
-function formatScopeFocus(scope: ReviewScope | undefined): string {
+function formatScopeCount(scope: ReviewScope | undefined): string {
   const count = scope?.paths?.length ?? 0;
   if (count === 0) return "repository-wide";
   return `path focus: ${count} ${count === 1 ? "path" : "paths"}`;
@@ -93,7 +93,7 @@ export function renderRunCall(args: unknown, theme: Theme): Text {
   const detail = [
     formatRequestedTarget(params.target),
     formatTaskModes(params.tasks),
-    formatScopeFocus(scope),
+    formatScopeCount(scope),
   ].join(" · ");
   return renderReviewToolCall(REVIEW_TOOL_SPECS.run.name, "review", theme, detail);
 }
@@ -127,7 +127,7 @@ function addPartialPreamble(
   if (details.sharedContext) {
     container.addChild(new Text(theme.fg("dim", `context: ${details.sharedContext}`), 1, 0));
   }
-  container.addChild(new Text(theme.fg("dim", `focus: ${formatScopeFocus(details.scope)}`), 1, 0));
+  container.addChild(new Text(theme.fg("dim", `focus: ${formatScopeCount(details.scope)}`), 1, 0));
 }
 
 function formatPartialTask(
@@ -223,7 +223,7 @@ function buildCollapsed(details: ReviewBatchDetails, theme: Theme): Text {
     ? `${files} file${files !== 1 ? "s" : ""} · +${additions.toLocaleString("en-US")} / -${deletions.toLocaleString("en-US")}`
     : "frozen after state";
   return new Text(
-    `${tasks}\n${theme.fg("dim", `${details.snapshot.title} · ${formatScopeFocus(details.scope)} (${targetDetail})`)}`,
+    `${tasks}\n${theme.fg("dim", `${details.snapshot.title} · ${formatScopeCount(details.scope)} (${targetDetail})`)}`,
     0,
     0,
   );
@@ -242,7 +242,7 @@ function buildExpanded(details: ReviewBatchDetails, theme: Theme): Container {
   container.addChild(
     new Text(`${theme.fg("dim", "target:")} ${theme.fg("muted", details.snapshot.title)}`, 1, 0),
   );
-  container.addChild(new Text(theme.fg("dim", `focus: ${formatScopeFocus(details.scope)}`), 1, 0));
+  container.addChild(new Text(theme.fg("dim", `focus: ${formatScopeCount(details.scope)}`), 1, 0));
   const receipt = details.workspaceReceipt;
   container.addChild(
     new Text(

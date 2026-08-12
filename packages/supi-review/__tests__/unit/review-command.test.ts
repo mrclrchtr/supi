@@ -264,6 +264,7 @@ describe("/supi-review task editing", () => {
         review: { tasks: [{ id: "general", instructions: "Caller task.", mode: "state" }] },
       }),
     );
+    expect(mocks.runReview.mock.calls[0]?.[0]).not.toHaveProperty("planning");
   });
 
   it.each([

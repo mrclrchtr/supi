@@ -13,11 +13,34 @@ import {
 } from "./change-metadata.ts";
 import { DIFF_FLAGS, diffUntrackedFile, parseNullList } from "./diff.ts";
 
+function validateTargetShape(target: ReviewTargetSpec): void {
+  if (!target || typeof target !== "object" || Array.isArray(target)) {
+    throw new Error("Review Target must be an object.");
+  }
+  const allowedFields = new Set(["from", "to", "includeUncommittedChanges"]);
+  for (const field of Object.keys(target)) {
+    if (!allowedFields.has(field))
+      throw new Error(`Review Target field ${field} is not supported.`);
+  }
+  for (const field of ["from", "to"] as const) {
+    if (target[field] !== undefined && typeof target[field] !== "string") {
+      throw new Error(`Review Target ${field} must be a Git revision string.`);
+    }
+  }
+  if (
+    target.includeUncommittedChanges !== undefined &&
+    typeof target.includeUncommittedChanges !== "boolean"
+  ) {
+    throw new Error("Review Target includeUncommittedChanges must be a boolean.");
+  }
+}
+
 function normalizedEndpoint(value: string | undefined, name: "from" | "to"): string | undefined {
   if (value === undefined) return undefined;
   const endpoint = value.trim();
   if (!endpoint) throw new Error(`Review Target ${name} must not be blank.`);
-  if (endpoint.includes("..") || /\^[@!]|\^-/.test(endpoint)) {
+  if (/\s/u.test(value)) throw new Error(`Review Target ${name} must not contain whitespace.`);
+  if (endpoint.includes("..") || endpoint.startsWith("^") || /\^[@!-]/u.test(endpoint)) {
     throw new Error(`Review Target ${name} must name one commit, not a commit range.`);
   }
   return endpoint;
@@ -54,7 +77,8 @@ async function resolveEndpoint(
       { signal },
     )
   ).trim();
-  if (commit) return commit.toLowerCase();
+  // The ^{commit} peel verifies the object type; this check verifies a canonical full object id.
+  if (/^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/u.test(commit)) return commit.toLowerCase();
 
   const type = await describeInvalidEndpoint(cwd, endpoint, signal);
   if (type === "tree" || type === "blob") {
@@ -192,6 +216,7 @@ export async function resolveReviewSnapshot(
   requested: ReviewTargetSpec = {},
   signal?: AbortSignal,
 ): Promise<ReviewSnapshot> {
+  validateTargetShape(requested);
   const repositoryRoot = await resolveGitRepositoryRoot(cwd, signal);
   const from = normalizedEndpoint(requested.from, "from");
   const to = normalizedEndpoint(requested.to, "to");

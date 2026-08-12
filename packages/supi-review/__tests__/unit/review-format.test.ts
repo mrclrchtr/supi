@@ -71,8 +71,12 @@ describe("formatReviewBatch", () => {
     expect(output).toContain("Verdict: ISSUES");
     expect(output).not.toContain("Finding Scope");
 
-    const scopedOutput = formatReviewBatch({ ...details, scope: { paths: ["src/a.ts"] } });
-    expect(scopedOutput).toContain("Focus: path focus: 1 path");
+    const scopedOutput = formatReviewBatch({
+      ...details,
+      scope: { paths: ["src/a.ts", "docs/review guide.md"] },
+    });
+    expect(scopedOutput).toContain('Focus: path focus\n- "src/a.ts"\n- "docs/review guide.md"');
+    expect(scopedOutput).not.toContain('"src/a.ts", "docs/review guide.md"');
   });
 
   it("uses an after-state title for an all-state filesystem Review", () => {

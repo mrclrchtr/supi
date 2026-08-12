@@ -143,6 +143,73 @@ describe("runReview exact Review Target workflow", () => {
       expect(outcome.kind).toBe("no-target");
       if (outcome.kind === "no-target") expect(outcome.reason).toMatch(/blank|range|commit/i);
     }
+    for (const [from, reason] of [
+      ["^HEAD", /range/i],
+      ["HEAD ^", /whitespace/i],
+    ] as const) {
+      const outcome = await review(cwd, { from, to: "HEAD", includeUncommittedChanges: false }, [
+        changeTask,
+      ]);
+      expect(outcome).toMatchObject({ kind: "no-target", reason: expect.stringMatching(reason) });
+    }
+    expect(mocks.runReviewer).not.toHaveBeenCalled();
+  });
+
+  it("rejects removed runtime input fields before workspace creation", async () => {
+    const before = git(cwd, "worktree", "list", "--porcelain");
+    const inputs = [
+      {
+        target: { kind: "current-state" },
+        review: { tasks: [stateTask] },
+        reason: /Review Target field kind is not supported/i,
+      },
+      {
+        target: {},
+        review: { tasks: [stateTask], prepared: {} },
+        reason: /Review input field prepared is not supported/i,
+      },
+      {
+        target: {},
+        review: {
+          tasks: [{ ...stateTask, findingScope: "criteria-only" }],
+        },
+        reason: /Review Task field findingScope is not supported/i,
+      },
+      {
+        target: {},
+        review: { tasks: [{}] },
+        reason: /Review Task id must be a string/i,
+      },
+      {
+        target: {},
+        review: { tasks: [{ ...stateTask, instructions: 42 }] },
+        reason: /Review Task instructions must be a string/i,
+      },
+      {
+        target: {},
+        review: { sharedContext: 42, tasks: [stateTask] },
+        reason: /Shared review context must be a string/i,
+      },
+      {
+        target: {},
+        review: { tasks: [{ ...stateTask, criteriaSources: {} }] },
+        reason: /criteria sources must be an array/i,
+      },
+    ];
+
+    for (const input of inputs) {
+      const outcome = await runReview({
+        cwd,
+        target: input.target as never,
+        review: input.review as never,
+        reviewerModel: model,
+      });
+      expect(outcome).toMatchObject({
+        kind: "no-target",
+        reason: expect.stringMatching(input.reason),
+      });
+    }
+    expect(git(cwd, "worktree", "list", "--porcelain")).toBe(before);
     expect(mocks.runReviewer).not.toHaveBeenCalled();
   });
 
