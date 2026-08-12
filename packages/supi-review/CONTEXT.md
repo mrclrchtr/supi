@@ -106,6 +106,18 @@ _Avoid_: caller-checkout evidence, tool-dependent evidence authority
 The Review Engine-derived result for one completed Review Task: `issues` when any finding blocks acceptance; otherwise `incomplete` when Criteria Coverage is incomplete; otherwise `pass_with_findings` for advisory findings or `pass` for none. It includes structured finding counts by blocking status and impact.
 _Avoid_: reviewer verdict, run-level verdict, proof of correctness
 
+**Recoverable Submission Failure**:
+A failure after a Reviewer Session was accepted and retained usable history but did not produce a valid structured submission. Session creation, preflight rejection, caller cancellation, and timeout are terminal outcomes outside this category.
+_Avoid_: partial review, failed verdict, any child failure
+
+**Submission Recovery Turn**:
+One same-session, history-only attempt to submit or decline a review after a Recoverable Submission Failure. It cannot inspect more Target Evidence and does not change the original reviewer or Reviewer Packet identity.
+_Avoid_: review retry, new reviewer, partial-result extraction
+
+**Replay Outline**:
+A bounded message index for one Local Reviewer Replay. It exposes navigation metadata without message text, tool arguments, or tool results; selected-message and raw views remain explicit replay access.
+_Avoid_: replay summary, failure digest, review result
+
 **Post-Review Disposition**:
 A direct user instruction to ask, verify, verify and fix, fix, or only report the findings from the current review. It overrides the Post-Review Policy; generic authorization to edit code is not a disposition.
 _Avoid_: Review Task, Review Mode, Agent plan

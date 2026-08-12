@@ -66,6 +66,10 @@ _Avoid_: logger, debug source, registry owner
 Monotonic duration evidence attached to one Debug Event. It can contain a total and named sequential phases for diagnostic comparison.
 _Avoid_: telemetry, benchmark result, profiler trace
 
+**Debug Operation ID**:
+A session-local opaque identity that groups Debug Events directly owned by one public Tool call. Ambient work and operations without an explicitly propagated request context have no Debug Operation ID.
+_Avoid_: trace id, tool-call id, time-window correlation
+
 **Debug Surface**:
 The SuPi extension package role that owns debug-event configuration, user/model inspection surfaces, and registry reset policy.
 _Avoid_: debug producer, generic observability package

@@ -1,0 +1,5 @@
+# Recover structured submission in the Reviewer Session
+
+A Reviewer Session can finish substantial inspection but fail before `submit_review`, so the Review Engine will recover structured delivery from the retained session history instead of extracting unfinished prose or starting a new review. After a Recoverable Submission Failure, one low-thinking Submission Recovery Turn runs on the reviewer model; if it does not submit or decline, one configured `review.recoveryModel` can continue in the same session. Recovery exposes only `submit_review` and `decline_review_recovery`. A valid submission completes normally, while a bounded sanitized decline or exhausted chain keeps the original failure and produces no Task Verdict.
+
+The original reviewer remains the Review Task model and Reviewer Packet identity because it performed the inspection. Recovery provenance records each delivery model, outcome, and usage. Audit-enabled tasks keep one continuous Local Reviewer Replay across the original run, model switches, and recovery turns.

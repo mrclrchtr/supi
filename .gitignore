@@ -2,6 +2,7 @@ node_modules/
 .idea
 .DS_Store
 .worktrees
+.ignored/
 *.tgz
 
 # TypeScript project references build artifacts
