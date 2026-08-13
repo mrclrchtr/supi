@@ -8,7 +8,11 @@ export {
 
 // ── Execution context and result ────────────────────────────────────────
 
-export type { CodeIntelResult, CodeIntelToolExecCtx } from "./execution.ts";
+export type {
+  CodeIntelResult,
+  CodeIntelResultDetails,
+  CodeIntelToolExecCtx,
+} from "./execution.ts";
 
 // ── Detail types ────────────────────────────────────────────────────────
 
@@ -23,4 +27,7 @@ export type {
   OrientationSectionDetails,
   ResolveDetails,
   SearchDetails,
+  ToolDisplaySection,
+  ToolOutputTruncationDetails,
+  ToolResultStatus,
 } from "../tool/result/types.ts";

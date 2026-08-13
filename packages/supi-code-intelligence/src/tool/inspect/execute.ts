@@ -23,12 +23,18 @@ export async function executeInspectTool(
     return inspectErrorResult(`**Error:** ${outcome.message}`, {
       focusTarget: "invalid input",
       nextQueries: ["Provide an existing file and exact 1-based point"],
+      message: outcome.message,
     });
   }
 
   const assembly = assembleInspectResult(outcome.data, outcome.nextQueries);
   return {
     content: renderInspectResult(assembly),
-    details: { type: "inspect", data: assembly.details },
+    details: {
+      type: "inspect",
+      data: assembly.details,
+      status: "completed",
+      displaySections: assembly.displaySections,
+    },
   };
 }

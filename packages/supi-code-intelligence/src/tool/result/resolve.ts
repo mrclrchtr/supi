@@ -10,7 +10,8 @@ import {
   type ResultProvenance,
   type ToolResultAssembly,
 } from "./assembly.ts";
-import type { ResolveDetails } from "./types.ts";
+import { createToolDisplaySection } from "./display.ts";
+import type { ResolveDetails, ToolDisplaySection } from "./types.ts";
 
 /** Presentation-neutral assembled code_resolve result. */
 export interface ResolveResultAssembly {
@@ -18,6 +19,7 @@ export interface ResolveResultAssembly {
   readonly cwd: string;
   readonly assembled: ToolResultAssembly<TargetWorkflowOutcome>;
   readonly details: ResolveDetails;
+  readonly displaySections: readonly ToolDisplaySection[];
 }
 
 interface ResolveProjection {
@@ -56,16 +58,19 @@ export function assembleResolveResult(
     provenance,
   });
 
+  const details = {
+    ...projection.details,
+    omittedCount: assembled.totals.omittedCount,
+    evidenceLists: [...assembled.evidenceLists],
+    nextQueries: assembledNextQueries(assembled),
+  };
+
   return Object.freeze({
     outcome,
     cwd,
     assembled,
-    details: {
-      ...projection.details,
-      omittedCount: assembled.totals.omittedCount,
-      evidenceLists: [...assembled.evidenceLists],
-      nextQueries: assembledNextQueries(assembled),
-    },
+    details,
+    displaySections: resolveDisplaySections(details),
   });
 }
 
@@ -231,6 +236,38 @@ function toTargetDetails(target: Readonly<TargetStoreEntry>, cwd: string) {
     provenance: [...target.provenance],
     resolution: target.resolution,
   };
+}
+
+function resolveDisplaySections(details: ResolveDetails): ToolDisplaySection[] {
+  if (details.targets.length > 0) {
+    return [
+      createToolDisplaySection({
+        key: "resolve.targets",
+        title: "Targets",
+        items: details.targets,
+        totalCount: details.targetCount,
+        omittedCount: details.omittedCount,
+        format: (target) =>
+          `${target.name ?? "anonymous"} (${target.kind ?? "unknown"}) — ${target.file}:${target.displayLine}:${target.displayCharacter} [${target.targetId}]`,
+      }),
+    ];
+  }
+
+  if (details.candidates && details.candidates.length > 0) {
+    return [
+      createToolDisplaySection({
+        key: "resolve.candidates",
+        title: "Candidates",
+        items: details.candidates,
+        totalCount: details.targetCount,
+        omittedCount: details.omittedCount,
+        format: (candidate) =>
+          `${candidate.rank}. ${candidate.name} (${candidate.kind ?? "unknown"}) — ${candidate.file}:${candidate.line}:${candidate.character} [${candidate.targetId}]`,
+      }),
+    ];
+  }
+
+  return [];
 }
 
 function resolveProvenance(outcome: TargetWorkflowOutcome): ResultProvenance[] {

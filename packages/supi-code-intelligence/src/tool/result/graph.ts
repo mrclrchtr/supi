@@ -6,6 +6,7 @@ import type {
   ImplementationEntry,
   ReferenceEntry,
 } from "../../analysis/relations/types.ts";
+import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { GraphSection } from "../../session/graph-types.ts";
 import {
   assembledNextQueries,
@@ -13,7 +14,8 @@ import {
   type ResultProvenance,
   type ToolResultAssembly,
 } from "./assembly.ts";
-import type { SearchDetails } from "./types.ts";
+import { createToolDisplaySection } from "./display.ts";
+import type { SearchDetails, ToolDisplaySection } from "./types.ts";
 
 export type { GraphRelationKind, GraphSection } from "../../session/graph-types.ts";
 
@@ -39,6 +41,7 @@ export interface GraphResultAssembly {
   cwd: string;
   assembled: ToolResultAssembly<{ readonly sections: readonly AssembledGraphSection[] }>;
   details: SearchDetails;
+  displaySections: readonly ToolDisplaySection[];
 }
 
 /** Assemble graph evidence once before either presentation adapter consumes it. */
@@ -77,12 +80,15 @@ export function assembleGraphResult(input: {
     provenance,
   });
 
+  const displaySections = sections.map((section) => graphDisplaySection(section, input.cwd));
+
   return {
     displayName: input.displayName,
     sections,
     resolvedDisplayFile: input.resolvedDisplayFile,
     cwd: input.cwd,
     assembled,
+    displaySections,
     details: {
       confidence,
       scope: null,
@@ -92,6 +98,43 @@ export function assembleGraphResult(input: {
       nextQueries: assembledNextQueries(assembled),
     },
   };
+}
+
+function graphDisplaySection(section: AssembledGraphSection, cwd: string): ToolDisplaySection {
+  if (section.kind === "unavailable") {
+    return createToolDisplaySection({
+      key: `graph.${section.rel}`,
+      title: section.rel,
+      items: [section.message],
+      format: (message) => `Unavailable — ${message}`,
+      totalCount: 1,
+    });
+  }
+
+  return createToolDisplaySection({
+    key: `graph.${section.rel}`,
+    title: section.rel,
+    items: section.evidence.items as readonly unknown[],
+    totalCount: section.evidence.metadata.totalCount,
+    omittedCount: section.evidence.metadata.omittedCount,
+    partialReason: section.evidence.metadata.partialReason,
+    format: (item) => formatGraphDisplayItem(section.rel, item, cwd),
+  });
+}
+
+function formatGraphDisplayItem(
+  relation: "references" | "callees" | "implements",
+  item: unknown,
+  cwd: string,
+): string {
+  if (relation === "callees") {
+    const call = item as { name: string; file: string; line: number };
+    return `${call.name} — ${toDisplayPath(cwd, call.file)}:L${call.line}`;
+  }
+
+  const location = item as { name: string | null; file: string; line: number; character: number };
+  const name = location.name ? `${location.name} — ` : "";
+  return `${name}${toDisplayPath(cwd, location.file)}:L${location.line}:${location.character}`;
 }
 
 function assembleGraphSection(section: GraphSection, maxResults: number): AssembledGraphSection {

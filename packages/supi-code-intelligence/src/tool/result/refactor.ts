@@ -3,7 +3,8 @@ import { createEvidenceList, type EvidenceList } from "../../analysis/evidence.t
 import type { ApplyResult } from "../../analysis/refactor/apply.ts";
 import type { RefactorPlan } from "../../session/refactor-plans.ts";
 import { assembledNextQueries, assembleToolResult, type ToolResultAssembly } from "./assembly.ts";
-import type { SearchDetails } from "./types.ts";
+import { createToolDisplaySection } from "./display.ts";
+import type { SearchDetails, ToolDisplaySection } from "./types.ts";
 
 export interface RefactorPlanAssemblyData {
   readonly plan: Readonly<RefactorPlan>;
@@ -14,6 +15,7 @@ export interface RefactorPlanAssemblyData {
 export interface RefactorPlanResultAssembly {
   readonly assembled: ToolResultAssembly<RefactorPlanAssemblyData>;
   readonly details: SearchDetails;
+  readonly displaySections: readonly ToolDisplaySection[];
 }
 
 export interface RefactorApplyAssemblyData {
@@ -24,6 +26,13 @@ export interface RefactorApplyAssemblyData {
 export interface RefactorApplyResultAssembly {
   readonly assembled: ToolResultAssembly<RefactorApplyAssemblyData>;
   readonly details: SearchDetails;
+  readonly displaySections: readonly ToolDisplaySection[];
+}
+
+function formatEdit(edit: FileEdit): string {
+  const range = edit.range;
+  const replacement = edit.newText.replace(/\n/g, " ↵ ");
+  return `${edit.file} L${range.start.line + 1}:${range.start.character + 1} → L${range.end.line + 1}:${range.end.character + 1}: ${replacement}`;
 }
 
 /** Assemble a bounded refactor plan and all facts needed by its renderers. */
@@ -59,6 +68,17 @@ export function assembleRefactorPlanDetails(
 
   return {
     assembled,
+    displaySections: [
+      createToolDisplaySection({
+        key: "refactor.edits",
+        title: "Proposed edits",
+        items: edits.items,
+        totalCount: edits.metadata.totalCount,
+        omittedCount: edits.metadata.omittedCount,
+        partialReason: edits.metadata.partialReason,
+        format: formatEdit,
+      }),
+    ],
     details: {
       confidence: assembled.confidence,
       scope: null,
@@ -98,8 +118,22 @@ export function assembleRefactorApplyDetails(
     provenance,
   });
 
+  const changedFiles = [...new Set(plan.edits.edits.map((edit) => edit.file))];
+
   return {
     assembled,
+    displaySections:
+      applyResult.kind === "applied"
+        ? [
+            createToolDisplaySection({
+              key: "refactor.changedFiles",
+              title: "Changed files",
+              items: changedFiles,
+              totalCount: changedFiles.length,
+              format: (file) => file,
+            }),
+          ]
+        : [],
     details: {
       confidence: assembled.confidence,
       scope: null,
@@ -107,9 +141,7 @@ export function assembleRefactorApplyDetails(
       omittedCount: assembled.totals.omittedCount,
       evidenceLists: [...assembled.evidenceLists],
       nextQueries: assembledNextQueries(assembled),
-      ...(applyResult.kind === "applied"
-        ? { changedFiles: [...new Set(plan.edits.edits.map((edit) => edit.file))] }
-        : {}),
+      ...(applyResult.kind === "applied" ? { changedFiles } : {}),
     },
   };
 }

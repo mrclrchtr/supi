@@ -29,6 +29,7 @@ export async function executeRefactorPlanTool(
   if (outcome.kind === "invalid-input") {
     return searchErrorResult(`**Error:** ${outcome.message}`, {
       nextQueries: ["Fix the target or operation and retry"],
+      message: outcome.message,
     });
   }
   if (outcome.kind === "ambiguous") {
@@ -40,6 +41,7 @@ export async function executeRefactorPlanTool(
       .join("\n");
     return searchErrorResult(`**Refactor ambiguous:**\n${candidates}`, {
       nextQueries: ["Use a precise target handle or anchor"],
+      message: "The refactor target is ambiguous.",
     });
   }
 
@@ -49,6 +51,8 @@ export async function executeRefactorPlanTool(
     details: {
       type: "search",
       data: assembly.details,
+      status: "completed",
+      displaySections: assembly.displaySections,
     },
   };
 }

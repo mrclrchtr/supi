@@ -6,7 +6,8 @@ import {
   type ResultSection,
   type ToolResultAssembly,
 } from "./assembly.ts";
-import type { HealthDetails, HealthSectionDetails } from "./types.ts";
+import { createToolDisplaySection, truncateDisplayText } from "./display.ts";
+import type { HealthDetails, HealthSectionDetails, ToolDisplaySection } from "./types.ts";
 
 export type {
   HealthData,
@@ -26,6 +27,7 @@ export interface HealthResultAssembly {
   data: HealthData;
   assembled: ToolResultAssembly<HealthData>;
   details: HealthDetails;
+  displaySections: readonly ToolDisplaySection[];
 }
 
 const SECTION_TITLES: Record<HealthSection, string> = {
@@ -53,9 +55,12 @@ export function assembleHealthResult(data: HealthData): HealthResultAssembly {
     provenance,
   });
 
+  const displaySections = buildHealthDisplaySections(data);
+
   return {
     data,
     assembled,
+    displaySections,
     details: {
       includedSections: [...data.includedSections],
       sections: sectionDetails,
@@ -76,6 +81,53 @@ export function assembleHealthResult(data: HealthData): HealthResultAssembly {
       evidenceLists: [...assembled.evidenceLists],
     },
   };
+}
+
+function buildHealthDisplaySections(data: HealthData): ToolDisplaySection[] {
+  const sections: ToolDisplaySection[] = [];
+
+  if (data.includedSections.includes("diagnostics") && data.diagnostics.entries.length > 0) {
+    sections.push(
+      createToolDisplaySection({
+        key: "health.diagnostics",
+        title: "Diagnostics",
+        items: data.diagnostics.entries,
+        totalCount: data.diagnostics.kind === "completed" ? data.diagnostics.entries.length : null,
+        omittedCount: data.diagnostics.kind === "completed" ? 0 : null,
+        partialReason: diagnosticPartialReason(data),
+        format: formatDiagnosticEntry,
+      }),
+    );
+  }
+
+  if (data.includedSections.includes("servers") && data.servers.length > 0) {
+    sections.push(
+      createToolDisplaySection({
+        key: "health.servers",
+        title: "Servers",
+        items: data.servers,
+        totalCount: data.servers.length,
+        format: (server) => `${server.name} (${server.fileTypes.join(", ")}) — ${server.status}`,
+      }),
+    );
+  }
+
+  return sections;
+}
+
+function diagnosticPartialReason(data: HealthData): string | null {
+  return data.diagnostics.kind === "partial" || data.diagnostics.kind === "unavailable"
+    ? data.diagnostics.reason
+    : null;
+}
+
+function formatDiagnosticEntry(entry: HealthData["diagnostics"]["entries"][number]): string {
+  const summary = `${entry.file} — ${entry.errors} error${entry.errors === 1 ? "" : "s"}, ${entry.warnings} warning${entry.warnings === 1 ? "" : "s"}`;
+  const messages = entry.messages?.map(
+    (message) =>
+      `  ${message.severity} L${message.line}${message.source ? ` [${message.source}]` : ""}: ${truncateDisplayText(message.message, 200)}`,
+  );
+  return messages && messages.length > 0 ? [summary, ...messages].join("\n") : summary;
 }
 
 interface HealthSectionFacts {

@@ -57,6 +57,7 @@ export type { TargetSymbolKind } from "./session/target-input.ts";
 // Code-intelligence-specific result types.
 export type {
   CodeIntelResult,
+  CodeIntelResultDetails,
   ContextDetails,
   DisambiguationCandidate,
   HealthDetails,
@@ -65,4 +66,7 @@ export type {
   OrientationSectionDetails,
   ResolveDetails,
   SearchDetails,
+  ToolDisplaySection,
+  ToolOutputTruncationDetails,
+  ToolResultStatus,
 } from "./types/index.ts";

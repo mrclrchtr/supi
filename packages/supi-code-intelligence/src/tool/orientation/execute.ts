@@ -7,7 +7,11 @@ import type {
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
 import { toWorkflowControl } from "../infra/workflow-control.ts";
 import { contextErrorResult } from "../result/errors.ts";
-import { assembleOrientationDetails, assembleOrientationResult } from "../result/orientation.ts";
+import {
+  assembleOrientationDetails,
+  assembleOrientationResult,
+  orientationCandidateDisplaySections,
+} from "../result/orientation.ts";
 import { renderOrientationResult } from "./markdown.ts";
 
 export interface CodeOrientationToolParams {
@@ -27,6 +31,7 @@ export async function executeOrientationTool(
   if (outcome.kind === "invalid-input") {
     return contextErrorResult(`**Error:** ${outcome.message}`, {
       nextQueries: ["Choose an existing path, module, or precise target"],
+      message: outcome.message,
     });
   }
   if (outcome.kind === "disambiguation" || outcome.kind === "kind-mismatch") {
@@ -52,11 +57,24 @@ export async function executeOrientationTool(
       candidates,
       nextQueries,
     });
-    return { content: lines.join("\n"), details: { type: "context", data: details } };
+    return {
+      content: lines.join("\n"),
+      details: {
+        type: "context",
+        data: details,
+        status: "completed",
+        displaySections: orientationCandidateDisplaySections(candidates, outcome.omittedCount),
+      },
+    };
   }
   const assembly = assembleOrientationResult(outcome.data);
   return {
     content: renderOrientationResult(assembly),
-    details: { type: "context", data: assembly.details },
+    details: {
+      type: "context",
+      data: assembly.details,
+      status: "completed",
+      displaySections: assembly.displaySections,
+    },
   };
 }

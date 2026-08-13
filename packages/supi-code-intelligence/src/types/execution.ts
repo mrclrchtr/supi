@@ -6,6 +6,9 @@ import type {
   InspectDetails,
   ResolveDetails,
   SearchDetails,
+  ToolDisplaySection,
+  ToolOutputTruncationDetails,
+  ToolResultStatus,
 } from "../tool/result/types.ts";
 
 /**
@@ -41,13 +44,21 @@ export interface CodeIntelToolExecCtx {
   session: WorkspaceCodeIntelligenceSession;
 }
 
+/** Shared metadata attached to one persisted Code Intelligence result. */
+export interface CodeIntelResultDetails {
+  status?: ToolResultStatus;
+  message?: string;
+  displaySections?: readonly ToolDisplaySection[];
+  truncation?: ToolOutputTruncationDetails;
+}
+
 /** Tool result shape returned by executeAction. */
 export interface CodeIntelResult {
   content: string;
   details?:
-    | { type: "context"; data: ContextDetails }
-    | { type: "inspect"; data: InspectDetails }
-    | { type: "search"; data: SearchDetails }
-    | { type: "resolve"; data: ResolveDetails }
-    | { type: "health"; data: HealthDetails };
+    | (CodeIntelResultDetails & { type: "context"; data: ContextDetails })
+    | (CodeIntelResultDetails & { type: "inspect"; data: InspectDetails })
+    | (CodeIntelResultDetails & { type: "search"; data: SearchDetails })
+    | (CodeIntelResultDetails & { type: "resolve"; data: ResolveDetails })
+    | (CodeIntelResultDetails & { type: "health"; data: HealthDetails });
 }

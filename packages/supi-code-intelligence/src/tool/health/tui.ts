@@ -6,11 +6,18 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import {
   type EvidenceEntry,
+  formatCallValue,
   formatEvidenceEntry,
   type ResultOptios,
+  renderDomainError,
+  renderDomainResult,
   renderEvidenceLines,
+  renderExecutionError,
   renderMarkdownDetail,
   renderPartial,
+  renderToolDisplaySections,
+  renderTruncationDisclosure,
+  type ToolRendererContext,
   type ToolResult,
 } from "../../ui/tui/common.ts";
 import type { CodeHealthToolParams } from "./execute.ts";
@@ -18,21 +25,24 @@ import { formatSemanticHealthState, readSemanticHealthState } from "./semantic-s
 
 /** ── renderCall ────────────────────────────────────────────────── */
 
-export function renderHealthCall(args: unknown, theme: Theme, _context: unknown): Text {
-  const params = (args ?? {}) as CodeHealthToolParams;
+export function renderHealthCall(
+  args: unknown,
+  theme: Theme,
+  _context: ToolRendererContext | undefined,
+): Text {
+  const params = (args ?? {}) as Partial<CodeHealthToolParams>;
   const sections =
     params.include === undefined
       ? "diag, servers"
-      : params.include.length > 0
-        ? params.include.join(", ")
+      : Array.isArray(params.include) && params.include.length > 0
+        ? params.include.map((section) => formatCallValue(section, 20) ?? "?").join(", ")
         : "none";
 
   let content = theme.fg("toolTitle", "code_health");
   content += ` ${theme.fg("accent", sections)}`;
 
-  if (params.scope) {
-    content += ` ${theme.fg("dim", params.scope)}`;
-  }
+  const scope = formatCallValue(params.scope);
+  if (scope) content += ` ${theme.fg("dim", scope)}`;
 
   return new Text(content, 0, 0);
 }
@@ -43,27 +53,29 @@ export function renderHealthResult(
   result: ToolResult,
   options: ResultOptios,
   theme: Theme,
-  _context: unknown,
+  context: ToolRendererContext | undefined,
 ): Container | Text {
-  if (options.isPartial) {
-    return renderPartial("Gathering workspace health…", theme);
+  if (options.isPartial) return renderPartial("Gathering workspace health…", theme);
+
+  const data =
+    result.details?.type === "health" ? (result.details.data as Record<string, unknown>) : null;
+  const executionError = renderExecutionError(context, "code_health failed", theme);
+  if (executionError) return executionError;
+  const domainError = renderDomainError(result, theme);
+  if (domainError) return renderDomainResult(result, options, theme, domainError);
+
+  if (!options.expanded) {
+    const compact = buildCompactSummary(data, theme);
+    const truncation = renderTruncationDisclosure(result, theme);
+    if (!truncation) return compact;
+    const compactContainer = new Container();
+    compactContainer.addChild(compact);
+    compactContainer.addChild(new Spacer(1));
+    compactContainer.addChild(truncation);
+    return compactContainer;
   }
 
   const container = new Container();
-  const data =
-    result.details?.type === "health" ? (result.details.data as Record<string, unknown>) : null;
-
-  if (result.isError) {
-    container.addChild(new Text(theme.fg("error", "code_health failed"), 0, 0));
-    return container;
-  }
-
-  if (!options.expanded) {
-    container.addChild(buildCompactSummary(data, theme));
-    return container;
-  }
-
-  // Expanded view
   container.addChild(buildStatusBar(data, theme));
   const capabilityWarnings = readCapabilityWarnings(data);
   if (capabilityWarnings.length > 0) {
@@ -72,8 +84,7 @@ export function renderHealthResult(
   }
   container.addChild(new Spacer(1));
   container.addChild(buildDiagnosticSummary(data, theme));
-  const diagnosticEntries = buildDiagnosticEntries(data, theme);
-  if (diagnosticEntries) container.addChild(diagnosticEntries);
+  renderToolDisplaySections(container, result.details?.displaySections, theme);
   container.addChild(buildHealthSectionSummary(data, theme));
 
   const lists = data?.evidenceLists as EvidenceEntry[] | undefined;
@@ -82,6 +93,11 @@ export function renderHealthResult(
     renderEvidenceLines(container, lists, theme);
   }
 
+  const truncation = renderTruncationDisclosure(result, theme);
+  if (truncation) {
+    container.addChild(new Spacer(1));
+    container.addChild(truncation);
+  }
   renderMarkdownDetail(container, result, theme);
 
   return container;
@@ -287,36 +303,6 @@ function buildDiagnosticSummary(data: Record<string, unknown> | null, theme: The
     0,
     0,
   );
-}
-
-/** Render per-file diagnostic messages in expanded detailed mode. */
-function buildDiagnosticEntries(data: Record<string, unknown> | null, theme: Theme): Text | null {
-  const observation = readRecord(data?.diagnosticObservation);
-  const entries = observation?.entries;
-  if (!Array.isArray(entries) || entries.length === 0) return null;
-
-  const lines: string[] = [];
-  for (const raw of entries) {
-    const entry = readRecord(raw);
-    if (!entry || !Array.isArray(entry.messages) || entry.messages.length === 0) continue;
-    lines.push(theme.fg("dim", `  ${typeof entry.file === "string" ? entry.file : ""}`));
-    for (const rawMsg of entry.messages) {
-      const formatted = formatDiagnosticMessage(readRecord(rawMsg), theme);
-      if (formatted) lines.push(formatted);
-    }
-  }
-
-  return lines.length > 0 ? new Text(lines.join("\n"), 0, 0) : null;
-}
-
-function formatDiagnosticMessage(msg: Record<string, unknown> | null, theme: Theme): string | null {
-  if (!msg || typeof msg.message !== "string") return null;
-  const line = typeof msg.line === "number" ? `L${msg.line} ` : "";
-  const isError = msg.severity === "error";
-  const color = isError ? "error" : "warning";
-  const icon = isError ? "✖" : "⚠";
-  const source = typeof msg.source === "string" ? ` [${msg.source}]` : "";
-  return `    ${theme.fg(color, `${icon} ${line}${msg.severity}${source}`)}: ${msg.message}`;
 }
 
 function readHealthSections(data: Record<string, unknown> | null): HealthSectionSummary[] {

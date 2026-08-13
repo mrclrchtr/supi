@@ -21,12 +21,17 @@ export async function executeHealthTool(
   const outcome = await ctx.session.health(params as HealthWorkflowInput, toWorkflowControl(ctx));
   if (outcome.kind === "unavailable") throw new Error(outcome.reason);
   if (outcome.kind === "invalid-input") {
-    return healthErrorResult(`**Error:** ${outcome.message}`, "invalid input");
+    return healthErrorResult(`**Error:** ${outcome.message}`, outcome.message);
   }
 
   const assembly = assembleHealthResult(outcome.data);
   return {
     content: renderHealthResult(assembly, ctx.cwd),
-    details: { type: "health", data: assembly.details },
+    details: {
+      type: "health",
+      data: assembly.details,
+      status: "completed",
+      displaySections: assembly.displaySections,
+    },
   };
 }

@@ -3,6 +3,7 @@ import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import type { ReadNextItem } from "../../analysis/read-next.ts";
 import type {
   OrientationCandidate,
+  OrientationItem,
   OrientationResultData,
   OrientationSectionData,
 } from "../../session/orientation-types.ts";
@@ -14,7 +15,8 @@ import {
   type ResultSection,
   type ToolResultAssembly,
 } from "./assembly.ts";
-import type { ContextDetails, OrientationSectionDetails } from "./types.ts";
+import { createToolDisplaySection } from "./display.ts";
+import type { ContextDetails, OrientationSectionDetails, ToolDisplaySection } from "./types.ts";
 
 export interface OrientationDetailsInput {
   readonly confidence: ConfidenceMode;
@@ -35,6 +37,25 @@ export interface OrientationDetailsInput {
 export interface OrientationResultAssembly {
   readonly assembled: ToolResultAssembly<OrientationResultData>;
   readonly details: ContextDetails;
+  readonly displaySections: readonly ToolDisplaySection[];
+}
+
+/** Build structured candidate rows for an unresolved Orientation target. */
+export function orientationCandidateDisplaySections(
+  candidates: readonly OrientationCandidate[],
+  omittedCount = 0,
+): readonly ToolDisplaySection[] {
+  return [
+    createToolDisplaySection({
+      key: "orientation.candidates",
+      title: "Candidates",
+      items: candidates,
+      totalCount: candidates.length + omittedCount,
+      omittedCount,
+      format: (candidate) =>
+        `${candidate.rank}. ${candidate.name} (${candidate.kind ?? "unknown"}) — ${candidate.file}:${candidate.line}:${candidate.character} [${candidate.targetId}]`,
+    }),
+  ];
 }
 
 /** Assemble Orientation facts and shared result policy before rendering. */
@@ -50,21 +71,24 @@ export function assembleOrientationResult(data: OrientationResultData): Orientat
     confidence: data.confidence,
     provenance: uniqueProvenance(data.sections),
   });
+  const details = assembleOrientationDetails({
+    confidence: assembled.confidence,
+    focusTarget: assembled.data.focusTarget,
+    requestedSections: assembled.data.requestedSections,
+    renderedSections: assembled.data.renderedSections,
+    omittedCount: assembled.totals.omittedCount,
+    evidenceLists: assembled.evidenceLists,
+    sections: assembled.data.sections,
+    nextQueries: assembledNextQueries(assembled),
+    readNext: assembledReadNext(assembled),
+    target: assembled.data.target,
+    instructions: assembled.data.instructions,
+  });
+
   return {
     assembled,
-    details: assembleOrientationDetails({
-      confidence: assembled.confidence,
-      focusTarget: assembled.data.focusTarget,
-      requestedSections: assembled.data.requestedSections,
-      renderedSections: assembled.data.renderedSections,
-      omittedCount: assembled.totals.omittedCount,
-      evidenceLists: assembled.evidenceLists,
-      sections: assembled.data.sections,
-      nextQueries: assembledNextQueries(assembled),
-      readNext: assembledReadNext(assembled),
-      target: assembled.data.target,
-      instructions: assembled.data.instructions,
-    }),
+    details,
+    displaySections: assembled.data.sections.map(orientationDisplaySection),
   };
 }
 
@@ -94,6 +118,34 @@ export function assembleOrientationDetails(input: OrientationDetailsInput): Cont
       rank: candidate.rank,
     })),
   };
+}
+
+function orientationDisplaySection(section: OrientationSectionData): ToolDisplaySection {
+  const items = section.items.filter((item) => item.kind !== "blank");
+  return createToolDisplaySection({
+    key: `orientation.${section.key}`,
+    title: section.title,
+    items,
+    totalCount: items.length,
+    omittedCount: 0,
+    partialReason:
+      section.reason ??
+      section.evidenceLists.find((evidence) => evidence.partialReason)?.partialReason,
+    format: formatOrientationItem,
+  });
+}
+
+function formatOrientationItem(item: OrientationItem): string {
+  switch (item.kind) {
+    case "paragraph":
+    case "list-item":
+    case "subheading":
+      return item.text;
+    case "code":
+      return item.lines.join(" ");
+    case "blank":
+      return "";
+  }
 }
 
 function toResultSection(section: OrientationSectionData): ResultSection {

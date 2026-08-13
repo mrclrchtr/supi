@@ -19,6 +19,7 @@ export async function executeRefactorApplyTool(
   if (outcome.kind === "invalid-input") {
     return searchErrorResult(`**Error:** ${outcome.message}`, {
       nextQueries: ["Generate a fresh plan with code_refactor_plan"],
+      message: outcome.message,
     });
   }
 
@@ -28,6 +29,8 @@ export async function executeRefactorApplyTool(
     details: {
       type: "search",
       data: assembly.details,
+      status: "completed",
+      displaySections: assembly.displaySections,
     },
   };
 }

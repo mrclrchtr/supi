@@ -17,7 +17,8 @@ import {
   type ResultSection,
   type ToolResultAssembly,
 } from "./assembly.ts";
-import type { InspectDetails, InspectSectionDetails } from "./types.ts";
+import { createToolDisplaySection, truncateDisplayText } from "./display.ts";
+import type { InspectDetails, InspectSectionDetails, ToolDisplaySection } from "./types.ts";
 
 export type { InspectResultData } from "../../session/inspect-types.ts";
 
@@ -30,6 +31,7 @@ export interface InspectResultAssembly {
   diagnosticEvidence: EvidenceList<InspectDiagnostic> | null;
   assembled: ToolResultAssembly<InspectResultData>;
   details: InspectDetails;
+  displaySections: readonly ToolDisplaySection[];
 }
 
 /** Assemble code_inspect evidence/details before presentation adapters render it. */
@@ -62,6 +64,14 @@ export function assembleInspectResult(
     provenance,
   });
 
+  const displaySections = buildInspectDisplaySections({
+    data,
+    displayedDefinitions: definitionEvidence?.items ?? [],
+    displayedDiagnostics: diagnosticEvidence?.items ?? [],
+    definitionEvidence,
+    diagnosticEvidence,
+  });
+
   return {
     data,
     displayedDefinitions: definitionEvidence?.items ?? [],
@@ -69,6 +79,7 @@ export function assembleInspectResult(
     definitionEvidence,
     diagnosticEvidence,
     assembled,
+    displaySections,
     details: {
       confidence: data.confidence,
       focusTarget: `${data.relPath}:${data.line}:${data.character}`,
@@ -78,6 +89,107 @@ export function assembleInspectResult(
       nextQueries: assembledNextQueries(assembled),
     },
   };
+}
+
+function buildInspectDisplaySections(input: {
+  data: InspectResultData;
+  displayedDefinitions: readonly InspectDefinition[];
+  displayedDiagnostics: readonly InspectDiagnostic[];
+  definitionEvidence: EvidenceList<InspectDefinition> | null;
+  diagnosticEvidence: EvidenceList<InspectDiagnostic> | null;
+}): ToolDisplaySection[] {
+  const sections: ToolDisplaySection[] = [];
+  const { data } = input;
+
+  if (data.sections.node.kind !== "unavailable" && data.sections.node.data) {
+    const node = data.sections.node.data;
+    sections.push(
+      createToolDisplaySection({
+        key: "inspect.node",
+        title: "Syntax node",
+        items: [node],
+        format: (item) =>
+          `${item.type} at ${data.relPath}:${item.startLine}:${item.startCharacter}–${item.endLine}:${item.endCharacter}${item.text ? ` — ${truncateDisplayText(item.text, 160)}` : ""}`,
+        partialReason: observationReason(data.sections.node),
+      }),
+    );
+  }
+
+  if (data.sections.enclosingSymbol.kind !== "unavailable" && data.sections.enclosingSymbol.data) {
+    const symbol = data.sections.enclosingSymbol.data;
+    sections.push(
+      createToolDisplaySection({
+        key: "inspect.enclosingSymbol",
+        title: "Enclosing symbol",
+        items: [symbol],
+        format: (item) =>
+          `${item.name} (${item.kind}) L${item.startLine}:${item.startCharacter}–L${item.endLine}:${item.endCharacter}`,
+        partialReason: observationReason(data.sections.enclosingSymbol),
+      }),
+    );
+  }
+
+  if (data.sections.hover.kind !== "unavailable" && data.sections.hover.data) {
+    sections.push(
+      createToolDisplaySection({
+        key: "inspect.hover",
+        title: "Hover",
+        items: [data.sections.hover.data],
+        format: (hover) => truncateDisplayText(hover, 240),
+        partialReason: observationReason(data.sections.hover),
+      }),
+    );
+  }
+
+  if (input.displayedDefinitions.length > 0) {
+    sections.push(
+      createToolDisplaySection({
+        key: "inspect.definitions",
+        title: "Definitions",
+        items: input.displayedDefinitions,
+        totalCount: input.definitionEvidence?.metadata.totalCount,
+        omittedCount: input.definitionEvidence?.metadata.omittedCount,
+        partialReason: input.definitionEvidence?.metadata.partialReason,
+        format: (definition) => `${definition.file}:${definition.line}:${definition.character}`,
+      }),
+    );
+  }
+
+  if (input.displayedDiagnostics.length > 0) {
+    sections.push(
+      createToolDisplaySection({
+        key: "inspect.diagnostics",
+        title: "Diagnostics",
+        items: input.displayedDiagnostics,
+        totalCount: input.diagnosticEvidence?.metadata.totalCount,
+        omittedCount: input.diagnosticEvidence?.metadata.omittedCount,
+        partialReason: input.diagnosticEvidence?.metadata.partialReason,
+        format: (diagnostic) =>
+          `L${diagnostic.line}:${diagnostic.character} ${formatDiagnosticSeverity(diagnostic.severity)}: ${truncateDisplayText(diagnostic.message, 200)}`,
+      }),
+    );
+  }
+
+  return sections;
+}
+
+function observationReason<T>(observation: InspectObservation<T>): string | null {
+  return observation.kind === "partial" ? observation.reason : null;
+}
+
+function formatDiagnosticSeverity(severity: number): string {
+  switch (severity) {
+    case 1:
+      return "Error";
+    case 2:
+      return "Warning";
+    case 3:
+      return "Info";
+    case 4:
+      return "Hint";
+    default:
+      return "Diagnostic";
+  }
 }
 
 function listEvidence<T>(

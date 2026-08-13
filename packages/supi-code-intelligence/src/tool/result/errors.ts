@@ -1,20 +1,14 @@
-/**
- * Tool-result error assembly factories for code-intelligence tool executors.
- *
- * Every factory returns a complete {@link CodeIntelResult} (content + typed
- * details) so executors never need to inline the `{ content, details }`
- * wrapper. Returned tool errors are result assembly concerns; whole-tool
- * capability failures may still throw so PI marks the tool call as failed.
- */
+import type { CodeIntelResult, ToolDisplaySection } from "../../types/index.ts";
 
-import type { CodeIntelResult } from "../../types/index.ts";
-
-// ── Error-result factories ──────────────────────────────────────────
-
-/** Full error result for search-family tools (code_find, code_graph, code_refactor_plan). */
+/** Full error result for search-family tools. */
 export function searchErrorResult(
   content: string,
-  opts?: { scope?: string | null; nextQueries?: string[] },
+  opts?: {
+    scope?: string | null;
+    nextQueries?: string[];
+    message?: string;
+    displaySections?: readonly ToolDisplaySection[];
+  },
 ): CodeIntelResult {
   return {
     content,
@@ -27,14 +21,17 @@ export function searchErrorResult(
         omittedCount: 0,
         nextQueries: opts?.nextQueries ?? [],
       },
+      status: "invalid-input",
+      ...(opts?.message ? { message: opts.message } : {}),
+      ...(opts?.displaySections ? { displaySections: opts.displaySections } : {}),
     },
   };
 }
 
-/** Full error result for code_orientation (context-type details). */
+/** Full error result for code_orientation. */
 export function contextErrorResult(
   content: string,
-  opts?: { nextQueries?: string[] },
+  opts?: { nextQueries?: string[]; message?: string },
 ): CodeIntelResult {
   return {
     content,
@@ -49,6 +46,8 @@ export function contextErrorResult(
         omittedCount: 0,
         nextQueries: opts?.nextQueries ?? [],
       },
+      status: "invalid-input",
+      ...(opts?.message ? { message: opts.message } : {}),
     },
   };
 }
@@ -56,7 +55,7 @@ export function contextErrorResult(
 /** Full error result for code_inspect. */
 export function inspectErrorResult(
   content: string,
-  opts?: { focusTarget?: string; nextQueries?: string[] },
+  opts?: { focusTarget?: string; nextQueries?: string[]; message?: string },
 ): CodeIntelResult {
   return {
     content,
@@ -69,6 +68,8 @@ export function inspectErrorResult(
         sections: [],
         nextQueries: opts?.nextQueries ?? [],
       },
+      status: "invalid-input",
+      ...(opts?.message ? { message: opts.message } : {}),
     },
   };
 }
@@ -100,6 +101,8 @@ export function healthErrorResult(content: string, reason?: string): CodeIntelRe
         diagnosticFileCount: 0,
         serverCount: 0,
       },
+      status: "invalid-input",
+      message: reason ?? content,
     },
   };
 }

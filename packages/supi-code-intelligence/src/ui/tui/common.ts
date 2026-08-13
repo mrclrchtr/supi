@@ -6,18 +6,46 @@
  * partial/error guards, and the shared simple-result pattern.
  */
 
-import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
+import {
+  getMarkdownTheme,
+  type Theme,
+  type ToolRenderResultOptions,
+} from "@earendil-works/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { formatEvidenceBadge } from "@mrclrchtr/supi-core/evidence-badge";
+import { truncateDisplayText } from "../../tool/result/display.ts";
+import { renderToolDisplaySections } from "./display.ts";
+
+export { formatCallPath, formatCallValue, renderToolDisplaySections } from "./display.ts";
+
+import type {
+  ToolDisplaySection,
+  ToolOutputTruncationDetails,
+  ToolResultStatus,
+} from "../../tool/result/types.ts";
 
 // ── Result type ──────────────────────────────────────────────────
 
 /** Shape of a pi tool result consumed by renderResult functions. */
 export interface ToolResult {
   content: Array<{ type: string; text?: string }>;
-  details?: { type: string; data: Record<string, unknown> };
-  isError?: boolean;
+  details?: {
+    type: string;
+    data: Record<string, unknown>;
+    status?: ToolResultStatus;
+    message?: string;
+    displaySections?: readonly ToolDisplaySection[];
+    truncation?: ToolOutputTruncationDetails;
+  };
 }
+
+/** PI render context used by Code Intelligence result renderers. */
+export interface ToolRendererContext {
+  isError: boolean;
+}
+
+/** PI render options used by Code Intelligence result renderers. */
+export type ResultOptios = ToolRenderResultOptions;
 
 // ── Evidence key labels ──────────────────────────────────────────
 
@@ -142,7 +170,7 @@ export function renderMarkdownDetail(
   const markdownText = source.content?.find((c) => c.type === "text")?.text ?? "";
   if (!markdownText) return;
   container.addChild(new Spacer(1));
-  const divider = `${theme.fg("border", "────")} ${theme.fg("dim", "raw markdown")} ${theme.fg("border", "─".repeat(100))}`;
+  const divider = `${theme.fg("border", "────")} ${theme.fg("dim", "raw markdown")} ${theme.fg("border", "────")}`;
   container.addChild(new Text(divider, 0, 0));
   container.addChild(new Markdown(markdownText, 0, 0, getMarkdownTheme()));
 }
@@ -157,12 +185,61 @@ export function renderError(label: string, theme: Theme): Text {
   return new Text(theme.fg("error", label), 0, 0);
 }
 
-// ── Result options ───────────────────────────────────────────────
-
-export interface ResultOptios {
-  expanded: boolean;
-  isPartial: boolean;
+/** Render an execution failure from PI's renderer context. */
+export function renderExecutionError(
+  context: ToolRendererContext | undefined,
+  label: string,
+  theme: Theme,
+): Text | null {
+  return context?.isError ? renderError(label, theme) : null;
 }
+
+/** Render a domain error encoded in structured result details. */
+export function renderDomainError(result: ToolResult, theme: Theme): Text | null {
+  const status = result.details?.status;
+  if (status !== "invalid-input" && status !== "disambiguation" && status !== "unavailable") {
+    return null;
+  }
+
+  const label =
+    status === "invalid-input"
+      ? "Invalid input"
+      : status === "disambiguation"
+        ? "Choose a target"
+        : "Unavailable";
+  const message = result.details?.message
+    ? `: ${truncateDisplayText(result.details.message, 160)}`
+    : "";
+  return renderError(`${label}${message}`, theme);
+}
+
+/** Render an invalid-input or unavailable result with its structured body. */
+export function renderDomainResult(
+  result: ToolResult,
+  options: ResultOptios,
+  theme: Theme,
+  error: Text,
+): Container | Text {
+  if (!options.expanded) return error;
+  const container = new Container();
+  container.addChild(error);
+  renderToolDisplaySections(container, result.details?.displaySections, theme);
+  renderMarkdownDetail(container, result, theme);
+  return container;
+}
+
+/** Render the structured output-truncation disclosure. */
+export function renderTruncationDisclosure(result: ToolResult, theme: Theme): Text | null {
+  const truncation = result.details?.truncation;
+  if (!truncation?.truncated) return null;
+
+  const path = truncation.fullOutputPath
+    ? `; full output: ${truncateDisplayText(truncation.fullOutputPath, 160)}`
+    : "";
+  return new Text(theme.fg("warning", `Output truncated${path}`), 0, 0);
+}
+
+// ── Result options ───────────────────────────────────────────────
 
 // ── Shared simple-result renderer ─────────────────────────────────
 
@@ -172,19 +249,34 @@ export interface ResultOptios {
  *
  * Handles partial, error, compact, and expanded states uniformly.
  */
+// biome-ignore lint/complexity/useMaxParams: renderer signature keeps the shared helper convenient for each tool
 export function renderSimpleResult(
   result: ToolResult,
   options: ResultOptios,
   theme: Theme,
   partialLabel: string,
+  context?: ToolRendererContext,
 ): Container | Text {
   if (options.isPartial) return renderPartial(partialLabel, theme);
-  if (result.isError) return renderError("Tool failed", theme);
+
+  const executionError = renderExecutionError(context, "Tool failed", theme);
+  if (executionError) return executionError;
+
+  const domainError = renderDomainError(result, theme);
+  if (domainError) return renderDomainResult(result, options, theme, domainError);
 
   const data = result.details?.data as Record<string, unknown> | undefined;
   if (options.expanded) return buildExpandedView(result, data, theme);
 
-  return buildSimpleCompact(data, theme);
+  const compact = buildSimpleCompact(data, theme);
+  const truncation = renderTruncationDisclosure(result, theme);
+  if (!truncation) return compact;
+
+  const container = new Container();
+  container.addChild(compact);
+  container.addChild(new Spacer(1));
+  container.addChild(truncation);
+  return container;
 }
 
 function buildExpandedView(
@@ -197,7 +289,13 @@ function buildExpandedView(
   const header = buildSimpleHeader(data, theme);
   if (header) container.addChild(header);
 
+  renderToolDisplaySections(container, result.details?.displaySections, theme);
   renderStructuredDetailBody(container, data, theme);
+  const truncation = renderTruncationDisclosure(result, theme);
+  if (truncation) {
+    container.addChild(new Spacer(1));
+    container.addChild(truncation);
+  }
   renderMarkdownDetail(container, result, theme);
 
   return container;

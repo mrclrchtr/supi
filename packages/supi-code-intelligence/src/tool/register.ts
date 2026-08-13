@@ -6,6 +6,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import type { Component } from "@earendil-works/pi-tui";
 import { recordDebugEvent, startDebugTimer } from "@mrclrchtr/supi-core/debug";
 import type { WorkspaceCodeIntelligenceSession } from "../session/session.ts";
+import type { CodeIntelResult, ToolOutputTruncationDetails } from "../types/index.ts";
 import { renderFindCall, renderFindResult } from "./find/tui.ts";
 import { renderGraphCall, renderGraphResult } from "./graph/tui.ts";
 import {
@@ -121,6 +122,13 @@ function recordCodeWorkflowTiming(
   );
 }
 
+function withTruncationDetails(
+  details: CodeIntelResult["details"],
+  truncation: ToolOutputTruncationDetails,
+): CodeIntelResult["details"] {
+  return details ? { ...details, truncation } : details;
+}
+
 function terminalCodeOperationOutcome(
   error: unknown,
   signal: AbortSignal | undefined,
@@ -192,13 +200,16 @@ export function registerCodeIntelligenceTools(
             );
             return {
               content: [{ type: "text" as const, text: text + notice }],
-              details,
+              details: withTruncationDetails(details, {
+                truncated: true,
+                fullOutputPath: spillPath,
+              }),
             };
           }
           recordCodeOperationBoundary("code-operation.finish", operationId, spec.name, "completed");
           return {
             content: [{ type: "text" as const, text }],
-            details,
+            details: withTruncationDetails(details, { truncated: false }),
           };
         } catch (error) {
           const outcome = terminalCodeOperationOutcome(error, signal);

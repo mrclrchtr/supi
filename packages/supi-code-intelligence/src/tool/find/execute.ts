@@ -26,12 +26,18 @@ export async function executeFindTool(
     return searchErrorResult(`**Error:** ${outcome.message}`, {
       scope: Array.isArray(params?.scope) ? params.scope.join(", ") : null,
       nextQueries: ["Fix the search input and retry"],
+      message: outcome.message,
     });
   }
 
   const assembly = assembleFindWorkflowResult(outcome);
   return {
     content: renderFindResult(assembly),
-    details: { type: "search", data: assembly.details },
+    details: {
+      type: "search",
+      data: assembly.details,
+      status: "completed",
+      displaySections: assembly.displaySections,
+    },
   };
 }

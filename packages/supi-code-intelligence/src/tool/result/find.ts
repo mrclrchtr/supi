@@ -11,13 +11,15 @@ import {
   type ResultProvenance,
   type ToolResultAssembly,
 } from "./assembly.ts";
-import type { SearchDetails } from "./types.ts";
+import { createToolDisplaySection } from "./display.ts";
+import type { SearchDetails, ToolDisplaySection } from "./types.ts";
 
 /** Presentation-neutral assembled find result. */
 export interface FindResultAssembly {
   outcome: Extract<FindWorkflowOutcome, { kind: "completed" }>;
   assembled: ToolResultAssembly<Extract<FindWorkflowOutcome, { kind: "completed" }>["data"]>;
   details: SearchDetails;
+  displaySections: readonly ToolDisplaySection[];
 }
 
 /** Assemble one completed code-aware search outcome before presentation. */
@@ -47,9 +49,22 @@ export function assembleFindWorkflowResult(
     provenance,
   });
 
+  const displaySections = [
+    createToolDisplaySection({
+      key: `find.${outcome.data.kind}`,
+      title: outcome.data.kind === "semantic" ? "Symbols" : "Matches",
+      items: findItems(outcome.data),
+      totalCount: evidence.metadata.totalCount,
+      omittedCount: evidence.metadata.omittedCount,
+      partialReason: evidence.metadata.partialReason,
+      format: (item) => formatFindDisplayItem(outcome.data.kind, item),
+    }),
+  ];
+
   return {
     outcome,
     assembled,
+    displaySections,
     details: {
       confidence,
       scope: outcome.scopeLabel === "." ? null : outcome.scopeLabel,
@@ -114,6 +129,25 @@ function findItems(
   data: Extract<FindWorkflowOutcome, { kind: "completed" }>["data"],
 ): readonly unknown[] {
   return data.kind === "semantic" ? data.symbols : data.result.matches;
+}
+
+function formatFindDisplayItem(kind: "semantic" | "ast", item: unknown): string {
+  if (kind === "ast") {
+    const match = item as { name: string; kind: string; file: string; line: number };
+    return `${match.name} (${match.kind}) — ${match.file}:L${match.line}`;
+  }
+
+  const symbol = item as {
+    name: string;
+    kind: string;
+    file: string;
+    container?: string | null;
+    nameAnchor?: { line: number };
+    declarationAnchor: { line: number };
+  };
+  const container = symbol.container ? ` in ${symbol.container}` : "";
+  const anchor = symbol.nameAnchor ?? symbol.declarationAnchor;
+  return `${symbol.name} [${symbol.kind}]${container} — ${symbol.file}:L${anchor.line}`;
 }
 
 function findProvenance(

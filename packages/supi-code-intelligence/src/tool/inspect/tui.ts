@@ -1,36 +1,44 @@
-/**
- * TUI renderer for code_inspect — renderCall + renderResult.
- */
+/** TUI renderer for code_inspect. */
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { type ResultOptios, renderSimpleResult, type ToolResult } from "../../ui/tui/common.ts";
+import {
+  formatCallPath,
+  type ResultOptios,
+  renderSimpleResult,
+  type ToolRendererContext,
+  type ToolResult,
+} from "../../ui/tui/common.ts";
 
-/** ── renderCall ────────────────────────────────────────────────── */
-
-export function renderInspectCall(args: unknown, theme: Theme, _context: unknown): Text {
+/** Render the compact code_inspect call header. */
+export function renderInspectCall(
+  args: unknown,
+  theme: Theme,
+  _context: ToolRendererContext | undefined,
+): Text {
   const params = (args ?? {}) as {
-    point?: { file: string; line: number; character: number };
+    point?: { file?: unknown; line?: unknown; character?: unknown };
   };
 
   let content = theme.fg("toolTitle", "code_inspect");
-
-  if (params.point) {
-    const file = params.point.file.split("/").pop() ?? params.point.file;
-    content += ` ${theme.fg("accent", file)}`;
-    content += theme.fg("warning", `:${params.point.line}`);
-    content += theme.fg("dim", `:${params.point.character}`);
+  const point = params.point;
+  if (point && typeof point === "object") {
+    const file = formatCallPath(point.file);
+    if (file) content += ` ${theme.fg("accent", file)}`;
+    if (typeof point.line === "number") content += theme.fg("warning", `:${point.line}`);
+    if (typeof point.character === "number") {
+      content += theme.fg("dim", `:${point.character}`);
+    }
   }
 
   return new Text(content, 0, 0);
 }
 
-/** ── renderResult ──────────────────────────────────────────────── */
-
+/** Render code_inspect progress, status, and structured result details. */
 export function renderInspectResult(
   result: ToolResult,
   options: ResultOptios,
   theme: Theme,
-  _context: unknown,
+  context: ToolRendererContext | undefined,
 ): ReturnType<typeof renderSimpleResult> {
-  return renderSimpleResult(result, options, theme, "Inspecting…");
+  return renderSimpleResult(result, options, theme, "Inspecting…", context);
 }

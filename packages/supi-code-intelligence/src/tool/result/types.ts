@@ -19,6 +19,26 @@ import type {
 } from "../../session/target-store.ts";
 import type { ResultProvenance } from "./assembly.ts";
 
+/** Final state for a public tool result. */
+export type ToolResultStatus = "completed" | "invalid-input" | "disambiguation" | "unavailable";
+
+/** Truncation state for model-facing tool content. */
+export interface ToolOutputTruncationDetails {
+  truncated: boolean;
+  fullOutputPath?: string;
+}
+
+/** Bounded, structured rows for the expanded TUI body. */
+export interface ToolDisplaySection {
+  key: string;
+  title: string;
+  lines: readonly string[];
+  shownCount: number;
+  totalCount: number | null;
+  omittedCount: number | null;
+  partialReason: string | null;
+}
+
 // ── Anchored coordinate resolution metadata ───────────────────────────
 
 /**

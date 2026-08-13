@@ -4,6 +4,7 @@ import type { GraphWorkflowInput, RequestedGraphRelation } from "../../session/g
 import type { GraphTargetInput } from "../../session/target-input.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
 import { toWorkflowControl } from "../infra/workflow-control.ts";
+import { createToolDisplaySection } from "../result/display.ts";
 import { searchErrorResult } from "../result/errors.ts";
 import { assembleGraphResult } from "../result/graph.ts";
 import { renderGraphResult } from "./markdown.ts";
@@ -25,7 +26,7 @@ export async function executeGraphTool(
 
   if (outcome.kind === "unavailable") throw new Error(outcome.reason);
   if (outcome.kind === "invalid-input") {
-    return searchErrorResult(`**Error:** ${outcome.message}`);
+    return searchErrorResult(`**Error:** ${outcome.message}`, { message: outcome.message });
   }
   if (outcome.kind === "disambiguation" || outcome.kind === "kind-mismatch") {
     const lines = [
@@ -45,7 +46,21 @@ export async function executeGraphTool(
         "Retry without `symbolKind`, use an observed provider kind, or choose a handle.",
       );
     }
-    return searchErrorResult(lines.join("\n"));
+    return searchErrorResult(lines.join("\n"), {
+      message:
+        outcome.kind === "kind-mismatch"
+          ? `No target matched provider kind ${outcome.requestedKind}.`
+          : "The target is ambiguous.",
+      displaySections: [
+        createToolDisplaySection({
+          key: "graph.candidates",
+          title: "Candidates",
+          items: outcome.candidates,
+          format: (candidate) =>
+            `${candidate.targetId} — ${candidate.name} (${candidate.kind ?? "unknown"}) at ${candidate.file}:${candidate.line}:${candidate.character}`,
+        }),
+      ],
+    });
   }
 
   const assembly = assembleGraphResult({
@@ -57,6 +72,11 @@ export async function executeGraphTool(
   });
   return {
     content: renderGraphResult(assembly),
-    details: { type: "search", data: assembly.details },
+    details: {
+      type: "search",
+      data: assembly.details,
+      status: "completed",
+      displaySections: assembly.displaySections,
+    },
   };
 }
