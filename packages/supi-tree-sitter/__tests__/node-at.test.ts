@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { TreeSitterRuntime } from "../src/session/runtime.ts";
 import { lookupNodeAt } from "../src/tool/node-at.ts";
+import type { TreeSitterRuntime } from "../src/worker/runtime.ts";
 
 type Point = { row: number; column: number };
 

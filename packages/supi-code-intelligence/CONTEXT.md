@@ -34,9 +34,13 @@ _Avoid_: health section, diagnostic report, priority warning
 The workspace-scoped Code intelligence context that owns workflow policy, capability readiness, and ephemeral target and refactor handles for one PI session. It yields typed workflow outcomes without owning Tool result assembly, presentation, or provider lifecycle.
 _Avoid_: provider bag, renderer, global code-intelligence state
 
+**Structural Worker lifecycle**:
+One process-shared workspace host owns exactly one Tree-sitter Structural Worker. The parent keeps AST enumeration and bounded result assembly; the Worker owns source reads, parser-backed work, extraction, and caches. Host shutdown awaits Worker termination.
+_Avoid_: main-thread Tree-sitter fallback, Worker pool, session-local duplicate Worker
+
 **Structural request control**:
-The exact caller Abort Signal and optional absolute deadline that a Workspace code-intelligence session forwards through every structural workflow. AST Scan uses one shared deadline for enumeration and substrate work. Cooperative cancellation stops reads, parser progress, query progress, and cache publication; it does not establish main-thread responsiveness.
-_Avoid_: relative timeout, worker responsiveness, result-only cancellation
+The exact caller Abort Signal and optional absolute deadline that a Workspace code-intelligence session forwards through every structural workflow. AST Scan uses one shared deadline for enumeration and Worker work. The parent maps control to a Worker-local abort, an absolute deadline, and a shared atomic flag. Worker isolation establishes main-thread responsiveness.
+_Avoid_: relative timeout, cancel-message-only control, result-only cancellation
 
 **Workspace provider host**:
 The process-shared, reference-counted owner of LSP and structural-provider lifecycle for one canonical workspace. Pi sessions share its providers while keeping target and refactor handles session-local; providers stop after the final session releases them.

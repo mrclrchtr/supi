@@ -47,7 +47,7 @@ describe("TypeScript call-site extraction (full-expression)", () => {
       const names = result.data.map((entry) => entry.name);
       expect(names).toContain("params.query.trim");
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 
@@ -72,7 +72,7 @@ describe("TypeScript call-site extraction (full-expression)", () => {
       const names = result.data.map((entry) => entry.name);
       expect(names).toContain("obj.method");
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 
@@ -92,7 +92,7 @@ describe("TypeScript call-site extraction (full-expression)", () => {
       const names = result.data.map((entry) => entry.name);
       expect(names).toContain("Thing");
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 
@@ -113,7 +113,7 @@ describe("TypeScript call-site extraction (full-expression)", () => {
       // The outer call expression's callee is `factory()`
       expect(names).toContain("factory()");
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 
@@ -137,7 +137,7 @@ describe("TypeScript call-site extraction (full-expression)", () => {
       const names = result.data.map((entry) => entry.name);
       expect(names).toContain("tagged");
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 });
@@ -165,7 +165,7 @@ describe("JSX/TSX call-site extraction (full-expression)", () => {
       const names = result.data.map((entry) => entry.name);
       expect(names).toContain("api.call");
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 });
@@ -187,7 +187,7 @@ describe("JavaScript call-site extraction (full-expression)", () => {
       const names = result.data.map((entry) => entry.name);
       expect(names).toContain("obj.method");
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 });

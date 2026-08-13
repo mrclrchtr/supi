@@ -44,7 +44,7 @@ describe("declared call-site language support", () => {
           data: [expect.objectContaining({ name: "foo" })],
         });
       } finally {
-        session.dispose();
+        await session.dispose();
       }
     },
   );
@@ -61,7 +61,7 @@ describe("declared call-site language support", () => {
         kind: "unsupported-language",
       });
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 });

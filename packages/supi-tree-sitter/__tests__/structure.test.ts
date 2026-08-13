@@ -2,11 +2,11 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
-import { TreeSitterRuntime } from "../src/session/runtime.ts";
 import { extractExports } from "../src/tool/exports.ts";
 import { extractImports } from "../src/tool/imports.ts";
 import { lookupNodeAt } from "../src/tool/node-at.ts";
 import { collectOutline } from "../src/tool/outline.ts";
+import { TreeSitterRuntime } from "../src/worker/runtime.ts";
 
 const FIXTURE_DIR = path.resolve(__dirname, "fixtures");
 

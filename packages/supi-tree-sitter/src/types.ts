@@ -122,10 +122,10 @@ export interface TreeSitterService {
   callSites(file: string, control?: CodeRequestControl): Promise<TreeSitterResult<CallSiteMatch[]>>;
 }
 
-/** Owned Tree-sitter session that must release its runtime resources. */
+/** Owned Tree-sitter session that must release its Worker resources. */
 export interface TreeSitterSession extends TreeSitterService {
-  /** Release parser and grammar resources owned by this session. */
-  dispose(): void;
+  /** Terminate and await the Structural Worker owned by this session. */
+  dispose(): Promise<void>;
 }
 
 /** Session-scoped shared structural service published by the extension runtime. */

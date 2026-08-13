@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import { readFile, realpath } from "node:fs/promises";
-import {
-  type CodeRequestControl,
-  isCodeRequestInterruption,
-  throwIfCodeRequestInterrupted,
-} from "@mrclrchtr/supi-code-runtime/api";
 import type { Query, Tree } from "web-tree-sitter";
 import type { GrammarId } from "../types.ts";
 import { safeDelete, touchEntry, validatePositiveLimits } from "./parsed-file-store-helpers.ts";
+import {
+  isStructuralRequestInterruption,
+  type StructuralRequestControl,
+  throwIfStructuralRequestInterrupted,
+} from "./request-control.ts";
 
 /** Fixed internal limits for session-owned parsed files and compiled queries. */
 export interface ParsedFileStoreLimits {
@@ -51,7 +51,7 @@ interface AcquireParsedFileInput {
   readonly resolvedPath: string;
   readonly grammarId: GrammarId;
   readonly parse: (source: string) => Tree | Promise<Tree>;
-  readonly control?: CodeRequestControl;
+  readonly control?: StructuralRequestControl;
   readonly onPhase?: (phase: "file-read" | "content-hash") => void;
 }
 
@@ -77,7 +77,7 @@ interface CachedQuery {
 }
 
 interface QueryExecution<T> {
-  readonly control?: CodeRequestControl;
+  readonly control?: StructuralRequestControl;
   readonly compile: () => Query;
   readonly execute: (query: Pick<Query, "matches">, cache: StructuralCacheObservation) => T;
 }
@@ -119,18 +119,18 @@ export class ParsedFileStore {
   /** Read one file asynchronously and return a caller-owned current tree. */
   async acquireParsedFile(input: AcquireParsedFileInput): Promise<OwnedParsedFile> {
     this.#assertActive();
-    throwIfCodeRequestInterrupted(input.control);
+    throwIfStructuralRequestInterrupted(input.control);
     const canonicalPath = await this.#canonicalize(input.resolvedPath, input.control);
     this.#assertActive();
-    throwIfCodeRequestInterrupted(input.control);
+    throwIfStructuralRequestInterrupted(input.control);
     const source = await this.#readSource(canonicalPath, input.control);
     this.#assertActive();
-    throwIfCodeRequestInterrupted(input.control);
+    throwIfStructuralRequestInterrupted(input.control);
     notifyPhase(input.onPhase, "file-read");
 
     const contentHash = createHash("sha256").update(source).digest("hex");
     notifyPhase(input.onPhase, "content-hash");
-    throwIfCodeRequestInterrupted(input.control);
+    throwIfStructuralRequestInterrupted(input.control);
     const key = fileKey(canonicalPath, input.grammarId);
     const existing = this.#files.get(key);
 
@@ -142,7 +142,7 @@ export class ParsedFileStore {
     try {
       parsedTree = await input.parse(source);
       this.#assertActive();
-      throwIfCodeRequestInterrupted(input.control);
+      throwIfStructuralRequestInterrupted(input.control);
     } catch (error) {
       if (parsedTree) safeDelete(parsedTree);
       throw error;
@@ -201,7 +201,7 @@ export class ParsedFileStore {
   ): { readonly data: T; readonly cache: StructuralCacheObservation } {
     const execution = normalizeQueryExecution(compileOrExecution, legacyExecute);
     this.#assertActive();
-    throwIfCodeRequestInterrupted(execution.control);
+    throwIfStructuralRequestInterrupted(execution.control);
     const key = queryKey(grammarId, queryText);
     const existing = this.#queries.get(key);
     if (existing) {
@@ -212,7 +212,7 @@ export class ParsedFileStore {
 
     const query = execution.compile();
     try {
-      throwIfCodeRequestInterrupted(execution.control);
+      throwIfStructuralRequestInterrupted(execution.control);
     } catch (error) {
       safeDelete(query);
       throw error;
@@ -286,28 +286,34 @@ export class ParsedFileStore {
     };
   }
 
-  async #canonicalize(filePath: string, control: CodeRequestControl | undefined): Promise<string> {
+  async #canonicalize(
+    filePath: string,
+    control: StructuralRequestControl | undefined,
+  ): Promise<string> {
     try {
       const canonicalPath = await this.#operations.realpath(filePath);
-      throwIfCodeRequestInterrupted(control);
+      throwIfStructuralRequestInterrupted(control);
       return canonicalPath;
     } catch (error) {
-      if (isCodeRequestInterruption(error, control)) {
-        throwIfCodeRequestInterrupted(control);
+      if (isStructuralRequestInterruption(error, control)) {
+        throwIfStructuralRequestInterrupted(control);
         throw error;
       }
       throw new ParsedFileReadError(fileReadMessage(error), { cause: error });
     }
   }
 
-  async #readSource(filePath: string, control: CodeRequestControl | undefined): Promise<string> {
+  async #readSource(
+    filePath: string,
+    control: StructuralRequestControl | undefined,
+  ): Promise<string> {
     try {
       const source = await this.#operations.readFile(filePath, { signal: control?.signal });
-      throwIfCodeRequestInterrupted(control);
+      throwIfStructuralRequestInterrupted(control);
       return source;
     } catch (error) {
-      if (isCodeRequestInterruption(error, control)) {
-        throwIfCodeRequestInterrupted(control);
+      if (isStructuralRequestInterruption(error, control)) {
+        throwIfStructuralRequestInterrupted(control);
         throw error;
       }
       throw new ParsedFileReadError(fileReadMessage(error), { cause: error });

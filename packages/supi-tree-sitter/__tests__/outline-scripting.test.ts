@@ -20,7 +20,7 @@ async function outline(file: string, source: string): Promise<OutlineItem[]> {
     expect(result.kind).toBe("success");
     return result.kind === "success" ? result.data : [];
   } finally {
-    session.dispose();
+    await session.dispose();
   }
 }
 

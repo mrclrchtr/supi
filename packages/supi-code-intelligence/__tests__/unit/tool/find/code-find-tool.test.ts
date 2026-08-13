@@ -607,7 +607,7 @@ describe("code_find tool", () => {
         expect(text).toContain("src/target.ts");
         expect(text).toContain("AST call results are name-based");
       } finally {
-        session.dispose();
+        await session.dispose();
       }
     });
 
@@ -653,7 +653,7 @@ describe("code_find tool", () => {
         expect(text).not.toContain("values .filter");
         expect(text).not.toContain("].join");
       } finally {
-        session.dispose();
+        await session.dispose();
       }
     });
   });

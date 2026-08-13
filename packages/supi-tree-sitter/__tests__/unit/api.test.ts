@@ -7,9 +7,15 @@ import { describe, expect, it } from "vitest";
  * only and does NOT require tool-handler exports.
  */
 describe("supi-tree-sitter API surface", () => {
-  it("exports TreeSitterRuntime", async () => {
-    const api = await import("@mrclrchtr/supi-tree-sitter/api");
-    expect(api.TreeSitterRuntime).toBeDefined();
+  it("does not export raw runtime or extraction helpers", async () => {
+    const api: Record<string, unknown> = await import("@mrclrchtr/supi-tree-sitter/api");
+    expect(api.TreeSitterRuntime).toBeUndefined();
+    expect(api.extractCallSites).toBeUndefined();
+    expect(api.lookupCalleesAt).toBeUndefined();
+    expect(api.extractExports).toBeUndefined();
+    expect(api.extractImports).toBeUndefined();
+    expect(api.lookupNodeAt).toBeUndefined();
+    expect(api.collectOutline).toBeUndefined();
   });
 
   it("exports TreeSitterRuntimeController", async () => {
@@ -40,10 +46,8 @@ describe("supi-tree-sitter API surface", () => {
     expect(exported.handleQuery).toBeUndefined();
   });
 
-  it("exports structural extraction functions from api.ts", async () => {
+  it("exports language and operation support without raw WASM values", async () => {
     const api = await import("@mrclrchtr/supi-tree-sitter/api");
-    expect(typeof api.lookupCalleesAt).toBe("function");
-    expect(typeof api.collectOutline).toBe("function");
     expect(typeof api.detectGrammar).toBe("function");
     expect(typeof api.getStructuralSearchSupportedExtensions).toBe("function");
   });

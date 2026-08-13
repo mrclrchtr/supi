@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TreeSitterRuntime } from "../src/session/runtime.ts";
+import { TreeSitterRuntime } from "../src/worker/runtime.ts";
 
 const FIXTURE_DIR = path.resolve(__dirname, "fixtures");
 

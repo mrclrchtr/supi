@@ -27,6 +27,7 @@
   "type": "module",
   "files": [
     "src/**/*.ts",
+    "src/**/*.mjs",
     "src/**/*.json",
     "resources",
     "scripts/*.mjs",
@@ -44,11 +45,13 @@
   "dependencies": {
     "@mrclrchtr/supi-code-runtime": "workspace:*",
     "@mrclrchtr/supi-core": "workspace:*",
+    "jiti": "^2.7.0",
     "web-tree-sitter": "^0.26.8"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-code-runtime",
     "@mrclrchtr/supi-core",
+    "jiti",
     "web-tree-sitter"
   ],
   "devDependencies": {

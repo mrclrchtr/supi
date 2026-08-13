@@ -26,8 +26,9 @@ This package provides the parser-backed structural substrate consumed by `@mrclr
 - a shared session-scoped Tree-sitter service for structural analysis
 - an owned parsing session API for direct library consumers
 - a `StructuralProvider` adapter published through `./provider/tree-sitter-provider`
-- cooperative `CodeRequestControl` cancellation and absolute deadlines for reads, parsing, queries, and cache publication
-- structural extraction helpers for outline/import/export/node/callee/call-site analysis inside the library surface
+- a long-lived owned Structural Worker that keeps Pi responsive during parser-backed work
+- `CodeRequestControl` cancellation, absolute deadlines, shared atomic interruption, and hard-stop termination
+- structural outline/import/export/node/callee/call-site operations through the asynchronous service surface
 - operation-specific extension discovery through `getStructuralSearchSupportedExtensions()`
 
 It does **not** register pi tools or commands on its own.
@@ -62,7 +63,7 @@ capabilities into the shared workspace runtime.
 ```text
 supi-code-runtime  ← shared contracts + workspace runtime
     ↑
-supi-tree-sitter  ← Tree-sitter WASM + session-scoped service + runtime capabilities
+supi-tree-sitter  ← one owned Structural Worker + session-scoped service + runtime capabilities
 ```
 
 ## Package surfaces
@@ -83,7 +84,7 @@ const parseable = await session.canParse("src/index.ts");
 const outline = await session.outline("src/index.ts");
 const callees = await session.calleesAt("src/index.ts", 42, 10);
 
-session.dispose();
+await session.dispose();
 ```
 
 Shared session-scoped service example:
@@ -107,19 +108,21 @@ pnpm --filter @mrclrchtr/supi-tree-sitter bench:structural
 
 The benchmark reports cold and repeated outline results. It also reports cold and repeated call-site query results. Repeated operations reuse unchanged parsed trees and compiled queries. Debug capture is active, so the baseline includes the internal timing observation cost. The benchmark records measurements but does not set a pass or fail threshold.
 
-The session runtime reads files asynchronously. It identifies fresh parsed files by canonical path, grammar, and SHA-256 content hash. Cached trees use true least-recently-used eviction with limits of 128 files and 32 MiB of retained UTF-8 source bytes. Compiled queries use the same policy with limits of 128 queries and 512 KiB of retained UTF-8 query text. Source and query byte counts are memory-related proxies because `web-tree-sitter` does not report WASM resource sizes. Cached canonical trees stay private. Structural consumers receive owned shallow copies.
+The Structural Worker reads files asynchronously. It identifies fresh parsed files by canonical path, grammar, and SHA-256 content hash. Cached trees use true least-recently-used eviction with limits of 128 files and 32 MiB of retained UTF-8 source bytes. Compiled queries use the same policy with limits of 128 queries and 512 KiB of retained UTF-8 query text. Source and query byte counts are memory-related proxies because `web-tree-sitter` does not report WASM resource sizes. Cached canonical trees stay private in the Worker.
 
-All structural service operations accept optional `CodeRequestControl`. Reads receive the caller signal and discard late results. Parser and query progress callbacks observe cancellation and absolute deadlines. An interrupted parser resets before reuse; if reset fails, the runtime removes and deletes that parser. Interruption checks run before cache publication, so partial work cannot become a cache hit. This is cooperative cancellation only. Synchronous WASM work can still block the main event loop until a progress callback runs.
+All structural service operations accept optional `CodeRequestControl`. The parent converts cancellation to one shared atomic flag and forwards absolute deadlines. Worker read phases observe a local abort signal. Parser and query progress callbacks observe the flag and deadline. If cooperative interruption does not settle in the fixed 250 ms grace period, the parent terminates the Worker. Valid queued work keeps FIFO order on one fresh Worker with cold caches. There is no main-thread parser fallback.
 
 ## Source
 
 - `src/api.ts` — public library entrypoint
 - `src/index.ts` — re-export surface
-- `src/session/runtime.ts` — parser and query runtime
-- `src/session/runtime-controller.ts` — generation-fenced session lifecycle
-- `src/session/parsed-file-store.ts` — bounded parsed-file and compiled-query reuse
-- `src/session/session.ts` — runtime-backed service helpers and owned session API
+- `src/worker/bootstrap.mjs` — package-owned Worker bootstrap and direct `jiti` loader
+- `src/worker/runtime.ts` — Worker-only parser and query runtime
+- `src/worker/parsed-file-store.ts` — Worker-only parsed-file and compiled-query reuse
+- `src/session/structural-worker-client.ts` — bounded FIFO mailbox, protocol, cancellation, and restart ownership
+- `src/session/runtime-controller.ts` — generation-fenced shared Worker lifecycle
+- `src/session/session.ts` — asynchronous Worker-proxy service and owned session API
 - `src/operation-support.ts` — authoritative operation-specific extension support
 - `src/session/service-registry.ts` — shared session-scoped structural service registry
 - `src/provider/tree-sitter-provider.ts` — `StructuralProvider` adapter consumed by `@mrclrchtr/supi-code-intelligence`
-- `src/tool/outline.ts`, `src/tool/outline-*.ts`, `src/tool/imports.ts`, `src/tool/exports.ts`, `src/tool/node-at.ts`, `src/tool/callees.ts`, `src/tool/call-sites.ts` — structural analyses exposed through the library surface
+- `src/tool/outline.ts`, `src/tool/outline-*.ts`, `src/tool/imports.ts`, `src/tool/exports.ts`, `src/tool/node-at.ts`, `src/tool/callees.ts`, `src/tool/call-sites.ts` — Worker-internal structural analyses

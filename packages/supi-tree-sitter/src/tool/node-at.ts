@@ -2,8 +2,8 @@
 
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { nodeToRange, publicToTreeSitter, splitSourceLines } from "../coordinates.ts";
-import type { TreeSitterRuntime } from "../session/runtime.ts";
 import type { NodeAtResult, SourceRange, TreeSitterResult } from "../types.ts";
+import type { TreeSitterRuntime } from "../worker/runtime.ts";
 
 const MAX_ANCESTRY = 10;
 

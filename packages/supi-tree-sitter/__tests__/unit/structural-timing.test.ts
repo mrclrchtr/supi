@@ -5,7 +5,7 @@ import {
   resetDebugRegistry,
 } from "@mrclrchtr/supi-core/debug";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { TreeSitterRuntime } from "../../src/session/runtime.ts";
+import { TreeSitterRuntime } from "../../src/worker/runtime.ts";
 
 const FIXTURE_DIR = path.resolve(import.meta.dirname, "../fixtures");
 

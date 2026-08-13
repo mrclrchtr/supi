@@ -42,7 +42,6 @@ describe("TreeSitterRuntimeController", () => {
     if (result.kind === "ready") {
       expect(controller.kind).toBe("ready");
       expect(controller.service).toBeTruthy();
-      expect(controller.runtime).toBeTruthy();
     } else {
       // web-tree-sitter may not be available in all environments
       expect(["unavailable"]).toContain(result.kind);
@@ -83,7 +82,7 @@ describe("TreeSitterRuntimeController", () => {
     await controller.shutdown();
   });
 
-  it("exposes service and runtime after start", async () => {
+  it("exposes only the asynchronous service after start", async () => {
     const tmpDir = makeProjectDir();
 
     const controller = new TreeSitterRuntimeController(tmpDir);
@@ -92,9 +91,8 @@ describe("TreeSitterRuntimeController", () => {
     if (result.kind === "ready") {
       expect(controller.kind).toBe("ready");
       const service = controller.service;
-      const runtime = controller.runtime;
       expect(service).toBeTruthy();
-      expect(runtime).toBeTruthy();
+      expect((controller as unknown as Record<string, unknown>).runtime).toBeUndefined();
       if (service) {
         expect(typeof service.canParse).toBe("function");
       }

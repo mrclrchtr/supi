@@ -2,8 +2,8 @@
 
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { detectGrammar } from "../language.ts";
-import type { TreeSitterRuntime } from "../session/runtime.ts";
 import type { CallSiteMatch, GrammarId, TreeSitterResult } from "../types.ts";
+import type { TreeSitterRuntime } from "../worker/runtime.ts";
 
 // ── Per-grammar call-site queries ─────────────────────────────────────
 

@@ -57,7 +57,7 @@ describe("TreeSitterRuntime request cancellation", () => {
       Parser: ParserMock,
       Query: class {},
     }));
-    const { TreeSitterRuntime } = await import("../../src/session/runtime.ts");
+    const { TreeSitterRuntime } = await import("../../src/worker/runtime.ts");
     const runtime = new TreeSitterRuntime(fixture());
 
     await expect(runtime.parseFile("sample.ts", { signal: controller.signal })).rejects.toBe(
@@ -114,7 +114,7 @@ describe("TreeSitterRuntime request cancellation", () => {
       Parser: ConcurrentParserMock,
       Query: class {},
     }));
-    const { TreeSitterRuntime } = await import("../../src/session/runtime.ts");
+    const { TreeSitterRuntime } = await import("../../src/worker/runtime.ts");
     const runtime = new TreeSitterRuntime("/project");
 
     const interrupted = runtime.parseFile("sample.ts", { signal: controller.signal });
@@ -157,7 +157,7 @@ describe("TreeSitterRuntime request cancellation", () => {
       Query: class {},
     }));
     const { CodeRequestDeadlineError } = await import("@mrclrchtr/supi-code-runtime/api");
-    const { TreeSitterRuntime } = await import("../../src/session/runtime.ts");
+    const { TreeSitterRuntime } = await import("../../src/worker/runtime.ts");
     const runtime = new TreeSitterRuntime(fixture());
 
     await expect(runtime.parseFile("sample.ts", { deadline })).rejects.toBeInstanceOf(
@@ -197,7 +197,7 @@ describe("TreeSitterRuntime request cancellation", () => {
       Parser: ParserMock,
       Query: QueryMock,
     }));
-    const { TreeSitterRuntime } = await import("../../src/session/runtime.ts");
+    const { TreeSitterRuntime } = await import("../../src/worker/runtime.ts");
     const runtime = new TreeSitterRuntime(fixture());
 
     await expect(

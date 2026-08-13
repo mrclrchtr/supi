@@ -28,7 +28,7 @@ describe("TreeSitterRuntime retry behavior", () => {
       Query: class {},
     }));
 
-    const { TreeSitterRuntime } = await import("../src/session/runtime.ts");
+    const { TreeSitterRuntime } = await import("../src/worker/runtime.ts");
     const runtime = new TreeSitterRuntime("/tmp");
 
     await expect(runtime.ensureGrammarParser("typescript")).rejects.toThrow("setLanguage failed");
@@ -55,7 +55,7 @@ describe("TreeSitterRuntime retry behavior", () => {
       Query: class {},
     }));
 
-    const { TreeSitterRuntime } = await import("../src/session/runtime.ts");
+    const { TreeSitterRuntime } = await import("../src/worker/runtime.ts");
     const runtime = new TreeSitterRuntime("/tmp");
 
     await expect(runtime.ensureGrammarParser("typescript")).rejects.toThrow(
@@ -90,7 +90,7 @@ describe("TreeSitterRuntime retry behavior", () => {
       Query: class {},
     }));
 
-    const { TreeSitterRuntime } = await import("../src/session/runtime.ts");
+    const { TreeSitterRuntime } = await import("../src/worker/runtime.ts");
     const runtime = new TreeSitterRuntime("/tmp");
     const pending = runtime.ensureGrammarParser("typescript");
     await vi.waitFor(() => expect(load).toHaveBeenCalledOnce());
@@ -122,7 +122,7 @@ describe("TreeSitterRuntime retry behavior", () => {
       Query: class {},
     }));
 
-    const { TreeSitterRuntime } = await import("../src/session/runtime.ts");
+    const { TreeSitterRuntime } = await import("../src/worker/runtime.ts");
     const runtime = new TreeSitterRuntime("/tmp");
     await runtime.ensureGrammarParser("typescript");
     await runtime.ensureGrammarParser("javascript");
@@ -154,7 +154,7 @@ describe("TreeSitterRuntime retry behavior", () => {
       Query: class {},
     }));
 
-    const { TreeSitterRuntime } = await import("../src/session/runtime.ts");
+    const { TreeSitterRuntime } = await import("../src/worker/runtime.ts");
     const runtime = new TreeSitterRuntime("/tmp");
 
     const [first, second] = await Promise.all([

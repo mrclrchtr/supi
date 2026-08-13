@@ -6,6 +6,18 @@ See also: `packages/supi-code-intelligence/CONTEXT.md` (Structural request contr
 
 ## Language
 
-**Cooperative structural cancellation**:
-Request interruption observed before and after asynchronous reads and through Tree-sitter parser/query progress callbacks. Interrupted parser state resets before reuse, and interrupted work cannot publish a cache entry. It does not guarantee that the main event loop stays responsive between synchronous WASM callbacks.
-_Avoid_: Worker cancellation, result-only cancellation, main-thread responsiveness
+**Structural Worker**:
+The one long-lived Worker owned by one shared workspace lifecycle or explicitly owned Tree-sitter session. It owns every parser-backed resource, source read, extraction, and cache.
+_Avoid_: Worker pool, main-thread parser, generic scheduler
+
+**Structural mailbox**:
+The parent-owned fixed FIFO of one active request and at most 32 queued requests. Valid queued work keeps order across a fresh-Worker restart.
+_Avoid_: Job queue, priority queue, configurable concurrency
+
+**Structural hard stop**:
+Worker termination after an active request does not settle within 250 ms of the parent setting its shared atomic cancellation flag. The active request is not retried and Worker caches become cold.
+_Avoid_: Process timeout, cancellation retry
+
+**Worker-cooperative structural cancellation**:
+Request interruption observed through asynchronous Worker phases and parser/query progress callbacks. The shared atomic flag stays visible while synchronous WASM blocks the Worker's event loop. Worker isolation keeps Pi's main event loop responsive.
+_Avoid_: result-only cancellation, cancel-message-only control, main-thread fallback

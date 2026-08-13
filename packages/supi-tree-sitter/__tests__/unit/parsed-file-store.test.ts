@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Query, Tree } from "web-tree-sitter";
-import {
-  ParsedFileStore,
-  type ParsedFileStoreLimits,
-} from "../../src/session/parsed-file-store.ts";
 import type { GrammarId } from "../../src/types.ts";
+import { ParsedFileStore, type ParsedFileStoreLimits } from "../../src/worker/parsed-file-store.ts";
 
 const DEFAULT_TEST_LIMITS: ParsedFileStoreLimits = {
   maxFileEntries: 2,

@@ -1,33 +1,35 @@
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: raw parser and query ownership stays in one Worker-only module
 // Tree-sitter runtime — parser management, parse, and query services.
 
 import * as path from "node:path";
-import {
-  type CodeRequestControl,
-  isCodeRequestInterrupted,
-  isCodeRequestInterruption,
-  throwIfCodeRequestInterrupted,
-} from "@mrclrchtr/supi-code-runtime/api";
 import { resolveToolPath } from "@mrclrchtr/supi-core/path";
 import type { Language, Parser, Tree } from "web-tree-sitter";
 import { detectGrammar, resolveGrammarWasmPath } from "../language.ts";
+import {
+  finishStructuralTiming,
+  type ParseTimingPhase,
+  type QueryTimingPhase,
+  type StructuralTimingEvent,
+  startStructuralTiming,
+} from "../session/structural-timing.ts";
 import type { GrammarId, QueryCapture, TreeSitterResult } from "../types.ts";
 import {
   ParsedFileReadError,
   ParsedFileStore,
   type StructuralCacheObservation,
 } from "./parsed-file-store.ts";
+import {
+  isStructuralRequestInterrupted,
+  isStructuralRequestInterruption,
+  type StructuralRequestControl,
+  throwIfStructuralRequestInterrupted,
+} from "./request-control.ts";
 import { resetInterruptedParser } from "./runtime-parser-helpers.ts";
 import {
   collectQueryCaptures,
   formatRuntimeError,
   validateQueryString,
 } from "./runtime-query-helpers.ts";
-import {
-  finishStructuralTiming,
-  type ParseTimingPhase,
-  type QueryTimingPhase,
-  startStructuralTiming,
-} from "./structural-timing.ts";
 
 interface ParserEntry {
   parser: Parser;
@@ -41,7 +43,7 @@ interface ParsedQueryInput {
   readonly tree: Tree;
   readonly source: string;
   readonly queryString: string;
-  readonly control?: CodeRequestControl;
+  readonly control?: StructuralRequestControl;
 }
 
 /**
@@ -61,7 +63,10 @@ export class TreeSitterRuntime {
   private disposed = false;
 
   /** Create a runtime that resolves relative file paths from `cwd`. */
-  constructor(private cwd: string) {}
+  constructor(
+    private cwd: string,
+    private onTiming?: (event: StructuralTimingEvent) => void,
+  ) {}
 
   /** Ensure web-tree-sitter Parser is initialized. */
   private async ensureParserInit(): Promise<typeof import("web-tree-sitter")> {
@@ -145,7 +150,7 @@ export class TreeSitterRuntime {
    */
   async parseFile(
     filePath: string,
-    control?: CodeRequestControl,
+    control?: StructuralRequestControl,
   ): Promise<
     TreeSitterResult<{
       tree: Tree;
@@ -164,7 +169,7 @@ export class TreeSitterRuntime {
       };
     }
 
-    const timer = startStructuralTiming();
+    const timer = startStructuralTiming(this.onTiming);
     const parserState = this.parsers.has(grammarId)
       ? "reused"
       : this.parserPromises.has(grammarId)
@@ -185,24 +190,24 @@ export class TreeSitterRuntime {
           finalPhase = "parser-setup";
           let entry = await this.ensureGrammarParser(grammarId);
           this.assertActive();
-          throwIfCodeRequestInterrupted(control);
+          throwIfStructuralRequestInterrupted(control);
           if (this.parsers.get(grammarId) !== entry) {
             entry = await this.ensureGrammarParser(grammarId);
             this.assertActive();
-            throwIfCodeRequestInterrupted(control);
+            throwIfStructuralRequestInterrupted(control);
           }
           timer.mark("parser-setup");
           finalPhase = "parse";
           const tree = entry.parser.parse(source, undefined, {
-            progressCallback: () => isCodeRequestInterrupted(control),
+            progressCallback: () => isStructuralRequestInterrupted(control),
           });
           if (!tree) {
             resetInterruptedParser(this.parsers, grammarId, entry);
-            throwIfCodeRequestInterrupted(control);
+            throwIfStructuralRequestInterrupted(control);
             throw new Error("Tree-sitter parser did not produce a tree");
           }
           try {
-            throwIfCodeRequestInterrupted(control);
+            throwIfStructuralRequestInterrupted(control);
             return tree;
           } catch (error) {
             tree.delete();
@@ -228,7 +233,7 @@ export class TreeSitterRuntime {
         },
       };
     } catch (err: unknown) {
-      if (isCodeRequestInterruption(err, control)) {
+      if (isStructuralRequestInterruption(err, control)) {
         finishStructuralTiming(timer, {
           operation: "parse",
           grammar: grammarId,
@@ -266,7 +271,7 @@ export class TreeSitterRuntime {
   async queryFile(
     filePath: string,
     queryString: string,
-    control?: CodeRequestControl,
+    control?: StructuralRequestControl,
   ): Promise<TreeSitterResult<QueryCapture[]>> {
     const validation = validateQueryString(queryString);
     if (validation) return validation;
@@ -288,7 +293,7 @@ export class TreeSitterRuntime {
     const validation = validateQueryString(queryString);
     if (validation) return validation;
 
-    const timer = startStructuralTiming();
+    const timer = startStructuralTiming(this.onTiming);
     let phase: QueryTimingPhase = "query-compilation";
     let compilationStarted = false;
     let cache: StructuralCacheObservation = {
@@ -300,15 +305,15 @@ export class TreeSitterRuntime {
     try {
       let entry = await this.ensureGrammarParser(grammarId);
       this.assertActive();
-      throwIfCodeRequestInterrupted(control);
+      throwIfStructuralRequestInterrupted(control);
       if (this.parsers.get(grammarId) !== entry) {
         entry = await this.ensureGrammarParser(grammarId);
         this.assertActive();
-        throwIfCodeRequestInterrupted(control);
+        throwIfStructuralRequestInterrupted(control);
       }
       const mod = await this.ensureParserInit();
       this.assertActive();
-      throwIfCodeRequestInterrupted(control);
+      throwIfStructuralRequestInterrupted(control);
       compilationStarted = true;
       const execution = this.parsedFiles.withQuery(grammarId, queryString, {
         control,
@@ -325,9 +330,9 @@ export class TreeSitterRuntime {
             phase = "query-execution";
           }
           const matches = query.matches(tree.rootNode, {
-            progressCallback: () => isCodeRequestInterrupted(control),
+            progressCallback: () => isStructuralRequestInterrupted(control),
           });
-          throwIfCodeRequestInterrupted(control);
+          throwIfStructuralRequestInterrupted(control);
           return collectQueryCaptures(matches, source);
         },
       });
@@ -341,7 +346,7 @@ export class TreeSitterRuntime {
       });
       return { kind: "success", data: execution.data };
     } catch (err: unknown) {
-      if (isCodeRequestInterruption(err, control)) {
+      if (isStructuralRequestInterruption(err, control)) {
         finishStructuralTiming(timer, {
           operation: "query",
           grammar: grammarId,

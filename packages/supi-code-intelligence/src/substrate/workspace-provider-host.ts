@@ -5,9 +5,11 @@ import { LspRuntimeController, scanWorkspaceSentinels } from "@mrclrchtr/supi-ls
 import { TreeSitterRuntimeController } from "@mrclrchtr/supi-tree-sitter/api";
 
 const HOSTS = Symbol.for("supi-code-intelligence/workspace-provider-hosts");
+const CLOSING_HOSTS = Symbol.for("supi-code-intelligence/closing-workspace-provider-hosts");
 const SHUTDOWN_GRACE_MS = 2_000;
 
 type HostRegistry = Map<string, WorkspaceProviderHost>;
+type ClosingHostRegistry = Map<string, Promise<void>>;
 
 /** One acquired reference to a process-shared Workspace provider host. */
 export interface WorkspaceProviderHostLease {
@@ -21,6 +23,12 @@ function registry(): HostRegistry {
   const global = globalThis as typeof globalThis & { [HOSTS]?: HostRegistry };
   global[HOSTS] ??= new Map();
   return global[HOSTS];
+}
+
+function closingRegistry(): ClosingHostRegistry {
+  const global = globalThis as typeof globalThis & { [CLOSING_HOSTS]?: ClosingHostRegistry };
+  global[CLOSING_HOSTS] ??= new Map();
+  return global[CLOSING_HOSTS];
 }
 
 function canonicalWorkspace(cwd: string): string {
@@ -76,8 +84,16 @@ class WorkspaceProviderHost {
         released = true;
         this.#leases--;
         if (this.#leases === 0) {
-          registry().delete(this.cwd);
-          await this.#shutdown();
+          await Promise.resolve();
+          if (this.#leases !== 0) return;
+          const shutdown = this.#shutdown();
+          closingRegistry().set(this.cwd, shutdown);
+          try {
+            await shutdown;
+          } finally {
+            if (closingRegistry().get(this.cwd) === shutdown) closingRegistry().delete(this.cwd);
+            registry().delete(this.cwd);
+          }
         }
       },
     };
@@ -101,7 +117,7 @@ class WorkspaceProviderHost {
     this.#closed = true;
     await Promise.all([
       ...(this.#lsp ? [settleWithin(this.#lsp.shutdown())] : []),
-      ...(this.#tree ? [settleWithin(this.#tree.shutdown())] : []),
+      ...(this.#tree ? [this.#tree.shutdown()] : []),
     ]);
     this.#lsp = null;
     this.#tree = null;
@@ -114,6 +130,11 @@ export async function acquireWorkspaceProviderHost(
   options: { projectTrusted: boolean },
 ): Promise<WorkspaceProviderHostLease> {
   const workspace = canonicalWorkspace(cwd);
+  for (;;) {
+    const closing = closingRegistry().get(workspace);
+    if (!closing) break;
+    await closing.catch(() => undefined);
+  }
   const hosts = registry();
   let host = hosts.get(workspace);
   if (!host) {
@@ -126,4 +147,5 @@ export async function acquireWorkspaceProviderHost(
 /** Clear process-shared hosts between isolated tests. */
 export function resetWorkspaceProviderHostsForTests(): void {
   registry().clear();
+  closingRegistry().clear();
 }

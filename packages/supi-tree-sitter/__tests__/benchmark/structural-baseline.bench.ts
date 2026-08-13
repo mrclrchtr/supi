@@ -22,8 +22,8 @@ beforeAll(async () => {
   }
 });
 
-afterAll(() => {
-  repeatedSession.dispose();
+afterAll(async () => {
+  await repeatedSession.dispose();
   resetDebugRegistry();
 });
 
@@ -36,7 +36,7 @@ describe("representative structural operation baselines", () => {
         const result = await session.outline(FIXTURE_FILE);
         if (result.kind !== "success") throw new Error(`Cold outline failed: ${result.message}`);
       } finally {
-        session.dispose();
+        await session.dispose();
       }
     },
     BENCHMARK_OPTIONS,
@@ -59,7 +59,7 @@ describe("representative structural operation baselines", () => {
         const result = await session.callSites(FIXTURE_FILE);
         if (result.kind !== "success") throw new Error(`Cold call sites failed: ${result.message}`);
       } finally {
-        session.dispose();
+        await session.dispose();
       }
     },
     BENCHMARK_OPTIONS,
@@ -72,6 +72,18 @@ describe("representative structural operation baselines", () => {
       if (result.kind !== "success") {
         throw new Error(`Repeated call sites failed: ${result.message}`);
       }
+    },
+    BENCHMARK_OPTIONS,
+  );
+
+  bench(
+    "post-restart cold parser and outline",
+    async () => {
+      await repeatedSession.dispose();
+      repeatedSession = createTreeSitterSession(FIXTURE_DIR);
+      const result = await repeatedSession.outline(FIXTURE_FILE);
+      if (result.kind !== "success")
+        throw new Error(`Post-restart outline failed: ${result.message}`);
     },
     BENCHMARK_OPTIONS,
   );

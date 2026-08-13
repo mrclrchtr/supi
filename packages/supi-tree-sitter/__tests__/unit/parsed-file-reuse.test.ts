@@ -7,8 +7,8 @@ import {
   resetDebugRegistry,
 } from "@mrclrchtr/supi-core/debug";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { TreeSitterRuntime } from "../../src/session/runtime.ts";
 import { lookupCalleesAt } from "../../src/tool/callees.ts";
+import { TreeSitterRuntime } from "../../src/worker/runtime.ts";
 
 let tmpDir: string;
 

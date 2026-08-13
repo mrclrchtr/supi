@@ -97,7 +97,7 @@ async function cleanupWorkspace(options: {
     await options.controller.shutdown();
   } finally {
     options.runtime.clearWorkspace(options.cwd);
-    options.treeSitter.dispose();
+    await options.treeSitter.dispose();
     rmSync(options.cwd, { recursive: true, force: true });
   }
 }

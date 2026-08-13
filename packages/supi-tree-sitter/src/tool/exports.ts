@@ -2,9 +2,9 @@
 
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { nodeToRange } from "../coordinates.ts";
-import type { TreeSitterRuntime } from "../session/runtime.ts";
 import type { SyntaxNodeLike } from "../syntax-node.ts";
 import type { ExportRecord, TreeSitterResult } from "../types.ts";
+import type { TreeSitterRuntime } from "../worker/runtime.ts";
 
 /** Extract export records from a supported file. */
 export async function extractExports(

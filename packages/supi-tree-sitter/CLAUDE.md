@@ -3,7 +3,7 @@
 ## Scope
 
 `@mrclrchtr/supi-tree-sitter` is a **library-only** package with one explicit surface:
-- `@mrclrchtr/supi-tree-sitter/api` → `src/api.ts` / `src/index.ts` → exports structured runtime/service APIs (`createTreeSitterSession()`, `getSessionTreeSitterService()`), structural extraction services (`lookupCalleesAt`, `collectOutline`, `extractExports`, etc.), language detection helpers, and shared types for other SuPi packages.
+- `@mrclrchtr/supi-tree-sitter/api` → `src/api.ts` / `src/index.ts` → exports asynchronous service APIs (`createTreeSitterSession()`, `getSessionTreeSitterService()`), language and operation-support helpers, the lifecycle controller, and shared result types. Raw runtime and extraction helpers are Worker-internal.
 
 This package has **no pi extension surface** — no `pi.extensions`, no `src/extension.ts`, no `./extension` export. Public tool registration and session lifecycle handlers live in `@mrclrchtr/supi-code-intelligence`. The package does not depend on `supi-lsp` and must remain correct when installed independently.
 
@@ -53,13 +53,18 @@ src/
   operation-support.ts # extractor-specific extension support for structural search
   syntax-node.ts      # syntax node interface
   session/
-    runtime.ts        # grammar initialization, parser reuse, parse/query services
-    parsed-file-store.ts # private bounded LRU ownership for parsed files and compiled queries
-    structural-timing.ts # sanitized parse/query timing observations
+    structural-worker-client.ts # parent mailbox, cancellation, protocol, restart, and termination
+    structural-worker-protocol.ts # private versioned bounded message contract
+    structural-timing.ts # sanitized Worker timing observations and parent publication
     service-registry.ts # shared session-scoped structural service registry (backed by core helper)
-    session.ts        # runtime-backed service helpers and owned session factory
-    runtime-controller.ts # Tree-sitter runtime lifecycle controller
+    session.ts        # asynchronous Worker-proxy service and owned session factory
+    runtime-controller.ts # shared Structural Worker lifecycle controller
     runtime-registration.ts # Runtime registration helpers
+  worker/
+    bootstrap.mjs     # package-owned jiti Worker bootstrap
+    worker-main.ts    # Worker request execution and bounded chunk publication
+    runtime.ts        # Worker-only grammar initialization and parse/query services
+    parsed-file-store.ts # Worker-only bounded LRU parsed-file and query ownership
   tool/
     call-sites.ts     # call-site extraction
     callees.ts        # callee extraction
@@ -80,8 +85,9 @@ src/
 ## Key files
 
 - `resources/grammars/<id>/` — vendored WASM files for all 15 supported grammars
-- `src/session/runtime.ts` — grammar initialization, parser reuse, parse/query services
-- `src/session/parsed-file-store.ts` — private parsed-file and compiled-query LRU ownership
+- `src/session/structural-worker-client.ts` — parent mailbox, request control, restart, and termination
+- `src/worker/runtime.ts` — Worker-only grammar initialization, parser reuse, and parse/query services
+- `src/worker/parsed-file-store.ts` — Worker-only parsed-file and compiled-query LRU ownership
 - `src/session/service-registry.ts` — shared session-scoped structural service registry
 - `src/session/session.ts` — runtime-backed service helpers and owned session factory
 - `src/provider/tree-sitter-provider.ts` — StructuralProvider impl consumed by supi-code-intelligence
@@ -105,9 +111,10 @@ pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json
 ## Gotchas
 
 - `web-tree-sitter` query construction errors are validation errors; avoid broad runtime-error string heuristics.
-- Structural services apply optional shared `CodeRequestControl` cooperatively. Pass the exact value through service helpers. Reads receive the signal; parser and query progress callbacks check signal/deadline; interrupted parsers reset before reuse; cache publication checks interruption first. Do not claim event-loop responsiveness.
-- `TreeSitterSession.canParse()` is a parseability check only. The parsed-file store keeps canonical trees private and gives runtime consumers owned shallow copies. Delete each owned copy. The installed `web-tree-sitter` `Language` type has no release method; runtime disposal deletes trees, queries, and parsers, then drops language references.
-- `TreeSitterRuntimeController` generation-fences startup. Shutdown and a newer start dispose the pending runtime, and stale startup continuations must not publish capability state.
+- Structural services apply optional shared `CodeRequestControl` in the Worker. The parent maps it to an absolute deadline, a local Worker abort, and one shared atomic cancellation slot. A 250 ms hard stop terminates uncooperative work. Never add a main-thread parser fallback.
+- `TreeSitterSession.canParse()` is a parseability check only. The Worker keeps canonical trees private. The installed `web-tree-sitter` `Language` type has no release method; Worker disposal deletes trees, queries, and parsers, then drops language references.
+- `TreeSitterRuntimeController` generation-fences startup. Shutdown and a newer start await pending session disposal, and stale startup continuations must not publish capability state.
+- `TreeSitterSession.dispose()` is asynchronous. All owners must await it.
 - `extractExports()` reports file-level exports only; nested `declare namespace/module` exports are scope-local.
 - `declare module "foo"` parses as a string-named `module` node; keep outline shallow and preserve the module name.
 - CRLF input needs normalized line splitting in coordinate helpers and `node_at` bounds to stay LSP-compatible.
@@ -118,7 +125,7 @@ pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json
 ## Packaging
 
 - Native `tree-sitter-*` packages are `devDependencies` only — NOT bundled or resolved at runtime
-- Only `web-tree-sitter` is a runtime `dependency`
+- `web-tree-sitter` and `jiti` are runtime dependencies and bundled dependencies
 - All grammar WASM files are vendored in `resources/` and shipped via the `files` field (`"resources"` entry in `package.json`)
 - This reduces `npm pack` size for consumers by ~89% compared to bundling native npm packages
 
@@ -132,4 +139,4 @@ pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json
 
 Keep this package independent of `supi-lsp` internals. Any shared utilities belong in `supi-core`.
 
-The package publishes a shared session-scoped Tree-sitter service through `getSessionTreeSitterService(cwd)`. Its backing storage delegates to `createSessionStateRegistry()` from `@mrclrchtr/supi-core/api`, while the Tree-sitter package keeps its own `ready | unavailable` wrapper local. Peer packages that only need structural operations should prefer that shared service over repeatedly creating owned sessions. Use `createTreeSitterSession()` only when you need an explicitly owned lifecycle.
+The package publishes a shared session-scoped Tree-sitter service through `getSessionTreeSitterService(cwd)`. Its backing storage delegates to `createSessionStateRegistry()` from `@mrclrchtr/supi-core/api`, while the Tree-sitter package keeps its own `ready | unavailable` wrapper local. Peer packages that only need structural operations should prefer that shared service over repeatedly creating owned sessions. Use `createTreeSitterSession()` only when you need an explicitly owned Worker lifecycle, and await its disposal.

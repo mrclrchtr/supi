@@ -21,12 +21,12 @@ function writeSource(fileName: string, source: string): string {
 }
 
 describe("TreeSitterSession.calleesAt", () => {
-  it("exposes calleesAt as a function on the session", () => {
+  it("exposes calleesAt as a function on the session", async () => {
     const session = createTreeSitterSession(tmpDir);
     try {
       expect(session.calleesAt).toEqual(expect.any(Function));
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 
@@ -36,7 +36,7 @@ describe("TreeSitterSession.calleesAt", () => {
       const result = await session.calleesAt("test.ts", 0, 5);
       expect(result.kind).toBe("validation-error");
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 });
@@ -66,7 +66,7 @@ describe("calleesAt — structural callee detection", () => {
         expect(result.data.callees[1].name).toContain("doSomethingElse");
       }
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 
@@ -84,7 +84,7 @@ describe("calleesAt — structural callee detection", () => {
         expect(result.data.callees).toHaveLength(2);
       }
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 
@@ -103,7 +103,7 @@ describe("calleesAt — structural callee detection", () => {
         expect(result.data.callees[0].name).toContain("compute_value");
       }
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 
@@ -121,7 +121,7 @@ describe("calleesAt — structural callee detection", () => {
         expect(result.data.callees).toHaveLength(2);
       }
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 
@@ -151,7 +151,7 @@ describe("calleesAt — structural callee detection", () => {
         expect(names).not.toContain("deeplyNested");
       }
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 
@@ -179,7 +179,7 @@ describe("calleesAt — structural callee detection", () => {
         ]);
       }
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 
@@ -191,7 +191,7 @@ describe("calleesAt — structural callee detection", () => {
       const result = await session.calleesAt("test.html", 1, 5);
       expect(result.kind).toBe("unsupported-language");
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 
@@ -203,7 +203,7 @@ describe("calleesAt — structural callee detection", () => {
       const result = await session.calleesAt("test.sql", 1, 5);
       expect(result.kind).toBe("unsupported-language");
     } finally {
-      session.dispose();
+      await session.dispose();
     }
   });
 });

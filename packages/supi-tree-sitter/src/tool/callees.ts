@@ -2,8 +2,8 @@
 
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { detectGrammar } from "../language.ts";
-import { queryParsedFile, type TreeSitterRuntime } from "../session/runtime.ts";
 import type { GrammarId, SourceRange, TreeSitterResult } from "../types.ts";
+import { queryParsedFile, type TreeSitterRuntime } from "../worker/runtime.ts";
 
 /** Result shape returned by lookupCalleesAt. */
 export interface CalleesAtResult {

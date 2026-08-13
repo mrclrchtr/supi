@@ -1,176 +1,62 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TreeSitterRuntime } from "../src/session/runtime.ts";
+import * as path from "node:path";
+import { describe, expect, it } from "vitest";
+import { createTreeSitterSession } from "../src/session/session.ts";
 
-const mocks = vi.hoisted(() => {
-  const instances: RuntimeMock[] = [];
-  return {
-    instances,
-    extractExports: vi.fn(),
-    extractImports: vi.fn(),
-    extractOutline: vi.fn(),
-    lookupNodeAt: vi.fn(),
-    lookupCalleesAt: vi.fn(),
-    extractCallSites: vi.fn(),
-  };
-});
-
-type RuntimeMock = {
-  cwd: string;
-  parseFile: ReturnType<typeof vi.fn>;
-  queryFile: ReturnType<typeof vi.fn>;
-  dispose: ReturnType<typeof vi.fn>;
-};
-
-vi.mock("../src/session/runtime.ts", () => ({
-  TreeSitterRuntime: class {
-    cwd: string;
-    parseFile = vi.fn();
-    queryFile = vi.fn();
-    dispose = vi.fn();
-
-    constructor(cwd: string) {
-      this.cwd = cwd;
-      mocks.instances.push(this as RuntimeMock);
-    }
-  },
-}));
-
-vi.mock("../src/tool/structure.ts", () => ({
-  extractExports: mocks.extractExports,
-  extractImports: mocks.extractImports,
-  extractOutline: mocks.extractOutline,
-  lookupNodeAt: mocks.lookupNodeAt,
-  lookupCalleesAt: mocks.lookupCalleesAt,
-  extractCallSites: mocks.extractCallSites,
-}));
-
-async function importSessionFactory() {
-  const mod = await import("../src/session/session.ts");
-  return mod.createTreeSitterSession;
-}
-
-function createParsedTree() {
-  return {
-    rootNode: { type: "program" },
-    delete: vi.fn(),
-  };
-}
+const FIXTURE_DIR = path.resolve(import.meta.dirname, "fixtures");
 
 describe("createTreeSitterSession", () => {
-  beforeEach(() => {
-    mocks.instances.length = 0;
-    mocks.extractExports.mockReset();
-    mocks.extractImports.mockReset();
-    mocks.extractOutline.mockReset();
-    mocks.lookupNodeAt.mockReset();
-    mocks.lookupCalleesAt.mockReset();
-    mocks.extractCallSites.mockReset();
+  it("runs all structural operations through the owned Worker", async () => {
+    const session = createTreeSitterSession(FIXTURE_DIR);
+    try {
+      await expect(session.canParse("sample.ts")).resolves.toEqual({
+        kind: "success",
+        data: { file: path.join(FIXTURE_DIR, "sample.ts"), language: "typescript" },
+      });
+      await expect(
+        session.query("sample.ts", "(function_declaration name: (identifier) @name)"),
+      ).resolves.toEqual({
+        kind: "success",
+        data: [expect.objectContaining({ name: "name", nodeType: "identifier", text: "hello" })],
+      });
+      await expect(session.outline("sample.ts")).resolves.toEqual({
+        kind: "success",
+        data: expect.arrayContaining([expect.objectContaining({ name: "hello" })]),
+      });
+      await expect(session.imports("sample.ts")).resolves.toEqual({
+        kind: "success",
+        data: expect.arrayContaining([
+          expect.objectContaining({ moduleSpecifier: "node:fs/promises" }),
+        ]),
+      });
+      await expect(session.exports("sample.ts")).resolves.toEqual({
+        kind: "success",
+        data: expect.arrayContaining([expect.objectContaining({ name: "hello" })]),
+      });
+      await expect(session.nodeAt("sample.ts", 1, 17)).resolves.toEqual({
+        kind: "success",
+        data: expect.objectContaining({ type: "identifier", text: "hello" }),
+      });
+      await expect(session.calleesAt("sample.ts", 1, 17)).resolves.toEqual({
+        kind: "success",
+        data: expect.objectContaining({ depth: "direct" }),
+      });
+      await expect(session.callSites("sample.ts")).resolves.toEqual({
+        kind: "success",
+        data: expect.any(Array),
+      });
+    } finally {
+      await session.dispose();
+    }
   });
 
-  it("delegates canParse and deletes the parse tree", async () => {
-    const createTreeSitterSession = await importSessionFactory();
-    const session = createTreeSitterSession("/repo");
-    const runtime = mocks.instances[0];
-    const tree = createParsedTree();
-    runtime?.parseFile.mockResolvedValue({
-      kind: "success",
-      data: { tree, source: "", resolvedPath: "/repo/sample.ts", grammarId: "typescript" },
+  it("awaits disposal and rejects later admission", async () => {
+    const session = createTreeSitterSession(FIXTURE_DIR);
+    await session.canParse("sample.ts");
+    await session.dispose();
+
+    await expect(session.canParse("sample.ts")).resolves.toEqual({
+      kind: "runtime-error",
+      message: "Structural Worker is shut down",
     });
-
-    const result = await session.canParse("sample.ts");
-
-    expect(result).toEqual({
-      kind: "success",
-      data: { file: "/repo/sample.ts", language: "typescript" },
-    });
-    expect(runtime?.parseFile).toHaveBeenCalledWith("sample.ts");
-    expect(tree.delete).toHaveBeenCalledOnce();
-  });
-
-  it("delegates query, imports, exports, and nodeAt", async () => {
-    const createTreeSitterSession = await importSessionFactory();
-    const session = createTreeSitterSession("/repo");
-    const runtime = mocks.instances[0] as unknown as TreeSitterRuntime;
-    mocks.instances[0]?.queryFile.mockResolvedValue({ kind: "success", data: [] });
-    mocks.extractImports.mockResolvedValue({ kind: "success", data: [] });
-    mocks.extractExports.mockResolvedValue({ kind: "success", data: [] });
-    mocks.lookupNodeAt.mockResolvedValue({
-      kind: "success",
-      data: { type: "identifier", range: range(), text: "x", ancestry: [] },
-    });
-
-    await session.query("sample.ts", "(identifier) @id");
-    await session.imports("sample.ts");
-    await session.exports("sample.ts");
-    await session.nodeAt("sample.ts", 1, 2);
-
-    expect(mocks.instances[0]?.queryFile).toHaveBeenCalledWith("sample.ts", "(identifier) @id");
-    expect(mocks.extractImports).toHaveBeenCalledWith(runtime, "sample.ts");
-    expect(mocks.extractExports).toHaveBeenCalledWith(runtime, "sample.ts");
-    expect(mocks.lookupNodeAt).toHaveBeenCalledWith(runtime, "sample.ts", 1, 2);
-  });
-
-  it("delegates outline and deletes the parse tree", async () => {
-    const createTreeSitterSession = await importSessionFactory();
-    const session = createTreeSitterSession("/repo");
-    const runtime = mocks.instances[0];
-    const tree = createParsedTree();
-    runtime?.parseFile.mockResolvedValue({
-      kind: "success",
-      data: { tree, source: "source", resolvedPath: "/repo/sample.ts", grammarId: "typescript" },
-    });
-    mocks.extractOutline.mockReturnValue([{ name: "x", kind: "function", range: range() }]);
-
-    const result = await session.outline("sample.ts");
-
-    expect(result.kind).toBe("success");
-    expect(mocks.extractOutline).toHaveBeenCalledWith(tree.rootNode, "source");
-    expect(tree.delete).toHaveBeenCalledOnce();
-  });
-
-  it("delegates calleesAt", async () => {
-    const createTreeSitterSession = await importSessionFactory();
-    const session = createTreeSitterSession("/repo");
-    mocks.lookupCalleesAt.mockResolvedValue({
-      kind: "success",
-      data: {
-        enclosingScope: {
-          name: "foo",
-          range: { startLine: 1, startCharacter: 1, endLine: 5, endCharacter: 1 },
-        },
-        callees: [
-          {
-            name: "bar",
-            range: { startLine: 3, startCharacter: 1, endLine: 3, endCharacter: 4 },
-          },
-        ],
-        depth: "direct" as const,
-      },
-    });
-
-    const result = await session.calleesAt("sample.ts", 1, 2);
-
-    expect(result.kind).toBe("success");
-    expect(mocks.lookupCalleesAt).toHaveBeenCalledWith(
-      mocks.instances[0] as unknown as TreeSitterRuntime,
-      "sample.ts",
-      1,
-      2,
-      undefined,
-    );
-  });
-
-  it("disposes the runtime", async () => {
-    const createTreeSitterSession = await importSessionFactory();
-    const session = createTreeSitterSession("/repo");
-    const runtime = mocks.instances[0];
-
-    session.dispose();
-
-    expect(runtime?.dispose).toHaveBeenCalledOnce();
   });
 });
-
-function range() {
-  return { startLine: 1, startCharacter: 1, endLine: 1, endCharacter: 2 };
-}

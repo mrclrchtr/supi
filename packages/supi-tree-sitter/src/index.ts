@@ -15,7 +15,6 @@ export type { StructuralSearchOperation } from "./operation-support.ts";
 export { getStructuralSearchSupportedExtensions } from "./operation-support.ts";
 // Provider implementation
 export { createTreeSitterProvider } from "./provider/tree-sitter-provider.ts";
-export { TreeSitterRuntime } from "./session/runtime.ts";
 export type {
   TsControllerState,
   TsStartResult,
@@ -23,13 +22,6 @@ export type {
 export { TreeSitterRuntimeController } from "./session/runtime-controller.ts";
 export { getSessionTreeSitterService } from "./session/service-registry.ts";
 export { createTreeSitterSession } from "./session/session.ts";
-// Structural extraction services (consumed by supi-code-intelligence tool execution)
-export { extractCallSites } from "./tool/call-sites.ts";
-export { lookupCalleesAt } from "./tool/callees.ts";
-export { extractExports } from "./tool/exports.ts";
-export { extractImports } from "./tool/imports.ts";
-export { lookupNodeAt } from "./tool/node-at.ts";
-export { collectOutline } from "./tool/outline.ts";
 // Shared types
 export type {
   CalleesAtResult,

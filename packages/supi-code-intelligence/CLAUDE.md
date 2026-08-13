@@ -57,7 +57,7 @@ Whole-workflow capability unavailable → throw from `execute()` so PI marks a r
 
 ## Provider/runtime contract
 
-`WorkspaceCapabilityAdapter` reads `supi-code-runtime` capability state and the `WorkspaceLspRuntime`. `Workspace provider host` is process-shared and reference-counted by canonical workspace; it starts LSP and Tree-sitter once and shuts them down only after the final session lease. Target/refactor stores remain session-local. `TestCapabilityAdapter` is the in-memory workflow-test seam. Read-only semantic providers return `CodeQueryResult<T>`; completed empty data must not be inferred as unavailable. When provider contracts change, update the LSP runtime, composite provider, test adapter, and behavior tests together.
+`WorkspaceCapabilityAdapter` reads `supi-code-runtime` capability state and the `WorkspaceLspRuntime`. `Workspace provider host` is process-shared and reference-counted by canonical workspace; it starts LSP and exactly one Tree-sitter Structural Worker, then awaits shutdown after the final session lease. Parser-backed work never falls back to the parent thread. Target/refactor stores remain session-local. `TestCapabilityAdapter` is the in-memory workflow-test seam. Read-only semantic providers return `CodeQueryResult<T>`; completed empty data must not be inferred as unavailable. When provider contracts change, update the LSP runtime, composite provider, test adapter, and behavior tests together.
 
 ## Always-on LSP policy
 

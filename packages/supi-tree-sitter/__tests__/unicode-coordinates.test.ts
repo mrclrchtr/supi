@@ -75,7 +75,7 @@ describe("real-parser UTF-16 coordinates", () => {
         },
       });
     } finally {
-      session.dispose();
+      await session.dispose();
       rmSync(tmpDir, { recursive: true, force: true });
     }
   });

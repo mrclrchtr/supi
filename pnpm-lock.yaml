@@ -525,6 +525,9 @@ importers:
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
+      jiti:
+        specifier: ^2.7.0
+        version: 2.7.0
       web-tree-sitter:
         specifier: ^0.26.8
         version: 0.26.12

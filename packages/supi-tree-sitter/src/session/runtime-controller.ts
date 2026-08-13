@@ -1,22 +1,14 @@
-// Tree-sitter session runtime controller — pi-independent lifecycle for structural analysis.
-//
-// This controller owns runtime creation/disposal for one cwd:
-//   - Creates and disposes the TreeSitterRuntime
-//   - Creates TreeSitterService from the runtime
-//   - Publishes SessionTreeSitterService state through the existing registry
-//   - Exposes ready/unavailable lifecycle for umbrella adapter consumption
+// Tree-sitter lifecycle controller — owns one Structural Worker for one cwd.
 
+import { fileURLToPath } from "node:url";
 import type { WorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import type { SessionTreeSitterService, TreeSitterService } from "../types.ts";
-import { TreeSitterRuntime } from "./runtime.ts";
+import type { SessionTreeSitterService, TreeSitterService, TreeSitterSession } from "../types.ts";
 import {
   registerTreeSitterCapabilities,
   unregisterTreeSitterCapabilities,
 } from "./runtime-registration.ts";
 import { clearSessionTreeSitterService, setSessionTreeSitterService } from "./service-registry.ts";
-import { createTreeSitterService } from "./session.ts";
-
-// ── Types ─────────────────────────────────────────────────────────────
+import { createTreeSitterSession } from "./session.ts";
 
 /** Starting state before or after shutdown. */
 export type TsControllerState = TsControllerInitial | TsControllerReady | TsControllerUnavailable;
@@ -27,7 +19,7 @@ interface TsControllerInitial {
 
 interface TsControllerReady {
   kind: "ready";
-  runtime: TreeSitterRuntime;
+  session: TreeSitterSession;
   service: TreeSitterService;
 }
 
@@ -39,137 +31,102 @@ interface TsControllerUnavailable {
 /** Result type from {@link TreeSitterRuntimeController.start}. */
 export type TsStartResult = { kind: "ready" } | { kind: "unavailable"; reason: string };
 
-// ── Controller ────────────────────────────────────────────────────────
-
-/**
- * Pi-independent Tree-sitter session lifecycle controller.
- *
- * Use this in the umbrella extension (supi-code-intelligence) instead of
- * reaching into substrate extension internals.
- *
- * @example
- * ```ts
- * const controller = new TreeSitterRuntimeController(cwd);
- * const result = await controller.start();
- * if (result.kind === "ready") {
- *   // use controller.service, controller.runtime
- * }
- * // later
- * await controller.shutdown();
- * ```
- */
+/** Pi-independent lifecycle for one shared workspace Structural Worker. */
 export class TreeSitterRuntimeController {
   readonly #cwd: string;
-  #state: TsControllerState;
+  #state: TsControllerState = { kind: "initial" };
   #runtime: WorkspaceRuntime | null;
-  #pendingRuntime: TreeSitterRuntime | null = null;
+  #pendingSession: TreeSitterSession | null = null;
   #generation = 0;
+  #transition = Promise.resolve();
 
   constructor(cwd: string, runtime?: WorkspaceRuntime) {
     this.#cwd = cwd;
-    this.#state = { kind: "initial" };
     this.#runtime = runtime ?? null;
   }
 
-  /** The workspace cwd this controller was created for. */
   get cwd(): string {
     return this.#cwd;
   }
 
-  /** Current controller state. */
   get kind(): TsControllerState["kind"] {
     return this.#state.kind;
   }
 
-  /** The TreeSitterService (structural operations), available when state is "ready". */
   get service(): SessionTreeSitterService | null {
     return this.#state.kind === "ready" ? this.#state.service : null;
   }
 
-  /** The TreeSitterRuntime, available when state is "ready". */
-  get runtime(): TreeSitterRuntime | null {
-    return this.#state.kind === "ready" ? this.#state.runtime : null;
-  }
-
-  /** Attach a WorkspaceRuntime for capability registration. */
   setRuntime(runtime: WorkspaceRuntime): void {
     this.#runtime = runtime;
   }
 
-  /**
-   * Start the Tree-sitter session.
-   *
-   * Creates the runtime, wires the service, and publishes state
-   * into the shared registries. Validates that WASM initialization
-   * succeeds, returning `unavailable` if it fails.
-   */
-  async start(): Promise<TsStartResult> {
+  /** Start and validate one Structural Worker before capability publication. */
+  start(): Promise<TsStartResult> {
     const generation = ++this.#generation;
-    this.#disposeOwnedRuntimes();
-    if (this.#runtime) unregisterTreeSitterCapabilities(this.#runtime, this.#cwd);
-    clearSessionTreeSitterService(this.#cwd);
+    let result: TsStartResult = supersededStart();
+    const transition = this.#transition.then(async () => {
+      if (generation !== this.#generation) return;
+      result = await this.#startGeneration(generation);
+    });
+    this.#transition = transition.catch(() => undefined);
+    return transition.then(() => result);
+  }
+
+  /** Stop publication, terminate owned Workers, and await their exit. */
+  async shutdown(): Promise<void> {
+    const generation = ++this.#generation;
+    const sessions = this.#takeOwnedSessions();
+    await Promise.all([...sessions].map((session) => session.dispose()));
+    if (generation === this.#generation) this.#state = { kind: "initial" };
+  }
+
+  async #startGeneration(generation: number): Promise<TsStartResult> {
+    const previous = this.#takeOwnedSessions();
+    await Promise.all([...previous].map((session) => session.dispose()));
+    if (generation !== this.#generation) return supersededStart();
     this.#state = { kind: "unavailable", reason: "Initializing Tree-sitter" };
 
-    const treeSitterRuntime = new TreeSitterRuntime(this.#cwd);
-    this.#pendingRuntime = treeSitterRuntime;
-
+    const session = createTreeSitterSession(this.#cwd);
+    this.#pendingSession = session;
     try {
-      // Probe WASM initialization by loading the JavaScript grammar
-      // (always vendored). This catches missing web-tree-sitter or
-      // corrupted WASM early rather than deferring to first tool use.
-      await treeSitterRuntime.ensureGrammarParser("javascript");
-
-      if (generation !== this.#generation || this.#pendingRuntime !== treeSitterRuntime) {
+      const probe = await session.canParse(fileURLToPath(import.meta.url));
+      if (probe.kind !== "success") throw new Error(probe.message);
+      if (generation !== this.#generation || this.#pendingSession !== session) {
         return supersededStart();
       }
-
-      const service = createTreeSitterService(treeSitterRuntime);
-      setSessionTreeSitterService(this.#cwd, service);
-
-      if (this.#runtime) {
-        registerTreeSitterCapabilities(this.#runtime, this.#cwd, service);
-      }
-
-      this.#pendingRuntime = null;
-      this.#state = { kind: "ready", runtime: treeSitterRuntime, service };
+      setSessionTreeSitterService(this.#cwd, session);
+      if (this.#runtime) registerTreeSitterCapabilities(this.#runtime, this.#cwd, session);
+      this.#pendingSession = null;
+      this.#state = { kind: "ready", session, service: session };
       return { kind: "ready" };
-    } catch (error: unknown) {
-      if (generation !== this.#generation || this.#pendingRuntime !== treeSitterRuntime) {
+    } catch (error) {
+      if (generation !== this.#generation || this.#pendingSession !== session) {
         return supersededStart();
       }
-      this.#pendingRuntime = null;
+      await session.dispose();
+      this.#pendingSession = null;
       const reason = error instanceof Error ? error.message : String(error);
-      treeSitterRuntime.dispose();
-      if (this.#runtime) {
-        unregisterTreeSitterCapabilities(this.#runtime, this.#cwd);
-      }
+      await this.#clearPublishedSession();
       this.#state = { kind: "unavailable", reason };
-      clearSessionTreeSitterService(this.#cwd);
       return { kind: "unavailable", reason };
     }
   }
 
-  /**
-   * Shut down the Tree-sitter session.
-   *
-   * Disposes the runtime and clears all published state.
-   */
-  async shutdown(): Promise<void> {
-    this.#generation++;
-    if (this.#runtime && this.#cwd) {
-      unregisterTreeSitterCapabilities(this.#runtime, this.#cwd);
-    }
-
-    clearSessionTreeSitterService(this.#cwd);
-    this.#disposeOwnedRuntimes();
-    this.#state = { kind: "initial" };
+  async #clearPublishedSession(): Promise<void> {
+    const sessions = this.#takeOwnedSessions();
+    await Promise.all([...sessions].map((session) => session.dispose()));
   }
 
-  /** Dispose both published and startup-owned runtimes before a lifecycle transition. */
-  #disposeOwnedRuntimes(): void {
-    this.#pendingRuntime?.dispose();
-    this.#pendingRuntime = null;
-    if (this.#state.kind === "ready") this.#state.runtime.dispose();
+  #takeOwnedSessions(): Set<TreeSitterSession> {
+    if (this.#runtime) unregisterTreeSitterCapabilities(this.#runtime, this.#cwd);
+    clearSessionTreeSitterService(this.#cwd);
+    const sessions = new Set<TreeSitterSession>();
+    if (this.#pendingSession) sessions.add(this.#pendingSession);
+    if (this.#state.kind === "ready") sessions.add(this.#state.session);
+    this.#pendingSession = null;
+    this.#state = { kind: "initial" };
+    return sessions;
   }
 }
 
