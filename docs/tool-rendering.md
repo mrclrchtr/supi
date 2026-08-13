@@ -1,12 +1,12 @@
 # Tool Rendering Convention
 
-This document defines SuPi's human-facing transcript convention for PI tools. For PI API rules, see [PI Extension Tool Guidelines](pi/tool-guidance.md#rendering-and-tui-rules).
+This document defines SuPi's human-facing transcript convention for PI tools. SuPi policy is stricter than PI's optional renderer API. For PI API rules, see [PI Extension Tool Guidelines](pi/tool-guidance.md#rendering-and-tui-rules).
 
-A tool result has separate surfaces:
+A tool has separate surfaces:
 
-- **Agent surface** — `content` text or image blocks. PI sends this to the model and stores it in the tool-result session entry. The content may already be bounded or truncated. Collapsing or expanding the TUI does not change it.
-- **Human transcript surface** — `renderCall` and `renderResult` components. PI uses these in the interactive TUI. PI's HTML export can also reuse them.
-- **Details surface** — `details` metadata for UI, logs, and state reconstruction. PI stores it with the tool result. PI does not automatically send it to the model as tool output.
+- **Agent surface** — Final `content` text or image blocks. PI stores this content in the tool-result session entry and uses it as model-facing tool-result content. The content can already be bounded or truncated. Collapsing or expanding the TUI does not change it. Partial `onUpdate()` content is not sent to the model or stored in the session.
+- **Human transcript surface** — `renderCall` and `renderResult` components. PI uses these in the interactive TUI. Current-session HTML export can also reuse them for custom tools. Standalone `pi --export` has no active extension tool definitions and does not reuse extension renderers.
+- **Details surface** — Final `details` metadata for UI, logs, and state reconstruction. PI stores it with the tool result. PI does not automatically send it to the model as tool output. Partial `details` from `onUpdate()` are transient runtime data unless the final result includes them.
 - **Transient UI** — `ctx.ui.custom()` components shown while a tool runs. This is separate from transcript rendering.
 
 ## Scope
@@ -26,13 +26,13 @@ A tool may open a temporary form with `ctx.ui.custom()`. The tool still needs a 
 - `packages/supi-ask-user/src/ui/form.ts` opens the temporary form.
 - `packages/supi-ask-user/src/render/transcript.ts` renders the completed tool result.
 
-Commands and durable custom entries use different APIs. Use `registerMessageRenderer()` for `pi.sendMessage()` messages and `registerEntryRenderer()` for `pi.appendEntry()` entries. Apply the same details-first rule where those surfaces have structured data.
+Custom messages and durable custom entries use different APIs. Use `registerMessageRenderer()` for `pi.sendMessage()` messages and `registerEntryRenderer()` for `pi.appendEntry()` entries. Build their chrome from `message.details` or `entry.data`; do not recover structured facts from message text.
 
 ## Slots
 
 ### `renderCall`
 
-`renderCall` should show a compact call header, preferably on one line. Include the tool name and the most useful arguments. Do not print large arguments, secrets, or the full prompt. Arguments can be incomplete while PI streams the tool call, so guard optional fields and use `context.argsComplete` for expensive previews.
+`renderCall` should show a compact call header, preferably on one line. Include the tool name and the most useful arguments. Do not print large arguments, secrets, or the full prompt. Arguments can be incomplete while PI streams the tool call, so guard optional fields. Use `context.argsComplete` as a live-stream optimization hint, not as the only condition for required content. A restored row does not run through the live argument-completion transition.
 
 The renderer receives `(args, theme, context)` and must return a PI TUI `Component`.
 
@@ -57,7 +57,7 @@ renderCall(args, theme) {
 
 `renderResult` receives `(result, { expanded, isPartial }, theme, context)`. The options describe the requested view and the current execution state.
 
-Use `context.isError` for a PI execution failure. There is no reliable `result.isError` field in the renderer contract.
+Use `context.isError` for a PI execution failure. The renderer API does not define `result.isError`.
 
 ```ts
 renderResult(result, { expanded, isPartial }, theme, context) {
@@ -99,17 +99,17 @@ Structured tools should build their primary body from `details`. Text tools may 
 
 #### Partial (streaming)
 
-Long-running tools should call `onUpdate()` with a small progress payload. While an update is active, `isPartial` is true.
+Long-running tools should call `onUpdate()` with a small progress payload. PI passes `isPartial: true` to `renderResult` for these payloads and `isPartial: false` for the final result. PI treats each update as a complete partial result; it does not merge updates or copy them into the final result. Calls made after `execute()` settles are ignored.
 
 Partial `details` can have a different or incomplete shape than the final result. Treat optional fields as optional.
 
 #### Error
 
-Show a clear error state when `context.isError` is true. PI marks a tool as failed when `execute()` throws. Returning text such as `"Error: ..."` is still a successful tool result, so domain-level errors need their own status in `details` when the tool uses that pattern.
+Show a clear error state when `context.isError` is true. PI sets this state when `execute()` throws. Validation failures, blocked calls, and hook failures can also produce an error result. Returning text such as `"Error: ..."` is still a successful tool result, so domain-level errors need their own status in `details` when the tool uses that pattern.
 
 ## The details contract
 
-When a custom renderer needs structured facts, `execute()` and `onUpdate()` should return `details` alongside `content`:
+When a custom renderer needs structured facts, return final `details` from `execute()` and include partial `details` in each `onUpdate()` payload:
 
 ```ts
 interface SearchDetails {
@@ -137,23 +137,24 @@ Keep `details`:
 
 `details` may be `undefined` for a deliberately simple result. A renderer must handle absent or malformed details without crashing.
 
-Keep `content` concise and model-relevant. Apply PI's output limits to large results, tell the model when output is truncated, and provide a full-output path when practical. See [Output Size](pi/tool-guidance.md#output-size).
+Keep `content` concise and model-relevant. PI does not automatically truncate custom tool text. For large results, use PI's default limit of 2,000 lines or 50 KB, whichever is reached first. Tell the model when output is truncated, and provide a full-output path when practical. See [Output Size](pi/tool-guidance.md#output-size).
 
 ## Dual-surface rendering
 
 The human surface has two independent parts:
 
-- **Chrome** — the call header in `renderCall`, plus result status, badges, counts, evidence disclosures, and section controls in `renderResult`. The call header uses tool-call arguments. Result chrome uses `details`.
+- **Chrome** — the call header in `renderCall`, plus result status, badges, counts, evidence disclosures, and section controls in `renderResult`. The call header uses tool-call arguments. Result chrome uses `details` and PI state such as `options.isPartial` and `context.isError`.
 - **Body** — the main human-facing result. Structured tools use `details` for the primary body. Text tools may use `content` as an optional expanded body or raw Markdown detail.
 
-Neither part parses Markdown `content` to recover facts. Markdown and TUI are independent projections of the same underlying result evidence. See [Tool package architecture](tool-architecture.md) for the result-assembly rule.
+Do not parse Markdown `content` to recover structured facts. It is valid to pass `content` to a Markdown component for body rendering. Markdown and TUI are independent projections of the same underlying result evidence. See [Tool package architecture](tool-architecture.md) for the result-assembly rule.
 
 ## Shell, fallback, and component rules
 
-- PI wraps ordinary tool renderer output in a default `Box` with padding and background. Use `Text` or other components with `(0, 0)` padding unless the tool uses `renderShell: "self"`.
+- PI wraps ordinary tool renderer output in a default `Box` with padding and background. Do not add outer padding. For `Text`, use `(0, 0)` unless the tool uses `renderShell: "self"`.
 - With `renderShell: "self"`, the tool provides its own framing, padding, and background. Use it only when the default shell prevents the required layout.
-- If a renderer is missing or throws, PI falls back to the tool name or raw text from `content`. This fallback is useful for recovery but is not the normal SuPi design for non-trivial tools.
-- Custom components must fit each rendered line within the supplied width and must implement invalidation correctly. See [TUI Components](https://github.com/earendil-works/pi-mono/blob/main/packages/coding-agent/docs/tui.md).
+- For an ordinary custom tool, a missing or failed `renderCall` falls back to the tool name. A missing or failed `renderResult` falls back to plain output derived from `content`.
+- A built-in override inherits each omitted renderer slot from the built-in tool. If the selected renderer throws, PI uses the generic fallback for that slot.
+- Each custom component must fit every rendered line within the supplied width and implement `invalidate()`. Invalidation must clear render caches and rebuild stored themed strings. See [TUI Components](https://github.com/earendil-works/pi-mono/blob/main/packages/coding-agent/docs/tui.md).
 
 ## Shared ownership
 
@@ -178,9 +179,11 @@ Before merging a tool, check that its renderer:
 - Fits custom components to the available width and supports invalidation.
 - Has focused tests for the main states.
 
-## Reference implementations
+## Package examples
 
-- **Simple text tools**: `packages/supi-web/src/tool/render.ts` — `renderToolCall` and `renderCollapsibleTextResult`
+These files show package-specific patterns. Check the complete tool registration against the review checklist before you copy a pattern.
+
+- **Simple text helpers**: `packages/supi-web/src/tool/render.ts` — `renderToolCall` and `renderCollapsibleTextResult`
 - **Structured code tools**: `packages/supi-code-intelligence/src/tool/<tool>/tui.ts` — per-tool renderers sharing `packages/supi-code-intelligence/src/ui/tui/common.ts`
 - **Stateful multi-task tool**: `packages/supi-agent/src/tool/render.ts` — bounded progress and conversation views
 - **Review results**: `packages/supi-review/src/tui/run.ts` — task verdicts and structured findings
