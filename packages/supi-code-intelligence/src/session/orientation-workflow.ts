@@ -58,8 +58,9 @@ export async function runOrientationWorkflow(
   if (!request.focus) {
     const result = await executeOrientation(
       { maxResults },
-      { model, provider, lspRuntime, cwd: deps.cwd },
+      { model, provider, lspRuntime, cwd: deps.cwd, requestControl: control },
     );
+    throwIfAborted(control);
     return { kind: "completed", data: result };
   }
 
@@ -74,8 +75,9 @@ export async function runOrientationWorkflow(
       focus: focus.path,
       maxResults,
     },
-    { model, provider, lspRuntime, cwd: deps.cwd },
+    { model, provider, lspRuntime, cwd: deps.cwd, requestControl: control },
   );
+  throwIfAborted(control);
   const withInstructions = addInstructionFiles(result, focus.path, deps);
   return { kind: "completed", data: withInstructions };
 }
@@ -101,7 +103,9 @@ async function orientTarget(options: {
       maxResults,
     },
     deps,
+    control,
   );
+  throwIfAborted(control);
   if (target.kind === "target-group") {
     return {
       kind: "invalid-input",
@@ -154,8 +158,10 @@ async function orientTarget(options: {
       provider,
       lspRuntime,
       cwd: deps.cwd,
+      requestControl: control,
     },
   );
+  throwIfAborted(control);
   return {
     kind: "completed",
     data: addTargetSummary(result, entry, target.notes, deps.cwd),

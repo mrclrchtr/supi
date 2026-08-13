@@ -6,10 +6,12 @@
  * evidence collector in `collect.ts`.
  */
 
-import type {
-  SemanticProvider,
-  SourceRange,
-  StructuralProvider,
+import {
+  type CodeRequestControl,
+  isCodeRequestInterruption,
+  type SemanticProvider,
+  type SourceRange,
+  type StructuralProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
 
 /** Structural provider subset plus optional semantic hover/definition used for gathering. */
@@ -64,6 +66,7 @@ export async function gatherSubstrateContext(
   line: number,
   character: number,
   positionStrict: boolean,
+  requestControl?: CodeRequestControl,
 ): Promise<SubstrateContext> {
   let nodeInfo: SubstrateContext["nodeInfo"] = null;
   let outline: SubstrateContext["outline"] = [];
@@ -76,7 +79,7 @@ export async function gatherSubstrateContext(
 
   try {
     if (positionStrict) {
-      const nodeResult = await provider.nodeAt(relPath, line, character);
+      const nodeResult = await provider.nodeAt(relPath, line, character, requestControl);
       if (nodeResult.kind === "success") {
         nodeInfo = {
           type: nodeResult.data.type,
@@ -88,7 +91,7 @@ export async function gatherSubstrateContext(
       }
     }
 
-    const outlineResult = await provider.outline(relPath);
+    const outlineResult = await provider.outline(relPath, requestControl);
     if (outlineResult.kind === "success") {
       outline = outlineResult.data.map((item) => ({
         name: item.name,
@@ -98,12 +101,12 @@ export async function gatherSubstrateContext(
       }));
     }
 
-    const importsResult = await provider.imports(relPath);
+    const importsResult = await provider.imports(relPath, requestControl);
     if (importsResult.kind === "success") {
       imports = importsResult.data;
     }
 
-    const exportsResult = await provider.exports(relPath);
+    const exportsResult = await provider.exports(relPath, requestControl);
     if (exportsResult.kind === "success") {
       exports = exportsResult.data.map((item) => ({
         name: item.name,
@@ -141,7 +144,8 @@ export async function gatherSubstrateContext(
         // definition failed — continue without it
       }
     }
-  } catch {
+  } catch (error) {
+    if (isCodeRequestInterruption(error, requestControl)) throw error;
     // Provider not available
   }
 

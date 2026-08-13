@@ -61,6 +61,8 @@ export interface StructuredPatternControl {
   readonly operations?: AstScanOperations;
   readonly maxFiles?: number;
   readonly timeoutMs?: number;
+  /** Optional caller deadline; the earlier caller/policy deadline wins. */
+  readonly deadline?: number;
 }
 
 export interface StructuredPatternSearchOptions {
@@ -84,7 +86,8 @@ export async function getStructuredPatternMatches(
   const now = options.control?.now ?? Date.now;
   const maxFiles = options.control?.maxFiles ?? DEFAULT_AST_SCAN_MAX_FILES;
   const timeoutMs = options.control?.timeoutMs ?? DEFAULT_AST_SCAN_TIMEOUT_MS;
-  const deadline = now() + timeoutMs;
+  const policyDeadline = now() + timeoutMs;
+  const deadline = Math.min(options.control?.deadline ?? Number.POSITIVE_INFINITY, policyDeadline);
   const roots = Array.isArray(options.roots) ? [...options.roots] : [options.roots];
   const operation = structuralOperationForKind(options.params.kind);
   options.control?.signal?.throwIfAborted();
@@ -127,6 +130,7 @@ export async function getStructuredPatternMatches(
   }
 
   scanTimer.enumerationCompleted();
+  const requestControl = { signal: options.control?.signal, deadline };
   const analysis = await analyzeStructuredFiles({
     files: enumeration.files,
     displayBase: enumeration.displayBase,
@@ -135,6 +139,7 @@ export async function getStructuredPatternMatches(
     deadline,
     now,
     signal: options.control?.signal,
+    requestControl,
     initialLimitations: enumeration.limitations,
   });
   const capabilityMismatches = analysis.failures.filter(

@@ -24,7 +24,7 @@ After installation, keep asking Pi normal coding questions. The agent can:
 - **Map an unfamiliar repository** — understand workspaces, packages, entry points, dependencies, and local `CLAUDE.md` or `AGENTS.md` instructions before editing.
 - **Navigate precisely with LSP** — identify the exact symbol at a source location and inspect its type, definition, enclosing declaration, and nearby diagnostics.
 - **Follow relationships across LSP and AST evidence** — find references, implementations, and outgoing calls without guessing from matching text.
-- **Search parsed code structure** — query AST definitions, types, interfaces, classes, methods, enums, imports, exports, and call sites.
+- **Search parsed code structure** — query AST definitions, types, interfaces, classes, methods, enums, imports, exports, and call sites. Tool cancellation and the shared AST deadline propagate into structural reads, parser progress, and query progress.
 - **Check live project health** — inspect language-server status and current errors or warnings, with an option to refresh stale diagnostics.
 - **Refactor safely** — preview language-aware renames and extractions before applying them. Plans are rejected if the files changed in the meantime.
 - **See uncertainty clearly** — results distinguish “nothing found” from incomplete or unavailable analysis and disclose omitted matches.

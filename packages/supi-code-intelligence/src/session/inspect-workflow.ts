@@ -54,6 +54,7 @@ export async function runInspectWorkflow(
     line: point.value.line,
     character: point.value.character,
     lineCount: point.value.lineCount,
+    requestControl: control,
     structural: deps.capability.getStructuralProvider(deps.cwd),
     semantic,
     semanticUnavailableReason: semantic

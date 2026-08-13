@@ -22,6 +22,13 @@ export {
   partialCodeQuery,
   unavailableCodeQuery,
 } from "./query-result.ts";
+export {
+  CodeRequestDeadlineError,
+  isCodeRequestDeadlineError,
+  isCodeRequestInterrupted,
+  isCodeRequestInterruption,
+  throwIfCodeRequestInterrupted,
+} from "./request-control.ts";
 // Shared canonical types
 export type {
   CalleeDepth,

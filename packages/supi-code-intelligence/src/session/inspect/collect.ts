@@ -2,6 +2,8 @@
 
 import {
   type CodePosition,
+  type CodeRequestControl,
+  isCodeRequestInterruption,
   mapCodeQueryResult,
   type OutlineData,
   type SemanticProvider,
@@ -27,6 +29,7 @@ export interface InspectCollectionInput {
   readonly line: number;
   readonly character: number;
   readonly lineCount: number;
+  readonly requestControl?: CodeRequestControl;
   readonly structural: StructuralProvider | null;
   readonly semantic: SemanticProvider | null;
   readonly semanticUnavailableReason: string;
@@ -50,7 +53,12 @@ async function collectNode(
 ): Promise<InspectObservation<InspectNode | null>> {
   if (!input.structural) return unavailableCodeQuery("No structural node provider is active.");
   try {
-    const result = await input.structural.nodeAt(input.file, input.line, input.character);
+    const result = await input.structural.nodeAt(
+      input.file,
+      input.line,
+      input.character,
+      input.requestControl,
+    );
     if (result.kind !== "success") return unavailableCodeQuery(result.message);
     return {
       kind: "completed",
@@ -65,6 +73,7 @@ async function collectNode(
       },
     };
   } catch (error) {
+    if (isCodeRequestInterruption(error, input.requestControl)) throw error;
     return unavailableCodeQuery(failureReason("Structural node lookup", error));
   }
 }
@@ -74,7 +83,7 @@ async function collectEnclosingSymbol(
 ): Promise<InspectObservation<InspectEnclosingSymbol | null>> {
   if (!input.structural) return unavailableCodeQuery("No structural outline provider is active.");
   try {
-    const result = await input.structural.outline(input.file);
+    const result = await input.structural.outline(input.file, input.requestControl);
     if (result.kind !== "success") return unavailableCodeQuery(result.message);
     return {
       kind: "completed",
@@ -84,6 +93,7 @@ async function collectEnclosingSymbol(
       }),
     };
   } catch (error) {
+    if (isCodeRequestInterruption(error, input.requestControl)) throw error;
     return unavailableCodeQuery(failureReason("Structural outline lookup", error));
   }
 }

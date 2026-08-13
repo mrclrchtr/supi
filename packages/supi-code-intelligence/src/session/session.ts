@@ -231,7 +231,7 @@ export class WorkspaceCodeIntelligenceSession {
       phase: "target",
       message: "Resolving target evidence",
     });
-    return resolveTargetWorkflow(
+    const outcome = await resolveTargetWorkflow(
       request.target,
       {
         fileLevelAllowed: true,
@@ -239,7 +239,10 @@ export class WorkspaceCodeIntelligenceSession {
         maxResults: request.maxResults,
       },
       this.targetWorkflowDeps(),
+      control,
     );
+    throwIfAborted(control);
+    return outcome;
   }
 
   /** Collect evidence-backed workspace health facts. */

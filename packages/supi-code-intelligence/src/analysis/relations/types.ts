@@ -1,4 +1,4 @@
-import type { SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
+import type { CodeRequestControl, SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
 
 /**
  * Shared types for the relations analysis modules.
@@ -58,7 +58,10 @@ export interface RelationsServiceDeps {
       file: string,
       line: number,
       character: number,
-      depth?: "direct" | "deep",
+      depthOrOptions?:
+        | "direct"
+        | "deep"
+        | { depth?: "direct" | "deep"; control?: CodeRequestControl },
     ) => Promise<{
       kind: string;
       data?: {

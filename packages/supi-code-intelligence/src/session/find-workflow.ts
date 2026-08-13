@@ -30,7 +30,8 @@ export async function runFindWorkflow(
   const scope = resolveScopeSet(request.scope ? [...request.scope] : undefined, deps.cwd);
   if (scope.kind === "error") return { kind: "invalid-input", message: scope.reason };
 
-  throwIfAborted(control);
+  if (mode === "ast") control?.signal?.throwIfAborted();
+  else throwIfAborted(control);
   reportProgress(control, {
     intent: "find",
     phase: mode,
@@ -120,13 +121,13 @@ async function runAstSearch(options: {
   if (!provider) {
     return { kind: "unavailable", reason: "No structural provider is active." };
   }
-  throwIfAborted(control);
+  control?.signal?.throwIfAborted();
   const outcome = await getStructuredPatternMatches({
     params: { pattern: query, kind: input.kind },
     roots: scopePaths,
     cwd: deps.cwd,
     structural: provider,
-    control: { signal: control?.signal },
+    control: { signal: control?.signal, deadline: control?.deadline },
   });
   if (outcome.kind === "invalid-input") return outcome;
   if (outcome.kind === "unavailable") return outcome;

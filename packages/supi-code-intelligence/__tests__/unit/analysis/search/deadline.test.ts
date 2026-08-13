@@ -8,6 +8,20 @@ describe("settleByDeadline", () => {
     ).resolves.toEqual({ kind: "completed", value: "done" });
   });
 
+  it("does not start an operation at the deadline instant", async () => {
+    let started = false;
+    const outcome = await settleByDeadline(
+      async () => {
+        started = true;
+        return "late";
+      },
+      { deadline: 10, now: () => 10 },
+    );
+
+    expect(outcome).toEqual({ kind: "timeout" });
+    expect(started).toBe(false);
+  });
+
   it("discards an operation result that settles after the injected clock deadline", async () => {
     let now = 0;
     const outcome = await settleByDeadline(

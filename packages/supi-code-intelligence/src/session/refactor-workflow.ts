@@ -70,7 +70,9 @@ export async function runRefactorPlanWorkflow(
       nameAnchorRequired: parsed.operation === "rename_symbol",
     },
     deps,
+    control,
   );
+  throwIfAborted(control);
   if (target.kind === "target-group") {
     return {
       kind: "invalid-input",

@@ -1,5 +1,6 @@
 // Node-at-position lookup.
 
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { nodeToRange, publicToTreeSitter, splitSourceLines } from "../coordinates.ts";
 import type { TreeSitterRuntime } from "../session/runtime.ts";
 import type { NodeAtResult, SourceRange, TreeSitterResult } from "../types.ts";
@@ -11,8 +12,9 @@ export async function lookupNodeAt(
   runtime: TreeSitterRuntime,
   filePath: string,
   line: number,
-  character: number,
+  ...position: [character: number, control?: CodeRequestControl]
 ): Promise<TreeSitterResult<NodeAtResult>> {
+  const [character, control] = position;
   if (!Number.isInteger(line) || line < 1) {
     return { kind: "validation-error", message: "line must be a positive 1-based integer" };
   }
@@ -20,7 +22,7 @@ export async function lookupNodeAt(
     return { kind: "validation-error", message: "character must be a positive 1-based integer" };
   }
 
-  const parseResult = await runtime.parseFile(filePath);
+  const parseResult = await runtime.parseFile(filePath, control);
   if (parseResult.kind !== "success") return parseResult;
 
   const { tree, source } = parseResult.data;

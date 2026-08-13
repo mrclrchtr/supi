@@ -17,14 +17,24 @@ export type StructuralTimingObservation =
       readonly operation: "parse";
       readonly grammar: GrammarId;
       readonly parserState: ParserState;
-      readonly outcome: "completed" | "file-access-error" | "runtime-error";
+      readonly outcome:
+        | "cancelled"
+        | "completed"
+        | "file-access-error"
+        | "runtime-error"
+        | "timeout";
       readonly cache?: StructuralCacheObservation;
       readonly finalPhase: ParseTimingPhase;
     }
   | {
       readonly operation: "query";
       readonly grammar: GrammarId;
-      readonly outcome: "completed" | "runtime-error" | "validation-error";
+      readonly outcome:
+        | "cancelled"
+        | "completed"
+        | "runtime-error"
+        | "timeout"
+        | "validation-error";
       readonly captureCount: number;
       readonly cache: StructuralCacheObservation;
       readonly finalPhase: QueryTimingPhase;

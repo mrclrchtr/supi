@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FindWorkflowOutcome } from "../../../src/session/find-types.ts";
 import { runFindWorkflow } from "../../../src/session/find-workflow.ts";
 import { renderFindResult } from "../../../src/tool/find/render.ts";
@@ -41,6 +41,53 @@ function structuralProvider(): StructuralProvider {
 }
 
 describe("runFindWorkflow", () => {
+  it("reports an expired caller AST deadline as a timeout partial", async () => {
+    writeFileSync(path.join(tmpDir, "alpha.ts"), "import target from 'target';\n");
+    const imports = vi.fn<StructuralProvider["imports"]>(async () => ({
+      kind: "success" as const,
+      data: [],
+    }));
+
+    const outcome = await runFindWorkflow(
+      { query: "target", mode: "ast", kind: "import" },
+      deps({ imports } as unknown as StructuralProvider),
+      { deadline: Date.now() - 1 },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        kind: "ast",
+        result: {
+          partialReason: "timeout",
+          scan: { complete: false, limitations: [expect.objectContaining({ reason: "timeout" })] },
+        },
+      },
+    });
+    expect(imports).not.toHaveBeenCalled();
+  });
+
+  it("forwards the caller absolute deadline into AST structural work", async () => {
+    writeFileSync(path.join(tmpDir, "alpha.ts"), "import target from 'target';\n");
+    const imports = vi.fn<StructuralProvider["imports"]>(async () => ({
+      kind: "success" as const,
+      data: [],
+    }));
+    const signal = new AbortController().signal;
+
+    await runFindWorkflow(
+      { query: "target", mode: "ast", kind: "import" },
+      deps({ imports } as unknown as StructuralProvider),
+      { signal, deadline: Date.now() + 60_000 },
+    );
+
+    expect(imports.mock.calls[0]?.[1]).toEqual({
+      signal,
+      deadline: expect.any(Number),
+    });
+    expect(imports.mock.calls[0]?.[1]?.deadline).toBeLessThanOrEqual(Date.now() + 10_000);
+  });
+
   it("collects every AST match before result assembly applies maxResults", async () => {
     writeFileSync(path.join(tmpDir, "alpha.ts"), "export const alpha = 1;\n");
     writeFileSync(path.join(tmpDir, "beta.ts"), "export const beta = 1;\n");

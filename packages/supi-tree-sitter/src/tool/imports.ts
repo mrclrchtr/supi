@@ -1,5 +1,6 @@
 // Import extraction for supported files.
 
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { nodeToRange } from "../coordinates.ts";
 import type { TreeSitterRuntime } from "../session/runtime.ts";
 import type { SyntaxNodeLike } from "../syntax-node.ts";
@@ -9,8 +10,9 @@ import type { ImportRecord, TreeSitterResult } from "../types.ts";
 export async function extractImports(
   runtime: TreeSitterRuntime,
   filePath: string,
+  control?: CodeRequestControl,
 ): Promise<TreeSitterResult<ImportRecord[]>> {
-  const parseResult = await runtime.parseFile(filePath);
+  const parseResult = await runtime.parseFile(filePath, control);
   if (parseResult.kind !== "success") return parseResult;
 
   const { tree, source } = parseResult.data;

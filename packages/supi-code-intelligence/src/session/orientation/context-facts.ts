@@ -1,5 +1,6 @@
 import { statSync } from "node:fs";
 import * as path from "node:path";
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import type {
   ArchitectureModel,
@@ -32,6 +33,7 @@ interface ContextFactsInput {
   readonly maxResults: number;
   readonly provider: CodeProvider | null;
   readonly lspRuntime: WorkspaceLspRuntimeState;
+  readonly requestControl?: CodeRequestControl;
 }
 
 /** Collect direct filesystem, parsed-manifest, and explicit-provider Orientation facts. */
@@ -115,7 +117,7 @@ async function collectFileFacts(
   });
   appendTopologyWarning(builder, input.model);
   appendPackageContext(builder, input.model, focus);
-  await appendStructuralFileFacts(builder, input.provider, focus);
+  await appendStructuralFileFacts(builder, input.provider, focus, input.requestControl);
   appendPrioritySignals(builder, {
     scope: focus,
     isFile: true,

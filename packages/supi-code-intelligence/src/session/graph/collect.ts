@@ -1,5 +1,9 @@
 /** Presentation-neutral relation collection used by the session-owned graph workflow. */
 
+import {
+  type CodeRequestControl,
+  isCodeRequestInterruption,
+} from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeProvider } from "../../analysis/provider.ts";
 import {
   readNextEnclosingScope,
@@ -25,6 +29,7 @@ export interface CollectRelationOptions {
   semanticReadinessError: string | null;
   anchorKind: AnchorKind;
   calleeDepth?: "direct" | "deep";
+  requestControl?: CodeRequestControl;
 }
 
 /** Collect one evidence-backed graph relation without rendering it. */
@@ -46,6 +51,7 @@ export async function collectRelation(
         return collectImplementationsRelation(options);
     }
   } catch (error) {
+    if (isCodeRequestInterruption(error, options.requestControl)) throw error;
     return {
       kind: "unavailable",
       rel: relation,
@@ -118,6 +124,7 @@ async function collectCalleesRelation(options: CollectRelationOptions): Promise<
     { cwd: options.cwd, provider: { calleesAt: options.provider.calleesAt } },
     undefined,
     options.calleeDepth ?? "direct",
+    options.requestControl,
   );
   if (result.confidence === "unavailable") {
     return { kind: "unavailable", rel: "callees", message: "Callees unavailable" };

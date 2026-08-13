@@ -24,7 +24,7 @@ export async function settleByDeadline<T>(
 ): Promise<DeadlineOutcome<T>> {
   control.signal?.throwIfAborted();
   const remainingMs = control.deadline - control.now();
-  if (remainingMs < 0) return { kind: "timeout" };
+  if (remainingMs <= 0) return { kind: "timeout" };
 
   return new Promise<DeadlineOutcome<T>>((resolve, reject) => {
     let settled = false;
@@ -70,7 +70,7 @@ export async function settleByDeadline<T>(
       .then(
         (value) => {
           complete(
-            control.now() > control.deadline ? { kind: "timeout" } : { kind: "completed", value },
+            control.now() >= control.deadline ? { kind: "timeout" } : { kind: "completed", value },
           );
         },
         (error: unknown) => fail(error),

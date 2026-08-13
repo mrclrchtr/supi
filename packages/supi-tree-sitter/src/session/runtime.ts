@@ -1,9 +1,14 @@
 // Tree-sitter runtime — parser management, parse, and query services.
 
 import * as path from "node:path";
+import {
+  type CodeRequestControl,
+  isCodeRequestInterrupted,
+  isCodeRequestInterruption,
+  throwIfCodeRequestInterrupted,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { resolveToolPath } from "@mrclrchtr/supi-core/path";
-import type { Language, Parser, QueryMatch, Tree } from "web-tree-sitter";
-import { nodeToRange } from "../coordinates.ts";
+import type { Language, Parser, Tree } from "web-tree-sitter";
 import { detectGrammar, resolveGrammarWasmPath } from "../language.ts";
 import type { GrammarId, QueryCapture, TreeSitterResult } from "../types.ts";
 import {
@@ -11,6 +16,12 @@ import {
   ParsedFileStore,
   type StructuralCacheObservation,
 } from "./parsed-file-store.ts";
+import { resetInterruptedParser } from "./runtime-parser-helpers.ts";
+import {
+  collectQueryCaptures,
+  formatRuntimeError,
+  validateQueryString,
+} from "./runtime-query-helpers.ts";
 import {
   finishStructuralTiming,
   type ParseTimingPhase,
@@ -30,6 +41,7 @@ interface ParsedQueryInput {
   readonly tree: Tree;
   readonly source: string;
   readonly queryString: string;
+  readonly control?: CodeRequestControl;
 }
 
 /**
@@ -131,7 +143,10 @@ export class TreeSitterRuntime {
    * The returned tree is an owned shallow copy. The caller must delete it.
    * Canonical cached trees never leave the parsed-file store.
    */
-  async parseFile(filePath: string): Promise<
+  async parseFile(
+    filePath: string,
+    control?: CodeRequestControl,
+  ): Promise<
     TreeSitterResult<{
       tree: Tree;
       source: string;
@@ -161,19 +176,38 @@ export class TreeSitterRuntime {
       const parsed = await this.parsedFiles.acquireParsedFile({
         resolvedPath,
         grammarId,
+        control,
         onPhase: (phase) => {
           timer.mark(phase);
           finalPhase = phase === "file-read" ? "content-hash" : "cache-lookup";
         },
         parse: async (source) => {
           finalPhase = "parser-setup";
-          const entry = await this.ensureGrammarParser(grammarId);
+          let entry = await this.ensureGrammarParser(grammarId);
           this.assertActive();
+          throwIfCodeRequestInterrupted(control);
+          if (this.parsers.get(grammarId) !== entry) {
+            entry = await this.ensureGrammarParser(grammarId);
+            this.assertActive();
+            throwIfCodeRequestInterrupted(control);
+          }
           timer.mark("parser-setup");
           finalPhase = "parse";
-          const tree = entry.parser.parse(source);
-          if (!tree) throw new Error("Tree-sitter parser did not produce a tree");
-          return tree;
+          const tree = entry.parser.parse(source, undefined, {
+            progressCallback: () => isCodeRequestInterrupted(control),
+          });
+          if (!tree) {
+            resetInterruptedParser(this.parsers, grammarId, entry);
+            throwIfCodeRequestInterrupted(control);
+            throw new Error("Tree-sitter parser did not produce a tree");
+          }
+          try {
+            throwIfCodeRequestInterrupted(control);
+            return tree;
+          } catch (error) {
+            tree.delete();
+            throw error;
+          }
         },
       });
       finishStructuralTiming(timer, {
@@ -194,6 +228,16 @@ export class TreeSitterRuntime {
         },
       };
     } catch (err: unknown) {
+      if (isCodeRequestInterruption(err, control)) {
+        finishStructuralTiming(timer, {
+          operation: "parse",
+          grammar: grammarId,
+          parserState,
+          outcome: control?.signal?.aborted ? "cancelled" : "timeout",
+          finalPhase,
+        });
+        throw err;
+      }
       if (err instanceof ParsedFileReadError) {
         finishStructuralTiming(timer, {
           operation: "parse",
@@ -211,7 +255,10 @@ export class TreeSitterRuntime {
         outcome: "runtime-error",
         finalPhase,
       });
-      return { kind: "runtime-error", message: formatError(err, "Parser initialization failed") };
+      return {
+        kind: "runtime-error",
+        message: formatRuntimeError(err, "Parser initialization failed"),
+      };
     }
   }
 
@@ -219,28 +266,25 @@ export class TreeSitterRuntime {
   async queryFile(
     filePath: string,
     queryString: string,
+    control?: CodeRequestControl,
   ): Promise<TreeSitterResult<QueryCapture[]>> {
     const validation = validateQueryString(queryString);
     if (validation) return validation;
 
-    const parseResult = await this.parseFile(filePath);
+    const parseResult = await this.parseFile(filePath, control);
     if (parseResult.kind !== "success") return parseResult;
 
     const { grammarId, tree, source } = parseResult.data;
     try {
-      return await this[QUERY_PARSED_FILE](grammarId, tree, source, queryString);
+      return await this[QUERY_PARSED_FILE]({ grammarId, tree, source, queryString, control });
     } finally {
       tree.delete();
     }
   }
 
   /** Execute a query against one caller-owned parsed tree without parsing again. */
-  async [QUERY_PARSED_FILE](
-    grammarId: GrammarId,
-    tree: Tree,
-    source: string,
-    queryString: string,
-  ): Promise<TreeSitterResult<QueryCapture[]>> {
+  async [QUERY_PARSED_FILE](input: ParsedQueryInput): Promise<TreeSitterResult<QueryCapture[]>> {
+    const { grammarId, tree, source, queryString, control } = input;
     const validation = validateQueryString(queryString);
     if (validation) return validation;
 
@@ -254,29 +298,39 @@ export class TreeSitterRuntime {
     };
 
     try {
-      const entry = await this.ensureGrammarParser(grammarId);
+      let entry = await this.ensureGrammarParser(grammarId);
       this.assertActive();
+      throwIfCodeRequestInterrupted(control);
+      if (this.parsers.get(grammarId) !== entry) {
+        entry = await this.ensureGrammarParser(grammarId);
+        this.assertActive();
+        throwIfCodeRequestInterrupted(control);
+      }
       const mod = await this.ensureParserInit();
       this.assertActive();
+      throwIfCodeRequestInterrupted(control);
       compilationStarted = true;
-      const execution = this.parsedFiles.withQuery(
-        grammarId,
-        queryString,
-        () => {
+      const execution = this.parsedFiles.withQuery(grammarId, queryString, {
+        control,
+        compile: () => {
           const query = new mod.Query(entry.language, queryString);
           timer.mark("query-compilation");
           phase = "query-execution";
           return query;
         },
-        (query, observation) => {
+        execute: (query, observation) => {
           cache = observation;
           if (observation.state === "hit") {
             timer.mark("query-cache");
             phase = "query-execution";
           }
-          return collectQueryCaptures(query.matches(tree.rootNode), source);
+          const matches = query.matches(tree.rootNode, {
+            progressCallback: () => isCodeRequestInterrupted(control),
+          });
+          throwIfCodeRequestInterrupted(control);
+          return collectQueryCaptures(matches, source);
         },
-      );
+      });
       finishStructuralTiming(timer, {
         operation: "query",
         grammar: grammarId,
@@ -287,6 +341,17 @@ export class TreeSitterRuntime {
       });
       return { kind: "success", data: execution.data };
     } catch (err: unknown) {
+      if (isCodeRequestInterruption(err, control)) {
+        finishStructuralTiming(timer, {
+          operation: "query",
+          grammar: grammarId,
+          outcome: control?.signal?.aborted ? "cancelled" : "timeout",
+          captureCount: 0,
+          cache,
+          finalPhase: phase,
+        });
+        throw err;
+      }
       const validationError = compilationStarted && phase === "query-compilation";
       finishStructuralTiming(timer, {
         operation: "query",
@@ -297,8 +362,8 @@ export class TreeSitterRuntime {
         finalPhase: phase,
       });
       return validationError
-        ? { kind: "validation-error", message: `Invalid query: ${formatError(err)}` }
-        : { kind: "runtime-error", message: formatError(err, "Query execution failed") };
+        ? { kind: "validation-error", message: `Invalid query: ${formatRuntimeError(err)}` }
+        : { kind: "runtime-error", message: formatRuntimeError(err, "Query execution failed") };
     }
   }
 
@@ -339,7 +404,7 @@ export function queryParsedFile(
   runtime: TreeSitterRuntime,
   input: ParsedQueryInput,
 ): Promise<TreeSitterResult<QueryCapture[]>> {
-  return runtime[QUERY_PARSED_FILE](input.grammarId, input.tree, input.source, input.queryString);
+  return runtime[QUERY_PARSED_FILE](input);
 }
 
 function deleteWasmResource(resource: { delete(): void }): void {
@@ -348,42 +413,4 @@ function deleteWasmResource(resource: { delete(): void }): void {
   } catch {
     // Continue cleanup so one failed release does not retain other resources.
   }
-}
-
-function validateQueryString(queryString: string): TreeSitterResult<QueryCapture[]> | null {
-  if (!queryString || queryString.trim().length === 0) {
-    return { kind: "validation-error", message: "query is required and must be non-empty" };
-  }
-  if (queryString.length > MAX_QUERY_LENGTH) {
-    return {
-      kind: "validation-error",
-      message: `query exceeds maximum length of ${MAX_QUERY_LENGTH} characters`,
-    };
-  }
-  return null;
-}
-
-function collectQueryCaptures(matches: QueryMatch[], source: string): QueryCapture[] {
-  const captures: QueryCapture[] = [];
-  for (const match of matches) {
-    for (const { name, node } of match.captures) {
-      captures.push({
-        name,
-        nodeType: node.type,
-        range: nodeToRange(node, source),
-        text: node.text,
-      });
-    }
-  }
-  return captures;
-}
-
-/** Max query string length to prevent ReDoS via overly complex Tree-sitter patterns. */
-const MAX_QUERY_LENGTH = 10_000;
-
-/** Format errors with their cause chain's first message for user-facing tool output. */
-function formatError(err: unknown, fallback = "Operation failed"): string {
-  if (!(err instanceof Error)) return String(err || fallback);
-  if (err.cause instanceof Error) return `${err.message}: ${err.cause.message}`;
-  return err.message || fallback;
 }

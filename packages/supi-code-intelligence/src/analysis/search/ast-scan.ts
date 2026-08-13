@@ -292,7 +292,7 @@ class AstFileEnumerator {
   #checkControl(): boolean {
     this.options.signal?.throwIfAborted();
     if (this.#safetyLimited) return false;
-    if (this.#now() <= this.options.deadline) return true;
+    if (this.#now() < this.options.deadline) return true;
     this.#markTimeout();
     return false;
   }

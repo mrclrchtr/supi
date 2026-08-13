@@ -169,6 +169,119 @@ describe("ParsedFileStore parsed-file reuse", () => {
     store.dispose();
   });
 
+  it("does not start a read when the request is already aborted", async () => {
+    const readFile = vi.fn(async () => "const a = 1;");
+    const parse = vi.fn(() => makeTree([]));
+    const store = new ParsedFileStore({
+      limits: DEFAULT_TEST_LIMITS,
+      operations: { realpath: vi.fn(async (filePath) => filePath), readFile },
+    });
+    const controller = new AbortController();
+    controller.abort(new Error("cancelled before read"));
+
+    await expect(
+      store.acquireParsedFile({
+        resolvedPath: "/real/a.ts",
+        grammarId: "typescript",
+        parse,
+        control: { signal: controller.signal },
+      }),
+    ).rejects.toThrow("cancelled before read");
+    expect(readFile).not.toHaveBeenCalled();
+    expect(parse).not.toHaveBeenCalled();
+    store.dispose();
+  });
+
+  it("preserves the abort reason when canonicalization fails after abort", async () => {
+    let rejectCanonicalization: ((error: Error) => void) | undefined;
+    const realpath = vi.fn(
+      () =>
+        new Promise<string>((_resolve, reject) => {
+          rejectCanonicalization = reject;
+        }),
+    );
+    const readFile = vi.fn(async () => "const a = 1;");
+    const store = new ParsedFileStore({
+      limits: DEFAULT_TEST_LIMITS,
+      operations: { realpath, readFile },
+    });
+    const controller = new AbortController();
+    const reason = new Error("cancelled during canonicalization");
+
+    const pending = store.acquireParsedFile({
+      resolvedPath: "/alias/a.ts",
+      grammarId: "typescript",
+      parse: () => makeTree([]),
+      control: { signal: controller.signal },
+    });
+    await vi.waitFor(() => expect(realpath).toHaveBeenCalledOnce());
+    controller.abort(reason);
+    rejectCanonicalization?.(new Error("filesystem failed"));
+
+    await expect(pending).rejects.toBe(reason);
+    expect(readFile).not.toHaveBeenCalled();
+    store.dispose();
+  });
+
+  it("discards a pending read result when the request is aborted", async () => {
+    let finishRead: ((source: string) => void) | undefined;
+    const readFile = vi.fn(
+      (_filePath: string, _options?: { signal?: AbortSignal }) =>
+        new Promise<string>((resolve) => {
+          finishRead = resolve;
+        }),
+    );
+    const parse = vi.fn(() => makeTree([]));
+    const store = new ParsedFileStore({
+      limits: DEFAULT_TEST_LIMITS,
+      operations: { realpath: vi.fn(async (filePath) => filePath), readFile },
+    });
+    const controller = new AbortController();
+
+    const pending = store.acquireParsedFile({
+      resolvedPath: "/real/a.ts",
+      grammarId: "typescript",
+      parse,
+      control: { signal: controller.signal },
+    });
+    await vi.waitFor(() => expect(readFile).toHaveBeenCalledOnce());
+    expect(readFile.mock.calls[0]?.[1]?.signal).toBe(controller.signal);
+    controller.abort(new Error("cancelled during read"));
+    finishRead?.("const a = 1;");
+
+    await expect(pending).rejects.toThrow("cancelled during read");
+    expect(parse).not.toHaveBeenCalled();
+    store.dispose();
+  });
+
+  it("deletes a parsed tree when abort wins immediately before cache insertion", async () => {
+    const operations = createFileOperations(new Map([["/real/a.ts", "const a = 1;"]]));
+    const store = new ParsedFileStore({ limits: DEFAULT_TEST_LIMITS, operations });
+    let finishParse: ((tree: Tree) => void) | undefined;
+    const parse = vi.fn(
+      () =>
+        new Promise<Tree>((resolve) => {
+          finishParse = resolve;
+        }),
+    );
+    const parsedTrees: FakeTree[] = [];
+    const controller = new AbortController();
+
+    const pending = store.acquireParsedFile({
+      resolvedPath: "/real/a.ts",
+      grammarId: "typescript",
+      parse,
+      control: { signal: controller.signal },
+    });
+    await vi.waitFor(() => expect(parse).toHaveBeenCalledOnce());
+    controller.abort(new Error("cancelled before insertion"));
+    finishParse?.(makeTree(parsedTrees));
+
+    await expect(pending).rejects.toThrow("cancelled before insertion");
+    expect(parsedTrees[0]?.delete).toHaveBeenCalledOnce();
+    store.dispose();
+  });
+
   it("waits for asynchronous reads before parsing", async () => {
     let finishRead: ((source: string) => void) | undefined;
     const readFile = vi.fn(

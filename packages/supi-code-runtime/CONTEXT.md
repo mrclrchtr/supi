@@ -11,5 +11,5 @@ The typed outcome of a read-only provider request: completed with possibly empty
 _Avoid_: nullable query result, inferring availability from method presence, treating empty data as failure
 
 **Code request control**:
-Optional request metadata with the caller Abort Signal and an absolute Unix-epoch deadline. Provider, adapter, and workspace-runtime interfaces preserve the same value. In the expansion stage, substrates do not interpret it or start cancellation behavior.
-_Avoid_: workflow control, relative timeout, provider client access
+Optional request metadata with the caller Abort Signal and an absolute Unix-epoch deadline. Provider, adapter, and workspace-runtime interfaces preserve the same value. Cooperative substrates use the canonical interruption helpers; unsupported substrates can preserve the value without applying it.
+_Avoid_: workflow progress, relative timeout, provider client access

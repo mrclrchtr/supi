@@ -1,5 +1,6 @@
 // Structural callee extraction — enclosing-scope lookup with per-language queries.
 
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { detectGrammar } from "../language.ts";
 import { queryParsedFile, type TreeSitterRuntime } from "../session/runtime.ts";
 import type { GrammarId, SourceRange, TreeSitterResult } from "../types.ts";
@@ -174,6 +175,7 @@ export async function lookupCalleesAt(
   line: number,
   character: number,
   depth: "direct" | "deep" = "direct",
+  control?: CodeRequestControl,
 ): Promise<TreeSitterResult<CalleesAtResult>> {
   // Validate coordinates and grammar
   const validation = validateCalleeInput(filePath, line, character);
@@ -181,7 +183,7 @@ export async function lookupCalleesAt(
   const { grammarId } = validation;
 
   // Parse the file
-  const parseResult = await runtime.parseFile(filePath);
+  const parseResult = await runtime.parseFile(filePath, control);
   if (parseResult.kind !== "success") return parseResult;
 
   const { tree, source } = parseResult.data;
@@ -219,6 +221,7 @@ export async function lookupCalleesAt(
       tree,
       source,
       queryString: queryStr,
+      control,
     });
     if (queryResult.kind !== "success") {
       return {

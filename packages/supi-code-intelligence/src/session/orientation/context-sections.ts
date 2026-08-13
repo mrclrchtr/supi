@@ -1,6 +1,11 @@
 import { readdirSync } from "node:fs";
 import * as path from "node:path";
-import type { CodeResult, ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type CodeRequestControl,
+  type CodeResult,
+  type ConfidenceMode,
+  isCodeRequestInterruption,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import type { EvidenceListMetadata, EvidencePartialReason } from "../../analysis/evidence.ts";
@@ -153,6 +158,7 @@ export async function appendStructuralFileFacts(
   builder: ContextOrientationBuilder,
   provider: CodeProvider | null,
   file: string,
+  requestControl?: CodeRequestControl,
 ): Promise<void> {
   if (!provider) {
     appendUnavailableStructuralSections(builder);
@@ -162,19 +168,22 @@ export async function appendStructuralFileFacts(
   await appendStructuralList(builder, {
     key: "structural.outline",
     title: "Provider outline",
-    collect: () => provider.outline(file),
+    collect: () => provider.outline(file, requestControl),
+    requestControl,
     render: (item) => `\`${item.name}\` (${item.kind}, L${item.startLine}–L${item.endLine})`,
   });
   await appendStructuralList(builder, {
     key: "structural.imports",
     title: "Provider imports",
-    collect: () => provider.imports(file),
+    collect: () => provider.imports(file, requestControl),
+    requestControl,
     render: (item) => `\`${item.moduleSpecifier}\``,
   });
   await appendStructuralList(builder, {
     key: "structural.exports",
     title: "Provider exports",
-    collect: () => provider.exports(file),
+    collect: () => provider.exports(file, requestControl),
+    requestControl,
     render: (item) => `\`${item.name}\` (${item.kind})`,
   });
 }
@@ -201,12 +210,14 @@ async function appendStructuralList<T>(
     title: string;
     collect: () => Promise<CodeResult<T[]>>;
     render: (item: T) => string;
+    requestControl?: CodeRequestControl;
   },
 ): Promise<void> {
   let result: CodeResult<T[]>;
   try {
     result = await input.collect();
   } catch (error) {
+    if (isCodeRequestInterruption(error, input.requestControl)) throw error;
     appendUnavailable(builder, {
       key: input.key,
       title: input.title,

@@ -11,6 +11,7 @@
  */
 
 import {
+  type CodeRequestControl,
   getDefaultWorkspaceRuntime,
   type SemanticProvider,
   type StructuralProvider,
@@ -84,6 +85,26 @@ export function getCodeProviderState(cwd: string): CodeProviderState {
 
 /** Alias for getCodeProviderState — kept for backward compatibility. */
 export const getCodeProvider = getCodeProviderState;
+
+/** Bind one exact request-control value to every structural provider operation. */
+export function withStructuralRequestControl<T extends StructuralProvider>(
+  provider: T | null,
+  control: CodeRequestControl | undefined,
+): T | null {
+  if (!provider || !control) return provider;
+  return {
+    ...provider,
+    calleesAt: (file, line, character, depthOrOptions) => {
+      const depth = typeof depthOrOptions === "string" ? depthOrOptions : depthOrOptions?.depth;
+      return provider.calleesAt(file, line, character, { depth, control });
+    },
+    exports: (file) => provider.exports(file, control),
+    outline: (file) => provider.outline(file, control),
+    imports: (file) => provider.imports(file, control),
+    nodeAt: (file, line, character) => provider.nodeAt(file, line, character, control),
+    callSites: (file) => provider.callSites(file, control),
+  } as T;
+}
 
 /**
  * Create a single CodeProvider that delegates semantic methods to the

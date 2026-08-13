@@ -43,7 +43,7 @@ export type CapabilityState =
 
 // ── Provider interfaces ────────────────────────────────────────────────
 
-/** Request metadata that providers preserve without interpreting it. */
+/** Request control that adapters preserve and cooperative providers apply. */
 export interface CodeRequestControl {
   /** Caller cancellation signal, when one exists. */
   readonly signal?: AbortSignal;

@@ -1,12 +1,15 @@
-import type {
-  CodeResult,
-  OutlineData,
-  StructuralProvider as StructuralSubstrate,
+import {
+  type CodeRequestControl,
+  type CodeResult,
+  isCodeRequestDeadlineError,
+  isCodeRequestInterruption,
+  type OutlineData,
+  type StructuralProvider as StructuralSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeFindAstKind } from "../../tool/find/ast-kinds.ts";
 import type { AstScanLimitation } from "./ast-scan.ts";
 import { callableExpressionForMatching } from "./call-name.ts";
-import { settleByDeadline } from "./deadline.ts";
+import { type DeadlineOutcome, settleByDeadline } from "./deadline.ts";
 import { relativeDisplayPath } from "./paths.ts";
 
 export interface StructuredPatternParams {
@@ -52,6 +55,7 @@ interface AnalyzeStructuredFilesOptions {
   readonly deadline: number;
   readonly now: () => number;
   readonly signal?: AbortSignal;
+  readonly requestControl: CodeRequestControl;
   readonly initialLimitations: readonly AstScanLimitation[];
 }
 
@@ -67,34 +71,43 @@ export async function analyzeStructuredFiles(
 
   for (const [index, absoluteFile] of options.files.entries()) {
     options.signal?.throwIfAborted();
-    if (options.now() > options.deadline) {
+    if (options.now() >= options.deadline) {
       addAnalysisTimeout(limitations, options.files.slice(index), options.displayBase);
       break;
     }
     const relativeFile = relativeDisplayPath(options.displayBase, absoluteFile);
     const fileMatches: StructuredMatch[] = [];
     const fileFailures: StructuredFailure[] = [];
-    const outcome = await settleByDeadline(
-      async () => {
-        try {
-          await collectMatchesForFile(
-            fileMatches,
-            fileFailures,
-            options.structural,
-            relativeFile,
-            options.params.kind,
-            matcher,
-          );
-        } catch (error) {
-          fileFailures.push({
-            file: relativeFile,
-            kind: "runtime-error",
-            reason: errorMessage(error),
-          });
-        }
-      },
-      { deadline: options.deadline, now: options.now, signal: options.signal },
-    );
+    let outcome: DeadlineOutcome<void>;
+    try {
+      outcome = await settleByDeadline(
+        async () => {
+          try {
+            await collectMatchesForFile(
+              fileMatches,
+              fileFailures,
+              options.structural,
+              relativeFile,
+              options.params.kind,
+              matcher,
+              options.requestControl,
+            );
+          } catch (error) {
+            if (isCodeRequestInterruption(error, options.requestControl)) throw error;
+            fileFailures.push({
+              file: relativeFile,
+              kind: "runtime-error",
+              reason: errorMessage(error),
+            });
+          }
+        },
+        { deadline: options.deadline, now: options.now, signal: options.signal },
+      );
+    } catch (error) {
+      if (!isCodeRequestDeadlineError(error)) throw error;
+      addAnalysisTimeout(limitations, options.files.slice(index), options.displayBase);
+      break;
+    }
     if (outcome.kind === "timeout") {
       addAnalysisTimeout(limitations, options.files.slice(index), options.displayBase);
       break;
@@ -137,13 +150,14 @@ async function collectMatchesForFile(
   relFile: string,
   kind: CodeFindAstKind,
   matcher: (value: string) => boolean,
+  requestControl: CodeRequestControl,
 ): Promise<void> {
   const recordFailure = (kind: StructuredFailureKind, reason: string) => {
     failures.push({ file: relFile, kind, reason });
   };
 
   if (kind === "definition") {
-    const outline = await structural.outline(relFile);
+    const outline = await structural.outline(relFile, requestControl);
     if (!handleStructuralResult(outline, recordFailure)) return;
     for (const item of flattenOutlineItems(outline.data)) {
       if (!matcher(item.name)) continue;
@@ -153,7 +167,7 @@ async function collectMatchesForFile(
   }
 
   if (kind === "export") {
-    const exportsResult = await structural.exports(relFile);
+    const exportsResult = await structural.exports(relFile, requestControl);
     if (!handleStructuralResult(exportsResult, recordFailure)) return;
     for (const item of exportsResult.data) {
       if (!matcher(item.name)) continue;
@@ -163,7 +177,7 @@ async function collectMatchesForFile(
   }
 
   if (kind === "import") {
-    const importsResult = await structural.imports(relFile);
+    const importsResult = await structural.imports(relFile, requestControl);
     if (!handleStructuralResult(importsResult, recordFailure)) return;
     for (const item of importsResult.data) {
       if (!matcher(item.moduleSpecifier)) continue;
@@ -178,7 +192,7 @@ async function collectMatchesForFile(
   }
 
   if (kind === "call") {
-    const callResult = await structural.callSites(relFile);
+    const callResult = await structural.callSites(relFile, requestControl);
     if (!handleStructuralResult(callResult, recordFailure)) return;
     for (const call of callResult.data) {
       if (!matcher(callableExpressionForMatching(call.name))) continue;
@@ -187,7 +201,7 @@ async function collectMatchesForFile(
     return;
   }
 
-  const outline = await structural.outline(relFile);
+  const outline = await structural.outline(relFile, requestControl);
   if (!handleStructuralResult(outline, recordFailure)) return;
   for (const item of flattenOutlineItems(outline.data)) {
     if (kind === "type" && !TYPE_KIND.test(item.kind.toLowerCase())) continue;

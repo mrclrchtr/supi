@@ -69,6 +69,7 @@ async function executeOrientationContext(
     focus: input.focus,
     maxResults: input.maxResults ?? 10,
     lspRuntime: deps.lspRuntime,
+    requestControl: deps.requestControl,
   });
 }
 
@@ -492,6 +493,7 @@ async function maybeGatherTreeContext(
     target.displayLine,
     target.displayCharacter,
     target.anchorKind !== "declaration",
+    deps.requestControl,
   );
 }
 

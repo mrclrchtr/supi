@@ -1,5 +1,6 @@
 /** File-wide call-site extraction using per-grammar tree-sitter queries. */
 
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { detectGrammar } from "../language.ts";
 import type { TreeSitterRuntime } from "../session/runtime.ts";
 import type { CallSiteMatch, GrammarId, TreeSitterResult } from "../types.ts";
@@ -48,6 +49,7 @@ export function supportsCallSitesGrammar(grammarId: GrammarId): boolean {
 export async function extractCallSites(
   runtime: TreeSitterRuntime,
   filePath: string,
+  control?: CodeRequestControl,
 ): Promise<TreeSitterResult<CallSiteMatch[]>> {
   const grammarId = detectGrammar(filePath);
   if (!grammarId) {
@@ -67,7 +69,7 @@ export async function extractCallSites(
     };
   }
 
-  const queryResult = await runtime.queryFile(filePath, queryStr);
+  const queryResult = await runtime.queryFile(filePath, queryStr, control);
   if (queryResult.kind !== "success") return queryResult;
 
   const captures = queryResult.data;

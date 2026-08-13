@@ -6,6 +6,8 @@
  */
 
 import { existsSync } from "node:fs";
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
+import { withStructuralRequestControl } from "../analysis/provider.ts";
 import { normalizePath, resolveScope } from "../analysis/search/paths.ts";
 import { resolveAnchoredSymbolTarget } from "../analysis/target/anchored.ts";
 import { resolveFileTargetGroup, validateFileTargetDiscovery } from "../analysis/target/file.ts";
@@ -87,6 +89,7 @@ export async function resolveTargetWorkflow(
   input: TargetInput,
   policy: TargetWorkflowPolicy,
   deps: TargetWorkflowDeps,
+  control?: CodeRequestControl,
 ): Promise<TargetWorkflowOutcome> {
   const parsed = parseTargetInput(input, ["handle", "anchor", "symbol", "file"]);
   if (parsed.kind === "invalid-input") return parsed;
@@ -96,10 +99,10 @@ export async function resolveTargetWorkflow(
     return resolveHandle(target.handle, policy, deps);
   }
   if ("anchor" in target) {
-    return resolveAnchoredWorkflow(target.anchor, policy, deps);
+    return resolveAnchoredWorkflow(target.anchor, policy, deps, control);
   }
   if ("symbol" in target) {
-    return resolveSymbolWorkflow(target.symbol, policy, deps);
+    return resolveSymbolWorkflow(target.symbol, policy, deps, control);
   }
   if (!policy.fileLevelAllowed) {
     return {
@@ -107,7 +110,7 @@ export async function resolveTargetWorkflow(
       message: "This workflow requires a handle, anchored point, or symbol target.",
     };
   }
-  return resolveFileOnlyWorkflow(target.file, policy.maxResults ?? 10, deps);
+  return resolveFileOnlyWorkflow(target.file, policy.maxResults ?? 10, deps, control);
 }
 
 function resolveHandle(
@@ -134,6 +137,7 @@ async function resolveAnchoredWorkflow(
   anchor: { file: string; line: number; character: number },
   policy: TargetWorkflowPolicy,
   deps: TargetWorkflowDeps,
+  control?: CodeRequestControl,
 ): Promise<TargetWorkflowOutcome> {
   const file = normalizePath(anchor.file, deps.cwd);
   if (!existsSync(file)) {
@@ -158,13 +162,14 @@ async function resolveAnchoredWorkflow(
     file,
     anchor.line,
     anchor.character,
-    deps.capability.getProvider(deps.cwd),
+    withStructuralRequestControl(deps.capability.getProvider(deps.cwd), control),
   );
   return toWorkflowOutcome(
     await refineTargetOutcomeIdentity(
       outcome,
       deps.cwd,
-      deps.capability.getStructuralProvider(deps.cwd) ?? undefined,
+      withStructuralRequestControl(deps.capability.getStructuralProvider(deps.cwd), control) ??
+        undefined,
     ),
     policy,
     deps,
@@ -175,6 +180,7 @@ async function resolveSymbolWorkflow(
   symbol: { query: string; scope?: string; symbolKind?: TargetSymbolKind },
   policy: TargetWorkflowPolicy,
   deps: TargetWorkflowDeps,
+  control?: CodeRequestControl,
 ): Promise<TargetWorkflowOutcome> {
   if (!symbol.query.trim()) {
     return { kind: "invalid-input", message: "Symbol query must not be empty." };
@@ -216,7 +222,8 @@ async function resolveSymbolWorkflow(
     await refineTargetOutcomeIdentity(
       outcome,
       deps.cwd,
-      deps.capability.getStructuralProvider(deps.cwd) ?? undefined,
+      withStructuralRequestControl(deps.capability.getStructuralProvider(deps.cwd), control) ??
+        undefined,
     ),
     policy,
     deps,
@@ -227,6 +234,7 @@ async function resolveFileOnlyWorkflow(
   requestedFile: string,
   maxResults: number,
   deps: TargetWorkflowDeps,
+  control?: CodeRequestControl,
 ): Promise<TargetWorkflowOutcome> {
   const validation = validateFileTargetDiscovery(requestedFile, deps.cwd);
   if (validation.kind === "invalid-input") return validation;
@@ -245,7 +253,9 @@ async function resolveFileOnlyWorkflow(
 
   const result = await resolveFileTargetGroup(file, deps.cwd, {
     semantic: deps.capability.getSemanticProvider(deps.cwd) ?? undefined,
-    structural: deps.capability.getStructuralProvider(deps.cwd) ?? undefined,
+    structural:
+      withStructuralRequestControl(deps.capability.getStructuralProvider(deps.cwd), control) ??
+      undefined,
   });
   if (result.kind === "invalid-input") return result;
   if (result.kind === "unavailable") {

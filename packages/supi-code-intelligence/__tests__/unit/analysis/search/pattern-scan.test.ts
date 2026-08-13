@@ -22,15 +22,11 @@ function source(relativePath: string): void {
   writeFileSync(file, "export const target = true;\n");
 }
 
-function outlineProvider(
-  resultForFile: (file: string) => ReturnType<StructuralProvider["outline"]>,
-): StructuralProvider {
+function outlineProvider(resultForFile: StructuralProvider["outline"]): StructuralProvider {
   return { outline: resultForFile } as StructuralProvider;
 }
 
-function importsProvider(
-  resultForFile: (file: string) => ReturnType<StructuralProvider["imports"]>,
-): StructuralProvider {
+function importsProvider(resultForFile: StructuralProvider["imports"]): StructuralProvider {
   return { imports: resultForFile } as StructuralProvider;
 }
 
@@ -295,6 +291,72 @@ describe("structured pattern AST Scan", () => {
         },
       },
     });
+  });
+
+  it("uses the earlier caller deadline as the shared structural deadline", async () => {
+    source("src/a.ts");
+    const controls: unknown[] = [];
+    const provider = outlineProvider(async (_file, control) => {
+      controls.push(control);
+      return { kind: "success", data: [] };
+    });
+
+    await getStructuredPatternMatches({
+      params: { pattern: "missing", kind: "definition" },
+      roots: [path.join(tmpDir, "src")],
+      cwd: tmpDir,
+      structural: provider,
+      control: { deadline: 8, timeoutMs: 10, now: () => 5 },
+    });
+
+    expect(controls[0]).toEqual({ signal: undefined, deadline: 8 });
+  });
+
+  it("forwards one exact signal and shared deadline to structural work", async () => {
+    source("src/a.ts");
+    source("src/b.ts");
+    const controls: unknown[] = [];
+    const provider = outlineProvider(async (_file, control) => {
+      controls.push(control);
+      return { kind: "success", data: [] };
+    });
+    const signal = new AbortController().signal;
+
+    await getStructuredPatternMatches({
+      params: { pattern: "missing", kind: "definition" },
+      roots: [path.join(tmpDir, "src")],
+      cwd: tmpDir,
+      structural: provider,
+      control: { signal, timeoutMs: 10, now: () => 5 },
+    });
+
+    expect(controls).toHaveLength(2);
+    expect(controls[0]).toBe(controls[1]);
+    expect(controls[0]).toEqual({ signal, deadline: 15 });
+  });
+
+  it("stops structural analysis between files on user cancellation", async () => {
+    source("src/a.ts");
+    source("src/b.ts");
+    const controller = new AbortController();
+    const cancellation = new Error("cancelled between files");
+    const provider = outlineProvider(
+      vi.fn(async () => {
+        controller.abort(cancellation);
+        return { kind: "success" as const, data: [] };
+      }),
+    );
+
+    await expect(
+      getStructuredPatternMatches({
+        params: { pattern: "missing", kind: "definition" },
+        roots: [path.join(tmpDir, "src")],
+        cwd: tmpDir,
+        structural: provider,
+        control: { signal: controller.signal },
+      }),
+    ).rejects.toBe(cancellation);
+    expect(provider.outline).toHaveBeenCalledOnce();
   });
 
   it("makes a deterministic analysis deadline partial", async () => {

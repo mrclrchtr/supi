@@ -1,3 +1,8 @@
+import {
+  type CodeRequestControl,
+  throwIfCodeRequestInterrupted,
+} from "@mrclrchtr/supi-code-runtime/api";
+
 /** Execution controls shared by Workspace code-intelligence session workflows. */
 
 /** Stable progress event emitted by a session-owned workflow. */
@@ -16,8 +21,7 @@ export interface WorkflowProgressEvent {
 }
 
 /** Per-call cancellation and progress controls. */
-export interface WorkflowControl {
-  readonly signal?: AbortSignal;
+export interface WorkflowControl extends CodeRequestControl {
   readonly progress?: (event: WorkflowProgressEvent) => void;
 }
 
@@ -31,5 +35,5 @@ export function reportProgress(
 
 /** Throw the platform-standard cancellation reason before starting a phase. */
 export function throwIfAborted(control: WorkflowControl | undefined): void {
-  control?.signal?.throwIfAborted();
+  throwIfCodeRequestInterrupted(control);
 }

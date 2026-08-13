@@ -28,8 +28,10 @@ import { TreeSitterRuntime } from "./runtime.ts";
 /** Create a runtime-backed structural service without taking ownership of disposal. */
 export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterService {
   return {
-    async canParse(file: string, _control?: CodeRequestControl) {
-      const result = await runtime.parseFile(file);
+    async canParse(file: string, control?: CodeRequestControl) {
+      const result = control
+        ? await runtime.parseFile(file, control)
+        : await runtime.parseFile(file);
       if (result.kind !== "success") return result;
       const { resolvedPath, grammarId, tree } = result.data;
       try {
@@ -45,14 +47,16 @@ export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterS
     async query(
       file: string,
       queryString: string,
-      _control?: CodeRequestControl,
+      control?: CodeRequestControl,
     ): Promise<TreeSitterResult<QueryCapture[]>> {
-      return runtime.queryFile(file, queryString);
+      return control
+        ? runtime.queryFile(file, queryString, control)
+        : runtime.queryFile(file, queryString);
     },
 
     async outline(
       file: string,
-      _control?: CodeRequestControl,
+      control?: CodeRequestControl,
     ): Promise<TreeSitterResult<OutlineItem[]>> {
       const grammarId = detectGrammar(file);
       if (grammarId && !supportsGrammarOperation(grammarId, "outline")) {
@@ -62,7 +66,9 @@ export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterS
           message: `outline is not supported for ${grammarId} files`,
         };
       }
-      const parseResult = await runtime.parseFile(file);
+      const parseResult = control
+        ? await runtime.parseFile(file, control)
+        : await runtime.parseFile(file);
       if (parseResult.kind !== "success") return parseResult;
       const { tree, source } = parseResult.data;
       try {
@@ -75,7 +81,7 @@ export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterS
 
     async imports(
       file: string,
-      _control?: CodeRequestControl,
+      control?: CodeRequestControl,
     ): Promise<TreeSitterResult<ImportRecord[]>> {
       const grammarId = detectGrammar(file);
       if (grammarId && !supportsGrammarOperation(grammarId, "imports")) {
@@ -85,12 +91,12 @@ export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterS
           message: `imports is not supported for ${grammarId} files`,
         };
       }
-      return extractImports(runtime, file);
+      return control ? extractImports(runtime, file, control) : extractImports(runtime, file);
     },
 
     async exports(
       file: string,
-      _control?: CodeRequestControl,
+      control?: CodeRequestControl,
     ): Promise<TreeSitterResult<ExportRecord[]>> {
       const grammarId = detectGrammar(file);
       if (grammarId && !supportsGrammarOperation(grammarId, "exports")) {
@@ -100,16 +106,18 @@ export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterS
           message: `exports is not supported for ${grammarId} files`,
         };
       }
-      return extractExports(runtime, file);
+      return control ? extractExports(runtime, file, control) : extractExports(runtime, file);
     },
 
     async nodeAt(
       file: string,
       line: number,
       character: number,
-      _control?: CodeRequestControl,
+      control?: CodeRequestControl,
     ): Promise<TreeSitterResult<NodeAtResult>> {
-      return lookupNodeAt(runtime, file, line, character);
+      return control
+        ? lookupNodeAt(runtime, file, line, character, control)
+        : lookupNodeAt(runtime, file, line, character);
     },
 
     async calleesAt(
@@ -122,14 +130,17 @@ export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterS
         | { depth?: "direct" | "deep"; control?: CodeRequestControl },
     ): Promise<TreeSitterResult<CalleesAtResult>> {
       const depth = typeof depthOrOptions === "string" ? depthOrOptions : depthOrOptions?.depth;
-      return lookupCalleesAt(runtime, file, line, character, depth);
+      const control = typeof depthOrOptions === "string" ? undefined : depthOrOptions?.control;
+      return control
+        ? lookupCalleesAt(runtime, file, line, character, depth, control)
+        : lookupCalleesAt(runtime, file, line, character, depth);
     },
 
     async callSites(
       file: string,
-      _control?: CodeRequestControl,
+      control?: CodeRequestControl,
     ): Promise<TreeSitterResult<CallSiteMatch[]>> {
-      return extractCallSites(runtime, file);
+      return control ? extractCallSites(runtime, file, control) : extractCallSites(runtime, file);
     },
   };
 }

@@ -1,7 +1,13 @@
 import { createHash } from "node:crypto";
 import { readFile, realpath } from "node:fs/promises";
+import {
+  type CodeRequestControl,
+  isCodeRequestInterruption,
+  throwIfCodeRequestInterrupted,
+} from "@mrclrchtr/supi-code-runtime/api";
 import type { Query, Tree } from "web-tree-sitter";
 import type { GrammarId } from "../types.ts";
+import { safeDelete, touchEntry, validatePositiveLimits } from "./parsed-file-store-helpers.ts";
 
 /** Fixed internal limits for session-owned parsed files and compiled queries. */
 export interface ParsedFileStoreLimits {
@@ -30,7 +36,10 @@ export interface StructuralCacheObservation {
 
 interface ParsedFileOperations {
   readonly realpath: (filePath: string) => Promise<string>;
-  readonly readFile: (filePath: string) => Promise<string>;
+  readonly readFile: (
+    filePath: string,
+    options?: { readonly signal?: AbortSignal },
+  ) => Promise<string>;
 }
 
 interface ParsedFileStoreOptions {
@@ -42,6 +51,7 @@ interface AcquireParsedFileInput {
   readonly resolvedPath: string;
   readonly grammarId: GrammarId;
   readonly parse: (source: string) => Tree | Promise<Tree>;
+  readonly control?: CodeRequestControl;
   readonly onPhase?: (phase: "file-read" | "content-hash") => void;
 }
 
@@ -64,6 +74,12 @@ interface CachedParsedFile {
 interface CachedQuery {
   readonly query: Query;
   readonly queryBytes: number;
+}
+
+interface QueryExecution<T> {
+  readonly control?: CodeRequestControl;
+  readonly compile: () => Query;
+  readonly execute: (query: Pick<Query, "matches">, cache: StructuralCacheObservation) => T;
 }
 
 /** File-access failure from canonicalization or an asynchronous source read. */
@@ -93,24 +109,28 @@ export class ParsedFileStore {
 
   constructor(options: ParsedFileStoreOptions = {}) {
     this.#limits = options.limits ?? DEFAULT_PARSED_FILE_STORE_LIMITS;
-    validateLimits(this.#limits);
+    validatePositiveLimits(this.#limits);
     this.#operations = options.operations ?? {
       realpath,
-      readFile: (filePath) => readFile(filePath, "utf-8"),
+      readFile: (filePath, options) => readFile(filePath, { encoding: "utf-8", ...options }),
     };
   }
 
   /** Read one file asynchronously and return a caller-owned current tree. */
   async acquireParsedFile(input: AcquireParsedFileInput): Promise<OwnedParsedFile> {
     this.#assertActive();
-    const canonicalPath = await this.#canonicalize(input.resolvedPath);
+    throwIfCodeRequestInterrupted(input.control);
+    const canonicalPath = await this.#canonicalize(input.resolvedPath, input.control);
     this.#assertActive();
-    const source = await this.#readSource(canonicalPath);
+    throwIfCodeRequestInterrupted(input.control);
+    const source = await this.#readSource(canonicalPath, input.control);
     this.#assertActive();
+    throwIfCodeRequestInterrupted(input.control);
     notifyPhase(input.onPhase, "file-read");
 
     const contentHash = createHash("sha256").update(source).digest("hex");
     notifyPhase(input.onPhase, "content-hash");
+    throwIfCodeRequestInterrupted(input.control);
     const key = fileKey(canonicalPath, input.grammarId);
     const existing = this.#files.get(key);
 
@@ -122,6 +142,7 @@ export class ParsedFileStore {
     try {
       parsedTree = await input.parse(source);
       this.#assertActive();
+      throwIfCodeRequestInterrupted(input.control);
     } catch (error) {
       if (parsedTree) safeDelete(parsedTree);
       throw error;
@@ -175,24 +196,32 @@ export class ParsedFileStore {
   withQuery<T>(
     grammarId: GrammarId,
     queryText: string,
-    compile: () => Query,
-    execute: (query: Pick<Query, "matches">, cache: StructuralCacheObservation) => T,
+    compileOrExecution: (() => Query) | QueryExecution<T>,
+    legacyExecute?: (query: Pick<Query, "matches">, cache: StructuralCacheObservation) => T,
   ): { readonly data: T; readonly cache: StructuralCacheObservation } {
+    const execution = normalizeQueryExecution(compileOrExecution, legacyExecute);
     this.#assertActive();
+    throwIfCodeRequestInterrupted(execution.control);
     const key = queryKey(grammarId, queryText);
     const existing = this.#queries.get(key);
     if (existing) {
-      touch(this.#queries, key, existing);
+      touchEntry(this.#queries, key, existing);
       const cache = { state: "hit", retained: true, evictionCount: 0 } as const;
-      return { data: execute(existing.query, cache), cache };
+      return { data: execution.execute(existing.query, cache), cache };
     }
 
-    const query = compile();
+    const query = execution.compile();
+    try {
+      throwIfCodeRequestInterrupted(execution.control);
+    } catch (error) {
+      safeDelete(query);
+      throw error;
+    }
     const queryBytes = Buffer.byteLength(queryText, "utf-8");
     if (queryBytes > this.#limits.maxQueryBytes) {
       const cache = { state: "miss", retained: false, evictionCount: 0 } as const;
       try {
-        return { data: execute(query, cache), cache };
+        return { data: execution.execute(query, cache), cache };
       } finally {
         safeDelete(query);
       }
@@ -204,7 +233,7 @@ export class ParsedFileStore {
       this.#queryBytes += queryBytes;
       const evictionCount = this.#evictQueries();
       const cache = { state: "miss", retained: true, evictionCount } as const;
-      return { data: execute(query, cache), cache };
+      return { data: execution.execute(query, cache), cache };
     } catch (error) {
       if (this.#queries.get(key) === cached) this.#removeQuery(key, cached);
       throw error;
@@ -229,7 +258,7 @@ export class ParsedFileStore {
     canonicalPath: string,
     grammarId: GrammarId,
   ): OwnedParsedFile {
-    touch(this.#files, key, cached);
+    touchEntry(this.#files, key, cached);
     try {
       return this.#ownedCopy(cached, canonicalPath, grammarId, {
         state: "hit",
@@ -257,18 +286,30 @@ export class ParsedFileStore {
     };
   }
 
-  async #canonicalize(filePath: string): Promise<string> {
+  async #canonicalize(filePath: string, control: CodeRequestControl | undefined): Promise<string> {
     try {
-      return await this.#operations.realpath(filePath);
+      const canonicalPath = await this.#operations.realpath(filePath);
+      throwIfCodeRequestInterrupted(control);
+      return canonicalPath;
     } catch (error) {
+      if (isCodeRequestInterruption(error, control)) {
+        throwIfCodeRequestInterrupted(control);
+        throw error;
+      }
       throw new ParsedFileReadError(fileReadMessage(error), { cause: error });
     }
   }
 
-  async #readSource(filePath: string): Promise<string> {
+  async #readSource(filePath: string, control: CodeRequestControl | undefined): Promise<string> {
     try {
-      return await this.#operations.readFile(filePath);
+      const source = await this.#operations.readFile(filePath, { signal: control?.signal });
+      throwIfCodeRequestInterrupted(control);
+      return source;
     } catch (error) {
+      if (isCodeRequestInterruption(error, control)) {
+        throwIfCodeRequestInterrupted(control);
+        throw error;
+      }
       throw new ParsedFileReadError(fileReadMessage(error), { cause: error });
     }
   }
@@ -318,16 +359,19 @@ export class ParsedFileStore {
   }
 }
 
-function fileReadMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "File could not be read";
+function normalizeQueryExecution<T>(
+  compileOrExecution: (() => Query) | QueryExecution<T>,
+  legacyExecute:
+    | ((query: Pick<Query, "matches">, cache: StructuralCacheObservation) => T)
+    | undefined,
+): QueryExecution<T> {
+  if (typeof compileOrExecution !== "function") return compileOrExecution;
+  if (!legacyExecute) throw new Error("Query execution callback is required");
+  return { compile: compileOrExecution, execute: legacyExecute };
 }
 
-function validateLimits(limits: ParsedFileStoreLimits): void {
-  for (const [name, value] of Object.entries(limits)) {
-    if (!Number.isSafeInteger(value) || value <= 0) {
-      throw new Error(`${name} must be a positive safe integer`);
-    }
-  }
+function fileReadMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "File could not be read";
 }
 
 function fileKey(canonicalPath: string, grammarId: GrammarId): string {
@@ -338,11 +382,6 @@ function queryKey(grammarId: GrammarId, queryText: string): string {
   return `${grammarId}\0${queryText}`;
 }
 
-function touch<K, V>(entries: Map<K, V>, key: K, value: V): void {
-  entries.delete(key);
-  entries.set(key, value);
-}
-
 function notifyPhase(
   observer: AcquireParsedFileInput["onPhase"],
   phase: "file-read" | "content-hash",
@@ -351,13 +390,5 @@ function notifyPhase(
     observer?.(phase);
   } catch {
     // Instrumentation must not alter parsed-file behavior.
-  }
-}
-
-function safeDelete(resource: { delete(): void }): void {
-  try {
-    resource.delete();
-  } catch {
-    // Continue deterministic cleanup of the remaining owned resources.
   }
 }

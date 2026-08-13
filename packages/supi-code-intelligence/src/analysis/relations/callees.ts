@@ -2,6 +2,7 @@
  * Structural callee lookup — finds direct calls in the enclosing scope at a target position.
  */
 
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import type { CalleeEntry, CalleeScope, RelationsServiceDeps } from "./types.ts";
 
 export interface CalleesResult {
@@ -26,12 +27,19 @@ export async function collectCallees(
   deps: RelationsServiceDeps,
   maxResults?: number,
   depth: "direct" | "deep" = "direct",
+  control?: CodeRequestControl,
 ): Promise<CalleesResult> {
   if (!deps.provider?.calleesAt) {
     return unavailableCallees(targetName);
   }
 
-  const result = await deps.provider.calleesAt(targetFile, targetLine, targetCharacter, depth);
+  const depthOrOptions = control ? { depth, control } : depth;
+  const result = await deps.provider.calleesAt(
+    targetFile,
+    targetLine,
+    targetCharacter,
+    depthOrOptions,
+  );
   if (result.kind !== "success" || !result.data) {
     return unavailableCallees(targetName);
   }

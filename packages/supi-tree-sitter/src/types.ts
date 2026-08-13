@@ -75,7 +75,11 @@ export interface CallSiteMatch {
   startLine: number;
 }
 
-/** Shared Tree-sitter service surface, independent of lifecycle ownership. */
+/**
+ * Shared Tree-sitter service surface, independent of lifecycle ownership.
+ * Optional request control cooperatively stops reads, parser progress, query
+ * progress, and cache publication without exposing raw WASM resources.
+ */
 export interface TreeSitterService {
   /** Validate that a supported file can be read and parsed; does not expose the raw tree. */
   canParse(

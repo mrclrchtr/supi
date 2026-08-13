@@ -1,4 +1,4 @@
-import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import type { CodeRequestControl, ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import type { ArchitectureModel } from "../analysis/architecture/model.ts";
 import type { EvidenceListMetadata } from "../analysis/evidence.ts";
@@ -37,6 +37,7 @@ export interface OrientationDeps {
   readonly provider: CodeProvider | null;
   readonly cwd: string;
   readonly lspRuntime: WorkspaceLspRuntimeState;
+  readonly requestControl?: CodeRequestControl;
 }
 
 /**

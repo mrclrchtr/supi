@@ -54,7 +54,9 @@ export async function runGraphWorkflow(
       maxResults: request.maxResults,
     },
     deps,
+    control,
   );
+  throwIfAborted(control);
   if (targetOutcome.kind === "target-group") {
     return {
       kind: "invalid-input",
@@ -94,9 +96,11 @@ export async function runGraphWorkflow(
         semanticReadinessError,
         anchorKind: entry.anchorKind,
         calleeDepth: request.calleeDepth,
+        requestControl: control,
       }),
     );
   }
+  throwIfAborted(control);
 
   if (sections.length > 0 && sections.every((section) => section.kind === "unavailable")) {
     return {
