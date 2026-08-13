@@ -1,12 +1,5 @@
 import { StringEnum } from "@earendil-works/pi-ai";
-import {
-  DEFAULT_MAX_BYTES,
-  DEFAULT_MAX_LINES,
-  type ExtensionAPI,
-  formatSize,
-  type TruncationResult,
-  truncateHead,
-} from "@earendil-works/pi-coding-agent";
+import type { AgentToolUpdateCallback, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
 import { registerContextProvider } from "@mrclrchtr/supi-core/context";
 import {
@@ -21,18 +14,23 @@ import {
   isDebugOperationId,
   subscribeDebugEvents,
 } from "@mrclrchtr/supi-core/debug";
+import { resolveToolPath } from "@mrclrchtr/supi-core/path";
 import { defineConfigSettings, registerSettings } from "@mrclrchtr/supi-core/settings";
 import { Type } from "typebox";
-import { formatDataLines } from "./format.ts";
-import { type DebugToolParams, parseDebugCommandArgs } from "./query.ts";
-import { registerDebugMessageRenderer } from "./renderer.ts";
+import { registerDebugCommand } from "./command.ts";
+import { formatDebugEvents, truncateDebugOutput } from "./output.ts";
+import type { DebugToolParams } from "./query.ts";
+import { createDebugRenderDetails } from "./render-details.ts";
+import {
+  registerDebugMessageRenderer,
+  renderDebugToolCall,
+  renderDebugToolResult,
+} from "./renderer.ts";
 import { DEBUG_EVENT_ENTRY_TYPE, readSessionDebugEvents } from "./session-events.ts";
 import { maybeLogLoadStatus } from "./status-log.ts";
 import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
 
 const DEBUG_SECTION = "debug";
-const DEBUG_REPORT_TYPE = "supi-debug-report";
-
 interface DebugConfig extends Record<string, unknown> {
   enabled: boolean;
   agentAccess: DebugAgentAccess;
@@ -142,74 +140,6 @@ function registerDebugSettings(pi: ExtensionAPI): void {
   );
 }
 
-function pushFormattedData(lines: string[], label: string, value: unknown): void {
-  const dataLines = formatDataLines(value);
-  if (dataLines.length === 0) return;
-  if (dataLines.length === 1) {
-    lines.push(`  ${label}: ${dataLines[0]}`);
-  } else {
-    lines.push(`  ${label}:`);
-    for (const dl of dataLines) {
-      lines.push(`    ${dl}`);
-    }
-  }
-}
-
-function formatEvents(
-  events: DebugEventView[],
-  rawAccessDenied: boolean,
-  rawDataUnavailable = false,
-  persistedEventCount?: number,
-): string[] {
-  if (events.length === 0) {
-    return persistedEventCount === 0
-      ? [
-          "This session has no persisted debug events; sessions recorded before persistence cannot be backfilled.",
-        ]
-      : ["No matching debug events available."];
-  }
-
-  const lines: string[] = [];
-  for (const event of events) {
-    lines.push(
-      `[${new Date(event.timestamp).toISOString()}] ${event.level.toUpperCase()} ${event.source}/${event.category}: ${event.message}`,
-    );
-    if (event.operationId) lines.push(`  operationId: ${event.operationId}`);
-    if (event.cwd) lines.push(`  cwd: ${event.cwd}`);
-    pushFormattedData(lines, "data", event.data);
-    pushFormattedData(lines, "rawData", event.rawData);
-  }
-  if (rawDataUnavailable) {
-    lines.push("");
-    lines.push("Raw debug data is not persisted for historical sessions.");
-  } else if (rawAccessDenied) {
-    lines.push("");
-    lines.push("Raw debug data was requested but is not enabled in SuPi Debug settings.");
-  }
-  return lines;
-}
-
-function appendTruncationNote(content: string, truncation: TruncationResult): string {
-  if (!truncation.truncated) return content;
-
-  const omittedLines = truncation.totalLines - truncation.outputLines;
-  const omittedBytes = truncation.totalBytes - truncation.outputBytes;
-  const separator = content.length > 0 ? "\n\n" : "";
-  return `${content}${separator}[Output truncated: showing ${truncation.outputLines} of ${truncation.totalLines} lines (${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}). ${omittedLines} lines (${formatSize(omittedBytes)}) omitted. Use filters or a smaller limit to narrow results.]`;
-}
-
-function truncateDebugOutput(content: string): { text: string; truncation?: TruncationResult } {
-  const truncation = truncateHead(content, {
-    maxLines: DEFAULT_MAX_LINES,
-    maxBytes: DEFAULT_MAX_BYTES,
-  });
-
-  return {
-    text: appendTruncationNote(truncation.content, truncation),
-    truncation: truncation.truncated ? truncation : undefined,
-  };
-}
-
 function buildSummaryData(): Record<string, string | number> | null {
   const summary = getDebugSummary();
   if (!summary) return null;
@@ -224,7 +154,36 @@ function buildSummaryData(): Record<string, string | number> | null {
   return data;
 }
 
-async function buildToolResult(params: DebugToolParams, config: DebugConfig) {
+interface DebugProgressDetails {
+  scannedLines: number;
+  persistedEventCount: number;
+  matchedEvents: number;
+}
+
+function reportDebugProgress(
+  onUpdate: AgentToolUpdateCallback<unknown> | undefined,
+  progress: DebugProgressDetails,
+): void {
+  onUpdate?.({
+    content: [
+      {
+        type: "text",
+        text: `Reading persisted debug events: ${progress.matchedEvents} matching events found.`,
+      },
+    ],
+    details: progress,
+  });
+}
+
+interface DebugToolExecutionOptions {
+  config: DebugConfig;
+  cwd: string;
+  signal?: AbortSignal;
+  onUpdate?: AgentToolUpdateCallback<unknown>;
+}
+
+async function buildToolResult(params: DebugToolParams, options: DebugToolExecutionOptions) {
+  const { config, cwd, signal, onUpdate } = options;
   if (!config.enabled && !params.sessionFile) {
     throw new Error(
       "SuPi debug event capture is disabled. Enable Debug in /supi-settings to retain events.",
@@ -252,7 +211,14 @@ async function buildToolResult(params: DebugToolParams, config: DebugConfig) {
   let rawDataUnavailable = false;
   let persistedEventCount: number | undefined;
   if (params.sessionFile) {
-    const persisted = await readSessionDebugEvents(params.sessionFile, filters);
+    const sessionFile = resolveToolPath(cwd, params.sessionFile);
+    const persisted =
+      signal || onUpdate
+        ? await readSessionDebugEvents(sessionFile, filters, {
+            signal,
+            onProgress: (progress) => reportDebugProgress(onUpdate, progress),
+          })
+        : await readSessionDebugEvents(sessionFile, filters);
     events = persisted.events;
     persistedEventCount = persisted.persistedEventCount;
     rawAccessDenied = Boolean(params.includeRaw);
@@ -263,19 +229,28 @@ async function buildToolResult(params: DebugToolParams, config: DebugConfig) {
     rawAccessDenied = result.rawAccessDenied;
   }
   const output = truncateDebugOutput(
-    formatEvents(events, rawAccessDenied, rawDataUnavailable, persistedEventCount).join("\n"),
+    formatDebugEvents(events, rawAccessDenied, rawDataUnavailable, persistedEventCount).join("\n"),
   );
+  const details = createDebugRenderDetails(events, {
+    enabled: config.enabled,
+    agentAccess: config.agentAccess,
+    sessionFile: params.sessionFile,
+    rawAccessDenied,
+    rawDataUnavailable,
+    persistedEventCount,
+    eventCount: events.length,
+    emptyReason:
+      events.length === 0
+        ? persistedEventCount === 0
+          ? "no-persisted-events"
+          : "no-matches"
+        : undefined,
+    truncation: output.truncation,
+  });
+
   return {
     content: [{ type: "text" as const, text: output.text }],
-    details: {
-      enabled: config.enabled,
-      agentAccess: config.agentAccess,
-      sessionFile: params.sessionFile,
-      rawAccessDenied,
-      rawDataUnavailable,
-      events,
-      truncation: output.truncation,
-    },
+    details,
   };
 }
 
@@ -307,54 +282,7 @@ export default function debugExtension(pi: ExtensionAPI) {
     unsubscribeDebugEvents();
   });
 
-  pi.registerCommand("supi-debug", {
-    description: "Show recent SuPi debug events",
-    handler: async (args, ctx) => {
-      const config = applyDebugConfig(ctx.cwd);
-      const query = parseDebugCommandArgs(args, normalizeMaxEvents);
-      if (!config.enabled && !query.sessionFile) {
-        pi.sendMessage({
-          customType: DEBUG_REPORT_TYPE,
-          content: "SuPi debug event capture is disabled. Enable Debug in /supi-settings.",
-          display: true,
-        });
-        return;
-      }
-
-      if (query.sessionFile) {
-        const persisted = await readSessionDebugEvents(query.sessionFile, {
-          operationId: query.operationId,
-          source: query.source,
-          level: query.level,
-          category: query.category,
-          limit: query.limit,
-        });
-        const output = truncateDebugOutput(
-          formatEvents(persisted.events, false, false, persisted.persistedEventCount).join("\n"),
-        );
-        pi.sendMessage({
-          customType: DEBUG_REPORT_TYPE,
-          content: output.text,
-          display: true,
-          details: {
-            sessionFile: query.sessionFile,
-            events: persisted.events,
-            truncation: output.truncation,
-          },
-        });
-        return;
-      }
-
-      const { events, rawAccessDenied } = getDebugEvents(query);
-      const output = truncateDebugOutput(formatEvents(events, rawAccessDenied).join("\n"));
-      pi.sendMessage({
-        customType: DEBUG_REPORT_TYPE,
-        content: output.text,
-        display: true,
-        details: { events, rawAccessDenied, truncation: output.truncation },
-      });
-    },
-  });
+  registerDebugCommand(pi, applyDebugConfig, normalizeMaxEvents);
 
   pi.registerTool({
     name: "supi_debug",
@@ -385,13 +313,15 @@ export default function debugExtension(pi: ExtensionAPI) {
       ),
     }),
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
-    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+    async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const query = params as DebugToolParams;
       if (query.operationId !== undefined && !isDebugOperationId(query.operationId)) {
         throw new Error("Invalid Debug Operation ID");
       }
       const config = applyDebugConfig(ctx.cwd);
-      return buildToolResult(query, config);
+      return buildToolResult(query, { config, cwd: ctx.cwd, signal, onUpdate });
     },
+    renderCall: renderDebugToolCall,
+    renderResult: renderDebugToolResult,
   });
 }

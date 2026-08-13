@@ -26,6 +26,97 @@ async function writeSession(entries: unknown[]): Promise<string> {
 }
 
 describe("readSessionDebugEvents", () => {
+  it("reports progress while scanning and stops on cancellation", async () => {
+    const file = await writeSession([
+      {
+        type: "custom",
+        customType: DEBUG_EVENT_ENTRY_TYPE,
+        data: {
+          id: 1,
+          timestamp: 1_700_000_000_000,
+          source: "lsp",
+          level: "debug",
+          category: "scan",
+          message: "first",
+        },
+      },
+    ]);
+    const progress: number[] = [];
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      readSessionDebugEvents(
+        file,
+        {},
+        {
+          signal: controller.signal,
+          onProgress: ({ scannedLines }) => progress.push(scannedLines),
+        },
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(progress).toEqual([]);
+  });
+
+  it("cancels when the final progress callback aborts the scan", async () => {
+    const file = await writeSession([
+      {
+        type: "custom",
+        customType: DEBUG_EVENT_ENTRY_TYPE,
+        data: {
+          id: 1,
+          timestamp: 1_700_000_000_000,
+          source: "lsp",
+          level: "debug",
+          category: "scan",
+          message: "first",
+        },
+      },
+    ]);
+    const controller = new AbortController();
+
+    await expect(
+      readSessionDebugEvents(
+        file,
+        {},
+        {
+          signal: controller.signal,
+          onProgress: ({ scannedLines }) => {
+            if (scannedLines === 2) controller.abort();
+          },
+        },
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("reports final progress for a completed scan", async () => {
+    const file = await writeSession([
+      {
+        type: "custom",
+        customType: DEBUG_EVENT_ENTRY_TYPE,
+        data: {
+          id: 1,
+          timestamp: 1_700_000_000_000,
+          source: "lsp",
+          level: "debug",
+          category: "scan",
+          message: "first",
+        },
+      },
+    ]);
+    const progress: Array<{ scannedLines: number; matchedEvents: number }> = [];
+
+    await readSessionDebugEvents(
+      file,
+      {},
+      {
+        onProgress: ({ scannedLines, matchedEvents }) =>
+          progress.push({ scannedLines, matchedEvents }),
+      },
+    );
+
+    expect(progress.at(-1)).toEqual({ scannedLines: 2, matchedEvents: 1 });
+  });
   it("filters persisted entries, returns newest first, and never exposes raw data", async () => {
     const file = await writeSession([
       {

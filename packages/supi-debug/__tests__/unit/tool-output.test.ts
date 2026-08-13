@@ -113,6 +113,24 @@ describe("supi-debug tool output", () => {
     expect(pi.entries).toEqual([{ type: "supi-debug-event", data: event }]);
   });
 
+  it("resolves relative historical tool paths from the tool cwd", async () => {
+    const pi = setup({ enabled: false, agentAccess: "sanitized", maxEvents: 100 });
+    mockFns.readSessionDebugEvents.mockResolvedValue({ events: [], persistedEventCount: 0 });
+    const tool = makeTool(pi);
+
+    await tool.execute("id", { sessionFile: "@logs/other.jsonl" }, undefined, undefined, {
+      cwd: "/repo",
+    });
+
+    expect(mockFns.readSessionDebugEvents).toHaveBeenCalledWith("/repo/logs/other.jsonl", {
+      operationId: undefined,
+      source: undefined,
+      level: undefined,
+      category: undefined,
+      limit: undefined,
+    });
+  });
+
   it("reads persisted events from another session", async () => {
     const pi = setup({ enabled: false, agentAccess: "raw", maxEvents: 100 });
     mockFns.readSessionDebugEvents.mockResolvedValue({
@@ -207,6 +225,24 @@ describe("supi-debug tool output", () => {
     expect(result.content[0]?.text).toContain("cannot be backfilled");
   });
 
+  it("resolves relative historical command paths from the command cwd", async () => {
+    const pi = setup({ enabled: false, agentAccess: "sanitized", maxEvents: 100 });
+    mockFns.readSessionDebugEvents.mockResolvedValue({ events: [], persistedEventCount: 0 });
+    const command = pi.commands.get("supi-debug") as {
+      handler: (args: string, ctx: { cwd: string }) => Promise<void>;
+    };
+
+    await command.handler("sessionFile=@logs/old.jsonl", { cwd: "/repo" });
+
+    expect(mockFns.readSessionDebugEvents).toHaveBeenCalledWith("/repo/logs/old.jsonl", {
+      operationId: undefined,
+      source: undefined,
+      level: undefined,
+      category: undefined,
+      limit: undefined,
+    });
+  });
+
   it("accepts sessionFile for historical command inspection", async () => {
     const pi = setup({ enabled: false, agentAccess: "sanitized", maxEvents: 100 });
     mockFns.readSessionDebugEvents.mockResolvedValue({ events: [], persistedEventCount: 0 });
@@ -223,6 +259,31 @@ describe("supi-debug tool output", () => {
       category: undefined,
       limit: undefined,
     });
+  });
+
+  it("keeps the truncation notice inside the output bounds", async () => {
+    const pi = setup();
+    mockFns.getDebugEvents.mockReturnValue({
+      rawAccessDenied: false,
+      events: Array.from({ length: 2_100 }, (_, index) => ({
+        id: index + 1,
+        timestamp: 1_700_000_000_000 + index,
+        source: "lsp",
+        level: "debug",
+        category: "trace",
+        message: `event-${index + 1}`,
+      })),
+    });
+    const tool = makeTool(pi);
+
+    const result = (await tool.execute("id", {}, undefined, undefined, { cwd: "/repo" })) as {
+      content: Array<{ text: string }>;
+    };
+    const text = result.content[0]?.text ?? "";
+
+    expect(text).toContain("[Output truncated:");
+    expect(text.split("\n").length).toBeLessThanOrEqual(2_000);
+    expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(50 * 1024);
   });
 
   it("truncates large tool output and reports truncation metadata", async () => {

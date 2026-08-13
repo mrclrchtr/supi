@@ -1,13 +1,19 @@
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import { registerDebugMessageRenderer } from "../../src/renderer.ts";
+import {
+  createDebugMessageDetails,
+  registerDebugMessageRenderer,
+  renderDebugToolCall,
+  renderDebugToolResult,
+} from "../../src/renderer.ts";
 
-function createMockTheme() {
+function createMockTheme(): Theme {
   return {
     fg: (_color: string, text: string) => text,
     bold: (text: string) => text,
     italic: (text: string) => text,
     strikethrough: (text: string) => text,
-  };
+  } as unknown as Theme;
 }
 
 function createMockPi() {
@@ -35,8 +41,8 @@ function makeMessage(content: string, details?: unknown) {
   };
 }
 
-function makeOptions(expanded: boolean) {
-  return { expanded };
+function makeOptions(expanded: boolean, isPartial = false) {
+  return { expanded, isPartial };
 }
 
 function getRegisteredRenderer() {
@@ -49,6 +55,86 @@ function getRegisteredRenderer() {
   return renderer;
 }
 
+describe("debug tool renderer", () => {
+  it("renders a bounded call header", () => {
+    const result = renderDebugToolCall(
+      {
+        source: "lsp",
+        category: "fallback",
+        sessionFile: `/sessions/${"x".repeat(200)}`,
+        includeRaw: true,
+      },
+      createMockTheme(),
+    );
+
+    expect((result as unknown as { text: string }).text).toContain("supi_debug");
+    expect((result as unknown as { text: string }).text).toContain("source=lsp");
+    expect((result as unknown as { text: string }).text.length).toBeLessThan(400);
+  });
+
+  it("renders partial and error states without reading result content", () => {
+    const partial = renderDebugToolResult(
+      {
+        content: [{ type: "text", text: "ignored" }],
+        details: { scannedLines: 250, matchedEvents: 2 },
+      },
+      makeOptions(false, true),
+      createMockTheme(),
+      { isError: false },
+    );
+    expect((partial as unknown as { text: string }).text).toContain(
+      "Reading persisted debug events",
+    );
+
+    const error = renderDebugToolResult(
+      { content: [{ type: "text", text: "secret failure" }], details: undefined },
+      makeOptions(false),
+      createMockTheme(),
+      { isError: true },
+    );
+    expect((error as unknown as { text: string }).text).toBe("supi_debug failed");
+    expect((error as unknown as { text: string }).text).not.toContain("secret failure");
+  });
+
+  it("bounds event details and excludes raw data", () => {
+    const rawData = { token: "must not be rendered" };
+    const details = createDebugMessageDetails([
+      {
+        id: 1,
+        timestamp: 1_700_000_000_000,
+        source: "lsp",
+        level: "warning",
+        category: "fallback",
+        message: "timeout",
+        data: { text: "x".repeat(5_000) },
+        rawData,
+      },
+    ]);
+
+    expect(details.events).toHaveLength(1);
+    expect(details.events[0]).not.toHaveProperty("rawData");
+    expect(details.eventDataTruncated).toBe(true);
+    expect(JSON.stringify(details).length).toBeLessThan(3_000);
+  });
+
+  it("bounds arrays of scalar values", () => {
+    const details = createDebugMessageDetails([
+      {
+        id: 1,
+        timestamp: 1_700_000_000_000,
+        source: "lsp",
+        level: "debug",
+        category: "trace",
+        message: "many values",
+        data: Array.from({ length: 10_000 }, (_, index) => index % 2 === 0),
+      },
+    ]);
+
+    expect(details.eventDataTruncated).toBe(true);
+    expect(JSON.stringify(details).length).toBeLessThan(10_000);
+  });
+});
+
 describe("debug message renderer", () => {
   it("shows fallback text when no events in details", () => {
     const renderer = getRegisteredRenderer();
@@ -58,7 +144,7 @@ describe("debug message renderer", () => {
       makeOptions(true),
       createMockTheme(),
     );
-    expect((result as { text: string }).text).toBe("disabled");
+    expect((result as unknown as { text: string }).text).toBe("disabled");
   });
 
   it("shows summary when collapsed", () => {
@@ -89,7 +175,7 @@ describe("debug message renderer", () => {
       createMockTheme(),
     );
 
-    expect((result as { text: string }).text).toBe("2 events — lsp/fallback +1 more");
+    expect((result as unknown as { text: string }).text).toBe("2 events — lsp/fallback +1 more");
   });
 
   it("renders full events when expanded", () => {
@@ -115,7 +201,7 @@ describe("debug message renderer", () => {
       createMockTheme(),
     );
 
-    const text = (result as { text: string }).text;
+    const text = (result as unknown as { text: string }).text;
     expect(text).toContain("lsp/fallback");
     expect(text).toContain("timeout");
     expect(text).toContain("/repo");
@@ -147,7 +233,7 @@ describe("debug message renderer", () => {
       createMockTheme(),
     );
 
-    const text = (result as { text: string }).text;
+    const text = (result as unknown as { text: string }).text;
     expect(text).toContain("line1");
     expect(text).toContain("line2");
     expect(text).toContain("line3");
