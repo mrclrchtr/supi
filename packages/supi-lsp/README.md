@@ -44,7 +44,7 @@ Clients, `LspManager`, and the default runtime implementation remain internal.
 - diagnostics, summaries, refresh, and recovery
 - project-server inventory and file support checks
 
-This separation keeps lifecycle and status distinct from workspace operations. Each controller transition has a monotonic generation and an aggregate server snapshot. Semantic capability is ready while at least one concrete client is ready. A crash or late progress event moves capability back to pending only after the final ready client is lost. The ready runtime owner stays available for lazy routing.
+This separation keeps lifecycle and status distinct from workspace operations. Each controller transition has a monotonic generation and an aggregate server snapshot. Semantic capability is ready while at least one concrete client is ready. A crash or late progress event moves capability back to pending only after the final ready client is lost. The ready runtime owner stays available for lazy routing. Debug telemetry records the transition kind, generation, semantic-ready state, ready and total client counts, and tracked-file count without file paths or server details.
 
 ## Example
 

@@ -25,6 +25,7 @@ import {
   setWorkspaceLspRuntimeState,
   type WorkspaceLspRuntime,
 } from "./runtime-registry.ts";
+import { recordLspRuntimeTransition } from "./runtime-transition-debug.ts";
 import { scanMissingServers, scanProjectCapabilities, startDetectedServers } from "./scanner.ts";
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -383,6 +384,7 @@ export class LspRuntimeController {
         openFiles: [...server.openFiles],
       })),
     };
+    recordLspRuntimeTransition(transition);
     this.#latestLifecycleTransition = transition;
     for (const listener of this.#lifecycleListeners) {
       this.notifyLifecycleListener(listener, transition);
