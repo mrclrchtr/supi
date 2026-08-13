@@ -62,6 +62,8 @@ export class TreeSitterRuntimeController {
   readonly #cwd: string;
   #state: TsControllerState;
   #runtime: WorkspaceRuntime | null;
+  #pendingRuntime: TreeSitterRuntime | null = null;
+  #generation = 0;
 
   constructor(cwd: string, runtime?: WorkspaceRuntime) {
     this.#cwd = cwd;
@@ -102,23 +104,24 @@ export class TreeSitterRuntimeController {
    * succeeds, returning `unavailable` if it fails.
    */
   async start(): Promise<TsStartResult> {
-    // Restart safety: dispose any existing runtime
-    if (this.#state.kind === "ready") {
-      this.#state.runtime.dispose();
-      if (this.#runtime) unregisterTreeSitterCapabilities(this.#runtime, this.#cwd);
-      clearSessionTreeSitterService(this.#cwd);
-    }
-
+    const generation = ++this.#generation;
+    this.#disposeOwnedRuntimes();
+    if (this.#runtime) unregisterTreeSitterCapabilities(this.#runtime, this.#cwd);
+    clearSessionTreeSitterService(this.#cwd);
     this.#state = { kind: "unavailable", reason: "Initializing Tree-sitter" };
-    let treeSitterRuntime: TreeSitterRuntime | undefined;
+
+    const treeSitterRuntime = new TreeSitterRuntime(this.#cwd);
+    this.#pendingRuntime = treeSitterRuntime;
 
     try {
-      treeSitterRuntime = new TreeSitterRuntime(this.#cwd);
-
       // Probe WASM initialization by loading the JavaScript grammar
       // (always vendored). This catches missing web-tree-sitter or
       // corrupted WASM early rather than deferring to first tool use.
       await treeSitterRuntime.ensureGrammarParser("javascript");
+
+      if (generation !== this.#generation || this.#pendingRuntime !== treeSitterRuntime) {
+        return supersededStart();
+      }
 
       const service = createTreeSitterService(treeSitterRuntime);
       setSessionTreeSitterService(this.#cwd, service);
@@ -127,11 +130,16 @@ export class TreeSitterRuntimeController {
         registerTreeSitterCapabilities(this.#runtime, this.#cwd, service);
       }
 
+      this.#pendingRuntime = null;
       this.#state = { kind: "ready", runtime: treeSitterRuntime, service };
       return { kind: "ready" };
     } catch (error: unknown) {
+      if (generation !== this.#generation || this.#pendingRuntime !== treeSitterRuntime) {
+        return supersededStart();
+      }
+      this.#pendingRuntime = null;
       const reason = error instanceof Error ? error.message : String(error);
-      treeSitterRuntime?.dispose();
+      treeSitterRuntime.dispose();
       if (this.#runtime) {
         unregisterTreeSitterCapabilities(this.#runtime, this.#cwd);
       }
@@ -147,16 +155,24 @@ export class TreeSitterRuntimeController {
    * Disposes the runtime and clears all published state.
    */
   async shutdown(): Promise<void> {
+    this.#generation++;
     if (this.#runtime && this.#cwd) {
       unregisterTreeSitterCapabilities(this.#runtime, this.#cwd);
     }
 
     clearSessionTreeSitterService(this.#cwd);
-
-    if (this.#state.kind === "ready") {
-      this.#state.runtime.dispose();
-    }
-
+    this.#disposeOwnedRuntimes();
     this.#state = { kind: "initial" };
   }
+
+  /** Dispose both published and startup-owned runtimes before a lifecycle transition. */
+  #disposeOwnedRuntimes(): void {
+    this.#pendingRuntime?.dispose();
+    this.#pendingRuntime = null;
+    if (this.#state.kind === "ready") this.#state.runtime.dispose();
+  }
+}
+
+function supersededStart(): TsStartResult {
+  return { kind: "unavailable", reason: "Startup superseded" };
 }

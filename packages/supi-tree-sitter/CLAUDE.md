@@ -107,6 +107,7 @@ pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json
 - `web-tree-sitter` query construction errors are validation errors; avoid broad runtime-error string heuristics.
 - Structural services accept optional shared `CodeRequestControl` metadata. Adapters preserve the exact value, but runtime methods do not apply its signal or deadline in the expansion stage.
 - `TreeSitterSession.canParse()` is a parseability check only. The parsed-file store keeps canonical trees private and gives runtime consumers owned shallow copies. Delete each owned copy. The installed `web-tree-sitter` `Language` type has no release method; runtime disposal deletes trees, queries, and parsers, then drops language references.
+- `TreeSitterRuntimeController` generation-fences startup. Shutdown and a newer start dispose the pending runtime, and stale startup continuations must not publish capability state.
 - `extractExports()` reports file-level exports only; nested `declare namespace/module` exports are scope-local.
 - `declare module "foo"` parses as a string-named `module` node; keep outline shallow and preserve the module name.
 - CRLF input needs normalized line splitting in coordinate helpers and `node_at` bounds to stay LSP-compatible.

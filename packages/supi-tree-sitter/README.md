@@ -114,6 +114,7 @@ The session runtime reads files asynchronously. It identifies fresh parsed files
 - `src/api.ts` — public library entrypoint
 - `src/index.ts` — re-export surface
 - `src/session/runtime.ts` — parser and query runtime
+- `src/session/runtime-controller.ts` — generation-fenced session lifecycle
 - `src/session/parsed-file-store.ts` — bounded parsed-file and compiled-query reuse
 - `src/session/session.ts` — runtime-backed service helpers and owned session API
 - `src/operation-support.ts` — authoritative operation-specific extension support
