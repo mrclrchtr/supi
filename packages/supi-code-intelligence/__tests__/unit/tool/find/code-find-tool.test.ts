@@ -690,9 +690,42 @@ describe("code_find tool", () => {
       )) as TextToolResult;
 
       const text = result.content[0].text;
-      expect(text).toContain("No semantic results found");
+      expect(text).toContain("No LSP workspace-symbol results found");
+      expect(text).toContain("Document-level semantic symbols can differ from the workspace index");
+      expect(text).toContain("use code_resolve with a file selector");
       expect(text).not.toContain("fell back to text search");
       expect(text).not.toContain("a.ts");
+      const details = result as TextToolResult & {
+        details?: { type: "search"; data: { nextQueries: string[] } };
+      };
+      expect(details.details?.data.nextQueries).toContain(
+        "If you know the file, use code_resolve with a file selector to enumerate document declarations",
+      );
+    });
+
+    it("discloses an empty partial semantic collection", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "const ghost = 1;\n");
+      registerMockProvider(tmpDir, {
+        workspaceSymbols: async () => ({
+          kind: "partial",
+          data: [],
+          reason: "One project server did not respond.",
+        }),
+      });
+      const tool = getCodeFindTool();
+
+      const result = (await tool.execute(
+        "test-semantic-partial-empty",
+        { query: "ghost", mode: "semantic" },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult;
+
+      const text = result.content[0].text;
+      expect(text).toContain("No LSP workspace-symbol results were collected");
+      expect(text).toContain("more may exist — provider-limited");
+      expect(text).not.toContain("No LSP workspace-symbol results found");
     });
 
     it("returns workspace symbols when a semantic provider is available", async () => {

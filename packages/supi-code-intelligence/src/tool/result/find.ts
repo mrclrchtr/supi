@@ -26,13 +26,7 @@ export function assembleFindWorkflowResult(
 ): FindResultAssembly {
   const evidence = createFindEvidence(outcome);
   const confidence: ConfidenceMode = outcome.data.kind === "semantic" ? "semantic" : "structural";
-  const nextQueries =
-    outcome.data.kind === "ast" && outcome.data.astKind === "call"
-      ? [
-          "Use code_graph references on a resolved target for symbol-identity relationships",
-          "Use PI grep for literal or regex source matches when it is active",
-        ]
-      : ["Change mode only when you need a different code-aware evidence substrate"];
+  const nextQueries = findNextQueries(outcome);
   const provenance = findProvenance(outcome.data.kind);
   const assembled = assembleToolResult({
     data: outcome.data,
@@ -66,6 +60,22 @@ export function assembleFindWorkflowResult(
       ...(outcome.data.kind === "ast" ? { scan: outcome.data.result.scan } : {}),
     },
   };
+}
+
+function findNextQueries(outcome: Extract<FindWorkflowOutcome, { kind: "completed" }>): string[] {
+  if (outcome.data.kind === "semantic" && outcome.data.symbols.length === 0) {
+    return [
+      "If you know the file, use code_resolve with a file selector to enumerate document declarations",
+      "Change mode only when you need a different code-aware evidence substrate",
+    ];
+  }
+  if (outcome.data.kind === "ast" && outcome.data.astKind === "call") {
+    return [
+      "Use code_graph references on a resolved target for symbol-identity relationships",
+      "Use PI grep for literal or regex source matches when it is active",
+    ];
+  }
+  return ["Change mode only when you need a different code-aware evidence substrate"];
 }
 
 function createFindEvidence(outcome: Extract<FindWorkflowOutcome, { kind: "completed" }>): {

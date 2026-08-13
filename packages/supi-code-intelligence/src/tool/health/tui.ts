@@ -173,16 +173,16 @@ function readRefreshStatus(data: Record<string, unknown> | null): string | null 
       const stale = readRecord(refresh.staleAssessment);
       const noOp = attempted === 0 && restarted === 0;
       const base = noOp
-        ? "refresh completed no-op"
-        : `refresh completed: ${attempted} clients targeted, ${restarted} restarted`;
+        ? "refresh attempt completed no-op"
+        : `refresh attempt completed: ${attempted} clients targeted, ${restarted} restarted`;
       return stale?.suspected === true
         ? `${base}; stale pattern suspected in ${readNumber(stale.matchedFileCount)} files`
         : base;
     }
     case "failed":
-      return `refresh failed${typeof refresh.reason === "string" ? `: ${refresh.reason}` : ""}`;
+      return `refresh attempt failed${typeof refresh.reason === "string" ? `: ${refresh.reason}` : ""}`;
     case "not-attempted":
-      return "refresh not attempted";
+      return "refresh attempt not started";
     default:
       return null;
   }

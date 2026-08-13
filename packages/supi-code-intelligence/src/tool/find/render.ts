@@ -38,9 +38,7 @@ function renderSemantic(assembly: FindResultAssembly, evidence: EvidenceListMeta
   const { outcome } = assembly;
   if (outcome.data.kind !== "semantic") return "";
   const symbols = outcome.data.symbols;
-  if (symbols.length === 0) {
-    return `**Semantic search** — \`${outcome.query}\`\n\nNo semantic results found in \`${outcome.scopeLabel}\`.`;
-  }
+  if (symbols.length === 0) return renderEmptySemantic(assembly, evidence);
 
   const lines = [
     `**Semantic search** — \`${outcome.query}\` (${symbols.length} symbol${symbols.length === 1 ? "" : "s"} found)`,
@@ -53,5 +51,24 @@ function renderSemantic(assembly: FindResultAssembly, evidence: EvidenceListMeta
   }
   const disclosure = renderEvidenceListMetadataDisclosure(evidence);
   if (disclosure) lines.push(disclosure);
+  return lines.join("\n");
+}
+
+function renderEmptySemantic(assembly: FindResultAssembly, evidence: EvidenceListMetadata): string {
+  const { outcome } = assembly;
+  const lines = [
+    `**Semantic search** — \`${outcome.query}\``,
+    "",
+    evidence.partialReason
+      ? `No LSP workspace-symbol results were collected in \`${outcome.scopeLabel}\`.`
+      : `No LSP workspace-symbol results found in \`${outcome.scopeLabel}\`.`,
+  ];
+  const disclosure = renderEvidenceListMetadataDisclosure(evidence);
+  if (disclosure) lines.push("", disclosure);
+  lines.push("", "Document-level semantic symbols can differ from the workspace index.");
+  const fileQuery = assembly.assembled.actions.find(
+    (action) => action.kind === "query" && action.instruction.startsWith("If you know the file"),
+  );
+  if (fileQuery?.kind === "query") lines.push(fileQuery.instruction);
   return lines.join("\n");
 }

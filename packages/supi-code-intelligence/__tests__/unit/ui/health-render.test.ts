@@ -84,7 +84,7 @@ describe("code_health TUI projection", () => {
       },
     });
 
-    expect(render(details, true)).toContain("refresh completed no-op");
+    expect(render(details, true)).toContain("refresh attempt completed no-op");
   });
 
   it("renders Capability Warnings from structured health details", () => {

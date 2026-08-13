@@ -51,16 +51,16 @@ function renderRefreshStatus(
 
   switch (data.refresh.kind) {
     case "completed":
-      lines.push(`**Diagnostic refresh**: ${completedRefreshText(data.refresh)}.`);
+      lines.push(`**Diagnostic refresh attempt**: ${completedRefreshText(data.refresh)}.`);
       lines.push(`**Stale assessment**: ${staleAssessmentText(data.refresh)}.`);
       lines.push("");
       return;
     case "failed":
-      lines.push(`**Diagnostic refresh**: failed — ${data.refresh.reason}`);
+      lines.push(`**Diagnostic refresh attempt**: failed — ${data.refresh.reason}`);
       lines.push("");
       return;
     case "not-attempted":
-      lines.push(`**Diagnostic refresh**: not attempted — ${data.refresh.reason}`);
+      lines.push(`**Diagnostic refresh attempt**: not started — ${data.refresh.reason}`);
       if (data.refresh.lastAttempt) renderLastAttempt(lines, data.refresh.lastAttempt, cwd);
       lines.push("");
       return;
@@ -69,7 +69,7 @@ function renderRefreshStatus(
         renderLastAttempt(lines, data.refresh.lastAttempt, cwd);
       } else {
         lines.push(
-          "**Diagnostic refresh**: not attempted this session. Use `refresh: true` to try one.",
+          "**Diagnostic refresh attempt**: not requested this session. Use `refresh: true` to try one.",
         );
       }
       lines.push("");

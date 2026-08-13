@@ -140,7 +140,8 @@ describe("code_health result assembly", () => {
       attemptedActiveClients: 0,
       restartedClients: 0,
     });
-    expect(markdown).toContain("Diagnostic refresh**: completed no-op");
+    expect(markdown).toContain("Diagnostic refresh attempt**: completed no-op");
+    expect(markdown).not.toContain("**Diagnostic refresh**:");
     expect(markdown).not.toContain("recovered");
   });
 
