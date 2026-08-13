@@ -45,6 +45,8 @@ export type CapabilityState =
 
 /** Request control that adapters preserve and cooperative providers apply. */
 export interface CodeRequestControl {
+  /** Opaque Debug Operation ID for work directly owned by one public Tool call. */
+  readonly operationId?: string;
   /** Caller cancellation signal, when one exists. */
   readonly signal?: AbortSignal;
   /** Absolute wall-clock deadline in Unix epoch milliseconds. */

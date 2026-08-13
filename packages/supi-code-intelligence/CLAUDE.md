@@ -57,6 +57,8 @@ Whole-workflow capability unavailable → throw from `execute()` so PI marks a r
 
 ## Provider/runtime contract
 
+Each registered public `code_*` call derives one opaque Debug Operation ID in the registration closure. Forward it only through explicit `WorkflowControl` and `CodeRequestControl`. Never retain or forward Pi's raw `toolCallId`, use async context, or add the opaque ID to normal Tool results. Ambient lifecycle events and direct library calls have no ID.
+
 `WorkspaceCapabilityAdapter` reads `supi-code-runtime` capability state and the `WorkspaceLspRuntime`. `Workspace provider host` is process-shared and reference-counted by canonical workspace; it starts LSP and exactly one Tree-sitter Structural Worker, then awaits shutdown after the final session lease. Parser-backed work never falls back to the parent thread. Target/refactor stores remain session-local. `TestCapabilityAdapter` is the in-memory workflow-test seam. Read-only semantic providers return `CodeQueryResult<T>`; completed empty data must not be inferred as unavailable. When provider contracts change, update the LSP runtime, composite provider, test adapter, and behavior tests together.
 
 ## Always-on LSP policy

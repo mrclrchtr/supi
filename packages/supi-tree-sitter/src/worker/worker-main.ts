@@ -8,6 +8,7 @@ import {
   STRUCTURAL_WORKER_PROTOCOL_VERSION,
   type StructuralWorkerChunkAckMessage,
   type StructuralWorkerRequestMessage,
+  validateStructuralWorkerRequest,
 } from "../session/structural-worker-protocol.ts";
 import type { TreeSitterResult } from "../types.ts";
 import type { StructuralRequestControl } from "./request-control.ts";
@@ -67,7 +68,9 @@ export async function runStructuralWorker(
       return;
     }
     if (message.kind !== "request" || active) return;
-    void execute(message);
+    const validation = validateStructuralWorkerRequest(message);
+    if (validation.kind === "invalid") return;
+    void execute(validation.message);
   });
 
   try {
@@ -92,6 +95,7 @@ export async function runStructuralWorker(
     const abortController = new AbortController();
     const cancellationFlag = new Int32Array(message.cancellationFlag);
     const control: StructuralRequestControl = {
+      operationId: message.operationId,
       signal: abortController.signal,
       deadline: message.deadline,
       cancellationFlag,

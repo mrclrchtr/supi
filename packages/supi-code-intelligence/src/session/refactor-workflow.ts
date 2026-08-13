@@ -87,10 +87,11 @@ export async function runRefactorPlanWorkflow(
   }
   if (target.kind !== "resolved") return target;
 
-  const readiness = await deps.capability.ensureSemanticReadiness(deps.cwd, {
-    kind: "file",
-    file: target.entry.file,
-  });
+  const readiness = await deps.capability.ensureSemanticReadiness(
+    deps.cwd,
+    { kind: "file", file: target.entry.file },
+    control,
+  );
   if (readiness.kind === "timeout") {
     return { kind: "unavailable", reason: "Semantic readiness timed out." };
   }
@@ -98,13 +99,17 @@ export async function runRefactorPlanWorkflow(
   throwIfAborted(control);
 
   const file = normalizePath(target.entry.file, deps.cwd);
-  const result = await planWithProvider(deps.capability.getSemanticProvider(deps.cwd), {
-    operation: parsed.operation,
-    file,
-    position: toLspPosition(target.entry.displayLine, target.entry.displayCharacter),
-    range: parsed.range ? toLspRange(parsed.range) : undefined,
-    newName: parsed.newName,
-  });
+  const result = await planWithProvider(
+    deps.capability.getSemanticProvider(deps.cwd),
+    {
+      operation: parsed.operation,
+      file,
+      position: toLspPosition(target.entry.displayLine, target.entry.displayCharacter),
+      range: parsed.range ? toLspRange(parsed.range) : undefined,
+      newName: parsed.newName,
+    },
+    control,
+  );
   if (result.kind === "unavailable") return result;
   if (result.kind === "ambiguous") {
     return { kind: "ambiguous", candidates: result.candidates };
@@ -261,11 +266,12 @@ async function planWithProvider(
     range?: SourceRange;
     newName: string;
   },
+  control?: WorkflowControl,
 ): Promise<RefactorResult> {
   if (!provider) return { kind: "unavailable", reason: "No semantic provider is active." };
-  if (provider.refactor) return provider.refactor(request);
+  if (provider.refactor) return provider.refactor(request, control);
   if (request.operation === "rename_symbol" && provider.rename) {
-    return provider.rename(request.file, request.position, request.newName);
+    return provider.rename(request.file, request.position, request.newName, control);
   }
   return {
     kind: "unavailable",

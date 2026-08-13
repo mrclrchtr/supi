@@ -152,7 +152,11 @@ async function collectDiagnostics(
     return unavailableCodeQuery(lspUnavailableReason(input.lspState));
   }
   try {
-    const result = await input.lspState.runtime.fileDiagnostics(input.file, 4);
+    const result = await input.lspState.runtime.fileDiagnostics(
+      input.file,
+      4,
+      input.requestControl,
+    );
     if (result.kind === "unavailable") return result;
     const diagnostics = result.data
       .filter((diagnostic) => diagnosticOverlapsWindow(diagnostic.range, input))

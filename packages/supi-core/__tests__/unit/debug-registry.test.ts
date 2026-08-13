@@ -7,6 +7,7 @@ import {
   getDebugRegistryConfig,
   getDebugSummary,
   isDebugLevel,
+  isDebugOperationId,
   matchesDebugEventQuery,
   recordDebugEvent,
   redactDebugData,
@@ -29,6 +30,14 @@ describe("debug registry", () => {
         { source: "lsp", level: "warning" },
       ),
     ).toBe(true);
+  });
+
+  it("validates the exact Debug Operation ID form", () => {
+    expect(isDebugOperationId("op-AAAAAAAAAAAAAAAAAAAAAA")).toBe(true);
+    expect(isDebugOperationId("op-_____________________w")).toBe(true);
+    expect(isDebugOperationId("op-AAAAAAAAAAAAAAAAAAAAAB")).toBe(false);
+    expect(isDebugOperationId("op-AAAAAAAAAAAAAAAAAAAAAA=")).toBe(false);
+    expect(isDebugOperationId("tool-call-raw")).toBe(false);
   });
 
   it("does not retain events when disabled", () => {
@@ -110,21 +119,57 @@ describe("debug registry", () => {
     expect(getDebugEvents().events.map((event) => event.category)).toEqual(["three", "two"]);
   });
 
-  it("filters by source, level, and category with newest-first limits", () => {
+  it("filters by operation, source, level, and category with newest-first limits", () => {
     configureDebugRegistry({ enabled: true, maxEvents: 10 });
+    const operationId = "op-AAAAAAAAAAAAAAAAAAAAAA";
 
-    recordDebugEvent({ source: "lsp", level: "warning", category: "fallback", message: "one" });
-    recordDebugEvent({ source: "lsp", level: "error", category: "diagnostic", message: "two" });
-    recordDebugEvent({ source: "lsp", level: "warning", category: "fallback", message: "three" });
+    recordDebugEvent({
+      source: "lsp",
+      level: "warning",
+      category: "fallback",
+      message: "one",
+      operationId,
+    });
+    recordDebugEvent({
+      source: "lsp",
+      level: "error",
+      category: "diagnostic",
+      message: "two",
+      operationId,
+    });
+    recordDebugEvent({ source: "lsp", level: "warning", category: "fallback", message: "other" });
+    recordDebugEvent({
+      source: "lsp",
+      level: "warning",
+      category: "fallback",
+      message: "three",
+      operationId,
+    });
 
     const result = getDebugEvents({
+      operationId,
       source: "lsp",
       level: "warning",
       category: "fallback",
       limit: 1,
     });
 
-    expect(result.events.map((event) => event.message)).toEqual(["three"]);
+    expect(result.events).toEqual([expect.objectContaining({ message: "three", operationId })]);
+  });
+
+  it("does not retain an invalid Debug Operation ID", () => {
+    configureDebugRegistry({ enabled: true });
+
+    expect(
+      recordDebugEvent({
+        source: "lsp",
+        level: "debug",
+        category: "request.timing",
+        message: "request",
+        operationId: "raw-tool-call-id",
+      }),
+    ).toBeNull();
+    expect(getDebugEvents().events).toEqual([]);
   });
 
   it("returns sanitized data by default and raw data only when explicitly allowed", () => {

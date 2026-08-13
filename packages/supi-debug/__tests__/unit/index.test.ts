@@ -6,6 +6,7 @@ const mockFns = vi.hoisted(() => ({
   getDebugEvents: vi.fn(),
   getDebugSummary: vi.fn(),
   isDebugLevel: vi.fn((value) => value === "warning"),
+  isDebugOperationId: vi.fn((value) => value === "op-AAAAAAAAAAAAAAAAAAAAAA"),
   matchesDebugEventQuery: vi.fn(() => true),
   loadSupiConfig: vi.fn(),
   defineConfigSettings: vi.fn((options) => options),
@@ -44,6 +45,7 @@ vi.mock("@mrclrchtr/supi-core/debug", () => ({
   getDebugEvents: mockFns.getDebugEvents,
   getDebugSummary: mockFns.getDebugSummary,
   isDebugLevel: mockFns.isDebugLevel,
+  isDebugOperationId: mockFns.isDebugOperationId,
   matchesDebugEventQuery: mockFns.matchesDebugEventQuery,
   redactDebugData: mockFns.redactDebugData,
   subscribeDebugEvents: mockFns.subscribeDebugEvents,
@@ -97,6 +99,16 @@ describe("supi-debug extension setup", () => {
     const level = tool.parameters.properties.level;
 
     expect(level).toMatchObject({ type: "string", enum: ["debug", "info", "warning", "error"] });
+  });
+
+  it("uses the exact Debug Operation ID pattern in the tool schema", () => {
+    const pi = setup();
+    const tool = pi.tools[0] as { parameters: { properties: Record<string, unknown> } };
+
+    expect(tool.parameters.properties.operationId).toMatchObject({
+      type: "string",
+      pattern: "^op-[A-Za-z0-9_-]{21}[AQgw]$",
+    });
   });
 
   it("configures the debug registry from merged config on load", () => {
@@ -265,9 +277,12 @@ describe("supi-debug command and tool", () => {
     const cmd = pi.commands.get("supi-debug") as {
       handler: (args: string, ctx: { cwd: string }) => Promise<void>;
     };
-    await cmd?.handler("source=lsp level=warning limit=5", { cwd: "/repo" });
+    await cmd?.handler("operationId=op-AAAAAAAAAAAAAAAAAAAAAA source=lsp level=warning limit=5", {
+      cwd: "/repo",
+    });
 
     expect(mockFns.getDebugEvents).toHaveBeenCalledWith({
+      operationId: "op-AAAAAAAAAAAAAAAAAAAAAA",
       source: "lsp",
       level: "warning",
       limit: 5,
@@ -342,6 +357,7 @@ describe("supi-debug command and tool", () => {
     };
 
     expect(mockFns.getDebugEvents).toHaveBeenCalledWith({
+      operationId: undefined,
       source: "lsp",
       level: undefined,
       category: undefined,
@@ -360,6 +376,7 @@ describe("supi-debug command and tool", () => {
     await tool?.execute("id", { includeRaw: true }, undefined, undefined, { cwd: "/repo" });
 
     expect(mockFns.getDebugEvents).toHaveBeenCalledWith({
+      operationId: undefined,
       source: undefined,
       level: undefined,
       category: undefined,

@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import {
   type CodeQueryResult,
+  type CodeRequestControl,
   completedCodeQuery,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
@@ -25,6 +26,7 @@ import {
 } from "./client-diagnostic-evidence.ts";
 import type { ClientDiagnosticsHost } from "./client-diagnostic-host.ts";
 import { pullDiagnosticEvidence } from "./client-diagnostic-pull.ts";
+import type { DiagnosticPullRequest } from "./client-diagnostic-request.ts";
 import {
   DiagnosticObserver,
   DiagnosticPullError,
@@ -41,10 +43,7 @@ import {
 import { resynchronizeOpenDocuments, synchronizeDocument } from "./client-document-sync.ts";
 
 const DIAGNOSTIC_WAIT_MS = 3_000;
-/**
- * Own one client's document and diagnostic evidence. Fingerprints prevent duplicate changes.
- * Revisions stop stale reuse, but keep invalidated cache data as partial fallback.
- */
+/** Own one client's document and diagnostic evidence; revisions prevent stale reuse. */
 export class ClientDiagnostics {
   readonly #openDocs = new Map<string, OpenDocumentState>();
   readonly #diagnosticStore = new Map<string, DiagnosticCacheEntry>();
@@ -188,12 +187,11 @@ export class ClientDiagnostics {
     this.#waiters.releaseFile(params.uri, "published");
     this.#waiters.notifySettle();
   }
-
   async refreshOpenDiagnostics(
-    options: { maxWaitMs?: number; quietMs?: number } = {},
+    options: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl = {},
   ): Promise<void> {
     const supportsPull = this.host.supportsPullDiagnostics();
-    const observer = new DiagnosticObserver("refresh-open", supportsPull);
+    const observer = new DiagnosticObserver("refresh-open", supportsPull, options);
     if (!this.host.isOperational()) {
       observer.skipped(0);
       return;
@@ -213,7 +211,12 @@ export class ClientDiagnostics {
 
     if (supportsPull) {
       try {
-        await this.#pullDiagnosticsForOpenDocuments(synchronizations, syncStart, maxWaitMs);
+        await this.#pullDiagnosticsForOpenDocuments(
+          synchronizations,
+          syncStart,
+          maxWaitMs,
+          options.operationId,
+        );
         observer.pullCompleted(documentCount);
         return;
       } catch (error) {
@@ -236,9 +239,10 @@ export class ClientDiagnostics {
   async syncAndWaitForDiagnostics(
     filePath: string,
     content: string,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Diagnostic[]>> {
     const supportsPull = this.host.supportsPullDiagnostics();
-    const observer = new DiagnosticObserver("sync-file", supportsPull);
+    const observer = new DiagnosticObserver("sync-file", supportsPull, control);
     const uri = fileToUri(filePath);
     const cached = this.#diagnosticStore.get(uri);
     const cachedDiagnostics = cached ? [...cached.diagnostics] : null;
@@ -284,10 +288,10 @@ export class ClientDiagnostics {
           synchronizationId: request.synchronizationId,
           evidenceRevision,
           signal,
+          operationId: control?.operationId,
         }),
     });
   }
-
   #synchronizeDocument(filePath: string, content: string): void {
     const uri = fileToUri(filePath);
     const doc = this.#openDocs.get(uri);
@@ -306,7 +310,6 @@ export class ClientDiagnostics {
       sendNotification: (method, params) => this.host.sendNotification(method, params),
     });
   }
-
   #resyncOpenDocuments(): DiagnosticSynchronization[] {
     return resynchronizeOpenDocuments({
       openDocuments: this.#openDocs,
@@ -319,11 +322,11 @@ export class ClientDiagnostics {
       clearFile: (uri) => this.#clearFileState(uri),
     });
   }
-
   async #pullDiagnosticsForOpenDocuments(
     requests: DiagnosticSynchronization[],
     syncStart: number,
     maxWaitMs: number,
+    operationId?: string,
   ): Promise<void> {
     const deadline = syncStart + maxWaitMs;
     const results = await Promise.allSettled(
@@ -339,6 +342,7 @@ export class ClientDiagnostics {
             evidenceRevision:
               this.#openDocs.get(request.uri)?.evidenceRevision ?? this.#evidenceRevision,
             signal: pullController.signal,
+            operationId,
           }),
           waitForChange: () => this.#waiters.waitForChange(),
           freshPush: () => hasFreshPush(this.#diagnosticStore, request),
@@ -359,13 +363,12 @@ export class ClientDiagnostics {
     }
   }
 
-  async #pullDiagnosticsForUri(options: {
-    uri: string;
-    timeoutMs: number;
-    synchronizationId?: number;
-    evidenceRevision?: number;
-    signal?: AbortSignal;
-  }): Promise<boolean> {
+  async #pullDiagnosticsForUri(
+    options: Omit<DiagnosticPullRequest, "previousResultId"> & {
+      synchronizationId?: number;
+      evidenceRevision?: number;
+    },
+  ): Promise<boolean> {
     const evidenceRevision = options.evidenceRevision ?? this.#evidenceRevision;
     const applied = await pullDiagnosticEvidence({
       store: this.#diagnosticStore,
@@ -378,19 +381,16 @@ export class ClientDiagnostics {
           uri: options.uri,
           synchronizationId: options.synchronizationId,
         }),
-      pull: (uri, resultId, timeoutMs, signal) =>
-        this.host.pullDocumentDiagnostics(uri, resultId, timeoutMs, signal),
+      pull: (request) => this.host.pullDocumentDiagnostics(request),
     });
     if (applied) this.#unversionedPushBlocked = false;
     return applied;
   }
-
   #sendDidClose(uri: string): void {
     this.host.sendNotification("textDocument/didClose", {
       textDocument: { uri } satisfies TextDocumentIdentifier,
     });
   }
-
   #clearFileState(uri: string): void {
     this.#openDocs.delete(uri);
     this.#diagnosticStore.delete(uri);

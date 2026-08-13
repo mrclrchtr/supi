@@ -3,6 +3,7 @@
 
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
 import type { Diagnostic, WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 import type {
@@ -34,18 +35,19 @@ interface CollectDiagnosticsOptions {
   readonly unavailableReason: string;
   /** Collect individual messages per file (detailed level). */
   readonly detailed?: boolean;
+  readonly requestControl?: CodeRequestControl;
 }
 
 /** Collect diagnostics without widening the requested evidence scope. */
 export async function collectDiagnostics(
   options: CollectDiagnosticsOptions,
 ): Promise<HealthDiagnosticObservation> {
-  const { service, included, scope, cwd, unavailableReason, detailed } = options;
+  const { service, included, scope, cwd, unavailableReason, detailed, requestControl } = options;
   if (!included.includes("diagnostics")) return { kind: "not-requested", entries: [] };
   if (!service) return unavailableDiagnostics(scope, unavailableReason);
 
   return scope.kind === "file"
-    ? collectScopedFileDiagnostics(service, scope, detailed)
+    ? collectScopedFileDiagnostics(service, scope, detailed, requestControl)
     : collectTrackedFileDiagnostics(service, scope, cwd, detailed);
 }
 
@@ -53,9 +55,10 @@ async function collectScopedFileDiagnostics(
   service: WorkspaceLspRuntime,
   scope: Extract<HealthDiagnosticScope, { kind: "file" }>,
   detailed?: boolean,
+  requestControl?: CodeRequestControl,
 ): Promise<HealthDiagnosticObservation> {
   try {
-    const result = await service.fileDiagnostics(scope.path, 4);
+    const result = await service.fileDiagnostics(scope.path, 4, requestControl);
     if (result.kind === "unavailable") return unavailableDiagnostics(scope, result.reason);
 
     const entries = toFileDiagnosticEntries(scope.path, result.data, detailed);

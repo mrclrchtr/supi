@@ -3,6 +3,7 @@
 // and notification/request dispatching through vscode-jsonrpc's MessageConnection.
 
 import type { Readable, Writable } from "node:stream";
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { startDebugTimer } from "@mrclrchtr/supi-core/debug";
 import {
   CancellationTokenSource,
@@ -85,19 +86,16 @@ export class JsonRpcClient {
   sendRequest(
     method: string,
     params?: unknown,
-    options?: { timeoutMs?: number; signal?: AbortSignal },
+    options?: { timeoutMs?: number } & CodeRequestControl,
   ): Promise<unknown> {
     const timeoutMs = options?.timeoutMs ?? this.timeoutMs;
     const signal = options?.signal;
     const methodClass = classifyRequestMethod(method);
     const timer = startDebugTimer();
     if (this.closed || !this.connection) {
-      recordRequestTiming(timer, {
+      recordRequestTiming(timer, options?.operationId, {
         methodClass,
         outcome: "cancelled",
-        timeoutMs,
-        timedOut: false,
-        cancelled: true,
       });
       return Promise.reject(new Error("JSON-RPC client is closed"));
     }
@@ -141,12 +139,9 @@ export class JsonRpcClient {
     ])
       .then(
         (result) => {
-          recordRequestTiming(timer, {
+          recordRequestTiming(timer, options?.operationId, {
             methodClass,
             outcome: "completed",
-            timeoutMs,
-            timedOut: false,
-            cancelled: false,
           });
           return result;
         },
@@ -157,12 +152,9 @@ export class JsonRpcClient {
             : cancelled
               ? "cancelled"
               : "failed";
-          recordRequestTiming(timer, {
+          recordRequestTiming(timer, options?.operationId, {
             methodClass,
             outcome,
-            timeoutMs,
-            timedOut,
-            cancelled,
           });
           throw error;
         },
@@ -236,17 +228,16 @@ function isCancellationError(error: unknown): boolean {
 interface RequestTimingObservation {
   readonly methodClass: RequestMethodClass;
   readonly outcome: RequestOutcome;
-  readonly timeoutMs: number;
-  readonly timedOut: boolean;
-  readonly cancelled: boolean;
 }
 
 function recordRequestTiming(
   timer: ReturnType<typeof startDebugTimer>,
+  operationId: string | undefined,
   observation: RequestTimingObservation,
 ): void {
   timer.finish(
     () => ({
+      operationId,
       source: "lsp",
       level: "debug",
       category: "request.timing",

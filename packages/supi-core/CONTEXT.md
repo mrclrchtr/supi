@@ -59,7 +59,7 @@ The session-local SuPi buffer that stores diagnostic events emitted by extension
 _Avoid_: log sink, event log, telemetry store
 
 **Debug Event Producer**:
-A SuPi extension package that records diagnostic events into the Debug Registry while doing its own primary work. Producers emit events only; they do not own registry reset, retention, or exposure policy.
+A SuPi extension package that records diagnostic events into the Debug Registry while doing its own primary work. Producers emit events only; they do not own registry reset, retention, or exposure policy. A producer adds a Debug Operation ID only when explicit request control proves that the public Tool call directly owns the work; time overlap does not establish ownership.
 _Avoid_: logger, debug source, registry owner
 
 **Debug Timing**:
@@ -67,7 +67,7 @@ Monotonic duration evidence attached to one Debug Event. It can contain a total 
 _Avoid_: telemetry, benchmark result, profiler trace
 
 **Debug Operation ID**:
-A session-local opaque identity that groups Debug Events directly owned by one public Tool call. Ambient work and operations without an explicitly propagated request context have no Debug Operation ID.
+A session-local opaque identity that groups Debug Events directly owned by one public Tool call. Ambient work and operations without an explicitly propagated request context have no Debug Operation ID. It is diagnostic correlation only. It is not a security identity, distributed trace, raw Pi Tool-call identity, or proof of time overlap.
 _Avoid_: trace id, tool-call id, time-window correlation
 
 **Debug Surface**:

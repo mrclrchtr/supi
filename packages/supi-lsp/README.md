@@ -66,7 +66,7 @@ if (state.kind === "ready") {
 
 Runtime methods use raw 0-based LSP positions. `toLspPosition()` converts user-facing 1-based coordinates. Read-only semantic and diagnostic methods return `CodeQueryResult<T>` so completed empty protocol responses remain distinct from partial or unavailable requests. A ready runtime owner may contain only lazy routes: workspace semantic readiness requires at least one active ready client, while file readiness requires the routed client for that file to start successfully. Empty client sets and failed routes are unavailable, not vacuously ready.
 
-Semantic operations accept optional shared `CodeRequestControl` metadata. The semantic adapter preserves the exact value through `WorkspaceLspRuntime`. This expansion does not pass the signal or deadline to clients or transport.
+Semantic and explicit diagnostic operations accept optional shared `CodeRequestControl` metadata. The semantic adapter preserves the exact value through `WorkspaceLspRuntime`. The opaque Debug Operation ID reaches sanitized request and diagnostic timing events. The signal and deadline remain metadata and do not control LSP transport. Ambient readiness, lifecycle, and push-diagnostic events have no Debug Operation ID.
 
 ## Startup performance
 

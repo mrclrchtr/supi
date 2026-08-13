@@ -1,4 +1,4 @@
-import type { CodeQueryResult } from "@mrclrchtr/supi-code-runtime/api";
+import type { CodeQueryResult, CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import type { Diagnostic } from "../config/types.ts";
 import type {
   OutstandingDiagnosticSummaryEntry,
@@ -9,8 +9,15 @@ import type {
 
 /** Diagnostic and recovery operations owned by a workspace LSP runtime. */
 export interface WorkspaceLspDiagnosticSurface {
-  fileDiagnostics(filePath: string, maxSeverity?: number): Promise<CodeQueryResult<Diagnostic[]>>;
-  refreshOpenDiagnostics(options?: { maxWaitMs?: number; quietMs?: number }): Promise<void>;
+  fileDiagnostics(
+    filePath: string,
+    maxSeverity?: number,
+    control?: CodeRequestControl,
+  ): Promise<CodeQueryResult<Diagnostic[]>>;
+  refreshOpenDiagnostics(
+    options?: { maxWaitMs?: number; quietMs?: number },
+    control?: CodeRequestControl,
+  ): Promise<void>;
   /** Return tracked-file counts with aggregate cache freshness. */
   getWorkspaceDiagnosticSummary(): WorkspaceDiagnosticSnapshot<WorkspaceDiagnosticSummaryEntry>;
   /** Return tracked-file messages with aggregate cache freshness. */
@@ -25,5 +32,6 @@ export interface WorkspaceLspDiagnosticSurface {
     restartIfStillStale?: boolean;
     maxWaitMs?: number;
     quietMs?: number;
+    control?: CodeRequestControl;
   }): Promise<RecoverDiagnosticsResult>;
 }

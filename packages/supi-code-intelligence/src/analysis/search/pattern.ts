@@ -56,6 +56,7 @@ export type StructuredPatternOutcome =
 
 /** Internal controls for deterministic deadline, filesystem, and cancellation tests. */
 export interface StructuredPatternControl {
+  readonly operationId?: string;
   readonly signal?: AbortSignal;
   readonly now?: () => number;
   readonly operations?: AstScanOperations;
@@ -82,7 +83,7 @@ export interface StructuredPatternSearchOptions {
 export async function getStructuredPatternMatches(
   options: StructuredPatternSearchOptions,
 ): Promise<StructuredPatternOutcome> {
-  const scanTimer = startAstScanTimer();
+  const scanTimer = startAstScanTimer(options.control);
   const now = options.control?.now ?? Date.now;
   const maxFiles = options.control?.maxFiles ?? DEFAULT_AST_SCAN_MAX_FILES;
   const timeoutMs = options.control?.timeoutMs ?? DEFAULT_AST_SCAN_TIMEOUT_MS;
@@ -130,7 +131,11 @@ export async function getStructuredPatternMatches(
   }
 
   scanTimer.enumerationCompleted();
-  const requestControl = { signal: options.control?.signal, deadline };
+  const requestControl = {
+    operationId: options.control?.operationId,
+    signal: options.control?.signal,
+    deadline,
+  };
   const analysis = await analyzeStructuredFiles({
     files: enumeration.files,
     displayBase: enumeration.displayBase,

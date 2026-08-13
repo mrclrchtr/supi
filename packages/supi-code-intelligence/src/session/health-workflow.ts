@@ -85,6 +85,7 @@ export async function runHealthWorkflow(
     scopeFilter,
     lspState,
     capabilityState: capabilityStates.semantic,
+    control,
   });
   const semanticReady = semanticState?.kind === "ready";
   throwIfAborted(control);
@@ -96,6 +97,7 @@ export async function runHealthWorkflow(
     cwd: deps.cwd,
     unavailableReason: diagnosticUnavailableReason(semanticState),
     detailed: level === "detailed",
+    requestControl: control,
   });
   const servers = collectServers(runtime, included);
   const capabilityWarnings = collectCapabilityWarnings(semanticRequested, deps);
@@ -126,6 +128,7 @@ interface SemanticHealthStateOptions {
   scopeFilter: string | null;
   lspState: WorkspaceLspRuntimeState;
   capabilityState: CapabilityState;
+  control?: WorkflowControl;
 }
 
 async function establishSemanticHealthState(
@@ -133,7 +136,11 @@ async function establishSemanticHealthState(
 ): Promise<SemanticHealthState | null> {
   if (!options.requested) return null;
   if (options.runtime && isScopedFile(options.scopeFilter)) {
-    const readiness = await options.runtime.waitUntilReadyForFile(options.scopeFilter);
+    const readiness = await options.runtime.waitUntilReadyForFile(
+      options.scopeFilter,
+      undefined,
+      options.control,
+    );
     if (readiness.kind === "ready") return { kind: "ready" };
     if (readiness.kind === "timeout") {
       return { kind: "pending", reason: "File semantic readiness timed out" };
@@ -270,7 +277,11 @@ async function collectFileRefreshAttempt(
     diagnosticsScope.path,
   );
   updateSentinelSnapshot(options.deps.sentinelSnapshot, maintenance.snapshot);
-  const readiness = await runtime.waitUntilReadyForFile(diagnosticsScope.path);
+  const readiness = await runtime.waitUntilReadyForFile(
+    diagnosticsScope.path,
+    undefined,
+    options.control,
+  );
   const targeted = readiness.kind === "ready" ? 1 : 0;
   return {
     kind: "completed",
@@ -296,10 +307,16 @@ async function collectWorkspaceRefreshAttempt(
 ): Promise<Extract<HealthRefreshAttempt, { kind: "completed" }>> {
   updateSentinelSnapshot(
     options.deps.sentinelSnapshot,
-    await refreshLspMaintenance(runtime, options.deps.cwd, options.deps.sentinelSnapshot),
+    await refreshLspMaintenance(
+      runtime,
+      options.deps.cwd,
+      options.deps.sentinelSnapshot,
+      options.control,
+    ),
   );
   const recovery = await recoverDiagnosticRuntime({
     service: runtime,
+    control: options.control,
     progress: () =>
       reportProgress(options.control, {
         intent: "health",

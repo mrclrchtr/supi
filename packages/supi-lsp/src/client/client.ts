@@ -6,6 +6,7 @@ import { type ChildProcess, execSync, spawn } from "node:child_process";
 import * as path from "node:path";
 import {
   type CodeQueryResult,
+  type CodeRequestControl,
   completedCodeQuery,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
@@ -132,14 +133,21 @@ export class LspClient {
       sendNotification: (method, params) => {
         if (this.rpc) void this.rpc.sendNotification(method, params);
       },
-      pullDocumentDiagnostics: async (uri, previousResultId, timeoutMs, signal) => {
+      pullDocumentDiagnostics: async (request) => {
         const rpc = this.rpc;
         if (!rpc || this._status !== "running") throw new Error("client not running");
         await this.getReady();
         return rpc.sendRequest(
           "textDocument/diagnostic",
-          { textDocument: { uri }, previousResultId },
-          { timeoutMs, signal },
+          {
+            textDocument: { uri: request.uri },
+            previousResultId: request.previousResultId,
+          },
+          {
+            timeoutMs: request.timeoutMs,
+            signal: request.signal,
+            operationId: request.operationId,
+          },
         ) as Promise<DocumentDiagnosticReport>;
       },
     });
@@ -385,7 +393,7 @@ export class LspClient {
 
   /** Re-read open documents, then collect pull diagnostics or wait for push diagnostics. */
   async refreshOpenDiagnostics(
-    options: { maxWaitMs?: number; quietMs?: number } = {},
+    options: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl = {},
   ): Promise<void> {
     return this.diagnostics.refreshOpenDiagnostics(options);
   }
@@ -394,95 +402,120 @@ export class LspClient {
   async syncAndWaitForDiagnostics(
     filePath: string,
     content: string,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Diagnostic[]>> {
-    return this.diagnostics.syncAndWaitForDiagnostics(filePath, content);
+    return this.diagnostics.syncAndWaitForDiagnostics(filePath, content, control);
   }
 
   // ── LSP Requests ───────────────────────────────────────────────────
-  async hover(filePath: string, position: Position): Promise<CodeQueryResult<Hover | null>> {
-    return this.query("textDocument/hover", {
-      textDocument: { uri: fileToUri(filePath) },
-      position,
-    });
+  async hover(
+    filePath: string,
+    position: Position,
+    control?: CodeRequestControl,
+  ): Promise<CodeQueryResult<Hover | null>> {
+    return this.query(
+      "textDocument/hover",
+      { textDocument: { uri: fileToUri(filePath) }, position },
+      control,
+    );
   }
 
   async definition(
     filePath: string,
     position: Position,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>> {
-    return this.query("textDocument/definition", {
-      textDocument: { uri: fileToUri(filePath) },
-      position,
-    });
+    return this.query(
+      "textDocument/definition",
+      { textDocument: { uri: fileToUri(filePath) }, position },
+      control,
+    );
   }
 
   async references(
     filePath: string,
     position: Position,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Location[] | null>> {
-    return this.query("textDocument/references", {
-      textDocument: { uri: fileToUri(filePath) },
-      position,
-      context: { includeDeclaration: true },
-    });
+    return this.query(
+      "textDocument/references",
+      {
+        textDocument: { uri: fileToUri(filePath) },
+        position,
+        context: { includeDeclaration: true },
+      },
+      control,
+    );
   }
 
   async documentSymbols(
     filePath: string,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<DocumentSymbol[] | SymbolInformation[] | null>> {
-    return this.query("textDocument/documentSymbol", {
-      textDocument: { uri: fileToUri(filePath) },
-    });
+    return this.query(
+      "textDocument/documentSymbol",
+      { textDocument: { uri: fileToUri(filePath) } },
+      control,
+    );
   }
 
   async workspaceSymbol(
     query: string,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<SymbolInformation[] | WorkspaceSymbol[] | null>> {
     if (!this.capabilities?.workspaceSymbolProvider) {
       return unavailableCodeQuery("Workspace-symbol requests are not supported by this server.");
     }
-    return this.query("workspace/symbol", { query });
+    return this.query("workspace/symbol", { query }, control);
   }
 
   async rename(
     filePath: string,
     position: Position,
     newName: string,
+    control?: CodeRequestControl,
   ): Promise<WorkspaceEdit | null> {
-    return this.request("textDocument/rename", {
-      textDocument: { uri: fileToUri(filePath) },
-      position,
-      newName,
-    });
+    return this.request(
+      "textDocument/rename",
+      { textDocument: { uri: fileToUri(filePath) }, position, newName },
+      control,
+    );
   }
 
   async codeActions(
     filePath: string,
     range: Range,
     context: CodeActionContext,
+    control?: CodeRequestControl,
   ): Promise<CodeAction[] | null> {
-    return this.request("textDocument/codeAction", {
-      textDocument: { uri: fileToUri(filePath) },
-      range,
-      context,
-    });
+    return this.request(
+      "textDocument/codeAction",
+      { textDocument: { uri: fileToUri(filePath) }, range, context },
+      control,
+    );
   }
 
   async implementation(
     filePath: string,
     position: Position,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>> {
     if (!this.capabilities?.implementationProvider) {
       return unavailableCodeQuery("Implementation requests are not supported by this server.");
     }
-    return this.query("textDocument/implementation", {
-      textDocument: { uri: fileToUri(filePath) },
-      position,
-    });
+    return this.query(
+      "textDocument/implementation",
+      { textDocument: { uri: fileToUri(filePath) }, position },
+      control,
+    );
   }
 
   // ── Private ─────────────────────────────────────────────────────────
-  private async query<T>(method: string, params: unknown): Promise<CodeQueryResult<T | null>> {
+  private async query<T>(
+    method: string,
+    params: unknown,
+    control?: CodeRequestControl,
+  ): Promise<CodeQueryResult<T | null>> {
     if (!this.rpc || this._status !== "running") {
       return unavailableCodeQuery(
         `LSP request ${method} is unavailable because the client is not running.`,
@@ -490,7 +523,11 @@ export class LspClient {
     }
     try {
       await this.getReady();
-      const data = (await this.rpc.sendRequest(method, params)) as T | null | undefined;
+      const data = (await this.rpc.sendRequest(
+        method,
+        params,
+        control?.operationId ? { operationId: control.operationId } : undefined,
+      )) as T | null | undefined;
       return completedCodeQuery(data ?? null);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -498,8 +535,12 @@ export class LspClient {
     }
   }
 
-  private async request<T>(method: string, params: unknown): Promise<T | null> {
-    const result = await this.query<T>(method, params);
+  private async request<T>(
+    method: string,
+    params: unknown,
+    control?: CodeRequestControl,
+  ): Promise<T | null> {
+    const result = await this.query<T>(method, params, control);
     return result.kind === "unavailable" ? null : result.data;
   }
 

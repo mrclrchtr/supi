@@ -7,6 +7,7 @@
  */
 
 import * as nodePath from "node:path";
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import type { WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 import {
   clearTsconfigCache,
@@ -23,16 +24,17 @@ export async function refreshLspMaintenance(
   runtime: WorkspaceLspRuntime,
   cwd: string,
   sentinelSnapshot: Map<string, number>,
+  control?: CodeRequestControl,
 ): Promise<Map<string, number>> {
   const { snapshot } = synchronizeSentinels(runtime, cwd, sentinelSnapshot);
 
   // Stale-module resync: force-reopen files with "Cannot find module" errors
-  await resyncStaleModuleFiles(runtime, cwd);
+  await resyncStaleModuleFiles(runtime, cwd, control);
 
   // Two-pass prune/refresh for diagnostics
   runtime.pruneMissingFiles();
   try {
-    await runtime.refreshOpenDiagnostics();
+    await runtime.refreshOpenDiagnostics(undefined, control);
   } catch {
     /* best-effort */
   }
@@ -87,7 +89,11 @@ function synchronizeSentinels(
 }
 
 /** Re-open files with stale module-resolution errors. */
-async function resyncStaleModuleFiles(runtime: WorkspaceLspRuntime, cwd: string): Promise<void> {
+async function resyncStaleModuleFiles(
+  runtime: WorkspaceLspRuntime,
+  cwd: string,
+  control?: CodeRequestControl,
+): Promise<void> {
   const outstanding = runtime.getOutstandingDiagnostics(1);
   const staleFiles: string[] = [];
 
@@ -106,7 +112,7 @@ async function resyncStaleModuleFiles(runtime: WorkspaceLspRuntime, cwd: string)
   }
 
   try {
-    await runtime.refreshOpenDiagnostics({ quietMs: 300, maxWaitMs: 2000 });
+    await runtime.refreshOpenDiagnostics({ quietMs: 300, maxWaitMs: 2000 }, control);
   } catch {
     /* best-effort */
   }

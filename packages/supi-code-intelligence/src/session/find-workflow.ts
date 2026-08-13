@@ -70,9 +70,11 @@ async function runSemanticSearch(options: {
   control?: WorkflowControl;
 }): Promise<FindWorkflowOutcome> {
   const { query, scopePaths, scopeLabel, maxResults, deps, control } = options;
-  const readiness = await deps.capability.ensureSemanticReadiness(deps.cwd, {
-    kind: "workspace",
-  });
+  const readiness = await deps.capability.ensureSemanticReadiness(
+    deps.cwd,
+    { kind: "workspace" },
+    control,
+  );
   if (readiness.kind === "timeout") {
     return { kind: "unavailable", reason: "Semantic readiness timed out." };
   }
@@ -83,7 +85,7 @@ async function runSemanticSearch(options: {
   if (!provider?.workspaceSymbols) {
     return { kind: "unavailable", reason: "No semantic workspace-symbol provider is active." };
   }
-  const result = await provider.workspaceSymbols(query);
+  const result = await provider.workspaceSymbols(query, control);
   if (result.kind === "unavailable") {
     return { kind: "unavailable", reason: result.reason };
   }
@@ -127,7 +129,11 @@ async function runAstSearch(options: {
     roots: scopePaths,
     cwd: deps.cwd,
     structural: provider,
-    control: { signal: control?.signal, deadline: control?.deadline },
+    control: {
+      operationId: control?.operationId,
+      signal: control?.signal,
+      deadline: control?.deadline,
+    },
   });
   if (outcome.kind === "invalid-input") return outcome;
   if (outcome.kind === "unavailable") return outcome;

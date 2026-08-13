@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import {
   type CodeQueryResult,
+  type CodeRequestControl,
   completedCodeQuery,
   partialCodeQuery,
   unavailableCodeQuery,
@@ -55,6 +56,7 @@ export interface WorkspaceSymbolCollection {
 export async function collectWorkspaceSymbols(
   clients: Iterable<LspClient>,
   query: string,
+  control?: CodeRequestControl,
 ): Promise<WorkspaceSymbolCollection> {
   const results: WorkspaceSymbolLike[] = [];
   const failures: string[] = [];
@@ -65,7 +67,7 @@ export async function collectWorkspaceSymbols(
     if (client.status !== "running") continue;
     if (!client.serverCapabilities?.workspaceSymbolProvider) continue;
     hasSupport = true;
-    const result = await client.workspaceSymbol(query);
+    const result = await client.workspaceSymbol(query, control);
     if (result.kind === "unavailable") {
       failures.push(result.reason);
       continue;
@@ -99,8 +101,9 @@ export function workspaceSymbolCollectionResult(
 export async function managerWorkspaceSymbol(
   clients: Iterable<LspClient>,
   query: string,
+  control?: CodeRequestControl,
 ): Promise<CodeQueryResult<WorkspaceSymbolLike[]>> {
-  return workspaceSymbolCollectionResult(await collectWorkspaceSymbols(clients, query));
+  return workspaceSymbolCollectionResult(await collectWorkspaceSymbols(clients, query, control));
 }
 
 export function findWorkspaceSymbolWarmTargets(

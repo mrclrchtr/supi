@@ -18,12 +18,13 @@ import {
   type DebugEventView,
   getDebugEvents,
   getDebugSummary,
-  isDebugLevel,
+  isDebugOperationId,
   subscribeDebugEvents,
 } from "@mrclrchtr/supi-core/debug";
 import { defineConfigSettings, registerSettings } from "@mrclrchtr/supi-core/settings";
 import { Type } from "typebox";
 import { formatDataLines } from "./format.ts";
+import { type DebugToolParams, parseDebugCommandArgs } from "./query.ts";
 import { registerDebugMessageRenderer } from "./renderer.ts";
 import { DEBUG_EVENT_ENTRY_TYPE, readSessionDebugEvents } from "./session-events.ts";
 import { maybeLogLoadStatus } from "./status-log.ts";
@@ -39,8 +40,6 @@ interface DebugConfig extends Record<string, unknown> {
 }
 
 const DEBUG_DEFAULTS: DebugConfig = { ...DEBUG_REGISTRY_DEFAULTS };
-
-type DebugToolParams = DebugEventQuery & { sessionFile?: string };
 
 function normalizeAgentAccess(value: string): DebugAgentAccess {
   return value === "off" || value === "raw" ? value : "sanitized";
@@ -143,21 +142,6 @@ function registerDebugSettings(pi: ExtensionAPI): void {
   );
 }
 
-function parseCommandArgs(args: string): DebugToolParams {
-  const query: DebugToolParams = {};
-  const parts = args.trim().split(/\s+/).filter(Boolean);
-  for (const part of parts) {
-    const [key, value] = part.split("=", 2);
-    if (!value) continue;
-    if (key === "source") query.source = value;
-    if (key === "category") query.category = value;
-    if (key === "level" && isDebugLevel(value)) query.level = value;
-    if (key === "limit") query.limit = normalizeMaxEvents(value);
-    if (key === "sessionFile") query.sessionFile = value;
-  }
-  return query;
-}
-
 function pushFormattedData(lines: string[], label: string, value: unknown): void {
   const dataLines = formatDataLines(value);
   if (dataLines.length === 0) return;
@@ -190,6 +174,7 @@ function formatEvents(
     lines.push(
       `[${new Date(event.timestamp).toISOString()}] ${event.level.toUpperCase()} ${event.source}/${event.category}: ${event.message}`,
     );
+    if (event.operationId) lines.push(`  operationId: ${event.operationId}`);
     if (event.cwd) lines.push(`  cwd: ${event.cwd}`);
     pushFormattedData(lines, "data", event.data);
     pushFormattedData(lines, "rawData", event.rawData);
@@ -251,6 +236,7 @@ async function buildToolResult(params: DebugToolParams, config: DebugConfig) {
   }
 
   const filters = {
+    operationId: params.operationId,
     source: params.source,
     level: params.level,
     category: params.category,
@@ -325,7 +311,7 @@ export default function debugExtension(pi: ExtensionAPI) {
     description: "Show recent SuPi debug events",
     handler: async (args, ctx) => {
       const config = applyDebugConfig(ctx.cwd);
-      const query = parseCommandArgs(args);
+      const query = parseDebugCommandArgs(args, normalizeMaxEvents);
       if (!config.enabled && !query.sessionFile) {
         pi.sendMessage({
           customType: DEBUG_REPORT_TYPE,
@@ -337,6 +323,7 @@ export default function debugExtension(pi: ExtensionAPI) {
 
       if (query.sessionFile) {
         const persisted = await readSessionDebugEvents(query.sessionFile, {
+          operationId: query.operationId,
           source: query.source,
           level: query.level,
           category: query.category,
@@ -376,6 +363,12 @@ export default function debugExtension(pi: ExtensionAPI) {
     promptSnippet,
     promptGuidelines,
     parameters: Type.Object({
+      operationId: Type.Optional(
+        Type.String({
+          description: "Filter by exact Debug Operation ID",
+          pattern: "^op-[A-Za-z0-9_-]{21}[AQgw]$",
+        }),
+      ),
       source: Type.Optional(Type.String({ description: "Filter by extension source, e.g. lsp" })),
       level: Type.Optional(
         StringEnum(["debug", "info", "warning", "error"], {
@@ -393,8 +386,12 @@ export default function debugExtension(pi: ExtensionAPI) {
     }),
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      const query = params as DebugToolParams;
+      if (query.operationId !== undefined && !isDebugOperationId(query.operationId)) {
+        throw new Error("Invalid Debug Operation ID");
+      }
       const config = applyDebugConfig(ctx.cwd);
-      return buildToolResult(params as DebugToolParams, config);
+      return buildToolResult(query, config);
     },
   });
 }

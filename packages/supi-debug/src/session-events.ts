@@ -4,6 +4,7 @@ import {
   type DebugEventQuery,
   type DebugEventView,
   isDebugLevel,
+  isDebugOperationId,
   matchesDebugEventQuery,
   redactDebugData,
 } from "@mrclrchtr/supi-core/debug";
@@ -11,7 +12,10 @@ import {
 /** Custom session-entry type used for sanitized debug-event persistence. */
 export const DEBUG_EVENT_ENTRY_TYPE = "supi-debug-event";
 
-type PersistedDebugEventQuery = Pick<DebugEventQuery, "source" | "level" | "category" | "limit">;
+type PersistedDebugEventQuery = Pick<
+  DebugEventQuery,
+  "operationId" | "source" | "level" | "category" | "limit"
+>;
 
 /** Sanitized events and total persisted entries found in one PI session file. */
 export interface SessionDebugEvents {
@@ -31,6 +35,7 @@ function parsePersistedEvent(data: unknown): DebugEventView | undefined {
     !isDebugLevel(event.level) ||
     typeof event.category !== "string" ||
     typeof event.message !== "string" ||
+    (event.operationId !== undefined && !isDebugOperationId(event.operationId)) ||
     (event.cwd !== undefined && typeof event.cwd !== "string")
   ) {
     return undefined;
@@ -39,6 +44,7 @@ function parsePersistedEvent(data: unknown): DebugEventView | undefined {
   return {
     id: event.id,
     timestamp: event.timestamp,
+    operationId: event.operationId,
     source: event.source,
     level: event.level,
     category: event.category,

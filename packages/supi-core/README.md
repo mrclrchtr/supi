@@ -49,6 +49,7 @@ Config file locations:
 
 - context-provider registry for `/supi-context`
 - debug-event registry and monotonic phase timers for producers that want shared debug capture
+- optional Debug Operation IDs for exact, directly owned public Tool-call correlation; ambient events stay uncorrelated
 - settings registry used by `/supi-settings`
 
 ### Project and session helpers

@@ -25,8 +25,13 @@ import type {
 import type { LspManager } from "../manager/manager.ts";
 import { resolveSessionPath } from "../utils.ts";
 import { raceReadinessValue } from "./readiness.ts";
-import type { WorkspaceLspDiagnosticSurface } from "./runtime-diagnostic-surface.ts";
-import type { WorkspaceLspRuntime } from "./workspace-lsp-runtime.ts";
+import type { RecoverDiagnosticsResult } from "./runtime-diagnostics.ts";
+import type {
+  RoutedMutationResponse,
+  SemanticReadinessResult,
+  WorkspaceLspRuntime,
+  WorkspaceLspRuntimeState,
+} from "./workspace-lsp-runtime.ts";
 
 export type { WorkspaceLspDiagnosticSurface } from "./runtime-diagnostic-surface.ts";
 export type {
@@ -63,35 +68,35 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   async hover(
     filePath: string,
     position: Position,
-    _control?: CodeRequestControl,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Hover | null>> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
     if (!client) return unavailableFileQuery("hover", resolvedPath);
-    return client.hover(resolvedPath, position);
+    return client.hover(resolvedPath, position, control);
   }
 
   async definition(
     filePath: string,
     position: Position,
-    _control?: CodeRequestControl,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
     if (!client) return unavailableFileQuery("definition", resolvedPath);
-    return client.definition(resolvedPath, position);
+    return client.definition(resolvedPath, position, control);
   }
 
   async references(
     filePath: string,
     position: Position,
-    _control?: CodeRequestControl,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Location[]>> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
     if (!client) return unavailableFileQuery("references", resolvedPath);
     return mapCodeQueryResult(
-      await client.references(resolvedPath, position),
+      await client.references(resolvedPath, position, control),
       (data) => data ?? [],
     );
   }
@@ -99,42 +104,45 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   async implementation(
     filePath: string,
     position: Position,
-    _control?: CodeRequestControl,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
     if (!client) return unavailableFileQuery("implementation", resolvedPath);
-    return client.implementation(resolvedPath, position);
+    return client.implementation(resolvedPath, position, control);
   }
 
   async documentSymbols(
     filePath: string,
-    _control?: CodeRequestControl,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<DocumentSymbol[] | SymbolInformation[]>> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
     if (!client) return unavailableFileQuery("document symbols", resolvedPath);
-    return mapCodeQueryResult(await client.documentSymbols(resolvedPath), (data) => data ?? []);
+    return mapCodeQueryResult(
+      await client.documentSymbols(resolvedPath, control),
+      (data) => data ?? [],
+    );
   }
 
   async workspaceSymbol(
     query: string,
-    _control?: CodeRequestControl,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<SymbolInformation[] | WorkspaceSymbol[]>> {
-    return this.manager.workspaceSymbol(query);
+    return this.manager.workspaceSymbol(query, control);
   }
 
   async rename(
     filePath: string,
     position: Position,
     newName: string,
-    _control?: CodeRequestControl,
+    control?: CodeRequestControl,
   ): Promise<RoutedMutationResponse<WorkspaceEdit | null> | null> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
     if (!client) return null;
     return {
-      value: await client.rename(resolvedPath, position, newName),
+      value: await client.rename(resolvedPath, position, newName, control),
       authorizedMutationRoots: [client.root],
     };
   }
@@ -146,7 +154,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   async codeActions(
     filePath: string,
     positionOrRange: Position | Range,
-    _control?: CodeRequestControl,
+    control?: CodeRequestControl,
   ): Promise<RoutedMutationResponse<CodeAction[] | null> | null> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
@@ -161,7 +169,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       .filter((diagnostic) => diagnostic.range.start.line <= range.end.line);
 
     return {
-      value: await client.codeActions(resolvedPath, range, { diagnostics }),
+      value: await client.codeActions(resolvedPath, range, { diagnostics }, control),
       authorizedMutationRoots: [client.root],
     };
   }
@@ -173,6 +181,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   async waitUntilReadyForFile(
     filePath: string,
     options: { timeoutMs?: number } = {},
+    control?: CodeRequestControl,
   ): Promise<SemanticReadinessResult> {
     const resolvedPath = this.resolveFilePath(filePath);
     if (!this.manager.canServeFile(resolvedPath)) {
@@ -183,7 +192,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     }
 
     const readiness = await raceReadinessValue(
-      this.manager.waitUntilFileReady(resolvedPath),
+      this.manager.waitUntilFileReady(resolvedPath, control),
       options.timeoutMs,
     );
     if (readiness.kind !== "resolved") return readiness;
@@ -202,9 +211,10 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
    */
   async waitUntilReadyForWorkspace(
     options: { timeoutMs?: number } = {},
+    control?: CodeRequestControl,
   ): Promise<SemanticReadinessResult> {
     const readiness = await raceReadinessValue(
-      this.manager.waitUntilWorkspaceReady(),
+      this.manager.waitUntilWorkspaceReady(control),
       options.timeoutMs,
     );
     if (readiness.kind !== "resolved") return readiness;
@@ -258,17 +268,21 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   async fileDiagnostics(
     filePath: string,
     maxSeverity: number = 4,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Diagnostic[]>> {
     const resolvedPath = this.resolveFilePath(filePath);
     if (!this.manager.canServeFile(resolvedPath)) {
       return unavailableFileQuery("diagnostics", resolvedPath);
     }
-    return this.manager.syncFileAndGetDiagnostics(resolvedPath, maxSeverity);
+    return this.manager.syncFileAndGetDiagnostics(resolvedPath, maxSeverity, control);
   }
 
   /** Re-sync every open document and wait for diagnostics to settle. */
-  async refreshOpenDiagnostics(options?: { maxWaitMs?: number; quietMs?: number }): Promise<void> {
-    await this.manager.refreshOpenDiagnostics(options);
+  async refreshOpenDiagnostics(
+    options?: { maxWaitMs?: number; quietMs?: number },
+    control?: CodeRequestControl,
+  ): Promise<void> {
+    await this.manager.refreshOpenDiagnostics({ ...options, operationId: control?.operationId });
   }
 
   /** Get a lightweight workspace diagnostic summary for all tracked files. */
@@ -291,7 +305,8 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     restartIfStillStale?: boolean;
     maxWaitMs?: number;
     quietMs?: number;
-  }) {
+    control?: CodeRequestControl;
+  }): Promise<RecoverDiagnosticsResult> {
     return this.manager.recoverWorkspaceDiagnostics(options);
   }
 

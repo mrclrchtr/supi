@@ -1,4 +1,7 @@
-import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type CodeRequestControl,
+  getDefaultWorkspaceRuntime,
+} from "@mrclrchtr/supi-code-runtime/api";
 import {
   getWorkspaceLspRuntime,
   type SemanticReadinessResult,
@@ -14,6 +17,7 @@ export async function ensureSemanticReadiness(
   cwd: string,
   scope: SemanticStartupScope,
   timeoutMs: number = DEFAULT_SEMANTIC_STARTUP_TIMEOUT_MS,
+  control?: CodeRequestControl,
 ): Promise<SemanticReadinessResult> {
   const workspace = getDefaultWorkspaceRuntime().getWorkspace(cwd);
   if (workspace.semantic.provider === null) {
@@ -24,7 +28,7 @@ export async function ensureSemanticReadiness(
   }
 
   if (workspace.semantic.state.kind === "ready") {
-    return resolveReadySemanticState(cwd, scope, timeoutMs);
+    return resolveReadySemanticState(cwd, scope, timeoutMs, control);
   }
 
   if (workspace.semantic.state.kind !== "pending") {
@@ -58,8 +62,13 @@ export async function ensureSemanticReadiness(
   if (remainingAfterLsp <= 0) {
     return { kind: "timeout" };
   }
-  return scope.kind === "workspace"
-    ? lspState.runtime.waitUntilReadyForWorkspace({ timeoutMs: remainingAfterLsp })
+  if (scope.kind === "workspace") {
+    return control
+      ? lspState.runtime.waitUntilReadyForWorkspace({ timeoutMs: remainingAfterLsp }, control)
+      : lspState.runtime.waitUntilReadyForWorkspace({ timeoutMs: remainingAfterLsp });
+  }
+  return control
+    ? lspState.runtime.waitUntilReadyForFile(scope.file, { timeoutMs: remainingAfterLsp }, control)
     : lspState.runtime.waitUntilReadyForFile(scope.file, { timeoutMs: remainingAfterLsp });
 }
 
@@ -67,11 +76,17 @@ function resolveReadySemanticState(
   cwd: string,
   scope: SemanticStartupScope,
   timeoutMs: number,
+  control?: CodeRequestControl,
 ): Promise<SemanticReadinessResult> | SemanticReadinessResult {
   const lspState = getWorkspaceLspRuntime(cwd);
   if (lspState.kind === "ready") {
-    return scope.kind === "workspace"
-      ? lspState.runtime.waitUntilReadyForWorkspace({ timeoutMs })
+    if (scope.kind === "workspace") {
+      return control
+        ? lspState.runtime.waitUntilReadyForWorkspace({ timeoutMs }, control)
+        : lspState.runtime.waitUntilReadyForWorkspace({ timeoutMs });
+    }
+    return control
+      ? lspState.runtime.waitUntilReadyForFile(scope.file, { timeoutMs }, control)
       : lspState.runtime.waitUntilReadyForFile(scope.file, { timeoutMs });
   }
   return {

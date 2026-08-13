@@ -39,8 +39,12 @@ One process-shared workspace host owns exactly one Tree-sitter Structural Worker
 _Avoid_: main-thread Tree-sitter fallback, Worker pool, session-local duplicate Worker
 
 **Structural request control**:
-The exact caller Abort Signal and optional absolute deadline that a Workspace code-intelligence session forwards through every structural workflow. AST Scan uses one shared deadline for enumeration and Worker work. The parent maps control to a Worker-local abort, an absolute deadline, and a shared atomic flag. Worker isolation establishes main-thread responsiveness.
-_Avoid_: relative timeout, cancel-message-only control, result-only cancellation
+The exact caller Abort Signal, optional absolute deadline, and optional opaque Debug Operation ID that a Workspace code-intelligence session forwards through every structural workflow. AST Scan uses one shared deadline for enumeration and Worker work. The parent maps control to a Worker-local abort, an absolute deadline, and a shared atomic flag. Worker isolation establishes main-thread responsiveness.
+_Avoid_: relative timeout, cancel-message-only control, result-only cancellation, raw Pi Tool-call identity
+
+**Public code operation**:
+One execution of a registered public `code_*` Tool. Its registration closure derives one opaque Debug Operation ID from Pi's raw Tool-call identity and emits sanitized start, workflow timing, and terminal events. The opaque ID goes only through explicit request control. Direct library calls and ambient lifecycle work have no ID.
+_Avoid_: async context, time-window correlation, normal result metadata, distributed trace
 
 **Workspace provider host**:
 The process-shared, reference-counted owner of LSP and structural-provider lifecycle for one canonical workspace. Pi sessions share its providers while keeping target and refactor handles session-local; providers stop after the final session releases them.

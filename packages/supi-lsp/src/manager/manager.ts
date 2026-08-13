@@ -2,7 +2,11 @@
 // biome-ignore-all lint/style/noExcessiveLinesPerFile: LspManager stays cohesive; recovery and sync helpers are split into manager-*.ts modules.
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { type CodeQueryResult, unavailableCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type CodeQueryResult,
+  type CodeRequestControl,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import * as projectRoots from "@mrclrchtr/supi-core/project";
 import { LspClient, type LspClientLifecycleTransitionKind } from "../client/client.ts";
 import { getServerForFile } from "../config/config.ts";
@@ -411,12 +415,15 @@ export class LspManager {
   }
 
   /** Wait until the client that owns a file is query-ready, then run a light warm-up probe. */
-  async waitUntilFileReady(filePath: string): Promise<LspClient | null> {
+  async waitUntilFileReady(
+    filePath: string,
+    control?: CodeRequestControl,
+  ): Promise<LspClient | null> {
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
     const client = await this.getClientForFile(resolvedPath);
     if (!client) return null;
     await client.getReady();
-    await this.warmSemanticProject(client, resolvedPath, true);
+    await this.warmSemanticProject(client, resolvedPath, true, control);
     return client;
   }
 
@@ -424,7 +431,7 @@ export class LspManager {
    * Wait until one started client is query-ready, then warm its project.
    * Returns the number of concrete clients that are ready after the warm-up.
    */
-  async waitUntilWorkspaceReady(): Promise<number> {
+  async waitUntilWorkspaceReady(control?: CodeRequestControl): Promise<number> {
     const activeClients = Array.from(this.clients.values()).filter(
       (client) => client.status === "running",
     );
@@ -451,7 +458,7 @@ export class LspManager {
         serverConfig.rootMarkers,
         serverConfig.fileTypes,
       )[0];
-      if (target) await this.warmSemanticProject(firstReady, target.file);
+      if (target) await this.warmSemanticProject(firstReady, target.file, false, control);
     }
 
     return activeClients.filter((client) => client.status === "running" && client.ready).length;
@@ -459,6 +466,7 @@ export class LspManager {
   async syncFileAndGetDiagnostics(
     filePath: string,
     maxSeverity: number = 1,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Diagnostic[]>> {
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
     const client = await this.getClientForFile(resolvedPath);
@@ -466,7 +474,7 @@ export class LspManager {
       return unavailableCodeQuery(`No LSP client can collect diagnostics for ${resolvedPath}.`);
     }
     try {
-      return await syncClientFileAndGetDiagnostics(client, resolvedPath, maxSeverity);
+      return await syncClientFileAndGetDiagnostics(client, resolvedPath, maxSeverity, control);
     } catch (error) {
       this.closeFile(resolvedPath);
       const detail = error instanceof Error ? error.message : String(error);
@@ -482,7 +490,9 @@ export class LspManager {
     return pruneMissingFilesFromClients(this.clients.values());
   }
   /** Re-sync all open documents across active clients and wait for diagnostics to settle. */
-  async refreshOpenDiagnostics(options?: { maxWaitMs?: number; quietMs?: number }): Promise<void> {
+  async refreshOpenDiagnostics(
+    options?: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl,
+  ): Promise<void> {
     await refreshOpenDiagnosticsForClients(this.clients.values(), options);
   }
 
@@ -506,6 +516,7 @@ export class LspManager {
     restartIfStillStale?: boolean;
     maxWaitMs?: number;
     quietMs?: number;
+    control?: CodeRequestControl;
   }): Promise<{
     attemptedClients: number;
     restartedClients: number;
@@ -705,18 +716,20 @@ export class LspManager {
   }
   async workspaceSymbol(
     query: string,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<(SymbolInformation | WorkspaceSymbol)[]>> {
-    const initial = await collectWorkspaceSymbols(this.clients.values(), query);
+    const initial = await collectWorkspaceSymbols(this.clients.values(), query, control);
     if (!initial.hasSupport || initial.results.length > 0) {
       return workspaceSymbolCollectionResult(initial);
     }
 
-    const warmed = await this.warmWorkspaceSymbolProjectsUntilResult(
-      findWorkspaceSymbolWarmTargets,
-      getWorkspaceSymbolWarmPosition,
-      collectWorkspaceSymbols,
+    const warmed = await this.warmWorkspaceSymbolProjectsUntilResult({
+      findWarmTargets: findWorkspaceSymbolWarmTargets,
+      getWarmPosition: getWorkspaceSymbolWarmPosition,
+      collect: (clients, value) => collectWorkspaceSymbols(clients, value, control),
       query,
-    );
+      control,
+    });
     return workspaceSymbolCollectionResult(warmed.collection ?? initial);
   }
   async ensureFileOpen(filePath: string): Promise<LspClient | null> {
@@ -733,18 +746,20 @@ export class LspManager {
   }
 
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: warm-up coordinates client/project iteration, targeted semantic nudges, and early-return queries in one place.
-  private async warmWorkspaceSymbolProjectsUntilResult(
+  private async warmWorkspaceSymbolProjectsUntilResult(options: {
     findWarmTargets: (
       root: string,
       rootMarkers: string[],
       fileTypes: string[],
-    ) => Array<{ projectRoot: string; file: string }>,
+    ) => Array<{ projectRoot: string; file: string }>;
     getWarmPosition: (
       symbols: import("../config/types.ts").DocumentSymbol[] | SymbolInformation[] | null,
-    ) => import("../config/types.ts").Position | null,
-    collect: (clients: Iterable<LspClient>, query: string) => Promise<WorkspaceSymbolCollection>,
-    query: string,
-  ): Promise<{ warmedAny: boolean; collection: WorkspaceSymbolCollection | null }> {
+    ) => import("../config/types.ts").Position | null;
+    collect: (clients: Iterable<LspClient>, query: string) => Promise<WorkspaceSymbolCollection>;
+    query: string;
+    control?: CodeRequestControl;
+  }): Promise<{ warmedAny: boolean; collection: WorkspaceSymbolCollection | null }> {
+    const { findWarmTargets, getWarmPosition, collect, query, control } = options;
     let warmedAny = false;
 
     for (const client of Array.from(this.clients.values())) {
@@ -774,10 +789,15 @@ export class LspManager {
         this.warmedWorkspaceSymbolProjects.add(projectKey);
         warmedAny = true;
 
-        const symbols = await openedClient.documentSymbols(target.file);
+        const symbols = control
+          ? await openedClient.documentSymbols(target.file, control)
+          : await openedClient.documentSymbols(target.file);
         if (symbols.kind !== "unavailable") {
           const hoverPosition = getWarmPosition(symbols.data);
-          if (hoverPosition) await openedClient.hover(target.file, hoverPosition);
+          if (hoverPosition) {
+            if (control) await openedClient.hover(target.file, hoverPosition, control);
+            else await openedClient.hover(target.file, hoverPosition);
+          }
         }
 
         const collected = await collect(this.clients.values(), query);
@@ -794,6 +814,7 @@ export class LspManager {
     client: LspClient,
     filePath: string,
     preferExactFile: boolean = false,
+    control?: CodeRequestControl,
   ): Promise<void> {
     const serverConfig = this.config.servers[client.name];
     if (!serverConfig) return;
@@ -814,7 +835,7 @@ export class LspManager {
       return;
     }
 
-    const probe = this.performWarmProbe(client, resolvedFile, projectKey);
+    const probe = this.performWarmProbe(client, resolvedFile, projectKey, control);
     this.pendingWarmProbes.set(projectKey, probe);
     try {
       await probe;
@@ -827,16 +848,22 @@ export class LspManager {
     _client: LspClient,
     resolvedFile: string,
     projectKey: string,
+    control?: CodeRequestControl,
   ): Promise<void> {
     const openedClient = await this.ensureFileOpen(resolvedFile);
     if (!openedClient) return;
 
     this.warmedSemanticProjects.add(projectKey);
 
-    const symbols = await openedClient.documentSymbols(resolvedFile);
+    const symbols = control
+      ? await openedClient.documentSymbols(resolvedFile, control)
+      : await openedClient.documentSymbols(resolvedFile);
     if (symbols.kind === "unavailable") return;
     const hoverPosition = getWorkspaceSymbolWarmPosition(symbols.data);
-    if (hoverPosition) await openedClient.hover(resolvedFile, hoverPosition);
+    if (hoverPosition) {
+      if (control) await openedClient.hover(resolvedFile, hoverPosition, control);
+      else await openedClient.hover(resolvedFile, hoverPosition);
+    }
   }
 
   private hasOpenFileInProject(client: LspClient, projectRoot: string): boolean {

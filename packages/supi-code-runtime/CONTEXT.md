@@ -11,5 +11,5 @@ The typed outcome of a read-only provider request: completed with possibly empty
 _Avoid_: nullable query result, inferring availability from method presence, treating empty data as failure
 
 **Code request control**:
-Optional request metadata with the caller Abort Signal and an absolute Unix-epoch deadline. Provider, adapter, and workspace-runtime interfaces preserve the same value. Cooperative substrates use the canonical interruption helpers; unsupported substrates can preserve the value without applying it.
-_Avoid_: workflow progress, relative timeout, provider client access
+Optional request metadata with the caller Abort Signal, an absolute Unix-epoch deadline, and an opaque Debug Operation ID when one public Tool call directly owns the work. Provider, adapter, and workspace-runtime interfaces preserve the same value. Cooperative substrates use the canonical interruption helpers. The Debug Operation ID does not change cancellation semantics.
+_Avoid_: workflow progress, relative timeout, provider client access, raw Pi Tool-call ID

@@ -6,6 +6,7 @@ const mockFns = vi.hoisted(() => ({
   getDebugEvents: vi.fn(),
   getDebugSummary: vi.fn(),
   isDebugLevel: vi.fn(),
+  isDebugOperationId: vi.fn((value) => value === "op-AAAAAAAAAAAAAAAAAAAAAA"),
   loadSupiConfig: vi.fn(),
   defineConfigSettings: vi.fn((options) => options),
   registerSettings: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock("@mrclrchtr/supi-core/debug", () => ({
   getDebugEvents: mockFns.getDebugEvents,
   getDebugSummary: mockFns.getDebugSummary,
   isDebugLevel: mockFns.isDebugLevel,
+  isDebugOperationId: mockFns.isDebugOperationId,
   subscribeDebugEvents: mockFns.subscribeDebugEvents,
 }));
 
@@ -66,6 +68,18 @@ function makeTool(pi: ReturnType<typeof createPiMock>) {
 describe("supi-debug tool output", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("rejects an invalid Debug Operation ID before querying retained events", async () => {
+    const pi = setup();
+    const tool = makeTool(pi);
+
+    await expect(
+      tool.execute("debug-call", { operationId: "raw-public-call" }, undefined, undefined, {
+        cwd: "/repo",
+      }),
+    ).rejects.toThrow("Invalid Debug Operation ID");
+    expect(mockFns.getDebugEvents).not.toHaveBeenCalled();
   });
 
   it("throws when debug capture is disabled", async () => {
@@ -128,6 +142,7 @@ describe("supi-debug tool output", () => {
     };
 
     expect(mockFns.readSessionDebugEvents).toHaveBeenCalledWith("/sessions/other.jsonl", {
+      operationId: undefined,
       source: "lsp",
       level: undefined,
       category: undefined,
@@ -136,6 +151,44 @@ describe("supi-debug tool output", () => {
     expect(result.content[0]?.text).toContain("Raw debug data is not persisted");
     expect(result.details.enabled).toBe(false);
     expect(result.details.rawDataUnavailable).toBe(true);
+  });
+
+  it("shows and filters a Debug Operation ID for persisted events", async () => {
+    const operationId = "op-AAAAAAAAAAAAAAAAAAAAAA";
+    const pi = setup({ enabled: false, agentAccess: "sanitized", maxEvents: 100 });
+    mockFns.readSessionDebugEvents.mockResolvedValue({
+      events: [
+        {
+          id: 1,
+          timestamp: 1_700_000_000_000,
+          source: "code-intelligence",
+          level: "debug",
+          category: "code-operation.start",
+          message: "Code operation started",
+          operationId,
+        },
+      ],
+      persistedEventCount: 1,
+    });
+    const tool = makeTool(pi);
+
+    const result = (await tool.execute(
+      "debug-call",
+      { sessionFile: "/sessions/other.jsonl", operationId },
+      undefined,
+      undefined,
+      { cwd: "/repo" },
+    )) as { content: Array<{ text: string }>; details: { events: unknown[] } };
+
+    expect(mockFns.readSessionDebugEvents).toHaveBeenCalledWith("/sessions/other.jsonl", {
+      operationId,
+      source: undefined,
+      level: undefined,
+      category: undefined,
+      limit: undefined,
+    });
+    expect(result.content[0]?.text).toContain(`operationId: ${operationId}`);
+    expect(result.details.events).toEqual([expect.objectContaining({ operationId })]);
   });
 
   it("identifies sessions recorded before debug persistence", async () => {
@@ -164,6 +217,7 @@ describe("supi-debug tool output", () => {
     await command.handler("sessionFile=/sessions/old.jsonl", { cwd: "/repo" });
 
     expect(mockFns.readSessionDebugEvents).toHaveBeenCalledWith("/sessions/old.jsonl", {
+      operationId: undefined,
       source: undefined,
       level: undefined,
       category: undefined,

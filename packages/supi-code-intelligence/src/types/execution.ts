@@ -26,6 +26,8 @@ import type {
  */
 export interface CodeIntelToolExecCtx {
   cwd: string;
+  /** Opaque identity for Debug Events directly owned by this public Tool call. */
+  operationId?: string;
   /** Abort signal from the agent runtime; forward to long-running subprocesses. */
   signal?: AbortSignal;
   /** Progress callback; long-running executors emit coarse beats, not chatty ones. */

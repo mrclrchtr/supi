@@ -107,4 +107,41 @@ describe("readSessionDebugEvents", () => {
       persistedEventCount: 3,
     });
   });
+
+  it("retains and filters valid persisted Debug Operation IDs", async () => {
+    const operationId = "op-AAAAAAAAAAAAAAAAAAAAAA";
+    const file = await writeSession([
+      {
+        type: "custom",
+        customType: DEBUG_EVENT_ENTRY_TYPE,
+        data: {
+          id: 1,
+          timestamp: 1_700_000_000_000,
+          source: "code-intelligence",
+          level: "debug",
+          category: "code-operation.start",
+          message: "Code operation started",
+          operationId,
+        },
+      },
+      {
+        type: "custom",
+        customType: DEBUG_EVENT_ENTRY_TYPE,
+        data: {
+          id: 2,
+          timestamp: 1_700_000_001_000,
+          source: "code-intelligence",
+          level: "debug",
+          category: "code-operation.finish",
+          message: "Code operation finished",
+          operationId: "raw-tool-call-id",
+        },
+      },
+    ]);
+
+    await expect(readSessionDebugEvents(file, { operationId })).resolves.toEqual({
+      events: [expect.objectContaining({ id: 1, operationId })],
+      persistedEventCount: 2,
+    });
+  });
 });

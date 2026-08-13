@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import type { LspClient } from "../client/client.ts";
 
 export function closeFileAcrossClients(clients: Iterable<LspClient>, filePath: string): void {
@@ -21,7 +22,7 @@ export function pruneMissingFilesFromClients(clients: Iterable<LspClient>): stri
 
 export async function refreshOpenDiagnosticsForClients(
   clients: Iterable<LspClient>,
-  options?: { maxWaitMs?: number; quietMs?: number },
+  options?: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl,
 ): Promise<void> {
   const refreshes = Array.from(clients)
     .filter((client) => client.status === "running")

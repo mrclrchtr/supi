@@ -1,5 +1,10 @@
 // Unit tests for LspClient readiness state machine.
 
+import {
+  configureDebugRegistry,
+  getDebugEvents,
+  resetDebugRegistry,
+} from "@mrclrchtr/supi-core/debug";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProgressToken } from "vscode-languageserver-protocol";
 import { LspClient } from "../../src/client/client.ts";
@@ -71,11 +76,26 @@ async function assertGetReadyResolves(client: LspClient): Promise<void> {
 
 describe("LspClient readiness state machine", () => {
   beforeEach(() => {
+    configureDebugRegistry({ enabled: true, maxEvents: 100 });
     vi.useFakeTimers();
   });
 
   afterEach(() => {
+    resetDebugRegistry();
     vi.useRealTimers();
+  });
+
+  it("keeps readiness events ambient without a Debug Operation ID", () => {
+    const client = createClient();
+
+    sendProgress(client, "ambient-token", "begin");
+    sendProgress(client, "ambient-token", "end");
+
+    const events = getDebugEvents({ source: "lsp" }).events.filter((event) =>
+      event.category.startsWith("readiness."),
+    );
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.every((event) => event.operationId === undefined)).toBe(true);
   });
 
   // ── Test 1: No progress → 2s window → ready ────────────────────────
@@ -403,6 +423,25 @@ describe("LspClient readiness state machine", () => {
     await expect(client.hover("test.ts", { line: 0, character: 0 })).resolves.toEqual({
       kind: "completed",
       data: null,
+    });
+  });
+
+  it("forwards only the Debug Operation ID from semantic request control", async () => {
+    const client = createClient();
+    await vi.advanceTimersByTimeAsync(2_000);
+    const sendRequest = vi.fn().mockResolvedValue(null);
+    (client as AnyClient).rpc.sendRequest = sendRequest;
+    const controller = new AbortController();
+    const control = {
+      operationId: "op-AAAAAAAAAAAAAAAAAAAAAA",
+      signal: controller.signal,
+      deadline: 42,
+    };
+
+    await client.hover("test.ts", { line: 0, character: 0 }, control);
+
+    expect(sendRequest).toHaveBeenCalledWith("textDocument/hover", expect.any(Object), {
+      operationId: control.operationId,
     });
   });
 

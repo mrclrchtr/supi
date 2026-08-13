@@ -63,6 +63,7 @@ Rendered fields per event:
 - optional `cwd`
 - optional `data`
 - optional `rawData`
+- optional `operationId` for events directly owned by one public `code_*` call
 
 ### Why collapsed by default
 
@@ -83,11 +84,12 @@ Both `/supi-debug` and `supi_debug` support the same basic filters:
 - `source`
 - `level`
 - `category`
+- exact `operationId`
 - `limit`
 
 For historical sessions, pass `sessionFile` to `supi_debug`, or
 `sessionFile=<path>` to `/supi-debug`. Historical sessions never retain raw data.
-The tool also accepts `includeRaw` for live-session data when settings allow it.
+The tool also accepts `includeRaw` for live-session data when settings allow it. A Debug Operation ID groups direct request ownership only. It is not a security identity, distributed trace, raw Pi Tool-call identity, or time-window correlation.
 
 ## Settings
 

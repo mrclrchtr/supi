@@ -7,6 +7,7 @@
 
 import {
   type CapabilityState,
+  type CodeRequestControl,
   completedCodeQuery,
   type SemanticProvider,
   type StructuralProvider,
@@ -126,7 +127,11 @@ export class TestCapabilityAdapter implements CapabilityAdapter {
     };
   }
 
-  async ensureSemanticReadiness(_cwd: string, _scope: ReadinessScope): Promise<ReadinessOutcome> {
+  async ensureSemanticReadiness(
+    _cwd: string,
+    _scope: ReadinessScope,
+    _control?: CodeRequestControl,
+  ): Promise<ReadinessOutcome> {
     return this.#readiness;
   }
 }

@@ -169,7 +169,7 @@ export class TreeSitterRuntime {
       };
     }
 
-    const timer = startStructuralTiming(this.onTiming);
+    const timer = startStructuralTiming(control?.operationId, this.onTiming);
     const parserState = this.parsers.has(grammarId)
       ? "reused"
       : this.parserPromises.has(grammarId)
@@ -293,7 +293,7 @@ export class TreeSitterRuntime {
     const validation = validateQueryString(queryString);
     if (validation) return validation;
 
-    const timer = startStructuralTiming(this.onTiming);
+    const timer = startStructuralTiming(control?.operationId, this.onTiming);
     let phase: QueryTimingPhase = "query-compilation";
     let compilationStarted = false;
     let cache: StructuralCacheObservation = {

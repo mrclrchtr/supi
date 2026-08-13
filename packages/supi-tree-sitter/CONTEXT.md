@@ -7,7 +7,7 @@ See also: `packages/supi-code-intelligence/CONTEXT.md` (Structural request contr
 ## Language
 
 **Structural Worker**:
-The one long-lived Worker owned by one shared workspace lifecycle or explicitly owned Tree-sitter session. It owns every parser-backed resource, source read, extraction, and cache.
+The one long-lived Worker owned by one shared workspace lifecycle or explicitly owned Tree-sitter session. It owns every parser-backed resource, source read, extraction, and cache. Explicit request control can carry one opaque Debug Operation ID through the private protocol. The Worker never receives Pi's raw Tool-call identity.
 _Avoid_: Worker pool, main-thread parser, generic scheduler
 
 **Structural mailbox**:

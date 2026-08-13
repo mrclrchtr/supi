@@ -1,5 +1,6 @@
 // biome-ignore-all lint/style/noExcessiveLinesPerFile: one private protocol module defines and validates the full closed contract
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
+import { isDebugOperationId } from "@mrclrchtr/supi-core/debug";
 import type { TreeSitterResult } from "../types.ts";
 import type { StructuralTimingEvent } from "./structural-timing.ts";
 
@@ -43,6 +44,7 @@ export interface StructuralWorkerRequestMessage {
   readonly generation: number;
   readonly requestId: string;
   readonly input: StructuralWorkerOperation;
+  readonly operationId?: string;
   readonly deadline?: number;
   readonly cancellationFlag: SharedArrayBuffer;
 }
@@ -117,6 +119,36 @@ export type StructuralWorkerToParentMessage =
 export type StructuralProtocolValidation<T> =
   | { readonly kind: "valid"; readonly message: T }
   | { readonly kind: "invalid"; readonly reason: string };
+
+/** Validate an untrusted request before the Structural Worker executes it. */
+export function validateStructuralWorkerRequest(
+  value: unknown,
+): StructuralProtocolValidation<StructuralWorkerRequestMessage> {
+  if (!isRecord(value)) return invalid("Structural Worker request must be an object");
+  const required = ["kind", "version", "generation", "requestId", "input", "cancellationFlag"];
+  const allowed = new Set([...required, "operationId", "deadline"]);
+  if (
+    required.some((key) => !(key in value)) ||
+    Object.keys(value).some((key) => !allowed.has(key))
+  ) {
+    return invalid("Invalid structural request envelope");
+  }
+  if (
+    value.kind !== "request" ||
+    value.version !== STRUCTURAL_WORKER_PROTOCOL_VERSION ||
+    !isPositiveInteger(value.generation) ||
+    !isRequestId(value.requestId) ||
+    !isRecord(value.input) ||
+    !(value.cancellationFlag instanceof SharedArrayBuffer) ||
+    value.cancellationFlag.byteLength !== Int32Array.BYTES_PER_ELEMENT ||
+    (value.deadline !== undefined &&
+      (typeof value.deadline !== "number" || !Number.isFinite(value.deadline))) ||
+    (value.operationId !== undefined && !isDebugOperationId(value.operationId))
+  ) {
+    return invalid("Invalid structural request");
+  }
+  return valid(value as unknown as StructuralWorkerRequestMessage);
+}
 
 /** Encode one complete structural result into fixed-size binary chunks. */
 export function encodeStructuralResult(result: TreeSitterResult<unknown>): Uint8Array[] {
@@ -258,7 +290,12 @@ function validateTerminal(
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: every sanitized nested timing field is validated at one trust boundary
 function isStructuralTimingEvent(value: unknown): value is StructuralTimingEvent {
   if (!isRecord(value) || !isRecord(value.data) || !isRecord(value.data.timing)) return false;
-  if (!hasExactKeys(value, ["source", "level", "category", "message", "data"])) return false;
+  const expected =
+    value.operationId === undefined
+      ? ["source", "level", "category", "message", "data"]
+      : ["operationId", "source", "level", "category", "message", "data"];
+  if (!hasExactKeys(value, expected)) return false;
+  if (value.operationId !== undefined && !isDebugOperationId(value.operationId)) return false;
   if (value.source !== "tree-sitter" || value.level !== "debug") return false;
   if (
     value.category !== "structural.parse.timing" &&

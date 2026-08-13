@@ -8,7 +8,7 @@ import {
   collectInstructionFiles,
   findInstructionFilesForDirectory,
 } from "../analysis/instruction-files.ts";
-import { createStructuralCodeProvider } from "../analysis/provider.ts";
+import { createStructuralCodeProvider, withSemanticRequestControl } from "../analysis/provider.ts";
 import { normalizePath } from "../analysis/search/paths.ts";
 import { loadCodeIntelligenceConfig } from "../config.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
@@ -137,13 +137,14 @@ async function orientTarget(options: {
   throwIfAborted(control);
 
   const entry = target.entry;
-  const readiness = await deps.capability.ensureSemanticReadiness(deps.cwd, {
-    kind: "file",
-    file: entry.file,
-  });
+  const readiness = await deps.capability.ensureSemanticReadiness(
+    deps.cwd,
+    { kind: "file", file: entry.file },
+    control,
+  );
   const semanticReady = readiness.kind === "ready";
   const provider = semanticReady
-    ? deps.capability.getProvider(deps.cwd)
+    ? withSemanticRequestControl(deps.capability.getProvider(deps.cwd), control)
     : createStructuralCodeProvider(deps.capability.getStructuralProvider(deps.cwd));
   const lspRuntime = semanticReady
     ? deps.capability.getLspRuntimeState(deps.cwd)

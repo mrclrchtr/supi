@@ -4,6 +4,7 @@ import type { StructuralCacheObservation } from "../worker/parsed-file-store.ts"
 
 /** Plain sanitized event sent from the Structural Worker to the parent. */
 export interface StructuralTimingEvent {
+  readonly operationId?: string;
   readonly source: "tree-sitter";
   readonly level: "debug";
   readonly category: "structural.parse.timing" | "structural.query.timing";
@@ -63,16 +64,17 @@ export type StructuralTimingObservation =
 
 /** Start one failure-isolated Tree-sitter timing observation. */
 export function startStructuralTiming(
+  operationId?: string,
   forward?: (event: StructuralTimingEvent) => void,
 ): StructuralTimer {
-  if (forward) return createForwardedTimer(forward);
+  if (forward) return createForwardedTimer(operationId, forward);
   const timer = startDebugTimer();
   return {
     mark(phase) {
       timer.mark(phase);
     },
     finish(event, finalPhase) {
-      timer.finish(event, finalPhase);
+      timer.finish({ ...event, operationId }, finalPhase);
     },
   };
 }
@@ -100,7 +102,10 @@ export function publishStructuralTimingEvent(event: StructuralTimingEvent): void
   recordDebugEvent(event);
 }
 
-function createForwardedTimer(forward: (event: StructuralTimingEvent) => void): StructuralTimer {
+function createForwardedTimer(
+  operationId: string | undefined,
+  forward: (event: StructuralTimingEvent) => void,
+): StructuralTimer {
   const startedAt = performance.now();
   let previousAt = startedAt;
   let finished = false;
@@ -122,6 +127,7 @@ function createForwardedTimer(forward: (event: StructuralTimingEvent) => void): 
       mark(finalPhase, completedAt);
       forward({
         ...event,
+        ...(operationId ? { operationId } : {}),
         data: {
           ...event.data,
           timing: {

@@ -1,7 +1,7 @@
 // Recovery and state description helpers for code_health.
 // Extracted from orchestrate.ts.
 
-import type { CapabilityState } from "@mrclrchtr/supi-code-runtime/api";
+import type { CapabilityState, CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import type { RecoverDiagnosticsResult, WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 
 // ── Recovery ──────────────────────────────────────────────────────────
@@ -9,6 +9,7 @@ import type { RecoverDiagnosticsResult, WorkspaceLspRuntime } from "@mrclrchtr/s
 interface RecoverOptions {
   service: WorkspaceLspRuntime;
   progress?: () => void;
+  control?: CodeRequestControl;
 }
 
 /** Run the runtime's best-effort recovery and preserve its established outcome. */
@@ -16,7 +17,10 @@ export async function recoverDiagnosticRuntime(
   opts: RecoverOptions,
 ): Promise<RecoverDiagnosticsResult> {
   opts.progress?.();
-  return opts.service.recoverDiagnostics({ restartIfStillStale: true });
+  return opts.service.recoverDiagnostics({
+    restartIfStillStale: true,
+    control: opts.control,
+  });
 }
 
 // ── State description helpers ─────────────────────────────────────────

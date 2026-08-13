@@ -86,6 +86,34 @@ export function getCodeProviderState(cwd: string): CodeProviderState {
 /** Alias for getCodeProviderState — kept for backward compatibility. */
 export const getCodeProvider = getCodeProviderState;
 
+/** Bind one exact request-control value to every semantic provider operation. */
+export function withSemanticRequestControl<T extends SemanticProvider>(
+  provider: T | null,
+  control: CodeRequestControl | undefined,
+): T | null {
+  if (!provider || !control) return provider;
+  return {
+    ...provider,
+    references: (file, position) => provider.references(file, position, control),
+    implementation: (file, position) => provider.implementation(file, position, control),
+    documentSymbols: (file) => provider.documentSymbols(file, control),
+    workspaceSymbols: (query) => provider.workspaceSymbols(query, control),
+    hover: provider.hover
+      ? (file, position) => provider.hover?.(file, position, control)
+      : undefined,
+    definition: provider.definition
+      ? (file, position) => provider.definition?.(file, position, control)
+      : undefined,
+    refactor: provider.refactor ? (request) => provider.refactor?.(request, control) : undefined,
+    rename: provider.rename
+      ? (file, position, newName) => provider.rename?.(file, position, newName, control)
+      : undefined,
+    codeActions: provider.codeActions
+      ? (file, position) => provider.codeActions?.(file, position, control)
+      : undefined,
+  } as T;
+}
+
 /** Bind one exact request-control value to every structural provider operation. */
 export function withStructuralRequestControl<T extends StructuralProvider>(
   provider: T | null,

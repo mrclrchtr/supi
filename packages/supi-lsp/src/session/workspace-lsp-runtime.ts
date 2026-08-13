@@ -87,8 +87,12 @@ export interface WorkspaceLspRuntime extends WorkspaceLspDiagnosticSurface {
   waitUntilReadyForFile(
     filePath: string,
     options?: { timeoutMs?: number },
+    control?: CodeRequestControl,
   ): Promise<SemanticReadinessResult>;
-  waitUntilReadyForWorkspace(options?: { timeoutMs?: number }): Promise<SemanticReadinessResult>;
+  waitUntilReadyForWorkspace(
+    options?: { timeoutMs?: number },
+    control?: CodeRequestControl,
+  ): Promise<SemanticReadinessResult>;
   getProjectServers(): ProjectServerInfo[];
   isSupportedSourceFile(filePath: string): boolean;
   trackFile(filePath: string): Promise<boolean>;

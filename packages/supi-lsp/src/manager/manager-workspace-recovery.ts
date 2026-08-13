@@ -1,3 +1,4 @@
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import type { Diagnostic, FileEvent } from "../config/types.ts";
 import {
   assessStaleDiagnostics,
@@ -14,7 +15,9 @@ export interface WorkspaceRecoveryResult {
 export interface WorkspaceRecoveryHost {
   clearAllPullResultIds(): void;
   notifyWorkspaceFileChanges(changes: FileEvent[]): void;
-  refreshOpenDiagnostics(options?: { maxWaitMs?: number; quietMs?: number }): Promise<void>;
+  refreshOpenDiagnostics(
+    options?: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl,
+  ): Promise<void>;
   getOutstandingDiagnostics(
     maxSeverity?: number,
   ): Array<{ file: string; diagnostics: Diagnostic[] }>;
@@ -40,12 +43,17 @@ export async function recoverWorkspaceDiagnostics(
     restartIfStillStale?: boolean;
     maxWaitMs?: number;
     quietMs?: number;
+    control?: CodeRequestControl;
   } = {},
 ): Promise<WorkspaceRecoveryResult> {
   const attemptedClients = softRecoverWorkspaceDiagnostics(host, options.changes ?? []);
 
   try {
-    await host.refreshOpenDiagnostics({ maxWaitMs: options.maxWaitMs, quietMs: options.quietMs });
+    await host.refreshOpenDiagnostics({
+      maxWaitMs: options.maxWaitMs,
+      quietMs: options.quietMs,
+      operationId: options.control?.operationId,
+    });
   } catch {
     // Recovery should be best-effort.
   }
@@ -64,6 +72,7 @@ export async function recoverWorkspaceDiagnostics(
         await host.refreshOpenDiagnostics({
           maxWaitMs: options.maxWaitMs,
           quietMs: options.quietMs,
+          operationId: options.control?.operationId,
         });
       } catch {
         // Keep the previous assessment if the follow-up refresh fails.

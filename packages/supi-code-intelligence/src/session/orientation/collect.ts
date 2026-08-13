@@ -296,7 +296,11 @@ async function buildDiagnosticsSection(
 
   try {
     const targetFile = path.resolve(deps.cwd, target.file);
-    const result = await deps.lspRuntime.runtime.fileDiagnostics(targetFile, 4);
+    const result = await deps.lspRuntime.runtime.fileDiagnostics(
+      targetFile,
+      4,
+      deps.requestControl,
+    );
     if (result.kind === "unavailable") {
       return unavailableTargetSection(
         [{ kind: "paragraph", text: `Diagnostics unavailable for this target — ${result.reason}` }],

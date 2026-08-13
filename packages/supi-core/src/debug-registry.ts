@@ -25,6 +25,8 @@ export const DEBUG_REGISTRY_DEFAULTS: DebugRegistryConfig = {
 };
 
 export interface DebugEventInput {
+  /** Opaque identity for events directly owned by one public Tool call. */
+  operationId?: string;
   source: string;
   level: DebugLevel;
   category: string;
@@ -42,6 +44,8 @@ export interface DebugEvent extends DebugEventInput {
 }
 
 export interface DebugEventQuery {
+  /** Match one exact Debug Operation ID. */
+  operationId?: string;
   source?: string;
   level?: DebugLevel;
   category?: string;
@@ -53,6 +57,7 @@ export interface DebugEventQuery {
 export interface DebugEventView {
   id: number;
   timestamp: number;
+  operationId?: string;
   source: string;
   level: DebugLevel;
   category: string;
@@ -84,6 +89,7 @@ interface DebugRegistryState {
 }
 
 const REGISTRY_KEY = Symbol.for("@mrclrchtr/supi-core/debug-registry");
+const DEBUG_OPERATION_ID_RE = /^op-[A-Za-z0-9_-]{21}[AQgw]$/;
 const SECRET_KEY_RE = /(?:token|password|passwd|secret|api[_-]?key|authorization|credential)/i;
 const ENV_SECRET_RE =
   /\b([A-Za-z0-9_]*(?:token|password|passwd|secret|api[_-]?key|authorization|credential)[A-Za-z0-9_]*)=(?:'[^']*'|"[^"]*"|\S+)/gi;
@@ -135,11 +141,17 @@ export function isDebugLevel(value: unknown): value is DebugLevel {
   return value === "debug" || value === "info" || value === "warning" || value === "error";
 }
 
-/** Match a debug event against the supported source, level, and category filters. */
+/** Return whether a value has the exact 16-byte base64url Debug Operation ID form. */
+export function isDebugOperationId(value: unknown): value is string {
+  return typeof value === "string" && DEBUG_OPERATION_ID_RE.test(value);
+}
+
+/** Match a debug event against the supported exact filters. */
 export function matchesDebugEventQuery(
-  event: Pick<DebugEventView, "source" | "level" | "category">,
-  query: Pick<DebugEventQuery, "source" | "level" | "category">,
+  event: Pick<DebugEventView, "operationId" | "source" | "level" | "category">,
+  query: Pick<DebugEventQuery, "operationId" | "source" | "level" | "category">,
 ): boolean {
+  if (query.operationId && event.operationId !== query.operationId) return false;
   if (query.source && event.source !== query.source) return false;
   if (query.level && event.level !== query.level) return false;
   if (query.category && event.category !== query.category) return false;
@@ -197,6 +209,7 @@ function toSanitizedView(event: DebugEvent): DebugEventView {
   return {
     id: event.id,
     timestamp: event.timestamp,
+    operationId: event.operationId,
     source: event.source,
     level: event.level,
     category: event.category,
@@ -216,6 +229,9 @@ export function subscribeDebugEvents(listener: DebugEventListener): () => void {
 /** Record a session-local debug event if debugging is enabled. */
 export function recordDebugEvent(input: DebugEventInput): DebugEvent | null {
   const state = getState();
+  if (input.operationId !== undefined && !isDebugOperationId(input.operationId)) {
+    return null;
+  }
   if (!state.config.enabled) {
     return null;
   }

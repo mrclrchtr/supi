@@ -8,6 +8,7 @@ import {
   isCodeRequestInterruption,
   throwIfCodeRequestInterrupted,
 } from "@mrclrchtr/supi-code-runtime/api";
+import { isDebugOperationId, startDebugTimer } from "@mrclrchtr/supi-core/debug";
 import type { TreeSitterResult } from "../types.ts";
 import { publishStructuralTimingEvent } from "./structural-timing.ts";
 import { StructuralWorkerLifecycle } from "./structural-worker-client-lifecycle.ts";
@@ -123,6 +124,9 @@ export class StructuralWorkerClient {
   ): Promise<TreeSitterResult<T>> {
     throwIfCodeRequestInterrupted(control);
     if (this.#closed) return runtimeError("Structural Worker is shut down");
+    if (control?.operationId !== undefined && !isDebugOperationId(control.operationId)) {
+      return runtimeError("Invalid Debug Operation ID");
+    }
     if (this.#unavailableReason) return runtimeError(this.#unavailableReason);
     if (this.#queue.length >= STRUCTURAL_WORKER_LIMITS.maxQueuedRequests) {
       return runtimeError("Structural Worker mailbox is busy");
@@ -267,6 +271,7 @@ export class StructuralWorkerClient {
         generation: this.#worker.generation,
         requestId: request.id,
         input: request.input,
+        ...(request.control?.operationId ? { operationId: request.control.operationId } : {}),
         deadline: request.control?.deadline,
         cancellationFlag: request.cancellationBuffer,
       } as const;
@@ -287,6 +292,9 @@ export class StructuralWorkerClient {
       if (this.#active?.id !== message.requestId)
         return this.#protocolFailure("Unknown observation request id");
       assertStructuralProtocolMessageSize(message);
+      if (message.observation.operationId !== this.#active.control?.operationId) {
+        return this.#protocolFailure("Structural observation ownership mismatch");
+      }
       publishStructuralTimingEvent(message.observation);
       return;
     }
@@ -414,21 +422,51 @@ export class StructuralWorkerClient {
     if (this.#active !== request || request.settled) return;
     this.#active = null;
     this.#reject(request, error);
-    await this.#lifecycle.run(() => this.#restart("Structural Worker hard stop"));
+    await this.#restartOwned(request, "Structural Worker hard stop");
   }
 
   async #protocolFailure(reason: string): Promise<void> {
     const active = this.#active;
     this.#active = null;
     if (active) this.#settle(active, runtimeError(`Structural Worker protocol failure: ${reason}`));
-    await this.#restart(reason);
+    if (active) await this.#restartOwned(active, reason);
+    else await this.#restart(reason);
   }
 
   async #workerFailure(reason: string): Promise<void> {
     const active = this.#active;
     this.#active = null;
     if (active) this.#settle(active, runtimeError(reason));
-    await this.#restart(reason);
+    if (active) await this.#restartOwned(active, reason, true);
+    else await this.#restart(reason);
+  }
+
+  async #restartOwned(
+    request: PendingRequest<unknown>,
+    reason: string,
+    lifecycleAlreadyOwned = false,
+  ): Promise<void> {
+    const timer = startDebugTimer();
+    let outcome: "completed" | "failed" = "completed";
+    try {
+      if (lifecycleAlreadyOwned) await this.#restart(reason);
+      else await this.#lifecycle.run(() => this.#restart(reason));
+      if (this.#unavailableReason) outcome = "failed";
+    } catch {
+      outcome = "failed";
+    }
+    if (this.#closed) return;
+    timer.finish(
+      {
+        operationId: request.control?.operationId,
+        source: "tree-sitter",
+        level: "debug",
+        category: "structural.worker.restart.timing",
+        message: `Structural Worker restart ${outcome}`,
+        data: { outcome, cacheReset: true },
+      },
+      "restart",
+    );
   }
 
   async #startupFailure(reason: string): Promise<void> {

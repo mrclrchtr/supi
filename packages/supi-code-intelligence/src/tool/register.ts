@@ -1,8 +1,10 @@
+import { createHmac, randomBytes } from "node:crypto";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
+import { recordDebugEvent, startDebugTimer } from "@mrclrchtr/supi-core/debug";
 import type { WorkspaceCodeIntelligenceSession } from "../session/session.ts";
 import { renderFindCall, renderFindResult } from "./find/tui.ts";
 import { renderGraphCall, renderGraphResult } from "./graph/tui.ts";
@@ -76,6 +78,63 @@ function getToolRenderer(name: string): ToolRenderer {
  */
 const registeredPis = new WeakSet<object>();
 
+type CodeOperationOutcome = "completed" | "failed" | "canceled";
+
+function createDebugOperationId(secret: Buffer, toolCallId: string): string {
+  const digest = createHmac("sha256", secret).update(toolCallId).digest().subarray(0, 16);
+  return `op-${digest.toString("base64url")}`;
+}
+
+function recordCodeOperationBoundary(
+  category: "code-operation.start" | "code-operation.finish",
+  operationId: string,
+  tool: string,
+  outcome?: CodeOperationOutcome,
+): void {
+  recordDebugEvent({
+    operationId,
+    source: "code-intelligence",
+    level: "debug",
+    category,
+    message:
+      category === "code-operation.start" ? "Code operation started" : "Code operation finished",
+    data: outcome ? { tool, outcome } : { tool },
+  });
+}
+
+function recordCodeWorkflowTiming(
+  timer: ReturnType<typeof startDebugTimer>,
+  operationId: string,
+  tool: string,
+  outcome: CodeOperationOutcome,
+): void {
+  timer.finish(
+    {
+      operationId,
+      source: "code-intelligence",
+      level: "debug",
+      category: "workflow.timing",
+      message: "Code workflow finished",
+      data: { tool, outcome },
+    },
+    "workflow",
+  );
+}
+
+function terminalCodeOperationOutcome(
+  error: unknown,
+  signal: AbortSignal | undefined,
+): CodeOperationOutcome {
+  if (signal?.aborted) return "canceled";
+  if (
+    error instanceof Error &&
+    (error.name === "AbortError" || error.name === "CodeRequestDeadlineError")
+  ) {
+    return "canceled";
+  }
+  return "failed";
+}
+
 export function registerCodeIntelligenceTools(
   pi: ExtensionAPI,
   getOrCreateSession: (cwd: string) => WorkspaceCodeIntelligenceSession,
@@ -89,6 +148,7 @@ export function registerCodeIntelligenceTools(
   // ponytail: WeakSet on pi identity; getAllTools() is not callable during load.
   if (registeredPis.has(pi)) return;
   registeredPis.add(pi);
+  const operationSecret = randomBytes(32);
 
   for (const spec of specs) {
     const surface = promptSurfaces[spec.name];
@@ -100,33 +160,52 @@ export function registerCodeIntelligenceTools(
       promptGuidelines: surface.promptGuidelines,
       parameters: spec.parameters,
       // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
-      execute: async (_toolCallId, params, signal, onUpdate, ctx: ExtensionContext) => {
-        const session = getOrCreateSession(ctx.cwd);
-        session.setProjectTrusted(ctx.isProjectTrusted());
-        const { content, details } = await spec.run(params, {
-          cwd: ctx.cwd,
-          signal,
-          onUpdate,
-          session,
-        });
-        const { text, truncated } = truncateToolContent(content, {
-          maxLines: spec.maxLines,
-          maxBytes: spec.maxBytes,
-        });
-        if (truncated && content.length > 0) {
-          const dir = mkdtempSync(join(tmpdir(), "supi-ci-"));
-          const spillPath = join(dir, `${spec.name}-output.md`);
-          writeFileSync(spillPath, content, "utf-8");
-          const notice = `\n_Full output saved to: \`${spillPath}\`_`;
+      execute: async (toolCallId, params, signal, onUpdate, ctx: ExtensionContext) => {
+        const operationId = createDebugOperationId(operationSecret, toolCallId);
+        const workflowTimer = startDebugTimer();
+        recordCodeOperationBoundary("code-operation.start", operationId, spec.name);
+        try {
+          const session = getOrCreateSession(ctx.cwd);
+          session.setProjectTrusted(ctx.isProjectTrusted());
+          const { content, details } = await spec.run(params, {
+            cwd: ctx.cwd,
+            operationId,
+            signal,
+            onUpdate,
+            session,
+          });
+          recordCodeWorkflowTiming(workflowTimer, operationId, spec.name, "completed");
+          const { text, truncated } = truncateToolContent(content, {
+            maxLines: spec.maxLines,
+            maxBytes: spec.maxBytes,
+          });
+          if (truncated && content.length > 0) {
+            const dir = mkdtempSync(join(tmpdir(), "supi-ci-"));
+            const spillPath = join(dir, `${spec.name}-output.md`);
+            writeFileSync(spillPath, content, "utf-8");
+            const notice = `\n_Full output saved to: \`${spillPath}\`_`;
+            recordCodeOperationBoundary(
+              "code-operation.finish",
+              operationId,
+              spec.name,
+              "completed",
+            );
+            return {
+              content: [{ type: "text" as const, text: text + notice }],
+              details,
+            };
+          }
+          recordCodeOperationBoundary("code-operation.finish", operationId, spec.name, "completed");
           return {
-            content: [{ type: "text" as const, text: text + notice }],
+            content: [{ type: "text" as const, text }],
             details,
           };
+        } catch (error) {
+          const outcome = terminalCodeOperationOutcome(error, signal);
+          recordCodeWorkflowTiming(workflowTimer, operationId, spec.name, outcome);
+          recordCodeOperationBoundary("code-operation.finish", operationId, spec.name, outcome);
+          throw error;
         }
-        return {
-          content: [{ type: "text" as const, text }],
-          details,
-        };
       },
       ...getToolRenderer(spec.name),
     });

@@ -95,9 +95,6 @@ describe("JsonRpcClient", () => {
         data: {
           methodClass: "semantic",
           outcome: "completed",
-          timeoutMs: 30_000,
-          timedOut: false,
-          cancelled: false,
           timing: {
             durationMs: expect.any(Number),
             phasesMs: { request: expect.any(Number) },
@@ -109,6 +106,19 @@ describe("JsonRpcClient", () => {
     expect(JSON.stringify(events)).not.toContain("secret source text");
     expect(JSON.stringify(events)).not.toContain("private-command");
     expect(JSON.stringify(events)).not.toContain("textDocument/hover");
+  });
+
+  it("attaches explicit request ownership but leaves direct requests ambient", async () => {
+    const operationId = "op-AAAAAAAAAAAAAAAAAAAAAA";
+    server.onRequest("textDocument/hover", () => ({ contents: "ok" }));
+
+    await client.sendRequest("textDocument/hover", undefined, { operationId });
+    await client.sendRequest("textDocument/hover");
+
+    const events = getDebugEvents({ source: "lsp", category: "request.timing" }).events;
+    expect(events).toHaveLength(2);
+    expect(events.filter((event) => event.operationId === operationId)).toHaveLength(1);
+    expect(events.filter((event) => event.operationId === undefined)).toHaveLength(1);
   });
 
   it("correlates response by id", async () => {
@@ -144,8 +154,6 @@ describe("JsonRpcClient", () => {
       expect.objectContaining({
         methodClass: "other",
         outcome: "failed",
-        timedOut: false,
-        cancelled: false,
       }),
     );
   });
@@ -195,8 +203,6 @@ describe("JsonRpcClient", () => {
       expect.objectContaining({
         methodClass: "semantic",
         outcome: "cancelled",
-        timedOut: false,
-        cancelled: true,
       }),
     );
   });
@@ -226,9 +232,6 @@ describe("JsonRpcClient", () => {
         expect.objectContaining({
           methodClass: "other",
           outcome: "timed-out",
-          timeoutMs: 50,
-          timedOut: true,
-          cancelled: true,
         }),
       );
     } finally {

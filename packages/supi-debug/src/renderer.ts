@@ -30,34 +30,21 @@ function pushEventLines(lines: string[], event: DebugEventView, theme: Theme): v
   const source = theme.fg("toolTitle", `${event.source}/${event.category}`);
 
   lines.push(`${timestamp} ${level} ${source}: ${event.message}`);
+  if (event.operationId) lines.push(theme.fg("dim", `  operationId: ${event.operationId}`));
+  if (event.cwd) lines.push(theme.fg("dim", `  cwd: ${event.cwd}`));
+  pushDataLines(lines, "data", event.data, theme);
+  pushDataLines(lines, "rawData", event.rawData, theme);
+}
 
-  if (event.cwd) {
-    lines.push(theme.fg("dim", `  cwd: ${event.cwd}`));
+function pushDataLines(lines: string[], label: string, value: unknown, theme: Theme): void {
+  const dataLines = formatDataLines(value);
+  if (dataLines.length === 0) return;
+  if (dataLines.length === 1) {
+    lines.push(theme.fg("dim", `  ${label}: ${dataLines[0]}`));
+    return;
   }
-
-  const dataLines = formatDataLines(event.data);
-  if (dataLines.length > 0) {
-    if (dataLines.length === 1) {
-      lines.push(theme.fg("dim", `  data: ${dataLines[0]}`));
-    } else {
-      lines.push(theme.fg("dim", "  data:"));
-      for (const dl of dataLines) {
-        lines.push(theme.fg("dim", `    ${dl}`));
-      }
-    }
-  }
-
-  const rawLines = formatDataLines(event.rawData);
-  if (rawLines.length > 0) {
-    if (rawLines.length === 1) {
-      lines.push(theme.fg("dim", `  rawData: ${rawLines[0]}`));
-    } else {
-      lines.push(theme.fg("dim", "  rawData:"));
-      for (const rl of rawLines) {
-        lines.push(theme.fg("dim", `    ${rl}`));
-      }
-    }
-  }
+  lines.push(theme.fg("dim", `  ${label}:`));
+  for (const line of dataLines) lines.push(theme.fg("dim", `    ${line}`));
 }
 
 function renderExpandedReport(details: DebugReportDetails, theme: Theme): string {

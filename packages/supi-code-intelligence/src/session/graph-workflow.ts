@@ -66,12 +66,13 @@ export async function runGraphWorkflow(
   if (targetOutcome.kind !== "resolved") return targetOutcome;
 
   const entry = targetOutcome.entry;
-  const semanticReadinessError = await getSemanticReadinessError(
+  const semanticReadinessError = await getSemanticReadinessError({
     relations,
-    entry.file,
-    deps.capability,
-    deps.cwd,
-  );
+    file: entry.file,
+    capability: deps.capability,
+    cwd: deps.cwd,
+    control,
+  });
   const provider = deps.capability.getProvider(deps.cwd);
   const maxResults = request.maxResults ?? 8;
   const displayName =
@@ -131,16 +132,18 @@ function normalizeRelations(
   return requested as readonly GraphRelationKind[];
 }
 
-async function getSemanticReadinessError(
-  relations: readonly GraphRelationKind[],
-  file: string,
-  capability: CapabilityAdapter,
-  cwd: string,
-): Promise<string | null> {
+async function getSemanticReadinessError(options: {
+  relations: readonly GraphRelationKind[];
+  file: string;
+  capability: CapabilityAdapter;
+  cwd: string;
+  control?: WorkflowControl;
+}): Promise<string | null> {
+  const { relations, file, capability, cwd, control } = options;
   if (!relations.some((relation) => relation === "references" || relation === "implements")) {
     return null;
   }
-  const readiness = await capability.ensureSemanticReadiness(cwd, { kind: "file", file });
+  const readiness = await capability.ensureSemanticReadiness(cwd, { kind: "file", file }, control);
   if (readiness.kind === "ready") return null;
   if (readiness.kind === "timeout") {
     return "Semantic readiness timed out. Retry shortly or inspect code_health.";

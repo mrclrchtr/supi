@@ -1,5 +1,10 @@
 import { EventEmitter } from "node:events";
-import { describe, expect, it, vi } from "vitest";
+import {
+  configureDebugRegistry,
+  getDebugEvents,
+  resetDebugRegistry,
+} from "@mrclrchtr/supi-core/debug";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { StructuralWorkerClient } from "../../src/session/structural-worker-client.ts";
 import {
   encodeStructuralResult,
@@ -24,12 +29,100 @@ class FakeWorker {
     return this;
   }
 
+  fail(error: Error): void {
+    this.emitter.emit("error", error);
+  }
+
   emit(message: unknown): void {
     this.emitter.emit("message", message);
   }
 }
 
+afterEach(() => resetDebugRegistry());
+
 describe("StructuralWorkerClient", () => {
+  it("forwards the opaque Debug Operation ID in the request message", async () => {
+    const worker = new FakeWorker();
+    const client = new StructuralWorkerClient("/workspace", ({ generation }) => {
+      queueMicrotask(() => worker.emit(ready(generation)));
+      return worker;
+    });
+    try {
+      void client.execute(
+        { operation: "outline", file: "test.ts" },
+        { operationId: "op-AAAAAAAAAAAAAAAAAAAAAA" },
+      );
+      await vi.waitFor(() => expect(requests(worker)).toEqual(["test.ts"]));
+
+      expect(request(worker, 0)).toMatchObject({
+        operationId: "op-AAAAAAAAAAAAAAAAAAAAAA",
+      });
+    } finally {
+      await client.dispose();
+    }
+  });
+
+  it("rejects a malformed Debug Operation ID before it crosses the Worker boundary", async () => {
+    const worker = new FakeWorker();
+    const client = new StructuralWorkerClient("/workspace", () => worker);
+    try {
+      await expect(
+        client.execute(
+          { operation: "outline", file: "test.ts" },
+          { operationId: "raw-public-call" },
+        ),
+      ).resolves.toEqual({ kind: "runtime-error", message: "Invalid Debug Operation ID" });
+      expect(worker.posts).toEqual([]);
+    } finally {
+      await client.dispose();
+    }
+  });
+
+  it("rejects a Worker observation whose ID does not own the active request", async () => {
+    const worker = new FakeWorker();
+    const client = new StructuralWorkerClient("/workspace", ({ generation }) => {
+      queueMicrotask(() => worker.emit(ready(generation)));
+      return worker;
+    });
+    try {
+      const outcome = client.execute(
+        { operation: "outline", file: "test.ts" },
+        { operationId: "op-AAAAAAAAAAAAAAAAAAAAAA" },
+      );
+      await vi.waitFor(() => expect(requests(worker)).toEqual(["test.ts"]));
+      const active = request(worker, 0);
+      worker.emit({
+        kind: "observation",
+        version: STRUCTURAL_WORKER_PROTOCOL_VERSION,
+        generation: 1,
+        requestId: active.requestId,
+        observation: {
+          operationId: "op-_____________________w",
+          source: "tree-sitter",
+          level: "debug",
+          category: "structural.query.timing",
+          message: "Tree-sitter query completed",
+          data: {
+            operation: "query",
+            grammar: "typescript",
+            outcome: "completed",
+            captureCount: 0,
+            cache: { state: "miss", retained: false, evictionCount: 0 },
+            timing: { durationMs: 1, phasesMs: { "query-execution": 1 } },
+          },
+        },
+      });
+
+      await expect(outcome).resolves.toEqual({
+        kind: "runtime-error",
+        message: "Structural Worker protocol failure: Structural observation ownership mismatch",
+      });
+      await vi.waitFor(() => expect(worker.terminate).toHaveBeenCalledOnce());
+    } finally {
+      await client.dispose();
+    }
+  });
+
   it("fails closed after two Worker startup failures", async () => {
     const workers: FakeWorker[] = [];
     const client = new StructuralWorkerClient("/workspace", () => {
@@ -60,7 +153,43 @@ describe("StructuralWorkerClient", () => {
     }
   });
 
-  it("keeps FIFO order across an active hard stop and a fresh Worker", async () => {
+  it("restarts after an active Worker error without deadlocking queued work", async () => {
+    configureDebugRegistry({ enabled: true, maxEvents: 10 });
+    const workers: FakeWorker[] = [];
+    const client = new StructuralWorkerClient("/workspace", ({ generation }) => {
+      const worker = new FakeWorker();
+      workers.push(worker);
+      queueMicrotask(() => worker.emit(ready(generation)));
+      return worker;
+    });
+    try {
+      const first = client.execute(
+        { operation: "outline", file: "first.ts" },
+        { operationId: "op-AAAAAAAAAAAAAAAAAAAAAA" },
+      );
+      const second = client.execute({ operation: "outline", file: "second.ts" });
+      await vi.waitFor(() => expect(requests(workers[0])).toEqual(["first.ts"]));
+
+      workers[0]?.fail(new Error("worker crashed"));
+
+      await expect(first).resolves.toEqual({ kind: "runtime-error", message: "worker crashed" });
+      await vi.waitFor(() => expect(requests(workers[1])).toEqual(["second.ts"]));
+      complete(workers[1], 3, request(workers[1], 0), { kind: "success", data: [] });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await expect(second).resolves.toEqual({ kind: "success", data: [] });
+      expect(
+        getDebugEvents({
+          operationId: "op-AAAAAAAAAAAAAAAAAAAAAA",
+          category: "structural.worker.restart.timing",
+        }).events,
+      ).toHaveLength(1);
+    } finally {
+      await client.dispose();
+    }
+  });
+
+  it("keeps FIFO order and request-owned restart timing across an active hard stop", async () => {
+    configureDebugRegistry({ enabled: true, maxEvents: 10 });
     vi.useFakeTimers();
     const workers: FakeWorker[] = [];
     const client = new StructuralWorkerClient("/workspace", ({ generation }) => {
@@ -73,7 +202,10 @@ describe("StructuralWorkerClient", () => {
       const abortController = new AbortController();
       const first = client.execute(
         { operation: "outline", file: "first.ts" },
-        { signal: abortController.signal },
+        {
+          operationId: "op-AAAAAAAAAAAAAAAAAAAAAA",
+          signal: abortController.signal,
+        },
       );
       const firstOutcome = first.then(
         () => "completed",
@@ -98,6 +230,17 @@ describe("StructuralWorkerClient", () => {
       await vi.advanceTimersByTimeAsync(2);
       await expect(second).resolves.toEqual({ kind: "success", data: [] });
       await expect(third).resolves.toEqual({ kind: "success", data: [] });
+      expect(
+        getDebugEvents({
+          operationId: "op-AAAAAAAAAAAAAAAAAAAAAA",
+          source: "tree-sitter",
+          category: "structural.worker.restart.timing",
+        }).events,
+      ).toEqual([
+        expect.objectContaining({
+          data: expect.objectContaining({ outcome: "completed", cacheReset: true }),
+        }),
+      ]);
     } finally {
       await client.dispose();
       vi.useRealTimers();

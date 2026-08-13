@@ -7,7 +7,7 @@
 
 import { existsSync } from "node:fs";
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
-import { withStructuralRequestControl } from "../analysis/provider.ts";
+import { withSemanticRequestControl, withStructuralRequestControl } from "../analysis/provider.ts";
 import { normalizePath, resolveScope } from "../analysis/search/paths.ts";
 import { resolveAnchoredSymbolTarget } from "../analysis/target/anchored.ts";
 import { resolveFileTargetGroup, validateFileTargetDiscovery } from "../analysis/target/file.ts";
@@ -144,10 +144,11 @@ async function resolveAnchoredWorkflow(
     return { kind: "invalid-input", message: `File not found: \`${anchor.file}\`` };
   }
 
-  const readiness = await deps.capability.ensureSemanticReadiness(deps.cwd, {
-    kind: "file",
-    file,
-  });
+  const readiness = await deps.capability.ensureSemanticReadiness(
+    deps.cwd,
+    { kind: "file", file },
+    control,
+  );
   if (readiness.kind === "timeout") {
     return {
       kind: "unavailable",
@@ -162,7 +163,10 @@ async function resolveAnchoredWorkflow(
     file,
     anchor.line,
     anchor.character,
-    withStructuralRequestControl(deps.capability.getProvider(deps.cwd), control),
+    withSemanticRequestControl(
+      withStructuralRequestControl(deps.capability.getProvider(deps.cwd), control),
+      control,
+    ),
   );
   return toWorkflowOutcome(
     await refineTargetOutcomeIdentity(
@@ -195,9 +199,11 @@ async function resolveSymbolWorkflow(
     scope = resolved.path;
   }
 
-  const readiness = await deps.capability.ensureSemanticReadiness(deps.cwd, {
-    kind: "workspace",
-  });
+  const readiness = await deps.capability.ensureSemanticReadiness(
+    deps.cwd,
+    { kind: "workspace" },
+    control,
+  );
   if (readiness.kind === "timeout") {
     return { kind: "unavailable", reason: "LSP readiness timed out. Retry shortly." };
   }
@@ -205,7 +211,10 @@ async function resolveSymbolWorkflow(
     return { kind: "unavailable", reason: readiness.reason };
   }
 
-  const provider = deps.capability.getSemanticProvider(deps.cwd);
+  const provider = withSemanticRequestControl(
+    deps.capability.getSemanticProvider(deps.cwd),
+    control,
+  );
   if (!provider) {
     return {
       kind: "unavailable",
@@ -240,10 +249,11 @@ async function resolveFileOnlyWorkflow(
   if (validation.kind === "invalid-input") return validation;
   const file = validation.file;
 
-  const readiness = await deps.capability.ensureSemanticReadiness(deps.cwd, {
-    kind: "file",
-    file,
-  });
+  const readiness = await deps.capability.ensureSemanticReadiness(
+    deps.cwd,
+    { kind: "file", file },
+    control,
+  );
   if (readiness.kind === "timeout") {
     return { kind: "unavailable", reason: "LSP readiness timed out. Retry shortly." };
   }
@@ -252,7 +262,9 @@ async function resolveFileOnlyWorkflow(
   }
 
   const result = await resolveFileTargetGroup(file, deps.cwd, {
-    semantic: deps.capability.getSemanticProvider(deps.cwd) ?? undefined,
+    semantic:
+      withSemanticRequestControl(deps.capability.getSemanticProvider(deps.cwd), control) ??
+      undefined,
     structural:
       withStructuralRequestControl(deps.capability.getStructuralProvider(deps.cwd), control) ??
       undefined,

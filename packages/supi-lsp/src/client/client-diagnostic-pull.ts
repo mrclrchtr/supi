@@ -1,5 +1,6 @@
 import type { DocumentDiagnosticReport } from "../config/types.ts";
 import { applyPullReport, type DiagnosticCacheEntry } from "./client-diagnostic-evidence.ts";
+import type { DiagnosticPullRequest } from "./client-diagnostic-request.ts";
 
 interface PullDiagnosticEvidenceOptions {
   store: Map<string, DiagnosticCacheEntry>;
@@ -10,12 +11,8 @@ interface PullDiagnosticEvidenceOptions {
   currentRevision(): number;
   isCurrentSynchronization(): boolean;
   signal?: AbortSignal;
-  pull(
-    uri: string,
-    previousResultId: string | undefined,
-    timeoutMs: number,
-    signal?: AbortSignal,
-  ): Promise<DocumentDiagnosticReport | null>;
+  operationId?: string;
+  pull(request: DiagnosticPullRequest): Promise<DocumentDiagnosticReport | null>;
 }
 
 /** Collect one pull report only if its document and workspace generations remain current. */
@@ -24,12 +21,13 @@ export async function pullDiagnosticEvidence(
 ): Promise<boolean> {
   const previous = options.store.get(options.uri);
   const previousResultId = previous?.resultId;
-  const report = await options.pull(
-    options.uri,
+  const report = await options.pull({
+    uri: options.uri,
     previousResultId,
-    options.timeoutMs,
-    options.signal,
-  );
+    timeoutMs: options.timeoutMs,
+    signal: options.signal,
+    operationId: options.operationId,
+  });
   if (!report) return false;
   if (
     options.evidenceRevision !== options.currentRevision() ||

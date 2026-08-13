@@ -1,6 +1,7 @@
 /** Session-owned point inspection workflow. */
 
 import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
+import { withSemanticRequestControl } from "../analysis/provider.ts";
 import type { CapabilityAdapter, ReadinessOutcome } from "./capability-adapter.ts";
 import { parseInspectWorkflowInput } from "./input/workflows.ts";
 import { collectInspectSections } from "./inspect/collect.ts";
@@ -37,14 +38,17 @@ export async function runInspectWorkflow(
     phase: "providers",
     message: "Collecting point facts",
   });
-  const readiness = await deps.capability.ensureSemanticReadiness(deps.cwd, {
-    kind: "file",
-    file: point.value.file,
-  });
+  const readiness = await deps.capability.ensureSemanticReadiness(
+    deps.cwd,
+    { kind: "file", file: point.value.file },
+    control,
+  );
   throwIfAborted(control);
 
   const semanticReady = readiness.kind === "ready";
-  const semantic = semanticReady ? deps.capability.getSemanticProvider(deps.cwd) : null;
+  const semantic = semanticReady
+    ? withSemanticRequestControl(deps.capability.getSemanticProvider(deps.cwd), control)
+    : null;
   const lspState = semanticReady
     ? deps.capability.getLspRuntimeState(deps.cwd)
     : unavailableLspState(readiness);

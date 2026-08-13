@@ -9,6 +9,7 @@
 
 import {
   type CapabilityState,
+  type CodeRequestControl,
   getDefaultWorkspaceRuntime,
   type SemanticProvider,
   type StructuralProvider,
@@ -67,7 +68,11 @@ export interface CapabilityAdapter {
    * the target workflow can decide whether to proceed, return a
    * timeout note, or return an unavailable result.
    */
-  ensureSemanticReadiness(cwd: string, scope: ReadinessScope): Promise<ReadinessOutcome>;
+  ensureSemanticReadiness(
+    cwd: string,
+    scope: ReadinessScope,
+    control?: CodeRequestControl,
+  ): Promise<ReadinessOutcome>;
 }
 
 // ── Production adapter ────────────────────────────────────────────────
@@ -107,8 +112,12 @@ export class WorkspaceCapabilityAdapter implements CapabilityAdapter {
     return null;
   }
 
-  async ensureSemanticReadiness(cwd: string, scope: ReadinessScope): Promise<ReadinessOutcome> {
-    const result = await ensureSemanticReadiness(cwd, scope);
+  async ensureSemanticReadiness(
+    cwd: string,
+    scope: ReadinessScope,
+    control?: CodeRequestControl,
+  ): Promise<ReadinessOutcome> {
+    const result = await ensureSemanticReadiness(cwd, scope, undefined, control);
     return result;
   }
 

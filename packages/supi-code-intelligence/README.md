@@ -25,6 +25,7 @@ After installation, keep asking Pi normal coding questions. The agent can:
 - **Navigate precisely with LSP** — identify the exact symbol at a source location and inspect its type, definition, enclosing declaration, and nearby diagnostics.
 - **Follow relationships across LSP and AST evidence** — find references, implementations, and outgoing calls without guessing from matching text.
 - **Search parsed code structure** — query AST definitions, types, interfaces, classes, methods, enums, imports, exports, and call sites. One owned Structural Worker keeps Pi responsive. Tool cancellation and the shared AST deadline propagate through an atomic cancellation flag into Worker reads, parser progress, and query progress.
+- **Correlate diagnostics** — each public `code_*` call gets one session-local opaque Debug Operation ID. Directly owned workflow, LSP, AST Scan, and Structural Worker events share it without changing normal Tool results.
 - **Check live project health** — inspect language-server status and current errors or warnings, with an option to refresh stale diagnostics.
 - **Refactor safely** — preview language-aware renames and extractions before applying them. Plans are rejected if the files changed in the meantime.
 - **See uncertainty clearly** — results distinguish “nothing found” from incomplete or unavailable analysis and disclose omitted matches.

@@ -3,6 +3,7 @@
 import {
   type CodeRequestControl,
   isCodeRequestInterruption,
+  unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeProvider } from "../../analysis/provider.ts";
 import {
@@ -67,7 +68,11 @@ async function collectReferences(options: CollectRelationOptions): Promise<Graph
 
   const result = await collectCallers(options.file, options.position, options.displayName, {
     cwd: options.cwd,
-    provider: { references: options.provider.references },
+    provider: {
+      references: async (file, position) =>
+        options.provider?.references(file, position, options.requestControl) ??
+        unavailableCodeQuery("References unavailable"),
+    },
   });
   if (result.confidence === "unavailable") {
     return { kind: "unavailable", rel: "references", message: "References unavailable" };
@@ -168,7 +173,11 @@ async function collectImplementationsRelation(
 
   const result = await collectImplementations(options.file, options.position, options.displayName, {
     cwd: options.cwd,
-    provider: { implementation: options.provider.implementation },
+    provider: {
+      implementation: async (file, position) =>
+        options.provider?.implementation(file, position, options.requestControl) ??
+        unavailableCodeQuery("Implementations unavailable"),
+    },
   });
   if (result.confidence === "unavailable") {
     return { kind: "unavailable", rel: "implements", message: "Implementations unavailable" };

@@ -1,3 +1,4 @@
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { startDebugTimer } from "@mrclrchtr/supi-core/debug";
 
 type DiagnosticCollection = "cache" | "fallback" | "none" | "pull" | "push";
@@ -49,6 +50,7 @@ export class DiagnosticObserver {
   constructor(
     readonly operation: DiagnosticTimingOperation,
     readonly supportsPull: boolean,
+    readonly control?: CodeRequestControl,
   ) {
     this.#pull = supportsPull ? "failed" : "not-supported";
   }
@@ -152,6 +154,7 @@ export class DiagnosticObserver {
   #finish(data: DiagnosticTimingData, finalPhase?: "pull" | "push-settle" | "synchronize"): void {
     this.#timer.finish(
       () => ({
+        operationId: this.control?.operationId,
         source: "lsp",
         level: "debug",
         category: "diagnostics.timing",

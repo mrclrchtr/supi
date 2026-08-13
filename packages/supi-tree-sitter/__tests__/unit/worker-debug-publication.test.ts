@@ -11,7 +11,9 @@ afterEach(() => resetDebugRegistry());
 describe("Structural Worker debug publication", () => {
   it("records only the validated sanitized timing shape in the parent registry", () => {
     configureDebugRegistry({ enabled: true, maxEvents: 10 });
+    const operationId = "op-AAAAAAAAAAAAAAAAAAAAAA";
     publishStructuralTimingEvent({
+      operationId,
       source: "tree-sitter",
       level: "debug",
       category: "structural.query.timing",
@@ -29,6 +31,7 @@ describe("Structural Worker debug publication", () => {
     const event = getDebugEvents({ source: "tree-sitter" }).events[0];
     expect(event).toEqual(
       expect.objectContaining({
+        operationId,
         category: "structural.query.timing",
         data: expect.objectContaining({ captureCount: 2 }),
       }),

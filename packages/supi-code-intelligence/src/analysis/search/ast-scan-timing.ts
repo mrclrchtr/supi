@@ -1,3 +1,4 @@
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { startDebugTimer } from "@mrclrchtr/supi-core/debug";
 import type { StructuralSearchOperation } from "@mrclrchtr/supi-tree-sitter/api";
 import type { StructuredFileAnalysis, StructuredPatternParams } from "./pattern-analysis.ts";
@@ -26,7 +27,7 @@ export interface AstScanTimer {
 }
 
 /** Start one AST scan timer without adding paths to debug-event data. */
-export function startAstScanTimer(): AstScanTimer {
+export function startAstScanTimer(control?: CodeRequestControl): AstScanTimer {
   const timer = startDebugTimer();
   return {
     enumerationCompleted() {
@@ -35,6 +36,7 @@ export function startAstScanTimer(): AstScanTimer {
     record(input) {
       timer.finish(
         () => ({
+          operationId: control?.operationId,
           source: "code-intelligence",
           level: "debug",
           category: "ast-scan.timing",
