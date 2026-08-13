@@ -28,6 +28,7 @@ pnpm add @mrclrchtr/supi-core
 - `loadSupiConfig()` — merged config with resolution order `defaults <- global <- project`
 - `loadSupiConfigForScope()` — load one scope at a time for settings UIs
 - `writeSupiConfig()` — persist values
+- `replaceSupiConfigSection()` — replace one nested section while preserving other sections
 - `removeSupiConfigKey()` — remove a key or override
 
 Config file locations:

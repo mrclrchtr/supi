@@ -12,6 +12,10 @@ Whether PI loads a skill and makes its user command available.
 **Model Invocation**:
 Whether a loaded skill appears in the model's skill catalog. This preference remains when Skill Load is disabled.
 
+**Model Invocation Override**:
+A scoped, explicit choice for one skill's Model Invocation: enabled or disabled. When the choice is absent, the skill uses its source default or the broader scope.
+_Avoid_: Skill Load setting, boolean skill flag
+
 **Skill State Override**:
 A scoped user choice for Skill Load or Model Invocation. A project choice takes precedence over a global choice, which takes precedence over the skill source.
 

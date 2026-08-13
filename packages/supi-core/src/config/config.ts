@@ -149,6 +149,37 @@ export function writeSupiConfig(
 }
 
 /**
+ * Replace one complete config section while preserving other sections.
+ *
+ * This is useful for nested settings that must remove stale keys as part of
+ * one update. An empty section is removed from the config file.
+ */
+export function replaceSupiConfigSection(
+  loc: SupiConfigLocation,
+  value: Record<string, unknown>,
+  options?: SupiConfigOptions,
+): void {
+  const configPath = getSupiConfigPath(loc.scope, loc.cwd, options);
+  const existing = readJsonFile(configPath) ?? {};
+
+  if (Object.keys(value).length > 0) existing[loc.section] = value;
+  else delete existing[loc.section];
+
+  const content = Object.keys(existing).length > 0 ? `${JSON.stringify(existing, null, 2)}\n` : "";
+  if (content) {
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, content, "utf-8");
+    return;
+  }
+
+  try {
+    fs.unlinkSync(configPath);
+  } catch {
+    // File may not exist.
+  }
+}
+
+/**
  * Remove a key from a config section.
  * Used by `interval default` to remove the project override.
  */

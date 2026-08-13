@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { formatSkillsForPrompt, type Skill } from "@earendil-works/pi-coding-agent";
@@ -69,17 +69,6 @@ describe("skill model invocation", () => {
         homeDir,
       }),
     ).toEqual({ disabled: true, source: "global" });
-  });
-
-  it("stores preferences under the skills config section", () => {
-    const homeDir = tempHome();
-    const cwd = join(homeDir, "project");
-    persistInvocation({ name: "review", disabled: true, scope: "global", cwd, homeDir });
-
-    const config = JSON.parse(
-      readFileSync(join(homeDir, ".pi", "agent", "supi", "config.json"), "utf-8"),
-    );
-    expect(config).toEqual({ skills: { modelInvocation: { review: true } } });
   });
 
   it("resolves project then global then source preferences", () => {

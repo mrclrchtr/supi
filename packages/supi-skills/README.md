@@ -35,6 +35,25 @@ Use `Tab` to switch between project and global scope. Project settings inherit g
 
 Skills that an extension adds only at runtime support Enabled and Model invocation disabled. PI does not provide a persistent load setting for these resources. PI exposes only the active source after a name collision, so disabling a static winner can reveal a runtime source after reload. The refreshed row then shows the runtime limitation.
 
+## Config shape
+
+SuPi stores Model Invocation overrides as per-skill records in the SuPi config:
+
+```json
+{
+  "skills": {
+    "$schemaVersion": 2,
+    "review": {
+      "modelInvocation": "disabled"
+    }
+  }
+}
+```
+
+Use `enabled` or `disabled` as the stored value. An absent record or field inherits the source default, global value, or project value. Skill Load remains in PI's native settings. SuPi adds the schema marker so a skill named `modelInvocation` can use an ordinary record.
+
+Older versions stored boolean values in `skills.modelInvocation`. SuPi reads that format and migrates valid entries on the next settings write. Invalid values remain preserved, marked as invalid, and produce a warning until they are repaired. A conflicting legacy fallback is kept under `$legacyModelInvocation` until the invalid record is repaired.
+
 ## Input shortcut
 
 `$skill-name` expands to `/skill:skill-name`. Skill-only autocomplete is active while the cursor is in a `$...` token.

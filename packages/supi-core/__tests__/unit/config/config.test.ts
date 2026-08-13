@@ -6,6 +6,7 @@ import {
   loadSupiConfig,
   loadSupiConfigForScope,
   removeSupiConfigKey,
+  replaceSupiConfigSection,
   writeSupiConfig,
 } from "../../../src/config/config.ts";
 
@@ -223,6 +224,33 @@ describe("writeSupiConfig", () => {
 
     const content = JSON.parse(fs.readFileSync(configPath, "utf-8"));
     expect(content["claude-md"]).toEqual({ rereadInterval: 5 });
+  });
+
+  it("replaces nested keys and preserves other sections", () => {
+    writeSupiConfig(
+      { section: "claude-md", scope: "project", cwd: tmpDir },
+      { stale: true, keep: true },
+    );
+    writeSupiConfig({ section: "other", scope: "project", cwd: tmpDir }, { value: 1 });
+
+    replaceSupiConfigSection(
+      { section: "claude-md", scope: "project", cwd: tmpDir },
+      { keep: false, fresh: true },
+    );
+
+    const content = JSON.parse(fs.readFileSync(path.join(tmpDir, ".pi/supi/config.json"), "utf-8"));
+    expect(content).toEqual({
+      "claude-md": { keep: false, fresh: true },
+      other: { value: 1 },
+    });
+  });
+
+  it("removes an empty section", () => {
+    writeSupiConfig({ section: "claude-md", scope: "project", cwd: tmpDir }, { stale: true });
+
+    replaceSupiConfigSection({ section: "claude-md", scope: "project", cwd: tmpDir }, {});
+
+    expect(fs.existsSync(path.join(tmpDir, ".pi/supi/config.json"))).toBe(false);
   });
 
   it("merges with existing config", () => {

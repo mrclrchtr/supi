@@ -33,17 +33,16 @@ import {
   DISABLED,
   ENABLED,
   MODEL_DISABLED,
+  notifyInvocationConfigWarnings,
   persistInvocation,
   resolveInvocation,
 } from "./skill-model-invocation.ts";
 
 const SETTINGS_SECTION_ID = "skills";
-
 interface SkillSettingsOptions {
   agentDir?: string;
   homeDir?: string;
 }
-
 interface SkillSettingsControllerOptions {
   cwd: string;
   agentDir: string;
@@ -56,14 +55,12 @@ interface SkillSettingsControllerOptions {
 function recordResources(record: SkillRecord): ResolvedResource[] {
   return record.sources.flatMap((source) => (source.resource ? [source.resource] : []));
 }
-
 function isLoaded(record: SkillRecord): boolean {
   return (
     record.activeSkill !== undefined ||
     record.sources.some((source) => source.runtime || source.resource?.enabled)
   );
 }
-
 function canDisable(record: SkillRecord): boolean {
   return record.sources.length > 0 && record.sources.every((source) => !source.runtime);
 }
@@ -370,9 +367,10 @@ function createSkillSettingsModule(options: SkillSettingsOptions): SettingsModul
   return {
     id: SETTINGS_SECTION_ID,
     label: "Skills",
-    read: async (context) => ({
-      rows: (await getController(context)).read(context.scope, context.ctx),
-    }),
+    read: async (context) => {
+      if (context.ctx) notifyInvocationConfigWarnings(context.ctx, options.homeDir);
+      return { rows: (await getController(context)).read(context.scope, context.ctx) };
+    },
     apply: async (request) =>
       (await getController(request)).apply(
         request.scope,
@@ -388,6 +386,7 @@ export default function skillSettings(pi: ExtensionAPI, options: SkillSettingsOp
   registerSettings(pi, createSkillSettingsModule(options));
 
   pi.on("before_agent_start", (event, ctx) => {
+    notifyInvocationConfigWarnings(ctx, options.homeDir);
     const systemPrompt = applyPromptOverrides({
       options: event.systemPromptOptions,
       systemPrompt: event.systemPrompt,
