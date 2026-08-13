@@ -1,5 +1,6 @@
 // Session factory — creates runtime-backed Tree-sitter services and owned sessions.
 
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { detectGrammar } from "../language.ts";
 import { supportsGrammarOperation } from "../operation-support.ts";
 import {
@@ -27,7 +28,7 @@ import { TreeSitterRuntime } from "./runtime.ts";
 /** Create a runtime-backed structural service without taking ownership of disposal. */
 export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterService {
   return {
-    async canParse(file: string) {
+    async canParse(file: string, _control?: CodeRequestControl) {
       const result = await runtime.parseFile(file);
       if (result.kind !== "success") return result;
       const { resolvedPath, grammarId, tree } = result.data;
@@ -41,11 +42,18 @@ export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterS
       }
     },
 
-    async query(file: string, queryString: string): Promise<TreeSitterResult<QueryCapture[]>> {
+    async query(
+      file: string,
+      queryString: string,
+      _control?: CodeRequestControl,
+    ): Promise<TreeSitterResult<QueryCapture[]>> {
       return runtime.queryFile(file, queryString);
     },
 
-    async outline(file: string): Promise<TreeSitterResult<OutlineItem[]>> {
+    async outline(
+      file: string,
+      _control?: CodeRequestControl,
+    ): Promise<TreeSitterResult<OutlineItem[]>> {
       const grammarId = detectGrammar(file);
       if (grammarId && !supportsGrammarOperation(grammarId, "outline")) {
         return {
@@ -65,7 +73,10 @@ export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterS
       }
     },
 
-    async imports(file: string): Promise<TreeSitterResult<ImportRecord[]>> {
+    async imports(
+      file: string,
+      _control?: CodeRequestControl,
+    ): Promise<TreeSitterResult<ImportRecord[]>> {
       const grammarId = detectGrammar(file);
       if (grammarId && !supportsGrammarOperation(grammarId, "imports")) {
         return {
@@ -77,7 +88,10 @@ export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterS
       return extractImports(runtime, file);
     },
 
-    async exports(file: string): Promise<TreeSitterResult<ExportRecord[]>> {
+    async exports(
+      file: string,
+      _control?: CodeRequestControl,
+    ): Promise<TreeSitterResult<ExportRecord[]>> {
       const grammarId = detectGrammar(file);
       if (grammarId && !supportsGrammarOperation(grammarId, "exports")) {
         return {
@@ -93,6 +107,7 @@ export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterS
       file: string,
       line: number,
       character: number,
+      _control?: CodeRequestControl,
     ): Promise<TreeSitterResult<NodeAtResult>> {
       return lookupNodeAt(runtime, file, line, character);
     },
@@ -101,12 +116,19 @@ export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterS
       file: string,
       line: number,
       character: number,
-      depth?: "direct" | "deep",
+      depthOrOptions?:
+        | "direct"
+        | "deep"
+        | { depth?: "direct" | "deep"; control?: CodeRequestControl },
     ): Promise<TreeSitterResult<CalleesAtResult>> {
+      const depth = typeof depthOrOptions === "string" ? depthOrOptions : depthOrOptions?.depth;
       return lookupCalleesAt(runtime, file, line, character, depth);
     },
 
-    async callSites(file: string): Promise<TreeSitterResult<CallSiteMatch[]>> {
+    async callSites(
+      file: string,
+      _control?: CodeRequestControl,
+    ): Promise<TreeSitterResult<CallSiteMatch[]>> {
       return extractCallSites(runtime, file);
     },
   };

@@ -1,5 +1,5 @@
 import type { StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createTreeSitterProvider } from "../../src/provider/tree-sitter-provider.ts";
 import type {
   CalleesAtResult,
@@ -70,6 +70,29 @@ describe("TreeSitterProvider", () => {
   });
 
   describe("outline", () => {
+    it("preserves the exact provider request control without activating it", async () => {
+      const outline = vi.fn().mockResolvedValue({ kind: "success", data: [] });
+      const service = mockService({ outline });
+      const provider = createTreeSitterProvider(service);
+      const controller = new AbortController();
+      controller.abort();
+      const control = { signal: controller.signal, deadline: 42 };
+
+      await provider.outline("test.ts", control);
+
+      expect(outline).toHaveBeenCalledWith("test.ts", control);
+      expect(outline.mock.calls[0]?.[1]).toBe(control);
+    });
+
+    it("keeps the current call form when request control is omitted", async () => {
+      const outline = vi.fn().mockResolvedValue({ kind: "success", data: [] });
+      const provider = createTreeSitterProvider(mockService({ outline }));
+
+      await provider.outline("test.ts");
+
+      expect(outline).toHaveBeenCalledWith("test.ts");
+    });
+
     it("maps success results", async () => {
       const service = mockService({
         outline: async () => ({

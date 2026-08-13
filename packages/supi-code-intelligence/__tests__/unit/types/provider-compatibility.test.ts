@@ -1,4 +1,5 @@
 import {
+  type CodeRequestControl,
   type SemanticProvider,
   type StructuralProvider,
   unavailableCodeQuery,
@@ -6,6 +7,13 @@ import {
 import { describe, expect, it } from "vitest";
 
 describe("Provider type compatibility", () => {
+  it("exports one canonical request-control value", () => {
+    const controller = new AbortController();
+    const control: CodeRequestControl = { signal: controller.signal, deadline: 42 };
+
+    expect(control).toEqual({ signal: controller.signal, deadline: 42 });
+  });
+
   it("SemanticProvider and SemanticSubstrate are compatible", () => {
     // Verify that SemanticProvider can be used where SemanticSubstrate is expected
     const provider: SemanticProvider = {

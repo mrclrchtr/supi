@@ -66,6 +66,8 @@ if (state.kind === "ready") {
 
 Runtime methods use raw 0-based LSP positions. `toLspPosition()` converts user-facing 1-based coordinates. Read-only semantic and diagnostic methods return `CodeQueryResult<T>` so completed empty protocol responses remain distinct from partial or unavailable requests. A ready runtime owner may contain only lazy routes: workspace semantic readiness requires at least one active ready client, while file readiness requires the routed client for that file to start successfully. Empty client sets and failed routes are unavailable, not vacuously ready.
 
+Semantic operations accept optional shared `CodeRequestControl` metadata. The semantic adapter preserves the exact value through `WorkspaceLspRuntime`. This expansion does not pass the signal or deadline to clients or transport.
+
 ## Startup performance
 
 Detected servers start concurrently. In a polyglot workspace, disable unneeded languages in `.pi/supi/config.json` or `~/.pi/agent/supi/config.json`:
@@ -111,6 +113,7 @@ See [`docs/adr/0016-workspace-lsp-runtime-interface.md`](../../docs/adr/0016-wor
 - `src/config/` — server configuration and protocol types
 - `src/diagnostics/` — stale diagnostics and workspace sentinels
 - `src/manager/` — package-internal server pool and routing, diagnostic, and recovery mechanics
-- `src/provider/` — semantic and refactor adapters
+- `src/provider/` — semantic, mapping, and refactor adapters
 - `src/session/runtime-controller.ts` — lifecycle/status
-- `src/session/runtime-registry.ts` — `WorkspaceLspRuntime` and registry
+- `src/session/workspace-lsp-runtime.ts` — `WorkspaceLspRuntime` contracts
+- `src/session/runtime-registry.ts` — runtime implementation and registry

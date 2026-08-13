@@ -22,6 +22,8 @@ Read-only provider methods return `CodeQueryResult<T>`:
 
 This keeps successful zero-result facts distinct from routing, transport, and provider failures.
 
+Semantic and structural provider methods also accept optional `CodeRequestControl` metadata. It contains a caller `AbortSignal` and an absolute Unix-epoch deadline. Adapters preserve the same object. This expansion does not make a substrate apply cancellation or deadlines yet.
+
 ## License
 
 MIT

@@ -43,6 +43,14 @@ export type CapabilityState =
 
 // ── Provider interfaces ────────────────────────────────────────────────
 
+/** Request metadata that providers preserve without interpreting it. */
+export interface CodeRequestControl {
+  /** Caller cancellation signal, when one exists. */
+  readonly signal?: AbortSignal;
+  /** Absolute wall-clock deadline in Unix epoch milliseconds. */
+  readonly deadline?: number;
+}
+
 /**
  * Semantic analysis capability backed by a language server (LSP).
  *
@@ -51,16 +59,31 @@ export type CapabilityState =
  * null values are completed observations rather than capability failures.
  */
 export interface SemanticProvider {
-  references(filePath: string, position: CodePosition): Promise<CodeQueryResult<CodeLocation[]>>;
+  references(
+    filePath: string,
+    position: CodePosition,
+    control?: CodeRequestControl,
+  ): Promise<CodeQueryResult<CodeLocation[]>>;
   implementation(
     filePath: string,
     position: CodePosition,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<CodeLocation[]>>;
-  documentSymbols(filePath: string): Promise<CodeQueryResult<DocumentCodeSymbol[]>>;
-  workspaceSymbols(query: string): Promise<CodeQueryResult<CodeSymbol[]>>;
+  documentSymbols(
+    filePath: string,
+    control?: CodeRequestControl,
+  ): Promise<CodeQueryResult<DocumentCodeSymbol[]>>;
+  workspaceSymbols(
+    query: string,
+    control?: CodeRequestControl,
+  ): Promise<CodeQueryResult<CodeSymbol[]>>;
 
   /** Optional definition capability with explicit completed-empty semantics. */
-  definition?(filePath: string, position: CodePosition): Promise<CodeQueryResult<CodeLocation[]>>;
+  definition?(
+    filePath: string,
+    position: CodePosition,
+    control?: CodeRequestControl,
+  ): Promise<CodeQueryResult<CodeLocation[]>>;
 
   /**
    * Optional hover capability. A completed `null` data value means the
@@ -69,6 +92,7 @@ export interface SemanticProvider {
   hover?(
     filePath: string,
     position: CodePosition,
+    control?: CodeRequestControl,
   ): Promise<CodeQueryResult<{ contents: string; range?: SourceRange } | null>>;
 
   /**
@@ -79,7 +103,7 @@ export interface SemanticProvider {
    * organize imports, dead-code cleanup, etc.) without exposing that branching
    * to callers.
    */
-  refactor?(request: RefactorRequest): Promise<RefactorResult>;
+  refactor?(request: RefactorRequest, control?: CodeRequestControl): Promise<RefactorResult>;
 
   /**
    * Optional rename capability. When present, the provider supports
@@ -88,7 +112,12 @@ export interface SemanticProvider {
    * This remains a lower-level substrate helper for providers that expose
    * symbol rename independently of their general refactor planner.
    */
-  rename?(file: string, position: CodePosition, newName: string): Promise<RefactorResult>;
+  rename?(
+    file: string,
+    position: CodePosition,
+    newName: string,
+    control?: CodeRequestControl,
+  ): Promise<RefactorResult>;
 
   /**
    * Optional code actions capability. When present, the provider
@@ -96,7 +125,11 @@ export interface SemanticProvider {
    *
    * Kept as a low-level substrate helper and for lightweight introspection.
    */
-  codeActions?(file: string, position: CodePosition): Promise<RefactorResult[]>;
+  codeActions?(
+    file: string,
+    position: CodePosition,
+    control?: CodeRequestControl,
+  ): Promise<RefactorResult[]>;
 }
 
 /**
@@ -111,14 +144,19 @@ export interface StructuralProvider {
     file: string,
     line: number,
     character: number,
-    depth?: CalleeDepth,
+    depthOrOptions?: CalleeDepth | { depth?: CalleeDepth; control?: CodeRequestControl },
   ): Promise<CodeResult<CalleesData>>;
-  exports(file: string): Promise<CodeResult<ExportData[]>>;
-  outline(file: string): Promise<CodeResult<OutlineData[]>>;
-  imports(file: string): Promise<CodeResult<ImportData[]>>;
-  nodeAt(file: string, line: number, character: number): Promise<CodeResult<NodeAtData>>;
+  exports(file: string, control?: CodeRequestControl): Promise<CodeResult<ExportData[]>>;
+  outline(file: string, control?: CodeRequestControl): Promise<CodeResult<OutlineData[]>>;
+  imports(file: string, control?: CodeRequestControl): Promise<CodeResult<ImportData[]>>;
+  nodeAt(
+    file: string,
+    line: number,
+    character: number,
+    control?: CodeRequestControl,
+  ): Promise<CodeResult<NodeAtData>>;
   /** Find all call-site identifiers in a file. Returns name + start line for each match. */
-  callSites(file: string): Promise<CodeResult<CallSite[]>>;
+  callSites(file: string, control?: CodeRequestControl): Promise<CodeResult<CallSite[]>>;
 }
 
 /** Convenience alias for `CodeResult` used in structural contexts. */

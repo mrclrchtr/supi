@@ -2,9 +2,10 @@ import {
   completedCodeQuery,
   getDefaultWorkspaceRuntime,
   type SemanticProvider,
+  type StructuralProvider,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getCodeProvider } from "../../../src/analysis/provider.ts";
 import { clearMockRuntime, registerMockProvider } from "../../helpers/register-mock-runtime.ts";
 
@@ -93,6 +94,63 @@ describe("request-context", () => {
       const result = await state.provider.outline("test.ts");
       expect(result.kind).toBe("unavailable");
     }
+  });
+
+  it("preserves exact request control through the composite provider", async () => {
+    const references = vi.fn().mockResolvedValue(completedCodeQuery([]));
+    const refactor = vi.fn().mockResolvedValue({ kind: "unavailable", reason: "test" });
+    const outline = vi.fn().mockResolvedValue({ kind: "success" as const, data: [] });
+    const semantic = {
+      references,
+      implementation: async () => unavailableCodeQuery("not configured"),
+      documentSymbols: async () => unavailableCodeQuery("not configured"),
+      workspaceSymbols: async () => unavailableCodeQuery("not configured"),
+      refactor,
+    } satisfies SemanticProvider;
+    const unavailableStructural = async () => ({
+      kind: "unavailable" as const,
+      message: "not configured",
+    });
+    const structural = {
+      calleesAt: unavailableStructural,
+      exports: unavailableStructural,
+      outline,
+      imports: unavailableStructural,
+      nodeAt: unavailableStructural,
+      callSites: unavailableStructural,
+    } satisfies StructuralProvider;
+    getDefaultWorkspaceRuntime().registerSemantic("/project", semantic);
+    getDefaultWorkspaceRuntime().registerStructural("/project", structural);
+    const state = getCodeProvider("/project");
+    if (state.kind !== "ready") throw new Error("Expected provider");
+    const control = { signal: new AbortController().signal, deadline: 42 };
+
+    await state.provider.references("test.ts", { line: 0, character: 0 }, control);
+    await state.provider.refactor?.(
+      {
+        operation: "rename_symbol",
+        file: "test.ts",
+        position: { line: 0, character: 0 },
+        newName: "renamed",
+      },
+      control,
+    );
+    await state.provider.outline("test.ts", control);
+
+    expect(references).toHaveBeenCalledWith("test.ts", { line: 0, character: 0 }, control);
+    expect(references.mock.calls[0]?.[2]).toBe(control);
+    expect(refactor).toHaveBeenCalledWith(
+      {
+        operation: "rename_symbol",
+        file: "test.ts",
+        position: { line: 0, character: 0 },
+        newName: "renamed",
+      },
+      control,
+    );
+    expect(refactor.mock.calls[0]?.[1]).toBe(control);
+    expect(outline).toHaveBeenCalledWith("test.ts", control);
+    expect(outline.mock.calls[0]?.[1]).toBe(control);
   });
 
   it("reflects cleared workspace as unavailable", () => {

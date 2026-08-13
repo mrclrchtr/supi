@@ -87,6 +87,29 @@ describe("LspSemanticProvider", () => {
   });
 
   describe("references", () => {
+    it("preserves the exact provider request control without activating it", async () => {
+      const references = vi.fn().mockResolvedValue([]);
+      const lsp = createMockLsp({ references });
+      const provider = createLspSemanticProvider(lsp);
+      const controller = new AbortController();
+      controller.abort();
+      const control = { signal: controller.signal, deadline: 42 };
+
+      await provider.references("test.ts", { line: 0, character: 0 }, control);
+
+      expect(references).toHaveBeenCalledWith("test.ts", { line: 0, character: 0 }, control);
+      expect(references.mock.calls[0]?.[2]).toBe(control);
+    });
+
+    it("keeps the current call form when request control is omitted", async () => {
+      const references = vi.fn().mockResolvedValue([]);
+      const provider = createLspSemanticProvider(createMockLsp({ references }));
+
+      await provider.references("test.ts", { line: 0, character: 0 });
+
+      expect(references).toHaveBeenCalledWith("test.ts", { line: 0, character: 0 });
+    });
+
     it("preserves a completed empty result", async () => {
       const lsp = createMockLsp({ references: vi.fn().mockResolvedValue(null) });
       const provider = createLspSemanticProvider(lsp);

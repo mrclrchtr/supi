@@ -138,6 +138,15 @@ function createCompositeProvider(
         semantic?.definition?.(...args) ?? unavailableCodeQuery("Semantic definition unavailable")
       );
     },
+    async refactor(...args: Parameters<NonNullable<SemanticProvider["refactor"]>>) {
+      const result = await semantic?.refactor?.(...args);
+      return (
+        result ?? {
+          kind: "unavailable" as const,
+          reason: "Refactor not available",
+        }
+      );
+    },
     async codeActions(...args: Parameters<NonNullable<SemanticProvider["codeActions"]>>) {
       return semantic?.codeActions?.(...args) ?? [];
     },

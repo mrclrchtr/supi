@@ -29,33 +29,37 @@ import type {
  */
 export function createTreeSitterProvider(service: TreeSitterService): StructuralProvider {
   return {
-    async calleesAt(file, line, character, depth?) {
-      const result = await service.calleesAt(file, line, character, depth);
+    async calleesAt(file, line, character, depthOrOptions?) {
+      const result = await service.calleesAt(file, line, character, depthOrOptions);
       return mapTreeSitterResult(result, mapCalleesAtResult);
     },
 
-    async exports(file) {
-      const result = await service.exports(file);
+    async exports(file, control?) {
+      const result = control ? await service.exports(file, control) : await service.exports(file);
       return mapTreeSitterResult(result, mapExportRecords);
     },
 
-    async outline(file) {
-      const result = await service.outline(file);
+    async outline(file, control?) {
+      const result = control ? await service.outline(file, control) : await service.outline(file);
       return mapTreeSitterResult(result, mapOutlineItems);
     },
 
-    async imports(file) {
-      const result = await service.imports(file);
+    async imports(file, control?) {
+      const result = control ? await service.imports(file, control) : await service.imports(file);
       return mapTreeSitterResult(result, mapImportRecords);
     },
 
-    async nodeAt(file, line, character) {
-      const result = await service.nodeAt(file, line, character);
+    async nodeAt(file, line, character, control?) {
+      const result = control
+        ? await service.nodeAt(file, line, character, control)
+        : await service.nodeAt(file, line, character);
       return mapTreeSitterResult(result, mapNodeAtResult);
     },
 
-    async callSites(file) {
-      const result = await service.callSites(file);
+    async callSites(file, control?) {
+      const result = control
+        ? await service.callSites(file, control)
+        : await service.callSites(file);
       return mapTreeSitterResult(result, mapCallSites);
     },
   };

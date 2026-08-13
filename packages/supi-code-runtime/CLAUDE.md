@@ -20,6 +20,7 @@
 - Read-only semantic queries use `CodeQueryResult<T>`; preserve completed empty data separately from partial or unavailable collection.
 - Availability states must distinguish pending, ready, inactive, disabled, and unavailable.
 - When adding new capability types, update the capability interfaces and `WorkspaceCapabilities` runtime snapshot.
+- `CodeRequestControl` is optional request metadata with an Abort Signal and absolute deadline. Adapters preserve the exact value. Do not interpret it in substrates until the cancellation ticket starts.
 - `SemanticProvider` may optionally expose a generic `refactor(request)` method plus lower-level `rename` and `codeActions` helpers. The broker computes `refactorAvailable` automatically from provider method existence — do not introduce a third independent broker slot for refactoring.
 - `RefactorRequest` carries the requested operation, target file/position, and any operation-specific fields such as `newName` or `destination`.
 - `RefactorResult` is a discriminated union: `precise` edits for safe direct apply, `ambiguous` candidates for disambiguation, and `unavailable` for when no refactor is possible.

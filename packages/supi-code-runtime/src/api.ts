@@ -9,6 +9,7 @@
 // Capability interfaces and availability states
 export type {
   CapabilityState,
+  CodeRequestControl,
   SemanticProvider,
   StructuralProvider,
   StructuralResult,

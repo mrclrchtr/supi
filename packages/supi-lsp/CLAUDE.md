@@ -22,7 +22,7 @@ manager never cross the public runtime interface.
 
 The registry uses the shared core session-state helper and retains explicit ready, pending, inactive, disabled, and unavailable states. Pending polling uses `waitForWorkspaceLspRuntime(cwd)`. Empty workspace warm-up leaves the ready owner published and semantic registration pending so a lazy file route can still start; never promote via `Promise.all([])` or retract the owner solely because no client was proactive.
 
-Runtime positions are raw 0-based LSP coordinates. Use `toLspPosition()` when starting from 1-based tool coordinates.
+Runtime positions are raw 0-based LSP coordinates. Use `toLspPosition()` when starting from 1-based tool coordinates. Semantic operations accept optional shared `CodeRequestControl` metadata. Preserve the exact value through adapters and runtime interfaces, but do not apply its signal or deadline to clients or transport in the expansion stage.
 
 ## Key files
 
@@ -31,9 +31,12 @@ Runtime positions are raw 0-based LSP coordinates. Use `toLspPosition()` when st
 - `src/diagnostics/` — diagnostic summaries, stale diagnostics, and workspace sentinels
 - `src/manager/manager.ts` + `manager-*.ts` — package-internal server pool, routing, diagnostics, and recovery mechanics
 - `src/provider/lsp-semantic-provider.ts` — semantic-provider adapter
+- `src/provider/semantic-symbol-mapper.ts` — LSP-to-shared symbol, location, and hover mapping
+- `src/provider/lsp-refactor-provider.ts` — refactor-capability adapter composition
 - `src/provider/refactor-planning.ts` — refactor request flow and code-action matching
 - `src/provider/semantic-edit-normalizer.ts` — fail-closed edit normalization and document preconditions
 - `src/session/runtime-controller.ts` — lifecycle/status
+- `src/session/workspace-lsp-runtime.ts` — public workspace runtime contracts
 - `src/session/runtime-registry.ts` — Workspace runtime implementation and registry
 - `src/session/runtime-registration.ts` — capability-broker registration
 - `src/session/scanner.ts` — workspace detection and startup

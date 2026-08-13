@@ -1,4 +1,9 @@
-import type { CodePosition, RefactorResult, SourceRange } from "@mrclrchtr/supi-code-runtime/api";
+import type {
+  CodePosition,
+  CodeRequestControl,
+  RefactorResult,
+  SourceRange,
+} from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeAction } from "../config/types.ts";
 import type { WorkspaceLspRuntime } from "../session/runtime-registry.ts";
 import {
@@ -6,13 +11,17 @@ import {
   type SemanticEditNormalizationContext,
 } from "./semantic-edit-normalizer.ts";
 
-export async function runRenameRefactor(
-  lsp: WorkspaceLspRuntime,
-  file: string,
-  position: CodePosition,
-  newName: string,
-): Promise<RefactorResult> {
-  const response = await lsp.rename(file, position, newName);
+export async function runRenameRefactor(options: {
+  lsp: WorkspaceLspRuntime;
+  file: string;
+  position: CodePosition;
+  newName: string;
+  control?: CodeRequestControl;
+}): Promise<RefactorResult> {
+  const { lsp, file, position, newName, control } = options;
+  const response = control
+    ? await lsp.rename(file, position, newName, control)
+    : await lsp.rename(file, position, newName);
   if (!response) {
     return { kind: "unavailable", reason: "No routed LSP client could plan the rename." };
   }
@@ -46,9 +55,12 @@ export async function runFilteredCodeActionRefactor(options: {
   operation: "update_imports" | "delete_dead_code" | "extract_function" | "extract_variable";
   range?: SourceRange;
   matches: (action: CodeAction) => boolean;
+  control?: CodeRequestControl;
 }): Promise<RefactorResult> {
   const { lsp, file, position, operation, matches } = options;
-  const response = await lsp.codeActions(file, options.range ?? position);
+  const response = options.control
+    ? await lsp.codeActions(file, options.range ?? position, options.control)
+    : await lsp.codeActions(file, options.range ?? position);
   const actions = response?.value;
   if (!response || !actions || actions.length === 0) {
     return {

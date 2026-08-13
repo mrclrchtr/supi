@@ -1,5 +1,7 @@
 // Public tree-sitter package types.
 
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
+
 /** 1-based source range compatible with LSP position convention. */
 export interface SourceRange {
   startLine: number;
@@ -76,29 +78,44 @@ export interface CallSiteMatch {
 /** Shared Tree-sitter service surface, independent of lifecycle ownership. */
 export interface TreeSitterService {
   /** Validate that a supported file can be read and parsed; does not expose the raw tree. */
-  canParse(file: string): Promise<TreeSitterResult<{ file: string; language: string }>>;
+  canParse(
+    file: string,
+    control?: CodeRequestControl,
+  ): Promise<TreeSitterResult<{ file: string; language: string }>>;
   /** Run a Tree-sitter query and return all captures. */
-  query(file: string, queryString: string): Promise<TreeSitterResult<QueryCapture[]>>;
+  query(
+    file: string,
+    queryString: string,
+    control?: CodeRequestControl,
+  ): Promise<TreeSitterResult<QueryCapture[]>>;
   /**
    * Extract shallow declarations, including supported nested code members,
    * HTML ids, and SQL schema members.
    */
-  outline(file: string): Promise<TreeSitterResult<OutlineItem[]>>;
+  outline(file: string, control?: CodeRequestControl): Promise<TreeSitterResult<OutlineItem[]>>;
   /** Extract static ES import declarations. */
-  imports(file: string): Promise<TreeSitterResult<ImportRecord[]>>;
+  imports(file: string, control?: CodeRequestControl): Promise<TreeSitterResult<ImportRecord[]>>;
   /** Extract exported declarations, named exports, re-exports, and TS export assignments. */
-  exports(file: string): Promise<TreeSitterResult<ExportRecord[]>>;
+  exports(file: string, control?: CodeRequestControl): Promise<TreeSitterResult<ExportRecord[]>>;
   /** Return the smallest syntax node at a 1-based UTF-16 position. */
-  nodeAt(file: string, line: number, character: number): Promise<TreeSitterResult<NodeAtResult>>;
+  nodeAt(
+    file: string,
+    line: number,
+    character: number,
+    control?: CodeRequestControl,
+  ): Promise<TreeSitterResult<NodeAtResult>>;
   /** Extract structural outgoing calls from the enclosing scope at a position. */
   calleesAt(
     file: string,
     line: number,
     character: number,
-    depth?: "direct" | "deep",
+    depthOrOptions?:
+      | "direct"
+      | "deep"
+      | { depth?: "direct" | "deep"; control?: CodeRequestControl },
   ): Promise<TreeSitterResult<CalleesAtResult>>;
   /** Extract all call-site identifiers in a file. */
-  callSites(file: string): Promise<TreeSitterResult<CallSiteMatch[]>>;
+  callSites(file: string, control?: CodeRequestControl): Promise<TreeSitterResult<CallSiteMatch[]>>;
 }
 
 /** Owned Tree-sitter session that must release its runtime resources. */

@@ -26,6 +26,7 @@ This package provides the parser-backed structural substrate consumed by `@mrclr
 - a shared session-scoped Tree-sitter service for structural analysis
 - an owned parsing session API for direct library consumers
 - a `StructuralProvider` adapter published through `./provider/tree-sitter-provider`
+- optional shared `CodeRequestControl` metadata that adapters preserve without applying cancellation yet
 - structural extraction helpers for outline/import/export/node/callee/call-site analysis inside the library surface
 - operation-specific extension discovery through `getStructuralSearchSupportedExtensions()`
 

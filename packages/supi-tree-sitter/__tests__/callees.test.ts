@@ -163,13 +163,13 @@ describe("calleesAt — structural callee detection", () => {
 
     const session = createTreeSitterSession(tmpDir);
     try {
-      const direct = await session.calleesAt("same-line.ts", 1, 10, "direct");
+      const direct = await session.calleesAt("same-line.ts", 1, 10, { depth: "direct" });
       expect(direct.kind).toBe("success");
       if (direct.kind === "success") {
         expect(direct.data.callees.map((callee) => callee.name)).toEqual(["before", "after"]);
       }
 
-      const deep = await session.calleesAt("same-line.ts", 1, 10, "deep");
+      const deep = await session.calleesAt("same-line.ts", 1, 10, { depth: "deep" });
       expect(deep.kind).toBe("success");
       if (deep.kind === "success") {
         expect(deep.data.callees.map((callee) => callee.name)).toEqual([

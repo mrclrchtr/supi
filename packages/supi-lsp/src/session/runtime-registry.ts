@@ -2,6 +2,7 @@
 
 import {
   type CodeQueryResult,
+  type CodeRequestControl,
   mapCodeQueryResult,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
@@ -25,6 +26,7 @@ import type { LspManager } from "../manager/manager.ts";
 import { resolveSessionPath } from "../utils.ts";
 import { raceReadinessValue } from "./readiness.ts";
 import type { WorkspaceLspDiagnosticSurface } from "./runtime-diagnostic-surface.ts";
+import type { WorkspaceLspRuntime } from "./workspace-lsp-runtime.ts";
 
 export type { WorkspaceLspDiagnosticSurface } from "./runtime-diagnostic-surface.ts";
 export type {
@@ -33,6 +35,12 @@ export type {
   WorkspaceDiagnosticSnapshot,
   WorkspaceDiagnosticSummaryEntry,
 } from "./runtime-diagnostics.ts";
+export type {
+  RoutedMutationResponse,
+  SemanticReadinessResult,
+  WorkspaceLspRuntime,
+  WorkspaceLspRuntimeState,
+} from "./workspace-lsp-runtime.ts";
 
 function isRange(value: Position | Range): value is Range {
   return "start" in value && "end" in value;
@@ -40,75 +48,6 @@ function isRange(value: Position | Range): value is Range {
 
 function unavailableFileQuery<T>(operation: string, file: string): CodeQueryResult<T> {
   return unavailableCodeQuery(`No routed LSP client could complete ${operation} for ${file}.`);
-}
-
-export type WorkspaceLspRuntimeState =
-  | { kind: "ready"; runtime: WorkspaceLspRuntime }
-  | { kind: "inactive"; runtime: WorkspaceLspRuntime }
-  | { kind: "pending" }
-  | { kind: "disabled" }
-  | { kind: "unavailable"; reason: string };
-
-export type SemanticReadinessResult =
-  | { kind: "ready" }
-  | { kind: "timeout" }
-  | { kind: "unavailable"; reason: string };
-
-/** One mutation response and the exact provider roots from its semantic route. */
-export interface RoutedMutationResponse<T> {
-  /** Provider response from the routed client. */
-  readonly value: T;
-  /** Roots that the routed client owns for this mutation response. */
-  readonly authorizedMutationRoots: readonly string[];
-}
-
-/**
- * Workspace-scoped LSP interface that owns routing, readiness, semantic operations,
- * diagnostics, and recovery without exposing clients or the mutable manager.
- * File path inputs may be absolute or session-cwd-relative; a leading `@` is stripped
- * to match pi's built-in path-tool convention. Position arguments use raw 0-based LSP
- * coordinates; use `toLspPosition()` from `@mrclrchtr/supi-lsp/api` when starting from
- * user-facing 1-based line and character values.
- */
-export interface WorkspaceLspRuntime extends WorkspaceLspDiagnosticSurface {
-  hover(filePath: string, position: Position): Promise<CodeQueryResult<Hover | null>>;
-  definition(
-    filePath: string,
-    position: Position,
-  ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>>;
-  references(filePath: string, position: Position): Promise<CodeQueryResult<Location[]>>;
-  implementation(
-    filePath: string,
-    position: Position,
-  ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>>;
-  documentSymbols(
-    filePath: string,
-  ): Promise<CodeQueryResult<DocumentSymbol[] | SymbolInformation[]>>;
-  workspaceSymbol(query: string): Promise<CodeQueryResult<SymbolInformation[] | WorkspaceSymbol[]>>;
-  rename(
-    filePath: string,
-    position: Position,
-    newName: string,
-  ): Promise<RoutedMutationResponse<WorkspaceEdit | null> | null>;
-  codeActions(
-    filePath: string,
-    positionOrRange: Position | Range,
-  ): Promise<RoutedMutationResponse<CodeAction[] | null> | null>;
-  /** Return the current version, or null when no client has the document open. */
-  getOpenDocumentVersion(filePath: string): number | null;
-  /** Succeeds only when the concrete routed client exists and is query-ready. */
-  waitUntilReadyForFile(
-    filePath: string,
-    options?: { timeoutMs?: number },
-  ): Promise<SemanticReadinessResult>;
-  /** Succeeds only when at least one concrete workspace client is active and query-ready. */
-  waitUntilReadyForWorkspace(options?: { timeoutMs?: number }): Promise<SemanticReadinessResult>;
-  getProjectServers(): ProjectServerInfo[];
-  isSupportedSourceFile(filePath: string): boolean;
-  trackFile(filePath: string): Promise<boolean>;
-  closeFile(filePath: string): void;
-  pruneMissingFiles(): readonly string[];
-  noteWorkspaceChanges(changes: FileEvent[]): void;
 }
 
 class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
@@ -121,7 +60,11 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
 
   // ── Semantic lookups ────────────────────────────────────────────────
 
-  async hover(filePath: string, position: Position): Promise<CodeQueryResult<Hover | null>> {
+  async hover(
+    filePath: string,
+    position: Position,
+    _control?: CodeRequestControl,
+  ): Promise<CodeQueryResult<Hover | null>> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
     if (!client) return unavailableFileQuery("hover", resolvedPath);
@@ -131,6 +74,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   async definition(
     filePath: string,
     position: Position,
+    _control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
@@ -138,7 +82,11 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     return client.definition(resolvedPath, position);
   }
 
-  async references(filePath: string, position: Position): Promise<CodeQueryResult<Location[]>> {
+  async references(
+    filePath: string,
+    position: Position,
+    _control?: CodeRequestControl,
+  ): Promise<CodeQueryResult<Location[]>> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
     if (!client) return unavailableFileQuery("references", resolvedPath);
@@ -151,6 +99,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   async implementation(
     filePath: string,
     position: Position,
+    _control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
@@ -160,6 +109,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
 
   async documentSymbols(
     filePath: string,
+    _control?: CodeRequestControl,
   ): Promise<CodeQueryResult<DocumentSymbol[] | SymbolInformation[]>> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
@@ -169,6 +119,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
 
   async workspaceSymbol(
     query: string,
+    _control?: CodeRequestControl,
   ): Promise<CodeQueryResult<SymbolInformation[] | WorkspaceSymbol[]>> {
     return this.manager.workspaceSymbol(query);
   }
@@ -177,6 +128,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     filePath: string,
     position: Position,
     newName: string,
+    _control?: CodeRequestControl,
   ): Promise<RoutedMutationResponse<WorkspaceEdit | null> | null> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
@@ -194,6 +146,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   async codeActions(
     filePath: string,
     positionOrRange: Position | Range,
+    _control?: CodeRequestControl,
   ): Promise<RoutedMutationResponse<CodeAction[] | null> | null> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
