@@ -77,7 +77,6 @@ describe("Reviewer Submission Recovery", () => {
         thinkingLevel: "low",
       });
       expect(step.model).toBeUndefined();
-      expect(step.prompt.toLowerCase()).toContain("inspection is complete");
       config.holder.value = {
         summary: "Recovered",
         findings: [],

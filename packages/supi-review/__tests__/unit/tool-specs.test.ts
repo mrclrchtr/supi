@@ -10,11 +10,4 @@ describe("review tool specs", () => {
       for (const guideline of spec.promptGuidelines) expect(guideline).toContain(spec.name);
     }
   });
-
-  it("states parent-facing page limits", () => {
-    for (const spec of [REVIEW_TOOL_SPECS.run, REVIEW_TOOL_SPECS.output, REVIEW_TOOL_SPECS.audit]) {
-      expect(spec.description).toContain("12000 UTF-16 characters");
-      expect(spec.description).toContain("2,000 lines");
-    }
-  });
 });

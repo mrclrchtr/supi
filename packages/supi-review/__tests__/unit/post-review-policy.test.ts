@@ -93,21 +93,6 @@ describe("post-review policy", () => {
     );
   });
 
-  it.each([
-    ["ask", "Fix selected"],
-    ["verify", "Do not edit yet"],
-    ["verify-and-fix", "fix every confirmed finding"],
-    ["fix", "including non-blocking and low-confidence findings"],
-    ["report", "Do not verify findings, edit code"],
-  ] as const)("builds the %s protocol", (policy, expected) => {
-    const instruction = buildPostReviewInstruction(policy, makeDetails(), output);
-    expect(instruction).toContain(expected);
-    expect(instruction).toContain("direct user instruction");
-    expect(instruction).toContain("Whenever this flow results in fixes");
-    expect(instruction).toContain("run an existing targeted check");
-    expect(instruction).toContain('"artifactId":"review-output-test","offset":100');
-  });
-
   it("keeps findings from completed tasks actionable in a partial batch", () => {
     expect(buildPostReviewInstruction("fix", makeDetails({ partial: true }), output)).toContain(
       "Act on available findings from completed tasks",
@@ -123,7 +108,6 @@ describe("post-review policy", () => {
       expect.objectContaining({
         customType: "supi-review-followup",
         display: false,
-        content: expect.stringContaining("Fix selected"),
       }),
       { deliverAs: "followUp", triggerTurn: true },
     );

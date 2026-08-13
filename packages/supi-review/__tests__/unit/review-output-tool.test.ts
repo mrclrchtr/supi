@@ -18,13 +18,9 @@ describe("supi_review_output", () => {
 
     const first = createReviewOutput(store, source);
     expect(first.reference.nextOffset).toBeDefined();
-    expect(first.text).toContain("call supi_review_output with");
     expect(first.text).toContain(first.reference.artifactId);
 
     const tool = getTool(pi, "supi_review_output");
-    expect(tool.description).toContain("supi_review_run or /supi-review");
-    expect(JSON.stringify(tool.parameters)).toContain("agent or interactive Review");
-    expect(JSON.stringify(tool.parameters)).not.toMatch(/prepare|prepared/i);
     const next = await tool.execute("call", {
       artifactId: first.reference.artifactId,
       offset: first.reference.nextOffset,

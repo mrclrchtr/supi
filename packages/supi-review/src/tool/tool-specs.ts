@@ -88,7 +88,9 @@ export const REVIEW_TOOL_SPECS = {
     description: `Run one to four independent Inspection-only tasks concurrently against one exact frozen target. Use for code reviews instead of generic subagents. Each change task needs a non-empty change; committed change targets require from; all-state targets omit from. Creates a disposable linked Git worktree. A configured bootstrap can run one shell command there, and enabled auditing stores raw local replays. Output pages are limited to ${MAX_PAGE_CHARACTERS} UTF-16 characters and ${MAX_PAGE_LINES.toLocaleString("en-US")} lines.`,
     promptSnippet: "Run independent inspection-only review tasks",
     promptGuidelines: [
-      "Unless explicitly requested otherwise, use `supi_review_run` for reviews instead of `Agent` or generic subagents.",
+      "Use `supi_review_run` for repository reviews and criteria-based inspections. Use task mode `change` for before-and-after changes and `state` for the frozen current code state.",
+      "Do not use `supi_review_run` for exploration.",
+      "Do not use `supi_review_run` for simple reviews you can complete directly.",
     ],
     parameters: runReviewSchema,
   },

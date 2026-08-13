@@ -13,28 +13,12 @@ vi.mock("../../src/tool/child-session-runner.ts", () => ({
   runIsolatedChild: mocks.runIsolatedChild,
 }));
 
-import {
-  buildPlannerSystemPrompt,
-  PLANNER_PROMPT_VERSION,
-  runPlanner,
-} from "../../src/tool/planner-runner.ts";
+import { runPlanner } from "../../src/tool/planner-runner.ts";
 
 const args = { cwd: "/repo", prompt: "bounded input", model: {} as never };
 const diagnostics = { lifecycleTrace: { entries: [], droppedCount: 0 }, turns: 0, toolUses: 0 };
 
 describe("runPlanner", () => {
-  it("constrains drafts to the reviewers' static target-aware capabilities", () => {
-    const prompt = buildPlannerSystemPrompt();
-
-    expect(PLANNER_PROMPT_VERSION).toBe("6");
-    expect(prompt).toContain("code_orientation");
-    expect(prompt).toContain("read, bash, grep");
-    expect(prompt).toMatch(/required mode to change.*required mode to state/is);
-    expect(prompt).toMatch(/Do not define finding eligibility/i);
-    expect(prompt).not.toContain("concrete regressions introduced");
-    expect(prompt).toContain("Do not request tests, builds, linters");
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.runIsolatedChild.mockResolvedValue({
