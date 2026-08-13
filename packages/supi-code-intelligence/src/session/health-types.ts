@@ -67,22 +67,25 @@ export type HealthDiagnosticObservation =
       readonly reason: string;
     };
 
-/** Bounded stale-diagnostic metadata from a completed workspace recovery pass. */
+/** Bounded stale-diagnostic metadata from one refresh attempt. */
 export interface HealthStaleAssessment {
-  readonly suspected: boolean;
+  readonly scope: "file" | "workspace";
+  readonly suspected: boolean | null;
   readonly matchedFileCount: number;
   readonly warning: string | null;
 }
 
-/** A diagnostic refresh attempt against the workspace LSP runtime. */
+export type HealthRefreshOperationScope = "file-runtime" | "workspace-runtime";
+
+/** A diagnostic refresh attempt against an explicit LSP runtime scope. */
 export type HealthRefreshAttempt =
   | {
       readonly kind: "completed";
       readonly attemptedAt: number;
       /** The diagnostic evidence scope requested by the caller, not the runtime operation scope. */
       readonly requestedDiagnosticScope: HealthDiagnosticScope;
-      /** Recovery always operates against the workspace runtime. */
-      readonly operationScope: "workspace-runtime";
+      /** Exact runtime scope used by this attempt. */
+      readonly operationScope: HealthRefreshOperationScope;
       /** Active clients targeted by the best-effort refresh; this is not a confirmed-success count. */
       readonly attemptedActiveClients: number;
       readonly restartedClients: number;
@@ -92,7 +95,7 @@ export type HealthRefreshAttempt =
       readonly kind: "failed";
       readonly attemptedAt: number;
       readonly requestedDiagnosticScope: HealthDiagnosticScope;
-      readonly operationScope: "workspace-runtime";
+      readonly operationScope: HealthRefreshOperationScope;
       readonly reason: string;
     };
 

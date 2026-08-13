@@ -726,6 +726,26 @@ describe("code_find tool", () => {
       expect(text).toContain("No LSP workspace-symbol results were collected");
       expect(text).toContain("more may exist — provider-limited");
       expect(text).not.toContain("No LSP workspace-symbol results found");
+      expect(text).not.toContain("One project server did not respond");
+      const details = result as TextToolResult & {
+        details?: {
+          type: "search";
+          data: {
+            evidenceLists?: Array<{
+              key: string;
+              totalCount: number | null;
+              partialReason: string | null;
+            }>;
+          };
+        };
+      };
+      expect(details.details?.data.evidenceLists).toContainEqual(
+        expect.objectContaining({
+          key: "find.semanticSymbols",
+          totalCount: null,
+          partialReason: "provider-limited",
+        }),
+      );
     });
 
     it("returns workspace symbols when a semantic provider is available", async () => {

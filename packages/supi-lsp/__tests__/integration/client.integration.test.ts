@@ -174,15 +174,11 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
     expect(hasError).toBe(true);
   }, 15_000);
 
-  it("does not claim a clean result when the server stays silent", async () => {
+  it("reuses current clean evidence for an unchanged file", async () => {
     const content = fs.readFileSync(goodFile, "utf-8");
     const result = await client.syncAndWaitForDiagnostics(goodFile, content);
 
-    expect(result).toMatchObject({
-      kind: "partial",
-      data: [],
-      reason: expect.stringContaining("not confirmed"),
-    });
+    expect(result).toEqual({ kind: "completed", data: [] });
   }, 10_000);
 
   it("updates diagnostics after fixing a file", async () => {

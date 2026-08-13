@@ -51,8 +51,10 @@ function renderRefreshStatus(
 
   switch (data.refresh.kind) {
     case "completed":
-      lines.push(`**Diagnostic refresh attempt**: ${completedRefreshText(data.refresh)}.`);
-      lines.push(`**Stale assessment**: ${staleAssessmentText(data.refresh)}.`);
+      lines.push(
+        `**Diagnostic refresh attempt**: ${asSentence(completedRefreshText(data.refresh))}`,
+      );
+      lines.push(`**Stale assessment**: ${asSentence(staleAssessmentText(data.refresh))}`);
       lines.push("");
       return;
     case "failed":
@@ -90,6 +92,9 @@ function staleAssessmentText(
 ): string {
   if (attempt.staleAssessment.warning) return attempt.staleAssessment.warning;
   const matches = `${attempt.staleAssessment.matchedFileCount} file${plural(attempt.staleAssessment.matchedFileCount)} match the stale-module heuristic`;
+  if (attempt.staleAssessment.scope === "file") {
+    return `${matches} in the requested file; workspace clustering was not assessed`;
+  }
   return attempt.staleAssessment.suspected
     ? `${matches}; a clustered stale-module pattern is suspected`
     : `${matches}; no clustered stale-module pattern is suspected`;
@@ -99,8 +104,12 @@ function renderLastAttempt(lines: string[], attempt: HealthRefreshAttempt, cwd: 
   const outcome =
     attempt.kind === "completed" ? completedRefreshText(attempt) : `failed — ${attempt.reason}`;
   lines.push(
-    `**Last diagnostic refresh attempt**: ${outcome}, started ${formatElapsed(Date.now() - attempt.attemptedAt)}; requested ${formatDiagnosticScope(attempt.requestedDiagnosticScope, cwd)}; operation scope: workspace runtime.`,
+    `**Last diagnostic refresh attempt**: ${asSentence(outcome)} Started ${formatElapsed(Date.now() - attempt.attemptedAt)}; requested ${formatDiagnosticScope(attempt.requestedDiagnosticScope, cwd)}; operation scope: ${refreshOperationScopeText(attempt)}.`,
   );
+}
+
+function refreshOperationScopeText(attempt: HealthRefreshAttempt): string {
+  return attempt.operationScope === "file-runtime" ? "file runtime" : "workspace runtime";
 }
 
 function formatElapsed(milliseconds: number): string {
@@ -154,11 +163,11 @@ function renderDiagnosticObservation(lines: string[], data: HealthData, cwd: str
   const observation = data.diagnostics;
   if (observation.kind === "not-requested") return;
   if (observation.kind === "unavailable") {
-    lines.push(`Diagnostics unavailable — ${observation.reason}.`);
+    lines.push(`Diagnostics unavailable — ${asSentence(observation.reason)}`);
     return;
   }
   if (observation.kind === "partial") {
-    lines.push(`Diagnostics partially collected — ${observation.reason}.`);
+    lines.push(`Diagnostics partially collected — ${asSentence(observation.reason)}`);
     if (observation.entries.length > 0) {
       lines.push("");
       lines.push("Partial results:");
@@ -171,6 +180,10 @@ function renderDiagnosticObservation(lines: string[], data: HealthData, cwd: str
     return;
   }
   renderDiagnosticEntries(lines, data, cwd);
+}
+
+function asSentence(text: string): string {
+  return /[.!?]$/.test(text) ? text : `${text}.`;
 }
 
 function emptyDiagnosticText(scope: HealthDiagnosticScope, cwd: string): string {

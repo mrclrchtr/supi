@@ -34,7 +34,8 @@ import type {
   WorkspaceSymbol,
 } from "../config/types.ts";
 import { fileToUri } from "../utils.ts";
-import { ClientDiagnostics, type DiagnosticEntry } from "./client-diagnostics.ts";
+import { ClientDiagnostics } from "./client-diagnostics.ts";
+import type { ClientDiagnosticSnapshot, DiagnosticEntry } from "./client-document-state.ts";
 import { JsonRpcClient, JsonRpcRequestError } from "./transport.ts";
 
 const SHUTDOWN_TIMEOUT_MS = 5_000;
@@ -355,8 +356,12 @@ export class LspClient {
   }
 
   /** Return non-empty diagnostics for files that still exist. */
+  getDiagnosticSnapshot(): ClientDiagnosticSnapshot {
+    return this.diagnostics.getDiagnosticSnapshot();
+  }
+
   getAllDiagnostics(): DiagnosticEntry[] {
-    return this.diagnostics.getAllDiagnostics();
+    return this.getDiagnosticSnapshot().entries;
   }
 
   /** Force the next pull refresh to request complete diagnostic reports. */
@@ -372,6 +377,7 @@ export class LspClient {
   /** Notify the server that watched workspace files changed. */
   notifyWorkspaceFileChanges(changes: FileEvent[]): void {
     if (!this.rpc || this._status !== "running" || changes.length === 0) return;
+    this.diagnostics.invalidateCachedEvidence();
     void this.rpc.sendNotification("workspace/didChangeWatchedFiles", {
       changes,
     } satisfies DidChangeWatchedFilesParams);

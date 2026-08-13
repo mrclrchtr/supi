@@ -37,6 +37,8 @@ export interface CiStatusData {
   serverInventoryAvailable: boolean;
   /** Whether diagnostics and semantic absence claims are currently supported. */
   semanticAvailable: boolean;
+  /** Whether tracked-file diagnostic counts prove the current document and workspace state. */
+  diagnosticSnapshotCurrent: boolean;
   /** Sorted: errors desc, then warnings desc, then info desc, then hints desc. */
   diagnostics: OutstandingDiagnosticSummaryEntry[];
   capabilities: {
@@ -373,6 +375,8 @@ export class CiStatusDialog {
     const t = this.theme;
     if (!this.data.semanticAvailable) {
       container.addChild(new Text(t.fg("dim", "  (diagnostics unavailable)"), 1, 0));
+    } else if (!this.data.diagnosticSnapshotCurrent) {
+      container.addChild(new Text(t.fg("warning", "  diagnostic snapshot is stale"), 1, 0));
     } else {
       container.addChild(new Text(t.fg("success", "  ✓ no issues"), 1, 0));
     }

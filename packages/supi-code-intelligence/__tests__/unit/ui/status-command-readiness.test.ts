@@ -63,7 +63,7 @@ describe("/supi-ci-status readiness evidence", () => {
     const runtime = {
       getProjectServers: vi.fn(() => []),
       getOutstandingDiagnosticSummary,
-      getOutstandingDiagnostics: vi.fn(() => []),
+      getOutstandingDiagnostics: vi.fn(() => ({ entries: [], current: true })),
     } as unknown as WorkspaceLspRuntime;
     mocks.getWorkspaceLspRuntime.mockReturnValue({ kind: "ready", runtime });
 

@@ -43,6 +43,132 @@ describe("LSP single-file diagnostic freshness", () => {
     });
   });
 
+  it("does not send a duplicate change for unchanged open content", () => {
+    const file = createTempTsFile("duplicate-open.ts", "const x = 1;");
+    tmpDir = file.tmpDir;
+    const { client, rpc } = createRunningTestClient();
+    client.didOpen(file.filePath, "const x = 1;");
+    rpc.sendNotification.mockClear();
+
+    client.didOpen(file.filePath, "const x = 1;");
+
+    expect(rpc.sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("reuses current diagnostic evidence when file content is unchanged", async () => {
+    vi.useFakeTimers();
+    const file = createTempTsFile("unchanged-sync.ts", "const x = 1;");
+    tmpDir = file.tmpDir;
+    const { client, rpc } = createRunningTestClient();
+    client.didOpen(file.filePath, "const x = 1;");
+    publish(client, file.uri, [makeDiagnostic("current")]);
+    rpc.sendNotification.mockClear();
+
+    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
+    await vi.runAllTimersAsync();
+
+    await expect(pending).resolves.toEqual({
+      kind: "completed",
+      data: [makeDiagnostic("current")],
+    });
+    expect(rpc.sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("does not reuse cached evidence after a workspace change", async () => {
+    vi.useFakeTimers();
+    const file = createTempTsFile("invalidated-sync.ts", "const x = 1;");
+    tmpDir = file.tmpDir;
+    const { client } = createRunningTestClient();
+    client.didOpen(file.filePath, "const x = 1;");
+    publish(client, file.uri, [makeDiagnostic("cached")]);
+    client.notifyWorkspaceFileChanges([{ uri: file.uri, type: 2 }]);
+
+    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
+    await vi.advanceTimersByTimeAsync(3_000);
+
+    await expect(pending).resolves.toMatchObject({
+      kind: "partial",
+      data: [makeDiagnostic("cached")],
+    });
+  });
+
+  it("rejects a pull response started before workspace invalidation", async () => {
+    vi.useFakeTimers();
+    const file = createTempTsFile("late-pull.ts", "const x = 1;");
+    tmpDir = file.tmpDir;
+    const { client, rpc } = createPullTestClient();
+    let resolvePull!: (report: unknown) => void;
+    rpc.sendRequest.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePull = resolve;
+        }),
+    );
+
+    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
+    await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(1));
+    client.notifyWorkspaceFileChanges([{ uri: file.uri, type: 2 }]);
+    resolvePull({ kind: "full", items: [makeDiagnostic("stale pull")] });
+    await vi.runAllTimersAsync();
+
+    await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
+  });
+
+  it("blocks an unversioned push until current evidence crosses workspace invalidation", async () => {
+    vi.useFakeTimers();
+    const file = createTempTsFile("late-push.ts", "const x = 1;");
+    tmpDir = file.tmpDir;
+    const { client } = createRunningTestClient();
+    client.didOpen(file.filePath, "const x = 1;");
+    client.notifyWorkspaceFileChanges([{ uri: file.uri, type: 2 }]);
+    publish(client, file.uri, [makeDiagnostic("stale push")]);
+
+    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
+    await vi.runAllTimersAsync();
+
+    await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
+  });
+
+  it("accepts unversioned push again after a current pull crosses invalidation", async () => {
+    const file = createTempTsFile("push-after-pull.ts", "const x = 1;");
+    tmpDir = file.tmpDir;
+    const { client, rpc } = createPullTestClient();
+    client.notifyWorkspaceFileChanges([{ uri: file.uri, type: 2 }]);
+    rpc.sendRequest.mockResolvedValue({ kind: "full", items: [] });
+    await expect(client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;")).resolves.toEqual({
+      kind: "completed",
+      data: [],
+    });
+
+    client.handlePublishDiagnostics({ uri: file.uri, diagnostics: [makeDiagnostic("current")] });
+    await expect(client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;")).resolves.toEqual({
+      kind: "completed",
+      data: [makeDiagnostic("current")],
+    });
+  });
+
+  it("marks an invalidated empty cache stale in workspace snapshots", () => {
+    const file = createTempTsFile("stale-clean-snapshot.ts", "const x = 1;");
+    tmpDir = file.tmpDir;
+    const { client } = createRunningTestClient();
+    client.didOpen(file.filePath, "const x = 1;");
+    publish(client, file.uri, []);
+    client.notifyWorkspaceFileChanges([{ uri: file.uri, type: 2 }]);
+
+    expect(client.getDiagnosticSnapshot()).toEqual({ entries: [], current: false });
+  });
+
+  it("marks cached diagnostics stale after a document content change", () => {
+    const file = createTempTsFile("changed-snapshot.ts", "const x = 1;");
+    tmpDir = file.tmpDir;
+    const { client } = createRunningTestClient();
+    client.didOpen(file.filePath, "const x = 1;");
+    publish(client, file.uri, [makeDiagnostic("old")]);
+    client.didChange(file.filePath, "const x = 2;");
+
+    expect(client.getDiagnosticSnapshot()).toMatchObject({ current: false });
+  });
+
   it("returns stale cached diagnostics as partial evidence after timeout", async () => {
     vi.useFakeTimers();
     const file = createTempTsFile("stale-sync.ts");

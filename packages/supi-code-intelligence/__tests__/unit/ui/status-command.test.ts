@@ -104,8 +104,8 @@ describe("/supi-ci-status command", () => {
     registerMinimalSemantic("/project");
     const mockService = {
       getProjectServers: vi.fn(() => [readyProjectServer()]),
-      getOutstandingDiagnosticSummary: vi.fn(() => []),
-      getOutstandingDiagnostics: vi.fn(async () => []),
+      getOutstandingDiagnosticSummary: vi.fn(() => ({ entries: [], current: true })),
+      getOutstandingDiagnostics: vi.fn(() => ({ entries: [], current: true })),
     } as unknown as WorkspaceLspRuntime;
 
     vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
@@ -129,6 +129,38 @@ describe("/supi-ci-status command", () => {
     expect(call?.[1]).toContain("1 server");
   });
 
+  it("passes invalidated diagnostic freshness to the status dialog", async () => {
+    const pi = createPiMock();
+    registerCiStatusCommand(pi as never);
+    pi.setActiveTools(["code_orientation"]);
+    const ctx = makeCtx({ cwd: "/project" });
+    Object.assign(ctx.ui, { setFooter: vi.fn() });
+    registerMinimalSemantic("/project");
+    const mockService = {
+      getProjectServers: vi.fn(() => [readyProjectServer()]),
+      getOutstandingDiagnosticSummary: vi.fn(() => ({ entries: [], current: false })),
+      getOutstandingDiagnostics: vi.fn(() => ({ entries: [], current: false })),
+    } as unknown as WorkspaceLspRuntime;
+    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({ kind: "ready", runtime: mockService });
+
+    const cmd = pi.getCommandHandler("supi-ci-status") as (
+      args: string,
+      ctx: ReturnType<typeof makeCtx>,
+    ) => Promise<void>;
+    await cmd("", ctx);
+
+    const customMock = ctx.ui.custom as unknown as {
+      mock: { calls: Array<[(t: unknown, theme: unknown, kb: unknown, done: unknown) => unknown]> };
+    };
+    const dialog = customMock.mock.calls[0]?.[0]?.(
+      { requestRender: vi.fn() },
+      ctx.ui.theme,
+      undefined,
+      vi.fn(),
+    ) as { render(width: number): string[] };
+    expect(dialog.render(100).join("\n")).toContain("diagnostic snapshot is stale");
+  });
+
   it("sets belowEditor widget when diagnostics exist", async () => {
     const pi = createPiMock();
     registerCiStatusCommand(pi as never);
@@ -139,10 +171,13 @@ describe("/supi-ci-status command", () => {
     registerMinimalSemantic("/project");
     const mockService = {
       getProjectServers: vi.fn(() => [readyProjectServer()]),
-      getOutstandingDiagnosticSummary: vi.fn(() => [
-        { file: "src/index.ts", total: 2, errors: 2, warnings: 0, information: 0, hints: 0 },
-      ]),
-      getOutstandingDiagnostics: vi.fn(async () => []),
+      getOutstandingDiagnosticSummary: vi.fn(() => ({
+        current: true,
+        entries: [
+          { file: "src/index.ts", total: 2, errors: 2, warnings: 0, information: 0, hints: 0 },
+        ],
+      })),
+      getOutstandingDiagnostics: vi.fn(() => ({ entries: [], current: true })),
     } as unknown as WorkspaceLspRuntime;
 
     vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
@@ -228,12 +263,15 @@ describe("/supi-ci-status command", () => {
     registerMinimalSemantic("/project");
     const mockService = {
       getProjectServers: vi.fn(() => [readyProjectServer()]),
-      getOutstandingDiagnosticSummary: vi.fn(() => [
-        { file: "src/warn.ts", total: 1, errors: 0, warnings: 1, information: 0, hints: 0 },
-        { file: "src/err.ts", total: 2, errors: 2, warnings: 0, information: 0, hints: 0 },
-        { file: "src/mixed.ts", total: 3, errors: 1, warnings: 2, information: 0, hints: 0 },
-      ]),
-      getOutstandingDiagnostics: vi.fn(async () => []),
+      getOutstandingDiagnosticSummary: vi.fn(() => ({
+        current: true,
+        entries: [
+          { file: "src/warn.ts", total: 1, errors: 0, warnings: 1, information: 0, hints: 0 },
+          { file: "src/err.ts", total: 2, errors: 2, warnings: 0, information: 0, hints: 0 },
+          { file: "src/mixed.ts", total: 3, errors: 1, warnings: 2, information: 0, hints: 0 },
+        ],
+      })),
+      getOutstandingDiagnostics: vi.fn(() => ({ entries: [], current: true })),
     } as unknown as WorkspaceLspRuntime;
 
     vi.mocked(getWorkspaceLspRuntime).mockReturnValue({

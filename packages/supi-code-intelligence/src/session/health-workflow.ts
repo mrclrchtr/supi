@@ -18,7 +18,7 @@ import {
 import { describeStructuralState, recoverDiagnosticRuntime } from "../analysis/health/recovery.ts";
 import { collectServers } from "../analysis/health/signals.ts";
 import { resolveScope } from "../analysis/search/paths.ts";
-import { refreshLspMaintenance } from "../substrate/lsp/maintenance.ts";
+import { refreshFileLspMaintenance, refreshLspMaintenance } from "../substrate/lsp/maintenance.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import type {
   HealthData,
@@ -231,46 +231,17 @@ async function collectRefreshState(options: RefreshStateOptions): Promise<Health
   }
 
   const attemptedAt = Date.now();
+  const operationScope = diagnosticsScope.kind === "file" ? "file-runtime" : "workspace-runtime";
   try {
     reportProgress(options.control, {
       intent: "health",
       phase: "maintenance",
       message: "Refreshing LSP state and sentinel snapshot",
     });
-    updateSentinelSnapshot(
-      deps.sentinelSnapshot,
-      await refreshLspMaintenance(runtime, deps.cwd, deps.sentinelSnapshot),
-    );
-    if (diagnosticsScope.kind === "file") {
-      try {
-        await runtime.waitUntilReadyForFile(diagnosticsScope.path);
-      } catch {
-        // Recovery still gets a chance to restart a failed routed client.
-      }
-    }
-
-    const recovery = await recoverDiagnosticRuntime({
-      service: runtime,
-      progress: () =>
-        reportProgress(options.control, {
-          intent: "health",
-          phase: "recovery",
-          message: "Refreshing diagnostics and recovery state",
-        }),
-    });
-    const attempt: HealthRefreshAttempt = {
-      kind: "completed",
-      attemptedAt,
-      requestedDiagnosticScope: diagnosticsScope,
-      operationScope: "workspace-runtime",
-      attemptedActiveClients: recovery.attemptedClients,
-      restartedClients: recovery.restartedClients,
-      staleAssessment: {
-        suspected: recovery.staleAssessment.suspected,
-        matchedFileCount: recovery.staleAssessment.matchedFiles.length,
-        warning: recovery.staleAssessment.warning,
-      },
-    };
+    const attempt =
+      diagnosticsScope.kind === "file"
+        ? await collectFileRefreshAttempt(runtime, diagnosticsScope, attemptedAt, options)
+        : await collectWorkspaceRefreshAttempt(runtime, diagnosticsScope, attemptedAt, options);
     deps.trackRefreshAttempt(attempt);
     return attempt;
   } catch (error) {
@@ -278,12 +249,78 @@ async function collectRefreshState(options: RefreshStateOptions): Promise<Health
       kind: "failed",
       attemptedAt,
       requestedDiagnosticScope: diagnosticsScope,
-      operationScope: "workspace-runtime",
+      operationScope,
       reason: errorMessage(error),
     };
     deps.trackRefreshAttempt(attempt);
     return attempt;
   }
+}
+
+async function collectFileRefreshAttempt(
+  runtime: WorkspaceLspRuntime,
+  diagnosticsScope: Extract<HealthDiagnosticScope, { kind: "file" }>,
+  attemptedAt: number,
+  options: RefreshStateOptions,
+): Promise<Extract<HealthRefreshAttempt, { kind: "completed" }>> {
+  const maintenance = await refreshFileLspMaintenance(
+    runtime,
+    options.deps.cwd,
+    options.deps.sentinelSnapshot,
+    diagnosticsScope.path,
+  );
+  updateSentinelSnapshot(options.deps.sentinelSnapshot, maintenance.snapshot);
+  const readiness = await runtime.waitUntilReadyForFile(diagnosticsScope.path);
+  const targeted = readiness.kind === "ready" ? 1 : 0;
+  return {
+    kind: "completed",
+    attemptedAt,
+    requestedDiagnosticScope: diagnosticsScope,
+    operationScope: "file-runtime",
+    attemptedActiveClients: targeted,
+    restartedClients: 0,
+    staleAssessment: {
+      scope: "file",
+      suspected: null,
+      matchedFileCount: maintenance.matchedStaleFileCount,
+      warning: null,
+    },
+  };
+}
+
+async function collectWorkspaceRefreshAttempt(
+  runtime: WorkspaceLspRuntime,
+  diagnosticsScope: HealthDiagnosticScope,
+  attemptedAt: number,
+  options: RefreshStateOptions,
+): Promise<Extract<HealthRefreshAttempt, { kind: "completed" }>> {
+  updateSentinelSnapshot(
+    options.deps.sentinelSnapshot,
+    await refreshLspMaintenance(runtime, options.deps.cwd, options.deps.sentinelSnapshot),
+  );
+  const recovery = await recoverDiagnosticRuntime({
+    service: runtime,
+    progress: () =>
+      reportProgress(options.control, {
+        intent: "health",
+        phase: "recovery",
+        message: "Refreshing diagnostics and recovery state",
+      }),
+  });
+  return {
+    kind: "completed",
+    attemptedAt,
+    requestedDiagnosticScope: diagnosticsScope,
+    operationScope: "workspace-runtime",
+    attemptedActiveClients: recovery.attemptedClients,
+    restartedClients: recovery.restartedClients,
+    staleAssessment: {
+      scope: "workspace",
+      suspected: recovery.staleAssessment.suspected,
+      matchedFileCount: recovery.staleAssessment.matchedFiles.length,
+      warning: recovery.staleAssessment.warning,
+    },
+  };
 }
 
 function updateSentinelSnapshot(target: Map<string, number>, next: Map<string, number>): void {

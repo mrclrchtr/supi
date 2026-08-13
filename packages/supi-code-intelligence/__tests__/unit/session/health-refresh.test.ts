@@ -1,7 +1,7 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { CapabilityState } from "@mrclrchtr/supi-code-runtime/api";
+import { type CapabilityState, completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import type { WorkspaceLspRuntime, WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CapabilityAdapter } from "../../../src/session/capability-adapter.ts";
@@ -27,8 +27,8 @@ function readyRuntime(overrides: Record<string, unknown> = {}): WorkspaceLspRunt
         ready: true,
       },
     ],
-    getOutstandingDiagnostics: () => [],
-    getWorkspaceDiagnosticSummary: () => [],
+    getOutstandingDiagnostics: () => ({ entries: [], current: true }),
+    getWorkspaceDiagnosticSummary: () => ({ entries: [], current: true }),
     pruneMissingFiles: () => [],
     refreshOpenDiagnostics: async () => undefined,
     noteWorkspaceChanges: () => undefined,
@@ -93,6 +93,110 @@ describe("code_health refresh evidence", () => {
     expect(trackRefreshAttempt).toHaveBeenCalledWith(
       expect.objectContaining({ kind: "completed", attemptedActiveClients: 0 }),
     );
+  });
+
+  it("uses a file-scoped refresh path for an exact file", async () => {
+    const file = path.join(cwd, "source.ts");
+    writeFileSync(file, "export const value = 1;\n");
+    const refreshOpenDiagnostics = vi.fn(async () => undefined);
+    const recoverDiagnostics = vi.fn(async () => ({
+      attemptedClients: 1,
+      restartedClients: 0,
+      staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+    }));
+    const fileDiagnostics = vi.fn(async () => completedCodeQuery([]));
+    const runtime = readyRuntime({
+      refreshOpenDiagnostics,
+      recoverDiagnostics,
+      fileDiagnostics,
+      waitUntilReadyForFile: vi.fn(async () => ({ kind: "ready" })),
+    });
+
+    const { outcome } = await run(
+      { kind: "ready", runtime },
+      { scope: file, include: ["diagnostics"], refresh: true },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        refresh: {
+          kind: "completed",
+          operationScope: "file-runtime",
+          attemptedActiveClients: 1,
+        },
+        diagnostics: { kind: "completed" },
+      },
+    });
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        refresh: {
+          staleAssessment: {
+            scope: "file",
+            suspected: null,
+            matchedFileCount: 0,
+          },
+        },
+      },
+    });
+    expect(fileDiagnostics).toHaveBeenCalledTimes(1);
+    expect(refreshOpenDiagnostics).not.toHaveBeenCalled();
+    expect(recoverDiagnostics).not.toHaveBeenCalled();
+  });
+
+  it("does not discard cached diagnostics for a sentinel-only file refresh", async () => {
+    const file = path.join(cwd, "source.ts");
+    writeFileSync(file, "export const value = 1;\n");
+    const closeFile = vi.fn();
+    const runtime = readyRuntime({
+      getOutstandingDiagnostics: () => ({ entries: [], current: false }),
+      closeFile,
+      waitUntilReadyForFile: async () => ({ kind: "ready" }),
+      fileDiagnostics: async () => ({
+        kind: "partial",
+        data: [],
+        reason: "Cached diagnostics are partial evidence.",
+      }),
+    });
+
+    const { outcome } = await run(
+      { kind: "ready", runtime },
+      { scope: file, include: ["diagnostics"], refresh: true },
+    );
+
+    expect(closeFile).not.toHaveBeenCalled();
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: { diagnostics: { kind: "partial" } },
+    });
+  });
+
+  it("records the file scope when a file refresh attempt fails", async () => {
+    const file = path.join(cwd, "source.ts");
+    writeFileSync(file, "export const value = 1;\n");
+    const runtime = readyRuntime({
+      getOutstandingDiagnostics: () => {
+        throw new Error("file maintenance failed");
+      },
+      waitUntilReadyForFile: async () => ({ kind: "ready" }),
+    });
+
+    const { outcome } = await run(
+      { kind: "ready", runtime },
+      { scope: file, include: ["diagnostics"], refresh: true },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        refresh: {
+          kind: "failed",
+          operationScope: "file-runtime",
+          reason: "file maintenance failed",
+        },
+      },
+    });
   });
 
   it("records a failed recovery attempt instead of collapsing it into no recovery", async () => {

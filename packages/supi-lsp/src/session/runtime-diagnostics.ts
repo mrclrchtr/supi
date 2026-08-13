@@ -1,5 +1,11 @@
 import type { Diagnostic } from "../config/types.ts";
 
+/** Workspace diagnostic snapshot with explicit cache freshness. */
+export interface WorkspaceDiagnosticSnapshot<T> {
+  entries: T[];
+  current: boolean;
+}
+
 /** Workspace diagnostic summary grouped by file. */
 export interface WorkspaceDiagnosticSummaryEntry {
   file: string;

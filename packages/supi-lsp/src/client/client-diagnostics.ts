@@ -1,17 +1,19 @@
-import { existsSync, readFileSync } from "node:fs";
-import { type CodeQueryResult, unavailableCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
+import { existsSync } from "node:fs";
+import {
+  type CodeQueryResult,
+  completedCodeQuery,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import type {
   Diagnostic,
-  DocumentDiagnosticReport,
   PublishDiagnosticsParams,
   TextDocumentIdentifier,
   TextDocumentItem,
-  VersionedTextDocumentIdentifier,
 } from "../config/types.ts";
 import { detectLanguageId, fileToUri, uriToFile } from "../utils.ts";
+import { applyPushDiagnostics, buildClientDiagnosticSnapshot } from "./client-diagnostic-cache.ts";
 import { collectSynchronizedFileDiagnostics } from "./client-diagnostic-collection.ts";
 import {
-  applyPullReport,
   type DiagnosticCacheEntry,
   type DiagnosticSynchronization,
   hasFreshEvidence,
@@ -21,47 +23,36 @@ import {
   nextDocumentVersion,
   raceDiagnosticPull,
 } from "./client-diagnostic-evidence.ts";
+import type { ClientDiagnosticsHost } from "./client-diagnostic-host.ts";
+import { pullDiagnosticEvidence } from "./client-diagnostic-pull.ts";
 import {
   DiagnosticObserver,
   DiagnosticPullError,
   isDiagnosticTimeout,
 } from "./client-diagnostic-timing.ts";
 import { DiagnosticWaitRegistry } from "./client-diagnostic-waiters.ts";
+import {
+  type ClientDiagnosticSnapshot,
+  type DiagnosticEntry,
+  fingerprintDocumentContent,
+  hasCurrentDiagnosticEvidence,
+  type OpenDocumentState,
+} from "./client-document-state.ts";
+import { resynchronizeOpenDocuments, synchronizeDocument } from "./client-document-sync.ts";
 
 const DIAGNOSTIC_WAIT_MS = 3_000;
-
-type OpenDocument = { version: number; synchronizationId: number };
-
-/** One file's stored diagnostics as consumed by manager-level collection. */
-export interface DiagnosticEntry {
-  uri: string;
-  diagnostics: Diagnostic[];
-}
-
-interface ClientDiagnosticsHost {
-  isOperational(): boolean;
-  supportsPullDiagnostics(): boolean;
-  sendNotification(method: string, params: unknown): void;
-  pullDocumentDiagnostics(
-    uri: string,
-    previousResultId: string | undefined,
-    timeoutMs: number,
-    signal?: AbortSignal,
-  ): Promise<DocumentDiagnosticReport | null>;
-}
-
 /**
- * Owns one LSP client's open documents, diagnostic cache, waiters, and refresh policy.
- *
- * The host supplies transport and readiness operations. Callers use `LspClient` as
- * the external seam and do not access this state directly.
+ * Own one client's document and diagnostic evidence. Fingerprints prevent duplicate changes.
+ * Revisions stop stale reuse, but keep invalidated cache data as partial fallback.
  */
 export class ClientDiagnostics {
-  readonly #openDocs = new Map<string, OpenDocument>();
+  readonly #openDocs = new Map<string, OpenDocumentState>();
   readonly #diagnosticStore = new Map<string, DiagnosticCacheEntry>();
   readonly #waiters = new DiagnosticWaitRegistry();
   readonly #versionHistory = new Map<string, number>();
+  #evidenceRevision = 0;
   #nextSynchronizationId = 0;
+  #unversionedPushBlocked = false;
 
   constructor(private readonly host: ClientDiagnosticsHost) {}
 
@@ -69,16 +60,16 @@ export class ClientDiagnostics {
     return Array.from(this.#openDocs.keys()).map(uriToFile);
   }
 
-  /** Release all waiters and remove all document and diagnostic state. */
   clear(): void {
     this.#openDocs.clear();
     this.#diagnosticStore.clear();
     this.#versionHistory.clear();
+    this.#evidenceRevision++;
+    this.#unversionedPushBlocked = false;
     this.#waiters.releaseAll();
     this.#waiters.cancelSettle();
   }
 
-  /** Open a document, or update it when it is already open. */
   didOpen(filePath: string, content: string): void {
     if (!this.host.isOperational()) return;
 
@@ -91,7 +82,12 @@ export class ClientDiagnostics {
     const languageId = detectLanguageId(filePath);
     this.#waiters.cancelSettle();
     const version = nextDocumentVersion(this.#versionHistory, uri);
-    this.#openDocs.set(uri, { version, synchronizationId: ++this.#nextSynchronizationId });
+    this.#openDocs.set(uri, {
+      version,
+      synchronizationId: ++this.#nextSynchronizationId,
+      evidenceRevision: this.#evidenceRevision,
+      contentFingerprint: fingerprintDocumentContent(content),
+    });
     this.host.sendNotification("textDocument/didOpen", {
       textDocument: {
         uri,
@@ -102,7 +98,6 @@ export class ClientDiagnostics {
     });
   }
 
-  /** Update a document, or open it when it is not tracked yet. */
   didChange(filePath: string, content: string): void {
     if (!this.host.isOperational()) return;
 
@@ -112,15 +107,21 @@ export class ClientDiagnostics {
       this.didOpen(filePath, content);
       return;
     }
+    const nextFingerprint = fingerprintDocumentContent(content);
+    if (doc.contentFingerprint === nextFingerprint) return;
 
-    this.#waiters.releaseFile(uri);
-    this.#waiters.cancelSettle();
-    doc.version = nextDocumentVersion(this.#versionHistory, uri);
-    doc.synchronizationId = ++this.#nextSynchronizationId;
-    this.#sendDidChange(uri, doc.version, content);
+    synchronizeDocument({
+      uri,
+      content,
+      document: doc,
+      version: nextDocumentVersion(this.#versionHistory, uri),
+      synchronizationId: ++this.#nextSynchronizationId,
+      evidenceRevision: this.#evidenceRevision,
+      waiters: this.#waiters,
+      sendNotification: (method, params) => this.host.sendNotification(method, params),
+    });
   }
 
-  /** Close a document and remove its cached diagnostic state. */
   didClose(filePath: string): void {
     const uri = fileToUri(filePath);
     const wasOpen = this.#openDocs.has(uri);
@@ -131,7 +132,6 @@ export class ClientDiagnostics {
     }
   }
 
-  /** Remove missing open documents and diagnostics, and return their file paths. */
   pruneMissingFiles(): string[] {
     const uris = new Set([...this.#openDocs.keys(), ...this.#diagnosticStore.keys()]);
     const removedFiles: string[] = [];
@@ -148,52 +148,47 @@ export class ClientDiagnostics {
 
     return removedFiles;
   }
-
-  /** Return the current client version, or null when the document is not open. */
   getOpenDocumentVersion(filePath: string): number | null {
     return this.#openDocs.get(fileToUri(filePath))?.version ?? null;
   }
-
   getDiagnostics(filePath: string): Diagnostic[] {
     return this.#diagnosticStore.get(fileToUri(filePath))?.diagnostics ?? [];
   }
-
-  /** Return non-empty diagnostics for files that still exist. */
-  getAllDiagnostics(): DiagnosticEntry[] {
-    const result: DiagnosticEntry[] = [];
-    for (const [uri, entry] of this.#diagnosticStore) {
-      if (entry.diagnostics.length === 0 || !existsSync(uriToFile(uri))) continue;
-      result.push({ uri, diagnostics: entry.diagnostics });
-    }
-    return result;
+  getDiagnosticSnapshot(): ClientDiagnosticSnapshot {
+    return buildClientDiagnosticSnapshot({
+      store: this.#diagnosticStore,
+      openDocuments: this.#openDocs,
+      evidenceRevision: this.#evidenceRevision,
+    });
   }
-
-  /** Force the next pull refresh to request complete diagnostic reports. */
+  getAllDiagnostics(): DiagnosticEntry[] {
+    return this.getDiagnosticSnapshot().entries;
+  }
   clearPullResultIds(): void {
     for (const entry of this.#diagnosticStore.values()) delete entry.resultId;
   }
+  /** Invalidate cache proof while retaining its data as partial fallback. */
+  invalidateCachedEvidence(): void {
+    this.#evidenceRevision++;
+    this.#unversionedPushBlocked = true;
+  }
 
-  /** Apply diagnostics received through `textDocument/publishDiagnostics`. */
   handlePublishDiagnostics(params: PublishDiagnosticsParams): void {
-    const openDoc = this.#openDocs.get(params.uri);
-    if (params.version !== undefined) {
-      if (!Number.isInteger(params.version)) return;
-      if (openDoc && params.version !== openDoc.version) return;
+    if (
+      !applyPushDiagnostics({
+        store: this.#diagnosticStore,
+        openDocuments: this.#openDocs,
+        params,
+        evidenceRevision: this.#evidenceRevision,
+        unversionedBlocked: this.#unversionedPushBlocked,
+      })
+    ) {
+      return;
     }
-    if (!Array.isArray(params.diagnostics)) return;
-
-    this.#diagnosticStore.set(params.uri, {
-      diagnostics: params.diagnostics,
-      receivedAt: Date.now(),
-      source: "push",
-      synchronizationId: openDoc?.synchronizationId,
-      version: params.version,
-    });
     this.#waiters.releaseFile(params.uri, "published");
     this.#waiters.notifySettle();
   }
 
-  /** Re-read open documents, then collect pull diagnostics or wait for push diagnostics. */
   async refreshOpenDiagnostics(
     options: { maxWaitMs?: number; quietMs?: number } = {},
   ): Promise<void> {
@@ -238,7 +233,6 @@ export class ClientDiagnostics {
     observer.pushSettled(documentCount, settle);
   }
 
-  /** Sync one file and return diagnostics with explicit evidence availability. */
   async syncAndWaitForDiagnostics(
     filePath: string,
     content: string,
@@ -249,13 +243,29 @@ export class ClientDiagnostics {
     const cached = this.#diagnosticStore.get(uri);
     const cachedDiagnostics = cached ? [...cached.diagnostics] : null;
     const syncStart = Date.now();
-    this.didChange(filePath, content);
+    const openDocument = this.#openDocs.get(uri);
+    const contentUnchanged =
+      openDocument?.contentFingerprint === fingerprintDocumentContent(content);
+    if (
+      !contentUnchanged ||
+      !hasCurrentDiagnosticEvidence(openDocument, cached, this.#evidenceRevision)
+    ) {
+      this.#synchronizeDocument(filePath, content);
+    }
     const synchronization = this.#openDocs.get(uri);
     observer.synchronized();
     if (!synchronization) {
       return unavailableCodeQuery("The document could not be synchronized for diagnostics.");
     }
+    if (
+      contentUnchanged &&
+      hasCurrentDiagnosticEvidence(synchronization, cached, this.#evidenceRevision)
+    ) {
+      observer.cacheReused(1);
+      return completedCodeQuery(cachedDiagnostics ?? []);
+    }
     const request = { uri, synchronizationId: synchronization.synchronizationId };
+    const evidenceRevision = synchronization.evidenceRevision;
     return collectSynchronizedFileDiagnostics({
       supportsPull,
       syncStart,
@@ -268,32 +278,46 @@ export class ClientDiagnostics {
       freshPush: () => hasFreshPush(this.#diagnosticStore, request),
       diagnostics: () => this.getDiagnostics(filePath),
       pullDiagnostics: (timeoutMs, signal) =>
-        this.#pullDiagnosticsForUri(uri, timeoutMs, request.synchronizationId, signal),
+        this.#pullDiagnosticsForUri({
+          uri,
+          timeoutMs,
+          synchronizationId: request.synchronizationId,
+          evidenceRevision,
+          signal,
+        }),
+    });
+  }
+
+  #synchronizeDocument(filePath: string, content: string): void {
+    const uri = fileToUri(filePath);
+    const doc = this.#openDocs.get(uri);
+    if (!doc) {
+      this.didOpen(filePath, content);
+      return;
+    }
+    synchronizeDocument({
+      uri,
+      content,
+      document: doc,
+      version: nextDocumentVersion(this.#versionHistory, uri),
+      synchronizationId: ++this.#nextSynchronizationId,
+      evidenceRevision: this.#evidenceRevision,
+      waiters: this.#waiters,
+      sendNotification: (method, params) => this.host.sendNotification(method, params),
     });
   }
 
   #resyncOpenDocuments(): DiagnosticSynchronization[] {
-    const synchronizations: DiagnosticSynchronization[] = [];
-    for (const [uri, doc] of this.#openDocs) {
-      const filePath = uriToFile(uri);
-      try {
-        if (!existsSync(filePath)) {
-          this.#clearFileState(uri);
-          this.#sendDidClose(uri);
-          continue;
-        }
-        const content = readFileSync(filePath, "utf-8");
-        this.#waiters.releaseFile(uri);
-        this.#waiters.cancelSettle();
-        doc.version = nextDocumentVersion(this.#versionHistory, uri);
-        doc.synchronizationId = ++this.#nextSynchronizationId;
-        this.#sendDidChange(uri, doc.version, content);
-        synchronizations.push({ uri, synchronizationId: doc.synchronizationId });
-      } catch {
-        // Keep the document open when a transient read fails.
-      }
-    }
-    return synchronizations;
+    return resynchronizeOpenDocuments({
+      openDocuments: this.#openDocs,
+      waiters: this.#waiters,
+      nextVersion: (uri) => nextDocumentVersion(this.#versionHistory, uri),
+      nextSynchronizationId: () => ++this.#nextSynchronizationId,
+      evidenceRevision: this.#evidenceRevision,
+      sendNotification: (method, params) => this.host.sendNotification(method, params),
+      uriToFile,
+      clearFile: (uri) => this.#clearFileState(uri),
+    });
   }
 
   async #pullDiagnosticsForOpenDocuments(
@@ -308,12 +332,14 @@ export class ClientDiagnostics {
         if (remaining <= 0) throw new Error("pull diagnostic timeout");
         const pullController = new AbortController();
         const outcome = await raceDiagnosticPull({
-          pull: this.#pullDiagnosticsForUri(
-            request.uri,
-            remaining,
-            request.synchronizationId,
-            pullController.signal,
-          ),
+          pull: this.#pullDiagnosticsForUri({
+            uri: request.uri,
+            timeoutMs: remaining,
+            synchronizationId: request.synchronizationId,
+            evidenceRevision:
+              this.#openDocs.get(request.uri)?.evidenceRevision ?? this.#evidenceRevision,
+            signal: pullController.signal,
+          }),
           waitForChange: () => this.#waiters.waitForChange(),
           freshPush: () => hasFreshPush(this.#diagnosticStore, request),
           current: () => isCurrentSynchronization(this.#openDocs, request),
@@ -333,42 +359,30 @@ export class ClientDiagnostics {
     }
   }
 
-  async #pullDiagnosticsForUri(
-    uri: string,
-    timeoutMs: number,
-    synchronizationId?: number,
-    signal?: AbortSignal,
-  ): Promise<boolean> {
-    const previous = this.#diagnosticStore.get(uri);
-    const previousResultId = previous?.resultId;
-    const report = await this.host.pullDocumentDiagnostics(
-      uri,
-      previousResultId,
-      timeoutMs,
-      signal,
-    );
-    if (!report) return false;
-    if (
-      synchronizationId !== undefined &&
-      !isCurrentSynchronization(this.#openDocs, { uri, synchronizationId })
-    ) {
-      return false;
-    }
-    return applyPullReport({
+  async #pullDiagnosticsForUri(options: {
+    uri: string;
+    timeoutMs: number;
+    synchronizationId?: number;
+    evidenceRevision?: number;
+    signal?: AbortSignal;
+  }): Promise<boolean> {
+    const evidenceRevision = options.evidenceRevision ?? this.#evidenceRevision;
+    const applied = await pullDiagnosticEvidence({
       store: this.#diagnosticStore,
-      uri,
-      report,
-      previous,
-      previousResultId,
-      synchronizationId,
+      ...options,
+      evidenceRevision,
+      currentRevision: () => this.#evidenceRevision,
+      isCurrentSynchronization: () =>
+        options.synchronizationId === undefined ||
+        isCurrentSynchronization(this.#openDocs, {
+          uri: options.uri,
+          synchronizationId: options.synchronizationId,
+        }),
+      pull: (uri, resultId, timeoutMs, signal) =>
+        this.host.pullDocumentDiagnostics(uri, resultId, timeoutMs, signal),
     });
-  }
-
-  #sendDidChange(uri: string, version: number, content: string): void {
-    this.host.sendNotification("textDocument/didChange", {
-      textDocument: { uri, version } satisfies VersionedTextDocumentIdentifier,
-      contentChanges: [{ text: content }],
-    });
+    if (applied) this.#unversionedPushBlocked = false;
+    return applied;
   }
 
   #sendDidClose(uri: string): void {

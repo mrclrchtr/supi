@@ -222,9 +222,12 @@ describe("workspace runtime behavior", () => {
     let recoveryOptions: unknown;
     const runtime = createRuntime(
       makeManager({
-        getDiagnosticSummary: () => summary,
-        getOutstandingDiagnostics: () => outstanding,
-        getOutstandingDiagnosticSummary: () => outstandingSummary,
+        getDiagnosticSnapshot: () => ({ entries: summary, current: true }),
+        getOutstandingDiagnosticsSnapshot: () => ({ entries: outstanding, current: true }),
+        getOutstandingDiagnosticSummarySnapshot: () => ({
+          entries: outstandingSummary,
+          current: true,
+        }),
         recoverWorkspaceDiagnostics: async (options: unknown) => {
           recoveryOptions = options;
           return recovery;
@@ -232,9 +235,12 @@ describe("workspace runtime behavior", () => {
       }),
     );
 
-    expect(runtime.getWorkspaceDiagnosticSummary()).toEqual(summary);
-    expect(runtime.getOutstandingDiagnostics(1)).toEqual(outstanding);
-    expect(runtime.getOutstandingDiagnosticSummary(1)).toEqual(outstandingSummary);
+    expect(runtime.getWorkspaceDiagnosticSummary()).toEqual({ entries: summary, current: true });
+    expect(runtime.getOutstandingDiagnostics(1)).toEqual({ entries: outstanding, current: true });
+    expect(runtime.getOutstandingDiagnosticSummary(1)).toEqual({
+      entries: outstandingSummary,
+      current: true,
+    });
     await expect(runtime.recoverDiagnostics({ restartIfStillStale: true })).resolves.toEqual(
       recovery,
     );

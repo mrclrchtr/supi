@@ -615,39 +615,58 @@ export class LspManager {
   }
   /** Get a diagnostic summary across all servers and files. */
   getDiagnosticSummary(): DiagnosticSummary[] {
+    return this.getDiagnosticSnapshot().entries;
+  }
+  getDiagnosticSnapshot(): { entries: DiagnosticSummary[]; current: boolean } {
     this.pruneMissingFiles();
     const fileDiags = new Map<string, { errors: number; warnings: number }>();
+    let current = true;
     for (const client of this.clients.values()) {
-      for (const entry of client.getAllDiagnostics()) {
+      const snapshot = client.getDiagnosticSnapshot();
+      current &&= snapshot.current;
+      for (const entry of snapshot.entries) {
         collectDiagnosticSummaryCounts(fileDiags, entry, this.cwd, this.excludePatterns);
       }
     }
-    return Array.from(fileDiags.entries()).map(([file, counts]) => ({ file, ...counts }));
+    return {
+      entries: Array.from(fileDiags.entries()).map(([file, counts]) => ({ file, ...counts })),
+      current,
+    };
   }
   /** Get outstanding diagnostics at or above the configured inline threshold. */
   getOutstandingDiagnosticSummary(maxSeverity: number = 1): OutstandingDiagnosticSummaryEntry[] {
+    return this.getOutstandingDiagnosticSummarySnapshot(maxSeverity).entries;
+  }
+  getOutstandingDiagnosticSummarySnapshot(maxSeverity: number = 1): {
+    entries: OutstandingDiagnosticSummaryEntry[];
+    current: boolean;
+  } {
     this.pruneMissingFiles();
     const fileDiags = new Map<string, OutstandingDiagnosticSummaryEntry>();
+    let current = true;
     for (const client of this.clients.values()) {
-      for (const entry of client.getAllDiagnostics()) {
+      const snapshot = client.getDiagnosticSnapshot();
+      current &&= snapshot.current;
+      for (const entry of snapshot.entries) {
         const file = relativeFilePathFromUri(entry.uri, this.cwd);
         if (shouldIgnoreLspPath(file, this.cwd)) continue;
         if (isExcludedByPattern(file, this.excludePatterns)) continue;
-        const current = fileDiags.get(file) ?? createOutstandingDiagnosticSummary(file);
-        const next = accumulateOutstandingDiagnostics(current, entry.diagnostics, maxSeverity);
-        if (next.total > 0) {
-          fileDiags.set(file, next);
-        }
+        const existing = fileDiags.get(file) ?? createOutstandingDiagnosticSummary(file);
+        const next = accumulateOutstandingDiagnostics(existing, entry.diagnostics, maxSeverity);
+        if (next.total > 0) fileDiags.set(file, next);
       }
     }
-    return Array.from(fileDiags.values()).sort(
-      (a, b) =>
-        b.errors - a.errors ||
-        b.warnings - a.warnings ||
-        b.information - a.information ||
-        b.hints - a.hints ||
-        a.file.localeCompare(b.file),
-    );
+    return {
+      entries: Array.from(fileDiags.values()).sort(
+        (a, b) =>
+          b.errors - a.errors ||
+          b.warnings - a.warnings ||
+          b.information - a.information ||
+          b.hints - a.hints ||
+          a.file.localeCompare(b.file),
+      ),
+      current,
+    };
   }
   getRelevantOutstandingDiagnosticsSummaryText(
     relevantPaths: string[],
@@ -666,13 +685,23 @@ export class LspManager {
   getOutstandingDiagnostics(
     maxSeverity: number = 1,
   ): Array<{ file: string; diagnostics: Diagnostic[] }> {
+    return this.getOutstandingDiagnosticsSnapshot(maxSeverity).entries;
+  }
+  getOutstandingDiagnosticsSnapshot(maxSeverity: number = 1): {
+    entries: Array<{ file: string; diagnostics: Diagnostic[] }>;
+    current: boolean;
+  } {
     this.pruneMissingFiles();
-    return collectOutstandingDiagnosticsDetailed(
-      this.clients.values(),
-      this.cwd,
-      this.excludePatterns,
-      maxSeverity,
-    );
+    const clients = Array.from(this.clients.values());
+    return {
+      entries: collectOutstandingDiagnosticsDetailed(
+        clients,
+        this.cwd,
+        this.excludePatterns,
+        maxSeverity,
+      ),
+      current: clients.every((client) => client.getDiagnosticSnapshot().current),
+    };
   }
   async workspaceSymbol(
     query: string,

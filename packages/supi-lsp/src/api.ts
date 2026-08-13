@@ -46,7 +46,9 @@ export type {
   RecoverDiagnosticsResult,
   RoutedMutationResponse,
   SemanticReadinessResult,
+  WorkspaceDiagnosticSnapshot,
   WorkspaceDiagnosticSummaryEntry,
+  WorkspaceLspDiagnosticSurface,
   WorkspaceLspRuntime,
   WorkspaceLspRuntimeState,
 } from "./session/runtime-registry.ts";

@@ -123,14 +123,10 @@ describe.skipIf(!HAS_TS_LSP)("LspManager integration", () => {
     expect(diags.every((d: Diagnostic) => d.severity === 1)).toBe(true);
   }, 15_000);
 
-  it("does not confirm a clean result when the server stays silent", async () => {
+  it("reuses current clean evidence for an unchanged file", async () => {
     const validFile = path.join(tmpDir, "valid.ts");
     const diags = await manager.syncFileAndGetDiagnostics(validFile, 1);
-    expect(diags).toMatchObject({
-      kind: "partial",
-      data: [],
-      reason: expect.stringContaining("not confirmed"),
-    });
+    expect(diags).toEqual({ kind: "completed", data: [] });
   }, 10_000);
 
   it("includes warnings when severity threshold raised", async () => {

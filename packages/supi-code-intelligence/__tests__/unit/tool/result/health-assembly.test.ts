@@ -101,6 +101,26 @@ describe("code_health result assembly", () => {
     expect(markdown).not.toContain("No diagnostics found");
   });
 
+  it("does not duplicate punctuation in a partial diagnostic reason", () => {
+    const assembly = assembleHealthResult(
+      makeHealthData({
+        diagnostics: {
+          kind: "partial",
+          scope: { kind: "file", path: "/repo/src/a.ts" },
+          entries: [],
+          reason: "Fresh diagnostics were not confirmed.",
+        },
+      }),
+    );
+
+    const markdown = renderHealthResult(assembly, "/repo");
+
+    expect(markdown).toContain(
+      "Diagnostics partially collected — Fresh diagnostics were not confirmed.",
+    );
+    expect(markdown).not.toContain("confirmed..");
+  });
+
   it("keeps a failed file diagnostic query unavailable despite semantic readiness", () => {
     const assembly = assembleHealthResult(
       makeHealthData({
@@ -119,6 +139,56 @@ describe("code_health result assembly", () => {
     expect(markdown).not.toContain("No errors or warnings found for");
   });
 
+  it("does not duplicate punctuation in dynamic refresh text", () => {
+    const assembly = assembleHealthResult(
+      makeHealthData({
+        refresh: {
+          kind: "completed",
+          attemptedAt: 1,
+          requestedDiagnosticScope: { kind: "tracked-files", filter: null },
+          operationScope: "workspace-runtime",
+          attemptedActiveClients: 1,
+          restartedClients: 0,
+          staleAssessment: {
+            scope: "workspace",
+            suspected: true,
+            matchedFileCount: 3,
+            warning: "Stale diagnostics may remain.",
+          },
+        },
+      }),
+    );
+
+    const markdown = renderHealthResult(assembly, "/repo");
+    expect(markdown).toContain("Stale diagnostics may remain.");
+    expect(markdown).not.toContain("remain..");
+  });
+
+  it("discloses when file refresh did not assess workspace clustering", () => {
+    const assembly = assembleHealthResult(
+      makeHealthData({
+        refresh: {
+          kind: "completed",
+          attemptedAt: 1,
+          requestedDiagnosticScope: { kind: "file", path: "/repo/src/a.ts" },
+          operationScope: "file-runtime",
+          attemptedActiveClients: 1,
+          restartedClients: 0,
+          staleAssessment: {
+            scope: "file",
+            suspected: null,
+            matchedFileCount: 1,
+            warning: null,
+          },
+        },
+      }),
+    );
+
+    const markdown = renderHealthResult(assembly, "/repo");
+    expect(markdown).toContain("workspace clustering was not assessed");
+    expect(markdown).not.toContain("no clustered stale-module pattern is suspected");
+  });
+
   it("projects a completed no-op refresh as an attempted outcome", () => {
     const assembly = assembleHealthResult(
       makeHealthData({
@@ -129,7 +199,12 @@ describe("code_health result assembly", () => {
           operationScope: "workspace-runtime",
           attemptedActiveClients: 0,
           restartedClients: 0,
-          staleAssessment: { suspected: false, matchedFileCount: 0, warning: null },
+          staleAssessment: {
+            scope: "workspace",
+            suspected: false,
+            matchedFileCount: 0,
+            warning: null,
+          },
         },
       }),
     );
@@ -145,6 +220,55 @@ describe("code_health result assembly", () => {
     expect(markdown).not.toContain("recovered");
   });
 
+  it("does not duplicate punctuation in a retained failed refresh reason", () => {
+    const assembly = assembleHealthResult(
+      makeHealthData({
+        refresh: {
+          kind: "not-requested",
+          reason: "Refresh was not requested.",
+          lastAttempt: {
+            kind: "failed",
+            attemptedAt: Date.now(),
+            requestedDiagnosticScope: { kind: "file", path: "/repo/src/a.ts" },
+            operationScope: "file-runtime",
+            reason: "Refresh failed.",
+          },
+        },
+      }),
+    );
+
+    const markdown = renderHealthResult(assembly, "/repo");
+    expect(markdown).toContain("failed — Refresh failed. Started");
+    expect(markdown).not.toContain("failed..");
+  });
+
+  it("reports the operation scope for a retained file refresh attempt", () => {
+    const assembly = assembleHealthResult(
+      makeHealthData({
+        refresh: {
+          kind: "not-requested",
+          reason: "Refresh was not requested.",
+          lastAttempt: {
+            kind: "completed",
+            attemptedAt: Date.now(),
+            requestedDiagnosticScope: { kind: "file", path: "/repo/src/a.ts" },
+            operationScope: "file-runtime",
+            attemptedActiveClients: 1,
+            restartedClients: 0,
+            staleAssessment: {
+              scope: "workspace",
+              suspected: false,
+              matchedFileCount: 0,
+              warning: null,
+            },
+          },
+        },
+      }),
+    );
+
+    expect(renderHealthResult(assembly, "/repo")).toContain("operation scope: file runtime");
+  });
+
   it("names retained timing as a refresh attempt rather than diagnostic age", () => {
     const assembly = assembleHealthResult(
       makeHealthData({
@@ -158,7 +282,12 @@ describe("code_health result assembly", () => {
             operationScope: "workspace-runtime",
             attemptedActiveClients: 1,
             restartedClients: 0,
-            staleAssessment: { suspected: false, matchedFileCount: 0, warning: null },
+            staleAssessment: {
+              scope: "workspace",
+              suspected: false,
+              matchedFileCount: 0,
+              warning: null,
+            },
           },
         },
       }),

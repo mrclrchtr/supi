@@ -24,15 +24,13 @@ import type {
 import type { LspManager } from "../manager/manager.ts";
 import { resolveSessionPath } from "../utils.ts";
 import { raceReadinessValue } from "./readiness.ts";
-import type {
-  OutstandingDiagnosticSummaryEntry,
-  RecoverDiagnosticsResult,
-  WorkspaceDiagnosticSummaryEntry,
-} from "./runtime-diagnostics.ts";
+import type { WorkspaceLspDiagnosticSurface } from "./runtime-diagnostic-surface.ts";
 
+export type { WorkspaceLspDiagnosticSurface } from "./runtime-diagnostic-surface.ts";
 export type {
   OutstandingDiagnosticSummaryEntry,
   RecoverDiagnosticsResult,
+  WorkspaceDiagnosticSnapshot,
   WorkspaceDiagnosticSummaryEntry,
 } from "./runtime-diagnostics.ts";
 
@@ -72,7 +70,7 @@ export interface RoutedMutationResponse<T> {
  * coordinates; use `toLspPosition()` from `@mrclrchtr/supi-lsp/api` when starting from
  * user-facing 1-based line and character values.
  */
-export interface WorkspaceLspRuntime {
+export interface WorkspaceLspRuntime extends WorkspaceLspDiagnosticSurface {
   hover(filePath: string, position: Position): Promise<CodeQueryResult<Hover | null>>;
   definition(
     filePath: string,
@@ -111,18 +109,6 @@ export interface WorkspaceLspRuntime {
   closeFile(filePath: string): void;
   pruneMissingFiles(): readonly string[];
   noteWorkspaceChanges(changes: FileEvent[]): void;
-  fileDiagnostics(filePath: string, maxSeverity?: number): Promise<CodeQueryResult<Diagnostic[]>>;
-  refreshOpenDiagnostics(options?: { maxWaitMs?: number; quietMs?: number }): Promise<void>;
-  getWorkspaceDiagnosticSummary(): WorkspaceDiagnosticSummaryEntry[];
-  getOutstandingDiagnostics(
-    maxSeverity?: number,
-  ): Array<{ file: string; diagnostics: Diagnostic[] }>;
-  getOutstandingDiagnosticSummary(maxSeverity?: number): OutstandingDiagnosticSummaryEntry[];
-  recoverDiagnostics(options?: {
-    restartIfStillStale?: boolean;
-    maxWaitMs?: number;
-    quietMs?: number;
-  }): Promise<RecoverDiagnosticsResult>;
 }
 
 class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
@@ -333,20 +319,18 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   }
 
   /** Get a lightweight workspace diagnostic summary for all tracked files. */
-  getWorkspaceDiagnosticSummary(): WorkspaceDiagnosticSummaryEntry[] {
-    return this.manager.getDiagnosticSummary();
+  getWorkspaceDiagnosticSummary() {
+    return this.manager.getDiagnosticSnapshot();
   }
 
   /** Get outstanding diagnostics grouped by file at or above the supplied severity threshold. */
-  getOutstandingDiagnostics(
-    maxSeverity: number = 1,
-  ): Array<{ file: string; diagnostics: Diagnostic[] }> {
-    return this.manager.getOutstandingDiagnostics(maxSeverity);
+  getOutstandingDiagnostics(maxSeverity: number = 1) {
+    return this.manager.getOutstandingDiagnosticsSnapshot(maxSeverity);
   }
 
   /** Get outstanding diagnostic counts grouped by file. */
-  getOutstandingDiagnosticSummary(maxSeverity: number = 1): OutstandingDiagnosticSummaryEntry[] {
-    return this.manager.getOutstandingDiagnosticSummary(maxSeverity);
+  getOutstandingDiagnosticSummary(maxSeverity: number = 1) {
+    return this.manager.getOutstandingDiagnosticSummarySnapshot(maxSeverity);
   }
 
   /** Trigger a workspace-wide diagnostics refresh and stale-state recovery pass. */
@@ -354,7 +338,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     restartIfStillStale?: boolean;
     maxWaitMs?: number;
     quietMs?: number;
-  }): Promise<RecoverDiagnosticsResult> {
+  }) {
     return this.manager.recoverWorkspaceDiagnostics(options);
   }
 

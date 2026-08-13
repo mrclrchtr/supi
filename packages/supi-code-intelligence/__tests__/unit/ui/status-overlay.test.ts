@@ -51,6 +51,7 @@ function makeData(overrides: Partial<CiStatusData> = {}): CiStatusData {
     servers: [],
     serverInventoryAvailable: true,
     semanticAvailable: true,
+    diagnosticSnapshotCurrent: true,
     diagnostics: [],
     capabilities: baseCapabilities,
     activeTools: [],
@@ -119,11 +120,21 @@ describe("CiStatusDialog", () => {
       expect(all).toContain("2 errors");
     });
 
-    it('shows "no issues" message when diagnostics empty', () => {
+    it('shows "no issues" message when current diagnostics are empty', () => {
       const dialog = createCiStatusDialog(makeData({ diagnostics: [] }), makeDeps());
       const lines = dialog.render(80);
       const all = lines.join("\n");
       expect(all).toMatch(/no issues|✓.*no.*issues/i);
+    });
+
+    it("shows stale status when an invalidated diagnostic snapshot is empty", () => {
+      const dialog = createCiStatusDialog(
+        makeData({ diagnostics: [], diagnosticSnapshotCurrent: false }),
+        makeDeps(),
+      );
+      const all = dialog.render(80).join("\n");
+      expect(all).toContain("diagnostic snapshot is stale");
+      expect(all).not.toContain("✓ no issues");
     });
 
     it("shows capabilities section with semantic, structural, refactor", () => {

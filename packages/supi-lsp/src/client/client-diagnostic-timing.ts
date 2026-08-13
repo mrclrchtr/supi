@@ -1,6 +1,6 @@
 import { startDebugTimer } from "@mrclrchtr/supi-core/debug";
 
-type DiagnosticCollection = "fallback" | "none" | "pull" | "push";
+type DiagnosticCollection = "cache" | "fallback" | "none" | "pull" | "push";
 type DiagnosticFreshness = "not-observed" | "observed";
 type DiagnosticOutcome = "completed" | "incomplete" | "skipped" | "timed-out";
 type DiagnosticPullOutcome = "completed" | "failed" | "not-supported" | "not-used" | "timed-out";
@@ -64,6 +64,20 @@ export class DiagnosticObserver {
       fallback: false,
       freshness: "not-observed",
       outcome: "skipped",
+      pull: "not-used",
+      push: "not-used",
+      settle: "not-used",
+      timedOut: false,
+    });
+  }
+
+  cacheReused(documentCount: number): void {
+    this.#finish({
+      collection: "cache",
+      documentCount,
+      fallback: false,
+      freshness: "observed",
+      outcome: "completed",
       pull: "not-used",
       push: "not-used",
       settle: "not-used",

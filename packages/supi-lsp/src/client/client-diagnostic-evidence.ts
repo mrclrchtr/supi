@@ -12,6 +12,7 @@ export interface DiagnosticCacheEntry {
   receivedAt: number;
   source: "pull" | "push";
   synchronizationId?: number;
+  evidenceRevision?: number;
   version?: number;
   resultId?: string;
 }
@@ -128,11 +129,13 @@ interface ApplyPullReportOptions {
   readonly previous: DiagnosticCacheEntry | undefined;
   readonly previousResultId: string | undefined;
   readonly synchronizationId: number | undefined;
+  readonly evidenceRevision: number;
 }
 
 /** Apply one valid full or linked unchanged pull report. */
 export function applyPullReport(options: ApplyPullReportOptions): boolean {
-  const { store, uri, report, previous, previousResultId, synchronizationId } = options;
+  const { store, uri, report, previous, previousResultId, synchronizationId, evidenceRevision } =
+    options;
   if (report.kind === "full") {
     if (!Array.isArray(report.items)) return false;
     if (report.resultId !== undefined && typeof report.resultId !== "string") return false;
@@ -141,6 +144,7 @@ export function applyPullReport(options: ApplyPullReportOptions): boolean {
       receivedAt: Date.now(),
       source: "pull",
       synchronizationId,
+      evidenceRevision,
       resultId: report.resultId,
     });
     applyRelatedPullReports(store, report);
@@ -155,6 +159,7 @@ export function applyPullReport(options: ApplyPullReportOptions): boolean {
     receivedAt: Date.now(),
     source: "pull",
     synchronizationId,
+    evidenceRevision,
     resultId: report.resultId,
   });
   applyRelatedPullReports(store, report);

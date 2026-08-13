@@ -61,7 +61,7 @@ function mockReadyLsp(
   }> = {},
 ) {
   const runtime = {
-    getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
+    getOutstandingDiagnostics: vi.fn().mockReturnValue({ entries: [], current: true }),
     getProjectServers: vi.fn().mockReturnValue([
       {
         name: "typescript",
@@ -71,7 +71,7 @@ function mockReadyLsp(
         ready: true,
       },
     ]),
-    getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue([]),
+    getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue({ entries: [], current: true }),
     fileDiagnostics: vi.fn().mockResolvedValue(null),
     recoverDiagnostics: vi.fn().mockResolvedValue({
       attemptedClients: 0,
@@ -289,9 +289,10 @@ describe("code_health tool", () => {
         },
       ]),
       recoverDiagnostics,
-      getWorkspaceDiagnosticSummary: vi.fn(() => [
-        { file: "src/index.ts", errors: 1, warnings: 0 },
-      ]),
+      getWorkspaceDiagnosticSummary: vi.fn(() => ({
+        current: true,
+        entries: [{ file: "src/index.ts", errors: 1, warnings: 0 }],
+      })),
     });
 
     const pi = createPiMock();
@@ -344,9 +345,10 @@ describe("code_health tool", () => {
   it("ignores workspace diagnostic summary entries with zero errors and warnings", async () => {
     registerMockProvider(tmpDir);
     mockReadyLsp({
-      getWorkspaceDiagnosticSummary: vi
-        .fn()
-        .mockReturnValue([{ file: "src/clean.ts", errors: 0, warnings: 0 }]),
+      getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue({
+        current: true,
+        entries: [{ file: "src/clean.ts", errors: 0, warnings: 0 }],
+      }),
     });
 
     const pi = createPiMock();

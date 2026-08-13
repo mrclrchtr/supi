@@ -52,7 +52,7 @@ export function registerCiStatusCommand(pi: ExtensionAPI): void {
               fetchDetailedDiagnostics: async (maxSeverity) => {
                 const lspState = getWorkspaceLspRuntime(ctx.cwd);
                 if (lspState.kind !== "ready") return [];
-                return lspState.runtime.getOutstandingDiagnostics(maxSeverity);
+                return lspState.runtime.getOutstandingDiagnostics(maxSeverity).entries;
               },
               onRefresh: async () => {
                 const fresh = await gatherCiStatusData(ctx.cwd, pi);
@@ -95,10 +95,11 @@ async function gatherCiStatusData(cwd: string, pi: ExtensionAPI): Promise<CiStat
   const semanticAvailable = servers.some(
     (server) => server.status === "running" && server.ready === true,
   );
-  const diagnostics =
+  const diagnosticSnapshot =
     lspState.kind === "ready" && semanticAvailable
       ? lspState.runtime.getOutstandingDiagnosticSummary(1)
-      : [];
+      : { entries: [], current: false };
+  const diagnostics = diagnosticSnapshot.entries;
   const semanticState = deriveSemanticCapabilityState(workspace, lspState, semanticAvailable);
 
   // Sort: errors desc, warnings desc, info desc, hints desc
@@ -123,6 +124,7 @@ async function gatherCiStatusData(cwd: string, pi: ExtensionAPI): Promise<CiStat
     diagnostics,
     serverInventoryAvailable,
     semanticAvailable,
+    diagnosticSnapshotCurrent: diagnosticSnapshot.current,
     capabilities: {
       semantic: semanticState,
       structural: {

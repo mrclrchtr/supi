@@ -74,10 +74,17 @@ function collectTrackedFileDiagnostics(
   detailed?: boolean,
 ): HealthDiagnosticObservation {
   try {
-    const entries = detailed
+    const snapshot = detailed
       ? collectWorkspaceDiagnosticsDetailed(service, scope.filter, cwd)
       : collectWorkspaceDiagnostics(service, scope.filter, cwd);
-    return { kind: "completed", scope, entries };
+    return snapshot.current
+      ? { kind: "completed", scope, entries: snapshot.entries }
+      : {
+          kind: "partial",
+          scope,
+          entries: snapshot.entries,
+          reason: "Some tracked-file diagnostics were invalidated by a workspace change.",
+        };
   } catch (error) {
     return unavailableDiagnostics(
       scope,
@@ -105,18 +112,18 @@ function collectWorkspaceDiagnostics(
   service: WorkspaceLspRuntime,
   scopeFilter: string | null,
   cwd: string,
-): HealthDiagnosticEntry[] {
+): { entries: HealthDiagnosticEntry[]; current: boolean } {
   const summary = service.getWorkspaceDiagnosticSummary();
   const result: HealthDiagnosticEntry[] = [];
 
-  for (const entry of summary) {
+  for (const entry of summary.entries) {
     const filePath = resolve(cwd, entry.file);
     if (scopeFilter && !isWithinOrEqual(scopeFilter, filePath)) continue;
     if (!hasIssueCounts(entry.errors, entry.warnings)) continue;
     result.push({ file: filePath, errors: entry.errors, warnings: entry.warnings });
   }
 
-  return result;
+  return { entries: result, current: summary.current };
 }
 
 /** Detailed workspace path: full diagnostics with messages, capped per file. */
@@ -124,18 +131,18 @@ function collectWorkspaceDiagnosticsDetailed(
   service: WorkspaceLspRuntime,
   scopeFilter: string | null,
   cwd: string,
-): HealthDiagnosticEntry[] {
+): { entries: HealthDiagnosticEntry[]; current: boolean } {
   const outstanding = service.getOutstandingDiagnostics(2);
   const result: HealthDiagnosticEntry[] = [];
 
-  for (const { file, diagnostics } of outstanding) {
+  for (const { file, diagnostics } of outstanding.entries) {
     const filePath = resolve(cwd, file);
     if (scopeFilter && !isWithinOrEqual(scopeFilter, filePath)) continue;
     const entries = toFileDiagnosticEntries(filePath, diagnostics, true);
     result.push(...entries);
   }
 
-  return result;
+  return { entries: result, current: outstanding.current };
 }
 
 // ── Message extraction ────────────────────────────────────────────────

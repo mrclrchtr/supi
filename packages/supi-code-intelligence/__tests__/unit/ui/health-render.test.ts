@@ -80,7 +80,12 @@ describe("code_health TUI projection", () => {
         operationScope: "workspace-runtime",
         attemptedActiveClients: 0,
         restartedClients: 0,
-        staleAssessment: { suspected: false, matchedFileCount: 0, warning: null },
+        staleAssessment: {
+          scope: "workspace",
+          suspected: false,
+          matchedFileCount: 0,
+          warning: null,
+        },
       },
     });
 

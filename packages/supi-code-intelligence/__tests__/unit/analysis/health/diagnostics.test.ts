@@ -21,7 +21,7 @@ afterEach(() => rmSync(cwd, { recursive: true, force: true }));
 function service(overrides: Record<string, unknown>): WorkspaceLspRuntime {
   return {
     fileDiagnostics: async () => ({ kind: "completed", data: [] }),
-    getWorkspaceDiagnosticSummary: () => [],
+    getWorkspaceDiagnosticSummary: () => ({ entries: [], current: true }),
     ...overrides,
   } as unknown as WorkspaceLspRuntime;
 }
@@ -92,10 +92,13 @@ describe("code_health diagnostic observations", () => {
     const src = path.join(cwd, "src");
     const observation = await collectDiagnostics({
       service: service({
-        getWorkspaceDiagnosticSummary: () => [
-          { file: "src/a.ts", errors: 1, warnings: 0 },
-          { file: "outside.ts", errors: 1, warnings: 0 },
-        ],
+        getWorkspaceDiagnosticSummary: () => ({
+          current: true,
+          entries: [
+            { file: "src/a.ts", errors: 1, warnings: 0 },
+            { file: "outside.ts", errors: 1, warnings: 0 },
+          ],
+        }),
       }),
       included: ["diagnostics"],
       scope: diagnosticScope(src),
@@ -107,6 +110,25 @@ describe("code_health diagnostic observations", () => {
       kind: "completed",
       scope: { kind: "tracked-files", filter: src },
       entries: [{ file: path.join(cwd, "src", "a.ts"), errors: 1, warnings: 0 }],
+    });
+  });
+
+  it("marks an invalidated empty tracked-file snapshot as partial", async () => {
+    const observation = await collectDiagnostics({
+      service: service({
+        getWorkspaceDiagnosticSummary: () => ({ entries: [], current: false }),
+      }),
+      included: ["diagnostics"],
+      scope: diagnosticScope(null),
+      cwd,
+      unavailableReason: "not ready",
+    });
+
+    expect(observation).toEqual({
+      kind: "partial",
+      scope: { kind: "tracked-files", filter: null },
+      entries: [],
+      reason: "Some tracked-file diagnostics were invalidated by a workspace change.",
     });
   });
 });

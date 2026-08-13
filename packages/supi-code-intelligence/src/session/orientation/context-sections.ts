@@ -246,7 +246,8 @@ export function appendPrioritySignals(
 ): void {
   if (input.lspRuntime.kind !== "ready") return;
   const scopePath = path.resolve(input.scope);
-  const entries = input.lspRuntime.runtime.getOutstandingDiagnosticSummary(2).filter((entry) => {
+  const snapshot = input.lspRuntime.runtime.getOutstandingDiagnosticSummary(2);
+  const entries = snapshot.entries.filter((entry) => {
     const file = path.resolve(input.cwd, entry.file);
     return input.isFile ? file === scopePath : isWithinOrEqual(scopePath, file);
   });
@@ -265,8 +266,9 @@ export function appendPrioritySignals(
     confidence: "semantic",
     provenance: [{ source: "semantic", capability: "LSP diagnostic snapshot" }],
     status: "partial",
-    reason:
-      "This is the current LSP snapshot, not a complete diagnostic scan; use code_health for diagnostic status.",
+    reason: snapshot.current
+      ? "This is the current LSP snapshot, not a complete diagnostic scan; use code_health for diagnostic status."
+      : "This LSP snapshot was invalidated by a document or workspace change; use code_health with refresh:true before relying on it.",
   });
 }
 

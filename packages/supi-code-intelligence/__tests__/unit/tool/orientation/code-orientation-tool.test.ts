@@ -133,19 +133,55 @@ describe("code_orientation tool", () => {
     expect(result.content[0].text).toContain("Workspace Orientation");
   });
 
+  it("discloses invalidated Priority Signal diagnostics", async () => {
+    writeSource("src/index.ts", "export const paymentLoader = 1;\n");
+    markLspReady({
+      getOutstandingDiagnosticSummary: vi.fn(() => ({
+        current: false,
+        entries: [
+          {
+            file: "src/index.ts",
+            total: 1,
+            errors: 1,
+            warnings: 0,
+            information: 0,
+            hints: 0,
+          },
+        ],
+      })),
+      fileDiagnostics: vi.fn(async () => []),
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const result = (await getTool(pi, "code_orientation").execute(
+      "orientation-with-stale-priority-signals",
+      { focus: { path: "src/index.ts" } },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ text: string }> };
+
+    expect(result.content[0].text).toContain("invalidated by a document or workspace change");
+    expect(result.content[0].text).not.toContain("This is the current LSP snapshot");
+  });
+
   it("renders bounded live diagnostics as Priority Signals", async () => {
     writeSource("src/index.ts", "export const paymentLoader = 1;\n");
     markLspReady({
-      getOutstandingDiagnosticSummary: vi.fn(() => [
-        {
-          file: "src/index.ts",
-          total: 2,
-          errors: 1,
-          warnings: 1,
-          information: 0,
-          hints: 0,
-        },
-      ]),
+      getOutstandingDiagnosticSummary: vi.fn(() => ({
+        current: true,
+        entries: [
+          {
+            file: "src/index.ts",
+            total: 2,
+            errors: 1,
+            warnings: 1,
+            information: 0,
+            hints: 0,
+          },
+        ],
+      })),
       fileDiagnostics: vi.fn(async () => []),
     });
 
