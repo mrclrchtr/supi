@@ -85,8 +85,11 @@ Add rows for other visible sources. Do not treat an instruction file as redundan
 Now read files from disk. Find all CLAUDE.md files in the repository:
 
 ```bash
-find . -name "CLAUDE.md" -o -name ".claude.md" -o -name ".claude.local.md" 2>/dev/null | head -50
+find . \( -name "CLAUDE.md" -o -name ".claude.md" -o -name ".claude.local.md" \) \
+  -not -path "*/.agents/skills/*" -not -path "*/.pi/skills/*" -not -path "*/.claude/skills/*" 2>/dev/null | head -50
 ```
+
+**Ignore instruction files inside agent skill directories.** Skills may ship `CLAUDE.md`/`AGENTS.md` files as examples, templates, or fixtures. They are skill content, not project instructions — exclude them from discovery, scoring, and updates. Match only hidden agent-tool skill directories such as `.agents/skills`, `.pi/skills`, or `.claude/skills`; do not exclude project directories that happen to be named `skills`.
 
 **File Types & Locations:**
 

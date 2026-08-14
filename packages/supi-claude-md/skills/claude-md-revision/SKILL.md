@@ -49,8 +49,11 @@ Removing unnecessary content is as valuable as adding useful content. Do both.
 Find existing CLAUDE.md and .claude.local.md files in the project:
 
 ```bash
-find . -name "CLAUDE.md" -o -name ".claude.local.md" 2>/dev/null | head -20
+find . \( -name "CLAUDE.md" -o -name ".claude.local.md" \) \
+  -not -path "*/.agents/skills/*" -not -path "*/.pi/skills/*" -not -path "*/.claude/skills/*" 2>/dev/null | head -20
 ```
+
+Ignore instruction files inside hidden agent-tool skill directories (`.agents/skills`, `.pi/skills`, `.claude/skills`, and similar) — they are skill content (examples, templates, fixtures), not project instructions. Do not ignore project directories that happen to be named `skills`.
 
 For each file found, decide if the new content belongs there:
 
