@@ -48,6 +48,10 @@ _Avoid_: Job, step, chain link
 An ordered set of independent Delegation Tasks accepted only when every selected profile and policy resolves successfully. Every task in a valid read-only multi-task batch starts concurrently without a queue; canceling the batch cancels every active Agent Run in it.
 _Avoid_: Workflow, chain, DAG
 
+**Delegation Batch Result**:
+The ordered, attributed parent-facing result of a Delegation Batch. It has one aggregate model-output bound; each task remains represented, and complete bounded task text stays available through human details and a temporary Markdown spill when needed.
+_Avoid_: unbounded joined output, Agent transcript, continuation artifact
+
 **Mutation-Capable Profile**:
 An Agent Profile whose allowed tools can change workspace state. It is eligible only for a single-task Delegation Batch.
 _Avoid_: Writer agent, unsafe profile

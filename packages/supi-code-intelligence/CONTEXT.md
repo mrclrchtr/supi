@@ -10,6 +10,10 @@ See also: root `CONTEXT.md` for project-wide terms (Context Efficiency, Prompt S
 The set of agent-facing capabilities that help understand, navigate, search, and refactor code.
 _Avoid_: code intel, IDE features
 
+**Workspace Overview**:
+An optional, bounded first-turn snapshot of manifest-declared package topology, entrypoints, and detected languages. It contains structural repository facts as untrusted evidence and points to the Orientation surface when facts are omitted.
+_Avoid_: architecture overview, complete project context, trusted instructions
+
 **Orientation surface**:
 The code-intelligence surface that helps an agent establish directly observed workspace, package, directory, file, or target facts before choosing more surgical tools.
 _Avoid_: context bundle, relation graph, treating orientation as target analysis

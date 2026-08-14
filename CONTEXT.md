@@ -22,6 +22,18 @@ _Avoid_: dumbing down tools, removing capability, token shaving
 A README grouping that explains SuPi packages by the user problem they solve rather than by package internals or install order. Each family should point readers to the relevant package README files for full details.
 _Avoid_: package category, module group
 
+**Recommended Release Stack**:
+The curated set of stable Extension Packages installed for ordinary use. It is smaller than the Full Stack and does not define which packages the repository loads during development.
+_Avoid_: standard root, release surface, default workspace
+
+**Full Stack**:
+The opt-in installation of all user-facing SuPi Extension Packages, including beta and DevTool Packages.
+_Avoid_: Recommended Release Stack, workspace install
+
+**Workspace Extension Surface**:
+The complete set of Extension Packages loaded from the repository root for development and local or Git installs. It represents the Full Stack, not the Recommended Release Stack.
+_Avoid_: root stack, standard stack, release stack
+
 **Extension Package**:
 A SuPi package that can be installed into PI and registers extension behavior such as tools, commands, event handlers, settings, or UI.
 _Avoid_: plugin package, module

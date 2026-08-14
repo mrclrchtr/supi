@@ -123,8 +123,8 @@ A direct user instruction to ask, verify, verify and fix, fix, or only report th
 _Avoid_: Review Task, Review Mode, Agent plan
 
 **Post-Review Policy**:
-The configured default for how the containing Agent responds to findings when no Post-Review Disposition exists. It applies consistently to interactive and agent-initiated reviews and defaults to asking the user.
-_Avoid_: Reviewer Protocol, Review Task, Task Verdict
+The configured default for how the containing Agent responds to findings when no Post-Review Disposition exists. It applies consistently to interactive and agent-initiated reviews and defaults to asking the user. A fixing policy first rejects findings that are refuted, stale, duplicated, incompatible, or not applicable to the live checkout.
+_Avoid_: Reviewer Protocol, Review Task, Task Verdict, authority to apply every reported finding
 
 **Review Output Artifact**:
 A bounded, session-scoped copy of complete parent-facing review text. The first page carries its opaque id; `supi_review_output` retrieves repeatable continuation pages until expiry or eviction.
