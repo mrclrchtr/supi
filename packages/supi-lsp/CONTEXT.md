@@ -25,3 +25,19 @@ _Avoid_: nullable runtime, implicit startup, manager availability, inferring sem
 **Concrete semantic readiness**:
 Evidence that a live LSP client is ready: workspace readiness requires at least one active ready client, while file readiness requires the routed client for that file to exist and finish startup. An empty client set and a routed `null` result are unavailable, never vacuously ready. Failed workspace warm-up leaves the runtime owner published and semantic registration pending so a lazy file route may still start later.
 _Avoid_: owner readiness, `Promise.all([])` readiness, treating a configured route as a live client
+
+**Diagnostic evidence barrier**:
+A freshness boundary that invalidates earlier diagnostic evidence after a document or workspace change. Evidence may cross the boundary only when the current document scope is confirmed; an old cache or an unversioned publication does not cross it.
+_Avoid_: cache clear, quiet period, clean result, workspace-wide freshness
+
+**Push-only diagnostic recovery**:
+A bounded recovery path for a server that publishes diagnostics but cannot answer pull requests. It may restart an affected client during an explicit refresh, but it must keep file-local freshness and report partial evidence when confirmation fails.
+_Avoid_: trust-next-push, automatic restart on status display, recovered diagnostics
+
+**Progress readiness**:
+The SuPi readiness interpretation of LSP work-done progress. A created progress token is pending, an observed `begin` token represents active work, and an observed `end` token completes that work.
+_Avoid_: created means active, token timeout means server failure, owner readiness
+
+**Identity-bearing debug event**:
+A retained or persisted LSP debug event that may include server, workspace, file, or path identity to support local protocol diagnosis. Secret values remain protected by the debug registry's redaction rules.
+_Avoid_: sanitized identity-free event, public tool evidence, raw protocol dump

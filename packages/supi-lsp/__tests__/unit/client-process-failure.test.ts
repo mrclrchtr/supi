@@ -120,6 +120,49 @@ describe("LspClient process failure", () => {
     expect(mocks.transports[0]?.disposed).toBe(true);
   });
 
+  it("keeps a failed document as removed when the file is deleted", async () => {
+    directory = mkdtempSync(join(tmpdir(), "lsp-process-failure-"));
+    const file = join(directory, "deleted-after-failure.ts");
+    writeFileSync(file, "const value = 1;\n");
+    const client = new LspClient(
+      "test",
+      { command: "test-lsp", fileTypes: ["ts"], rootMarkers: ["package.json"] },
+      directory,
+    );
+    await client.start();
+    (client as unknown as { resolveReady(): void }).resolveReady();
+    client.didOpen(file, "const value = 1;\n");
+
+    process.emit("exit", 1);
+    rmSync(file);
+
+    expect(client.getDiagnosticSnapshot()).toMatchObject({
+      documents: [{ uri: `file://${file}`, status: "removed", current: false }],
+      current: false,
+    });
+  });
+
+  it("keeps a cache-only document as removed after a process failure", async () => {
+    directory = mkdtempSync(join(tmpdir(), "lsp-process-failure-"));
+    const file = join(directory, "related-after-failure.ts");
+    writeFileSync(file, "const value = 1;\n");
+    const client = new LspClient(
+      "test",
+      { command: "test-lsp", fileTypes: ["ts"], rootMarkers: ["package.json"] },
+      directory,
+    );
+    await client.start();
+    client.handlePublishDiagnostics({ uri: `file://${file}`, diagnostics: [] });
+
+    process.emit("exit", 1);
+    rmSync(file);
+
+    expect(client.getDiagnosticSnapshot()).toMatchObject({
+      documents: [{ uri: `file://${file}`, status: "removed", current: false }],
+      current: false,
+    });
+  });
+
   it("releases a diagnostic settle timer when the server exits", async () => {
     directory = mkdtempSync(join(tmpdir(), "lsp-process-failure-"));
     const file = join(directory, "pending.ts");
@@ -137,7 +180,15 @@ describe("LspClient process failure", () => {
 
     process.emit("exit", 1);
 
-    await expect(Promise.race([pending, timeoutAfter(250)])).resolves.toBeUndefined();
+    await expect(Promise.race([pending, timeoutAfter(250)])).resolves.toMatchObject({
+      requested: 1,
+      failed: 1,
+      removed: 0,
+    });
     expect(client.status).toBe("error");
+    expect(client.getDiagnosticSnapshot()).toMatchObject({
+      documents: [{ uri: `file://${file}`, status: "failed", current: false }],
+      current: false,
+    });
   });
 });

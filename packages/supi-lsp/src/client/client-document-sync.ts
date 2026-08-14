@@ -1,8 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import type { VersionedTextDocumentIdentifier } from "../config/types.ts";
 import type { DiagnosticSynchronization } from "./client-diagnostic-evidence.ts";
 import type { DiagnosticWaitRegistry } from "./client-diagnostic-waiters.ts";
 import { fingerprintDocumentContent, type OpenDocumentState } from "./client-document-state.ts";
+import { getDiagnosticFileState } from "./client-file-state.ts";
 
 type NotificationSender = (method: string, params: unknown) => void;
 
@@ -34,6 +35,51 @@ export function synchronizeDocument(options: SynchronizeDocumentOptions): void {
   });
 }
 
+/** Remove one document and release all diagnostic waits for its URI. */
+export function clearTrackedDocumentState(
+  openDocuments: Map<string, OpenDocumentState>,
+  diagnosticStore: Map<string, unknown>,
+  waiters: DiagnosticWaitRegistry,
+  uri: string,
+): void {
+  openDocuments.delete(uri);
+  diagnosticStore.delete(uri);
+  waiters.releaseFile(uri);
+  waiters.cancelSettle();
+}
+
+/** Synchronize one open document, or open it when the route is not tracked yet. */
+export function synchronizeTrackedDocument(options: {
+  uri: string;
+  content: string;
+  document: OpenDocumentState | undefined;
+  nextVersion(): number;
+  nextSynchronizationId(): number;
+  evidenceRevision: number;
+  waiters: DiagnosticWaitRegistry;
+  sendNotification: NotificationSender;
+  blockUnversionedPush?(): void;
+  clearFailedFile?(): void;
+  open(): void;
+}): void {
+  if (!options.document) {
+    options.open();
+    return;
+  }
+  options.blockUnversionedPush?.();
+  synchronizeDocument({
+    uri: options.uri,
+    content: options.content,
+    document: options.document,
+    version: options.nextVersion(),
+    synchronizationId: options.nextSynchronizationId(),
+    evidenceRevision: options.evidenceRevision,
+    waiters: options.waiters,
+    sendNotification: options.sendNotification,
+  });
+  options.clearFailedFile?.();
+}
+
 interface ResynchronizeDocumentsOptions {
   openDocuments: Map<string, OpenDocumentState>;
   waiters: DiagnosticWaitRegistry;
@@ -43,21 +89,32 @@ interface ResynchronizeDocumentsOptions {
   sendNotification: NotificationSender;
   uriToFile(uri: string): string;
   clearFile(uri: string): void;
+  invalidateEvidence(uri: string): void;
+  blockUnversionedPush(uri: string): void;
+  clearFailedFile(uri: string): void;
+}
+
+/** Document coverage produced while re-reading tracked files for refresh. */
+export interface ResynchronizeDocumentsResult {
+  /** Documents that were synchronized and can receive fresh evidence. */
+  synchronizations: DiagnosticSynchronization[];
+  /** Existing tracked documents removed because their files no longer exist. */
+  removedFiles: string[];
+  /** Existing tracked documents that could not be read or synchronized. */
+  failedFiles: string[];
 }
 
 /** Re-read and synchronize every existing open document. */
 export function resynchronizeOpenDocuments(
   options: ResynchronizeDocumentsOptions,
-): DiagnosticSynchronization[] {
+): ResynchronizeDocumentsResult {
   const synchronizations: DiagnosticSynchronization[] = [];
+  const removedFiles: string[] = [];
+  const failedFiles: string[] = [];
   for (const [uri, document] of options.openDocuments) {
     const filePath = options.uriToFile(uri);
     try {
-      if (!existsSync(filePath)) {
-        options.clearFile(uri);
-        options.sendNotification("textDocument/didClose", { textDocument: { uri } });
-        continue;
-      }
+      options.blockUnversionedPush(uri);
       synchronizeDocument({
         uri,
         content: readFileSync(filePath, "utf-8"),
@@ -68,10 +125,24 @@ export function resynchronizeOpenDocuments(
         waiters: options.waiters,
         sendNotification: options.sendNotification,
       });
-      synchronizations.push({ uri, synchronizationId: document.synchronizationId });
+      options.clearFailedFile(uri);
+      synchronizations.push({
+        uri,
+        synchronizationId: document.synchronizationId,
+        evidenceRevision: document.evidenceRevision,
+      });
     } catch {
+      if (getDiagnosticFileState(filePath) === "removed") {
+        options.clearFile(uri);
+        options.sendNotification("textDocument/didClose", { textDocument: { uri } });
+        removedFiles.push(filePath);
+        continue;
+      }
+      options.invalidateEvidence(uri);
+      options.blockUnversionedPush(uri);
+      failedFiles.push(filePath);
       // Keep the document open when a transient read fails.
     }
   }
-  return synchronizations;
+  return { synchronizations, removedFiles, failedFiles };
 }

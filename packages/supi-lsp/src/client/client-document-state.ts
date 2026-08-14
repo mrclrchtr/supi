@@ -9,9 +9,17 @@ export interface DiagnosticEntry {
   current: boolean;
 }
 
+/** One tracked document's current diagnostic freshness. */
+export interface ClientDiagnosticDocument {
+  uri: string;
+  current: boolean;
+  status: "confirmed" | "unconfirmed" | "failed" | "removed";
+}
+
 /** One client's diagnostic snapshot, including empty cache freshness. */
 export interface ClientDiagnosticSnapshot {
   entries: DiagnosticEntry[];
+  documents: ClientDiagnosticDocument[];
   current: boolean;
 }
 

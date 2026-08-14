@@ -22,6 +22,17 @@ function registerMinimalSemantic(cwd: string) {
   });
 }
 
+function emptyDiagnosticEvidence() {
+  return {
+    requested: 0,
+    confirmed: 0,
+    unconfirmed: 0,
+    failed: 0,
+    removed: 0,
+    documents: [],
+  };
+}
+
 function readyProjectServer() {
   return {
     name: "typescript",
@@ -104,8 +115,16 @@ describe("/supi-ci-status command", () => {
     registerMinimalSemantic("/project");
     const mockService = {
       getProjectServers: vi.fn(() => [readyProjectServer()]),
-      getOutstandingDiagnosticSummary: vi.fn(() => ({ entries: [], current: true })),
-      getOutstandingDiagnostics: vi.fn(() => ({ entries: [], current: true })),
+      getOutstandingDiagnosticSummary: vi.fn(() => ({
+        entries: [],
+        current: true,
+        evidence: emptyDiagnosticEvidence(),
+      })),
+      getOutstandingDiagnostics: vi.fn(() => ({
+        entries: [],
+        current: true,
+        evidence: emptyDiagnosticEvidence(),
+      })),
     } as unknown as WorkspaceLspRuntime;
 
     vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
@@ -138,8 +157,16 @@ describe("/supi-ci-status command", () => {
     registerMinimalSemantic("/project");
     const mockService = {
       getProjectServers: vi.fn(() => [readyProjectServer()]),
-      getOutstandingDiagnosticSummary: vi.fn(() => ({ entries: [], current: false })),
-      getOutstandingDiagnostics: vi.fn(() => ({ entries: [], current: false })),
+      getOutstandingDiagnosticSummary: vi.fn(() => ({
+        entries: [],
+        current: false,
+        evidence: emptyDiagnosticEvidence(),
+      })),
+      getOutstandingDiagnostics: vi.fn(() => ({
+        entries: [],
+        current: false,
+        evidence: emptyDiagnosticEvidence(),
+      })),
     } as unknown as WorkspaceLspRuntime;
     vi.mocked(getWorkspaceLspRuntime).mockReturnValue({ kind: "ready", runtime: mockService });
 
@@ -176,8 +203,13 @@ describe("/supi-ci-status command", () => {
         entries: [
           { file: "src/index.ts", total: 2, errors: 2, warnings: 0, information: 0, hints: 0 },
         ],
+        evidence: emptyDiagnosticEvidence(),
       })),
-      getOutstandingDiagnostics: vi.fn(() => ({ entries: [], current: true })),
+      getOutstandingDiagnostics: vi.fn(() => ({
+        entries: [],
+        current: true,
+        evidence: emptyDiagnosticEvidence(),
+      })),
     } as unknown as WorkspaceLspRuntime;
 
     vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
@@ -270,8 +302,13 @@ describe("/supi-ci-status command", () => {
           { file: "src/err.ts", total: 2, errors: 2, warnings: 0, information: 0, hints: 0 },
           { file: "src/mixed.ts", total: 3, errors: 1, warnings: 2, information: 0, hints: 0 },
         ],
+        evidence: emptyDiagnosticEvidence(),
       })),
-      getOutstandingDiagnostics: vi.fn(() => ({ entries: [], current: true })),
+      getOutstandingDiagnostics: vi.fn(() => ({
+        entries: [],
+        current: true,
+        evidence: emptyDiagnosticEvidence(),
+      })),
     } as unknown as WorkspaceLspRuntime;
 
     vi.mocked(getWorkspaceLspRuntime).mockReturnValue({

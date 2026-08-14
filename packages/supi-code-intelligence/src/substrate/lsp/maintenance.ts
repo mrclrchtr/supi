@@ -6,45 +6,71 @@
  * semantic tool queries.
  */
 
+import { statSync } from "node:fs";
 import * as nodePath from "node:path";
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
-import type { WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
+import type { DiagnosticEvidenceSummary, WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 import {
   clearTsconfigCache,
   isLikelyStaleDiagnostic,
   syncWorkspaceSentinelSnapshot,
 } from "@mrclrchtr/supi-lsp/api";
+import { mergeDiagnosticEvidence } from "../../diagnostics/evidence.ts";
 
 /**
- * Run sentinel-sync, stale-module resync, prune, and diagnostic refresh
- * as a single maintenance pass. Call before explicit diagnostic queries
- * (code_health with refresh:true) or semantic tool readiness checks.
+ * Run sentinel-sync, diagnostic refresh, and stale-module resync as a single
+ * maintenance pass. Call before explicit diagnostic queries (code_health with
+ * refresh:true) or semantic tool readiness checks.
  */
 export async function refreshLspMaintenance(
   runtime: WorkspaceLspRuntime,
   cwd: string,
   sentinelSnapshot: Map<string, number>,
   control?: CodeRequestControl,
-): Promise<Map<string, number>> {
+): Promise<WorkspaceLspMaintenanceResult> {
   const { snapshot } = synchronizeSentinels(runtime, cwd, sentinelSnapshot);
+  let diagnosticEvidence = emptyEvidence();
+  let failureReason: string | undefined;
 
-  // Stale-module resync: force-reopen files with "Cannot find module" errors
-  await resyncStaleModuleFiles(runtime, cwd, control);
-
-  // Two-pass prune/refresh for diagnostics
-  runtime.pruneMissingFiles();
+  // Refresh before stale-module inspection. The refresh owns deleted-file
+  // classification; later snapshots must not erase its removed evidence.
   try {
-    await runtime.refreshOpenDiagnostics(undefined, control);
-  } catch {
-    /* best-effort */
+    diagnosticEvidence = await runtime.refreshOpenDiagnostics(undefined, control);
+  } catch (error) {
+    failureReason = errorMessage(error);
+    diagnosticEvidence = readRuntimeEvidence(runtime);
   }
-  runtime.pruneMissingFiles();
 
-  return snapshot;
+  try {
+    const staleResult = await resyncStaleModuleFiles(runtime, cwd, control);
+    diagnosticEvidence = mergeDiagnosticEvidence(diagnosticEvidence, staleResult.evidence, cwd);
+    if (staleResult.completed) failureReason = undefined;
+  } catch {
+    // Keep evidence from the first refresh when stale inspection fails.
+  }
+
+  return {
+    snapshot,
+    diagnosticEvidence,
+    ...(failureReason ? { failureReason } : {}),
+  };
 }
 
-export interface FileLspMaintenanceResult {
+/** Sentinel state and diagnostic evidence retained from one workspace pass. */
+export interface WorkspaceLspMaintenanceResult {
+  /** The next sentinel snapshot for the session-owned maintenance state. */
   snapshot: Map<string, number>;
+  /** Evidence from every diagnostic refresh performed by this pass. */
+  diagnosticEvidence: DiagnosticEvidenceSummary;
+  /** Failure from the first workspace refresh, when no fresh pass completed. */
+  failureReason?: string;
+}
+
+/** Sentinel state and stale-file facts from one file-scoped pass. */
+export interface FileLspMaintenanceResult {
+  /** The next sentinel snapshot for the session-owned maintenance state. */
+  snapshot: Map<string, number>;
+  /** Number of stale files that matched the requested file. */
   matchedStaleFileCount: number;
 }
 
@@ -93,7 +119,7 @@ async function resyncStaleModuleFiles(
   runtime: WorkspaceLspRuntime,
   cwd: string,
   control?: CodeRequestControl,
-): Promise<void> {
+): Promise<{ evidence: DiagnosticEvidenceSummary; completed: boolean }> {
   const outstanding = runtime.getOutstandingDiagnostics(1);
   const staleFiles: string[] = [];
 
@@ -103,17 +129,104 @@ async function resyncStaleModuleFiles(
     }
   }
 
-  if (staleFiles.length === 0) return;
+  if (staleFiles.length === 0) return { evidence: emptyEvidence(), completed: false };
 
+  const invalidated: Array<{
+    file: string;
+    status: "unconfirmed" | "failed" | "removed";
+  }> = staleFiles.map((file) => ({
+    file: nodePath.relative(cwd, nodePath.resolve(cwd, file)),
+    status: "unconfirmed",
+  }));
   for (const file of staleFiles) {
     const filePath = nodePath.resolve(cwd, file);
+    const relativeFile = nodePath.relative(cwd, filePath);
     runtime.closeFile(filePath);
-    await runtime.trackFile(filePath);
+    try {
+      if (!(await runtime.trackFile(filePath))) {
+        markUnavailable(invalidated, relativeFile, filePath);
+      }
+    } catch {
+      markUnavailable(invalidated, relativeFile, filePath);
+    }
   }
 
   try {
-    await runtime.refreshOpenDiagnostics({ quietMs: 300, maxWaitMs: 2000 }, control);
+    return {
+      evidence: mergeDiagnosticEvidence(
+        {
+          requested: invalidated.length,
+          confirmed: 0,
+          unconfirmed: invalidated.length,
+          failed: 0,
+          removed: 0,
+          documents: invalidated,
+        },
+        await runtime.refreshOpenDiagnostics({ quietMs: 300, maxWaitMs: 2000 }, control),
+        cwd,
+      ),
+      completed: true,
+    };
   } catch {
-    /* best-effort */
+    return {
+      evidence: {
+        requested: invalidated.length,
+        confirmed: 0,
+        unconfirmed: invalidated.filter((document) => document.status === "unconfirmed").length,
+        failed: invalidated.filter((document) => document.status === "failed").length,
+        removed: invalidated.filter((document) => document.status === "removed").length,
+        documents: invalidated,
+      },
+      completed: false,
+    };
   }
+}
+
+function markUnavailable(
+  documents: Array<{ file: string; status: "unconfirmed" | "failed" | "removed" }>,
+  file: string,
+  filePath: string,
+): void {
+  const entry = documents.find((document) => document.file === file);
+  if (entry) entry.status = diagnosticFailureStatus(filePath);
+}
+
+function diagnosticFailureStatus(filePath: string): "failed" | "removed" {
+  try {
+    statSync(filePath);
+    return "failed";
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error.code === "ENOENT" || error.code === "ENOTDIR")
+    ) {
+      return "removed";
+    }
+    return "failed";
+  }
+}
+
+function readRuntimeEvidence(runtime: WorkspaceLspRuntime): DiagnosticEvidenceSummary {
+  try {
+    return runtime.getWorkspaceDiagnosticSummary().evidence;
+  } catch {
+    return emptyEvidence();
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error && error.message ? error.message : "Diagnostic refresh failed.";
+}
+
+function emptyEvidence(): DiagnosticEvidenceSummary {
+  return {
+    requested: 0,
+    confirmed: 0,
+    unconfirmed: 0,
+    failed: 0,
+    removed: 0,
+    documents: [],
+  };
 }

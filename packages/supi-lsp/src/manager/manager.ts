@@ -27,6 +27,11 @@ import {
   relativeFilePathFromUri,
 } from "../diagnostics/diagnostic-summary.ts";
 import {
+  type DiagnosticEvidenceDocument,
+  type DiagnosticEvidenceSummary,
+  summarizeDiagnosticEvidence,
+} from "../diagnostics/evidence.ts";
+import {
   displayRelativeFilePath,
   formatCoverageSummaryText,
   formatOutstandingDiagnosticsSummaryText,
@@ -34,7 +39,7 @@ import {
   normalizeRelevantPaths,
   shouldIgnoreLspPath,
 } from "../summary.ts";
-import { commandExists, resolveSessionPath } from "../utils.ts";
+import { commandExists, resolveSessionPath, uriToFile } from "../utils.ts";
 import {
   closeFileAcrossClients,
   pruneMissingFilesFromClients,
@@ -59,7 +64,10 @@ import type {
   OutstandingDiagnosticSummaryEntry,
   ServerStatus,
 } from "./manager-types.ts";
-import { recoverWorkspaceDiagnostics as recoverWorkspaceDiagnosticsImpl } from "./manager-workspace-recovery.ts";
+import {
+  recoverWorkspaceDiagnostics as recoverWorkspaceDiagnosticsImpl,
+  type WorkspaceRecoveryResult,
+} from "./manager-workspace-recovery.ts";
 import {
   collectWorkspaceSymbols,
   findWorkspaceSymbolWarmTargets,
@@ -75,6 +83,12 @@ type FileRoute = {
   serverConfig: ServerConfig;
   root: string;
   key: string;
+};
+
+type ClientRestartResult = {
+  key: string;
+  files: string[];
+  restarted: boolean;
 };
 
 export type ManagerLifecycleTransitionKind = LspClientLifecycleTransitionKind | "recovery";
@@ -316,8 +330,8 @@ export class LspManager {
   }
 
   /** Restart the clients that own the supplied file paths, if any are active. */
-  async restartClientsForFiles(filePaths: string[]): Promise<string[]> {
-    const restarted: string[] = [];
+  async restartClientsForFiles(filePaths: string[]): Promise<ClientRestartResult[]> {
+    const restarted: ClientRestartResult[] = [];
     const seen = new Set<string>();
 
     for (const filePath of filePaths) {
@@ -328,20 +342,23 @@ export class LspManager {
       if (seen.has(key)) continue;
       seen.add(key);
 
-      if (await this.restartClient(client)) {
-        restarted.push(key);
-      }
+      const result = await this.restartClient(client);
+      restarted.push({ key, ...result });
     }
 
     return restarted;
   }
 
-  private async restartClient(client: LspClient): Promise<boolean> {
+  private async restartClient(client: LspClient): Promise<{ files: string[]; restarted: boolean }> {
     const key = clientKey(client.name, client.root);
     const serverConfig = this.config.servers[client.name];
-    if (!serverConfig) return false;
+    if (!serverConfig) return { files: [], restarted: false };
 
     const openFiles = client.openFiles;
+    const trackedDiagnosticFiles = client
+      .getDiagnosticSnapshot()
+      .documents.map((document) => uriToFile(document.uri));
+    const files = [...new Set([...openFiles, ...trackedDiagnosticFiles])];
     try {
       await client.shutdown();
     } catch {
@@ -360,19 +377,24 @@ export class LspManager {
 
     try {
       await replacement.start();
-      for (const filePath of openFiles) {
-        if (!fs.existsSync(filePath)) continue;
+      const failedFiles: string[] = [];
+      for (const filePath of files) {
+        if (!fs.existsSync(filePath)) {
+          failedFiles.push(filePath);
+          continue;
+        }
         try {
           replacement.didOpen(filePath, fs.readFileSync(filePath, "utf-8"));
         } catch {
-          // Skip unreadable files on restart.
+          failedFiles.push(filePath);
         }
       }
-      return true;
+      for (const filePath of failedFiles) replacement.markFailedFile(filePath);
+      return { files, restarted: true };
     } catch {
       this.clients.delete(key);
       this.unavailable.set(key, "start-failed");
-      return false;
+      return { files, restarted: false };
     }
   }
 
@@ -489,11 +511,12 @@ export class LspManager {
   pruneMissingFiles(): string[] {
     return pruneMissingFilesFromClients(this.clients.values());
   }
-  /** Re-sync all open documents across active clients and wait for diagnostics to settle. */
+  /** Re-sync all open documents across active clients and return exact evidence coverage. */
   async refreshOpenDiagnostics(
     options?: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl,
-  ): Promise<void> {
-    await refreshOpenDiagnosticsForClients(this.clients.values(), options);
+  ): Promise<DiagnosticEvidenceSummary> {
+    const summary = await refreshOpenDiagnosticsForClients(this.clients.values(), options);
+    return this.toWorkspaceDiagnosticEvidence(summary.documents);
   }
 
   /** Clear cached pull-diagnostic result IDs across all clients. */
@@ -517,15 +540,7 @@ export class LspManager {
     maxWaitMs?: number;
     quietMs?: number;
     control?: CodeRequestControl;
-  }): Promise<{
-    attemptedClients: number;
-    restartedClients: number;
-    staleAssessment: {
-      suspected: boolean;
-      matchedFiles: Array<{ file: string; diagnostics: Diagnostic[] }>;
-      warning: string | null;
-    };
-  }> {
+  }): Promise<WorkspaceRecoveryResult> {
     return recoverWorkspaceDiagnosticsImpl(this, options);
   }
 
@@ -542,6 +557,23 @@ export class LspManager {
     this.pendingWarmProbes.clear();
   }
   /** Get status of all servers. */
+  getRunningClientCount(): number {
+    return Array.from(this.clients.values()).filter((client) => client.status === "running").length;
+  }
+
+  /** Check whether a path belongs to the configured diagnostic evidence scope. */
+  isDiagnosticFile(filePath: string): boolean {
+    const relative = path.relative(this.cwd, path.resolve(this.cwd, filePath));
+    return (
+      !shouldIgnoreLspPath(relative, this.cwd) &&
+      !isExcludedByPattern(relative, this.excludePatterns)
+    );
+  }
+
+  getDiagnosticEvidence(): DiagnosticEvidenceSummary {
+    return this.getDiagnosticSnapshot().evidence;
+  }
+
   getStatus(): ManagerStatus {
     this.pruneMissingFiles();
     const servers: ServerStatus[] = [];
@@ -628,20 +660,34 @@ export class LspManager {
   getDiagnosticSummary(): DiagnosticSummary[] {
     return this.getDiagnosticSnapshot().entries;
   }
-  getDiagnosticSnapshot(): { entries: DiagnosticSummary[]; current: boolean } {
+  getDiagnosticSnapshot(): {
+    entries: DiagnosticSummary[];
+    current: boolean;
+    evidence: DiagnosticEvidenceSummary;
+  } {
     this.pruneMissingFiles();
     const fileDiags = new Map<string, { errors: number; warnings: number }>();
-    let current = true;
+    const evidenceDocuments: DiagnosticEvidenceDocument[] = [];
+    let clientCurrent = true;
     for (const client of this.clients.values()) {
       const snapshot = client.getDiagnosticSnapshot();
-      current &&= snapshot.current;
+      clientCurrent &&= snapshot.current;
+      for (const document of snapshot.documents) {
+        evidenceDocuments.push({
+          file: relativeFilePathFromUri(document.uri, this.cwd),
+          status: document.status,
+        });
+      }
       for (const entry of snapshot.entries) {
         collectDiagnosticSummaryCounts(fileDiags, entry, this.cwd, this.excludePatterns);
       }
     }
+    const evidence = this.toWorkspaceDiagnosticEvidence(evidenceDocuments);
     return {
       entries: Array.from(fileDiags.entries()).map(([file, counts]) => ({ file, ...counts })),
-      current,
+      current:
+        clientCurrent && evidence.documents.every((document) => document.status === "confirmed"),
+      evidence,
     };
   }
   /** Get outstanding diagnostics at or above the configured inline threshold. */
@@ -651,32 +697,25 @@ export class LspManager {
   getOutstandingDiagnosticSummarySnapshot(maxSeverity: number = 1): {
     entries: OutstandingDiagnosticSummaryEntry[];
     current: boolean;
+    evidence: DiagnosticEvidenceSummary;
   } {
     this.pruneMissingFiles();
-    const fileDiags = new Map<string, OutstandingDiagnosticSummaryEntry>();
-    let current = true;
-    for (const client of this.clients.values()) {
-      const snapshot = client.getDiagnosticSnapshot();
-      current &&= snapshot.current;
-      for (const entry of snapshot.entries) {
-        const file = relativeFilePathFromUri(entry.uri, this.cwd);
-        if (shouldIgnoreLspPath(file, this.cwd)) continue;
-        if (isExcludedByPattern(file, this.excludePatterns)) continue;
-        const existing = fileDiags.get(file) ?? createOutstandingDiagnosticSummary(file);
-        const next = accumulateOutstandingDiagnostics(existing, entry.diagnostics, maxSeverity);
-        if (next.total > 0) fileDiags.set(file, next);
-      }
-    }
+    const evidence = this.toWorkspaceDiagnosticEvidence(
+      collectClientDiagnosticEvidenceDocuments(this.clients.values(), this.cwd),
+    );
+    const clientCurrent = Array.from(this.clients.values()).every(
+      (client) => client.getDiagnosticSnapshot().current,
+    );
     return {
-      entries: Array.from(fileDiags.values()).sort(
-        (a, b) =>
-          b.errors - a.errors ||
-          b.warnings - a.warnings ||
-          b.information - a.information ||
-          b.hints - a.hints ||
-          a.file.localeCompare(b.file),
+      entries: collectOutstandingDiagnosticSummaryEntries(
+        this.clients.values(),
+        this.cwd,
+        this.excludePatterns,
+        maxSeverity,
       ),
-      current,
+      current:
+        clientCurrent && evidence.documents.every((document) => document.status === "confirmed"),
+      evidence,
     };
   }
   getRelevantOutstandingDiagnosticsSummaryText(
@@ -701,9 +740,20 @@ export class LspManager {
   getOutstandingDiagnosticsSnapshot(maxSeverity: number = 1): {
     entries: Array<{ file: string; diagnostics: Diagnostic[] }>;
     current: boolean;
+    evidence: DiagnosticEvidenceSummary;
   } {
     this.pruneMissingFiles();
     const clients = Array.from(this.clients.values());
+    let clientCurrent = true;
+    const evidenceDocuments = clients.flatMap((client) => {
+      const snapshot = client.getDiagnosticSnapshot();
+      clientCurrent &&= snapshot.current;
+      return snapshot.documents.map((document) => ({
+        file: relativeFilePathFromUri(document.uri, this.cwd),
+        status: document.status,
+      }));
+    });
+    const evidence = this.toWorkspaceDiagnosticEvidence(evidenceDocuments);
     return {
       entries: collectOutstandingDiagnosticsDetailed(
         clients,
@@ -711,9 +761,29 @@ export class LspManager {
         this.excludePatterns,
         maxSeverity,
       ),
-      current: clients.every((client) => client.getDiagnosticSnapshot().current),
+      current:
+        clientCurrent && evidence.documents.every((document) => document.status === "confirmed"),
+      evidence,
     };
   }
+  private toWorkspaceDiagnosticEvidence(
+    documents: readonly DiagnosticEvidenceDocument[],
+  ): DiagnosticEvidenceSummary {
+    const byFile = new Map<string, DiagnosticEvidenceDocument>();
+    for (const document of documents) {
+      const file = path.relative(this.cwd, path.resolve(this.cwd, document.file));
+      if (shouldIgnoreLspPath(file, this.cwd)) continue;
+      if (isExcludedByPattern(file, this.excludePatterns)) continue;
+      const existing = byFile.get(file);
+      if (!existing || evidenceStatusRank(document.status) > evidenceStatusRank(existing.status)) {
+        byFile.set(file, { file, status: document.status });
+      }
+    }
+    return summarizeDiagnosticEvidence(
+      Array.from(byFile.values()).sort((a, b) => a.file.localeCompare(b.file)),
+    );
+  }
+
   async workspaceSymbol(
     query: string,
     control?: CodeRequestControl,
@@ -899,5 +969,56 @@ export class LspManager {
         this.pendingWarmProbes.delete(key);
       }
     }
+  }
+}
+
+function collectClientDiagnosticEvidenceDocuments(
+  clients: Iterable<LspClient>,
+  cwd: string,
+): DiagnosticEvidenceDocument[] {
+  return Array.from(clients).flatMap((client) =>
+    client.getDiagnosticSnapshot().documents.map((document) => ({
+      file: relativeFilePathFromUri(document.uri, cwd),
+      status: document.status,
+    })),
+  );
+}
+
+function collectOutstandingDiagnosticSummaryEntries(
+  clients: Iterable<LspClient>,
+  cwd: string,
+  excludePatterns: string[],
+  maxSeverity: number,
+): OutstandingDiagnosticSummaryEntry[] {
+  const fileDiags = new Map<string, OutstandingDiagnosticSummaryEntry>();
+  for (const client of clients) {
+    for (const entry of client.getDiagnosticSnapshot().entries) {
+      const file = relativeFilePathFromUri(entry.uri, cwd);
+      if (shouldIgnoreLspPath(file, cwd) || isExcludedByPattern(file, excludePatterns)) continue;
+      const existing = fileDiags.get(file) ?? createOutstandingDiagnosticSummary(file);
+      const next = accumulateOutstandingDiagnostics(existing, entry.diagnostics, maxSeverity);
+      if (next.total > 0) fileDiags.set(file, next);
+    }
+  }
+  return Array.from(fileDiags.values()).sort(
+    (a, b) =>
+      b.errors - a.errors ||
+      b.warnings - a.warnings ||
+      b.information - a.information ||
+      b.hints - a.hints ||
+      a.file.localeCompare(b.file),
+  );
+}
+
+function evidenceStatusRank(status: DiagnosticEvidenceDocument["status"]): number {
+  switch (status) {
+    case "confirmed":
+      return 1;
+    case "unconfirmed":
+      return 2;
+    case "failed":
+      return 3;
+    case "removed":
+      return 4;
   }
 }

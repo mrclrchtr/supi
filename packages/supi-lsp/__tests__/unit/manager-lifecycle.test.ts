@@ -7,6 +7,12 @@ const mocks = vi.hoisted(() => ({
     didOpen(file: string): void;
     emit(kind: string): void;
     getReady(): Promise<void>;
+    getDiagnosticSnapshot(): {
+      entries: [];
+      documents: [];
+      current: boolean;
+    };
+    markFailedFile(file: string): void;
     loseReadiness(): void;
     name: string;
     openFiles: string[];
@@ -90,6 +96,12 @@ vi.mock("../../src/client/client.ts", () => ({
     getOpenDocumentVersion(): null {
       return null;
     }
+
+    getDiagnosticSnapshot(): { entries: []; documents: []; current: boolean } {
+      return { entries: [], documents: [], current: true };
+    }
+
+    markFailedFile(_file: string): void {}
   },
 }));
 

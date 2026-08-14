@@ -10,6 +10,7 @@ interface PullDiagnosticEvidenceOptions {
   evidenceRevision: number;
   currentRevision(): number;
   isCurrentSynchronization(): boolean;
+  isRelatedUriTracked(uri: string): boolean;
   signal?: AbortSignal;
   operationId?: string;
   pull(request: DiagnosticPullRequest): Promise<DocumentDiagnosticReport | null>;
@@ -28,14 +29,16 @@ export async function pullDiagnosticEvidence(
     signal: options.signal,
     operationId: options.operationId,
   });
-  if (!report) return false;
+  if (report === null || report === undefined) {
+    throw new Error("Invalid LSP diagnostic report.");
+  }
   if (
     options.evidenceRevision !== options.currentRevision() ||
     (options.synchronizationId !== undefined && !options.isCurrentSynchronization())
   ) {
     return false;
   }
-  return applyPullReport({
+  const applied = applyPullReport({
     store: options.store,
     uri: options.uri,
     report,
@@ -43,5 +46,8 @@ export async function pullDiagnosticEvidence(
     previousResultId,
     synchronizationId: options.synchronizationId,
     evidenceRevision: options.evidenceRevision,
+    isRelatedUriTracked: options.isRelatedUriTracked,
   });
+  if (!applied) throw new Error("Invalid LSP diagnostic report.");
+  return true;
 }

@@ -3,6 +3,28 @@ import type { HealthData } from "../../../../src/session/health-types.ts";
 import { renderHealthResult } from "../../../../src/tool/health/markdown.ts";
 import { assembleHealthResult } from "../../../../src/tool/result/health.ts";
 
+function cleanEvidence() {
+  return {
+    requested: 0,
+    confirmed: 0,
+    unconfirmed: 0,
+    failed: 0,
+    removed: 0,
+    documents: [],
+  } as const;
+}
+
+function fileEvidence(status: "confirmed" | "unconfirmed" | "failed") {
+  return {
+    requested: 1,
+    confirmed: status === "confirmed" ? 1 : 0,
+    unconfirmed: status === "unconfirmed" ? 1 : 0,
+    failed: status === "failed" ? 1 : 0,
+    removed: 0,
+    documents: [{ file: "/repo/src/a.ts", status }],
+  } as const;
+}
+
 function makeHealthData(overrides: Partial<HealthData> = {}): HealthData {
   return {
     includedSections: ["diagnostics", "servers"],
@@ -14,6 +36,7 @@ function makeHealthData(overrides: Partial<HealthData> = {}): HealthData {
       kind: "completed",
       scope: { kind: "tracked-files", filter: null },
       entries: [],
+      evidence: cleanEvidence(),
     },
     servers: [],
     refresh: {
@@ -35,6 +58,7 @@ describe("code_health result assembly", () => {
         kind: "unavailable",
         scope: { kind: "tracked-files", filter: null },
         entries: [],
+        evidence: cleanEvidence(),
         reason: "Disabled by configuration",
       },
       servers: [],
@@ -70,6 +94,7 @@ describe("code_health result assembly", () => {
           kind: "unavailable",
           scope: { kind: "tracked-files", filter: null },
           entries: [],
+          evidence: cleanEvidence(),
           reason: "no LSP session",
         },
         servers: [],
@@ -93,6 +118,7 @@ describe("code_health result assembly", () => {
       kind: "completed",
       scope: { kind: "tracked-files", filter: null },
       entries: [],
+      evidence: cleanEvidence(),
     });
     expect(markdown).toContain("tracked-file diagnostic snapshot");
     expect(markdown).toContain(
@@ -108,6 +134,7 @@ describe("code_health result assembly", () => {
           kind: "partial",
           scope: { kind: "file", path: "/repo/src/a.ts" },
           entries: [],
+          evidence: fileEvidence("unconfirmed"),
           reason: "Fresh diagnostics were not confirmed.",
         },
       }),
@@ -117,6 +144,9 @@ describe("code_health result assembly", () => {
 
     expect(markdown).toContain(
       "Diagnostics partially collected — Fresh diagnostics were not confirmed.",
+    );
+    expect(markdown).toContain(
+      "Evidence coverage**: 1 requested, 0 confirmed, 1 unconfirmed, 0 failed, 0 removed.",
     );
     expect(markdown).not.toContain("confirmed..");
   });
@@ -128,6 +158,7 @@ describe("code_health result assembly", () => {
           kind: "unavailable",
           scope: { kind: "file", path: "/repo/src/a.ts" },
           entries: [],
+          evidence: fileEvidence("failed"),
           reason: "file request failed",
         },
       }),
@@ -149,6 +180,7 @@ describe("code_health result assembly", () => {
           operationScope: "workspace-runtime",
           attemptedActiveClients: 1,
           restartedClients: 0,
+          diagnosticEvidence: cleanEvidence(),
           staleAssessment: {
             scope: "workspace",
             suspected: true,
@@ -199,6 +231,7 @@ describe("code_health result assembly", () => {
           operationScope: "workspace-runtime",
           attemptedActiveClients: 0,
           restartedClients: 0,
+          diagnosticEvidence: cleanEvidence(),
           staleAssessment: {
             scope: "workspace",
             suspected: false,
@@ -282,6 +315,7 @@ describe("code_health result assembly", () => {
             operationScope: "workspace-runtime",
             attemptedActiveClients: 1,
             restartedClients: 0,
+            diagnosticEvidence: cleanEvidence(),
             staleAssessment: {
               scope: "workspace",
               suspected: false,

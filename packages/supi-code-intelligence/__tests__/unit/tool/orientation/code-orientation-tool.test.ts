@@ -22,6 +22,17 @@ vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
 
 let tmpDir: string;
 
+function emptyEvidence() {
+  return {
+    requested: 0,
+    confirmed: 0,
+    unconfirmed: 0,
+    failed: 0,
+    removed: 0,
+    documents: [],
+  } as const;
+}
+
 beforeEach(() => {
   tmpDir = mkdtempSync(path.join(os.tmpdir(), "code-orientation-"));
   writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "ctx-ws" }, null, 2));
@@ -315,6 +326,7 @@ describe("code_orientation tool", () => {
         recoverDiagnostics: vi.fn(async () => ({
           attemptedClients: 0,
           restartedClients: 0,
+          diagnosticEvidence: emptyEvidence(),
           staleAssessment: { suspected: false, matchedFiles: [], warning: null },
         })),
       },
@@ -380,6 +392,7 @@ describe("code_orientation tool", () => {
         recoverDiagnostics: vi.fn(async () => ({
           attemptedClients: 0,
           restartedClients: 0,
+          diagnosticEvidence: emptyEvidence(),
           staleAssessment: { suspected: false, matchedFiles: [], warning: null },
         })),
       },

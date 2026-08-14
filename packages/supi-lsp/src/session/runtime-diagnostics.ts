@@ -1,9 +1,17 @@
 import type { Diagnostic } from "../config/types.ts";
+import type { DiagnosticEvidenceSummary } from "../diagnostics/evidence.ts";
 
-/** Workspace diagnostic snapshot with explicit cache freshness. */
+export type {
+  DiagnosticEvidenceDocument,
+  DiagnosticEvidenceStatus,
+  DiagnosticEvidenceSummary,
+} from "../diagnostics/evidence.ts";
+
+/** Workspace diagnostic snapshot with explicit cache freshness and coverage. */
 export interface WorkspaceDiagnosticSnapshot<T> {
   entries: T[];
   current: boolean;
+  evidence: DiagnosticEvidenceSummary;
 }
 
 /** Workspace diagnostic summary grouped by file. */
@@ -28,6 +36,10 @@ export interface RecoverDiagnosticsResult {
   /** Active clients targeted by the best-effort refresh, not confirmed successful refreshes. */
   attemptedClients: number;
   restartedClients: number;
+  /** Final document-level evidence from the last refresh in this recovery pass. */
+  diagnosticEvidence: DiagnosticEvidenceSummary;
+  /** Failure from the first refresh, when no later pass replaced it. */
+  refreshFailureReason?: string;
   staleAssessment: {
     suspected: boolean;
     matchedFiles: Array<{ file: string; diagnostics: Diagnostic[] }>;

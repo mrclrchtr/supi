@@ -25,7 +25,7 @@ import type {
 import type { LspManager } from "../manager/manager.ts";
 import { resolveSessionPath } from "../utils.ts";
 import { raceReadinessValue } from "./readiness.ts";
-import type { RecoverDiagnosticsResult } from "./runtime-diagnostics.ts";
+import type { DiagnosticEvidenceSummary, RecoverDiagnosticsResult } from "./runtime-diagnostics.ts";
 import type {
   RoutedMutationResponse,
   SemanticReadinessResult,
@@ -35,6 +35,9 @@ import type {
 
 export type { WorkspaceLspDiagnosticSurface } from "./runtime-diagnostic-surface.ts";
 export type {
+  DiagnosticEvidenceDocument,
+  DiagnosticEvidenceStatus,
+  DiagnosticEvidenceSummary,
   OutstandingDiagnosticSummaryEntry,
   RecoverDiagnosticsResult,
   WorkspaceDiagnosticSnapshot,
@@ -281,8 +284,8 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   async refreshOpenDiagnostics(
     options?: { maxWaitMs?: number; quietMs?: number },
     control?: CodeRequestControl,
-  ): Promise<void> {
-    await this.manager.refreshOpenDiagnostics({ ...options, operationId: control?.operationId });
+  ): Promise<DiagnosticEvidenceSummary> {
+    return this.manager.refreshOpenDiagnostics({ ...options, operationId: control?.operationId });
   }
 
   /** Get a lightweight workspace diagnostic summary for all tracked files. */

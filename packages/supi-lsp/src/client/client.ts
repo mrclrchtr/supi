@@ -26,7 +26,6 @@ import type {
   Location,
   LocationLink,
   Position,
-  PublishDiagnosticsParams,
   Range,
   ServerCapabilities,
   ServerConfig,
@@ -34,6 +33,7 @@ import type {
   WorkspaceEdit,
   WorkspaceSymbol,
 } from "../config/types.ts";
+import type { DiagnosticEvidenceSummary } from "../diagnostics/evidence.ts";
 import { fileToUri } from "../utils.ts";
 import { ClientDiagnostics } from "./client-diagnostics.ts";
 import type { ClientDiagnosticSnapshot, DiagnosticEntry } from "./client-document-state.ts";
@@ -213,7 +213,7 @@ export class LspClient {
     // Handle notifications
     this.rpc.onNotification((method, params) => {
       if (method === "textDocument/publishDiagnostics") {
-        this.handlePublishDiagnostics(params as PublishDiagnosticsParams);
+        this.handlePublishDiagnostics(params);
       } else if (method === "$/progress") {
         this.handleProgress(params as { token: ProgressToken; value: { kind: string } });
       }
@@ -314,7 +314,7 @@ export class LspClient {
       this.cancelNoProgressTimer();
       this.rejectReady(reason);
     }
-    this.diagnostics.clear();
+    this.diagnostics.clear({ preserveFailedDocuments: didCrash || this._status === "error" });
     this.rpc?.dispose();
     if (didCrash) this.publishLifecycle("crash");
   }
@@ -351,6 +351,11 @@ export class LspClient {
 
   private publishTrackedFileChange(previousCount: number): void {
     if (this.openFiles.length !== previousCount) this.publishLifecycle("tracked-files");
+  }
+
+  /** Retain a failed document outcome when a replacement cannot reopen it. */
+  markFailedFile(filePath: string): void {
+    this.diagnostics.markFailedFile(filePath);
   }
 
   /** Return the current client version, or null when the document is not open. */
@@ -394,7 +399,7 @@ export class LspClient {
   /** Re-read open documents, then collect pull diagnostics or wait for push diagnostics. */
   async refreshOpenDiagnostics(
     options: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl = {},
-  ): Promise<void> {
+  ): Promise<DiagnosticEvidenceSummary> {
     return this.diagnostics.refreshOpenDiagnostics(options);
   }
 
@@ -585,7 +590,7 @@ export class LspClient {
   }
 
   /** Apply a diagnostic publication received from the LSP transport. */
-  handlePublishDiagnostics(params: PublishDiagnosticsParams): void {
+  handlePublishDiagnostics(params: unknown): void {
     this.diagnostics.handlePublishDiagnostics(params);
   }
 

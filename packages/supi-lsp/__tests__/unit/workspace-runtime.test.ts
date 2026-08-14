@@ -29,6 +29,17 @@ const diagnostic = {
   severity: 1,
 } as Diagnostic;
 
+function emptyEvidence() {
+  return {
+    requested: 0,
+    confirmed: 0,
+    unconfirmed: 0,
+    failed: 0,
+    removed: 0,
+    documents: [],
+  } as const;
+}
+
 const symbol: SymbolInformation = {
   name: "greet",
   kind: 12,
@@ -210,9 +221,18 @@ describe("workspace runtime behavior", () => {
     const outstandingSummary = [
       { file: "src/index.ts", total: 1, errors: 1, warnings: 0, information: 0, hints: 0 },
     ];
+    const evidence = {
+      requested: 1,
+      confirmed: 1,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/index.ts", status: "confirmed" as const }],
+    };
     const recovery = {
       attemptedClients: 1,
       restartedClients: 1,
+      diagnosticEvidence: evidence,
       staleAssessment: {
         suspected: false,
         matchedFiles: [],
@@ -222,11 +242,16 @@ describe("workspace runtime behavior", () => {
     let recoveryOptions: unknown;
     const runtime = createRuntime(
       makeManager({
-        getDiagnosticSnapshot: () => ({ entries: summary, current: true }),
-        getOutstandingDiagnosticsSnapshot: () => ({ entries: outstanding, current: true }),
+        getDiagnosticSnapshot: () => ({ entries: summary, current: true, evidence }),
+        getOutstandingDiagnosticsSnapshot: () => ({
+          entries: outstanding,
+          current: true,
+          evidence,
+        }),
         getOutstandingDiagnosticSummarySnapshot: () => ({
           entries: outstandingSummary,
           current: true,
+          evidence,
         }),
         recoverWorkspaceDiagnostics: async (options: unknown) => {
           recoveryOptions = options;
@@ -235,11 +260,20 @@ describe("workspace runtime behavior", () => {
       }),
     );
 
-    expect(runtime.getWorkspaceDiagnosticSummary()).toEqual({ entries: summary, current: true });
-    expect(runtime.getOutstandingDiagnostics(1)).toEqual({ entries: outstanding, current: true });
+    expect(runtime.getWorkspaceDiagnosticSummary()).toEqual({
+      entries: summary,
+      current: true,
+      evidence,
+    });
+    expect(runtime.getOutstandingDiagnostics(1)).toEqual({
+      entries: outstanding,
+      current: true,
+      evidence,
+    });
     expect(runtime.getOutstandingDiagnosticSummary(1)).toEqual({
       entries: outstandingSummary,
       current: true,
+      evidence,
     });
     await expect(runtime.recoverDiagnostics({ restartIfStillStale: true })).resolves.toEqual(
       recovery,
@@ -264,6 +298,7 @@ describe("workspace runtime behavior", () => {
         pruneMissingFiles: () => ["src/missing.ts"],
         refreshOpenDiagnostics: async (options: unknown) => {
           refreshOptions = options;
+          return emptyEvidence();
         },
         clearAllPullResultIds: () => events.push("invalidate-pull-results"),
         notifyWorkspaceFileChanges: (nextChanges: FileEvent[]) => {

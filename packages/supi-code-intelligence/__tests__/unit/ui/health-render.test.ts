@@ -36,6 +36,14 @@ function makeDetails(overrides: Record<string, unknown> = {}): Record<string, un
       kind: "completed",
       scope: { kind: "tracked-files", filter: null },
       entries: [],
+      evidence: {
+        requested: 0,
+        confirmed: 0,
+        unconfirmed: 0,
+        failed: 0,
+        removed: 0,
+        documents: [],
+      },
     },
     refresh: {
       kind: "not-requested",
@@ -80,6 +88,14 @@ describe("code_health TUI projection", () => {
         operationScope: "workspace-runtime",
         attemptedActiveClients: 0,
         restartedClients: 0,
+        diagnosticEvidence: {
+          requested: 0,
+          confirmed: 0,
+          unconfirmed: 0,
+          failed: 0,
+          removed: 0,
+          documents: [],
+        },
         staleAssessment: {
           scope: "workspace",
           suspected: false,
@@ -90,6 +106,73 @@ describe("code_health TUI projection", () => {
     });
 
     expect(render(details, true)).toContain("refresh attempt completed no-op");
+  });
+
+  it("renders diagnostic coverage in the compact view", () => {
+    expect(render(makeDetails())).toContain("req 0 · conf 0 · unconf 0 · failed 0 · removed 0");
+  });
+
+  it("renders exact partial diagnostic coverage in the expanded view", () => {
+    const details = makeDetails({
+      sections: [
+        {
+          key: "diagnostics",
+          title: "Diagnostics",
+          status: "partial",
+          confidence: "semantic",
+          provenance: [{ source: "semantic", capability: "LSP" }],
+          itemCount: 0,
+          available: true,
+        },
+      ],
+      diagnosticObservation: {
+        kind: "partial",
+        scope: { kind: "tracked-files", filter: null },
+        entries: [],
+        evidence: {
+          requested: 3,
+          confirmed: 1,
+          unconfirmed: 1,
+          failed: 1,
+          removed: 0,
+          documents: [
+            { file: "src/a.ts", status: "confirmed" },
+            { file: "src/b.ts", status: "unconfirmed" },
+            { file: "src/c.ts", status: "failed" },
+          ],
+        },
+        reason: "Diagnostic evidence is partial.",
+      },
+    });
+
+    expect(render(details, true)).toContain(
+      "Tracked-file diagnostics partial (3 requested, 1 confirmed, 1 unconfirmed, 1 failed, 0 removed)",
+    );
+  });
+
+  it("renders the previous refresh attempt in the compact view", () => {
+    const details = makeDetails({
+      refresh: {
+        kind: "not-requested",
+        reason: "Refresh was not requested.",
+        lastAttempt: {
+          kind: "failed",
+          reason: "server stopped",
+          diagnosticEvidence: {
+            requested: 2,
+            confirmed: 0,
+            unconfirmed: 1,
+            failed: 1,
+            removed: 0,
+          },
+        },
+      },
+    });
+
+    expect(render(details)).toContain("last refresh attempt failed");
+    expect(render(details)).toMatch(
+      /req 2\s*·\s*conf 0\s*·\s*unconf 1\s*·\s*failed 1\s*·\s*removed 0/,
+    );
   });
 
   it("renders Capability Warnings from structured health details", () => {

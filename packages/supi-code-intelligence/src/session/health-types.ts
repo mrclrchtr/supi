@@ -1,3 +1,4 @@
+import type { DiagnosticEvidenceSummary } from "@mrclrchtr/supi-lsp/api";
 import type { CapabilityWarningReport } from "../analysis/capability/capability-warnings.ts";
 
 export type HealthSection = "diagnostics" | "servers";
@@ -53,17 +54,20 @@ export type HealthDiagnosticObservation =
       readonly kind: "completed";
       readonly scope: HealthDiagnosticScope;
       readonly entries: readonly HealthDiagnosticEntry[];
+      readonly evidence: DiagnosticEvidenceSummary;
     }
   | {
       readonly kind: "partial";
       readonly scope: HealthDiagnosticScope;
       readonly entries: readonly HealthDiagnosticEntry[];
+      readonly evidence: DiagnosticEvidenceSummary;
       readonly reason: string;
     }
   | {
       readonly kind: "unavailable";
       readonly scope: HealthDiagnosticScope;
       readonly entries: readonly HealthDiagnosticEntry[];
+      readonly evidence: DiagnosticEvidenceSummary;
       readonly reason: string;
     };
 
@@ -77,25 +81,36 @@ export interface HealthStaleAssessment {
 
 export type HealthRefreshOperationScope = "file-runtime" | "workspace-runtime";
 
+/** Shared facts for one completed refresh or file-maintenance attempt. */
+interface CompletedHealthRefreshAttempt {
+  readonly kind: "completed";
+  readonly attemptedAt: number;
+  /** The diagnostic evidence scope requested by the caller, not the runtime operation scope. */
+  readonly requestedDiagnosticScope: HealthDiagnosticScope;
+  /** Active clients targeted by the best-effort operation; this is not a confirmed-success count. */
+  readonly attemptedActiveClients: number;
+  readonly restartedClients: number;
+  readonly staleAssessment: HealthStaleAssessment;
+}
+
 /** A diagnostic refresh attempt against an explicit LSP runtime scope. */
 export type HealthRefreshAttempt =
-  | {
-      readonly kind: "completed";
-      readonly attemptedAt: number;
-      /** The diagnostic evidence scope requested by the caller, not the runtime operation scope. */
-      readonly requestedDiagnosticScope: HealthDiagnosticScope;
-      /** Exact runtime scope used by this attempt. */
-      readonly operationScope: HealthRefreshOperationScope;
-      /** Active clients targeted by the best-effort refresh; this is not a confirmed-success count. */
-      readonly attemptedActiveClients: number;
-      readonly restartedClients: number;
-      readonly staleAssessment: HealthStaleAssessment;
-    }
+  | (CompletedHealthRefreshAttempt & {
+      readonly operationScope: "workspace-runtime";
+      /** Final document-level evidence from the refresh or recovery pass. */
+      readonly diagnosticEvidence: DiagnosticEvidenceSummary;
+    })
+  | (CompletedHealthRefreshAttempt & {
+      /** File maintenance does not claim a workspace diagnostic refresh. */
+      readonly operationScope: "file-runtime";
+    })
   | {
       readonly kind: "failed";
       readonly attemptedAt: number;
       readonly requestedDiagnosticScope: HealthDiagnosticScope;
       readonly operationScope: HealthRefreshOperationScope;
+      /** Evidence collected before the operation failed, when available. */
+      readonly diagnosticEvidence?: DiagnosticEvidenceSummary;
       readonly reason: string;
     };
 

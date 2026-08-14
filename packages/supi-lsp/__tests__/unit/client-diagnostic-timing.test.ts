@@ -70,6 +70,7 @@ describe("LSP diagnostic timing observations", () => {
       () =>
         client.handlePublishDiagnostics({
           uri: `file://${file}`,
+          version: client.getOpenDocumentVersion(file) ?? undefined,
           diagnostics: [],
         }),
       10,
@@ -138,6 +139,7 @@ describe("LSP diagnostic timing observations", () => {
       () =>
         client.handlePublishDiagnostics({
           uri: `file://${file}`,
+          version: client.getOpenDocumentVersion(file) ?? undefined,
           diagnostics: [],
         }),
       10,
@@ -196,6 +198,7 @@ describe("LSP diagnostic timing observations", () => {
       () =>
         client.handlePublishDiagnostics({
           uri: `file://${file}`,
+          version: client.getOpenDocumentVersion(file) ?? undefined,
           diagnostics: [],
         }),
       10,

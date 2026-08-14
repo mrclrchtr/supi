@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { type CapabilityState, completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
@@ -9,6 +9,17 @@ import type { HealthRefreshAttempt } from "../../../src/session/health-types.ts"
 import { runHealthWorkflow } from "../../../src/session/health-workflow.ts";
 
 let cwd: string;
+
+function emptyEvidence() {
+  return {
+    requested: 0,
+    confirmed: 0,
+    unconfirmed: 0,
+    failed: 0,
+    removed: 0,
+    documents: [],
+  } as const;
+}
 
 beforeEach(() => {
   cwd = mkdtempSync(path.join(os.tmpdir(), "health-refresh-"));
@@ -27,14 +38,23 @@ function readyRuntime(overrides: Record<string, unknown> = {}): WorkspaceLspRunt
         ready: true,
       },
     ],
-    getOutstandingDiagnostics: () => ({ entries: [], current: true }),
-    getWorkspaceDiagnosticSummary: () => ({ entries: [], current: true }),
+    getOutstandingDiagnostics: () => ({
+      entries: [],
+      current: true,
+      evidence: emptyEvidence(),
+    }),
+    getWorkspaceDiagnosticSummary: () => ({
+      entries: [],
+      current: true,
+      evidence: emptyEvidence(),
+    }),
     pruneMissingFiles: () => [],
-    refreshOpenDiagnostics: async () => undefined,
+    refreshOpenDiagnostics: async () => emptyEvidence(),
     noteWorkspaceChanges: () => undefined,
     recoverDiagnostics: async () => ({
       attemptedClients: 0,
       restartedClients: 0,
+      diagnosticEvidence: emptyEvidence(),
       staleAssessment: { suspected: false, matchedFiles: [], warning: null },
     }),
     ...overrides,
@@ -73,6 +93,251 @@ async function run(
 }
 
 describe("code_health refresh evidence", () => {
+  it("propagates final refresh evidence into partial workspace health", async () => {
+    const evidence = {
+      requested: 2,
+      confirmed: 1,
+      unconfirmed: 1,
+      failed: 0,
+      removed: 0,
+      documents: [
+        { file: "src/confirmed.ts", status: "confirmed" as const },
+        { file: "src/unconfirmed.ts", status: "unconfirmed" as const },
+      ],
+    };
+    const runtime = readyRuntime({
+      getWorkspaceDiagnosticSummary: () => ({
+        entries: [],
+        current: false,
+        evidence,
+      }),
+      recoverDiagnostics: async () => ({
+        attemptedClients: 1,
+        restartedClients: 0,
+        diagnosticEvidence: evidence,
+        staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+      }),
+    });
+
+    const { outcome } = await run(
+      { kind: "ready", runtime },
+      { include: ["diagnostics"], refresh: true },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        diagnostics: {
+          kind: "partial",
+          evidence,
+          reason:
+            "Diagnostic evidence is partial: 2 requested, 1 confirmed, 1 unconfirmed, 0 failed, 0 removed.",
+        },
+        refresh: { kind: "completed", diagnosticEvidence: evidence },
+      },
+    });
+  });
+
+  it("clears an initial refresh failure after stale-file refresh succeeds", async () => {
+    const evidence = {
+      requested: 1,
+      confirmed: 1,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "confirmed" as const }],
+    };
+    const refreshOpenDiagnostics = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("initial refresh failed"))
+      .mockResolvedValueOnce(evidence);
+    const runtime = readyRuntime({
+      refreshOpenDiagnostics,
+      closeFile: vi.fn(),
+      trackFile: vi.fn().mockResolvedValue(true),
+      getOutstandingDiagnostics: () => ({
+        entries: [
+          {
+            file: "src/a.ts",
+            diagnostics: [
+              {
+                message: "Cannot find module 'x'",
+                severity: 1,
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+              },
+            ],
+          },
+        ],
+        current: false,
+        evidence,
+      }),
+      getWorkspaceDiagnosticSummary: () => ({ entries: [], current: false, evidence }),
+    });
+
+    const { outcome } = await run(
+      { kind: "ready", runtime },
+      { include: ["diagnostics"], refresh: true },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        refresh: { kind: "completed" },
+        diagnostics: { evidence },
+      },
+    });
+    expect(refreshOpenDiagnostics).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports a failed workspace refresh when the host refresh rejects", async () => {
+    const refreshOpenDiagnostics = vi.fn(async () => {
+      throw new Error("host refresh failed");
+    });
+    const recoverDiagnostics = vi.fn();
+    const runtime = readyRuntime({ refreshOpenDiagnostics, recoverDiagnostics });
+
+    const { outcome } = await run(
+      { kind: "ready", runtime },
+      { include: ["diagnostics"], refresh: true },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        refresh: { kind: "failed", reason: "host refresh failed" },
+      },
+    });
+    expect(recoverDiagnostics).not.toHaveBeenCalled();
+  });
+
+  it("keeps removed evidence from maintenance after recovery prunes the file", async () => {
+    const removedEvidence = {
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 1,
+      documents: [{ file: "src/deleted.ts", status: "removed" as const }],
+    };
+    const runtime = readyRuntime({
+      refreshOpenDiagnostics: async () => removedEvidence,
+      recoverDiagnostics: async () => ({
+        attemptedClients: 0,
+        restartedClients: 0,
+        diagnosticEvidence: emptyEvidence(),
+        staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+      }),
+    });
+
+    const { outcome } = await run(
+      { kind: "ready", runtime },
+      { include: ["diagnostics"], refresh: true },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        refresh: { kind: "completed", diagnosticEvidence: removedEvidence },
+        diagnostics: {
+          kind: "partial",
+          evidence: removedEvidence,
+        },
+      },
+    });
+  });
+
+  it("keeps failed stale-module recovery evidence after a re-open failure", async () => {
+    const failedEvidence = {
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 0,
+      failed: 1,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "failed" as const }],
+    };
+    const refreshOpenDiagnostics = vi
+      .fn()
+      .mockResolvedValueOnce({
+        requested: 1,
+        confirmed: 1,
+        unconfirmed: 0,
+        failed: 0,
+        removed: 0,
+        documents: [{ file: "src/a.ts", status: "confirmed" as const }],
+      })
+      .mockRejectedValueOnce(new Error("refresh failed"));
+    mkdirSync(path.join(cwd, "src"), { recursive: true });
+    writeFileSync(path.join(cwd, "src/a.ts"), "export {};");
+    expect(existsSync(path.join(cwd, "src/a.ts"))).toBe(true);
+    const runtime = readyRuntime({
+      refreshOpenDiagnostics,
+      getOutstandingDiagnostics: () => ({
+        entries: [
+          {
+            file: path.join(cwd, "src/a.ts"),
+            diagnostics: [
+              {
+                message: "Cannot find module 'missing'",
+                severity: 1,
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+              },
+            ],
+          },
+        ],
+        current: false,
+        evidence: failedEvidence,
+      }),
+      trackFile: async () => false,
+      closeFile: vi.fn(),
+    });
+
+    const { outcome } = await run(
+      { kind: "ready", runtime },
+      { include: ["diagnostics"], refresh: true },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        refresh: { kind: "completed", diagnosticEvidence: failedEvidence },
+        diagnostics: { kind: "partial", evidence: failedEvidence },
+      },
+    });
+  });
+
+  it("preserves refresh evidence when snapshot projection fails", async () => {
+    const evidence = {
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 0,
+      failed: 1,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "failed" as const }],
+    };
+    const runtime = readyRuntime({
+      refreshOpenDiagnostics: async () => evidence,
+      getWorkspaceDiagnosticSummary: () => {
+        throw new Error("snapshot projection failed");
+      },
+    });
+
+    const { outcome } = await run(
+      { kind: "ready", runtime },
+      { include: ["diagnostics"], refresh: true },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        diagnostics: {
+          kind: "unavailable",
+          evidence,
+          reason: "snapshot projection failed",
+        },
+      },
+    });
+  });
+
   it("reports a zero-client refresh as a completed no-op, not recovery", async () => {
     const { outcome, trackRefreshAttempt } = await run(
       { kind: "ready", runtime: readyRuntime() },
@@ -87,6 +352,7 @@ describe("code_health refresh evidence", () => {
           attemptedActiveClients: 0,
           restartedClients: 0,
           operationScope: "workspace-runtime",
+          diagnosticEvidence: emptyEvidence(),
         },
       },
     });
@@ -95,13 +361,86 @@ describe("code_health refresh evidence", () => {
     );
   });
 
+  it("preserves refresh evidence when semantic readiness is later unavailable", async () => {
+    const removedEvidence = {
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 1,
+      documents: [{ file: "src/deleted.ts", status: "removed" as const }],
+    };
+    const runtime = readyRuntime({
+      getProjectServers: () => [
+        {
+          name: "typescript",
+          root: cwd,
+          fileTypes: ["ts"],
+          status: "running",
+          ready: false,
+        },
+      ],
+      refreshOpenDiagnostics: async () => removedEvidence,
+      recoverDiagnostics: async () => ({
+        attemptedClients: 0,
+        restartedClients: 0,
+        diagnosticEvidence: emptyEvidence(),
+        staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+      }),
+    });
+
+    const { outcome } = await run(
+      { kind: "ready", runtime },
+      { include: ["diagnostics"], refresh: true },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        diagnostics: {
+          kind: "unavailable",
+          evidence: removedEvidence,
+        },
+      },
+    });
+  });
+
+  it("keeps evidence from an inactive runtime owner", async () => {
+    const evidence = {
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 0,
+      failed: 1,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "failed" as const }],
+    };
+    const runtime = readyRuntime({
+      getWorkspaceDiagnosticSummary: () => ({
+        entries: [],
+        current: false,
+        evidence,
+      }),
+    });
+
+    const { outcome } = await run({ kind: "inactive", runtime }, { include: ["diagnostics"] });
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        semanticState: { kind: "inactive" },
+        diagnostics: { kind: "unavailable", evidence },
+      },
+    });
+  });
+
   it("uses a file-scoped refresh path for an exact file", async () => {
     const file = path.join(cwd, "source.ts");
     writeFileSync(file, "export const value = 1;\n");
-    const refreshOpenDiagnostics = vi.fn(async () => undefined);
+    const refreshOpenDiagnostics = vi.fn(async () => emptyEvidence());
     const recoverDiagnostics = vi.fn(async () => ({
       attemptedClients: 1,
       restartedClients: 0,
+      diagnosticEvidence: emptyEvidence(),
       staleAssessment: { suspected: false, matchedFiles: [], warning: null },
     }));
     const fileDiagnostics = vi.fn(async () => completedCodeQuery([]));
@@ -150,7 +489,11 @@ describe("code_health refresh evidence", () => {
     writeFileSync(file, "export const value = 1;\n");
     const closeFile = vi.fn();
     const runtime = readyRuntime({
-      getOutstandingDiagnostics: () => ({ entries: [], current: false }),
+      getOutstandingDiagnostics: () => ({
+        entries: [],
+        current: false,
+        evidence: emptyEvidence(),
+      }),
       closeFile,
       waitUntilReadyForFile: async () => ({ kind: "ready" }),
       fileDiagnostics: async () => ({

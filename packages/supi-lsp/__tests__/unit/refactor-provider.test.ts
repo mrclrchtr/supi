@@ -4,6 +4,17 @@ import { createLspSemanticProvider } from "../../src/provider/lsp-semantic-provi
 import type { WorkspaceLspRuntime } from "../../src/session/runtime-registry.ts";
 
 describe("LspRefactorProvider", () => {
+  function emptyEvidence() {
+    return {
+      requested: 0,
+      confirmed: 0,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [],
+    } as const;
+  }
+
   function routed<T>(value: T) {
     return { value, authorizedMutationRoots: ["/src"] };
   }
@@ -21,12 +32,19 @@ describe("LspRefactorProvider", () => {
       fileDiagnostics: vi.fn().mockResolvedValue(null),
       getProjectServers: vi.fn().mockReturnValue([]),
       isSupportedSourceFile: vi.fn().mockReturnValue(true),
-      getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue([]),
-      getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
-      getOutstandingDiagnosticSummary: vi.fn().mockReturnValue([]),
+      getWorkspaceDiagnosticSummary: vi
+        .fn()
+        .mockReturnValue({ entries: [], current: true, evidence: emptyEvidence() }),
+      getOutstandingDiagnostics: vi
+        .fn()
+        .mockReturnValue({ entries: [], current: true, evidence: emptyEvidence() }),
+      getOutstandingDiagnosticSummary: vi
+        .fn()
+        .mockReturnValue({ entries: [], current: true, evidence: emptyEvidence() }),
       recoverDiagnostics: vi.fn().mockResolvedValue({
         attemptedClients: 0,
         restartedClients: 0,
+        diagnosticEvidence: emptyEvidence(),
         staleAssessment: { suspected: false, matchedFiles: [], warning: null },
       }),
       resolveFilePath: vi.fn().mockImplementation((f: string) => f),

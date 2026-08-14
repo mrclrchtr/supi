@@ -181,7 +181,7 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
     expect(result).toEqual({ kind: "completed", data: [] });
   }, 10_000);
 
-  it("updates diagnostics after fixing a file", async () => {
+  it("does not claim fresh diagnostics after fixing a push-only file", async () => {
     // First sync bad content
     const badContent = 'export const y: number = "wrong";\n';
     const fixFile = path.join(tmpDir, "fixme.ts");
@@ -196,10 +196,10 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
     const goodContent = "export const y: number = 42;\n";
     fs.writeFileSync(fixFile, goodContent);
     const afterResult = await client.syncAndWaitForDiagnostics(fixFile, goodContent);
-    const errorsAfter = completedDiagnostics(afterResult).filter(
-      (d: Diagnostic) => d.severity === 1,
-    );
-    expect(errorsAfter).toHaveLength(0);
+    expect(["partial", "unavailable"]).toContain(afterResult.kind);
+    if (afterResult.kind === "partial") {
+      expect(afterResult.reason).toContain("Fresh diagnostics were not confirmed");
+    }
   }, 15_000);
 
   it("returns code actions for diagnostic", async () => {

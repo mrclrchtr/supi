@@ -16,6 +16,54 @@ This package is library-only. It registers no model-callable tools; `@mrclrchtr/
 npm install @mrclrchtr/supi-lsp
 ```
 
+## Language-server support
+
+The runtime starts an installed server when the project contains a matching file type and, where configured, a root marker. Some built-in servers use extension-based discovery without a root marker. Built-in command names must be on `PATH`; a configured absolute command path is also supported. This table describes diagnostic support, not the full semantic feature set. A push server can still provide hover, definitions, references, symbols, and refactors.
+
+The table is an observed capability audit for the configured server versions. The server handshake is authoritative and can report a different mode after an upgrade.
+
+| Language | Server binary | Observed pull diagnostics | Built-in SuPi mode | User notes |
+|---|---|---|---|---|
+| TypeScript / JavaScript | `typescript-language-server` | No | Push | Diagnostics arrive through `publishDiagnostics`. |
+| Python | `pyright-langserver` | Conditional | Push | Pull uses dynamic registration. SuPi does not enable that registration yet. |
+| Rust | `rust-analyzer` | Yes | Pull | The server advertises `diagnosticProvider`. |
+| Go | `gopls` | Conditional | Push | Some versions accept `initializationOptions.pullDiagnostics: true`; the handshake is authoritative. |
+| C / C++ | `clangd` | No | Push | Diagnostics use `publishDiagnostics`. |
+| Ruby | `ruby-lsp` | Yes | Pull | The server uses the project Ruby environment. |
+| Java | `jdtls` | No | Push | Diagnostics use `publishDiagnostics`. |
+| Kotlin | `kotlin-lsp` | Yes | Pull when configured | Kotlin LSP needs the `--stdio` argument. |
+| Bash | `bash-language-server` | No | Push | Diagnostics use `publishDiagnostics`. |
+| HTML | `vscode-html-language-server` | Yes | Pull | Install `vscode-langservers-extracted`. |
+| SQL | `sql-language-server` | No | Push | Diagnostics use `publishDiagnostics`. |
+| R | `R` | No | Push | Install the R `languageserver` package. |
+
+Pull diagnostics use `textDocument/diagnostic`, so the client can tie a report to the current request. Push diagnostics are asynchronous and can omit a document version. After a workspace change, SuPi may report push-only diagnostics as partial or unavailable when it cannot prove that the result matches the current document. It does not treat missing fresh evidence as a clean file.
+
+A workspace diagnostic refresh returns exact coverage counts for requested, confirmed, unconfirmed, failed, and removed tracked documents. `code_health` marks tracked-file diagnostics as complete only when every document in the requested scope has confirmed evidence. It keeps cached diagnostics as partial evidence and shows the same coverage counts in summary and detailed views; a refresh attempt does not prove fresh evidence by itself.
+
+### Optional diagnostic configuration
+
+Configuration overrides merge with the built-in server definitions. Use `.pi/supi/config.json` for one project or `~/.pi/agent/supi/config.json` for all projects:
+
+```json
+{
+  "lsp": {
+    "servers": {
+      "go": {
+        "initializationOptions": {
+          "pullDiagnostics": true
+        }
+      },
+      "kotlin": {
+        "args": ["--stdio"]
+      }
+    }
+  }
+}
+```
+
+The `lsp.enabled` and `lsp.active` settings are deprecated and ignored. Disable one language with `lsp.servers.<language>.enabled: false`. Use `/supi-ci-status` from `@mrclrchtr/supi-code-intelligence` to see detected, running, and missing servers.
+
 ## What it provides
 
 - `LspRuntimeController` for workspace lifecycle, status, and transition subscriptions
@@ -44,7 +92,7 @@ Clients, `LspManager`, and the default runtime implementation remain internal.
 - diagnostics, summaries, refresh, and recovery
 - project-server inventory and file support checks
 
-This separation keeps lifecycle and status distinct from workspace operations. Each controller transition has a monotonic generation and an aggregate server snapshot. Semantic capability is ready while at least one concrete client is ready. A crash or late progress event moves capability back to pending only after the final ready client is lost. The ready runtime owner stays available for lazy routing. Debug telemetry records the transition kind, generation, semantic-ready state, ready and total client counts, and tracked-file count without file paths or server details.
+This separation keeps lifecycle and status distinct from workspace operations. Each controller transition has a monotonic generation and an aggregate server snapshot. Semantic capability is ready while at least one concrete client is ready. A crash or late progress event moves capability back to pending only after the final ready client is lost. The ready runtime owner stays available for lazy routing. Aggregate lifecycle telemetry records the transition kind, generation, semantic-ready state, ready and total client counts, and tracked-file count without file paths or server details. Diagnostic debug events may include bounded, sanitized server, workspace, file, and path identities for local diagnosis; secret values remain redacted.
 
 ## Example
 

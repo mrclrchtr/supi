@@ -31,6 +31,17 @@ vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
 
 let tmpDir: string;
 
+function emptyEvidence() {
+  return {
+    requested: 0,
+    confirmed: 0,
+    unconfirmed: 0,
+    failed: 0,
+    removed: 0,
+    documents: [],
+  } as const;
+}
+
 beforeEach(() => {
   tmpDir = mkdtempSync(path.join(os.tmpdir(), "code-health-"));
   // Default: LSP unavailable for existing tests
@@ -61,7 +72,11 @@ function mockReadyLsp(
   }> = {},
 ) {
   const runtime = {
-    getOutstandingDiagnostics: vi.fn().mockReturnValue({ entries: [], current: true }),
+    getOutstandingDiagnostics: vi.fn().mockReturnValue({
+      entries: [],
+      current: true,
+      evidence: emptyEvidence(),
+    }),
     getProjectServers: vi.fn().mockReturnValue([
       {
         name: "typescript",
@@ -71,15 +86,20 @@ function mockReadyLsp(
         ready: true,
       },
     ]),
-    getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue({ entries: [], current: true }),
+    getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue({
+      entries: [],
+      current: true,
+      evidence: emptyEvidence(),
+    }),
     fileDiagnostics: vi.fn().mockResolvedValue(null),
     recoverDiagnostics: vi.fn().mockResolvedValue({
       attemptedClients: 0,
       restartedClients: 0,
+      diagnosticEvidence: emptyEvidence(),
       staleAssessment: { suspected: false, matchedFiles: [], warning: null },
     }),
     pruneMissingFiles: vi.fn().mockReturnValue([]),
-    refreshOpenDiagnostics: vi.fn().mockResolvedValue(undefined),
+    refreshOpenDiagnostics: vi.fn().mockResolvedValue(emptyEvidence()),
     noteWorkspaceChanges: vi.fn(),
     closeFile: vi.fn(),
     trackFile: vi.fn().mockResolvedValue(true),
@@ -275,6 +295,7 @@ describe("code_health tool", () => {
       return {
         attemptedClients: 1,
         restartedClients: 1,
+        diagnosticEvidence: emptyEvidence(),
         staleAssessment: { suspected: false, matchedFiles: [], warning: null },
       };
     });
@@ -292,6 +313,14 @@ describe("code_health tool", () => {
       getWorkspaceDiagnosticSummary: vi.fn(() => ({
         current: true,
         entries: [{ file: "src/index.ts", errors: 1, warnings: 0 }],
+        evidence: {
+          requested: 1,
+          confirmed: 1,
+          unconfirmed: 0,
+          failed: 0,
+          removed: 0,
+          documents: [{ file: "src/index.ts", status: "confirmed" as const }],
+        },
       })),
     });
 
@@ -348,6 +377,14 @@ describe("code_health tool", () => {
       getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue({
         current: true,
         entries: [{ file: "src/clean.ts", errors: 0, warnings: 0 }],
+        evidence: {
+          requested: 1,
+          confirmed: 1,
+          unconfirmed: 0,
+          failed: 0,
+          removed: 0,
+          documents: [{ file: "src/clean.ts", status: "confirmed" as const }],
+        },
       }),
     });
 

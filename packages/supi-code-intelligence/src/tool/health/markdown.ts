@@ -52,15 +52,21 @@ function renderRefreshStatus(
   switch (data.refresh.kind) {
     case "completed":
       lines.push(
-        `**Diagnostic refresh attempt**: ${asSentence(completedRefreshText(data.refresh))}`,
+        `**${refreshAttemptLabel(data.refresh)}**: ${asSentence(completedRefreshText(data.refresh))}`,
       );
       lines.push(`**Stale assessment**: ${asSentence(staleAssessmentText(data.refresh))}`);
       lines.push("");
       return;
-    case "failed":
-      lines.push(`**Diagnostic refresh attempt**: failed — ${data.refresh.reason}`);
+    case "failed": {
+      const evidence = data.refresh.diagnosticEvidence
+        ? `; ${formatDiagnosticEvidence(data.refresh.diagnosticEvidence)}`
+        : "";
+      lines.push(
+        `**${refreshAttemptLabel(data.refresh)}**: failed — ${data.refresh.reason}${evidence}`,
+      );
       lines.push("");
       return;
+    }
     case "not-attempted":
       lines.push(`**Diagnostic refresh attempt**: not started — ${data.refresh.reason}`);
       if (data.refresh.lastAttempt) renderLastAttempt(lines, data.refresh.lastAttempt, cwd);
@@ -81,10 +87,19 @@ function renderRefreshStatus(
 function completedRefreshText(
   attempt: Extract<HealthRefreshAttempt, { kind: "completed" }>,
 ): string {
-  if (attempt.attemptedActiveClients === 0 && attempt.restartedClients === 0) {
-    return "completed no-op — no active clients were targeted";
-  }
-  return `completed — ${attempt.attemptedActiveClients} active client${plural(attempt.attemptedActiveClients)} targeted, ${attempt.restartedClients} restarted`;
+  const base =
+    attempt.attemptedActiveClients === 0 && attempt.restartedClients === 0
+      ? "completed no-op — no active clients were targeted"
+      : `completed — ${attempt.attemptedActiveClients} active client${plural(attempt.attemptedActiveClients)} targeted, ${attempt.restartedClients} restarted`;
+  return attempt.operationScope === "workspace-runtime"
+    ? `${base}; ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}`
+    : base;
+}
+
+function refreshAttemptLabel(attempt: Pick<HealthRefreshAttempt, "operationScope">): string {
+  return attempt.operationScope === "file-runtime"
+    ? "File LSP maintenance attempt"
+    : "Diagnostic refresh attempt";
 }
 
 function staleAssessmentText(
@@ -102,9 +117,12 @@ function staleAssessmentText(
 
 function renderLastAttempt(lines: string[], attempt: HealthRefreshAttempt, cwd: string): void {
   const outcome =
-    attempt.kind === "completed" ? completedRefreshText(attempt) : `failed — ${attempt.reason}`;
+    attempt.kind === "completed"
+      ? completedRefreshText(attempt)
+      : `failed — ${attempt.reason}${attempt.diagnosticEvidence ? `; ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}` : ""}`;
+  const label = refreshAttemptLabel(attempt);
   lines.push(
-    `**Last diagnostic refresh attempt**: ${asSentence(outcome)} Started ${formatElapsed(Date.now() - attempt.attemptedAt)}; requested ${formatDiagnosticScope(attempt.requestedDiagnosticScope, cwd)}; operation scope: ${refreshOperationScopeText(attempt)}.`,
+    `**Last ${label.toLowerCase()}**: ${asSentence(outcome)} Started ${formatElapsed(Date.now() - attempt.attemptedAt)}; requested ${formatDiagnosticScope(attempt.requestedDiagnosticScope, cwd)}; operation scope: ${refreshOperationScopeText(attempt)}.`,
   );
 }
 
@@ -152,11 +170,22 @@ function renderDiagnosticsSection(lines: string[], data: HealthData, cwd: string
     lines.push("Diagnostics were not requested.");
   } else {
     lines.push(`**Evidence scope**: ${formatDiagnosticScope(observation.scope, cwd)}.`);
+    lines.push(`**Evidence coverage**: ${formatDiagnosticEvidence(observation.evidence)}.`);
     lines.push("");
     renderDiagnosticObservation(lines, data, cwd);
   }
 
   lines.push("");
+}
+
+function formatDiagnosticEvidence(evidence: {
+  requested: number;
+  confirmed: number;
+  unconfirmed: number;
+  failed: number;
+  removed: number;
+}): string {
+  return `${evidence.requested} requested, ${evidence.confirmed} confirmed, ${evidence.unconfirmed} unconfirmed, ${evidence.failed} failed, ${evidence.removed} removed`;
 }
 
 function renderDiagnosticObservation(lines: string[], data: HealthData, cwd: string): void {

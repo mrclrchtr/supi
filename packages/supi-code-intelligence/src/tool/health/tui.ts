@@ -7,7 +7,6 @@ import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import {
   type EvidenceEntry,
   formatCallValue,
-  formatEvidenceEntry,
   type ResultOptios,
   renderDomainError,
   renderDomainResult,
@@ -21,6 +20,7 @@ import {
   type ToolResult,
 } from "../../ui/tui/common.ts";
 import type { CodeHealthToolParams } from "./execute.ts";
+import { readPreviousRefreshStatus, readRefreshStatus } from "./refresh-status.ts";
 import { formatSemanticHealthState, readSemanticHealthState } from "./semantic-state.ts";
 
 /** ── renderCall ────────────────────────────────────────────────── */
@@ -121,12 +121,22 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
   const semanticRequested = sections.some(
     (section) => section.key === "diagnostics" || section.key === "servers",
   );
-  const segments = sections.map((section) => formatSectionSummary(section, undefined, theme));
+  const segments = sections.map((section) =>
+    formatSectionSummary(
+      section,
+      section.key === "diagnostics"
+        ? formatCompactDiagnosticEvidence(readDiagnosticEvidence(data))
+        : null,
+      theme,
+    ),
+  );
   if (semanticRequested) {
     const semanticStatus = readSemanticStatus(data);
     const statusColor = semanticStatus.startsWith("ready") ? "success" : "warning";
     segments.push(`${theme.fg("dim", "lsp")} ${theme.fg(statusColor, semanticStatus)}`);
   }
+  const previousRefresh = readPreviousRefreshStatus(data);
+  if (previousRefresh) segments.push(theme.fg("dim", previousRefresh));
   const capabilityWarningCount = readCapabilityWarnings(data).length;
   if (capabilityWarningCount > 0) {
     const label = capabilityWarningCount === 1 ? "capability warning" : "capability warnings";
@@ -139,20 +149,20 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
 
 function formatSectionSummary(
   section: HealthSectionSummary,
-  evidence: EvidenceEntry | undefined,
+  coverage: string | null,
   theme: Theme,
 ): string {
   const label = sectionLabel(section.key);
+  const coverageSuffix = coverage ? ` (${coverage})` : "";
   if (section.status === "unavailable" || !section.available) {
-    return `${theme.fg("dim", label)} ${theme.fg("warning", "unavailable")}`;
+    return `${theme.fg("dim", label)} ${theme.fg("warning", "unavailable")}${coverageSuffix}`;
   }
   if (section.status === "partial") {
-    return `${theme.fg("dim", label)} ${theme.fg("warning", "partial")}`;
+    return `${theme.fg("dim", label)} ${theme.fg("warning", "partial")}${coverageSuffix}`;
   }
-  if (evidence) return theme.fg("success", theme.bold(formatEvidenceEntry(evidence)));
 
-  const suffix = section.key === "diagnostics" ? " with issues" : "";
-  return `${theme.fg("dim", label)} ${theme.fg("success", theme.bold(`${section.itemCount}`))}${theme.fg("muted", suffix)}`;
+  const suffix = section.key === "diagnostics" && !coverage ? " with issues" : "";
+  return `${theme.fg("dim", label)} ${theme.fg("success", theme.bold(`${section.itemCount}`))}${theme.fg("muted", suffix)}${coverageSuffix}`;
 }
 
 function buildStatusBar(data: Record<string, unknown> | null, theme: Theme): Text {
@@ -178,32 +188,6 @@ function buildStatusBar(data: Record<string, unknown> | null, theme: Theme): Tex
   return new Text(lines.join("  "), 0, 0);
 }
 
-function readRefreshStatus(data: Record<string, unknown> | null): string | null {
-  const refresh = readRecord(data?.refresh);
-  if (!refresh) return null;
-
-  switch (refresh.kind) {
-    case "completed": {
-      const attempted = readNumber(refresh.attemptedActiveClients);
-      const restarted = readNumber(refresh.restartedClients);
-      const stale = readRecord(refresh.staleAssessment);
-      const noOp = attempted === 0 && restarted === 0;
-      const base = noOp
-        ? "refresh attempt completed no-op"
-        : `refresh attempt completed: ${attempted} clients targeted, ${restarted} restarted`;
-      return stale?.suspected === true
-        ? `${base}; stale pattern suspected in ${readNumber(stale.matchedFileCount)} files`
-        : base;
-    }
-    case "failed":
-      return `refresh attempt failed${typeof refresh.reason === "string" ? `: ${refresh.reason}` : ""}`;
-    case "not-attempted":
-      return "refresh attempt not started";
-    default:
-      return null;
-  }
-}
-
 function diagnosticEmptySummary(data: Record<string, unknown> | null): string {
   return diagnosticScopeKind(data) === "file"
     ? "No errors or warnings for file"
@@ -216,12 +200,44 @@ function diagnosticScopeKind(data: Record<string, unknown> | null): string | nul
   return typeof scope?.kind === "string" ? scope.kind : null;
 }
 
-function readRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
+function readDiagnosticEvidence(
+  data: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  return readRecord(readRecord(data?.diagnosticObservation)?.evidence);
 }
 
-function readNumber(value: unknown): number {
-  return typeof value === "number" ? value : 0;
+function formatCompactDiagnosticEvidence(evidence: Record<string, unknown> | null): string | null {
+  if (!evidence) return null;
+  const counts = [
+    evidence.requested,
+    evidence.confirmed,
+    evidence.unconfirmed,
+    evidence.failed,
+    evidence.removed,
+  ];
+  if (!counts.every(isEvidenceCount)) return null;
+  return `req ${evidence.requested} · conf ${evidence.confirmed} · unconf ${evidence.unconfirmed} · failed ${evidence.failed} · removed ${evidence.removed}`;
+}
+
+function formatDiagnosticEvidence(evidence: Record<string, unknown> | null): string | null {
+  if (!evidence) return null;
+  const counts = [
+    evidence.requested,
+    evidence.confirmed,
+    evidence.unconfirmed,
+    evidence.failed,
+    evidence.removed,
+  ];
+  if (!counts.every(isEvidenceCount)) return null;
+  return `${evidence.requested} requested, ${evidence.confirmed} confirmed, ${evidence.unconfirmed} unconfirmed, ${evidence.failed} failed, ${evidence.removed} removed`;
+}
+
+function isEvidenceCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function readRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
 }
 
 interface RenderedCapabilityWarning {
@@ -284,14 +300,9 @@ function buildDiagnosticSummary(data: Record<string, unknown> | null, theme: The
   }
   const trackedFiles = diagnosticScopeKind(data) === "tracked-files";
   if (section.status === "partial") {
-    return new Text(
-      theme.fg(
-        "warning",
-        trackedFiles ? "Tracked-file diagnostics partial" : "Diagnostics partial",
-      ),
-      0,
-      0,
-    );
+    const coverage = formatDiagnosticEvidence(readDiagnosticEvidence(data));
+    const label = trackedFiles ? "Tracked-file diagnostics partial" : "Diagnostics partial";
+    return new Text(theme.fg("warning", coverage ? `${label} (${coverage})` : label), 0, 0);
   }
   if (section.itemCount === 0) {
     return new Text(theme.fg("success", diagnosticEmptySummary(data)), 0, 0);

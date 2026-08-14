@@ -42,6 +42,9 @@ export type {
 } from "./session/runtime-controller.ts";
 export { LspRuntimeController } from "./session/runtime-controller.ts";
 export type {
+  DiagnosticEvidenceDocument,
+  DiagnosticEvidenceStatus,
+  DiagnosticEvidenceSummary,
   OutstandingDiagnosticSummaryEntry,
   RecoverDiagnosticsResult,
   RoutedMutationResponse,

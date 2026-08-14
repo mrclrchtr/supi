@@ -30,9 +30,12 @@ interface DiagnosticTimingData {
   readonly timedOut: boolean;
 }
 
-/** Internal pull failure that retains only whether a timeout occurred. */
+/** Internal pull failure that retains timeout state and failed document URIs. */
 export class DiagnosticPullError extends Error {
-  constructor(readonly timedOut: boolean) {
+  constructor(
+    readonly timedOut: boolean,
+    readonly failedUris: readonly string[] = [],
+  ) {
     super("pull diagnostics incomplete");
   }
 }

@@ -82,7 +82,9 @@ describe("LSP manager lifecycle integration", () => {
       { timeoutMs: 2_000, retryDelayMs: 20, label: "initial LSP process crash" },
     );
 
-    await expect(manager.restartClientsForFiles([sourceFile])).resolves.toEqual([`test:${root}`]);
+    await expect(manager.restartClientsForFiles([sourceFile])).resolves.toEqual([
+      { key: `test:${root}`, files: [sourceFile], restarted: true },
+    ]);
     const replacement = await manager.startServerForRoot("test", root);
     if (!replacement) throw new Error("Expected the replacement client to start.");
     expect(replacement).not.toBe(original);

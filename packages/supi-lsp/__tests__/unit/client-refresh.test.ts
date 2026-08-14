@@ -3,10 +3,10 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, describe, expect, it, type vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LspClient } from "../../src/client/client.ts";
 import { uriToFile } from "../../src/utils.ts";
-import { createRunningTestClient } from "../helpers/client-test-harness.ts";
+import { createPullTestClient, createRunningTestClient } from "../helpers/client-test-harness.ts";
 
 function createStartedClient(): LspClient {
   return createRunningTestClient().client;
@@ -24,8 +24,16 @@ function makeDiagnostic(message: string) {
   };
 }
 
-function simulatePublish(client: LspClient, uri: string, diagnostics = [makeDiagnostic("err")]) {
-  client.handlePublishDiagnostics({ uri, diagnostics });
+function simulatePublish(
+  client: LspClient,
+  uri: string,
+  diagnostics = [makeDiagnostic("err")],
+  versioned = false,
+): void {
+  const version = versioned
+    ? (client.getOpenDocumentVersion(uriToFile(uri)) ?? undefined)
+    : undefined;
+  client.handlePublishDiagnostics({ uri, diagnostics, ...(version ? { version } : {}) });
 }
 
 function openDocument(client: LspClient, uri: string): void {
@@ -60,7 +68,7 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
 
     try {
       const publishDelay = 30;
-      setTimeout(() => simulatePublish(client, uri), publishDelay);
+      setTimeout(() => simulatePublish(client, uri, undefined, true), publishDelay);
       const start = Date.now();
 
       await client.refreshOpenDiagnostics({ maxWaitMs: 2000, quietMs: 80 });
@@ -90,11 +98,142 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
     }
   });
 
+  it("returns exact confirmed and unconfirmed document coverage", async () => {
+    const client = createStartedClient();
+    const first = createTempFileUri();
+    const second = createTempFileUri();
+    openDocument(client, first.uri);
+    openDocument(client, second.uri);
+
+    try {
+      setTimeout(() => simulatePublish(client, first.uri, [], true), 10);
+
+      await expect(
+        client.refreshOpenDiagnostics({ maxWaitMs: 80, quietMs: 10 }),
+      ).resolves.toMatchObject({
+        requested: 2,
+        confirmed: 1,
+        unconfirmed: 1,
+        failed: 0,
+        removed: 0,
+        documents: [
+          { file: uriToFile(first.uri), status: "confirmed" },
+          { file: uriToFile(second.uri), status: "unconfirmed" },
+        ],
+      });
+    } finally {
+      fs.rmSync(first.tmpDir, { recursive: true, force: true });
+      fs.rmSync(second.tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not confirm a pull that crosses a workspace invalidation", async () => {
+    const file = createTempFileUri();
+    const { client, rpc } = createPullTestClient();
+    openDocument(client, file.uri);
+    let resolvePull!: (report: unknown) => void;
+    rpc.sendRequest.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePull = resolve;
+        }),
+    );
+
+    try {
+      const pending = client.refreshOpenDiagnostics({ maxWaitMs: 100, quietMs: 10 });
+      await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(1));
+      client.notifyWorkspaceFileChanges([{ uri: file.uri, type: 2 }]);
+      resolvePull({ kind: "full", items: [] });
+
+      await expect(pending).resolves.toMatchObject({
+        requested: 1,
+        confirmed: 0,
+        unconfirmed: 1,
+        failed: 0,
+        removed: 0,
+      });
+    } finally {
+      fs.rmSync(file.tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("records a failed pull separately from an unconfirmed document", async () => {
+    const file = createTempFileUri();
+    const { client, rpc } = createPullTestClient();
+    openDocument(client, file.uri);
+    rpc.sendRequest.mockRejectedValue(new Error("pull request failed"));
+
+    try {
+      await expect(
+        client.refreshOpenDiagnostics({ maxWaitMs: 40, quietMs: 10 }),
+      ).resolves.toMatchObject({
+        requested: 1,
+        confirmed: 0,
+        unconfirmed: 0,
+        failed: 1,
+        removed: 0,
+        documents: [{ file: uriToFile(file.uri), status: "failed" }],
+      });
+    } finally {
+      fs.rmSync(file.tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("records a null pull report as failed evidence", async () => {
+    const file = createTempFileUri();
+    const { client, rpc } = createPullTestClient();
+    openDocument(client, file.uri);
+    rpc.sendRequest.mockResolvedValue(null);
+
+    try {
+      await expect(
+        client.refreshOpenDiagnostics({ maxWaitMs: 40, quietMs: 10 }),
+      ).resolves.toMatchObject({
+        requested: 1,
+        confirmed: 0,
+        unconfirmed: 0,
+        failed: 1,
+        removed: 0,
+      });
+    } finally {
+      fs.rmSync(file.tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("records malformed pull diagnostics as failed evidence", async () => {
+    const file = createTempFileUri();
+    const { client, rpc } = createPullTestClient();
+    openDocument(client, file.uri);
+    rpc.sendRequest.mockResolvedValue({
+      kind: "full",
+      items: [
+        {
+          message: "reversed range",
+          range: { start: { line: 2, character: 0 }, end: { line: 1, character: 0 } },
+        },
+      ],
+    });
+
+    try {
+      await expect(
+        client.refreshOpenDiagnostics({ maxWaitMs: 40, quietMs: 10 }),
+      ).resolves.toMatchObject({
+        requested: 1,
+        confirmed: 0,
+        unconfirmed: 0,
+        failed: 1,
+        removed: 0,
+      });
+    } finally {
+      fs.rmSync(file.tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it("times out when diagnostics keep arriving", async () => {
     const client = createStartedClient();
     const { tmpDir, uri } = createTempFileUri();
     openDocument(client, uri);
-    const interval = setInterval(() => simulatePublish(client, uri), 30);
+    const interval = setInterval(() => simulatePublish(client, uri, undefined, true), 30);
 
     try {
       const start = Date.now();
@@ -164,14 +303,67 @@ describe("LspClient refreshOpenDiagnostics — file handling", () => {
     expect(client.openFiles).toContain(filePath);
     expect(client.getDiagnostics(filePath)).toHaveLength(1);
 
-    await client.refreshOpenDiagnostics({ maxWaitMs: 50, quietMs: 20 });
+    const refresh = await client.refreshOpenDiagnostics({ maxWaitMs: 50, quietMs: 20 });
 
+    expect(refresh).toMatchObject({
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 1,
+      documents: [{ file: filePath, status: "removed" }],
+    });
     expect(client.openFiles).not.toContain(filePath);
     expect(client.getDiagnostics(filePath)).toEqual([]);
     expect(sendNotification).toHaveBeenCalledWith(
       "textDocument/didClose",
       expect.objectContaining({ textDocument: { uri } }),
     );
+  });
+
+  it("keeps an unreadable tracked path as failed coverage", async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-refresh-test-"));
+    const filePath = path.join(tmpDir, "unreadable.ts");
+    const uri = `file://${filePath}`;
+    fs.writeFileSync(filePath, "const x = 1;");
+    const client = createStartedClient();
+    openDocument(client, uri);
+    simulatePublish(client, uri);
+    fs.unlinkSync(filePath);
+    fs.mkdirSync(filePath);
+
+    await expect(
+      client.refreshOpenDiagnostics({ maxWaitMs: 50, quietMs: 20 }),
+    ).resolves.toMatchObject({
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 0,
+      failed: 1,
+      removed: 0,
+      documents: [{ file: filePath, status: "failed" }],
+    });
+    expect(client.openFiles).toContain(filePath);
+  });
+
+  it("includes a deleted cache-only document in refresh coverage", async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-refresh-test-"));
+    const filePath = path.join(tmpDir, "related.ts");
+    const uri = `file://${filePath}`;
+    fs.writeFileSync(filePath, "const x = 1;");
+    const client = createStartedClient();
+    simulatePublish(client, uri);
+    fs.rmSync(filePath);
+
+    await expect(
+      client.refreshOpenDiagnostics({ maxWaitMs: 50, quietMs: 20 }),
+    ).resolves.toMatchObject({
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 1,
+      documents: [{ file: filePath, status: "removed" }],
+    });
   });
 
   it("closes non-existent files as deleted", async () => {

@@ -1,5 +1,4 @@
 /** Session-owned workspace health workflow. */
-
 import type { CapabilityState } from "@mrclrchtr/supi-code-runtime/api";
 import type {
   LspRuntimeController,
@@ -15,11 +14,11 @@ import {
   diagnosticScope,
   isScopedFile,
 } from "../analysis/health/diagnostics.ts";
-import { describeStructuralState, recoverDiagnosticRuntime } from "../analysis/health/recovery.ts";
+import { describeStructuralState } from "../analysis/health/recovery.ts";
 import { collectServers } from "../analysis/health/signals.ts";
 import { resolveScope } from "../analysis/search/paths.ts";
-import { refreshFileLspMaintenance, refreshLspMaintenance } from "../substrate/lsp/maintenance.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
+import { collectHealthRefreshAttempt } from "./health-refresh.ts";
 import type {
   HealthData,
   HealthDiagnosticScope,
@@ -63,10 +62,11 @@ export async function runHealthWorkflow(
     phase: "collection",
     message: "Collecting workspace health evidence",
   });
-
   const lspState = deps.capability.getLspRuntimeState(deps.cwd);
   const capabilityStates = deps.capability.getCapabilityStates(deps.cwd);
   const runtime = lspState.kind === "ready" ? lspState.runtime : null;
+  const evidenceRuntime =
+    lspState.kind === "ready" || lspState.kind === "inactive" ? lspState.runtime : null;
   const serverInventoryAvailable = lspState.kind === "ready" || lspState.kind === "disabled";
 
   const diagnosticsScope = diagnosticScope(scopeFilter);
@@ -92,12 +92,18 @@ export async function runHealthWorkflow(
 
   const diagnostics = await collectDiagnostics({
     service: semanticReady ? runtime : null,
+    evidenceService: evidenceRuntime,
     included,
     scope: diagnosticsScope,
     cwd: deps.cwd,
     unavailableReason: diagnosticUnavailableReason(semanticState),
     detailed: level === "detailed",
     requestControl: control,
+    refreshEvidence:
+      (refresh.kind === "completed" || refresh.kind === "failed") &&
+      refresh.operationScope === "workspace-runtime"
+        ? refresh.diagnosticEvidence
+        : undefined,
   });
   const servers = collectServers(runtime, included);
   const capabilityWarnings = collectCapabilityWarnings(semanticRequested, deps);
@@ -117,7 +123,6 @@ export async function runHealthWorkflow(
 
   return { kind: "completed", data };
 }
-
 function healthNeedsSemantic(included: readonly HealthSection[]): boolean {
   return included.includes("diagnostics") || included.includes("servers");
 }
@@ -245,10 +250,20 @@ async function collectRefreshState(options: RefreshStateOptions): Promise<Health
       phase: "maintenance",
       message: "Refreshing LSP state and sentinel snapshot",
     });
-    const attempt =
-      diagnosticsScope.kind === "file"
-        ? await collectFileRefreshAttempt(runtime, diagnosticsScope, attemptedAt, options)
-        : await collectWorkspaceRefreshAttempt(runtime, diagnosticsScope, attemptedAt, options);
+    const attempt = await collectHealthRefreshAttempt({
+      runtime,
+      diagnosticsScope,
+      attemptedAt,
+      cwd: options.deps.cwd,
+      sentinelSnapshot: options.deps.sentinelSnapshot,
+      control: options.control,
+      reportRecoveryProgress: () =>
+        reportProgress(options.control, {
+          intent: "health",
+          phase: "recovery",
+          message: "Refreshing diagnostics and recovery state",
+        }),
+    });
     deps.trackRefreshAttempt(attempt);
     return attempt;
   } catch (error) {
@@ -262,87 +277,6 @@ async function collectRefreshState(options: RefreshStateOptions): Promise<Health
     deps.trackRefreshAttempt(attempt);
     return attempt;
   }
-}
-
-async function collectFileRefreshAttempt(
-  runtime: WorkspaceLspRuntime,
-  diagnosticsScope: Extract<HealthDiagnosticScope, { kind: "file" }>,
-  attemptedAt: number,
-  options: RefreshStateOptions,
-): Promise<Extract<HealthRefreshAttempt, { kind: "completed" }>> {
-  const maintenance = await refreshFileLspMaintenance(
-    runtime,
-    options.deps.cwd,
-    options.deps.sentinelSnapshot,
-    diagnosticsScope.path,
-  );
-  updateSentinelSnapshot(options.deps.sentinelSnapshot, maintenance.snapshot);
-  const readiness = await runtime.waitUntilReadyForFile(
-    diagnosticsScope.path,
-    undefined,
-    options.control,
-  );
-  const targeted = readiness.kind === "ready" ? 1 : 0;
-  return {
-    kind: "completed",
-    attemptedAt,
-    requestedDiagnosticScope: diagnosticsScope,
-    operationScope: "file-runtime",
-    attemptedActiveClients: targeted,
-    restartedClients: 0,
-    staleAssessment: {
-      scope: "file",
-      suspected: null,
-      matchedFileCount: maintenance.matchedStaleFileCount,
-      warning: null,
-    },
-  };
-}
-
-async function collectWorkspaceRefreshAttempt(
-  runtime: WorkspaceLspRuntime,
-  diagnosticsScope: HealthDiagnosticScope,
-  attemptedAt: number,
-  options: RefreshStateOptions,
-): Promise<Extract<HealthRefreshAttempt, { kind: "completed" }>> {
-  updateSentinelSnapshot(
-    options.deps.sentinelSnapshot,
-    await refreshLspMaintenance(
-      runtime,
-      options.deps.cwd,
-      options.deps.sentinelSnapshot,
-      options.control,
-    ),
-  );
-  const recovery = await recoverDiagnosticRuntime({
-    service: runtime,
-    control: options.control,
-    progress: () =>
-      reportProgress(options.control, {
-        intent: "health",
-        phase: "recovery",
-        message: "Refreshing diagnostics and recovery state",
-      }),
-  });
-  return {
-    kind: "completed",
-    attemptedAt,
-    requestedDiagnosticScope: diagnosticsScope,
-    operationScope: "workspace-runtime",
-    attemptedActiveClients: recovery.attemptedClients,
-    restartedClients: recovery.restartedClients,
-    staleAssessment: {
-      scope: "workspace",
-      suspected: recovery.staleAssessment.suspected,
-      matchedFileCount: recovery.staleAssessment.matchedFiles.length,
-      warning: recovery.staleAssessment.warning,
-    },
-  };
-}
-
-function updateSentinelSnapshot(target: Map<string, number>, next: Map<string, number>): void {
-  target.clear();
-  for (const [key, value] of next) target.set(key, value);
 }
 
 function refreshUnavailableReason(lspState: WorkspaceLspRuntimeState): string {

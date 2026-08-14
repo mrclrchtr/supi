@@ -1,6 +1,7 @@
 import type { CodeQueryResult, CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import type { Diagnostic } from "../config/types.ts";
 import type {
+  DiagnosticEvidenceSummary,
   OutstandingDiagnosticSummaryEntry,
   RecoverDiagnosticsResult,
   WorkspaceDiagnosticSnapshot,
@@ -14,20 +15,22 @@ export interface WorkspaceLspDiagnosticSurface {
     maxSeverity?: number,
     control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Diagnostic[]>>;
+  /** Re-synchronize tracked documents and return exact five-state evidence coverage. */
   refreshOpenDiagnostics(
     options?: { maxWaitMs?: number; quietMs?: number },
     control?: CodeRequestControl,
-  ): Promise<void>;
-  /** Return tracked-file counts with aggregate cache freshness. */
+  ): Promise<DiagnosticEvidenceSummary>;
+  /** Return tracked-file counts with aggregate cache freshness and evidence coverage. */
   getWorkspaceDiagnosticSummary(): WorkspaceDiagnosticSnapshot<WorkspaceDiagnosticSummaryEntry>;
-  /** Return tracked-file messages with aggregate cache freshness. */
+  /** Return tracked-file messages with aggregate cache freshness and evidence coverage. */
   getOutstandingDiagnostics(
     maxSeverity?: number,
   ): WorkspaceDiagnosticSnapshot<{ file: string; diagnostics: Diagnostic[] }>;
-  /** Return tracked-file severity counts with aggregate cache freshness. */
+  /** Return tracked-file severity counts with aggregate cache freshness and evidence coverage. */
   getOutstandingDiagnosticSummary(
     maxSeverity?: number,
   ): WorkspaceDiagnosticSnapshot<OutstandingDiagnosticSummaryEntry>;
+  /** Run best-effort recovery and retain final diagnostic evidence, including failures. */
   recoverDiagnostics(options?: {
     restartIfStillStale?: boolean;
     maxWaitMs?: number;
