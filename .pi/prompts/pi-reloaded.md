@@ -1,7 +1,5 @@
 ---
-name: pi-reloaded
 description: Live-check PI changes after /reload and identify regressions, unexpected behavior, improvements, and follow-up work
-disable-model-invocation: true
 ---
 
 PI got reloaded with `/reload`, verify the changes live by invoking the relevant tool(s).

@@ -1,12 +1,11 @@
 ---
-name: refine-issue
 description: Refine a GitHub issue into a clear, actionable specification — challenge every requirement and goal for YAGNI and KISS.
-disable-model-invocation: true
+argument-hint: "<issue-number>"
 ---
 
 # Refine an issue
 
-Refine the GitHub issue named by the user.
+Refine GitHub issue `$1`. If the issue number was not given, ask the user which issue to refine.
 
 1. Read the issue with `gh`. Inspect relevant code, read or fetch docs, history, and related issues or pull requests. Separate facts, assumptions, decisions, and open questions.
    Done when every claim in the issue is classified.
