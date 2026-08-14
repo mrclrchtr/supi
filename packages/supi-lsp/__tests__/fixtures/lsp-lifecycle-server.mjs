@@ -16,7 +16,7 @@ const progressSequence = process.argv[3] ?? "normal";
 const progressStepMs = Number(process.argv[4] ?? 40);
 
 let pushDelayMs = pushLongDelayMs;
-if (mode === "push" && crashMarker) {
+if ((mode === "push" || mode === "stall-push") && crashMarker) {
   try {
     const descriptor = fs.openSync(crashMarker, "wx");
     fs.closeSync(descriptor);
@@ -128,11 +128,22 @@ function handle(message) {
     runProgressSequence(progressSequence, progressStepMs);
     return;
   }
-  if (mode === "push" && message.method === "textDocument/didOpen") {
+  if (mode === "stall-push" && message.method === "initialized") {
+    // Create a progress token that never begins: a readiness-stall signal
+    // that makes the client eligible for a recovery restart.
+    send({
+      jsonrpc: "2.0",
+      id: 99,
+      method: "window/workDoneProgress/create",
+      params: { token: "stall-token" },
+    });
+    return;
+  }
+  if ((mode === "push" || mode === "stall-push") && message.method === "textDocument/didOpen") {
     schedulePush(message.params.textDocument);
     return;
   }
-  if (mode === "push" && message.method === "textDocument/didChange") {
+  if ((mode === "push" || mode === "stall-push") && message.method === "textDocument/didChange") {
     schedulePush(message.params.textDocument);
     return;
   }

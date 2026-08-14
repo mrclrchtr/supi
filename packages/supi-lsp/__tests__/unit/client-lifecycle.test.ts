@@ -3,6 +3,11 @@ import { LspClient } from "../../src/client/client.ts";
 
 type TestClient = {
   _status: "initializing" | "running" | "error" | "shutdown";
+  _isReady: boolean;
+  everReady: boolean;
+  startedAt: number;
+  tokenCreatedAt: Map<string, number>;
+  getRecoveryStallSignal(): "readiness-stall" | "protocol-errors" | null;
   armNoProgressTimer(): void;
   didOpen(filePath: string, content: string): void;
   handleProcessFailure(reason: Error): void;
@@ -12,6 +17,7 @@ type TestClient = {
   readonly ready: boolean;
   rpc: {
     dispose(): void;
+    getProtocolFailureCount(): number;
     onNotification(): void;
     onRequest(): void;
     sendNotification(): Promise<void>;
@@ -33,8 +39,10 @@ function createRunningClient(transitions: string[]): LspClient {
   );
   const testClient = client as unknown as TestClient;
   testClient._status = "running";
+  testClient.startedAt = Date.now();
   testClient.rpc = {
     dispose: vi.fn(),
+    getProtocolFailureCount: vi.fn(() => 0),
     onNotification: vi.fn(),
     onRequest: vi.fn(),
     sendNotification: vi.fn().mockResolvedValue(undefined),
@@ -118,5 +126,52 @@ describe("LspClient lifecycle publication", () => {
     expect(client.ready).toBe(false);
     expect(client.openFiles).toEqual([]);
     expect(transitions).toEqual(["tracked-files", "shutdown"]);
+  });
+
+  it("reports a readiness-stall signal when a running client never became ready", async () => {
+    const client = createRunningClient([]) as unknown as TestClient;
+    client._isReady = false;
+    client.startedAt = Date.now() - 6_000;
+
+    expect(client.getRecoveryStallSignal()).toBe("readiness-stall");
+  });
+
+  it("does not report a readiness-stall after the client was ready once", async () => {
+    const client = createRunningClient([]) as unknown as TestClient;
+    // The client became ready early, then lost readiness for normal indexing.
+    client.everReady = true;
+    client._isReady = false;
+    client.startedAt = Date.now() - 6_000;
+
+    expect(client.getRecoveryStallSignal()).toBeNull();
+  });
+
+  it("reports a readiness-stall signal for a created token that never began", async () => {
+    vi.useFakeTimers();
+    const client = createRunningClient([]) as unknown as TestClient;
+    client.handleServerRequest("window/workDoneProgress/create", { token: "unbegun" });
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(client.getRecoveryStallSignal()).toBe("readiness-stall");
+  });
+
+  it("reports no stall signal for a healthy running client", () => {
+    const client = createRunningClient([]) as unknown as TestClient;
+
+    expect(client.getRecoveryStallSignal()).toBeNull();
+  });
+
+  it("reports protocol-errors after repeated request failures", () => {
+    const client = createRunningClient([]) as unknown as TestClient;
+    client.rpc.getProtocolFailureCount = vi.fn(() => 3);
+
+    expect(client.getRecoveryStallSignal()).toBe("protocol-errors");
+  });
+
+  it("reports no stall signal when the client is not running", async () => {
+    const client = createRunningClient([]) as unknown as TestClient;
+    client._status = "error";
+
+    expect(client.getRecoveryStallSignal()).toBeNull();
   });
 });

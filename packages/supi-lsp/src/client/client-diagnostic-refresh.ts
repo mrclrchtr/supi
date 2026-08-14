@@ -1,3 +1,5 @@
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: refresh orchestration, pull collection, and the reopen fallback stay in one cohesive module.
+import { readFileSync } from "node:fs";
 import {
   type CodeRequestControl,
   isCodeRequestInterruption,
@@ -8,7 +10,7 @@ import {
   type DiagnosticEvidenceSummary,
   summarizeDiagnosticEvidence,
 } from "../diagnostics/evidence.ts";
-import { fileToUri, uriToFile } from "../utils.ts";
+import { detectLanguageId, fileToUri, uriToFile } from "../utils.ts";
 import {
   type DiagnosticCacheEntry,
   type DiagnosticSynchronization,
@@ -31,6 +33,7 @@ import type { DiagnosticStateWait, DiagnosticWaitRegistry } from "./client-diagn
 import type { OpenDocumentState } from "./client-document-state.ts";
 import {
   type ResynchronizeDocumentsResult,
+  reopenDocument,
   resynchronizeOpenDocuments,
 } from "./client-document-sync.ts";
 import { getDiagnosticFileState } from "./client-file-state.ts";
@@ -49,6 +52,8 @@ export function sendDidCloseNotification(
 export function buildDiagnosticRefreshEvidence(options: {
   requestedFiles: readonly string[];
   resynchronization: ResynchronizeDocumentsResult;
+  /** Synchronizations that prove evidence, after reopen-resync updates. */
+  synchronizations: readonly DiagnosticSynchronization[];
   failedPullUris: ReadonlySet<string>;
   failedFiles: ReadonlySet<string>;
   failedResynchronizations: ReadonlySet<string>;
@@ -57,7 +62,7 @@ export function buildDiagnosticRefreshEvidence(options: {
   diagnosticStore: ReadonlyMap<string, DiagnosticCacheEntry>;
 }): DiagnosticEvidenceSummary {
   const synchronizationByFile = new Map(
-    options.resynchronization.synchronizations.map((item) => [uriToFile(item.uri), item]),
+    options.synchronizations.map((item) => [uriToFile(item.uri), item]),
   );
   const removedFiles = new Set(options.resynchronization.removedFiles);
   const failedFiles = new Set(options.resynchronization.failedFiles);
@@ -115,7 +120,6 @@ export function pullClientDiagnosticEvidenceFromHost(options: {
   openDocuments: ReadonlyMap<string, { synchronizationId: number; evidenceRevision?: number }>;
   currentEvidenceRevision(): number;
   isRelatedUriTracked(uri: string): boolean;
-  onApplied?(): void;
   request: Omit<DiagnosticPullRequest, "previousResultId"> & {
     synchronizationId?: number;
     evidenceRevision?: number;
@@ -135,9 +139,6 @@ export function pullClientDiagnosticEvidenceFromHost(options: {
       }),
     isRelatedUriTracked: options.isRelatedUriTracked,
     pull: (request) => options.host.pullDocumentDiagnostics(request),
-  }).then((applied) => {
-    if (applied) options.onApplied?.();
-    return applied;
   });
 }
 
@@ -226,9 +227,8 @@ interface ClientDiagnosticRefreshOptions {
   readonly nextSynchronizationId: () => number;
   readonly clearFile: (uri: string) => void;
   readonly invalidateEvidence: (uri: string) => void;
-  readonly blockUnversionedPush: (uri: string) => void;
+  readonly markUnversionedSyncMoment: (uri: string) => void;
   readonly clearFailedFile: (uri: string) => void;
-  readonly unblockUnversionedPush: (uri: string) => void;
   readonly options: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl;
 }
 
@@ -269,18 +269,19 @@ export async function refreshClientOpenDiagnostics(
     uriToFile,
     clearFile: options.clearFile,
     invalidateEvidence: options.invalidateEvidence,
-    blockUnversionedPush: options.blockUnversionedPush,
+    markUnversionedSyncMoment: options.markUnversionedSyncMoment,
     clearFailedFile: options.clearFailedFile,
   });
-  const synchronizations = resynchronization.synchronizations;
+  let synchronizations = resynchronization.synchronizations;
   const settleEpoch = options.waiters.settleEpoch;
   observer.synchronized();
   const documentCount = synchronizations.length;
-  let failedPullUris = new Set<string>();
+  let failedPullUris: ReadonlySet<string> = new Set();
   const buildEvidence = () =>
     buildDiagnosticRefreshEvidence({
       requestedFiles: options.requestedFiles,
       resynchronization,
+      synchronizations,
       failedPullUris,
       failedFiles: options.failedFiles(),
       failedResynchronizations: new Set(resynchronization.failedFiles),
@@ -294,51 +295,18 @@ export async function refreshClientOpenDiagnostics(
   }
 
   if (supportsPull) {
-    try {
-      await pullDiagnosticsForOpenDocuments({
-        requests: synchronizations,
-        syncStart,
-        maxWaitMs,
-        signal: options.options.signal,
-        deadline: options.options.deadline,
-        operationId: options.options.operationId,
-        currentEvidenceRevision: options.evidenceRevision,
-        openDocuments: options.openDocuments,
-        diagnosticStore: options.diagnosticStore,
-        waitForChange: () => options.waiters.waitForChange(),
-        pullDiagnostics: (pullOptions) =>
-          pullClientDiagnosticEvidenceFromHost({
-            host: options.host,
-            store: options.diagnosticStore,
-            openDocuments: options.openDocuments,
-            currentEvidenceRevision: options.evidenceRevision,
-            isRelatedUriTracked: options.isRelatedUriTracked,
-            onApplied: () => options.unblockUnversionedPush(pullOptions.request.uri),
-            request: {
-              uri: pullOptions.request.uri,
-              timeoutMs: pullOptions.timeoutMs,
-              synchronizationId: pullOptions.request.synchronizationId,
-              evidenceRevision:
-                options.openDocuments.get(pullOptions.request.uri)?.evidenceRevision ??
-                options.evidenceRevision(),
-              signal: pullOptions.signal,
-              deadline: pullOptions.deadline,
-              operationId: pullOptions.operationId,
-            },
-          }),
-      });
-      observer.pullCompleted(documentCount);
-      return buildEvidence();
-    } catch (error) {
-      observer.pullFailed(error);
-      if (error instanceof DiagnosticPullError) failedPullUris = new Set(error.failedUris);
-      // An interruption during the pull phase stops the refresh instead of
-      // falling through to the settle path with failed-coverage evidence.
-      if (isCodeRequestInterruption(error, options.options)) throw error;
-    }
+    const pull = await collectPullEvidenceForRefresh({
+      options,
+      synchronizations,
+      syncStart,
+      maxWaitMs,
+      observer,
+    });
+    failedPullUris = new Set(pull.failedPullUris);
+    if (pull.completed) return buildEvidence();
   }
 
-  const settle = await options.waiters.waitForSettle(
+  let finalSettle = await options.waiters.waitForSettle(
     {
       syncStart,
       maxWaitMs,
@@ -357,8 +325,167 @@ export async function refreshClientOpenDiagnostics(
     },
     options.options,
   );
-  observer.pushSettled(documentCount, settle);
+  if (!supportsPull && finalSettle.outcome === "timed-out") {
+    const reopen = await reopenUnconfirmedDocuments({
+      options,
+      synchronizations,
+      maxWaitMs,
+      quietMs,
+      observer,
+    });
+    if (reopen.performed) {
+      synchronizations = reopen.synchronizations;
+      finalSettle = await options.waiters.waitForSettle(
+        {
+          syncStart: reopen.startedAt,
+          maxWaitMs: reopen.budgetMs,
+          quietMs,
+          settleEpoch: options.waiters.settleEpoch,
+          isComplete: () =>
+            synchronizations.every((item) =>
+              hasFreshEvidence(options.diagnosticStore, item, options.evidenceRevision()),
+            ),
+          latestReceived: () =>
+            latestFreshEvidenceReceivedAt(
+              options.diagnosticStore,
+              synchronizations,
+              options.evidenceRevision(),
+            ),
+        },
+        options.options,
+      );
+    }
+  }
+  observer.pushSettled(documentCount, finalSettle);
   // A cancelled settle must not publish evidence the caller no longer awaits.
   throwIfCodeRequestInterrupted(options.options);
   return buildEvidence();
+}
+
+/**
+ * Pull diagnostic evidence for every synchronized document, or fall through
+ * to the push settle path when any pull fails. An interruption during the
+ * pull phase stops the refresh instead of degrading into failed coverage.
+ */
+async function collectPullEvidenceForRefresh(options: {
+  options: ClientDiagnosticRefreshOptions;
+  synchronizations: readonly DiagnosticSynchronization[];
+  syncStart: number;
+  maxWaitMs: number;
+  observer: DiagnosticObserver;
+}): Promise<{ completed: boolean; failedPullUris: ReadonlySet<string> }> {
+  const { options: refresh, synchronizations, syncStart, maxWaitMs, observer } = options;
+  try {
+    await pullDiagnosticsForOpenDocuments({
+      requests: synchronizations,
+      syncStart,
+      maxWaitMs,
+      signal: refresh.options.signal,
+      deadline: refresh.options.deadline,
+      operationId: refresh.options.operationId,
+      currentEvidenceRevision: refresh.evidenceRevision,
+      openDocuments: refresh.openDocuments,
+      diagnosticStore: refresh.diagnosticStore,
+      waitForChange: () => refresh.waiters.waitForChange(),
+      pullDiagnostics: (pullOptions) =>
+        pullClientDiagnosticEvidenceFromHost({
+          host: refresh.host,
+          store: refresh.diagnosticStore,
+          openDocuments: refresh.openDocuments,
+          currentEvidenceRevision: refresh.evidenceRevision,
+          isRelatedUriTracked: refresh.isRelatedUriTracked,
+          request: {
+            uri: pullOptions.request.uri,
+            timeoutMs: pullOptions.timeoutMs,
+            synchronizationId: pullOptions.request.synchronizationId,
+            evidenceRevision:
+              refresh.openDocuments.get(pullOptions.request.uri)?.evidenceRevision ??
+              refresh.evidenceRevision(),
+            signal: pullOptions.signal,
+            deadline: pullOptions.deadline,
+            operationId: pullOptions.operationId,
+          },
+        }),
+    });
+    observer.pullCompleted(synchronizations.length);
+    return { completed: true, failedPullUris: new Set() };
+  } catch (error) {
+    observer.pullFailed(error);
+    if (error instanceof DiagnosticPullError) {
+      return { completed: false, failedPullUris: new Set(error.failedUris) };
+    }
+    if (isCodeRequestInterruption(error, refresh.options)) throw error;
+    return { completed: false, failedPullUris: new Set() };
+  }
+}
+
+/**
+ * Reopen-resync fallback (R2): on push-only routes an open document that
+
+ * stays unconfirmed after the settle window receives no further push — a
+ * clean file gets no push on didChange at all. Close and reopen each
+ * unconfirmed document so the server publishes on didOpen, then settle
+ * again within a bounded second window. The cache entry and version
+ * history survive the reopen; other documents keep their server state.
+ */
+async function reopenUnconfirmedDocuments(options: {
+  options: ClientDiagnosticRefreshOptions;
+  synchronizations: readonly DiagnosticSynchronization[];
+  maxWaitMs: number;
+  quietMs: number;
+  observer: DiagnosticObserver;
+}): Promise<{
+  performed: boolean;
+  startedAt: number;
+  budgetMs: number;
+  synchronizations: DiagnosticSynchronization[];
+}> {
+  const { options: refresh, synchronizations, maxWaitMs, quietMs, observer } = options;
+  const startedAt = Date.now();
+  const budgetMs = Math.min(maxWaitMs, quietMs * 4);
+  const unconfirmed = synchronizations.filter(
+    (item) => !hasFreshEvidence(refresh.diagnosticStore, item, refresh.evidenceRevision()),
+  );
+  const reopenedSynchronizations: DiagnosticSynchronization[] = [];
+  for (const item of unconfirmed) {
+    const document = refresh.openDocuments.get(item.uri);
+    if (!document) continue;
+    const filePath = uriToFile(item.uri);
+    let content: string;
+    try {
+      content = readFileSync(filePath, "utf-8");
+    } catch {
+      // The file disappeared mid-refresh; keep the document as-is and
+      // report its current unconfirmed coverage.
+      continue;
+    }
+    reopenDocument({
+      uri: item.uri,
+      content,
+      document,
+      languageId: detectLanguageId(filePath),
+      nextVersion: () => nextDocumentVersion(refresh.versionHistory, item.uri),
+      nextSynchronizationId: refresh.nextSynchronizationId,
+      evidenceRevision: refresh.evidenceRevision(),
+      waiters: refresh.waiters,
+      sendNotification: (method, params) => refresh.host.sendNotification(method, params),
+      markUnversionedSyncMoment: () => refresh.markUnversionedSyncMoment(item.uri),
+    });
+    reopenedSynchronizations.push({
+      uri: item.uri,
+      synchronizationId: document.synchronizationId,
+      evidenceRevision: document.evidenceRevision,
+    });
+  }
+  if (reopenedSynchronizations.length === 0) {
+    return { performed: false, startedAt, budgetMs, synchronizations: [...synchronizations] };
+  }
+  observer.reopened(reopenedSynchronizations.length);
+  const reopenedByUri = new Map(reopenedSynchronizations.map((item) => [item.uri, item]));
+  return {
+    performed: true,
+    startedAt,
+    budgetMs,
+    synchronizations: synchronizations.map((item) => reopenedByUri.get(item.uri) ?? item),
+  };
 }

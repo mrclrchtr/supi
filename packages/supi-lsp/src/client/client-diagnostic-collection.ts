@@ -12,7 +12,7 @@ import {
   incompleteDiagnosticResult,
   raceDiagnosticPull,
 } from "./client-diagnostic-evidence.ts";
-import type { DiagnosticObserver } from "./client-diagnostic-timing.ts";
+import type { DiagnosticObserver, DiagnosticPushWaitOutcome } from "./client-diagnostic-timing.ts";
 import type { DiagnosticWaitRegistry } from "./client-diagnostic-waiters.ts";
 
 interface FileDiagnosticCollectionOptions {
@@ -27,6 +27,8 @@ interface FileDiagnosticCollectionOptions {
   readonly freshPush: () => boolean;
   readonly diagnostics: () => Diagnostic[];
   readonly pullDiagnostics: (timeoutMs: number, signal: AbortSignal) => Promise<boolean>;
+  /** Observe the push wait outcome without finishing the observer; the caller finishes once. */
+  readonly onPushWait?: (outcome: DiagnosticPushWaitOutcome) => void;
 }
 
 type PullCollectionOutcome = "failed" | "pull" | "push" | "released";
@@ -61,7 +63,8 @@ export async function collectSynchronizedFileDiagnostics(
     Math.max(0, options.maxWaitMs - (Date.now() - options.syncStart)),
     control,
   );
-  options.observer.pushWaitCompleted(1, push);
+  if (options.onPushWait) options.onPushWait(push);
+  else options.observer.pushWaitCompleted(1, push);
   if (push === "published" && options.freshPush()) {
     return completedCodeQuery(options.diagnostics());
   }

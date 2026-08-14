@@ -98,6 +98,43 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
     }
   });
 
+  it("confirms a clean file through the reopen-resync fallback", async () => {
+    const client = createStartedClient();
+    const { tmpDir, uri } = createTempFileUri();
+    openDocument(client, uri);
+    const sendNotification = notificationMock(client);
+
+    try {
+      // The server stays silent through the first settle window, then
+      // publishes on the fallback didOpen.
+      setTimeout(() => client.handlePublishDiagnostics({ uri, diagnostics: [] }), 120);
+      const start = Date.now();
+      const evidence = await client.refreshOpenDiagnostics({ maxWaitMs: 80, quietMs: 20 });
+      const elapsed = Date.now() - start;
+
+      expect(evidence).toMatchObject({
+        requested: 1,
+        confirmed: 1,
+        unconfirmed: 0,
+        failed: 0,
+        removed: 0,
+        documents: [{ file: uriToFile(uri), status: "confirmed" }],
+      });
+      // The reopen fallback ran after the first settle window: the total
+      // wait covers the settle budget plus the bounded second settle.
+      expect(elapsed).toBeGreaterThanOrEqual(100);
+      expect(sendNotification).toHaveBeenCalledWith("textDocument/didClose", {
+        textDocument: { uri },
+      });
+      expect(sendNotification).toHaveBeenCalledWith(
+        "textDocument/didOpen",
+        expect.objectContaining({ textDocument: expect.objectContaining({ uri }) }),
+      );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it("returns exact confirmed and unconfirmed document coverage", async () => {
     const client = createStartedClient();
     const first = createTempFileUri();
@@ -416,7 +453,9 @@ describe("LspClient refreshOpenDiagnostics — file handling", () => {
     const uri = `file://${filePath}`;
     fs.writeFileSync(filePath, "const x = 1;");
     const client = createStartedClient();
-    simulatePublish(client, uri);
+    // A versioned publish seeds the cache for a URI the client never opened;
+    // unversioned pushes for untracked URIs stay fail-closed.
+    client.handlePublishDiagnostics({ uri, version: 1, diagnostics: [makeDiagnostic("err")] });
     fs.rmSync(filePath);
 
     await expect(

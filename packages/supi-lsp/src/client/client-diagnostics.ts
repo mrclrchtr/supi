@@ -1,3 +1,4 @@
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: one client's document sync, diagnostics, refresh, and sync-file flow stay in one cohesive class.
 import * as path from "node:path";
 import {
   type CodeQueryResult,
@@ -13,6 +14,7 @@ import { applyPushDiagnostics, buildClientDiagnosticSnapshot } from "./client-di
 import { collectSynchronizedFileDiagnostics } from "./client-diagnostic-collection.ts";
 import {
   type DiagnosticCacheEntry,
+  type DiagnosticSynchronization,
   hasFreshPush,
   isCurrentSynchronization,
   isValidPublishDiagnosticsParams,
@@ -24,7 +26,7 @@ import {
   refreshClientOpenDiagnostics,
   sendDidCloseNotification,
 } from "./client-diagnostic-refresh.ts";
-import { DiagnosticObserver } from "./client-diagnostic-timing.ts";
+import { DiagnosticObserver, type DiagnosticPushWaitOutcome } from "./client-diagnostic-timing.ts";
 import { DiagnosticWaitRegistry } from "./client-diagnostic-waiters.ts";
 import {
   type ClientDiagnosticSnapshot,
@@ -33,10 +35,16 @@ import {
   hasCurrentDiagnosticEvidence,
   type OpenDocumentState,
 } from "./client-document-state.ts";
-import { clearTrackedDocumentState, synchronizeTrackedDocument } from "./client-document-sync.ts";
+import {
+  clearTrackedDocumentState,
+  reopenDocument,
+  synchronizeTrackedDocument,
+} from "./client-document-sync.ts";
 import { getDiagnosticFileState } from "./client-file-state.ts";
 
 const DIAGNOSTIC_WAIT_MS = 3_000;
+/** Bounded push wait after a reopen-resync fallback, in milliseconds. */
+const REOPEN_EVIDENCE_WAIT_MS = 1_000;
 /** Own one client's document and diagnostic evidence; revisions prevent stale reuse. */
 export class ClientDiagnostics {
   readonly #openDocs = new Map<string, OpenDocumentState>();
@@ -44,7 +52,10 @@ export class ClientDiagnostics {
   readonly #waiters = new DiagnosticWaitRegistry();
   readonly #versionHistory = new Map<string, number>();
   readonly #failedUris = new Set<string>();
-  readonly #unversionedPushBlocked = new Set<string>();
+  /** Client-side sync moment per URI: unversioned pushes before it stay rejected. */
+  readonly #unversionedPushSyncMoments = new Map<string, number>();
+  /** URIs closed by a lifecycle operation: versioned pushes stay fail-closed. */
+  readonly #closedVersionedBarrier = new Set<string>();
   #evidenceRevision = 0;
   #nextSynchronizationId = 0;
 
@@ -58,16 +69,17 @@ export class ClientDiagnostics {
     if (options.preserveFailedDocuments) {
       for (const uri of [...this.#openDocs.keys(), ...this.#diagnosticStore.keys()]) {
         this.#failedUris.add(uri);
-        this.#unversionedPushBlocked.add(uri);
+        this.#closedVersionedBarrier.add(uri);
       }
     } else {
       this.#failedUris.clear();
+      this.#closedVersionedBarrier.clear();
     }
     this.#openDocs.clear();
     this.#diagnosticStore.clear();
     this.#versionHistory.clear();
     this.#evidenceRevision++;
-    if (!options.preserveFailedDocuments) this.#unversionedPushBlocked.clear();
+    this.#unversionedPushSyncMoments.clear();
     this.#waiters.releaseAll();
     this.#waiters.cancelSettle();
   }
@@ -84,6 +96,10 @@ export class ClientDiagnostics {
 
     const languageId = detectLanguageId(filePath);
     this.#waiters.cancelSettle();
+    // A didOpen is a synchronization: pushes the server sends after it are
+    // responses to the open and can become fresh evidence (ADR 0020).
+    this.#unversionedPushSyncMoments.set(uri, Date.now());
+    this.#closedVersionedBarrier.delete(uri);
     const version = nextDocumentVersion(this.#versionHistory, uri);
     this.#openDocs.set(uri, {
       version,
@@ -121,7 +137,7 @@ export class ClientDiagnostics {
       evidenceRevision: this.#evidenceRevision,
       waiters: this.#waiters,
       sendNotification: (method, params) => this.host.sendNotification(method, params),
-      blockUnversionedPush: () => this.#unversionedPushBlocked.add(uri),
+      markUnversionedSyncMoment: () => this.#unversionedPushSyncMoments.set(uri, Date.now()),
       clearFailedFile: () => this.#failedUris.delete(uri),
       open: () => this.didOpen(filePath, content),
     });
@@ -131,7 +147,8 @@ export class ClientDiagnostics {
     const uri = fileToUri(filePath);
     const wasOpen = this.#openDocs.has(uri);
     this.#failedUris.delete(uri);
-    this.#unversionedPushBlocked.add(uri);
+    this.#unversionedPushSyncMoments.delete(uri);
+    this.#closedVersionedBarrier.add(uri);
     clearTrackedDocumentState(this.#openDocs, this.#diagnosticStore, this.#waiters, uri);
 
     if (wasOpen && this.host.isOperational()) {
@@ -149,7 +166,8 @@ export class ClientDiagnostics {
 
       const wasOpen = this.#openDocs.has(uri);
       this.#failedUris.add(uri);
-      this.#unversionedPushBlocked.add(uri);
+      this.#unversionedPushSyncMoments.delete(uri);
+      this.#closedVersionedBarrier.add(uri);
       clearTrackedDocumentState(this.#openDocs, this.#diagnosticStore, this.#waiters, uri);
       removedFiles.push(filePath);
       if (wasOpen && this.host.isOperational()) sendDidCloseNotification(this.host, uri);
@@ -161,7 +179,8 @@ export class ClientDiagnostics {
   markFailedFile(filePath: string): void {
     const uri = fileToUri(filePath);
     this.#failedUris.add(uri);
-    this.#unversionedPushBlocked.add(uri);
+    this.#unversionedPushSyncMoments.delete(uri);
+    this.#closedVersionedBarrier.add(uri);
   }
 
   getOpenDocumentVersion(filePath: string): number | null {
@@ -193,7 +212,14 @@ export class ClientDiagnostics {
       ...this.#versionHistory.keys(),
       ...this.#failedUris,
     ]);
-    for (const uri of knownUris) this.#unversionedPushBlocked.add(uri);
+    // A watched-file notification is sent immediately after this call, so the
+    // recorded moment gates unversioned pushes around the invalidation: only
+    // pushes the server sends after the change can become fresh evidence.
+    const moment = Date.now();
+    for (const uri of knownUris) {
+      this.#unversionedPushSyncMoments.set(uri, moment);
+      this.#closedVersionedBarrier.add(uri);
+    }
   }
 
   handlePublishDiagnostics(params: unknown): void {
@@ -204,19 +230,11 @@ export class ClientDiagnostics {
         openDocuments: this.#openDocs,
         params,
         evidenceRevision: this.#evidenceRevision,
-        unversionedBlocked: this.#unversionedPushBlocked.has(params.uri),
+        unversionedSyncMoment: this.#unversionedPushSyncMoments.get(params.uri),
+        closedVersionedBarrier: this.#closedVersionedBarrier.has(params.uri),
       })
     ) {
       return;
-    }
-    const document = this.#openDocs.get(params.uri);
-    if (
-      params.version !== undefined &&
-      document &&
-      params.version === document.version &&
-      document.evidenceRevision === this.#evidenceRevision
-    ) {
-      this.#unversionedPushBlocked.delete(params.uri);
     }
     this.#waiters.releaseFile(params.uri, "published");
     this.#waiters.notifySettle();
@@ -245,12 +263,12 @@ export class ClientDiagnostics {
       },
       clearFile: (uri) => {
         this.#failedUris.add(uri);
-        this.#unversionedPushBlocked.add(uri);
+        this.#unversionedPushSyncMoments.delete(uri);
+        this.#closedVersionedBarrier.add(uri);
         clearTrackedDocumentState(this.#openDocs, this.#diagnosticStore, this.#waiters, uri);
       },
-      blockUnversionedPush: (uri) => this.#unversionedPushBlocked.add(uri),
+      markUnversionedSyncMoment: (uri) => this.#unversionedPushSyncMoments.set(uri, Date.now()),
       clearFailedFile: (uri) => this.#failedUris.delete(uri),
-      unblockUnversionedPush: (uri) => this.#unversionedPushBlocked.delete(uri),
       options,
     });
   }
@@ -289,7 +307,7 @@ export class ClientDiagnostics {
         evidenceRevision: this.#evidenceRevision,
         waiters: this.#waiters,
         sendNotification: (method, params) => this.host.sendNotification(method, params),
-        blockUnversionedPush: () => this.#unversionedPushBlocked.add(uri),
+        markUnversionedSyncMoment: () => this.#unversionedPushSyncMoments.set(uri, Date.now()),
         clearFailedFile: () => this.#failedUris.delete(uri),
         open: () => this.didOpen(filePath, content),
       });
@@ -311,41 +329,132 @@ export class ClientDiagnostics {
       synchronizationId: synchronization.synchronizationId,
       evidenceRevision: synchronization.evidenceRevision,
     };
-    const evidenceRevision = synchronization.evidenceRevision;
-    return collectSynchronizedFileDiagnostics(
+    return this.#collectFileDiagnosticsWithReopenRetry(
       {
+        filePath,
+        content,
+        uri,
         supportsPull,
         syncStart,
-        maxWaitMs: DIAGNOSTIC_WAIT_MS,
         request,
         cachedDiagnostics,
         observer,
-        waiters: this.#waiters,
-        current: () => isCurrentSynchronization(this.#openDocs, request),
-        freshPush: () => hasFreshPush(this.#diagnosticStore, request, this.#evidenceRevision),
-        diagnostics: () => this.getDiagnostics(filePath),
-        pullDiagnostics: (timeoutMs, signal) =>
-          pullClientDiagnosticEvidenceFromHost({
-            host: this.host,
-            store: this.#diagnosticStore,
-            openDocuments: this.#openDocs,
-            currentEvidenceRevision: () => this.#evidenceRevision,
-            isRelatedUriTracked: (relatedUri) =>
-              this.#openDocs.has(relatedUri) || this.#versionHistory.has(relatedUri),
-            onApplied: () => this.#unversionedPushBlocked.delete(uri),
-            request: {
-              uri,
-              timeoutMs,
-              synchronizationId: request.synchronizationId,
-              evidenceRevision,
-              signal,
-              deadline: control?.deadline,
-              operationId: control?.operationId,
-            },
-          }),
       },
       control,
     );
+  }
+
+  /**
+   * Collect diagnostics for one synchronized document, retrying once through
+   * a reopen-resync on push-only routes when the first wait times out.
+   */
+  async #collectFileDiagnosticsWithReopenRetry(
+    options: {
+      filePath: string;
+      content: string;
+      uri: string;
+      supportsPull: boolean;
+      syncStart: number;
+      request: DiagnosticSynchronization;
+      cachedDiagnostics: Diagnostic[] | null;
+      observer: DiagnosticObserver;
+    },
+    control?: CodeRequestControl,
+  ): Promise<CodeQueryResult<Diagnostic[]>> {
+    const {
+      filePath,
+      content,
+      uri,
+      supportsPull,
+      syncStart,
+      request,
+      cachedDiagnostics,
+      observer,
+    } = options;
+    let pushOutcome: DiagnosticPushWaitOutcome | undefined;
+    let attemptRequest = request;
+    let attemptSyncStart = syncStart;
+    let attemptMaxWaitMs = DIAGNOSTIC_WAIT_MS;
+    let reopenedOnce = false;
+    let result: CodeQueryResult<Diagnostic[]>;
+    for (;;) {
+      result = await collectSynchronizedFileDiagnostics(
+        {
+          supportsPull,
+          syncStart: attemptSyncStart,
+          maxWaitMs: attemptMaxWaitMs,
+          request: attemptRequest,
+          cachedDiagnostics,
+          observer,
+          waiters: this.#waiters,
+          current: () => isCurrentSynchronization(this.#openDocs, attemptRequest),
+          freshPush: () =>
+            hasFreshPush(this.#diagnosticStore, attemptRequest, this.#evidenceRevision),
+          diagnostics: () => this.getDiagnostics(filePath),
+          pullDiagnostics: (timeoutMs, signal) =>
+            pullClientDiagnosticEvidenceFromHost({
+              host: this.host,
+              store: this.#diagnosticStore,
+              openDocuments: this.#openDocs,
+              currentEvidenceRevision: () => this.#evidenceRevision,
+              isRelatedUriTracked: (relatedUri) =>
+                this.#openDocs.has(relatedUri) || this.#versionHistory.has(relatedUri),
+              request: {
+                uri,
+                timeoutMs,
+                synchronizationId: attemptRequest.synchronizationId,
+                evidenceRevision: attemptRequest.evidenceRevision ?? this.#evidenceRevision,
+                signal,
+                deadline: control?.deadline,
+                operationId: control?.operationId,
+              },
+            }),
+          onPushWait: (outcome) => {
+            pushOutcome = outcome;
+          },
+        },
+        control,
+      );
+      // Reopen-resync fallback (R2): on push-only routes a document that
+      // timed out with no push stays unconfirmed — a clean file gets no
+      // push on didChange at all. Close and reopen it over the protocol so
+      // the server publishes on didOpen, then wait once more with a bounded
+      // budget. The cache entry and version history survive the reopen.
+      const document = this.#openDocs.get(uri);
+      if (
+        supportsPull ||
+        reopenedOnce ||
+        result.kind === "completed" ||
+        pushOutcome !== "timed-out" ||
+        !document ||
+        !isCurrentSynchronization(this.#openDocs, attemptRequest)
+      ) {
+        break;
+      }
+      reopenDocument({
+        uri,
+        content,
+        document,
+        languageId: detectLanguageId(filePath),
+        nextVersion: () => nextDocumentVersion(this.#versionHistory, uri),
+        nextSynchronizationId: () => ++this.#nextSynchronizationId,
+        evidenceRevision: this.#evidenceRevision,
+        waiters: this.#waiters,
+        sendNotification: (method, params) => this.host.sendNotification(method, params),
+        markUnversionedSyncMoment: () => this.#unversionedPushSyncMoments.set(uri, Date.now()),
+      });
+      observer.reopened(1);
+      reopenedOnce = true;
+      attemptRequest = {
+        uri,
+        synchronizationId: document.synchronizationId,
+        evidenceRevision: document.evidenceRevision,
+      };
+      attemptSyncStart = Date.now();
+      attemptMaxWaitMs = REOPEN_EVIDENCE_WAIT_MS;
+    }
+    observer.pushWaitCompleted(1, pushOutcome ?? "timed-out");
+    return result;
   }
 }
 

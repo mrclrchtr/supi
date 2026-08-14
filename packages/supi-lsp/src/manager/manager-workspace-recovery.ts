@@ -4,6 +4,7 @@ import {
   isCodeRequestInterruption,
   throwIfCodeRequestInterrupted,
 } from "@mrclrchtr/supi-code-runtime/api";
+import type { RecoveryRestartReason } from "../client/client.ts";
 import { getDiagnosticFileState } from "../client/client-file-state.ts";
 import type { Diagnostic, FileEvent } from "../config/types.ts";
 import {
@@ -25,6 +26,8 @@ export interface WorkspaceRecoveryResult {
   attemptedServers: string[];
   /** Server names of the clients restarted during this pass, for telemetry identity. */
   restartedServers: string[];
+  /** Stall signal of the first restarted route, when this pass restarted a client. */
+  restartReason?: RecoveryRestartReason;
   /** Final document-level evidence from the last refresh in this recovery pass. */
   diagnosticEvidence: DiagnosticEvidenceSummary;
   /** Failure from the first refresh, when no later pass replaced it. */
@@ -41,6 +44,8 @@ export interface WorkspaceDiagnosticRoute {
   supportsPull: boolean;
   /** Files tracked by the route whose evidence is unconfirmed. */
   unconfirmedFiles: string[];
+  /** Protocol-stall signal observed on the route, or null when healthy. */
+  stallSignal: RecoveryRestartReason | null;
 }
 
 export interface WorkspaceRecoveryHost {
@@ -115,21 +120,24 @@ export async function recoverWorkspaceDiagnostics(
   let staleAssessment = assessStaleDiagnostics(host.getOutstandingDiagnostics(1));
   let restartedClients = 0;
   let restartServerNames: string[] = [];
+  let restartReason: RecoveryRestartReason | undefined;
 
   if (options.restartIfStillStale) {
     // Observe cancellation between pass phases: an abort that arrived during
     // the first refresh stops the pass before any client restart.
     throwIfCodeRequestInterrupted(options.control);
-    const restartFiles = collectRecoveryRestartFiles(host, staleAssessment);
+    const restartTargets = collectRecoveryRestartTargets(host);
+    const restartFiles = restartTargets.flatMap((target) => target.files);
     if (restartFiles.length > 0) {
-      const escalation = await runRestartEscalation(
-        host,
+      const escalation = await runRestartEscalation(host, {
         restartFiles,
-        diagnosticEvidence,
-        options,
-      );
+        restartTargets,
+        evidence: diagnosticEvidence,
+        ...options,
+      });
       restartedClients = escalation.restartedClients;
       restartServerNames = escalation.restartedServerNames;
+      restartReason = escalation.restartReason;
       diagnosticEvidence = escalation.diagnosticEvidence;
       if (escalation.refreshedAfterRestart) refreshFailureReason = undefined;
       staleAssessment = assessStaleDiagnostics(host.getOutstandingDiagnostics(1));
@@ -149,6 +157,7 @@ export async function recoverWorkspaceDiagnostics(
       restartedClients,
       attemptedServers,
       restartedServers: restartServerNames,
+      ...(restartReason ? { restartReason } : {}),
       diagnosticEvidence,
       ...(refreshFailureReason ? { refreshFailureReason } : {}),
       elapsedMs: Date.now() - recoveryStartedAt,
@@ -157,24 +166,34 @@ export async function recoverWorkspaceDiagnostics(
   }
 }
 
-/** Collect restart targets: unconfirmed push-only routes plus stale clusters. */
-function collectRecoveryRestartFiles(
-  host: WorkspaceRecoveryHost,
-  staleAssessment: StaleDiagnosticAssessment,
-): string[] {
-  const restartFiles = new Set<string>();
-  // Targeted push-only recovery: restart routes whose evidence is still
-  // unconfirmed after the first refresh. Pull-capable routes never restart
-  // because push evidence is absent.
+/** One push-only route that a recovery pass may restart. */
+interface RecoveryRestartTarget {
+  key: string;
+  reason: RecoveryRestartReason;
+  files: string[];
+}
+
+/**
+ * Collect restart targets: push-only routes with a protocol-stall signal.
+ *
+ * Unconfirmed evidence alone never restarts a client: the reopen-resync
+ * fallback handles unconfirmed push-only documents without discarding
+ * server state (ADR 0020). Restarts require a readiness stall or repeated
+ * protocol failures, and stay limited to push-only routes.
+ */
+function collectRecoveryRestartTargets(host: WorkspaceRecoveryHost): RecoveryRestartTarget[] {
+  const targets: RecoveryRestartTarget[] = [];
   for (const route of host.getClientDiagnosticRoutes()) {
     if (route.supportsPull) continue;
-    for (const file of route.unconfirmedFiles) restartFiles.add(file);
+    if (!route.stallSignal) continue;
+    if (route.unconfirmedFiles.length === 0) continue;
+    targets.push({
+      key: route.key,
+      reason: route.stallSignal,
+      files: route.unconfirmedFiles,
+    });
   }
-  // Supplemental stale-cluster heuristic, kept as an additional trigger.
-  if (staleAssessment.suspected) {
-    for (const entry of staleAssessment.matchedFiles) restartFiles.add(entry.file);
-  }
-  return Array.from(restartFiles);
+  return targets;
 }
 
 /**
@@ -185,9 +204,10 @@ function collectRecoveryRestartFiles(
  */
 async function runRestartEscalation(
   host: WorkspaceRecoveryHost,
-  restartFiles: readonly string[],
-  evidence: DiagnosticEvidenceSummary,
   options: {
+    restartFiles: readonly string[];
+    restartTargets: readonly RecoveryRestartTarget[];
+    evidence: DiagnosticEvidenceSummary;
     maxWaitMs?: number;
     quietMs?: number;
     control?: CodeRequestControl;
@@ -195,17 +215,16 @@ async function runRestartEscalation(
 ): Promise<{
   restartedClients: number;
   restartedServerNames: string[];
+  restartReason?: RecoveryRestartReason;
   diagnosticEvidence: DiagnosticEvidenceSummary;
   refreshedAfterRestart: boolean;
 }> {
-  // Invalidate only evidence that a restart can re-establish: the unconfirmed
-  // push-only trigger files and every file owned by a route that actually
-  // restarted. Files added by the stale-cluster heuristic that belong to a
-  // pull-capable route keep their freshly refreshed evidence.
-  const unconfirmedTriggerFiles = collectUnconfirmedPushOnlyFiles(host);
+  const { restartFiles, restartTargets, evidence } = options;
+  const reasonByKey = new Map(restartTargets.map((target) => [target.key, target.reason]));
   let diagnosticEvidence = evidence;
   let restartedClients = 0;
   let restartedServerNames: string[] = [];
+  let restartReason: RecoveryRestartReason | undefined;
   let refreshedAfterRestart = false;
 
   try {
@@ -219,17 +238,14 @@ async function runRestartEscalation(
     const restarted = restartResults.filter((result) => result.restarted);
     restartedClients = restarted.length;
     restartedServerNames = restarted.map((result) => result.serverName);
+    restartReason = firstRestartReason(restarted, reasonByKey);
     // Every attempted route had its client replaced or shut down; its owned
     // files need fresh evidence. Routes the manager skipped (pull-capable or
     // guard-blocked) produce no result and keep their refreshed evidence.
     const attemptedFiles = restartResults
       .flatMap((result) => result.files)
       .filter((file) => host.isDiagnosticFile(file));
-    diagnosticEvidence = invalidateDiagnosticEvidence(
-      evidence,
-      [...unconfirmedTriggerFiles, ...attemptedFiles],
-      host.getCwd(),
-    );
+    diagnosticEvidence = invalidateDiagnosticEvidence(evidence, attemptedFiles, host.getCwd());
 
     if (restarted.length > 0) {
       try {
@@ -256,19 +272,25 @@ async function runRestartEscalation(
     // Keep affected evidence unconfirmed when replacement fails.
   }
 
-  return { restartedClients, restartedServerNames, diagnosticEvidence, refreshedAfterRestart };
+  return {
+    restartedClients,
+    restartedServerNames,
+    ...(restartReason ? { restartReason } : {}),
+    diagnosticEvidence,
+    refreshedAfterRestart,
+  };
 }
 
-/** Collect diagnostic-visible unconfirmed files owned by push-only routes. */
-function collectUnconfirmedPushOnlyFiles(host: WorkspaceRecoveryHost): string[] {
-  const files: string[] = [];
-  for (const route of host.getClientDiagnosticRoutes()) {
-    if (route.supportsPull) continue;
-    for (const file of route.unconfirmedFiles) {
-      if (host.isDiagnosticFile(file)) files.push(file);
-    }
+/** Return the stall signal of the first route that actually restarted. */
+function firstRestartReason(
+  restarted: Array<{ key: string }>,
+  reasonByKey: ReadonlyMap<string, RecoveryRestartReason>,
+): RecoveryRestartReason | undefined {
+  for (const result of restarted) {
+    const reason = reasonByKey.get(result.key);
+    if (reason !== undefined) return reason;
   }
-  return files;
+  return undefined;
 }
 
 function invalidateDiagnosticEvidence(

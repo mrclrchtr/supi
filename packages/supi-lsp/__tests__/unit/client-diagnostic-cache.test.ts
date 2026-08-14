@@ -30,6 +30,7 @@ function openAtVersion(client: LspClient, version: number): void {
 describe("LspClient diagnostic cache", () => {
   it("stores diagnostics received from the server", () => {
     const { client } = createRunningTestClient();
+    openAtVersion(client, 1);
 
     publish(client, { uri: URI, diagnostics: [makeDiagnostic("err")] });
 
@@ -38,6 +39,7 @@ describe("LspClient diagnostic cache", () => {
 
   it("replaces an earlier publication for the same document", () => {
     const { client } = createRunningTestClient();
+    openAtVersion(client, 1);
 
     publish(client, { uri: URI, diagnostics: [makeDiagnostic("first")] });
     publish(client, { uri: URI, diagnostics: [makeDiagnostic("second")] });
@@ -56,6 +58,7 @@ describe("LspClient diagnostic cache", () => {
 
   it("ignores diagnostics older than the open document version", () => {
     const { client } = createRunningTestClient();
+    openAtVersion(client, 1);
     publish(client, { uri: URI, diagnostics: [makeDiagnostic("current")] });
     openAtVersion(client, 5);
 
@@ -66,6 +69,7 @@ describe("LspClient diagnostic cache", () => {
 
   it("ignores diagnostics newer than the open document version", () => {
     const { client } = createRunningTestClient();
+    openAtVersion(client, 1);
     publish(client, { uri: URI, diagnostics: [makeDiagnostic("current")] });
     openAtVersion(client, 5);
 
@@ -76,8 +80,8 @@ describe("LspClient diagnostic cache", () => {
 
   it("ignores a null diagnostic version as an unsupported protocol value", () => {
     const { client } = createRunningTestClient();
-    publish(client, { uri: URI, diagnostics: [makeDiagnostic("current")] });
     openAtVersion(client, 1);
+    publish(client, { uri: URI, diagnostics: [makeDiagnostic("current")] });
 
     publish(client, {
       uri: URI,

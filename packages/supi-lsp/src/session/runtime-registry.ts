@@ -334,6 +334,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
           restartedClients: result.restartedClients,
           attemptedServers: boundServerNames(result.attemptedServers ?? []),
           restartedServers: boundServerNames(result.restartedServers ?? []),
+          ...(result.restartReason ? { reason: result.restartReason } : {}),
         },
       });
       return result;

@@ -13,31 +13,70 @@ interface ApplyPushOptions {
   openDocuments: ReadonlyMap<string, OpenDocumentState>;
   params: PublishDiagnosticsParams;
   evidenceRevision: number;
-  unversionedBlocked: boolean;
+  /** Client-side sync moment for the URI, or undefined when never synchronized. */
+  unversionedSyncMoment: number | undefined;
+  /** Whether a lifecycle close marked this URI fail-closed for versioned pushes. */
+  closedVersionedBarrier: boolean;
 }
 
-/** Apply one valid push publication and return whether it can release current waiters. */
+/**
+ * Apply one valid push publication and return whether it can release current waiters.
+ *
+ * Fail-closed policy (ADR 0020): unversioned pushes are rejected for closed
+ * and untracked URIs and for arrivals before the URI's sync moment; versioned
+ * pushes for a URI closed by a lifecycle operation are rejected because their
+ * version cannot be verified. An unversioned push that arrives after the sync
+ * moment of an open document is accepted and re-stamped with that document's
+ * current synchronization state.
+ */
 export function applyPushDiagnostics(options: ApplyPushOptions): boolean {
   if (!isValidPublishDiagnosticsParams(options.params)) return false;
   const openDocument = options.openDocuments.get(options.params.uri);
   if (options.params.version !== undefined) {
     if (!Number.isInteger(options.params.version)) return false;
     if (openDocument && options.params.version !== openDocument.version) return false;
+    if (!openDocument && options.closedVersionedBarrier) return false;
   }
   if (!Array.isArray(options.params.diagnostics)) return false;
-  if (options.unversionedBlocked && !openDocument) return false;
-  if (options.params.version === undefined && options.unversionedBlocked) return false;
+  if (!acceptUnversionedPush(options, openDocument)) return false;
+  options.store.set(options.params.uri, buildPushCacheEntry(options, openDocument));
+  return true;
+}
 
+/** Gate one unversioned push publication against the sync-moment policy. */
+function acceptUnversionedPush(
+  options: ApplyPushOptions,
+  openDocument: OpenDocumentState | undefined,
+): boolean {
+  if (options.params.version !== undefined) return true;
+  if (!openDocument) return false;
+  return !(
+    options.unversionedSyncMoment !== undefined && Date.now() < options.unversionedSyncMoment
+  );
+}
+
+/**
+ * Build the stored entry for one accepted push publication.
+ *
+ * Time-gated unversioned acceptance re-stamps the entry with the open
+ * document's current synchronization state, so the push proves that
+ * document's synchronization. Versioned pushes keep the current-revision
+ * check: a version match alone does not prove a current generation.
+ */
+function buildPushCacheEntry(
+  options: ApplyPushOptions,
+  openDocument: OpenDocumentState | undefined,
+): DiagnosticCacheEntry {
   const currentRevision = openDocument?.evidenceRevision === options.evidenceRevision;
-  options.store.set(options.params.uri, {
+  const unversioned = options.params.version === undefined && openDocument !== undefined;
+  return {
     diagnostics: options.params.diagnostics,
     receivedAt: Date.now(),
     source: "push",
-    synchronizationId: currentRevision ? openDocument.synchronizationId : undefined,
+    synchronizationId: unversioned || currentRevision ? openDocument?.synchronizationId : undefined,
     evidenceRevision: openDocument?.evidenceRevision,
     version: options.params.version,
-  });
-  return true;
+  };
 }
 
 /** Build one client snapshot without dropping empty-cache freshness. */

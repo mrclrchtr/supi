@@ -187,6 +187,66 @@ describe("JsonRpcClient", () => {
     );
   });
 
+  it("counts repeated protocol-error failures as stall signals", async () => {
+    server.onRequest("stall/not-initialized", () => {
+      throw new JsonRpcRequestError(-32002, "server not initialized");
+    });
+    server.onRequest("stall/invalid", () => {
+      throw new JsonRpcRequestError(-32600, "invalid request");
+    });
+    server.onRequest("stall/other", () => {
+      throw new JsonRpcRequestError(-32601, "method not found");
+    });
+
+    await expect(client.sendRequest("stall/not-initialized")).rejects.toThrow();
+    await expect(client.sendRequest("stall/not-initialized")).rejects.toThrow();
+    expect(client.getProtocolFailureCount()).toBe(2);
+    // Invalid requests count as stall signals too.
+    await expect(client.sendRequest("stall/invalid")).rejects.toThrow();
+    expect(client.getProtocolFailureCount()).toBe(3);
+    // Ordinary method-not-found errors are not stall signals.
+    await expect(client.sendRequest("stall/other")).rejects.toThrow();
+    expect(client.getProtocolFailureCount()).toBe(3);
+  });
+
+  it("counts repeated local timeouts as stall signals", async () => {
+    const deadInput = new PassThrough();
+    const deadOutput = new PassThrough();
+    const shortClient = new JsonRpcClient(deadInput, deadOutput, { timeoutMs: 30_000 });
+    try {
+      await expect(
+        shortClient.sendRequest("stall/slow", undefined, { timeoutMs: 20 }),
+      ).rejects.toThrow("timed out");
+      await expect(
+        shortClient.sendRequest("stall/slow", undefined, { timeoutMs: 20 }),
+      ).rejects.toThrow("timed out");
+      expect(shortClient.getProtocolFailureCount()).toBe(2);
+    } finally {
+      shortClient.dispose();
+      deadInput.destroy();
+      deadOutput.destroy();
+    }
+  });
+
+  it("does not count a caller-imposed deadline expiry as a stall signal", async () => {
+    const deadInput = new PassThrough();
+    const deadOutput = new PassThrough();
+    const shortClient = new JsonRpcClient(deadInput, deadOutput, { timeoutMs: 30_000 });
+    try {
+      await expect(
+        shortClient.sendRequest("stall/deadline", undefined, {
+          timeoutMs: 100,
+          deadline: Date.now() + 20,
+        }),
+      ).rejects.toThrow("Code request deadline exceeded");
+      expect(shortClient.getProtocolFailureCount()).toBe(0);
+    } finally {
+      shortClient.dispose();
+      deadInput.destroy();
+      deadOutput.destroy();
+    }
+  });
+
   it("dispatches notifications to handler", async () => {
     const received: Array<{ method: string; params: unknown }> = [];
     client.onNotification((method, params) => {

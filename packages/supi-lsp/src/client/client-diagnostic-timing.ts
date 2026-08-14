@@ -27,6 +27,7 @@ interface DiagnosticTimingData {
   readonly outcome: DiagnosticOutcome;
   readonly pull: DiagnosticPullOutcome;
   readonly push: DiagnosticPushOutcome;
+  readonly reopen: number;
   readonly settle: DiagnosticSettleOutcome;
   readonly timedOut: boolean;
 }
@@ -60,6 +61,7 @@ export interface DiagnosticTimingIdentity {
 export class DiagnosticObserver {
   readonly #timer = startDebugTimer();
   #pull: "failed" | "not-supported" | "timed-out";
+  #reopened = 0;
 
   constructor(
     readonly operation: DiagnosticTimingOperation,
@@ -83,6 +85,7 @@ export class DiagnosticObserver {
       outcome: "skipped",
       pull: "not-used",
       push: "not-used",
+      reopen: 0,
       settle: "not-used",
       timedOut: false,
     });
@@ -97,6 +100,7 @@ export class DiagnosticObserver {
       outcome: "completed",
       pull: "not-used",
       push: "not-used",
+      reopen: 0,
       settle: "not-used",
       timedOut: false,
     });
@@ -112,6 +116,7 @@ export class DiagnosticObserver {
         outcome: "completed",
         pull: "completed",
         push: "not-used",
+        reopen: 0,
         settle: "not-used",
         timedOut: false,
       },
@@ -129,6 +134,12 @@ export class DiagnosticObserver {
     this.#timer.mark("pull");
   }
 
+  /** Record that the reopen-resync fallback re-opened unconfirmed documents. */
+  reopened(count: number): void {
+    this.#reopened += count;
+    this.#timer.mark("reopen");
+  }
+
   pushSettled(documentCount: number, settle: DiagnosticSettleResult): void {
     const timedOut = settle.outcome === "timed-out";
     const completed = settle.outcome === "quiet" && settle.freshness === "observed";
@@ -141,6 +152,7 @@ export class DiagnosticObserver {
         outcome: completed ? "completed" : timedOut ? "timed-out" : "incomplete",
         pull: this.#pull,
         push: timedOut ? "timed-out" : settle.outcome === "released" ? "released" : "settled",
+        reopen: this.#reopened,
         settle: settle.outcome,
         timedOut: timedOut || this.#pull === "timed-out",
       },
@@ -159,6 +171,7 @@ export class DiagnosticObserver {
         outcome: push === "published" ? "completed" : timedOut ? "timed-out" : "incomplete",
         pull: this.#pull,
         push,
+        reopen: this.#reopened,
         settle: push,
         timedOut: timedOut || this.#pull === "timed-out",
       },
@@ -167,6 +180,7 @@ export class DiagnosticObserver {
   }
 
   #finish(data: DiagnosticTimingData, finalPhase?: "pull" | "push-settle" | "synchronize"): void {
+    const { reopen, ...observation } = data;
     this.#timer.finish(
       () => ({
         operationId: this.control?.operationId,
@@ -177,7 +191,10 @@ export class DiagnosticObserver {
         cwd: boundCwd(this.identity?.cwd),
         data: {
           operation: this.operation,
-          ...data,
+          ...observation,
+          // Reopen fallback usage is recorded only when it happened; the
+          // default event shape stays stable for consumers of #322 telemetry.
+          ...(reopen > 0 ? { reopen } : {}),
           ...(this.identity?.server !== undefined
             ? { server: truncateIdentity(this.identity.server) }
             : {}),

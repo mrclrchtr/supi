@@ -360,6 +360,39 @@ describe("workspace runtime behavior", () => {
     debugMocks.recordDebugEvent.mockClear();
   });
 
+  it("records the stall signal that triggered a restart in telemetry", async () => {
+    const recovery = {
+      attemptedClients: 1,
+      restartedClients: 1,
+      attemptedServers: ["typescript"],
+      restartedServers: ["typescript"],
+      restartReason: "readiness-stall" as const,
+      diagnosticEvidence: emptyEvidence(),
+      staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+      elapsedMs: 6,
+    };
+    const runtime = createRuntime(
+      makeManager({
+        recoverWorkspaceDiagnostics: async () => recovery,
+      }),
+    );
+
+    await runtime.recoverDiagnostics({ restartIfStillStale: true });
+
+    expect(debugMocks.recordDebugEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cwd: "/project",
+        data: expect.objectContaining({
+          outcome: "completed",
+          restartedClients: 1,
+          restartedServers: ["typescript"],
+          reason: "readiness-stall",
+        }),
+      }),
+    );
+    debugMocks.recordDebugEvent.mockClear();
+  });
+
   it("records a cancelled recovery outcome in telemetry", async () => {
     const controller = new AbortController();
     const abortReason = new Error("cancelled mid-pass");

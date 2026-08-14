@@ -152,7 +152,9 @@ describe("LspClient process failure", () => {
       directory,
     );
     await client.start();
-    client.handlePublishDiagnostics({ uri: `file://${file}`, diagnostics: [] });
+    // A versioned publish seeds the cache for a URI the client never opened;
+    // unversioned pushes for untracked URIs stay fail-closed.
+    client.handlePublishDiagnostics({ uri: `file://${file}`, version: 1, diagnostics: [] });
 
     process.emit("exit", 1);
     rmSync(file);

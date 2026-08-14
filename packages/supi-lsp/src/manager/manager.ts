@@ -10,7 +10,15 @@ import {
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
 import * as projectRoots from "@mrclrchtr/supi-core/project";
-import { LspClient, type LspClientLifecycleTransitionKind, withTimeout } from "../client/client.ts";
+import {
+  LspClient,
+  type LspClientLifecycleTransitionKind,
+  RECOVERY_CLIENT_STARTUP_BOUND_MS,
+  withTimeout,
+} from "../client/client.ts";
+
+export { RECOVERY_CLIENT_STARTUP_BOUND_MS } from "../client/client.ts";
+
 import { getServerForFile } from "../config/config.ts";
 import type {
   DetectedProjectServer,
@@ -80,15 +88,6 @@ import {
 } from "./manager-workspace-symbol.ts";
 
 type UnavailableReason = "missing-command" | "start-failed" | "runtime-error";
-
-/**
- * Fixed bound for one replacement-client startup during recovery restarts.
- *
- * The bound covers spawn, initialize, and the readiness handshake for the
- * replacement process. A restart that exceeds the bound fails closed as
- * start-failed and never retries within the same invalidation generation.
- */
-export const RECOVERY_CLIENT_STARTUP_BOUND_MS = 5_000;
 
 type FileRoute = {
   serverName: string;
@@ -609,11 +608,13 @@ export class LspManager {
     key: string;
     supportsPull: boolean;
     unconfirmedFiles: string[];
+    stallSignal: ReturnType<LspClient["getRecoveryStallSignal"]>;
   }> {
     const routes: Array<{
       key: string;
       supportsPull: boolean;
       unconfirmedFiles: string[];
+      stallSignal: ReturnType<LspClient["getRecoveryStallSignal"]>;
     }> = [];
     for (const [key, client] of this.clients) {
       if (client.status !== "running") continue;
@@ -622,7 +623,12 @@ export class LspManager {
         .documents.filter((document) => document.status === "unconfirmed")
         .map((document) => uriToFile(document.uri))
         .filter((file) => this.isDiagnosticFile(file));
-      routes.push({ key, supportsPull: client.hasDiagnosticProvider, unconfirmedFiles });
+      routes.push({
+        key,
+        supportsPull: client.hasDiagnosticProvider,
+        unconfirmedFiles,
+        stallSignal: client.getRecoveryStallSignal(),
+      });
     }
     return routes;
   }

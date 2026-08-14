@@ -45,6 +45,18 @@ import { JsonRpcClient, JsonRpcRequestError } from "./transport.ts";
 
 const SHUTDOWN_TIMEOUT_MS = 5_000;
 
+/**
+ * Fixed bound after which a running client that never became ready is
+ * considered readiness-stalled and eligible for a recovery restart.
+ */
+export const RECOVERY_CLIENT_STARTUP_BOUND_MS = 5_000;
+
+/** Repeated protocol-stall failures that justify a recovery restart. */
+export const RECOVERY_PROTOCOL_FAILURE_THRESHOLD = 3;
+
+/** Stall signals that justify replacing a client's server process. */
+export type RecoveryRestartReason = "readiness-stall" | "protocol-errors";
+
 /** Race an operation against a timeout without retaining the timer after settlement. */
 export async function withTimeout<T>(
   operation: Promise<T>,
@@ -116,12 +128,17 @@ export class LspClient {
 
   // ── Readiness (work-done-progress) ──────────────────────────────────
   private trackedTokens = new Map<ProgressToken, "created" | "active" | "ended">();
+  private tokenCreatedAt = new Map<ProgressToken, number>();
   private _readyPromise: Promise<void> | null = null;
   private _readyResolve: (() => void) | undefined;
   private _readyReject: ((err: Error) => void) | undefined;
   private _isReady = false;
+  /** Whether this client generation ever reached concrete readiness. */
+  private everReady = false;
   private noProgressTimer: ReturnType<typeof setTimeout> | null = null;
   private tokenTimeouts = new Map<ProgressToken, ReturnType<typeof setTimeout>>();
+  /** Wall-clock start of the current client generation, for stall detection. */
+  private startedAt = 0;
 
   // biome-ignore lint/complexity/useMaxParams: internal constructor keeps positional identity for test call sites
   constructor(
@@ -197,6 +214,7 @@ export class LspClient {
   async start(): Promise<void> {
     const cmd = this.config.command;
     const args = this.config.args ?? [];
+    this.startedAt = Date.now();
 
     try {
       this.process = spawn(cmd, args, {
@@ -401,6 +419,37 @@ export class LspClient {
   /** Retain a failed document outcome when a replacement cannot reopen it. */
   markFailedFile(filePath: string): void {
     this.diagnostics.markFailedFile(filePath);
+  }
+
+  /**
+   * Return the stall signal that justifies replacing this client's process,
+   * or null when the client is healthy. Recovery restarts clients only on
+   * these signals, never on unconfirmed evidence alone (ADR 0020).
+   */
+  getRecoveryStallSignal(): RecoveryRestartReason | null {
+    if (this._status !== "running") return null;
+    // The startup bound applies only before the client ever became ready: a
+    // later readiness loss (a normal progress begin during indexing) is not
+    // a startup stall.
+    const pastStartupBound =
+      this.startedAt > 0 && Date.now() - this.startedAt >= RECOVERY_CLIENT_STARTUP_BOUND_MS;
+    if (!this.everReady && pastStartupBound) return "readiness-stall";
+    if (this.hasUnbegunCreatedToken()) return "readiness-stall";
+    if ((this.rpc?.getProtocolFailureCount() ?? 0) >= RECOVERY_PROTOCOL_FAILURE_THRESHOLD) {
+      return "protocol-errors";
+    }
+    return null;
+  }
+
+  /** Test whether a created progress token never began within its per-token bound. */
+  private hasUnbegunCreatedToken(): boolean {
+    const boundMs = this.config.readinessTimeoutMs ?? 10_000;
+    for (const [token, createdAt] of this.tokenCreatedAt) {
+      if (this.trackedTokens.get(token) === "created" && Date.now() - createdAt >= boundMs) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Return the current client version, or null when the document is not open. */
@@ -612,6 +661,7 @@ export class LspClient {
         // arrives, so an unused token never causes false readiness loss.
         const token = (params as { token: ProgressToken }).token;
         this.trackedTokens.set(token, "created");
+        this.tokenCreatedAt.set(token, Date.now());
         return null;
       }
       default:
@@ -655,7 +705,10 @@ export class LspClient {
     // only when the client is still running — a crash or shutdown clears
     // both fields but must not report the client as ready.
     if (this.noProgressTimer === null && this.trackedTokens.size === 0) {
-      if (this._status === "running") this._isReady = true;
+      if (this._status === "running") {
+        this._isReady = true;
+        this.everReady = true;
+      }
       return Promise.resolve();
     }
     this._readyPromise = new Promise<void>((resolve, reject) => {
@@ -689,6 +742,7 @@ export class LspClient {
       // prior create is spec-deviant but valid.
       this.cancelNoProgressTimer();
       this.trackedTokens.set(token, "active");
+      this.tokenCreatedAt.delete(token);
       const wasReady = this._isReady;
       this._isReady = false;
       if (wasReady) this.publishLifecycle("readiness");
@@ -714,6 +768,7 @@ export class LspClient {
       });
       const state = this.trackedTokens.get(token);
       if (state === undefined) return; // Unknown token: ignore fail-closed.
+      this.tokenCreatedAt.delete(token);
       if (state === "created") {
         // A pending token never blocked readiness; its end removes it.
         this.trackedTokens.delete(token);
@@ -754,6 +809,7 @@ export class LspClient {
     if (this._status !== "running") return;
     const becameReady = !this._isReady;
     this._isReady = true;
+    if (becameReady) this.everReady = true;
     if (becameReady) this.publishLifecycle("readiness");
     recordDebugEvent({
       source: "lsp",
@@ -776,7 +832,6 @@ export class LspClient {
     this.cancelNoProgressTimer();
     this.rejectReady(new Error("Client disposed"));
   }
-
   /**
    * Reject the current readiness promise (if any) and mark the client
    * not ready. Called on shutdown, crash, or restart.
@@ -790,6 +845,7 @@ export class LspClient {
     }
     this._isReady = false;
     this.trackedTokens.clear();
+    this.tokenCreatedAt.clear();
     for (const timer of this.tokenTimeouts.values()) clearTimeout(timer);
     this.tokenTimeouts.clear();
     recordDebugEvent({

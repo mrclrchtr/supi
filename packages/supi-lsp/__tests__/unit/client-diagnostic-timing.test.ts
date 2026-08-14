@@ -192,7 +192,6 @@ describe("LSP diagnostic timing observations", () => {
       }),
     );
   });
-
   it("records single-file fallback publication as fresh diagnostic evidence", async () => {
     const file = join(cwd, "single.ts");
     writeFileSync(file, "const single = true;\n");
@@ -229,6 +228,34 @@ describe("LSP diagnostic timing observations", () => {
           documentCount: 1,
           outcome: "completed",
         }),
+      }),
+    );
+  });
+
+  it("records the reopen-resync fallback count for a clean push-only file", async () => {
+    const file = join(cwd, "reopen-timing.ts");
+    writeFileSync(file, "const reopenTiming = true;\n");
+    const { client } = createRunningTestClient({ root: cwd, cwd });
+    client.didOpen(file, "const reopenTiming = true;\n");
+    // The server stays silent through the first settle window, then
+    // publishes on the fallback didOpen.
+    setTimeout(
+      () => client.handlePublishDiagnostics({ uri: `file://${file}`, diagnostics: [] }),
+      120,
+    );
+
+    await client.refreshOpenDiagnostics({ maxWaitMs: 80, quietMs: 20 });
+
+    expect(
+      getDebugEvents({ source: "lsp", category: "diagnostics.timing" }).events[0]?.data,
+    ).toEqual(
+      expect.objectContaining({
+        operation: "refresh-open",
+        collection: "push",
+        pull: "not-supported",
+        reopen: 1,
+        freshness: "observed",
+        outcome: "completed",
       }),
     );
   });

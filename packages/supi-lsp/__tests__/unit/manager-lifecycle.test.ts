@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../src/client/client.ts", () => ({
   withTimeout: async <T>(operation: Promise<T>) => operation,
+  RECOVERY_CLIENT_STARTUP_BOUND_MS: 5_000,
   LspClient: class {
     readonly name: string;
     readonly root: string;
@@ -104,6 +105,14 @@ vi.mock("../../src/client/client.ts", () => ({
 
     getDiagnosticSnapshot(): { entries: []; documents: []; current: boolean } {
       return { entries: [], documents: [], current: true };
+    }
+
+    getRecoveryStallSignal(): null {
+      return null;
+    }
+
+    forceKill(): Promise<void> {
+      return Promise.resolve();
     }
 
     markFailedFile(_file: string): void {}

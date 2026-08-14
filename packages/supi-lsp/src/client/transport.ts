@@ -11,6 +11,7 @@ import { startDebugTimer } from "@mrclrchtr/supi-core/debug";
 import {
   CancellationTokenSource,
   createMessageConnection,
+  ErrorCodes,
   type MessageConnection,
   NullLogger,
   ResponseError,
@@ -44,6 +45,8 @@ export class JsonRpcClient {
   private readonly timeoutMs: number;
   private readonly server: string | undefined;
   private readonly cwd: string | undefined;
+  /** Failures that signal a stalled protocol: repeated errors and local timeouts. */
+  private protocolFailureCount = 0;
 
   constructor(
     private readonly input: Readable,
@@ -208,6 +211,8 @@ export class JsonRpcClient {
             : cancelled
               ? "cancelled"
               : "failed";
+          const errorCode = requestErrorCode(outcome, error);
+          this.countProtocolStallFailure(outcome, errorCode, error);
           recordRequestTiming(
             timer,
             options?.operationId,
@@ -219,12 +224,7 @@ export class JsonRpcClient {
               // when the error carries one; timed-out requests record the
               // defined timeout code (also for deadline expiries, whose error
               // carries none); cancellations carry no error code.
-              errorCode:
-                outcome === "failed"
-                  ? jsonRpcErrorCode(error)
-                  : outcome === "timed-out"
-                    ? (jsonRpcErrorCode(error) ?? LSP_REQUEST_TIMEOUT_ERROR_CODE)
-                    : undefined,
+              errorCode,
             },
             { server: this.server, cwd: this.cwd },
           );
@@ -262,6 +262,30 @@ export class JsonRpcClient {
       this.connection.dispose();
       this.connection = null;
     }
+  }
+
+  /**
+   * Count one protocol-stall failure: a local timeout (not a caller-imposed
+   * deadline expiry) or a repeated server-reported protocol error. A deadline
+   * expiry is not a stall: the request may be perfectly healthy (ADR 0020).
+   */
+  private countProtocolStallFailure(
+    outcome: RequestOutcome,
+    errorCode: number | undefined,
+    error: unknown,
+  ): void {
+    if (
+      (outcome === "timed-out" && !(error instanceof CodeRequestDeadlineError)) ||
+      errorCode === ErrorCodes.ServerNotInitialized ||
+      errorCode === ErrorCodes.InvalidRequest
+    ) {
+      this.protocolFailureCount++;
+    }
+  }
+
+  /** Number of protocol-stall failures observed on this connection. */
+  getProtocolFailureCount(): number {
+    return this.protocolFailureCount;
   }
 }
 
@@ -304,6 +328,13 @@ interface RequestTimingObservation {
   readonly outcome: RequestOutcome;
   /** JSON-RPC error code reported by the server for a failed request. */
   readonly errorCode?: number;
+}
+
+/** Return the JSON-RPC error code for one request outcome. */
+function requestErrorCode(outcome: RequestOutcome, error: unknown): number | undefined {
+  if (outcome === "failed") return jsonRpcErrorCode(error);
+  if (outcome === "timed-out") return jsonRpcErrorCode(error) ?? LSP_REQUEST_TIMEOUT_ERROR_CODE;
+  return undefined;
 }
 
 /** Return the numeric JSON-RPC error code carried by an error, if any. */

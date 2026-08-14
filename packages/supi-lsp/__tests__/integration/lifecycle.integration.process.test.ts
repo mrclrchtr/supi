@@ -32,15 +32,20 @@ function config(mode: "stable" | "crash" | "crash-once", crashMarker?: string): 
   };
 }
 
-/** Push-only fixture: the first process publishes slowly, replacements publish quickly. */
-function pushConfig(longDelayMs: number, marker: string, shortDelayMs: number): LspConfig {
+/**
+ * Push-only fixture with a readiness-stall signal: the first process
+ * publishes slowly, publishes quickly after a marker, and creates a
+ * work-done-progress token that never begins on every process.
+ */
+function stallPushConfig(longDelayMs: number, marker: string, shortDelayMs: number): LspConfig {
   return {
     servers: {
       test: {
         command: process.execPath,
-        args: [server, "push", String(longDelayMs), marker, String(shortDelayMs)],
+        args: [server, "stall-push", String(longDelayMs), marker, String(shortDelayMs)],
         fileTypes: ["test"],
         rootMarkers: ["package.json"],
+        readinessTimeoutMs: 200,
       },
     },
   };
@@ -140,12 +145,12 @@ describe("LSP manager lifecycle integration", () => {
     expect(transitions.at(-1)).toMatchObject({ kind: "recovery", semanticReady: true });
   }, 10_000);
 
-  it("confirms fresh diagnostics only through the replacement process", async () => {
+  it("restarts a stalled push-only client and confirms diagnostics through the replacement", async () => {
     const root = createProject();
     const sourceFile = path.join(root, "fresh.test");
     const marker = path.join(root, ".pushed-once");
     fs.writeFileSync(sourceFile, "fixture content\n");
-    const manager = new LspManager(pushConfig(1_000, marker, 50), root);
+    const manager = new LspManager(stallPushConfig(1_000, marker, 50), root);
     managers.push(manager);
 
     const original = await manager.startServerForRoot("test", root);
@@ -162,6 +167,7 @@ describe("LSP manager lifecycle integration", () => {
     });
 
     expect(recovery.restartedClients).toBe(1);
+    expect(recovery.restartReason).toBe("readiness-stall");
     expect(recovery.elapsedMs).toBeTypeOf("number");
     expect(recovery.diagnosticEvidence).toMatchObject({
       confirmed: 1,

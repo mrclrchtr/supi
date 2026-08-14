@@ -51,7 +51,14 @@ describe("recoverWorkspaceDiagnostics", () => {
       getRunningClientCount: vi.fn(() => 1),
       getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
-      getClientDiagnosticRoutes: vi.fn(() => []),
+      getClientDiagnosticRoutes: vi.fn(() => [
+        {
+          key: "typescript:/project",
+          supportsPull: false,
+          unconfirmedFiles: ["/project/src/a.ts", "/project/src/b.ts", "/project/src/c.ts"],
+          stallSignal: "readiness-stall" as const,
+        },
+      ]),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
       getCwd: vi.fn(() => "/project"),
     };
@@ -72,6 +79,7 @@ describe("recoverWorkspaceDiagnostics", () => {
         { file: "src/c.ts", status: "removed" },
       ],
     });
+    expect(result.restartReason).toBe("readiness-stall");
     expect(manager.refreshOpenDiagnostics).toHaveBeenCalledTimes(2);
   });
 
@@ -112,7 +120,14 @@ describe("recoverWorkspaceDiagnostics", () => {
       getRunningClientCount: vi.fn(() => 1),
       getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn((file: string) => !file.includes("node_modules")),
-      getClientDiagnosticRoutes: vi.fn(() => []),
+      getClientDiagnosticRoutes: vi.fn(() => [
+        {
+          key: "typescript:/project",
+          supportsPull: false,
+          unconfirmedFiles: ["/project/src/a.ts"],
+          stallSignal: "protocol-errors" as const,
+        },
+      ]),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
       getCwd: vi.fn(() => "/project"),
     };
@@ -127,6 +142,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       failed: 0,
       removed: 3,
     });
+    expect(result.restartReason).toBe("protocol-errors");
     expect(result.diagnosticEvidence.documents).not.toContainEqual(
       expect.objectContaining({ file: "node_modules/dependency.ts" }),
     );
@@ -205,7 +221,14 @@ describe("recoverWorkspaceDiagnostics", () => {
       getRunningClientCount: vi.fn(() => 1),
       getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
-      getClientDiagnosticRoutes: vi.fn(() => []),
+      getClientDiagnosticRoutes: vi.fn(() => [
+        {
+          key: "typescript:/project",
+          supportsPull: false,
+          unconfirmedFiles: ["/project/src/a.ts"],
+          stallSignal: "readiness-stall" as const,
+        },
+      ]),
       getDiagnosticEvidence: vi.fn(() => confirmed),
       getCwd: vi.fn(() => "/project"),
     };
@@ -259,7 +282,7 @@ describe("recoverWorkspaceDiagnostics", () => {
     expect(result.staleAssessment.suspected).toBe(false);
   });
 
-  it("restarts clients when clustered missing-module diagnostics remain after soft recovery", async () => {
+  it("does not restart clients on stale clusters or unconfirmed evidence alone", async () => {
     const manager = {
       clearAllPullResultIds: vi.fn(),
       notifyWorkspaceFileChanges: vi.fn(),
@@ -278,19 +301,18 @@ describe("recoverWorkspaceDiagnostics", () => {
           diagnostics: [makeDiagnostic("Cannot find module 'vitest'")],
         },
       ]),
-      restartClientsForFiles: vi.fn().mockResolvedValue([
-        { key: "typescript:/project", serverName: "typescript", files: [], restarted: true },
-        {
-          key: "typescript:/project/packages/app",
-          serverName: "typescript",
-          files: [],
-          restarted: true,
-        },
-      ]),
+      restartClientsForFiles: vi.fn().mockResolvedValue([]),
       getRunningClientCount: vi.fn(() => 1),
       getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
-      getClientDiagnosticRoutes: vi.fn(() => []),
+      getClientDiagnosticRoutes: vi.fn(() => [
+        {
+          key: "typescript:/project",
+          supportsPull: false,
+          unconfirmedFiles: ["/project/src/a.ts", "/project/src/b.ts", "/project/src/c.ts"],
+          stallSignal: null,
+        },
+      ]),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
       getCwd: vi.fn(() => "/project"),
     };
@@ -300,13 +322,53 @@ describe("recoverWorkspaceDiagnostics", () => {
       changes: [],
     });
 
-    expect(manager.restartClientsForFiles).toHaveBeenCalledWith(
-      ["/project/src/a.ts", "/project/src/b.ts", "/project/src/c.ts"],
-      { pushOnly: true },
-    );
-    expect(manager.refreshOpenDiagnostics).toHaveBeenCalledTimes(2);
-    expect(result.restartedClients).toBe(2);
+    expect(manager.restartClientsForFiles).not.toHaveBeenCalled();
+    expect(manager.refreshOpenDiagnostics).toHaveBeenCalledTimes(1);
+    expect(result.restartedClients).toBe(0);
     expect(result.staleAssessment.suspected).toBe(true);
+  });
+
+  it("restarts a push-only client on a stall signal and records the reason", async () => {
+    const manager = {
+      clearAllPullResultIds: vi.fn(),
+      notifyWorkspaceFileChanges: vi.fn(),
+      refreshOpenDiagnostics: vi.fn().mockResolvedValue(emptyEvidence()),
+      getOutstandingDiagnostics: vi.fn(() => []),
+      restartClientsForFiles: vi.fn().mockResolvedValue([
+        {
+          key: "typescript:/project",
+          serverName: "typescript",
+          files: ["/project/src/a.ts"],
+          restarted: true,
+        },
+      ]),
+      getRunningClientCount: vi.fn(() => 1),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
+      isDiagnosticFile: vi.fn(() => true),
+      getClientDiagnosticRoutes: vi.fn(() => [
+        {
+          key: "typescript:/project",
+          supportsPull: false,
+          unconfirmedFiles: ["/project/src/a.ts"],
+          stallSignal: "readiness-stall" as const,
+        },
+      ]),
+      getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getCwd: vi.fn(() => "/project"),
+    };
+
+    const result = await recoverWorkspaceDiagnostics(manager as never, {
+      restartIfStillStale: true,
+      changes: [],
+    });
+
+    expect(manager.restartClientsForFiles).toHaveBeenCalledWith(["/project/src/a.ts"], {
+      pushOnly: true,
+    });
+    expect(manager.refreshOpenDiagnostics).toHaveBeenCalledTimes(2);
+    expect(result.restartedClients).toBe(1);
+    expect(result.restartReason).toBe("readiness-stall");
+    expect(result.staleAssessment.suspected).toBe(false);
   });
 
   it("restarts only unconfirmed push-only routes", async () => {
@@ -330,19 +392,27 @@ describe("recoverWorkspaceDiagnostics", () => {
       getClientDiagnosticRoutes: vi.fn(() => [
         {
           key: "typescript:/project",
-          serverName: "typescript",
           supportsPull: false,
           unconfirmedFiles: ["/project/src/a.ts"],
+          stallSignal: "protocol-errors" as const,
         },
         {
           key: "rust:/project",
           supportsPull: true,
           unconfirmedFiles: ["/project/src/main.rs"],
+          stallSignal: "readiness-stall" as const,
         },
         {
           key: "typescript:/project/lib",
           supportsPull: false,
           unconfirmedFiles: [],
+          stallSignal: "readiness-stall" as const,
+        },
+        {
+          key: "typescript:/project/other",
+          supportsPull: false,
+          unconfirmedFiles: ["/project/src/other.ts"],
+          stallSignal: null,
         },
       ]),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
@@ -457,7 +527,12 @@ describe("recoverWorkspaceDiagnostics", () => {
       getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => [
-        { key: "typescript:/project", supportsPull: false, unconfirmedFiles: ["src/a.ts"] },
+        {
+          key: "typescript:/project",
+          supportsPull: false,
+          unconfirmedFiles: ["/project/src/a.ts"],
+          stallSignal: "readiness-stall" as const,
+        },
       ]),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
       getCwd: vi.fn(() => "/project"),
@@ -474,7 +549,7 @@ describe("recoverWorkspaceDiagnostics", () => {
     resolveReplacementRefresh(confirmed);
 
     await expect(pending).rejects.toThrow("cancelled mid-pass");
-    expect(manager.restartClientsForFiles).toHaveBeenCalledWith(["src/a.ts"], {
+    expect(manager.restartClientsForFiles).toHaveBeenCalledWith(["/project/src/a.ts"], {
       pushOnly: true,
       control: { signal: controller.signal },
     });
