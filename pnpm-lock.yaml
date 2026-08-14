@@ -385,10 +385,10 @@ importers:
         specifier: ^9.0.0
         version: 9.0.1
       vscode-languageserver-protocol:
-        specifier: ^3.17.5
+        specifier: ^3.18.0
         version: 3.18.2
       vscode-languageserver-types:
-        specifier: ^3.17.5
+        specifier: ^3.18.0
         version: 3.18.0
     devDependencies:
       '@mrclrchtr/supi-test-utils':
