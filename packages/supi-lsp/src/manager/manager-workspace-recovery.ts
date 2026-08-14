@@ -1,5 +1,9 @@
 import * as path from "node:path";
-import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type CodeRequestControl,
+  isCodeRequestInterruption,
+  throwIfCodeRequestInterrupted,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { getDiagnosticFileState } from "../client/client-file-state.ts";
 import type { Diagnostic, FileEvent } from "../config/types.ts";
 import {
@@ -51,7 +55,7 @@ export interface WorkspaceRecoveryHost {
   getCwd(): string;
   restartClientsForFiles(
     filePaths: string[],
-    options?: { pushOnly?: boolean },
+    options?: { pushOnly?: boolean; control?: CodeRequestControl },
   ): Promise<Array<{ key: string; files: string[]; restarted: boolean }>>;
 }
 
@@ -65,7 +69,13 @@ export function softRecoverWorkspaceDiagnostics(
   return host.getRunningClientCount();
 }
 
-/** Run a recovery pass, refreshing diagnostics and escalating if stale state remains. */
+/**
+ * Run a recovery pass, refreshing diagnostics and escalating if stale state remains.
+ *
+ * The pass observes request cancellation between its phases and propagates
+ * the interruption as a rejection instead of swallowing it. A pass that
+ * starts already cancelled rejects before any client or evidence work.
+ */
 export async function recoverWorkspaceDiagnostics(
   host: WorkspaceRecoveryHost,
   options: {
@@ -76,6 +86,9 @@ export async function recoverWorkspaceDiagnostics(
     control?: CodeRequestControl;
   } = {},
 ): Promise<WorkspaceRecoveryResult> {
+  // Reject immediately when the request was already cancelled: no client or
+  // evidence work may start for a pass the caller no longer awaits.
+  throwIfCodeRequestInterrupted(options.control);
   const recoveryStartedAt = Date.now();
   const attemptedClients = softRecoverWorkspaceDiagnostics(host, options.changes ?? []);
   let diagnosticEvidence = emptyDiagnosticEvidence();
@@ -88,6 +101,7 @@ export async function recoverWorkspaceDiagnostics(
       operationId: options.control?.operationId,
     });
   } catch (error) {
+    if (isCodeRequestInterruption(error, options.control)) throw error;
     refreshFailureReason = errorMessage(error);
     diagnosticEvidence = host.getDiagnosticEvidence();
   }
@@ -96,6 +110,9 @@ export async function recoverWorkspaceDiagnostics(
   let restartedClients = 0;
 
   if (options.restartIfStillStale) {
+    // Observe cancellation between pass phases: an abort that arrived during
+    // the first refresh stops the pass before any client restart.
+    throwIfCodeRequestInterrupted(options.control);
     const restartFiles = collectRecoveryRestartFiles(host, staleAssessment);
     if (restartFiles.length > 0) {
       const escalation = await runRestartEscalation(
@@ -110,6 +127,11 @@ export async function recoverWorkspaceDiagnostics(
       staleAssessment = assessStaleDiagnostics(host.getOutstandingDiagnostics(1));
     }
   }
+
+  // Observe cancellation before returning regardless of escalation: a
+  // refresh-only pass must not report a clean result after the caller
+  // cancelled the request.
+  throwIfCodeRequestInterrupted(options.control);
 
   return recoveryResult();
 
@@ -145,7 +167,12 @@ function collectRecoveryRestartFiles(
   return Array.from(restartFiles);
 }
 
-/** Restart affected push-only clients and merge the replacement refresh evidence. */
+/**
+ * Restart affected push-only clients and merge the replacement refresh evidence.
+ *
+ * Cancellation observed during the escalation is propagated as a rejection;
+ * only non-interruption failures degrade to unconfirmed evidence.
+ */
 async function runRestartEscalation(
   host: WorkspaceRecoveryHost,
   restartFiles: readonly string[],
@@ -172,7 +199,11 @@ async function runRestartEscalation(
   try {
     const restartResults = await host.restartClientsForFiles([...restartFiles], {
       pushOnly: true,
+      control: options.control,
     });
+    // Observe cancellation once the restart loop settles: a cancelled pass
+    // must not invalidate or refresh evidence for replacement processes.
+    throwIfCodeRequestInterrupted(options.control);
     const restarted = restartResults.filter((result) => result.restarted);
     restartedClients = restarted.length;
     // Every attempted route had its client replaced or shut down; its owned
@@ -198,12 +229,17 @@ async function runRestartEscalation(
           }),
           host.getCwd(),
         );
+        // Observe cancellation after the replacement refresh: a cancelled
+        // pass discards the fresh result instead of reporting it as current.
+        throwIfCodeRequestInterrupted(options.control);
         refreshedAfterRestart = true;
-      } catch {
+      } catch (error) {
+        if (isCodeRequestInterruption(error, options.control)) throw error;
         // Keep affected evidence unconfirmed when replacement refresh fails.
       }
     }
-  } catch {
+  } catch (error) {
+    if (isCodeRequestInterruption(error, options.control)) throw error;
     // Keep affected evidence unconfirmed when replacement fails.
   }
 

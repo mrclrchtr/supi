@@ -344,6 +344,39 @@ describe("workspace runtime behavior", () => {
     debugMocks.recordDebugEvent.mockClear();
   });
 
+  it("records a cancelled recovery outcome in telemetry", async () => {
+    const controller = new AbortController();
+    const abortReason = new Error("cancelled mid-pass");
+    controller.abort(abortReason);
+    const runtime = createRuntime(
+      makeManager({
+        recoverWorkspaceDiagnostics: async () => {
+          throw abortReason;
+        },
+      }),
+    );
+
+    await expect(
+      runtime.recoverDiagnostics({
+        restartIfStillStale: true,
+        control: { signal: controller.signal },
+      }),
+    ).rejects.toThrow("cancelled mid-pass");
+
+    expect(debugMocks.recordDebugEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "lsp",
+        category: "runtime.recovery",
+        message: "LSP diagnostic recovery cancelled",
+        data: expect.objectContaining({
+          outcome: "cancelled",
+          elapsedMs: expect.any(Number),
+        }),
+      }),
+    );
+    debugMocks.recordDebugEvent.mockClear();
+  });
+
   it("coordinates tracking, refresh, and workspace-change invalidation", async () => {
     const events: string[] = [];
     const trackedPaths: string[] = [];

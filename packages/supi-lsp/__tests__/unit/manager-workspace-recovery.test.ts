@@ -364,6 +364,180 @@ describe("recoverWorkspaceDiagnostics", () => {
     expect(typeof result.elapsedMs).toBe("number");
     expect(result.elapsedMs).toBeGreaterThanOrEqual(0);
   });
+
+  it("stops before restart escalation when the request is cancelled during the first refresh", async () => {
+    const controller = new AbortController();
+    let resolveFirstRefresh!: (evidence: unknown) => void;
+    const firstRefresh = new Promise((resolve) => {
+      resolveFirstRefresh = resolve;
+    });
+    const manager = {
+      clearAllPullResultIds: vi.fn(),
+      notifyWorkspaceFileChanges: vi.fn(),
+      refreshOpenDiagnostics: vi.fn().mockReturnValueOnce(firstRefresh),
+      getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
+      restartClientsForFiles: vi.fn().mockResolvedValue([]),
+      getRunningClientCount: vi.fn(() => 1),
+      isDiagnosticFile: vi.fn(() => true),
+      getClientDiagnosticRoutes: vi.fn(() => [
+        { key: "typescript:/project", supportsPull: false, unconfirmedFiles: ["src/a.ts"] },
+      ]),
+      getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getCwd: vi.fn(() => "/project"),
+    };
+
+    const pending = recoverWorkspaceDiagnostics(manager as never, {
+      restartIfStillStale: true,
+      control: { signal: controller.signal },
+    });
+    controller.abort(new Error("cancelled mid-pass"));
+    resolveFirstRefresh(emptyEvidence());
+
+    await expect(pending).rejects.toThrow("cancelled mid-pass");
+    expect(manager.restartClientsForFiles).not.toHaveBeenCalled();
+  });
+
+  it("discards replacement refresh evidence when the request is cancelled after client restart", async () => {
+    const controller = new AbortController();
+    const unconfirmed = {
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 1,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "unconfirmed" as const }],
+    };
+    const confirmed = {
+      requested: 1,
+      confirmed: 1,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "confirmed" as const }],
+    };
+    let resolveReplacementRefresh!: (evidence: unknown) => void;
+    const replacementRefresh = new Promise((resolve) => {
+      resolveReplacementRefresh = resolve;
+    });
+    const manager = {
+      clearAllPullResultIds: vi.fn(),
+      notifyWorkspaceFileChanges: vi.fn(),
+      refreshOpenDiagnostics: vi
+        .fn()
+        .mockResolvedValueOnce(unconfirmed)
+        .mockReturnValueOnce(replacementRefresh),
+      getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
+      restartClientsForFiles: vi
+        .fn()
+        .mockResolvedValue([
+          { key: "typescript:/project", files: ["/project/src/a.ts"], restarted: true },
+        ]),
+      getRunningClientCount: vi.fn(() => 1),
+      isDiagnosticFile: vi.fn(() => true),
+      getClientDiagnosticRoutes: vi.fn(() => [
+        { key: "typescript:/project", supportsPull: false, unconfirmedFiles: ["src/a.ts"] },
+      ]),
+      getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getCwd: vi.fn(() => "/project"),
+    };
+
+    const pending = recoverWorkspaceDiagnostics(manager as never, {
+      restartIfStillStale: true,
+      control: { signal: controller.signal },
+    });
+    await vi.waitFor(() => {
+      expect(manager.refreshOpenDiagnostics).toHaveBeenCalledTimes(2);
+    });
+    controller.abort(new Error("cancelled mid-pass"));
+    resolveReplacementRefresh(confirmed);
+
+    await expect(pending).rejects.toThrow("cancelled mid-pass");
+    expect(manager.restartClientsForFiles).toHaveBeenCalledWith(["src/a.ts"], {
+      pushOnly: true,
+      control: { signal: controller.signal },
+    });
+  });
+
+  it("rejects immediately when the request was already cancelled", async () => {
+    const controller = new AbortController();
+    controller.abort(new Error("cancelled before start"));
+    const manager = {
+      clearAllPullResultIds: vi.fn(),
+      notifyWorkspaceFileChanges: vi.fn(),
+      refreshOpenDiagnostics: vi.fn().mockResolvedValue(emptyEvidence()),
+      getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
+      restartClientsForFiles: vi.fn().mockResolvedValue([]),
+      getRunningClientCount: vi.fn(() => 1),
+      isDiagnosticFile: vi.fn(() => true),
+      getClientDiagnosticRoutes: vi.fn(() => []),
+      getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getCwd: vi.fn(() => "/project"),
+    };
+
+    await expect(
+      recoverWorkspaceDiagnostics(manager as never, {
+        restartIfStillStale: true,
+        control: { signal: controller.signal },
+      }),
+    ).rejects.toThrow("cancelled before start");
+    expect(manager.clearAllPullResultIds).not.toHaveBeenCalled();
+    expect(manager.refreshOpenDiagnostics).not.toHaveBeenCalled();
+    expect(manager.restartClientsForFiles).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the deadline elapsed before the pass started", async () => {
+    const manager = {
+      clearAllPullResultIds: vi.fn(),
+      notifyWorkspaceFileChanges: vi.fn(),
+      refreshOpenDiagnostics: vi.fn().mockResolvedValue(emptyEvidence()),
+      getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
+      restartClientsForFiles: vi.fn().mockResolvedValue([]),
+      getRunningClientCount: vi.fn(() => 1),
+      isDiagnosticFile: vi.fn(() => true),
+      getClientDiagnosticRoutes: vi.fn(() => []),
+      getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getCwd: vi.fn(() => "/project"),
+    };
+
+    await expect(
+      recoverWorkspaceDiagnostics(manager as never, {
+        restartIfStillStale: true,
+        control: { deadline: Date.now() - 1 },
+      }),
+    ).rejects.toThrow("Code request deadline exceeded");
+    expect(manager.clearAllPullResultIds).not.toHaveBeenCalled();
+  });
+
+  it("rejects after the first refresh when cancelled without restart escalation", async () => {
+    const controller = new AbortController();
+    let resolveFirstRefresh!: (evidence: unknown) => void;
+    const firstRefresh = new Promise((resolve) => {
+      resolveFirstRefresh = resolve;
+    });
+    const manager = {
+      clearAllPullResultIds: vi.fn(),
+      notifyWorkspaceFileChanges: vi.fn(),
+      refreshOpenDiagnostics: vi.fn().mockReturnValueOnce(firstRefresh),
+      getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
+      restartClientsForFiles: vi.fn(),
+      getRunningClientCount: vi.fn(() => 1),
+      isDiagnosticFile: vi.fn(() => true),
+      getClientDiagnosticRoutes: vi.fn(() => []),
+      getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getCwd: vi.fn(() => "/project"),
+    };
+
+    const pending = recoverWorkspaceDiagnostics(manager as never, {
+      restartIfStillStale: false,
+      control: { signal: controller.signal },
+    });
+    controller.abort(new Error("cancelled mid-pass"));
+    resolveFirstRefresh(emptyEvidence());
+
+    await expect(pending).rejects.toThrow("cancelled mid-pass");
+    expect(manager.refreshOpenDiagnostics).toHaveBeenCalledTimes(1);
+    expect(manager.restartClientsForFiles).not.toHaveBeenCalled();
+  });
 });
 
 function emptyEvidence() {

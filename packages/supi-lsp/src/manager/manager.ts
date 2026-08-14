@@ -5,6 +5,7 @@ import * as path from "node:path";
 import {
   type CodeQueryResult,
   type CodeRequestControl,
+  throwIfCodeRequestInterrupted,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
 import * as projectRoots from "@mrclrchtr/supi-core/project";
@@ -347,10 +348,11 @@ export class LspManager {
    *
    * Each route restarts at most once per invalidation generation. Pass
    * `pushOnly` to restrict restarts to clients without pull diagnostics.
+   * The loop observes request cancellation between route restarts.
    */
   async restartClientsForFiles(
     filePaths: string[],
-    options?: { pushOnly?: boolean },
+    options?: { pushOnly?: boolean; control?: CodeRequestControl },
   ): Promise<ClientRestartResult[]> {
     const restarted: ClientRestartResult[] = [];
     const seen = new Set<string>();
@@ -365,6 +367,9 @@ export class LspManager {
       seen.add(key);
       if (this.recoveryRestartEpochs.get(key) === this.invalidationEpoch) continue;
 
+      // Observe cancellation between route restarts so a cancelled pass does
+      // not keep restarting further clients.
+      throwIfCodeRequestInterrupted(options?.control);
       const result = await this.restartClient(client);
       this.recoveryRestartEpochs.set(key, this.invalidationEpoch);
       restarted.push({ key, ...result });

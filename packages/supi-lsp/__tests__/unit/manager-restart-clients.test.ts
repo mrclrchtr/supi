@@ -315,4 +315,45 @@ describe("LspManager restartClientsForFiles", () => {
       vi.useRealTimers();
     }
   });
+
+  it("stops between client restarts when the request is cancelled mid-loop", async () => {
+    const sessionCwd = createProject();
+    const rootA = path.join(sessionCwd, "a");
+    const rootB = path.join(sessionCwd, "b");
+    fs.mkdirSync(rootA);
+    fs.mkdirSync(rootB);
+    fs.writeFileSync(path.join(rootA, "package.json"), "{}");
+    fs.writeFileSync(path.join(rootB, "package.json"), "{}");
+    const fileA = path.join(rootA, "a.ts");
+    const fileB = path.join(rootB, "b.ts");
+    fs.writeFileSync(fileA, "const a = 1;\n");
+    fs.writeFileSync(fileB, "const b = 1;\n");
+
+    const manager = makeManager(sessionCwd);
+    const clientA = makeClient({ root: rootA, openFiles: [fileA] });
+    const clientB = makeClient({ root: rootB, openFiles: [fileB] });
+    const clients = (manager as unknown as { clients: Map<string, unknown> }).clients;
+    clients.set(`typescript:${rootA}`, clientA);
+    clients.set(`typescript:${rootB}`, clientB);
+
+    let releaseReplacementStart!: () => void;
+    const deferredStart = new Promise<void>((resolve) => {
+      releaseReplacementStart = resolve;
+    });
+    const createClient = vi
+      .spyOn(manager as unknown as { createClient: (...args: never[]) => unknown }, "createClient")
+      .mockReturnValueOnce(makeReplacement({ root: rootA, start: vi.fn(() => deferredStart) }))
+      .mockReturnValueOnce(makeReplacement({ root: rootB }));
+
+    const controller = new AbortController();
+    const pending = manager.restartClientsForFiles([fileA, fileB], {
+      control: { signal: controller.signal },
+    });
+    controller.abort(new Error("cancelled mid-loop"));
+    releaseReplacementStart();
+
+    await expect(pending).rejects.toThrow("cancelled mid-loop");
+    expect(createClient).toHaveBeenCalledTimes(1);
+    expect(clientB.shutdown).not.toHaveBeenCalled();
+  });
 });

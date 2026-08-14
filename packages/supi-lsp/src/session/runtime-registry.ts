@@ -3,6 +3,7 @@
 import {
   type CodeQueryResult,
   type CodeRequestControl,
+  isCodeRequestInterruption,
   mapCodeQueryResult,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
@@ -311,21 +312,37 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     quietMs?: number;
     control?: CodeRequestControl;
   }): Promise<RecoverDiagnosticsResult> {
-    const result = await this.manager.recoverWorkspaceDiagnostics(options);
-    const outcome = result.refreshFailureReason ? "failed" : "completed";
-    recordDebugEvent({
-      source: "lsp",
-      level: "debug",
-      category: "runtime.recovery",
-      message: `LSP diagnostic recovery ${outcome}`,
-      data: {
-        outcome,
-        elapsedMs: result.elapsedMs,
-        attemptedClients: result.attemptedClients,
-        restartedClients: result.restartedClients,
-      },
-    });
-    return result;
+    const recoveryStartedAt = Date.now();
+    try {
+      const result = await this.manager.recoverWorkspaceDiagnostics(options);
+      const outcome = result.refreshFailureReason ? "failed" : "completed";
+      recordDebugEvent({
+        source: "lsp",
+        level: "debug",
+        category: "runtime.recovery",
+        message: `LSP diagnostic recovery ${outcome}`,
+        data: {
+          outcome,
+          elapsedMs: result.elapsedMs,
+          attemptedClients: result.attemptedClients,
+          restartedClients: result.restartedClients,
+        },
+      });
+      return result;
+    } catch (error) {
+      // A cancelled pass has no result object, so telemetry records the
+      // attempt, the cancelled outcome, and the elapsed time without counts.
+      if (isCodeRequestInterruption(error, options?.control)) {
+        recordDebugEvent({
+          source: "lsp",
+          level: "debug",
+          category: "runtime.recovery",
+          message: "LSP diagnostic recovery cancelled",
+          data: { outcome: "cancelled", elapsedMs: Date.now() - recoveryStartedAt },
+        });
+      }
+      throw error;
+    }
   }
 
   private resolveFilePath(filePath: string): string {
