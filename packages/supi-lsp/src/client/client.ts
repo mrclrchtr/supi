@@ -8,6 +8,8 @@ import {
   type CodeQueryResult,
   type CodeRequestControl,
   completedCodeQuery,
+  isCodeRequestInterruption,
+  throwIfCodeRequestInterrupted,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
@@ -34,6 +36,7 @@ import type {
   WorkspaceSymbol,
 } from "../config/types.ts";
 import type { DiagnosticEvidenceSummary } from "../diagnostics/evidence.ts";
+import { raceRequestControl } from "../session/readiness.ts";
 import { fileToUri } from "../utils.ts";
 import { ClientDiagnostics } from "./client-diagnostics.ts";
 import type { ClientDiagnosticSnapshot, DiagnosticEntry } from "./client-document-state.ts";
@@ -136,7 +139,10 @@ export class LspClient {
       pullDocumentDiagnostics: async (request) => {
         const rpc = this.rpc;
         if (!rpc || this._status !== "running") throw new Error("client not running");
-        await this.getReady();
+        await this.getReady({
+          signal: request.signal,
+          deadline: request.deadline,
+        });
         return rpc.sendRequest(
           "textDocument/diagnostic",
           {
@@ -146,6 +152,7 @@ export class LspClient {
           {
             timeoutMs: request.timeoutMs,
             signal: request.signal,
+            deadline: request.deadline,
             operationId: request.operationId,
           },
         ) as Promise<DocumentDiagnosticReport>;
@@ -550,20 +557,23 @@ export class LspClient {
     params: unknown,
     control?: CodeRequestControl,
   ): Promise<CodeQueryResult<T | null>> {
+    // An already-cancelled caller gets the interruption, not an unavailable
+    // outcome that could mask the cancellation.
+    throwIfCodeRequestInterrupted(control);
     if (!this.rpc || this._status !== "running") {
       return unavailableCodeQuery(
         `LSP request ${method} is unavailable because the client is not running.`,
       );
     }
     try {
-      await this.getReady();
-      const data = (await this.rpc.sendRequest(
-        method,
-        params,
-        control?.operationId ? { operationId: control.operationId } : undefined,
-      )) as T | null | undefined;
+      await this.getReady(control);
+      const data = (await this.rpc.sendRequest(method, params, control)) as T | null | undefined;
       return completedCodeQuery(data ?? null);
     } catch (error) {
+      // Cancellation and absolute-deadline expiry propagate as interruptions:
+      // the caller no longer awaits a result, so no unavailable outcome may
+      // mask the cancellation.
+      if (isCodeRequestInterruption(error, control)) throw error;
       const detail = error instanceof Error ? error.message : String(error);
       return unavailableCodeQuery(`LSP request ${method} failed: ${detail}`);
     }
@@ -618,9 +628,17 @@ export class LspClient {
    * Wait for the server to be ready to serve queries.
    * Returns immediately if already ready; returns the ongoing promise
    * if one is pending; creates and returns a new one otherwise.
+   * With request control, the caller's wait stops promptly on abort or
+   * deadline while the shared readiness state keeps its own lifecycle.
    */
-  async getReady(): Promise<void> {
-    if (this._isReady) return;
+  async getReady(control?: CodeRequestControl): Promise<void> {
+    const pending = this.pendingReady();
+    if (!control) return pending;
+    return raceRequestControl(pending, control);
+  }
+
+  private pendingReady(): Promise<void> {
+    if (this._isReady) return Promise.resolve();
     if (this._readyPromise !== null) return this._readyPromise;
     // If no progress timer was ever armed and no tokens are tracked,
     // the server was either never started with a real process (test scenario)
@@ -629,7 +647,7 @@ export class LspClient {
     // both fields but must not report the client as ready.
     if (this.noProgressTimer === null && this.trackedTokens.size === 0) {
       if (this._status === "running") this._isReady = true;
-      return;
+      return Promise.resolve();
     }
     this._readyPromise = new Promise<void>((resolve, reject) => {
       this._readyResolve = resolve;

@@ -384,6 +384,12 @@ describe("workspace runtime behavior", () => {
     let refreshOptions: unknown;
     let receivedChanges: FileEvent[] | undefined;
     const changes = [{ uri: "file:///project/src/index.ts", type: 2 as FileChangeType }];
+    const controller = new AbortController();
+    const control = {
+      signal: controller.signal,
+      deadline: 987_654,
+      operationId: "op-AAAAAAAAAAAAAAAAAAAAAA",
+    };
     const runtime = createRuntime(
       makeManager({
         ensureFileOpen: async (filePath: string) => {
@@ -407,14 +413,54 @@ describe("workspace runtime behavior", () => {
     await expect(runtime.trackFile("@src/index.ts")).resolves.toBe(true);
     runtime.closeFile("@src/index.ts");
     expect(runtime.pruneMissingFiles()).toEqual(["src/missing.ts"]);
-    await runtime.refreshOpenDiagnostics({ maxWaitMs: 10, quietMs: 2 });
+    await runtime.refreshOpenDiagnostics({ maxWaitMs: 10, quietMs: 2 }, control);
     runtime.noteWorkspaceChanges(changes);
 
     expect(trackedPaths).toEqual(["/project/src/index.ts"]);
     expect(closedPaths).toEqual(["/project/src/index.ts"]);
-    expect(refreshOptions).toEqual({ maxWaitMs: 10, quietMs: 2 });
+    expect(refreshOptions).toEqual({
+      maxWaitMs: 10,
+      quietMs: 2,
+      signal: controller.signal,
+      deadline: 987_654,
+      operationId: "op-AAAAAAAAAAAAAAAAAAAAAA",
+    });
     expect(events).toEqual(["invalidate-pull-results", "notify-workspace-changes"]);
     expect(receivedChanges).toEqual(changes);
+  });
+
+  it("rejects immediately when the caller is already aborted before readiness", async () => {
+    const controller = new AbortController();
+    controller.abort(new Error("cancelled before readiness"));
+    const runtime = createRuntime(
+      makeManager({
+        canServeFile: () => true,
+        waitUntilFileReady: vi.fn(async () => ({})),
+      }),
+    );
+
+    await expect(
+      runtime.waitUntilReadyForFile("/project/src/index.ts", {}, { signal: controller.signal }),
+    ).rejects.toThrow("cancelled before readiness");
+  });
+
+  it("rejects with the abort reason when cancelled during a readiness wait", async () => {
+    const controller = new AbortController();
+    const runtime = createRuntime(
+      makeManager({
+        canServeFile: () => true,
+        waitUntilFileReady: vi.fn(() => new Promise(() => {})),
+      }),
+    );
+
+    const pending = runtime.waitUntilReadyForFile(
+      "/project/src/index.ts",
+      { timeoutMs: 60_000 },
+      { signal: controller.signal },
+    );
+    controller.abort(new Error("cancelled during readiness"));
+
+    await expect(pending).rejects.toThrow("cancelled during readiness");
   });
 
   it("keeps shutdown under the owner instead of the public runtime", async () => {

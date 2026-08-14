@@ -1,3 +1,8 @@
+import {
+  type CodeRequestControl,
+  CodeRequestDeadlineError,
+  throwIfCodeRequestInterrupted,
+} from "@mrclrchtr/supi-code-runtime/api";
 import type {
   DiagnosticPushWaitOutcome,
   DiagnosticSettleResult,
@@ -32,19 +37,52 @@ export class DiagnosticWaitRegistry {
   }
 
   /** Wait for a diagnostic publication or a lifecycle release for one URI. */
-  waitForPush(uri: string, timeoutMs: number): Promise<DiagnosticPushWaitOutcome> {
-    if (timeoutMs <= 0) return Promise.resolve("timed-out");
+  waitForPush(
+    uri: string,
+    timeoutMs: number,
+    control?: CodeRequestControl,
+  ): Promise<DiagnosticPushWaitOutcome> {
+    const deadlineRemaining =
+      control?.deadline === undefined ? undefined : control.deadline - Date.now();
+    const bindMs =
+      deadlineRemaining === undefined ? timeoutMs : Math.min(timeoutMs, deadlineRemaining);
+    if (control?.signal?.aborted) {
+      return Promise.reject(control.signal.reason ?? new Error("Diagnostic push wait cancelled"));
+    }
+    if (bindMs <= 0) {
+      if (deadlineRemaining !== undefined && deadlineRemaining < timeoutMs) {
+        return Promise.reject(new CodeRequestDeadlineError());
+      }
+      return Promise.resolve("timed-out");
+    }
 
-    return new Promise<DiagnosticPushWaitOutcome>((resolve) => {
-      const waiter: DiagnosticWaiter = (outcome) => {
+    return new Promise<DiagnosticPushWaitOutcome>((resolve, reject) => {
+      const cleanup = () => {
         clearTimeout(timer);
+        if (abortHandler) control?.signal?.removeEventListener("abort", abortHandler);
+      };
+      const waiter: DiagnosticWaiter = (outcome) => {
+        cleanup();
         this.#removePushWaiter(uri, waiter);
         resolve(outcome);
       };
       const timer = setTimeout(() => {
         this.#removePushWaiter(uri, waiter);
-        resolve("timed-out");
-      }, timeoutMs);
+        cleanup();
+        if (deadlineRemaining !== undefined && deadlineRemaining < timeoutMs) {
+          reject(new CodeRequestDeadlineError());
+        } else {
+          resolve("timed-out");
+        }
+      }, bindMs);
+      let abortHandler: (() => void) | undefined;
+      abortHandler = () => {
+        cleanup();
+        this.#removePushWaiter(uri, waiter);
+        reject(control?.signal?.reason ?? new Error("Diagnostic push wait cancelled"));
+      };
+      if (control?.signal?.aborted) abortHandler();
+      else control?.signal?.addEventListener("abort", abortHandler, { once: true });
       const waiters = this.#pushWaiters.get(uri) ?? [];
       waiters.push(waiter);
       this.#pushWaiters.set(uri, waiters);
@@ -92,10 +130,19 @@ export class DiagnosticWaitRegistry {
   }
 
   /** Wait for fresh diagnostic state to become quiet or reach its deadline. */
-  async waitForSettle(options: DiagnosticSettleOptions): Promise<DiagnosticSettleResult> {
+  async waitForSettle(
+    options: DiagnosticSettleOptions,
+    control?: CodeRequestControl,
+  ): Promise<DiagnosticSettleResult> {
     const { syncStart, maxWaitMs, quietMs, settleEpoch, isComplete, latestReceived } = options;
-    const deadline = syncStart + maxWaitMs;
+    const deadlineRemaining =
+      control?.deadline === undefined ? undefined : control.deadline - Date.now();
+    const deadline =
+      deadlineRemaining === undefined
+        ? syncStart + maxWaitMs
+        : Math.min(syncStart + maxWaitMs, control?.deadline ?? syncStart + maxWaitMs);
     while (Date.now() < deadline) {
+      throwIfCodeRequestInterrupted(control);
       if (this.#settleEpoch !== settleEpoch) {
         return { outcome: "released", freshness: "not-observed" };
       }
@@ -109,8 +156,11 @@ export class DiagnosticWaitRegistry {
         observedAt > 0 && complete
           ? Math.min(quietMs - elapsed, deadline - Date.now())
           : deadline - Date.now();
-      await this.#waitForStateChange(waitMs);
+      await this.#waitForStateChange(waitMs, control);
     }
+    // A bound absolute deadline makes the settle outcome a deadline
+    // interruption instead of an ordinary relative timeout.
+    throwIfCodeRequestInterrupted(control);
     return {
       outcome: "timed-out",
       freshness: latestReceived() > 0 ? "observed" : "not-observed",
@@ -118,15 +168,26 @@ export class DiagnosticWaitRegistry {
   }
 
   /** Wait until diagnostic state changes or the timeout expires. */
-  #waitForStateChange(timeoutMs: number): Promise<void> {
+  #waitForStateChange(timeoutMs: number, control?: CodeRequestControl): Promise<void> {
     if (timeoutMs <= 0) return Promise.resolve();
-    return new Promise((resolve) => {
+    if (control?.signal?.aborted) {
+      return Promise.reject(control.signal.reason ?? new Error("Settle wait cancelled"));
+    }
+    return new Promise((resolve, reject) => {
+      let abortHandler: (() => void) | undefined;
       const finish = () => {
         clearTimeout(timer);
+        if (abortHandler) control?.signal?.removeEventListener("abort", abortHandler);
         this.#settleWaiters.delete(finish);
         resolve();
       };
       const timer = setTimeout(finish, timeoutMs);
+      abortHandler = () => {
+        clearTimeout(timer);
+        this.#settleWaiters.delete(finish);
+        reject(control?.signal?.reason ?? new Error("Settle wait cancelled"));
+      };
+      control?.signal?.addEventListener("abort", abortHandler, { once: true });
       this.#settleWaiters.add(finish);
     });
   }

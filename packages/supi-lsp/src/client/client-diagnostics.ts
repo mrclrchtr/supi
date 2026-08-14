@@ -2,6 +2,7 @@ import {
   type CodeQueryResult,
   type CodeRequestControl,
   completedCodeQuery,
+  throwIfCodeRequestInterrupted,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { Diagnostic, TextDocumentItem } from "../config/types.ts";
@@ -258,6 +259,10 @@ export class ClientDiagnostics {
     content: string,
     control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Diagnostic[]>> {
+    // Reject immediately when the request was already cancelled: no document
+    // synchronization or protocol traffic may start for a caller that no
+    // longer awaits a result.
+    throwIfCodeRequestInterrupted(control);
     const supportsPull = this.host.supportsPullDiagnostics();
     const observer = new DiagnosticObserver("sync-file", supportsPull, control);
     const uri = fileToUri(filePath);
@@ -302,35 +307,39 @@ export class ClientDiagnostics {
       evidenceRevision: synchronization.evidenceRevision,
     };
     const evidenceRevision = synchronization.evidenceRevision;
-    return collectSynchronizedFileDiagnostics({
-      supportsPull,
-      syncStart,
-      maxWaitMs: DIAGNOSTIC_WAIT_MS,
-      request,
-      cachedDiagnostics,
-      observer,
-      waiters: this.#waiters,
-      current: () => isCurrentSynchronization(this.#openDocs, request),
-      freshPush: () => hasFreshPush(this.#diagnosticStore, request, this.#evidenceRevision),
-      diagnostics: () => this.getDiagnostics(filePath),
-      pullDiagnostics: (timeoutMs, signal) =>
-        pullClientDiagnosticEvidenceFromHost({
-          host: this.host,
-          store: this.#diagnosticStore,
-          openDocuments: this.#openDocs,
-          currentEvidenceRevision: () => this.#evidenceRevision,
-          isRelatedUriTracked: (relatedUri) =>
-            this.#openDocs.has(relatedUri) || this.#versionHistory.has(relatedUri),
-          onApplied: () => this.#unversionedPushBlocked.delete(uri),
-          request: {
-            uri,
-            timeoutMs,
-            synchronizationId: request.synchronizationId,
-            evidenceRevision,
-            signal,
-            operationId: control?.operationId,
-          },
-        }),
-    });
+    return collectSynchronizedFileDiagnostics(
+      {
+        supportsPull,
+        syncStart,
+        maxWaitMs: DIAGNOSTIC_WAIT_MS,
+        request,
+        cachedDiagnostics,
+        observer,
+        waiters: this.#waiters,
+        current: () => isCurrentSynchronization(this.#openDocs, request),
+        freshPush: () => hasFreshPush(this.#diagnosticStore, request, this.#evidenceRevision),
+        diagnostics: () => this.getDiagnostics(filePath),
+        pullDiagnostics: (timeoutMs, signal) =>
+          pullClientDiagnosticEvidenceFromHost({
+            host: this.host,
+            store: this.#diagnosticStore,
+            openDocuments: this.#openDocs,
+            currentEvidenceRevision: () => this.#evidenceRevision,
+            isRelatedUriTracked: (relatedUri) =>
+              this.#openDocs.has(relatedUri) || this.#versionHistory.has(relatedUri),
+            onApplied: () => this.#unversionedPushBlocked.delete(uri),
+            request: {
+              uri,
+              timeoutMs,
+              synchronizationId: request.synchronizationId,
+              evidenceRevision,
+              signal,
+              deadline: control?.deadline,
+              operationId: control?.operationId,
+            },
+          }),
+      },
+      control,
+    );
   }
 }

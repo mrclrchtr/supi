@@ -5,6 +5,7 @@ import {
   type CodeRequestControl,
   isCodeRequestInterruption,
   mapCodeQueryResult,
+  throwIfCodeRequestInterrupted,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
@@ -199,6 +200,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     const readiness = await raceReadinessValue(
       this.manager.waitUntilFileReady(resolvedPath, control),
       options.timeoutMs,
+      control,
     );
     if (readiness.kind !== "resolved") return readiness;
     if (readiness.value === null) {
@@ -221,6 +223,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     const readiness = await raceReadinessValue(
       this.manager.waitUntilWorkspaceReady(control),
       options.timeoutMs,
+      control,
     );
     if (readiness.kind !== "resolved") return readiness;
     if (readiness.value === 0) {
@@ -287,7 +290,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     options?: { maxWaitMs?: number; quietMs?: number },
     control?: CodeRequestControl,
   ): Promise<DiagnosticEvidenceSummary> {
-    return this.manager.refreshOpenDiagnostics({ ...options, operationId: control?.operationId });
+    return this.manager.refreshOpenDiagnostics({ ...options, ...control });
   }
 
   /** Get a lightweight workspace diagnostic summary for all tracked files. */
@@ -376,15 +379,19 @@ export function getWorkspaceLspRuntime(cwd: string): WorkspaceLspRuntimeState {
 export async function waitForWorkspaceLspRuntime(
   cwd: string,
   timeoutMs: number = 250,
+  control?: CodeRequestControl,
 ): Promise<WorkspaceLspRuntimeState> {
   const deadline = Date.now() + Math.max(0, timeoutMs);
   let state = getWorkspaceLspRuntime(cwd);
 
   while (state.kind === "pending" && Date.now() < deadline) {
+    throwIfCodeRequestInterrupted(control);
     await new Promise((resolve) => setTimeout(resolve, WAIT_INTERVAL_MS));
     state = getWorkspaceLspRuntime(cwd);
   }
 
+  // A cancelled poll must not hand a runtime to a caller that no longer awaits.
+  throwIfCodeRequestInterrupted(control);
   return state;
 }
 

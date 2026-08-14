@@ -22,7 +22,7 @@ manager never cross the public runtime interface.
 
 The registry uses the shared core session-state helper and retains explicit ready, pending, inactive, disabled, and unavailable states. Pending polling uses `waitForWorkspaceLspRuntime(cwd)`. Empty workspace warm-up leaves the ready owner published and semantic registration pending so a lazy file route can still start; never promote via `Promise.all([])` or retract the owner solely because no client was proactive.
 
-Runtime positions are raw 0-based LSP coordinates. Use `toLspPosition()` when starting from 1-based tool coordinates. Semantic and explicit diagnostic operations accept optional shared `CodeRequestControl` metadata. Preserve the exact value through adapters and runtime interfaces. Pass only its opaque Debug Operation ID to sanitized request and diagnostic timing events. Do not apply its signal or deadline to semantic clients or transport. Keep readiness, lifecycle, ambient push diagnostics, and direct library calls uncorrelated.
+Runtime positions are raw 0-based LSP coordinates. Use `toLspPosition()` when starting from 1-based tool coordinates. Semantic and explicit diagnostic operations accept optional shared `CodeRequestControl` metadata. Preserve the exact value through adapters and runtime interfaces. Pass the exact signal and deadline into semantic requests and transport; the transport maps the signal to protocol cancellation and enforces the absolute deadline. Pass only its opaque Debug Operation ID to sanitized request and diagnostic timing events. Keep readiness, lifecycle, ambient push diagnostics, and direct library calls uncorrelated.
 
 ## Key files
 

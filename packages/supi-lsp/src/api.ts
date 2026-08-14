@@ -33,6 +33,7 @@ export {
   scanWorkspaceSentinels,
   syncWorkspaceSentinelSnapshot,
 } from "./diagnostics/workspace-sentinels.ts";
+export { raceReadinessValue, raceRequestControl } from "./session/readiness.ts";
 export type {
   LspControllerState,
   LspRuntimeTransition,

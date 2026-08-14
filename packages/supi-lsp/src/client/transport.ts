@@ -3,7 +3,10 @@
 // and notification/request dispatching through vscode-jsonrpc's MessageConnection.
 
 import type { Readable, Writable } from "node:stream";
-import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type CodeRequestControl,
+  CodeRequestDeadlineError,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { startDebugTimer } from "@mrclrchtr/supi-core/debug";
 import {
   CancellationTokenSource,
@@ -97,8 +100,18 @@ export class JsonRpcClient {
   ): Promise<unknown> {
     const timeoutMs = options?.timeoutMs ?? this.timeoutMs;
     const signal = options?.signal;
+    const deadlineMs = options?.deadline === undefined ? undefined : options.deadline - Date.now();
     const methodClass = classifyRequestMethod(method);
     const timer = startDebugTimer();
+    // An expired absolute deadline must not even send the request: the caller
+    // no longer awaits a result, so no protocol traffic may start.
+    if (deadlineMs !== undefined && deadlineMs <= 0) {
+      recordRequestTiming(timer, options?.operationId, {
+        methodClass,
+        outcome: "timed-out",
+      });
+      return Promise.reject(new CodeRequestDeadlineError());
+    }
     if (this.closed || !this.connection) {
       recordRequestTiming(timer, options?.operationId, {
         methodClass,
@@ -111,7 +124,8 @@ export class JsonRpcClient {
     let timeout: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
     let aborted = false;
-    const timeoutError = new Error(`Request ${method} timed out after ${timeoutMs}ms`);
+    const timerDelayMs = deadlineMs === undefined ? timeoutMs : Math.min(timeoutMs, deadlineMs);
+    const timeoutError = new Error(`Request ${method} timed out after ${timerDelayMs}ms`);
     const abortError = new Error(`Request ${method} was cancelled`);
 
     const request = this.connection.sendRequest(method, params, tokenSource.token);
@@ -128,7 +142,9 @@ export class JsonRpcClient {
       abortHandler = () => {
         aborted = true;
         tokenSource.cancel();
-        reject(abortError);
+        // Reject with the caller's abort reason when one exists, matching the
+        // canonical throwIfCodeRequestInterrupted() behavior.
+        reject(signal?.reason ?? abortError);
       };
       if (signal?.aborted) abortHandler();
       else signal?.addEventListener("abort", abortHandler, { once: true });
@@ -139,8 +155,14 @@ export class JsonRpcClient {
         timeout = setTimeout(() => {
           timedOut = true;
           tokenSource.cancel();
-          reject(timeoutError);
-        }, timeoutMs);
+          // A deadline that binds earlier than the timeout is a deadline
+          // outcome, distinct from an ordinary per-request timeout.
+          reject(
+            deadlineMs !== undefined && deadlineMs < timeoutMs
+              ? new CodeRequestDeadlineError()
+              : timeoutError,
+          );
+        }, timerDelayMs);
       }),
       abort,
     ])

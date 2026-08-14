@@ -157,6 +157,71 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
     }
   });
 
+  it("rejects with the abort reason when cancelled during the pull phase", async () => {
+    const file = createTempFileUri();
+    const { client, rpc } = createPullTestClient();
+    openDocument(client, file.uri);
+    const controller = new AbortController();
+    rpc.sendRequest.mockImplementation(
+      (_method, _params, options) =>
+        new Promise((_resolve, reject) => {
+          options?.signal?.addEventListener("abort", () => reject(options.signal.reason));
+        }),
+    );
+
+    try {
+      const pending = client.refreshOpenDiagnostics({
+        maxWaitMs: 100,
+        quietMs: 10,
+        signal: controller.signal,
+      });
+      await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(1));
+      controller.abort(new Error("cancelled mid-refresh-pull"));
+
+      await expect(pending).rejects.toThrow("cancelled mid-refresh-pull");
+    } finally {
+      fs.rmSync(file.tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects with the abort reason when cancelled during the settle wait", async () => {
+    const file = createTempFileUri();
+    const { client } = createRunningTestClient();
+    openDocument(client, file.uri);
+    const controller = new AbortController();
+
+    try {
+      const pending = client.refreshOpenDiagnostics({
+        maxWaitMs: 1_000,
+        quietMs: 50,
+        signal: controller.signal,
+      });
+      controller.abort(new Error("cancelled during settle"));
+
+      await expect(pending).rejects.toThrow("cancelled during settle");
+    } finally {
+      fs.rmSync(file.tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects with a deadline error when the deadline already elapsed", async () => {
+    const file = createTempFileUri();
+    const { client } = createRunningTestClient();
+    openDocument(client, file.uri);
+
+    try {
+      await expect(
+        client.refreshOpenDiagnostics({
+          maxWaitMs: 100,
+          quietMs: 10,
+          deadline: Date.now() - 1,
+        }),
+      ).rejects.toThrow("Code request deadline exceeded");
+    } finally {
+      fs.rmSync(file.tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it("records a failed pull separately from an unconfirmed document", async () => {
     const file = createTempFileUri();
     const { client, rpc } = createPullTestClient();

@@ -1,4 +1,8 @@
-import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type CodeRequestControl,
+  isCodeRequestInterruption,
+  throwIfCodeRequestInterrupted,
+} from "@mrclrchtr/supi-code-runtime/api";
 import type { TextDocumentIdentifier } from "../config/types.ts";
 import {
   type DiagnosticEvidenceSummary,
@@ -142,17 +146,20 @@ export async function pullDiagnosticsForOpenDocuments(options: {
   requests: readonly DiagnosticSynchronization[];
   syncStart: number;
   maxWaitMs: number;
+  signal?: AbortSignal;
+  deadline?: number;
   operationId?: string;
   currentEvidenceRevision: () => number;
   openDocuments: ReadonlyMap<string, { evidenceRevision: number; synchronizationId: number }>;
   diagnosticStore: ReadonlyMap<string, DiagnosticCacheEntry>;
   waitForChange: () => DiagnosticStateWait;
-  pullDiagnostics: (
-    request: DiagnosticSynchronization,
-    timeoutMs: number,
-    signal: AbortSignal,
-    operationId?: string,
-  ) => Promise<boolean>;
+  pullDiagnostics: (options: {
+    request: DiagnosticSynchronization;
+    timeoutMs: number;
+    signal: AbortSignal;
+    operationId?: string;
+    deadline?: number;
+  }) => Promise<boolean>;
 }): Promise<void> {
   const deadline = options.syncStart + options.maxWaitMs;
   const results = await Promise.allSettled(
@@ -160,22 +167,36 @@ export async function pullDiagnosticsForOpenDocuments(options: {
       const remaining = deadline - Date.now();
       if (remaining <= 0) throw new Error("pull diagnostic timeout");
       const pullController = new AbortController();
-      const outcome = await raceDiagnosticPull({
-        pull: options.pullDiagnostics(
-          request,
-          remaining,
-          pullController.signal,
-          options.operationId,
-        ),
-        waitForChange: options.waitForChange,
-        freshPush: () =>
-          hasFreshPush(options.diagnosticStore, request, options.currentEvidenceRevision()),
-        current: () => isCurrentSynchronization(options.openDocuments, request),
-      });
-      if (outcome !== "pull") pullController.abort();
-      return outcome === "pull";
+      // Link the caller's cancellation to this document's pull controller so
+      // an in-flight pull receives protocol cancellation and stops promptly.
+      const onAbort = () => pullController.abort(options.signal?.reason);
+      if (options.signal?.aborted) onAbort();
+      else options.signal?.addEventListener("abort", onAbort, { once: true });
+      try {
+        const outcome = await raceDiagnosticPull({
+          pull: options.pullDiagnostics({
+            request,
+            timeoutMs: remaining,
+            signal: pullController.signal,
+            operationId: options.operationId,
+            deadline: options.deadline,
+          }),
+          waitForChange: options.waitForChange,
+          freshPush: () =>
+            hasFreshPush(options.diagnosticStore, request, options.currentEvidenceRevision()),
+          current: () => isCurrentSynchronization(options.openDocuments, request),
+        });
+        if (outcome !== "pull") pullController.abort();
+        return outcome === "pull";
+      } finally {
+        options.signal?.removeEventListener("abort", onAbort);
+      }
     }),
   );
+
+  // A cancelled refresh must not degrade into failed coverage evidence:
+  // the caller no longer awaits a result.
+  throwIfCodeRequestInterrupted({ signal: options.signal, deadline: options.deadline });
 
   const incomplete = results.some((result) => result.status === "rejected" || !result.value);
   if (incomplete && options.requests.length > 0) {
@@ -215,6 +236,10 @@ interface ClientDiagnosticRefreshOptions {
 export async function refreshClientOpenDiagnostics(
   options: ClientDiagnosticRefreshOptions,
 ): Promise<DiagnosticEvidenceSummary> {
+  // Reject immediately when the request was already cancelled: no document
+  // resynchronization or protocol traffic may start for a pass the caller
+  // no longer awaits.
+  throwIfCodeRequestInterrupted(options.options);
   const supportsPull = options.host.supportsPullDiagnostics();
   const observer = new DiagnosticObserver("refresh-open", supportsPull, options.options);
   if (!options.host.isOperational()) {
@@ -271,28 +296,31 @@ export async function refreshClientOpenDiagnostics(
         requests: synchronizations,
         syncStart,
         maxWaitMs,
+        signal: options.options.signal,
+        deadline: options.options.deadline,
         operationId: options.options.operationId,
         currentEvidenceRevision: options.evidenceRevision,
         openDocuments: options.openDocuments,
         diagnosticStore: options.diagnosticStore,
         waitForChange: () => options.waiters.waitForChange(),
-        pullDiagnostics: (request, timeoutMs, signal, operationId) =>
+        pullDiagnostics: (pullOptions) =>
           pullClientDiagnosticEvidenceFromHost({
             host: options.host,
             store: options.diagnosticStore,
             openDocuments: options.openDocuments,
             currentEvidenceRevision: options.evidenceRevision,
             isRelatedUriTracked: options.isRelatedUriTracked,
-            onApplied: () => options.unblockUnversionedPush(request.uri),
+            onApplied: () => options.unblockUnversionedPush(pullOptions.request.uri),
             request: {
-              uri: request.uri,
-              timeoutMs,
-              synchronizationId: request.synchronizationId,
+              uri: pullOptions.request.uri,
+              timeoutMs: pullOptions.timeoutMs,
+              synchronizationId: pullOptions.request.synchronizationId,
               evidenceRevision:
-                options.openDocuments.get(request.uri)?.evidenceRevision ??
+                options.openDocuments.get(pullOptions.request.uri)?.evidenceRevision ??
                 options.evidenceRevision(),
-              signal,
-              operationId,
+              signal: pullOptions.signal,
+              deadline: pullOptions.deadline,
+              operationId: pullOptions.operationId,
             },
           }),
       });
@@ -301,25 +329,33 @@ export async function refreshClientOpenDiagnostics(
     } catch (error) {
       observer.pullFailed(error);
       if (error instanceof DiagnosticPullError) failedPullUris = new Set(error.failedUris);
+      // An interruption during the pull phase stops the refresh instead of
+      // falling through to the settle path with failed-coverage evidence.
+      if (isCodeRequestInterruption(error, options.options)) throw error;
     }
   }
 
-  const settle = await options.waiters.waitForSettle({
-    syncStart,
-    maxWaitMs,
-    quietMs,
-    settleEpoch,
-    isComplete: () =>
-      synchronizations.every((item) =>
-        hasFreshEvidence(options.diagnosticStore, item, options.evidenceRevision()),
-      ),
-    latestReceived: () =>
-      latestFreshEvidenceReceivedAt(
-        options.diagnosticStore,
-        synchronizations,
-        options.evidenceRevision(),
-      ),
-  });
+  const settle = await options.waiters.waitForSettle(
+    {
+      syncStart,
+      maxWaitMs,
+      quietMs,
+      settleEpoch,
+      isComplete: () =>
+        synchronizations.every((item) =>
+          hasFreshEvidence(options.diagnosticStore, item, options.evidenceRevision()),
+        ),
+      latestReceived: () =>
+        latestFreshEvidenceReceivedAt(
+          options.diagnosticStore,
+          synchronizations,
+          options.evidenceRevision(),
+        ),
+    },
+    options.options,
+  );
   observer.pushSettled(documentCount, settle);
+  // A cancelled settle must not publish evidence the caller no longer awaits.
+  throwIfCodeRequestInterrupted(options.options);
   return buildEvidence();
 }

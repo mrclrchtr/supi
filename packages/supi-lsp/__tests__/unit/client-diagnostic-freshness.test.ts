@@ -304,6 +304,83 @@ describe("LSP single-file diagnostic freshness", () => {
     });
   });
 
+  it("rejects with the abort reason when cancelled during the pull fallback", async () => {
+    vi.useFakeTimers();
+    const file = createTempTsFile("aborted-pull.ts");
+    tmpDir = file.tmpDir;
+    const { client, rpc } = createPullTestClient();
+    const controller = new AbortController();
+    rpc.sendRequest.mockImplementation(() => {
+      controller.abort(new Error("cancelled mid-pull"));
+      return Promise.reject(controller.signal.reason);
+    });
+
+    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;", {
+      signal: controller.signal,
+    });
+
+    await expect(pending).rejects.toThrow("cancelled mid-pull");
+  });
+
+  it("does not apply pull evidence when the caller aborts mid-pull", async () => {
+    vi.useFakeTimers();
+    const file = createTempTsFile("aborted-pull-apply.ts");
+    tmpDir = file.tmpDir;
+    const { client, rpc } = createPullTestClient();
+    const controller = new AbortController();
+    let pullStarted = false;
+    rpc.sendRequest.mockImplementation((_method, _params, options) => {
+      pullStarted = true;
+      return new Promise((_resolve, reject) => {
+        options?.signal?.addEventListener("abort", () => reject(options.signal.reason));
+      });
+    });
+
+    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;", {
+      signal: controller.signal,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(pullStarted).toBe(true);
+
+    controller.abort(new Error("cancelled mid-pull"));
+
+    await expect(pending).rejects.toThrow("cancelled mid-pull");
+    expect(client.getDiagnostics(file.filePath)).toEqual([]);
+  });
+
+  it("rejects with the abort reason when cancelled during the push wait", async () => {
+    vi.useFakeTimers();
+    const file = createTempTsFile("aborted-push-wait.ts");
+    tmpDir = file.tmpDir;
+    const { client } = createRunningTestClient();
+    const controller = new AbortController();
+
+    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;", {
+      signal: controller.signal,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    controller.abort(new Error("cancelled during push wait"));
+
+    await expect(pending).rejects.toThrow("cancelled during push wait");
+  });
+
+  it("rejects with the abort reason when cancelled during the push wait after a failed pull", async () => {
+    vi.useFakeTimers();
+    const file = createTempTsFile("aborted-pull-fallback.ts");
+    tmpDir = file.tmpDir;
+    const { client, rpc } = createPullTestClient();
+    const controller = new AbortController();
+    rpc.sendRequest.mockRejectedValue(new Error("pull failed"));
+
+    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;", {
+      signal: controller.signal,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    controller.abort(new Error("cancelled during fallback push wait"));
+
+    await expect(pending).rejects.toThrow("cancelled during fallback push wait");
+  });
+
   it("does not let a delayed push from a closed document confirm its reopen", async () => {
     const file = createTempTsFile("reopened.ts");
     tmpDir = file.tmpDir;

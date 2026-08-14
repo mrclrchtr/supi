@@ -98,7 +98,7 @@ export async function recoverWorkspaceDiagnostics(
     diagnosticEvidence = await host.refreshOpenDiagnostics({
       maxWaitMs: options.maxWaitMs,
       quietMs: options.quietMs,
-      operationId: options.control?.operationId,
+      ...options.control,
     });
   } catch (error) {
     if (isCodeRequestInterruption(error, options.control)) throw error;
@@ -225,7 +225,7 @@ async function runRestartEscalation(
           await host.refreshOpenDiagnostics({
             maxWaitMs: options.maxWaitMs,
             quietMs: options.quietMs,
-            operationId: options.control?.operationId,
+            ...options.control,
           }),
           host.getCwd(),
         );

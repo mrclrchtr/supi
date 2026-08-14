@@ -1,5 +1,8 @@
 import * as path from "node:path";
-import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type CodeRequestControl,
+  isCodeRequestInterruption,
+} from "@mrclrchtr/supi-code-runtime/api";
 import type { LspClient } from "../client/client.ts";
 import { getDiagnosticFileState } from "../client/client-file-state.ts";
 import {
@@ -48,7 +51,9 @@ export async function refreshOpenDiagnosticsForClients(
           .filter((file) => !reportedFiles.has(file))
           .map((file) => ({ file, status: "failed" as const })),
       );
-    } catch {
+    } catch (error) {
+      // A cancelled refresh must not degrade into failed coverage evidence.
+      if (isCodeRequestInterruption(error, options)) throw error;
       // Keep failed coverage for every document requested by the client.
       documents.push(...failedCoverageForClient(client, trackedFiles));
     }

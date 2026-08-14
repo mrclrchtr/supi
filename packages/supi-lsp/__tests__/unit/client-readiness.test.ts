@@ -1,5 +1,6 @@
 // Unit tests for LspClient readiness state machine.
 
+import { CodeRequestDeadlineError } from "@mrclrchtr/supi-code-runtime/api";
 import {
   configureDebugRegistry,
   getDebugEvents,
@@ -532,7 +533,7 @@ describe("LspClient readiness state machine", () => {
     });
   });
 
-  it("forwards only the Debug Operation ID from semantic request control", async () => {
+  it("forwards signal, deadline, and Debug Operation ID from semantic request control", async () => {
     const client = createClient();
     await vi.advanceTimersByTimeAsync(2_000);
     const sendRequest = vi.fn().mockResolvedValue(null);
@@ -541,14 +542,80 @@ describe("LspClient readiness state machine", () => {
     const control = {
       operationId: "op-AAAAAAAAAAAAAAAAAAAAAA",
       signal: controller.signal,
-      deadline: 42,
+      deadline: Date.now() + 60_000,
     };
 
     await client.hover("test.ts", { line: 0, character: 0 }, control);
 
     expect(sendRequest).toHaveBeenCalledWith("textDocument/hover", expect.any(Object), {
       operationId: control.operationId,
+      signal: controller.signal,
+      deadline: control.deadline,
     });
+  });
+
+  it("rejects with a deadline error when the deadline already elapsed", async () => {
+    const client = createClient();
+    await vi.advanceTimersByTimeAsync(2_000);
+    const sendRequest = vi.fn();
+    (client as AnyClient).rpc.sendRequest = sendRequest;
+
+    await expect(
+      client.hover("test.ts", { line: 0, character: 0 }, { deadline: Date.now() - 1 }),
+    ).rejects.toThrow("Code request deadline exceeded");
+
+    expect(sendRequest).not.toHaveBeenCalled();
+  });
+
+  it("rethrows the abort when the in-flight request is cancelled", async () => {
+    const client = createClient();
+    await vi.advanceTimersByTimeAsync(2_000);
+    const controller = new AbortController();
+    const sendRequest = vi.fn(() => {
+      controller.abort(new Error("cancelled mid-request"));
+      return Promise.reject(controller.signal.reason);
+    });
+    (client as AnyClient).rpc.sendRequest = sendRequest;
+
+    await expect(
+      client.hover("test.ts", { line: 0, character: 0 }, { signal: controller.signal }),
+    ).rejects.toThrow("cancelled mid-request");
+  });
+
+  it("rethrows the deadline error instead of reporting unavailable", async () => {
+    const client = createClient();
+    await vi.advanceTimersByTimeAsync(2_000);
+    const controller = new AbortController();
+    const sendRequest = vi.fn().mockRejectedValue(new CodeRequestDeadlineError());
+    (client as AnyClient).rpc.sendRequest = sendRequest;
+
+    await expect(
+      client.hover(
+        "test.ts",
+        { line: 0, character: 0 },
+        { signal: controller.signal, deadline: Date.now() + 60_000 },
+      ),
+    ).rejects.toThrow("Code request deadline exceeded");
+  });
+
+  it("rejects promptly when the caller aborts during the readiness wait", async () => {
+    const client = createClient();
+    const controller = new AbortController();
+    const ready = client.getReady({ signal: controller.signal });
+
+    controller.abort(new Error("cancelled during readiness"));
+
+    await expect(ready).rejects.toThrow("cancelled during readiness");
+  });
+
+  it("rejects immediately when the caller is already aborted", async () => {
+    const client = createClient();
+    const controller = new AbortController();
+    controller.abort(new Error("cancelled before readiness"));
+
+    await expect(client.getReady({ signal: controller.signal })).rejects.toThrow(
+      "cancelled before readiness",
+    );
   });
 
   // ── Test 18: query() preserves sendRequest errors ──────────────────

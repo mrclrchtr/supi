@@ -100,6 +100,19 @@ describe("workspace LSP runtime registry", () => {
     });
   });
 
+  it("rejects with the abort reason while polling a pending workspace", async () => {
+    setWorkspaceLspRuntimeState("/test", { kind: "pending" });
+    const controller = new AbortController();
+    const pending = waitForWorkspaceLspRuntime("/test", 5_000, {
+      signal: controller.signal,
+    });
+
+    controller.abort(new Error("cancelled during poll"));
+
+    await expect(pending).rejects.toThrow("cancelled during poll");
+    clearWorkspaceLspRuntime("/test");
+  });
+
   it("returns an inactive runtime without polling", async () => {
     const manager = { getCwd: vi.fn().mockReturnValue("/test") } as unknown as LspManager;
     const runtime = createWorkspaceLspRuntime(manager);

@@ -5,6 +5,7 @@ import * as path from "node:path";
 import {
   type CodeQueryResult,
   type CodeRequestControl,
+  isCodeRequestInterruption,
   throwIfCodeRequestInterrupted,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
@@ -32,6 +33,7 @@ import {
   type DiagnosticEvidenceSummary,
   summarizeDiagnosticEvidence,
 } from "../diagnostics/evidence.ts";
+import { raceRequestControl } from "../session/readiness.ts";
 import {
   displayRelativeFilePath,
   formatCoverageSummaryText,
@@ -477,11 +479,15 @@ export class LspManager {
     filePath: string,
     control?: CodeRequestControl,
   ): Promise<LspClient | null> {
+    throwIfCodeRequestInterrupted(control);
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
     const client = await this.getClientForFile(resolvedPath);
     if (!client) return null;
-    await client.getReady();
+    // The caller's wait stops on cancellation even though the shared
+    // readiness state keeps its own lifecycle.
+    await client.getReady(control);
     await this.warmSemanticProject(client, resolvedPath, true, control);
+    throwIfCodeRequestInterrupted(control);
     return client;
   }
 
@@ -490,6 +496,7 @@ export class LspManager {
    * Returns the number of concrete clients that are ready after the warm-up.
    */
   async waitUntilWorkspaceReady(control?: CodeRequestControl): Promise<number> {
+    throwIfCodeRequestInterrupted(control);
     const activeClients = Array.from(this.clients.values()).filter(
       (client) => client.status === "running",
     );
@@ -500,13 +507,17 @@ export class LspManager {
       alreadyReady ??
       (await Promise.any(
         activeClients.map(async (client) => {
-          await client.getReady();
+          await client.getReady(control);
           if (client.status !== "running" || !client.ready) {
             throw new Error("LSP client did not reach concrete readiness.");
           }
           return client;
         }),
       ).catch(() => null));
+    // Promise.any swallows individual rejections, so an interruption that
+    // raced the readiness wait must be re-raised before it degrades into a
+    // zero-ready outcome.
+    throwIfCodeRequestInterrupted(control);
     if (!firstReady) return 0;
 
     const serverConfig = this.config.servers[firstReady.name];
@@ -519,6 +530,7 @@ export class LspManager {
       if (target) await this.warmSemanticProject(firstReady, target.file, false, control);
     }
 
+    throwIfCodeRequestInterrupted(control);
     return activeClients.filter((client) => client.status === "running" && client.ready).length;
   }
   async syncFileAndGetDiagnostics(
@@ -534,6 +546,9 @@ export class LspManager {
     try {
       return await syncClientFileAndGetDiagnostics(client, resolvedPath, maxSeverity, control);
     } catch (error) {
+      // Cancellation must propagate; a cancelled caller no longer awaits a
+      // diagnostic result or the file cleanup side effects.
+      if (isCodeRequestInterruption(error, control)) throw error;
       this.closeFile(resolvedPath);
       const detail = error instanceof Error ? error.message : String(error);
       return unavailableCodeQuery(`Diagnostic collection failed for ${resolvedPath}: ${detail}`);
@@ -932,6 +947,8 @@ export class LspManager {
         const openedClient = await this.ensureFileOpen(target.file);
         if (!openedClient) continue;
 
+        // A cancelled pass must not mark projects warmed on its way out.
+        throwIfCodeRequestInterrupted(control);
         this.warmedWorkspaceSymbolProjects.add(projectKey);
         warmedAny = true;
 
@@ -977,14 +994,16 @@ export class LspManager {
 
     const pending = this.pendingWarmProbes.get(projectKey);
     if (pending) {
-      await pending;
+      // The shared probe keeps running for other consumers; only this
+      // caller's wait stops when it cancels.
+      await raceRequestControl(pending, control);
       return;
     }
 
     const probe = this.performWarmProbe(client, resolvedFile, projectKey, control);
     this.pendingWarmProbes.set(projectKey, probe);
     try {
-      await probe;
+      await raceRequestControl(probe, control);
     } finally {
       this.pendingWarmProbes.delete(projectKey);
     }
@@ -1001,14 +1020,15 @@ export class LspManager {
 
     this.warmedSemanticProjects.add(projectKey);
 
-    const symbols = control
-      ? await openedClient.documentSymbols(resolvedFile, control)
-      : await openedClient.documentSymbols(resolvedFile);
+    // The probe is shared state for concurrent callers. One caller's
+    // cancellation must not cancel the shared in-flight queries, so only the
+    // Debug Operation ID is forwarded; each caller races its own wait above.
+    const sharedControl = { operationId: control?.operationId };
+    const symbols = await openedClient.documentSymbols(resolvedFile, sharedControl);
     if (symbols.kind === "unavailable") return;
     const hoverPosition = getWorkspaceSymbolWarmPosition(symbols.data);
     if (hoverPosition) {
-      if (control) await openedClient.hover(resolvedFile, hoverPosition, control);
-      else await openedClient.hover(resolvedFile, hoverPosition);
+      await openedClient.hover(resolvedFile, hoverPosition, sharedControl);
     }
   }
 

@@ -1,6 +1,9 @@
 import {
   type CodeQueryResult,
+  type CodeRequestControl,
   completedCodeQuery,
+  isCodeRequestInterruption,
+  throwIfCodeRequestInterrupted,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { Diagnostic } from "../config/types.ts";
@@ -31,14 +34,17 @@ type PullCollectionOutcome = "failed" | "pull" | "push" | "released";
 /** Collect fresh pull or push evidence for one synchronized document. */
 export async function collectSynchronizedFileDiagnostics(
   options: FileDiagnosticCollectionOptions,
+  control?: CodeRequestControl,
 ): Promise<CodeQueryResult<Diagnostic[]>> {
+  throwIfCodeRequestInterrupted(control);
   if (options.supportsPull) {
-    const pullOutcome = await collectPullEvidence(options);
+    const pullOutcome = await collectPullEvidence(options, control);
     if (pullOutcome === "pull" || pullOutcome === "push") {
       return completedCodeQuery(options.diagnostics());
     }
   }
 
+  throwIfCodeRequestInterrupted(control);
   if (!options.current()) {
     options.observer.pushWaitCompleted(1, "released");
     return unavailableCodeQuery(
@@ -53,6 +59,7 @@ export async function collectSynchronizedFileDiagnostics(
   const push = await options.waiters.waitForPush(
     options.request.uri,
     Math.max(0, options.maxWaitMs - (Date.now() - options.syncStart)),
+    control,
   );
   options.observer.pushWaitCompleted(1, push);
   if (push === "published" && options.freshPush()) {
@@ -66,6 +73,7 @@ export async function collectSynchronizedFileDiagnostics(
 
 async function collectPullEvidence(
   options: FileDiagnosticCollectionOptions,
+  control?: CodeRequestControl,
 ): Promise<PullCollectionOutcome> {
   const remaining = options.maxWaitMs - (Date.now() - options.syncStart);
   if (remaining <= 0) {
@@ -75,18 +83,28 @@ async function collectPullEvidence(
 
   try {
     const controller = new AbortController();
-    const outcome = await raceDiagnosticPull({
-      pull: options.pullDiagnostics(remaining, controller.signal),
-      waitForChange: () => options.waiters.waitForChange(),
-      freshPush: options.freshPush,
-      current: options.current,
-    });
-    if (outcome !== "pull") controller.abort();
-    if (outcome === "pull") options.observer.pullCompleted(1);
-    else options.observer.pullFailed(undefined);
-    if (outcome === "push") options.observer.pushWaitCompleted(1, "published");
-    return outcome;
+    // Link the caller's cancellation to the local pull controller so an
+    // in-flight pull receives protocol cancellation and stops promptly.
+    const onAbort = () => controller.abort(control?.signal?.reason);
+    if (control?.signal?.aborted) onAbort();
+    else control?.signal?.addEventListener("abort", onAbort, { once: true });
+    try {
+      const outcome = await raceDiagnosticPull({
+        pull: options.pullDiagnostics(remaining, controller.signal),
+        waitForChange: () => options.waiters.waitForChange(),
+        freshPush: options.freshPush,
+        current: options.current,
+      });
+      if (outcome !== "pull") controller.abort();
+      if (outcome === "pull") options.observer.pullCompleted(1);
+      else options.observer.pullFailed(undefined);
+      if (outcome === "push") options.observer.pushWaitCompleted(1, "published");
+      return outcome;
+    } finally {
+      control?.signal?.removeEventListener("abort", onAbort);
+    }
   } catch (error) {
+    if (isCodeRequestInterruption(error, control)) throw error;
     options.observer.pullFailed(error);
     return "failed";
   }

@@ -4,5 +4,6 @@ export interface DiagnosticPullRequest {
   readonly previousResultId: string | undefined;
   readonly timeoutMs: number;
   readonly signal?: AbortSignal;
+  readonly deadline?: number;
   readonly operationId?: string;
 }

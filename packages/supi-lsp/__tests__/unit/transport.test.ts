@@ -296,9 +296,35 @@ describe("JsonRpcClient", () => {
     const timerIndex = setTimeoutSpy.mock.calls.findIndex((call) => call[1] === 12_348);
     const timer = setTimeoutSpy.mock.results[timerIndex]?.value;
 
-    controller.abort();
+    controller.abort(new Error("request cancelled by caller"));
 
-    await expect(request).rejects.toThrow("cancelled");
+    await expect(request).rejects.toThrow("request cancelled by caller");
+    expect(timer).toBeDefined();
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(timer);
+  });
+
+  it("rejects with a deadline error when the absolute deadline has already elapsed", async () => {
+    server.onRequest("slow/expired", () => new Promise(() => {}));
+    const request = client.sendRequest("slow/expired", undefined, {
+      timeoutMs: 12_349,
+      deadline: Date.now() - 1,
+    });
+
+    await expect(request).rejects.toThrow("Code request deadline exceeded");
+  });
+
+  it("bounds the request timer by the absolute deadline when it is earlier than the timeout", async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+    server.onRequest("slow/deadline", () => new Promise(() => {}));
+    const request = client.sendRequest("slow/deadline", undefined, {
+      timeoutMs: 12_350,
+      deadline: Date.now() + 30,
+    });
+    const timerIndex = setTimeoutSpy.mock.calls.findIndex((call) => call[1] === 30);
+    const timer = setTimeoutSpy.mock.results[timerIndex]?.value;
+
+    await expect(request).rejects.toThrow("Code request deadline exceeded");
     expect(timer).toBeDefined();
     expect(clearTimeoutSpy).toHaveBeenCalledWith(timer);
   });
