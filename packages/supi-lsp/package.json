@@ -57,6 +57,7 @@
   "exports": {
     "./api": "./src/api.ts",
     "./package.json": "./package.json",
-    "./provider/lsp-semantic-provider": "./src/provider/lsp-semantic-provider.ts"
+    "./provider/lsp-semantic-provider": "./src/provider/lsp-semantic-provider.ts",
+    "./debug-telemetry": "./src/debug-telemetry.ts"
   }
 }

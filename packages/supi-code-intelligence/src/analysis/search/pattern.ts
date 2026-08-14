@@ -83,7 +83,7 @@ export interface StructuredPatternSearchOptions {
 export async function getStructuredPatternMatches(
   options: StructuredPatternSearchOptions,
 ): Promise<StructuredPatternOutcome> {
-  const scanTimer = startAstScanTimer(options.control);
+  const scanTimer = startAstScanTimer(options.control, options.cwd);
   const now = options.control?.now ?? Date.now;
   const maxFiles = options.control?.maxFiles ?? DEFAULT_AST_SCAN_MAX_FILES;
   const timeoutMs = options.control?.timeoutMs ?? DEFAULT_AST_SCAN_TIMEOUT_MS;

@@ -7,11 +7,14 @@
 //
 // It does NOT import pi event types or ExtensionAPI.
 
+// biome-ignore lint/style/noExcessiveLinesPerFile: session lifecycle, capability projection, and telemetry stay in one controller.
 import type { WorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import { loadConfig } from "../config/config.ts";
 import { type LspSettings, loadLspSettings } from "../config/lsp-settings.ts";
 import { clearTsconfigCache } from "../config/tsconfig-scope.ts";
 import type { DetectedProjectServer, LspConfig, ProjectServerInfo } from "../config/types.ts";
+import { truncateIdentity } from "../debug-telemetry.ts";
 import { scanWorkspaceSentinels } from "../diagnostics/workspace-sentinels.ts";
 import { LspManager, type ManagerLifecycleTransition } from "../manager/manager.ts";
 import {
@@ -361,11 +364,25 @@ export class LspRuntimeController {
       if (this.#projectedSemanticReady === true) return;
       markLspCapabilitiesReady(this.#capabilityRuntime, this.#cwd);
       this.#projectedSemanticReady = true;
+      this.recordCapabilityTransition(true);
       return;
     }
     if (this.#projectedSemanticReady === false) return;
     registerPendingLspCapabilities(this.#capabilityRuntime, this.#cwd, workspaceRuntime);
     this.#projectedSemanticReady = false;
+    this.recordCapabilityTransition(false);
+  }
+
+  /** Record one semantic capability ready↔pending transition for telemetry. */
+  private recordCapabilityTransition(ready: boolean): void {
+    recordDebugEvent({
+      source: "lsp",
+      level: "debug",
+      category: "capability.transition",
+      message: `LSP capability transition: ${ready ? "ready" : "pending"}`,
+      cwd: truncateIdentity(this.#cwd),
+      data: { ready },
+    });
   }
 
   private publishLifecycle(
@@ -384,7 +401,7 @@ export class LspRuntimeController {
         openFiles: [...server.openFiles],
       })),
     };
-    recordLspRuntimeTransition(transition);
+    recordLspRuntimeTransition(this.#cwd, transition);
     this.#latestLifecycleTransition = transition;
     for (const listener of this.#lifecycleListeners) {
       this.notifyLifecycleListener(listener, transition);

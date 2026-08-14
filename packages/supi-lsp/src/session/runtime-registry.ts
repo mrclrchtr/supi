@@ -1,5 +1,6 @@
 // Shared session-scoped LSP service registry reused by peer extensions.
 
+// biome-ignore lint/style/noExcessiveLinesPerFile: session registry, runtime recovery, and telemetry stay in one file; splitting would hide the recovery contract.
 import {
   type CodeQueryResult,
   type CodeRequestControl,
@@ -25,6 +26,7 @@ import type {
   WorkspaceEdit,
   WorkspaceSymbol,
 } from "../config/types.ts";
+import { boundServerNames, truncateIdentity } from "../debug-telemetry.ts";
 import type { LspManager } from "../manager/manager.ts";
 import { resolveSessionPath } from "../utils.ts";
 import { raceReadinessValue } from "./readiness.ts";
@@ -324,24 +326,34 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
         level: "debug",
         category: "runtime.recovery",
         message: `LSP diagnostic recovery ${outcome}`,
+        cwd: truncateIdentity(this.manager.getCwd()),
         data: {
           outcome,
           elapsedMs: result.elapsedMs,
           attemptedClients: result.attemptedClients,
           restartedClients: result.restartedClients,
+          attemptedServers: boundServerNames(result.attemptedServers ?? []),
+          restartedServers: boundServerNames(result.restartedServers ?? []),
         },
       });
       return result;
     } catch (error) {
       // A cancelled pass has no result object, so telemetry records the
-      // attempt, the cancelled outcome, and the elapsed time without counts.
+      // cancelled outcome, the elapsed time, and the server names that are
+      // still running at cancellation. Restart identity is unavailable
+      // because the pass produced no result.
       if (isCodeRequestInterruption(error, options?.control)) {
         recordDebugEvent({
           source: "lsp",
           level: "debug",
           category: "runtime.recovery",
           message: "LSP diagnostic recovery cancelled",
-          data: { outcome: "cancelled", elapsedMs: Date.now() - recoveryStartedAt },
+          cwd: truncateIdentity(this.manager.getCwd()),
+          data: {
+            outcome: "cancelled",
+            elapsedMs: Date.now() - recoveryStartedAt,
+            attemptedServers: boundServerNames(this.manager.getRunningClientNames()),
+          },
         });
       }
       throw error;

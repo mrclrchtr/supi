@@ -1,3 +1,4 @@
+import * as path from "node:path";
 import {
   type CodeQueryResult,
   type CodeRequestControl,
@@ -264,7 +265,11 @@ export class ClientDiagnostics {
     // longer awaits a result.
     throwIfCodeRequestInterrupted(control);
     const supportsPull = this.host.supportsPullDiagnostics();
-    const observer = new DiagnosticObserver("sync-file", supportsPull, control);
+    const observer = new DiagnosticObserver("sync-file", supportsPull, control, {
+      server: this.host.server,
+      cwd: this.host.cwd,
+      file: relativeDiagnosticFile(this.host.cwd, filePath),
+    });
     const uri = fileToUri(filePath);
     const cached = this.#diagnosticStore.get(uri);
     const cachedDiagnostics = cached ? [...cached.diagnostics] : null;
@@ -342,4 +347,10 @@ export class ClientDiagnostics {
       control,
     );
   }
+}
+
+/** Return a workspace-relative diagnostic file path for telemetry identity. */
+function relativeDiagnosticFile(cwd: string | undefined, filePath: string): string | undefined {
+  if (cwd === undefined) return undefined;
+  return path.relative(cwd, path.resolve(cwd, filePath));
 }

@@ -47,7 +47,9 @@ Server readiness follows LSP work-done progress: a created progress token is pen
 
 A workspace diagnostic refresh returns exact coverage counts for requested, confirmed, unconfirmed, failed, and removed tracked documents. `code_health` marks tracked-file diagnostics as complete only when every document in the requested scope has confirmed evidence. It keeps cached diagnostics as partial evidence and shows the same coverage counts in summary and detailed views; a refresh attempt does not prove fresh evidence by itself.
 
-An explicit recovery pass may restart a push-only client that stays unconfirmed after the first refresh. It never restarts a pull-capable client because push evidence is absent, and it never restarts a client during passive health display. Each client route restarts at most once per workspace invalidation generation. The replacement process has a fixed startup bound of 5 seconds; exceeding the bound fails closed as start-failed without retry. Recovery telemetry records the outcome, elapsed time, attempted clients, and restart count without changing the evidence semantics of the result.
+An explicit recovery pass may restart a push-only client that stays unconfirmed after the first refresh. It never restarts a pull-capable client because push evidence is absent, and it never restarts a client during passive health display. Each client route restarts at most once per workspace invalidation generation. The replacement process has a fixed startup bound of 5 seconds; exceeding the bound fails closed as start-failed without retry. Recovery telemetry records the outcome, elapsed time, attempted clients, restart count, and the bounded server names involved, without changing the evidence semantics of the result.
+
+Servers that publish diagnostics without a document version (for example `typescript-language-server`) can never confirm evidence after a workspace change: the refresh window rejects unversioned pushes, so their routes report partial evidence and an explicit recovery pass may restart them on every refresh. This limitation is tracked in #324.
 
 ### Optional diagnostic configuration
 
@@ -100,7 +102,21 @@ Clients, `LspManager`, and the default runtime implementation remain internal.
 - diagnostics, summaries, refresh, and recovery
 - project-server inventory and file support checks
 
-This separation keeps lifecycle and status distinct from workspace operations. Each controller transition has a monotonic generation and an aggregate server snapshot. Semantic capability is ready while at least one concrete client is ready. A crash or late progress event moves capability back to pending only after the final ready client is lost. The ready runtime owner stays available for lazy routing. Aggregate lifecycle telemetry records the transition kind, generation, semantic-ready state, ready and total client counts, and tracked-file count without file paths or server details. Diagnostic debug events may include bounded, sanitized server, workspace, file, and path identities for local diagnosis; secret values remain redacted.
+This separation keeps lifecycle and status distinct from workspace operations. Each controller transition has a monotonic generation and an aggregate server snapshot. Semantic capability is ready while at least one concrete client is ready. A crash or late progress event moves capability back to pending only after the final ready client is lost. The ready runtime owner stays available for lazy routing.
+
+### LSP debug telemetry identity
+
+Retained and persisted LSP debug events may identify local workspaces, servers, files, and requests for protocol diagnosis. All LSP producers share one identity vocabulary:
+
+- `cwd` — absolute workspace root (event level)
+- `server` — configured server name, e.g. `typescript`
+- `file` — workspace-relative path
+- `method` — exact LSP method, e.g. `textDocument/hover`
+- `root` — server root, absolute where present
+
+`runtime.transition` events carry `cwd` and a bounded `servers` array (name, status, ready; at most 16 entries) alongside the aggregate counts. `readiness.*` events carry `cwd`, `server`, and `root`; their messages and data never embed raw progress-token values. `request.timing` events carry the exact `method`, `server`, and `cwd`, plus the JSON-RPC error code: the server-reported code for failed requests, and the defined constant `-32095` (`LSP_REQUEST_TIMEOUT_ERROR_CODE`) for local timeouts; cancellations carry no code. `diagnostics.timing` events carry `cwd`, `server`, and a workspace-relative `file` for `sync-file` operations; `refresh-open` stays aggregate. `runtime.recovery` events carry `cwd` and bounded attempted/restarted server names; a cancelled pass records the server names still running at cancellation, while restart identity requires the pass result. `capability.transition` events fire only on semantic ready↔pending transitions and carry `cwd` and the ready state — never for initialize, registration, or unregistration traffic. Code-intelligence events (`code-operation.*`, `workflow.timing`, `ast-scan.timing`) carry `cwd` only.
+
+Identity strings — `cwd`, `server`, `file`, `method`, and `root` — are bounded to 512 UTF-16 code units (marker included; truncation appends `…`) and server lists to 16 entries. No raw protocol dumps, request/response params, diagnostic text, progress tokens, or unbounded file lists are recorded; `openFiles` stays a count. Identity fields are intentionally **not** secret-redacted — the debug registry still redacts secret keys and values, but server names, workspace-relative files, and method names pass through unredacted so local protocol failures stay diagnosable. The supi-debug package documents this disclosure for retained and persisted events.
 
 ## Example
 
@@ -122,7 +138,7 @@ if (state.kind === "ready") {
 
 Runtime methods use raw 0-based LSP positions. `toLspPosition()` converts user-facing 1-based coordinates. Read-only semantic and diagnostic methods return `CodeQueryResult<T>` so completed empty protocol responses remain distinct from partial or unavailable requests. A ready runtime owner may contain only lazy routes: workspace semantic readiness requires at least one active ready client, while file readiness requires the routed client for that file to start successfully. Empty client sets and failed routes are unavailable, not vacuously ready.
 
-Semantic and explicit diagnostic operations accept optional shared `CodeRequestControl` metadata. The semantic adapter preserves the exact value through `WorkspaceLspRuntime`. The signal maps to LSP protocol cancellation (`$/cancelRequest`) and the absolute deadline bounds every request and readiness wait. The opaque Debug Operation ID reaches sanitized request and diagnostic timing events. Ambient readiness, lifecycle, and push-diagnostic events have no Debug Operation ID.
+Semantic and explicit diagnostic operations accept optional shared `CodeRequestControl` metadata. The semantic adapter preserves the exact value through `WorkspaceLspRuntime`. The signal maps to LSP protocol cancellation (`$/cancelRequest`) and the absolute deadline bounds every request and readiness wait. The opaque Debug Operation ID reaches sanitized request and diagnostic timing events. Ambient readiness, lifecycle, capability, and push-diagnostic events have no Debug Operation ID.
 
 ## Startup performance
 

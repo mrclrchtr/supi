@@ -1,8 +1,28 @@
 import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
+import type { ProjectServerInfo } from "../config/types.ts";
+import { MAX_SERVERS, truncateIdentity } from "../debug-telemetry.ts";
 import type { LspRuntimeTransition } from "./runtime-controller.ts";
 
+/** One bounded server entry in a runtime-transition payload. */
+export interface TransitionServerEntry {
+  readonly name: string;
+  readonly status: ProjectServerInfo["status"];
+  readonly ready: boolean;
+}
+
+/** Bound a project-server snapshot to MAX_SERVERS name/status/ready entries. */
+function boundedServerEntries(
+  projectServers: readonly ProjectServerInfo[],
+): TransitionServerEntry[] {
+  return projectServers.slice(0, MAX_SERVERS).map((server) => ({
+    name: truncateIdentity(server.name),
+    status: server.status,
+    ready: server.ready,
+  }));
+}
+
 /** Record bounded aggregate telemetry for one runtime transition. */
-export function recordLspRuntimeTransition(transition: LspRuntimeTransition): void {
+export function recordLspRuntimeTransition(cwd: string, transition: LspRuntimeTransition): void {
   const readyClients = transition.projectServers.filter(
     (server) => server.status === "running" && server.ready,
   ).length;
@@ -15,6 +35,7 @@ export function recordLspRuntimeTransition(transition: LspRuntimeTransition): vo
     level: transition.kind === "crash" ? "warning" : "debug",
     category: "runtime.transition",
     message: `LSP runtime transition: ${transition.kind}`,
+    cwd: truncateIdentity(cwd),
     data: {
       generation: transition.generation,
       kind: transition.kind,
@@ -22,6 +43,7 @@ export function recordLspRuntimeTransition(transition: LspRuntimeTransition): vo
       readyClients,
       totalClients: transition.projectServers.length,
       trackedFiles,
+      servers: boundedServerEntries(transition.projectServers),
     },
   });
 }

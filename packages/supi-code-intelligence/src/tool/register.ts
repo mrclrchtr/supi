@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 import { recordDebugEvent, startDebugTimer } from "@mrclrchtr/supi-core/debug";
+import { truncateIdentity } from "@mrclrchtr/supi-lsp/debug-telemetry";
 import type { WorkspaceCodeIntelligenceSession } from "../session/session.ts";
 import type { CodeIntelResult, ToolOutputTruncationDetails } from "../types/index.ts";
 import { renderFindCall, renderFindResult } from "./find/tui.ts";
@@ -90,7 +91,7 @@ function recordCodeOperationBoundary(
   category: "code-operation.start" | "code-operation.finish",
   operationId: string,
   tool: string,
-  outcome?: CodeOperationOutcome,
+  options: { cwd: string; outcome?: CodeOperationOutcome },
 ): void {
   recordDebugEvent({
     operationId,
@@ -99,7 +100,8 @@ function recordCodeOperationBoundary(
     category,
     message:
       category === "code-operation.start" ? "Code operation started" : "Code operation finished",
-    data: outcome ? { tool, outcome } : { tool },
+    cwd: truncateIdentity(options.cwd),
+    data: options.outcome ? { tool, outcome: options.outcome } : { tool },
   });
 }
 
@@ -107,7 +109,7 @@ function recordCodeWorkflowTiming(
   timer: ReturnType<typeof startDebugTimer>,
   operationId: string,
   tool: string,
-  outcome: CodeOperationOutcome,
+  options: { cwd: string; outcome: CodeOperationOutcome },
 ): void {
   timer.finish(
     {
@@ -116,7 +118,8 @@ function recordCodeWorkflowTiming(
       level: "debug",
       category: "workflow.timing",
       message: "Code workflow finished",
-      data: { tool, outcome },
+      cwd: truncateIdentity(options.cwd),
+      data: { tool, outcome: options.outcome },
     },
     "workflow",
   );
@@ -171,7 +174,9 @@ export function registerCodeIntelligenceTools(
       execute: async (toolCallId, params, signal, onUpdate, ctx: ExtensionContext) => {
         const operationId = createDebugOperationId(operationSecret, toolCallId);
         const workflowTimer = startDebugTimer();
-        recordCodeOperationBoundary("code-operation.start", operationId, spec.name);
+        recordCodeOperationBoundary("code-operation.start", operationId, spec.name, {
+          cwd: ctx.cwd,
+        });
         try {
           const session = getOrCreateSession(ctx.cwd);
           session.setProjectTrusted(ctx.isProjectTrusted());
@@ -182,7 +187,10 @@ export function registerCodeIntelligenceTools(
             onUpdate,
             session,
           });
-          recordCodeWorkflowTiming(workflowTimer, operationId, spec.name, "completed");
+          recordCodeWorkflowTiming(workflowTimer, operationId, spec.name, {
+            cwd: ctx.cwd,
+            outcome: "completed",
+          });
           const { text, truncated } = truncateToolContent(content, {
             maxLines: spec.maxLines,
             maxBytes: spec.maxBytes,
@@ -192,12 +200,10 @@ export function registerCodeIntelligenceTools(
             const spillPath = join(dir, `${spec.name}-output.md`);
             writeFileSync(spillPath, content, "utf-8");
             const notice = `\n_Full output saved to: \`${spillPath}\`_`;
-            recordCodeOperationBoundary(
-              "code-operation.finish",
-              operationId,
-              spec.name,
-              "completed",
-            );
+            recordCodeOperationBoundary("code-operation.finish", operationId, spec.name, {
+              cwd: ctx.cwd,
+              outcome: "completed",
+            });
             return {
               content: [{ type: "text" as const, text: text + notice }],
               details: withTruncationDetails(details, {
@@ -206,15 +212,24 @@ export function registerCodeIntelligenceTools(
               }),
             };
           }
-          recordCodeOperationBoundary("code-operation.finish", operationId, spec.name, "completed");
+          recordCodeOperationBoundary("code-operation.finish", operationId, spec.name, {
+            cwd: ctx.cwd,
+            outcome: "completed",
+          });
           return {
             content: [{ type: "text" as const, text }],
             details: withTruncationDetails(details, { truncated: false }),
           };
         } catch (error) {
           const outcome = terminalCodeOperationOutcome(error, signal);
-          recordCodeWorkflowTiming(workflowTimer, operationId, spec.name, outcome);
-          recordCodeOperationBoundary("code-operation.finish", operationId, spec.name, outcome);
+          recordCodeWorkflowTiming(workflowTimer, operationId, spec.name, {
+            cwd: ctx.cwd,
+            outcome,
+          });
+          recordCodeOperationBoundary("code-operation.finish", operationId, spec.name, {
+            cwd: ctx.cwd,
+            outcome,
+          });
           throw error;
         }
       },

@@ -315,3 +315,49 @@ describe("supi-debug tool output", () => {
     expect(result.details.truncation?.outputLines).toBeLessThan(2_100);
   });
 });
+
+it("renders identity-bearing LSP events with cwd, server, file, and method", async () => {
+  const pi = setup();
+  mockFns.getDebugEvents.mockReturnValue({
+    rawAccessDenied: false,
+    events: [
+      {
+        id: 1,
+        timestamp: 1_700_000_000_000,
+        source: "lsp",
+        level: "debug",
+        category: "request.timing",
+        message: "LSP semantic request completed for textDocument/hover",
+        cwd: "/home/user/workspace",
+        data: {
+          method: "textDocument/hover",
+          methodClass: "semantic",
+          outcome: "completed",
+          server: "typescript",
+          timing: { durationMs: 5, phasesMs: { request: 5 } },
+        },
+      },
+      {
+        id: 2,
+        timestamp: 1_700_000_001_000,
+        source: "lsp",
+        level: "debug",
+        category: "diagnostics.timing",
+        message: "LSP diagnostic sync-file completed",
+        cwd: "/home/user/workspace",
+        data: { operation: "sync-file", file: "src/index.ts", server: "typescript" },
+      },
+    ],
+  });
+  const tool = makeTool(pi);
+
+  const result = (await tool.execute("id", { source: "lsp" }, undefined, undefined, {
+    cwd: "/repo",
+  })) as { content: Array<{ text: string }> };
+
+  const text = result.content[0]?.text ?? "";
+  expect(text).toContain("cwd: /home/user/workspace");
+  expect(text).toContain("textDocument/hover");
+  expect(text).toContain("server");
+  expect(text).toContain("src/index.ts");
+});

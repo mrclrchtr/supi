@@ -43,11 +43,13 @@ describe("recoverWorkspaceDiagnostics", () => {
       restartClientsForFiles: vi.fn().mockResolvedValue([
         {
           key: "typescript:/project",
+          serverName: "typescript",
           files: ["/project/src/a.ts", "/project/src/b.ts", "/project/src/c.ts"],
           restarted: true,
         },
       ]),
       getRunningClientCount: vi.fn(() => 1),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
@@ -97,6 +99,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       restartClientsForFiles: vi.fn().mockResolvedValue([
         {
           key: "typescript:/project",
+          serverName: "typescript",
           files: [
             "/project/src/a.ts",
             "/project/src/b.ts",
@@ -107,6 +110,7 @@ describe("recoverWorkspaceDiagnostics", () => {
         },
       ]),
       getRunningClientCount: vi.fn(() => 1),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn((file: string) => !file.includes("node_modules")),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
@@ -144,6 +148,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
       restartClientsForFiles: vi.fn().mockResolvedValue([]),
       getRunningClientCount: vi.fn(() => 1),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => evidence),
@@ -187,6 +192,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       restartClientsForFiles: vi.fn().mockResolvedValue([
         {
           key: "typescript:/project",
+          serverName: "typescript",
           files: [
             "/project/src/a.ts",
             "/project/src/b.ts",
@@ -197,6 +203,7 @@ describe("recoverWorkspaceDiagnostics", () => {
         },
       ]),
       getRunningClientCount: vi.fn(() => 1),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => confirmed),
@@ -227,6 +234,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
       restartClientsForFiles: vi.fn().mockResolvedValue([]),
       getRunningClientCount: vi.fn(() => 2),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
@@ -271,10 +279,16 @@ describe("recoverWorkspaceDiagnostics", () => {
         },
       ]),
       restartClientsForFiles: vi.fn().mockResolvedValue([
-        { key: "typescript:/project", files: [], restarted: true },
-        { key: "typescript:/project/packages/app", files: [], restarted: true },
+        { key: "typescript:/project", serverName: "typescript", files: [], restarted: true },
+        {
+          key: "typescript:/project/packages/app",
+          serverName: "typescript",
+          files: [],
+          restarted: true,
+        },
       ]),
       getRunningClientCount: vi.fn(() => 1),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
@@ -311,10 +325,12 @@ describe("recoverWorkspaceDiagnostics", () => {
       getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
       restartClientsForFiles: vi.fn().mockResolvedValue([]),
       getRunningClientCount: vi.fn(() => 3),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => [
         {
           key: "typescript:/project",
+          serverName: "typescript",
           supportsPull: false,
           unconfirmedFiles: ["/project/src/a.ts"],
         },
@@ -351,6 +367,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
       restartClientsForFiles: vi.fn().mockResolvedValue([]),
       getRunningClientCount: vi.fn(() => 1),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
@@ -378,6 +395,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
       restartClientsForFiles: vi.fn().mockResolvedValue([]),
       getRunningClientCount: vi.fn(() => 1),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => [
         { key: "typescript:/project", supportsPull: false, unconfirmedFiles: ["src/a.ts"] },
@@ -427,12 +445,16 @@ describe("recoverWorkspaceDiagnostics", () => {
         .mockResolvedValueOnce(unconfirmed)
         .mockReturnValueOnce(replacementRefresh),
       getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
-      restartClientsForFiles: vi
-        .fn()
-        .mockResolvedValue([
-          { key: "typescript:/project", files: ["/project/src/a.ts"], restarted: true },
-        ]),
+      restartClientsForFiles: vi.fn().mockResolvedValue([
+        {
+          key: "typescript:/project",
+          serverName: "typescript",
+          files: ["/project/src/a.ts"],
+          restarted: true,
+        },
+      ]),
       getRunningClientCount: vi.fn(() => 1),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => [
         { key: "typescript:/project", supportsPull: false, unconfirmedFiles: ["src/a.ts"] },
@@ -468,6 +490,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
       restartClientsForFiles: vi.fn().mockResolvedValue([]),
       getRunningClientCount: vi.fn(() => 1),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
@@ -493,6 +516,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
       restartClientsForFiles: vi.fn().mockResolvedValue([]),
       getRunningClientCount: vi.fn(() => 1),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
@@ -521,6 +545,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
       restartClientsForFiles: vi.fn(),
       getRunningClientCount: vi.fn(() => 1),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),

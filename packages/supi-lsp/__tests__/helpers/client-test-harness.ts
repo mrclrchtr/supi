@@ -17,12 +17,14 @@ export type TestRpc = {
 };
 
 export function createRunningTestClient(
-  options: { capabilities?: ServerCapabilities; root?: string } = {},
+  options: { capabilities?: ServerCapabilities; root?: string; cwd?: string } = {},
 ): { client: LspClient; rpc: TestRpc } {
   const client = new LspClient(
     "test",
     { command: "echo", args: [], fileTypes: ["ts"], rootMarkers: ["tsconfig.json"] },
     options.root ?? "/project",
+    undefined,
+    options.cwd ?? "/project",
   );
   const rpc: TestRpc = {
     sendNotification: vi.fn(async () => {}),
@@ -46,8 +48,12 @@ export function createDiagnosticTestFile(
   return { tmpDir, filePath, uri: `file://${filePath}` };
 }
 
-export function createPullTestClient(): { client: LspClient; rpc: TestRpc } {
+export function createPullTestClient(options: { root?: string; cwd?: string } = {}): {
+  client: LspClient;
+  rpc: TestRpc;
+} {
   return createRunningTestClient({
+    ...options,
     capabilities: {
       diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false },
     },

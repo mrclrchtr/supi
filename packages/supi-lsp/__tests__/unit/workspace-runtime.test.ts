@@ -239,6 +239,8 @@ describe("workspace runtime behavior", () => {
     const recovery = {
       attemptedClients: 1,
       restartedClients: 1,
+      attemptedServers: ["typescript"],
+      restartedServers: ["typescript"],
       diagnosticEvidence: evidence,
       staleAssessment: {
         suspected: false,
@@ -288,10 +290,12 @@ describe("workspace runtime behavior", () => {
     expect(recoveryOptions).toEqual({ restartIfStillStale: true });
   });
 
-  it("records bounded recovery telemetry with elapsed time and restart count", async () => {
+  it("records bounded recovery telemetry with identity, elapsed time, and restart count", async () => {
     const recovery = {
       attemptedClients: 2,
       restartedClients: 1,
+      attemptedServers: ["typescript", "bash"],
+      restartedServers: ["bash"],
       diagnosticEvidence: emptyEvidence(),
       staleAssessment: { suspected: false, matchedFiles: [], warning: null },
       elapsedMs: 12,
@@ -308,11 +312,14 @@ describe("workspace runtime behavior", () => {
       expect.objectContaining({
         source: "lsp",
         category: "runtime.recovery",
+        cwd: "/project",
         data: expect.objectContaining({
           outcome: "completed",
           elapsedMs: 12,
           attemptedClients: 2,
           restartedClients: 1,
+          attemptedServers: ["typescript", "bash"],
+          restartedServers: ["bash"],
         }),
       }),
     );
@@ -323,6 +330,8 @@ describe("workspace runtime behavior", () => {
     const recovery = {
       attemptedClients: 1,
       restartedClients: 0,
+      attemptedServers: ["typescript"],
+      restartedServers: [],
       diagnosticEvidence: emptyEvidence(),
       refreshFailureReason: "refresh failed",
       staleAssessment: { suspected: false, matchedFiles: [], warning: null },
@@ -338,7 +347,14 @@ describe("workspace runtime behavior", () => {
 
     expect(debugMocks.recordDebugEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ outcome: "failed", elapsedMs: 4, restartedClients: 0 }),
+        cwd: "/project",
+        data: expect.objectContaining({
+          outcome: "failed",
+          elapsedMs: 4,
+          restartedClients: 0,
+          attemptedServers: ["typescript"],
+          restartedServers: [],
+        }),
       }),
     );
     debugMocks.recordDebugEvent.mockClear();
@@ -353,6 +369,7 @@ describe("workspace runtime behavior", () => {
         recoverWorkspaceDiagnostics: async () => {
           throw abortReason;
         },
+        getRunningClientNames: () => ["typescript", "bash"],
       }),
     );
 
@@ -367,10 +384,14 @@ describe("workspace runtime behavior", () => {
       expect.objectContaining({
         source: "lsp",
         category: "runtime.recovery",
+        cwd: "/project",
         message: "LSP diagnostic recovery cancelled",
         data: expect.objectContaining({
           outcome: "cancelled",
           elapsedMs: expect.any(Number),
+          // Running server names stay available at cancellation; restart
+          // identity is unavailable because the pass produced no result.
+          attemptedServers: ["typescript", "bash"],
         }),
       }),
     );

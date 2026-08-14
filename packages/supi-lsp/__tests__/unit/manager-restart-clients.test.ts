@@ -122,6 +122,7 @@ describe("LspManager restartClientsForFiles", () => {
     await expect(manager.restartClientsForFiles(["src/a.ts"])).resolves.toEqual([
       {
         key: `typescript:${sessionCwd}`,
+        serverName: "typescript",
         files: [`${sessionCwd}/src/a.ts`, `${sessionCwd}/src/b.ts`],
         restarted: false,
       },
@@ -174,6 +175,7 @@ describe("LspManager restartClientsForFiles", () => {
     await expect(manager.restartClientsForFiles(["src/a.ts"])).resolves.toEqual([
       {
         key: `typescript:${sessionCwd}`,
+        serverName: "typescript",
         files: [`${sessionCwd}/src/a.ts`],
         restarted: true,
       },
@@ -306,6 +308,7 @@ describe("LspManager restartClientsForFiles", () => {
       await expect(pending).resolves.toEqual([
         {
           key: `typescript:${sessionCwd}`,
+          serverName: "typescript",
           files: [],
           restarted: false,
         },

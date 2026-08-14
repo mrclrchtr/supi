@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 describe("AST scan timing events", () => {
-  it("records one aggregate timing event without file paths", async () => {
+  it("records one aggregate timing event with event-level cwd but no file paths in data", async () => {
     writeFileSync(path.join(tmpDir, "sample.ts"), "export const target = true;\n");
     const structural = {
       outline: async () => ({
@@ -56,6 +56,7 @@ describe("AST scan timing events", () => {
     expect(events).toEqual([
       expect.objectContaining({
         message: expect.stringContaining("AST definition scan analyzed 1 files"),
+        cwd: tmpDir,
         data: {
           kind: "definition",
           operation: "outline",
@@ -75,6 +76,7 @@ describe("AST scan timing events", () => {
         },
       }),
     ]);
-    expect(JSON.stringify(events)).not.toContain(tmpDir);
+    // Scan data stays path-free; only the event-level cwd carries identity.
+    expect(JSON.stringify(events[0]?.data)).not.toContain(tmpDir);
   });
 });

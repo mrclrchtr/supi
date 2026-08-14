@@ -17,6 +17,7 @@ import {
   StreamMessageReader,
   StreamMessageWriter,
 } from "vscode-jsonrpc/node";
+import { boundCwd, LSP_REQUEST_TIMEOUT_ERROR_CODE, truncateIdentity } from "../debug-telemetry.ts";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -41,13 +42,17 @@ export class JsonRpcClient {
   private requestHandler: RequestHandler | null = null;
   private closed = false;
   private readonly timeoutMs: number;
+  private readonly server: string | undefined;
+  private readonly cwd: string | undefined;
 
   constructor(
     private readonly input: Readable,
     private readonly output: Writable,
-    options?: { timeoutMs?: number },
+    options?: { timeoutMs?: number; server?: string; cwd?: string },
   ) {
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.server = options?.server;
+    this.cwd = options?.cwd;
 
     const reader = new StreamMessageReader(this.input);
     const writer = new StreamMessageWriter(this.output);
@@ -102,30 +107,46 @@ export class JsonRpcClient {
     const signal = options?.signal;
     const deadlineMs = options?.deadline === undefined ? undefined : options.deadline - Date.now();
     const methodClass = classifyRequestMethod(method);
+    const boundedMethod = truncateIdentity(method);
     const timer = startDebugTimer();
     // An expired absolute deadline must not even send the request: the caller
     // no longer awaits a result, so no protocol traffic may start.
     if (deadlineMs !== undefined && deadlineMs <= 0) {
-      recordRequestTiming(timer, options?.operationId, {
-        methodClass,
-        outcome: "timed-out",
-      });
+      recordRequestTiming(
+        timer,
+        options?.operationId,
+        {
+          method: boundedMethod,
+          methodClass,
+          outcome: "timed-out",
+          errorCode: LSP_REQUEST_TIMEOUT_ERROR_CODE,
+        },
+        { server: this.server, cwd: this.cwd },
+      );
       return Promise.reject(new CodeRequestDeadlineError());
     }
     if (this.closed || !this.connection) {
-      recordRequestTiming(timer, options?.operationId, {
-        methodClass,
-        outcome: "cancelled",
-      });
+      recordRequestTiming(
+        timer,
+        options?.operationId,
+        {
+          method: boundedMethod,
+          methodClass,
+          outcome: "cancelled",
+        },
+        { server: this.server, cwd: this.cwd },
+      );
       return Promise.reject(new Error("JSON-RPC client is closed"));
     }
-
     const tokenSource = new CancellationTokenSource();
     let timeout: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
     let aborted = false;
     const timerDelayMs = deadlineMs === undefined ? timeoutMs : Math.min(timeoutMs, deadlineMs);
-    const timeoutError = new Error(`Request ${method} timed out after ${timerDelayMs}ms`);
+    const timeoutError = Object.assign(
+      new Error(`Request ${method} timed out after ${timerDelayMs}ms`),
+      { code: LSP_REQUEST_TIMEOUT_ERROR_CODE },
+    );
     const abortError = new Error(`Request ${method} was cancelled`);
 
     const request = this.connection.sendRequest(method, params, tokenSource.token);
@@ -168,10 +189,16 @@ export class JsonRpcClient {
     ])
       .then(
         (result) => {
-          recordRequestTiming(timer, options?.operationId, {
-            methodClass,
-            outcome: "completed",
-          });
+          recordRequestTiming(
+            timer,
+            options?.operationId,
+            {
+              method: boundedMethod,
+              methodClass,
+              outcome: "completed",
+            },
+            { server: this.server, cwd: this.cwd },
+          );
           return result;
         },
         (error: unknown) => {
@@ -181,10 +208,26 @@ export class JsonRpcClient {
             : cancelled
               ? "cancelled"
               : "failed";
-          recordRequestTiming(timer, options?.operationId, {
-            methodClass,
-            outcome,
-          });
+          recordRequestTiming(
+            timer,
+            options?.operationId,
+            {
+              method: boundedMethod,
+              methodClass,
+              outcome,
+              // Failed requests record the server-reported JSON-RPC error code
+              // when the error carries one; timed-out requests record the
+              // defined timeout code (also for deadline expiries, whose error
+              // carries none); cancellations carry no error code.
+              errorCode:
+                outcome === "failed"
+                  ? jsonRpcErrorCode(error)
+                  : outcome === "timed-out"
+                    ? (jsonRpcErrorCode(error) ?? LSP_REQUEST_TIMEOUT_ERROR_CODE)
+                    : undefined,
+            },
+            { server: this.server, cwd: this.cwd },
+          );
           throw error;
         },
       )
@@ -254,15 +297,27 @@ function isCancellationError(error: unknown): boolean {
   );
 }
 
+/** One bounded request-timing observation with exact method identity. */
 interface RequestTimingObservation {
+  readonly method: string;
   readonly methodClass: RequestMethodClass;
   readonly outcome: RequestOutcome;
+  /** JSON-RPC error code reported by the server for a failed request. */
+  readonly errorCode?: number;
+}
+
+/** Return the numeric JSON-RPC error code carried by an error, if any. */
+function jsonRpcErrorCode(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "number" && Number.isInteger(code) ? code : undefined;
 }
 
 function recordRequestTiming(
   timer: ReturnType<typeof startDebugTimer>,
   operationId: string | undefined,
   observation: RequestTimingObservation,
+  identity: { server?: string; cwd?: string },
 ): void {
   timer.finish(
     () => ({
@@ -270,8 +325,15 @@ function recordRequestTiming(
       source: "lsp",
       level: "debug",
       category: "request.timing",
-      message: `LSP ${observation.methodClass} request ${observation.outcome}`,
-      data: { ...observation },
+      message: `LSP ${observation.methodClass} request ${observation.outcome} for ${observation.method}`,
+      cwd: boundCwd(identity.cwd),
+      data: {
+        method: observation.method,
+        methodClass: observation.methodClass,
+        outcome: observation.outcome,
+        ...(identity.server !== undefined ? { server: identity.server } : {}),
+        ...(observation.errorCode !== undefined ? { errorCode: observation.errorCode } : {}),
+      },
     }),
     "request",
   );

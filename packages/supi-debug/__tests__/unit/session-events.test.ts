@@ -236,3 +236,67 @@ describe("readSessionDebugEvents", () => {
     });
   });
 });
+
+describe("persisted LSP identity", () => {
+  it("preserves identity fields unredacted while secret values stay redacted", async () => {
+    const file = await writeSession([
+      {
+        type: "custom",
+        customType: DEBUG_EVENT_ENTRY_TYPE,
+        data: {
+          id: 1,
+          timestamp: 1_700_000_000_000,
+          source: "lsp",
+          level: "debug",
+          category: "request.timing",
+          message: "LSP semantic request completed for textDocument/hover",
+          cwd: "/home/user/workspace",
+          data: {
+            method: "textDocument/hover",
+            methodClass: "semantic",
+            outcome: "completed",
+            server: "typescript",
+            apiToken: "super-secret-value",
+          },
+        },
+      },
+      {
+        type: "custom",
+        customType: DEBUG_EVENT_ENTRY_TYPE,
+        data: {
+          id: 2,
+          timestamp: 1_700_000_001_000,
+          source: "lsp",
+          level: "debug",
+          category: "diagnostics.timing",
+          message: "LSP diagnostic sync-file completed",
+          cwd: "/home/user/workspace",
+          data: {
+            operation: "sync-file",
+            file: "src/index.ts",
+            server: "typescript",
+            outcome: "completed",
+          },
+        },
+      },
+    ]);
+
+    const result = await readSessionDebugEvents(file, { source: "lsp" });
+    // Events sort newest-first: the diagnostics event precedes the request event.
+    const [requestEvent, diagnosticsEvent] = [...result.events].reverse();
+    // Identity fields pass through unredacted.
+    expect(requestEvent).toMatchObject({
+      cwd: "/home/user/workspace",
+      data: {
+        method: "textDocument/hover",
+        server: "typescript",
+        apiToken: "[REDACTED]",
+      },
+    });
+    expect(diagnosticsEvent).toMatchObject({
+      cwd: "/home/user/workspace",
+      data: { file: "src/index.ts", server: "typescript" },
+    });
+    expect(result.persistedEventCount).toBe(2);
+  });
+});

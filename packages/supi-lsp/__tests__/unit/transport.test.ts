@@ -13,6 +13,7 @@ import {
   StreamMessageWriter,
 } from "vscode-jsonrpc/node";
 import { JsonRpcClient, JsonRpcRequestError } from "../../src/client/transport.ts";
+import { LSP_REQUEST_TIMEOUT_ERROR_CODE } from "../../src/debug-telemetry.ts";
 
 /**
  * Creates a client JsonRpcClient connected to a server MessageConnection
@@ -21,7 +22,7 @@ import { JsonRpcClient, JsonRpcRequestError } from "../../src/client/transport.t
  *       client.writer → serverIn → server.reader
  *       client.reader ← serverOut ← server.writer
  */
-function createServerPair(): {
+function createServerPair(identity?: { server?: string; cwd?: string }): {
   client: JsonRpcClient;
   serverIn: PassThrough;
   serverOut: PassThrough;
@@ -31,7 +32,7 @@ function createServerPair(): {
   const serverOut = new PassThrough();
 
   // Client reads from serverOut, writes to serverIn
-  const client = new JsonRpcClient(serverOut, serverIn);
+  const client = new JsonRpcClient(serverOut, serverIn, identity);
 
   // Server reads from serverIn, writes to serverOut
   const server = createMessageConnection(
@@ -53,7 +54,7 @@ describe("JsonRpcClient", () => {
 
   beforeEach(() => {
     configureDebugRegistry({ enabled: true, maxEvents: 100 });
-    const pair = createServerPair();
+    const pair = createServerPair({ server: "typescript", cwd: "/workspace" });
     client = pair.client;
     server = pair.server;
     serverIn = pair.serverIn;
@@ -79,7 +80,7 @@ describe("JsonRpcClient", () => {
     resetDebugRegistry();
   });
 
-  it("records a sanitized request timing observation", async () => {
+  it("records a sanitized request timing observation with exact method identity", async () => {
     server.onRequest("textDocument/hover", () => ({ contents: "ok" }));
 
     await client.sendRequest("textDocument/hover", {
@@ -91,10 +92,13 @@ describe("JsonRpcClient", () => {
     const events = getDebugEvents({ source: "lsp", category: "request.timing" }).events;
     expect(events).toEqual([
       expect.objectContaining({
-        message: "LSP semantic request completed",
+        message: "LSP semantic request completed for textDocument/hover",
+        cwd: "/workspace",
         data: {
+          method: "textDocument/hover",
           methodClass: "semantic",
           outcome: "completed",
+          server: "typescript",
           timing: {
             durationMs: expect.any(Number),
             phasesMs: { request: expect.any(Number) },
@@ -105,7 +109,30 @@ describe("JsonRpcClient", () => {
     expect(JSON.stringify(events)).not.toContain("/private/source.ts");
     expect(JSON.stringify(events)).not.toContain("secret source text");
     expect(JSON.stringify(events)).not.toContain("private-command");
-    expect(JSON.stringify(events)).not.toContain("textDocument/hover");
+  });
+
+  it("omits identity when the transport was constructed without it", async () => {
+    const pair = createServerPair();
+    pair.server.onRequest("textDocument/hover", () => ({ contents: "ok" }));
+
+    await pair.client.sendRequest("textDocument/hover");
+
+    const events = getDebugEvents({ source: "lsp", category: "request.timing" }).events;
+    expect(events[0]?.cwd).toBeUndefined();
+    expect(events[0]?.data).toEqual(
+      expect.objectContaining({ method: "textDocument/hover", methodClass: "semantic" }),
+    );
+    expect(events[0]?.data).not.toHaveProperty("server");
+    try {
+      pair.client.dispose();
+    } catch {
+      // Suppress rejections
+    }
+    try {
+      pair.server.dispose();
+    } catch {
+      // Suppress
+    }
   });
 
   it("attaches explicit request ownership but leaves direct requests ambient", async () => {
@@ -144,7 +171,7 @@ describe("JsonRpcClient", () => {
     expect(r2).toBe("second");
   });
 
-  it("rejects on error response", async () => {
+  it("rejects on error response and records the JSON-RPC error code", async () => {
     server.onRequest("bad/method", () => {
       throw new JsonRpcRequestError(-32601, "Method not found");
     });
@@ -152,8 +179,10 @@ describe("JsonRpcClient", () => {
     await expect(client.sendRequest("bad/method")).rejects.toThrow("Method not found");
     expect(getDebugEvents({ source: "lsp", category: "request.timing" }).events[0]?.data).toEqual(
       expect.objectContaining({
+        method: "bad/method",
         methodClass: "other",
         outcome: "failed",
+        errorCode: -32601,
       }),
     );
   });
@@ -201,6 +230,7 @@ describe("JsonRpcClient", () => {
 
     expect(getDebugEvents({ source: "lsp", category: "request.timing" }).events[0]?.data).toEqual(
       expect.objectContaining({
+        method: "textDocument/references",
         methodClass: "semantic",
         outcome: "cancelled",
       }),
@@ -230,8 +260,11 @@ describe("JsonRpcClient", () => {
       await expect(promise).rejects.toThrow("timed out");
       expect(getDebugEvents({ source: "lsp", category: "request.timing" }).events[0]?.data).toEqual(
         expect.objectContaining({
+          method: "slow/method",
           methodClass: "other",
           outcome: "timed-out",
+          // A local timeout records the defined timeout error code.
+          errorCode: LSP_REQUEST_TIMEOUT_ERROR_CODE,
         }),
       );
     } finally {

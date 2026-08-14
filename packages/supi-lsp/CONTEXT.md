@@ -39,5 +39,5 @@ The SuPi readiness interpretation of LSP work-done progress. A created progress 
 _Avoid_: created means active, token timeout means server failure, owner readiness
 
 **Identity-bearing debug event**:
-A retained or persisted LSP debug event that may include server, workspace, file, or path identity to support local protocol diagnosis. Secret values remain protected by the debug registry's redaction rules.
+A retained or persisted LSP debug event that may include server, workspace, file, method, or root identity to support local protocol diagnosis. Event-level `cwd` is the absolute workspace root, `file` fields are workspace-relative, and server `root` stays absolute where present. Identity strings are bounded to 512 UTF-16 code units (marker included) and server lists to 16 entries; readiness events never embed raw progress-token values; `capability.transition` fires only on semantic ready↔pending transitions. Identity fields are intentionally not secret-redacted.
 _Avoid_: sanitized identity-free event, public tool evidence, raw protocol dump

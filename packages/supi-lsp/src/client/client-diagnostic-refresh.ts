@@ -241,7 +241,10 @@ export async function refreshClientOpenDiagnostics(
   // no longer awaits.
   throwIfCodeRequestInterrupted(options.options);
   const supportsPull = options.host.supportsPullDiagnostics();
-  const observer = new DiagnosticObserver("refresh-open", supportsPull, options.options);
+  const observer = new DiagnosticObserver("refresh-open", supportsPull, options.options, {
+    server: options.host.server,
+    cwd: options.host.cwd,
+  });
   if (!options.host.isOperational()) {
     observer.skipped(options.requestedFiles.length);
     return summarizeDiagnosticEvidence(

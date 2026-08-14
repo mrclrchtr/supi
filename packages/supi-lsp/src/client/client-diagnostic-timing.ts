@@ -1,5 +1,6 @@
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { startDebugTimer } from "@mrclrchtr/supi-core/debug";
+import { boundCwd, truncateIdentity } from "../debug-telemetry.ts";
 
 type DiagnosticCollection = "cache" | "fallback" | "none" | "pull" | "push";
 type DiagnosticFreshness = "not-observed" | "observed";
@@ -40,11 +41,21 @@ export class DiagnosticPullError extends Error {
   }
 }
 
+/** Bounded identity for one diagnostic timing observation. */
+export interface DiagnosticTimingIdentity {
+  /** Configured server name. */
+  readonly server?: string;
+  /** Absolute workspace root. */
+  readonly cwd?: string;
+  /** Workspace-relative file path; sync-file operations only. */
+  readonly file?: string;
+}
+
 /**
- * Record one diagnostic operation without document identifiers or diagnostic text.
+ * Record one diagnostic operation without diagnostic text or document content.
  *
  * The observer owns result classification so diagnostic control flow does not
- * duplicate the event shape.
+ * duplicate the event shape. Identity is bounded and workspace-relative.
  */
 export class DiagnosticObserver {
   readonly #timer = startDebugTimer();
@@ -54,6 +65,7 @@ export class DiagnosticObserver {
     readonly operation: DiagnosticTimingOperation,
     readonly supportsPull: boolean,
     readonly control?: CodeRequestControl,
+    readonly identity?: DiagnosticTimingIdentity,
   ) {
     this.#pull = supportsPull ? "failed" : "not-supported";
   }
@@ -162,7 +174,17 @@ export class DiagnosticObserver {
         level: "debug",
         category: "diagnostics.timing",
         message: `LSP diagnostic ${this.operation} ${data.outcome}`,
-        data: { operation: this.operation, ...data },
+        cwd: boundCwd(this.identity?.cwd),
+        data: {
+          operation: this.operation,
+          ...data,
+          ...(this.identity?.server !== undefined
+            ? { server: truncateIdentity(this.identity.server) }
+            : {}),
+          ...(this.identity?.file !== undefined
+            ? { file: truncateIdentity(this.identity.file) }
+            : {}),
+        },
       }),
       finalPhase,
     );

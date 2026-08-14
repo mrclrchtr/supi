@@ -21,6 +21,10 @@ export interface WorkspaceRecoveryResult {
   /** Active clients targeted by the best-effort refresh, not confirmed successful refreshes. */
   attemptedClients: number;
   restartedClients: number;
+  /** Server names of the active clients targeted by this pass, for telemetry identity. */
+  attemptedServers: string[];
+  /** Server names of the clients restarted during this pass, for telemetry identity. */
+  restartedServers: string[];
   /** Final document-level evidence from the last refresh in this recovery pass. */
   diagnosticEvidence: DiagnosticEvidenceSummary;
   /** Failure from the first refresh, when no later pass replaced it. */
@@ -49,6 +53,7 @@ export interface WorkspaceRecoveryHost {
     maxSeverity?: number,
   ): Array<{ file: string; diagnostics: Diagnostic[] }>;
   getRunningClientCount(): number;
+  getRunningClientNames(): string[];
   isDiagnosticFile(filePath: string): boolean;
   getClientDiagnosticRoutes(): WorkspaceDiagnosticRoute[];
   getDiagnosticEvidence(): DiagnosticEvidenceSummary;
@@ -56,7 +61,7 @@ export interface WorkspaceRecoveryHost {
   restartClientsForFiles(
     filePaths: string[],
     options?: { pushOnly?: boolean; control?: CodeRequestControl },
-  ): Promise<Array<{ key: string; files: string[]; restarted: boolean }>>;
+  ): Promise<Array<{ key: string; serverName: string; files: string[]; restarted: boolean }>>;
 }
 
 /** Clear cached pull IDs and forward watched-file changes to active clients. */
@@ -91,6 +96,7 @@ export async function recoverWorkspaceDiagnostics(
   throwIfCodeRequestInterrupted(options.control);
   const recoveryStartedAt = Date.now();
   const attemptedClients = softRecoverWorkspaceDiagnostics(host, options.changes ?? []);
+  const attemptedServers = host.getRunningClientNames();
   let diagnosticEvidence = emptyDiagnosticEvidence();
   let refreshFailureReason: string | undefined;
 
@@ -108,6 +114,7 @@ export async function recoverWorkspaceDiagnostics(
 
   let staleAssessment = assessStaleDiagnostics(host.getOutstandingDiagnostics(1));
   let restartedClients = 0;
+  let restartServerNames: string[] = [];
 
   if (options.restartIfStillStale) {
     // Observe cancellation between pass phases: an abort that arrived during
@@ -122,6 +129,7 @@ export async function recoverWorkspaceDiagnostics(
         options,
       );
       restartedClients = escalation.restartedClients;
+      restartServerNames = escalation.restartedServerNames;
       diagnosticEvidence = escalation.diagnosticEvidence;
       if (escalation.refreshedAfterRestart) refreshFailureReason = undefined;
       staleAssessment = assessStaleDiagnostics(host.getOutstandingDiagnostics(1));
@@ -139,6 +147,8 @@ export async function recoverWorkspaceDiagnostics(
     return {
       attemptedClients,
       restartedClients,
+      attemptedServers,
+      restartedServers: restartServerNames,
       diagnosticEvidence,
       ...(refreshFailureReason ? { refreshFailureReason } : {}),
       elapsedMs: Date.now() - recoveryStartedAt,
@@ -184,6 +194,7 @@ async function runRestartEscalation(
   },
 ): Promise<{
   restartedClients: number;
+  restartedServerNames: string[];
   diagnosticEvidence: DiagnosticEvidenceSummary;
   refreshedAfterRestart: boolean;
 }> {
@@ -194,6 +205,7 @@ async function runRestartEscalation(
   const unconfirmedTriggerFiles = collectUnconfirmedPushOnlyFiles(host);
   let diagnosticEvidence = evidence;
   let restartedClients = 0;
+  let restartedServerNames: string[] = [];
   let refreshedAfterRestart = false;
 
   try {
@@ -206,6 +218,7 @@ async function runRestartEscalation(
     throwIfCodeRequestInterrupted(options.control);
     const restarted = restartResults.filter((result) => result.restarted);
     restartedClients = restarted.length;
+    restartedServerNames = restarted.map((result) => result.serverName);
     // Every attempted route had its client replaced or shut down; its owned
     // files need fresh evidence. Routes the manager skipped (pull-capable or
     // guard-blocked) produce no result and keep their refreshed evidence.
@@ -243,7 +256,7 @@ async function runRestartEscalation(
     // Keep affected evidence unconfirmed when replacement fails.
   }
 
-  return { restartedClients, diagnosticEvidence, refreshedAfterRestart };
+  return { restartedClients, restartedServerNames, diagnosticEvidence, refreshedAfterRestart };
 }
 
 /** Collect diagnostic-visible unconfirmed files owned by push-only routes. */

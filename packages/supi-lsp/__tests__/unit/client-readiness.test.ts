@@ -24,6 +24,8 @@ function createClient(opts: { readinessTimeoutMs?: number } = {}): LspClient {
       readinessTimeoutMs: opts.readinessTimeoutMs,
     },
     "/project",
+    undefined,
+    "/workspace",
   );
   // Simulate running state (no real process spawned)
   (client as AnyClient)._status = "running";
@@ -97,6 +99,49 @@ describe("LspClient readiness state machine", () => {
     );
     expect(events.length).toBeGreaterThan(0);
     expect(events.every((event) => event.operationId === undefined)).toBe(true);
+  });
+
+  it("carries server and workspace identity on every readiness event", () => {
+    const client = createClient();
+
+    sendCreateProgress(client, "token-1");
+    sendProgress(client, "token-1", "begin");
+    sendProgress(client, "token-1", "end");
+
+    const events = getDebugEvents({ source: "lsp" }).events.filter((event) =>
+      event.category.startsWith("readiness."),
+    );
+    expect(events.length).toBeGreaterThan(0);
+    for (const event of events) {
+      expect(event.cwd).toBe("/workspace");
+      expect(event.data).toMatchObject({ server: "test", root: "/project" });
+    }
+  });
+
+  it("never embeds raw progress-token values in readiness messages or data", async () => {
+    const client = createClient({ readinessTimeoutMs: 50 });
+
+    sendProgress(client, "top-secret-token-1", "begin");
+    sendProgress(client, "top-secret-token-1", "report");
+    sendProgress(client, "top-secret-token-1", "end");
+    sendCreateProgress(client, "top-secret-token-2");
+    sendProgress(client, "top-secret-token-2", "begin");
+    await vi.advanceTimersByTimeAsync(50);
+
+    const events = getDebugEvents({ source: "lsp" }).events.filter((event) =>
+      event.category.startsWith("readiness."),
+    );
+    const serialized = JSON.stringify(events);
+    expect(serialized).not.toContain("top-secret-token");
+    // Timeout-duration facts stay available.
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "readiness.token-timeout",
+          data: expect.objectContaining({ timeoutMs: 50 }),
+        }),
+      ]),
+    );
   });
 
   // ── Test 1: No progress → 2s window → ready ────────────────────────

@@ -35,6 +35,7 @@ import type {
   WorkspaceEdit,
   WorkspaceSymbol,
 } from "../config/types.ts";
+import { boundCwd, truncateIdentity } from "../debug-telemetry.ts";
 import type { DiagnosticEvidenceSummary } from "../diagnostics/evidence.ts";
 import { raceRequestControl } from "../session/readiness.ts";
 import { fileToUri } from "../utils.ts";
@@ -122,15 +123,20 @@ export class LspClient {
   private noProgressTimer: ReturnType<typeof setTimeout> | null = null;
   private tokenTimeouts = new Map<ProgressToken, ReturnType<typeof setTimeout>>();
 
+  // biome-ignore lint/complexity/useMaxParams: internal constructor keeps positional identity for test call sites
   constructor(
     name: string,
     private readonly config: ServerConfig,
     root: string,
     private readonly onLifecycleTransition?: LspClientLifecycleListener,
+    /** Absolute workspace root for debug-telemetry identity. */
+    readonly cwd?: string,
   ) {
     this.name = name;
     this.root = root;
     this.diagnostics = new ClientDiagnostics({
+      server: name,
+      cwd: cwd,
       isOperational: () => this.rpc !== null && this._status === "running",
       supportsPullDiagnostics: () => this.hasDiagnosticProvider,
       sendNotification: (method, params) => {
@@ -215,7 +221,10 @@ export class LspClient {
       throw failure;
     }
 
-    this.rpc = new JsonRpcClient(this.process.stdout, this.process.stdin);
+    this.rpc = new JsonRpcClient(this.process.stdout, this.process.stdin, {
+      server: this.name,
+      cwd: this.cwd,
+    });
 
     // Handle notifications
     this.rpc.onNotification((method, params) => {
@@ -670,8 +679,9 @@ export class LspClient {
         source: "lsp",
         level: "debug",
         category: "readiness.progress-begin",
-        message: `Readiness progress begin for token ${token}`,
-        data: { token },
+        message: `Readiness progress begin for ${this.name}`,
+        cwd: boundCwd(this.cwd),
+        data: { server: this.name, root: truncateIdentity(this.root) },
       });
       // begin is the only transition that proves active work: it cancels
       // the no-progress grace timer, blocks readiness, and arms the
@@ -698,8 +708,9 @@ export class LspClient {
         source: "lsp",
         level: "debug",
         category: "readiness.progress-end",
-        message: `Readiness progress end for token ${token}`,
-        data: { token },
+        message: `Readiness progress end for ${this.name}`,
+        cwd: boundCwd(this.cwd),
+        data: { server: this.name, root: truncateIdentity(this.root) },
       });
       const state = this.trackedTokens.get(token);
       if (state === undefined) return; // Unknown token: ignore fail-closed.
@@ -748,7 +759,9 @@ export class LspClient {
       source: "lsp",
       level: "info",
       category: "readiness.resolved",
-      message: `LSP client ${this.name} is ready (cwd: ${this.root})`,
+      message: `LSP client ${this.name} is ready`,
+      cwd: boundCwd(this.cwd),
+      data: { server: this.name, root: truncateIdentity(this.root) },
     });
   }
 
@@ -784,7 +797,12 @@ export class LspClient {
       level: this._status === "shutdown" ? "debug" : "warning",
       category: "readiness.rejected",
       message: `LSP client ${this.name} readiness rejected: ${reason.message}`,
-      data: { status: this._status },
+      cwd: boundCwd(this.cwd),
+      data: {
+        server: this.name,
+        root: truncateIdentity(this.root),
+        status: this._status,
+      },
     });
   }
 
@@ -804,8 +822,9 @@ export class LspClient {
         source: "lsp",
         level: "debug",
         category: "readiness.token-timeout",
-        message: `Readiness per-token timeout fired for token ${token} after ${timeoutMs}ms`,
-        data: { token, timeoutMs },
+        message: `Readiness per-token timeout fired for ${this.name} after ${timeoutMs}ms`,
+        cwd: boundCwd(this.cwd),
+        data: { server: this.name, root: truncateIdentity(this.root), timeoutMs },
       });
       this.checkAllTokensEnded();
     }, timeoutMs);
@@ -831,6 +850,8 @@ export class LspClient {
         level: "debug",
         category: "readiness.no-progress-cancelled",
         message: `No-progress grace timer cancelled for ${this.name}`,
+        cwd: boundCwd(this.cwd),
+        data: { server: this.name, root: truncateIdentity(this.root) },
       });
     }
   }
@@ -852,6 +873,8 @@ export class LspClient {
           level: "debug",
           category: "readiness.no-progress-resolved",
           message: `No-progress grace timer resolved for ${this.name}`,
+          cwd: boundCwd(this.cwd),
+          data: { server: this.name, root: truncateIdentity(this.root) },
         });
         this.resolveReady();
       }

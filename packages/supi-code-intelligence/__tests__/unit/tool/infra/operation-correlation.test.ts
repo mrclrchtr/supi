@@ -88,6 +88,13 @@ describe("public code operation correlation", () => {
       tool: "code_find",
       outcome: "completed",
     });
+    // Every production code-intelligence event carries the workspace root as
+    // event-level cwd; the synthetic workflow.outcome fixture does not.
+    const productionEvents = events.filter(
+      (event) =>
+        event.category.startsWith("code-operation.") || event.category === "workflow.timing",
+    );
+    expect(productionEvents.every((event) => event.cwd === "/repo")).toBe(true);
     expect(JSON.stringify(events)).not.toContain(RAW_CALL_IDS[0]);
     expect(JSON.stringify(events)).not.toContain("query");
     expect(JSON.stringify(events)).not.toContain("file.ts");

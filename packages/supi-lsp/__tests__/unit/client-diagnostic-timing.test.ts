@@ -22,10 +22,10 @@ afterEach(() => {
 });
 
 describe("LSP diagnostic timing observations", () => {
-  it("records a pull refresh without file paths or source text", async () => {
+  it("records a pull refresh with workspace identity but no source text", async () => {
     const file = join(cwd, "private-source.ts");
     writeFileSync(file, "const privateSource = true;\n");
-    const { client, rpc } = createPullTestClient();
+    const { client, rpc } = createPullTestClient({ root: cwd, cwd });
     client.didOpen(file, "const privateSource = true;\n");
     rpc.sendRequest.mockResolvedValue({ kind: "full", items: [] });
 
@@ -35,6 +35,7 @@ describe("LSP diagnostic timing observations", () => {
     expect(events).toEqual([
       expect.objectContaining({
         message: "LSP diagnostic refresh-open completed",
+        cwd,
         data: {
           operation: "refresh-open",
           collection: "pull",
@@ -46,6 +47,7 @@ describe("LSP diagnostic timing observations", () => {
           freshness: "observed",
           documentCount: 1,
           outcome: "completed",
+          server: "test",
           timing: {
             durationMs: expect.any(Number),
             phasesMs: {
@@ -56,14 +58,15 @@ describe("LSP diagnostic timing observations", () => {
         },
       }),
     ]);
-    expect(JSON.stringify(events)).not.toContain(cwd);
+    // refresh-open stays aggregate: no file identity in data.
+    expect(events[0]?.data).not.toHaveProperty("file");
     expect(JSON.stringify(events)).not.toContain("privateSource");
   });
 
   it("records pull fallback, push settle, and observed freshness", async () => {
     const file = join(cwd, "fallback.ts");
     writeFileSync(file, "const fallback = true;\n");
-    const { client, rpc } = createPullTestClient();
+    const { client, rpc } = createPullTestClient({ root: cwd, cwd });
     client.didOpen(file, "const fallback = true;\n");
     rpc.sendRequest.mockRejectedValue(new Error("pull failed"));
     setTimeout(
@@ -91,6 +94,7 @@ describe("LSP diagnostic timing observations", () => {
       freshness: "observed",
       documentCount: 1,
       outcome: "completed",
+      server: "test",
       timing: {
         durationMs: expect.any(Number),
         phasesMs: {
@@ -107,7 +111,7 @@ describe("LSP diagnostic timing observations", () => {
     const second = join(cwd, "second.ts");
     writeFileSync(first, "const first = true;\n");
     writeFileSync(second, "const second = true;\n");
-    const { client, rpc } = createPullTestClient();
+    const { client, rpc } = createPullTestClient({ root: cwd, cwd });
     client.didOpen(first, "const first = true;\n");
     client.didOpen(second, "const second = true;\n");
     rpc.sendRequest.mockImplementation(
@@ -133,7 +137,7 @@ describe("LSP diagnostic timing observations", () => {
   it("records push settle timeout separately from observed freshness", async () => {
     const file = join(cwd, "timeout.ts");
     writeFileSync(file, "const timeout = true;\n");
-    const { client } = createRunningTestClient();
+    const { client } = createRunningTestClient({ root: cwd, cwd });
     client.didOpen(file, "const timeout = true;\n");
     const interval = setInterval(
       () =>
@@ -170,7 +174,7 @@ describe("LSP diagnostic timing observations", () => {
   it("does not classify waiter release as fresh push evidence", async () => {
     const file = join(cwd, "released.ts");
     writeFileSync(file, "const released = true;\n");
-    const { client } = createRunningTestClient();
+    const { client } = createRunningTestClient({ root: cwd, cwd });
     setTimeout(() => client.didClose(file), 10);
 
     await client.syncAndWaitForDiagnostics(file, "const released = true;\n");
@@ -192,7 +196,7 @@ describe("LSP diagnostic timing observations", () => {
   it("records single-file fallback publication as fresh diagnostic evidence", async () => {
     const file = join(cwd, "single.ts");
     writeFileSync(file, "const single = true;\n");
-    const { client, rpc } = createPullTestClient();
+    const { client, rpc } = createPullTestClient({ root: cwd, cwd });
     rpc.sendRequest.mockRejectedValue(new Error("pull failed"));
     setTimeout(
       () =>
@@ -206,20 +210,25 @@ describe("LSP diagnostic timing observations", () => {
 
     await client.syncAndWaitForDiagnostics(file, "const single = true;\n");
 
-    expect(
-      getDebugEvents({ source: "lsp", category: "diagnostics.timing" }).events[0]?.data,
-    ).toEqual(
+    const event = getDebugEvents({ source: "lsp", category: "diagnostics.timing" }).events[0];
+    expect(event).toEqual(
       expect.objectContaining({
-        operation: "sync-file",
-        collection: "fallback",
-        pull: "failed",
-        push: "published",
-        fallback: true,
-        settle: "published",
-        timedOut: false,
-        freshness: "observed",
-        documentCount: 1,
-        outcome: "completed",
+        cwd,
+        data: expect.objectContaining({
+          operation: "sync-file",
+          server: "test",
+          // The file identity is workspace-relative.
+          file: "single.ts",
+          collection: "fallback",
+          pull: "failed",
+          push: "published",
+          fallback: true,
+          settle: "published",
+          timedOut: false,
+          freshness: "observed",
+          documentCount: 1,
+          outcome: "completed",
+        }),
       }),
     );
   });

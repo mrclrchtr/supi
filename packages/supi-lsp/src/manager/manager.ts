@@ -99,6 +99,7 @@ type FileRoute = {
 
 type ClientRestartResult = {
   key: string;
+  serverName: string;
   files: string[];
   restarted: boolean;
 };
@@ -260,9 +261,15 @@ export class LspManager {
     const generation = (this.clientGenerations.get(key) ?? 0) + 1;
     this.clientGenerations.set(key, generation);
     let client: LspClient;
-    client = new LspClient(serverName, serverConfig, root, (kind) => {
-      this.handleClientLifecycle(key, generation, client, kind);
-    });
+    client = new LspClient(
+      serverName,
+      serverConfig,
+      root,
+      (kind) => {
+        this.handleClientLifecycle(key, generation, client, kind);
+      },
+      this.cwd,
+    );
     return client;
   }
 
@@ -374,7 +381,7 @@ export class LspManager {
       throwIfCodeRequestInterrupted(options?.control);
       const result = await this.restartClient(client);
       this.recoveryRestartEpochs.set(key, this.invalidationEpoch);
-      restarted.push({ key, ...result });
+      restarted.push({ key, serverName: client.name, ...result });
     }
 
     return restarted;
@@ -650,6 +657,13 @@ export class LspManager {
   /** Get status of all servers. */
   getRunningClientCount(): number {
     return Array.from(this.clients.values()).filter((client) => client.status === "running").length;
+  }
+
+  /** Get the server names of all running clients, for recovery telemetry. */
+  getRunningClientNames(): string[] {
+    return Array.from(this.clients.values())
+      .filter((client) => client.status === "running")
+      .map((client) => client.name);
   }
 
   /** Check whether a path belongs to the configured diagnostic evidence scope. */

@@ -40,6 +40,12 @@ It also registers a **Debug** provider section for `/supi-context`.
 - if debug capture is disabled, no events are retained
 - agent-facing access is blocked, sanitized, or raw depending on settings
 
+### Identity disclosure
+
+Retained and persisted LSP debug events may identify local workspaces and files. Since the LSP telemetry expansion, LSP events can carry the absolute workspace root (`cwd`), the configured server name (`server`), workspace-relative file paths (`file`), exact LSP method names (`method`), and the server root (`root`). Identity strings are bounded to 512 UTF-16 code units and server lists to 16 entries.
+
+Identity fields are **not** secret-redacted. The debug registry redacts secret keys and secret-looking values (tokens, passwords, API keys, authorization headers, URL credentials), but server names, file paths, method names, and workspace roots pass through unredacted by design, so local protocol failures stay diagnosable. Treat retained and persisted LSP events as potentially identifying your local machine, project layout, and file names.
+
 ## Rendering
 
 `/supi-debug` uses a custom TUI message renderer that shows two levels of detail:
