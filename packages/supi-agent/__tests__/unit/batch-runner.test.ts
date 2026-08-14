@@ -311,6 +311,52 @@ describe("runDelegationBatch", () => {
     ]);
   });
 
+  it("bounds four 16,000-character answers to one aggregate result with a complete spill", async () => {
+    const { startAgentRun } = await import("@mrclrchtr/supi-agent-runtime/api");
+    const bigAnswer = "x".repeat(16_000);
+    for (let i = 0; i < 4; i++) {
+      (startAgentRun as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+        result: Promise.resolve({ kind: "success" as const, value: bigAnswer }),
+        subscribe: vi.fn(() => () => undefined),
+        steer: vi.fn(async () => "not-running" as const),
+        stop: vi.fn(async () => undefined),
+      }));
+    }
+
+    const { modelText, fullOutputPath, results } = await runDelegationBatch(
+      {
+        tasks: [
+          { id: "t1", profile: "explore", instructions: "a" },
+          { id: "t2", profile: "explore", instructions: "b" },
+          { id: "t3", profile: "explore", instructions: "c" },
+          { id: "t4", profile: "explore", instructions: "d" },
+        ],
+      },
+      makeCatalogue(["explore"]),
+      mockCtx(),
+    );
+
+    expect(results).toHaveLength(4);
+    expect(results.every((result) => result.status === "completed")).toBe(true);
+    // One bounded aggregate result, still under the byte bound.
+    expect(Buffer.byteLength(modelText, "utf-8")).toBeLessThanOrEqual(51_200 + 120);
+    // Every task stays represented.
+    for (let i = 1; i <= 4; i++) {
+      expect(modelText).toContain(`## t${i} (profile: explore) — completed`);
+    }
+    expect(modelText).toContain("[truncated: 16,000 total characters]");
+
+    // The complete joined per-task Markdown is spilled to a temporary file.
+    expect(fullOutputPath).toBeDefined();
+    expect(fullOutputPath).toMatch(/supi-agent-/);
+    const { readFileSync } = await import("node:fs");
+    const spill = readFileSync(fullOutputPath!, "utf-8");
+    expect(Buffer.byteLength(spill, "utf-8")).toBeGreaterThan(51_200);
+    for (let i = 1; i <= 4; i++) {
+      expect(spill).toContain(`## t${i} (profile: explore) — completed`);
+    }
+  });
+
   it("preserves missing assistant text as missing completion", async () => {
     const { startAgentRun } = await import("@mrclrchtr/supi-agent-runtime/api");
     (startAgentRun as ReturnType<typeof vi.fn>).mockImplementationOnce(

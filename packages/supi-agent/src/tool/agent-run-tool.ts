@@ -28,7 +28,7 @@ export function registerAgentRunTool(pi: ExtensionAPI): void {
     name: "supi_agent_run",
     label: "Agent Run",
     description:
-      "Delegate one or more tasks to Agent Profiles in foreground. Read-only profiles may run concurrently (1-4 tasks); mutation-capable profiles require a single-task batch. Returns ordered results with attribution. All runs are foreground-awaited; no background or recursive delegation.",
+      "Delegate tasks to Agent Profiles in foreground. Read-only profiles can run concurrently; mutation-capable profiles require one task. Results keep task attribution and are limited to 2,000 lines or 50KB. Runs cannot execute in the background or delegate recursively.",
     executionMode: "sequential",
     parameters,
     renderCall,
@@ -57,7 +57,7 @@ export function registerAgentRunTool(pi: ExtensionAPI): void {
           }
         : undefined;
 
-      const { modelText, results, aggregateUsage } = await runDelegationBatch(
+      const { modelText, fullOutputPath, results, aggregateUsage } = await runDelegationBatch(
         toolParams,
         catalogue,
         ctx,
@@ -78,6 +78,7 @@ export function registerAgentRunTool(pi: ExtensionAPI): void {
           sharedContext: toolParams.sharedContext,
           aggregateUsage,
           conversationViews: batch.conversationViews,
+          ...(fullOutputPath ? { fullOutputPath } : {}),
         },
         usage: aggregateUsage,
       };
