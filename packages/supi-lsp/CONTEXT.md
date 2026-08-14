@@ -11,7 +11,7 @@ The workspace-scoped interface that owns file routing, semantic readiness and op
 _Avoid_: LspManager, LSP singleton, provider bag, client registry
 
 **Diagnostic recovery attempt**:
-A best-effort workspace-runtime operation that clears pull state, refreshes active clients, and may restart unconfirmed push-only clients, including routes found by the supplemental stale-cluster heuristic. Its attempted-client count names targets, not confirmed successful diagnostic refreshes.
+A best-effort workspace-runtime operation that clears pull state, refreshes active clients, and may restart an affected push-only client on a protocol-stall signal (readiness-stall or protocol-errors), never on unconfirmed evidence alone and never pull-capable routes. Its attempted-client count names targets, not confirmed successful diagnostic refreshes.
 _Avoid_: recovered diagnostics, freshness proof, per-client success inference
 
 **LSP runtime controller**:
