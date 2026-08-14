@@ -4,10 +4,46 @@ let input = Buffer.alloc(0);
 const mode = process.argv[2] ?? "stable";
 const delayMs = Number(process.argv[3] ?? 50);
 const crashMarker = process.argv[4];
+const pushLongDelayMs = Number(process.argv[3] ?? 1000);
+const pushShortDelayMs = Number(process.argv[5] ?? 50);
 
 function send(message) {
   const body = JSON.stringify(message);
   process.stdout.write(`Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
+}
+
+let pushDelayMs = pushLongDelayMs;
+if (mode === "push" && crashMarker) {
+  try {
+    const descriptor = fs.openSync(crashMarker, "wx");
+    fs.closeSync(descriptor);
+  } catch {
+    // The marker exists: this process is a replacement, publish quickly.
+    pushDelayMs = pushShortDelayMs;
+  }
+}
+
+function schedulePush(textDocument) {
+  const { uri, version } = textDocument;
+  setTimeout(() => publishDiagnostics(uri, version), pushDelayMs);
+}
+
+function publishDiagnostics(uri, version) {
+  send({
+    jsonrpc: "2.0",
+    method: "textDocument/publishDiagnostics",
+    params: {
+      uri,
+      ...(version !== undefined ? { version } : {}),
+      diagnostics: [
+        {
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+          severity: 1,
+          message: `fresh-${process.pid}`,
+        },
+      ],
+    },
+  });
 }
 
 function handle(message) {
@@ -17,6 +53,14 @@ function handle(message) {
   }
   if (message.method === "initialized" && shouldCrash()) {
     setTimeout(() => process.exit(17), delayMs);
+    return;
+  }
+  if (mode === "push" && message.method === "textDocument/didOpen") {
+    schedulePush(message.params.textDocument);
+    return;
+  }
+  if (mode === "push" && message.method === "textDocument/didChange") {
+    schedulePush(message.params.textDocument);
     return;
   }
   if (message.method === "shutdown") {

@@ -361,6 +361,21 @@ describe("code_health refresh evidence", () => {
     );
   });
 
+  it("records elapsed time in the workspace refresh attempt telemetry", async () => {
+    const { trackRefreshAttempt } = await run(
+      { kind: "ready", runtime: readyRuntime() },
+      { include: ["diagnostics"], refresh: true },
+    );
+
+    expect(trackRefreshAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "completed",
+        operationScope: "workspace-runtime",
+        elapsedMs: expect.any(Number),
+      }),
+    );
+  });
+
   it("preserves refresh evidence when semantic readiness is later unavailable", async () => {
     const removedEvidence = {
       requested: 1,

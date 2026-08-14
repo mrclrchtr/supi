@@ -11,7 +11,7 @@ The workspace-scoped interface that owns file routing, semantic readiness and op
 _Avoid_: LspManager, LSP singleton, provider bag, client registry
 
 **Diagnostic recovery attempt**:
-A best-effort workspace-runtime operation that clears pull state, refreshes active clients, and may restart clients for a suspected stale cluster. Its attempted-client count names targets, not confirmed successful diagnostic refreshes.
+A best-effort workspace-runtime operation that clears pull state, refreshes active clients, and may restart unconfirmed push-only clients, including routes found by the supplemental stale-cluster heuristic. Its attempted-client count names targets, not confirmed successful diagnostic refreshes.
 _Avoid_: recovered diagnostics, freshness proof, per-client success inference
 
 **LSP runtime controller**:
@@ -31,8 +31,8 @@ A freshness boundary that invalidates earlier diagnostic evidence after a docume
 _Avoid_: cache clear, quiet period, clean result, workspace-wide freshness
 
 **Push-only diagnostic recovery**:
-A bounded recovery path for a server that publishes diagnostics but cannot answer pull requests. It may restart an affected client during an explicit refresh, but it must keep file-local freshness and report partial evidence when confirmation fails.
-_Avoid_: trust-next-push, automatic restart on status display, recovered diagnostics
+A bounded recovery path for a server that publishes diagnostics but cannot answer pull requests. It may restart an affected client during an explicit refresh, but it must keep file-local freshness and report partial evidence when confirmation fails. Each route restarts at most once per invalidation generation, and the replacement startup has a fixed 5-second bound.
+_Avoid_: trust-next-push, automatic restart on status display, recovered diagnostics, restarting pull-capable routes
 
 **Progress readiness**:
 The SuPi readiness interpretation of LSP work-done progress. A created progress token is pending, an observed `begin` token represents active work, and an observed `end` token completes that work.

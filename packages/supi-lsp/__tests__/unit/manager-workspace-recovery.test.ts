@@ -40,11 +40,16 @@ describe("recoverWorkspaceDiagnostics", () => {
         { file: "/project/src/b.ts", diagnostics: [makeDiagnostic("Cannot find module 'y'")] },
         { file: "/project/src/c.ts", diagnostics: [makeDiagnostic("Cannot find module 'z'")] },
       ]),
-      restartClientsForFiles: vi
-        .fn()
-        .mockResolvedValue([{ key: "typescript:/project", files: [], restarted: true }]),
+      restartClientsForFiles: vi.fn().mockResolvedValue([
+        {
+          key: "typescript:/project",
+          files: ["/project/src/a.ts", "/project/src/b.ts", "/project/src/c.ts"],
+          restarted: true,
+        },
+      ]),
       getRunningClientCount: vi.fn(() => 1),
       isDiagnosticFile: vi.fn(() => true),
+      getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
       getCwd: vi.fn(() => "/project"),
     };
@@ -92,12 +97,18 @@ describe("recoverWorkspaceDiagnostics", () => {
       restartClientsForFiles: vi.fn().mockResolvedValue([
         {
           key: "typescript:/project",
-          files: ["/project/node_modules/dependency.ts"],
+          files: [
+            "/project/src/a.ts",
+            "/project/src/b.ts",
+            "/project/src/c.ts",
+            "/project/node_modules/dependency.ts",
+          ],
           restarted: true,
         },
       ]),
       getRunningClientCount: vi.fn(() => 1),
       isDiagnosticFile: vi.fn((file: string) => !file.includes("node_modules")),
+      getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
       getCwd: vi.fn(() => "/project"),
     };
@@ -134,6 +145,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       restartClientsForFiles: vi.fn().mockResolvedValue([]),
       getRunningClientCount: vi.fn(() => 1),
       isDiagnosticFile: vi.fn(() => true),
+      getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => evidence),
       getCwd: vi.fn(() => "/project"),
     };
@@ -186,6 +198,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       ]),
       getRunningClientCount: vi.fn(() => 1),
       isDiagnosticFile: vi.fn(() => true),
+      getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => confirmed),
       getCwd: vi.fn(() => "/project"),
     };
@@ -215,6 +228,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       restartClientsForFiles: vi.fn().mockResolvedValue([]),
       getRunningClientCount: vi.fn(() => 2),
       isDiagnosticFile: vi.fn(() => true),
+      getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
       getCwd: vi.fn(() => "/project"),
     };
@@ -262,6 +276,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       ]),
       getRunningClientCount: vi.fn(() => 1),
       isDiagnosticFile: vi.fn(() => true),
+      getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
       getCwd: vi.fn(() => "/project"),
     };
@@ -271,14 +286,83 @@ describe("recoverWorkspaceDiagnostics", () => {
       changes: [],
     });
 
-    expect(manager.restartClientsForFiles).toHaveBeenCalledWith([
-      "/project/src/a.ts",
-      "/project/src/b.ts",
-      "/project/src/c.ts",
-    ]);
+    expect(manager.restartClientsForFiles).toHaveBeenCalledWith(
+      ["/project/src/a.ts", "/project/src/b.ts", "/project/src/c.ts"],
+      { pushOnly: true },
+    );
     expect(manager.refreshOpenDiagnostics).toHaveBeenCalledTimes(2);
     expect(result.restartedClients).toBe(2);
     expect(result.staleAssessment.suspected).toBe(true);
+  });
+
+  it("restarts only unconfirmed push-only routes", async () => {
+    const unconfirmed = {
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 1,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "unconfirmed" as const }],
+    };
+    const manager = {
+      clearAllPullResultIds: vi.fn(),
+      notifyWorkspaceFileChanges: vi.fn(),
+      refreshOpenDiagnostics: vi.fn().mockResolvedValue(unconfirmed),
+      getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
+      restartClientsForFiles: vi.fn().mockResolvedValue([]),
+      getRunningClientCount: vi.fn(() => 3),
+      isDiagnosticFile: vi.fn(() => true),
+      getClientDiagnosticRoutes: vi.fn(() => [
+        {
+          key: "typescript:/project",
+          supportsPull: false,
+          unconfirmedFiles: ["/project/src/a.ts"],
+        },
+        {
+          key: "rust:/project",
+          supportsPull: true,
+          unconfirmedFiles: ["/project/src/main.rs"],
+        },
+        {
+          key: "typescript:/project/lib",
+          supportsPull: false,
+          unconfirmedFiles: [],
+        },
+      ]),
+      getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getCwd: vi.fn(() => "/project"),
+    };
+
+    const result = await recoverWorkspaceDiagnostics(manager as never, {
+      restartIfStillStale: true,
+    });
+
+    expect(manager.restartClientsForFiles).toHaveBeenCalledWith(["/project/src/a.ts"], {
+      pushOnly: true,
+    });
+    expect(result.restartedClients).toBe(0);
+  });
+
+  it("records elapsed time for the recovery pass", async () => {
+    const manager = {
+      clearAllPullResultIds: vi.fn(),
+      notifyWorkspaceFileChanges: vi.fn(),
+      refreshOpenDiagnostics: vi.fn().mockResolvedValue(emptyEvidence()),
+      getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
+      restartClientsForFiles: vi.fn().mockResolvedValue([]),
+      getRunningClientCount: vi.fn(() => 1),
+      isDiagnosticFile: vi.fn(() => true),
+      getClientDiagnosticRoutes: vi.fn(() => []),
+      getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getCwd: vi.fn(() => "/project"),
+    };
+
+    const result = await recoverWorkspaceDiagnostics(manager as never, {
+      restartIfStillStale: false,
+    });
+
+    expect(typeof result.elapsedMs).toBe("number");
+    expect(result.elapsedMs).toBeGreaterThanOrEqual(0);
   });
 });
 

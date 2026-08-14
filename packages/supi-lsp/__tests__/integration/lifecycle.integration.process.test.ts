@@ -3,8 +3,9 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import type { LspConfig } from "../../src/config/types.ts";
+import { FileChangeType, type FileEvent, type LspConfig } from "../../src/config/types.ts";
 import { LspManager, type ManagerLifecycleTransition } from "../../src/manager/manager.ts";
+import { fileToUri } from "../../src/utils.ts";
 import { waitFor } from "../helpers/integration-utils.ts";
 
 const server = fileURLToPath(new URL("../fixtures/lsp-lifecycle-server.mjs", import.meta.url));
@@ -24,6 +25,20 @@ function config(mode: "stable" | "crash" | "crash-once", crashMarker?: string): 
       test: {
         command: process.execPath,
         args: [server, mode, "50", ...(crashMarker ? [crashMarker] : [])],
+        fileTypes: ["test"],
+        rootMarkers: ["package.json"],
+      },
+    },
+  };
+}
+
+/** Push-only fixture: the first process publishes slowly, replacements publish quickly. */
+function pushConfig(longDelayMs: number, marker: string, shortDelayMs: number): LspConfig {
+  return {
+    servers: {
+      test: {
+        command: process.execPath,
+        args: [server, "push", String(longDelayMs), marker, String(shortDelayMs)],
         fileTypes: ["test"],
         rootMarkers: ["package.json"],
       },
@@ -97,5 +112,51 @@ describe("LSP manager lifecycle integration", () => {
     );
 
     expect(transitions.at(-1)).toMatchObject({ kind: "recovery", semanticReady: true });
+  }, 10_000);
+
+  it("confirms fresh diagnostics only through the replacement process", async () => {
+    const root = createProject();
+    const sourceFile = path.join(root, "fresh.test");
+    const marker = path.join(root, ".pushed-once");
+    fs.writeFileSync(sourceFile, "fixture content\n");
+    const manager = new LspManager(pushConfig(1_000, marker, 50), root);
+    managers.push(manager);
+
+    const original = await manager.startServerForRoot("test", root);
+    if (!original) throw new Error("Expected the original client to start.");
+    const originalPid = (original as unknown as { process: { pid?: number } }).process?.pid;
+    original.didOpen(sourceFile, fs.readFileSync(sourceFile, "utf8"));
+    const changes: FileEvent[] = [{ uri: fileToUri(sourceFile), type: FileChangeType.Changed }];
+
+    const recovery = await manager.recoverWorkspaceDiagnostics({
+      changes,
+      restartIfStillStale: true,
+      maxWaitMs: 200,
+      quietMs: 20,
+    });
+
+    expect(recovery.restartedClients).toBe(1);
+    expect(recovery.elapsedMs).toBeTypeOf("number");
+    expect(recovery.diagnosticEvidence).toMatchObject({
+      confirmed: 1,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+    });
+
+    const relativeFile = path.relative(root, sourceFile);
+    await waitFor(
+      async () => manager.getOutstandingDiagnostics(1),
+      (entries) => entries.some((entry) => entry.file === relativeFile),
+      { timeoutMs: 2_000, retryDelayMs: 20, label: "replacement process diagnostics" },
+    );
+    const entry = manager
+      .getOutstandingDiagnostics(1)
+      .find((candidate) => candidate.file === relativeFile);
+    const message = entry?.diagnostics[0]?.message ?? "";
+    const text = typeof message === "string" ? message : message.value;
+    expect(text).toMatch(/^fresh-\d+$/);
+    const publisherPid = Number.parseInt(text.slice("fresh-".length), 10);
+    expect(publisherPid).not.toBe(originalPid);
   }, 10_000);
 });

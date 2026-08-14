@@ -41,6 +41,8 @@ Pull diagnostics use `textDocument/diagnostic`, so the client can tie a report t
 
 A workspace diagnostic refresh returns exact coverage counts for requested, confirmed, unconfirmed, failed, and removed tracked documents. `code_health` marks tracked-file diagnostics as complete only when every document in the requested scope has confirmed evidence. It keeps cached diagnostics as partial evidence and shows the same coverage counts in summary and detailed views; a refresh attempt does not prove fresh evidence by itself.
 
+An explicit recovery pass may restart a push-only client that stays unconfirmed after the first refresh. It never restarts a pull-capable client because push evidence is absent, and it never restarts a client during passive health display. Each client route restarts at most once per workspace invalidation generation. The replacement process has a fixed startup bound of 5 seconds; exceeding the bound fails closed as start-failed without retry. Recovery telemetry records the outcome, elapsed time, attempted clients, and restart count without changing the evidence semantics of the result.
+
 ### Optional diagnostic configuration
 
 Configuration overrides merge with the built-in server definitions. Use `.pi/supi/config.json` for one project or `~/.pi/agent/supi/config.json` for all projects:

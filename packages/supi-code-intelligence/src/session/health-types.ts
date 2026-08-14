@@ -85,6 +85,8 @@ export type HealthRefreshOperationScope = "file-runtime" | "workspace-runtime";
 interface CompletedHealthRefreshAttempt {
   readonly kind: "completed";
   readonly attemptedAt: number;
+  /** Wall-clock duration of the attempt, for telemetry. */
+  readonly elapsedMs: number;
   /** The diagnostic evidence scope requested by the caller, not the runtime operation scope. */
   readonly requestedDiagnosticScope: HealthDiagnosticScope;
   /** Active clients targeted by the best-effort operation; this is not a confirmed-success count. */
@@ -107,6 +109,8 @@ export type HealthRefreshAttempt =
   | {
       readonly kind: "failed";
       readonly attemptedAt: number;
+      /** Wall-clock duration of the attempt, for telemetry. */
+      readonly elapsedMs: number;
       readonly requestedDiagnosticScope: HealthDiagnosticScope;
       readonly operationScope: HealthRefreshOperationScope;
       /** Evidence collected before the operation failed, when available. */

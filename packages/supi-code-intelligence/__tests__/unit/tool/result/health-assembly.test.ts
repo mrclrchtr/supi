@@ -176,6 +176,7 @@ describe("code_health result assembly", () => {
         refresh: {
           kind: "completed",
           attemptedAt: 1,
+          elapsedMs: 1,
           requestedDiagnosticScope: { kind: "tracked-files", filter: null },
           operationScope: "workspace-runtime",
           attemptedActiveClients: 1,
@@ -202,6 +203,7 @@ describe("code_health result assembly", () => {
         refresh: {
           kind: "completed",
           attemptedAt: 1,
+          elapsedMs: 1,
           requestedDiagnosticScope: { kind: "file", path: "/repo/src/a.ts" },
           operationScope: "file-runtime",
           attemptedActiveClients: 1,
@@ -227,6 +229,7 @@ describe("code_health result assembly", () => {
         refresh: {
           kind: "completed",
           attemptedAt: 1,
+          elapsedMs: 1,
           requestedDiagnosticScope: { kind: "tracked-files", filter: null },
           operationScope: "workspace-runtime",
           attemptedActiveClients: 0,
@@ -262,6 +265,7 @@ describe("code_health result assembly", () => {
           lastAttempt: {
             kind: "failed",
             attemptedAt: Date.now(),
+            elapsedMs: 1,
             requestedDiagnosticScope: { kind: "file", path: "/repo/src/a.ts" },
             operationScope: "file-runtime",
             reason: "Refresh failed.",
@@ -284,6 +288,7 @@ describe("code_health result assembly", () => {
           lastAttempt: {
             kind: "completed",
             attemptedAt: Date.now(),
+            elapsedMs: 1,
             requestedDiagnosticScope: { kind: "file", path: "/repo/src/a.ts" },
             operationScope: "file-runtime",
             attemptedActiveClients: 1,
@@ -311,6 +316,7 @@ describe("code_health result assembly", () => {
           lastAttempt: {
             kind: "completed",
             attemptedAt: Date.now() - 65_000,
+            elapsedMs: 1,
             requestedDiagnosticScope: { kind: "file", path: "/repo/src/a.ts" },
             operationScope: "workspace-runtime",
             attemptedActiveClients: 1,

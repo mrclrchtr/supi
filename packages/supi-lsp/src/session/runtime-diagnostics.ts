@@ -40,6 +40,8 @@ export interface RecoverDiagnosticsResult {
   diagnosticEvidence: DiagnosticEvidenceSummary;
   /** Failure from the first refresh, when no later pass replaced it. */
   refreshFailureReason?: string;
+  /** Wall-clock duration of the whole recovery pass, for telemetry. */
+  elapsedMs: number;
   staleAssessment: {
     suspected: boolean;
     matchedFiles: Array<{ file: string; diagnostics: Diagnostic[] }>;

@@ -8,7 +8,7 @@ import {
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
 import * as projectRoots from "@mrclrchtr/supi-core/project";
-import { LspClient, type LspClientLifecycleTransitionKind } from "../client/client.ts";
+import { LspClient, type LspClientLifecycleTransitionKind, withTimeout } from "../client/client.ts";
 import { getServerForFile } from "../config/config.ts";
 import type {
   DetectedProjectServer,
@@ -78,6 +78,15 @@ import {
 
 type UnavailableReason = "missing-command" | "start-failed" | "runtime-error";
 
+/**
+ * Fixed bound for one replacement-client startup during recovery restarts.
+ *
+ * The bound covers spawn, initialize, and the readiness handshake for the
+ * replacement process. A restart that exceeds the bound fails closed as
+ * start-failed and never retries within the same invalidation generation.
+ */
+export const RECOVERY_CLIENT_STARTUP_BOUND_MS = 5_000;
+
 type FileRoute = {
   serverName: string;
   serverConfig: ServerConfig;
@@ -118,6 +127,10 @@ export class LspManager {
   private knownRoots = new Map<string, string[]>();
   /** User-configured gitignore-style exclude patterns */
   private excludePatterns: string[] = [];
+  /** Monotonic workspace invalidation generation advanced by each invalidation event. */
+  private invalidationEpoch = 0;
+  /** Invalidation generation in which each route last received a recovery restart. */
+  private recoveryRestartEpochs = new Map<string, number>();
   /** Project roots already warmed for workspace-symbol queries. */
   private warmedWorkspaceSymbolProjects = new Set<string>();
   /** Project roots whose semantic state was warmed with a readiness probe. */
@@ -329,20 +342,31 @@ export class LspManager {
     return route ? (this.clients.get(route.key) ?? null) : null;
   }
 
-  /** Restart the clients that own the supplied file paths, if any are active. */
-  async restartClientsForFiles(filePaths: string[]): Promise<ClientRestartResult[]> {
+  /**
+   * Restart the clients that own the supplied file paths, if any are active.
+   *
+   * Each route restarts at most once per invalidation generation. Pass
+   * `pushOnly` to restrict restarts to clients without pull diagnostics.
+   */
+  async restartClientsForFiles(
+    filePaths: string[],
+    options?: { pushOnly?: boolean },
+  ): Promise<ClientRestartResult[]> {
     const restarted: ClientRestartResult[] = [];
     const seen = new Set<string>();
 
     for (const filePath of filePaths) {
       const client = this.getExistingClientForFile(filePath);
       if (!client) continue;
+      if (options?.pushOnly && client.hasDiagnosticProvider) continue;
 
       const key = clientKey(client.name, client.root);
       if (seen.has(key)) continue;
       seen.add(key);
+      if (this.recoveryRestartEpochs.get(key) === this.invalidationEpoch) continue;
 
       const result = await this.restartClient(client);
+      this.recoveryRestartEpochs.set(key, this.invalidationEpoch);
       restarted.push({ key, ...result });
     }
 
@@ -376,7 +400,11 @@ export class LspManager {
     rememberKnownRoot(this.knownRoots, client.name, client.root);
 
     try {
-      await replacement.start();
+      await withTimeout(
+        replacement.start(),
+        RECOVERY_CLIENT_STARTUP_BOUND_MS,
+        "replacement client startup bound exceeded",
+      );
       const failedFiles: string[] = [];
       for (const filePath of files) {
         if (!fs.existsSync(filePath)) {
@@ -394,6 +422,9 @@ export class LspManager {
     } catch {
       this.clients.delete(key);
       this.unavailable.set(key, "start-failed");
+      // A bound-exceeded start may have spawned a live process; terminate
+      // the tree so the orphan cannot outlive the failed restart.
+      void replacement.forceKill().catch(() => {});
       return { files, restarted: false };
     }
   }
@@ -533,6 +564,42 @@ export class LspManager {
     }
   }
 
+  /**
+   * Record one workspace invalidation event and forward it to clients.
+   *
+   * Every call with a non-empty change batch advances the invalidation
+   * generation, so a repeated edit to the same file opens a fresh
+   * generation. Recovery passes forward changes through
+   * {@link notifyWorkspaceFileChanges} and never advance the generation.
+   */
+  noteWorkspaceChanges(changes: FileEvent[]): void {
+    if (changes.length > 0) this.invalidationEpoch++;
+    this.notifyWorkspaceFileChanges(changes);
+  }
+
+  /** Return per-route diagnostic evidence capability for recovery targeting. */
+  getClientDiagnosticRoutes(): Array<{
+    key: string;
+    supportsPull: boolean;
+    unconfirmedFiles: string[];
+  }> {
+    const routes: Array<{
+      key: string;
+      supportsPull: boolean;
+      unconfirmedFiles: string[];
+    }> = [];
+    for (const [key, client] of this.clients) {
+      if (client.status !== "running") continue;
+      const unconfirmedFiles = client
+        .getDiagnosticSnapshot()
+        .documents.filter((document) => document.status === "unconfirmed")
+        .map((document) => uriToFile(document.uri))
+        .filter((file) => this.isDiagnosticFile(file));
+      routes.push({ key, supportsPull: client.hasDiagnosticProvider, unconfirmedFiles });
+    }
+    return routes;
+  }
+
   /** Force a workspace-wide diagnostic recovery pass. */
   async recoverWorkspaceDiagnostics(options?: {
     changes?: FileEvent[];
@@ -550,6 +617,7 @@ export class LspManager {
     await Promise.all(shutdowns);
     this.clients.clear();
     this.clientGenerations.clear();
+    this.recoveryRestartEpochs.clear();
     this.unavailable.clear();
     this.knownRoots.clear();
     this.warmedWorkspaceSymbolProjects.clear();

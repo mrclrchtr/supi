@@ -21,7 +21,18 @@ export interface WorkspaceRecoveryResult {
   diagnosticEvidence: DiagnosticEvidenceSummary;
   /** Failure from the first refresh, when no later pass replaced it. */
   refreshFailureReason?: string;
+  /** Wall-clock duration of the whole recovery pass, for telemetry. */
+  elapsedMs: number;
   staleAssessment: StaleDiagnosticAssessment;
+}
+
+/** One client route's diagnostic evidence capability for recovery targeting. */
+export interface WorkspaceDiagnosticRoute {
+  key: string;
+  /** False for push-only clients, which cannot confirm freshness by pull. */
+  supportsPull: boolean;
+  /** Files tracked by the route whose evidence is unconfirmed. */
+  unconfirmedFiles: string[];
 }
 
 export interface WorkspaceRecoveryHost {
@@ -35,10 +46,12 @@ export interface WorkspaceRecoveryHost {
   ): Array<{ file: string; diagnostics: Diagnostic[] }>;
   getRunningClientCount(): number;
   isDiagnosticFile(filePath: string): boolean;
+  getClientDiagnosticRoutes(): WorkspaceDiagnosticRoute[];
   getDiagnosticEvidence(): DiagnosticEvidenceSummary;
   getCwd(): string;
   restartClientsForFiles(
     filePaths: string[],
+    options?: { pushOnly?: boolean },
   ): Promise<Array<{ key: string; files: string[]; restarted: boolean }>>;
 }
 
@@ -63,6 +76,7 @@ export async function recoverWorkspaceDiagnostics(
     control?: CodeRequestControl;
   } = {},
 ): Promise<WorkspaceRecoveryResult> {
+  const recoveryStartedAt = Date.now();
   const attemptedClients = softRecoverWorkspaceDiagnostics(host, options.changes ?? []);
   let diagnosticEvidence = emptyDiagnosticEvidence();
   let refreshFailureReason: string | undefined;
@@ -81,57 +95,131 @@ export async function recoverWorkspaceDiagnostics(
   let staleAssessment = assessStaleDiagnostics(host.getOutstandingDiagnostics(1));
   let restartedClients = 0;
 
-  if (options.restartIfStillStale && staleAssessment.suspected) {
-    const affectedFiles = staleAssessment.matchedFiles.map((entry) => entry.file);
-    const diagnosticAffectedFiles = affectedFiles.filter((file) => host.isDiagnosticFile(file));
-    diagnosticEvidence = invalidateDiagnosticEvidence(
+  if (options.restartIfStillStale) {
+    const restartFiles = collectRecoveryRestartFiles(host, staleAssessment);
+    if (restartFiles.length > 0) {
+      const escalation = await runRestartEscalation(
+        host,
+        restartFiles,
+        diagnosticEvidence,
+        options,
+      );
+      restartedClients = escalation.restartedClients;
+      diagnosticEvidence = escalation.diagnosticEvidence;
+      if (escalation.refreshedAfterRestart) refreshFailureReason = undefined;
+      staleAssessment = assessStaleDiagnostics(host.getOutstandingDiagnostics(1));
+    }
+  }
+
+  return recoveryResult();
+
+  function recoveryResult(): WorkspaceRecoveryResult {
+    return {
+      attemptedClients,
+      restartedClients,
       diagnosticEvidence,
-      diagnosticAffectedFiles,
+      ...(refreshFailureReason ? { refreshFailureReason } : {}),
+      elapsedMs: Date.now() - recoveryStartedAt,
+      staleAssessment,
+    };
+  }
+}
+
+/** Collect restart targets: unconfirmed push-only routes plus stale clusters. */
+function collectRecoveryRestartFiles(
+  host: WorkspaceRecoveryHost,
+  staleAssessment: StaleDiagnosticAssessment,
+): string[] {
+  const restartFiles = new Set<string>();
+  // Targeted push-only recovery: restart routes whose evidence is still
+  // unconfirmed after the first refresh. Pull-capable routes never restart
+  // because push evidence is absent.
+  for (const route of host.getClientDiagnosticRoutes()) {
+    if (route.supportsPull) continue;
+    for (const file of route.unconfirmedFiles) restartFiles.add(file);
+  }
+  // Supplemental stale-cluster heuristic, kept as an additional trigger.
+  if (staleAssessment.suspected) {
+    for (const entry of staleAssessment.matchedFiles) restartFiles.add(entry.file);
+  }
+  return Array.from(restartFiles);
+}
+
+/** Restart affected push-only clients and merge the replacement refresh evidence. */
+async function runRestartEscalation(
+  host: WorkspaceRecoveryHost,
+  restartFiles: readonly string[],
+  evidence: DiagnosticEvidenceSummary,
+  options: {
+    maxWaitMs?: number;
+    quietMs?: number;
+    control?: CodeRequestControl;
+  },
+): Promise<{
+  restartedClients: number;
+  diagnosticEvidence: DiagnosticEvidenceSummary;
+  refreshedAfterRestart: boolean;
+}> {
+  // Invalidate only evidence that a restart can re-establish: the unconfirmed
+  // push-only trigger files and every file owned by a route that actually
+  // restarted. Files added by the stale-cluster heuristic that belong to a
+  // pull-capable route keep their freshly refreshed evidence.
+  const unconfirmedTriggerFiles = collectUnconfirmedPushOnlyFiles(host);
+  let diagnosticEvidence = evidence;
+  let restartedClients = 0;
+  let refreshedAfterRestart = false;
+
+  try {
+    const restartResults = await host.restartClientsForFiles([...restartFiles], {
+      pushOnly: true,
+    });
+    const restarted = restartResults.filter((result) => result.restarted);
+    restartedClients = restarted.length;
+    // Every attempted route had its client replaced or shut down; its owned
+    // files need fresh evidence. Routes the manager skipped (pull-capable or
+    // guard-blocked) produce no result and keep their refreshed evidence.
+    const attemptedFiles = restartResults
+      .flatMap((result) => result.files)
+      .filter((file) => host.isDiagnosticFile(file));
+    diagnosticEvidence = invalidateDiagnosticEvidence(
+      evidence,
+      [...unconfirmedTriggerFiles, ...attemptedFiles],
       host.getCwd(),
     );
 
-    try {
-      const restartResults = await host.restartClientsForFiles(affectedFiles);
-      const restarted = restartResults.filter((result) => result.restarted);
-      restartedClients = restarted.length;
-      const restartedFiles = restartResults
-        .flatMap((result) => result.files)
-        .filter((file) => host.isDiagnosticFile(file));
-      diagnosticEvidence = invalidateDiagnosticEvidence(
-        diagnosticEvidence,
-        [...diagnosticAffectedFiles, ...restartedFiles],
-        host.getCwd(),
-      );
-
-      if (restartedClients > 0) {
-        try {
-          diagnosticEvidence = mergeDiagnosticEvidence(
-            diagnosticEvidence,
-            await host.refreshOpenDiagnostics({
-              maxWaitMs: options.maxWaitMs,
-              quietMs: options.quietMs,
-              operationId: options.control?.operationId,
-            }),
-            host.getCwd(),
-          );
-          refreshFailureReason = undefined;
-        } catch {
-          // Keep affected evidence unconfirmed when replacement refresh fails.
-        }
+    if (restarted.length > 0) {
+      try {
+        diagnosticEvidence = mergeDiagnosticEvidence(
+          diagnosticEvidence,
+          await host.refreshOpenDiagnostics({
+            maxWaitMs: options.maxWaitMs,
+            quietMs: options.quietMs,
+            operationId: options.control?.operationId,
+          }),
+          host.getCwd(),
+        );
+        refreshedAfterRestart = true;
+      } catch {
+        // Keep affected evidence unconfirmed when replacement refresh fails.
       }
-    } catch {
-      // Keep affected evidence unconfirmed when replacement fails.
     }
-    staleAssessment = assessStaleDiagnostics(host.getOutstandingDiagnostics(1));
+  } catch {
+    // Keep affected evidence unconfirmed when replacement fails.
   }
 
-  return {
-    attemptedClients,
-    restartedClients,
-    diagnosticEvidence,
-    ...(refreshFailureReason ? { refreshFailureReason } : {}),
-    staleAssessment,
-  };
+  return { restartedClients, diagnosticEvidence, refreshedAfterRestart };
+}
+
+/** Collect diagnostic-visible unconfirmed files owned by push-only routes. */
+function collectUnconfirmedPushOnlyFiles(host: WorkspaceRecoveryHost): string[] {
+  const files: string[] = [];
+  for (const route of host.getClientDiagnosticRoutes()) {
+    if (route.supportsPull) continue;
+    for (const file of route.unconfirmedFiles) {
+      if (host.isDiagnosticFile(file)) files.push(file);
+    }
+  }
+  return files;
 }
 
 function invalidateDiagnosticEvidence(

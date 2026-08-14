@@ -42,7 +42,7 @@ import { JsonRpcClient, JsonRpcRequestError } from "./transport.ts";
 const SHUTDOWN_TIMEOUT_MS = 5_000;
 
 /** Race an operation against a timeout without retaining the timer after settlement. */
-async function withTimeout<T>(
+export async function withTimeout<T>(
   operation: Promise<T>,
   timeoutMs: number,
   message: string,
@@ -305,6 +305,35 @@ export class LspClient {
         });
       }
     }
+  }
+
+  /**
+   * Terminate the process tree without a protocol handshake.
+   *
+   * Used when a replacement startup exceeds its recovery bound, so the
+   * orphaned server process cannot outlive the failed restart.
+   */
+  async forceKill(): Promise<void> {
+    const pid = this.process?.pid;
+    this.rpc?.dispose();
+    if (pid && this.process?.exitCode === null) {
+      killProcessTree(pid);
+      if (process.platform !== "win32") {
+        // Escalate to SIGKILL after a brief grace period on Unix, mirroring
+        // the graceful shutdown path for servers that ignore SIGTERM.
+        await new Promise<void>((resolve) => {
+          setTimeout(() => {
+            try {
+              process.kill(-pid, "SIGKILL");
+            } catch {
+              // Already dead — ignore.
+            }
+            resolve();
+          }, 500);
+        });
+      }
+    }
+    this.handleProcessFailure(new Error("Client start bound exceeded"));
   }
 
   private handleProcessFailure(reason: Error): void {

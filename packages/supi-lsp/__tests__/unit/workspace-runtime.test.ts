@@ -1,5 +1,12 @@
 import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const debugMocks = vi.hoisted(() => ({ recordDebugEvent: vi.fn() }));
+
+vi.mock("@mrclrchtr/supi-core/debug", () => ({
+  recordDebugEvent: debugMocks.recordDebugEvent,
+}));
+
 import type { LspClient } from "../../src/client/client.ts";
 import type {
   Diagnostic,
@@ -281,6 +288,62 @@ describe("workspace runtime behavior", () => {
     expect(recoveryOptions).toEqual({ restartIfStillStale: true });
   });
 
+  it("records bounded recovery telemetry with elapsed time and restart count", async () => {
+    const recovery = {
+      attemptedClients: 2,
+      restartedClients: 1,
+      diagnosticEvidence: emptyEvidence(),
+      staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+      elapsedMs: 12,
+    };
+    const runtime = createRuntime(
+      makeManager({
+        recoverWorkspaceDiagnostics: async () => recovery,
+      }),
+    );
+
+    await runtime.recoverDiagnostics({ restartIfStillStale: true });
+
+    expect(debugMocks.recordDebugEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "lsp",
+        category: "runtime.recovery",
+        data: expect.objectContaining({
+          outcome: "completed",
+          elapsedMs: 12,
+          attemptedClients: 2,
+          restartedClients: 1,
+        }),
+      }),
+    );
+    debugMocks.recordDebugEvent.mockClear();
+  });
+
+  it("records a failed recovery outcome in telemetry", async () => {
+    const recovery = {
+      attemptedClients: 1,
+      restartedClients: 0,
+      diagnosticEvidence: emptyEvidence(),
+      refreshFailureReason: "refresh failed",
+      staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+      elapsedMs: 4,
+    };
+    const runtime = createRuntime(
+      makeManager({
+        recoverWorkspaceDiagnostics: async () => recovery,
+      }),
+    );
+
+    await runtime.recoverDiagnostics({ restartIfStillStale: true });
+
+    expect(debugMocks.recordDebugEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ outcome: "failed", elapsedMs: 4, restartedClients: 0 }),
+      }),
+    );
+    debugMocks.recordDebugEvent.mockClear();
+  });
+
   it("coordinates tracking, refresh, and workspace-change invalidation", async () => {
     const events: string[] = [];
     const trackedPaths: string[] = [];
@@ -301,7 +364,7 @@ describe("workspace runtime behavior", () => {
           return emptyEvidence();
         },
         clearAllPullResultIds: () => events.push("invalidate-pull-results"),
-        notifyWorkspaceFileChanges: (nextChanges: FileEvent[]) => {
+        noteWorkspaceChanges: (nextChanges: FileEvent[]) => {
           events.push("notify-workspace-changes");
           receivedChanges = nextChanges;
         },

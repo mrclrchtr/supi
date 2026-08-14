@@ -2,7 +2,7 @@
 
 SuPi keeps diagnostic freshness file-local.
 
-Pull-capable servers provide the strongest post-invalidation evidence. Push-only servers may receive one targeted client restart per affected client route during an explicit refresh. Each restart has a bounded startup extension. The result stays partial when confirmation fails.
+Pull-capable servers provide the strongest post-invalidation evidence. Push-only servers may receive one targeted client restart per affected client route during an explicit refresh, and at most one restart per workspace invalidation generation. Each restart has a fixed 5-second startup bound. The result stays partial when confirmation fails.
 
 Work-done progress creation does not make a client active. The client becomes active at `begin`.
 

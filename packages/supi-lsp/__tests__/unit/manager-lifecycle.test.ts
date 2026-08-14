@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../src/client/client.ts", () => ({
+  withTimeout: async <T>(operation: Promise<T>) => operation,
   LspClient: class {
     readonly name: string;
     readonly root: string;

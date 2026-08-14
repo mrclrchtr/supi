@@ -44,6 +44,7 @@ async function collectFileRefreshAttempt(
   return {
     kind: "completed",
     attemptedAt: options.attemptedAt,
+    elapsedMs: Date.now() - options.attemptedAt,
     requestedDiagnosticScope: scope,
     operationScope: "file-runtime",
     attemptedActiveClients: readiness.kind === "ready" ? 1 : 0,
@@ -71,6 +72,7 @@ async function collectWorkspaceRefreshAttempt(
     return {
       kind: "failed",
       attemptedAt: options.attemptedAt,
+      elapsedMs: Date.now() - options.attemptedAt,
       requestedDiagnosticScope: options.diagnosticsScope,
       operationScope: "workspace-runtime",
       diagnosticEvidence: maintenance.diagnosticEvidence,
@@ -93,6 +95,7 @@ async function collectWorkspaceRefreshAttempt(
       return {
         kind: "failed",
         attemptedAt: options.attemptedAt,
+        elapsedMs: Date.now() - options.attemptedAt,
         requestedDiagnosticScope: options.diagnosticsScope,
         operationScope: "workspace-runtime",
         diagnosticEvidence,
@@ -102,6 +105,7 @@ async function collectWorkspaceRefreshAttempt(
     return {
       kind: "completed",
       attemptedAt: options.attemptedAt,
+      elapsedMs: Date.now() - options.attemptedAt,
       requestedDiagnosticScope: options.diagnosticsScope,
       operationScope: "workspace-runtime",
       attemptedActiveClients: recovery.attemptedClients,
@@ -118,6 +122,7 @@ async function collectWorkspaceRefreshAttempt(
     return {
       kind: "failed",
       attemptedAt: options.attemptedAt,
+      elapsedMs: Date.now() - options.attemptedAt,
       requestedDiagnosticScope: options.diagnosticsScope,
       operationScope: "workspace-runtime",
       diagnosticEvidence: maintenance.diagnosticEvidence,

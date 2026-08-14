@@ -270,6 +270,7 @@ async function collectRefreshState(options: RefreshStateOptions): Promise<Health
     const attempt: HealthRefreshAttempt = {
       kind: "failed",
       attemptedAt,
+      elapsedMs: Date.now() - attemptedAt,
       requestedDiagnosticScope: diagnosticsScope,
       operationScope,
       reason: errorMessage(error),

@@ -6,6 +6,7 @@ import {
   mapCodeQueryResult,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
+import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import { createSessionStateRegistry } from "@mrclrchtr/supi-core/session";
 import type {
   CodeAction,
@@ -258,7 +259,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   /** Notify routed clients of workspace file changes and reset pull state. */
   noteWorkspaceChanges(changes: FileEvent[]): void {
     this.manager.clearAllPullResultIds();
-    this.manager.notifyWorkspaceFileChanges(changes);
+    this.manager.noteWorkspaceChanges(changes);
   }
 
   async #shutdown(): Promise<void> {
@@ -310,7 +311,21 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     quietMs?: number;
     control?: CodeRequestControl;
   }): Promise<RecoverDiagnosticsResult> {
-    return this.manager.recoverWorkspaceDiagnostics(options);
+    const result = await this.manager.recoverWorkspaceDiagnostics(options);
+    const outcome = result.refreshFailureReason ? "failed" : "completed";
+    recordDebugEvent({
+      source: "lsp",
+      level: "debug",
+      category: "runtime.recovery",
+      message: `LSP diagnostic recovery ${outcome}`,
+      data: {
+        outcome,
+        elapsedMs: result.elapsedMs,
+        attemptedClients: result.attemptedClients,
+        restartedClients: result.restartedClients,
+      },
+    });
+    return result;
   }
 
   private resolveFilePath(filePath: string): string {
