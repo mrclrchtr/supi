@@ -119,7 +119,10 @@ function parseProjectConfig(configPath: string): ParsedProjectConfig | null {
     configDir,
     parsed.raw.include,
     parsed.raw.exclude,
-    usesDefaultInclude,
+    {
+      useDefaultInclude: usesDefaultInclude,
+      useCaseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
+    },
   );
   const supportedExtensions = new Set(getSupportedExtensions(parsed.options));
   if (parsed.options.resolveJsonModule) supportedExtensions.add(".json");
@@ -147,15 +150,21 @@ function extractExplicitFiles(rawFiles: unknown, configDir: string): Set<string>
   );
 }
 
+interface FileMatcherOptions {
+  useDefaultInclude: boolean;
+  useCaseSensitiveFileNames: boolean;
+}
+
 function createFileMatchers(
   configDir: string,
   rawInclude: unknown,
   rawExclude: unknown,
-  useDefaultInclude: boolean,
+  options: FileMatcherOptions,
 ): {
   includeFilePattern: RegExp | null;
   excludePattern: RegExp | null;
 } {
+  const { useDefaultInclude, useCaseSensitiveFileNames } = options;
   const includeSpecs = Array.isArray(rawInclude)
     ? rawInclude.filter((entry): entry is string => typeof entry === "string")
     : undefined;
@@ -167,13 +176,18 @@ function createFileMatchers(
     excludeSpecs,
     useDefaultInclude ? ["**/*"] : includeSpecs,
   );
+  // normalizePath() lowercases paths when the filesystem is case-insensitive,
+  // so the include/exclude regexes must match case-insensitively too. Otherwise
+  // files created after the parse (absent from fileNames, tested against the
+  // include pattern) are wrongly declared excluded.
+  const regexFlags = useCaseSensitiveFileNames ? undefined : "i";
 
   return {
     includeFilePattern: matcherPatterns.includeFilePattern
-      ? new RegExp(matcherPatterns.includeFilePattern)
+      ? new RegExp(matcherPatterns.includeFilePattern, regexFlags)
       : null,
     excludePattern: matcherPatterns.excludePattern
-      ? new RegExp(matcherPatterns.excludePattern)
+      ? new RegExp(matcherPatterns.excludePattern, regexFlags)
       : null,
   };
 }

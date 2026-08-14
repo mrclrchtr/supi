@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import ts from "typescript";
 import { afterEach, describe, expect, it } from "vitest";
 import { clearTsconfigCache, isFileExcludedByTsconfig } from "../../src/config/tsconfig-scope.ts";
 
@@ -126,6 +127,33 @@ describe("isFileExcludedByTsconfig", () => {
       expect(isFileExcludedByTsconfig("src/app.js", tempRoot)).toBe(false);
       expect(isFileExcludedByTsconfig("src/app.ts", tempRoot)).toBe(true);
     } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("includes a file created after the first config parse on a case-insensitive filesystem", () => {
+    // Uppercase prefix guarantees a real case mismatch between the regex
+    // pattern (built from the config dir) and the lowercased target path,
+    // on any platform.
+    // biome-ignore lint/security/noSecrets: temp dir prefix, not a secret
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "SupiLspPostParse-"));
+    const originalCaseSensitivity = ts.sys.useCaseSensitiveFileNames;
+    ts.sys.useCaseSensitiveFileNames = false;
+    try {
+      const projectRoot = path.join(tempRoot, "project");
+      fs.mkdirSync(path.join(projectRoot, "src"), { recursive: true });
+      fs.writeFileSync(path.join(projectRoot, "tsconfig.json"), '{"include":["src/**/*.ts"]}');
+
+      // Prime the cached parse while the file does not exist yet.
+      fs.writeFileSync(path.join(projectRoot, "src/existing.ts"), "export const ok = true;\n");
+      expect(isFileExcludedByTsconfig("src/existing.ts", projectRoot)).toBe(false);
+
+      // The file is created after the parse was cached, so it is absent from
+      // the cached fileNames set and must fall through to the include pattern.
+      fs.writeFileSync(path.join(projectRoot, "src/late.ts"), "export const late = true;\n");
+      expect(isFileExcludedByTsconfig("src/late.ts", projectRoot)).toBe(false);
+    } finally {
+      ts.sys.useCaseSensitiveFileNames = originalCaseSensitivity;
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
   });
