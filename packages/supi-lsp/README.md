@@ -20,22 +20,26 @@ npm install @mrclrchtr/supi-lsp
 
 The runtime starts an installed server when the project contains a matching file type and, where configured, a root marker. Some built-in servers use extension-based discovery without a root marker. Built-in command names must be on `PATH`; a configured absolute command path is also supported. This table describes diagnostic support, not the full semantic feature set. A push server can still provide hover, definitions, references, symbols, and refactors.
 
-The table is an observed capability audit for the configured server versions. The server handshake is authoritative and can report a different mode after an upgrade.
+The table records an initialize-handshake audit performed on 2026-08-21 against the locally installed server versions. The handshake is authoritative and can report a different mode after an upgrade; treat rows marked `unverified` as unknown until a probe confirms them. Pull-capability facts come from the official LSP specification (pull diagnostics are a 3.17 feature; 3.18 is the current specification at microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification).
 
-| Language | Server binary | Observed pull diagnostics | Built-in SuPi mode | User notes |
+| Language | Server binary | Pull diagnostics (probe) | Built-in SuPi mode | Notes |
 |---|---|---|---|---|
-| TypeScript / JavaScript | `typescript-language-server` | No | Push | Diagnostics arrive through `publishDiagnostics`. |
-| Python | `pyright-langserver` | Conditional | Push | Pull uses dynamic registration. SuPi does not enable that registration yet. |
-| Rust | `rust-analyzer` | Yes | Pull | The server advertises `diagnosticProvider`. |
-| Go | `gopls` | Conditional | Push | Some versions accept `initializationOptions.pullDiagnostics: true`; the handshake is authoritative. |
-| C / C++ | `clangd` | No | Push | Diagnostics use `publishDiagnostics`. |
-| Ruby | `ruby-lsp` | Yes | Pull | The server uses the project Ruby environment. |
-| Java | `jdtls` | No | Push | Diagnostics use `publishDiagnostics`. |
-| Kotlin | `kotlin-lsp` | Yes | Pull when configured | Kotlin LSP needs the `--stdio` argument. |
-| Bash | `bash-language-server` | No | Push | Diagnostics use `publishDiagnostics`. |
-| HTML | `vscode-html-language-server` | Yes | Pull | Install `vscode-langservers-extracted`. |
-| SQL | `sql-language-server` | No | Push | Diagnostics use `publishDiagnostics`. |
-| R | `R` | No | Push | Install the R `languageserver` package. |
+| TypeScript / JavaScript | `typescript-language-server` 5.3.0 | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
+| Python | `pyright-langserver` | No (confirmed) | Push | No `diagnosticProvider` even when the client advertises dynamic pull registration. |
+| Rust | `rust-analyzer` 0.0.0 (2026-08-10) | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
+| Go | `gopls` v0.23.0 | Conditional (confirmed) | Push | Default is push; `initializationOptions.pullDiagnostics: true` makes gopls advertise `diagnosticProvider`. Keep push while golang/go#70199 stays open; initial pull support tracked in golang/go#53275. |
+| C / C++ | `clangd` 21.0.0 | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
+| Ruby | `ruby-lsp` 0.26.10 | No (confirmed) | Push | No `diagnosticProvider`. The server also refuses to start in a project that has a `Gemfile` without a `Gemfile.lock`. |
+| Java | `jdtls` | Unverified | Push | Probe limitation: the wrapper needs a workspace launch configuration; the version probe did not respond. |
+| Kotlin | `kotlin-lsp` | Unverified | Push when configured | Probe limitation: the binary is not installed in the audit environment. Upstream requires the `--stdio` argument. |
+| Bash | `bash-language-server` 5.6.0 | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
+| HTML | `vscode-html-language-server` | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
+| SQL | `sql-language-server` 1.7.1 | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
+| R | `R` 4.6.1 (languageserver) | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
+
+SuPi advertises static-only pull support (`textDocument.diagnostic.dynamicRegistration: false`) and answers `client/registerCapability` without acting on it, so only a server that declares `diagnosticProvider` at initialize time gets pull diagnostics. Protocol support is separate from the configured mode: a server may support pull yet stay in SuPi's push mode because the built-in configuration does not enable it.
+
+The LSP 3.18 specification adds `Diagnostic.message` markup content, guarded by the client capability `textDocument.diagnostic.markupMessageSupport`; SuPi's validator already accepts plaintext and markdown messages but does not advertise the capability. Other 3.18 features (snippet text edits, inline completion, folding-range refresh, multi-range formatting) are outside the diagnostic surface and are not implemented.
 
 Pull diagnostics use `textDocument/diagnostic`, so the client can tie a report to the current request. Push diagnostics are asynchronous and can omit a document version. After a workspace change, SuPi may report push-only diagnostics as partial or unavailable when it cannot prove that the result matches the current document. It does not treat missing fresh evidence as a clean file.
 
