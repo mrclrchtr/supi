@@ -15,6 +15,7 @@ import { stripHumanDetail } from "../forensics/redact.ts";
 import { formatForensicsReport } from "../report/forensics.ts";
 import { type CacheReportSnapshot, formatCacheReport } from "../report/history.ts";
 import { registerCacheMonitorSettings } from "../settings-registration.ts";
+import { boundForensicsOutput } from "../tool/bound.ts";
 import { promptGuidelines, promptSnippet, toolDescription } from "../tool/guidance.ts";
 import { CacheMonitorState, type RegressionResult } from "./state.ts";
 import { formatCacheStatus } from "./status.ts";
@@ -285,9 +286,16 @@ export default function cacheMonitorExtension(pi: ExtensionAPI) {
         result.findings = stripHumanDetail(result.findings);
       }
 
+      const output = boundForensicsOutput(result, {
+        pattern: params.pattern as "hotspots" | "breakdown" | "correlate" | "idle",
+        since: (params.since as string) ?? "7d",
+        minDrop: (params.minDrop as number) ?? 0,
+        maxSessions: (params.maxSessions as number) ?? 100,
+      });
+
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-        details: undefined,
+        content: [{ type: "text", text: output.text }],
+        details: output.fullOutputPath ? { fullOutputPath: output.fullOutputPath } : undefined,
       };
     },
   });
