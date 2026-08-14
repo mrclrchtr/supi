@@ -25,10 +25,14 @@ function policyInstructions(policy: PostReviewPolicy): string[] {
       ];
     case "verify-and-fix":
       return [
-        "Independently confirm or refute every finding, then fix every confirmed finding that still applies in the live checkout.",
+        "Run the applicability gate first: reject findings that are refuted by evidence, stale, duplicated, incompatible with other findings, or no longer applicable to the live checkout.",
+        "Then perform full Finding Verification: independently confirm or refute every remaining finding against the reviewed target and the live checkout, and fix only the findings that are confirmed and still apply.",
       ];
     case "fix":
-      return ["Fix every reported finding, including non-blocking and low-confidence findings."];
+      return [
+        "Run the light applicability gate first: reject findings that are refuted by evidence, stale, duplicated, incompatible with other findings, or no longer applicable to the live checkout.",
+        "Then fix every remaining finding, including non-blocking and low-confidence findings. The light gate suffices; full independent verification is not required.",
+      ];
     case "report":
       return [
         "Report the review result and stop. Do not verify findings, edit code, or ask a post-review question.",
@@ -61,7 +65,7 @@ export function buildPostReviewInstruction(
   }
   lines.push(
     ...policyInstructions(policy),
-    "Whenever this flow results in fixes, reconcile duplicate findings and verify incompatible ones. If the live checkout differs from the reviewed after-state, re-verify affected findings against live code and fix those that still apply.",
+    "Whenever this flow results in fixes, the applicability gate comes first: fix only findings that are current, non-duplicate, compatible with other findings, and actionable against the live checkout.",
     "After non-trivial edits, run an existing targeted check when available; report what ran or why it was skipped.",
   );
   return wrapExtensionContext("supi-review", lines.join("\n"), {
