@@ -111,7 +111,7 @@ export class LspClient {
   private readonly diagnostics: ClientDiagnostics;
 
   // ── Readiness (work-done-progress) ──────────────────────────────────
-  private trackedTokens = new Map<ProgressToken, "begin-seen" | "ended">();
+  private trackedTokens = new Map<ProgressToken, "created" | "active" | "ended">();
   private _readyPromise: Promise<void> | null = null;
   private _readyResolve: (() => void) | undefined;
   private _readyReject: ((err: Error) => void) | undefined;
@@ -588,22 +588,11 @@ export class LspClient {
       case "client/unregisterCapability":
         return null;
       case "window/workDoneProgress/create": {
+        // A create reserves a token; it does not prove active work. The
+        // token stays pending and readiness is untouched until a begin
+        // arrives, so an unused token never causes false readiness loss.
         const token = (params as { token: ProgressToken }).token;
-        this.trackedTokens.set(token, "begin-seen");
-        this.cancelNoProgressTimer();
-        const wasReady = this._isReady;
-        this._isReady = false;
-        if (wasReady) this.publishLifecycle("readiness");
-        if (!this._readyPromise) {
-          this._readyPromise = new Promise<void>((resolve, reject) => {
-            this._readyResolve = resolve;
-            this._readyReject = reject;
-          });
-          // Prevent unhandled rejection when rejectReady fires before any
-          // consumer is actively awaiting this promise (e.g. during shutdown).
-          this._readyPromise.catch(() => {});
-        }
-        this.startTokenTimeout(token);
+        this.trackedTokens.set(token, "created");
         return null;
       }
       default:
@@ -666,10 +655,12 @@ export class LspClient {
         message: `Readiness progress begin for token ${token}`,
         data: { token },
       });
-      // Cancel the 2s no-progress grace timer — a server that sends
-      // begin without a prior create is spec-deviant but valid.
+      // begin is the only transition that proves active work: it cancels
+      // the no-progress grace timer, blocks readiness, and arms the
+      // bounded per-token timeout. A server that sends begin without a
+      // prior create is spec-deviant but valid.
       this.cancelNoProgressTimer();
-      this.trackedTokens.set(token, "begin-seen");
+      this.trackedTokens.set(token, "active");
       const wasReady = this._isReady;
       this._isReady = false;
       if (wasReady) this.publishLifecycle("readiness");
@@ -692,19 +683,31 @@ export class LspClient {
         message: `Readiness progress end for token ${token}`,
         data: { token },
       });
+      const state = this.trackedTokens.get(token);
+      if (state === undefined) return; // Unknown token: ignore fail-closed.
+      if (state === "created") {
+        // A pending token never blocked readiness; its end removes it.
+        this.trackedTokens.delete(token);
+        return;
+      }
       this.trackedTokens.set(token, "ended");
       this.clearTokenTimeout(token);
       this.checkAllTokensEnded();
     }
-    // kind: "report" — intentionally no-op
+    // kind: "report" — intentionally no-op; active state is retained.
   }
 
-  /** Check whether all tracked tokens have ended and resolve readiness. */
-  private checkAllTokensEnded(): void {
-    if (this.trackedTokens.size === 0) return;
+  /** Test whether any token has active (begun) work. */
+  private hasActiveTokens(): boolean {
     for (const state of this.trackedTokens.values()) {
-      if (state !== "ended") return;
+      if (state === "active") return true;
     }
+    return false;
+  }
+
+  /** Resolve readiness when no token is active; pending tokens do not block. */
+  private checkAllTokensEnded(): void {
+    if (this.hasActiveTokens()) return;
     this.trackedTokens.clear();
     this.resolveReady();
   }
@@ -717,6 +720,9 @@ export class LspClient {
       this._readyResolve = undefined;
       this._readyReject = undefined;
     }
+    // A rejected or disposed client must never be marked ready again,
+    // even if a stray progress end arrives after the rejection.
+    if (this._status !== "running") return;
     const becameReady = !this._isReady;
     this._isReady = true;
     if (becameReady) this.publishLifecycle("readiness");
@@ -726,6 +732,18 @@ export class LspClient {
       category: "readiness.resolved",
       message: `LSP client ${this.name} is ready (cwd: ${this.root})`,
     });
+  }
+
+  /**
+   * Tear down readiness state without a protocol shutdown.
+   *
+   * Clears pending and active progress tokens and rejects any pending
+   * readiness. Called when a client is discarded or its observer is
+   * disposed so token state cannot outlive the client.
+   */
+  dispose(): void {
+    this.cancelNoProgressTimer();
+    this.rejectReady(new Error("Client disposed"));
   }
 
   /**
@@ -810,7 +828,7 @@ export class LspClient {
    */
   private armNoProgressTimer(): void {
     this.noProgressTimer = setTimeout(() => {
-      if (this.trackedTokens.size === 0 && this._status === "running") {
+      if (!this.hasActiveTokens() && this._status === "running") {
         recordDebugEvent({
           source: "lsp",
           level: "debug",

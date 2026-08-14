@@ -56,6 +56,13 @@ export class JsonRpcClient {
       this.notificationHandler?.(method, params);
     });
 
+    // vscode-jsonrpc registers an internal $/progress handler that never
+    // reaches the catch-all handler. Route it explicitly so LSP progress
+    // notifications reach the client's readiness state machine.
+    this.connection.onNotification("$/progress", (params) => {
+      this.notificationHandler?.("$/progress", params);
+    });
+
     // Register catch-all request handler for server-initiated requests
     this.connection.onRequest(async (method, params, _token) => {
       if (!this.requestHandler) {

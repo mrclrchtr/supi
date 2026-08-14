@@ -46,6 +46,32 @@ function pushConfig(longDelayMs: number, marker: string, shortDelayMs: number): 
   };
 }
 
+/** Progress fixture: the server emits a configurable work-done-progress sequence. */
+function progressConfig(
+  sequence: "normal" | "create-only" | "begin-only" | "end-only" | "duplicate-create",
+  stepMs = 40,
+  readinessTimeoutMs = 200,
+): LspConfig {
+  return {
+    servers: {
+      test: {
+        command: process.execPath,
+        args: [server, "progress", sequence, String(stepMs)],
+        fileTypes: ["test"],
+        rootMarkers: ["package.json"],
+        readinessTimeoutMs,
+      },
+    },
+  };
+}
+
+/** Count readiness-loss transitions (semantic readiness dropped to false). */
+function readinessLosses(transitions: ManagerLifecycleTransition[]): number {
+  return transitions.filter(
+    (transition) => transition.kind === "readiness" && !transition.semanticReady,
+  ).length;
+}
+
 afterEach(async () => {
   await Promise.all(managers.splice(0).map((manager) => manager.shutdownAll()));
   for (const directory of tempDirs.splice(0)) {
@@ -158,5 +184,91 @@ describe("LSP manager lifecycle integration", () => {
     expect(text).toMatch(/^fresh-\d+$/);
     const publisherPid = Number.parseInt(text.slice("fresh-".length), 10);
     expect(publisherPid).not.toBe(originalPid);
+  }, 10_000);
+
+  it("resolves readiness through a real create→begin→report→end sequence", async () => {
+    const root = createProject();
+    const transitions: ManagerLifecycleTransition[] = [];
+    const manager = new LspManager(progressConfig("normal"), root, (transition) => {
+      transitions.push(transition);
+    });
+    managers.push(manager);
+
+    const client = await manager.startServerForRoot("test", root);
+    if (!client) throw new Error("Expected the progress client to start.");
+    const started = Date.now();
+    await waitFor(
+      async () => client.ready,
+      (ready) => ready === true,
+      { timeoutMs: 5_000, retryDelayMs: 20, label: "progress sequence readiness" },
+    );
+
+    // The begin→end cycle resolves well before the 2s grace window, which
+    // proves the readiness path ran through the progress tokens.
+    expect(Date.now() - started).toBeLessThan(1_500);
+    expect(transitions.at(-1)).toMatchObject({ kind: "readiness", semanticReady: true });
+  }, 10_000);
+
+  it("does not lose readiness for a created token that never begins", async () => {
+    const root = createProject();
+    const transitions: ManagerLifecycleTransition[] = [];
+    const manager = new LspManager(progressConfig("create-only", 40, 200), root, (transition) => {
+      transitions.push(transition);
+    });
+    managers.push(manager);
+
+    const client = await manager.startServerForRoot("test", root);
+    if (!client) throw new Error("Expected the progress client to start.");
+    await waitFor(
+      async () => client.ready,
+      (ready) => ready === true,
+      { timeoutMs: 5_000, retryDelayMs: 20, label: "create-only readiness" },
+    );
+
+    // The unused token never produced a readiness loss; the grace window
+    // resolved readiness without any per-token timeout transition.
+    expect(readinessLosses(transitions)).toBe(0);
+  }, 10_000);
+
+  it("bounds readiness for a begin without a prior create", async () => {
+    const root = createProject();
+    const transitions: ManagerLifecycleTransition[] = [];
+    const manager = new LspManager(progressConfig("begin-only", 40, 200), root, (transition) => {
+      transitions.push(transition);
+    });
+    managers.push(manager);
+
+    const client = await manager.startServerForRoot("test", root);
+    if (!client) throw new Error("Expected the progress client to start.");
+    const started = Date.now();
+    await waitFor(
+      async () => client.ready,
+      (ready) => ready === true,
+      { timeoutMs: 5_000, retryDelayMs: 20, label: "begin-only readiness" },
+    );
+
+    // begin blocks readiness and the bounded token timeout restores it well
+    // before the 2s grace window would have resolved.
+    expect(Date.now() - started).toBeLessThan(1_500);
+    expect(transitions.at(-1)).toMatchObject({ kind: "readiness", semanticReady: true });
+  }, 10_000);
+
+  it("ignores an end for a token that was never created", async () => {
+    const root = createProject();
+    const transitions: ManagerLifecycleTransition[] = [];
+    const manager = new LspManager(progressConfig("end-only", 40, 200), root, (transition) => {
+      transitions.push(transition);
+    });
+    managers.push(manager);
+
+    const client = await manager.startServerForRoot("test", root);
+    if (!client) throw new Error("Expected the progress client to start.");
+    await waitFor(
+      async () => client.ready,
+      (ready) => ready === true,
+      { timeoutMs: 5_000, retryDelayMs: 20, label: "end-only readiness" },
+    );
+
+    expect(readinessLosses(transitions)).toBe(0);
   }, 10_000);
 });

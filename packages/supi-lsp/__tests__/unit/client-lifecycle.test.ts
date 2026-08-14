@@ -63,18 +63,22 @@ describe("LspClient lifecycle publication", () => {
     expect(transitions).toEqual(["readiness"]);
   });
 
-  it("publishes late readiness loss and recovery", async () => {
+  it("publishes readiness loss only on begin and recovery on end", async () => {
     const transitions: string[] = [];
     const client = createRunningClient(transitions) as unknown as TestClient;
     await vi.advanceTimersByTimeAsync(2_000);
 
     client.handleServerRequest("window/workDoneProgress/create", { token: "late" });
 
+    // A pending token never blocks a ready client (issue #319).
+    expect(client.ready).toBe(true);
+    expect(transitions).toEqual(["readiness"]);
+
+    client.handleProgress({ token: "late", value: { kind: "begin" } });
     expect(client.ready).toBe(false);
     expect(transitions).toEqual(["readiness", "readiness"]);
 
     client.handleProgress({ token: "late", value: { kind: "end" } });
-
     expect(client.ready).toBe(true);
     expect(transitions).toEqual(["readiness", "readiness", "readiness"]);
   });

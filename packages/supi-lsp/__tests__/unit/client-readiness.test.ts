@@ -266,17 +266,22 @@ describe("LspClient readiness state machine", () => {
     await expect(readyPromise).resolves.toBeUndefined();
   });
 
-  // ── Test 10: No-progress timer cancelled by window/workDoneProgress/create ──
-  it("does not resolve ready at 2s when create arrives before timer fires", async () => {
-    const client = createClient();
+  // ── Test 10: create is pending and does not cancel the grace window ──
+  it("resolves ready at 2s when create arrives without begin", async () => {
+    const client = createClient({ readinessTimeoutMs: 100 });
 
     // Send create request at 1s (before the 2s timer fires)
     await vi.advanceTimersByTimeAsync(1_000);
     sendCreateProgress(client, "token-1");
+    expect(client.ready).toBe(false);
 
-    // Advance to 2s+ — timer should have been cancelled
-    await vi.advanceTimersByTimeAsync(1_500);
-    expect(client.ready).toBe(false); // still waiting for begin/end
+    // No per-token timeout may resolve early for a pending token.
+    await vi.advanceTimersByTimeAsync(100);
+    expect(client.ready).toBe(false);
+
+    // The 2s no-progress window still resolves readiness.
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(client.ready).toBe(true);
   });
 
   // ── Test 11: No-progress timer cancelled by $/progress begin (no prior create) ──
@@ -308,16 +313,117 @@ describe("LspClient readiness state machine", () => {
     expect(client.ready).toBe(false);
   });
 
-  // ── Test 13: create without begin → timeout resolves ready ─────────
-  it("resolves ready via per-token timeout when create arrives without begin", async () => {
+  // ── Test 13: create without begin never blocks a ready client ──────
+  it("does not block readiness when create arrives without begin", async () => {
+    const client = createClient({ readinessTimeoutMs: 100 });
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(client.ready).toBe(true);
+
+    sendCreateProgress(client, "token-1");
+    expect(client.ready).toBe(true);
+    // No per-token timeout is armed for a pending token.
+    expect((client as AnyClient).tokenTimeouts.size ?? 0).toBe(0);
+    // The pending token stays tracked until end, begin, or teardown.
+    expect((client as AnyClient).trackedTokens.has("token-1")).toBe(true);
+  });
+
+  // ── Test 19: begin after create arms the bounded token timeout ─────
+  it("starts the bounded token timeout only after begin", async () => {
     const client = createClient({ readinessTimeoutMs: 100 });
 
     sendCreateProgress(client, "token-1");
     expect(client.ready).toBe(false);
+    expect((client as AnyClient).tokenTimeouts.size ?? 0).toBe(0);
 
-    // No begin ever sent — timeout should fire
+    sendProgress(client, "token-1", "begin");
+    expect(client.ready).toBe(false);
+    expect((client as AnyClient).tokenTimeouts.size ?? 0).toBe(1);
+
     await vi.advanceTimersByTimeAsync(100);
     expect(client.ready).toBe(true);
+  });
+
+  // ── Test 20: duplicate create is inert ─────────────────────────────
+  it("treats duplicate create requests as inert", async () => {
+    const client = createClient();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(client.ready).toBe(true);
+
+    sendCreateProgress(client, "token-1");
+    sendCreateProgress(client, "token-1");
+    expect(client.ready).toBe(true);
+    expect((client as AnyClient).trackedTokens.get("token-1")).toBe("created");
+    expect((client as AnyClient).tokenTimeouts.size ?? 0).toBe(0);
+  });
+
+  // ── Test 21: end for an unknown token is ignored ───────────────────
+  it("ignores end for a token that was never created", async () => {
+    const client = createClient();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(client.ready).toBe(true);
+
+    sendProgress(client, "ghost-token", "end");
+    expect(client.ready).toBe(true);
+    expect((client as AnyClient).trackedTokens.has("ghost-token")).toBe(false);
+  });
+
+  // ── Test 22: end for a pending token removes it without blocking ───
+  it("removes a pending token on end without blocking readiness", async () => {
+    const client = createClient();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(client.ready).toBe(true);
+
+    sendCreateProgress(client, "token-1");
+    sendProgress(client, "token-1", "end");
+    expect(client.ready).toBe(true);
+    expect((client as AnyClient).trackedTokens.has("token-1")).toBe(false);
+  });
+
+  // ── Test 23: report retains the active state ───────────────────────
+  it("retains the active state across report notifications", async () => {
+    const client = createClient();
+
+    sendProgress(client, "token-1", "begin");
+    expect(client.ready).toBe(false);
+    sendProgress(client, "token-1", "report");
+    expect(client.ready).toBe(false);
+    sendProgress(client, "token-1", "report");
+    expect(client.ready).toBe(false);
+
+    sendProgress(client, "token-1", "end");
+    expect(client.ready).toBe(true);
+  });
+
+  // ── Test 24: stray end after crash cannot restore readiness ────────
+  it("does not restore readiness from a stray end after a crash", async () => {
+    const client = createClient();
+    sendProgress(client, "token-1", "begin");
+    (client as AnyClient).rejectReady?.(new Error("Client crashed"));
+    (client as AnyClient)._status = "error";
+    await vi.advanceTimersByTimeAsync(0);
+    expect(client.ready).toBe(false);
+
+    sendProgress(client, "token-1", "end");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(client.ready).toBe(false);
+  });
+
+  // ── Test 25: dispose tears down tokens and rejects readiness ───────
+  it("tears down pending tokens and rejects readiness on dispose", async () => {
+    const client = createClient();
+    sendCreateProgress(client, "token-1");
+    sendProgress(client, "token-1", "begin");
+    expect(client.ready).toBe(false);
+
+    const readyPromise = (client as AnyClient).getReady?.();
+    readyPromise.catch(() => {});
+    (client as AnyClient).dispose?.();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(client.ready).toBe(false);
+    expect((client as AnyClient).trackedTokens.size ?? 0).toBe(0);
+    expect((client as AnyClient).tokenTimeouts.size ?? 0).toBe(0);
+    await expect(readyPromise).rejects.toThrow("Client disposed");
   });
 
   // ── Test 14: process error handler rejects pending readiness ────────

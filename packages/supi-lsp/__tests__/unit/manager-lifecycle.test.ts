@@ -56,6 +56,10 @@ vi.mock("../../src/client/client.ts", () => ({
       this.listener?.("shutdown");
     }
 
+    dispose(): void {
+      this.ready = false;
+    }
+
     becomeReady(): void {
       this.ready = true;
       this.listener?.("readiness");

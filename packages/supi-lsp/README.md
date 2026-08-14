@@ -39,6 +39,8 @@ The table is an observed capability audit for the configured server versions. Th
 
 Pull diagnostics use `textDocument/diagnostic`, so the client can tie a report to the current request. Push diagnostics are asynchronous and can omit a document version. After a workspace change, SuPi may report push-only diagnostics as partial or unavailable when it cannot prove that the result matches the current document. It does not treat missing fresh evidence as a clean file.
 
+Server readiness follows LSP work-done progress: a created progress token is pending and never blocks readiness; an observed `begin` marks active work and makes the client not ready until its `end` or the bounded per-token timeout.
+
 A workspace diagnostic refresh returns exact coverage counts for requested, confirmed, unconfirmed, failed, and removed tracked documents. `code_health` marks tracked-file diagnostics as complete only when every document in the requested scope has confirmed evidence. It keeps cached diagnostics as partial evidence and shows the same coverage counts in summary and detailed views; a refresh attempt does not prove fresh evidence by itself.
 
 An explicit recovery pass may restart a push-only client that stays unconfirmed after the first refresh. It never restarts a pull-capable client because push evidence is absent, and it never restarts a client during passive health display. Each client route restarts at most once per workspace invalidation generation. The replacement process has a fixed startup bound of 5 seconds; exceeding the bound fails closed as start-failed without retry. Recovery telemetry records the outcome, elapsed time, attempted clients, and restart count without changing the evidence semantics of the result.

@@ -615,6 +615,9 @@ export class LspManager {
   async shutdownAll(): Promise<void> {
     const shutdowns = Array.from(this.clients.values()).map((c) => c.shutdown().catch(() => {}));
     await Promise.all(shutdowns);
+    // Dispose every client so pending or active progress tokens and
+    // readiness promises cannot outlive the manager.
+    for (const client of this.clients.values()) client.dispose();
     this.clients.clear();
     this.clientGenerations.clear();
     this.recoveryRestartEpochs.clear();

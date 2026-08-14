@@ -12,6 +12,9 @@ function send(message) {
   process.stdout.write(`Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
 }
 
+const progressSequence = process.argv[3] ?? "normal";
+const progressStepMs = Number(process.argv[4] ?? 40);
+
 let pushDelayMs = pushLongDelayMs;
 if (mode === "push" && crashMarker) {
   try {
@@ -26,6 +29,72 @@ if (mode === "push" && crashMarker) {
 function schedulePush(textDocument) {
   const { uri, version } = textDocument;
   setTimeout(() => publishDiagnostics(uri, version), pushDelayMs);
+}
+
+function sendProgressNotification(token, kind) {
+  send({
+    jsonrpc: "2.0",
+    method: "$/progress",
+    params: {
+      token,
+      value: { kind, title: kind === "begin" ? "Indexing" : undefined },
+    },
+  });
+}
+
+function runProgressSequence(sequence, stepMs) {
+  const token = "progress-token-1";
+  const at = (step, run) => setTimeout(run, step * stepMs);
+  switch (sequence) {
+    case "create-only":
+      at(0, () =>
+        send({
+          jsonrpc: "2.0",
+          id: 99,
+          method: "window/workDoneProgress/create",
+          params: { token },
+        }),
+      );
+      return;
+    case "begin-only":
+      at(1, () => sendProgressNotification(token, "begin"));
+      return;
+    case "end-only":
+      at(1, () => sendProgressNotification(token, "end"));
+      return;
+    case "duplicate-create":
+      at(0, () =>
+        send({
+          jsonrpc: "2.0",
+          id: 99,
+          method: "window/workDoneProgress/create",
+          params: { token },
+        }),
+      );
+      at(1, () =>
+        send({
+          jsonrpc: "2.0",
+          id: 100,
+          method: "window/workDoneProgress/create",
+          params: { token },
+        }),
+      );
+      at(2, () => sendProgressNotification(token, "begin"));
+      at(3, () => sendProgressNotification(token, "end"));
+      return;
+    default:
+      at(0, () =>
+        send({
+          jsonrpc: "2.0",
+          id: 99,
+          method: "window/workDoneProgress/create",
+          params: { token },
+        }),
+      );
+      at(1, () => sendProgressNotification(token, "begin"));
+      at(2, () => sendProgressNotification(token, "report"));
+      at(3, () => sendProgressNotification(token, "end"));
+  }
 }
 
 function publishDiagnostics(uri, version) {
@@ -53,6 +122,10 @@ function handle(message) {
   }
   if (message.method === "initialized" && shouldCrash()) {
     setTimeout(() => process.exit(17), delayMs);
+    return;
+  }
+  if (mode === "progress" && message.method === "initialized") {
+    runProgressSequence(progressSequence, progressStepMs);
     return;
   }
   if (mode === "push" && message.method === "textDocument/didOpen") {
