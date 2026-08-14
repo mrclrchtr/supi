@@ -2,6 +2,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import { isCodeRequestInterruption } from "@mrclrchtr/supi-code-runtime/api";
 import { uriToFile } from "@mrclrchtr/supi-core/path";
 import type { Diagnostic } from "@mrclrchtr/supi-lsp/api";
 import {
@@ -263,6 +264,7 @@ async function collectDefinitionTargets(
       evidenceLists: [evidence.metadata],
     };
   } catch (error) {
+    if (isCodeRequestInterruption(error, deps.requestControl)) throw error;
     return {
       items: [],
       hasSemanticEvidence: false,
@@ -336,6 +338,7 @@ async function buildDiagnosticsSection(
       evidenceLists: [evidence.metadata],
     };
   } catch (error) {
+    if (isCodeRequestInterruption(error, deps.requestControl)) throw error;
     return unavailableTargetSection(
       [{ kind: "paragraph", text: "Diagnostics failed to load." }],
       false,

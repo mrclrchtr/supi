@@ -122,7 +122,8 @@ export async function gatherSubstrateContext(
           character: character - 1,
         });
         if (hoverResult.kind !== "unavailable" && hoverResult.data) hover = hoverResult.data;
-      } catch {
+      } catch (error) {
+        if (isCodeRequestInterruption(error, requestControl)) throw error;
         // hover failed — continue without it
       }
     }
@@ -140,7 +141,8 @@ export async function gatherSubstrateContext(
             range: loc.range,
           }));
         }
-      } catch {
+      } catch (error) {
+        if (isCodeRequestInterruption(error, requestControl)) throw error;
         // definition failed — continue without it
       }
     }

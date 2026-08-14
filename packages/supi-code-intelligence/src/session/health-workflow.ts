@@ -1,5 +1,7 @@
 /** Session-owned workspace health workflow. */
+
 import type { CapabilityState } from "@mrclrchtr/supi-code-runtime/api";
+import { isCodeRequestInterruption } from "@mrclrchtr/supi-code-runtime/api";
 import type {
   LspRuntimeController,
   WorkspaceLspRuntime,
@@ -105,6 +107,9 @@ export async function runHealthWorkflow(
         ? refresh.diagnosticEvidence
         : undefined,
   });
+  // A cancellation that landed during diagnostic resolution must not produce
+  // a completed health result the caller no longer awaits.
+  throwIfAborted(control);
   const servers = collectServers(runtime, included);
   const capabilityWarnings = collectCapabilityWarnings(semanticRequested, deps);
 
@@ -121,6 +126,7 @@ export async function runHealthWorkflow(
     capabilityWarnings: capabilityWarnings?.hasWarnings ? capabilityWarnings : undefined,
   };
 
+  throwIfAborted(control);
   return { kind: "completed", data };
 }
 function healthNeedsSemantic(included: readonly HealthSection[]): boolean {
@@ -267,6 +273,9 @@ async function collectRefreshState(options: RefreshStateOptions): Promise<Health
     deps.trackRefreshAttempt(attempt);
     return attempt;
   } catch (error) {
+    // Cancellation must propagate; a cancelled caller no longer awaits a
+    // recorded failed attempt or the refresh data it would carry.
+    if (isCodeRequestInterruption(error, options.control)) throw error;
     const attempt: HealthRefreshAttempt = {
       kind: "failed",
       attemptedAt,

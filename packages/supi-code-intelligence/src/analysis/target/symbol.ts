@@ -7,9 +7,11 @@
  */
 
 import * as path from "node:path";
-import type {
-  CodeSymbol,
-  SemanticProvider as SemanticSubstrate,
+import {
+  type CodeRequestControl,
+  type CodeSymbol,
+  isCodeRequestInterruption,
+  type SemanticProvider as SemanticSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import type { TargetSymbolKind } from "../../session/target-input.ts";
@@ -59,6 +61,7 @@ function anchorOf(s: CodeSymbol): CodeSymbol["declarationAnchor"] {
 async function refineResolvedSymbolAnchor(
   workspaceSymbol: CodeSymbol,
   semantic: SemanticSubstrate,
+  control?: CodeRequestControl,
 ): Promise<CodeSymbol> {
   try {
     const result = await semantic.documentSymbols(workspaceSymbol.file);
@@ -84,7 +87,8 @@ async function refineResolvedSymbolAnchor(
     }
 
     return refined;
-  } catch {
+  } catch (error) {
+    if (isCodeRequestInterruption(error, control)) throw error;
     return workspaceSymbol;
   }
 }
@@ -107,6 +111,7 @@ export async function resolveSymbolTarget(
     kind?: TargetSymbolKind;
     exportedOnly?: boolean;
     maxResults?: number;
+    control?: CodeRequestControl;
   },
 ): Promise<TargetOutcome> {
   const result = await semantic.workspaceSymbols(symbol);
@@ -150,12 +155,25 @@ export async function resolveSymbolTarget(
         cwd,
         maxResults: options.maxResults,
         requestedKind,
+        control: options.control,
       });
     }
-    return resolveCandidates(exactKind, semantic, cwd, options.maxResults);
+    return resolveCandidates({
+      candidates: exactKind,
+      semantic,
+      cwd,
+      maxResults: options.maxResults,
+      control: options.control,
+    });
   }
 
-  return resolveCandidates(eligible, semantic, cwd, options?.maxResults);
+  return resolveCandidates({
+    candidates: eligible,
+    semantic,
+    cwd,
+    maxResults: options?.maxResults,
+    control: options?.control,
+  });
 }
 
 function providerKindMatches(reported: string, requested: TargetSymbolKind): boolean {
@@ -166,18 +184,20 @@ function normalizeProviderKind(kind: string): string {
   return kind.replace(/[\s_-]/g, "").toLowerCase();
 }
 
-async function resolveCandidates(
-  candidates: readonly CodeSymbol[],
-  semantic: SemanticSubstrate,
-  cwd: string,
-  maxResults?: number,
-): Promise<TargetOutcome> {
+async function resolveCandidates(options: {
+  candidates: readonly CodeSymbol[];
+  semantic: SemanticSubstrate;
+  cwd: string;
+  maxResults?: number;
+  control?: CodeRequestControl;
+}): Promise<TargetOutcome> {
+  const { candidates, semantic, cwd, maxResults, control } = options;
   const ranged = candidates.filter(
     (candidate) =>
       candidate.declarationAnchor.line > 0 || candidate.declarationAnchor.character > 0,
   );
   if (ranged.length === 1) {
-    return resolvedTarget(await refineResolvedSymbolAnchor(ranged[0], semantic));
+    return resolvedTarget(await refineResolvedSymbolAnchor(ranged[0], semantic, control));
   }
   return buildCandidateOutcome({
     kind: "disambiguation",
@@ -185,6 +205,7 @@ async function resolveCandidates(
     semantic,
     cwd,
     maxResults,
+    control,
   });
 }
 
@@ -220,7 +241,7 @@ type CandidateOutcomeOptions = CandidateOutcomeBase &
   (
     | { kind: "disambiguation"; requestedKind?: never }
     | { kind: "kind-mismatch"; requestedKind: TargetSymbolKind }
-  );
+  ) & { control?: CodeRequestControl };
 
 /**
  * Refine only bounded visible candidates to name anchors while retaining the
@@ -234,7 +255,7 @@ async function buildCandidateOutcome(
   const refined = await Promise.all(
     options.candidates
       .slice(0, cap)
-      .map((candidate) => refineResolvedSymbolAnchor(candidate, options.semantic)),
+      .map((candidate) => refineResolvedSymbolAnchor(candidate, options.semantic, options.control)),
   );
   const common = {
     candidates: toDisambiguationCandidates(refined, options.cwd),

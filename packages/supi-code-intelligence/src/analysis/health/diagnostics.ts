@@ -3,7 +3,10 @@
 
 import { existsSync, statSync } from "node:fs";
 import { relative, resolve } from "node:path";
-import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type CodeRequestControl,
+  isCodeRequestInterruption,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
 import type {
   Diagnostic,
@@ -101,6 +104,7 @@ async function collectScopedFileDiagnostics(
           evidence: singleFileEvidence(scope.path, "confirmed"),
         };
   } catch (error) {
+    if (isCodeRequestInterruption(error, requestControl)) throw error;
     return unavailableDiagnostics(
       scope,
       errorMessage(error, "File diagnostic request failed."),

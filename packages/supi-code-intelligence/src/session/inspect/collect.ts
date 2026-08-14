@@ -108,6 +108,7 @@ async function collectHover(
       (hover) => hover?.contents ?? null,
     );
   } catch (error) {
+    if (isCodeRequestInterruption(error, input.requestControl)) throw error;
     return unavailableCodeQuery(failureReason("Hover lookup", error));
   }
 }
@@ -141,6 +142,7 @@ async function collectDefinition(
       ? { kind: "partial", data: definitions, reason: reasons.join(" ") }
       : { kind: "completed", data: definitions };
   } catch (error) {
+    if (isCodeRequestInterruption(error, input.requestControl)) throw error;
     return unavailableCodeQuery(failureReason("Definition lookup", error));
   }
 }
@@ -173,6 +175,7 @@ async function collectDiagnostics(
       ? { kind: "partial", data: diagnostics, reason: result.reason }
       : { kind: "completed", data: diagnostics };
   } catch (error) {
+    if (isCodeRequestInterruption(error, input.requestControl)) throw error;
     return unavailableCodeQuery(failureReason("Diagnostic lookup", error));
   }
 }

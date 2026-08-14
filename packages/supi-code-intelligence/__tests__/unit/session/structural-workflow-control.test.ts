@@ -112,6 +112,48 @@ describe("structural workflow request control", () => {
     expectLastArgument(outline, requestControl);
   });
 
+  it("rejects immediately without provider calls when the caller is already aborted", async () => {
+    const { cwd, file } = workspace();
+    const nodeAt = vi.fn(structural({}).nodeAt);
+    const outline = vi.fn(structural({}).outline);
+    const controller = new AbortController();
+    controller.abort(new Error("cancelled before routing"));
+
+    await expect(
+      runInspectWorkflow(
+        { point: { file, line: 1, character: 17 } },
+        {
+          cwd,
+          capability: new TestCapabilityAdapter({ structural: structural({ nodeAt, outline }) }),
+        },
+        { signal: controller.signal },
+      ),
+    ).rejects.toThrow("cancelled before routing");
+
+    expect(nodeAt).not.toHaveBeenCalled();
+    expect(outline).not.toHaveBeenCalled();
+  });
+
+  it("rejects with a deadline error before routing when the deadline already elapsed", async () => {
+    const { cwd, file } = workspace();
+    const nodeAt = vi.fn(structural({}).nodeAt);
+
+    await expect(
+      runInspectWorkflow(
+        { point: { file, line: 1, character: 17 } },
+        {
+          cwd,
+          capability: new TestCapabilityAdapter({
+            structural: structural({ nodeAt }),
+          }),
+        },
+        { deadline: Date.now() - 1 },
+      ),
+    ).rejects.toThrow("Code request deadline exceeded");
+
+    expect(nodeAt).not.toHaveBeenCalled();
+  });
+
   it("forwards exact control through point inspection", async () => {
     const { cwd, file } = workspace();
     const nodeAt = vi.fn(structural({}).nodeAt);

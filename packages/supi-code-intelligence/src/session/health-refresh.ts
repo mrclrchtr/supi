@@ -1,4 +1,7 @@
-import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type CodeRequestControl,
+  isCodeRequestInterruption,
+} from "@mrclrchtr/supi-code-runtime/api";
 import type { WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 import { recoverDiagnosticRuntime } from "../analysis/health/recovery.ts";
 import { mergeDiagnosticEvidence } from "../diagnostics/evidence.ts";
@@ -29,12 +32,13 @@ async function collectFileRefreshAttempt(
   options: HealthRefreshAttemptOptions,
   scope: Extract<HealthDiagnosticScope, { kind: "file" }>,
 ): Promise<Extract<HealthRefreshAttempt, { kind: "completed" }>> {
-  const maintenance = await refreshFileLspMaintenance(
-    options.runtime,
-    options.cwd,
-    options.sentinelSnapshot,
-    scope.path,
-  );
+  const maintenance = await refreshFileLspMaintenance({
+    runtime: options.runtime,
+    cwd: options.cwd,
+    sentinelSnapshot: options.sentinelSnapshot,
+    filePath: scope.path,
+    control: options.control,
+  });
   updateSentinelSnapshot(options.sentinelSnapshot, maintenance.snapshot);
   const readiness = await options.runtime.waitUntilReadyForFile(
     scope.path,
@@ -119,6 +123,9 @@ async function collectWorkspaceRefreshAttempt(
       },
     };
   } catch (error) {
+    // Cancellation must propagate; a cancelled caller no longer awaits a
+    // recorded failed attempt.
+    if (isCodeRequestInterruption(error, options.control)) throw error;
     return {
       kind: "failed",
       attemptedAt: options.attemptedAt,

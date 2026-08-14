@@ -1,6 +1,7 @@
 import {
   type CodeRequestControl,
   getDefaultWorkspaceRuntime,
+  throwIfCodeRequestInterrupted,
 } from "@mrclrchtr/supi-code-runtime/api";
 import {
   getWorkspaceLspRuntime,
@@ -19,6 +20,8 @@ export async function ensureSemanticReadiness(
   timeoutMs: number = DEFAULT_SEMANTIC_STARTUP_TIMEOUT_MS,
   control?: CodeRequestControl,
 ): Promise<SemanticReadinessResult> {
+  // A cancelled caller stops before any readiness work starts.
+  throwIfCodeRequestInterrupted(control);
   const workspace = getDefaultWorkspaceRuntime().getWorkspace(cwd);
   if (workspace.semantic.provider === null) {
     return {
@@ -38,13 +41,15 @@ export async function ensureSemanticReadiness(
     };
   }
 
-  const deadline = Date.now() + timeoutMs;
+  // The request deadline bounds the internal readiness budget when it is
+  // earlier than the relative startup timeout.
+  const deadline = Math.min(Date.now() + timeoutMs, control?.deadline ?? Infinity);
 
   const remainingAfterService = deadline - Date.now();
   if (remainingAfterService <= 0) {
     return { kind: "timeout" };
   }
-  const lspState = await resolveSemanticServiceState(cwd, remainingAfterService);
+  const lspState = await resolveSemanticServiceState(cwd, remainingAfterService, control);
   if (lspState.kind === "pending") {
     return { kind: "timeout" };
   }
@@ -101,8 +106,9 @@ function resolveReadySemanticState(
 async function resolveSemanticServiceState(
   cwd: string,
   timeoutMs: number,
+  control?: CodeRequestControl,
 ): Promise<WorkspaceLspRuntimeState> {
   const initialState = getWorkspaceLspRuntime(cwd);
   if (initialState.kind !== "pending") return initialState;
-  return waitForWorkspaceLspRuntime(cwd, timeoutMs);
+  return waitForWorkspaceLspRuntime(cwd, timeoutMs, control);
 }

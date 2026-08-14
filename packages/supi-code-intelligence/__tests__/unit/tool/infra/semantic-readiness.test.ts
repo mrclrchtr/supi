@@ -49,6 +49,60 @@ describe("ensureSemanticReadiness", () => {
     expect(waitUntilReadyForWorkspace).toHaveBeenCalledWith({ timeoutMs: 100 });
   });
 
+  it("forwards request control into the runtime readiness wait", async () => {
+    registerReadySemantic("/test");
+    const controller = new AbortController();
+    const waitUntilReadyForWorkspace = vi.fn().mockResolvedValue({ kind: "ready" });
+    setWorkspaceLspRuntimeState("/test", {
+      kind: "ready",
+      runtime: { waitUntilReadyForWorkspace },
+    } as unknown as WorkspaceLspRuntimeState);
+
+    const result = await ensureSemanticReadiness("/test", { kind: "workspace" }, 100, {
+      signal: controller.signal,
+    });
+
+    expect(result.kind).toBe("ready");
+    expect(waitUntilReadyForWorkspace).toHaveBeenCalledWith(
+      { timeoutMs: expect.any(Number) },
+      { signal: controller.signal },
+    );
+  });
+
+  it("rejects immediately when the caller is already aborted", async () => {
+    registerReadySemantic("/test");
+    const controller = new AbortController();
+    controller.abort(new Error("cancelled before readiness"));
+
+    await expect(
+      ensureSemanticReadiness("/test", { kind: "workspace" }, 100, {
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow("cancelled before readiness");
+  });
+
+  it("rejects with a deadline error when the request deadline is earlier than the readiness timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      registerPendingSemantic("/test");
+      setWorkspaceLspRuntimeState("/test", { kind: "pending" });
+
+      const resultPromise = ensureSemanticReadiness("/test", { kind: "workspace" }, 200, {
+        deadline: Date.now() + 50,
+      });
+      // Attach the rejection handler before advancing so the deadline
+      // rejection is never observed as unhandled.
+      const assertion = expect(resultPromise).rejects.toThrow("Code request deadline exceeded");
+      // Advance beyond both the request deadline and the internal timeout so
+      // the wait settles even when the deadline is not yet enforced.
+      await vi.advanceTimersByTimeAsync(250);
+
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("returns unavailable when a ready semantic provider has no live LSP runtime", async () => {
     registerReadySemantic("/test");
 

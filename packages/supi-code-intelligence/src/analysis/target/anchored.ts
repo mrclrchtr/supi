@@ -9,12 +9,14 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type {
-  CodeResult,
-  CodeSymbol,
-  NodeAtData,
-  SemanticProvider,
-  StructuralProvider,
+import {
+  type CodeRequestControl,
+  type CodeResult,
+  type CodeSymbol,
+  isCodeRequestInterruption,
+  type NodeAtData,
+  type SemanticProvider,
+  type StructuralProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { AnchorKind } from "../../session/target-store.ts";
 import type { AnchoredResolutionMetadata, AnchoredResolutionSource } from "../../types/index.ts";
@@ -217,17 +219,20 @@ async function candidatesFromSymbols(
 }
 
 /** Layer 1: match the coordinate against LSP document symbols. Returns null to fall through. */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: layered anchored resolution keeps layer-1 symbol matching and identity resolution together.
 async function resolveFromSemantic(
   file: string,
   requested: Anchor,
   provider: AnchoredResolverProvider,
+  control?: CodeRequestControl,
 ): Promise<TargetOutcome | null> {
   if (!provider.documentSymbols) return null;
   let symbols: CodeSymbol[] = [];
   try {
     const result = await provider.documentSymbols(file);
     if (result.kind !== "unavailable") symbols = result.data;
-  } catch {
+  } catch (error) {
+    if (isCodeRequestInterruption(error, control)) throw error;
     symbols = [];
   }
   if (symbols.length === 0) return null;
@@ -241,7 +246,7 @@ async function resolveFromSemantic(
   }
 
   const structural = provider.nodeAt ? { nodeAt: provider.nodeAt } : undefined;
-  const resolveIdentity = createCodeSymbolIdentityResolver(file, symbols, structural);
+  const resolveIdentity = createCodeSymbolIdentityResolver(file, symbols, structural, control);
   if (exact.length === 1) {
     return resolvedFromSymbol(file, exact[0], {
       snapped: false,
@@ -268,12 +273,14 @@ async function resolveFromStructural(
   file: string,
   requested: Anchor,
   provider: AnchoredResolverProvider,
+  control?: CodeRequestControl,
 ): Promise<TargetOutcome | null> {
   if (!provider.nodeAt) return null;
   let nodeResult: CodeResult<NodeAtData> | null = null;
   try {
     nodeResult = await provider.nodeAt(file, requested.line, requested.character);
-  } catch {
+  } catch (error) {
+    if (isCodeRequestInterruption(error, control)) throw error;
     nodeResult = null;
   }
   if (nodeResult?.kind !== "success") return null;
@@ -351,11 +358,13 @@ async function resolveFromStructural(
  * This does not perform heuristic global text search and does not silently
  * treat declaration anchors as name anchors (ADR 0003).
  */
+// biome-ignore lint/complexity/useMaxParams: anchored resolution is a stable public resolver boundary with fixed positional fields.
 export async function resolveAnchoredSymbolTarget(
   file: string,
   line: number,
   character: number,
   provider: AnchoredResolverProvider | null,
+  control?: CodeRequestControl,
 ): Promise<TargetOutcome> {
   if (!fs.existsSync(file)) {
     return { kind: "error", message: `File not found: \`${file}\`` };
@@ -369,9 +378,9 @@ export async function resolveAnchoredSymbolTarget(
 
   const requested: Anchor = { line, character };
   if (provider) {
-    const semantic = await resolveFromSemantic(file, requested, provider);
+    const semantic = await resolveFromSemantic(file, requested, provider, control);
     if (semantic) return semantic;
-    const structural = await resolveFromStructural(file, requested, provider);
+    const structural = await resolveFromStructural(file, requested, provider, control);
     if (structural) return structural;
   }
 

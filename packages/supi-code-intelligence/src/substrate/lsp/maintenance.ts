@@ -8,12 +8,18 @@
 
 import { statSync } from "node:fs";
 import * as nodePath from "node:path";
-import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
-import type { DiagnosticEvidenceSummary, WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
+import {
+  type CodeRequestControl,
+  isCodeRequestInterruption,
+  throwIfCodeRequestInterrupted,
+} from "@mrclrchtr/supi-code-runtime/api";
+import type { DiagnosticEvidenceSummary } from "@mrclrchtr/supi-lsp/api";
 import {
   clearTsconfigCache,
   isLikelyStaleDiagnostic,
+  raceRequestControl,
   syncWorkspaceSentinelSnapshot,
+  type WorkspaceLspRuntime,
 } from "@mrclrchtr/supi-lsp/api";
 import { mergeDiagnosticEvidence } from "../../diagnostics/evidence.ts";
 
@@ -37,6 +43,7 @@ export async function refreshLspMaintenance(
   try {
     diagnosticEvidence = await runtime.refreshOpenDiagnostics(undefined, control);
   } catch (error) {
+    if (isCodeRequestInterruption(error, control)) throw error;
     failureReason = errorMessage(error);
     diagnosticEvidence = readRuntimeEvidence(runtime);
   }
@@ -45,7 +52,8 @@ export async function refreshLspMaintenance(
     const staleResult = await resyncStaleModuleFiles(runtime, cwd, control);
     diagnosticEvidence = mergeDiagnosticEvidence(diagnosticEvidence, staleResult.evidence, cwd);
     if (staleResult.completed) failureReason = undefined;
-  } catch {
+  } catch (error) {
+    if (isCodeRequestInterruption(error, control)) throw error;
     // Keep evidence from the first refresh when stale inspection fails.
   }
 
@@ -75,12 +83,16 @@ export interface FileLspMaintenanceResult {
 }
 
 /** Refresh sentinel and stale-module state for one exact file without a workspace resync. */
-export async function refreshFileLspMaintenance(
-  runtime: WorkspaceLspRuntime,
-  cwd: string,
-  sentinelSnapshot: Map<string, number>,
-  filePath: string,
-): Promise<FileLspMaintenanceResult> {
+export async function refreshFileLspMaintenance(options: {
+  runtime: WorkspaceLspRuntime;
+  cwd: string;
+  sentinelSnapshot: Map<string, number>;
+  filePath: string;
+  control?: CodeRequestControl;
+}): Promise<FileLspMaintenanceResult> {
+  const { runtime, cwd, sentinelSnapshot, filePath, control } = options;
+  // A cancelled caller stops before any maintenance work starts.
+  throwIfCodeRequestInterrupted(control);
   const { snapshot } = synchronizeSentinels(runtime, cwd, sentinelSnapshot);
   const target = nodePath.resolve(filePath);
   const stale = runtime
@@ -94,9 +106,12 @@ export async function refreshFileLspMaintenance(
   runtime.pruneMissingFiles();
   if (stale) {
     runtime.closeFile(target);
-    await runtime.trackFile(target);
+    // Race the caller's cancellation so a client start during re-open does
+    // not outlive the caller; the underlying runtime keeps its own lifecycle.
+    await raceRequestControl(runtime.trackFile(target), control);
   }
   runtime.pruneMissingFiles();
+  throwIfCodeRequestInterrupted(control);
 
   return { snapshot, matchedStaleFileCount: stale ? 1 : 0 };
 }
@@ -146,7 +161,8 @@ async function resyncStaleModuleFiles(
       if (!(await runtime.trackFile(filePath))) {
         markUnavailable(invalidated, relativeFile, filePath);
       }
-    } catch {
+    } catch (error) {
+      if (isCodeRequestInterruption(error, control)) throw error;
       markUnavailable(invalidated, relativeFile, filePath);
     }
   }
@@ -167,7 +183,8 @@ async function resyncStaleModuleFiles(
       ),
       completed: true,
     };
-  } catch {
+  } catch (error) {
+    if (isCodeRequestInterruption(error, control)) throw error;
     return {
       evidence: {
         requested: invalidated.length,

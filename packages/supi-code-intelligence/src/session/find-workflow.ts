@@ -86,6 +86,9 @@ async function runSemanticSearch(options: {
     return { kind: "unavailable", reason: "No semantic workspace-symbol provider is active." };
   }
   const result = await provider.workspaceSymbols(query, control);
+  // A cancellation that landed during the request must not publish symbols
+  // the caller no longer awaits.
+  throwIfAborted(control);
   if (result.kind === "unavailable") {
     return { kind: "unavailable", reason: result.reason };
   }

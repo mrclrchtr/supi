@@ -4,7 +4,7 @@
  * Turns one exact target selector into immutable resolved-target facts before
  * graph, Orientation, resolve, or refactor analysis begins.
  */
-
+// biome-ignore lint/style/noExcessiveLinesPerFile: target workflow keeps anchored, symbol, and file resolution together.
 import { existsSync } from "node:fs";
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { withSemanticRequestControl, withStructuralRequestControl } from "../analysis/provider.ts";
@@ -167,6 +167,7 @@ async function resolveAnchoredWorkflow(
       withStructuralRequestControl(deps.capability.getProvider(deps.cwd), control),
       control,
     ),
+    control,
   );
   return toWorkflowOutcome(
     await refineTargetOutcomeIdentity(
@@ -174,6 +175,7 @@ async function resolveAnchoredWorkflow(
       deps.cwd,
       withStructuralRequestControl(deps.capability.getStructuralProvider(deps.cwd), control) ??
         undefined,
+      control,
     ),
     policy,
     deps,
@@ -226,6 +228,7 @@ async function resolveSymbolWorkflow(
     path: scope,
     kind: symbol.symbolKind,
     maxResults: policy.maxResults,
+    control,
   });
   return toWorkflowOutcome(
     await refineTargetOutcomeIdentity(
@@ -233,6 +236,7 @@ async function resolveSymbolWorkflow(
       deps.cwd,
       withStructuralRequestControl(deps.capability.getStructuralProvider(deps.cwd), control) ??
         undefined,
+      control,
     ),
     policy,
     deps,
@@ -261,14 +265,19 @@ async function resolveFileOnlyWorkflow(
     return { kind: "unavailable", reason: readiness.reason };
   }
 
-  const result = await resolveFileTargetGroup(file, deps.cwd, {
-    semantic:
-      withSemanticRequestControl(deps.capability.getSemanticProvider(deps.cwd), control) ??
-      undefined,
-    structural:
-      withStructuralRequestControl(deps.capability.getStructuralProvider(deps.cwd), control) ??
-      undefined,
-  });
+  const result = await resolveFileTargetGroup(
+    file,
+    deps.cwd,
+    {
+      semantic:
+        withSemanticRequestControl(deps.capability.getSemanticProvider(deps.cwd), control) ??
+        undefined,
+      structural:
+        withStructuralRequestControl(deps.capability.getStructuralProvider(deps.cwd), control) ??
+        undefined,
+    },
+    control,
+  );
   if (result.kind === "invalid-input") return result;
   if (result.kind === "unavailable") {
     return { kind: "unavailable", reason: result.message };

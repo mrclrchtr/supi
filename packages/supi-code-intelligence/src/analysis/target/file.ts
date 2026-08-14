@@ -9,12 +9,14 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type {
-  DeclarationNesting,
-  DocumentCodeSymbol,
-  OutlineData,
-  SemanticProvider as SemanticSubstrate,
-  StructuralProvider as StructuralSubstrate,
+import {
+  type CodeRequestControl,
+  type DeclarationNesting,
+  type DocumentCodeSymbol,
+  isCodeRequestInterruption,
+  type OutlineData,
+  type SemanticProvider as SemanticSubstrate,
+  type StructuralProvider as StructuralSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { AnchorKind } from "../../session/target-store.ts";
 import { normalizePath } from "../search/paths.ts";
@@ -80,6 +82,7 @@ export async function resolveFileTargetGroup(
     semantic?: SemanticSubstrate;
     structural?: StructuralSubstrate;
   } = {},
+  control?: CodeRequestControl,
 ): Promise<
   | { kind: "resolved"; group: ResolvedTargetGroupData }
   | { kind: "invalid-input"; message: string }
@@ -90,8 +93,8 @@ export async function resolveFileTargetGroup(
   const resolvedFile = validation.file;
 
   const [semantic, structural] = await Promise.all([
-    discoverSemantic(resolvedFile, deps.semantic, deps.structural),
-    discoverStructural(resolvedFile, deps.structural),
+    discoverSemantic(resolvedFile, deps.semantic, deps.structural, control),
+    discoverStructural(resolvedFile, deps.structural, control),
   ]);
   if (!semantic.available && !structural.available) {
     const displayFile = path.relative(cwd, resolvedFile) || file;
@@ -148,6 +151,7 @@ async function discoverSemantic(
   file: string,
   semantic: SemanticSubstrate | undefined,
   structural: StructuralSubstrate | undefined,
+  control?: CodeRequestControl,
 ): Promise<DiscoveryResult> {
   if (!semantic) return { available: false, targets: [] };
   try {
@@ -158,12 +162,13 @@ async function discoverSemantic(
       targets: await Promise.all(
         result.data.map(async (symbol) => {
           const target = targetFromSymbol(file, symbol);
-          const refined = await refineTypeAliasIdentity(target, structural);
+          const refined = await refineTypeAliasIdentity(target, structural, control);
           return { ...refined, nesting: target.nesting };
         }),
       ),
     };
-  } catch {
+  } catch (error) {
+    if (isCodeRequestInterruption(error, control)) throw error;
     return { available: false, targets: [] };
   }
 }
@@ -196,13 +201,15 @@ function normalizeNesting(value: unknown): DeclarationNesting {
 async function discoverStructural(
   file: string,
   structural: StructuralSubstrate | undefined,
+  control?: CodeRequestControl,
 ): Promise<DiscoveryResult> {
   if (!structural) return { available: false, targets: [] };
   try {
     const result = await structural.outline(file);
     if (result.kind !== "success") return { available: false, targets: [] };
     return { available: true, targets: flattenOutline(file, result.data) };
-  } catch {
+  } catch (error) {
+    if (isCodeRequestInterruption(error, control)) throw error;
     return { available: false, targets: [] };
   }
 }

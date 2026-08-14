@@ -1,5 +1,10 @@
 import { resolve } from "node:path";
-import type { CodeSymbol, StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type CodeRequestControl,
+  type CodeSymbol,
+  isCodeRequestInterruption,
+  type StructuralProvider,
+} from "@mrclrchtr/supi-code-runtime/api";
 import type { ResolvedTargetData, TargetOutcome } from "./types.ts";
 
 /**
@@ -45,6 +50,7 @@ export interface DeclarationOccurrenceIdentity extends DeclarationIdentityResult
 export async function resolveDeclarationIdentityKind(
   observation: DeclarationIdentityObservation,
   structural: Pick<StructuralProvider, "nodeAt"> | undefined,
+  control?: CodeRequestControl,
 ): Promise<DeclarationIdentityResult> {
   const identityKind = canonicalDeclarationKind(observation.providerKind);
   if (
@@ -69,7 +75,8 @@ export async function resolveDeclarationIdentityKind(
     return exactNameAnchor && isTypeAlias
       ? { identityKind: "type", structuralEvidence: true }
       : { identityKind, structuralEvidence: false };
-  } catch {
+  } catch (error) {
+    if (isCodeRequestInterruption(error, control)) throw error;
     return { identityKind, structuralEvidence: false };
   }
 }
@@ -82,6 +89,7 @@ export function createCodeSymbolIdentityResolver(
   file: string,
   allSymbols: readonly CodeSymbol[],
   structural: Pick<StructuralProvider, "nodeAt"> | undefined,
+  control?: CodeRequestControl,
 ): (symbol: CodeSymbol) => Promise<DeclarationOccurrenceIdentity> {
   const identities = new Map<CodeSymbol, Promise<DeclarationIdentityResult>>();
   const occurrences = new Map<CodeSymbol, Promise<DeclarationOccurrenceIdentity>>();
@@ -97,6 +105,7 @@ export function createCodeSymbolIdentityResolver(
         nameAnchor: symbol.nameAnchor ?? null,
       },
       structural,
+      control,
     );
     identities.set(symbol, identity);
     return identity;
@@ -147,6 +156,7 @@ function compareCodeSymbolDeclarations(left: CodeSymbol, right: CodeSymbol): num
 export async function refineTypeAliasIdentity(
   target: ResolvedTargetData,
   structural: Pick<StructuralProvider, "nodeAt"> | undefined,
+  control?: CodeRequestControl,
 ): Promise<ResolvedTargetData> {
   if (target.identityKind !== undefined) return target;
   const identity = await resolveDeclarationIdentityKind(
@@ -160,6 +170,7 @@ export async function refineTypeAliasIdentity(
           : null,
     },
     structural,
+    control,
   );
   return {
     ...target,
@@ -173,9 +184,13 @@ export async function refineTargetOutcomeIdentity(
   outcome: TargetOutcome,
   cwd: string,
   structural: Pick<StructuralProvider, "nodeAt"> | undefined,
+  control?: CodeRequestControl,
 ): Promise<TargetOutcome> {
   if (outcome.kind === "resolved") {
-    return { kind: "resolved", target: await refineTypeAliasIdentity(outcome.target, structural) };
+    return {
+      kind: "resolved",
+      target: await refineTypeAliasIdentity(outcome.target, structural, control),
+    };
   }
   if (outcome.kind !== "disambiguation" && outcome.kind !== "kind-mismatch") return outcome;
 
@@ -195,6 +210,7 @@ export async function refineTargetOutcomeIdentity(
               : null,
         },
         structural,
+        control,
       );
       return {
         candidate: {

@@ -79,16 +79,21 @@ async function run(
   lspState: WorkspaceLspRuntimeState,
   input: Record<string, unknown>,
   lastRefreshAttempt: HealthRefreshAttempt | null = null,
+  control?: Parameters<typeof runHealthWorkflow>[2],
 ) {
   const trackRefreshAttempt = vi.fn();
-  const outcome = await runHealthWorkflow(input, {
-    cwd,
-    capability: capability(lspState),
-    lspController: { getMissingServers: () => [] } as never,
-    lastRefreshAttempt,
-    trackRefreshAttempt,
-    sentinelSnapshot: new Map(),
-  });
+  const outcome = await runHealthWorkflow(
+    input,
+    {
+      cwd,
+      capability: capability(lspState),
+      lspController: { getMissingServers: () => [] } as never,
+      lastRefreshAttempt,
+      trackRefreshAttempt,
+      sentinelSnapshot: new Map(),
+    },
+    control,
+  );
   return { outcome, trackRefreshAttempt };
 }
 
@@ -208,6 +213,21 @@ describe("code_health refresh evidence", () => {
       },
     });
     expect(recoverDiagnostics).not.toHaveBeenCalled();
+  });
+
+  it("rethrows an interruption instead of recording a failed attempt", async () => {
+    const controller = new AbortController();
+    const refreshOpenDiagnostics = vi.fn(async () => {
+      controller.abort(new Error("cancelled mid-refresh"));
+      throw controller.signal.reason;
+    });
+    const runtime = readyRuntime({ refreshOpenDiagnostics });
+
+    await expect(
+      run({ kind: "ready", runtime }, { include: ["diagnostics"], refresh: true }, null, {
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow("cancelled mid-refresh");
   });
 
   it("keeps removed evidence from maintenance after recovery prunes the file", async () => {
@@ -497,6 +517,44 @@ describe("code_health refresh evidence", () => {
     expect(fileDiagnostics).toHaveBeenCalledTimes(1);
     expect(refreshOpenDiagnostics).not.toHaveBeenCalled();
     expect(recoverDiagnostics).not.toHaveBeenCalled();
+  });
+
+  it("rejects a file-scoped refresh when the caller is already aborted", async () => {
+    const file = path.join(cwd, "source.ts");
+    writeFileSync(file, "export const value = 1;\n");
+    const trackFile = vi.fn(async () => true);
+    const runtime = readyRuntime({
+      getOutstandingDiagnostics: () => ({
+        entries: [
+          {
+            file: "source.ts",
+            diagnostics: [
+              {
+                message: "stale",
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+              },
+            ],
+          },
+        ],
+        current: true,
+        evidence: emptyEvidence(),
+      }),
+      trackFile,
+      waitUntilReadyForFile: vi.fn(async () => ({ kind: "ready" })),
+    });
+    const controller = new AbortController();
+    controller.abort(new Error("cancelled before maintenance"));
+
+    await expect(
+      run(
+        { kind: "ready", runtime },
+        { scope: file, include: ["diagnostics"], refresh: true },
+        null,
+        { signal: controller.signal },
+      ),
+    ).rejects.toThrow("cancelled before maintenance");
+
+    expect(trackFile).not.toHaveBeenCalled();
   });
 
   it("does not discard cached diagnostics for a sentinel-only file refresh", async () => {

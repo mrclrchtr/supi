@@ -93,6 +93,21 @@ describe("public code operation correlation", () => {
     expect(JSON.stringify(events)).not.toContain("file.ts");
   });
 
+  it("supplies a bounded absolute deadline for every public tool call", async () => {
+    let controlDeadline: number | undefined;
+    const tool = register((_params, ctx) => {
+      controlDeadline = toWorkflowControl(ctx).deadline;
+      return { content: "ok" };
+    });
+
+    await tool.execute(RAW_CALL_IDS[0], {}, undefined, undefined, makeCtx({ cwd: "/repo" }));
+
+    expect(typeof controlDeadline).toBe("number");
+    const deadline = controlDeadline ?? 0;
+    expect(deadline).toBeGreaterThan(Date.now());
+    expect(deadline - Date.now()).toBeLessThan(120_000);
+  });
+
   it("propagates the exact ID through semantic, AST, and Structural Worker producers", async () => {
     const tool = register(async (_params, ctx) => {
       const control = toWorkflowControl(ctx);
