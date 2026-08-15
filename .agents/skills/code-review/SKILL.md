@@ -20,6 +20,12 @@ Whatever the user said is the fixed point — a commit SHA, branch name, tag, `m
 
 Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so the comparison is against the merge-base). Also note the list of commits via `git log <fixed-point>..HEAD --oneline`.
 
+For work-in-progress with no commit yet, the fixed point is HEAD and the
+reviewed change is the working tree. The diff command is `git diff HEAD`; the
+three-dot form is empty for uncommitted changes. When the Review Engine runs
+the review, express the target as `from: HEAD` with
+`includeUncommittedChanges: true`.
+
 Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here — not inside two parallel sub-agents.
 
 ### 2. Identify the spec source
@@ -85,3 +91,10 @@ A change can pass one axis and fail the other:
 - Code that does exactly what the issue asked but breaks the project's conventions → **Spec pass, Standards fail.**
 
 Reporting them separately stops one axis from masking the other.
+
+## After the report
+
+The Review Engine may append a Post-Review Policy to the review result (for
+example `verify-and-fix`). The policy governs what happens to the findings
+after this report. A direct user instruction about the findings overrides the
+policy; otherwise follow the policy.
