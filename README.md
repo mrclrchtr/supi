@@ -112,7 +112,7 @@ Not part of the recommended release stack. Included in the full-stack installer 
 
 | Package | What it adds | Install |
 |---|---|---|
-| [`supi-debug`](packages/supi-debug/README.md) | Shared debug-event capture and bounded troubleshooting tools | `pi install npm:@mrclrchtr/supi-debug` |
+| [`supi-debug`](packages/supi-debug/README.md) | Debug-event capture, troubleshooting tools, and post-task tooling feedback via `/supi-tooling-retro` | `pi install npm:@mrclrchtr/supi-debug` |
 
 ### Beta additions
 
@@ -204,6 +204,16 @@ pi uninstall npm:@mrclrchtr/supi-web
 ```
 
 Run `/reload` or restart Pi after removing extensions.
+
+## Give feedback
+
+SuPi improves with your feedback. After a task, run `/supi-tooling-retro` to produce a compact retrospective of the SuPi surfaces you used — what helped, what fell short, what was missing, and what was noisy. This prompt template ships with the `supi-debug` DevTool package:
+
+```bash
+pi install npm:@mrclrchtr/supi-debug
+```
+
+Share the result, or any friction you find in SuPi tools, prompts, skills, or injected context, as a [GitHub issue](https://github.com/mrclrchtr/supi/issues).
 
 ## License
 

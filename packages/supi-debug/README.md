@@ -30,7 +30,7 @@ After install, this package wires the shared debug registry into three user-faci
 - `supi_debug` — let the model query recent debug events during troubleshooting
 - `/supi-settings` integration — configure whether events are captured and how much data is exposed
 
-It also registers a **Debug** provider section for `/supi-context`.
+It also registers a **Debug** provider section for `/supi-context`, and ships a `/supi-tooling-retro` prompt template for post-task retrospective feedback on the SuPi tooling used in the completed task.
 
 ## Event behavior
 

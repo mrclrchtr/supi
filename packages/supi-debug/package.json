@@ -28,6 +28,7 @@
   "type": "module",
   "files": [
     "src/**/*.ts",
+    "prompts",
     "README.md"
   ],
   "dependencies": {

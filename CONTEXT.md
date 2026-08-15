@@ -18,6 +18,10 @@ _Avoid_: token saving, prompt minimalism
 A Context Efficiency practice that reduces a tool's model-facing prompt surface while preserving its callable behavior and honest usage contract.
 _Avoid_: dumbing down tools, removing capability, token shaving
 
+**Prompt Template**:
+A Markdown prompt shipped by a SuPi package via `resources_discover` promptPaths, or placed project-locally in `.pi/prompts/`, and invoked as `/name` in the editor. It is distinct from a tool's Prompt Surface.
+_Avoid_: prompt, prompt surface
+
 **Capability Family**:
 A README grouping that explains SuPi packages by the user problem they solve rather than by package internals or install order. Each family should point readers to the relevant package README files for full details.
 _Avoid_: package category, module group

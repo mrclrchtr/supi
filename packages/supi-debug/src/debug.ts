@@ -1,3 +1,5 @@
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { AgentToolUpdateCallback, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
@@ -29,6 +31,8 @@ import {
 import { DEBUG_EVENT_ENTRY_TYPE, readSessionDebugEvents } from "./session-events.ts";
 import { maybeLogLoadStatus } from "./status-log.ts";
 import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
+
+const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
 const DEBUG_SECTION = "debug";
 interface DebugConfig extends Record<string, unknown> {
@@ -276,6 +280,9 @@ export default function debugExtension(pi: ExtensionAPI) {
 
   pi.on("resources_discover", async (_event, ctx) => {
     maybeLogLoadStatus(pi, ctx.cwd, "resources_discover");
+    // Self-register the package prompt template so standalone installs and
+    // workspace-root loads expose the same `/supi-tooling-retro` surface.
+    return { promptPaths: [join(baseDir, "prompts")] };
   });
 
   pi.on("session_shutdown", () => {

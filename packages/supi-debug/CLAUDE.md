@@ -4,11 +4,12 @@ Session-local debug event capture, querying, and reporting for SuPi extensions.
 
 ## Architecture
 
-Registers three surfaces:
+Registers four surfaces:
 
 1. **`supi_debug` tool** — agent-callable tool for querying recent or persisted-session debug events with filters
 2. **`/supi-debug` command** — user-facing command for browsing live or persisted-session debug events in the TUI
-3. **Settings** — `/supi-settings` integration for enable/disable, agent access level (off/sanitized/raw), and max events
+3. **`/supi-tooling-retro` prompt template** — post-task retrospective evaluating the SuPi surfaces used in the completed task
+4. **Settings** — `/supi-settings` integration for enable/disable, agent access level (off/sanitized/raw), and max events
 
 Uses `supi-core`'s shared debug registry (`configureDebugRegistry`, `getDebugEvents`, `getDebugSummary`) and `registerContextProvider` for the TUI context summary.
 

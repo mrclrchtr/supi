@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFns = vi.hoisted(() => ({
@@ -140,12 +142,24 @@ describe("supi-debug extension setup", () => {
     expect(mockFns.loadSupiConfig).toHaveBeenCalledWith("debug", "/repo", expect.any(Object));
   });
 
-  it("logs the load inventory after resource discovery", () => {
+  it("logs the load inventory after resource discovery", async () => {
     const pi = setup();
 
-    pi.handlers.get("resources_discover")?.[0]?.({}, { cwd: "/repo" });
+    await pi.handlers.get("resources_discover")?.[0]?.({}, { cwd: "/repo" });
 
     expect(mockFns.maybeLogLoadStatus).toHaveBeenCalledWith(pi, "/repo", "resources_discover");
+  });
+
+  it("self-registers the tooling-retro prompt template", async () => {
+    const pi = setup();
+    const result = (await pi.handlers.get("resources_discover")?.[0]?.({}, { cwd: "/repo" })) as
+      | { promptPaths?: string[] }
+      | undefined;
+
+    expect(result?.promptPaths).toHaveLength(1);
+    const promptDir = result?.promptPaths?.[0] ?? "";
+    expect(promptDir).toMatch(/^\//);
+    expect(existsSync(join(promptDir, "supi-tooling-retro.md"))).toBe(true);
   });
 
   it("context provider returns aggregate summary without event payloads", () => {
