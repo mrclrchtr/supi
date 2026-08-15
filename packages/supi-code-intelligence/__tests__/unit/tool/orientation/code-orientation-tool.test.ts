@@ -21,6 +21,7 @@ vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
 });
 
 let tmpDir: string;
+let homeDir: string;
 
 function emptyEvidence() {
   return {
@@ -35,6 +36,7 @@ function emptyEvidence() {
 
 beforeEach(() => {
   tmpDir = mkdtempSync(path.join(os.tmpdir(), "code-orientation-"));
+  homeDir = mkdtempSync(path.join(os.tmpdir(), "code-orientation-home-"));
   writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "ctx-ws" }, null, 2));
   mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
     kind: "unavailable",
@@ -45,6 +47,7 @@ beforeEach(() => {
 afterEach(() => {
   clearMockRuntime();
   rmSync(tmpDir, { recursive: true, force: true });
+  rmSync(homeDir, { recursive: true, force: true });
   vi.clearAllMocks();
 });
 
@@ -118,7 +121,7 @@ function registerBasicSymbolProvider(): void {
 describe("code_orientation tool", () => {
   it("is registered as an active public tool", () => {
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    codeIntelligenceExtension(pi as never, undefined, homeDir);
 
     const tool = getTool(pi, "code_orientation");
     expect(tool).toBeDefined();
@@ -129,7 +132,7 @@ describe("code_orientation tool", () => {
     writeSource("src/index.ts", "export const x = 1;\n");
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    codeIntelligenceExtension(pi as never, undefined, homeDir);
     const tool = getTool(pi, "code_orientation");
 
     const result = (await tool.execute(
@@ -164,7 +167,7 @@ describe("code_orientation tool", () => {
     });
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    codeIntelligenceExtension(pi as never, undefined, homeDir);
     const result = (await getTool(pi, "code_orientation").execute(
       "orientation-with-stale-priority-signals",
       { focus: { path: "src/index.ts" } },
@@ -197,7 +200,7 @@ describe("code_orientation tool", () => {
     });
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    codeIntelligenceExtension(pi as never, undefined, homeDir);
     const result = (await getTool(pi, "code_orientation").execute(
       "orientation-with-priority-signals",
       { focus: { path: "src/index.ts" } },
@@ -227,7 +230,7 @@ describe("code_orientation tool", () => {
     );
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    codeIntelligenceExtension(pi as never, undefined, homeDir);
     const result = (await getTool(pi, "code_orientation").execute(
       "orientation-with-ambient-reports",
       { focus: { path: "src/index.ts" } },
@@ -253,7 +256,7 @@ describe("code_orientation tool", () => {
     writeFileSync(path.join(pkgDir, "index.ts"), "export const app = 1;\n");
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    codeIntelligenceExtension(pi as never, undefined, homeDir);
     const tool = getTool(pi, "code_orientation");
 
     const result = (await tool.execute(
@@ -279,7 +282,7 @@ describe("code_orientation tool", () => {
     writeFileSync(path.join(otherDir, "package.json"), JSON.stringify({ name: "@scope/app" }));
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    codeIntelligenceExtension(pi as never, undefined, homeDir);
     const tool = getTool(pi, "code_orientation");
 
     const result = (await tool.execute(
@@ -333,7 +336,7 @@ describe("code_orientation tool", () => {
     });
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    codeIntelligenceExtension(pi as never, undefined, homeDir);
     const tool = getTool(pi, "code_orientation");
 
     const result = (await tool.execute(
@@ -399,7 +402,7 @@ describe("code_orientation tool", () => {
     });
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    codeIntelligenceExtension(pi as never, undefined, homeDir);
     const tool = getTool(pi, "code_orientation");
 
     const result = (await tool.execute(
@@ -462,7 +465,7 @@ describe("code_orientation tool", () => {
     markLspReady();
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    codeIntelligenceExtension(pi as never, undefined, homeDir);
     const targetId = await resolveTargetId(pi, "src/widget.ts", 1, 17);
     const fileDiagnostics = vi.fn(async () => null);
     markLspReady({
@@ -510,7 +513,7 @@ describe("code_orientation tool", () => {
     markLspReady();
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    codeIntelligenceExtension(pi as never, undefined, homeDir);
     const targetId = await resolveTargetId(pi, "src/widget.ts", 1, 17);
     const tool = getTool(pi, "code_orientation");
 
@@ -528,7 +531,7 @@ describe("code_orientation tool", () => {
 
   it("hard-errors on invalid focus in orientation mode", async () => {
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    codeIntelligenceExtension(pi as never, undefined, homeDir);
     const tool = getTool(pi, "code_orientation");
 
     const result = (await tool.execute(

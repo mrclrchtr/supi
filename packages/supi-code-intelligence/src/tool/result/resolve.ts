@@ -105,7 +105,7 @@ function projectResolved(target: Readonly<TargetStoreEntry>, cwd: string): Resol
       omittedCount: 0,
       evidenceLists: [evidence],
       targets: [toTargetDetails(target, cwd)],
-      nextQueries: buildResolveNextQueries(target.targetId, target.kind),
+      nextQueries: [],
     },
   };
 }
@@ -286,29 +286,5 @@ function resolveProvenance(outcome: TargetWorkflowOutcome): ResultProvenance[] {
     ...(sources.has("structural")
       ? [{ source: "structural" as const, detail: "target-workflow" }]
       : []),
-  ];
-}
-
-/** Suggested surviving graph relations for a resolved symbol kind. */
-export function suggestedResolveRelations(kind: string | undefined | null): string[] {
-  switch (kind?.toLowerCase()) {
-    case "function":
-    case "method":
-    case "constructor":
-      return ["references", "callees"];
-    case "class":
-    case "interface":
-    case "type":
-    case "enum":
-      return ["references", "implements"];
-    default:
-      return ["references"];
-  }
-}
-
-function buildResolveNextQueries(targetId: string, kind: string | null): string[] {
-  const relations = suggestedResolveRelations(kind);
-  return [
-    `Use code_graph with target.handle "${targetId}" and relations ${JSON.stringify(relations)}`,
   ];
 }

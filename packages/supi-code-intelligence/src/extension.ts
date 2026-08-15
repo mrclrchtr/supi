@@ -4,7 +4,7 @@
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { buildArchitectureModel } from "./analysis/architecture/discovery.ts";
 import { createCodeIntelligenceApp } from "./app/app.ts";
-import { registerCodeIntelligenceSettings } from "./config.ts";
+import { registerCodeIntelligenceSettings, resolveOverviewEnabled } from "./config.ts";
 import { estimateTokens, OVERVIEW_TOKEN_BUDGET, renderOverview } from "./overview/overview.ts";
 import { buildOverviewData } from "./overview/overview-data.ts";
 import type { WorkspaceCodeIntelligenceSession } from "./session/session.ts";
@@ -22,11 +22,12 @@ const OVERVIEW_CUSTOM_TYPE = "code-intelligence-overview";
 export default function codeIntelligenceExtension(
   pi: ExtensionAPI,
   getOrCreateSession?: (cwd: string) => WorkspaceCodeIntelligenceSession,
+  homeDir?: string,
 ) {
   const app = createCodeIntelligenceApp(pi);
   const lspState = createLspAdapterState();
 
-  registerCodeIntelligenceSettings(pi);
+  registerCodeIntelligenceSettings(pi, homeDir);
   registerLspSettings(pi);
   registerLspSessionLifecycle(pi, lspState, (ctx) => {
     const session = app.getSession(ctx.cwd);
@@ -34,13 +35,15 @@ export default function codeIntelligenceExtension(
     session.attachLspController(lspState.controller);
     session.seedSentinelSnapshot(lspState.sentinelSnapshot);
     session.setProjectTrusted(ctx.isProjectTrusted());
+    session.setHomeDir(homeDir);
   });
   registerWorkspaceRecoveryHandler(pi, lspState);
 
-  registerCodeIntelligenceTools(
-    pi,
-    getOrCreateSession ?? ((cwd) => app.getSession(cwd) ?? app.createSession(cwd)),
-  );
+  registerCodeIntelligenceTools(pi, (cwd) => {
+    const session = getOrCreateSession?.(cwd) ?? app.getSession(cwd) ?? app.createSession(cwd);
+    session.setHomeDir(homeDir);
+    return session;
+  });
 
   registerCiStatusCommand(pi);
   const lspFooter = registerLspFooterContribution(pi, lspState);
@@ -49,16 +52,34 @@ export default function codeIntelligenceExtension(
     lspFooter.dispose();
   });
 
+  pi.on("session_start", (_event, ctx) => {
+    app
+      .getSession(ctx.cwd)
+      ?.setOverviewEnabledOnce(resolveOverviewEnabled(ctx.cwd, ctx.isProjectTrusted(), homeDir));
+  });
+
   pi.on("before_agent_start", (event, ctx) => {
     const session = app.getSession(ctx.cwd) ?? app.createSession(ctx.cwd);
     session.captureNativeInstructionPaths(event.systemPromptOptions.contextFiles ?? []);
+    session.setHomeDir(homeDir);
+    if (!session.hasPinnedOverview()) {
+      session.setOverviewEnabledOnce(
+        resolveOverviewEnabled(ctx.cwd, ctx.isProjectTrusted(), homeDir),
+      );
+    }
   });
 
   pi.on(
     "before_agent_start",
     async (_event, ctx): Promise<BeforeAgentStartEventResult | undefined> => {
       const session = app.getSession(ctx.cwd);
-      if (!session?.claimOverviewInjection()) return;
+      if (!session) return;
+      if (!session.hasPinnedOverview()) {
+        session.setOverviewEnabledOnce(
+          resolveOverviewEnabled(ctx.cwd, ctx.isProjectTrusted(), homeDir),
+        );
+      }
+      if (!session.claimOverviewInjection()) return;
 
       const model = await buildArchitectureModel(ctx.cwd);
       if (model.modules.length === 0) return;

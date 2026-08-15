@@ -109,10 +109,7 @@ export function assembleRefactorApplyDetails(
         provenance,
       },
     ],
-    nextQueries:
-      applyResult.kind === "applied"
-        ? ["Use code_health to check for new issues after the refactor"]
-        : [],
+    nextQueries: [],
     candidateCount,
     confidence: applyResult.kind === "applied" ? "semantic" : "unavailable",
     provenance,

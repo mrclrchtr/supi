@@ -44,7 +44,6 @@ export function buildOverviewData(model: ArchitectureModel): OverviewData | null
 
   return {
     projectName: model.name,
-    projectDescription: model.description,
     modules,
     detectedLanguages: detectedLanguages.length > 0 ? detectedLanguages : null,
   };
@@ -55,7 +54,6 @@ function overviewModule(module: ModuleInfo, model: ArchitectureModel): OverviewM
   return {
     name,
     shortName: module.name?.replace(/^@[^/]+\//, "") ?? module.relativePath,
-    description: module.description,
     declaredDependencies: model.edges
       .filter((edge) => edge.from === module.name)
       .map((edge) => edge.to),

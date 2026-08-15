@@ -138,6 +138,8 @@ export class WorkspaceCodeIntelligenceSession {
 
   /** Whether the hidden architecture overview has been injected. */
   #hasInjectedOverview = false;
+  /** Pinned overview setting; null until resolved once per session. */
+  #overviewEnabled: boolean | null = null;
 
   /** Most recent explicit diagnostic refresh attempt, including its established outcome. */
   #lastHealthRefreshAttempt: HealthRefreshAttempt | null = null;
@@ -166,6 +168,9 @@ export class WorkspaceCodeIntelligenceSession {
   /** Whether the project owning this session is trusted for config loading. */
   #projectTrusted = false;
 
+  /** Global config home for hermetic config reads; undefined uses os.homedir(). */
+  #homeDir: string | undefined;
+
   constructor(cwd: string, capability?: CapabilityAdapter) {
     this.cwd = cwd;
     this.#capability = capability ?? new WorkspaceCapabilityAdapter();
@@ -174,6 +179,11 @@ export class WorkspaceCodeIntelligenceSession {
   /** Record whether project-local configuration may be read for this session. */
   setProjectTrusted(trusted: boolean): void {
     this.#projectTrusted = trusted;
+  }
+
+  /** Record the global-config home used for session config reads. */
+  setHomeDir(homeDir?: string): void {
+    this.#homeDir = homeDir;
   }
 
   /** Attach lifecycle-owned LSP state without exposing it to Tool adapters. */
@@ -194,9 +204,22 @@ export class WorkspaceCodeIntelligenceSession {
     this.#hasInjectedOverview = true;
   }
 
+  /**
+   * Pin the overview setting resolved once per session. The first resolution
+   * wins; later config changes never toggle the setting mid-session.
+   */
+  setOverviewEnabledOnce(enabled: boolean): void {
+    this.#overviewEnabled ??= enabled;
+  }
+
+  /** Whether the overview setting has been pinned for this session. */
+  hasPinnedOverview(): boolean {
+    return this.#overviewEnabled !== null;
+  }
+
   /** Atomically claim first-turn overview injection for this workspace session. */
   claimOverviewInjection(): boolean {
-    if (this.#hasInjectedOverview) return false;
+    if (this.#overviewEnabled === false || this.#hasInjectedOverview) return false;
     this.#hasInjectedOverview = true;
     return true;
   }
@@ -284,6 +307,7 @@ export class WorkspaceCodeIntelligenceSession {
         surfacedInstructionDirs: this.#surfacedInstructionDirs,
         markInstructionDirsSurfaced: (directories) => this.markInstructionDirsSurfaced(directories),
         projectTrusted: this.#projectTrusted,
+        homeDir: this.#homeDir,
       },
       control,
     );

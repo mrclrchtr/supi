@@ -72,7 +72,7 @@ describe("refactor result projections", () => {
     });
   });
 
-  it("projects apply facts and assembled follow-up actions", () => {
+  it("projects apply facts without an automatic code_health hint", () => {
     const plan = makePlan();
     const applyResult: ApplyResult = { kind: "applied", filesChanged: 1, totalEdits: 3 };
     const assembly = assembleRefactorApplyDetails(applyResult, plan);
@@ -81,9 +81,11 @@ describe("refactor result projections", () => {
     expect(markdown).toContain("Plan: `plan-1`");
     expect(markdown).toContain("Operation: `rename_symbol`");
     expect(markdown).toContain("Total edits: 3");
-    expect(markdown).toContain(assembly.details.nextQueries[0]);
     expect(assembly.details.changedFiles).toEqual(["/repo/src/index.ts"]);
     expect(assembly.assembled.data.result).toBe(applyResult);
+    // A successful apply emits no unconditional health advice.
+    expect(assembly.details.nextQueries).toEqual([]);
+    expect(markdown).not.toContain("code_health");
   });
 
   it("does not report an unavailable apply as successful in compact TUI", () => {

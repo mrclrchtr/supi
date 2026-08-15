@@ -33,6 +33,8 @@ export interface OrientationWorkflowDeps extends TargetWorkflowDeps {
   readonly markInstructionDirsSurfaced: (directories: string[]) => void;
   /** Whether the project is trusted — controls instruction-file discovery. */
   readonly projectTrusted: boolean;
+  /** Global config home for hermetic config reads; undefined uses os.homedir(). */
+  readonly homeDir?: string;
 }
 
 /** Resolve the Orientation focus and collect immutable facts for presentation adapters. */
@@ -201,7 +203,7 @@ function addInstructionFiles(
   deps: OrientationWorkflowDeps,
 ): Awaited<ReturnType<typeof executeOrientation>> {
   if (!deps.projectTrusted || !isDirectory(focusPath)) return result;
-  const config = loadCodeIntelligenceConfig(deps.cwd);
+  const config = loadCodeIntelligenceConfig(deps.cwd, deps.homeDir);
   const matches = findInstructionFilesForDirectory({
     directory: focusPath,
     cwd: deps.cwd,

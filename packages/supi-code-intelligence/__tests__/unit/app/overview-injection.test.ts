@@ -1,7 +1,10 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codeIntelligenceExtension from "../../../src/extension.ts";
 
 /**
@@ -22,20 +25,73 @@ import codeIntelligenceExtension from "../../../src/extension.ts";
  */
 describe("overview injection", () => {
   let pi: ReturnType<typeof createPiMock> & ExtensionAPI;
+  let homeDir: string;
+  const tempDirs: string[] = [];
 
   beforeEach(() => {
     vi.restoreAllMocks();
     getDefaultWorkspaceRuntime().clearAll();
     pi = createPiMock() as never;
-    codeIntelligenceExtension(pi as never);
+    // An isolated empty global config keeps every injection decision hermetic.
+    homeDir = mkdtempSync(path.join(os.tmpdir(), "ci-overview-home-"));
+    tempDirs.push(homeDir);
+    codeIntelligenceExtension(pi as never, undefined, homeDir);
   });
+
+  afterEach(() => {
+    for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
+    tempDirs.length = 0;
+  });
+
+  /** Create a single-package workspace fixture and return its root. */
+  function makeWorkspace(packageCount: number): string {
+    const root = mkdtempSync(path.join(os.tmpdir(), "ci-overview-inject-"));
+    tempDirs.push(root);
+    mkdirSync(path.join(root, "packages"), { recursive: true });
+    writeFileSync(
+      path.join(root, "package.json"),
+      JSON.stringify({
+        name: "fixture-workspace",
+        description: "Free-text workspace description",
+        private: true,
+      }),
+    );
+    writeFileSync(path.join(root, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
+    for (let index = 0; index < packageCount; index++) {
+      const dir = path.join(root, "packages", `pkg-${String(index).padStart(3, "0")}`);
+      mkdirSync(path.join(dir, "src"), { recursive: true });
+      writeFileSync(path.join(dir, "src/index.ts"), "export const value = 1;\n");
+      writeFileSync(
+        path.join(dir, "package.json"),
+        JSON.stringify({
+          name: `fixture-pkg-${String(index).padStart(3, "0")}`,
+          description: `Free-text package description ${index}`,
+          main: "src/index.ts",
+          dependencies: {
+            [`fixture-pkg-${String((index + 1) % packageCount).padStart(3, "0")}`]: "workspace:*",
+            [`fixture-pkg-${String((index + 2) % packageCount).padStart(3, "0")}`]: "workspace:*",
+          },
+        }),
+      );
+    }
+    return root;
+  }
+
+  /** Write an explicit code-intelligence project config into a workspace root. */
+  function writeProjectConfig(root: string, config: Record<string, unknown>): void {
+    mkdirSync(path.join(root, ".pi/supi"), { recursive: true });
+    writeFileSync(
+      path.join(root, ".pi/supi/config.json"),
+      JSON.stringify({ "code-intelligence": config }),
+    );
+  }
 
   function makeSessionManager(branch: unknown[] = []) {
     return { getBranch: () => branch };
   }
 
-  function makeCtx(cwd: string, branch: unknown[] = []) {
-    return { cwd, sessionManager: makeSessionManager(branch) };
+  function makeCtx(cwd: string, branch: unknown[] = [], trusted = true) {
+    return { cwd, sessionManager: makeSessionManager(branch), isProjectTrusted: () => trusted };
   }
 
   /** The overview handler is the second before_agent_start handler (index 1). */
@@ -116,5 +172,103 @@ describe("overview injection", () => {
     await shutdownHandler?.({ reason: "quit" }, null as never);
     // Shutdown succeeds without throwing
     expect(true).toBe(true);
+  });
+
+  it("injects the hidden overview on the first turn when enabled", async () => {
+    const handler = getOverviewHandler();
+    const sessionStartHandler = pi.getHandlers("session_start")[0];
+    const root = makeWorkspace(4);
+    // An explicit project value keeps the test independent of any global config.
+    writeProjectConfig(root, { overviewEnabled: true });
+    const ctx = makeCtx(root);
+    await sessionStartHandler?.({ reason: "startup" }, ctx);
+
+    const result = (await handler(null, ctx)) as
+      | { message?: { customType?: string; display?: boolean; content?: string } }
+      | undefined;
+
+    expect(result?.message?.customType).toBe("code-intelligence-overview");
+    expect(result?.message?.display).toBe(false);
+    expect(result?.message?.content).toContain("fixture-workspace");
+    expect(result?.message?.content).toContain("fixture-pkg-000");
+    expect(result?.message?.content).toContain("fixture-pkg-003");
+    // Free-text manifest descriptions never enter the overview.
+    expect(result?.message?.content).not.toContain("Free-text workspace description");
+    expect(result?.message?.content).not.toContain("Free-text package description");
+  });
+
+  it("emits no overview when overviewEnabled is false", async () => {
+    const handler = getOverviewHandler();
+    const sessionStartHandler = pi.getHandlers("session_start")[0];
+    const root = makeWorkspace(2);
+    writeProjectConfig(root, { overviewEnabled: false });
+    const ctx = makeCtx(root);
+    await sessionStartHandler?.({ reason: "startup" }, ctx);
+
+    const result = await handler(null, ctx);
+
+    expect(result).toBeUndefined();
+  });
+
+  it("ignores an untrusted project's overview setting and keeps the default", async () => {
+    const handler = getOverviewHandler();
+    const sessionStartHandler = pi.getHandlers("session_start")[0];
+    const root = makeWorkspace(2);
+    writeProjectConfig(root, { overviewEnabled: false });
+    const ctx = makeCtx(root, [], false);
+    await sessionStartHandler?.({ reason: "startup" }, ctx);
+
+    const result = (await handler(null, ctx)) as { message?: { customType?: string } } | undefined;
+
+    // The untrusted project override is ignored, so the default true applies.
+    expect(result?.message?.customType).toBe("code-intelligence-overview");
+  });
+
+  it("pins the overview setting once per session without a mid-session toggle", async () => {
+    const handler = getOverviewHandler();
+    const sessionStartHandler = pi.getHandlers("session_start")[0];
+    const root = makeWorkspace(2);
+    writeProjectConfig(root, { overviewEnabled: false });
+    const ctx = makeCtx(root);
+    await sessionStartHandler?.({ reason: "startup" }, ctx);
+
+    // First turn: disabled, no injection.
+    expect(await handler(null, ctx)).toBeUndefined();
+
+    // The config changes before the next turn; the pinned value still applies.
+    writeProjectConfig(root, { overviewEnabled: true });
+    const second = await handler(null, ctx);
+    expect(second).toBeUndefined();
+  });
+
+  it("emits only a debug event when the overview exceeds the soft token budget", async () => {
+    const handler = getOverviewHandler();
+    const sessionStartHandler = pi.getHandlers("session_start")[0];
+    const root = makeWorkspace(60);
+    writeProjectConfig(root, { overviewEnabled: true });
+    const ctx = makeCtx(root);
+    await sessionStartHandler?.({ reason: "startup" }, ctx);
+
+    const debugEvents: Array<Record<string, unknown>> = [];
+    pi.events.on("supi:debug", (event) => {
+      debugEvents.push(event as Record<string, unknown>);
+    });
+
+    const result = (await handler(null, ctx)) as
+      | { message?: { customType?: string; content?: string } }
+      | undefined;
+
+    expect(result?.message?.customType).toBe("code-intelligence-overview");
+    expect(debugEvents).toContainEqual(
+      expect.objectContaining({
+        source: "supi-code-intelligence",
+        level: "warning",
+        category: "overview",
+      }),
+    );
+    // No model-facing or TUI warning text.
+    expect(result?.message?.content).not.toContain("budget");
+    expect(result?.message?.content).not.toContain("token");
+    expect(result?.message?.content).not.toContain("warning");
   });
 });

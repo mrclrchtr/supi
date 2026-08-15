@@ -7,15 +7,22 @@ import codeIntelligenceExtension from "../../../../src/extension.ts";
 import { clearMockRuntime } from "../../../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
+let homeDir: string;
 
 beforeEach(() => {
   tmpDir = mkdtempSync(path.join(os.tmpdir(), "code-orientation-instructions-"));
+  homeDir = mkdtempSync(path.join(os.tmpdir(), "code-orientation-home-"));
   writeJson("package.json", { name: "ctx-ws" });
 });
+
+function extensionWithIsolatedHome(pi: ReturnType<typeof createPiMock>): void {
+  codeIntelligenceExtension(pi as never, undefined, homeDir);
+}
 
 afterEach(() => {
   clearMockRuntime();
   rmSync(tmpDir, { recursive: true, force: true });
+  rmSync(homeDir, { recursive: true, force: true });
 });
 
 function writeJson(relPath: string, data: unknown): void {
@@ -54,7 +61,7 @@ describe("code_orientation instruction files", () => {
     writeFile("packages/foo/CLAUDE.md", "# Foo instructions\n\n- Follow foo rules.\n");
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    extensionWithIsolatedHome(pi);
 
     const result = await orientDirectory(pi, "packages/foo");
 
@@ -85,7 +92,7 @@ describe("code_orientation instruction files", () => {
     writeFile("packages/foo/src/index.ts", "export const foo = 1;\n");
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    extensionWithIsolatedHome(pi);
 
     const result = await orientDirectory(pi, "packages/foo/src");
 
@@ -104,7 +111,7 @@ describe("code_orientation instruction files", () => {
     writeFile("packages/foo/AGENTS.md", "# Agents\n");
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    extensionWithIsolatedHome(pi);
 
     const result = await orientDirectory(pi, "packages/foo");
 
@@ -122,7 +129,7 @@ describe("code_orientation instruction files", () => {
     writeFile("packages/foo/RULES.md", "# Rules\n");
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    extensionWithIsolatedHome(pi);
 
     const result = await orientDirectory(pi, "packages/foo");
 
@@ -140,7 +147,7 @@ describe("code_orientation instruction files", () => {
     writeFile("packages/foo/src/index.ts", "export const foo = 1;\n");
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    extensionWithIsolatedHome(pi);
 
     const result = await orientDirectory(pi, "packages/foo");
     expect(result.text).not.toContain("## Instructions");
@@ -156,7 +163,7 @@ describe("code_orientation instruction files", () => {
     writeFile("packages/foo/CLAUDE.md", "# Valid rules\n");
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    extensionWithIsolatedHome(pi);
 
     const result = await orientDirectory(pi, "packages/foo");
     expect(result.text).toContain("Valid rules");
@@ -172,7 +179,7 @@ describe("code_orientation instruction files", () => {
 
     try {
       const pi = createPiMock();
-      codeIntelligenceExtension(pi as never);
+      extensionWithIsolatedHome(pi);
 
       const result = await orientDirectory(pi, "packages/foo");
       expect(result.text).not.toContain("## Instructions");
@@ -189,7 +196,7 @@ describe("code_orientation instruction files", () => {
     symlinkSync(path.join(tmpDir, "shared/CLAUDE.md"), path.join(tmpDir, "packages/foo/CLAUDE.md"));
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    extensionWithIsolatedHome(pi);
 
     const result = await orientDirectory(pi, "packages/foo");
     expect(result.text).toContain("### packages/foo/CLAUDE.md");
@@ -205,7 +212,7 @@ describe("code_orientation instruction files", () => {
 
     try {
       const pi = createPiMock();
-      codeIntelligenceExtension(pi as never);
+      extensionWithIsolatedHome(pi);
 
       const result = await orientDirectory(pi, "packages/external");
       expect(result.text).not.toContain("## Instructions");
@@ -221,7 +228,7 @@ describe("code_orientation instruction files", () => {
     writeFile("packages/foo/CLAUDE.md", "# Untrusted project instructions\n");
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    extensionWithIsolatedHome(pi);
 
     const untrusted = await orientDirectory(pi, "packages/foo", { projectTrusted: false });
     expect(untrusted.text).not.toContain("## Instructions");
@@ -244,7 +251,7 @@ describe("code_orientation instruction-file limits and deduplication", () => {
     writeFile("packages/foo/CLAUDE.md", "# Foo instructions\n");
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    extensionWithIsolatedHome(pi);
 
     const result = await orientDirectory(pi, "packages/foo/src/index.ts");
 
@@ -259,7 +266,7 @@ describe("code_orientation instruction-file limits and deduplication", () => {
     writeFile("packages/foo/CLAUDE.md", lines.join("\n"));
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    extensionWithIsolatedHome(pi);
 
     const result = await orientDirectory(pi, "packages/foo");
 
@@ -278,7 +285,7 @@ describe("code_orientation instruction-file limits and deduplication", () => {
     writeFile("packages/foo/CLAUDE.md", "# Native\n");
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    extensionWithIsolatedHome(pi);
     await pi.emit(
       "before_agent_start",
       { systemPromptOptions: { contextFiles: [{ path: nativePath, content: "# Native" }] } },
@@ -296,7 +303,7 @@ describe("code_orientation instruction-file limits and deduplication", () => {
     writeFile("packages/foo/CLAUDE.md", "# Foo\n");
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    extensionWithIsolatedHome(pi);
 
     expect((await orientDirectory(pi, "packages/foo")).text).toContain("## Instructions");
     expect((await orientDirectory(pi, "packages/foo")).text).not.toContain("## Instructions");
@@ -314,7 +321,7 @@ describe("code_orientation instruction-file reconstruction", () => {
     writeFile("packages/foo/CLAUDE.md", "# Foo\n");
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    extensionWithIsolatedHome(pi);
     const sessionStart = getHandlerOrThrow(pi, "session_start");
     await sessionStart(
       {},
@@ -333,7 +340,7 @@ describe("code_orientation instruction-file reconstruction", () => {
     writeFile("packages/foo/CLAUDE.md", "# Foo\n");
 
     const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
+    extensionWithIsolatedHome(pi);
     const sessionStart = getHandlerOrThrow(pi, "session_start");
     await sessionStart(
       {},
@@ -346,6 +353,30 @@ describe("code_orientation instruction-file reconstruction", () => {
     );
 
     expect((await orientDirectory(pi, "packages/foo")).text).toContain("## Instructions");
+  });
+
+  it("reads the instruction file names from the isolated global home", async () => {
+    writeJson("packages/foo/package.json", { name: "foo" });
+    writeFile("packages/foo/src/index.ts", "export const foo = 1;\n");
+    writeFile("packages/foo/CLAUDE.md", "# Foo instructions\n");
+    writeFile("packages/foo/HOSTILE.md", "# Hostile home rules\n");
+
+    // Seed the isolated global home with a custom instruction file name. If the
+    // orientation read leaked to os.homedir(), CLAUDE.md would be surfaced
+    // instead and this assertion would fail.
+    mkdirSync(path.join(homeDir, ".pi/agent/supi"), { recursive: true });
+    writeFileSync(
+      path.join(homeDir, ".pi/agent/supi/config.json"),
+      JSON.stringify({ "code-intelligence": { instructionFileNames: ["HOSTILE.md"] } }),
+    );
+
+    const pi = createPiMock();
+    extensionWithIsolatedHome(pi);
+
+    const result = await orientDirectory(pi, "packages/foo");
+
+    expect(result.text).toContain("### packages/foo/HOSTILE.md");
+    expect(result.text).not.toContain("### packages/foo/CLAUDE.md");
   });
 });
 

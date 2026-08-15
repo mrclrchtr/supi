@@ -30,7 +30,7 @@ After installation, keep asking Pi normal coding questions. The agent can:
 - **Refactor safely** — preview language-aware renames and extractions before applying them. Plans are rejected if the files changed in the meantime.
 - **See uncertainty clearly** — results distinguish “nothing found” from incomplete or unavailable analysis and disclose omitted matches.
 
-When Pi recognizes a workspace, the agent also receives an architecture overview near the start of the session, so it can orient before spending turns opening files.
+When Pi recognizes a workspace, the agent also receives a compact architecture overview near the start of the session, so it can orient before spending turns opening files. The overview contains only structural repository facts (module names, manifest-declared topology, declared entrypoints, and detected languages), is labeled as untrusted repository evidence, and is controlled by the `code-intelligence.overviewEnabled` setting in `/supi-settings`.
 
 ## Example requests
 
@@ -127,7 +127,7 @@ Open the status view to see detected languages, running or missing servers, and 
 /supi-ci-status
 ```
 
-Use `/supi-settings` to disable language servers you do not need or change the instruction filenames surfaced during directory orientation. The defaults are `CLAUDE.md` and `AGENTS.md`.
+Use `/supi-settings` to disable language servers you do not need, change the instruction filenames surfaced during directory orientation (defaults `CLAUDE.md` and `AGENTS.md`), or disable the first-turn architecture overview with `overviewEnabled`.
 
 [workspace-orientation]: https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-code-intelligence/assets/workspace-orientation.png
 [symbol-inspection]: https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-code-intelligence/assets/symbol-inspection.png

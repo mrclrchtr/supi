@@ -146,7 +146,7 @@ describe("canonical Tool result assembly", () => {
     expect(markdown.match(/showing 1 of 2; 1 omitted/g)).toHaveLength(3);
   });
 
-  it("assembles a resolved target with provenance and a follow-up query", () => {
+  it("assembles a resolved target with provenance and no unconditional graph advice", () => {
     const assembly = assembleResolveResult(
       {
         kind: "resolved",
@@ -172,7 +172,10 @@ describe("canonical Tool result assembly", () => {
 
     expect(assembly.details.targets[0]?.file).toBe("src/a.ts");
     expect(assembly.assembled.provenance[0]?.source).toBe("semantic");
-    expect(assembly.assembled.actions[0]?.kind).toBe("query");
+    expect(assembly.assembled.actions).toHaveLength(0);
+    expect(assembly.details.nextQueries).toEqual([]);
+    expect(renderResolveResult(assembly)).not.toContain("code_graph");
+    expect(renderResolveResult(assembly)).not.toContain("Chain next");
   });
 
   it("keeps no-symbol coordinate errors plain in details and frames markdown once", () => {
@@ -259,6 +262,8 @@ describe("canonical Tool result assembly", () => {
     expect(assembly.details.candidates?.[0]).not.toHaveProperty("reason");
     expect(markdown).toContain("No exact symbol-kind match");
     expect(markdown).toContain("Retry without `symbolKind`");
+    // Ambiguity keeps established corrective advice.
+    expect(assembly.details.nextQueries[0]).toContain("Retry without symbolKind");
   });
 
   it("assembles a bounded file Target group without synthetic handles", () => {
@@ -314,6 +319,8 @@ describe("canonical Tool result assembly", () => {
     expect(markdown).toContain("1 declaration has unknown hierarchy");
     expect(markdown).not.toContain("tg-two");
     expect(markdown).toContain("showing 1 of 2; 1 omitted");
+    // A partial group keeps the established member-choice advice.
+    expect(assembly.details.nextQueries[0]).toContain("Choose one Target group member handle");
   });
 
   it("assembles Orientation facts before markdown rendering", () => {
