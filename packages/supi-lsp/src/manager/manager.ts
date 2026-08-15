@@ -929,8 +929,8 @@ export class LspManager {
     let totalFiles = 0;
 
     for (const client of this.clients.values()) {
-      for (const entry of client.getAllDiagnostics()) {
-        const file = relativeFilePathFromUri(entry.uri, this.cwd);
+      for (const document of client.getDiagnosticSnapshot().documents) {
+        const file = relativeFilePathFromUri(document.uri, this.cwd);
         totalFiles++;
         accumulateScopeDecision(accumulator, file, getFileScopeDecision(file, this.cwd));
       }
