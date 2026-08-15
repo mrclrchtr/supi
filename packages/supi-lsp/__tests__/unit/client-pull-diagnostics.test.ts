@@ -68,6 +68,56 @@ describe("LSP pull diagnostics — refresh requests", () => {
     expect(client.getDiagnostics(file.filePath)[0]?.message).toBe("pull-diag-error");
   });
 
+  it("stores diagnostics from a gopls-style report with an empty kind", async () => {
+    // gopls v0.23.0 sends `kind: ""` (the discriminator is never set) with no
+    // resultId; the empty kind is tolerated as a full report.
+    const file = createTempTsFile();
+    tmpDir = file.tmpDir;
+    const { client, rpc } = createPullTestClient();
+    openDocument(client, file.filePath);
+    rpc.sendRequest.mockResolvedValue({
+      kind: "",
+      items: [makeDiagnostic("gopls-pull-diag")],
+    });
+
+    await client.refreshOpenDiagnostics({ maxWaitMs: 500, quietMs: 50 });
+
+    expect(client.getDiagnostics(file.filePath)[0]?.message).toBe("gopls-pull-diag");
+  });
+
+  it("stores diagnostics from a report with a missing kind", async () => {
+    const file = createTempTsFile();
+    tmpDir = file.tmpDir;
+    const { client, rpc } = createPullTestClient();
+    openDocument(client, file.filePath);
+    rpc.sendRequest.mockResolvedValue({
+      items: [makeDiagnostic("no-kind-diag")],
+    });
+
+    await client.refreshOpenDiagnostics({ maxWaitMs: 500, quietMs: 50 });
+
+    expect(client.getDiagnostics(file.filePath)[0]?.message).toBe("no-kind-diag");
+  });
+
+  it("fails closed on a report with an unknown kind", async () => {
+    const file = createTempTsFile();
+    tmpDir = file.tmpDir;
+    const { client, rpc } = createPullTestClient();
+    openDocument(client, file.filePath);
+    rpc.sendRequest.mockResolvedValue({
+      kind: "bogus",
+      items: [makeDiagnostic("never-stored")],
+    });
+    setTimeout(
+      () => simulatePublish(client, file.uri, [makeDiagnostic("push-fallback")], true),
+      20,
+    );
+
+    await client.refreshOpenDiagnostics({ maxWaitMs: 2000, quietMs: 80 });
+
+    expect(client.getDiagnostics(file.filePath)[0]?.message).toBe("push-fallback");
+  });
+
   it("stores related document diagnostics from a pull response", async () => {
     const file = createTempTsFile();
     tmpDir = file.tmpDir;

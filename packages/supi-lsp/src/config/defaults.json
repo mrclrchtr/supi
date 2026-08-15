@@ -50,7 +50,7 @@
     },
     "kotlin": {
       "command": "kotlin-lsp",
-      "args": [],
+      "args": ["--stdio"],
       "fileTypes": ["kt", "kts"],
       "rootMarkers": ["build.gradle.kts", "pom.xml"]
     },

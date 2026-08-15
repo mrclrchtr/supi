@@ -39,6 +39,11 @@ import { boundCwd, truncateIdentity } from "../debug-telemetry.ts";
 import type { DiagnosticEvidenceSummary } from "../diagnostics/evidence.ts";
 import { raceRequestControl } from "../session/readiness.ts";
 import { fileToUri } from "../utils.ts";
+import {
+  ClientDynamicRegistrations,
+  DOCUMENT_DIAGNOSTIC_METHOD,
+  isValidDiagnosticOptions,
+} from "./client-diagnostic-capabilities.ts";
 import { ClientDiagnostics } from "./client-diagnostics.ts";
 import type { ClientDiagnosticSnapshot, DiagnosticEntry } from "./client-document-state.ts";
 import { JsonRpcClient, JsonRpcRequestError } from "./transport.ts";
@@ -74,6 +79,41 @@ export async function withTimeout<T>(
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Read and validate the `registrations` array of a `client/registerCapability`
+ * request. Each entry must be a record with string `id` and `method`; the
+ * optional `registerOptions` stay unvalidated here (method-specific checks
+ * happen in the handler). Malformed values reject the request.
+ */
+function readRegistrations(
+  params: unknown,
+  requestName: string,
+): Array<{ id: string; method: string; registerOptions?: unknown }> {
+  if (!isRecord(params) || !Array.isArray(params.registrations)) {
+    throw new JsonRpcRequestError(-32602, `Malformed ${requestName} params.`);
+  }
+  const registrations: Array<{ id: string; method: string; registerOptions?: unknown }> = [];
+  for (const registration of params.registrations) {
+    if (
+      !isRecord(registration) ||
+      typeof registration.id !== "string" ||
+      typeof registration.method !== "string"
+    ) {
+      throw new JsonRpcRequestError(-32602, `Malformed ${requestName} registration.`);
+    }
+    registrations.push({
+      id: registration.id,
+      method: registration.method,
+      registerOptions: registration.registerOptions,
+    });
+  }
+  return registrations;
 }
 
 // ── Process-tree cleanup ──────────────────────────────────────────────
@@ -125,6 +165,8 @@ export class LspClient {
   private _status: ClientStatus = "initializing";
   private capabilities: ServerCapabilities | null = null;
   private readonly diagnostics: ClientDiagnostics;
+  /** Dynamic capability registrations for this client instance only. */
+  private readonly dynamicRegistrations = new ClientDynamicRegistrations();
 
   // ── Readiness (work-done-progress) ──────────────────────────────────
   private trackedTokens = new Map<ProgressToken, "created" | "active" | "ended">();
@@ -167,7 +209,7 @@ export class LspClient {
           deadline: request.deadline,
         });
         return rpc.sendRequest(
-          "textDocument/diagnostic",
+          DOCUMENT_DIAGNOSTIC_METHOD,
           {
             textDocument: { uri: request.uri },
             previousResultId: request.previousResultId,
@@ -298,6 +340,7 @@ export class LspClient {
     if (this._status === "shutdown") return;
     this._status = "shutdown";
     this.diagnostics.clear();
+    this.dynamicRegistrations.clear();
     this.cancelNoProgressTimer();
     this.rejectReady(new Error("Client shutdown"));
     this.publishLifecycle("shutdown");
@@ -378,6 +421,7 @@ export class LspClient {
       this.rejectReady(reason);
     }
     this.diagnostics.clear({ preserveFailedDocuments: didCrash || this._status === "error" });
+    this.dynamicRegistrations.clear();
     this.rpc?.dispose();
     if (didCrash) this.publishLifecycle("crash");
   }
@@ -478,7 +522,14 @@ export class LspClient {
 
   /** Check if server supports pull diagnostics. */
   get hasDiagnosticProvider(): boolean {
-    return this.capabilities?.diagnosticProvider !== undefined;
+    // Static state: a valid `diagnosticProvider` in the initialize result.
+    // Dynamic state: an active registration for the diagnostic method. A
+    // malformed static shape or an empty dynamic set fails closed, so an
+    // unsupported server never gets pull requests.
+    return (
+      isValidDiagnosticOptions(this.capabilities?.diagnosticProvider) ||
+      this.dynamicRegistrations.has(DOCUMENT_DIAGNOSTIC_METHOD)
+    );
   }
 
   /** Notify the server that watched workspace files changed. */
@@ -653,7 +704,14 @@ export class LspClient {
       case "workspace/workspaceFolders":
         return [{ uri: fileToUri(this.root), name: path.basename(this.root) || this.root }];
       case "client/registerCapability":
+        return this.handleRegisterCapability(params);
       case "client/unregisterCapability":
+        return this.handleUnregisterCapability(params);
+      case "workspace/diagnostic/refresh":
+        // The client does not advertise refresh support, but pyright sends
+        // this request anyway when a document opens in pull mode. Answering
+        // with an error crashes pyright (exit 1); answering null keeps the
+        // server alive and pull-on-demand still serves fresh diagnostics.
         return null;
       case "window/workDoneProgress/create": {
         // A create reserves a token; it does not prove active work. The
@@ -674,6 +732,50 @@ export class LspClient {
     const items = (params as { items?: unknown }).items;
     if (!Array.isArray(items)) return [];
     return items.map(() => null);
+  }
+
+  /**
+   * Apply a dynamic registration for `textDocument/diagnostic`.
+   *
+   * Registrations for other methods are ignored (status quo). Malformed
+   * params or malformed diagnostic registration options reject the request
+   * without enabling pull, so a server never gets pull requests it did not
+   * validly register for.
+   */
+  private handleRegisterCapability(params: unknown): null {
+    const registrations = readRegistrations(params, "client/registerCapability");
+    for (const registration of registrations) {
+      if (registration.method !== DOCUMENT_DIAGNOSTIC_METHOD) continue;
+      if (!isValidDiagnosticOptions(registration.registerOptions)) {
+        throw new JsonRpcRequestError(
+          -32602,
+          "Malformed textDocument/diagnostic registration options.",
+        );
+      }
+      this.dynamicRegistrations.register(registration.method, registration.id);
+    }
+    return null;
+  }
+
+  /**
+   * Remove dynamic registrations for `textDocument/diagnostic`.
+   *
+   * The params key is the LSP specification's documented compatibility typo
+   * `unregisterations` (renamed to `unregistrations` only in a future 4.x).
+   * Capability loss disables pull as soon as the last id is removed.
+   */
+  private handleUnregisterCapability(params: unknown): null {
+    if (!isRecord(params) || !Array.isArray(params.unregisterations)) {
+      throw new JsonRpcRequestError(-32602, "Malformed client/unregisterCapability params.");
+    }
+    for (const entry of params.unregisterations) {
+      if (!isRecord(entry) || typeof entry.id !== "string" || typeof entry.method !== "string") {
+        throw new JsonRpcRequestError(-32602, "Malformed client/unregisterCapability entry.");
+      }
+      if (entry.method !== DOCUMENT_DIAGNOSTIC_METHOD) continue;
+      this.dynamicRegistrations.unregister(entry.method, entry.id);
+    }
+    return null;
   }
 
   /** Apply a diagnostic publication received from the LSP transport. */
@@ -830,6 +932,7 @@ export class LspClient {
    */
   dispose(): void {
     this.cancelNoProgressTimer();
+    this.dynamicRegistrations.clear();
     this.rejectReady(new Error("Client disposed"));
   }
   /**

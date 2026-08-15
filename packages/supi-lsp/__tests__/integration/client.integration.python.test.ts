@@ -210,6 +210,62 @@ describe.skipIf(!HAS_PYRIGHT)("LspClient integration (pyright-langserver)", () =
   }, 10_000);
 });
 
+describe.skipIf(!HAS_PYRIGHT)("LspClient pyright dynamic pull registration", () => {
+  let client: LspClient;
+
+  afterAll(async () => {
+    if (client?.status === "running") {
+      await client.shutdown();
+    }
+  });
+
+  it("starts without a static diagnosticProvider", async () => {
+    client = new LspClient("pyright-langserver", PY_SERVER_CONFIG, tmpDir);
+    await client.start();
+    expect(client.serverCapabilities?.diagnosticProvider).toBeUndefined();
+    expect(client.hasDiagnosticProvider).toBe(false);
+  }, 15_000);
+
+  it("dynamically registers textDocument/diagnostic after initialization", async () => {
+    // Pyright registers pull diagnostics through client/registerCapability
+    // right after `initialized`; the client must enable pull from the
+    // dynamic registration even though the static provider is absent.
+    await waitFor(
+      () => Promise.resolve(client.hasDiagnosticProvider),
+      (supportsPull) => supportsPull,
+      { timeoutMs: 10_000, retryDelayMs: 100, label: "pyright dynamic registration" },
+    );
+    expect(client.hasDiagnosticProvider).toBe(true);
+  }, 15_000);
+
+  it("collects pull diagnostics through the dynamic registration", async () => {
+    const content = fs.readFileSync(badFile, "utf-8");
+    const result = await waitFor(
+      () => client.syncAndWaitForDiagnostics(badFile, content),
+      (diagnostics) => diagnostics.kind !== "unavailable" && diagnostics.data.length > 0,
+      { timeoutMs: 15_000, retryDelayMs: 200, label: "pull diagnostics for errors.py" },
+    );
+    const typeErrors = completedDiagnostics(result).filter((d: Diagnostic) => d.severity === 1);
+    expect(typeErrors.length).toBeGreaterThan(0);
+  }, 20_000);
+
+  it("disables pull when the dynamic registrations are unregistered", async () => {
+    // Unregister exactly the ids the real server registered; capability loss
+    // must disable pull without any stale support.
+    const anyClient = client as unknown as {
+      handleServerRequest(method: string, params: unknown): unknown;
+      dynamicRegistrations: { ids(method: string): readonly string[] };
+    };
+    const ids = anyClient.dynamicRegistrations.ids("textDocument/diagnostic");
+    expect(ids.length).toBeGreaterThan(0);
+
+    anyClient.handleServerRequest("client/unregisterCapability", {
+      unregisterations: ids.map((id) => ({ id, method: "textDocument/diagnostic" })),
+    });
+    expect(client.hasDiagnosticProvider).toBe(false);
+  }, 10_000);
+});
+
 describe.skipIf(!HAS_PYRIGHT)("LspClient python shutdown-after-error", () => {
   it("shuts down cleanly after sync on a diagnostic-heavy file", async () => {
     const tmpDir2 = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-py-shutdown-"));

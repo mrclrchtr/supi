@@ -25,19 +25,19 @@ The table records an initialize-handshake audit performed on 2026-08-21 against 
 | Language | Server binary | Pull diagnostics (probe) | Built-in SuPi mode | Notes |
 |---|---|---|---|---|
 | TypeScript / JavaScript | `typescript-language-server` 5.3.0 | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
-| Python | `pyright-langserver` | No (confirmed) | Push | No `diagnosticProvider` even when the client advertises dynamic pull registration. |
+| Python | `pyright-langserver` 1.1.411 | Dynamic-only pull (confirmed) | Pull | No static `diagnosticProvider` in the initialize result; registers `textDocument/diagnostic` dynamically after `initialized`. The #320 handshake inspected only the initialize result and missed the registration. |
 | Rust | `rust-analyzer` 0.0.0 (2026-08-10) | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
-| Go | `gopls` v0.23.0 | Conditional (confirmed) | Push | Default is push; `initializationOptions.pullDiagnostics: true` makes gopls advertise `diagnosticProvider`. Keep push while golang/go#70199 stays open; initial pull support tracked in golang/go#53275. |
+| Go | `gopls` v0.23.0 | Conditional (confirmed) | Push | Default is push; `initializationOptions.pullDiagnostics: true` makes gopls advertise `diagnosticProvider`. Keep push while golang/go#70199 stays open; initial pull support tracked in golang/go#53275. gopls v0.23.0 pull reports omit the `kind` discriminator (`""`) and `resultId`; SuPi tolerates the empty-kind full report. |
 | C / C++ | `clangd` 21.0.0 | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
 | Ruby | `ruby-lsp` 0.26.10 | No (confirmed) | Push | No `diagnosticProvider`. The server also refuses to start in a project that has a `Gemfile` without a `Gemfile.lock`. |
 | Java | `jdtls` | Unverified | Push | Probe limitation: the wrapper needs a workspace launch configuration; the version probe did not respond. |
-| Kotlin | `kotlin-lsp` | Unverified | Push when configured | Probe limitation: the binary is not installed in the audit environment. Upstream requires the `--stdio` argument. |
+| Kotlin | `kotlin-lsp` LS-262.9593.0 | Static pull (confirmed) | Pull | Statically advertises `diagnosticProvider` in the initialize result, but only when started with `--stdio`; the built-in configuration provides the argument. |
 | Bash | `bash-language-server` 5.6.0 | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
 | HTML | `vscode-html-language-server` | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
 | SQL | `sql-language-server` 1.7.1 | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
 | R | `R` 4.6.1 (languageserver) | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
 
-SuPi advertises static-only pull support (`textDocument.diagnostic.dynamicRegistration: false`) and answers `client/registerCapability` without acting on it, so only a server that declares `diagnosticProvider` at initialize time gets pull diagnostics. Protocol support is separate from the configured mode: a server may support pull yet stay in SuPi's push mode because the built-in configuration does not enable it.
+SuPi advertises static and dynamic pull support (`textDocument.diagnostic.dynamicRegistration: true`). A server that declares a valid `diagnosticProvider` in its initialize result gets pull diagnostics; a server that registers `textDocument/diagnostic` after initialization gets pull diagnostics for as long as its registration stays active. Registration parameters are validated and malformed values reject the request without enabling pull. Other registration methods are ignored. Protocol support is separate from the configured mode: a server may support pull yet stay in SuPi's push mode because the built-in configuration does not enable it.
 
 The LSP 3.18 specification adds `Diagnostic.message` markup content, guarded by the client capability `textDocument.diagnostic.markupMessageSupport`; SuPi's validator already accepts plaintext and markdown messages but does not advertise the capability. Other 3.18 features (snippet text edits, inline completion, folding-range refresh, multi-range formatting) are outside the diagnostic surface and are not implemented.
 
@@ -63,14 +63,13 @@ Configuration overrides merge with the built-in server definitions. Use `.pi/sup
         "initializationOptions": {
           "pullDiagnostics": true
         }
-      },
-      "kotlin": {
-        "args": ["--stdio"]
       }
     }
   }
 }
 ```
+
+Gopls pull diagnostics stay opt-in while golang/go#70199 is open; without the option the built-in Go configuration stays in push mode. Kotlin's `--stdio` argument is already part of the built-in configuration and needs no override.
 
 The `lsp.enabled` and `lsp.active` settings are deprecated and ignored. Disable one language with `lsp.servers.<language>.enabled: false`. Use `/supi-ci-status` from `@mrclrchtr/supi-code-intelligence` to see detected, running, and missing servers.
 

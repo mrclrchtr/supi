@@ -23,7 +23,11 @@ export function isValidDocumentDiagnosticReport(
   allowRelatedDocuments = true,
 ): value is DocumentDiagnosticReport {
   if (!isRecord(value)) return false;
-  if (value.kind === "full") {
+  // gopls v0.23.0 ships a non-conforming pull report with an empty `kind`
+  // discriminator and no resultId (upstream work in progress). Treat a
+  // missing/empty kind with an items array as a full report; every other
+  // kind value stays strict.
+  if (value.kind === "full" || value.kind === undefined || value.kind === "") {
     if (!Array.isArray(value.items) || !value.items.every(isValidDiagnostic)) return false;
     if (value.resultId !== undefined && typeof value.resultId !== "string") return false;
   } else if (value.kind === "unchanged") {
@@ -312,7 +316,9 @@ export function applyPullReport(options: ApplyPullReportOptions): boolean {
     evidenceRevision,
     isRelatedUriTracked,
   } = options;
-  if (report.kind === "full") {
+  // A report validated as full (kind "full", "", or absent — gopls v0.23.0)
+  // stores its items; only an explicit "unchanged" reuses the previous entry.
+  if (report.kind !== "unchanged") {
     if (!Array.isArray(report.items)) return false;
     if (report.resultId !== undefined && typeof report.resultId !== "string") return false;
     store.set(uri, {
@@ -326,7 +332,6 @@ export function applyPullReport(options: ApplyPullReportOptions): boolean {
     applyRelatedPullReports(store, report, evidenceRevision, isRelatedUriTracked);
     return true;
   }
-  if (report.kind !== "unchanged") return false;
   if (!previous || previousResultId === undefined || typeof report.resultId !== "string") {
     return false;
   }
@@ -350,7 +355,9 @@ function applyRelatedPullReports(
 ): void {
   for (const [relatedUri, relatedReport] of Object.entries(report.relatedDocuments ?? {})) {
     if (!isValidDocumentDiagnosticReport(relatedReport, false)) continue;
-    if (relatedReport.kind !== "full") continue;
+    // Skip explicit unchanged reports; full reports (kind "full", "", or
+    // absent) may enter the related-document store.
+    if (relatedReport.kind === "unchanged") continue;
     if (isRelatedUriTracked(relatedUri)) continue;
     const existing = store.get(relatedUri);
     if (existing?.evidenceRevision === evidenceRevision) continue;

@@ -52,7 +52,10 @@ export const CLIENT_CAPABILITIES: ClientCapabilities = {
       versionSupport: true,
     },
     diagnostic: {
-      dynamicRegistration: false,
+      // Dynamic registration lets servers such as pyright-langserver register
+      // `textDocument/diagnostic` support after initialization. Probes show
+      // only Pyright acts on this global flag among the built-in servers.
+      dynamicRegistration: true,
       relatedDocumentSupport: true,
     },
   },
