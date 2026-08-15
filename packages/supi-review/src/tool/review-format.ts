@@ -46,14 +46,7 @@ function appendTaskStatus(
 }
 
 function formatTaskResult(result: ReviewTaskResult): string[] {
-  const lines = [
-    "",
-    `## ${result.taskId}`,
-    `Review Mode: ${result.mode}`,
-    `Model: ${result.modelId}`,
-    `Packet SHA-256: ${result.packetHash}`,
-  ];
-  if (result.usage) lines.push(`Usage: ${formatReviewUsage(result.usage)}`);
+  const lines = ["", `## ${result.taskId}`, `Review Mode: ${result.mode}`];
   if (result.audit) {
     lines.push(`Local replay: ${result.audit.artifactId} (expires ${result.audit.expiresAt})`);
   }

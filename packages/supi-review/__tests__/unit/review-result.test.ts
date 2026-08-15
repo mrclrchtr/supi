@@ -36,6 +36,22 @@ describe("normalizeReviewSubmission verdict precedence", () => {
     });
   });
 
+  it("derives pass for a clean review even when criteria coverage is incomplete", () => {
+    const normalized = normalizeReviewSubmission({
+      summary: "Clean.",
+      findings: [],
+      criteriaCoverage: { status: "incomplete", reason: "Spec file missing" },
+    });
+
+    // A clean review must not surface as INCOMPLETE: the coverage line still
+    // prints, but the verdict reflects that nothing was found.
+    expect(normalized.verdict).toBe("pass");
+    expect(normalized.criteriaCoverage).toEqual({
+      status: "incomplete",
+      reason: "Spec file missing",
+    });
+  });
+
   it("derives pass_with_findings when coverage is complete with advisory findings", () => {
     const normalized = normalizeReviewSubmission({
       summary: "Advisory notes only.",
@@ -72,14 +88,17 @@ describe("normalizeReviewSubmission verdict precedence", () => {
     ).toThrow(/criteria coverage reason/i);
   });
 
-  it("rejects a reason when coverage is complete", () => {
-    expect(() =>
-      normalizeReviewSubmission({
-        summary: "Contradictory coverage.",
-        findings: [],
-        criteriaCoverage: { status: "complete", reason: "Issue unavailable" } as never,
-      }),
-    ).toThrow(/complete criteria coverage/i);
+  it("drops a stray reason when coverage is complete", () => {
+    const normalized = normalizeReviewSubmission({
+      summary: "Contradictory coverage.",
+      findings: [],
+      criteriaCoverage: { status: "complete", reason: "Issue unavailable" } as never,
+    });
+
+    // A model that treats the reason field as required must still be able to
+    // deliver a valid complete submission; the stray reason is discarded.
+    expect(normalized.verdict).toBe("pass");
+    expect(normalized.criteriaCoverage).toEqual({ status: "complete" });
   });
 
   it("rejects oversized coverage reasons", () => {

@@ -49,7 +49,9 @@ function normalizeCriteriaCoverage(coverage: CriteriaCoverage): CriteriaCoverage
   if (!coverage) throw new Error("Review submissions must include criteria coverage.");
   const reason = ("reason" in coverage ? coverage.reason : undefined)?.trim();
   if (coverage.status === "complete") {
-    if (reason) throw new Error("Complete criteria coverage must not include a reason.");
+    // Tolerate a stray reason: reviewer models may treat the reason field as
+    // required and include it even for complete coverage. The accepted
+    // submission is complete with no reason.
     return { status: "complete" };
   }
   if (!reason) throw new Error("Incomplete criteria coverage needs a criteria coverage reason.");
@@ -125,7 +127,7 @@ export function normalizeReviewSubmission(
     verdict:
       findingCounts.blocking > 0
         ? "issues"
-        : criteriaCoverage?.status === "incomplete"
+        : criteriaCoverage?.status === "incomplete" && findingCounts.total > 0
           ? "incomplete"
           : findingCounts.total > 0
             ? "pass_with_findings"

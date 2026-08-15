@@ -26,7 +26,7 @@ const scopePathsSchema = Type.Array(
     minItems: 1,
     maxItems: REVIEW_LIMITS.reviewScopePathsPerTarget,
     description:
-      "Optional advisory path focus for this batch. It does not limit repository inspection, changed-path evidence, or findings.",
+      "Optional advisory path focus for this batch. This argument sits at the top level of the tool call, alongside target; do not place it inside target. It does not limit repository inspection, changed-path evidence, or findings.",
   },
 );
 
@@ -98,6 +98,13 @@ function oldTargetError(target: unknown): Error | undefined {
     : undefined;
 }
 
+function pathsInsideTargetError(target: unknown): Error | undefined {
+  if (!isRecord(target)) return undefined;
+  return "paths" in target
+    ? new Error("Review paths must be a top-level argument, not part of the Review Target.")
+    : undefined;
+}
+
 function endpointWhitespaceError(target: unknown): Error | undefined {
   if (!isRecord(target)) return undefined;
   for (const name of ["from", "to"] as const) {
@@ -141,6 +148,7 @@ function invalidInputError(input: unknown): Error {
     blankEndpointError(input.target) ??
     endpointWhitespaceError(input.target) ??
     oldTargetError(input.target) ??
+    pathsInsideTargetError(input.target) ??
     taskModeError(input.tasks) ??
     new Error("Invalid review execution input.")
   );

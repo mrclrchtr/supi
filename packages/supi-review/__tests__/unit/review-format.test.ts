@@ -70,6 +70,9 @@ describe("formatReviewBatch", () => {
     expect(output).toContain("Review Mode: change");
     expect(output).toContain("Verdict: ISSUES");
     expect(output).not.toContain("Finding Scope");
+    expect(output).not.toContain("Packet SHA-256:");
+    expect(output).not.toContain("Model: provider/model");
+    expect(output).not.toContain("Usage:");
 
     const scopedOutput = formatReviewBatch({
       ...details,

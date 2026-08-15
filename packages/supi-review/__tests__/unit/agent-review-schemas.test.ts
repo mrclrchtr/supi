@@ -159,6 +159,13 @@ describe("agent review schemas", () => {
     },
   );
 
+  it("rejects paths placed inside the Review Target with a top-level guidance error", () => {
+    expect(() => parseRunReviewToolInput({ target: { paths: ["src/a.ts"] }, tasks })).toThrow(
+      "Review paths must be a top-level argument, not part of the Review Target.",
+    );
+    expect(() => parseRunReviewToolInput({ paths: ["src/a.ts"], target: {}, tasks })).not.toThrow();
+  });
+
   it.each(["from", "to"] as const)(
     "rejects whitespace inside Review Target %s endpoint syntax",
     (endpoint) => {

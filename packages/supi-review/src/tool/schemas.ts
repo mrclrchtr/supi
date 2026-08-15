@@ -152,21 +152,21 @@ export const reviewSubmissionSchema = Type.Object(
       {
         status: StringEnum(["complete", "incomplete"] as const, {
           description:
-            "complete when the supplied Review Criteria were sufficient; incomplete when unavailable source detail limited the audit.",
+            "complete when the supplied Review Criteria were sufficient (this includes a clean review); incomplete only when an identified Review Criteria source was actually unavailable.",
         }),
         reason: Type.Optional(
           Type.String({
             minLength: 1,
             maxLength: REVIEW_LIMITS.criteriaCoverageReasonCharacters,
             pattern: "\\S",
-            description: "Required only when status is incomplete; names the unavailable detail.",
+            description: "Use only when status is incomplete; omit it when status is complete.",
           }),
         ),
       },
       {
         additionalProperties: false,
         description:
-          "Required structured criteria coverage statement; incomplete coverage cannot support a definitive pass.",
+          "Required structured criteria coverage statement; a clean review with sufficient criteria must report complete, and incomplete coverage cannot support a definitive verdict on its own.",
       },
     ),
   },
