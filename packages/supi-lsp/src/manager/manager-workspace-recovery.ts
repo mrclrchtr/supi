@@ -10,7 +10,6 @@ import type { Diagnostic, FileEvent } from "../config/types.ts";
 import {
   type DiagnosticEvidenceDocument,
   type DiagnosticEvidenceSummary,
-  emptyDiagnosticEvidence,
   summarizeDiagnosticEvidence,
 } from "../diagnostics/evidence.ts";
 import {
@@ -28,7 +27,7 @@ export interface WorkspaceRecoveryResult {
   restartedServers: string[];
   /** Stall signal of the first restarted route, when this pass restarted a client. */
   restartReason?: RecoveryRestartReason;
-  /** Final document-level evidence from the last refresh in this recovery pass. */
+  /** Final document-level evidence from this pass, starting from the caller's initial evidence when one was supplied. */
   diagnosticEvidence: DiagnosticEvidenceSummary;
   /** Failure from the first refresh, when no later pass replaced it. */
   refreshFailureReason?: string;
@@ -82,6 +81,13 @@ export function softRecoverWorkspaceDiagnostics(
 /**
  * Run a recovery pass, refreshing diagnostics and escalating if stale state remains.
  *
+ * When the caller already ran a refresh this pass, it can hand its evidence in
+ * `initialEvidence`; the recovery pass then skips its own initial refresh and
+ * still runs stale assessment and restart escalation on the current state.
+ * Caller evidence is only reused when the pass applies no watched-file changes:
+ * evidence captured before a change would otherwise be reported as current
+ * after it.
+ *
  * The pass observes request cancellation between its phases and propagates
  * the interruption as a rejection instead of swallowing it. A pass that
  * starts already cancelled rejects before any client or evidence work.
@@ -93,6 +99,8 @@ export async function recoverWorkspaceDiagnostics(
     restartIfStillStale?: boolean;
     maxWaitMs?: number;
     quietMs?: number;
+    /** Evidence from a refresh the caller already completed; skips this pass's own refresh when no watched-file changes apply. */
+    initialEvidence?: DiagnosticEvidenceSummary;
     control?: CodeRequestControl;
   } = {},
 ): Promise<WorkspaceRecoveryResult> {
@@ -100,22 +108,11 @@ export async function recoverWorkspaceDiagnostics(
   // evidence work may start for a pass the caller no longer awaits.
   throwIfCodeRequestInterrupted(options.control);
   const recoveryStartedAt = Date.now();
-  const attemptedClients = softRecoverWorkspaceDiagnostics(host, options.changes ?? []);
+  const initial = await collectInitialEvidence(host, options);
+  const attemptedClients = initial.attemptedClients;
   const attemptedServers = host.getRunningClientNames();
-  let diagnosticEvidence = emptyDiagnosticEvidence();
-  let refreshFailureReason: string | undefined;
-
-  try {
-    diagnosticEvidence = await host.refreshOpenDiagnostics({
-      maxWaitMs: options.maxWaitMs,
-      quietMs: options.quietMs,
-      ...options.control,
-    });
-  } catch (error) {
-    if (isCodeRequestInterruption(error, options.control)) throw error;
-    refreshFailureReason = errorMessage(error);
-    diagnosticEvidence = host.getDiagnosticEvidence();
-  }
+  let diagnosticEvidence = initial.diagnosticEvidence;
+  let refreshFailureReason = initial.refreshFailureReason;
 
   let staleAssessment = assessStaleDiagnostics(host.getOutstandingDiagnostics(1));
   let restartedClients = 0;
@@ -171,6 +168,51 @@ interface RecoveryRestartTarget {
   key: string;
   reason: RecoveryRestartReason;
   files: string[];
+}
+
+/** Establish the pass's starting evidence: caller-supplied reuse or a fresh refresh. */
+async function collectInitialEvidence(
+  host: WorkspaceRecoveryHost,
+  options: {
+    changes?: FileEvent[];
+    initialEvidence?: DiagnosticEvidenceSummary;
+    maxWaitMs?: number;
+    quietMs?: number;
+    control?: CodeRequestControl;
+  },
+): Promise<{
+  attemptedClients: number;
+  diagnosticEvidence: DiagnosticEvidenceSummary;
+  refreshFailureReason?: string;
+}> {
+  const changes = options.changes ?? [];
+  if (options.initialEvidence !== undefined && changes.length === 0) {
+    // Reuse skips the soft invalidation: the caller already refreshed this
+    // pass, and clearing cached pull result IDs without a refresh only forces
+    // a full pull on a later pass.
+    return {
+      attemptedClients: host.getRunningClientCount(),
+      diagnosticEvidence: options.initialEvidence,
+    };
+  }
+  const attemptedClients = softRecoverWorkspaceDiagnostics(host, changes);
+  try {
+    return {
+      attemptedClients,
+      diagnosticEvidence: await host.refreshOpenDiagnostics({
+        maxWaitMs: options.maxWaitMs,
+        quietMs: options.quietMs,
+        ...options.control,
+      }),
+    };
+  } catch (error) {
+    if (isCodeRequestInterruption(error, options.control)) throw error;
+    return {
+      attemptedClients,
+      diagnosticEvidence: host.getDiagnosticEvidence(),
+      refreshFailureReason: errorMessage(error),
+    };
+  }
 }
 
 /**

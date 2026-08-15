@@ -315,6 +315,8 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     restartIfStillStale?: boolean;
     maxWaitMs?: number;
     quietMs?: number;
+    /** Evidence from a refresh the caller already completed; skips this pass's own refresh when no watched-file changes apply. */
+    initialEvidence?: DiagnosticEvidenceSummary;
     control?: CodeRequestControl;
   }): Promise<RecoverDiagnosticsResult> {
     const recoveryStartedAt = Date.now();

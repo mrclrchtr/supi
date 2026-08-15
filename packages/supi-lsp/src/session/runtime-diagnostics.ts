@@ -36,7 +36,7 @@ export interface RecoverDiagnosticsResult {
   /** Active clients targeted by the best-effort refresh, not confirmed successful refreshes. */
   attemptedClients: number;
   restartedClients: number;
-  /** Final document-level evidence from the last refresh in this recovery pass. */
+  /** Final document-level evidence from this pass, starting from caller-supplied initial evidence when one was provided. */
   diagnosticEvidence: DiagnosticEvidenceSummary;
   /** Failure from the first refresh, when no later pass replaced it. */
   refreshFailureReason?: string;

@@ -2,7 +2,11 @@
 // Extracted from orchestrate.ts.
 
 import type { CapabilityState, CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
-import type { RecoverDiagnosticsResult, WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
+import type {
+  DiagnosticEvidenceSummary,
+  RecoverDiagnosticsResult,
+  WorkspaceLspRuntime,
+} from "@mrclrchtr/supi-lsp/api";
 
 // ── Recovery ──────────────────────────────────────────────────────────
 
@@ -10,6 +14,8 @@ interface RecoverOptions {
   service: WorkspaceLspRuntime;
   progress?: () => void;
   control?: CodeRequestControl;
+  /** Evidence from the maintenance refresh, so the recovery pass skips its own refresh. */
+  initialEvidence?: DiagnosticEvidenceSummary;
 }
 
 /** Run the runtime's best-effort recovery and preserve its established outcome. */
@@ -19,6 +25,7 @@ export async function recoverDiagnosticRuntime(
   opts.progress?.();
   return opts.service.recoverDiagnostics({
     restartIfStillStale: true,
+    ...(opts.initialEvidence !== undefined ? { initialEvidence: opts.initialEvidence } : {}),
     control: opts.control,
   });
 }

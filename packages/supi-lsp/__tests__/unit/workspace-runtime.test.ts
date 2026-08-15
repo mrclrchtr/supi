@@ -290,6 +290,37 @@ describe("workspace runtime behavior", () => {
     expect(recoveryOptions).toEqual({ restartIfStillStale: true });
   });
 
+  it("forwards caller-supplied initial evidence into the recovery pass", async () => {
+    const evidence = {
+      requested: 1,
+      confirmed: 1,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/index.ts", status: "confirmed" as const }],
+    };
+    const recovery = {
+      attemptedClients: 1,
+      restartedClients: 0,
+      diagnosticEvidence: evidence,
+      staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+    };
+    let recoveryOptions: unknown;
+    const runtime = createRuntime(
+      makeManager({
+        recoverWorkspaceDiagnostics: async (options: unknown) => {
+          recoveryOptions = options;
+          return recovery;
+        },
+      }),
+    );
+
+    await expect(
+      runtime.recoverDiagnostics({ restartIfStillStale: true, initialEvidence: evidence }),
+    ).resolves.toEqual(recovery);
+    expect(recoveryOptions).toEqual({ restartIfStillStale: true, initialEvidence: evidence });
+  });
+
   it("records bounded recovery telemetry with identity, elapsed time, and restart count", async () => {
     const recovery = {
       attemptedClients: 2,

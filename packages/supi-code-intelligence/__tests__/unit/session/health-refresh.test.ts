@@ -194,6 +194,46 @@ describe("code_health refresh evidence", () => {
     expect(refreshOpenDiagnostics).toHaveBeenCalledTimes(2);
   });
 
+  it("reuses maintenance evidence in the recovery pass instead of a second refresh", async () => {
+    const evidence = {
+      requested: 2,
+      confirmed: 2,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [
+        { file: "src/a.ts", status: "confirmed" as const },
+        { file: "src/b.ts", status: "confirmed" as const },
+      ],
+    };
+    const refreshOpenDiagnostics = vi.fn(async () => evidence);
+    const recoverDiagnostics = vi.fn(async () => ({
+      attemptedClients: 1,
+      restartedClients: 0,
+      diagnosticEvidence: evidence,
+      staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+    }));
+    const runtime = readyRuntime({ refreshOpenDiagnostics, recoverDiagnostics });
+
+    const { outcome } = await run(
+      { kind: "ready", runtime },
+      { include: ["diagnostics"], refresh: true },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        refresh: { kind: "completed", diagnosticEvidence: evidence },
+        diagnostics: { evidence },
+      },
+    });
+    // The maintenance pass refreshes once; the recovery pass reuses its evidence.
+    expect(refreshOpenDiagnostics).toHaveBeenCalledTimes(1);
+    expect(recoverDiagnostics).toHaveBeenCalledWith(
+      expect.objectContaining({ restartIfStillStale: true, initialEvidence: evidence }),
+    );
+  });
+
   it("reports a failed workspace refresh when the host refresh rejects", async () => {
     const refreshOpenDiagnostics = vi.fn(async () => {
       throw new Error("host refresh failed");

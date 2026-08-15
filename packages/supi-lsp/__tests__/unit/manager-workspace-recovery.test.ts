@@ -282,6 +282,148 @@ describe("recoverWorkspaceDiagnostics", () => {
     expect(result.staleAssessment.suspected).toBe(false);
   });
 
+  it("skips its own refresh and starts from caller evidence when initialEvidence is supplied", async () => {
+    const initialEvidence = {
+      requested: 1,
+      confirmed: 1,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "confirmed" as const }],
+    };
+    const manager = {
+      clearAllPullResultIds: vi.fn(),
+      notifyWorkspaceFileChanges: vi.fn(),
+      refreshOpenDiagnostics: vi.fn().mockResolvedValue(emptyEvidence()),
+      getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
+      restartClientsForFiles: vi.fn().mockResolvedValue([]),
+      getRunningClientCount: vi.fn(() => 1),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
+      isDiagnosticFile: vi.fn(() => true),
+      getClientDiagnosticRoutes: vi.fn(() => []),
+      getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getCwd: vi.fn(() => "/project"),
+    };
+
+    const result = await recoverWorkspaceDiagnostics(manager as never, {
+      restartIfStillStale: true,
+      initialEvidence,
+    });
+
+    expect(manager.refreshOpenDiagnostics).not.toHaveBeenCalled();
+    expect(manager.clearAllPullResultIds).not.toHaveBeenCalled();
+    expect(result.diagnosticEvidence).toBe(initialEvidence);
+    expect(result.refreshFailureReason).toBeUndefined();
+    expect(result.staleAssessment.suspected).toBe(false);
+    expect(result.restartedClients).toBe(0);
+  });
+
+  it("refreshes instead of reusing caller evidence when the pass applies watched-file changes", async () => {
+    const staleEvidence = {
+      requested: 1,
+      confirmed: 1,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "confirmed" as const }],
+    };
+    const manager = {
+      clearAllPullResultIds: vi.fn(),
+      notifyWorkspaceFileChanges: vi.fn(),
+      refreshOpenDiagnostics: vi.fn().mockResolvedValue(emptyEvidence()),
+      getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
+      restartClientsForFiles: vi.fn().mockResolvedValue([]),
+      getRunningClientCount: vi.fn(() => 1),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
+      isDiagnosticFile: vi.fn(() => true),
+      getClientDiagnosticRoutes: vi.fn(() => []),
+      getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getCwd: vi.fn(() => "/project"),
+    };
+
+    const result = await recoverWorkspaceDiagnostics(manager as never, {
+      changes: [{ uri: "file:///project/package.json", type: FileChangeType.Changed }],
+      restartIfStillStale: false,
+      initialEvidence: staleEvidence,
+    });
+
+    // Evidence captured before the change must not be reported as current:
+    // the pass forwards the change and refreshes instead of reusing it.
+    expect(manager.notifyWorkspaceFileChanges).toHaveBeenCalledWith([
+      { uri: "file:///project/package.json", type: FileChangeType.Changed },
+    ]);
+    expect(manager.clearAllPullResultIds).toHaveBeenCalledTimes(1);
+    expect(manager.refreshOpenDiagnostics).toHaveBeenCalledTimes(1);
+    expect(result.diagnosticEvidence).not.toBe(staleEvidence);
+    expect(result.refreshFailureReason).toBeUndefined();
+  });
+
+  it("merges caller evidence with replacement refresh evidence after a restart", async () => {
+    const initialEvidence = {
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 1,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "unconfirmed" as const }],
+    };
+    const finalEvidence = {
+      requested: 1,
+      confirmed: 1,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "confirmed" as const }],
+    };
+    const manager = {
+      clearAllPullResultIds: vi.fn(),
+      notifyWorkspaceFileChanges: vi.fn(),
+      refreshOpenDiagnostics: vi.fn().mockResolvedValueOnce(finalEvidence),
+      getOutstandingDiagnostics: vi.fn(() => [
+        { file: "/project/src/a.ts", diagnostics: [makeDiagnostic("Cannot find module 'x'")] },
+      ]),
+      restartClientsForFiles: vi.fn().mockResolvedValue([
+        {
+          key: "typescript:/project",
+          serverName: "typescript",
+          files: ["/project/src/a.ts"],
+          restarted: true,
+        },
+      ]),
+      getRunningClientCount: vi.fn(() => 1),
+      getRunningClientNames: vi.fn(() => ["typescript"]),
+      isDiagnosticFile: vi.fn(() => true),
+      getClientDiagnosticRoutes: vi.fn(() => [
+        {
+          key: "typescript:/project",
+          supportsPull: false,
+          unconfirmedFiles: ["/project/src/a.ts"],
+          stallSignal: "readiness-stall" as const,
+        },
+      ]),
+      getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getCwd: vi.fn(() => "/project"),
+    };
+
+    const result = await recoverWorkspaceDiagnostics(manager as never, {
+      restartIfStillStale: true,
+      initialEvidence,
+    });
+
+    // Only the post-restart replacement refresh runs; the initial one is skipped.
+    expect(manager.refreshOpenDiagnostics).toHaveBeenCalledTimes(1);
+    expect(result.restartReason).toBe("readiness-stall");
+    expect(result.restartedClients).toBe(1);
+    expect(result.diagnosticEvidence).toMatchObject({
+      requested: 1,
+      confirmed: 1,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "confirmed" }],
+    });
+  });
+
   it("does not restart clients on stale clusters or unconfirmed evidence alone", async () => {
     const manager = {
       clearAllPullResultIds: vi.fn(),
