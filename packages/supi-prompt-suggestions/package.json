@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-prompt-suggestions",
-  "version": "4.10.0",
+  "version": "5.0.0",
   "description": "Optional model-powered ghost-text prompt suggestions",
   "license": "MIT",
   "repository": {

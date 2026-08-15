@@ -1,5 +1,96 @@
 # Changelog
 
+## [5.0.0](https://github.com/mrclrchtr/supi/compare/v4.10.0...v5.0.0) (2026-08-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* **supi-review:** unify exact-target review flow
+* **supi-agent-runtime:** @mrclrchtr/supi-agent-runtime/api no longer exports internal builders, collectors, limits, grace constants, or sanitizers. The package-root barrel is removed.
+
+### Features
+
+* **agent:** bound the aggregate delegation result ([cde1008](https://github.com/mrclrchtr/supi/commit/cde10082ccc22e5c6609daee51e9d9541c89ce2b))
+* **cache:** bound forensics output with a summary envelope ([6f1fd68](https://github.com/mrclrchtr/supi/commit/6f1fd68a6bfc6ab2b589300cb5150d651d930ed7))
+* **code-intelligence:** propagate tool signal and deadline through workflows ([caeb4d3](https://github.com/mrclrchtr/supi/commit/caeb4d38959a08383b05ef320623e2360d47a675))
+* **code-runtime:** expand providers with request control ([df26327](https://github.com/mrclrchtr/supi/commit/df263271430bf3bfa1431db7d1060c0064ca7894))
+* **debug:** correlate public code operations ([4e46368](https://github.com/mrclrchtr/supi/commit/4e46368d6a8a19aa24f63d1a65bb49592d6dc8a1))
+* **debug:** ship supi-tooling-retro as installable prompt template ([24dfb43](https://github.com/mrclrchtr/supi/commit/24dfb43514801b1a50a627a9d5c12cc73f5816b2))
+* gate agent-facing tools behind per-package settings ([fd192d4](https://github.com/mrclrchtr/supi/commit/fd192d463e400ece14eb87f5596092ed993e04ac))
+* **lsp:** cancel diagnostic recovery mid-pass ([d3409d2](https://github.com/mrclrchtr/supi/commit/d3409d2a47e90e39a0aeb68522a7e27630543a40))
+* **lsp:** cancel semantic requests, readiness, and diagnostic waits ([07fa4cb](https://github.com/mrclrchtr/supi/commit/07fa4cb24d9b357a8b3a74c4e5bac233c487cc86))
+* **lsp:** expand LSP debug telemetry identity ([96503f1](https://github.com/mrclrchtr/supi/commit/96503f1b7325ed37b6fe56004d513987e0e0847d))
+* **lsp:** publish lifecycle transitions ([ccad1da](https://github.com/mrclrchtr/supi/commit/ccad1da203dda2ca05a886d3c5be2ec0dd9b8976)), closes [#312](https://github.com/mrclrchtr/supi/issues/312)
+* **lsp:** recover push-only diagnostics after invalidation ([e7871a3](https://github.com/mrclrchtr/supi/commit/e7871a3f36d5a3a5ab2585ca22b907a85519fbd6))
+* **lsp:** track exact diagnostic evidence coverage ([892cb1f](https://github.com/mrclrchtr/supi/commit/892cb1f9aaf57360a7d30f5be1ac3ed34c843cd1))
+* **settings:** apply Agent and Review settings without reload ([4b8d29c](https://github.com/mrclrchtr/supi/commit/4b8d29cdd6894e7a1a2dbb83b29ba9ea4ed35d7a))
+* **settings:** group Agent Profile settings ([69d575a](https://github.com/mrclrchtr/supi/commit/69d575a4c87fdb6425833afa2c7a62e31f15c5b3))
+* **skills:** improve model invocation config schema ([45b75a4](https://github.com/mrclrchtr/supi/commit/45b75a4235ab8cf213554e3cd55791e1371ae904))
+* **supi-agent-runtime:** extract neutral Agent Run lifecycle ([d45ec38](https://github.com/mrclrchtr/supi/commit/d45ec38bb3b9aacad380f90e8629d24323a6e8f9))
+* **supi-agent:** add Agent Runs overlay ([ec0fd9e](https://github.com/mrclrchtr/supi/commit/ec0fd9e29c357dca29a6ecd884aeff2ac7654471)), closes [#271](https://github.com/mrclrchtr/supi/issues/271)
+* **supi-agent:** add foreground delegation tool with bounded rendering ([cd3c968](https://github.com/mrclrchtr/supi/commit/cd3c9689a538658a6cbffab75f8fa2e6c72ffa70))
+* **supi-agent:** add profile overlays and settings ([28c6148](https://github.com/mrclrchtr/supi/commit/28c61483db93740e6aa0eba76ef9494d68723ba0))
+* **supi-agent:** record Agent Run timing telemetry ([33e2e0d](https://github.com/mrclrchtr/supi/commit/33e2e0da2ec94d61df7251df55a7a7e7776b5c96))
+* **supi-agents:** add profile catalogue and resource policy ([f2cf9a5](https://github.com/mrclrchtr/supi/commit/f2cf9a522c4b3bdabe37c6ce93b70c9902d8f9a4))
+* **supi-agent:** show field-level profile provenance in /agents ([f138714](https://github.com/mrclrchtr/supi/commit/f138714a6639af0c807b3f417f711a1b821c3b95))
+* **supi-review:** add replay outline navigation ([b747863](https://github.com/mrclrchtr/supi/commit/b747863542b6e104f60cd14b3ebc86c43227deb1))
+* **supi-review:** gate fixing policies on finding applicability ([7674c6e](https://github.com/mrclrchtr/supi/commit/7674c6ed698e07efbcbdcd14f8c27b268460873a))
+* **supi-review:** recover structured reviewer submissions ([42984fa](https://github.com/mrclrchtr/supi/commit/42984fa6a401ef212c521a08c8d290720e9c38d6))
+* **supi-review:** unify exact-target review flow ([c1c7063](https://github.com/mrclrchtr/supi/commit/c1c7063af696e6dfa4e57dd2f0abc937a693e10f))
+* **tree-sitter:** cancel structural operations ([71a4ff2](https://github.com/mrclrchtr/supi/commit/71a4ff2ea0399589b563b26b83bc45ec15a3fee9))
+* **tree-sitter:** isolate structural work in a worker ([0f5197b](https://github.com/mrclrchtr/supi/commit/0f5197bbabb5c7176f5331ede49e1e92a16c2bd1))
+* **tree-sitter:** reuse parsed files and queries ([0d2bad7](https://github.com/mrclrchtr/supi/commit/0d2bad72c8e97987cd862f5869923ea65b0ec4e1)), closes [#310](https://github.com/mrclrchtr/supi/issues/310)
+
+
+### Bug Fixes
+
+* **ask-user:** scroll overflowing decision forms ([e545b56](https://github.com/mrclrchtr/supi/commit/e545b564e71590c7966143b7de7dee485904aef7))
+* **code-intelligence:** clarify provider evidence ([06ac04f](https://github.com/mrclrchtr/supi/commit/06ac04fbac2f2eb82eecaf5c132486f645f095bc))
+* **code-intelligence:** constrain semantic mutation roots ([2e07ece](https://github.com/mrclrchtr/supi/commit/2e07ece391c32d6d479790f764980684f444ae52)), closes [#305](https://github.com/mrclrchtr/supi/issues/305)
+* **code-intelligence:** improve tool transcript rendering ([0a893a3](https://github.com/mrclrchtr/supi/commit/0a893a3b052bf6d469424e75989c6595847f28c6))
+* **code-intelligence:** normalize semantic edits fail closed ([46d5bc5](https://github.com/mrclrchtr/supi/commit/46d5bc5d8ee6d0ab5428814a26a898afce4e8502)), closes [#304](https://github.com/mrclrchtr/supi/issues/304)
+* **debug:** render and bound debug tool output ([411fb49](https://github.com/mrclrchtr/supi/commit/411fb492ac68508f5d7c4dbaba375448fedb1acf))
+* **deps:** refresh rebased lockfile ([96aa6d6](https://github.com/mrclrchtr/supi/commit/96aa6d63c7cfb4aac1609892e71f67a024bbcc4f))
+* **deps:** update dependency @biomejs/biome to v2.5.8 ([1c50a4e](https://github.com/mrclrchtr/supi/commit/1c50a4e352fcbb7e66bd63d1ece83b67c95afd6a))
+* **deps:** update dependency typebox to v1.3.12 ([ce4e64a](https://github.com/mrclrchtr/supi/commit/ce4e64a2bfb2094c27601d3b70f8a9c2856426f5))
+* **lsp:** confirm push-only diagnostic evidence without restarting clients ([14baa17](https://github.com/mrclrchtr/supi/commit/14baa178827784a7282feb60b85b3a0610358f0f))
+* **lsp:** correct conditional pull-diagnostic configuration ([4b4cd8e](https://github.com/mrclrchtr/supi/commit/4b4cd8eafbc5a8c31aabad6d906bb05ab5118e31)), closes [#321](https://github.com/mrclrchtr/supi/issues/321)
+* **lsp:** model work-done progress readiness as pending-create ([9064cda](https://github.com/mrclrchtr/supi/commit/9064cda72a491806ff921d4532e9c15bd54afeec))
+* **lsp:** preserve diagnostic freshness ([6f7dc42](https://github.com/mrclrchtr/supi/commit/6f7dc42ed41f3d78d5b641d4b1843e25b43463e5))
+* **lsp:** require fresh diagnostic evidence ([9c9833a](https://github.com/mrclrchtr/supi/commit/9c9833a0f04834a3ccaf310af9e2e01b65ad2751)), closes [#306](https://github.com/mrclrchtr/supi/issues/306)
+* sever terminal callback and history helper references ([368b043](https://github.com/mrclrchtr/supi/commit/368b043f5bee490d1e7837dfc441835f2fdfd98c))
+* **supi-agent-runtime:** add the package-root barrel ([ddaec90](https://github.com/mrclrchtr/supi/commit/ddaec90a8d1cf8ab9f72ab7d263a697fe92b6cc5))
+* **supi-agent-runtime:** align new package version with workspace release ([41e5234](https://github.com/mrclrchtr/supi/commit/41e5234986004e5e28f7d6c3981100cf58d1781a))
+* **supi-agent-runtime:** bound cancellation and completion waits ([e957da9](https://github.com/mrclrchtr/supi/commit/e957da9e4766196f032a47df042632d277712ad9))
+* **supi-agent-runtime:** close final diagnostic gaps ([6429147](https://github.com/mrclrchtr/supi/commit/642914797b4ee2470e53ad563cb3436c06359f91))
+* **supi-agent-runtime:** close usage and callback isolation gaps ([fcceb74](https://github.com/mrclrchtr/supi/commit/fcceb7459fd4ad2363030c3c3a6d5c51427dc412))
+* **supi-agent-runtime:** finish review hardening ([50cea4b](https://github.com/mrclrchtr/supi/commit/50cea4b9657f780afc61a09e869af251a904fd19))
+* **supi-agent-runtime:** harden lifecycle teardown and diagnostics ([4ca93df](https://github.com/mrclrchtr/supi/commit/4ca93df03d2d5caf0fa1030831f7a838c52eb2f2))
+* **supi-agent-runtime:** harden local child run lifecycle ([4862a0f](https://github.com/mrclrchtr/supi/commit/4862a0fbaa9a59a013a1b6213105988a86294a42))
+* **supi-agent-runtime:** preserve PI lifecycle semantics ([574b0ad](https://github.com/mrclrchtr/supi/commit/574b0ad4ff4d5e2c78adf03b21db61db23a4cd35))
+* **supi-agent-runtime:** retain reviewer tool-error progress ([f321c6d](https://github.com/mrclrchtr/supi/commit/f321c6d9af7d7fef3871233d4af969cf6ea15506))
+* **supi-agent-runtime:** serialize cancellation races safely ([dd48fde](https://github.com/mrclrchtr/supi/commit/dd48fde21ddff5029d8dd5c5a9fd8ec16a833734))
+* **supi-agent-runtime:** support nullable Pi headers ([8393c42](https://github.com/mrclrchtr/supi/commit/8393c4223ca460b9d906b458bdc2b5a29871323e))
+* **supi-agent-runtime:** tighten redaction and callback boundaries ([ba47029](https://github.com/mrclrchtr/supi/commit/ba47029f18f06f2a313a75e25a658c15364ba25e))
+* **supi-agent:** harden Agent Run rendering bounds ([66dc23b](https://github.com/mrclrchtr/supi/commit/66dc23b83b4340bfbeeb48c7b71000d952afa6a3))
+* **supi-agent:** keep invalid profiles out of the effective catalogue ([2565f96](https://github.com/mrclrchtr/supi/commit/2565f965fb2652b0e7e7445d4075e70b917173cb))
+* **supi-agent:** preserve missing child completion as failure ([b4ac1a5](https://github.com/mrclrchtr/supi/commit/b4ac1a568eda9fad7b0f691e9c2c8a3919a3ab93))
+* **supi-agent:** record failed Agent Run diagnostics ([64dca68](https://github.com/mrclrchtr/supi/commit/64dca68dffb211bba6515bb711e40f1e07df7fce))
+* **supi-agent:** redact spaced and quoted bash secrets in previews ([3d28817](https://github.com/mrclrchtr/supi/commit/3d288172f48c83ecc56b1b3d7dde741957eedd73))
+* **supi-agent:** sharpen Explorer evidence policy ([b94cf1b](https://github.com/mrclrchtr/supi/commit/b94cf1b37259495fccfcae917a561a87873e98b5))
+* **supi-agent:** show profile IDs in settings ([ea85e77](https://github.com/mrclrchtr/supi/commit/ea85e77a5d43364f91818dc3cf9f65c82b419433))
+* **supi-agent:** store shared context once per Delegation Batch ([cb04d22](https://github.com/mrclrchtr/supi/commit/cb04d222b5faa8a1e85a73312391858c2195bfc8))
+* **supi-review:** capture audit replay before run teardown ([3435390](https://github.com/mrclrchtr/supi/commit/3435390da3bfce1095aa6bc89fe18966ebbe4424))
+* **supi-review:** defer tool sync until session start ([9e2e193](https://github.com/mrclrchtr/supi/commit/9e2e1939ac492011646b37d43a0082df625741aa))
+* **supi-review:** harden exact review flow ([8f9972d](https://github.com/mrclrchtr/supi/commit/8f9972dcedbab23ca8a23de345d40d7dd9148be8))
+* **supi-review:** tighten exact review contracts ([0d60de7](https://github.com/mrclrchtr/supi/commit/0d60de73d6daa498031855f6100f4ebb85d266dc))
+* **tree-sitter:** fence runtime startup races ([6b0f08c](https://github.com/mrclrchtr/supi/commit/6b0f08c35c3f64a2e04bd4e1e9f3454cdefc55c5))
+
+
+### Code Refactoring
+
+* **supi-agent-runtime:** narrow public interface ([791e40f](https://github.com/mrclrchtr/supi/commit/791e40f2a0a231d0b40aa19b2e82b3c6e8f0ea05))
+
 ## [4.10.0](https://github.com/mrclrchtr/supi/compare/v4.9.0...v4.10.0) (2026-08-12)
 
 
