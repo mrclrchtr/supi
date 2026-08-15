@@ -41,3 +41,19 @@ _Avoid_: created means active, token timeout means server failure, owner readine
 **Identity-bearing debug event**:
 A retained or persisted LSP debug event that may include server, workspace, file, method, or root identity to support local protocol diagnosis. Event-level `cwd` is the absolute workspace root, `file` fields are workspace-relative, and server `root` stays absolute where present. Identity strings are bounded to 512 UTF-16 code units (marker included) and server lists to 16 entries; readiness events never embed raw progress-token values; `capability.transition` fires only on semantic ready↔pending transitions. Identity fields are intentionally not secret-redacted.
 _Avoid_: sanitized identity-free event, public tool evidence, raw protocol dump
+
+**File scope state**:
+Whether a file is inside the compilation scope of its nearest tsconfig.json or jsconfig.json. Statuses: `included`, `excluded`, `no-config`, `out-of-tree`. A decision always carries its basis; never report a bare boolean.
+_Avoid_: excluded-without-basis, "in project" as a boolean
+
+**Scope decision basis**:
+The mechanism that produced a file scope state: `fileNames` (parse-time file set), `explicit` (files array), `include-pattern`, `default-include`, or `exclude-pattern`. The basis explains why a post-parse file is included although it never appeared in the parse-time file set.
+_Avoid_: "the include pattern" as the only mechanism, untyped decision reasons
+
+**Tracked-file evidence**:
+Diagnostic evidence bounded by the client's tracked documents. A file created after the tracked set was last updated is absent until a refresh pulls it; the evidence line in health output is therefore explicitly bounded.
+_Avoid_: "current diagnostics", "the latest evidence"
+
+**Refresh-attempt evidence**:
+The diagnostic evidence produced by the just-run recovery pass. It can differ from tracked-file evidence inside one health call; the two must be labeled distinctly in output.
+_Avoid_: conflating the health refresh line with the evidence snapshot
