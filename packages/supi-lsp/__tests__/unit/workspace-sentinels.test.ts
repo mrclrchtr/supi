@@ -7,7 +7,9 @@ import {
   diffWorkspaceSentinelSnapshot,
   isWorkspaceRecoveryTrigger,
   scanWorkspaceSentinels,
+  syncWorkspaceSentinelSnapshot,
 } from "../../src/diagnostics/workspace-sentinels.ts";
+import { uriToFile } from "../../src/utils.ts";
 
 let tmpDir = "";
 
@@ -127,5 +129,80 @@ describe("workspace sentinels", () => {
     } finally {
       fs.chmodSync(blockedDir, 0o755);
     }
+  });
+});
+
+describe("workspace sentinels with source files", () => {
+  it("tracks every regular source file when includeSourceFiles is set", () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-sentinels-src-"));
+
+    fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}\n");
+    fs.writeFileSync(path.join(tmpDir, "app.ts"), "export const app = true;\n");
+    const src = path.join(tmpDir, "src");
+    fs.mkdirSync(src, { recursive: true });
+    fs.writeFileSync(path.join(src, "module.ts"), "export const m = true;\n");
+
+    const snapshot = scanWorkspaceSentinels(tmpDir, { includeSourceFiles: true });
+    expect(
+      Array.from(snapshot.keys())
+        .map((file) => path.relative(tmpDir, file))
+        .sort(),
+    ).toEqual(["app.ts", "src/module.ts", "tsconfig.json"]);
+
+    // Without widening, source files stay absent.
+    const sentinelOnly = scanWorkspaceSentinels(tmpDir);
+    expect(
+      Array.from(sentinelOnly.keys())
+        .map((file) => path.relative(tmpDir, file))
+        .sort(),
+    ).toEqual(["tsconfig.json"]);
+  });
+
+  it("partitions sentinel events from source-file events on sync", () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-sentinels-partition-"));
+
+    fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}\n");
+    fs.writeFileSync(path.join(tmpDir, "existing.ts"), "export const a = true;\n");
+
+    // First pass primes the widened snapshot.
+    const primed = syncWorkspaceSentinelSnapshot(tmpDir, new Map(), {
+      includeSourceFiles: true,
+    });
+    expect(
+      primed.changes.map((c) => path.basename(uriToFile(c.uri))).sort((a, b) => a.localeCompare(b)),
+    ).toEqual(["tsconfig.json"]);
+    expect(
+      primed.sourceChanges
+        .map((c) => path.basename(uriToFile(c.uri)))
+        .sort((a, b) => a.localeCompare(b)),
+    ).toEqual(["existing.ts"]);
+
+    // Create a new source file and change the config: the second pass sees a
+    // source Created and a sentinel Changed, partitioned separately.
+    fs.writeFileSync(path.join(tmpDir, "late.ts"), "export const late = true;\n");
+    fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}\n");
+
+    const next = syncWorkspaceSentinelSnapshot(tmpDir, primed.snapshot, {
+      includeSourceFiles: true,
+    });
+    expect(
+      next.changes.map((c) => path.basename(uriToFile(c.uri))).sort((a, b) => a.localeCompare(b)),
+    ).toEqual(["tsconfig.json"]);
+    expect(
+      next.sourceChanges
+        .map((c) => path.basename(uriToFile(c.uri)))
+        .sort((a, b) => a.localeCompare(b)),
+    ).toEqual(["late.ts"]);
+    expect(next.sourceChanges.every((c) => c.type === FileChangeType.Created)).toBe(true);
+  });
+
+  it("returns no sourceChanges when includeSourceFiles is not set", () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-sentinels-nosrc-"));
+
+    fs.writeFileSync(path.join(tmpDir, "app.ts"), "export const app = true;\n");
+
+    const synced = syncWorkspaceSentinelSnapshot(tmpDir, new Map());
+    expect(synced.sourceChanges).toEqual([]);
+    expect(synced.changes).toEqual([]);
   });
 });

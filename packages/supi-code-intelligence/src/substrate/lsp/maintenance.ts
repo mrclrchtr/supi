@@ -13,15 +13,37 @@ import {
   isCodeRequestInterruption,
   throwIfCodeRequestInterrupted,
 } from "@mrclrchtr/supi-code-runtime/api";
+import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
+import { uriToFile } from "@mrclrchtr/supi-core/path";
 import type { DiagnosticEvidenceSummary } from "@mrclrchtr/supi-lsp/api";
 import {
-  clearTsconfigCache,
+  FileChangeType,
+  type FileEvent,
+  invalidateTsconfigCacheForConfig,
+  invalidateTsconfigCacheForConfigDir,
   isLikelyStaleDiagnostic,
+  isProjectConfigFileName,
   raceRequestControl,
   syncWorkspaceSentinelSnapshot,
   type WorkspaceLspRuntime,
 } from "@mrclrchtr/supi-lsp/api";
 import { mergeDiagnosticEvidence } from "../../diagnostics/evidence.ts";
+
+/** Options shared by the workspace and file-scoped maintenance passes. */
+export interface LspMaintenanceOptions {
+  control?: CodeRequestControl;
+  /**
+   * Workspace-relative scope prefix for source-file discovery. Discovery only
+   * tracks created files inside this prefix; null disables the scope bound.
+   */
+  scope?: string | null;
+  /**
+   * Track files created since the last refresh so the following refresh pull
+   * includes them. Only the workspace-runtime path sets this; the snapshot is
+   * still widened on file-scoped passes so later diffs stay correct.
+   */
+  trackSources?: boolean;
+}
 
 /**
  * Run sentinel-sync, diagnostic refresh, and stale-module resync as a single
@@ -32,28 +54,28 @@ export async function refreshLspMaintenance(
   runtime: WorkspaceLspRuntime,
   cwd: string,
   sentinelSnapshot: Map<string, number>,
-  control?: CodeRequestControl,
+  options: LspMaintenanceOptions = {},
 ): Promise<WorkspaceLspMaintenanceResult> {
-  const { snapshot } = synchronizeSentinels(runtime, cwd, sentinelSnapshot);
+  const { snapshot } = await synchronizeSentinels(runtime, cwd, sentinelSnapshot, options);
   let diagnosticEvidence = emptyEvidence();
   let failureReason: string | undefined;
 
   // Refresh before stale-module inspection. The refresh owns deleted-file
   // classification; later snapshots must not erase its removed evidence.
   try {
-    diagnosticEvidence = await runtime.refreshOpenDiagnostics(undefined, control);
+    diagnosticEvidence = await runtime.refreshOpenDiagnostics(undefined, options.control);
   } catch (error) {
-    if (isCodeRequestInterruption(error, control)) throw error;
+    if (isCodeRequestInterruption(error, options.control)) throw error;
     failureReason = errorMessage(error);
     diagnosticEvidence = readRuntimeEvidence(runtime);
   }
 
   try {
-    const staleResult = await resyncStaleModuleFiles(runtime, cwd, control);
+    const staleResult = await resyncStaleModuleFiles(runtime, cwd, options.control);
     diagnosticEvidence = mergeDiagnosticEvidence(diagnosticEvidence, staleResult.evidence, cwd);
     if (staleResult.completed) failureReason = undefined;
   } catch (error) {
-    if (isCodeRequestInterruption(error, control)) throw error;
+    if (isCodeRequestInterruption(error, options.control)) throw error;
     // Keep evidence from the first refresh when stale inspection fails.
   }
 
@@ -93,7 +115,7 @@ export async function refreshFileLspMaintenance(options: {
   const { runtime, cwd, sentinelSnapshot, filePath, control } = options;
   // A cancelled caller stops before any maintenance work starts.
   throwIfCodeRequestInterrupted(control);
-  const { snapshot } = synchronizeSentinels(runtime, cwd, sentinelSnapshot);
+  const { snapshot } = await synchronizeSentinels(runtime, cwd, sentinelSnapshot);
   const target = nodePath.resolve(filePath);
   const stale = runtime
     .getOutstandingDiagnostics(1)
@@ -116,17 +138,67 @@ export async function refreshFileLspMaintenance(options: {
   return { snapshot, matchedStaleFileCount: stale ? 1 : 0 };
 }
 
-function synchronizeSentinels(
+/**
+ * Sync the widened workspace snapshot, forward sentinel changes, and track
+ * source files newly created since the last pass.
+ *
+ * The snapshot is widened to every regular file on every pass so later diffs
+ * see genuine creations. Only sentinel-file events are forwarded as workspace
+ * changes (config semantics unchanged); created source files are tracked only
+ * on the workspace-runtime path and only once the snapshot was primed by an
+ * earlier pass — the first pass establishes the baseline and cannot tell a
+ * just-created file from a long-existing one.
+ */
+async function synchronizeSentinels(
   runtime: WorkspaceLspRuntime,
   cwd: string,
   sentinelSnapshot: Map<string, number>,
+  options: LspMaintenanceOptions = {},
 ) {
-  const state = syncWorkspaceSentinelSnapshot(cwd, sentinelSnapshot);
-  if (state.changes.length > 0) {
-    clearTsconfigCache();
-    runtime.noteWorkspaceChanges(state.changes);
+  const primed = sentinelSnapshot.size > 0;
+  const state = syncWorkspaceSentinelSnapshot(cwd, sentinelSnapshot, {
+    includeSourceFiles: true,
+  });
+
+  invalidateChangedProjectConfigs(state.changes);
+  if (state.changes.length > 0) runtime.noteWorkspaceChanges(state.changes);
+
+  if (options.trackSources && primed) {
+    await trackCreatedSourceFiles(runtime, state.sourceChanges, options.scope);
   }
+
   return state;
+}
+
+/** Invalidate cached tsconfig scope parses only for config files that changed. */
+function invalidateChangedProjectConfigs(changes: readonly FileEvent[]): void {
+  for (const change of changes) {
+    const filePath = uriToFile(change.uri);
+    if (!isProjectConfigFileName(nodePath.basename(filePath))) continue;
+    // Change-targeted invalidation: only config files affect tsconfig scope
+    // decisions. A created config can also turn previously empty lookups into
+    // resolved ones below the new config's directory.
+    invalidateTsconfigCacheForConfig(filePath);
+    if (change.type === FileChangeType.Created) {
+      invalidateTsconfigCacheForConfigDir(nodePath.dirname(filePath));
+    }
+  }
+}
+
+/** Track source files newly created since the last pass, within the scope bound. */
+async function trackCreatedSourceFiles(
+  runtime: WorkspaceLspRuntime,
+  sourceChanges: readonly FileEvent[],
+  scope: string | null | undefined,
+): Promise<void> {
+  for (const change of sourceChanges) {
+    if (change.type !== FileChangeType.Created) continue;
+    const filePath = uriToFile(change.uri);
+    if (scope && !isWithinOrEqual(scope, filePath)) continue;
+    // Best-effort: a file no client can serve stays untracked and is
+    // simply absent from evidence until a later explicit request.
+    await runtime.trackFile(filePath);
+  }
 }
 
 /** Re-open files with stale module-resolution errors. */

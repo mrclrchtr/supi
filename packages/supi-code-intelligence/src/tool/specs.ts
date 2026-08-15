@@ -114,7 +114,8 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     parameters: CodeHealthParameters,
     run: (params, ctx) => executeHealthTool(params as Parameters<typeof executeHealthTool>[0], ctx),
     purpose: "Report live diagnostic, runtime, and structural health observations.",
-    schemaDocs: "Optional scope, refresh, include, and level; diagnostics and servers are default.",
+    schemaDocs:
+      "Optional scope, refresh, include, and level; diagnostics and servers are default. Evidence is bounded by the client's tracked documents; a workspace refresh pulls diagnostics for files that appeared or changed since the last refresh, so a newly created file's errors appear in the next settled refresh.",
     substrates: ["semantic", "structural", "diagnostics"],
     nonGoals: [
       "Does not run tests or verification commands.",

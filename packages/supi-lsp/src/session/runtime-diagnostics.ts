@@ -48,3 +48,29 @@ export interface RecoverDiagnosticsResult {
     warning: string | null;
   };
 }
+
+/** One tracked file's tsconfig scope decision, for debug telemetry. */
+export interface ScopeDecisionEntry {
+  /** Workspace-relative file path. */
+  file: string;
+  status: "included" | "excluded" | "no-config" | "out-of-tree";
+  /** Decision mechanism; null when no decision applies. */
+  basis: string | null;
+}
+
+/** Aggregate tsconfig scope decisions for all tracked files, for debug telemetry. */
+export interface ScopeDecisionSummary {
+  caseSensitiveFileNames: boolean;
+  counts: {
+    included: number;
+    excluded: number;
+    noConfig: number;
+    outOfTree: number;
+  };
+  /** Exact decision-basis counts; keys are {@link ScopeDecisionEntry.basis} values. */
+  basisCounts: Record<string, number>;
+  /** Bounded workspace-relative entries (oldest first), not the full set. */
+  entries: ScopeDecisionEntry[];
+  /** Total number of tracked files the summary was computed over. */
+  totalFiles: number;
+}

@@ -65,11 +65,17 @@ async function collectFileRefreshAttempt(
 async function collectWorkspaceRefreshAttempt(
   options: HealthRefreshAttemptOptions,
 ): Promise<HealthRefreshAttempt> {
+  const workspaceScope =
+    options.diagnosticsScope.kind === "tracked-files" ? options.diagnosticsScope : null;
   const maintenance = await refreshLspMaintenance(
     options.runtime,
     options.cwd,
     options.sentinelSnapshot,
-    options.control,
+    {
+      control: options.control,
+      scope: workspaceScope?.filter ?? null,
+      trackSources: workspaceScope !== null,
+    },
   );
   updateSentinelSnapshot(options.sentinelSnapshot, maintenance.snapshot);
   if (maintenance.failureReason) {

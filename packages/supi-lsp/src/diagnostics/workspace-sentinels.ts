@@ -1,20 +1,32 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { FileChangeType, type FileEvent } from "../config/types.ts";
-import { fileToUri } from "../utils.ts";
+import { fileToUri, uriToFile } from "../utils.ts";
 
 const IGNORED_DIRECTORIES = new Set(["node_modules", ".pnpm", ".git", "dist", "coverage"]);
 const ROOT_LOCKFILES = ["pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lockb"];
 
+export interface WorkspaceSentinelScanOptions {
+  /**
+   * Also track every regular source file (not just sentinels). The workspace
+   * refresh path uses this to discover files created since the last refresh;
+   * the diff then reports them as `sourceChanges` so the caller can pull them.
+   */
+  includeSourceFiles?: boolean;
+}
+
 /** Build a fresh snapshot of workspace sentinel files and their mtimes. */
-export function scanWorkspaceSentinels(cwd: string): Map<string, number> {
+export function scanWorkspaceSentinels(
+  cwd: string,
+  options: WorkspaceSentinelScanOptions = {},
+): Map<string, number> {
   const resolvedCwd = path.resolve(cwd);
   const snapshot = new Map<string, number>();
 
   if (!fs.existsSync(resolvedCwd)) return snapshot;
 
   try {
-    walkWorkspace(resolvedCwd, resolvedCwd, snapshot);
+    walkWorkspace(resolvedCwd, resolvedCwd, snapshot, options.includeSourceFiles ?? false);
   } catch {
     return snapshot;
   }
@@ -48,15 +60,34 @@ export function diffWorkspaceSentinelSnapshot(
   return changes.sort((a, b) => a.uri.localeCompare(b.uri));
 }
 
-/** Refresh a previous snapshot and return the new snapshot plus change events. */
+/**
+ * Refresh a previous snapshot and return the new snapshot plus change events.
+ *
+ * When `includeSourceFiles` is set, the returned `changes` list keeps
+ * sentinel-file events only; source-file events are returned separately in
+ * `sourceChanges` so the caller can act on them without interpreting every
+ * regular file edit as a config-level workspace change.
+ */
 export function syncWorkspaceSentinelSnapshot(
   cwd: string,
   previous: Map<string, number>,
-): { snapshot: Map<string, number>; changes: FileEvent[] } {
-  const snapshot = scanWorkspaceSentinels(cwd);
+  options: WorkspaceSentinelScanOptions = {},
+): { snapshot: Map<string, number>; changes: FileEvent[]; sourceChanges: FileEvent[] } {
+  const snapshot = scanWorkspaceSentinels(cwd, options);
+  const changes = diffWorkspaceSentinelSnapshot(previous, snapshot);
+  if (!options.includeSourceFiles) return { snapshot, changes, sourceChanges: [] };
+
+  const sourceChanges = changes.filter((change) => {
+    const filePath = uriToFile(change.uri);
+    return !isWorkspaceSentinelPath(filePath, cwd);
+  });
   return {
     snapshot,
-    changes: diffWorkspaceSentinelSnapshot(previous, snapshot),
+    changes: changes.filter((change) => {
+      const filePath = uriToFile(change.uri);
+      return isWorkspaceSentinelPath(filePath, cwd);
+    }),
+    sourceChanges,
   };
 }
 
@@ -66,7 +97,12 @@ export function isWorkspaceRecoveryTrigger(filePath: string, cwd: string): boole
   return isWorkspaceSentinelPath(path.resolve(root, filePath), root);
 }
 
-function walkWorkspace(root: string, directory: string, snapshot: Map<string, number>): void {
+function walkWorkspace(
+  root: string,
+  directory: string,
+  snapshot: Map<string, number>,
+  includeSourceFiles: boolean,
+): void {
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(directory, { withFileTypes: true });
@@ -80,14 +116,14 @@ function walkWorkspace(root: string, directory: string, snapshot: Map<string, nu
   for (const entry of entries) {
     if (entry.isDirectory()) {
       if (IGNORED_DIRECTORIES.has(entry.name)) continue;
-      walkWorkspace(root, path.join(directory, entry.name), snapshot);
+      walkWorkspace(root, path.join(directory, entry.name), snapshot, includeSourceFiles);
       continue;
     }
 
     if (!entry.isFile()) continue;
 
     const filePath = path.join(directory, entry.name);
-    if (!isWorkspaceSentinelPath(filePath, root)) continue;
+    if (!includeSourceFiles && !isWorkspaceSentinelPath(filePath, root)) continue;
     try {
       snapshot.set(filePath, fs.statSync(filePath).mtimeMs);
     } catch {

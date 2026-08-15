@@ -170,7 +170,11 @@ function renderDiagnosticsSection(lines: string[], data: HealthData, cwd: string
     lines.push("Diagnostics were not requested.");
   } else {
     lines.push(`**Evidence scope**: ${formatDiagnosticScope(observation.scope, cwd)}.`);
-    lines.push(`**Evidence coverage**: ${formatDiagnosticEvidence(observation.evidence)}.`);
+    // The evidence line is bounded by the client's tracked documents; a file
+    // created after the last refresh is pulled on the next pass. Labeling the
+    // bound prevents misreading a first-call partial as an exclusion verdict.
+    const bound = observation.scope.kind === "tracked-files" ? " (tracked-file bound)" : "";
+    lines.push(`**Evidence coverage**: ${formatDiagnosticEvidence(observation.evidence)}${bound}.`);
     lines.push("");
     renderDiagnosticObservation(lines, data, cwd);
   }

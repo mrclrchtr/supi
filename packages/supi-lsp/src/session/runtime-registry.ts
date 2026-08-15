@@ -63,6 +63,33 @@ function unavailableFileQuery<T>(operation: string, file: string): CodeQueryResu
   return unavailableCodeQuery(`No routed LSP client could complete ${operation} for ${file}.`);
 }
 
+/** Emit one aggregate tsconfig scope-decision event after a recovery pass. */
+function recordScopeDecisionEvent(manager: LspManager): void {
+  try {
+    const summary = manager.getScopeDecisionSummary();
+    recordDebugEvent({
+      source: "lsp",
+      level: "debug",
+      category: "diagnostics.scope",
+      message: "LSP diagnostic tsconfig scope decisions",
+      cwd: truncateIdentity(manager.getCwd()),
+      data: {
+        caseSensitiveFileNames: summary.caseSensitiveFileNames,
+        counts: summary.counts,
+        basisCounts: summary.basisCounts,
+        totalFiles: summary.totalFiles,
+        entries: summary.entries.map((entry) => ({
+          file: truncateIdentity(entry.file),
+          status: entry.status,
+          ...(entry.basis ? { basis: entry.basis } : {}),
+        })),
+      },
+    });
+  } catch {
+    // Telemetry must never turn a completed recovery into a failure.
+  }
+}
+
 class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   constructor(private readonly manager: LspManager) {}
 
@@ -339,6 +366,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
           ...(result.restartReason ? { reason: result.restartReason } : {}),
         },
       });
+      recordScopeDecisionEvent(this.manager);
       return result;
     } catch (error) {
       // A cancelled pass has no result object, so telemetry records the

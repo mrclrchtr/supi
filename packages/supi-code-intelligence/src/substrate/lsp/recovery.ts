@@ -11,7 +11,11 @@ import type {
   ToolResultEvent,
 } from "@earendil-works/pi-coding-agent";
 import { fileToUri } from "@mrclrchtr/supi-core/path";
-import { clearTsconfigCache } from "@mrclrchtr/supi-lsp/api";
+import {
+  invalidateTsconfigCacheForConfig,
+  invalidateTsconfigCacheForConfigDir,
+  isProjectConfigFileName,
+} from "@mrclrchtr/supi-lsp/api";
 import type { LspAdapterState } from "./state.ts";
 
 /** Tool names whose successful results should trigger workspace change notifications. */
@@ -37,10 +41,12 @@ export function registerWorkspaceRecoveryHandler(pi: ExtensionAPI, state: LspAda
       const normalized = filePath.startsWith("@") ? filePath.slice(1) : filePath;
       const resolved = nodePath.resolve(cwd, normalized);
 
-      // Invalidate tsconfig cache when config files change
-      const ext = nodePath.extname(resolved).toLowerCase();
-      if (ext === ".json" || ext === ".jsonc") {
-        clearTsconfigCache();
+      // Invalidate the tsconfig scope cache only when a project config itself
+      // changed; other .json/.jsonc writes (package.json and friends) do not
+      // affect scope decisions and keep their cached parses.
+      if (isProjectConfigFileName(nodePath.basename(resolved))) {
+        invalidateTsconfigCacheForConfig(resolved);
+        invalidateTsconfigCacheForConfigDir(nodePath.dirname(resolved));
       }
 
       runtime.noteWorkspaceChanges([{ uri: fileToUri(resolved), type: 2 }]);

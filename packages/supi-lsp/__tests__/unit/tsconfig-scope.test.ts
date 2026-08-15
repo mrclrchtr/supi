@@ -3,7 +3,13 @@ import * as os from "node:os";
 import * as path from "node:path";
 import ts from "typescript";
 import { afterEach, describe, expect, it } from "vitest";
-import { clearTsconfigCache, isFileExcludedByTsconfig } from "../../src/config/tsconfig-scope.ts";
+import {
+  clearTsconfigCache,
+  getFileScopeDecision,
+  invalidateTsconfigCacheForConfig,
+  invalidateTsconfigCacheForConfigDir,
+  isFileExcludedByTsconfig,
+} from "../../src/config/tsconfig-scope.ts";
 
 // Use the repo root as cwd — this matches how LspManager passes this.cwd
 const CWD = path.resolve(__dirname, "../../../../");
@@ -32,12 +38,16 @@ describe("isFileExcludedByTsconfig", () => {
   });
 
   it("returns true for a fixture file not matching include patterns", () => {
-    // packages/supi-lsp/__tests__/fixtures/sample.tsx
-    // The nearest tsconfig is __tests__/tsconfig.json with include: ["**/*.ts"]
-    // "fixtures/sample.tsx" does NOT match "**/*.ts" → excluded
-    expect(isFileExcludedByTsconfig("packages/supi-lsp/__tests__/fixtures/sample.tsx", CWD)).toBe(
-      true,
-    );
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-lsp-fixture-tsx-"));
+    try {
+      fs.writeFileSync(path.join(tempRoot, "tsconfig.json"), '{"include":["**/*.ts"]}');
+      fs.writeFileSync(path.join(tempRoot, "sample.tsx"), "export const sample = true;\n");
+
+      // "sample.tsx" does NOT match "**/*.ts" → excluded
+      expect(isFileExcludedByTsconfig("sample.tsx", tempRoot)).toBe(true);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it("returns true for a fixture .js file not matching include **/*.ts", () => {
@@ -162,6 +172,243 @@ describe("isFileExcludedByTsconfig", () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-lsp-no-config-"));
     try {
       expect(isFileExcludedByTsconfig("some-random-file.ts", tempRoot)).toBe(false);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("getFileScopeDecision", () => {
+  afterEach(() => {
+    clearTsconfigCache();
+  });
+
+  it("reports basis fileNames for a parse-time file", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-scope-filenames-"));
+    try {
+      fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+      fs.writeFileSync(path.join(tempRoot, "tsconfig.json"), '{"include":["src/**/*.ts"]}');
+      fs.writeFileSync(path.join(tempRoot, "src/existing.ts"), "export const ok = true;\n");
+
+      const decision = getFileScopeDecision("src/existing.ts", tempRoot);
+      expect(decision.status).toBe("included");
+      expect(decision.basis).toBe("fileNames");
+      expect(decision.configPath).toBe(path.join(tempRoot, "tsconfig.json"));
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("reports basis include-pattern for a post-parse file", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-scope-postparse-"));
+    try {
+      fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+      fs.writeFileSync(path.join(tempRoot, "tsconfig.json"), '{"include":["src/**/*.ts"]}');
+      fs.writeFileSync(path.join(tempRoot, "src/existing.ts"), "export const ok = true;\n");
+      // Prime the cached parse while the file does not exist yet.
+      expect(getFileScopeDecision("src/existing.ts", tempRoot).status).toBe("included");
+      fs.writeFileSync(path.join(tempRoot, "src/late.ts"), "export const late = true;\n");
+
+      const decision = getFileScopeDecision("src/late.ts", tempRoot);
+      expect(decision.status).toBe("included");
+      expect(decision.basis).toBe("include-pattern");
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("reports basis explicit for a files-array config", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-scope-explicit-"));
+    try {
+      fs.writeFileSync(
+        path.join(tempRoot, "tsconfig.json"),
+        '{"files":["src/a.ts"],"compilerOptions":{"allowJs":true}}',
+      );
+      fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+      fs.writeFileSync(path.join(tempRoot, "src/a.ts"), "export const a = true;\n");
+      fs.writeFileSync(path.join(tempRoot, "src/b.ts"), "export const b = true;\n");
+
+      // The listed file is part of the parse-time file set.
+      expect(getFileScopeDecision("src/a.ts", tempRoot)).toMatchObject({
+        status: "included",
+        basis: "fileNames",
+      });
+      // An unlisted file is excluded because it is not in the explicit list.
+      expect(getFileScopeDecision("src/b.ts", tempRoot)).toMatchObject({
+        status: "excluded",
+        basis: "explicit",
+      });
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("reports basis exclude-pattern for an excluded file", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-scope-exclude-"));
+    try {
+      fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tempRoot, "tsconfig.json"),
+        '{"include":["src/**/*.ts"],"exclude":["src/generated/**"]}',
+      );
+      // Prime the cached parse before the post-parse files exist, so they
+      // fall through to the include/exclude patterns instead of fileNames.
+      fs.writeFileSync(path.join(tempRoot, "src/existing.ts"), "export const ok = true;\n");
+      expect(getFileScopeDecision("src/existing.ts", tempRoot).status).toBe("included");
+      fs.writeFileSync(path.join(tempRoot, "src/app.ts"), "export const app = true;\n");
+      fs.mkdirSync(path.join(tempRoot, "src/generated"), { recursive: true });
+      fs.writeFileSync(path.join(tempRoot, "src/generated/gen.ts"), "export const gen = true;\n");
+
+      expect(getFileScopeDecision("src/app.ts", tempRoot)).toMatchObject({
+        status: "included",
+        basis: "include-pattern",
+      });
+      expect(getFileScopeDecision("src/generated/gen.ts", tempRoot)).toMatchObject({
+        status: "excluded",
+        basis: "exclude-pattern",
+      });
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("reports basis extension for a non-included file type", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-scope-extension-"));
+    try {
+      fs.writeFileSync(path.join(tempRoot, "tsconfig.json"), '{"include":["**/*.ts"]}');
+      fs.writeFileSync(path.join(tempRoot, "notes.md"), "# notes\n");
+
+      expect(getFileScopeDecision("notes.md", tempRoot)).toMatchObject({
+        status: "excluded",
+        basis: "extension",
+      });
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("reports no-config when no project config exists", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-scope-noconfig-"));
+    try {
+      const decision = getFileScopeDecision("some-file.ts", tempRoot);
+      expect(decision.status).toBe("no-config");
+      expect(decision.basis).toBeNull();
+      expect(decision.configPath).toBeNull();
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("reports out-of-tree for a file outside the project root", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-scope-oot-root-"));
+    // A sibling directory at the same level as the project root: the file is
+    // genuinely outside the project tree.
+    const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-scope-oot-out-"));
+    try {
+      const outside = path.join(outsideRoot, "file.ts");
+      fs.writeFileSync(outside, "export const x = true;\n");
+
+      const decision = getFileScopeDecision(outside, tempRoot);
+      expect(decision.status).toBe("out-of-tree");
+      expect(decision.basis).toBeNull();
+      expect(decision.configPath).toBeNull();
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+      fs.rmSync(outsideRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the case-sensitivity flag in the decision", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-scope-case-"));
+    const original = ts.sys.useCaseSensitiveFileNames;
+    try {
+      ts.sys.useCaseSensitiveFileNames = false;
+      expect(getFileScopeDecision("x.ts", tempRoot).caseSensitiveFileNames).toBe(false);
+      ts.sys.useCaseSensitiveFileNames = true;
+      expect(getFileScopeDecision("x.ts", tempRoot).caseSensitiveFileNames).toBe(true);
+    } finally {
+      ts.sys.useCaseSensitiveFileNames = original;
+    }
+  });
+});
+
+describe("targeted tsconfig cache invalidation", () => {
+  afterEach(() => {
+    clearTsconfigCache();
+  });
+
+  it("re-derives decisions after a config edit via targeted invalidation", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-invalid-config-"));
+    try {
+      fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+      fs.writeFileSync(path.join(tempRoot, "tsconfig.json"), '{"include":["src/**/*.ts"]}');
+      fs.writeFileSync(path.join(tempRoot, "src/app.ts"), "export const app = true;\n");
+      fs.writeFileSync(path.join(tempRoot, "src/gen.ts"), "export const gen = true;\n");
+
+      expect(getFileScopeDecision("src/gen.ts", tempRoot).status).toBe("included");
+
+      // The config now excludes the generated directory, but the cached parse
+      // still includes it until the cache is invalidated.
+      fs.writeFileSync(
+        path.join(tempRoot, "tsconfig.json"),
+        '{"include":["src/**/*.ts"],"exclude":["src/gen.ts"]}',
+      );
+      expect(getFileScopeDecision("src/gen.ts", tempRoot).status).toBe("included");
+
+      invalidateTsconfigCacheForConfig(path.join(tempRoot, "tsconfig.json"));
+      expect(getFileScopeDecision("src/gen.ts", tempRoot).status).toBe("excluded");
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("re-resolves dirs that previously had no config when a config is created", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-invalid-create-"));
+    try {
+      fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+      fs.writeFileSync(path.join(tempRoot, "src/app.ts"), "export const app = true;\n");
+
+      // No config: decisions are no-config.
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("no-config");
+
+      // Create a config that excludes the src directory; the cached no-config
+      // lookup under src must be dropped for the new config to take effect.
+      fs.writeFileSync(path.join(tempRoot, "tsconfig.json"), '{"include":["*.ts"]}');
+      fs.writeFileSync(path.join(tempRoot, "ok.ts"), "export const ok = true;\n");
+
+      invalidateTsconfigCacheForConfig(path.join(tempRoot, "tsconfig.json"));
+      invalidateTsconfigCacheForConfigDir(tempRoot);
+
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("excluded");
+      expect(getFileScopeDecision("ok.ts", tempRoot).status).toBe("included");
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps unrelated parsed configs intact after targeted invalidation", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-invalid-other-"));
+    try {
+      fs.mkdirSync(path.join(tempRoot, "a/src"), { recursive: true });
+      fs.mkdirSync(path.join(tempRoot, "b/src"), { recursive: true });
+      fs.writeFileSync(path.join(tempRoot, "a/tsconfig.json"), '{"include":["src/**/*.ts"]}');
+      fs.writeFileSync(path.join(tempRoot, "b/tsconfig.json"), '{"include":["src/**/*.ts"]}');
+      fs.writeFileSync(path.join(tempRoot, "a/src/app.ts"), "export const app = true;\n");
+      fs.writeFileSync(path.join(tempRoot, "b/src/app.ts"), "export const app = true;\n");
+
+      expect(getFileScopeDecision("a/src/app.ts", tempRoot).status).toBe("included");
+      expect(getFileScopeDecision("b/src/app.ts", tempRoot).status).toBe("included");
+
+      // Invalidate only the a config; b keeps its cached parse even when the
+      // b tsconfig is rewritten on disk.
+      invalidateTsconfigCacheForConfig(path.join(tempRoot, "a/tsconfig.json"));
+      fs.writeFileSync(
+        path.join(tempRoot, "b/tsconfig.json"),
+        '{"include":["src/**/*.ts"],"exclude":["src/app.ts"]}',
+      );
+      expect(getFileScopeDecision("b/src/app.ts", tempRoot).status).toBe("included");
+      invalidateTsconfigCacheForConfig(path.join(tempRoot, "b/tsconfig.json"));
+      expect(getFileScopeDecision("b/src/app.ts", tempRoot).status).toBe("excluded");
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }

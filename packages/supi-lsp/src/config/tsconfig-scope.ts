@@ -19,6 +19,32 @@ interface ParsedProjectConfig {
   usesDefaultInclude: boolean;
 }
 
+/** Whether a file is inside the compilation scope of its nearest project config. */
+export type FileScopeStatus = "included" | "excluded" | "no-config" | "out-of-tree";
+
+/**
+ * The mechanism that produced a file scope decision.
+ *
+ * `extension` covers unsupported file extensions (checked before any pattern).
+ */
+export type ScopeDecisionBasis =
+  | "fileNames"
+  | "explicit"
+  | "include-pattern"
+  | "default-include"
+  | "exclude-pattern"
+  | "extension";
+
+/** An explainable tsconfig scope decision for one file. */
+export interface FileScopeDecision {
+  status: FileScopeStatus;
+  /** Decision mechanism; null when no decision applies (no-config, out-of-tree). */
+  basis: ScopeDecisionBasis | null;
+  /** Absolute path of the config that decided the file, when one exists. */
+  configPath: string | null;
+  caseSensitiveFileNames: boolean;
+}
+
 const nearestConfigCache = new Map<string, string | null>();
 const parsedConfigCache = new Map<string, ParsedProjectConfig | null>();
 
@@ -47,14 +73,63 @@ const tsInternal = ts as typeof ts & {
  * @returns `true` if the file is excluded from compilation scope
  */
 export function isFileExcludedByTsconfig(filePath: string, cwd: string): boolean {
+  // Legacy filter semantics: only a resolved "excluded" decision filters a
+  // file. Out-of-tree and no-config files stay unfiltered; the decision API
+  // still reports those statuses honestly for consumers that want them.
+  return getFileScopeDecision(filePath, cwd).status === "excluded";
+}
+
+/**
+ * Compute the explainable tsconfig scope decision for one file.
+ *
+ * The decision carries the mechanism that produced it (the scope decision
+ * basis) so consumers can report why a file is inside or outside the nearest
+ * project config without re-deriving the scope logic.
+ */
+export function getFileScopeDecision(filePath: string, cwd: string): FileScopeDecision {
+  const caseSensitiveFileNames = ts.sys.useCaseSensitiveFileNames;
   const absolutePath = path.resolve(cwd, filePath);
+  if (isOutOfTree(cwd, absolutePath)) {
+    return {
+      status: "out-of-tree",
+      basis: null,
+      configPath: null,
+      caseSensitiveFileNames,
+    };
+  }
+
   const configPath = findNearestProjectConfig(path.dirname(absolutePath), cwd);
-  if (!configPath) return false;
+  if (!configPath) {
+    return {
+      status: "no-config",
+      basis: null,
+      configPath: null,
+      caseSensitiveFileNames,
+    };
+  }
 
   const parsed = parseProjectConfig(configPath);
-  if (!parsed) return false;
+  if (!parsed) {
+    return {
+      status: "no-config",
+      basis: null,
+      configPath,
+      caseSensitiveFileNames,
+    };
+  }
 
-  return !isFileInProjectScope(parsed, absolutePath);
+  const decision = decideFileScope(parsed, absolutePath);
+  return {
+    status: decision.included ? "included" : "excluded",
+    basis: decision.basis,
+    configPath: parsed.configPath,
+    caseSensitiveFileNames,
+  };
+}
+
+function isOutOfTree(cwd: string, absolutePath: string): boolean {
+  const relative = path.relative(path.resolve(cwd), absolutePath);
+  return relative.startsWith(`..${path.sep}`) || relative === "..";
 }
 
 /**
@@ -192,18 +267,29 @@ function createFileMatchers(
   };
 }
 
-function isFileInProjectScope(parsed: ParsedProjectConfig, absolutePath: string): boolean {
+function decideFileScope(
+  parsed: ParsedProjectConfig,
+  absolutePath: string,
+): { included: boolean; basis: ScopeDecisionBasis } {
   const normalizedPath = normalizePath(absolutePath);
-  if (parsed.fileNames.has(normalizedPath)) return true;
+  if (parsed.fileNames.has(normalizedPath)) return { included: true, basis: "fileNames" };
 
   const extension = path.extname(absolutePath).toLowerCase();
-  if (!parsed.supportedExtensions.has(extension)) return false;
+  if (!parsed.supportedExtensions.has(extension)) return { included: false, basis: "extension" };
 
-  if (parsed.explicitFiles) return parsed.explicitFiles.has(normalizedPath);
-  if (!isWithinOrEqual(parsed.configDir, absolutePath)) return false;
-  if (parsed.excludePattern?.test(normalizedPath)) return false;
-  if (parsed.usesDefaultInclude) return true;
-  return parsed.includeFilePattern ? parsed.includeFilePattern.test(normalizedPath) : false;
+  if (parsed.explicitFiles) {
+    return { included: parsed.explicitFiles.has(normalizedPath), basis: "explicit" };
+  }
+  // Include patterns are rooted at the config directory; a file outside it can
+  // only be in scope through the parse-time file set or an explicit files list.
+  if (!isWithinOrEqual(parsed.configDir, absolutePath)) {
+    return { included: false, basis: "include-pattern" };
+  }
+  if (parsed.excludePattern?.test(normalizedPath))
+    return { included: false, basis: "exclude-pattern" };
+  if (parsed.usesDefaultInclude) return { included: true, basis: "default-include" };
+  if (!parsed.includeFilePattern) return { included: false, basis: "include-pattern" };
+  return { included: parsed.includeFilePattern.test(normalizedPath), basis: "include-pattern" };
 }
 
 function getSupportedExtensions(options: ts.CompilerOptions): string[] {
@@ -255,4 +341,46 @@ function normalizePath(target: string): string {
 export function clearTsconfigCache(): void {
   nearestConfigCache.clear();
   parsedConfigCache.clear();
+}
+
+/**
+ * Invalidate cached state for one config file that changed or was created.
+ *
+ * Removes the parsed config and every nearest-config lookup that resolved to
+ * it, so the next decision re-reads the config from disk. The wholesale
+ * {@link clearTsconfigCache} stays for lifecycle events; change signals use
+ * this targeted invalidation instead.
+ */
+export function invalidateTsconfigCacheForConfig(configPath: string): void {
+  const resolved = path.resolve(configPath);
+  parsedConfigCache.delete(normalizePath(resolved));
+  for (const [key, value] of nearestConfigCache) {
+    if (value !== null && path.resolve(value) === resolved) nearestConfigCache.delete(key);
+  }
+}
+
+/**
+ * Invalidate nearest-config lookups that found nothing under `dir`.
+ *
+ * Used when a config is created: directories below the new config that
+ * previously resolved to no config may now resolve to it.
+ */
+export function invalidateTsconfigCacheForConfigDir(dir: string): void {
+  const normalizedDir = normalizePath(dir);
+  for (const [key, value] of nearestConfigCache) {
+    if (value !== null) continue;
+    const keyDir = key.split("::", 1)[0];
+    if (keyDir === normalizedDir || keyDir.startsWith(`${normalizedDir}/`)) {
+      nearestConfigCache.delete(key);
+    }
+  }
+}
+
+/** Whether a file name is a tsconfig.json, jsconfig.json, or tsconfig.*.json name. */
+export function isProjectConfigFileName(name: string): boolean {
+  return (
+    name === "tsconfig.json" ||
+    name === "jsconfig.json" ||
+    (name.startsWith("tsconfig.") && name.endsWith(".json"))
+  );
 }

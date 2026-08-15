@@ -8,7 +8,12 @@ export {
   hasDeprecatedLspKeys,
   loadLspSettings,
 } from "./config/lsp-settings.ts";
-export { clearTsconfigCache } from "./config/tsconfig-scope.ts";
+export {
+  clearTsconfigCache,
+  invalidateTsconfigCacheForConfig,
+  invalidateTsconfigCacheForConfigDir,
+  isProjectConfigFileName,
+} from "./config/tsconfig-scope.ts";
 export type {
   CodeAction,
   Diagnostic,

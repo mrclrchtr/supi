@@ -10,6 +10,7 @@ import {
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
 import * as projectRoots from "@mrclrchtr/supi-core/project";
+import * as ts from "typescript";
 import {
   LspClient,
   type LspClientLifecycleTransitionKind,
@@ -20,6 +21,7 @@ import {
 export { RECOVERY_CLIENT_STARTUP_BOUND_MS } from "../client/client.ts";
 
 import { getServerForFile } from "../config/config.ts";
+import { getFileScopeDecision } from "../config/tsconfig-scope.ts";
 import type {
   DetectedProjectServer,
   Diagnostic,
@@ -42,6 +44,7 @@ import {
   summarizeDiagnosticEvidence,
 } from "../diagnostics/evidence.ts";
 import { raceRequestControl } from "../session/readiness.ts";
+import type { ScopeDecisionEntry, ScopeDecisionSummary } from "../session/runtime-diagnostics.ts";
 import {
   displayRelativeFilePath,
   formatCoverageSummaryText,
@@ -88,6 +91,35 @@ import {
 } from "./manager-workspace-symbol.ts";
 
 type UnavailableReason = "missing-command" | "start-failed" | "runtime-error";
+
+/** Maximum tracked-file entries retained in one scope-decision telemetry summary. */
+const SCOPE_DECISION_MAX_ENTRIES = 24;
+
+interface ScopeDecisionAccumulator {
+  entries: ScopeDecisionEntry[];
+  counts: ScopeDecisionSummary["counts"];
+  basisCounts: Record<string, number>;
+}
+
+function accumulateScopeDecision(
+  accumulator: ScopeDecisionAccumulator,
+  file: string,
+  decision: ReturnType<typeof getFileScopeDecision>,
+): void {
+  const statusKey =
+    decision.status === "no-config"
+      ? "noConfig"
+      : decision.status === "out-of-tree"
+        ? "outOfTree"
+        : decision.status;
+  accumulator.counts[statusKey]++;
+  if (decision.basis) {
+    accumulator.basisCounts[decision.basis] = (accumulator.basisCounts[decision.basis] ?? 0) + 1;
+  }
+  if (accumulator.entries.length < SCOPE_DECISION_MAX_ENTRIES) {
+    accumulator.entries.push({ file, status: decision.status, basis: decision.basis });
+  }
+}
 
 type FileRoute = {
   serverName: string;
@@ -877,6 +909,39 @@ export class LspManager {
       current:
         clientCurrent && evidence.documents.every((document) => document.status === "confirmed"),
       evidence,
+    };
+  }
+
+  /**
+   * Aggregate the tsconfig scope decision for every tracked file.
+   *
+   * The recovery telemetry surface uses this to report why tracked files are
+   * in or out of scope without re-deriving the scope logic. The returned
+   * entry list is bounded; counts are exact.
+   */
+  getScopeDecisionSummary(): ScopeDecisionSummary {
+    this.pruneMissingFiles();
+    const accumulator: ScopeDecisionAccumulator = {
+      entries: [],
+      counts: { included: 0, excluded: 0, noConfig: 0, outOfTree: 0 },
+      basisCounts: {},
+    };
+    let totalFiles = 0;
+
+    for (const client of this.clients.values()) {
+      for (const entry of client.getAllDiagnostics()) {
+        const file = relativeFilePathFromUri(entry.uri, this.cwd);
+        totalFiles++;
+        accumulateScopeDecision(accumulator, file, getFileScopeDecision(file, this.cwd));
+      }
+    }
+
+    return {
+      caseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
+      counts: accumulator.counts,
+      basisCounts: accumulator.basisCounts,
+      entries: accumulator.entries,
+      totalFiles,
     };
   }
   private toWorkspaceDiagnosticEvidence(
