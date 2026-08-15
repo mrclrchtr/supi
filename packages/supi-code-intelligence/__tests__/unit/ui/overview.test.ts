@@ -3,7 +3,11 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ArchitectureModel, ModuleInfo } from "../../../src/analysis/architecture/model.ts";
-import { renderOverview } from "../../../src/overview/overview.ts";
+import {
+  estimateTokens,
+  OVERVIEW_TOKEN_BUDGET,
+  renderOverview,
+} from "../../../src/overview/overview.ts";
 import { buildOverviewData } from "../../../src/overview/overview-data.ts";
 
 const LONG_DESCRIPTION = `Module zero ${"details ".repeat(12)}`;
@@ -80,18 +84,20 @@ describe("first-turn overview", () => {
     expect(output).not.toContain("omitted");
   });
 
-  it("keeps structural facts only and omits free-text manifest descriptions", () => {
+  it("keeps one-line manifest descriptions as untrusted repository evidence", () => {
     const data = buildOverviewData(architectureModel());
     if (!data) throw new Error("Expected overview data");
 
     const output = renderOverview(data);
 
-    expect(output).not.toContain(LONG_DESCRIPTION);
-    expect(output).not.toContain("Test workspace");
-    expect(output).not.toContain("Module 1");
+    expect(output).toContain("**workspace** — Test workspace");
+    expect(output).toContain("- **module-0** → module-1, module-2");
+    expect(output).toContain(" — Module zero details");
+    expect(output).toContain(LONG_DESCRIPTION.trim());
+    expect(output).toContain("Module 1");
   });
 
-  it("labels structural facts as untrusted repository evidence", () => {
+  it("labels manifest facts as untrusted repository evidence", () => {
     const data = buildOverviewData(architectureModel());
     if (!data) throw new Error("Expected overview data");
 
@@ -108,10 +114,62 @@ describe("first-turn overview", () => {
     const output = renderOverview(data);
 
     expect(output).toContain("# Project: Code Intelligence Overview");
-    expect(output).toContain("**workspace**");
+    expect(output).toContain("**workspace** — Test workspace");
     expect(output).toContain("- **module-0** → module-1, module-2");
     expect(output).toContain("[main: src/index.ts]");
     expect(output).toContain("**Detected:** ts");
     expect(output).toContain("code_orientation");
+  });
+
+  it("renders multiline manifest descriptions as one compact line", () => {
+    const model = architectureModel();
+    const withMultilineDescriptions: ArchitectureModel = {
+      ...model,
+      description: "Project first line\nProject second line",
+      modules: model.modules.map((module, index) =>
+        index === 1
+          ? {
+              ...module,
+              description: "Line one\n\nLine two with   spaces\tand tabs",
+            }
+          : module,
+      ),
+    };
+
+    const data = buildOverviewData(withMultilineDescriptions);
+    if (!data) throw new Error("Expected overview data");
+
+    const output = renderOverview(data);
+
+    expect(data.modules[1]?.description).toBe("Line one Line two with spaces and tabs");
+    expect(data.projectDescription).toBe("Project first line Project second line");
+    expect(output).toContain(
+      "- **module-1** [main: src/index.ts] — Line one Line two with spaces and tabs",
+    );
+    expect(output).toContain("**workspace** — Project first line Project second line");
+  });
+
+  it("renders the project description when the root manifest has no name", () => {
+    const model = architectureModel();
+    const unnamedRoot: ArchitectureModel = {
+      ...model,
+      name: null,
+      description: "Unnamed workspace description",
+    };
+
+    const data = buildOverviewData(unnamedRoot);
+    if (!data) throw new Error("Expected overview data");
+
+    const output = renderOverview(data);
+
+    expect(output).toContain("**Workspace** — Unnamed workspace description");
+  });
+
+  it("sizes the soft token budget for an overview with descriptions", () => {
+    const data = buildOverviewData(architectureModel());
+    if (!data) throw new Error("Expected overview data");
+
+    const output = renderOverview(data);
+    expect(estimateTokens(output)).toBeLessThanOrEqual(OVERVIEW_TOKEN_BUDGET);
   });
 });

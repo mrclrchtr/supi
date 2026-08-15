@@ -44,9 +44,17 @@ export function buildOverviewData(model: ArchitectureModel): OverviewData | null
 
   return {
     projectName: model.name,
+    projectDescription: normalizeOneLine(model.description),
     modules,
     detectedLanguages: detectedLanguages.length > 0 ? detectedLanguages : null,
   };
+}
+
+/** Collapse whitespace runs so one description always renders on one line. */
+function normalizeOneLine(value: string | null): string | null {
+  if (!value) return null;
+  const collapsed = value.replace(/\s+/g, " ").trim();
+  return collapsed.length > 0 ? collapsed : null;
 }
 
 function overviewModule(module: ModuleInfo, model: ArchitectureModel): OverviewModule {
@@ -54,6 +62,7 @@ function overviewModule(module: ModuleInfo, model: ArchitectureModel): OverviewM
   return {
     name,
     shortName: module.name?.replace(/^@[^/]+\//, "") ?? module.relativePath,
+    description: normalizeOneLine(module.description),
     declaredDependencies: model.edges
       .filter((edge) => edge.from === module.name)
       .map((edge) => edge.to),

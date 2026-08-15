@@ -11,7 +11,7 @@ The set of agent-facing capabilities that help understand, navigate, search, and
 _Avoid_: code intel, IDE features
 
 **Workspace Overview**:
-An optional, bounded first-turn snapshot of manifest-declared package topology, entrypoints, and detected languages. It contains structural repository facts as untrusted evidence and points to the Orientation surface when facts are omitted.
+An optional, bounded first-turn snapshot of manifest-declared package topology, one-line descriptions, entrypoints, and detected languages. It contains manifest facts as untrusted evidence and points to the Orientation surface when facts are omitted.
 _Avoid_: architecture overview, complete project context, trusted instructions
 
 **Orientation surface**:

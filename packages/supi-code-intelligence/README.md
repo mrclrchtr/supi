@@ -30,7 +30,7 @@ After installation, keep asking Pi normal coding questions. The agent can:
 - **Refactor safely** — preview language-aware renames and extractions before applying them. Plans are rejected if the files changed in the meantime.
 - **See uncertainty clearly** — results distinguish “nothing found” from incomplete or unavailable analysis and disclose omitted matches.
 
-When Pi recognizes a workspace, the agent also receives a compact architecture overview near the start of the session, so it can orient before spending turns opening files. The overview contains only structural repository facts (module names, manifest-declared topology, declared entrypoints, and detected languages), is labeled as untrusted repository evidence, and is controlled by the `code-intelligence.overviewEnabled` setting in `/supi-settings`.
+When Pi recognizes a workspace, the agent also receives a compact architecture overview near the start of the session, so it can orient before spending turns opening files. The overview contains manifest facts (module names, one-line descriptions, declared topology, declared entrypoints, and detected languages), is labeled as untrusted repository evidence, and is controlled by the `code-intelligence.overviewEnabled` setting in `/supi-settings`.
 
 ## Example requests
 

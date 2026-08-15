@@ -192,9 +192,10 @@ describe("overview injection", () => {
     expect(result?.message?.content).toContain("fixture-workspace");
     expect(result?.message?.content).toContain("fixture-pkg-000");
     expect(result?.message?.content).toContain("fixture-pkg-003");
-    // Free-text manifest descriptions never enter the overview.
-    expect(result?.message?.content).not.toContain("Free-text workspace description");
-    expect(result?.message?.content).not.toContain("Free-text package description");
+    // One-line manifest descriptions are included as untrusted evidence.
+    expect(result?.message?.content).toContain("Free-text workspace description");
+    expect(result?.message?.content).toContain("Free-text package description");
+    expect(result?.message?.content).toContain("untrusted evidence");
   });
 
   it("emits no overview when overviewEnabled is false", async () => {

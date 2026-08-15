@@ -1,10 +1,10 @@
 # SuPi agent context audit
 
-> **Status: Rewritten 2026-08-14.** This document now records the accepted decisions from the four follow-up grilling rounds, not only the original audit recommendations. Measured evidence is preserved; where a decision differs from the original recommendation, the finding records both and names the decision. Implementation is tracked in `.ignored/tickets/05` through `09`.
+> **Status: Rewritten.** This document records the accepted decisions from the four follow-up grilling rounds, not only the original audit recommendations. Measured evidence is preserved; where a decision differs from the original recommendation, the finding records both and names the decision. Implementation is tracked in `.ignored/tickets/05` through `09`.
 
 ## 1. Executive summary
 
-The largest ambient context cost in this repository is repository-owned text that standard PI loads: root `CLAUDE.md` is 18,943 characters. This is not a SuPi extension injection. The largest SuPi costs in the default root stack are the active custom-tool definitions, a 3,587-character system-prompt contribution, and a 3,452-character Code Intelligence workspace overview on the first turn. The measured default root tool set has at least 24,750 characters of descriptions plus serialized schemas, before provider wrapper syntax. Code Intelligence supplies 10,446 schema characters and 4,848 fixed description, snippet, and guideline characters by itself.
+The largest ambient context cost in this repository is repository-owned text that standard PI loads: root `CLAUDE.md` is 18,943 characters. This is not a SuPi extension injection. The largest SuPi costs in the default root stack are the active custom-tool definitions, a 3,587-character system-prompt contribution, and a 3,527-character Code Intelligence workspace overview on the first turn. The measured default root tool set has at least 24,750 characters of descriptions plus serialized schemas, before provider wrapper syntax. Code Intelligence supplies 10,446 schema characters and 4,848 fixed description, snippet, and guideline characters by itself.
 
 **Settled product principle:** Install gives a capability, not control of the user's workflow. Standard capability packages expose truthful tool metadata and bounded results. Diagnostics, reviews, delegation, and maintenance workflows stay behind explicit package, setting, command, skill, or user-action boundaries where a real boundary exists. Safety, trust, cancellation, truncation, and data-integrity rules stay at the narrowest effective point.
 
@@ -13,7 +13,7 @@ The largest ambient context cost in this repository is repository-owned text tha
 1. The repository root stays the **Full Stack workspace surface** for development and local/Git installs. The Recommended Release Stack is defined by `scripts/install.sh`, which already excludes Agent, Review, Cache, Debug, Insights, Claude-MD, and Bash Timeout. No root manifest change.
 2. `supi_cache_forensics` and `supi_agent_run` get hard model-output bounds (2,000 lines / 51,200 UTF-8 bytes) with complete spill files outside model context.
 3. Review keeps its configurable Post-Review Policy (`ask` default, hidden agent turn for interactive review). Both fixing policies first reject findings that are refuted, stale, duplicated, incompatible, or not applicable to the live checkout; `fix` applies a light gate, `verify-and-fix` full confirmation.
-4. The Code Intelligence Workspace Overview stays, default-enabled through a scoped setting, narrowed to structural facts (no free-text manifest descriptions), rendered in full with token-efficient formatting, with a debug-event-only soft-budget warning.
+4. The Code Intelligence Workspace Overview stays, default-enabled through a scoped setting, rendered in full with token-efficient formatting, a debug-event-only soft-budget warning, and one-line manifest descriptions labeled as untrusted evidence (ADR 0002).
 5. Code results add next-query guidance only when a result establishes the need; unconditional graph/health advice is removed.
 6. Fixed prompt surfaces are compressed with invariants authoritative; prompt-surface overrides (ADR 0012) roll out to every public parent tool family with full description replacement allowed and JSON-only configuration.
 7. Debug, Cache, Insights, and Review Cleanup command reports move to custom entries; no send-to-agent bridge.
@@ -71,7 +71,7 @@ The root manifest loads 15 extension entry points (`package.json:80-97`). Under 
 - “Fixed text” in tool tables is description + snippet + guidelines. A separate schema value is shown.
 - “System” is an additive line measure for PI-rendered snippets and guidelines. It includes `- <tool>: `, bullet prefixes, and one separator per contribution. A fully joined snippets-plus-guidelines section is two characters smaller than the summed measure.
 - The final Code Intelligence descriptions include the shared 94-character output-limit suffix from `packages/supi-code-intelligence/src/tool/register.ts:25-26`.
-- The current overview was generated from the source against this checkout: 3,452 characters, 34 lines, and about 863 characters-per-four estimate units.
+- The overview was generated from the source against this checkout: 3,527 characters, 36 lines, and about 882 characters-per-four estimate units.
 - Dynamic sizes use a measured representative or a hard assembly bound. Growth factors are stated. Model token counts are not exact because tokenization depends on the provider.
 - Runtime behavior is inferred from source and installed PI lifecycle contracts unless this report says “observed.” No provider request payload was captured.
 
@@ -87,7 +87,7 @@ Each immediate `packages/*` directory appears once in this table. Verdicts are t
 | `supi-bash-timeout` | Published extension; root-loaded | Mutates missing built-in `bash.timeout` values | No text enters model context | **No model context** | It changes execution behavior only. The configured timeout is a runtime guard, not prompt policy |
 | `supi-cache` | Published extension; root-loaded | Cache monitor, commands, and `supi_cache_forensics`; tool is always active when installed | Parent tool: 519 fixed + 507 schema; 390 system chars. Tool result is currently unbounded. Commands add short custom messages | **Keep** | Hard-bound the tool result (2,000 lines/50KB, summary envelope plus temporary spill); move command reports to entries |
 | `supi-claude-md` | Published resource extension; root-loaded | Discovers two manual-only instruction-file skills | No ambient catalogue entry because both skills disable model invocation. On demand: 14,333-char improver and 7,392-char revision skill | **Keep** | Replace both bodies with concise evidence-based contracts; remove hard caps, mandatory Orientation, and overview assumptions |
-| `supi-code-intelligence` | Published extension; root-loaded; owns the eight public code tools; also exports a child-only headless profile | Navigation, search, health, graph, and refactor tools; first-turn workspace overview in parent only | Eight parent tools: 4,848 fixed + 10,446 schema; 1,528 system chars. First-turn overview: 3,452 current chars. Results are bounded at 2,000 lines/50KB | **Keep** | Overview stays default-enabled but narrows to structural facts with token-efficient full rendering; advice becomes conditional; metadata compresses |
+| `supi-code-intelligence` | Published extension; root-loaded; owns the eight public code tools; also exports a child-only headless profile | Navigation, search, health, graph, and refactor tools; first-turn workspace overview in parent only | Eight parent tools: 4,848 fixed + 10,446 schema; 1,528 system chars. First-turn overview: 3,527 chars. Results are bounded at 2,000 lines/50KB | **Keep** | Overview stays default-enabled with manifest facts (module names, one-line descriptions, topology, entrypoints, languages) labeled untrusted, token-efficient full rendering, debug-only warning, scoped off switch; advice becomes conditional; metadata compresses |
 | `supi-code-runtime` | Published library-only infrastructure | Shared types and capability state | No direct model context | **No model context** | Callers own all public tools and text |
 | `supi-context` | Published extension; root-loaded | Human `/supi-context`; optional `supi_context` tool | Default parent cost is 0 because the tool defaults off. If enabled: 330 fixed + 170 schema; 94 system chars. Full output uses a 50KB envelope. Human command uses `appendEntry()` | **Keep** | The model surface is explicit, bounded, and off by default; the human report stays out of context |
 | `supi-core` | Published library-only infrastructure | Config, settings, debug, report, and session helpers | No direct model context | **No model context** | Callers decide whether helper output enters context |
@@ -145,7 +145,7 @@ This excludes tool names, labels, JSON wrapper syntax, and PI-owned built-ins. I
 
 | Package | Activation | Model-context effect and accepted disposition |
 |---|---|---|
-| Code Intelligence | First `before_agent_start` claim in a parent session | Hidden 3,452-char current overview, persists as a custom message (`packages/supi-code-intelligence/src/extension.ts:57-84`). **Kept by decision:** scoped setting defaults on, structural facts only, token-efficient full rendering, debug-only soft-budget warning |
+| Code Intelligence | First `before_agent_start` claim in a parent session | Hidden 3,527-char overview, persists as a custom message (`packages/supi-code-intelligence/src/extension.ts:57-84`). **Kept by decision:** scoped setting defaults on, manifest facts incl. one-line descriptions, token-efficient full rendering, debug-only soft-budget warning |
 | Review agent tool | A completed review with findings | Appends 975-1,175 chars of post-review workflow policy to the tool result (`packages/supi-review/src/tool/post-review-policy.ts:39-81`). **Kept with gate:** fixing policies reject refuted/stale/duplicate/incompatible/not-applicable findings first |
 | Review interactive command | Completed review with findings and policy other than `report` | Queues hidden `followUp` with `triggerTurn: true` (`packages/supi-review/src/tool/post-review-policy.ts:84-102`). **Kept by decision** for the default `ask` policy |
 | Cache commands | User invokes history or forensics command | Adds only “N turns tracked” or “N sessions, N turns” as custom-message content; report details are not model text (`packages/supi-cache/src/monitor/monitor.ts:142-160`, `:181-210`). **Batch 5:** moves to entries |
@@ -164,7 +164,7 @@ This excludes tool names, labels, JSON wrapper syntax, and PI-owned built-ins. I
 ### Duplicate and conflicting meaning
 
 1. **PI snippet prefix ↔ SuPi snippets.** PI renders `- <tool-name>: <snippet>`, but 15 SuPi snippets start with the same tool name. Exact sources include `packages/supi-ask-user/src/tool/guidance.ts:10`, `packages/supi-cache/src/tool/guidance.ts:6-7`, `packages/supi-debug/src/tool/guidance.ts:7`, `packages/supi-code-intelligence/src/tool/guidance.ts:26-79`, and `packages/supi-web/src/tool/tool-specs.ts:89-105`. **Batch 4** removes the prefixes.
-2. **Overview ↔ Orientation.** The overview renders every module, dependency, entry point, and language (`packages/supi-code-intelligence/src/overview/overview.ts:17-59`). `code_orientation` is the on-demand owner for workspace/package/path facts (`packages/supi-code-intelligence/src/tool/guidance.ts:37-45`). **Batch 3** narrows the overview to structural facts, keeps full rendering, and removes the skills' dependency on it. Both `supi-claude-md` skills described the overview as a required baseline (`packages/supi-claude-md/skills/claude-md-improver/SKILL.md:20-38`; `packages/supi-claude-md/skills/claude-md-revision/SKILL.md:31-45`).
+2. **Overview ↔ Orientation.** The overview renders every module, dependency, one-line description, entry point, and language (`packages/supi-code-intelligence/src/overview/overview.ts`). `code_orientation` is the on-demand owner for workspace/package/path facts (`packages/supi-code-intelligence/src/tool/guidance.ts:37-45`). **Batch 3** sets the overview contract — manifest facts incl. one-line descriptions, full rendering, 1000-token debug-only budget (ADR 0002) — and removes the skills' dependency on it. Both `supi-claude-md` skills described the overview as a required baseline (`packages/supi-claude-md/skills/claude-md-improver/SKILL.md:20-38`; `packages/supi-claude-md/skills/claude-md-revision/SKILL.md:31-45`).
 3. **Ask User guidelines ↔ schema.** Stable ids, recommendation types, `option.details`, question count, and question shape occur in both `packages/supi-ask-user/src/tool/guidance.ts:12-16` and `packages/supi-ask-user/src/schema.ts:5-75`. **Batch 4** keeps the schema as the only mechanics source.
 4. **Code guidelines ↔ descriptions/schema.** Orientation routing, health refresh, and the refactor planner/applier split occur in descriptions and guidelines (`packages/supi-code-intelligence/src/tool/guidance.ts:38-81`). Exact selector mechanics also exist in `packages/supi-code-intelligence/src/tool/schemas.ts`. **Batch 4** removes the duplication.
 5. **Web routing ↔ descriptions/schema/result.** Known Context7 ID and search-first meaning occurs in `packages/supi-web/src/tool/tool-specs.ts:94-109`, the `library_id` parameter, and the search result's `web_docs_fetch` hint (`packages/supi-web/src/docs.ts:232-244`). **Batch 4** deletes the fixed routing guidelines.
@@ -206,9 +206,9 @@ Each finding records the original measurement and the accepted disposition. "Acc
 - **Activation:** First parent `before_agent_start` after the session claims overview injection.
 - **Audience/frequency:** Ambient parent custom message; once per session state that resets the claim.
 - **Representative output:** The current repository overview lists 22 manifest packages, dependencies, entry points, and detected languages.
-- **Measured size:** 3,452 characters and 34 lines. It grows with module names, descriptions, dependencies, entry points, and languages. The 600-token value only emits a warning; source states “Output is never truncated.”
+- **Measured size:** 3,527 characters and 36 lines with descriptions. It grows with module names, descriptions, dependencies, entry points, and languages; without descriptions the same checkout measures 2,169 characters (~543 tokens). The soft budget is 1000 tokens and only emits a debug warning.
 - **Original risk:** It pays for broad orientation before the task shows a need; free-text manifest descriptions add prompt-injection surface.
-- **Decision (Rounds 1-3, Q5/Q16/Q25/Q26/Q32):** Keep the overview, default-enabled through scoped setting `code-intelligence.overviewEnabled` (`true`). Content narrows to structural facts — module names, declared topology, entrypoints, detected languages — labeled as untrusted evidence; free-text manifest descriptions are omitted. The full overview is always shown with token-efficient formatting; the 600-token soft-budget check emits only a `supi:debug` event. Headless children never receive it.
+- **Decision (Rounds 1-3, Q5/Q16/Q25/Q26/Q32):** Keep the overview, default-enabled through scoped setting `code-intelligence.overviewEnabled` (`true`). Content is manifest facts — module names, one-line descriptions (curated, bounded npm fields with real first-turn legibility value), declared topology, entrypoints, detected languages — labeled as untrusted evidence, never instructions. The full overview is always shown with token-efficient formatting; the 1000-token soft-budget check emits only a `supi:debug` event. Headless children never receive it.
 - **Ticket:** `.ignored/tickets/07-agent-context-batch3-overview-and-advice.md`. New ADR: `packages/supi-code-intelligence/docs/adr/0002-opt-in-workspace-overview.md`.
 
 ### SAFE-001 — Cache forensics has no model-output bound — Accepted
@@ -341,7 +341,7 @@ Each finding records the original measurement and the accepted disposition. "Acc
 
 ### Decision record
 
-Settled 2026-08-14 through four `ask_user` grilling rounds. Round 1 (Q1-Q10): distribution role, cache bound, agent aggregate, review completion, overview, result advice, fixed prompts, command reports, prompt overrides, maintenance skills. Round 2 (Q11-Q20): cache overflow storage, agent overflow storage, agent allocation, fix policy, interactive ask, overview contract, prompt wording authority, override boundary, `@` path rule, command bridge. Round 3 (Q21-Q30): cache envelope shape, common output limit, temporary-file lifetime, fix distinction, overview setting, overview bound, skill depth, decision documents, audit status, delivery batches. Round 4 (Q31-Q35): docs sequencing, overview warning, issue tracking (local tickets in `.ignored/tickets/`, no GitHub issues), override UI, shared-understanding confirmation.
+Settled through four `ask_user` grilling rounds. Round 1 (Q1-Q10): distribution role, cache bound, agent aggregate, review completion, overview, result advice, fixed prompts, command reports, prompt overrides, maintenance skills. Round 2 (Q11-Q20): cache overflow storage, agent overflow storage, agent allocation, fix policy, interactive ask, overview contract, prompt wording authority, override boundary, `@` path rule, command bridge. Round 3 (Q21-Q30): cache envelope shape, common output limit, temporary-file lifetime, fix distinction, overview setting, overview bound, skill depth, decision documents, audit status, delivery batches. Round 4 (Q31-Q35): docs sequencing, overview warning, issue tracking (local tickets in `.ignored/tickets/`, no GitHub issues), override UI, shared-understanding confirmation.
 
 ## 6. Accepted catalog design
 
@@ -356,7 +356,7 @@ Model-facing contract:
 3. Schemas own exact input mechanics.
 4. The family adds at most one concise sibling-selection guideline per tool when the description is not sufficient.
 5. Results are bounded and add advice only when the current result establishes a need.
-6. The Code Intelligence Workspace Overview is a settled exception: default-enabled, structural facts only, full token-efficient rendering, debug-only warning, and a scoped off switch.
+6. The Code Intelligence Workspace Overview is a settled exception: default-enabled, manifest facts (module names, one-line descriptions, topology, entrypoints, languages) labeled as untrusted evidence, full token-efficient rendering, debug-only warning, and a scoped off switch.
 
 All current capabilities remain: structured decisions, semantic and structural code evidence, plan-then-apply refactors, public web fetch, Context7 lookup, and the first-turn topology snapshot.
 
@@ -437,7 +437,7 @@ Intentional behavior changes:
 - no unconditional graph or health next action after complete code-tool results;
 - no debug/cache/insights/cleanup command text in later model context;
 - no fixing-policy edits from refuted, stale, duplicate, incompatible, or not-applicable findings;
-- the Workspace Overview narrows to structural facts with token-efficient full rendering.
+- the Workspace Overview renders manifest facts incl. one-line descriptions with token-efficient full rendering.
 
 User-control changes:
 
@@ -479,8 +479,8 @@ Ticket: `.ignored/tickets/06-agent-context-batch2-review-policy.md`.
 Ticket: `.ignored/tickets/07-agent-context-batch3-overview-and-advice.md`.
 
 - `code-intelligence.overviewEnabled` setting, default `true`, in `/supi-settings`.
-- Overview content narrows to structural facts; free-text manifest descriptions removed; repository facts labeled untrusted; one `code_orientation` pointer line.
-- Token-efficient full rendering; 600-token check becomes a debug-event-only warning.
+- Overview renders manifest facts — module names, one-line descriptions, topology, entrypoints, languages — labeled untrusted; one `code_orientation` pointer line; 1000-token soft budget (ADR 0002).
+- Token-efficient full rendering; the 1000-token soft-budget check becomes a debug-event-only warning.
 - Next-query guidance only when established; delete unconditional resolve/apply advice; keep Read Next ranges and the plan-to-apply transaction hint.
 
 ### Batch 4 — Prompt compression and overrides
@@ -690,7 +690,7 @@ Do not add routine commands, generic advice, session summaries, one-off fixes, o
 |---|---:|---:|
 | Compress Ask, Code, Web, Cache, Debug, and Review surfaces that remain standard | about 2,059 chars/request | none |
 | Delete Extras path rule | 144 chars on every request | 0 |
-| Narrow overview to structural facts with token-efficient rendering | 0 after first call, because it persists as a message | depends on workspace; current 3,452-char baseline falls as descriptions and formatting are removed |
+| Overview with manifest facts incl. one-line descriptions, token-efficient full rendering | 0 after first call, because it persists as a message | depends on workspace; measured 3,527 chars (~882 tokens) |
 | Gate review fixing policies | 0 outside review | policy text changes; the hidden `ask` turn stays by decision |
 | Compress Reviewer protocol | child-only | 1,440 chars/reviewer |
 | Replace Agent Profile prompts | child-only | 378 chars/explore and 105 chars/general |
@@ -762,7 +762,7 @@ Agent schema size grows with up to 32 profile IDs. Ask prompt text can be replac
 
 | Surface | Activation and audience | Representative/bound | Growth factors |
 |---|---|---|---|
-| Workspace Overview | First parent turn; setting default true | 3,452 chars, 34 lines current baseline; structural facts only after Batch 3; full output, never truncated | Module names, topology, entrypoints, languages |
+| Workspace Overview | First parent turn; setting default true | 3,527 chars, 36 lines, ~882 tokens; full output, never truncated | Module names, one-line descriptions, topology, entrypoints, languages |
 | Code tool results | After a code call | 2,000 lines/50KB, then full Markdown path | Evidence count until tool cap; exact omissions disclosed |
 | Directory instruction surfacing | `code_orientation` directory focus | Up to 200 lines per surfaced file by current package policy | Applicable configured instruction files and line lengths |
 | Ask result | After form submission | Empty submitted sample: `User submitted the form.`; hard 2,000 lines/50KB | User answers and comments |
@@ -841,5 +841,5 @@ These surfaces do not enter model context unless noted elsewhere:
 - Code Orientation instruction-file output depends on configured names and the focused directory.
 - Review packet size depends on bounded caller text, criteria summaries, and changed paths. The source has input limits, but this audit did not generate a maximum-size packet.
 - Auxiliary Insights model context depends on session transcripts and cached facets. It is command-triggered and separate from parent context, but it can contain private session data by design.
-- The post-Batch-3 overview size is not yet measured; the current 3,452-character baseline is the upper bound for structural-facts-only rendering in this checkout.
+- The overview measures 3,527 characters (~882 tokens) in this checkout with one-line descriptions, and 2,169 characters (~543 tokens) without them.
 - No direct provider payload capture was available. Lifecycle claims use installed PI documentation and source. This is inference, not an observed request.
