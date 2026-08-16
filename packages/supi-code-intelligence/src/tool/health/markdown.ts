@@ -185,12 +185,12 @@ function renderDiagnosticsSection(lines: string[], data: HealthData, cwd: string
 }
 
 /**
- * Render the tsconfig scope verdict for a single-file health request.
+ * Render the tsconfig coverage verdict for a single-file health request.
  *
- * Written consequence-first so a reader without tsconfig background can act
- * on it: the sentence states whether the file's errors are part of workspace
- * diagnostics. The basis stays a secondary parenthetical; the config path
- * lets the reader verify instead of trusting the label.
+ * Written in plain vocabulary (no basis terms) so a reader without tsconfig
+ * background can act on it: the sentence names the deciding config and states
+ * whether the file's errors are part of workspace diagnostics. The structured
+ * decision basis stays in the diagnostics.scope debug event.
  */
 function renderFileScopeStatus(
   lines: string[],
@@ -206,26 +206,24 @@ function renderFileScopeStatus(
   switch (decision.status) {
     case "included":
       lines.push(
-        `**File scope**: included (${decision.basis}) — errors reported here are part of workspace diagnostics. Config: ${formatConfigPath(decision.configPath, cwd)}`,
+        `**Tsconfig**: covered by ${formatConfigPath(decision.configPath, cwd)} — part of workspace diagnostics.`,
       );
       return;
     case "excluded":
       lines.push(
-        `**File scope**: excluded (${decision.basis}) — NOT part of workspace diagnostics. Config: ${formatConfigPath(decision.configPath, cwd)}`,
+        `**Tsconfig**: NOT covered by ${formatConfigPath(decision.configPath, cwd)} — not part of workspace diagnostics.`,
       );
       return;
     case "no-config":
-      lines.push(
-        "**File scope**: no project config — nothing is filtered; errors reported here are part of workspace diagnostics.",
-      );
+      lines.push("**Tsconfig**: no tsconfig.json or jsconfig.json found — nothing filtered.");
       return;
     case "out-of-tree":
-      lines.push("**File scope**: outside the project root — not part of workspace diagnostics.");
+      lines.push("**Tsconfig**: outside the project root — not part of workspace diagnostics.");
   }
 }
 
 function formatConfigPath(configPath: string | null, cwd: string): string {
-  if (!configPath) return "none";
+  if (!configPath) return "no config";
   return `\`${makeRelative(cwd, configPath)}\``;
 }
 

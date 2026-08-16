@@ -42,12 +42,12 @@ _Avoid_: created means active, token timeout means server failure, owner readine
 A retained or persisted LSP debug event that may include server, workspace, file, method, or root identity to support local protocol diagnosis. Event-level `cwd` is the absolute workspace root, `file` fields are workspace-relative, and server `root` stays absolute where present. Identity strings are bounded to 512 UTF-16 code units (marker included) and server lists to 16 entries; readiness events never embed raw progress-token values; `capability.transition` fires only on semantic ready↔pending transitions. Identity fields are intentionally not secret-redacted.
 _Avoid_: sanitized identity-free event, public tool evidence, raw protocol dump
 
-**File scope state**:
-Whether a file is inside the compilation scope of its nearest tsconfig.json or jsconfig.json. Statuses: `included`, `excluded`, `no-config`, `out-of-tree`. A decision always carries its basis; never report a bare boolean.
-_Avoid_: excluded-without-basis, "in project" as a boolean
+**Config coverage state**:
+Whether a file is inside the compilation scope of its nearest tsconfig.json or jsconfig.json. User-facing statuses: `covered`, `not covered`, `no-config`, `out-of-tree` — rendered in code_health file scope as "Tsconfig: covered by <config>". Machine vocabulary (`included`/`excluded`) appears in debug events and code; the mapping is 1:1. A decision always carries its basis; never report a bare boolean.
+_Avoid_: "file scope" as the rendered term (collides with the evidence-scope line), excluded-without-basis, "in project" as a boolean
 
 **Scope decision basis**:
-The mechanism that produced a file scope state: `fileNames` (parse-time file set), `explicit` (files array), `include-pattern`, `default-include`, `exclude-pattern`, or `extension` (unsupported file type, checked before any pattern). The basis explains why a post-parse file is included although it never appeared in the parse-time file set. Decisions are computed by `getFileScopeDecision` and aggregated per recovery pass in the `diagnostics.scope` debug event; the boolean filter (`isFileExcludedByTsconfig`) stays the source of truth for diagnostic filtering.
+The mechanism that produced a config coverage state: `fileNames` (parse-time file set), `explicit` (files array), `include-pattern`, `default-include`, `exclude-pattern`, or `extension` (unsupported file type, checked before any pattern). The basis explains why a post-parse file is covered although it never appeared in the parse-time file set. Decisions are computed by `getFileScopeDecision` and aggregated per recovery pass in the `diagnostics.scope` debug event; the rendered code_health line carries no basis — the event is the structured reason. The boolean filter (`isFileExcludedByTsconfig`) stays the source of truth for diagnostic filtering.
 _Avoid_: "the include pattern" as the only mechanism, untyped decision reasons
 
 **Tracked-file evidence**:

@@ -78,7 +78,7 @@ describe("code_health file-scope status line", () => {
     const markdown = renderHealthResult(assembly, "/repo");
 
     expect(markdown).toContain(
-      "**File scope**: included (include-pattern) — errors reported here are part of workspace diagnostics. Config: `packages/app/tsconfig.json`",
+      "**Tsconfig**: covered by `packages/app/tsconfig.json` — part of workspace diagnostics.",
     );
   });
 
@@ -94,7 +94,7 @@ describe("code_health file-scope status line", () => {
     const markdown = renderHealthResult(assembly, "/repo");
 
     expect(markdown).toContain(
-      "**File scope**: excluded (exclude-pattern) — NOT part of workspace diagnostics. Config: `packages/app/tsconfig.json`",
+      "**Tsconfig**: NOT covered by `packages/app/tsconfig.json` — not part of workspace diagnostics.",
     );
   });
 
@@ -110,7 +110,7 @@ describe("code_health file-scope status line", () => {
     const markdown = renderHealthResult(assembly, "/repo");
 
     expect(markdown).toContain(
-      "**File scope**: no project config — nothing is filtered; errors reported here are part of workspace diagnostics.",
+      "**Tsconfig**: no tsconfig.json or jsconfig.json found — nothing filtered.",
     );
   });
 
@@ -127,6 +127,6 @@ describe("code_health file-scope status line", () => {
     );
     const markdown = renderHealthResult(assembly, "/repo");
 
-    expect(markdown).not.toContain("**File scope**:");
+    expect(markdown).not.toContain("**Tsconfig**:");
   });
 });
