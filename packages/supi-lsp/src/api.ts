@@ -10,9 +10,13 @@ export {
 } from "./config/lsp-settings.ts";
 export {
   clearTsconfigCache,
+  type FileScopeDecision,
+  type FileScopeStatus,
+  getFileScopeDecision,
   invalidateTsconfigCacheForConfig,
   invalidateTsconfigCacheForConfigDir,
   isProjectConfigFileName,
+  type ScopeDecisionBasis,
 } from "./config/tsconfig-scope.ts";
 export type {
   CodeAction,

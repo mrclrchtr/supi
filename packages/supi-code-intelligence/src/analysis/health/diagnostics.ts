@@ -3,13 +3,9 @@
 
 import { existsSync, statSync } from "node:fs";
 import { relative, resolve } from "node:path";
-import {
-  type CodeRequestControl,
-  isCodeRequestInterruption,
-} from "@mrclrchtr/supi-code-runtime/api";
+import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
 import type {
-  Diagnostic,
   DiagnosticEvidenceDocument,
   DiagnosticEvidenceSummary,
   WorkspaceLspRuntime,
@@ -17,11 +13,17 @@ import type {
 import { mergeDiagnosticEvidence } from "../../diagnostics/evidence.ts";
 import type {
   HealthDiagnosticEntry,
-  HealthDiagnosticMessage,
   HealthDiagnosticObservation,
   HealthDiagnosticScope,
   HealthSection,
 } from "../../session/health-types.ts";
+import {
+  collectScopedFileDiagnostics,
+  fileScopeStatus,
+  toFileDiagnosticEntries,
+  unavailableDiagnostics,
+  unavailableFileEvidence,
+} from "./file-scope.ts";
 
 // ── Diagnostics ───────────────────────────────────────────────────────
 
@@ -62,11 +64,12 @@ export async function collectDiagnostics(
       scope,
       unavailableReason,
       unavailableScopeEvidence(scope, options.refreshEvidence, options.evidenceService, cwd),
+      scope.kind === "file" ? fileScopeStatus(scope.path, cwd) : undefined,
     );
   }
 
   return scope.kind === "file"
-    ? collectScopedFileDiagnostics(service, scope, detailed, requestControl)
+    ? collectScopedFileDiagnostics({ service, scope, cwd, detailed, requestControl })
     : collectTrackedFileDiagnostics({
         service,
         scope,
@@ -74,43 +77,6 @@ export async function collectDiagnostics(
         detailed,
         refreshEvidence: options.refreshEvidence,
       });
-}
-
-async function collectScopedFileDiagnostics(
-  service: WorkspaceLspRuntime,
-  scope: Extract<HealthDiagnosticScope, { kind: "file" }>,
-  detailed?: boolean,
-  requestControl?: CodeRequestControl,
-): Promise<HealthDiagnosticObservation> {
-  try {
-    const result = await service.fileDiagnostics(scope.path, 4, requestControl);
-    if (result.kind === "unavailable") {
-      return unavailableDiagnostics(scope, result.reason, unavailableFileEvidence(scope.path));
-    }
-
-    const entries = toFileDiagnosticEntries(scope.path, result.data, detailed);
-    return result.kind === "partial"
-      ? {
-          kind: "partial",
-          scope,
-          entries,
-          evidence: singleFileEvidence(scope.path, "unconfirmed"),
-          reason: result.reason,
-        }
-      : {
-          kind: "completed",
-          scope,
-          entries,
-          evidence: singleFileEvidence(scope.path, "confirmed"),
-        };
-  } catch (error) {
-    if (isCodeRequestInterruption(error, requestControl)) throw error;
-    return unavailableDiagnostics(
-      scope,
-      errorMessage(error, "File diagnostic request failed."),
-      unavailableFileEvidence(scope.path),
-    );
-  }
 }
 
 interface TrackedFileDiagnosticOptions {
@@ -151,21 +117,6 @@ function collectTrackedFileDiagnostics(
       evidence,
     );
   }
-}
-
-function toFileDiagnosticEntries(
-  file: string,
-  diagnostics: ReadonlyArray<Pick<Diagnostic, "severity" | "message" | "source" | "range">>,
-  detailed?: boolean,
-): HealthDiagnosticEntry[] {
-  const errors = diagnostics.filter((diagnostic) => (diagnostic.severity ?? 1) === 1).length;
-  const warnings = diagnostics.filter((diagnostic) => (diagnostic.severity ?? 1) === 2).length;
-  if (!hasIssueCounts(errors, warnings)) return [];
-  const entry: HealthDiagnosticEntry = { file, errors, warnings };
-  if (detailed) {
-    return [{ ...entry, messages: extractMessages(diagnostics) }];
-  }
-  return [entry];
 }
 
 function collectWorkspaceDiagnostics(
@@ -213,27 +164,6 @@ function collectWorkspaceDiagnosticsDetailed(
   return { entries: result, current: outstanding.current, evidence: outstanding.evidence };
 }
 
-// ── Message extraction ────────────────────────────────────────────────
-
-const MAX_MESSAGES_PER_FILE = 3;
-
-function extractMessages(
-  diagnostics: ReadonlyArray<Pick<Diagnostic, "severity" | "message" | "source" | "range">>,
-): HealthDiagnosticMessage[] {
-  const errorsAndWarnings = diagnostics
-    .filter((d) => (d.severity ?? 1) <= 2)
-    .sort(
-      (a, b) => (a.severity ?? 1) - (b.severity ?? 1) || a.range.start.line - b.range.start.line,
-    );
-
-  return errorsAndWarnings.slice(0, MAX_MESSAGES_PER_FILE).map((d) => ({
-    line: d.range.start.line + 1,
-    severity: (d.severity ?? 1) === 1 ? ("error" as const) : ("warning" as const),
-    message: typeof d.message === "string" ? d.message : d.message.value,
-    ...(d.source ? { source: d.source } : {}),
-  }));
-}
-
 function unavailableScopeEvidence(
   scope: HealthDiagnosticScope,
   refreshEvidence: DiagnosticEvidenceSummary | undefined,
@@ -256,10 +186,6 @@ function unavailableScopeEvidence(
   return scope.kind === "file" ? unavailableFileEvidence(scope.path) : scoped;
 }
 
-function unavailableFileEvidence(file: string): DiagnosticEvidenceSummary {
-  return singleFileEvidence(file, existsSync(file) ? "failed" : "removed");
-}
-
 function readRuntimeEvidence(
   service: WorkspaceLspRuntime | null | undefined,
 ): DiagnosticEvidenceSummary {
@@ -269,14 +195,6 @@ function readRuntimeEvidence(
   } catch {
     return emptyEvidence();
   }
-}
-
-function unavailableDiagnostics(
-  scope: HealthDiagnosticScope,
-  reason: string,
-  evidence: DiagnosticEvidenceSummary = emptyEvidence(),
-): HealthDiagnosticObservation {
-  return { kind: "unavailable", scope, entries: [], evidence, reason };
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -295,20 +213,6 @@ function emptyEvidence(): DiagnosticEvidenceSummary {
     failed: 0,
     removed: 0,
     documents: [],
-  };
-}
-
-function singleFileEvidence(
-  file: string,
-  status: DiagnosticEvidenceDocument["status"],
-): DiagnosticEvidenceSummary {
-  return {
-    requested: 1,
-    confirmed: status === "confirmed" ? 1 : 0,
-    unconfirmed: status === "unconfirmed" ? 1 : 0,
-    failed: status === "failed" ? 1 : 0,
-    removed: status === "removed" ? 1 : 0,
-    documents: [{ file, status }],
   };
 }
 

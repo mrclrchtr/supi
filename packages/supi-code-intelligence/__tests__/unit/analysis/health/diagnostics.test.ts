@@ -69,6 +69,11 @@ describe("code_health diagnostic observations", () => {
         removed: 0,
         documents: [{ file, status: "confirmed" }],
       },
+      scopeStatus: expect.objectContaining({
+        status: "no-config",
+        basis: null,
+        configPath: null,
+      }),
     });
   });
 
@@ -123,6 +128,11 @@ describe("code_health diagnostic observations", () => {
         documents: [{ file, status: "unconfirmed" }],
       },
       reason: "one provider failed",
+      scopeStatus: expect.objectContaining({
+        status: "no-config",
+        basis: null,
+        configPath: null,
+      }),
     });
   });
 
@@ -151,6 +161,44 @@ describe("code_health diagnostic observations", () => {
         documents: [{ file, status: "failed" }],
       },
       reason: "route failed",
+      scopeStatus: expect.objectContaining({
+        status: "no-config",
+        basis: null,
+        configPath: null,
+      }),
+    });
+  });
+
+  it("attaches the tsconfig scope decision for a post-parse file in a configured project", async () => {
+    writeFileSync(path.join(cwd, "tsconfig.json"), '{"include":["src/**/*.ts"]}');
+    writeFileSync(path.join(cwd, "src", "existing.ts"), "export {};\n");
+    const existing = path.join(cwd, "src", "existing.ts");
+    // Prime the cached parse before the post-parse file exists.
+    await collectDiagnostics({
+      service: service({}),
+      included: ["diagnostics"],
+      scope: diagnosticScope(existing),
+      cwd,
+      unavailableReason: "not ready",
+    });
+    const late = path.join(cwd, "src", "late.ts");
+    writeFileSync(late, "export const late: number = 'x';\n");
+
+    const observation = await collectDiagnostics({
+      service: service({}),
+      included: ["diagnostics"],
+      scope: diagnosticScope(late),
+      cwd,
+      unavailableReason: "not ready",
+    });
+
+    expect(observation).toMatchObject({
+      kind: "completed",
+      scopeStatus: {
+        status: "included",
+        basis: "include-pattern",
+        configPath: path.join(cwd, "tsconfig.json"),
+      },
     });
   });
 

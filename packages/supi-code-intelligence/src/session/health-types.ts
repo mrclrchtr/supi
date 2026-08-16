@@ -1,4 +1,4 @@
-import type { DiagnosticEvidenceSummary } from "@mrclrchtr/supi-lsp/api";
+import type { DiagnosticEvidenceSummary, FileScopeDecision } from "@mrclrchtr/supi-lsp/api";
 import type { CapabilityWarningReport } from "../analysis/capability/capability-warnings.ts";
 
 export type HealthSection = "diagnostics" | "servers";
@@ -55,6 +55,8 @@ export type HealthDiagnosticObservation =
       readonly scope: HealthDiagnosticScope;
       readonly entries: readonly HealthDiagnosticEntry[];
       readonly evidence: DiagnosticEvidenceSummary;
+      /** Tsconfig scope decision for the requested file (file scope only). */
+      readonly scopeStatus?: FileScopeDecision;
     }
   | {
       readonly kind: "partial";
@@ -62,6 +64,8 @@ export type HealthDiagnosticObservation =
       readonly entries: readonly HealthDiagnosticEntry[];
       readonly evidence: DiagnosticEvidenceSummary;
       readonly reason: string;
+      /** Tsconfig scope decision for the requested file (file scope only). */
+      readonly scopeStatus?: FileScopeDecision;
     }
   | {
       readonly kind: "unavailable";
@@ -69,6 +73,8 @@ export type HealthDiagnosticObservation =
       readonly entries: readonly HealthDiagnosticEntry[];
       readonly evidence: DiagnosticEvidenceSummary;
       readonly reason: string;
+      /** Tsconfig scope decision for the requested file (file scope only). */
+      readonly scopeStatus?: FileScopeDecision;
     };
 
 /** Bounded stale-diagnostic metadata from one refresh attempt. */

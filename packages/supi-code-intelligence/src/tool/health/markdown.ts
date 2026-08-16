@@ -8,6 +8,7 @@
 import type { CapabilityWarningReport } from "../../analysis/capability/capability-warnings.ts";
 import type {
   HealthData,
+  HealthDiagnosticObservation,
   HealthDiagnosticScope,
   HealthRefreshAttempt,
   HealthResultAssembly,
@@ -170,6 +171,7 @@ function renderDiagnosticsSection(lines: string[], data: HealthData, cwd: string
     lines.push("Diagnostics were not requested.");
   } else {
     lines.push(`**Evidence scope**: ${formatDiagnosticScope(observation.scope, cwd)}.`);
+    renderFileScopeStatus(lines, observation, cwd);
     // The evidence line is bounded by the client's tracked documents; a file
     // created after the last refresh is pulled on the next pass. Labeling the
     // bound prevents misreading a first-call partial as an exclusion verdict.
@@ -180,6 +182,51 @@ function renderDiagnosticsSection(lines: string[], data: HealthData, cwd: string
   }
 
   lines.push("");
+}
+
+/**
+ * Render the tsconfig scope verdict for a single-file health request.
+ *
+ * Written consequence-first so a reader without tsconfig background can act
+ * on it: the sentence states whether the file's errors are part of workspace
+ * diagnostics. The basis stays a secondary parenthetical; the config path
+ * lets the reader verify instead of trusting the label.
+ */
+function renderFileScopeStatus(
+  lines: string[],
+  observation: Extract<
+    HealthDiagnosticObservation,
+    { kind: "completed" | "partial" | "unavailable" }
+  >,
+  cwd: string,
+): void {
+  if (observation.scope.kind !== "file" || !observation.scopeStatus) return;
+
+  const decision = observation.scopeStatus;
+  switch (decision.status) {
+    case "included":
+      lines.push(
+        `**File scope**: included (${decision.basis}) — errors reported here are part of workspace diagnostics. Config: ${formatConfigPath(decision.configPath, cwd)}`,
+      );
+      return;
+    case "excluded":
+      lines.push(
+        `**File scope**: excluded (${decision.basis}) — NOT part of workspace diagnostics. Config: ${formatConfigPath(decision.configPath, cwd)}`,
+      );
+      return;
+    case "no-config":
+      lines.push(
+        "**File scope**: no project config — nothing is filtered; errors reported here are part of workspace diagnostics.",
+      );
+      return;
+    case "out-of-tree":
+      lines.push("**File scope**: outside the project root — not part of workspace diagnostics.");
+  }
+}
+
+function formatConfigPath(configPath: string | null, cwd: string): string {
+  if (!configPath) return "none";
+  return `\`${makeRelative(cwd, configPath)}\``;
 }
 
 function formatDiagnosticEvidence(evidence: {
