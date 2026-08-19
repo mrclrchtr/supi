@@ -475,7 +475,7 @@ describe("code_find tool", () => {
       expect(text).toContain("not symbol-identity-aware");
     });
 
-    it("routes AST call nextQueries to code_graph and emits no stale summary hint", async () => {
+    it("emits no routing nextQueries for completed AST call scans", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), "const x = obj.method();\n");
       registerMockProvider(tmpDir, {
         callSites: async () => ({
@@ -495,14 +495,10 @@ describe("code_find tool", () => {
         details?: { type: "search"; data: { nextQueries: string[] } };
       };
 
+      // Cross-tool routing lives in the system-prompt guideline, so completed
+      // scans add no per-result routing hints.
       const nextQueries = result.details?.data.nextQueries ?? [];
-      expect(nextQueries).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining("code_graph"),
-          expect.stringContaining("symbol-identity"),
-        ]),
-      );
-      expect(nextQueries.some((q) => q.includes("summary"))).toBe(false);
+      expect(nextQueries).toEqual([]);
     });
 
     it("discloses truncated AST matches in markdown and details", async () => {

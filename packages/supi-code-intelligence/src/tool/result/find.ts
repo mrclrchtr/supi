@@ -81,16 +81,9 @@ function findNextQueries(outcome: Extract<FindWorkflowOutcome, { kind: "complete
   if (outcome.data.kind === "semantic" && outcome.data.symbols.length === 0) {
     return [
       "If you know the file, use code_resolve with a file selector to enumerate document declarations",
-      "Change mode only when you need a different code-aware evidence substrate",
     ];
   }
-  if (outcome.data.kind === "ast" && outcome.data.astKind === "call") {
-    return [
-      "Use code_graph references on a resolved target for symbol-identity relationships",
-      "Use PI grep for literal or regex source matches when it is active",
-    ];
-  }
-  return ["Change mode only when you need a different code-aware evidence substrate"];
+  return [];
 }
 
 function createFindEvidence(outcome: Extract<FindWorkflowOutcome, { kind: "completed" }>): {

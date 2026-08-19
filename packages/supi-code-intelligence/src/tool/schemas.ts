@@ -15,7 +15,7 @@ const FindScopeParam = Type.Array(
     minItems: 1,
   },
 );
-const FileParam = Type.String({ description: "Target file path." });
+const FileParam = Type.String({ description: "File path." });
 const QueryParam = Type.String({
   description: "Human or code reference to resolve or search for.",
   minLength: 1,
@@ -32,7 +32,7 @@ const MaxResultsParam = Type.Integer({
 
 const SourcePointParam = Type.Object(
   { file: FileParam, line: LineParam, character: CharacterParam },
-  { description: "A precise 1-based source point.", additionalProperties: false },
+  { additionalProperties: false },
 );
 
 const SymbolTargetParam = Type.Object(
@@ -41,12 +41,12 @@ const SymbolTargetParam = Type.Object(
     scope: Type.Optional(ScopeParam),
     symbolKind: Type.Optional(
       StringEnum(TARGET_SYMBOL_KINDS, {
-        description: "Exact provider-reported LSP SymbolKind filter; omit when uncertain.",
+        description: "LSP SymbolKind filter; omit when uncertain.",
       }),
     ),
   },
   {
-    description: "Semantic symbol query and optional workspace-relative scope.",
+    description: "Semantic symbol query.",
     additionalProperties: false,
   },
 );
@@ -74,7 +74,7 @@ const ResolveTargetParam = exactOneSelector(
     symbol: SymbolTargetParam,
     file: FileParam,
   },
-  "Exactly one target source: provider-backed anchor, semantic symbol query, or file declaration group.",
+  "Exactly one: anchor, symbol query, or file declaration group.",
 );
 
 const GraphTargetParam = exactOneSelector(
@@ -83,7 +83,7 @@ const GraphTargetParam = exactOneSelector(
     anchor: SourcePointParam,
     symbol: SymbolTargetParam,
   },
-  "Exactly one graph target: handle, provider-backed anchor, or semantic symbol query.",
+  "Exactly one graph target.",
 );
 
 const OrientationTargetParam = exactOneSelector(
@@ -92,7 +92,7 @@ const OrientationTargetParam = exactOneSelector(
     anchor: SourcePointParam,
     symbol: SymbolTargetParam,
   },
-  "Exactly one precise Orientation target: handle, provider-backed anchor, or semantic symbol query.",
+  "Exactly one Orientation target.",
 );
 
 const OrientationFocusParam = exactOneSelector(
@@ -103,7 +103,7 @@ const OrientationFocusParam = exactOneSelector(
     module: Type.String({ description: "Discovered module name." }),
     target: OrientationTargetParam,
   },
-  "Exactly one Orientation focus: path, discovered module, or precise target.",
+  "Exactly one Orientation focus.",
 );
 
 const RefactorTargetParam = exactOneSelector(
@@ -111,7 +111,7 @@ const RefactorTargetParam = exactOneSelector(
     handle: Type.String({ description: "Target handle returned by code_resolve." }),
     anchor: SourcePointParam,
   },
-  "Exactly one refactor target: handle or provider-backed anchor.",
+  "Exactly one refactor target.",
 );
 
 const RangeParam = Type.Object(
@@ -125,27 +125,24 @@ const RangeParam = Type.Object(
       { additionalProperties: false },
     ),
   },
-  { description: "1-based selected source range.", additionalProperties: false },
+  { additionalProperties: false },
 );
 
 const NewNameParam = Type.String({ description: "New symbol name.", minLength: 1 });
 
 const RefactorOperationParam = exactOneSelector(
   {
-    rename_symbol: Type.Object(
-      { newName: NewNameParam },
-      { description: "Rename a semantic symbol.", additionalProperties: false },
-    ),
+    rename_symbol: Type.Object({ newName: NewNameParam }, { additionalProperties: false }),
     extract_function: Type.Object(
       { newName: NewNameParam, range: RangeParam },
-      { description: "Extract the selected range into a function.", additionalProperties: false },
+      { additionalProperties: false },
     ),
     extract_variable: Type.Object(
       { newName: NewNameParam, range: RangeParam },
-      { description: "Extract the selected range into a variable.", additionalProperties: false },
+      { additionalProperties: false },
     ),
   },
-  "Exactly one precise refactor operation.",
+  "Exactly one refactor operation.",
 );
 
 /** Resolve one target or enumerate a file declaration group as session-scoped handles. */
@@ -185,7 +182,7 @@ export const CodeFindParameters = Type.Object(
     }),
     kind: Type.Optional(
       StringEnum(CODE_FIND_AST_KINDS, {
-        description: 'AST kind; only valid with mode:"ast".',
+        description: 'AST kind for mode:"ast".',
       }),
     ),
     maxResults: Type.Optional(MaxResultsParam),
@@ -208,7 +205,7 @@ export const CodeGraphParameters = Type.Object(
     maxResults: Type.Optional(MaxResultsParam),
     calleeDepth: Type.Optional(
       StringEnum(["direct", "deep"], {
-        description: '`"direct"` excludes nested scopes; `"deep"` includes them.',
+        description: "direct excludes nested scopes; deep includes them.",
       }),
     ),
   },
@@ -228,7 +225,7 @@ export const CodeRefactorParameters = Type.Object(
 export const CodeApplyParameters = Type.Object(
   {
     planId: Type.String({
-      description: "Stored plan identifier returned by code_refactor_plan.",
+      description: "planId returned by code_refactor_plan.",
       minLength: 1,
     }),
   },
@@ -241,17 +238,14 @@ export const CodeHealthParameters = Type.Object(
     scope: Type.Optional(ScopeParam),
     refresh: Type.Optional(
       Type.Boolean({
-        description:
-          "Attempt workspace-runtime diagnostic recovery before collecting health data; the result reports the established attempt outcome.",
+        description: "Attempt diagnostic recovery before collecting; result reports the outcome.",
       }),
     ),
     include: Type.Optional(
-      Type.Array(
-        StringEnum(["diagnostics", "servers"], {
-          description: "Live health signals to include.",
-        }),
-        { description: "Requested health-signal sections.", uniqueItems: true },
-      ),
+      Type.Array(StringEnum(["diagnostics", "servers"]), {
+        description: "Requested health-signal sections.",
+        uniqueItems: true,
+      }),
     ),
     level: Type.Optional(
       StringEnum(["summary", "detailed"], {

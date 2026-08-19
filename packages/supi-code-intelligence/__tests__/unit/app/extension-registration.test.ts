@@ -79,26 +79,18 @@ describe("focused code intelligence tool registration", () => {
     codeIntelligenceExtension(pi as never);
 
     const resolveDescription = getTool(pi, "code_resolve").description ?? "";
-    expect(resolveDescription).toContain("concrete ready LSP client");
+    expect(resolveDescription).toContain("Anchors must identify real symbols");
     expect(resolveDescription).toContain("never falls back to text search");
 
     const findDescription = getTool(pi, "code_find").description ?? "";
     expect(findDescription).toContain('mode:"ast"');
     expect(findDescription).toContain("LSP workspace symbols");
     expect(findDescription).toContain("Modes never silently fall back");
-    expect(findDescription).toContain("Incomplete scans disclose limitations");
 
     expect(getTool(pi, "code_graph").description).toContain("not symbol identity");
     expect(getTool(pi, "code_health").description).toContain("Report live diagnostics");
     expect(getTool(pi, "code_refactor_plan").description).toContain("without mutating files");
-    expect(getTool(pi, "code_refactor_apply").description).toContain("before mutation");
-
-    for (const name of CODE_INTELLIGENCE_TOOL_NAMES) {
-      const description = getTool(pi, name).description ?? "";
-      expect(description).toContain(
-        "Output over 2000 lines or 50KB is truncated, with full Markdown saved to a temporary file",
-      );
-    }
+    expect(getTool(pi, "code_refactor_apply").description).toContain("fail validation");
   });
 
   it("keeps cross-tool routing in guidelines and names a tool in every bullet", () => {
@@ -111,7 +103,6 @@ describe("focused code intelligence tool registration", () => {
     const orientationGuidelines = (getTool(pi, "code_orientation").promptGuidelines ?? []).join(
       "\n",
     );
-    expect(orientationGuidelines).toContain("In code_orientation, use focus.path");
     expect(orientationGuidelines).toContain("Use code_graph for relationships");
 
     // PI adds no heading or prefix to guideline bullets, so every bullet must

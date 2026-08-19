@@ -73,7 +73,7 @@ export function assembleGraphResult(input: {
       provenance: section.kind === "ok" ? graphProvenance([section]) : [],
     })),
     evidenceLists,
-    nextQueries: ["Use code_orientation on an exact result before editing"],
+    nextQueries: [],
     readNext: sections.flatMap((section) => (section.kind === "ok" ? section.readNext : [])),
     candidateCount,
     confidence,
