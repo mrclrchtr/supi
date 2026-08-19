@@ -2,12 +2,16 @@
   "review": {
     "bootstrapCommand": "pnpm install"
   },
-  "context": {
-    "agentToolEnabled": false
-  },
   "skills": {
-    "modelInvocation": {
-      "implement": false
+    "$schemaVersion": 2,
+    "implement": {
+      "modelInvocation": "enabled"
+    },
+    "pi-tui-design": {
+      "modelInvocation": "disabled"
+    },
+    "pi-upgrade": {
+      "modelInvocation": "disabled"
     }
   }
 }
