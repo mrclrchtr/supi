@@ -134,10 +134,15 @@ export class DiagnosticObserver {
     this.#timer.mark("pull");
   }
 
-  /** Record that the reopen-resync fallback re-opened unconfirmed documents. */
+  /**
+   * Record that the reopen-resync fallback re-opened unconfirmed documents.
+   *
+   * The mark fires when the second settle window starts, so the measured
+   * phase is the preceding first settle window, not the reopen work.
+   */
   reopened(count: number): void {
     this.#reopened += count;
-    this.#timer.mark("reopen");
+    this.#timer.mark("first-settle");
   }
 
   pushSettled(documentCount: number, settle: DiagnosticSettleResult): void {

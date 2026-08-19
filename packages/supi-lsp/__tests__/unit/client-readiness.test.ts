@@ -9,13 +9,14 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProgressToken } from "vscode-languageserver-protocol";
 import { LspClient } from "../../src/client/client.ts";
+import { IDENTITY_TRUNCATION_MARKER, MAX_IDENTITY_STRING } from "../../src/debug-telemetry.ts";
 
 // biome-ignore lint/suspicious/noExplicitAny: accessing private members for testing
 type AnyClient = any;
 
-function createClient(opts: { readinessTimeoutMs?: number } = {}): LspClient {
+function createClient(opts: { readinessTimeoutMs?: number; name?: string } = {}): LspClient {
   const client = new LspClient(
-    "test",
+    opts.name ?? "test",
     {
       command: "echo",
       args: [],
@@ -115,6 +116,28 @@ describe("LspClient readiness state machine", () => {
     for (const event of events) {
       expect(event.cwd).toBe("/workspace");
       expect(event.data).toMatchObject({ server: "test", root: "/project" });
+    }
+  });
+
+  it("bounds a long server name on every readiness event", () => {
+    const longSuffix = "x".repeat(MAX_IDENTITY_STRING + 100);
+    const longName = `server-${longSuffix}`;
+    const client = createClient({ name: longName });
+
+    sendCreateProgress(client, "token-1");
+    sendProgress(client, "token-1", "begin");
+    sendProgress(client, "token-1", "end");
+
+    const events = getDebugEvents({ source: "lsp" }).events.filter((event) =>
+      event.category.startsWith("readiness."),
+    );
+    expect(events.length).toBeGreaterThan(0);
+    for (const event of events) {
+      const server = (event.data as { server?: string } | undefined)?.server;
+      expect(server).toBeDefined();
+      expect(server?.length).toBe(MAX_IDENTITY_STRING);
+      expect(server?.endsWith(IDENTITY_TRUNCATION_MARKER)).toBe(true);
+      expect(server).not.toContain("x".repeat(MAX_IDENTITY_STRING));
     }
   });
 

@@ -13,7 +13,11 @@ import {
   StreamMessageWriter,
 } from "vscode-jsonrpc/node";
 import { JsonRpcClient, JsonRpcRequestError } from "../../src/client/transport.ts";
-import { LSP_REQUEST_TIMEOUT_ERROR_CODE } from "../../src/debug-telemetry.ts";
+import {
+  IDENTITY_TRUNCATION_MARKER,
+  LSP_REQUEST_TIMEOUT_ERROR_CODE,
+  MAX_IDENTITY_STRING,
+} from "../../src/debug-telemetry.ts";
 
 /**
  * Creates a client JsonRpcClient connected to a server MessageConnection
@@ -109,6 +113,32 @@ describe("JsonRpcClient", () => {
     expect(JSON.stringify(events)).not.toContain("/private/source.ts");
     expect(JSON.stringify(events)).not.toContain("secret source text");
     expect(JSON.stringify(events)).not.toContain("private-command");
+  });
+
+  it("bounds a long server name in request timing identity", async () => {
+    const longSuffix = "x".repeat(MAX_IDENTITY_STRING + 100);
+    const longName = `server-${longSuffix}`;
+    const pair = createServerPair({ server: longName, cwd: "/workspace" });
+    pair.server.onRequest("textDocument/hover", () => ({ contents: "ok" }));
+
+    await pair.client.sendRequest("textDocument/hover");
+
+    const events = getDebugEvents({ source: "lsp", category: "request.timing" }).events;
+    const server = (events[0]?.data as { server?: string } | undefined)?.server;
+    expect(server).toBeDefined();
+    expect(server?.length).toBe(MAX_IDENTITY_STRING);
+    expect(server?.endsWith(IDENTITY_TRUNCATION_MARKER)).toBe(true);
+    expect(server).not.toContain("x".repeat(MAX_IDENTITY_STRING));
+    try {
+      pair.client.dispose();
+    } catch {
+      // Suppress rejections
+    }
+    try {
+      pair.server.dispose();
+    } catch {
+      // Suppress
+    }
   });
 
   it("omits identity when the transport was constructed without it", async () => {

@@ -836,7 +836,7 @@ export class LspClient {
         category: "readiness.progress-begin",
         message: `Readiness progress begin for ${this.name}`,
         cwd: boundCwd(this.cwd),
-        data: { server: this.name, root: truncateIdentity(this.root) },
+        data: { server: truncateIdentity(this.name), root: truncateIdentity(this.root) },
       });
       // begin is the only transition that proves active work: it cancels
       // the no-progress grace timer, blocks readiness, and arms the
@@ -866,7 +866,7 @@ export class LspClient {
         category: "readiness.progress-end",
         message: `Readiness progress end for ${this.name}`,
         cwd: boundCwd(this.cwd),
-        data: { server: this.name, root: truncateIdentity(this.root) },
+        data: { server: truncateIdentity(this.name), root: truncateIdentity(this.root) },
       });
       const state = this.trackedTokens.get(token);
       if (state === undefined) return; // Unknown token: ignore fail-closed.
@@ -919,7 +919,7 @@ export class LspClient {
       category: "readiness.resolved",
       message: `LSP client ${this.name} is ready`,
       cwd: boundCwd(this.cwd),
-      data: { server: this.name, root: truncateIdentity(this.root) },
+      data: { server: truncateIdentity(this.name), root: truncateIdentity(this.root) },
     });
   }
 
@@ -958,7 +958,7 @@ export class LspClient {
       message: `LSP client ${this.name} readiness rejected: ${reason.message}`,
       cwd: boundCwd(this.cwd),
       data: {
-        server: this.name,
+        server: truncateIdentity(this.name),
         root: truncateIdentity(this.root),
         status: this._status,
       },
@@ -983,7 +983,7 @@ export class LspClient {
         category: "readiness.token-timeout",
         message: `Readiness per-token timeout fired for ${this.name} after ${timeoutMs}ms`,
         cwd: boundCwd(this.cwd),
-        data: { server: this.name, root: truncateIdentity(this.root), timeoutMs },
+        data: { server: truncateIdentity(this.name), root: truncateIdentity(this.root), timeoutMs },
       });
       this.checkAllTokensEnded();
     }, timeoutMs);
@@ -1010,7 +1010,7 @@ export class LspClient {
         category: "readiness.no-progress-cancelled",
         message: `No-progress grace timer cancelled for ${this.name}`,
         cwd: boundCwd(this.cwd),
-        data: { server: this.name, root: truncateIdentity(this.root) },
+        data: { server: truncateIdentity(this.name), root: truncateIdentity(this.root) },
       });
     }
   }
@@ -1033,7 +1033,7 @@ export class LspClient {
           category: "readiness.no-progress-resolved",
           message: `No-progress grace timer resolved for ${this.name}`,
           cwd: boundCwd(this.cwd),
-          data: { server: this.name, root: truncateIdentity(this.root) },
+          data: { server: truncateIdentity(this.name), root: truncateIdentity(this.root) },
         });
         this.resolveReady();
       }

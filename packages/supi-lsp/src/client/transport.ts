@@ -362,7 +362,7 @@ function recordRequestTiming(
         method: observation.method,
         methodClass: observation.methodClass,
         outcome: observation.outcome,
-        ...(identity.server !== undefined ? { server: identity.server } : {}),
+        ...(identity.server !== undefined ? { server: truncateIdentity(identity.server) } : {}),
         ...(observation.errorCode !== undefined ? { errorCode: observation.errorCode } : {}),
       },
     }),

@@ -256,6 +256,15 @@ describe("LSP diagnostic timing observations", () => {
         reopen: 1,
         freshness: "observed",
         outcome: "completed",
+        // The reopen mark names the preceding first settle window; the
+        // final phase covers the reopen fallback and second settle.
+        timing: expect.objectContaining({
+          phasesMs: expect.objectContaining({
+            synchronize: expect.any(Number),
+            "first-settle": expect.any(Number),
+            "push-settle": expect.any(Number),
+          }),
+        }),
       }),
     );
   });
