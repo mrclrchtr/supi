@@ -1,6 +1,6 @@
 # Tool Rendering Convention
 
-This document defines SuPi's human-facing transcript convention for PI tools. SuPi policy is stricter than PI's optional renderer API. For PI API rules, see [PI Extension Tool Guidelines](pi/tool-guidance.md#rendering-and-tui-rules).
+This document defines SuPi's human-facing transcript convention for PI tools. SuPi policy is stricter than PI's optional renderer API. For PI API rules, see [PI Extension Tool Guidelines](../pi/tool-guidance.md#rendering-and-tui-rules).
 
 A tool has separate surfaces:
 
@@ -137,7 +137,7 @@ Keep `details`:
 
 `details` may be `undefined` for a deliberately simple result. A renderer must handle absent or malformed details without crashing.
 
-Keep `content` concise and model-relevant. PI does not automatically truncate custom tool text. For large results, use PI's default limit of 2,000 lines or 50 KB, whichever is reached first. Tell the model when output is truncated, and provide a full-output path when practical. See [Output Size](pi/tool-guidance.md#output-size).
+Keep `content` concise and model-relevant. PI does not automatically truncate custom tool text. For large results, use PI's default limit of 2,000 lines or 50 KB, whichever is reached first. Tell the model when output is truncated, and provide a full-output path when practical. See [Output Size](../pi/tool-guidance.md#output-size).
 
 ## Dual-surface rendering
 

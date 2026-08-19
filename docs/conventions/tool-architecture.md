@@ -1,14 +1,6 @@
 # Tool package architecture convention
 
-This document defines the preferred internal architecture for SuPi packages that register model-callable tools with PI. `docs/package-layout.md` defines folder layout; this document defines metadata, workflow, result, runtime, and presentation seams.
-
-## Goals
-
-- keep public tool interfaces coherent
-- make capabilities typed before they become display strings
-- centralize workflow and result policy for leverage
-- keep runtime ownership local to the package that understands it
-- make PI registration a thin adapter
+This document defines the preferred internal architecture for SuPi packages that register model-callable tools with PI. `package-layout.md` defines folder layout; this document defines metadata, workflow, result, runtime, and presentation seams.
 
 ## Core rule: one public-surface source
 

@@ -26,7 +26,7 @@ Do not assume that context is useful because it already has tests or an ADR. Tre
 2. Read the relevant installed PI documentation before you make PI-specific claims. Start with PI's `docs/index.md`. Read the relevant sections of `docs/extensions.md`, especially the system-prompt build, event lifecycle, tool registration, tool results, `sendMessage()`, and `appendEntry()`.
 3. Read the repository guidance that defines prompt-surface intent, including:
    - `docs/pi/tool-guidance.md`
-   - `docs/tool-architecture.md`
+   - `docs/conventions/tool-architecture.md`
    - `docs/adr/0005-code-tool-prompt-surface-division-of-labor.md`
    - `docs/adr/0012-runtime-scoped-prompt-surfaces-and-settings.md`
    - `docs/adr/0013-centralized-code-intelligence-prompt-steering-assumes-all-tools-active.md`

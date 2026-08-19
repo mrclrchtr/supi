@@ -2,13 +2,6 @@
 
 This document defines the default directory structure for `packages/*` in the SuPi workspace.
 
-## Goals
-
-- standardize package boundaries so packages are easy to scan
-- keep small packages simple
-- use domain folders instead of catch-all folders
-- make test layout predictable across packages
-
 ## Standard package boundary
 
 Use these files when the package role requires them:
@@ -87,7 +80,7 @@ These spec modules should own the machine-readable public metadata that otherwis
 - displayed capability labels when the package surfaces runtime support to users
 - optionally descriptions, `promptSnippet`, and base `promptGuidelines` when the package does not split those into guidance modules
 
-Guidance and registration code should derive from, or be keyed by, the same canonical spec names rather than re-declaring independent tool lists. Keep execution logic in separate action or service modules. For the full rationale and examples, see `docs/tool-architecture.md`.
+Guidance and registration code should derive from, or be keyed by, the same canonical spec names rather than re-declaring independent tool lists. Keep execution logic in separate action or service modules. For the full rationale and examples, see `tool-architecture.md`.
 
 ### Prefer domain folders over generic buckets
 
@@ -164,13 +157,4 @@ Keep ambiguous utilities at the root until they clearly belong somewhere.
 
 ## Adoption status
 
-This convention is now the default for new packages and for existing packages when they receive structural work.
-
-Stay flat unless they grow:
-- `supi`
-- `supi-bash-timeout`
-- `supi-context`
-- `supi-test-utils`
-
-Lightweight packages that may stay mostly flat while still using a focused `tool/` folder for guidance or tool-specific wiring:
-- `supi-web`
+This convention is the default for new packages and for existing packages receiving structural work. Per-package target shapes and flat-package lists live in the matrix above.

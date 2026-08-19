@@ -2,7 +2,7 @@
  * Shared TUI rendering helpers for supi-review tool output.
  *
  * Dual-surface rendering: chrome built from details, markdown body excluded.
- * Follows the tool-rendering convention in docs/tool-rendering.md.
+ * Follows the tool-rendering convention in docs/conventions/tool-rendering.md.
  */
 
 import type { Theme } from "@earendil-works/pi-coding-agent";

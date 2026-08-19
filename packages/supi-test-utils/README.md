@@ -101,7 +101,7 @@ vi.mock("@mrclrchtr/supi-core", async (importOriginal) => {
 
 ## Package layout
 
-This package follows the **stay flat utility package** convention from `docs/package-layout.md`:
+This package follows the **stay flat utility package** convention from `docs/conventions/package-layout.md`:
 
 ```text
 src/

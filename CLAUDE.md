@@ -17,12 +17,13 @@ SuPi is pre-release and not API-stable. Intentional breaking changes to package 
 
 ## Documentation expectations
 
+- `docs/INDEX.md` is the docs index — start there for repo documentation; add new docs per its maintenance rules.
 - Add JSDoc for exported APIs, config surfaces, and non-obvious behavior; skip boilerplate for trivial private code.
 - Add inline JSDoc for complex internal logic where a short explanation would help maintainers.
 
 ## Package layout convention
 
-- Follow `docs/package-layout.md` for repo-wide package structure.
+- Follow `docs/conventions/package-layout.md` for repo-wide package structure.
 - Standardize package boundaries with `src/api.ts`, `src/index.ts`, and `src/extension.ts` when the package role requires them.
 - Prefer package-level tests in `__tests__/unit/` and `__tests__/integration/`, with `__tests__/helpers/` and `__tests__/fixtures/` as needed.
 - Prefer domain folders over catch-all names like `core/`, `shared/`, or `misc/`.
