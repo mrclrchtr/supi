@@ -25,10 +25,6 @@ function fakeSpec(
     name: "code_find",
     label: "Fake Find",
     parameters: Type.Object({}, { additionalProperties: false }),
-    purpose: "test operation correlation",
-    schemaDocs: "test schema",
-    substrates: ["search"],
-    nonGoals: ["not production"],
     run,
   };
 }

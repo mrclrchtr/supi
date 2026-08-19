@@ -87,7 +87,7 @@ describe("code intelligence tool specs", () => {
     }
   });
 
-  it("documents every tool with purpose, schema docs, substrates, and non-goals", () => {
+  it("registers one spec per tool name with a matching schema", () => {
     expect(CODE_INTELLIGENCE_TOOL_SPECS).toHaveLength(CODE_INTELLIGENCE_TOOL_NAMES.length);
 
     const specNames = CODE_INTELLIGENCE_TOOL_SPECS.map((spec) => spec.name);
@@ -98,12 +98,6 @@ describe("code intelligence tool specs", () => {
     );
 
     for (const spec of CODE_INTELLIGENCE_TOOL_SPECS) {
-      expect(spec.purpose.trim().length).toBeGreaterThan(0);
-      expect(spec.schemaDocs.trim().length).toBeGreaterThan(0);
-      expect(Array.isArray(spec.substrates)).toBe(true);
-      expect(spec.substrates.length).toBeGreaterThan(0);
-      expect(Array.isArray(spec.nonGoals)).toBe(true);
-      expect(spec.nonGoals.length).toBeGreaterThan(0);
       expect(Object.hasOwn(CODE_INTELLIGENCE_TOOL_SCHEMAS, spec.name)).toBe(true);
     }
   });
