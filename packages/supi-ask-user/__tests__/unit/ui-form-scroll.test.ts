@@ -120,7 +120,7 @@ describe("Ask User form viewport", () => {
     const lines = component.render(60);
 
     expect(lines.length).toBeLessThanOrEqual(calculateFormHeightLimit(terminalRows));
-    expect(lines.join("\n")).toContain("PgUp/PgDn scroll");
+    expect(lines.join("\n")).toContain("↑↓ scroll");
   });
 
   it("keeps the focused choice visible while arrow navigation moves the window", async () => {
@@ -284,7 +284,7 @@ describe("Ask User form viewport", () => {
     const rendered = component.render(60).join("\n");
     expect(rendered).toContain("Review · all questions");
     expect(rendered).toContain("→ Submit form");
-    expect(rendered).toContain("PgUp/PgDn scroll");
+    expect(rendered).toContain("↑↓ scroll");
 
     component.handleInput?.(enterKey());
   });

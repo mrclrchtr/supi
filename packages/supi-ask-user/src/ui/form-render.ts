@@ -283,7 +283,7 @@ function renderScrollIndicator(
 }
 
 function scrollHint(args: RenderFormFrameArgs): string {
-  return args.focus === "editor" ? "Alt+PgUp/PgDn" : "PgUp/PgDn";
+  return args.focus === "editor" ? "Alt+PgUp/PgDn" : "↑↓";
 }
 
 function frameLines(theme: Theme, content: string[], width: number): string[] {

@@ -5,16 +5,16 @@ const lines = Array.from({ length: 20 }, (_entry, index) => `line ${index + 1}`)
 
 describe("calculateFormHeightLimit", () => {
   it("uses the absolute cap on a large terminal", () => {
-    expect(calculateFormHeightLimit(60)).toBe(24);
+    expect(calculateFormHeightLimit(60)).toBe(36);
   });
 
   it("uses a proportional height on a medium terminal", () => {
-    expect(calculateFormHeightLimit(20)).toBe(14);
+    expect(calculateFormHeightLimit(20)).toBe(17);
   });
 
-  it("reserves surrounding rows on a small terminal", () => {
-    expect(calculateFormHeightLimit(8)).toBe(5);
-    expect(calculateFormHeightLimit(4)).toBe(2);
+  it("keeps a usable proportional height on a small terminal", () => {
+    expect(calculateFormHeightLimit(8)).toBe(6);
+    expect(calculateFormHeightLimit(4)).toBe(3);
     expect(calculateFormHeightLimit(0)).toBe(1);
   });
 });

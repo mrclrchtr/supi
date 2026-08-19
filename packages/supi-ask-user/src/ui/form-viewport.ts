@@ -1,6 +1,6 @@
 /** Maximum number of terminal rows used by the inline Ask User form. */
-const MAX_FORM_HEIGHT = 24;
-const TERMINAL_HEIGHT_SHARE = 0.7;
+const MAX_FORM_HEIGHT = 36;
+const TERMINAL_HEIGHT_SHARE = 0.85;
 
 /** A zero-based, end-exclusive range in rendered form content. */
 export interface FormLineRange {
@@ -25,9 +25,9 @@ export interface FormViewportLayout {
 }
 
 /**
- * Calculate a conservative inline height that leaves room for Pi's transcript and footer.
- * The absolute cap keeps the form stable on large terminals, while the terminal share
- * keeps it usable on small terminals.
+ * Calculate the inline height budget for an active form. The form may take most of the
+ * terminal while a decision is pending. The absolute cap keeps the form stable on large
+ * terminals, while the terminal share keeps it usable on small terminals.
  */
 export function calculateFormHeightLimit(terminalRows: number): number {
   const rows = Math.max(1, Math.floor(terminalRows));

@@ -99,7 +99,6 @@ The form shows context-specific key hints at the bottom.
 | Key | Action |
 |---|---|
 | `↑` `↓` | Move through choices or review rows; at the first or last row, scroll surrounding content |
-| `Page Up` / `Page Down` | Scroll an overflowing choice or review form by one page |
 | `Alt+Page Up` / `Alt+Page Down` | Scroll the outer form while editing text or comments |
 | `Space` | Select a single choice or toggle a multi-select option |
 | `Enter` | Accept an answer, save text or comments, edit a review row, or submit the form |
@@ -110,7 +109,7 @@ The form shows context-specific key hints at the bottom.
 | `u` / `Alt+U` | Mark the question unanswered (`Alt+U` for text questions) |
 | `Esc` | Cancel the form; in a comment editor, discard unsaved comment text |
 
-On wide terminals, option details appear beside the choices. On narrow terminals, they appear below the choices. If a form is taller than its inline height limit, Ask User keeps the focused row visible and shows a scroll position indicator.
+On wide terminals, option details appear beside the choices. On narrow terminals, they appear below the choices. Ask User uses up to 85% of the terminal height, capped at 36 rows. If a form is taller than its inline height limit, Ask User keeps the focused row visible and shows a scroll position indicator.
 
 ## Requirements, defaults, and limits
 
