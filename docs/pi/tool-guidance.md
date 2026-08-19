@@ -2,7 +2,7 @@
 
 Guidelines for designing, registering, executing, and rendering tools in PI extensions. Use this document as a checklist for model-facing metadata, schemas, execution behavior, output limits, state handling, UI rendering, and built-in overrides.
 
-For SuPi-specific package conventions around `action-specs.ts`, `tool-specs.ts`, and deriving registration/guidance from shared metadata, see `../tool-architecture.md`.
+For SuPi-specific package conventions around `action-specs.ts`, `tool-specs.ts`, and deriving registration/guidance from shared metadata, see `../tool-architecture.md`. For how tool metadata, results, and injected messages consume model context and prompt cache, see `context-architecture.md`.
 
 ## Canonical Shape
 

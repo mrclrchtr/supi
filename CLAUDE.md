@@ -13,6 +13,7 @@ SuPi is pre-release and not API-stable. Intentional breaking changes to package 
 - Never assume pi harness APIs, behavior, or conventions from memory or model priors.
 - Before changing code or giving guidance about pi-specific behavior, read the relevant installed pi docs (`README.md`, matching files in `docs/`, and `examples/`) and follow linked `.md` cross-references.
 - Start with `docs/index.md` for getting an overview of PI's docs.
+- For Pi context mechanics verified in this repo (request payload, prompt caching, compaction, extension hooks for context control), see `docs/pi/context-architecture.md`.
 
 ## Documentation expectations
 

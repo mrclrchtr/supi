@@ -23,6 +23,8 @@ The highest original behavioral risks — automatic post-review edits without va
 
 ## 2. Baseline and method
 
+For the underlying PI mechanics (request payload, prompt caching, compaction), see `pi/context-architecture.md`.
+
 ### Standard PI baseline
 
 The installed PI version is `@earendil-works/pi-coding-agent` 0.84.1. I used `<installed-pi>` below for its installed package directory.
