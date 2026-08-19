@@ -11,6 +11,7 @@ import {
   enumerateAstFiles,
 } from "./ast-scan.ts";
 import { startAstScanTimer } from "./ast-scan-timing.ts";
+import type { ScheduleDeadline } from "./deadline.ts";
 import { relativeDisplayPath } from "./paths.ts";
 import {
   analyzeStructuredFiles,
@@ -64,6 +65,8 @@ export interface StructuredPatternControl {
   readonly timeoutMs?: number;
   /** Optional caller deadline; the earlier caller/policy deadline wins. */
   readonly deadline?: number;
+  /** Timer seam for deterministic deadline tests; defaults to wall-clock timers. */
+  readonly schedule?: ScheduleDeadline;
 }
 
 export interface StructuredPatternSearchOptions {
@@ -102,6 +105,7 @@ export async function getStructuredPatternMatches(
     timeoutMs,
     signal: options.control?.signal,
     now,
+    schedule: options.control?.schedule,
     operations: options.control?.operations,
   });
   if (enumeration.kind === "invalid-root") {
@@ -144,6 +148,7 @@ export async function getStructuredPatternMatches(
     deadline,
     now,
     signal: options.control?.signal,
+    schedule: options.control?.schedule,
     requestControl,
     initialLimitations: enumeration.limitations,
   });

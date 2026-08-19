@@ -30,6 +30,11 @@ function importsProvider(resultForFile: StructuralProvider["imports"]): Structur
   return { imports: resultForFile } as StructuralProvider;
 }
 
+/** Scheduler that never fires, so mocked-clock tests arm no wall-clock timers. */
+function neverSchedule(): () => void {
+  return () => undefined;
+}
+
 describe("structured pattern AST Scan", () => {
   it("reports exact totals without an rg executable after a complete scan", async () => {
     vi.stubEnv("PATH", "");
@@ -306,7 +311,7 @@ describe("structured pattern AST Scan", () => {
       roots: [path.join(tmpDir, "src")],
       cwd: tmpDir,
       structural: provider,
-      control: { deadline: 8, timeoutMs: 10, now: () => 5 },
+      control: { deadline: 8, timeoutMs: 10, now: () => 5, schedule: neverSchedule },
     });
 
     expect(controls[0]).toEqual({ signal: undefined, deadline: 8 });
@@ -327,7 +332,7 @@ describe("structured pattern AST Scan", () => {
       roots: [path.join(tmpDir, "src")],
       cwd: tmpDir,
       structural: provider,
-      control: { signal, timeoutMs: 10, now: () => 5 },
+      control: { signal, timeoutMs: 10, now: () => 5, schedule: neverSchedule },
     });
 
     expect(controls).toHaveLength(2);
@@ -373,7 +378,7 @@ describe("structured pattern AST Scan", () => {
       roots: [path.join(tmpDir, "src")],
       cwd: tmpDir,
       structural: provider,
-      control: { timeoutMs: 10, now: () => (expired ? 11 : 0) },
+      control: { timeoutMs: 10, now: () => (expired ? 11 : 0), schedule: neverSchedule },
     });
 
     expect(outcome).toMatchObject({

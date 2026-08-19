@@ -9,7 +9,7 @@ import {
 import type { CodeFindAstKind } from "../../tool/find/ast-kinds.ts";
 import type { AstScanLimitation } from "./ast-scan.ts";
 import { callableExpressionForMatching } from "./call-name.ts";
-import { type DeadlineOutcome, settleByDeadline } from "./deadline.ts";
+import { type DeadlineOutcome, type ScheduleDeadline, settleByDeadline } from "./deadline.ts";
 import { relativeDisplayPath } from "./paths.ts";
 
 export interface StructuredPatternParams {
@@ -55,6 +55,8 @@ interface AnalyzeStructuredFilesOptions {
   readonly deadline: number;
   readonly now: () => number;
   readonly signal?: AbortSignal;
+  /** Timer seam for deterministic deadline tests; defaults to wall-clock timers. */
+  readonly schedule?: ScheduleDeadline;
   readonly requestControl: CodeRequestControl;
   readonly initialLimitations: readonly AstScanLimitation[];
 }
@@ -101,7 +103,12 @@ export async function analyzeStructuredFiles(
             });
           }
         },
-        { deadline: options.deadline, now: options.now, signal: options.signal },
+        {
+          deadline: options.deadline,
+          now: options.now,
+          signal: options.signal,
+          schedule: options.schedule,
+        },
       );
     } catch (error) {
       if (!isCodeRequestDeadlineError(error)) throw error;

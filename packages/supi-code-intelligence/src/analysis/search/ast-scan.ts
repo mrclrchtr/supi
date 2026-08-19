@@ -5,7 +5,7 @@ import {
   getSupportedExtensions,
   type StructuralSearchOperation,
 } from "@mrclrchtr/supi-tree-sitter/api";
-import { type DeadlineOutcome, settleByDeadline } from "./deadline.ts";
+import { type DeadlineOutcome, type ScheduleDeadline, settleByDeadline } from "./deadline.ts";
 import { relativeDisplayPath } from "./paths.ts";
 
 /** Directory names excluded below an AST Scan root. */
@@ -83,6 +83,8 @@ export interface EnumerateAstFilesOptions {
   readonly timeoutMs?: number;
   readonly signal?: AbortSignal;
   readonly now?: () => number;
+  /** Timer seam for deterministic deadline tests; defaults to wall-clock timers. */
+  readonly schedule?: ScheduleDeadline;
   readonly operations?: AstScanOperations;
 }
 
@@ -302,6 +304,7 @@ class AstFileEnumerator {
       deadline: this.options.deadline,
       now: this.#now,
       signal: this.options.signal,
+      schedule: this.options.schedule,
     });
     if (outcome.kind === "timeout") this.#markTimeout();
     return outcome;
