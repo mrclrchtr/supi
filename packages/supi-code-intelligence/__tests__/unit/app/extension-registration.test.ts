@@ -85,7 +85,6 @@ describe("focused code intelligence tool registration", () => {
     const findDescription = getTool(pi, "code_find").description ?? "";
     expect(findDescription).toContain('mode:"ast"');
     expect(findDescription).toContain("LSP workspace symbols");
-    expect(findDescription).toContain("PI grep for literal/regex source search");
     expect(findDescription).toContain("Modes never silently fall back");
     expect(findDescription).toContain("Incomplete scans disclose limitations");
 
@@ -99,6 +98,29 @@ describe("focused code intelligence tool registration", () => {
       expect(description).toContain(
         "Output over 2000 lines or 50KB is truncated, with full Markdown saved to a temporary file",
       );
+    }
+  });
+
+  it("keeps cross-tool routing in guidelines and names a tool in every bullet", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const findGuidelines = (getTool(pi, "code_find").promptGuidelines ?? []).join("\n");
+    expect(findGuidelines).toContain("PI grep for literal/regex source search");
+
+    const orientationGuidelines = (getTool(pi, "code_orientation").promptGuidelines ?? []).join(
+      "\n",
+    );
+    expect(orientationGuidelines).toContain("In code_orientation, use focus.path");
+    expect(orientationGuidelines).toContain("Use code_graph for relationships");
+
+    // PI adds no heading or prefix to guideline bullets, so every bullet must
+    // name its tool explicitly.
+    for (const name of CODE_INTELLIGENCE_TOOL_NAMES) {
+      const guidelines: string[] = getTool(pi, name).promptGuidelines ?? [];
+      for (const bullet of guidelines) {
+        expect(bullet).toMatch(/code_[a-z_]+/);
+      }
     }
   });
 

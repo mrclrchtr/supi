@@ -18,6 +18,10 @@ _Avoid_: token saving, prompt minimalism
 A Context Efficiency practice that reduces a tool's model-facing prompt surface while preserving its callable behavior and honest usage contract.
 _Avoid_: dumbing down tools, removing capability, token shaving
 
+**Prompt Surface**:
+The model-facing text a tool contributes to the system prompt: its description, prompt snippet, and prompt guidelines. It excludes the tool schema, which travels in the tools parameter.
+_Avoid_: prompt, prompt text
+
 **Prompt Template**:
 A Markdown prompt shipped by a SuPi package via `resources_discover` promptPaths, or placed project-locally in `.pi/prompts/`, and invoked as `/name` in the editor. It is distinct from a tool's Prompt Surface.
 _Avoid_: prompt, prompt surface

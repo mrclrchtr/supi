@@ -45,6 +45,8 @@ Whole-workflow capability unavailable → throw from `execute()` so PI marks a r
 - Forward `signal` and `onUpdate` through `toWorkflowControl()`. The tool adapter derives one absolute deadline per public call (`DEFAULT_WORKFLOW_DEADLINE_MS`). Every workflow must pass the exact signal/deadline control to its provider. AST Scan creates one shared absolute deadline for enumeration and substrate work.
 - PI schema validation is not enough: workflow validation must protect direct callers.
 - Exact-one schemas use closed one-key objects rather than TypeBox unions/literals for model-provider compatibility.
+- Prompt-surface ownership (see `docs/pi/tool-guidance.md`): `description` owns selection rules, preconditions, and no-fallback contracts; `promptSnippet` owns one capability phrase; `promptGuidelines` owns cross-tool routing; schema field descriptions own parameter mechanics. Every model-facing fact lives in exactly one home; duplicates are deleted.
+- All eight tools stay always-active. Deferred/lazy activation via `pi.setActiveTools()` is a rejected design: the static `tools` parameter keeps the prompt-cache prefix stable.
 
 ## Target resolution
 

@@ -55,6 +55,7 @@ Use `defineTool()` for standalone constants, arrays, or SDK `customTools` where 
 - `description` is the main provider tool description. Include what the tool does, when to use it, preconditions, side effects, truncation, and any required sequencing/batching.
 - `promptSnippet` opts a custom tool into the default system prompt's `Available tools` list. If omitted, the active tool is still callable but not listed there.
 - `promptGuidelines` are appended flat to the default `Guidelines` section only while the tool is active. Each bullet must name the tool (`Use my_tool when ...`), because PI does not add a heading or prefix. Parameter-style bullets must also name the tool (`Pass refresh: true to code_health to recover stale diagnostics`), not just the parameter (`Pass refresh: true to recover stale diagnostics`).
+- Give every model-facing fact exactly one home and delete duplicates. `description` owns selection rules, preconditions, and no-fallback contracts; `promptSnippet` owns one capability phrase; `promptGuidelines` owns cross-tool routing and ordering; schema field descriptions own parameter mechanics (formats, enum semantics, cross-field rules). Human docs (README, CLAUDE.md) restate behavior in their own words instead of duplicating model-facing text.
 - Token efficiency is a top goal for model-facing guidance. Treat prompt budget as scarce: make snippets/guidelines concise, concrete, and information-dense.
 - Skip low-value hints. Include negative or ordering guidance only when it materially improves tool choice or execution quality.
 - Built-in overrides do **not** inherit `promptSnippet` or `promptGuidelines`; redefine them intentionally.
@@ -140,6 +141,7 @@ Built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`.
 - [ ] `description` explains purpose, use cases, limits/side effects, and ordering.
 - [ ] `promptSnippet` is present only if the tool should appear in `Available tools`.
 - [ ] `promptGuidelines` bullets explicitly name the tool.
+- [ ] Each model-facing fact has exactly one home (description, guidelines, or schema field).
 - [ ] Model-facing guidance is concise, information-dense, and omits low-value hints.
 - [ ] Important parameters have descriptions; string enums use `StringEnum`.
 - [ ] `prepareArguments()` is only a legacy compatibility shim.
