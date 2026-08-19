@@ -1,7 +1,13 @@
 // Code Intelligence extension entry point — registers the focused code-intelligence tools,
 // shared provider lifecycle, settings, UI, and the unified /supi-ci-status command.
 
-import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+  BeforeAgentStartEventResult,
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
+import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
+import { truncateIdentity } from "@mrclrchtr/supi-lsp/debug-telemetry";
 import { buildArchitectureModel } from "./analysis/architecture/discovery.ts";
 import { createCodeIntelligenceApp } from "./app/app.ts";
 import { registerCodeIntelligenceSettings, resolveOverviewEnabled } from "./config.ts";
@@ -17,6 +23,27 @@ import { registerLspFooterContribution } from "./ui/footer.ts";
 import { registerCiStatusCommand } from "./ui/status-command.ts";
 
 const OVERVIEW_CUSTOM_TYPE = "code-intelligence-overview";
+
+/**
+ * Warn about an over-budget overview without capping it.
+ *
+ * The injected overview is never truncated; the debug record exists in every
+ * mode, and the visible notification needs a UI.
+ */
+function warnOverviewBudget(ctx: ExtensionContext, estimatedTokens: number): void {
+  const message = `Code Intelligence overview exceeds soft token budget: ${estimatedTokens} tokens (budget: ${OVERVIEW_TOKEN_BUDGET})`;
+  recordDebugEvent({
+    source: "code-intelligence",
+    level: "warning",
+    category: "overview",
+    message,
+    cwd: truncateIdentity(ctx.cwd),
+    data: { estimatedTokens, budget: OVERVIEW_TOKEN_BUDGET },
+  });
+  if (ctx.hasUI) {
+    ctx.ui.notify(message, "warning");
+  }
+}
 
 /** Register the full interactive Code Intelligence profile. */
 export default function codeIntelligenceExtension(
@@ -92,12 +119,7 @@ export default function codeIntelligenceExtension(
 
       const estimatedTokens = estimateTokens(overview);
       if (estimatedTokens > OVERVIEW_TOKEN_BUDGET) {
-        pi.events.emit("supi:debug", {
-          source: "supi-code-intelligence",
-          level: "warning",
-          category: "overview",
-          message: `Overview exceeds soft token budget: ${estimatedTokens} tokens (budget: ${OVERVIEW_TOKEN_BUDGET})`,
-        });
+        warnOverviewBudget(ctx, estimatedTokens);
       }
 
       return {

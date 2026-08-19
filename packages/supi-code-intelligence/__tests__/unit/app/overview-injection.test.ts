@@ -3,6 +3,11 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  configureDebugRegistry,
+  getDebugEvents,
+  resetDebugRegistry,
+} from "@mrclrchtr/supi-core/debug";
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codeIntelligenceExtension from "../../../src/extension.ts";
@@ -30,6 +35,7 @@ describe("overview injection", () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    resetDebugRegistry();
     getDefaultWorkspaceRuntime().clearAll();
     pi = createPiMock() as never;
     // An isolated empty global config keeps every injection decision hermetic.
@@ -39,6 +45,7 @@ describe("overview injection", () => {
   });
 
   afterEach(() => {
+    resetDebugRegistry();
     for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
     tempDirs.length = 0;
   });
@@ -242,34 +249,44 @@ describe("overview injection", () => {
     expect(second).toBeUndefined();
   });
 
-  it("emits only a debug event when the overview exceeds the soft token budget", async () => {
+  it("notifies the user and records a debug event when the overview exceeds the soft token budget", async () => {
+    configureDebugRegistry({ enabled: true, maxEvents: 100 });
+    const notify = vi.fn();
     const handler = getOverviewHandler();
     const sessionStartHandler = pi.getHandlers("session_start")[0];
     const root = makeWorkspace(60);
     writeProjectConfig(root, { overviewEnabled: true });
-    const ctx = makeCtx(root);
+    const ctx = { ...makeCtx(root), hasUI: true, ui: { notify } };
     await sessionStartHandler?.({ reason: "startup" }, ctx);
-
-    const debugEvents: Array<Record<string, unknown>> = [];
-    pi.events.on("supi:debug", (event) => {
-      debugEvents.push(event as Record<string, unknown>);
-    });
 
     const result = (await handler(null, ctx)) as
       | { message?: { customType?: string; content?: string } }
       | undefined;
 
     expect(result?.message?.customType).toBe("code-intelligence-overview");
-    expect(debugEvents).toContainEqual(
-      expect.objectContaining({
-        source: "supi-code-intelligence",
-        level: "warning",
-        category: "overview",
-      }),
-    );
-    // No model-facing or TUI warning text.
+    expect(notify).toHaveBeenCalledWith(expect.stringContaining("token budget"), "warning");
+    const events = getDebugEvents({ source: "code-intelligence", category: "overview" }).events;
+    expect(events.some((event) => event.level === "warning")).toBe(true);
+    // The warning is never part of the model-facing overview content.
     expect(result?.message?.content).not.toContain("budget");
     expect(result?.message?.content).not.toContain("token");
     expect(result?.message?.content).not.toContain("warning");
+  });
+
+  it("records the budget warning without a UI notification in headless sessions", async () => {
+    configureDebugRegistry({ enabled: true, maxEvents: 100 });
+    const handler = getOverviewHandler();
+    const sessionStartHandler = pi.getHandlers("session_start")[0];
+    const root = makeWorkspace(60);
+    writeProjectConfig(root, { overviewEnabled: true });
+    // makeCtx carries no hasUI/ui, matching headless child sessions.
+    const ctx = makeCtx(root);
+    await sessionStartHandler?.({ reason: "startup" }, ctx);
+
+    const result = (await handler(null, ctx)) as { message?: { customType?: string } } | undefined;
+
+    expect(result?.message?.customType).toBe("code-intelligence-overview");
+    const events = getDebugEvents({ source: "code-intelligence", category: "overview" }).events;
+    expect(events.some((event) => event.level === "warning")).toBe(true);
   });
 });
