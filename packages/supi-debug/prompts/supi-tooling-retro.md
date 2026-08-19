@@ -7,7 +7,7 @@ Produce a compact, evidence-based retrospective of the task that just ended. Eva
 ## Evidence rules
 
 - Reconstruct the retrospective from this session only. Do not invent tool calls, outcomes, failures, token costs, or user impact.
-- You may query the `supi_debug` tool to verify event-level claims. You may query `supi_cache_forensics` when it is available to verify cache-related claims. Use such queries only for verification, and keep them few. Do not perform any other tool calls or follow-up investigation. Stop after you write the retrospective.
+- You may query the `debug` tool to verify event-level claims. You may query `cache_forensics` when it is available to verify cache-related claims. Use such queries only for verification, and keep them few. Do not perform any other tool calls or follow-up investigation. Stop after you write the retrospective.
 - Tag every claim as `[observed]`, `[inferred]`, or `[unknown]`. An observed claim is supported by the transcript, a tool result, or an evidence query. An inferred claim is plausible but untested.
 - Rate the impact of each surfaced item as `high`, `medium`, or `low`. The impact is the degree to which the item changed the task outcome or its cost.
 - Use the exact surface name that appears in the session. Do not treat an available but unused tool as evidence of failure.

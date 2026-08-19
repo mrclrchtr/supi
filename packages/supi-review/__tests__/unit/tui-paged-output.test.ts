@@ -34,7 +34,7 @@ describe("paged review tool TUI", () => {
 
     expect(
       rendered(renderOutputCall({ artifactId: "review-output-1", offset: 12_000 }, theme)),
-    ).toContain("supi_review_output review-output-1 — offset 12000");
+    ).toContain("review_output review-output-1 — offset 12000");
     const collapsed = rendered(
       renderOutputResult(result, { expanded: false, isPartial: false }, theme),
     );
@@ -47,7 +47,7 @@ describe("paged review tool TUI", () => {
       rendered(
         renderOutputResult(result, { expanded: false, isPartial: false }, theme, { isError: true }),
       ),
-    ).toContain("supi_review_output failed");
+    ).toContain("review_output failed");
   });
 
   it("identifies outline, message, and raw audit views", () => {
@@ -104,6 +104,6 @@ describe("paged review tool TUI", () => {
       rendered(
         renderAuditResult(result, { expanded: false, isPartial: false }, theme, { isError: true }),
       ),
-    ).toContain("supi_review_audit failed");
+    ).toContain("review_audit failed");
   });
 });

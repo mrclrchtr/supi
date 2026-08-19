@@ -21,11 +21,11 @@ function buildSchema(catalogue: ReturnType<typeof agentProfileCatalogueStore.get
   );
 }
 
-/** Register the foreground supi_agent_run tool on a PI extension. */
+/** Register the foreground agent_run tool on a PI extension. */
 export function registerAgentRunTool(pi: ExtensionAPI): void {
   const parameters = buildSchema(agentProfileCatalogueStore.get());
   pi.registerTool({
-    name: "supi_agent_run",
+    name: "agent_run",
     label: "Agent Run",
     description:
       "Delegate tasks to Agent Profiles in foreground. Read-only profiles can run concurrently; mutation-capable profiles require one task. Results keep task attribution and are limited to 2,000 lines or 50KB. Runs cannot execute in the background or delegate recursively.",
@@ -43,7 +43,7 @@ export function registerAgentRunTool(pi: ExtensionAPI): void {
         throw new Error("No valid Agent Profiles are available.");
       }
       if (!Value.Check(parameters, params)) {
-        throw new Error("Invalid supi_agent_run input.");
+        throw new Error("Invalid agent_run input.");
       }
 
       const toolParams = params as AgentRunToolParams;

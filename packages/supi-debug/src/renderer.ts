@@ -61,10 +61,10 @@ function formatCallArgs(args: unknown): string {
   return filters.join(" ");
 }
 
-/** Render the compact human-facing call header for `supi_debug`. */
+/** Render the compact human-facing call header for `debug`. */
 export function renderDebugToolCall(args: unknown, theme: Theme): Text {
   const callArgs = formatCallArgs(args);
-  let content = theme.fg("toolTitle", "supi_debug");
+  let content = theme.fg("toolTitle", "debug");
   if (callArgs) content += ` ${theme.fg("dim", callArgs)}`;
   return new Text(content, 0, 0);
 }
@@ -205,7 +205,7 @@ function renderProgress(details: unknown, expanded: boolean, theme: Theme): Text
   return new Text(theme.fg("warning", expanded ? line : "Reading persisted debug events…"), 0, 0);
 }
 
-/** Render the compact or expanded result for the `supi_debug` tool. */
+/** Render the compact or expanded result for the `debug` tool. */
 export function renderDebugToolResult(
   result: DebugToolResult,
   options: ToolRenderResultOptions,
@@ -213,7 +213,7 @@ export function renderDebugToolResult(
   context: { isError: boolean },
 ): Text {
   if (options.isPartial) return renderProgress(result.details, options.expanded, theme);
-  if (context.isError) return new Text(theme.fg("error", "supi_debug failed"), 0, 0);
+  if (context.isError) return new Text(theme.fg("error", "debug failed"), 0, 0);
 
   const details = readDebugRenderDetails(result.details);
   if (!options.expanded) {

@@ -22,7 +22,7 @@ src/
 │   ├── history.ts    /supi-cache-history — per-turn table with regression details
 │   └── forensics.ts  /supi-cache-forensics — themed breakdown/hotspot/correlate/idle views
 ├── tool/
-│   └── guidance.ts   promptGuidelines + promptSnippet + toolDescription for `supi_cache_forensics`
+│   └── guidance.ts   promptGuidelines + promptSnippet + toolDescription for `cache_forensics`
 ├── fingerprint.ts    Prompt component fingerprinting (context files, tools, skills, etc.)
 ├── config.ts         Shared config (supi-cache section, legacy fallback for cache-monitor)
 ├── settings-registration.ts  /supi-settings wiring
@@ -39,7 +39,7 @@ and `unit/fingerprint.test.ts`.
 |----------|------|---------|
 | Command  | `/supi-cache-history` | Per-turn cache metrics table for the current session |
 | Command  | `/supi-cache-forensics` | Cross-session regression investigation with TUI report |
-| Tool     | `supi_cache_forensics` | Agent-callable — returns structured JSON with shape fingerprints |
+| Tool     | `cache_forensics` | Agent-callable — returns structured JSON with shape fingerprints |
 
 ## Key gotchas
 

@@ -127,7 +127,7 @@ The configured default for how the containing Agent responds to findings when no
 _Avoid_: Reviewer Protocol, Review Task, Task Verdict, authority to apply every reported finding
 
 **Review Output Artifact**:
-A bounded, session-scoped copy of complete parent-facing review text. The first page carries its opaque id; `supi_review_output` retrieves repeatable continuation pages until expiry or eviction.
+A bounded, session-scoped copy of complete parent-facing review text. The first page carries its opaque id; `review_output` retrieves repeatable continuation pages until expiry or eviction.
 _Avoid_: review result, transcript, permanent report
 
 **Child Lifecycle Trace**:
@@ -143,5 +143,5 @@ The typed result of running one isolated child session (planner or reviewer): a 
 _Avoid_: reviewer output, run result, result-builder callbacks
 
 **Local Reviewer Replay**:
-A private local artifact for tuning a Reviewer Session. It retains provider-visible messages and tool output, packet/protocol text, timing, usage, and the Review Workspace Receipt for seven days; thinking blocks and thought signatures are omitted. It is disabled by default; enabling `review.auditEnabled` records every task and activates `supi_review_audit` immediately while Agent tools are on.
+A private local artifact for tuning a Reviewer Session. It retains provider-visible messages and tool output, packet/protocol text, timing, usage, and the Review Workspace Receipt for seven days; thinking blocks and thought signatures are omitted. It is disabled by default; enabling `review.auditEnabled` records every task and activates `review_audit` immediately while Agent tools are on.
 _Avoid_: normal review output, child diagnostics, permanent transcript

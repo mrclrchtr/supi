@@ -292,7 +292,7 @@ export default function debugExtension(pi: ExtensionAPI) {
   registerDebugCommand(pi, applyDebugConfig, normalizeMaxEvents);
 
   pi.registerTool({
-    name: "supi_debug",
+    name: "debug",
     label: "SuPi Debug",
     description: toolDescription,
     promptSnippet,

@@ -174,7 +174,7 @@ describe("supi-context extension surfaces", () => {
     const pi = createPiMock();
     contextExtension(pi as never);
     const ctx = { ...makeCtx(), mode: "tui" };
-    const tool = getTool(pi, "supi_context");
+    const tool = getTool(pi, "context_report");
     expect(tool.description).toContain(`${DEFAULT_MAX_LINES} lines`);
     expect(tool.description).toContain(formatSize(DEFAULT_MAX_BYTES));
     const result = (await tool.execute("tool-call", {}, undefined, undefined, ctx)) as {
@@ -204,7 +204,7 @@ describe("supi-context extension surfaces", () => {
       return snapshot;
     });
 
-    await getTool(pi, "supi_context").execute("tool-call", {}, undefined, undefined, ctx);
+    await getTool(pi, "context_report").execute("tool-call", {}, undefined, undefined, ctx);
 
     expect(mockFns.analyzeContextPressure).toHaveBeenCalledWith(ctx);
     expect(pi.entries).toEqual([]);
@@ -215,7 +215,7 @@ describe("supi-context extension surfaces", () => {
     const pi = createPiMock();
     contextExtension(pi as never);
     const ctx = { ...makeCtx(), mode: "tui" };
-    const tool = getTool(pi, "supi_context");
+    const tool = getTool(pi, "context_report");
     const result = (await tool.execute(
       "tool-call",
       { mode: "full" },
@@ -247,7 +247,7 @@ describe("supi-context extension surfaces", () => {
     const pi = createPiMock();
     contextExtension(pi as never);
     const ctx = { ...makeCtx(), mode: "tui" };
-    const tool = getTool(pi, "supi_context");
+    const tool = getTool(pi, "context_report");
     const result = (await tool.execute(
       "tool-call",
       { mode: "full" },

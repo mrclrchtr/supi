@@ -411,7 +411,7 @@ describe("/supi-cache-history command", () => {
   });
 });
 
-describe("supi_cache_forensics agent tool", () => {
+describe("cache_forensics agent tool", () => {
   beforeEach(() => {
     resetMocks();
     vi.mocked(runForensics).mockReset();
@@ -423,7 +423,7 @@ describe("supi_cache_forensics agent tool", () => {
 
     expect(pi.tools).toHaveLength(1);
     const tool = pi.tools[0] as { name: string; promptGuidelines?: string[] };
-    expect(tool.name).toBe("supi_cache_forensics");
+    expect(tool.name).toBe("cache_forensics");
     expect(tool.promptGuidelines?.length).toBeGreaterThan(0);
   });
 

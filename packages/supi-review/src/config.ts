@@ -28,8 +28,8 @@ export interface ReviewConfig extends Record<string, unknown> {
 
 /** Shared SuPi configuration section owned by this package. */
 export const REVIEW_CONFIG_SECTION = "review";
-const REVIEW_RUN_TOOL_NAME = "supi_review_run";
-const REVIEW_AUDIT_TOOL_NAME = "supi_review_audit";
+const REVIEW_RUN_TOOL_NAME = "review_run";
+const REVIEW_AUDIT_TOOL_NAME = "review_audit";
 /** Availability-safe defaults; users can configure a separate lightweight Planner model. */
 export const REVIEW_DEFAULTS: ReviewConfig = {
   agentToolEnabled: true,

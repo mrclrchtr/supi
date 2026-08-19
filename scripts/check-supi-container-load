@@ -72,7 +72,7 @@ if (!Array.isArray(status.commands)) {
   console.error("SuPi status marker is missing command inventory", status);
   process.exit(1);
 }
-const requiredTools = ["supi_debug"];
+const requiredTools = ["debug"];
 const requiredCommands = ["supi-debug"];
 const missing = requiredTools.filter((name) => !status.tools.registered.includes(name));
 const inactive = requiredTools.filter((name) => !status.tools.active.includes(name));

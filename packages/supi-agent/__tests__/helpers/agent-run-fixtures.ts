@@ -143,7 +143,7 @@ export async function registerAgentRunToolForTest(
   shutdowns.push(async () => {
     await sessionShutdown({ type: "session_shutdown", reason: "test" }, context());
   });
-  return getTool(pi, "supi_agent_run") as unknown as RegisteredAgentRunTool;
+  return getTool(pi, "agent_run") as unknown as RegisteredAgentRunTool;
 }
 
 export async function shutdownRegisteredTools(shutdowns: Shutdown[]): Promise<void> {

@@ -56,7 +56,7 @@ const details: ReviewBatchDetails = {
   ],
 };
 
-describe("supi_review_run TUI", () => {
+describe("review_run TUI", () => {
   it.each([
     [
       "a current filesystem state batch",
@@ -122,7 +122,7 @@ describe("supi_review_run TUI", () => {
       .render(200)
       .join("\n");
 
-    expect(output).toContain("supi_review_run failed");
+    expect(output).toContain("review_run failed");
   });
 
   it("does not present state-only output as a changed-file review", () => {

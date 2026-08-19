@@ -72,7 +72,7 @@ Useful flags:
 
 ![Cache forensics report](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-cache-forensics.png)
 
-### `supi_cache_forensics`
+### `cache_forensics`
 
 Adds one model-callable tool with the same four patterns: `hotspots`, `breakdown`, `correlate`, and `idle`.
 

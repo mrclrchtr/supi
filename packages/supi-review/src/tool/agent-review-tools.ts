@@ -83,7 +83,7 @@ function initialReviewProgress(input: ReturnType<typeof parseRunReviewToolInput>
   };
 }
 
-/** Factory for the supi_review_run execute function with animated status-bar spinner. */
+/** Factory for the review_run execute function with animated status-bar spinner. */
 function makeRunReviewExecute(
   artifactStore: ReviewArtifactStore,
   localAuditStore?: LocalReviewAuditStore,

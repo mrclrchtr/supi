@@ -2,13 +2,13 @@
 //
 // Config shape (in supi shared config, "context" section):
 // {
-//   "agentToolEnabled": false   // enable the supi_context agent-callable tool
+//   "agentToolEnabled": false   // enable the context_report agent-callable tool
 // }
 
 import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
 
 export interface ContextConfig extends Record<string, unknown> {
-  /** Enable the supi_context agent-callable tool. Default: false */
+  /** Enable the context_report agent-callable tool. Default: false */
   agentToolEnabled: boolean;
 }
 

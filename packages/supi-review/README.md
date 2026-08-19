@@ -20,15 +20,15 @@ This package is beta software. Its interfaces can change.
 
 - `/supi-review` — interactive review with optional Planner Draft help
 - `/supi-review-cleanup` — remove marked Review Workspaces after an interrupted cleanup
-- `supi_review_run` — run one caller-defined Review
-- `supi_review_output` — read more parent-facing output
-- `supi_review_audit` — navigate local reviewer replays when audit is enabled
+- `review_run` — run one caller-defined Review
+- `review_output` — read more parent-facing output
+- `review_audit` — navigate local reviewer replays when audit is enabled
 
 Changes to **Agent tools** apply immediately. Turning this setting off removes the agent start and audit tools from the active tool set. The output tool and the commands stay available.
 
 ## Review input
 
-`supi_review_run` has one flat input. It has `target`, optional top-level `paths`, optional `sharedContext`, and one to four `tasks`.
+`review_run` has one flat input. It has `target`, optional top-level `paths`, optional `sharedContext`, and one to four `tasks`.
 
 ```json
 {
@@ -133,11 +133,11 @@ Each task result includes its Review Mode, packet SHA-256, verdict, finding coun
 
 `blocksAcceptance` keeps its existing meaning. The Review Engine derives `issues` for a blocking finding. It derives `incomplete` for incomplete Criteria Coverage without a blocking finding, `pass_with_findings` for only non-blocking findings, and `pass` for no findings.
 
-Parent-facing output from `supi_review_run` or `/supi-review` is stored as a bounded session artifact. Use `supi_review_output` with its returned `artifactId` and offset to read more output.
+Parent-facing output from `review_run` or `/supi-review` is stored as a bounded session artifact. Use `review_output` with its returned `artifactId` and offset to read more output.
 
 ## Local reviewer replay
 
-`review.auditEnabled` is off by default. When **Agent tools** are on, enabling **Local reviewer replay** records a protected local replay for each Reviewer Session and activates `supi_review_audit` immediately. Replays expire after seven days. Normal review output includes only an opaque artifact id.
+`review.auditEnabled` is off by default. When **Agent tools** are on, enabling **Local reviewer replay** records a protected local replay for each Reviewer Session and activates `review_audit` immediately. Replays expire after seven days. Normal review output includes only an opaque artifact id.
 
 With an artifact id, the audit tool now returns **Replay Outline** by default. The outline gives one metadata-only row for each stable zero-based position in the persisted captured-message array. It includes role, content kinds and size, tool names, stop reason, and error presence. It does not include message prose, provider error text, tool arguments, tool results, arbitrary message fields, or file paths.
 

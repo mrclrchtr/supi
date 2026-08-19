@@ -27,7 +27,7 @@ pi install ./packages/supi-debug
 After install, this package wires the shared debug registry into three user-facing surfaces:
 
 - `/supi-debug` — show recent debug events in a readable TUI report
-- `supi_debug` — let the model query recent debug events during troubleshooting
+- `debug` — let the model query recent debug events during troubleshooting
 - `/supi-settings` integration — configure whether events are captured and how much data is exposed
 
 It also registers a **Debug** provider section for `/supi-context`, and ships a `/supi-tooling-retro` prompt template for post-task retrospective feedback on the SuPi tooling used in the completed task.
@@ -78,14 +78,14 @@ keeps the conversation focused; expand only when you need the details.
 
 ### Seeing full details without expanding
 
-The agent-facing `supi_debug` tool returns the expanded plain-text
+The agent-facing `debug` tool returns the expanded plain-text
 representation, subject to PI's standard tool-output truncation limits. This is
 useful for automated troubleshooting flows while protecting the model context
 from very large event payloads.
 
 ## Filters
 
-Both `/supi-debug` and `supi_debug` support the same basic filters:
+Both `/supi-debug` and `debug` support the same basic filters:
 
 - `source`
 - `level`
@@ -93,7 +93,7 @@ Both `/supi-debug` and `supi_debug` support the same basic filters:
 - exact `operationId`
 - `limit`
 
-For historical sessions, pass `sessionFile` to `supi_debug`, or
+For historical sessions, pass `sessionFile` to `debug`, or
 `sessionFile=<path>` to `/supi-debug`. Historical sessions never retain raw data.
 The tool also accepts `includeRaw` for live-session data when settings allow it. A Debug Operation ID groups direct request ownership only. It is not a security identity, distributed trace, raw Pi Tool-call identity, or time-window correlation.
 
@@ -108,7 +108,7 @@ Available settings:
 - `maxEvents` — maximum retained events in memory
 
 Historical inspection works for events captured after this version is loaded. For example, an
-agent can call `supi_debug` with `sessionFile` set to a PI session JSONL path.
+agent can call `debug` with `sessionFile` set to a PI session JSONL path.
 
 Defaults come from the shared debug registry:
 

@@ -75,7 +75,7 @@ describe("Agent Run config", () => {
     const cwd = path.join(homeDir, "repo");
     fs.mkdirSync(cwd, { recursive: true });
     const pi = createPiMock();
-    pi.setActiveTools(["read", "supi_agent_run"]);
+    pi.setActiveTools(["read", "agent_run"]);
 
     try {
       registerAgentSettings(pi as never, homeDir);
@@ -97,7 +97,7 @@ describe("Agent Run config", () => {
         { homeDir },
       );
       options?.afterPersist?.({ cwd });
-      expect(pi.getActiveTools()).toEqual(["read", "supi_agent_run"]);
+      expect(pi.getActiveTools()).toEqual(["read", "agent_run"]);
     } finally {
       fs.rmSync(homeDir, { recursive: true, force: true });
     }

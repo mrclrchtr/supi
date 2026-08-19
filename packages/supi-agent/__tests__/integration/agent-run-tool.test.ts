@@ -48,7 +48,7 @@ afterEach(async () => {
   vi.unstubAllEnvs();
 });
 
-describe("registered supi_agent_run boundary", () => {
+describe("registered agent_run boundary", () => {
   it("bounds task instructions at 16,000 characters in the registered schema", async () => {
     const tool = await registeredTool();
     const schema = tool.parameters as {
@@ -78,7 +78,7 @@ describe("registered supi_agent_run boundary", () => {
         undefined,
         context(),
       ),
-    ).rejects.toThrow("Invalid supi_agent_run input");
+    ).rejects.toThrow("Invalid agent_run input");
     expect(mocks.startAgentRun).not.toHaveBeenCalled();
   });
 

@@ -89,7 +89,7 @@ describe("/agents selected-run control with an active Delegation Batch", () => {
     agentExtension(pi as unknown as ExtensionAPI);
     const start = getHandlerOrThrow(pi, "session_start");
     await start({ type: "session_start", reason: "startup" }, context());
-    const tool = getTool(pi, "supi_agent_run") as ToolDef;
+    const tool = getTool(pi, "agent_run") as ToolDef;
 
     let toolSettled = false;
     const toolPromise = Promise.resolve(

@@ -238,10 +238,10 @@ export default function cacheMonitorExtension(pi: ExtensionAPI) {
     return container;
   });
 
-  // ── supi_cache_forensics agent tool ───────────────────────
+  // ── cache_forensics agent tool ───────────────────────
 
   pi.registerTool({
-    name: "supi_cache_forensics",
+    name: "cache_forensics",
     label: "Cache Forensics",
     description: toolDescription,
     promptSnippet,

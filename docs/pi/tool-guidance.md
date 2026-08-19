@@ -4,6 +4,17 @@ Guidelines for designing, registering, executing, and rendering tools in PI exte
 
 For SuPi-specific package conventions around `action-specs.ts`, `tool-specs.ts`, and deriving registration/guidance from shared metadata, see `../conventions/tool-architecture.md`. For how tool metadata, results, and injected messages consume model context and prompt cache, see `context-architecture.md`.
 
+## Naming
+
+PI built-in tools occupy the shared tool namespace: `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`. Registering the same `name` replaces the built-in (see Built-ins below).
+
+SuPi naming rules:
+
+- Lowercase snake_case.
+- No `supi_` prefix in tool names. Slash commands keep the `supi-` prefix because they share one namespace with PI core commands; tool names do not need it.
+- Use a domain prefix only for a family of related tools (`code_*`, `web_*`, `review_*`). Single tools use flat names (`debug`, `agent_run`, `cache_forensics`, `context_report`, `ask_user`).
+- Never reuse a PI built-in name unless you intend to replace that built-in.
+
 ## Canonical Shape
 
 ```typescript
@@ -138,6 +149,7 @@ Built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`.
 
 ## Shipping Checklist
 
+- [ ] Name follows the Naming rules: snake_case, no `supi_` prefix, no unintended built-in replacement.
 - [ ] `description` explains purpose, use cases, limits/side effects, and ordering.
 - [ ] `promptSnippet` is present only if the tool should appear in `Available tools`.
 - [ ] `promptGuidelines` bullets explicitly name the tool.

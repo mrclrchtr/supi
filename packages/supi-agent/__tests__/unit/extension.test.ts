@@ -65,7 +65,7 @@ describe("supi-agent extension", () => {
       ui: { notify: vi.fn() },
     } as never);
 
-    expect(getTools(pi).some((tool) => tool.name === "supi_agent_run")).toBe(true);
+    expect(getTools(pi).some((tool) => tool.name === "agent_run")).toBe(true);
     expect(mocks.syncAgentRunTool).toHaveBeenCalledWith(pi, process.cwd());
     await sessionShutdown({ type: "session_shutdown", reason: "quit" }, {} as never);
   });

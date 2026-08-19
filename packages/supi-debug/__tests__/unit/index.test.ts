@@ -92,7 +92,7 @@ describe("supi-debug extension setup", () => {
     expect(pi.handlers.has("session_start")).toBe(true);
     expect(pi.handlers.has("resources_discover")).toBe(true);
     expect(pi.commands.has("supi-debug")).toBe(true);
-    expect(pi.tools.map((tool) => (tool as { name: string }).name)).toEqual(["supi_debug"]);
+    expect(pi.tools.map((tool) => (tool as { name: string }).name)).toEqual(["debug"]);
   });
 
   it("uses a string enum schema for debug levels", () => {

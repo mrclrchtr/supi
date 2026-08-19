@@ -9,7 +9,7 @@ function textContent(result: unknown): string {
   return value.content?.[0]?.text ?? "";
 }
 
-describe("supi_review_output", () => {
+describe("review_output", () => {
   it("returns a directly callable continuation and retrieves the requested page", async () => {
     const store = new ReviewArtifactStore();
     const pi = createPiMock();
@@ -20,7 +20,7 @@ describe("supi_review_output", () => {
     expect(first.reference.nextOffset).toBeDefined();
     expect(first.text).toContain(first.reference.artifactId);
 
-    const tool = getTool(pi, "supi_review_output");
+    const tool = getTool(pi, "review_output");
     const next = await tool.execute("call", {
       artifactId: first.reference.artifactId,
       offset: first.reference.nextOffset,
@@ -45,7 +45,7 @@ describe("supi_review_output", () => {
     registerReviewOutputTool(pi as unknown as ExtensionAPI, new ReviewArtifactStore());
 
     await expect(
-      getTool(pi, "supi_review_output").execute("call", { artifactId: "missing" }),
+      getTool(pi, "review_output").execute("call", { artifactId: "missing" }),
     ).rejects.toThrow(/not found or has expired/i);
   });
 });

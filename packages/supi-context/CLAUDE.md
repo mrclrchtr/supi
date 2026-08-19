@@ -8,10 +8,10 @@ Observability for how a pi session occupies and approaches its context-window li
 
 ## Concepts and surfaces
 
-- **Context Pressure Snapshot** — the agent-facing, constant-shape capacity reading. `supi_context({})` defaults to this concise mode; it intentionally excludes diagnostic inventories.
+- **Context Pressure Snapshot** — the agent-facing, constant-shape capacity reading. `context_report({})` defaults to this concise mode; it intentionally excludes diagnostic inventories.
 - **Context Usage Report** — the human-facing diagnostic report. `/supi-context` is registered only in TUI mode and appends a custom entry, so it stays visible in the transcript without entering LLM context.
 
-`mode: "full"` on `supi_context` returns compact diagnostic JSON. It uses Pi's normal output limits only to detect oversized output, then writes the complete valid JSON to a temporary file and returns a valid JSON envelope.
+`mode: "full"` on `context_report` returns compact diagnostic JSON. It uses Pi's normal output limits only to detect oversized output, then writes the complete valid JSON to a temporary file and returns a valid JSON envelope.
 
 ## Architecture
 
@@ -51,4 +51,4 @@ Rendering uses `@mrclrchtr/supi-core/report` helpers for shared themed report pr
 - System-prompt breakdown separates native instruction files (`AGENTS.md`, `CLAUDE.md`, etc.) from other context files.
 - Auto-compaction settings are read when analysis runs. Its reserve is effective only while auto-compaction is enabled.
 - The human command must use `pi.appendEntry()` plus `pi.registerEntryRenderer()`, never `pi.sendMessage()` or a custom-message renderer.
-- The `supi_context` tool reads `agentToolEnabled` at extension load time (`process.cwd()`). Toggling it in `/supi-settings` requires `/reload` or a restart.
+- The `context_report` tool reads `agentToolEnabled` at extension load time (`process.cwd()`). Toggling it in `/supi-settings` requires `/reload` or a restart.

@@ -101,7 +101,7 @@ describe("agent review tool usage", () => {
     registerAgentReviewTools(pi as unknown as ExtensionAPI, new ReviewArtifactStore());
     const ctx = { ...makeCtx(), hasUI: false };
 
-    await getTool(pi, "supi_review_run").execute(
+    await getTool(pi, "review_run").execute(
       "call",
       { tasks: [{ id: "spec", instructions: "Review.", mode: "change" }] },
       undefined,
@@ -115,7 +115,7 @@ describe("agent review tool usage", () => {
   it("passes the flat target and task mode into the Review workflow", async () => {
     const pi = createPiMock();
     registerAgentReviewTools(pi as unknown as ExtensionAPI, new ReviewArtifactStore());
-    await getTool(pi, "supi_review_run").execute(
+    await getTool(pi, "review_run").execute(
       "call",
       {
         target: {},
@@ -169,7 +169,7 @@ describe("agent review tool usage", () => {
     const pi = createPiMock();
     registerAgentReviewTools(pi as unknown as ExtensionAPI, new ReviewArtifactStore());
 
-    const output = (await getTool(pi, "supi_review_run").execute(
+    const output = (await getTool(pi, "review_run").execute(
       "call",
       { tasks: [{ id: "spec", instructions: "Review.", mode: "change" }] },
       undefined,

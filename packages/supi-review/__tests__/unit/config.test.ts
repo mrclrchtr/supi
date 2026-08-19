@@ -134,7 +134,7 @@ describe("review config", () => {
     const cwd = path.join(homeDir, "repo");
     fs.mkdirSync(cwd, { recursive: true });
     const pi = createPiMock();
-    pi.setActiveTools(["read", "supi_review_output", "supi_review_run", "supi_review_audit"]);
+    pi.setActiveTools(["read", "review_output", "review_run", "review_audit"]);
 
     try {
       registerReviewSettings(pi as never, homeDir);
@@ -148,7 +148,7 @@ describe("review config", () => {
         { homeDir },
       );
       options?.afterPersist?.({ cwd });
-      expect(pi.getActiveTools()).toEqual(["read", "supi_review_output"]);
+      expect(pi.getActiveTools()).toEqual(["read", "review_output"]);
 
       writeSupiConfig(
         { section: REVIEW_CONFIG_SECTION, scope: "project", cwd },
@@ -156,7 +156,7 @@ describe("review config", () => {
         { homeDir },
       );
       options?.afterPersist?.({ cwd });
-      expect(pi.getActiveTools()).toEqual(["read", "supi_review_output", "supi_review_run"]);
+      expect(pi.getActiveTools()).toEqual(["read", "review_output", "review_run"]);
 
       writeSupiConfig(
         { section: REVIEW_CONFIG_SECTION, scope: "project", cwd },
@@ -164,12 +164,7 @@ describe("review config", () => {
         { homeDir },
       );
       options?.afterPersist?.({ cwd });
-      expect(pi.getActiveTools()).toEqual([
-        "read",
-        "supi_review_output",
-        "supi_review_run",
-        "supi_review_audit",
-      ]);
+      expect(pi.getActiveTools()).toEqual(["read", "review_output", "review_run", "review_audit"]);
     } finally {
       fs.rmSync(homeDir, { recursive: true, force: true });
     }

@@ -55,7 +55,7 @@ afterEach(async () => {
   vi.unstubAllEnvs();
 });
 
-describe("registered supi_agent_run rendering boundary", () => {
+describe("registered agent_run rendering boundary", () => {
   it("renders safe activity from the registered run's session events", async () => {
     const tool = await registeredTool();
     installRunDouble({

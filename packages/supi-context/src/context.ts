@@ -48,11 +48,11 @@ export default function contextExtension(pi: ExtensionAPI) {
     });
   });
 
-  // ── supi_context agent tool (gated on config) ────────────
+  // ── context_report agent tool (gated on config) ────────────
 
   if (loadContextConfig(process.cwd()).agentToolEnabled) {
     pi.registerTool({
-      name: "supi_context",
+      name: "context_report",
       label: "Context Usage",
       description: toolDescription,
       promptSnippet,

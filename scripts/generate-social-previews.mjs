@@ -28,18 +28,18 @@ const SOCIAL_BADGES = {
   "agent-runtime": ["./api", "startAgentRun()", "AgentRunHandle"],
   "ask-user": ["ask_user", "choice forms", "text forms"],
   "bash-timeout": ["bash hook", "120s default", "/supi-settings"],
-  cache: ["/supi-cache-history", "supi_cache_forensics"],
+  cache: ["/supi-cache-history", "cache_forensics"],
   "claude-md": ["claude-md-improver", "claude-md-revision"],
   "code-intelligence": ["code_resolve", "code_graph", "code_refactor_plan"],
   "code-runtime": ["./api", "CodeQueryResult", "workspace registry"],
-  context: ["/supi-context", "supi_context"],
+  context: ["/supi-context", "context_report"],
   core: ["./api", "./settings", "./report"],
-  debug: ["/supi-debug", "supi_debug"],
+  debug: ["/supi-debug", "debug"],
   extras: ["/supi-stash", "/clone-session", "shortcuts"],
   insights: ["/supi-insights", "shareable HTML"],
   lsp: ["./api", "server lifecycle", "diagnostics"],
   "prompt-suggestions": ["ghost text", "/supi-settings"],
-  review: ["/supi-review", "supi_review_run", "supi_review_audit"],
+  review: ["/supi-review", "review_run", "review_audit"],
   settings: ["/supi-settings", "project/global"],
   skills: ["model-invocation-disabled", "$skill-name shortcut"],
   // biome-ignore lint/security/noSecrets: public test-util API names, not secrets
@@ -48,7 +48,7 @@ const SOCIAL_BADGES = {
   web: ["web_fetch_md", "web_docs_search", "web_docs_fetch"],
 };
 // Flagship agent tools surfaced on the repository-level preview.
-const ROOT_BADGES = ["code_resolve", "supi_review_run", "web_fetch_md"];
+const ROOT_BADGES = ["code_resolve", "review_run", "web_fetch_md"];
 const SOCIAL_TAGLINES = {
   agent: ["Discovers explicit Agent Profiles and builds", "bounded child-session resource policy."],
   "agent-runtime": [

@@ -1,5 +1,5 @@
 /**
- * TUI renderer for supi_agent_run — renderCall + renderResult.
+ * TUI renderer for agent_run — renderCall + renderResult.
  *
  * Dual-surface: chrome built from details, markdown body excluded.
  */

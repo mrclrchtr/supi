@@ -37,7 +37,7 @@ export function renderContextToolCall(args: unknown, theme: Theme): Text {
     (args as { mode?: string }).mode === "full"
       ? "full"
       : "concise";
-  const content = `${theme.fg("toolTitle", "supi_context")} ${theme.fg("muted", mode)}`;
+  const content = `${theme.fg("toolTitle", "context_report")} ${theme.fg("muted", mode)}`;
   return new Text(content, 0, 0);
 }
 
@@ -51,7 +51,7 @@ export function renderContextToolResult(
   }
 
   if (result?.isError) {
-    return new Text(theme.fg("error", "supi_context failed"), 0, 0);
+    return new Text(theme.fg("error", "context_report failed"), 0, 0);
   }
 
   const details = extractDetails(result?.details);

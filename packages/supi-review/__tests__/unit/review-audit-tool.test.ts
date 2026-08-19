@@ -100,10 +100,10 @@ async function setup() {
   const artifact = await store.create(record());
   const pi = createPiMock();
   registerReviewAuditTool(pi as unknown as ExtensionAPI, store);
-  return { store, artifact, tool: getTool(pi, "supi_review_audit") };
+  return { store, artifact, tool: getTool(pi, "review_audit") };
 }
 
-describe("supi_review_audit views", () => {
+describe("review_audit views", () => {
   it("keeps listing unchanged and uses metadata-only outline by default", async () => {
     const { artifact, tool } = await setup();
     const listed = (await tool.execute("call", {}, undefined, undefined, {} as never)) as {
@@ -216,7 +216,7 @@ describe("supi_review_audit views", () => {
     } as unknown as LocalReviewAuditStore;
     const pi = createPiMock();
     registerReviewAuditTool(pi as unknown as ExtensionAPI, store);
-    const tool = getTool(pi, "supi_review_audit");
+    const tool = getTool(pi, "review_audit");
 
     await expect(
       tool.execute(
@@ -246,7 +246,7 @@ describe("supi_review_audit views", () => {
     const pi = createPiMock();
     registerReviewAuditTool(pi as unknown as ExtensionAPI, store);
 
-    const result = (await getTool(pi, "supi_review_audit").execute(
+    const result = (await getTool(pi, "review_audit").execute(
       "call",
       {},
       undefined,
@@ -265,7 +265,7 @@ describe("supi_review_audit views", () => {
   it("reports expired artifacts and honors cancellation", async () => {
     const pi = createPiMock();
     registerReviewAuditTool(pi as unknown as ExtensionAPI, createStore());
-    const tool = getTool(pi, "supi_review_audit");
+    const tool = getTool(pi, "review_audit");
     await expect(
       tool.execute(
         "call",

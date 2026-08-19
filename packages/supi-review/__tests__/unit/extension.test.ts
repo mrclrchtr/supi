@@ -20,12 +20,12 @@ describe("supi-review extension", () => {
     reviewExtension(pi as unknown as ExtensionAPI);
 
     expect(getTools(pi).map((tool) => tool.name)).toEqual([
-      "supi_review_output",
-      "supi_review_run",
-      "supi_review_audit",
+      "review_output",
+      "review_run",
+      "review_audit",
     ]);
-    expect(getTools(pi).some((tool) => tool.name === "supi_review_prepare")).toBe(false);
-    expect(getTool(pi, "supi_review_output")).toBeDefined();
+    expect(getTools(pi).some((tool) => tool.name === "review_prepare")).toBe(false);
+    expect(getTool(pi, "review_output")).toBeDefined();
     expect(mocks.syncReviewAgentTools).not.toHaveBeenCalled();
     expect(pi.commands.has("supi-review")).toBe(true);
     expect(pi.commands.has("supi-review-cleanup")).toBe(true);

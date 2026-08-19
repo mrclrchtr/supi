@@ -67,7 +67,7 @@ describe("debug tool renderer", () => {
       createMockTheme(),
     );
 
-    expect((result as unknown as { text: string }).text).toContain("supi_debug");
+    expect((result as unknown as { text: string }).text).toContain("debug");
     expect((result as unknown as { text: string }).text).toContain("source=lsp");
     expect((result as unknown as { text: string }).text.length).toBeLessThan(400);
   });
@@ -92,7 +92,7 @@ describe("debug tool renderer", () => {
       createMockTheme(),
       { isError: true },
     );
-    expect((error as unknown as { text: string }).text).toBe("supi_debug failed");
+    expect((error as unknown as { text: string }).text).toBe("debug failed");
     expect((error as unknown as { text: string }).text).not.toContain("secret failure");
   });
 

@@ -78,11 +78,11 @@ function renderText(component: { render(width: number): string[] }, width = 160)
   return component.render(width).join("\n");
 }
 
-describe("supi_context tool rendering", () => {
+describe("context_report tool rendering", () => {
   it("renders the requested mode in a compact tool-call header", () => {
     const output = renderText(renderContextToolCall({ mode: "concise" }, mockTheme));
 
-    expect(output).toContain("supi_context");
+    expect(output).toContain("context_report");
     expect(output).toContain("concise");
   });
 
@@ -169,6 +169,6 @@ describe("supi_context tool rendering", () => {
     );
 
     expect(partial).toContain("Analyzing context…");
-    expect(failed).toContain("supi_context failed");
+    expect(failed).toContain("context_report failed");
   });
 });

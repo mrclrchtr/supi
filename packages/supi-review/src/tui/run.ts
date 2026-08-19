@@ -1,4 +1,4 @@
-/** TUI renderer for supi_review_run. */
+/** TUI renderer for review_run. */
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";

@@ -36,7 +36,7 @@ The command appends a durable `supi-context` custom entry and uses a dedicated e
 
 ### Agent: Context Pressure Snapshot
 
-`supi_context` is agent-callable when enabled in configuration. It defaults to a one-line, constant-shape JSON **Context Pressure Snapshot**:
+`context_report` is agent-callable when enabled in configuration. It defaults to a one-line, constant-shape JSON **Context Pressure Snapshot**:
 
 ```ts
 interface ContextPressureSnapshot {
@@ -53,7 +53,7 @@ interface ContextPressureSnapshot {
 }
 ```
 
-Use `supi_context({ mode: "full" })` only when diagnostic attribution is needed. Full mode returns compact JSON for the Context Usage Report. If it exceeds Pi's normal tool-output limits, it returns a small valid-JSON envelope with the path to a temporary file containing the complete report.
+Use `context_report({ mode: "full" })` only when diagnostic attribution is needed. Full mode returns compact JSON for the Context Usage Report. If it exceeds Pi's normal tool-output limits, it returns a small valid-JSON envelope with the path to a temporary file containing the complete report.
 
 The tool TUI never shows raw agent JSON: concise results render as a dense snapshot that expands into its metrics; full results expand into the diagnostic report.
 
@@ -71,7 +71,7 @@ The Context Usage Report includes:
 
 The human `/supi-context` command needs no configuration.
 
-To enable the agent-callable `supi_context` tool, set `agentToolEnabled` to `true` in your supi config:
+To enable the agent-callable `context_report` tool, set `agentToolEnabled` to `true` in your supi config:
 
 ```json
 {

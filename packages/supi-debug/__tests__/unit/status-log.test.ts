@@ -15,8 +15,8 @@ describe("supi-debug status log", () => {
     maybeLogLoadStatus(
       {
         appendEntry,
-        getAllTools: () => [{ name: "code_impact" }, { name: "supi_debug" }],
-        getActiveTools: () => ["supi_debug"],
+        getAllTools: () => [{ name: "code_impact" }, { name: "debug" }],
+        getActiveTools: () => ["debug"],
         getCommands: () => [{ name: "supi-debug" }],
       } as never,
       "/repo",
@@ -32,8 +32,8 @@ describe("supi-debug status log", () => {
     };
     expect(status.version).toBe(2);
     expect(status.phase).toBe("session_start");
-    expect(status.tools.registered).toEqual(["code_impact", "supi_debug"]);
-    expect(status.tools.active).toEqual(["supi_debug"]);
+    expect(status.tools.registered).toEqual(["code_impact", "debug"]);
+    expect(status.tools.active).toEqual(["debug"]);
     expect(status.commands).toEqual(["supi-debug"]);
     expect(status.expectedTools).toBeUndefined();
     expect(status.expectedCommands).toBeUndefined();

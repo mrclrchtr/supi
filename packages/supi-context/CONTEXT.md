@@ -30,7 +30,7 @@ _Avoid_: usage percentage, window committed
 
 ## Surfaces
 
-- `supi_context` returns a Context Pressure Snapshot by default. Its `full` mode returns a Context Usage Report only when diagnostic attribution is needed.
+- `context_report` returns a Context Pressure Snapshot by default. Its `full` mode returns a Context Usage Report only when diagnostic attribution is needed.
 - `/supi-context` and `/supi-context full` are TUI-only human surfaces. They persist Context Usage Reports as custom entries, not LLM-context messages.
 
 See also: root `CONTEXT.md` (Context Usage Monitor, Context Efficiency).

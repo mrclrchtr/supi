@@ -18,7 +18,7 @@ export function registerContextSettings(pi: ExtensionAPI, homeDir?: string): voi
           kind: "boolean" as const,
           key: "agentToolEnabled",
           label: "Agent Tool",
-          description: "Enable supi_context agent tool for context usage queries",
+          description: "Enable context_report agent tool for context usage queries",
         },
       ],
       ...(homeDir ? { homeDir } : {}),

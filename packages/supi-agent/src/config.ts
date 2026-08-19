@@ -4,13 +4,13 @@ import { defineConfigSettings, registerSettings } from "@mrclrchtr/supi-core/set
 
 /** Persisted Agent Run settings. */
 export interface AgentConfig extends Record<string, unknown> {
-  /** Enable the supi_agent_run agent tool. */
+  /** Enable the agent_run agent tool. */
   agentToolEnabled: boolean;
 }
 
 /** Shared SuPi configuration section owned by this package. */
 export const AGENT_CONFIG_SECTION = "agent";
-const AGENT_RUN_TOOL_NAME = "supi_agent_run";
+const AGENT_RUN_TOOL_NAME = "agent_run";
 /** Defaults that retain Agent Run availability. */
 export const AGENT_DEFAULTS: AgentConfig = {
   agentToolEnabled: true,
@@ -50,7 +50,7 @@ export function registerAgentSettings(pi: ExtensionAPI, homeDir?: string): void 
           kind: "boolean",
           key: "agentToolEnabled",
           label: "Agent Run tool",
-          description: "Enable supi_agent_run for agents.",
+          description: "Enable agent_run for agents.",
         },
       ],
       afterPersist: ({ cwd }) => syncAgentRunTool(pi, cwd, homeDir),

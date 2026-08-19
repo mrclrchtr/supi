@@ -1,4 +1,4 @@
-// Bounded model output for the supi_cache_forensics tool.
+// Bounded model output for the cache_forensics tool.
 //
 // The complete redacted result is always serialized and measured first. When
 // it fits PI's standard model-output limit it is returned unchanged. When it
