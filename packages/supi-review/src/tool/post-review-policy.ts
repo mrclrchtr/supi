@@ -2,7 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { wrapExtensionContext } from "@mrclrchtr/supi-core/context";
 import type { PostReviewPolicy } from "../config.ts";
 import type { ReviewBatchDetails, ReviewOutputReference } from "../types.ts";
-import { REVIEW_TOOL_SPECS } from "./tool-specs.ts";
+import { REVIEW_OUTPUT_TOOL_NAME } from "./review_output/spec.ts";
 
 function findingCount(details: ReviewBatchDetails): number {
   return details.results.reduce(
@@ -55,7 +55,7 @@ export function buildPostReviewInstruction(
   ];
   if (output.nextOffset !== undefined) {
     lines.push(
-      `Before responding, retrieve every remaining output page with ${REVIEW_TOOL_SPECS.output.name}, starting with ${JSON.stringify({ artifactId: output.artifactId, offset: output.nextOffset })}.`,
+      `Before responding, retrieve every remaining output page with ${REVIEW_OUTPUT_TOOL_NAME}, starting with ${JSON.stringify({ artifactId: output.artifactId, offset: output.nextOffset })}.`,
     );
   }
   if (details.results.some((result) => result.status !== "completed")) {

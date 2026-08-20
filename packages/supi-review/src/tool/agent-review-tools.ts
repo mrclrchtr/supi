@@ -11,10 +11,9 @@ import {
 import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
 import { renderRunCall, renderRunResult } from "../tui/run.ts";
 import { parseRunReviewToolInput } from "./agent-review-schemas.ts";
-import { MAX_PAGE_CHARACTERS, MAX_PAGE_LINES } from "./output-page.ts";
+import { createReviewOutput, MAX_PAGE_CHARACTERS, MAX_PAGE_LINES } from "./output-page.ts";
 import { withPostReviewInstruction } from "./post-review-policy.ts";
 import { formatReviewBatch } from "./review-format.ts";
-import { createReviewOutput } from "./review-output-tool.ts";
 import { runReview } from "./review-workflow.ts";
 import { REVIEW_TOOL_SPECS } from "./tool-specs.ts";
 

@@ -1,6 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
-import { REVIEW_TOOL_SPECS } from "../tool/tool-specs.ts";
+import { REVIEW_AUDIT_TOOL_NAME } from "../tool/review_audit/spec.ts";
+import { REVIEW_OUTPUT_TOOL_NAME } from "../tool/review_output/spec.ts";
 import type { ReviewAuditReference, ReviewOutputReference } from "../types.ts";
 import { renderError, renderPartial, renderReviewToolCall } from "./common.ts";
 
@@ -61,7 +62,7 @@ function expandedPage(
 export function renderOutputCall(args: unknown, theme: Theme): Text {
   const params = (args ?? {}) as { artifactId?: string; offset?: number };
   return renderReviewToolCall(
-    REVIEW_TOOL_SPECS.output.name,
+    REVIEW_OUTPUT_TOOL_NAME,
     params.artifactId ?? "output",
     theme,
     `offset ${params.offset ?? 0}`,
@@ -77,7 +78,7 @@ export function renderOutputResult(
   if (options.isPartial) return renderPartial("Reading review output…", theme);
   const details = result.details as PageDetails | undefined;
   if (context.isError || details?.kind !== "review-output-page") {
-    return renderError(`${REVIEW_TOOL_SPECS.output.name} failed`, theme);
+    return renderError(`${REVIEW_OUTPUT_TOOL_NAME} failed`, theme);
   }
   if (options.expanded) return expandedPage("Review output", details, result, theme);
   return new Text(pageSummary("Review output", details, theme), 0, 0);
@@ -94,12 +95,7 @@ export function renderAuditCall(args: unknown, theme: Theme): Text {
   const detail = params.artifactId
     ? `${view}${view === "message" ? ` ${params.messageIndex ?? "?"}` : ""} · offset ${params.offset ?? 0}`
     : undefined;
-  return renderReviewToolCall(
-    REVIEW_TOOL_SPECS.audit.name,
-    params.artifactId ?? "list",
-    theme,
-    detail,
-  );
+  return renderReviewToolCall(REVIEW_AUDIT_TOOL_NAME, params.artifactId ?? "list", theme, detail);
 }
 
 function renderAuditList(
@@ -138,7 +134,7 @@ export function renderAuditResult(
   if (options.isPartial) return renderPartial("Reading reviewer replays…", theme);
   const details = result.details as AuditDetails | undefined;
   if (context.isError || details?.kind !== "review-audit") {
-    return renderError(`${REVIEW_TOOL_SPECS.audit.name} failed`, theme);
+    return renderError(`${REVIEW_AUDIT_TOOL_NAME} failed`, theme);
   }
   if (details.mode === "list") return renderAuditList(details, options.expanded, theme);
   const label =

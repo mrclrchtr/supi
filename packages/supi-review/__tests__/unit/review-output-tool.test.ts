@@ -2,7 +2,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createPiMock, getHandlerOrThrow, getTool } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it } from "vitest";
 import { ReviewArtifactStore } from "../../src/session/review-artifact-store.ts";
-import { createReviewOutput, registerReviewOutputTool } from "../../src/tool/review-output-tool.ts";
+import { createReviewOutput } from "../../src/tool/output-page.ts";
+import { registerReviewOutputTool } from "../../src/tool/review_output/register.ts";
 
 function textContent(result: unknown): string {
   const value = result as { content?: Array<{ text?: string }> };

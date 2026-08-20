@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { LocalReviewAuditStore } from "../../src/audit/local-review-audit-store.ts";
 import type { ReviewAuditRecordInput } from "../../src/audit/review-audit.ts";
 import { MAX_PAGE_CHARACTERS } from "../../src/tool/output-page.ts";
-import { registerReviewAuditTool } from "../../src/tool/review-audit-tool.ts";
+import { registerReviewAuditTool } from "../../src/tool/review_audit/register.ts";
 
 const directories: string[] = [];
 const secrets = {
