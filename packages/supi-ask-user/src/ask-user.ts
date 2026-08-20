@@ -6,7 +6,6 @@ import {
 import { createSessionNameTracker } from "@mrclrchtr/supi-core/session";
 import { formatTitle, signalWaiting } from "@mrclrchtr/supi-core/terminal";
 import { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
-import { type AskUserToolResult, buildResult } from "./render/result.ts";
 import { renderAskUserCall, renderAskUserResult } from "./render/transcript.ts";
 import { type AskUserParams, AskUserParamsSchema } from "./schema.ts";
 import { ActiveQuestionnaireLock } from "./session/lock.ts";
@@ -15,6 +14,7 @@ import {
   ASK_USER_TOOL_LABEL,
   ASK_USER_TOOL_NAME,
 } from "./tool/guidance.ts";
+import { type AskUserToolResult, buildResult } from "./tool/result.ts";
 import type {
   AskUserInteractionResult,
   AskUserOutcome,

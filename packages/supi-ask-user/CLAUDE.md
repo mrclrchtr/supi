@@ -27,8 +27,9 @@ Entrypoint: `src/ask-user.ts`
 3. **Headless state** — `src/session/controller.ts`
 4. **Renderer selection** — `src/ui/choose-renderer.ts`
 5. **UI renderers** — `src/ui/form*.ts`
-6. **Result + transcript** — `src/render/result.ts`, `src/render/transcript.ts`
-7. **Tool guidance** — `src/tool/guidance.ts` (model-facing description, single source of truth)
+6. **Result assembly** — `src/tool/result.ts` (model-visible `content` + free `details`, truncation)
+7. **Tool guidance** — `src/tool/guidance.ts` (model-facing description, canonical name/label, single source of truth)
+8. **Transcript** — `src/render/transcript.ts` (human display only, never sent to the model)
 
 ## Package surfaces
 
