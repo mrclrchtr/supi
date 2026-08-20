@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildResult } from "../../src/tool/result.ts";
+import { buildResult } from "../../src/tool/ask_user/result.ts";
 import type { AskUserOutcome, NormalizedQuestionnaire } from "../../src/types.ts";
 
 describe("ask_user result formatting", () => {

@@ -2,9 +2,6 @@
 
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize } from "@earendil-works/pi-coding-agent";
 
-export const ASK_USER_TOOL_NAME = "ask_user";
-export const ASK_USER_TOOL_LABEL = "Ask User";
-
 export const toolDescription = `Open a blocking interactive TUI decision form for focused user input. Supports 1-10 choice/text questions, one active form, and sequential execution; requires TUI custom UI. Result text is truncated to ${DEFAULT_MAX_LINES} lines or ${formatSize(DEFAULT_MAX_BYTES)}.`;
 
 export const promptSnippet = "ask_user — request a focused blocking user decision";

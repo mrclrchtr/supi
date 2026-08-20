@@ -1,6 +1,6 @@
 import type { AgentToolResult, Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import { renderAskUserCall, renderAskUserResult } from "../../src/render/transcript.ts";
+import { renderAskUserCall, renderAskUserResult } from "../../src/tool/ask_user/render.ts";
 import type { AskUserToolDetails } from "../../src/types.ts";
 
 const theme = {

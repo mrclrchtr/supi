@@ -1,15 +1,15 @@
 import { type AgentToolResult, keyText, type Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import type { AskUserParams } from "../schema.ts";
-import { ASK_USER_TOOL_NAME } from "../tool/guidance.ts";
+import type { AskUserParams } from "../../schema.ts";
 import type {
   AskUserDetails,
   AskUserOutcomeKind,
   AskUserResponse,
   AskUserToolDetails,
   NormalizedQuestion,
-} from "../types.ts";
-import { isErrorDetails } from "../types.ts";
+} from "../../types.ts";
+import { isErrorDetails } from "../../types.ts";
+import { ASK_USER_TOOL_NAME } from "./spec.ts";
 
 const COLLAPSED_ANSWER_LIMIT = 2;
 const DEFAULT_REVIEW_KEY = "Ctrl+O";

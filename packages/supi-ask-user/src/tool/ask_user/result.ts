@@ -14,7 +14,7 @@ import type {
   ChoiceQuestionResponse,
   NormalizedQuestion,
   NormalizedQuestionnaire,
-} from "../types.ts";
+} from "../../types.ts";
 
 export type AskUserToolResult = AgentToolResult<AskUserToolDetails>;
 
