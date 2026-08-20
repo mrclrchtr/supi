@@ -1,15 +1,18 @@
 import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
 import type { ReviewOutputReference } from "../types.ts";
+import {
+  DEFAULT_PAGE_CHARACTERS,
+  MAX_PAGE_CHARACTERS,
+  MAX_PAGE_LINES,
+  MIN_PAGE_CHARACTERS,
+} from "./page-schemas.ts";
 import { REVIEW_OUTPUT_TOOL_NAME } from "./review_output/spec.ts";
 
-/** Default output page size in UTF-16 code units. */
-export const DEFAULT_PAGE_CHARACTERS = 12_000;
-/** Smallest page that can retain model-facing continuation metadata. */
-export const MIN_PAGE_CHARACTERS = 512;
-/** Hard ceiling for a single output page. */
-export const MAX_PAGE_CHARACTERS = 12_000;
-/** Line-based cap for a single output page (including continuation metadata). */
-export const MAX_PAGE_LINES = 2_000;
+// Page-size constants are defined in page-schemas.ts (a leaf module) so tool
+// spec schemas never depend on this module's evaluation order. Re-exported
+// here for existing consumers.
+export { DEFAULT_PAGE_CHARACTERS, MAX_PAGE_CHARACTERS, MAX_PAGE_LINES, MIN_PAGE_CHARACTERS };
+
 const CONTINUATION_FOOTER_RESERVE = MIN_PAGE_CHARACTERS;
 
 /** One page of paged tool or rendering output with an optional continuation offset. */

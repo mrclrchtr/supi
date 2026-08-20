@@ -26,4 +26,35 @@ describe("review tool specs", () => {
       for (const guideline of guidelines) expect(guideline).toContain(spec.name);
     }
   });
+
+  it("builds structurally complete parameter schemas", () => {
+    // Guard against circular-import construction failures: a schema property
+    // that is undefined at Type.Object time drops out of `properties` while
+    // staying listed in `required`, which providers reject.
+    const specs = [reviewRunSpec, reviewOutputSpec, reviewAuditSpec];
+    for (const spec of specs) {
+      const schema = spec.parameters as {
+        type?: string;
+        required?: string[];
+        properties?: Record<string, { type?: string } | undefined>;
+      };
+      expect(schema.type).toBe("object");
+      expect(schema.properties).toBeDefined();
+      for (const name of schema.required ?? []) {
+        expect(schema.properties, `${spec.name}: required property ${name} missing`).toHaveProperty(
+          name,
+        );
+      }
+      for (const [name, property] of Object.entries(schema.properties ?? {})) {
+        expect(property, `${spec.name}: property ${name} is not a schema object`).toBeDefined();
+        const hasShape =
+          typeof property?.type === "string" ||
+          "anyOf" in (property ?? {}) ||
+          "oneOf" in (property ?? {}) ||
+          "enum" in (property ?? {}) ||
+          "const" in (property ?? {});
+        expect(hasShape, `${spec.name}: property ${name} lacks a schema shape`).toBe(true);
+      }
+    }
+  });
 });

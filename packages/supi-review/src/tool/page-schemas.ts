@@ -1,5 +1,13 @@
 import { Type } from "typebox";
-import { MAX_PAGE_CHARACTERS, MIN_PAGE_CHARACTERS } from "./output-page.ts";
+
+/** Default output page size in UTF-16 code units. */
+export const DEFAULT_PAGE_CHARACTERS = 12_000;
+/** Smallest page that can retain model-facing continuation metadata. */
+export const MIN_PAGE_CHARACTERS = 512;
+/** Hard ceiling for a single output page. */
+export const MAX_PAGE_CHARACTERS = 12_000;
+/** Line-based cap for a single output page (including continuation metadata). */
+export const MAX_PAGE_LINES = 2_000;
 
 /** Shared paging offset parameter for paged Review tools. */
 export const pageOffsetSchema = Type.Optional(
