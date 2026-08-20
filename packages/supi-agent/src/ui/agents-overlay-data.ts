@@ -1,7 +1,7 @@
 import type { ModelThinkingLevel, Usage } from "@earendil-works/pi-ai";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import type { AgentConversationView } from "../tool/conversation-view.ts";
-import type { BatchTaskStatus } from "../tool/registry.ts";
+import type { AgentConversationView } from "../tool/agent_run/conversation-view.ts";
+import type { BatchTaskStatus } from "../tool/agent_run/registry.ts";
 import type { AgentProfileFieldSources, ProfileDiagnostic, ProfileSource } from "../types.ts";
 
 /** Number of Conversation View entries shown on one overlay page. */

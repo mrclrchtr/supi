@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AgentRunTelemetry } from "../../src/tool/run-telemetry.ts";
+import { AgentRunTelemetry } from "../../src/tool/agent_run/run-telemetry.ts";
 
 describe("AgentRunTelemetry", () => {
   it("reports setup, elapsed, and bounded per-tool timings", () => {

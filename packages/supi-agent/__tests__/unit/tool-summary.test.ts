@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { firstLineBashPreview, summarizeToolCall } from "../../src/tool/tool-summary.ts";
+import { firstLineBashPreview, summarizeToolCall } from "../../src/tool/agent_run/tool-summary.ts";
 
 describe("summarizeToolCall", () => {
   it("returns name-only for unknown tools", () => {

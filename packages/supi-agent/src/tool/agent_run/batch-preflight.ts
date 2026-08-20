@@ -1,11 +1,11 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AgentSessionInputs } from "@mrclrchtr/supi-agent-runtime/api";
 import { createAgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/api";
-import { isReadOnlyCapabilitySet } from "../capabilities.ts";
-import { resolveAgentProfile } from "../model-policy.ts";
-import { resolveProfileDefinition } from "../profile-catalogue.ts";
-import { resolveAgentDirectory } from "../resources.ts";
-import type { AgentModelContext, AgentProfile, ProfileCatalogue } from "../types.ts";
+import { isReadOnlyCapabilitySet } from "../../capabilities.ts";
+import { resolveAgentProfile } from "../../model-policy.ts";
+import { resolveProfileDefinition } from "../../profile-catalogue.ts";
+import { resolveAgentDirectory } from "../../resources.ts";
+import type { AgentModelContext, AgentProfile, ProfileCatalogue } from "../../types.ts";
 import type { AgentRunToolParams } from "./schema.ts";
 
 interface PreflightError {

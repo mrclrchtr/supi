@@ -4,7 +4,7 @@ import {
   type ActiveRunRegistration,
   AgentRunRegistry,
   type BatchTaskResult,
-} from "../../src/tool/registry.ts";
+} from "../../src/tool/agent_run/registry.ts";
 
 function makeHandle(status: AgentRunProgress["status"] = "running") {
   return {

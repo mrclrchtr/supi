@@ -1,6 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
-import type { ProfileCatalogue } from "../types.ts";
+import type { ProfileCatalogue } from "../../types.ts";
 import {
   MAX_INSTRUCTIONS_CHARS,
   MAX_SHARED_CONTEXT_CHARS,

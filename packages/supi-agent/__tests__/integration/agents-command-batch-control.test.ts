@@ -14,7 +14,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import agentExtension from "../../src/extension.ts";
 import { agentProfileCatalogueStore } from "../../src/session.ts";
-import { registry } from "../../src/tool/agent-run-tool.ts";
+import { registry } from "../../src/tool/agent_run/register.ts";
 import { context } from "../helpers/agent-run-fixtures.ts";
 
 const mocks = vi.hoisted(() => ({

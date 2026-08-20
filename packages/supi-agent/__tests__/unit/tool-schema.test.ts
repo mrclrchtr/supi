@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAgentRunSchema } from "../../src/tool/schema.ts";
+import { buildAgentRunSchema } from "../../src/tool/agent_run/schema.ts";
 import type { AgentProfile, ProfileCatalogue, ProfileDiagnostic } from "../../src/types.ts";
 
 function makeProfile(id: string): AgentProfile {

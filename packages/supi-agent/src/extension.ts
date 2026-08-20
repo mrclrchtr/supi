@@ -2,7 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerAgentSettings, syncAgentRunTool } from "./config.ts";
 import { registerProfileSettings } from "./profile-settings.ts";
 import { agentProfileCatalogueStore } from "./session.ts";
-import { registerAgentRunTool, registry } from "./tool/agent-run-tool.ts";
+import { registerAgentRunTool, registry } from "./tool/agent_run/register.ts";
 import { registerAgentsCommand } from "./ui/agents-command.ts";
 
 /** Register session-scoped Agent Profile discovery and foreground delegation tool. */

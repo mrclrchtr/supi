@@ -5,7 +5,7 @@ import type {
   AgentRunRegistry,
   AgentRunRegistrySnapshot,
   BatchTaskResult,
-} from "../tool/registry.ts";
+} from "../tool/agent_run/registry.ts";
 import type { ProfileCatalogue, ProfileDiagnostic, ProfileSourceDirectories } from "../types.ts";
 import { AgentsDialog } from "./agents-overlay.ts";
 import type {

@@ -1,9 +1,9 @@
 import type { Usage } from "@earendil-works/pi-ai";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { type Container, Spacer, Text } from "@earendil-works/pi-tui";
-import type { AgentConversationView } from "../tool/conversation-view.ts";
-import type { BatchTaskStatus } from "../tool/registry.ts";
-import { renderConversationEntry } from "../tool/render.ts";
+import type { AgentConversationView } from "../tool/agent_run/conversation-view.ts";
+import type { BatchTaskStatus } from "../tool/agent_run/registry.ts";
+import { renderConversationEntry } from "../tool/agent_run/render.ts";
 import type {
   AgentsOverlayData,
   AgentsOverlayProfile,

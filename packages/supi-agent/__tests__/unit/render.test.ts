@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderCall, renderResult } from "../../src/tool/render.ts";
+import { renderCall, renderResult } from "../../src/tool/agent_run/render.ts";
 
 const mockTheme = {
   fg: (color: string, text: string) => `[${color}]${text}[/${color}]`,

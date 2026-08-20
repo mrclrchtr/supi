@@ -7,8 +7,8 @@ import { createPiMock, getHandlerOrThrow, makeCtx } from "@mrclrchtr/supi-test-u
 import { afterEach, describe, expect, it, vi } from "vitest";
 import agentExtension from "../../src/extension.ts";
 import { agentProfileCatalogueStore } from "../../src/session.ts";
-import { registry } from "../../src/tool/agent-run-tool.ts";
-import type { ActiveRunRegistration } from "../../src/tool/registry.ts";
+import { registry } from "../../src/tool/agent_run/register.ts";
+import type { ActiveRunRegistration } from "../../src/tool/agent_run/registry.ts";
 
 const temporaryDirectories: string[] = [];
 

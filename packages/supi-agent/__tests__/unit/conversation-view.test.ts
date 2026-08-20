@@ -1,6 +1,6 @@
 import type { AgentRunMessage } from "@mrclrchtr/supi-agent-runtime/api";
 import { describe, expect, it } from "vitest";
-import { buildConversationView } from "../../src/tool/conversation-view.ts";
+import { buildConversationView } from "../../src/tool/agent_run/conversation-view.ts";
 
 describe("buildConversationView", () => {
   it("skips the first user message (initial prompt) and retains steering messages", () => {

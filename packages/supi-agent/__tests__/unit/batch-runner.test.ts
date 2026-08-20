@@ -5,7 +5,7 @@ import {
   resetDebugRegistry,
 } from "@mrclrchtr/supi-core/debug";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { runDelegationBatch } from "../../src/tool/batch-runner.ts";
+import { runDelegationBatch } from "../../src/tool/agent_run/batch-runner.ts";
 import type { ProfileCatalogue } from "../../src/types.ts";
 
 // Mock startAgentRun from supi-agent-runtime

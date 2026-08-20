@@ -4,7 +4,7 @@ import {
   type AggregateSection,
   boundAggregateOutput,
   fairByteShares,
-} from "../../src/tool/aggregate.ts";
+} from "../../src/tool/agent_run/aggregate.ts";
 
 function section(taskId: string, bodyLength: number): AggregateSection {
   return { overhead: `## ${taskId} — completed`, body: "x".repeat(bodyLength) };
