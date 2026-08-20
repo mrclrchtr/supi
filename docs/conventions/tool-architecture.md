@@ -29,6 +29,30 @@ The PI adapter should register metadata, invoke one workflow interface, and map 
 
 A deep workflow module hides multiple decisions behind a small interface. A forwarding module that merely renames another method adds no depth and should usually be removed.
 
+## Context channel ownership
+
+Each PI context channel (`../pi/context-architecture.md`) maps to exactly one seam. Content placement rules live in `../pi/tool-guidance.md` § Content Budget and Placement; this section assigns code ownership.
+
+| Channel | Billing | Owning seam |
+| --- | --- | --- |
+| `description`, `promptSnippet`, `promptGuidelines`, schema field descriptions | Tier 1 prefix | Metadata (spec + guidance) |
+| System-prompt injection, skill catalog entries | Tier 1 prefix | PI adapter; skill files |
+| Result `content`, injected message `content` | Tier 2 addition | Result assembly |
+| Result `details`, `pi.appendEntry`, spill files | Free | Result assembly; session code |
+| Transcript renderers, TUI components | Never sent | Presentation adapters |
+
+Metadata rules:
+
+- Canonical names and labels are metadata. Tool families keep them in the spec module; tiny one-tool packages may keep them in their single metadata module (for example `guidance.ts`) without adding a new file.
+- Do not split the prompt surface into per-field modules. `description`, `promptSnippet`, and `promptGuidelines` change together; the fields themselves are the fact homes.
+- Lazy/dynamic tools ship `description` only and omit `promptSnippet`/`promptGuidelines`.
+- Prompt-surface config defaults derive from the same constants; keep them beside the content to prevent drift.
+
+Result rules:
+
+- The result module is the sole producer of model-visible `content` and free `details`, and owns truncation and spill-file policy.
+- Presentation folders (`render/`, `ui/`, markdown/TUI adapters) never produce model-visible text; result assembly never lives under a presentation folder.
+
 ## Typed outcomes
 
 Workflow seams return immutable facts, not presentation strings. Keep these outcomes distinct:

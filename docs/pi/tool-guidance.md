@@ -8,7 +8,7 @@ Checklist for designing, registering, and improving model-callable tools in PI e
 
 ## Content Budget and Placement
 
-Context surfaces bill differently (`context-architecture.md#2-cache-lifecycle-and-billing-tiers`):
+Context surfaces bill differently (`context-architecture.md#2-cache-lifecycle-and-billing-tiers`). Code ownership of each channel (which module holds which surface): `../conventions/tool-architecture.md` § Context channel ownership.
 
 | Surface | Billing tier | Budget |
 | --- | --- | --- |
