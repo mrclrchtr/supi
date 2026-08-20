@@ -4,10 +4,10 @@ import { describe, expect, it } from "vitest";
 import type { ContextAnalysis } from "../../src/analysis.ts";
 import type { ContextPressureSnapshot } from "../../src/capacity.ts";
 import {
-  type ContextToolDetails,
   renderContextToolCall,
   renderContextToolResult,
-} from "../../src/tool/render.ts";
+} from "../../src/tool/context_report/render.ts";
+import type { ContextToolDetails } from "../../src/tool/context_report/result.ts";
 
 const mockTheme = {
   fg: (color: string, text: string) => `[${color}]${text}[/${color}]`,

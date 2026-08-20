@@ -6,7 +6,21 @@ import {
   DEFAULT_MAX_LINES,
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
-import type { ContextAnalysis } from "../analysis.ts";
+import type { ContextAnalysis } from "../../analysis.ts";
+import type { ContextPressureSnapshot } from "../../capacity.ts";
+
+export interface ContextToolConciseDetails {
+  mode: "concise";
+  snapshot: ContextPressureSnapshot;
+}
+
+export interface ContextToolFullDetails {
+  mode: "full";
+  analysis: ContextAnalysis;
+}
+
+/** Mode-specific details returned to the agent and mirrored for TUI rendering. */
+export type ContextToolDetails = ContextToolConciseDetails | ContextToolFullDetails;
 
 interface TruncatedOutputEnvelope {
   truncated: true;

@@ -1,22 +1,13 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import type { ContextAnalysis } from "../analysis.ts";
-import { type ContextPressureSnapshot, createContextPressureSnapshot } from "../capacity.ts";
-import { ContextReportComponent } from "../report-component.ts";
-import { ContextPressureComponent } from "../snapshot-component.ts";
-
-export interface ContextToolConciseDetails {
-  mode: "concise";
-  snapshot: ContextPressureSnapshot;
-}
-
-export interface ContextToolFullDetails {
-  mode: "full";
-  analysis: ContextAnalysis;
-}
-
-/** TUI data mirrors the mode-specific data returned to the agent. */
-export type ContextToolDetails = ContextToolConciseDetails | ContextToolFullDetails;
+import { createContextPressureSnapshot } from "../../capacity.ts";
+import { ContextReportComponent } from "../../report-component.ts";
+import { ContextPressureComponent } from "../../snapshot-component.ts";
+import type {
+  ContextToolConciseDetails,
+  ContextToolDetails,
+  ContextToolFullDetails,
+} from "./result.ts";
 
 interface ContextToolResult {
   content: Array<{ type: string; text?: string }>;
