@@ -1,14 +1,11 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
 import { TARGET_SYMBOL_KINDS } from "../session/target-input.ts";
-import type { CodeIntelligenceToolName } from "../types/index.ts";
-import { CODE_FIND_AST_KINDS } from "./find/ast-kinds.ts";
-import { CODE_FIND_MODES } from "./find/modes.ts";
 
-const ScopeParam = Type.String({
+export const ScopeParam = Type.String({
   description: "Workspace-relative file or directory scope.",
 });
-const FindScopeParam = Type.Array(
+export const FindScopeParam = Type.Array(
   Type.String({ description: "Workspace-relative search scope." }),
   {
     description: "One or more workspace-relative search scopes.",
@@ -16,7 +13,7 @@ const FindScopeParam = Type.Array(
   },
 );
 const FileParam = Type.String({ description: "File path." });
-const QueryParam = Type.String({
+export const QueryParam = Type.String({
   description: "Human or code reference to resolve or search for.",
   minLength: 1,
 });
@@ -25,12 +22,12 @@ const CharacterParam = Type.Integer({
   description: "1-based UTF-16 column.",
   minimum: 1,
 });
-const MaxResultsParam = Type.Integer({
+export const MaxResultsParam = Type.Integer({
   description: "Maximum displayed results.",
   minimum: 1,
 });
 
-const SourcePointParam = Type.Object(
+export const SourcePointParam = Type.Object(
   { file: FileParam, line: LineParam, character: CharacterParam },
   { additionalProperties: false },
 );
@@ -68,7 +65,7 @@ function exactOneSelector(properties: Record<string, TSchema>, description: stri
   });
 }
 
-const ResolveTargetParam = exactOneSelector(
+export const ResolveTargetParam = exactOneSelector(
   {
     anchor: SourcePointParam,
     symbol: SymbolTargetParam,
@@ -77,7 +74,7 @@ const ResolveTargetParam = exactOneSelector(
   "Exactly one: anchor, symbol query, or file declaration group.",
 );
 
-const GraphTargetParam = exactOneSelector(
+export const GraphTargetParam = exactOneSelector(
   {
     handle: Type.String({ description: "Target handle returned by code_resolve." }),
     anchor: SourcePointParam,
@@ -95,7 +92,7 @@ const OrientationTargetParam = exactOneSelector(
   "Exactly one Orientation target.",
 );
 
-const OrientationFocusParam = exactOneSelector(
+export const OrientationFocusParam = exactOneSelector(
   {
     path: Type.String({
       description: "Workspace-relative project, package, directory, or file path.",
@@ -106,7 +103,7 @@ const OrientationFocusParam = exactOneSelector(
   "Exactly one Orientation focus.",
 );
 
-const RefactorTargetParam = exactOneSelector(
+export const RefactorTargetParam = exactOneSelector(
   {
     handle: Type.String({ description: "Target handle returned by code_resolve." }),
     anchor: SourcePointParam,
@@ -130,7 +127,7 @@ const RangeParam = Type.Object(
 
 const NewNameParam = Type.String({ description: "New symbol name.", minLength: 1 });
 
-const RefactorOperationParam = exactOneSelector(
+export const RefactorOperationParam = exactOneSelector(
   {
     rename_symbol: Type.Object({ newName: NewNameParam }, { additionalProperties: false }),
     extract_function: Type.Object(
@@ -145,127 +142,5 @@ const RefactorOperationParam = exactOneSelector(
   "Exactly one refactor operation.",
 );
 
-/** Resolve one target or enumerate a file declaration group as session-scoped handles. */
-export const CodeResolveParameters = Type.Object(
-  {
-    target: ResolveTargetParam,
-    maxResults: Type.Optional(MaxResultsParam),
-  },
-  { additionalProperties: false },
-);
-
-/** Inspect one precise point. */
-export const CodeInspectParameters = Type.Object(
-  {
-    point: SourcePointParam,
-    maxResults: Type.Optional(MaxResultsParam),
-  },
-  { additionalProperties: false },
-);
-
-/** Orient around the workspace or one exact focus. */
-export const CodeOrientationParameters = Type.Object(
-  {
-    focus: Type.Optional(OrientationFocusParam),
-    maxResults: Type.Optional(MaxResultsParam),
-  },
-  { additionalProperties: false },
-);
-
-/** Unified structural and semantic code search. */
-export const CodeFindParameters = Type.Object(
-  {
-    query: QueryParam,
-    scope: Type.Optional(FindScopeParam),
-    mode: StringEnum(CODE_FIND_MODES, {
-      description: 'Required code-aware search mode. mode:"ast" requires `kind`.',
-    }),
-    kind: Type.Optional(
-      StringEnum(CODE_FIND_AST_KINDS, {
-        description: 'AST kind for mode:"ast".',
-      }),
-    ),
-    maxResults: Type.Optional(MaxResultsParam),
-  },
-  { additionalProperties: false },
-);
-
-/** Provider-backed and explicitly structural relations for one target. */
-export const CodeGraphParameters = Type.Object(
-  {
-    target: GraphTargetParam,
-    relations: Type.Optional(
-      Type.Array(StringEnum(["all", "references", "callees", "implements"]), {
-        description:
-          'Requested relations; defaults to ["references"]. "all" must be the only item.',
-        minItems: 1,
-        uniqueItems: true,
-      }),
-    ),
-    maxResults: Type.Optional(MaxResultsParam),
-    calleeDepth: Type.Optional(
-      StringEnum(["direct", "deep"], {
-        description: "direct excludes nested scopes; deep includes them.",
-      }),
-    ),
-  },
-  { additionalProperties: false },
-);
-
-/** Preview one precise semantic refactor without mutating files. */
-export const CodeRefactorParameters = Type.Object(
-  {
-    target: RefactorTargetParam,
-    operation: RefactorOperationParam,
-  },
-  { additionalProperties: false },
-);
-
-/** Apply a stored plan after freshness and fingerprint validation. */
-export const CodeApplyParameters = Type.Object(
-  {
-    planId: Type.String({
-      description: "planId returned by code_refactor_plan.",
-      minLength: 1,
-    }),
-  },
-  { additionalProperties: false },
-);
-
-/** Report evidence-backed workspace health signals. */
-export const CodeHealthParameters = Type.Object(
-  {
-    scope: Type.Optional(ScopeParam),
-    refresh: Type.Optional(
-      Type.Boolean({
-        description: "Attempt diagnostic recovery before collecting; result reports the outcome.",
-      }),
-    ),
-    include: Type.Optional(
-      Type.Array(StringEnum(["diagnostics", "servers"]), {
-        description: "Requested health-signal sections.",
-        uniqueItems: true,
-      }),
-    ),
-    level: Type.Optional(
-      StringEnum(["summary", "detailed"], {
-        description: "Detail level for the health report.",
-      }),
-    ),
-  },
-  { additionalProperties: false },
-);
-
-export type WorkflowCodeToolSchemaKey = CodeIntelligenceToolName;
-
-/** Code intelligence tool schemas keyed by public tool name. */
-export const CODE_INTELLIGENCE_TOOL_SCHEMAS = {
-  code_resolve: CodeResolveParameters,
-  code_inspect: CodeInspectParameters,
-  code_orientation: CodeOrientationParameters,
-  code_find: CodeFindParameters,
-  code_graph: CodeGraphParameters,
-  code_refactor_plan: CodeRefactorParameters,
-  code_refactor_apply: CodeApplyParameters,
-  code_health: CodeHealthParameters,
-} as const satisfies Record<CodeIntelligenceToolName, TSchema>;
+// Per-tool parameter objects live in each tool's spec.ts; this module keeps the
+// shared parameter vocabulary for the eight-tool family.

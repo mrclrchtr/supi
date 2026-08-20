@@ -1,7 +1,7 @@
 /** Runtime parsers for inspection, Orientation, graph, and find workflows. */
 
-import { type CodeFindAstKind, isCodeFindAstKind } from "../../tool/find/ast-kinds.ts";
-import { CODE_FIND_MODES } from "../../tool/find/modes.ts";
+import { type CodeFindAstKind, isCodeFindAstKind } from "../../tool/code_find/ast-kinds.ts";
+import { CODE_FIND_MODES } from "../../tool/code_find/modes.ts";
 import type { FindMode, FindWorkflowInput } from "../find-types.ts";
 import type { GraphWorkflowInput, RequestedGraphRelation } from "../graph-types.ts";
 import type { InspectWorkflowInput } from "../inspect-types.ts";

@@ -4,30 +4,21 @@ import type {
   CodeIntelResult,
   CodeIntelToolExecCtx,
 } from "../types/index.ts";
-import { executeFindTool } from "./find/execute.ts";
-import { executeGraphTool } from "./graph/execute.ts";
-import { executeHealthTool } from "./health/execute.ts";
-import { executeInspectTool } from "./inspect/execute.ts";
-import { executeOrientationTool } from "./orientation/execute.ts";
-import { executeRefactorApplyTool } from "./refactor-apply/execute.ts";
-import { executeRefactorPlanTool } from "./refactor-plan/execute.ts";
-import { executeResolveTool } from "./resolve/execute.ts";
-import {
-  CodeApplyParameters,
-  CodeFindParameters,
-  CodeGraphParameters,
-  CodeHealthParameters,
-  CodeInspectParameters,
-  CodeOrientationParameters,
-  CodeRefactorParameters,
-  CodeResolveParameters,
-} from "./schemas.ts";
+import { codeFindSpec } from "./code_find/spec.ts";
+import { codeGraphSpec } from "./code_graph/spec.ts";
+import { codeHealthSpec } from "./code_health/spec.ts";
+import { codeInspectSpec } from "./code_inspect/spec.ts";
+import { codeOrientationSpec } from "./code_orientation/spec.ts";
+import { codeRefactorApplySpec } from "./code_refactor_apply/spec.ts";
+import { codeRefactorPlanSpec } from "./code_refactor_plan/spec.ts";
+import { codeResolveSpec } from "./code_resolve/spec.ts";
 
 /**
  * Canonical registration spec for one public code-intelligence tool.
  *
  * Model-facing prose is not part of the spec: descriptions, snippets, and
- * guidelines live in `guidance.ts`, parameter mechanics live in `schemas.ts`.
+ * guidelines live in each tool's `guidance.ts`, parameter mechanics live in
+ * each tool's `spec.ts` over the shared vocabulary in `schemas.ts`.
  */
 export interface CodeIntelligenceToolDefinitionSpec {
   name: CodeIntelligenceToolName;
@@ -40,57 +31,24 @@ export interface CodeIntelligenceToolDefinitionSpec {
 
 /** Single source of truth for the surviving eight-tool family. */
 export const CODE_INTELLIGENCE_TOOL_SPECS = [
-  {
-    name: "code_resolve",
-    label: "Code Resolve",
-    parameters: CodeResolveParameters,
-    run: (params, ctx) =>
-      executeResolveTool(params as Parameters<typeof executeResolveTool>[0], ctx),
-  },
-  {
-    name: "code_inspect",
-    label: "Code Inspect",
-    parameters: CodeInspectParameters,
-    run: (params, ctx) =>
-      executeInspectTool(params as Parameters<typeof executeInspectTool>[0], ctx),
-  },
-  {
-    name: "code_orientation",
-    label: "Code Orientation",
-    parameters: CodeOrientationParameters,
-    run: (params, ctx) =>
-      executeOrientationTool(params as Parameters<typeof executeOrientationTool>[0], ctx),
-  },
-  {
-    name: "code_graph",
-    label: "Code Graph",
-    parameters: CodeGraphParameters,
-    run: (params, ctx) => executeGraphTool(params as Parameters<typeof executeGraphTool>[0], ctx),
-  },
-  {
-    name: "code_find",
-    label: "Code Find",
-    parameters: CodeFindParameters,
-    run: (params, ctx) => executeFindTool(params as Parameters<typeof executeFindTool>[0], ctx),
-  },
-  {
-    name: "code_health",
-    label: "Code Health",
-    parameters: CodeHealthParameters,
-    run: (params, ctx) => executeHealthTool(params as Parameters<typeof executeHealthTool>[0], ctx),
-  },
-  {
-    name: "code_refactor_plan",
-    label: "Code Refactor Plan",
-    parameters: CodeRefactorParameters,
-    run: (params, ctx) =>
-      executeRefactorPlanTool(params as Parameters<typeof executeRefactorPlanTool>[0], ctx),
-  },
-  {
-    name: "code_refactor_apply",
-    label: "Code Refactor Apply",
-    parameters: CodeApplyParameters,
-    run: (params, ctx) =>
-      executeRefactorApplyTool(params as Parameters<typeof executeRefactorApplyTool>[0], ctx),
-  },
+  codeResolveSpec,
+  codeInspectSpec,
+  codeOrientationSpec,
+  codeGraphSpec,
+  codeFindSpec,
+  codeHealthSpec,
+  codeRefactorPlanSpec,
+  codeRefactorApplySpec,
 ] as const satisfies readonly CodeIntelligenceToolDefinitionSpec[];
+
+/** Code intelligence tool schemas keyed by public tool name. */
+export const CODE_INTELLIGENCE_TOOL_SCHEMAS = {
+  code_resolve: codeResolveSpec.parameters,
+  code_inspect: codeInspectSpec.parameters,
+  code_orientation: codeOrientationSpec.parameters,
+  code_find: codeFindSpec.parameters,
+  code_graph: codeGraphSpec.parameters,
+  code_refactor_plan: codeRefactorPlanSpec.parameters,
+  code_refactor_apply: codeRefactorApplySpec.parameters,
+  code_health: codeHealthSpec.parameters,
+} as const satisfies Record<CodeIntelligenceToolName, TSchema>;

@@ -1,6 +1,6 @@
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { beforeAll, describe, expect, it } from "vitest";
-import { renderHealthResult } from "../../../src/tool/health/tui.ts";
+import { renderHealthResult } from "../../../src/tool/code_health/tui.ts";
 
 const theme = {
   fg: (_color: string, text: string) => text,

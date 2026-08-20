@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { renderGraphResult } from "../../../../src/tool/graph/markdown.ts";
-import { renderResolveResult } from "../../../../src/tool/resolve/markdown.ts";
+import { renderGraphResult } from "../../../../src/tool/code_graph/markdown.ts";
+import { assembleGraphResult } from "../../../../src/tool/code_graph/result.ts";
+import { assembleOrientationResult } from "../../../../src/tool/code_orientation/result.ts";
+import { renderResolveResult } from "../../../../src/tool/code_resolve/markdown.ts";
+import { assembleResolveResult } from "../../../../src/tool/code_resolve/result.ts";
 import { assembleToolResult } from "../../../../src/tool/result/assembly.ts";
-import { assembleGraphResult } from "../../../../src/tool/result/graph.ts";
-import { assembleOrientationResult } from "../../../../src/tool/result/orientation.ts";
 import { assembleRefactorPlanDetails } from "../../../../src/tool/result/refactor.ts";
-import { assembleResolveResult } from "../../../../src/tool/result/resolve.ts";
 
 const provenance = [{ source: "semantic" as const, capability: "test" }];
 

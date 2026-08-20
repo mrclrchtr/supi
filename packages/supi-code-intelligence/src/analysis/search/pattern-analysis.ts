@@ -6,7 +6,7 @@ import {
   type OutlineData,
   type StructuralProvider as StructuralSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
-import type { CodeFindAstKind } from "../../tool/find/ast-kinds.ts";
+import type { CodeFindAstKind } from "../../tool/code_find/ast-kinds.ts";
 import type { AstScanLimitation } from "./ast-scan.ts";
 import { callableExpressionForMatching } from "./call-name.ts";
 import { type DeadlineOutcome, type ScheduleDeadline, settleByDeadline } from "./deadline.ts";

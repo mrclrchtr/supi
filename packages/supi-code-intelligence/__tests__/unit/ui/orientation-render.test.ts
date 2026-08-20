@@ -1,9 +1,9 @@
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { OrientationResultData } from "../../../src/session/orientation-types.ts";
-import { renderOrientationResult as renderOrientationMarkdown } from "../../../src/tool/orientation/markdown.ts";
-import { renderOrientationResult as renderOrientationTui } from "../../../src/tool/orientation/tui.ts";
-import { assembleOrientationResult } from "../../../src/tool/result/orientation.ts";
+import { renderOrientationResult as renderOrientationMarkdown } from "../../../src/tool/code_orientation/markdown.ts";
+import { assembleOrientationResult } from "../../../src/tool/code_orientation/result.ts";
+import { renderOrientationResult as renderOrientationTui } from "../../../src/tool/code_orientation/tui.ts";
 
 const testTheme = {
   fg: (_color: string, text: string) => text,

@@ -2,11 +2,11 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { executeFindTool } from "../../../src/tool/find/execute.ts";
-import { executeGraphTool } from "../../../src/tool/graph/execute.ts";
-import { executeRefactorApplyTool } from "../../../src/tool/refactor-apply/execute.ts";
-import { executeRefactorPlanTool } from "../../../src/tool/refactor-plan/execute.ts";
-import { executeResolveTool } from "../../../src/tool/resolve/execute.ts";
+import { executeFindTool } from "../../../src/tool/code_find/execute.ts";
+import { executeGraphTool } from "../../../src/tool/code_graph/execute.ts";
+import { executeRefactorApplyTool } from "../../../src/tool/code_refactor_apply/execute.ts";
+import { executeRefactorPlanTool } from "../../../src/tool/code_refactor_plan/execute.ts";
+import { executeResolveTool } from "../../../src/tool/code_resolve/execute.ts";
 import { makeTestCtx } from "../../helpers/execute-action.ts";
 import { clearMockRuntime } from "../../helpers/register-mock-runtime.ts";
 

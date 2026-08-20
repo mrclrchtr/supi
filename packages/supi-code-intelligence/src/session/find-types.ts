@@ -1,7 +1,7 @@
 import type { CodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
 import type { StructuredPatternResult } from "../analysis/search/pattern.ts";
-import type { CodeFindAstKind } from "../tool/find/ast-kinds.ts";
-import type { CodeFindMode } from "../tool/find/modes.ts";
+import type { CodeFindAstKind } from "../tool/code_find/ast-kinds.ts";
+import type { CodeFindMode } from "../tool/code_find/modes.ts";
 
 export type FindMode = CodeFindMode;
 

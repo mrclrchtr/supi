@@ -165,10 +165,10 @@ Reuse the core session-registry helper for normalized workspace-keyed state. Kee
 
 Its main seams are:
 
-- `src/tool/specs.ts` and `src/tool/guidance.ts` — canonical public metadata
+- `src/tool/code_*/spec.ts` and `guidance.ts` — per-tool canonical metadata and prompt surface; `specs.ts`, `guidance.ts`, and `schemas.ts` aggregate and hold the shared schema vocabulary
 - `src/session/` — Workspace code-intelligence session and typed workflows
-- `src/tool/result/assembly.ts` — canonical Tool result assembly
-- `src/tool/*/markdown.ts` and TUI modules — presentation adapters
+- `src/tool/code_*/result.ts` with the shared core in `src/tool/result/assembly.ts` — canonical Tool result assembly
+- `src/tool/code_*/markdown.ts` and TUI modules — presentation adapters
 - `src/tool/register.ts` — PI registration adapter
 
 `code_orientation` replaced the old context/brief surfaces. `code_impact` and the older graph relation families are removed rather than aliased.

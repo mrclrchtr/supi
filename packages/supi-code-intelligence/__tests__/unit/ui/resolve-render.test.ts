@@ -1,8 +1,8 @@
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { beforeAll, describe, expect, it } from "vitest";
-import { renderResolveResult as renderResolveMarkdown } from "../../../src/tool/resolve/markdown.ts";
-import { renderResolveResult as renderResolveTui } from "../../../src/tool/resolve/tui.ts";
-import { assembleResolveResult } from "../../../src/tool/result/resolve.ts";
+import { renderResolveResult as renderResolveMarkdown } from "../../../src/tool/code_resolve/markdown.ts";
+import { assembleResolveResult } from "../../../src/tool/code_resolve/result.ts";
+import { renderResolveResult as renderResolveTui } from "../../../src/tool/code_resolve/tui.ts";
 
 const testTheme = {
   fg: (_color: string, text: string) => text,

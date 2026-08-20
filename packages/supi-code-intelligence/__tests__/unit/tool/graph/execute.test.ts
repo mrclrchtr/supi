@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { executeGraphTool } from "../../../../src/tool/graph/execute.ts";
+import { executeGraphTool } from "../../../../src/tool/code_graph/execute.ts";
 import { executeAction, makeTestCtx } from "../../../helpers/execute-action.ts";
 import { registerMockProvider } from "../../../helpers/register-mock-runtime.ts";
 

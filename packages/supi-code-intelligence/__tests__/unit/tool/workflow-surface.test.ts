@@ -1,8 +1,10 @@
 import { Check } from "typebox/value";
 import { describe, expect, it } from "vitest";
-import { CODE_FIND_AST_KINDS } from "../../../src/tool/find/ast-kinds.ts";
-import { CODE_INTELLIGENCE_TOOL_SCHEMAS } from "../../../src/tool/schemas.ts";
-import { CODE_INTELLIGENCE_TOOL_SPECS } from "../../../src/tool/specs.ts";
+import { CODE_FIND_AST_KINDS } from "../../../src/tool/code_find/ast-kinds.ts";
+import {
+  CODE_INTELLIGENCE_TOOL_SCHEMAS,
+  CODE_INTELLIGENCE_TOOL_SPECS,
+} from "../../../src/tool/specs.ts";
 import { CODE_INTELLIGENCE_TOOL_NAMES } from "../../../src/types/index.ts";
 
 type SchemaCandidate = {

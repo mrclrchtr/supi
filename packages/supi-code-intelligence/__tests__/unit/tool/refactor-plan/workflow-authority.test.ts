@@ -14,7 +14,7 @@ import {
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../../../src/extension.ts";
-import { executeRefactorApplyTool } from "../../../../src/tool/refactor-apply/execute.ts";
+import { executeRefactorApplyTool } from "../../../../src/tool/code_refactor_apply/execute.ts";
 import { sessionCache } from "../../../helpers/execute-action.ts";
 
 let temporaryDirectory: string | null = null;

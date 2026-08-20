@@ -5,8 +5,8 @@ import type { StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FindWorkflowOutcome } from "../../../src/session/find-types.ts";
 import { runFindWorkflow } from "../../../src/session/find-workflow.ts";
-import { renderFindResult } from "../../../src/tool/find/render.ts";
-import { assembleFindWorkflowResult } from "../../../src/tool/result/find.ts";
+import { renderFindResult } from "../../../src/tool/code_find/render.ts";
+import { assembleFindWorkflowResult } from "../../../src/tool/code_find/result.ts";
 import { TestCapabilityAdapter } from "../../helpers/test-capability-adapter.ts";
 
 let tmpDir: string;

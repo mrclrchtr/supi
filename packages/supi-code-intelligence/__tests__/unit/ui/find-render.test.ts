@@ -1,6 +1,6 @@
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { beforeAll, describe, expect, it } from "vitest";
-import { renderFindResult } from "../../../src/tool/find/tui.ts";
+import { renderFindResult } from "../../../src/tool/code_find/tui.ts";
 
 const testTheme = {
   fg: (_color: string, text: string) => text,

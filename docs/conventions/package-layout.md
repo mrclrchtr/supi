@@ -163,4 +163,4 @@ Keep ambiguous utilities at the root until they clearly belong somewhere.
 
 This convention is the default for new packages and for existing packages receiving structural work. Per-package target shapes and flat-package lists live in the matrix above.
 
-Per-tool layout migration: `supi-review` is migrated (pilot). Remaining tool packages: `supi-agent`, `supi-ask-user`, `supi-cache`, `supi-code-intelligence`, `supi-context`, `supi-debug`, `supi-web`.
+Per-tool layout migration: complete. All tool packages (`supi-review`, `supi-agent`, `supi-ask-user`, `supi-cache`, `supi-code-intelligence`, `supi-context`, `supi-debug`, `supi-web`) use per-tool directories.

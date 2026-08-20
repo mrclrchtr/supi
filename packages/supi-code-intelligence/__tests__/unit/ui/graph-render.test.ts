@@ -1,6 +1,6 @@
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { beforeAll, describe, expect, it } from "vitest";
-import { renderGraphResult } from "../../../src/tool/graph/tui.ts";
+import { renderGraphResult } from "../../../src/tool/code_graph/tui.ts";
 
 const testTheme = {
   fg: (_color: string, text: string) => text,

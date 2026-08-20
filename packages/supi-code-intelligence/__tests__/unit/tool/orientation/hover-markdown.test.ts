@@ -4,8 +4,8 @@ import * as path from "node:path";
 import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeOrientation } from "../../../../src/session/orientation/collect.ts";
-import { renderOrientationResult } from "../../../../src/tool/orientation/markdown.ts";
-import { assembleOrientationResult } from "../../../../src/tool/result/orientation.ts";
+import { renderOrientationResult } from "../../../../src/tool/code_orientation/markdown.ts";
+import { assembleOrientationResult } from "../../../../src/tool/code_orientation/result.ts";
 
 let tmpDir: string;
 let file: string;

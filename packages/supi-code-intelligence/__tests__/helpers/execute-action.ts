@@ -1,10 +1,10 @@
 import { createSessionCache } from "../../src/app/app.ts";
 import type { GraphTargetInput, TargetInput } from "../../src/session/target-input.ts";
-import type { GraphRelation } from "../../src/tool/graph/execute.ts";
-import { executeGraphTool } from "../../src/tool/graph/execute.ts";
-import { executeOrientationTool } from "../../src/tool/orientation/execute.ts";
-import { executeRefactorApplyTool } from "../../src/tool/refactor-apply/execute.ts";
-import { executeRefactorPlanTool } from "../../src/tool/refactor-plan/execute.ts";
+import type { GraphRelation } from "../../src/tool/code_graph/execute.ts";
+import { executeGraphTool } from "../../src/tool/code_graph/execute.ts";
+import { executeOrientationTool } from "../../src/tool/code_orientation/execute.ts";
+import { executeRefactorApplyTool } from "../../src/tool/code_refactor_apply/execute.ts";
+import { executeRefactorPlanTool } from "../../src/tool/code_refactor_plan/execute.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../src/types/index.ts";
 
 export type TestAction =

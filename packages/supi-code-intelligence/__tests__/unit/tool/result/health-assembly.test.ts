@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { HealthData } from "../../../../src/session/health-types.ts";
-import { renderHealthResult } from "../../../../src/tool/health/markdown.ts";
-import { assembleHealthResult } from "../../../../src/tool/result/health.ts";
+import { renderHealthResult } from "../../../../src/tool/code_health/markdown.ts";
+import { assembleHealthResult } from "../../../../src/tool/code_health/result.ts";
 
 function cleanEvidence() {
   return {

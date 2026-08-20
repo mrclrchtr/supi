@@ -1,6 +1,6 @@
 import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-code-runtime/api";
 import type { StructuralSearchOperation } from "@mrclrchtr/supi-tree-sitter/api";
-import type { CodeFindAstKind } from "../../tool/find/ast-kinds.ts";
+import type { CodeFindAstKind } from "../../tool/code_find/ast-kinds.ts";
 import type { EvidencePartialReason } from "../evidence.ts";
 import {
   type AstScanExclusion,

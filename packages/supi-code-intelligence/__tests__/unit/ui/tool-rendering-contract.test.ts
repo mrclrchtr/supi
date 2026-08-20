@@ -1,7 +1,7 @@
 import { initTheme } from "@earendil-works/pi-coding-agent";
 import { beforeAll, describe, expect, it } from "vitest";
-import { renderFindResult } from "../../../src/tool/find/tui.ts";
-import { renderResolveCall } from "../../../src/tool/resolve/tui.ts";
+import { renderFindResult } from "../../../src/tool/code_find/tui.ts";
+import { renderResolveCall } from "../../../src/tool/code_resolve/tui.ts";
 
 const theme = {
   fg: (_color: string, text: string) => text,

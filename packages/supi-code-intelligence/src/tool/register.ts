@@ -8,19 +8,19 @@ import { recordDebugEvent, startDebugTimer } from "@mrclrchtr/supi-core/debug";
 import { truncateIdentity } from "@mrclrchtr/supi-lsp/debug-telemetry";
 import type { WorkspaceCodeIntelligenceSession } from "../session/session.ts";
 import type { CodeIntelResult, ToolOutputTruncationDetails } from "../types/index.ts";
-import { renderFindCall, renderFindResult } from "./find/tui.ts";
-import { renderGraphCall, renderGraphResult } from "./graph/tui.ts";
+import { renderFindCall, renderFindResult } from "./code_find/tui.ts";
+import { renderGraphCall, renderGraphResult } from "./code_graph/tui.ts";
+import { renderHealthCall, renderHealthResult } from "./code_health/tui.ts";
+import { renderInspectCall, renderInspectResult } from "./code_inspect/tui.ts";
+import { renderOrientationCall, renderOrientationResult } from "./code_orientation/tui.ts";
+import { renderRefactorApplyCall, renderRefactorApplyResult } from "./code_refactor_apply/tui.ts";
+import { renderRefactorPlanCall, renderRefactorPlanResult } from "./code_refactor_plan/tui.ts";
+import { renderResolveCall, renderResolveResult } from "./code_resolve/tui.ts";
 import {
   CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES,
   type CodeIntelligenceToolPromptSurfaceMap,
 } from "./guidance.ts";
-import { renderHealthCall, renderHealthResult } from "./health/tui.ts";
 import { truncateToolContent } from "./infra/truncate.ts";
-import { renderInspectCall, renderInspectResult } from "./inspect/tui.ts";
-import { renderOrientationCall, renderOrientationResult } from "./orientation/tui.ts";
-import { renderRefactorApplyCall, renderRefactorApplyResult } from "./refactor-apply/tui.ts";
-import { renderRefactorPlanCall, renderRefactorPlanResult } from "./refactor-plan/tui.ts";
-import { renderResolveCall, renderResolveResult } from "./resolve/tui.ts";
 import { CODE_INTELLIGENCE_TOOL_SPECS, type CodeIntelligenceToolDefinitionSpec } from "./specs.ts";
 
 interface ToolRenderer {

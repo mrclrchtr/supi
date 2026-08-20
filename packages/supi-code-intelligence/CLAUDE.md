@@ -9,9 +9,9 @@ Surfaces: `./extension` (PI registration) and `./api` (reusable type contracts).
 | Module | Directory | Role |
 |---|---|---|
 | Entry | `src/extension.ts`, `src/app/` | PI wiring, composition, session lifecycle |
-| Public tools | `src/tool/<tool>/` | Thin executors and presentation adapters |
-| Tool metadata | `src/tool/specs.ts`, `schemas.ts`, `guidance.ts` | Canonical eight-tool surface |
-| Result assembly | `src/tool/result/` | Sections, evidence lists, totals, provenance, actions, details |
+| Public tools | `src/tool/code_*/` | Per-tool spec.ts, guidance.ts, execute.ts, result.ts, markdown/TUI adapters |
+| Tool metadata | per-tool `spec.ts` + `guidance.ts`; aggregators `specs.ts`, `guidance.ts`; shared schema vocabulary `schemas.ts` | Canonical eight-tool surface |
+| Result assembly | per-tool `result.ts` plus shared core `src/tool/result/` | Sections, evidence lists, totals, provenance, actions, details |
 | Workflows | `src/session/` | Workspace session, typed outcomes, target handles, refactor plans |
 | Analysis | `src/analysis/` | PI-free evidence collection and refactor safety |
 | Substrates | `src/substrate/` | Process-shared LSP and Tree-sitter provider-host lifecycle |

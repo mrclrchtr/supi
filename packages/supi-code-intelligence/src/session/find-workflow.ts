@@ -4,7 +4,7 @@ import type { CodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import { resolveScopeSet } from "../analysis/search/paths.ts";
 import { getStructuredPatternMatches } from "../analysis/search/pattern.ts";
-import { isCodeFindAstKind } from "../tool/find/ast-kinds.ts";
+import { isCodeFindAstKind } from "../tool/code_find/ast-kinds.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import type { FindWorkflowInput, FindWorkflowOutcome } from "./find-types.ts";
 import { parseFindWorkflowInput } from "./input/workflows.ts";

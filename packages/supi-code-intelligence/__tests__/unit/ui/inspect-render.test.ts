@@ -1,7 +1,7 @@
 import { completedCodeQuery, unavailableCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it } from "vitest";
-import { renderInspectResult } from "../../../src/tool/inspect/markdown.ts";
-import { assembleInspectResult } from "../../../src/tool/result/inspect.ts";
+import { renderInspectResult } from "../../../src/tool/code_inspect/markdown.ts";
+import { assembleInspectResult } from "../../../src/tool/code_inspect/result.ts";
 
 describe("renderInspectResult", () => {
   it("renders factual sections and completed-empty observations", () => {
