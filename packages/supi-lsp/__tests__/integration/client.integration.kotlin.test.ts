@@ -79,9 +79,11 @@ describe.skipIf(!HAS_KOTLIN)("LspClient integration (kotlin-lsp)", () => {
 
     client = new LspClient("kotlin", KOTLIN_CONFIG, tmpDir);
     // kotlin-lsp is a JVM server with a slow cold start and a Gradle import.
+    // Under full-suite load other test processes starve this JVM, so keep a
+    // generous budget well above isolation-run times.
     await client.start();
     expect(client.status).toBe("running");
-  }, 120_000);
+  }, 240_000);
 
   it("observes the static diagnosticProvider capability", () => {
     // With --stdio, kotlin-lsp statically advertises diagnosticProvider in
@@ -96,12 +98,12 @@ describe.skipIf(!HAS_KOTLIN)("LspClient integration (kotlin-lsp)", () => {
       () => client.syncAndWaitForDiagnostics(badFile, content),
       (diagnostics) => diagnostics.kind !== "unavailable" && diagnostics.data.length > 0,
       {
-        timeoutMs: 100_000,
+        timeoutMs: 240_000,
         retryDelayMs: 1_000,
         label: "pull diagnostics for Main.kt",
       },
     );
     const typeErrors = completedDiagnostics(result).filter((d: Diagnostic) => d.severity === 1);
     expect(typeErrors.length).toBeGreaterThan(0);
-  }, 120_000);
+  }, 300_000);
 });
