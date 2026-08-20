@@ -1,11 +1,44 @@
-import { StringEnum } from "@earendil-works/pi-ai";
-import { type Static, type TSchema, Type } from "typebox";
-import { FETCH_TIMEOUT_MAX_MS } from "../fetch.ts";
-import { MODEL_OUTPUT_LIMIT_DESCRIPTION } from "./output.ts";
+// Compatibility aggregator for the per-tool web specs and prompt surfaces.
 
-export const WEB_FETCH_MD_TOOL_NAME = "web_fetch_md";
-export const WEB_DOCS_SEARCH_TOOL_NAME = "web_docs_search";
-export const WEB_DOCS_FETCH_TOOL_NAME = "web_docs_fetch";
+import type { TSchema } from "typebox";
+import {
+  toolDescription as docsFetchDescription,
+  promptGuidelines as docsFetchGuidelines,
+  promptSnippet as docsFetchSnippet,
+} from "./web_docs_fetch/guidance.ts";
+import {
+  WEB_DOCS_FETCH_TOOL_LABEL,
+  WEB_DOCS_FETCH_TOOL_NAME,
+  webDocsFetchParameters,
+} from "./web_docs_fetch/spec.ts";
+import {
+  toolDescription as searchDescription,
+  promptGuidelines as searchGuidelines,
+  promptSnippet as searchSnippet,
+} from "./web_docs_search/guidance.ts";
+import {
+  WEB_DOCS_SEARCH_TOOL_LABEL,
+  WEB_DOCS_SEARCH_TOOL_NAME,
+  webDocsSearchParameters,
+} from "./web_docs_search/spec.ts";
+import {
+  toolDescription as fetchDescription,
+  promptGuidelines as fetchGuidelines,
+  promptSnippet as fetchSnippet,
+  getWebFetchPromptSurface,
+} from "./web_fetch_md/guidance.ts";
+import {
+  WEB_FETCH_MD_TOOL_LABEL,
+  WEB_FETCH_MD_TOOL_NAME,
+  webFetchMdParameters,
+} from "./web_fetch_md/spec.ts";
+
+export type { WebDocsFetchInput } from "./web_docs_fetch/spec.ts";
+export { WEB_DOCS_FETCH_TOOL_NAME } from "./web_docs_fetch/spec.ts";
+export type { WebDocsSearchInput } from "./web_docs_search/spec.ts";
+export { WEB_DOCS_SEARCH_TOOL_NAME } from "./web_docs_search/spec.ts";
+export type { WebFetchMdInput, WebFetchOutputMode } from "./web_fetch_md/spec.ts";
+export { WEB_FETCH_INLINE_MAX_CHARS, WEB_FETCH_MD_TOOL_NAME } from "./web_fetch_md/spec.ts";
 
 export const WEB_TOOL_NAMES = [
   WEB_FETCH_MD_TOOL_NAME,
@@ -14,63 +47,12 @@ export const WEB_TOOL_NAMES = [
 ] as const;
 export type WebToolName = (typeof WEB_TOOL_NAMES)[number];
 
-export const WEB_FETCH_INLINE_MAX_CHARS = 15_000;
-export const WEB_FETCH_OUTPUT_MODES = ["auto", "inline", "file"] as const;
-export type WebFetchOutputMode = (typeof WEB_FETCH_OUTPUT_MODES)[number];
-
-const OutputModeEnum = StringEnum(WEB_FETCH_OUTPUT_MODES, {
-  default: "auto",
-  description: "auto, inline, or file output",
-});
-
-const WebFetchMdParameters = Type.Object(
-  {
-    url: Type.String({ description: "Public http(s) URL" }),
-    output_mode: Type.Optional(OutputModeEnum),
-    abs_links: Type.Optional(Type.Boolean({ description: "Absolute links/images", default: true })),
-    timeout_ms: Type.Optional(
-      Type.Integer({
-        description: "Fetch timeout (ms)",
-        default: 30_000,
-        minimum: 0,
-        maximum: FETCH_TIMEOUT_MAX_MS,
-      }),
-    ),
-  },
-  { additionalProperties: false },
-);
-
-const WebDocsSearchParameters = Type.Object(
-  {
-    library_name: Type.String({
-      description: "Library name (e.g. react, next.js, fastapi)",
-    }),
-    query: Type.String({
-      description: "Task/question for relevance ranking",
-    }),
-  },
-  { additionalProperties: false },
-);
-
-const WebDocsFetchParameters = Type.Object(
-  {
-    library_id: Type.String({
-      description: "Context7 ID (e.g. /facebook/react); search first if unknown",
-    }),
-    query: Type.String({ description: "Specific docs question" }),
-    raw: Type.Optional(
-      Type.Boolean({
-        description: "Return JSON snippets instead of Markdown",
-        default: false,
-      }),
-    ),
-  },
-  { additionalProperties: false },
-);
-
-export type WebFetchMdInput = Static<typeof WebFetchMdParameters>;
-export type WebDocsSearchInput = Static<typeof WebDocsSearchParameters>;
-export type WebDocsFetchInput = Static<typeof WebDocsFetchParameters>;
+/** Prompt metadata sent to pi for a single web tool. */
+export interface WebToolPromptSurface {
+  description: string;
+  promptSnippet: string;
+  promptGuidelines: string[];
+}
 
 export interface WebToolSpec {
   name: WebToolName;
@@ -84,29 +66,27 @@ export interface WebToolSpec {
 export const WEB_TOOL_SPECS = [
   {
     name: WEB_FETCH_MD_TOOL_NAME,
-    label: "Web Fetch",
-    description: `Fetch public http(s) URL as Markdown. Not for login/private pages. output_mode auto inlines <=${WEB_FETCH_INLINE_MAX_CHARS.toLocaleString()} chars else temp; inline may truncate; file returns a temp path. Links are absolute by default. ${MODEL_OUTPUT_LIMIT_DESCRIPTION}`,
-    promptSnippet: "web_fetch_md: public URL to Markdown",
-    promptGuidelines: ["Use web_fetch_md only for public http(s); ask if login/private."],
-    parameters: WebFetchMdParameters,
+    label: WEB_FETCH_MD_TOOL_LABEL,
+    description: fetchDescription,
+    promptSnippet: fetchSnippet,
+    promptGuidelines: fetchGuidelines,
+    parameters: webFetchMdParameters,
   },
   {
     name: WEB_DOCS_SEARCH_TOOL_NAME,
-    label: "Web Docs Search",
-    description: `Search Context7 for library IDs; returns compact Markdown. ${MODEL_OUTPUT_LIMIT_DESCRIPTION}`,
-    promptSnippet: "web_docs_search: Context7 library IDs",
-    promptGuidelines: ["Use web_docs_search before web_docs_fetch if ID unknown."],
-    parameters: WebDocsSearchParameters,
+    label: WEB_DOCS_SEARCH_TOOL_LABEL,
+    description: searchDescription,
+    promptSnippet: searchSnippet,
+    promptGuidelines: searchGuidelines,
+    parameters: webDocsSearchParameters,
   },
   {
     name: WEB_DOCS_FETCH_TOOL_NAME,
-    label: "Web Docs Fetch",
-    description: `Fetch focused Context7 docs for a known Context7 library_id. Markdown by default; raw=true returns JSON snippets. Search first if unknown. ${MODEL_OUTPUT_LIMIT_DESCRIPTION}`,
-    promptSnippet: "web_docs_fetch: focused Context7 docs",
-    promptGuidelines: [
-      "Use web_docs_fetch with a known library_id and narrow query; raw only for JSON.",
-    ],
-    parameters: WebDocsFetchParameters,
+    label: WEB_DOCS_FETCH_TOOL_LABEL,
+    description: docsFetchDescription,
+    promptSnippet: docsFetchSnippet,
+    promptGuidelines: docsFetchGuidelines,
+    parameters: webDocsFetchParameters,
   },
 ] as const satisfies readonly WebToolSpec[];
 
@@ -114,4 +94,17 @@ export function getWebToolSpec(name: WebToolName): WebToolSpec {
   const spec = WEB_TOOL_SPECS.find((candidate) => candidate.name === name);
   if (!spec) throw new Error(`Unknown web tool: ${name}`);
   return spec;
+}
+
+/** Runtime prompt surface, including environment-dependent guidance. */
+export function getWebToolPromptSurface(name: WebToolName): WebToolPromptSurface {
+  if (name === WEB_FETCH_MD_TOOL_NAME) {
+    return getWebFetchPromptSurface();
+  }
+  const spec = getWebToolSpec(name);
+  return {
+    description: spec.description,
+    promptSnippet: spec.promptSnippet,
+    promptGuidelines: [...spec.promptGuidelines],
+  };
 }

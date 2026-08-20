@@ -10,8 +10,11 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { FETCH_TIMEOUT_MAX_MS } from "../../src/fetch.ts";
-import { getWebToolPromptSurface } from "../../src/tool/guidance.ts";
-import { WEB_FETCH_MD_TOOL_NAME, WEB_TOOL_SPECS } from "../../src/tool/tool-specs.ts";
+import {
+  getWebToolPromptSurface,
+  WEB_FETCH_MD_TOOL_NAME,
+  WEB_TOOL_SPECS,
+} from "../../src/tool/tool-specs.ts";
 
 const MODEL_SURFACE_CHAR_BUDGET = 950;
 
