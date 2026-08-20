@@ -10,7 +10,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@earendil-works/pi-coding-agent";
-import type { ForensicsResult } from "../forensics/forensics.ts";
+import type { ForensicsResult } from "../../forensics/forensics.ts";
 
 /** Effective query echoed by the bounded envelope. */
 export interface ForensicsBoundQuery {

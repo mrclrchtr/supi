@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { ForensicsResult } from "../../../src/forensics/forensics.ts";
-import type { ForensicsFinding } from "../../../src/forensics/types.ts";
-import { boundForensicsOutput } from "../../../src/tool/bound.ts";
+import type { ForensicsResult } from "../../../../src/forensics/forensics.ts";
+import type { ForensicsFinding } from "../../../../src/forensics/types.ts";
+import { boundForensicsOutput } from "../../../../src/tool/cache_forensics/result.ts";
 
 function makeFinding(sessionId: string, index: number): ForensicsFinding {
   return {

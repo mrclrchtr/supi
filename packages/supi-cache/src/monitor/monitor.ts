@@ -3,20 +3,16 @@
 // Tracks per-turn cache metrics, detects regressions with cause diagnosis,
 // shows a compact footer status, and provides /supi-cache-history and /supi-cache-forensics commands.
 
-import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import { footerContributions } from "@mrclrchtr/supi-core/footer-registry";
-import { Type } from "typebox";
 import { loadCacheMonitorConfig } from "../config.ts";
 import { computePromptFingerprint, diffFingerprints, zeroFingerprint } from "../fingerprint.ts";
 import { runForensics } from "../forensics/forensics.ts";
-import { stripHumanDetail } from "../forensics/redact.ts";
 import { formatForensicsReport } from "../report/forensics.ts";
 import { type CacheReportSnapshot, formatCacheReport } from "../report/history.ts";
 import { registerCacheMonitorSettings } from "../settings-registration.ts";
-import { boundForensicsOutput } from "../tool/bound.ts";
-import { promptGuidelines, promptSnippet, toolDescription } from "../tool/guidance.ts";
+import { registerCacheForensicsTool } from "../tool/cache_forensics/register.ts";
 import { CacheMonitorState, type RegressionResult } from "./state.ts";
 import { formatCacheStatus } from "./status.ts";
 
@@ -240,65 +236,7 @@ export default function cacheMonitorExtension(pi: ExtensionAPI) {
 
   // ── cache_forensics agent tool ───────────────────────
 
-  pi.registerTool({
-    name: "cache_forensics",
-    label: "Cache Forensics",
-    description: toolDescription,
-    promptSnippet,
-    parameters: Type.Object({
-      pattern: StringEnum(["hotspots", "breakdown", "correlate", "idle"], {
-        description: "Query pattern",
-      }),
-      since: Type.Optional(
-        Type.String({
-          description: 'Duration string like "7d", "24h", "30m". Default: "7d"',
-          default: "7d",
-        }),
-      ),
-      minDrop: Type.Optional(
-        Type.Number({
-          description: "Minimum hit-rate drop in percentage points to include. Default: 0",
-          default: 0,
-        }),
-      ),
-      maxSessions: Type.Optional(
-        Type.Number({
-          description: "Maximum sessions to scan. Default: 100",
-          default: 100,
-        }),
-      ),
-    }),
-    promptGuidelines,
-    // biome-ignore lint/complexity/useMaxParams: pi tool execute signature
-    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-      const config = loadCacheMonitorConfig(ctx.cwd);
-      const result = await runForensics({
-        pattern: params.pattern as "hotspots" | "breakdown" | "correlate" | "idle",
-        since: (params.since as string) ?? "7d",
-        minDrop: (params.minDrop as number) ?? 0,
-        maxSessions: (params.maxSessions as number) ?? 100,
-        idleThresholdMinutes: config.idleThresholdMinutes,
-        regressionThreshold: config.regressionThreshold,
-      });
-
-      // Strip human-only detail before returning to agent
-      if (result.findings) {
-        result.findings = stripHumanDetail(result.findings);
-      }
-
-      const output = boundForensicsOutput(result, {
-        pattern: params.pattern as "hotspots" | "breakdown" | "correlate" | "idle",
-        since: (params.since as string) ?? "7d",
-        minDrop: (params.minDrop as number) ?? 0,
-        maxSessions: (params.maxSessions as number) ?? 100,
-      });
-
-      return {
-        content: [{ type: "text", text: output.text }],
-        details: output.fullOutputPath ? { fullOutputPath: output.fullOutputPath } : undefined,
-      };
-    },
-  });
+  registerCacheForensicsTool(pi);
 }
 
 /** Parse a simple `--key value` argument from a command string. */
