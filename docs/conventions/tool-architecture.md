@@ -53,6 +53,24 @@ Result rules:
 - The result module is the sole producer of model-visible `content` and free `details`, and owns truncation and spill-file policy.
 - Presentation folders (`render/`, `ui/`, markdown/TUI adapters) never produce model-visible text; result assembly never lives under a presentation folder.
 
+## Result module naming
+
+Name result modules after pi's vocabulary: `execute()` returns an `AgentToolResult` (`content` + `details`), and this seam is result assembly. Use `result`, not `output` — "output" is pi's truncation-limit and transcript vocabulary and would collide.
+
+Structure follows package shape:
+
+| Package shape | Result assembly |
+| --- | --- |
+| Tiny one-tool package | `src/tool/result.ts` |
+| One tool with shared formatting | `src/tool/result.ts` plus sibling formatting modules in `src/tool/` |
+| Tool family | `src/tool/result/<tool-name>.ts` per tool, plus an optional shared core in `src/tool/result/` |
+
+Placement rules:
+
+- Result modules live under `src/tool/` whenever that folder exists. Do not place result assembly at the package root or under `render/`/`ui/`.
+- Transient `onUpdate` progress text may live in workflow/execution modules; final results must be built by the result module.
+- Legacy names (`output.ts`, `review-result.ts`) are renamed when the package receives structural work.
+
 ## Typed outcomes
 
 Workflow seams return immutable facts, not presentation strings. Keep these outcomes distinct:

@@ -82,6 +82,17 @@ These spec modules should own the machine-readable public metadata that otherwis
 
 Guidance and registration code should derive from, or be keyed by, the same canonical spec names rather than re-declaring independent tool lists. Keep execution logic in separate action or service modules. For the full rationale and examples, see `tool-architecture.md`.
 
+### Tool result convention
+
+Model-visible result assembly (`content` + `details`) lives under `src/tool/` whenever that folder exists.
+
+Preferred pattern:
+- single custom tool → `src/tool/result.ts`
+- multiple custom tools → `src/tool/result/<tool-name>.ts`, plus an optional shared core inside `src/tool/result/`
+- transient `onUpdate` progress text may stay in workflow/execution modules; final results are built by the result module
+
+Never place result assembly under `render/` or `ui/`, and do not leave it at the package root once `src/tool/` exists. Module names follow pi's `AgentToolResult` vocabulary (`result`, not `output`). See `tool-architecture.md` § Result module naming.
+
 ### Prefer domain folders over generic buckets
 
 Prefer domain folders over `core/`, `shared/`, `misc/`, or other catch-all names. Use domain folders when files already share a prefix or responsibility boundary.
