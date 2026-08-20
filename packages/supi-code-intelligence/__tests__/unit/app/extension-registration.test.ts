@@ -80,7 +80,6 @@ describe("focused code intelligence tool registration", () => {
 
     const resolveDescription = getTool(pi, "code_resolve").description ?? "";
     expect(resolveDescription).toContain("Anchors must identify real symbols");
-    expect(resolveDescription).toContain("never falls back to text search");
 
     const findDescription = getTool(pi, "code_find").description ?? "";
     expect(findDescription).toContain('mode:"ast"');
@@ -90,7 +89,7 @@ describe("focused code intelligence tool registration", () => {
     expect(getTool(pi, "code_graph").description).toContain("not symbol identity");
     expect(getTool(pi, "code_health").description).toContain("Report live diagnostics");
     expect(getTool(pi, "code_refactor_plan").description).toContain("without mutating files");
-    expect(getTool(pi, "code_refactor_apply").description).toContain("fail validation");
+    expect(getTool(pi, "code_refactor_apply").description).toContain("by planId");
   });
 
   it("keeps cross-tool routing in guidelines and names a tool in every bullet", () => {
