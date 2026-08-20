@@ -1,14 +1,32 @@
 # PI Extension Tool Guidelines
 
-Guidelines for designing, registering, executing, and rendering tools in PI extensions. Use this document as a checklist for model-facing metadata, schemas, execution behavior, output limits, state handling, UI rendering, and built-in overrides.
+Checklist for designing, registering, and improving model-callable tools in PI extensions. Two goals: the model can select and use the tool correctly, and the tool consumes as little model context as possible.
 
-This doc owns design rules. Mechanics and costs of context (what PI sends, prompt cache, compaction, session store) live in `context-architecture.md`.
+- Context mechanics and costs (billing tiers, free channels, cache breaks): `context-architecture.md`.
+- Baseline tool API: installed Pi `docs/extensions.md` of `@earendil-works/pi-coding-agent` — the primary source for mechanics, not restated here (§3 of `context-architecture.md` is the index).
+- SuPi package internals (spec/guidance modules, result assembly): `../conventions/tool-architecture.md`. Transcript rendering: `../conventions/tool-rendering.md`.
 
-For SuPi-specific package conventions around `action-specs.ts`, `tool-specs.ts`, and deriving registration/guidance from shared metadata, see `../conventions/tool-architecture.md`. For how tool metadata, results, and injected messages consume model context and prompt cache, see `context-architecture.md`.
+## Content Budget and Placement
+
+Context surfaces bill differently (`context-architecture.md#2-cache-lifecycle-and-billing-tiers`):
+
+| Surface | Billing tier | Budget |
+| --- | --- | --- |
+| `description`, parameter schemas, `promptSnippet`, `promptGuidelines` | Tier 1 prefix: full price on every cold session and cache miss | Strictest — selection-sufficient only |
+| Result `content` | Tier 2: full once when appended, cached after, re-paid on misses | Decision-sufficient only |
+| `details`, `appendEntry`, spill files | Free — never sent to the model (`context-architecture.md#1-what-extensions-pay-for--and-what-is-free`) | Everything else lives here |
+
+Placement rules:
+
+1. **Selection facts** — what the model needs to choose the tool — go in `description` and parameter schemas. One home per fact, duplicates deleted: `description` owns selection rules, preconditions, and no-fallback contracts; `promptSnippet` owns one capability phrase; `promptGuidelines` owns cross-tool routing and ordering; schema field descriptions own parameter mechanics. Human docs (README, CLAUDE.md) restate behavior in their own words instead of duplicating model-facing text.
+2. **Post-call facts** — what the model needs after calling — go in result `content`, decision-first: answer and totals before evidence, compact formats (paths, counts, IDs) over dumps.
+3. **Everything the model does not read** goes to free channels: `details` for state, evidence, and diagnostics (zero cost, durable, drives UI and state reconstruction); spill files for bulk output — `content` carries a short preview plus the path.
+4. Never duplicate facts between `content` and `details`. Never echo input arguments or boilerplate headers back in results. Return handles and pointers instead of data the model can re-query.
+5. Progressive disclosure: keep always-on guidance selection-sufficient; rare usage detail belongs on demand (result pointers, skills, docs), not in the prefix.
 
 ## Naming
 
-PI built-in tools occupy the shared tool namespace: `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`. Registering the same `name` replaces the built-in (see Built-ins below).
+PI built-in tools occupy the shared tool namespace: `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`. Registering the same `name` replaces the built-in.
 
 SuPi naming rules:
 
@@ -17,91 +35,58 @@ SuPi naming rules:
 - Use a domain prefix only for a family of related tools (`code_*`, `web_*`, `review_*`). Single tools use flat names (`debug`, `agent_run`, `cache_forensics`, `context_report`, `ask_user`).
 - Never reuse a PI built-in name unless you intend to replace that built-in.
 
-## Canonical Shape
+## Registration Shape
 
-```typescript
-import { StringEnum } from "@earendil-works/pi-ai";
-import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
+Definition fields, canonical example, `prepareArguments`, `StringEnum`, `executionMode`, and `renderShell`: installed Pi `docs/extensions.md` § Custom Tools and § Tool Definition.
 
-const myTool = defineTool({
-  name: "my_tool",
-  label: "My Tool",
-  description: "Do X. Use when Y. Limits, side effects, and ordering rules: Z.",
-  promptSnippet: "Do X for Y", // optional: one line in Available tools
-  promptGuidelines: ["Use my_tool when ..."], // optional; name the tool explicitly
-  parameters: Type.Object({
-    action: StringEnum(["list", "add"] as const, { description: "Operation to perform" }),
-    text: Type.Optional(Type.String({ description: "Text for add" })),
-  }),
+SuPi additions:
 
-  // Optional legacy/resume shim. Runs before schema validation and execute().
-  prepareArguments(args) {
-    return args;
-  },
-
-  // Optional: use "sequential" only when sibling calls must not run concurrently.
-  // executionMode: "sequential",
-  // Optional: tool renders its own shell/framing.
-  // renderShell: "self",
-
-  async execute(_toolCallId, params, signal, onUpdate, ctx) {
-    onUpdate?.({ content: [{ type: "text", text: "Working..." }], details: { progress: 50 } });
-
-    return {
-      content: [{ type: "text", text: `Done: ${params.action}` }],
-      details: { action: params.action },
-      // terminate: true, // only for final-answer tools
-    };
-  },
-});
-
-export default function (pi: ExtensionAPI) {
-  pi.registerTool(myTool);
-}
-```
-
-Use `defineTool()` for standalone constants, arrays, or SDK `customTools` where contextual typing would otherwise widen params. Inline `pi.registerTool({ ... })` infers parameter types.
+- Use `defineTool()` for standalone constants, arrays, or SDK `customTools` where contextual typing would otherwise widen params. Inline `pi.registerTool({ ... })` infers parameter types.
+- Built-in overrides: match the built-in result shape including `details`, or built-in UI/session logic breaks. Renderers inherit per omitted slot, but `promptSnippet`/`promptGuidelines` do **not** — redefine them intentionally (official: § Overriding Built-in Tools).
 
 ## Model-Facing Guidance
 
-- `description` is the main provider tool description. Include what the tool does, when to use it, preconditions, side effects, truncation, and any required sequencing/batching.
-- `promptSnippet` opts a custom tool into the default system prompt's `Available tools` list. If omitted, the active tool is still callable but not listed there.
-- `promptGuidelines` are appended flat to the default `Guidelines` section only while the tool is active. Each bullet must name the tool (`Use my_tool when ...`), because PI does not add a heading or prefix. Parameter-style bullets must also name the tool (`Pass refresh: true to code_health to recover stale diagnostics`), not just the parameter (`Pass refresh: true to recover stale diagnostics`).
-- Give every model-facing fact exactly one home and delete duplicates. `description` owns selection rules, preconditions, and no-fallback contracts; `promptSnippet` owns one capability phrase; `promptGuidelines` owns cross-tool routing and ordering; schema field descriptions own parameter mechanics (formats, enum semantics, cross-field rules). Human docs (README, CLAUDE.md) restate behavior in their own words instead of duplicating model-facing text.
-- Token efficiency is a top goal for model-facing guidance. Treat prompt budget as scarce: make snippets/guidelines concise, concrete, and information-dense.
-- Skip low-value hints. Include negative or ordering guidance only when it materially improves tool choice or execution quality.
-- Built-in overrides do **not** inherit `promptSnippet` or `promptGuidelines`; redefine them intentionally.
+Mechanics of `promptSnippet` (opts into the `Available tools` list) and `promptGuidelines` (appended flat to `Guidelines` only while the tool is active): installed Pi `docs/extensions.md` § Custom Tools.
 
-## Parameters and Argument Compatibility
+Design rules:
 
-- Use a TypeBox `Type.Object(...)` schema. Add `{ description: "..." }` to fields the model must fill.
-- Use `Type.Optional(...)` for optional inputs.
-- Use `StringEnum` from `@earendil-works/pi-ai` for string enums; `Type.Union([Type.Literal(...)])` is not Google-compatible.
-- Keep the public schema current. Do not add deprecated fields solely for old sessions.
-- Use `prepareArguments(args)` to translate old stored tool-call args before validation, especially for resumed sessions. Return an object matching the current schema.
+- Every guideline bullet must name the tool (`Use my_tool when ...`), because PI adds no heading or prefix. Parameter-style bullets also name the tool (`Pass refresh: true to code_health to recover stale diagnostics`), not just the parameter.
+- Token budget is a top goal: concise, concrete, information-dense. Skip low-value hints; include negative or ordering guidance only when it materially improves tool choice or execution quality.
+- Prefix metadata is Tier 1 (`context-architecture.md#2-cache-lifecycle-and-billing-tiers`): every byte is re-paid on each cold session. Nothing in metadata should belong in results or `details` instead.
+- Activation churn rebuilds the prefix (Tier 3): treat shipped metadata as stable.
+
+## Parameters
+
+Schema basics (TypeBox `Type.Object`, `Type.Optional`, `StringEnum` from `@earendil-works/pi-ai` for Google compatibility): installed Pi `docs/extensions.md` § Tool Definition.
+
+SuPi rules:
+
+- Schemas are Tier 1: keep field descriptions short and prefer enums over prose enumerations. Add descriptions only to fields the model must fill.
+- Keep the public schema current. Do not add deprecated fields solely for old sessions; use `prepareArguments(args)` as the only legacy/resume shim.
 - Export a custom tool input type when other extensions/events need typed `isToolCallEventType<"tool", Input>()` checks.
 
-## Execution Contract
+## Execution and Results
 
-`execute(toolCallId, params, signal, onUpdate, ctx)` returns an `AgentToolResult`:
+Contract, throw-for-failure semantics (`isError: true`), `onUpdate` streaming, `signal` handling, `ctx.hasUI` vs `ctx.mode`: installed Pi `docs/extensions.md` § Custom Tools.
 
-- `content`: text/image blocks sent back to the model.
-- `details`: structured data for UI, logs, and state reconstruction; use `details: {}` if there is no state.
-- `terminate?: true`: hint to skip the automatic follow-up LLM call **only when every finalized result in the current tool batch also terminates**.
+SuPi rules:
 
-Rules:
+- `content` = what the model must read; `details` = everything else. `details` is never sent to the model — zero context cost — and is the durable home for UI data and branch-aware state.
+- Shape results decision-first: answer/totals before evidence; totals instead of full lists when counts suffice; handles and next-step pointers instead of re-derivable data; bulk output to a spill file with preview + path in `content`.
+- Valid empty outcomes (for example, no matches) return success. Throw only for real failures or capability-unavailable conditions.
 
-- Keep `content` concise and model-relevant; keep `details` stable and structured.
-- Use `onUpdate?.(...)` for partial progress on long-running tools.
-- Honor `signal` and pass it to abort-aware APIs (`fetch`, `pi.exec`, subprocess helpers, model calls).
-- Throw from `execute()` to mark the tool result as failed (`isError: true`). Returning text like `"Error: ..."` is still a successful tool call. Valid empty outcomes (for example, no matches) should return success.
-- Use `ctx.hasUI` for dialogs that work in TUI/RPC (`select`, `confirm`, `input`, `editor`, `notify`). Use `ctx.mode === "tui"` for TUI-only features such as `ctx.ui.custom()`, component factories, terminal input, and direct rendering. Return a clear fallback outside supported modes.
+## Output Size
 
-## Concurrency, Paths, and File Mutation
+PI does not automatically truncate custom tool output. Truncation helpers and defaults (`truncateHead`/`truncateTail`, `DEFAULT_MAX_LINES = 2000`, `DEFAULT_MAX_BYTES = 50KB`, truncation notice + full-output path): installed Pi `docs/extensions.md` § Output Truncation.
 
-- Tool execution is parallel by default: sibling calls from one assistant message are preflighted in order, then execute concurrently. Do not assume sibling results are visible in `ctx.sessionManager` during `tool_call`.
-- Set `executionMode: "sequential"` only for order-dependent shared state (games, cursors, state machines).
+SuPi rules:
+
+- Mention truncation limits in `description` when they affect tool choice.
+- Prefer spill files over large inline output: `content` carries preview + path only (Tier 2 economy), full data stays on disk.
+- `tool_result` handlers that shrink history should move noise to `details` rather than delete information.
+
+## Paths and File Mutation
+
 - For path params, strip a leading `@` and resolve relative paths from `ctx.cwd`:
 
 ```typescript
@@ -111,56 +96,45 @@ const normalizePathArg = (path: string) => (path.startsWith("@") ? path.slice(1)
 const absolutePath = resolve(ctx.cwd, normalizePathArg(params.path));
 ```
 
-- File-mutating tools must use `withFileMutationQueue(absolutePath, async () => { ... })` on the real resolved target path, wrapping the whole read-modify-write window. Built-in `edit`/`write` use the same per-file queue; for existing files the helper canonicalizes through `realpath()` so symlink aliases share a queue.
-
-## Output Size
-
-Custom tools **must truncate** large model-visible output.
-
-- Built-in limits: `DEFAULT_MAX_LINES = 2000`, `DEFAULT_MAX_BYTES = 50KB`.
-- Use `truncateHead()` when the beginning matters (file reads/search results); use `truncateTail()` when the end matters (logs/command output).
-- Mention truncation limits in `description`.
-- Tell the model when output was truncated and, when practical, save full output to a temp file and include that path.
+- File-mutating tools participate in the shared per-file queue: `withFileMutationQueue()` semantics, `realpath()` canonicalization, and parallel-execution context: installed Pi `docs/extensions.md` § Custom Tools. Wrap the whole read-modify-write window with the resolved absolute path.
 
 ## State and Session Safety
 
-- Branch-aware tool state belongs in tool-result `details`; reconstruct it from `ctx.sessionManager.getBranch()` on `session_start` and `session_tree`.
-- Use `pi.appendEntry(customType, data)` for extension state that should persist but not participate in LLM context.
-- Do not rely on long tool `content` for durable state. Compaction truncates tool-result text to 2,000 characters and summaries are lossy (`context-architecture.md#3-compaction-mechanics-what-extensions-need-to-know`).
+- Branch-aware tool state belongs in tool-result `details`, reconstructed from `ctx.sessionManager.getBranch()` on `session_start` and `session_tree`: installed Pi `docs/extensions.md` § State Management.
+- Use `pi.appendEntry(customType, data)` for extension state that should persist but never reach the model.
+- Do not rely on long tool `content` for durable state: compaction summary serialization truncates tool results to 2,000 characters (official: `docs/compaction.md` § Message Serialization). `details` survives intact and unbilled.
 
 ## Rendering and TUI Rules
 
-- `renderCall(args, theme, context)` and `renderResult(result, options, theme, context)` are optional; if defined, each must return a `Component`.
-- Handle `options.isPartial`, `options.expanded`, and `context.isError`. There is no `result.isError`.
-- Prefer compact default views; show detail only when expanded.
-- Reuse `context.lastComponent` for in-place updates when useful. Use `context.state` only for state shared across call/result render slots; read `context.args` in `renderResult` instead of duplicating args.
-- `renderShell: "self"` means the tool owns its own framing, padding, and background.
-- Custom components must follow `tui.md`: each rendered line fits `width`; implement `invalidate()`; if themed strings are cached, rebuild them on invalidation so theme changes apply.
-- Fallbacks: ordinary custom tools use generic rendering when slots are omitted; built-in overrides inherit omitted `renderCall`/`renderResult` per slot from the built-in renderer.
+Slots (`renderCall`/`renderResult`), required option handling (`isPartial`, `expanded`, `context.isError`), fallbacks, and best practices: installed Pi `docs/extensions.md` § Custom Rendering. SuPi transcript conventions (collapsed/expanded states, `details` contract): `../conventions/tool-rendering.md`.
+
+SuPi additions:
+
+- Built-in overrides inherit omitted `renderCall`/`renderResult` per slot from the built-in renderer (official: § Overriding Built-in Tools).
+- `renderShell: "self"` strips PI's Box (background, padding) entirely — the tool must provide its own framing. Avoid unless the tool needs full-screen control.
+- Custom components follow installed Pi `docs/tui.md`: each rendered line fits `width`; implement `invalidate()`; rebuild cached themed strings on invalidation.
 
 ## Built-ins, Dynamic Tools, and Events
 
-Built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`.
-
-- Registering the same `name` replaces a built-in. Match the built-in result shape, especially `details`, if you want built-in UI/session logic to keep working.
-- To wrap built-ins, delegate to `createReadTool`, `createBashTool`, `createEditTool`, `createWriteTool`, etc. Use operations interfaces for remote/sandbox execution; use `createLocalBashOperations()` for `user_bash`; use `createBashTool(..., { spawnHook })` to adjust command/cwd/env before execution.
-- `pi.registerTool()` works at startup or later (`session_start`, commands, handlers); newly registered tools are refreshed immediately.
-- `pi.setActiveTools(names)` controls which tools are active/callable and which prompt snippets/guidelines shape the prompt. Inspect with `pi.getActiveTools()` / `pi.getAllTools()`. For lazy tool loading and its prompt-cache effects, see `context-architecture.md#5-extension-surfaces-for-context-control`.
-- `tool_call` handlers can block a call or mutate `event.input` before execution. Mutations are not revalidated.
-- `tool_result` handlers can patch `content`, `details`, or `isError`; fields replace whole values, not deep-merge. Use `ctx.signal` for nested abort-aware work.
+- To wrap built-ins, delegate to `createReadTool`, `createBashTool`, `createEditTool`, `createWriteTool`, etc. Use operations interfaces for remote/sandbox execution; use `createLocalBashOperations()` for `user_bash`; use `createBashTool(..., { spawnHook })` to adjust command/cwd/env before execution. `createBashTool` applies `commandPrefix` **before** `spawnHook`; strip the prefix manually if the hook needs the raw command.
+- Registration timing, `pi.setActiveTools()` / `getActiveTools()` / `getAllTools()`, `tool_call` blocking/input mutation, `tool_result` patching: installed Pi `docs/extensions.md` (§ Custom Tools, § Dynamic Tool Loading, § Tool Events).
+- **Activation decision (Tier 3):** keep the always-on active set minimal. Rarely needed tools use the loader pattern with additive activation. Lazy tools rely on `description` only and omit `promptSnippet`/`promptGuidelines`; deferred-native models keep the prefix stable, the fallback can break it.
+- New definitions added mid-session are Tier-2 additions for deferred-native models; on the fallback path they re-bill with the whole tool list.
 
 ## Shipping Checklist
 
 - [ ] Name follows the Naming rules: snake_case, no `supi_` prefix, no unintended built-in replacement.
-- [ ] `description` explains purpose, use cases, limits/side effects, and ordering.
+- [ ] `description` explains purpose, use cases, limits/side effects, and ordering — selection-sufficient, nothing more.
 - [ ] `promptSnippet` is present only if the tool should appear in `Available tools`.
 - [ ] `promptGuidelines` bullets explicitly name the tool.
 - [ ] Each model-facing fact has exactly one home (description, guidelines, or schema field).
 - [ ] Model-facing guidance is concise, information-dense, and omits low-value hints.
-- [ ] Important parameters have descriptions; string enums use `StringEnum`.
+- [ ] Result `content` holds only what the model must read; evidence, state, and bulk output live in `details` or spill files.
+- [ ] No fact duplicated between `content` and `details`; inputs are not echoed in results.
+- [ ] Important parameters have descriptions; string enums use `StringEnum`; schemas stay compact.
 - [ ] `prepareArguments()` is only a legacy compatibility shim.
 - [ ] `execute()` honors `signal`, streams progress when useful, and throws for real failures.
-- [ ] Long output is truncated with a clear truncation notice.
+- [ ] Long output is truncated with a clear truncation notice, or spilled to a file with path + preview.
 - [ ] Path tools normalize leading `@` and resolve from `ctx.cwd`.
 - [ ] File-mutating tools queue the full mutation window with `withFileMutationQueue()`.
 - [ ] Stateful tools persist branch-aware state in `details` and reconstruct on session events.
@@ -168,4 +142,4 @@ Built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`.
 - [ ] Order-dependent tools use `executionMode: "sequential"`.
 - [ ] Built-in overrides intentionally preserve or replace prompt metadata, rendering, and result shape.
 - [ ] Custom renderers handle partial, expanded, error, width, and invalidation behavior.
-
+- [ ] Activation set is stable; lazy tools omit prompt metadata and load additively.

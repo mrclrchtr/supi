@@ -1,52 +1,92 @@
 # Pi context architecture for extension developers
 
-What Pi sends to the model on each request, scoped to what extension authors can influence and control. Evidence comes from installed Pi 0.84.2 docs (`docs/compaction.md`, `docs/skills.md`, `docs/session-format.md`, `docs/extensions.md`) and dist source (`core/skills.js`, `core/compaction/compaction.js`, `core/session-manager.js`, pi-ai `api/anthropic-messages.js`). Items marked **inferred** are not stated in Pi docs or source. User-owned controls (system prompt skeleton, `AGENTS.md` files, compaction settings, `/tree`/`/fork`, `PI_CACHE_RETENTION`) are excluded from guidance. Their mechanics appear only where extensions can read or intercept them. This doc owns mechanics and costs. Design rules for tools live in `tool-guidance.md`.
+What Pi sends to the model on each request, and what that costs. Scoped to what extension authors can influence and control. This doc owns context mechanics and costs; tool design rules live in `tool-guidance.md`.
 
-## 1. Components extensions pay for
+Baseline mechanics are officially documented. This doc references the installed Pi docs (§3) instead of restating them, and adds only source-verified facts that are not officially documented plus extension-specific consequences.
 
-Each request is stateless. Pi rebuilds and sends the full payload each turn. Extensions add cost in four places:
+Evidence: installed Pi 0.84.2 docs (`docs/extensions.md`, `docs/compaction.md`, `docs/skills.md`, `docs/session-format.md`) and dist source (pi-ai `api/anthropic-messages.js`, pi-agent-core `harness/messages.js`). Items marked **inferred** are not stated in Pi docs or source; price relations follow provider prompt-caching economics. User-owned controls (system prompt skeleton, `AGENTS.md` files, compaction settings, `/tree`/`/fork`, `PI_CACHE_RETENTION`) are excluded from guidance.
 
-- **Tool schemas** — JSON Schema for each active tool, sent in the `tools` parameter each turn. Every extension-registered tool adds its own schema.
-- **Skill metadata catalog** — `<available_skills>` XML in the system prompt: name + description + file location for each skill, including skills shipped by extension packages. The Agent Skills spec limits names to 64 chars and descriptions to 1,024 chars. Pi warns on longer values but still loads the skill without truncation. Rough guide: ~50–200 tokens for each skill (**inferred**).
-- **Tool results in history** — the largest history contributor. Extension tool output stays in the growing history until compaction.
-- **Injected messages** — custom messages (`role: "custom"`) injected with `pi.sendMessage()` or returned from `before_agent_start` persist in the session and are sent to the LLM like normal turns.
+## 1. What extensions pay for — and what is free
 
-## 2. Per-turn vs. cached
+Each request is stateless. Pi rebuilds and sends the full payload every turn.
 
-- **Cache breakpoints (confirmed, Anthropic provider code):** pi-ai sets ephemeral `cache_control` on (1) the system prompt block, (2) the last immediate tool definition, and (3) the last block of the last user message. Tool definitions carry `cache_control` only when the model compat flag `supportsCacheControlOnTools` allows it (default: allowed). Deferred definitions carry no `cache_control`. Everything before the last breakpoint is the cache prefix. On a cache hit, only content after the last breakpoint bills as fresh input.
-- **Extension actions that break the prefix:** adding or removing tools, activating a tool with `promptSnippet`/`promptGuidelines`, and per-turn system-prompt changes. `docs/extensions.md` documents all three effects. Dynamic activation adds tool definitions. The added definitions and the rebuilt prompt can each invalidate the cached prefix. The exact re-billing split on a cache hit follows from the breakpoint mechanics above.
-- **History:** grows each turn. It is the growing cache-eligible prefix.
-- **Lazy-loaded:** full skill instructions are **not** in the request. Only the catalog entry is. The agent loads `SKILL.md` with the `read` tool when a task matches, or on `/skill:name` (progressive disclosure, confirmed in `docs/skills.md`).
-- **Cache-hostile by design:** compaction and branch-summary calls use fresh routing session IDs and disable prompt-cache writes where the provider supports it (confirmed in `docs/compaction.md`).
+Paid surfaces:
 
-## 3. Compaction mechanics (what extensions need to know)
+- **Tool schemas** — JSON Schema for each active tool, sent in the `tools` parameter every request.
+- **Skill metadata catalog** — `<available_skills>` XML in the system prompt: name, description, location per skill. Frontmatter limits (name 64 / description 1,024 chars) and validation in installed Pi `docs/skills.md` § Frontmatter.
+- **History content** — `content` of tool results and injected custom messages; the largest growing contributor.
+- **Injected messages** — custom messages (`role: "custom"`) via `pi.sendMessage()` or returned from `before_agent_start`; their `content` is sent like normal turns.
 
-- **Trigger:** auto-compaction fires when `contextTokens > contextWindow - reserveTokens` (defaults: `reserveTokens` 16384, `keepRecentTokens` 20000, both user-configurable). Extensions read the effective settings via `preparation.settings` in the compact hook.
-- **Token estimation:** last valid assistant `usage` from the provider plus a `chars / 4` estimate for later messages (conservative overestimate, images count as 4,800 chars).
-- **Cut points:** cuts land on user, assistant, bashExecution, custom, or branch-summary messages — never on tool results (a result must stay with its call). Compaction entries themselves are skipped in cut-point selection. Custom extension messages are valid cut boundaries.
-- **What survives:** a structured summary (Goal, Constraints, Progress, Decisions, Next Steps, Critical Context) plus cumulative `<read-files>`/`<modified-files>` path lists. Tool results are truncated to 2,000 chars during summary serialization. Exact function names and error messages have no verbatim guarantee (**inferred**).
-- **JSONL is never destroyed:** compaction appends a `CompactionEntry` (`summary`, `firstKeptEntryId`, `tokensBefore`). Older entries stay in the file, unsent but intact. `docs/session-format.md` also documents an optional `retainedTail` variant that stores the kept messages directly on the entry.
+Free channels — never serialized to the model (source-verified: pi-ai `convertToolResult()` sends only `content`/`isError`; pi-agent-core `convertToLlm()` sends only custom-message `content`):
 
-## 4. Session vs. context
+- Tool result `details` and custom message `details`.
+- `pi.appendEntry(customType, data)` payloads.
+- Spill files — only a path reference in `content` is paid.
 
-- **Session = the record of what happened.** Append-only JSONL. Entries form a tree via `id`/`parentId`. The session-manager source describes the store as an append-only tree and states that branching never modifies history.
-- **Context = what the model needs now.** A derived, compaction-aware view: `buildContextEntries()` walks leaf → root and applies the latest `CompactionEntry`.
-- **Extension consequence:** every custom message or branch summary an extension appends is a permanent session record. Only its branch path reaches the model. Compaction can later summarize it. Branch navigation only moves the leaf pointer, so injected entries never corrupt other branches.
+Consequence: full fidelity (UI rendering, state reconstruction, bulk evidence) can live outside model context. Placement design rules: `tool-guidance.md#content-budget-and-placement`.
 
-## 5. Extension surfaces for context control
+## 2. Cache lifecycle and billing tiers
 
-All confirmed in `docs/extensions.md`:
+Pi's model definitions carry four cost channels: `input`, `output`, `cacheRead`, `cacheWrite`. Relative price relations below are **inferred** from provider prompt-caching economics; exact ratios are provider- and model-specific.
 
-- **System prompt injection:** `before_agent_start` can return a `message` (custom message, stored and sent to the LLM) and a replacement `systemPrompt` that chains across handlers. `event.systemPromptOptions` exposes the structured inputs (custom prompt, active tools, snippets, guidelines, context files, skills). Changes here are part of the cached prefix.
-- **Tool prompt metadata:** `promptSnippet` and `promptGuidelines` apply only while the tool is active, so dynamic activation changes the prompt (§2). Design rules: `tool-guidance.md#model-facing-guidance`.
-- **Dynamic/lazy tool loading:** register all tools, keep only a loader tool active, then extend with `pi.setActiveTools()` during execution. Changes must be additive. Models with native deferred loading (Anthropic Sonnet, Opus, and Fable 4.5+ except Haiku; OpenAI gpt-5.4+) keep the prefix stable. They load new definitions at the tool-result position. Other models fall back to the full active tool list. That fallback can invalidate the cache prefix. Lazy tools should rely on their `description` only and omit `promptSnippet`/`promptGuidelines`.
-- **History control:** the `tool_result` event can rewrite tool output before it enters the session (handler mechanics: `tool-guidance.md#built-ins-dynamic-tools-and-events`). Truncation and spill-file rules: `tool-guidance.md#output-size`. The 2,000-char cut applies only during summary serialization (§3), not in live history.
-- **Per-turn message mutation:** the `context` event fires before each LLM call and can return a replaced `messages` array (a deep copy, safe to modify). This is the direct hook for pruning or rewriting what the model sees on a given turn.
-- **Provider payload rewrite:** `before_provider_request` fires after the provider payload is built, right before it is sent. Returning a value replaces the payload, including provider-level system instructions. Returning `undefined` keeps the payload unchanged.
-- **Skill discipline:** ship short, specific skill descriptions. Set `disable-model-invocation: true` to hide a skill from the catalog and force `/skill:name` use.
-- **Compaction hooks:** `session_before_compact` can cancel compaction or supply a custom summary. `session_before_tree` can cancel navigation or supply a branch summary. Both accept arbitrary JSON in `details`. `session_before_compact` receives `preparation.settings`. `session_before_tree` does not.
+**Cache breakpoints (confirmed in pi-ai provider code):** ephemeral `cache_control` is set on (1) the system prompt block, (2) the last immediate tool definition, and (3) the last block of the last user message. Tool definitions carry `cache_control` only when the model compat flag `supportsCacheControlOnTools` allows it (default: allowed). Deferred definitions carry no `cache_control`. Everything before the last breakpoint is the cache prefix.
+
+### Tier 1 — stable prefix
+
+Everything before the last breakpoint: system prompt skeleton (including `promptSnippet`/`promptGuidelines` of active tools), active tool schemas, skill catalog, context files.
+
+- Billed at full input price on every cold session start and every cache miss.
+- Billed at cheap `cacheRead` price on a cache hit. Cross-session reuse happens only within the provider TTL and only when the prefix is byte-identical.
+- Design rule: prefix bytes are the most expensive bytes an extension adds — the only content reliably re-paid across sessions. Keep active schemas and prompt metadata at a minimal, selection-sufficient budget.
+
+### Tier 2 — additions
+
+Content after the last breakpoint: new user/assistant messages and new tool results.
+
+- Billed once at full input price (plus provider cache-write premium) when appended.
+- Then part of the prefix on later requests: cheap on hits, re-paid in full on every later miss, retained until compaction.
+- Design rule: every result byte is paid full at least once, grows every later full re-bill, and pulls compaction closer. Keep results decision-sufficient and minimal; offload bulk to free channels (§1).
+
+### Tier 3 — cache breaks
+
+- Adding or removing active tools, activating tools with `promptSnippet`/`promptGuidelines` (system-prompt rebuild), and per-turn system-prompt changes: the accumulated prefix re-bills at full price on the next request. Official cache advice: installed Pi `docs/extensions.md` § Dynamic Tool Loading.
+- Compaction and branch-summary calls are cache-hostile by design: fresh routing session IDs and prompt-cache writes disabled where supported (official: `docs/compaction.md` Overview).
+- Design rule: stability first. Register all tools at startup; keep activation changes additive and rare.
+
+## 3. Mechanics index — official Pi docs
+
+Read these first (repo pi-docs-first rule). Locations refer to the installed Pi docs.
+
+| Topic | Official location (`docs/…` of `@earendil-works/pi-coding-agent`) |
+| --- | --- |
+| Tool definition fields, `execute` contract, throw-for-failure semantics, `onUpdate`, `ctx` | `extensions.md` § Custom Tools |
+| Output truncation helpers and defaults (2,000 lines / 50KB) | `extensions.md` § Output Truncation |
+| Parallel execution and `withFileMutationQueue()` | `extensions.md` § Custom Tools |
+| State in `details` + branch reconstruction | `extensions.md` § State Management |
+| Built-in overrides: per-slot renderer inheritance, prompt-metadata non-inheritance | `extensions.md` § Overriding Built-in Tools |
+| Dynamic/lazy tool loading, deferred-native models, fallback | `extensions.md` § Dynamic Tool Loading |
+| `tool_call` / `tool_result` handler mechanics | `extensions.md` § Tool Events |
+| Compaction triggers, cut points, summary format, 2,000-char tool-result serialization | `compaction.md` |
+| Custom summaries and branch summaries via extensions | `compaction.md` § Custom Summarization via Extensions |
+| Session tree, entry types, context building | `session-format.md` |
+| Skill catalog, progressive disclosure, `disable-model-invocation` | `skills.md` |
+
+## 4. Extension surfaces for context control
+
+All surfaces are official (`docs/extensions.md`); the notes are the context-cost reading of each.
+
+- **System prompt injection** — `before_agent_start` can return a replacement `systemPrompt` (chains across handlers) and a `message` (stored and sent). `event.systemPromptOptions` exposes the structured inputs. Part of the Tier-1 prefix: keep stable.
+- **Tool prompt metadata** — `promptSnippet`/`promptGuidelines` apply only while the tool is active, so activation changes touch Tier 1 (§2). Design rules: `tool-guidance.md#model-facing-guidance`.
+- **Dynamic tool loading** — additive `pi.setActiveTools()` during execution. Deferred-native models keep the prefix stable and load definitions at the tool-result position (Tier 2); the fallback resends the full active list and can break the prefix (Tier 3). Lazy tools should rely on `description` only and omit `promptSnippet`/`promptGuidelines`. Current model list: installed Pi `docs/extensions.md` § Models with native deferred loading.
+- **History control** — the `tool_result` event rewrites output before it enters the session. Prefer moving noise from `content` to `details` over deleting information — `details` is free (§1). Spill rules: `tool-guidance.md#output-size`. The 2,000-char cut applies only during summary serialization (official: `compaction.md` § Message Serialization), not in live history.
+- **Per-turn message mutation** — the `context` event fires before each LLM call and can return a replaced `messages` array (a deep copy, safe to modify). The direct hook for pruning what the model sees on a given turn.
+- **Provider payload rewrite** — `before_provider_request` fires after the payload is built; returning a value replaces the payload including provider-level system instructions, `undefined` keeps it.
+- **Skill discipline** — catalog entries are Tier 1; full `SKILL.md` bodies are lazy-loaded by the agent on demand. Ship short, specific descriptions; `disable-model-invocation: true` hides a skill from the catalog and forces `/skill:name`.
+- **Compaction hooks** — `session_before_compact` can cancel compaction or supply a custom summary and receives `preparation.settings`; `session_before_tree` can cancel navigation or supply a branch summary and does not. Both accept arbitrary JSON in `details`.
+
+**Session-record consequence (official: `session-format.md`):** every custom message or branch summary an extension appends is a permanent JSONL record. Only its branch path reaches the model; compaction can later summarize it. Branch navigation only moves the leaf pointer, so injected entries never corrupt other branches.
 
 ## Related docs
 
-- `tool-guidance.md` — design rules for tools: naming, metadata, schemas, execution, output limits, rendering. This doc owns the context costs of those surfaces.
+- `tool-guidance.md` — design rules for tools: naming, metadata budgets, placement, output limits, checklist. This doc owns the context costs of those surfaces.
 - `model-call.md` — direct model calls from extensions.
