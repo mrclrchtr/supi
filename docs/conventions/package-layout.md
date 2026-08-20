@@ -43,55 +43,48 @@ Stay flat when a package is small or has only one clear subsystem.
 
 Preferred optional folders:
 - `config/` — config loading, schemas, defaults, capabilities
-- `tool/` — tool wiring, action specs, capability metadata, overrides, prompt guidance
+- `tool/` — one directory per registered tool (spec, guidance, execution, result, display) plus shared tool modules
 - `ui/` — renderers, widgets, display formatting
 - `session/` — per-session state, registries, persistence, runtime wiring
 - domain folders such as `actions/`, `client/`, `manager/`, `forensics/`, `monitor/`, `report/`
 
 ### Tool guidance convention
 
-When a package registers model-callable tools with pi, keep model-facing tool guidance under `src/tool/`.
+Model-facing tool guidance lives in the tool's own directory:
 
-Preferred pattern:
-- single custom tool → `src/tool/guidance.ts`
-- multiple custom tools → one guidance file per logical tool, such as `src/tool/<tool-name>-guidance.ts`
+- every registered tool → `src/tool/<tool_name>/guidance.ts`
 - built-in tool overrides may export only the extra `promptGuidelines` they add on top of pi-owned metadata
-- packages with no registered tools should not add empty guidance modules
+- packages with no registered tools should not add guidance modules
 
-Guidance modules should export the relevant prompt surfaces for that tool:
+Guidance modules export the tool's prompt surface:
 - `toolDescription`
 - `promptSnippet`
 - `promptGuidelines`
 - optional dynamic builders such as `buildPromptGuidelines()` when the guidance depends on runtime or project state
+- prompt-surface config defaults derived from the same constants
 
 ### Tool metadata convention
 
-When a package has more than trivial tool metadata, keep a single coherent source for the public tool or action surface under `src/tool/`. This may be one spec module or an aligned spec/guidance pair when verbose model-facing prose would make the spec module noisy.
+Each registered tool owns its machine-readable public metadata in `src/tool/<tool_name>/spec.ts`. Registration and tests derive from these modules; do not re-declare independent tool lists elsewhere. Keep execution logic in separate execute or workflow modules.
 
-Preferred pattern:
-- one multiplexed tool with an `action` parameter → `src/tool/action-specs.ts`
-- multiple public tools in one package → `src/tool/tool-specs.ts` or `src/tool/specs.ts` plus `src/tool/guidance.ts`
-- small packages with one simple tool may keep metadata inline until duplication appears
-
-These spec modules should own the machine-readable public metadata that otherwise drifts between schemas, registration, validation, and UI:
-- tool or action names
+A spec module owns:
+- canonical tool name and label
 - parameter schemas or enum values
+- execution bindings
 - validation support text such as ordered action lists
 - displayed capability labels when the package surfaces runtime support to users
-- optionally descriptions, `promptSnippet`, and base `promptGuidelines` when the package does not split those into guidance modules
 
-Guidance and registration code should derive from, or be keyed by, the same canonical spec names rather than re-declaring independent tool lists. Keep execution logic in separate action or service modules. For the full rationale and examples, see `tool-architecture.md`.
+For the full rationale and examples, see `tool-architecture.md`.
 
 ### Tool result convention
 
-Model-visible result assembly (`content` + `details`) lives under `src/tool/` whenever that folder exists.
+Model-visible result assembly (`content` + `details`) lives in the tool's own directory:
 
-Preferred pattern:
-- single custom tool → `src/tool/result.ts`
-- multiple custom tools → `src/tool/result/<tool-name>.ts`, plus an optional shared core inside `src/tool/result/`
-- transient `onUpdate` progress text may stay in workflow/execution modules; final results are built by the result module
+- every registered tool → `src/tool/<tool_name>/result.ts`
+- shared result cores, formatting, or paging used by 2+ tools → named modules at `src/tool/` level
+- transient `onUpdate` progress text may stay in workflow/execution modules; final results are built by the tool's result module
 
-Never place result assembly under `render/` or `ui/`, and do not leave it at the package root once `src/tool/` exists. Module names follow pi's `AgentToolResult` vocabulary (`result`, not `output`). See `tool-architecture.md` § Result module naming.
+Never place result assembly under `render/` or `ui/`. Module names follow pi's `AgentToolResult` vocabulary (`result`, not `output`). See `tool-architecture.md` § Result module naming.
 
 ### Prefer domain folders over generic buckets
 
@@ -118,26 +111,26 @@ When multiple SuPi packages need the same path, URI, config, or session helper s
 | Package | Target shape |
 | --- | --- |
 | `supi` | keep flat meta-package surface (`src/api.ts`, `src/extension.ts`) |
-| `supi-ask-user` | hybrid: root surfaces + `render/` + `ui/` |
+| `supi-ask-user` | per-tool `tool/ask_user/`; interactive form stays in `ui/` |
 | `supi-bash-timeout` | stay flat unless it grows |
-| `supi-cache` | domain-first: `forensics/`, `monitor/`, `report/`; optional `config/` later |
+| `supi-cache` | domain-first: `forensics/`, `monitor/`, `report/` + per-tool `tool/cache_forensics/` |
 | `supi-claude-md` | skills-only behavior with thin `resources_discover` extension; keep flat |
-| `supi-code-intelligence` | hybrid: root surfaces + `app/` + `session/` + `substrate/` + `analysis/` + `tool/` + `ui/` |
+| `supi-code-intelligence` | per-tool directories for the eight `code_*` tools + shared tool modules; keep `app/`, `session/`, `substrate/`, `analysis/`, `ui/` |
 | `supi-code-runtime` | library-only: flat source with `capability/` + `workspace/`; no pi extension |
-| `supi-agent` | stay flat for the catalogue/resource-policy slice; add `config/`, `session/`, `tool/`, or `ui/` only as later slices earn them |
+| `supi-agent` | per-tool `tool/agent_run/`; catalogue/resource-policy slice stays at root |
 | `supi-agent-runtime` | library-only: flat lifecycle/diagnostics source; no pi extension |
-| `supi-context` | stay flat unless it grows |
+| `supi-context` | root domains stay; per-tool `tool/<tool>/` layout |
 | `supi-core` | domain-first if reorganized: `config/`, `context/`, `settings/` |
-| `supi-debug` | stay flat unless it grows; optional `ui/` if renderer concerns expand |
+| `supi-debug` | root domains stay; per-tool `tool/debug/` layout |
 | `supi-extras` | mostly flat; split only if coherent domains emerge |
 | `supi-insights` | flat source is fine; move tests to package-level `__tests__/unit/` |
 | `supi-lsp` | hybrid large-package layout with `client/`, `config/`, `diagnostics/`, `manager/`, `provider/`, `session/` |
-| `supi-review` | likely hybrid with `ui/` and `tool/` if reorganized |
+| `supi-review` | per-tool `tool/review_run/`, `tool/review_output/`, `tool/review_audit/` + shared tool modules; keep package domains (`audit/`, `target/`, `history/`) |
 | `supi-skill-patches` | private maintenance package: flat patch, upstream sync, and root skill catalog validation |
 | `supi-skills` | flat skill controls and input shortcuts domain |
 | `supi-test-utils` | stay flat utility package |
 | `supi-tree-sitter` | hybrid: root surfaces + `tool/` + `session/` |
-| `supi-web` | mostly flat; use `tool/` for per-tool guidance files when multiple tools are present |
+| `supi-web` | per-tool directories for the web tools; shared fetch/convert infra stays at root |
 
 ## Package-specific examples
 
@@ -169,3 +162,5 @@ Keep ambiguous utilities at the root until they clearly belong somewhere.
 ## Adoption status
 
 This convention is the default for new packages and for existing packages receiving structural work. Per-package target shapes and flat-package lists live in the matrix above.
+
+Per-tool layout migration: no package has migrated yet. `supi-review` is the pilot. Remaining tool packages after the pilot: `supi-agent`, `supi-ask-user`, `supi-cache`, `supi-code-intelligence`, `supi-context`, `supi-debug`, `supi-web`.

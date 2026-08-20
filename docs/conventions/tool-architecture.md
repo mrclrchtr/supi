@@ -4,16 +4,16 @@ This document defines the preferred internal architecture for SuPi packages that
 
 ## Core rule: one public-surface source
 
-A package with non-trivial tool metadata keeps one canonical tool list under `src/tool/`. Do not hand-maintain the same names or enum values in guidance, schemas, routers, status views, and tests.
+Every registered tool keeps its public surface in one place: its per-tool directory under `src/tool/` (§ Per-tool directory layout). Do not hand-maintain the same names or enum values in schemas, routers, status views, and tests.
 
-For a family of public tools, a spec module should own:
+A tool's `spec.ts` owns:
 
-- public names
+- canonical name and label
 - parameter schemas
 - execution bindings
 - concise purpose and substrate metadata
 
-A paired guidance module may own verbose descriptions, snippets, and guidelines, but it must be keyed by the canonical names and covered by alignment tests.
+The paired `guidance.ts` owns verbose descriptions, snippets, and guidelines. Registration imports each tool's spec and guidance; alignment tests assert that registration matches the spec modules.
 
 ## Preferred module depth
 
@@ -29,6 +29,29 @@ The PI adapter should register metadata, invoke one workflow interface, and map 
 
 A deep workflow module hides multiple decisions behind a small interface. A forwarding module that merely renames another method adds no depth and should usually be removed.
 
+## Per-tool directory layout
+
+Every registered tool gets its own directory under `src/tool/`, regardless of how many tools a package registers. One invariant beats per-package judgment: all code for one tool lives in one directory. The directory name matches the tool name (snake_case).
+
+```text
+src/tool/
+  <tool_name>/
+    spec.ts      — canonical name and label, parameter schema, execution bindings
+    guidance.ts  — prompt surface and its config defaults
+    execute.ts   — execution and workflow glue (role name may vary, e.g. workflow.ts)
+    result.ts    — result assembly; sole producer of model-visible content and details
+    render.ts    — transcript display (or a render/ subfolder)
+  <shared tool modules>  — formatting, paging, or result cores used by 2+ tools
+```
+
+Rules:
+
+- Files inside a tool directory are role-named; the directory carries the tool name.
+- A tool directory holds only that tool's files. Shared modules live at `src/tool/` level; infrastructure that is not tool-specific lives in package-level domain folders (`target/`, `audit/`, git helpers, …).
+- Registration (the PI adapter) imports each tool's spec and guidance and holds no tool-specific logic.
+- Presentation for one tool lives in its directory (`render.ts` or `render/`); package-wide UI lives in `ui/`.
+- Optional files are allowed: tiny tools may not need separate execute or render modules. `spec.ts`, `guidance.ts` (when the tool ships prompt metadata), and `result.ts` exist for every tool that returns model-visible results.
+
 ## Context channel ownership
 
 Each PI context channel (`../pi/context-architecture.md`) maps to exactly one seam. Content placement rules live in `../pi/tool-guidance.md` § Content Budget and Placement; this section assigns code ownership.
@@ -43,7 +66,7 @@ Each PI context channel (`../pi/context-architecture.md`) maps to exactly one se
 
 Metadata rules:
 
-- Canonical names and labels are metadata. Tool families keep them in the spec module; tiny one-tool packages may keep them in their single metadata module (for example `guidance.ts`) without adding a new file.
+- Canonical names and labels are metadata and live in the tool's `spec.ts`; the prompt surface lives in the paired `guidance.ts`.
 - Do not split the prompt surface into per-field modules. `description`, `promptSnippet`, and `promptGuidelines` change together; the fields themselves are the fact homes.
 - Lazy/dynamic tools ship `description` only and omit `promptSnippet`/`promptGuidelines`.
 - Prompt-surface config defaults derive from the same constants; keep them beside the content to prevent drift.
@@ -57,19 +80,13 @@ Result rules:
 
 Name result modules after pi's vocabulary: `execute()` returns an `AgentToolResult` (`content` + `details`), and this seam is result assembly. Use `result`, not `output` — "output" is pi's truncation-limit and transcript vocabulary and would collide.
 
-Structure follows package shape:
-
-| Package shape | Result assembly |
-| --- | --- |
-| Tiny one-tool package | `src/tool/result.ts` |
-| One tool with shared formatting | `src/tool/result.ts` plus sibling formatting modules in `src/tool/` |
-| Tool family | `src/tool/result/<tool-name>.ts` per tool, plus an optional shared core in `src/tool/result/` |
+Each tool's result assembly lives in `src/tool/<tool_name>/result.ts`. Shared result cores, formatting, or paging used by two or more tools live as named modules at `src/tool/` level; infrastructure that is not tool-specific lives in package-level domain folders.
 
 Placement rules:
 
-- Result modules live under `src/tool/` whenever that folder exists. Do not place result assembly at the package root or under `render/`/`ui/`.
-- Transient `onUpdate` progress text may live in workflow/execution modules; final results must be built by the result module.
-- Legacy names (`output.ts`, `review-result.ts`) are renamed when the package receives structural work.
+- Result assembly never lives under `render/` or `ui/`, and not at the package root once `src/tool/` exists.
+- Transient `onUpdate` progress text may live in workflow/execution modules; final results must be built by the tool's result module.
+- Legacy names (`output.ts`, `review-result.ts`) are renamed when the package migrates to the per-tool layout.
 
 ## Typed outcomes
 

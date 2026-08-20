@@ -27,7 +27,7 @@ SuPi is pre-release and not API-stable. Intentional breaking changes to package 
 - Standardize package boundaries with `src/api.ts`, `src/index.ts`, and `src/extension.ts` when the package role requires them.
 - Prefer package-level tests in `__tests__/unit/` and `__tests__/integration/`, with `__tests__/helpers/` and `__tests__/fixtures/` as needed.
 - Prefer domain folders over catch-all names like `core/`, `shared/`, or `misc/`.
-- Keep small packages flat; add `config/`, `tool/`, `ui/`, `session/`, or other domain folders only when the package size and responsibilities clearly justify them.
+- Keep small packages flat; add `config/`, `ui/`, `session/`, or other domain folders only when the package size and responsibilities clearly justify them. Packages that register tools use the per-tool directory layout under `src/tool/` (`docs/conventions/tool-architecture.md` § Per-tool directory layout).
 - Anchor examples: the large-package model (hybrid with domain folders) and the standard package model (flat with package-level tests).
 - This convention is the default for new packages and for existing packages when they receive structural work.
 - Packages that should stay flat unless they grow: `supi-bash-timeout`, `supi-context`, `supi-debug`, `supi-test-utils`.

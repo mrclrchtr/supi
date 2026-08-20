@@ -22,7 +22,7 @@ Reference material for agents that develop PI extensions in this repo. Docs here
 | Doc | Answers | Read when |
 | --- | --- | --- |
 | `conventions/package-layout.md` | Package directory structure, boundary files (`api.ts` / `index.ts` / `extension.ts`), test layout, per-package target matrix | You create a package or do structural work on one |
-| `conventions/tool-architecture.md` | Internal architecture for tool packages: spec/guidance modules, workflow, result assembly, presentation adapters, PI adapter, context-channel ownership | You add or restructure a package that registers tools |
+| `conventions/tool-architecture.md` | Internal architecture for tool packages: per-tool directory layout, spec/guidance modules, workflow, result assembly, presentation adapters, PI adapter, context-channel ownership | You add or restructure a package that registers tools |
 | `conventions/tool-rendering.md` | Transcript rendering: `renderCall`/`renderResult`, `details` contract, collapsed/expanded/partial/error states | You add or change tool renderers |
 | `conventions/code-runtime-architecture.md` | Ownership split of the code stack: `supi-code-intelligence`, `supi-lsp`, `supi-tree-sitter`, `supi-code-runtime` | You work on the code-understanding stack |
 
