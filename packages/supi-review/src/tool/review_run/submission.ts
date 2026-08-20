@@ -1,5 +1,5 @@
-import { REVIEW_LIMITS } from "./review-limits.ts";
-import { normalizeRepositoryRelativePath, normalizeReviewPathArgument } from "./review-path.ts";
+import { REVIEW_LIMITS } from "../../review-limits.ts";
+import { normalizeRepositoryRelativePath, normalizeReviewPathArgument } from "../../review-path.ts";
 import type {
   CriteriaCoverage,
   FindingCounts,
@@ -7,7 +7,7 @@ import type {
   ReviewFinding,
   ReviewLocation,
   ReviewSubmission,
-} from "./types.ts";
+} from "../../types.ts";
 
 type ReviewSubmissionInput = Omit<ReviewSubmission, "findings"> & {
   findings: Array<

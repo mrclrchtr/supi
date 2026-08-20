@@ -5,10 +5,10 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ runReviewer: vi.fn() }));
-vi.mock("../../src/tool/review-runner.ts", () => ({ runReviewer: mocks.runReviewer }));
+vi.mock("../../src/tool/review_run/runner.ts", () => ({ runReviewer: mocks.runReviewer }));
 
 import { resolveReviewSnapshot } from "../../src/git.ts";
-import { runReview } from "../../src/tool/review-workflow.ts";
+import { runReview } from "../../src/tool/review_run/workflow.ts";
 import type {
   ReviewModelSelection,
   ReviewScope,

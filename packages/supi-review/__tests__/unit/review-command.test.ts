@@ -56,11 +56,11 @@ vi.mock("../../src/git-command.ts", () => ({
   runGit: mocks.runGit,
   runGitAllowExit: (cwd: string, args: string[]) => mocks.runGit(cwd, args),
 }));
-vi.mock("../../src/tool/post-review-policy.ts", async (original) => ({
+vi.mock("../../src/tool/review_run/post-policy.ts", async (original) => ({
   ...(await original()),
   queuePostReviewTurn: mocks.queuePostReviewTurn,
 }));
-vi.mock("../../src/tool/review-workflow.ts", () => ({
+vi.mock("../../src/tool/review_run/workflow.ts", () => ({
   captureReviewTarget: mocks.captureReviewTarget,
   draftReviewTasks: mocks.draftReviewTasks,
   runReview: mocks.runReview,

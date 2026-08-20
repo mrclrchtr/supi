@@ -1,8 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { wrapExtensionContext } from "@mrclrchtr/supi-core/context";
-import type { PostReviewPolicy } from "../config.ts";
-import type { ReviewBatchDetails, ReviewOutputReference } from "../types.ts";
-import { REVIEW_OUTPUT_TOOL_NAME } from "./review_output/spec.ts";
+import type { PostReviewPolicy } from "../../config.ts";
+import type { ReviewBatchDetails, ReviewOutputReference } from "../../types.ts";
+import { REVIEW_OUTPUT_TOOL_NAME } from "../review_output/spec.ts";
 
 function findingCount(details: ReviewBatchDetails): number {
   return details.results.reduce(

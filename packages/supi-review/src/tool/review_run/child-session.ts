@@ -9,8 +9,8 @@ import {
   type AgentRunSessionView,
   startAgentRun,
 } from "@mrclrchtr/supi-agent-runtime/api";
-import type { ChildRunOutcome, ReviewProgress } from "../types.ts";
-import { createIsolatedChildResources } from "./child-resource-loader.ts";
+import type { ChildRunOutcome, ReviewProgress } from "../../types.ts";
+import { createIsolatedChildResources } from "./child-resources.ts";
 
 /** Configuration for one review adapter over the neutral Agent Run runtime. */
 export interface IsolatedRunConfig<T> {

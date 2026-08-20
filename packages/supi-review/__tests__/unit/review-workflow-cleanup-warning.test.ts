@@ -20,7 +20,7 @@ vi.mock("../../src/workspace/review-workspace.ts", () => ({
   materializeReviewWorkspace: mocks.materializeReviewWorkspace,
 }));
 
-import { runReview } from "../../src/tool/review-workflow.ts";
+import { runReview } from "../../src/tool/review_run/workflow.ts";
 import type { ReviewModelSelection, ReviewSnapshot } from "../../src/types.ts";
 
 const commit = "a".repeat(40);

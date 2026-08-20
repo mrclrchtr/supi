@@ -4,7 +4,7 @@ import type {
   ReviewMode,
   ReviewProgress,
   ReviewTaskResult,
-} from "../types.ts";
+} from "../../types.ts";
 
 /** Lifecycle facts observed for one finished review task. */
 export interface ReviewTaskDebugSummaryInput {

@@ -22,13 +22,13 @@ vi.mock("../../src/model.ts", () => ({
   resolveAgentReviewModel: mocks.resolveAgentReviewModel,
   resolveRecoveryReviewModel: mocks.resolveRecoveryReviewModel,
 }));
-vi.mock("../../src/tool/review-workflow.ts", () => ({ runReview: mocks.runReview }));
+vi.mock("../../src/tool/review_run/workflow.ts", () => ({ runReview: mocks.runReview }));
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { ReviewArtifactStore } from "../../src/session/review-artifact-store.ts";
-import { registerAgentReviewTools } from "../../src/tool/agent-review-tools.ts";
 import { MAX_PAGE_CHARACTERS, MAX_PAGE_LINES } from "../../src/tool/output-page.ts";
+import { registerReviewRunTool } from "../../src/tool/review_run/register.ts";
 import type { ReviewBatchDetails, ReviewModelSelection } from "../../src/types.ts";
 
 const details: ReviewBatchDetails = {
@@ -98,7 +98,7 @@ describe("agent review tool usage", () => {
 
   it("does not start status UI when the execution context has no UI", async () => {
     const pi = createPiMock();
-    registerAgentReviewTools(pi as unknown as ExtensionAPI, new ReviewArtifactStore());
+    registerReviewRunTool(pi as unknown as ExtensionAPI, new ReviewArtifactStore());
     const ctx = { ...makeCtx(), hasUI: false };
 
     await getTool(pi, "review_run").execute(
@@ -114,7 +114,7 @@ describe("agent review tool usage", () => {
 
   it("passes the flat target and task mode into the Review workflow", async () => {
     const pi = createPiMock();
-    registerAgentReviewTools(pi as unknown as ExtensionAPI, new ReviewArtifactStore());
+    registerReviewRunTool(pi as unknown as ExtensionAPI, new ReviewArtifactStore());
     await getTool(pi, "review_run").execute(
       "call",
       {
@@ -167,7 +167,7 @@ describe("agent review tool usage", () => {
       },
     });
     const pi = createPiMock();
-    registerAgentReviewTools(pi as unknown as ExtensionAPI, new ReviewArtifactStore());
+    registerReviewRunTool(pi as unknown as ExtensionAPI, new ReviewArtifactStore());
 
     const output = (await getTool(pi, "review_run").execute(
       "call",

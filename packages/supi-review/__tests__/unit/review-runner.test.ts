@@ -4,12 +4,12 @@ const mocks = vi.hoisted(() => ({
   runIsolatedChild: vi.fn(),
 }));
 
-vi.mock("../../src/tool/child-session-runner.ts", () => ({
+vi.mock("../../src/tool/review_run/child-session.ts", () => ({
   runIsolatedChild: mocks.runIsolatedChild,
 }));
 
 import type { AgentRunSessionView } from "@mrclrchtr/supi-agent-runtime/api";
-import { runReviewer } from "../../src/tool/review-runner.ts";
+import { runReviewer } from "../../src/tool/review_run/runner.ts";
 import type { ReviewModelSelection, ReviewSnapshot } from "../../src/types.ts";
 
 const snapshot: ReviewSnapshot = {

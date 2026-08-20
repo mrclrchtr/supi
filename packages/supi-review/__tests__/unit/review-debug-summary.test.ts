@@ -4,7 +4,7 @@ import {
   resetDebugRegistry,
 } from "@mrclrchtr/supi-core/debug";
 import { afterEach, describe, expect, it } from "vitest";
-import { recordReviewTaskDebugSummary } from "../../src/tool/review-debug-summary.ts";
+import { recordReviewTaskDebugSummary } from "../../src/tool/review_run/debug-summary.ts";
 import type { ReviewTaskResult } from "../../src/types.ts";
 
 const completedResult: ReviewTaskResult = {

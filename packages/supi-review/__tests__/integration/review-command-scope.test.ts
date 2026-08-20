@@ -15,7 +15,7 @@ vi.mock("@earendil-works/pi-coding-agent", async (original) => {
     },
   };
 });
-vi.mock("../../src/tool/review-runner.ts", () => ({ runReviewer: mocks.runReviewer }));
+vi.mock("../../src/tool/review_run/runner.ts", () => ({ runReviewer: mocks.runReviewer }));
 
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { LocalReviewAuditStore } from "../../src/audit/local-review-audit-store.ts";

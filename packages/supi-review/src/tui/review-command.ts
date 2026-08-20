@@ -15,10 +15,10 @@ import {
   resolveRecoveryReviewModel,
 } from "../model.ts";
 import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
-import { formatReviewBatch } from "../tool/agent-review-tools.ts";
 import { createReviewOutput } from "../tool/output-page.ts";
-import { queuePostReviewTurn } from "../tool/post-review-policy.ts";
-import { captureReviewTarget, draftReviewTasks, runReview } from "../tool/review-workflow.ts";
+import { formatReviewBatch } from "../tool/review_run/format.ts";
+import { queuePostReviewTurn } from "../tool/review_run/post-policy.ts";
+import { captureReviewTarget, draftReviewTasks, runReview } from "../tool/review_run/workflow.ts";
 import type {
   PlanningRecord,
   ReviewInput,

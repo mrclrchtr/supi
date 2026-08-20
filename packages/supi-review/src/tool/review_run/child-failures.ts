@@ -3,7 +3,7 @@ import {
   formatAgentRunDiagnostics,
   getAgentRunDiagnosticErrorRows,
 } from "@mrclrchtr/supi-agent-runtime/api";
-import type { ChildFailureCode, ChildFailureDiagnostics, ChildStage } from "../types.ts";
+import type { ChildFailureCode, ChildFailureDiagnostics, ChildStage } from "../../types.ts";
 
 /** Generate static parent-facing copy for a review-owned failure code. */
 export function formatChildFailureCopy(stage: ChildStage, code: ChildFailureCode): string {

@@ -2,8 +2,8 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
 import { defineConfigSettings, registerSettings } from "@mrclrchtr/supi-core/settings";
 import { CURRENT_SESSION_REVIEW_MODEL } from "./model.ts";
-// Canonical audit name lives in the per-tool spec; run follows with its own spec migration.
 import { REVIEW_AUDIT_TOOL_NAME } from "./tool/review_audit/spec.ts";
+import { REVIEW_RUN_TOOL_NAME } from "./tool/review_run/spec.ts";
 
 /** Supported containing-Agent behaviors after a review returns findings. */
 export const POST_REVIEW_POLICIES = ["ask", "verify", "verify-and-fix", "fix", "report"] as const;
@@ -30,7 +30,6 @@ export interface ReviewConfig extends Record<string, unknown> {
 
 /** Shared SuPi configuration section owned by this package. */
 export const REVIEW_CONFIG_SECTION = "review";
-const REVIEW_RUN_TOOL_NAME = "review_run";
 /** Availability-safe defaults; users can configure a separate lightweight Planner model. */
 export const REVIEW_DEFAULTS: ReviewConfig = {
   agentToolEnabled: true,

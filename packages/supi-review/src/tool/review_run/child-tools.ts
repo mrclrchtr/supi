@@ -1,9 +1,46 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { normalizeReviewSubmission } from "../review-result.ts";
-import type { ReviewSubmission } from "../types.ts";
-import { normalizeDeclineReason } from "./review-recovery.ts";
-import { REVIEW_TOOL_SPECS } from "./tool-specs.ts";
+import type { ReviewSubmission } from "../../types.ts";
+import { normalizeDeclineReason } from "./recovery.ts";
+import { plannerDraftSchema, reviewSubmissionSchema } from "./schemas.ts";
+import { normalizeReviewSubmission } from "./submission.ts";
+
+const declineReviewRecoverySchema = Type.Object(
+  {
+    reason: Type.String({
+      minLength: 1,
+      maxLength: 2_000,
+      description: "Reason that retained history cannot support a valid structured submission.",
+    }),
+  },
+  { additionalProperties: false },
+);
+
+/** Canonical metadata for the child-session tools owned by the review_run workflow. */
+export const REVIEW_CHILD_TOOL_SPECS = {
+  submitReview: {
+    name: "submit_review",
+    label: "Submit Review",
+    description:
+      "Submit the one final structured result for this review task. A successful call ends the Reviewer Session.",
+    parameters: reviewSubmissionSchema,
+  },
+  declineReviewRecovery: {
+    name: "decline_review_recovery",
+    label: "Decline Review Recovery",
+    description:
+      "End Submission Recovery without a Task Verdict when retained history cannot support a valid review submission.",
+    parameters: declineReviewRecoverySchema,
+  },
+  submitPlannerDraft: {
+    name: "submit_planner_draft",
+    label: "Submit Planner Draft",
+    description:
+      "Submit the one advisory Planner Draft. A successful call ends the Planner Session.",
+    parameters: plannerDraftSchema,
+  },
+} as const;
 
 /** Shared terminal state for the mutually exclusive recovery tools. */
 export interface ReviewRecoveryTerminalState {
@@ -16,7 +53,7 @@ export function createReviewSubmissionTool(
   submission: { value?: ReviewSubmission },
   recovery?: ReviewRecoveryTerminalState,
 ) {
-  const spec = REVIEW_TOOL_SPECS.submitReview;
+  const spec = REVIEW_CHILD_TOOL_SPECS.submitReview;
   return defineTool({
     ...spec,
     execute: async (_id, args) => {
@@ -41,7 +78,7 @@ export function createReviewSubmissionTool(
 
 /** Build the recovery-only terminal tool that declines structured delivery. */
 export function createReviewRecoveryDeclineTool(holder: ReviewRecoveryTerminalState) {
-  const spec = REVIEW_TOOL_SPECS.declineReviewRecovery;
+  const spec = REVIEW_CHILD_TOOL_SPECS.declineReviewRecovery;
   return defineTool({
     ...spec,
     execute: async (_id, args) => {

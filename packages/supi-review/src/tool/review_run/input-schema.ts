@@ -1,8 +1,8 @@
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { REVIEW_LIMITS } from "../review-limits.ts";
-import { normalizeReviewScope } from "../review-scope.ts";
-import type { ReviewInput, ReviewScope, ReviewTargetSpec } from "../types.ts";
+import { REVIEW_LIMITS } from "../../review-limits.ts";
+import { normalizeReviewScope } from "../../review-scope.ts";
+import type { ReviewInput, ReviewScope, ReviewTargetSpec } from "../../types.ts";
 import { reviewInputSchema } from "./schemas.ts";
 
 function endpointSchema(role: "before" | "after") {

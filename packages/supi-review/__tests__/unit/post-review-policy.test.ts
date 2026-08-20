@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildPostReviewInstruction,
   queuePostReviewTurn,
-} from "../../src/tool/post-review-policy.ts";
+} from "../../src/tool/review_run/post-policy.ts";
 import type { ReviewBatchDetails, ReviewOutputReference } from "../../src/types.ts";
 
 const output: ReviewOutputReference = {

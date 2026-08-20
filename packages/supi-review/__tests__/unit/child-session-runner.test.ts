@@ -8,11 +8,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@mrclrchtr/supi-agent-runtime/api", () => ({
   startAgentRun: mocks.startAgentRun,
 }));
-vi.mock("../../src/tool/child-resource-loader.ts", () => ({
+vi.mock("../../src/tool/review_run/child-resources.ts", () => ({
   createIsolatedChildResources: mocks.createResources,
 }));
 
-import { runIsolatedChild } from "../../src/tool/child-session-runner.ts";
+import { runIsolatedChild } from "../../src/tool/review_run/child-session.ts";
 
 const diagnostics = { lifecycleTrace: { entries: [], droppedCount: 0 }, turns: 1, toolUses: 1 };
 const config = {

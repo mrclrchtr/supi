@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeReviewSubmission } from "../../src/review-result.ts";
+import { normalizeReviewSubmission } from "../../src/tool/review_run/submission.ts";
 
 const finding = (overrides: Partial<{ blocksAcceptance: boolean }> = {}) => ({
   title: "Problem",

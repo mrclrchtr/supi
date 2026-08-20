@@ -9,11 +9,11 @@ vi.mock("@earendil-works/pi-ai", async (original) => ({
   ...(await original()),
   clampThinkingLevel: () => "low",
 }));
-vi.mock("../../src/tool/child-session-runner.ts", () => ({
+vi.mock("../../src/tool/review_run/child-session.ts", () => ({
   runIsolatedChild: mocks.runIsolatedChild,
 }));
 
-import { runPlanner } from "../../src/tool/planner-runner.ts";
+import { runPlanner } from "../../src/tool/review_run/planner.ts";
 
 const args = { cwd: "/repo", prompt: "bounded input", model: {} as never };
 const diagnostics = { lifecycleTrace: { entries: [], droppedCount: 0 }, turns: 0, toolUses: 0 };

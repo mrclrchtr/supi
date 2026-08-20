@@ -1,6 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
-import { REVIEW_LIMITS } from "../review-limits.ts";
+import { REVIEW_LIMITS } from "../../review-limits.ts";
 
 /** TypeBox schema for one caller-defined review task (provider-visible). */
 export const reviewTaskSchema = Type.Object(

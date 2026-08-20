@@ -5,11 +5,11 @@ import {
   createEarlyCancellationDiagnostics,
   createUnobservedAgentRunDiagnostics,
 } from "@mrclrchtr/supi-agent-runtime/api";
-import type { LocalReviewAuditStore } from "../audit/local-review-audit-store.ts";
-import { isRootCommit, resolveReviewSnapshot, summarizeReviewSnapshot } from "../git.ts";
-import { normalizeReviewInput } from "../review-input.ts";
-import { normalizeReviewScope, validateReviewScope } from "../review-scope.ts";
-import { snapshotsMatch } from "../target/snapshot-match.ts";
+import type { LocalReviewAuditStore } from "../../audit/local-review-audit-store.ts";
+import { isRootCommit, resolveReviewSnapshot, summarizeReviewSnapshot } from "../../git.ts";
+import { normalizeReviewInput } from "../../review-input.ts";
+import { normalizeReviewScope, validateReviewScope } from "../../review-scope.ts";
+import { snapshotsMatch } from "../../target/snapshot-match.ts";
 import type {
   PlannerRunResult,
   PlanningRecord,
@@ -21,12 +21,12 @@ import type {
   ReviewTargetSpec,
   ReviewTask,
   ReviewTaskResult,
-} from "../types.ts";
-import { runDependencyBootstrap } from "../workspace/dependency-bootstrap.ts";
-import { materializeReviewWorkspace } from "../workspace/review-workspace.ts";
+} from "../../types.ts";
+import { runDependencyBootstrap } from "../../workspace/dependency-bootstrap.ts";
+import { materializeReviewWorkspace } from "../../workspace/review-workspace.ts";
+import { executeReviewTasks, type ReviewExecutionUpdate } from "./execution.ts";
+import { PLANNER_PROMPT_VERSION, runPlanner } from "./planner.ts";
 import { buildPlannerPrompt } from "./planner-input.ts";
-import { PLANNER_PROMPT_VERSION, runPlanner } from "./planner-runner.ts";
-import { executeReviewTasks, type ReviewExecutionUpdate } from "./review-execution.ts";
 
 /** Tool update callback signature shared across workflow adapters. */
 type OnUpdate = ReviewExecutionUpdate;

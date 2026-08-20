@@ -27,10 +27,10 @@ vi.mock("../../src/git.ts", async (original) => {
     },
   };
 });
-vi.mock("../../src/tool/review-runner.ts", () => ({ runReviewer: mocks.runReviewer }));
+vi.mock("../../src/tool/review_run/runner.ts", () => ({ runReviewer: mocks.runReviewer }));
 
 import { isRootCommit, resolveReviewSnapshot } from "../../src/git.ts";
-import { runReview } from "../../src/tool/review-workflow.ts";
+import { runReview } from "../../src/tool/review_run/workflow.ts";
 import type { ReviewModelSelection, ReviewTask } from "../../src/types.ts";
 
 vi.setConfig({ testTimeout: 20_000 });

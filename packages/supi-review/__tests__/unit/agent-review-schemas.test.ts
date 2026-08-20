@@ -1,7 +1,10 @@
 import { Value } from "typebox/value";
 import { describe, expect, it } from "vitest";
-import { parseRunReviewToolInput, runReviewSchema } from "../../src/tool/agent-review-schemas.ts";
-import { reviewInputSchema, reviewSubmissionSchema } from "../../src/tool/schemas.ts";
+import {
+  parseRunReviewToolInput,
+  runReviewSchema,
+} from "../../src/tool/review_run/input-schema.ts";
+import { reviewInputSchema, reviewSubmissionSchema } from "../../src/tool/review_run/schemas.ts";
 
 const tasks = [{ id: "spec", instructions: "Check the spec.", mode: "change" }];
 

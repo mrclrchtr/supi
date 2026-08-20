@@ -2,9 +2,8 @@ import {
   type AgentRunProviderAuthority,
   createUnobservedAgentRunDiagnostics,
 } from "@mrclrchtr/supi-agent-runtime/api";
-import { normalizeReviewInput } from "../review-input.ts";
-import { normalizeReviewSubmission } from "../review-result.ts";
-import { buildReviewPacket } from "../target/packet.ts";
+import { normalizeReviewInput } from "../../review-input.ts";
+import { buildReviewPacket } from "../../target/packet.ts";
 import type {
   ReviewerAuditRequest,
   ReviewerExtensionSetStatus,
@@ -15,9 +14,10 @@ import type {
   ReviewSnapshot,
   ReviewTask,
   ReviewTaskResult,
-} from "../types.ts";
-import { recordReviewTaskDebugSummary } from "./review-debug-summary.ts";
-import { runReviewer } from "./review-runner.ts";
+} from "../../types.ts";
+import { recordReviewTaskDebugSummary } from "./debug-summary.ts";
+import { runReviewer } from "./runner.ts";
+import { normalizeReviewSubmission } from "./submission.ts";
 
 /** One task's compact state while a review batch is still running. */
 export interface ReviewExecutionPartialTaskState {

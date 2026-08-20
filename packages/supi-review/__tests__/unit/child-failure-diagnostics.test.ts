@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatChildFailureDiagnostics } from "../../src/tool/child-failure-diagnostics.ts";
+import { formatChildFailureDiagnostics } from "../../src/tool/review_run/child-failures.ts";
 import type { ChildFailureDiagnostics } from "../../src/types.ts";
 
 describe("review failure diagnostics", () => {

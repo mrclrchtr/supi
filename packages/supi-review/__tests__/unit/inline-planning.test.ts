@@ -12,17 +12,17 @@ vi.mock("../../src/git.ts", async (original) => ({
   isRootCommit: mocks.isRootCommit,
   resolveReviewSnapshot: mocks.resolveReviewSnapshot,
 }));
-vi.mock("../../src/tool/planner-runner.ts", () => ({
+vi.mock("../../src/tool/review_run/planner.ts", () => ({
   PLANNER_PROMPT_VERSION: "test-v1",
   runPlanner: mocks.runPlanner,
 }));
-vi.mock("../../src/tool/review-runner.ts", () => ({ runReviewer: mocks.runReviewer }));
+vi.mock("../../src/tool/review_run/runner.ts", () => ({ runReviewer: mocks.runReviewer }));
 vi.mock("../../src/workspace/review-workspace.ts", async (original) => ({
   ...(await original()),
   materializeReviewWorkspace: mocks.materializeReviewWorkspace,
 }));
 
-import { draftReviewTasks, runReview } from "../../src/tool/review-workflow.ts";
+import { draftReviewTasks, runReview } from "../../src/tool/review_run/workflow.ts";
 import type { ReviewModelSelection, ReviewSnapshot } from "../../src/types.ts";
 
 const head = "a".repeat(40);

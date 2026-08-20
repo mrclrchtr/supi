@@ -10,13 +10,13 @@ vi.mock("../../src/git.ts", async (original) => ({
   ...(await original()),
   resolveReviewSnapshot: mocks.resolveReviewSnapshot,
 }));
-vi.mock("../../src/tool/review-runner.ts", () => ({ runReviewer: mocks.runReviewer }));
+vi.mock("../../src/tool/review_run/runner.ts", () => ({ runReviewer: mocks.runReviewer }));
 vi.mock("../../src/workspace/review-workspace.ts", async (original) => ({
   ...(await original()),
   materializeReviewWorkspace: mocks.materialize,
 }));
 
-import { runReview } from "../../src/tool/review-workflow.ts";
+import { runReview } from "../../src/tool/review_run/workflow.ts";
 import type { ReviewModelSelection, ReviewSnapshot } from "../../src/types.ts";
 
 const snapshot: ReviewSnapshot = {

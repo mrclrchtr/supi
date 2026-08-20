@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createReviewRecoveryDeclineTool,
   createReviewSubmissionTool,
-} from "../../src/tool/review-tools.ts";
+} from "../../src/tool/review_run/child-tools.ts";
 import type { ReviewSubmission } from "../../src/types.ts";
 
 describe("submit_review", () => {

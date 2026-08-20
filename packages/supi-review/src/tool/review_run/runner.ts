@@ -4,19 +4,19 @@ import {
   createEarlyCancellationDiagnostics,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import { HEADLESS_INSPECTION_TOOL_NAMES } from "@mrclrchtr/supi-code-intelligence/headless";
-import { ReviewAuditTraceCollector } from "../audit/review-audit.ts";
-import { summarizeReviewSnapshot } from "../git.ts";
+import { ReviewAuditTraceCollector } from "../../audit/review-audit.ts";
+import { summarizeReviewSnapshot } from "../../git.ts";
 import type {
   ReviewerCapabilityWarning,
   ReviewerExtensionSetStatus,
   ReviewerInvocation,
   ReviewerRunResult,
   ReviewSubmission,
-} from "../types.ts";
-import { runIsolatedChild } from "./child-session-runner.ts";
-import { ReviewRecoveryPolicy } from "./review-recovery.ts";
-import { buildReviewerSystemPrompt } from "./review-system-prompt.ts";
-import { createReviewRecoveryDeclineTool, createReviewSubmissionTool } from "./review-tools.ts";
+} from "../../types.ts";
+import { runIsolatedChild } from "./child-session.ts";
+import { createReviewRecoveryDeclineTool, createReviewSubmissionTool } from "./child-tools.ts";
+import { ReviewRecoveryPolicy } from "./recovery.ts";
+import { buildReviewerSystemPrompt } from "./system-prompt.ts";
 
 function auditOutcome(result: ReviewerRunResult): {
   kind: string;

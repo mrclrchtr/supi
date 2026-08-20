@@ -1,4 +1,4 @@
-import { REVIEW_TOOL_SPECS } from "./tool-specs.ts";
+import { REVIEW_CHILD_TOOL_SPECS } from "./child-tools.ts";
 
 /** Minimal non-overridable protocol shared by every caller-defined review task. */
 export function buildReviewerSystemPrompt(dependencyBootstrapConfigured = false): string {
@@ -23,6 +23,6 @@ export function buildReviewerSystemPrompt(dependencyBootstrapConfigured = false)
     "effort estimates correction size: small, medium, or large.",
     "confidence is a value from 0 to 1; the Review Engine applies no confidence threshold.",
     "Preserve your intended finding order.",
-    `Submit one valid result with ${REVIEW_TOOL_SPECS.submitReview.name}. If it is rejected, correct the result and retry. Do not return review prose outside that tool.`,
+    `Submit one valid result with ${REVIEW_CHILD_TOOL_SPECS.submitReview.name}. If it is rejected, correct the result and retry. Do not return review prose outside that tool.`,
   ].join("\n");
 }

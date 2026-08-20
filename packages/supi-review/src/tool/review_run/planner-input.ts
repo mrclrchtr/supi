@@ -1,6 +1,6 @@
-import { formatReviewScopeForPlanner } from "../review-scope.ts";
-import { buildFileManifest } from "../target/file-manifest.ts";
-import type { ReviewScope, ReviewSnapshot } from "../types.ts";
+import { formatReviewScopeForPlanner } from "../../review-scope.ts";
+import { buildFileManifest } from "../../target/file-manifest.ts";
+import type { ReviewScope, ReviewSnapshot } from "../../types.ts";
 
 /** Build bounded Planner input from exact target facts and an advisory Review Scope. */
 export function buildPlannerPrompt(

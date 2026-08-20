@@ -1,6 +1,11 @@
-import type { FindingCounts, ReviewBatchDetails, ReviewScope, ReviewTaskResult } from "../types.ts";
-import { formatChildFailureDiagnostics } from "./child-failure-diagnostics.ts";
-import { formatReviewUsage } from "./usage-format.ts";
+import type {
+  FindingCounts,
+  ReviewBatchDetails,
+  ReviewScope,
+  ReviewTaskResult,
+} from "../../types.ts";
+import { formatReviewUsage } from "../usage-format.ts";
+import { formatChildFailureDiagnostics } from "./child-failures.ts";
 
 function appendCapabilityWarnings(lines: string[], result: ReviewTaskResult): void {
   for (const warning of result.capabilityWarnings ?? []) {

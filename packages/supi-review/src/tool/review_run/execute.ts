@@ -1,26 +1,17 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createAgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/api";
 import { StatusSpinner } from "@mrclrchtr/supi-core/status-spinner";
-import type { LocalReviewAuditStore } from "../audit/local-review-audit-store.ts";
-import { loadReviewConfig } from "../config.ts";
+import type { LocalReviewAuditStore } from "../../audit/local-review-audit-store.ts";
+import { loadReviewConfig } from "../../config.ts";
 import {
   CURRENT_SESSION_REVIEW_MODEL,
   resolveAgentReviewModel,
   resolveRecoveryReviewModel,
-} from "../model.ts";
-import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
-import { renderRunCall, renderRunResult } from "../tui/run.ts";
-import { parseRunReviewToolInput } from "./agent-review-schemas.ts";
-import { createReviewOutput, MAX_PAGE_CHARACTERS, MAX_PAGE_LINES } from "./output-page.ts";
-import { withPostReviewInstruction } from "./post-review-policy.ts";
-import { formatReviewBatch } from "./review-format.ts";
-import { runReview } from "./review-workflow.ts";
-import { REVIEW_TOOL_SPECS } from "./tool-specs.ts";
-
-const POST_REVIEW_POLICY_CHARACTER_RESERVE = 4_000;
-const POST_REVIEW_POLICY_LINE_RESERVE = 32;
-
-export { formatReviewBatch } from "./review-format.ts";
+} from "../../model.ts";
+import type { ReviewArtifactStore } from "../../session/review-artifact-store.ts";
+import { parseRunReviewToolInput } from "./input-schema.ts";
+import { buildRunResult } from "./result.ts";
+import { runReview } from "./workflow.ts";
 
 function resolveReviewerModel(
   ctx: Parameters<Parameters<ExtensionAPI["registerTool"]>[0]["execute"]>[4],
@@ -83,12 +74,11 @@ function initialReviewProgress(input: ReturnType<typeof parseRunReviewToolInput>
 }
 
 /** Factory for the review_run execute function with animated status-bar spinner. */
-function makeRunReviewExecute(
+export function makeRunReviewExecute(
   artifactStore: ReviewArtifactStore,
   localAuditStore?: LocalReviewAuditStore,
 ): NonNullable<Parameters<ExtensionAPI["registerTool"]>[0]["execute"]> {
   // biome-ignore lint/complexity/useMaxParams: Pi ToolDefinition execute signature
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: tool execution keeps spinner and bounded output cleanup in one closure.
   return async (_id, params, signal, onUpdate, ctx) => {
     const input = parseRunReviewToolInput(params);
     const config = loadReviewConfig(ctx.cwd);
@@ -122,47 +112,9 @@ function makeRunReviewExecute(
         onUpdate: wrappedUpdate,
       });
       if (outcome.kind !== "completed") throw new Error(outcome.reason);
-      const hasFindings = outcome.details.results.some(
-        (result) => result.status === "completed" && result.findings.length > 0,
-      );
-      const output = createReviewOutput(
-        artifactStore,
-        formatReviewBatch(outcome.details),
-        hasFindings
-          ? {
-              firstPageCharacters: MAX_PAGE_CHARACTERS - POST_REVIEW_POLICY_CHARACTER_RESERVE,
-              firstPageLines: MAX_PAGE_LINES - POST_REVIEW_POLICY_LINE_RESERVE,
-            }
-          : {},
-      );
-      const text = withPostReviewInstruction(
-        output.text,
-        config.postReviewPolicy,
-        outcome.details,
-        output.reference,
-      );
-      return {
-        content: [{ type: "text", text }],
-        details: { ...outcome.details, output: output.reference },
-        ...(outcome.usage ? { usage: outcome.usage } : {}),
-      };
+      return buildRunResult(artifactStore, outcome, config.postReviewPolicy);
     } finally {
       statusSpinner?.stop();
     }
   };
-}
-
-/** Register caller-defined Review execution for agents. */
-export function registerAgentReviewTools(
-  pi: ExtensionAPI,
-  artifactStore: ReviewArtifactStore,
-  localAuditStore?: LocalReviewAuditStore,
-): void {
-  pi.registerTool({
-    ...REVIEW_TOOL_SPECS.run,
-    promptGuidelines: [...REVIEW_TOOL_SPECS.run.promptGuidelines],
-    renderCall: renderRunCall,
-    renderResult: renderRunResult,
-    execute: makeRunReviewExecute(artifactStore, localAuditStore),
-  });
 }

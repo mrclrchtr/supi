@@ -40,13 +40,14 @@ Default child diagnostics retain only bounded lifecycle metadata and redacted pr
 
 ## Main files
 
-- `src/tool/review-workflow.ts` — Planner Draft and Review Workspace orchestration
+- `src/tool/review_run/` — per-tool directory: spec/guidance/execute/result/register plus Planner Draft and Review Workspace orchestration
+- `src/tool/review_output/`, `src/tool/review_audit/` — per-tool directories for paged output and replay retrieval
 - `src/workspace/review-workspace.ts` — linked-worktree materialization and best-effort cleanup
 - `src/workspace/review-workspace-cleanup.ts` — marked-worktree recovery inventory/removal
 - `src/workspace/cleanup-command.ts` — `/supi-review-cleanup`
-- `src/tool/review-runner.ts` — Reviewer child, optional replay capture, and structured delivery
+- `src/tool/review_run/runner.ts` — Reviewer child, optional replay capture, and structured delivery
 - `src/audit/` — private seven-day local replay persistence and trace capture
-- `src/tool/child-session-runner.ts` — thin adapter over `@mrclrchtr/supi-agent-runtime`, mapping review resources and structured completion to `ChildRunOutcome`
+- `src/tool/review_run/child-session.ts` — thin adapter over `@mrclrchtr/supi-agent-runtime`, mapping review resources and structured completion to `ChildRunOutcome`
 - `src/target/` — target resolution, canonical patches, changed-path metadata, Reviewer Packets
 
 ## Testing seams

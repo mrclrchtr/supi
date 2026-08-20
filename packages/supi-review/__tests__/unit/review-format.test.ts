@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatReviewBatch } from "../../src/tool/agent-review-tools.ts";
+import { formatReviewBatch } from "../../src/tool/review_run/format.ts";
 import type { ReviewBatchDetails } from "../../src/types.ts";
 
 const details: ReviewBatchDetails = {

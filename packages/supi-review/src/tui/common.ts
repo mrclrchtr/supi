@@ -8,7 +8,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { type Container, Spacer, Text } from "@earendil-works/pi-tui";
 import { formatEvidenceBadge } from "@mrclrchtr/supi-core/evidence-badge";
-import { getChildDiagnosticErrorRows } from "../tool/child-failure-diagnostics.ts";
+import { getChildDiagnosticErrorRows } from "../tool/review_run/child-failures.ts";
 import { formatReviewUsage } from "../tool/usage-format.ts";
 import type {
   ChildFailureDiagnostics,

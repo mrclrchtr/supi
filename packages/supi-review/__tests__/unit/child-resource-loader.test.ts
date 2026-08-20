@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createIsolatedChildResources } from "../../src/tool/child-resource-loader.ts";
+import { createIsolatedChildResources } from "../../src/tool/review_run/child-resources.ts";
 
 describe("createIsolatedResourceLoader", () => {
   const roots: string[] = [];

@@ -5,15 +5,15 @@ import type {
   AgentRunContinuationTurn,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import { redactDebugData } from "@mrclrchtr/supi-core/debug";
-import type { ReviewAuditTraceCollector } from "../audit/review-audit.ts";
-import { REVIEW_LIMITS } from "../review-limits.ts";
+import type { ReviewAuditTraceCollector } from "../../audit/review-audit.ts";
+import { REVIEW_LIMITS } from "../../review-limits.ts";
 import type {
   ReviewModelSelection,
   ReviewSubmission,
   SubmissionRecovery,
   SubmissionRecoveryAttempt,
-} from "../types.ts";
-import type { ReviewRecoveryTerminalState } from "./review-tools.ts";
+} from "../../types.ts";
+import type { ReviewRecoveryTerminalState } from "./child-tools.ts";
 
 const RECOVERY_TOOLS = ["submit_review", "decline_review_recovery"] as const;
 const RECOVERY_PROMPT = [

@@ -5,8 +5,8 @@ import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import type {
   ReviewExecutionPartialTaskState,
   ReviewExecutionProgressDetails,
-} from "../tool/review-execution.ts";
-import { REVIEW_TOOL_SPECS } from "../tool/tool-specs.ts";
+} from "../tool/review_run/execution.ts";
+import { REVIEW_RUN_TOOL_NAME } from "../tool/review_run/spec.ts";
 import { formatReviewUsage } from "../tool/usage-format.ts";
 import type {
   ReviewBatchDetails,
@@ -95,7 +95,7 @@ export function renderRunCall(args: unknown, theme: Theme): Text {
     formatTaskModes(params.tasks),
     formatScopeCount(scope),
   ].join(" · ");
-  return renderReviewToolCall(REVIEW_TOOL_SPECS.run.name, "review", theme, detail);
+  return renderReviewToolCall(REVIEW_RUN_TOOL_NAME, "review", theme, detail);
 }
 
 type PartialReviewDetails = ReviewExecutionProgressDetails;
@@ -208,7 +208,7 @@ export function renderRunResult(
   }
   const details = result.details as ReviewBatchDetails | undefined;
   if (context.isError || !details) {
-    return renderError(`${REVIEW_TOOL_SPECS.run.name} failed`, theme);
+    return renderError(`${REVIEW_RUN_TOOL_NAME} failed`, theme);
   }
   return options.expanded ? buildExpanded(details, theme) : buildCollapsed(details, theme);
 }
