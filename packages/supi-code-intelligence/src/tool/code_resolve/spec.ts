@@ -2,6 +2,7 @@ import { Type } from "typebox";
 import type { CodeIntelToolExecCtx } from "../../types/index.ts";
 import { MaxResultsParam, ResolveTargetParam } from "../schemas.ts";
 import { executeResolveTool } from "./execute.ts";
+import { renderResolveCall, renderResolveResult } from "./tui.ts";
 
 export const CODE_RESOLVE_TOOL_NAME = "code_resolve";
 export const CODE_RESOLVE_TOOL_LABEL = "Code Resolve";
@@ -19,4 +20,6 @@ export const codeResolveSpec = {
   ),
   run: (params: unknown, ctx: CodeIntelToolExecCtx) =>
     executeResolveTool(params as Parameters<typeof executeResolveTool>[0], ctx),
+  renderCall: renderResolveCall,
+  renderResult: renderResolveResult,
 } as const;

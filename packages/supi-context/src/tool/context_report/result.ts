@@ -1,6 +1,7 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
 import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
@@ -62,4 +63,24 @@ export async function serializeFullContextAnalysis(analysis: ContextAnalysis): P
     maxBytes: DEFAULT_MAX_BYTES,
   };
   return JSON.stringify(envelope);
+}
+
+/** Assemble the concise-mode model-facing result. */
+export function buildConciseResult(
+  snapshot: ContextPressureSnapshot,
+): AgentToolResult<ContextToolConciseDetails> {
+  return {
+    content: [{ type: "text", text: JSON.stringify(snapshot) }],
+    details: { mode: "concise", snapshot },
+  };
+}
+
+/** Assemble the full-mode model-facing result. */
+export async function buildFullResult(
+  analysis: ContextAnalysis,
+): Promise<AgentToolResult<ContextToolFullDetails>> {
+  return {
+    content: [{ type: "text", text: await serializeFullContextAnalysis(analysis) }],
+    details: { mode: "full", analysis },
+  };
 }

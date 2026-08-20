@@ -41,6 +41,8 @@ and `unit/fingerprint.test.ts`.
 | Command  | `/supi-cache-forensics` | Cross-session regression investigation with TUI report |
 | Tool     | `cache_forensics` | Agent-callable — returns structured JSON with shape fingerprints |
 
+Documented rendering exception (`docs/conventions/tool-rendering.md` § Scope): `cache_forensics` is deliberately machine-only. Its result is a bounded JSON envelope for agent consumption, so it uses PI's generic transcript fallback and defines no `renderCall`/`renderResult`. Human forensics output goes through the `/supi-cache-forensics` command renderer instead.
+
 ## Key gotchas
 
 - Config section is `supi-cache` with a backwards-compatible fallback read from the old `cache-monitor` section.

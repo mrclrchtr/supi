@@ -150,3 +150,35 @@ function findProvenance(
     ? [{ source: "semantic", capability: "workspace-symbol" }]
     : [{ source: "structural", capability: "tree-sitter" }];
 }
+
+import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
+import { searchErrorResult } from "../result/errors.ts";
+import { renderFindResult } from "./render.ts";
+
+type FindOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["find"]>>;
+
+/** Assemble the final model-visible code_find result for one workflow outcome. */
+export function finishFindResult(
+  outcome: FindOutcome,
+  scope: readonly string[] | undefined,
+): CodeIntelResult {
+  if (outcome.kind === "unavailable") throw new Error(outcome.reason);
+  if (outcome.kind === "invalid-input") {
+    return searchErrorResult(`**Error:** ${outcome.message}`, {
+      scope: Array.isArray(scope) ? scope.join(", ") : null,
+      nextQueries: ["Fix the search input and retry"],
+      message: outcome.message,
+    });
+  }
+
+  const assembly = assembleFindWorkflowResult(outcome);
+  return {
+    content: renderFindResult(assembly),
+    details: {
+      type: "search",
+      data: assembly.details,
+      status: "completed",
+      displaySections: assembly.displaySections,
+    },
+  };
+}

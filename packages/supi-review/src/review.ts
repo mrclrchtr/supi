@@ -6,8 +6,8 @@ import { ReviewArtifactStore } from "./session/review-artifact-store.ts";
 import { registerReviewAuditTool } from "./tool/review_audit/register.ts";
 import { registerReviewOutputTool } from "./tool/review_output/register.ts";
 import { registerReviewRunTool } from "./tool/review_run/register.ts";
+import { renderRunResult } from "./tool/review_run/render.ts";
 import { runReviewCommand } from "./tui/review-command.ts";
-import { renderRunResult } from "./tui/run.ts";
 import { registerReviewWorkspaceCleanupCommand } from "./workspace/cleanup-command.ts";
 
 /** Register the interactive and agent-owned Review surfaces. */

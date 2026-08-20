@@ -6,7 +6,7 @@ import {
 } from "@mrclrchtr/supi-core/debug";
 import { resolveToolPath } from "@mrclrchtr/supi-core/path";
 import type { DebugConfig } from "../../config.ts";
-import { formatDebugEvents, truncateDebugOutput } from "../../output.ts";
+import { formatDebugEvents, truncateDebugOutput } from "../../format-events.ts";
 import type { DebugToolParams } from "../../query.ts";
 import { createDebugRenderDetails } from "../../render-details.ts";
 import { readSessionDebugEvents } from "../../session-events.ts";

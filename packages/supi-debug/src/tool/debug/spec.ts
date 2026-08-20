@@ -1,5 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
+import { makeDebugExecute } from "./execute.ts";
 
 export const DEBUG_TOOL_NAME = "debug";
 export const DEBUG_TOOL_LABEL = "SuPi Debug";
@@ -30,4 +31,5 @@ export const debugSpec = {
       Type.Boolean({ description: "Request raw event data when settings permit it" }),
     ),
   }),
+  execute: makeDebugExecute(),
 } as const;

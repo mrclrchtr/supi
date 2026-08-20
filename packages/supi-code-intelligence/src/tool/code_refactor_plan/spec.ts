@@ -2,6 +2,7 @@ import { Type } from "typebox";
 import type { CodeIntelToolExecCtx } from "../../types/index.ts";
 import { RefactorOperationParam, RefactorTargetParam } from "../schemas.ts";
 import { executeRefactorPlanTool } from "./execute.ts";
+import { renderRefactorPlanCall, renderRefactorPlanResult } from "./tui.ts";
 
 export const CODE_REFACTOR_PLAN_TOOL_NAME = "code_refactor_plan";
 export const CODE_REFACTOR_PLAN_TOOL_LABEL = "Code Refactor Plan";
@@ -19,4 +20,6 @@ export const codeRefactorPlanSpec = {
   ),
   run: (params: unknown, ctx: CodeIntelToolExecCtx) =>
     executeRefactorPlanTool(params as Parameters<typeof executeRefactorPlanTool>[0], ctx),
+  renderCall: renderRefactorPlanCall,
+  renderResult: renderRefactorPlanResult,
 } as const;

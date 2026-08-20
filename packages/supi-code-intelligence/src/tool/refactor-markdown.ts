@@ -1,10 +1,7 @@
-import { renderEvidenceListDisclosure } from "../../analysis/evidence.ts";
-import { toDisplayPath } from "../../analysis/search/paths.ts";
-import { assembledNextQueries } from "../result/assembly.ts";
-import type {
-  RefactorApplyResultAssembly,
-  RefactorPlanResultAssembly,
-} from "../result/refactor.ts";
+import { renderEvidenceListDisclosure } from "../analysis/evidence.ts";
+import { toDisplayPath } from "../analysis/search/paths.ts";
+import { assembledNextQueries } from "./result/assembly.ts";
+import type { RefactorApplyResultAssembly, RefactorPlanResultAssembly } from "./result/refactor.ts";
 
 /** Render a refactor plan from its canonical assembled evidence. */
 export function renderRefactorPlanResult(assembly: RefactorPlanResultAssembly): string {

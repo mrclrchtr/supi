@@ -1,6 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import { renderRunCall, renderRunResult } from "../../src/tui/run.ts";
+import { renderRunCall, renderRunResult } from "../../src/tool/review_run/render.ts";
 import type { ReviewBatchDetails } from "../../src/types.ts";
 
 const theme = {

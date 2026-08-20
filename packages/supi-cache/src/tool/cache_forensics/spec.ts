@@ -1,5 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
+import { makeCacheForensicsExecute } from "./execute.ts";
 
 export const CACHE_FORENSICS_TOOL_NAME = "cache_forensics";
 export const CACHE_FORENSICS_TOOL_LABEL = "Cache Forensics";
@@ -31,4 +32,5 @@ export const cacheForensicsSpec = {
       }),
     ),
   }),
+  execute: makeCacheForensicsExecute(),
 } as const;

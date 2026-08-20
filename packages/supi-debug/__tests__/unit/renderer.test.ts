@@ -1,11 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import {
-  createDebugMessageDetails,
-  registerDebugMessageRenderer,
-  renderDebugToolCall,
-  renderDebugToolResult,
-} from "../../src/renderer.ts";
+import { createDebugMessageDetails, registerDebugMessageRenderer } from "../../src/renderer.ts";
+import { renderDebugToolCall, renderDebugToolResult } from "../../src/tool/debug/render.ts";
 
 function createMockTheme(): Theme {
   return {

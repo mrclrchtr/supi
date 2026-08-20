@@ -4,7 +4,7 @@ import {
   capModelText,
   humanTextOverflow,
   modelTextOverflow,
-} from "../../src/tool/agent_run/output.ts";
+} from "../../src/tool/agent_run/text-caps.ts";
 
 describe("output lane caps", () => {
   it("passes text under the model lane cap unchanged", () => {

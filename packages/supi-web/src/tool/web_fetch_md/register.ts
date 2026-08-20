@@ -1,5 +1,4 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { runWebFetch } from "./execute.ts";
 import { getWebFetchPromptSurface } from "./guidance.ts";
 import { renderWebFetchCall, renderWebFetchResult } from "./render.ts";
 import { webFetchMdSpec } from "./spec.ts";
@@ -12,7 +11,6 @@ export function registerWebFetchMdTool(pi: ExtensionAPI): void {
     description: surface.description,
     promptSnippet: surface.promptSnippet,
     promptGuidelines: surface.promptGuidelines,
-    execute: runWebFetch,
     renderCall: renderWebFetchCall,
     renderResult: renderWebFetchResult,
   });

@@ -10,7 +10,7 @@ A tool's `spec.ts` owns:
 
 - canonical name and label
 - parameter schemas
-- execution bindings
+- execution bindings — `execute` lives on the spec object when it needs no runtime dependencies; when a tool's schema or execute is dynamic (depends on catalog or session state), `spec.ts` exports the factory (e.g. a parameter builder or execute factory) and `register.ts` evaluates it at registration time
 - concise purpose and substrate metadata
 
 The paired `guidance.ts` owns verbose descriptions, snippets, and guidelines. Registration imports each tool's spec and guidance; alignment tests assert that registration matches the spec modules.

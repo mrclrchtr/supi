@@ -1,4 +1,5 @@
 import type { Static } from "typebox";
+import { Value } from "typebox/value";
 import type { LocalReviewAuditStore } from "../../audit/local-review-audit-store.ts";
 import { parseReviewAuditRecord, serializeReplayMessage } from "../../audit/review-audit-record.ts";
 import {
@@ -7,7 +8,7 @@ import {
   buildAuditOutlineResult,
   buildAuditRawResult,
 } from "./result.ts";
-import type { reviewAuditSpec } from "./spec.ts";
+import { reviewAuditSpec } from "./spec.ts";
 
 export type ReviewAuditParams = Static<(typeof reviewAuditSpec)["parameters"]>;
 
@@ -28,7 +29,11 @@ function validateAuditCombination(params: ReviewAuditParams): void {
 
 /** List local replays or fetch one bounded replay view. */
 export function executeReviewAudit(store: LocalReviewAuditStore) {
-  return async (_toolCallId: string, params: ReviewAuditParams, signal?: AbortSignal) => {
+  return async (_toolCallId: string, rawParams: unknown, signal?: AbortSignal) => {
+    if (!Value.Check(reviewAuditSpec.parameters, rawParams)) {
+      throw new Error("Invalid review audit input.");
+    }
+    const params = rawParams as ReviewAuditParams;
     validateAuditCombination(params);
     if (!params.artifactId) {
       const audits = await store.list(signal);

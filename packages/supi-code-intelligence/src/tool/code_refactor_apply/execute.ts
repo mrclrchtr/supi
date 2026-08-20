@@ -1,10 +1,8 @@
 /** Thin Pi adapter for session-owned refactor application. */
 
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
-import { renderRefactorApplyResult } from "../code_refactor_plan/markdown.ts";
 import { toWorkflowControl } from "../infra/workflow-control.ts";
-import { searchErrorResult } from "../result/errors.ts";
-import { assembleRefactorApplyDetails } from "../result/refactor.ts";
+import { finishRefactorApplyResult } from "./result.ts";
 
 export interface CodeRefactorApplyToolParams {
   planId: string;
@@ -15,22 +13,5 @@ export async function executeRefactorApplyTool(
   ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   const outcome = await ctx.session.applyRefactor(params, toWorkflowControl(ctx));
-  if (outcome.kind === "unavailable") throw new Error(outcome.reason);
-  if (outcome.kind === "invalid-input") {
-    return searchErrorResult(`**Error:** ${outcome.message}`, {
-      nextQueries: ["Generate a fresh plan with code_refactor_plan"],
-      message: outcome.message,
-    });
-  }
-
-  const assembly = assembleRefactorApplyDetails(outcome.result, outcome.plan);
-  return {
-    content: renderRefactorApplyResult(assembly),
-    details: {
-      type: "search",
-      data: assembly.details,
-      status: "completed",
-      displaySections: assembly.displaySections,
-    },
-  };
+  return finishRefactorApplyResult(outcome);
 }

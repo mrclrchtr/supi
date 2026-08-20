@@ -9,6 +9,7 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@earendil-works/pi-coding-agent";
 import type { ForensicsResult } from "../../forensics/forensics.ts";
 
@@ -79,4 +80,16 @@ export function boundForensicsOutput(
     turnsAnalyzed: result.turnsAnalyzed,
   };
   return { text: JSON.stringify(envelope, null, 2), truncated: true, fullOutputPath };
+}
+
+/** Assemble the model-facing cache_forensics result for one bounded query. */
+export function buildForensicsResult(
+  result: ForensicsResult,
+  query: ForensicsBoundQuery,
+): AgentToolResult<{ fullOutputPath?: string } | undefined> {
+  const output = boundForensicsOutput(result, query);
+  return {
+    content: [{ type: "text", text: output.text }],
+    details: output.fullOutputPath ? { fullOutputPath: output.fullOutputPath } : undefined,
+  };
 }

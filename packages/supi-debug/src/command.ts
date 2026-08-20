@@ -1,7 +1,7 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { getDebugEvents } from "@mrclrchtr/supi-core/debug";
 import { resolveToolPath } from "@mrclrchtr/supi-core/path";
-import { formatDebugEvents, truncateDebugOutput } from "./output.ts";
+import { formatDebugEvents, truncateDebugOutput } from "./format-events.ts";
 import type { DebugToolParams } from "./query.ts";
 import { parseDebugCommandArgs } from "./query.ts";
 import { createDebugMessageDetails } from "./renderer.ts";

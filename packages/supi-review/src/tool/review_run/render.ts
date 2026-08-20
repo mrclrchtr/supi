@@ -2,18 +2,6 @@
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
-import type {
-  ReviewExecutionPartialTaskState,
-  ReviewExecutionProgressDetails,
-} from "../tool/review_run/execution.ts";
-import { REVIEW_RUN_TOOL_NAME } from "../tool/review_run/spec.ts";
-import { formatReviewUsage } from "../tool/usage-format.ts";
-import type {
-  ReviewBatchDetails,
-  ReviewProgress,
-  ReviewScope,
-  ReviewTaskResult,
-} from "../types.ts";
 import {
   buildTaskSection,
   formatStatusLabel,
@@ -21,7 +9,19 @@ import {
   renderError,
   renderPartial,
   renderReviewToolCall,
-} from "./common.ts";
+} from "../../tui/common.ts";
+import type {
+  ReviewBatchDetails,
+  ReviewProgress,
+  ReviewScope,
+  ReviewTaskResult,
+} from "../../types.ts";
+import { formatReviewUsage } from "../usage-format.ts";
+import type {
+  ReviewExecutionPartialTaskState,
+  ReviewExecutionProgressDetails,
+} from "./execution.ts";
+import { REVIEW_RUN_TOOL_NAME } from "./spec.ts";
 
 function formatTaskCollapsed(result: ReviewTaskResult, theme: Theme): string {
   const warnings = result.capabilityWarnings?.length ?? 0;

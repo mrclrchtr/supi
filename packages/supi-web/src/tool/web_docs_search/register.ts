@@ -1,5 +1,4 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { runSearch } from "./execute.ts";
 import { promptGuidelines, promptSnippet, toolDescription } from "./guidance.ts";
 import { renderSearchCall, renderSearchResult } from "./render.ts";
 import { webDocsSearchSpec } from "./spec.ts";
@@ -11,7 +10,6 @@ export function registerWebDocsSearchTool(pi: ExtensionAPI): void {
     description: toolDescription,
     promptSnippet,
     promptGuidelines: [...promptGuidelines],
-    execute: runSearch,
     renderCall: renderSearchCall,
     renderResult: renderSearchResult,
   });

@@ -1,73 +1,14 @@
 import { createHmac, randomBytes } from "node:crypto";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { Component } from "@earendil-works/pi-tui";
 import { recordDebugEvent, startDebugTimer } from "@mrclrchtr/supi-core/debug";
 import { truncateIdentity } from "@mrclrchtr/supi-lsp/debug-telemetry";
 import type { WorkspaceCodeIntelligenceSession } from "../session/session.ts";
-import type { CodeIntelResult, ToolOutputTruncationDetails } from "../types/index.ts";
-import { renderFindCall, renderFindResult } from "./code_find/tui.ts";
-import { renderGraphCall, renderGraphResult } from "./code_graph/tui.ts";
-import { renderHealthCall, renderHealthResult } from "./code_health/tui.ts";
-import { renderInspectCall, renderInspectResult } from "./code_inspect/tui.ts";
-import { renderOrientationCall, renderOrientationResult } from "./code_orientation/tui.ts";
-import { renderRefactorApplyCall, renderRefactorApplyResult } from "./code_refactor_apply/tui.ts";
-import { renderRefactorPlanCall, renderRefactorPlanResult } from "./code_refactor_plan/tui.ts";
-import { renderResolveCall, renderResolveResult } from "./code_resolve/tui.ts";
 import {
   CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES,
   type CodeIntelligenceToolPromptSurfaceMap,
 } from "./guidance.ts";
-import { truncateToolContent } from "./infra/truncate.ts";
+import { boundCodeToolResult } from "./infra/truncate.ts";
 import { CODE_INTELLIGENCE_TOOL_SPECS, type CodeIntelligenceToolDefinitionSpec } from "./specs.ts";
-
-interface ToolRenderer {
-  // biome-ignore lint/suspicious/noExplicitAny: pi render call/result signatures vary per tool; spread into pi.registerTool where concrete typing handles variance
-  renderCall?: (...args: any[]) => Component;
-  // biome-ignore lint/suspicious/noExplicitAny: same variance reason as renderCall
-  renderResult?: (...args: any[]) => Component;
-  renderShell?: "self";
-}
-
-function getToolRenderer(name: string): ToolRenderer {
-  switch (name) {
-    case "code_graph":
-      return {
-        renderCall: renderGraphCall,
-        renderResult: renderGraphResult,
-      };
-    case "code_health":
-      return {
-        renderCall: renderHealthCall,
-        renderResult: renderHealthResult,
-      };
-    case "code_orientation":
-      return {
-        renderCall: renderOrientationCall,
-        renderResult: renderOrientationResult,
-      };
-    case "code_resolve":
-      return { renderCall: renderResolveCall, renderResult: renderResolveResult };
-    case "code_inspect":
-      return { renderCall: renderInspectCall, renderResult: renderInspectResult };
-    case "code_find":
-      return { renderCall: renderFindCall, renderResult: renderFindResult };
-    case "code_refactor_plan":
-      return {
-        renderCall: renderRefactorPlanCall,
-        renderResult: renderRefactorPlanResult,
-      };
-    case "code_refactor_apply":
-      return {
-        renderCall: renderRefactorApplyCall,
-        renderResult: renderRefactorApplyResult,
-      };
-    default:
-      return {};
-  }
-}
 
 /**
  * Register the focused code-intelligence tool surface from shared specs.
@@ -120,13 +61,6 @@ function recordCodeWorkflowTiming(
     },
     "workflow",
   );
-}
-
-function withTruncationDetails(
-  details: CodeIntelResult["details"],
-  truncation: ToolOutputTruncationDetails,
-): CodeIntelResult["details"] {
-  return details ? { ...details, truncation } : details;
 }
 
 function terminalCodeOperationOutcome(
@@ -188,35 +122,15 @@ export function registerCodeIntelligenceTools(
             cwd: ctx.cwd,
             outcome: "completed",
           });
-          const { text, truncated } = truncateToolContent(content, {
-            maxLines: spec.maxLines,
-            maxBytes: spec.maxBytes,
-          });
-          if (truncated && content.length > 0) {
-            const dir = mkdtempSync(join(tmpdir(), "supi-ci-"));
-            const spillPath = join(dir, `${spec.name}-output.md`);
-            writeFileSync(spillPath, content, "utf-8");
-            const notice = `\n_Full output saved to: \`${spillPath}\`_`;
-            recordCodeOperationBoundary("code-operation.finish", operationId, spec.name, {
-              cwd: ctx.cwd,
-              outcome: "completed",
-            });
-            return {
-              content: [{ type: "text" as const, text: text + notice }],
-              details: withTruncationDetails(details, {
-                truncated: true,
-                fullOutputPath: spillPath,
-              }),
-            };
-          }
           recordCodeOperationBoundary("code-operation.finish", operationId, spec.name, {
             cwd: ctx.cwd,
             outcome: "completed",
           });
-          return {
-            content: [{ type: "text" as const, text }],
-            details: withTruncationDetails(details, { truncated: false }),
-          };
+          return boundCodeToolResult(content, details, {
+            toolName: spec.name,
+            maxLines: spec.maxLines,
+            maxBytes: spec.maxBytes,
+          });
         } catch (error) {
           const outcome = terminalCodeOperationOutcome(error, signal);
           recordCodeWorkflowTiming(workflowTimer, operationId, spec.name, {
@@ -230,7 +144,8 @@ export function registerCodeIntelligenceTools(
           throw error;
         }
       },
-      ...getToolRenderer(spec.name),
+      renderCall: spec.renderCall,
+      renderResult: spec.renderResult,
     });
   }
 }

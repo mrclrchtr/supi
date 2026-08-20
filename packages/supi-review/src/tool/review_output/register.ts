@@ -1,8 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { ReviewArtifactStore } from "../../session/review-artifact-store.ts";
-import { renderOutputCall, renderOutputResult } from "../../tui/paged-output.ts";
 import { executeReviewOutput } from "./execute.ts";
 import { promptGuidelines, promptSnippet, toolDescription } from "./guidance.ts";
+import { renderOutputCall, renderOutputResult } from "./render.ts";
 import { reviewOutputSpec } from "./spec.ts";
 
 /** Register resumable retrieval for agent and interactive Review output artifacts. */

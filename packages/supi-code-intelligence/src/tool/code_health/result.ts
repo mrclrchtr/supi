@@ -241,3 +241,28 @@ function uniqueProvenance(provenance: readonly ResultProvenance[]): ResultProven
     return true;
   });
 }
+
+import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
+import { healthErrorResult } from "../result/errors.ts";
+import { renderHealthResult } from "./markdown.ts";
+
+type HealthOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["health"]>>;
+
+/** Assemble the final model-visible code_health result for one workflow outcome. */
+export function finishHealthResult(outcome: HealthOutcome, cwd: string): CodeIntelResult {
+  if (outcome.kind === "unavailable") throw new Error(outcome.reason);
+  if (outcome.kind === "invalid-input") {
+    return healthErrorResult(`**Error:** ${outcome.message}`, outcome.message);
+  }
+
+  const assembly = assembleHealthResult(outcome.data);
+  return {
+    content: renderHealthResult(assembly, cwd),
+    details: {
+      type: "health",
+      data: assembly.details,
+      status: "completed",
+      displaySections: assembly.displaySections,
+    },
+  };
+}

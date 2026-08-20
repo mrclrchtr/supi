@@ -3,11 +3,11 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { ApplyResult } from "../../../src/analysis/refactor/apply.ts";
 import type { RefactorPlan } from "../../../src/session/refactor-plans.ts";
 import { renderRefactorApplyResult as renderRefactorApplyTui } from "../../../src/tool/code_refactor_apply/tui.ts";
+import { renderRefactorPlanResult as renderRefactorPlanTui } from "../../../src/tool/code_refactor_plan/tui.ts";
 import {
   renderRefactorApplyResult as renderRefactorApplyMarkdown,
   renderRefactorPlanResult as renderRefactorPlanMarkdown,
-} from "../../../src/tool/code_refactor_plan/markdown.ts";
-import { renderRefactorPlanResult as renderRefactorPlanTui } from "../../../src/tool/code_refactor_plan/tui.ts";
+} from "../../../src/tool/refactor-markdown.ts";
 import {
   assembleRefactorApplyDetails,
   assembleRefactorPlanDetails,

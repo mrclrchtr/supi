@@ -6,6 +6,7 @@ import {
 } from "@mrclrchtr/supi-core/debug";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runDelegationBatch } from "../../src/tool/agent_run/batch-runner.ts";
+import { formatModelResult } from "../../src/tool/agent_run/result.ts";
 import type { ProfileCatalogue } from "../../src/types.ts";
 
 // Mock startAgentRun from supi-agent-runtime
@@ -168,7 +169,7 @@ describe("runDelegationBatch", () => {
 
   it("runs a read-only single-task batch and returns results", async () => {
     const catalogue = makeCatalogue(["explore"]);
-    const { modelText, results } = await runDelegationBatch(
+    const { results } = await runDelegationBatch(
       { tasks: [{ id: "t1", profile: "explore", instructions: "do work" }] },
       catalogue,
       mockCtx(),
@@ -177,7 +178,7 @@ describe("runDelegationBatch", () => {
     expect(results[0].taskId).toBe("t1");
     expect(results[0].status).toBe("completed");
     expect(results[0].finalText).toContain("completed:");
-    expect(modelText).toContain("## t1 (profile: explore) — completed");
+    expect(formatModelResult(results).text).toContain("## t1 (profile: explore) — completed");
   });
 
   it("records timing telemetry for a successful task", async () => {
@@ -243,14 +244,14 @@ describe("runDelegationBatch", () => {
     }));
 
     const catalogue = makeCatalogue(["explore"]);
-    const { results, modelText } = await runDelegationBatch(
+    const { results } = await runDelegationBatch(
       { tasks: [{ id: "t1", profile: "explore", instructions: "fail" }] },
       catalogue,
       mockCtx(),
     );
     expect(results).toHaveLength(1);
     expect(results[0].status).toBe("failed");
-    expect(modelText).toContain("failed");
+    expect(formatModelResult(results).text).toContain("failed");
     // Should not throw — returns normal result.
   });
 
@@ -323,7 +324,7 @@ describe("runDelegationBatch", () => {
       }));
     }
 
-    const { modelText, fullOutputPath, results } = await runDelegationBatch(
+    const { results } = await runDelegationBatch(
       {
         tasks: [
           { id: "t1", profile: "explore", instructions: "a" },
@@ -338,6 +339,7 @@ describe("runDelegationBatch", () => {
 
     expect(results).toHaveLength(4);
     expect(results.every((result) => result.status === "completed")).toBe(true);
+    const { text: modelText, fullOutputPath } = formatModelResult(results);
     // One bounded aggregate result, still under the byte bound.
     expect(Buffer.byteLength(modelText, "utf-8")).toBeLessThanOrEqual(51_200 + 120);
     // Every task stays represented.

@@ -4,12 +4,10 @@ import type { AgentRunHandle, AgentRunSessionView } from "@mrclrchtr/supi-agent-
 import { combineAgentRunUsage, startAgentRun } from "@mrclrchtr/supi-agent-runtime/api";
 import { toAgentToolNames } from "../../capabilities.ts";
 import type { AgentProfile, ProfileCatalogue } from "../../types.ts";
-import { type AggregateSection, boundAggregateOutput } from "./aggregate.ts";
 import type { ResolvedTask } from "./batch-preflight.ts";
 import { preflightDelegationBatch } from "./batch-preflight.ts";
 import type { AgentConversationView, ConversationTaskMetadata } from "./conversation-view.ts";
 import { buildConversationView } from "./conversation-view.ts";
-import { capHumanText, capModelText, humanTextOverflow, modelTextOverflow } from "./output.ts";
 import type {
   AgentRunRegistry,
   BatchProgressState,
@@ -23,6 +21,7 @@ import {
   statusFromOutcome,
 } from "./run-telemetry.ts";
 import type { AgentRunToolParams } from "./schema.ts";
+import { capHumanText, capModelText, humanTextOverflow, modelTextOverflow } from "./text-caps.ts";
 import { summarizeToolActivity } from "./tool-summary.ts";
 
 // ── Progress ─────────────────────────────────────────────────────
@@ -54,8 +53,6 @@ export async function runDelegationBatch(
   onUpdate?: OnUpdate,
   registry?: AgentRunRegistry,
 ): Promise<{
-  modelText: string;
-  fullOutputPath?: string;
   results: BatchTaskResult[];
   aggregateUsage?: Usage;
   conversationViews: Map<string, AgentConversationView>;
@@ -333,33 +330,10 @@ export async function runDelegationBatch(
   }
 
   const aggregateUsage = usageList.length > 0 ? combineAgentRunUsage(usageList) : undefined;
-  const formatted = formatModelResult(results);
 
   return {
-    modelText: formatted.text,
-    fullOutputPath: formatted.fullOutputPath,
     results,
     aggregateUsage,
     conversationViews,
   };
-}
-
-// ── Format model-visible result ─────────────────────────────────
-
-function formatModelResult(results: readonly BatchTaskResult[]): {
-  text: string;
-  fullOutputPath?: string;
-} {
-  const sections: AggregateSection[] = results.map((task) => {
-    const header = `## ${task.taskId} (profile: ${task.profileId}) — ${task.status}`;
-    if (task.status === "completed") {
-      return { overhead: header, body: task.finalText ?? "(no output)" };
-    }
-    const reason = task.failureCode ? ` (${task.failureCode})` : "";
-    return {
-      overhead: `${header}${reason}\nTurns: ${task.turns} · Tool uses: ${task.toolUses}`,
-      body: "",
-    };
-  });
-  return boundAggregateOutput(sections);
 }

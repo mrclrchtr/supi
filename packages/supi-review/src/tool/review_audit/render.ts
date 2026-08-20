@@ -1,18 +1,11 @@
+/** Transcript renderers for the review_audit tool. */
+
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
-import { REVIEW_AUDIT_TOOL_NAME } from "../tool/review_audit/spec.ts";
-import { REVIEW_OUTPUT_TOOL_NAME } from "../tool/review_output/spec.ts";
-import type { ReviewAuditReference, ReviewOutputReference } from "../types.ts";
-import { renderError, renderPartial, renderReviewToolCall } from "./common.ts";
-
-interface TextResult {
-  content?: Array<{ type: string; text?: string }>;
-  details?: unknown;
-}
-
-interface PageDetails extends ReviewOutputReference {
-  kind: "review-output-page";
-}
+import { renderError, renderPartial, renderReviewToolCall } from "../../tui/common.ts";
+import type { ReviewAuditReference, ReviewOutputReference } from "../../types.ts";
+import { expandedPage, pageSummary, type TextResult } from "../page-render.ts";
+import { REVIEW_AUDIT_TOOL_NAME } from "./spec.ts";
 
 interface AuditListDetails {
   kind: "review-audit";
@@ -31,58 +24,6 @@ interface AuditPageDetails extends ReviewOutputReference {
 }
 
 type AuditDetails = AuditListDetails | AuditPageDetails;
-
-function body(result: TextResult): string {
-  const content = result.content?.[0];
-  return content?.type === "text" ? (content.text ?? "") : "";
-}
-
-function pageSummary(label: string, details: ReviewOutputReference, theme: Theme): string {
-  const end = details.nextOffset ?? details.totalCharacters;
-  const continuation = details.nextOffset === undefined ? "complete" : "more available";
-  return `${theme.fg("accent", label)} ${theme.fg("muted", `${details.offset.toLocaleString("en-US")}–${end.toLocaleString("en-US")} of ${details.totalCharacters.toLocaleString("en-US")} chars`)} ${theme.fg("dim", `· ${continuation}`)}`;
-}
-
-function expandedPage(
-  label: string,
-  details: ReviewOutputReference,
-  result: TextResult,
-  theme: Theme,
-): Container {
-  const container = new Container();
-  container.addChild(new Text(pageSummary(label, details, theme), 0, 0));
-  const text = body(result).trimEnd();
-  if (text) {
-    container.addChild(new Spacer(1));
-    container.addChild(new Text(theme.fg("toolOutput", text), 0, 0));
-  }
-  return container;
-}
-
-export function renderOutputCall(args: unknown, theme: Theme): Text {
-  const params = (args ?? {}) as { artifactId?: string; offset?: number };
-  return renderReviewToolCall(
-    REVIEW_OUTPUT_TOOL_NAME,
-    params.artifactId ?? "output",
-    theme,
-    `offset ${params.offset ?? 0}`,
-  );
-}
-
-export function renderOutputResult(
-  result: TextResult,
-  options: { expanded: boolean; isPartial: boolean },
-  theme: Theme,
-  context: { isError: boolean } = { isError: false },
-): Container | Text {
-  if (options.isPartial) return renderPartial("Reading review output…", theme);
-  const details = result.details as PageDetails | undefined;
-  if (context.isError || details?.kind !== "review-output-page") {
-    return renderError(`${REVIEW_OUTPUT_TOOL_NAME} failed`, theme);
-  }
-  if (options.expanded) return expandedPage("Review output", details, result, theme);
-  return new Text(pageSummary("Review output", details, theme), 0, 0);
-}
 
 export function renderAuditCall(args: unknown, theme: Theme): Text {
   const params = (args ?? {}) as {
@@ -130,7 +71,7 @@ export function renderAuditResult(
   options: { expanded: boolean; isPartial: boolean },
   theme: Theme,
   context: { isError: boolean } = { isError: false },
-): Container | Text {
+) {
   if (options.isPartial) return renderPartial("Reading reviewer replays…", theme);
   const details = result.details as AuditDetails | undefined;
   if (context.isError || details?.kind !== "review-audit") {

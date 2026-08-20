@@ -1,5 +1,6 @@
 import type { Static } from "typebox";
 import { Type } from "typebox";
+import { runSearch } from "./execute.ts";
 
 export const WEB_DOCS_SEARCH_TOOL_NAME = "web_docs_search";
 export const WEB_DOCS_SEARCH_TOOL_LABEL = "Web Docs Search";
@@ -23,4 +24,5 @@ export const webDocsSearchSpec = {
   name: WEB_DOCS_SEARCH_TOOL_NAME,
   label: WEB_DOCS_SEARCH_TOOL_LABEL,
   parameters: webDocsSearchParameters,
+  execute: runSearch,
 } as const;

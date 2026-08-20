@@ -1,3 +1,4 @@
+import type { Component } from "@earendil-works/pi-tui";
 import type { TSchema } from "typebox";
 import type {
   CodeIntelligenceToolName,
@@ -20,6 +21,9 @@ import { codeResolveSpec } from "./code_resolve/spec.ts";
  * guidelines live in each tool's `guidance.ts`, parameter mechanics live in
  * each tool's `spec.ts` over the shared vocabulary in `schemas.ts`.
  */
+// biome-ignore lint/suspicious/noExplicitAny: pi render call/result signatures vary per tool
+export type CodeToolRendererFn = (...args: any[]) => Component;
+
 export interface CodeIntelligenceToolDefinitionSpec {
   name: CodeIntelligenceToolName;
   label: string;
@@ -27,6 +31,8 @@ export interface CodeIntelligenceToolDefinitionSpec {
   maxLines?: number;
   maxBytes?: number;
   run: (params: unknown, ctx: CodeIntelToolExecCtx) => Promise<CodeIntelResult> | CodeIntelResult;
+  renderCall?: CodeToolRendererFn;
+  renderResult?: CodeToolRendererFn;
 }
 
 /** Single source of truth for the surviving eight-tool family. */

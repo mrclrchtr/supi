@@ -1,11 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import {
-  renderAuditCall,
-  renderAuditResult,
-  renderOutputCall,
-  renderOutputResult,
-} from "../../src/tui/paged-output.ts";
+import { renderAuditCall, renderAuditResult } from "../../src/tool/review_audit/render.ts";
+import { renderOutputCall, renderOutputResult } from "../../src/tool/review_output/render.ts";
 
 const theme = {
   fg: (_color: string, text: string) => text,

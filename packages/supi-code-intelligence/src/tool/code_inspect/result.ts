@@ -312,3 +312,32 @@ function overallProvenance(data: InspectResultData): ResultProvenance[] {
     ...(structural ? [{ source: "structural" as const, capability: "tree-sitter" }] : []),
   ];
 }
+
+import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
+import { inspectErrorResult } from "../result/errors.ts";
+import { renderInspectResult } from "./markdown.ts";
+
+type InspectOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["inspect"]>>;
+
+/** Assemble the final model-visible code_inspect result for one workflow outcome. */
+export function finishInspectResult(outcome: InspectOutcome): CodeIntelResult {
+  if (outcome.kind === "unavailable") throw new Error(outcome.reason);
+  if (outcome.kind === "invalid-input") {
+    return inspectErrorResult(`**Error:** ${outcome.message}`, {
+      focusTarget: "invalid input",
+      nextQueries: ["Provide an existing file and exact 1-based point"],
+      message: outcome.message,
+    });
+  }
+
+  const assembly = assembleInspectResult(outcome.data, outcome.nextQueries);
+  return {
+    content: renderInspectResult(assembly),
+    details: {
+      type: "inspect",
+      data: assembly.details,
+      status: "completed",
+      displaySections: assembly.displaySections,
+    },
+  };
+}

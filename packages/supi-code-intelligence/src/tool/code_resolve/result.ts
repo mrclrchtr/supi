@@ -288,3 +288,40 @@ function resolveProvenance(outcome: TargetWorkflowOutcome): ResultProvenance[] {
       : []),
   ];
 }
+
+import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
+import { renderResolveResult } from "./markdown.ts";
+
+type ResolveOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["resolve"]>>;
+
+/** Assemble the final model-visible code_resolve result for one workflow outcome. */
+export function finishResolveResult(outcome: ResolveOutcome, cwd: string): CodeIntelResult {
+  if (outcome.kind === "unavailable") {
+    throw new Error(outcome.reason);
+  }
+
+  const assembly = assembleResolveResult(outcome, cwd);
+  const content = renderResolveResult(assembly);
+
+  return {
+    content,
+    details: {
+      type: "resolve",
+      data: assembly.details,
+      status:
+        outcome.kind === "resolved" || outcome.kind === "target-group"
+          ? "completed"
+          : outcome.kind === "disambiguation" || outcome.kind === "kind-mismatch"
+            ? "disambiguation"
+            : "invalid-input",
+      ...(outcome.kind === "invalid-input"
+        ? { message: outcome.message }
+        : outcome.kind === "disambiguation"
+          ? { message: "Multiple target matches require one candidate." }
+          : outcome.kind === "kind-mismatch"
+            ? { message: `No target matched provider kind ${outcome.requestedKind}.` }
+            : {}),
+      displaySections: assembly.displaySections,
+    },
+  };
+}
