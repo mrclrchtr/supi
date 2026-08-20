@@ -7,12 +7,12 @@ import { htmlToMarkdown, wrapAsCodeBlock } from "../../convert.ts";
 import { fetchWithNegotiation, isValidHttpUrl } from "../../fetch.ts";
 import { writeTempFile } from "../../temp-file.ts";
 import { limitModelVisibleOutput } from "../result.ts";
-import { buildFileResult, buildInlineResult, type WebFetchDetails } from "./result.ts";
 import {
   WEB_FETCH_INLINE_MAX_CHARS,
   type WebFetchMdInput,
   type WebFetchOutputMode,
-} from "./spec.ts";
+} from "./input.ts";
+import { buildFileResult, buildInlineResult, type WebFetchDetails } from "./result.ts";
 
 // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
 export async function runWebFetch(
