@@ -2,6 +2,8 @@
 
 Guidelines for designing, registering, executing, and rendering tools in PI extensions. Use this document as a checklist for model-facing metadata, schemas, execution behavior, output limits, state handling, UI rendering, and built-in overrides.
 
+This doc owns design rules. Mechanics and costs of context (what PI sends, prompt cache, compaction, session store) live in `context-architecture.md`.
+
 For SuPi-specific package conventions around `action-specs.ts`, `tool-specs.ts`, and deriving registration/guidance from shared metadata, see `../conventions/tool-architecture.md`. For how tool metadata, results, and injected messages consume model context and prompt cache, see `context-architecture.md`.
 
 ## Naming
@@ -124,7 +126,7 @@ Custom tools **must truncate** large model-visible output.
 
 - Branch-aware tool state belongs in tool-result `details`; reconstruct it from `ctx.sessionManager.getBranch()` on `session_start` and `session_tree`.
 - Use `pi.appendEntry(customType, data)` for extension state that should persist but not participate in LLM context.
-- Do not rely on long tool `content` for durable state. During compaction serialization, PI truncates tool-result text to 2000 characters and summaries are lossy.
+- Do not rely on long tool `content` for durable state. Compaction truncates tool-result text to 2,000 characters and summaries are lossy (`context-architecture.md#3-compaction-mechanics-what-extensions-need-to-know`).
 
 ## Rendering and TUI Rules
 
@@ -143,7 +145,7 @@ Built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`.
 - Registering the same `name` replaces a built-in. Match the built-in result shape, especially `details`, if you want built-in UI/session logic to keep working.
 - To wrap built-ins, delegate to `createReadTool`, `createBashTool`, `createEditTool`, `createWriteTool`, etc. Use operations interfaces for remote/sandbox execution; use `createLocalBashOperations()` for `user_bash`; use `createBashTool(..., { spawnHook })` to adjust command/cwd/env before execution.
 - `pi.registerTool()` works at startup or later (`session_start`, commands, handlers); newly registered tools are refreshed immediately.
-- `pi.setActiveTools(names)` controls which tools are active/callable and which prompt snippets/guidelines shape the prompt. Inspect with `pi.getActiveTools()` / `pi.getAllTools()`.
+- `pi.setActiveTools(names)` controls which tools are active/callable and which prompt snippets/guidelines shape the prompt. Inspect with `pi.getActiveTools()` / `pi.getAllTools()`. For lazy tool loading and its prompt-cache effects, see `context-architecture.md#5-extension-surfaces-for-context-control`.
 - `tool_call` handlers can block a call or mutate `event.input` before execution. Mutations are not revalidated.
 - `tool_result` handlers can patch `content`, `details`, or `isError`; fields replace whole values, not deep-merge. Use `ctx.signal` for nested abort-aware work.
 

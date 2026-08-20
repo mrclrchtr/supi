@@ -1,6 +1,6 @@
 # Pi context architecture for extension developers
 
-What Pi sends to the model on each request, scoped to what extension authors can influence and control. Evidence comes from installed Pi 0.84.2 docs (`docs/compaction.md`, `docs/skills.md`, `docs/session-format.md`, `docs/extensions.md`) and dist source (`core/skills.js`, `core/compaction/compaction.js`, `core/session-manager.js`, pi-ai `api/anthropic-messages.js`). Items marked **inferred** are not stated in Pi docs or source. User-owned controls (system prompt skeleton, `AGENTS.md` files, compaction settings, `/tree`/`/fork`, `PI_CACHE_RETENTION`) are excluded from guidance. Their mechanics appear only where extensions can read or intercept them.
+What Pi sends to the model on each request, scoped to what extension authors can influence and control. Evidence comes from installed Pi 0.84.2 docs (`docs/compaction.md`, `docs/skills.md`, `docs/session-format.md`, `docs/extensions.md`) and dist source (`core/skills.js`, `core/compaction/compaction.js`, `core/session-manager.js`, pi-ai `api/anthropic-messages.js`). Items marked **inferred** are not stated in Pi docs or source. User-owned controls (system prompt skeleton, `AGENTS.md` files, compaction settings, `/tree`/`/fork`, `PI_CACHE_RETENTION`) are excluded from guidance. Their mechanics appear only where extensions can read or intercept them. This doc owns mechanics and costs. Design rules for tools live in `tool-guidance.md`.
 
 ## 1. Components extensions pay for
 
@@ -38,9 +38,9 @@ Each request is stateless. Pi rebuilds and sends the full payload each turn. Ext
 All confirmed in `docs/extensions.md`:
 
 - **System prompt injection:** `before_agent_start` can return a `message` (custom message, stored and sent to the LLM) and a replacement `systemPrompt` that chains across handlers. `event.systemPromptOptions` exposes the structured inputs (custom prompt, active tools, snippets, guidelines, context files, skills). Changes here are part of the cached prefix.
-- **Tool prompt metadata:** `pi.registerTool()` accepts `promptSnippet` (one line in `Available tools`) and `promptGuidelines` (bullets in `Guidelines`), applied only while the tool is active. Guideline bullets get no tool-name prefix. Each bullet must name its tool explicitly.
+- **Tool prompt metadata:** `promptSnippet` and `promptGuidelines` apply only while the tool is active, so dynamic activation changes the prompt (§2). Design rules: `tool-guidance.md#model-facing-guidance`.
 - **Dynamic/lazy tool loading:** register all tools, keep only a loader tool active, then extend with `pi.setActiveTools()` during execution. Changes must be additive. Models with native deferred loading (Anthropic Sonnet, Opus, and Fable 4.5+ except Haiku; OpenAI gpt-5.4+) keep the prefix stable. They load new definitions at the tool-result position. Other models fall back to the full active tool list. That fallback can invalidate the cache prefix. Lazy tools should rely on their `description` only and omit `promptSnippet`/`promptGuidelines`.
-- **History control:** the `tool_result` event can rewrite tool output before it enters the session. Bound output at the source with truncation or spill files. The 2,000-char cut applies only during summary serialization, not in live history.
+- **History control:** the `tool_result` event can rewrite tool output before it enters the session (handler mechanics: `tool-guidance.md#built-ins-dynamic-tools-and-events`). Truncation and spill-file rules: `tool-guidance.md#output-size`. The 2,000-char cut applies only during summary serialization (§3), not in live history.
 - **Per-turn message mutation:** the `context` event fires before each LLM call and can return a replaced `messages` array (a deep copy, safe to modify). This is the direct hook for pruning or rewriting what the model sees on a given turn.
 - **Provider payload rewrite:** `before_provider_request` fires after the provider payload is built, right before it is sent. Returning a value replaces the payload, including provider-level system instructions. Returning `undefined` keeps the payload unchanged.
 - **Skill discipline:** ship short, specific skill descriptions. Set `disable-model-invocation: true` to hide a skill from the catalog and force `/skill:name` use.
@@ -48,5 +48,5 @@ All confirmed in `docs/extensions.md`:
 
 ## Related docs
 
-- `tool-guidance.md` — design checklist for model-facing tool metadata, results, and rendering.
+- `tool-guidance.md` — design rules for tools: naming, metadata, schemas, execution, output limits, rendering. This doc owns the context costs of those surfaces.
 - `model-call.md` — direct model calls from extensions.
