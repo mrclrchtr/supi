@@ -38,9 +38,7 @@ SuPi is pre-release and not API-stable. Intentional breaking changes to package 
 
 See `pnpm run` for routine build/lint/test. Toolchain versions pinned in `.mise.toml`.
 
-- When both standard and `*:ai` scripts exist, prefer the `*:ai` variant for agent runs — they produce lower-noise, more token-efficient output.
-- Current root examples: `biome:ai`, `typecheck:ai`, `test:ai`, `check:ai`, `verify:ai`.
-- Use the non-`:ai` variant when you specifically want prettier or interactive local output.
+- When both standard and `*:ai` scripts exist, prefer the `*:ai` variant for agent runs (lower-noise output); use the plain variant only for prettier or interactive local output.
 - Run `pnpm verify:ai` (typecheck, lint, tests) for code, test, dependency, or package/config changes; skip it for specs, docs, and skill-only changes unless requested.
 
 ## Architecture
@@ -72,7 +70,7 @@ New installable extension packages should be added to the root `package.json` `p
 
 ## supi-core entry points
 
-`@mrclrchtr/supi-core` exposes 12 domain subpath exports plus a convenience barrel at `./api`. It is library-only — the `/supi-settings` command is now registered by `@mrclrchtr/supi-settings`.
+`@mrclrchtr/supi-core` exposes domain subpath exports plus a convenience barrel at `./api`. It is library-only — `/supi-settings` is registered by `@mrclrchtr/supi-settings`.
 
 Prefer domain entry points when importing from supi-core — they only load the dependencies needed for that domain. Use `./api` when you need symbols from 3+ domains.
 
@@ -80,20 +78,7 @@ Prefer domain entry points when importing from supi-core — they only load the 
 
 SuPi extensions self-register their prompts, skills, and themes using the `resources_discover` event rather than relying on static `pi.prompts` / `pi.skills` / `pi.themes` in `package.json`. This ensures resources are discovered regardless of whether the package is installed standalone or consumed through the workspace root.
 
-Pattern:
-```ts
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
-
-export default function (pi: ExtensionAPI) {
-  pi.on("resources_discover", () => ({
-    skillPaths: [join(baseDir, "skills")],
-    promptPaths: [join(baseDir, "prompts")],
-  }));
-}
-```
+Pattern: derive `baseDir = dirname(dirname(fileURLToPath(import.meta.url)))` and return `{ skillPaths: [join(baseDir, "skills")], promptPaths: [...] }` from a `resources_discover` handler.
 
 Extension packages with prompts/skills:
 - `packages/supi-claude-md` — skills via `resources_discover`
@@ -129,6 +114,7 @@ Extensions register a `SettingsModule` via `registerSettings()` from `@mrclrchtr
 
 ### Dependencies & tool behavior
 - Pi core peer deps (`@earendil-works/pi-*`, `typebox`) use `"*"` ranges per Pi package docs; do not tighten them.
+- Import cycles silently corrupt TypeBox tool schemas at module-evaluation time (bindings read `undefined` depending on load order); providers reject the emitted schema with misleading "must have type 'object'" errors — dump the actual wire payload before trusting source schemas. `noImportCycles` is enforced; keep anything a spec imports in leaf modules (`input.ts`, shared constants).
 - `createBashTool` applies `commandPrefix` **before** `spawnHook`; if your hook needs the raw user command, strip the prefix manually and re-apply it to the result.
 - Run `pnpm install` before editing `.ts` files when editing dependencies.
 
@@ -138,6 +124,7 @@ Extensions register a `SettingsModule` via `registerSettings()` from `@mrclrchtr
 - pnpm `ignoredBuiltDependencies` silently skips install scripts; `onlyBuiltDependencies` explicitly allows them — confusing the two causes missing native binaries (e.g. tree-sitter-cli).
 - `tsc -b` (build mode) and `--noEmit` are incompatible — use `pnpm typecheck:ai` instead of raw `tsc` commands.
 - Per PI docs, signal real tool failures by throwing from `execute()` — returning error text is still a successful tool call. Only throw for actual invalid usage or capability-unavailable conditions, not for valid searches that find zero results.
+- `pi -p "Say ok" --model openai-codex/<model> --no-session` — quick repro harness for provider request errors; Codex rides the WebSocket transport under `transport: auto`, set `"transport": "sse"` in `~/.pi/agent/settings.json` to instrument the HTTP path.
 
 > For per-package gotchas (session entry parsing, message rendering, config patterns, WASM quirks), see individual `packages/*/CLAUDE.md` files — surfaced by `code_orientation(focus="packages/...")` when the agent orients into that directory.
 ## Publish pipeline
@@ -156,7 +143,7 @@ node scripts/publish.mjs packages/supi-lsp --publish  # pack + verify + publish
 
 `pack:check` runs this pipeline as a dry-run for all publishable packages. `pack:verify` runs the full pack + tarball verification for all publishable packages via a parallel Node.js runner (`scripts/pack-all.mjs`).
 
-Root cause for the staging pipeline: direct `pnpm pack` on workspace packages produces tarball entries with `../` paths to the root `node_modules`. The staged `cp -RL` + `npm pack` approach avoids this because npm produces correct tarballs from a flat, dereferenced `node_modules`.
+Root cause: direct `pnpm pack` on workspace packages emits `../` tarball paths into root `node_modules`; staging dereferences symlinks so `npm pack` sees a flat tree.
 
 ## Release & tagging convention
 
@@ -168,12 +155,6 @@ Root cause for the staging pipeline: direct `pnpm pack` on workspace packages pr
   - `.release-please-manifest.json` — single entry `{".": "<version>"}`
 - Per-package npm publish uses the matching version from the workspace.
 - Release-please manages the `.release-please-manifest.json` automatically — do not edit it manually.
-- To trigger a manual release outside the automated cycle:
-  ```bash
-  git tag -m "vX.Y.Z" "vX.Y.Z"
-  git push origin "vX.Y.Z"
-  gh release create "vX.Y.Z" --title "vX.Y.Z" --notes "..." --latest
-  ```
 
 ## Agent skills
 
@@ -208,3 +189,5 @@ Multi-context — `CONTEXT-MAP.md` at root pointing to per-package `CONTEXT.md` 
 - **Changing state shape requires updating every `createInitialState` mock in test files** — keep mock shapes in sync with real types
 - New installable extension package: add `package.json` + `tsconfig.json` + `__tests__/tsconfig.json` (`{"extends": "../../../tsconfig.json", "include": ["**/*.ts", "../src/**/*.ts"], "exclude": []}`), wire it into root `pi.extensions`, and run `pnpm install`. Library-only packages use the same package/test configs but must not enter `pi.extensions`.
 - Module-level `let`/`const` state persists across Vitest tests (ES modules are cached) — use behavioral verification instead of counting constructor invocations
+- Vitest `experimental.fsModuleCache` (`node_modules/.experimental-vitest-cache`) can serve stale module evaluations mid-refactor — delete it when module errors refuse to reproduce
+- `noImportCycles` counts `export ... from` re-exports as cycle edges but ignores `import type` — delete dead type re-exports rather than suppress
