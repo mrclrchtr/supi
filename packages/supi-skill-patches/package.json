@@ -14,6 +14,6 @@
   "devDependencies": {
     "jiti": "2.7.0",
     "mattpocock-skills": "github:mattpocock/skills#v1.2.3",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   }
 }
