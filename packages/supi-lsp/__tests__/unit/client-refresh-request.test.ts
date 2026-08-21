@@ -1,5 +1,6 @@
 // Unit tests for server-requested workspace diagnostic refresh handling.
 
+import { rmSync } from "node:fs";
 import {
   configureDebugRegistry,
   getDebugEvents,
@@ -7,12 +8,16 @@ import {
 } from "@mrclrchtr/supi-core/debug";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DiagnosticEvidenceSummary } from "../../src/diagnostics/evidence.ts";
-import { createRunningTestClient } from "../helpers/client-test-harness.ts";
+import {
+  createDiagnosticTestFile,
+  createRunningTestClient,
+} from "../helpers/client-test-harness.ts";
 
 // biome-ignore lint/suspicious/noExplicitAny: accessing the private request handler at its protocol boundary
 type AnyClient = any;
 
 const REFRESH_METHOD = "workspace/diagnostic/refresh";
+const tempDirs: string[] = [];
 
 function evidenceSummary(): DiagnosticEvidenceSummary {
   return {
@@ -38,13 +43,17 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
+  for (const directory of tempDirs.splice(0)) rmSync(directory, { recursive: true, force: true });
   resetDebugRegistry();
 });
 
 describe("LSP server-requested diagnostic refresh", () => {
   it("returns null immediately and records aggregate success after the refresh", async () => {
     const { client } = createRunningTestClient();
-    const refresh = vi.spyOn(client, "refreshOpenDiagnostics").mockResolvedValue(evidenceSummary());
+    const refresh = vi
+      .spyOn(client as AnyClient, "refreshForServerRequest")
+      .mockResolvedValue(evidenceSummary());
 
     expect((client as AnyClient).handleServerRequest(REFRESH_METHOD, {})).toBeNull();
     expect(refresh).not.toHaveBeenCalled();
@@ -78,7 +87,7 @@ describe("LSP server-requested diagnostic refresh", () => {
 
   it("consumes a rejected refresh and records one failure event", async () => {
     const { client } = createRunningTestClient();
-    vi.spyOn(client, "refreshOpenDiagnostics").mockRejectedValue(
+    vi.spyOn(client as AnyClient, "refreshForServerRequest").mockRejectedValue(
       new Error("private diagnostic failure"),
     );
 
@@ -97,6 +106,46 @@ describe("LSP server-requested diagnostic refresh", () => {
       }),
     ]);
     expect(JSON.stringify(events)).not.toContain("private diagnostic failure");
+  });
+
+  it("force-resynchronizes reusable open documents", async () => {
+    vi.useFakeTimers();
+    const file = createDiagnosticTestFile("forced-refresh.ts");
+    tempDirs.push(file.tmpDir);
+    const { client, rpc } = createRunningTestClient();
+    client.didOpen(file.filePath, "const x = 1;");
+    const version = client.getOpenDocumentVersion(file.filePath);
+    if (version === null) throw new Error("Expected an open document version.");
+    client.handlePublishDiagnostics({ uri: file.uri, version, diagnostics: [] });
+    rpc.sendNotification.mockClear();
+    rpc.sendNotification.mockImplementation((method: string) => {
+      if (method === "textDocument/didChange") {
+        const currentVersion = client.getOpenDocumentVersion(file.filePath);
+        client.handlePublishDiagnostics({
+          uri: file.uri,
+          version: currentVersion ?? undefined,
+          diagnostics: [],
+        });
+      }
+      return Promise.resolve();
+    });
+
+    expect((client as AnyClient).handleServerRequest(REFRESH_METHOD, {})).toBeNull();
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(rpc.sendNotification).toHaveBeenCalledWith(
+      "textDocument/didChange",
+      expect.objectContaining({ textDocument: { uri: file.uri, version: 2 } }),
+    );
+    expect(
+      getDebugEvents({ source: "lsp", category: "diagnostics.refresh-request" }).events,
+    ).toEqual([
+      expect.objectContaining({
+        message: "LSP diagnostic refresh request completed",
+        data: expect.objectContaining({ requested: 1, confirmed: 1 }),
+      }),
+    ]);
   });
 
   it("does not send pull requests when no documents are tracked", async () => {

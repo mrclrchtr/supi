@@ -726,12 +726,17 @@ export class LspClient {
     }
   }
 
+  /** Run a server-requested refresh through the forced diagnostic path. */
+  private refreshForServerRequest(): Promise<DiagnosticEvidenceSummary> {
+    return this.diagnostics.refreshForServerRequest();
+  }
+
   private handleServerDiagnosticRefreshRequest(): null {
     // Defer the pass before invoking it. Its setup rereads and resynchronizes
     // tracked documents, so even an async method can otherwise delay the null
     // response on the JSON-RPC request stack.
     void Promise.resolve()
-      .then(() => this.refreshOpenDiagnostics())
+      .then(() => this.refreshForServerRequest())
       .then(
         (evidence) => this.recordDiagnosticRefreshRequest("completed", evidence),
         () => this.recordDiagnosticRefreshRequest("failed"),

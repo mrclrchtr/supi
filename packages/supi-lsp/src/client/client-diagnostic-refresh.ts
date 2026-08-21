@@ -30,7 +30,11 @@ import {
   isDiagnosticTimeout,
 } from "./client-diagnostic-timing.ts";
 import type { DiagnosticStateWait, DiagnosticWaitRegistry } from "./client-diagnostic-waiters.ts";
-import type { OpenDocumentState } from "./client-document-state.ts";
+import {
+  fingerprintDocumentContent,
+  hasCurrentDiagnosticEvidence,
+  type OpenDocumentState,
+} from "./client-document-state.ts";
 import {
   type ResynchronizeDocumentsResult,
   reopenDocument,
@@ -214,6 +218,37 @@ export async function pullDiagnosticsForOpenDocuments(options: {
   }
 }
 
+/** Find open documents with current diagnostic evidence and matching disk content. */
+function findReusableDocumentUris(options: {
+  openDocuments: ReadonlyMap<string, OpenDocumentState>;
+  diagnosticStore: ReadonlyMap<string, DiagnosticCacheEntry>;
+  evidenceRevision: number;
+  failedFiles: ReadonlySet<string>;
+}): Set<string> {
+  const reusable = new Set<string>();
+  for (const [uri, document] of options.openDocuments) {
+    if (options.failedFiles.has(uriToFile(uri))) continue;
+    if (
+      !hasCurrentDiagnosticEvidence(
+        document,
+        options.diagnosticStore.get(uri),
+        options.evidenceRevision,
+      )
+    ) {
+      continue;
+    }
+    try {
+      const content = readFileSync(uriToFile(uri), "utf-8");
+      if (fingerprintDocumentContent(content) === document.contentFingerprint) {
+        reusable.add(uri);
+      }
+    } catch {
+      // The normal resynchronization path handles files that cannot be read.
+    }
+  }
+  return reusable;
+}
+
 interface ClientDiagnosticRefreshOptions {
   readonly host: ClientDiagnosticsHost;
   readonly openDocuments: Map<string, OpenDocumentState>;
@@ -229,7 +264,64 @@ interface ClientDiagnosticRefreshOptions {
   readonly invalidateEvidence: (uri: string) => void;
   readonly markUnversionedSyncMoment: (uri: string) => void;
   readonly clearFailedFile: (uri: string) => void;
+  /** Server-requested refreshes bypass normal push-only evidence reuse. */
+  readonly forceResynchronize?: boolean;
   readonly options: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl;
+}
+
+interface PreparedRefreshDocuments {
+  readonly resynchronization: ResynchronizeDocumentsResult;
+  readonly synchronizations: DiagnosticSynchronization[];
+  readonly fullyReusable: boolean;
+}
+
+/** Classify reusable documents, then resynchronize only the remaining set. */
+function prepareRefreshDocuments(
+  options: ClientDiagnosticRefreshOptions,
+  supportsPull: boolean,
+  evidenceRevision: number,
+): PreparedRefreshDocuments {
+  const reuseEnabled = !supportsPull && !options.forceResynchronize;
+  const reusableUris = reuseEnabled
+    ? findReusableDocumentUris({
+        openDocuments: options.openDocuments,
+        diagnosticStore: options.diagnosticStore,
+        evidenceRevision,
+        failedFiles: options.failedFiles(),
+      })
+    : new Set<string>();
+  const documentsToResynchronize = new Map(
+    Array.from(options.openDocuments).filter(([uri]) => !reusableUris.has(uri)),
+  );
+  const resynchronization = resynchronizeOpenDocuments({
+    openDocuments: documentsToResynchronize,
+    waiters: options.waiters,
+    nextVersion: (uri) => nextDocumentVersion(options.versionHistory, uri),
+    nextSynchronizationId: options.nextSynchronizationId,
+    evidenceRevision,
+    sendNotification: (method, params) => options.host.sendNotification(method, params),
+    uriToFile,
+    clearFile: options.clearFile,
+    invalidateEvidence: options.invalidateEvidence,
+    markUnversionedSyncMoment: options.markUnversionedSyncMoment,
+    clearFailedFile: options.clearFailedFile,
+  });
+  const reusableSynchronizations: DiagnosticSynchronization[] = [];
+  for (const uri of reusableUris) {
+    const document = options.openDocuments.get(uri);
+    if (!document) continue;
+    reusableSynchronizations.push({
+      uri,
+      synchronizationId: document.synchronizationId,
+      evidenceRevision: document.evidenceRevision,
+    });
+  }
+  const synchronizations = [...reusableSynchronizations, ...resynchronization.synchronizations];
+  const fullyReusable =
+    reuseEnabled &&
+    options.openDocuments.size > 0 &&
+    reusableUris.size === options.openDocuments.size;
+  return { resynchronization, synchronizations, fullyReusable };
 }
 
 /** Refresh one client and return exact document evidence for that attempt. */
@@ -259,23 +351,9 @@ export async function refreshClientOpenDiagnostics(
   const maxWaitMs = options.options.maxWaitMs ?? 3_000;
   const quietMs = options.options.quietMs ?? 200;
   const syncStart = Date.now();
-  const resynchronization = resynchronizeOpenDocuments({
-    openDocuments: options.openDocuments,
-    waiters: options.waiters,
-    nextVersion: (uri) => nextDocumentVersion(options.versionHistory, uri),
-    nextSynchronizationId: options.nextSynchronizationId,
-    evidenceRevision: options.evidenceRevision(),
-    sendNotification: (method, params) => options.host.sendNotification(method, params),
-    uriToFile,
-    clearFile: options.clearFile,
-    invalidateEvidence: options.invalidateEvidence,
-    markUnversionedSyncMoment: options.markUnversionedSyncMoment,
-    clearFailedFile: options.clearFailedFile,
-  });
-  let synchronizations = resynchronization.synchronizations;
-  const settleEpoch = options.waiters.settleEpoch;
-  observer.synchronized();
-  const documentCount = synchronizations.length;
+  const prepared = prepareRefreshDocuments(options, supportsPull, options.evidenceRevision());
+  const resynchronization = prepared.resynchronization;
+  let synchronizations = prepared.synchronizations;
   let failedPullUris: ReadonlySet<string> = new Set();
   const buildEvidence = () =>
     buildDiagnosticRefreshEvidence({
@@ -289,6 +367,17 @@ export async function refreshClientOpenDiagnostics(
       openDocuments: options.openDocuments,
       diagnosticStore: options.diagnosticStore,
     });
+
+  // A fully reusable push-only refresh has no protocol work to collect.
+  // Preserve the existing cache timing event format and return current evidence.
+  if (prepared.fullyReusable) {
+    observer.cacheReused(synchronizations.length);
+    return buildEvidence();
+  }
+
+  const settleEpoch = options.waiters.settleEpoch;
+  observer.synchronized();
+  const documentCount = resynchronization.synchronizations.length;
   if (documentCount === 0) {
     observer.skipped(0);
     return buildEvidence();

@@ -63,6 +63,48 @@ describe("LSP diagnostic timing observations", () => {
     expect(JSON.stringify(events)).not.toContain("privateSource");
   });
 
+  it("records cache reuse for a fully reusable push-only refresh", async () => {
+    const file = join(cwd, "cache-refresh.ts");
+    writeFileSync(file, "const cacheRefresh = true;\n");
+    const { client, rpc } = createRunningTestClient({ root: cwd, cwd });
+    client.didOpen(file, "const cacheRefresh = true;\n");
+    client.handlePublishDiagnostics({
+      uri: `file://${file}`,
+      version: client.getOpenDocumentVersion(file) ?? undefined,
+      diagnostics: [],
+    });
+    rpc.sendNotification.mockClear();
+
+    await client.refreshOpenDiagnostics({ maxWaitMs: 500, quietMs: 20 });
+
+    const event = getDebugEvents({ source: "lsp", category: "diagnostics.timing" }).events[0];
+    expect(event).toEqual(
+      expect.objectContaining({
+        message: "LSP diagnostic refresh-open completed",
+        cwd,
+        data: {
+          operation: "refresh-open",
+          collection: "cache",
+          pull: "not-used",
+          push: "not-used",
+          fallback: false,
+          settle: "not-used",
+          timedOut: false,
+          freshness: "observed",
+          documentCount: 1,
+          outcome: "completed",
+          server: "test",
+          timing: {
+            durationMs: expect.any(Number),
+            phasesMs: {},
+          },
+        },
+      }),
+    );
+    expect(event?.data).not.toHaveProperty("reopen");
+    expect(rpc.sendNotification).not.toHaveBeenCalled();
+  });
+
   it("records pull fallback, push settle, and observed freshness", async () => {
     const file = join(cwd, "fallback.ts");
     writeFileSync(file, "const fallback = true;\n");

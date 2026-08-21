@@ -242,6 +242,18 @@ export class ClientDiagnostics {
   async refreshOpenDiagnostics(
     options: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl = {},
   ): Promise<DiagnosticEvidenceSummary> {
+    return this.#refreshOpenDiagnostics(options, false);
+  }
+
+  /** Force a full document resynchronization for a server refresh request. */
+  async refreshForServerRequest(): Promise<DiagnosticEvidenceSummary> {
+    return this.#refreshOpenDiagnostics({}, true);
+  }
+
+  async #refreshOpenDiagnostics(
+    options: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl,
+    forceResynchronize: boolean,
+  ): Promise<DiagnosticEvidenceSummary> {
     const requestedFiles = Array.from(
       new Set([...this.#openDocs.keys(), ...this.#diagnosticStore.keys(), ...this.#failedUris]),
     ).map(uriToFile);
@@ -269,6 +281,7 @@ export class ClientDiagnostics {
       },
       markUnversionedSyncMoment: (uri) => this.#unversionedPushSyncMoments.set(uri, Date.now()),
       clearFailedFile: (uri) => this.#failedUris.delete(uri),
+      forceResynchronize,
       options,
     });
   }
