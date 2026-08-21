@@ -1,5 +1,5 @@
 export const toolDescription =
-  "Orient around the workspace or one path, module, or target focus before surgical work. Omit focus for workspace Orientation. Directory focus may surface local instruction files.";
+  "Orient around the workspace or one path, module, or target focus before surgical work. Omit focus for workspace Orientation. Workspace Orientation includes manifest and dependency inventories. For one-file work, use focused path Orientation. Directory focus may surface local instruction files.";
 
 export const promptSnippet = "workspace/path/module/symbol Orientation";
 

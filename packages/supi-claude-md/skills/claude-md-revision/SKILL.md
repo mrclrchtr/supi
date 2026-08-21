@@ -42,7 +42,7 @@ Removing unnecessary content is as valuable as adding useful content. Do both.
 
 > See also: [detailed update guidelines](references/update-guidelines.md) and [quality criteria](references/quality-criteria.md)
 
-**Step 1.5: Build the Orientation baseline.** Assume future agents use `code_orientation` heavily. Run workspace Orientation once, then focus the target directory and any relevant child directory/file; raise `maxResults` or repeat narrower calls when needed. Remove static facts those non-instruction sections already provide. Do not treat the instruction file's appearance inside Orientation as proof that its own human guidance is redundant—Orientation is its delivery mechanism.
+**Step 1.5: Build a focused Orientation baseline.** Assume future agents use `code_orientation` heavily. Start with a directory focus for the target instruction file. This shows applicable instruction files and local facts. Use file or child-directory focus when needed. Run workspace Orientation only when the edit checks repo-wide facts, such as package topology or dependency relationships. Remove static facts those non-instruction sections already provide. Do not treat the instruction file's appearance inside Orientation as proof that its own human guidance is redundant—Orientation is its delivery mechanism.
 
 ### Step 2: Find Context Files
 

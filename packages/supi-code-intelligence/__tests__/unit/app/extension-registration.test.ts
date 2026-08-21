@@ -88,6 +88,9 @@ describe("focused code intelligence tool registration", () => {
 
     expect(getTool(pi, "code_graph").description).toContain("not symbol identity");
     expect(getTool(pi, "code_health").description).toContain("Report live diagnostics");
+    expect(getTool(pi, "code_orientation").description).toContain(
+      "Workspace Orientation includes manifest and dependency inventories.",
+    );
     expect(getTool(pi, "code_refactor_plan").description).toContain("without mutating files");
     expect(getTool(pi, "code_refactor_apply").description).toContain("by planId");
   });

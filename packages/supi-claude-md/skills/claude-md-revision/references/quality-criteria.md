@@ -107,7 +107,7 @@ Score after comparing the file with the complete first-turn code-intelligence ov
 
 ## Assessment Process
 
-1. Run workspace Orientation, then focused directory/file Orientation for the target; repeat or raise `maxResults` as needed.
+1. For a repo-wide check, run workspace Orientation first. For a targeted change, start with focused directory/file Orientation. Use workspace Orientation only when the edit checks repo-wide facts. Repeat or raise `maxResults` as needed.
 2. Read the CLAUDE.md file completely.
 3. Classify sections against the first-turn overview, native PI context, and Orientation as **fully redundant**, **partially redundant**, or **unique**.
 4. Cross-reference with the codebase: test non-obvious commands, check paths, and verify human architectural claims.

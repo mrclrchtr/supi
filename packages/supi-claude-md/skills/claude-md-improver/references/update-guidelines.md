@@ -82,7 +82,7 @@ Assume `code_orientation` is used heavily. Distinguish first-turn context from r
 - Cross-package conventions and decisions
 - Gotchas and human-curated "start here" guidance with reasoning
 
-Run workspace Orientation once, then focus every target file's directory and relevant child paths. Increase `maxResults` or use narrower repeated focuses when necessary. Compare instruction content with the non-instruction sections of those results; the file's appearance inside Orientation is delivery, not duplication by itself.
+For a repo-wide check, run workspace Orientation first. For a targeted change, focus each target file's directory and relevant child paths first. Use workspace Orientation only when the edit checks repo-wide facts. Increase `maxResults` or use narrower repeated focuses when necessary. Compare instruction content with the non-instruction sections of those results; the file's appearance inside Orientation is delivery, not duplication by itself.
 
 ## What to REMOVE or Compress
 
