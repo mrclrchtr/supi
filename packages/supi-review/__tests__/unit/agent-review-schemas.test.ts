@@ -9,18 +9,21 @@ import { reviewInputSchema, reviewSubmissionSchema } from "../../src/tool/review
 const tasks = [{ id: "spec", instructions: "Check the spec.", mode: "change" }];
 
 describe("agent review schemas", () => {
-  it("publishes one flat exact-target request without a direct wrapper", () => {
+  it("publishes explicit working-tree and committed target sources", () => {
     const publishedSchema = JSON.stringify(runReviewSchema);
 
     expect(publishedSchema).toContain('"target"');
     expect(publishedSchema).toContain('"paths"');
     expect(publishedSchema).toContain('"from"');
     expect(publishedSchema).toContain('"to"');
-    // biome-ignore lint/security/noSecrets: Schema field name assertion.
-    expect(publishedSchema).toContain('"includeUncommittedChanges"');
+    expect(publishedSchema).toContain('"workingTree"');
+    expect(publishedSchema).toContain('"committed"');
+    expect(publishedSchema).toContain("Review the frozen current filesystem");
+    expect(publishedSchema).toContain("Review exact committed Git state");
+    // biome-ignore lint/security/noSecrets: Removed schema field name assertion.
+    expect(publishedSchema).not.toContain('"includeUncommittedChanges"');
     expect(publishedSchema).not.toContain('"direct"');
     expect(publishedSchema).not.toContain('"kind"');
-    expect(publishedSchema).not.toContain("workingTree");
     expect(publishedSchema).not.toContain("comparison");
     expect(publishedSchema).not.toContain("currentState");
     expect(publishedSchema).not.toContain("prepared");
@@ -56,18 +59,42 @@ describe("agent review schemas", () => {
     });
   });
 
-  it("preserves a flat exact target for later endpoint resolution", () => {
+  it("preserves the explicit committed target source for later endpoint resolution", () => {
     expect(
       parseRunReviewToolInput({
-        target: { from: "topic~1", to: "release", includeUncommittedChanges: false },
+        target: { committed: { from: "topic~1", to: "release" } },
         sharedContext: "Issue #287.",
         tasks,
       }),
     ).toEqual({
-      target: { from: "topic~1", to: "release", includeUncommittedChanges: false },
+      target: { committed: { from: "topic~1", to: "release" } },
       scope: {},
       review: { sharedContext: "Issue #287.", tasks },
     });
+  });
+
+  it("keeps target source objects mutually exclusive and closed", () => {
+    expect(
+      Value.Check(runReviewSchema, {
+        target: { committed: { from: "base", to: "HEAD" } },
+        tasks,
+      }),
+    ).toBe(true);
+    expect(
+      Value.Check(runReviewSchema, {
+        target: { workingTree: { to: "HEAD" } },
+        tasks,
+      }),
+    ).toBe(false);
+    expect(
+      Value.Check(runReviewSchema, {
+        target: { workingTree: {}, committed: {} },
+        tasks,
+      }),
+    ).toBe(false);
+    expect(() =>
+      parseRunReviewToolInput({ target: { workingTree: {}, committed: {} }, tasks }),
+    ).toThrow("Review Target must select at most one of workingTree or committed.");
   });
 
   it("normalizes and bounds optional batch Review Scope paths", () => {
@@ -87,14 +114,16 @@ describe("agent review schemas", () => {
   });
 
   it.each([
-    { workingTree: {} },
+    { from: "main" },
+    { to: "HEAD" },
+    { includeUncommittedChanges: true },
     { comparison: { baseCommit: "main" } },
     { commit: { commit: "HEAD" } },
     { currentState: {} },
     { kind: "working-tree" },
-  ])("rejects the old Review Target %o", (target) => {
+  ])("rejects the flat or old Review Target %o", (target) => {
     expect(() => parseRunReviewToolInput({ target, tasks })).toThrow(
-      "Review Target must use only from, to, and includeUncommittedChanges.",
+      "Review Target must select a workingTree or committed target object.",
     );
   });
 
@@ -150,10 +179,13 @@ describe("agent review schemas", () => {
     },
   );
 
-  it.each(["from", "to"] as const)(
-    "reports a blank Review Target %s endpoint before target normalization",
-    (endpoint) => {
-      const input = { target: { [endpoint]: " ", includeUncommittedChanges: false }, tasks };
+  it.each([
+    { target: { workingTree: { from: " " } }, endpoint: "workingTree.from" },
+    { target: { committed: { to: " " } }, endpoint: "committed.to" },
+  ])(
+    "reports a blank Review Target $endpoint before target normalization",
+    ({ target, endpoint }) => {
+      const input = { target, tasks };
 
       expect(Value.Check(runReviewSchema, input)).toBe(false);
       expect(() => parseRunReviewToolInput(input)).toThrow(
@@ -169,41 +201,43 @@ describe("agent review schemas", () => {
     expect(() => parseRunReviewToolInput({ paths: ["src/a.ts"], target: {}, tasks })).not.toThrow();
   });
 
-  it.each(["from", "to"] as const)(
-    "rejects whitespace inside Review Target %s endpoint syntax",
-    (endpoint) => {
-      for (const revision of ["HEAD ^", "HEAD\n"]) {
-        const input = {
-          target: { [endpoint]: revision, includeUncommittedChanges: false },
-          tasks,
-        };
-
-        expect(() => parseRunReviewToolInput(input)).toThrow(
-          `Review Target ${endpoint} must not contain whitespace.`,
-        );
-      }
-    },
-  );
+  it.each([
+    { target: { workingTree: { from: "HEAD ^" } }, endpoint: "workingTree.from" },
+    { target: { committed: { to: "HEAD\n" } }, endpoint: "committed.to" },
+  ])("rejects whitespace inside Review Target $endpoint syntax", ({ target, endpoint }) => {
+    expect(() => parseRunReviewToolInput({ target, tasks })).toThrow(
+      `Review Target ${endpoint} must not contain whitespace.`,
+    );
+  });
 
   it("rejects target and task cross-field conflicts", () => {
     expect(() =>
       parseRunReviewToolInput({
-        target: { to: "HEAD" },
-        tasks,
-      }),
-    ).toThrow(/includeUncommittedChanges/i);
-    expect(() =>
-      parseRunReviewToolInput({
-        target: { includeUncommittedChanges: false },
+        target: { committed: { to: "HEAD" } },
         tasks,
       }),
     ).toThrow(/explicit from/i);
     expect(() =>
       parseRunReviewToolInput({
-        target: { from: "HEAD" },
+        target: { committed: {} },
+        tasks,
+      }),
+    ).toThrow(/explicit from/i);
+    expect(() =>
+      parseRunReviewToolInput({
+        target: { workingTree: { from: "HEAD" } },
         tasks: [{ id: "state", instructions: "Check.", mode: "state" }],
       }),
     ).toThrow(/all-state/i);
+  });
+
+  it("rejects a working-tree target with a committed after endpoint", () => {
+    expect(() =>
+      parseRunReviewToolInput({
+        target: { workingTree: { to: "HEAD" } },
+        tasks,
+      }),
+    ).toThrow("Review Target workingTree field to is not supported.");
   });
 
   it("rejects blank caller and reviewer text in provider-visible schemas", () => {

@@ -9,6 +9,7 @@ import type { LocalReviewAuditStore } from "../../audit/local-review-audit-store
 import { isRootCommit, resolveReviewSnapshot, summarizeReviewSnapshot } from "../../git.ts";
 import { normalizeReviewInput } from "../../review-input.ts";
 import { normalizeReviewScope, validateReviewScope } from "../../review-scope.ts";
+import { reviewTargetEndpoints } from "../../target/input.ts";
 import { snapshotsMatch } from "../../target/snapshot-match.ts";
 import type {
   PlannerRunResult,
@@ -266,10 +267,11 @@ async function targetRuleError(
   signal?: AbortSignal,
 ): Promise<string | undefined> {
   const change = hasChangeTask(review.tasks);
-  if (!change && snapshot.requestedTarget.from !== undefined) {
+  const requestedTarget = reviewTargetEndpoints(snapshot.requestedTarget);
+  if (!change && requestedTarget.from !== undefined) {
     return "Review Targets for all-state tasks must not set from.";
   }
-  if (!snapshot.target.includeUncommittedChanges && change && !snapshot.requestedTarget.from) {
+  if (!snapshot.target.includeUncommittedChanges && change && requestedTarget.from === undefined) {
     return "A committed change Review Target requires an explicit from endpoint.";
   }
   if (!snapshot.target.includeUncommittedChanges && change) {
@@ -288,10 +290,12 @@ type ResolvedReviewInput =
   | { kind: "invalid"; reason: string };
 
 function reviewTargetsMatch(left: ReviewTargetSpec, right: ReviewTargetSpec): boolean {
+  const leftTarget = reviewTargetEndpoints(left);
+  const rightTarget = reviewTargetEndpoints(right);
   return (
-    left.from === right.from &&
-    left.to === right.to &&
-    (left.includeUncommittedChanges ?? true) === (right.includeUncommittedChanges ?? true)
+    leftTarget.kind === rightTarget.kind &&
+    leftTarget.from === rightTarget.from &&
+    leftTarget.to === rightTarget.to
   );
 }
 

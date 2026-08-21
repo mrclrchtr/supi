@@ -4,7 +4,7 @@ import type { ReviewModelSelection, ReviewSnapshot } from "../../src/types.ts";
 
 const snapshot: ReviewSnapshot = {
   repositoryRoot: "/repo",
-  requestedTarget: { includeUncommittedChanges: true },
+  requestedTarget: { workingTree: {} },
   target: {
     fromCommit: "a".repeat(40),
     toCommit: "b".repeat(40),
@@ -73,7 +73,7 @@ describe("buildReviewPacket", () => {
     const after = "e".repeat(40);
     const committed: ReviewSnapshot = {
       ...snapshot,
-      requestedTarget: { from: "old", to: "new", includeUncommittedChanges: false },
+      requestedTarget: { committed: { from: "old", to: "new" } },
       target: { fromCommit: before, toCommit: after, includeUncommittedChanges: false },
       title: `Changes ${before.slice(0, 7)}..${after.slice(0, 7)}`,
     };
@@ -90,7 +90,7 @@ describe("buildReviewPacket", () => {
   it("uses exact committed before and after guidance", () => {
     const committed: ReviewSnapshot = {
       ...snapshot,
-      requestedTarget: { from: "old", to: "new", includeUncommittedChanges: false },
+      requestedTarget: { committed: { from: "old", to: "new" } },
       target: {
         fromCommit: "d".repeat(40),
         toCommit: "e".repeat(40),

@@ -66,25 +66,25 @@ describe("review_run TUI", () => {
     [
       "a committed requested range",
       {
-        target: { from: "base", to: "HEAD", includeUncommittedChanges: false },
+        target: { committed: { from: "base", to: "HEAD" } },
         tasks: [{ mode: "change" }],
       },
       'requested target: from "base" · to "HEAD" · uncommitted changes excluded · task modes: change · repository-wide',
     ],
     [
       "a committed range with a default after endpoint",
-      { target: { from: "main", includeUncommittedChanges: false }, tasks: [{ mode: "change" }] },
+      { target: { committed: { from: "main" } }, tasks: [{ mode: "change" }] },
       'requested target: from "main" · default to "HEAD" · uncommitted changes excluded · task modes: change · repository-wide',
     ],
     [
       "a historical requested state",
-      { target: { to: "v1.2.3", includeUncommittedChanges: false }, tasks: [{ mode: "state" }] },
+      { target: { committed: { to: "v1.2.3" } }, tasks: [{ mode: "state" }] },
       'requested target: to "v1.2.3" · uncommitted changes excluded · task modes: state · repository-wide',
     ],
     [
       "a batch with both task modes",
       {
-        target: { from: "base", includeUncommittedChanges: true },
+        target: { workingTree: { from: "base" } },
         paths: ["src/a.ts", "docs"],
         tasks: [{ mode: "change" }, { mode: "state" }],
       },

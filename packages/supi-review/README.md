@@ -33,9 +33,10 @@ Changes to **Agent tools** apply immediately. Turning this setting off removes t
 ```json
 {
   "target": {
-    "from": "main",
-    "to": "HEAD",
-    "includeUncommittedChanges": false
+    "committed": {
+      "from": "main",
+      "to": "HEAD"
+    }
   },
   "paths": ["packages/supi-review"],
   "sharedContext": "The change implements issue #287.",
@@ -54,17 +55,16 @@ Changes to **Agent tools** apply immediately. Turning this setting off removes t
 }
 ```
 
-A Review Target has only these optional fields:
+A Review Target selects at most one source object:
 
-- `from` — one before endpoint
-- `to` — one after endpoint
-- `includeUncommittedChanges` — include the current filesystem and non-ignored untracked files; default is `true`
+- `workingTree` — review the frozen current filesystem, including staged, unstaged, and non-ignored untracked files. Its optional `from` field sets the committed before state.
+- `committed` — review exact committed Git state. Its optional `from` and `to` fields select the before and after commits. `to` defaults to `HEAD`.
 
-Omit `target`, or use `{}`, to select the current filesystem. When uncommitted changes are included, `to` is not valid. When they are not included, `to` defaults to `HEAD`. Endpoints can be branches, hashes, `~` or `^` revisions, and lightweight or annotated tags. The Review Engine resolves each endpoint once to a full commit. It rejects endpoints that contain whitespace and rejects blank endpoints, ranges, trees, and blobs.
+Select at most one source object. Omit `target`, or use `{}`, to select the current filesystem. Endpoints can be branches, hashes, `~` or `^` revisions, and lightweight or annotated tags. The Review Engine resolves each endpoint once to a full commit. It rejects endpoints that contain whitespace and rejects blank endpoints, ranges, trees, and blobs.
 
 Each task must set `mode` to `change` or `state`.
 
-- `change` needs one non-empty canonical change. A filesystem change defaults its omitted `from` to captured `HEAD`. A committed change needs an explicit `from`.
+- `change` needs one non-empty canonical change. A `workingTree` change defaults its omitted `from` to captured `HEAD`. A `committed` change needs an explicit `from`.
 - `state` reviews only the frozen after state. A batch of only state tasks must not set `from`. It can review a root commit.
 
 A committed change cannot use a root commit as `to`. A root commit is valid as `from`. Every Review requires a repository with `HEAD`.

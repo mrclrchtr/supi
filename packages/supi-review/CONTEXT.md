@@ -95,7 +95,7 @@ An optional advisory proposal of shared context and Review Tasks generated for t
 _Avoid_: Review Plan, generated prompt, reviewer output
 
 **Review Target**:
-A selected repository after state with optional `from`, `to`, and `includeUncommittedChanges` input. The Review Engine resolves endpoints to exact commits. It can include staged, unstaged, and non-ignored untracked changes.
+A selected repository after state from at most one `workingTree` or `committed` source object. The Review Engine resolves endpoints to exact commits. A `workingTree` source can include staged, unstaged, and non-ignored untracked changes.
 _Avoid_: target kind, Review Mode, Current-State Audit, Working-Tree Review
 
 **Target Evidence**:

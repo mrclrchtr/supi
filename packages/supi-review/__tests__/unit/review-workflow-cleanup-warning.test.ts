@@ -26,7 +26,7 @@ import type { ReviewModelSelection, ReviewSnapshot } from "../../src/types.ts";
 const commit = "a".repeat(40);
 const snapshot: ReviewSnapshot = {
   repositoryRoot: "/repo",
-  requestedTarget: { includeUncommittedChanges: true },
+  requestedTarget: { workingTree: {} },
   target: { fromCommit: commit, toCommit: commit, includeUncommittedChanges: true },
   title: "Filesystem changes",
   changes: [],

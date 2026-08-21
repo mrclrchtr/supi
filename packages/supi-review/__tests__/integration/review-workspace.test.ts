@@ -48,7 +48,7 @@ describe("Review Workspace materialization", () => {
     const to = git(cwd, "rev-parse", "HEAD");
     writeFileSync(join(cwd, "tracked.txt"), "reviewed\n");
     writeFileSync(join(cwd, "untracked.txt"), "also reviewed\n");
-    const snapshot = await resolveReviewSnapshot(cwd, { from });
+    const snapshot = await resolveReviewSnapshot(cwd, { workingTree: { from } });
 
     const workspace = await materializeReviewWorkspace(snapshot);
 
@@ -92,11 +92,7 @@ describe("Review Workspace materialization", () => {
     writeFileSync(join(cwd, "tracked.txt"), "committed\n");
     git(cwd, "commit", "-am", "target");
     const to = git(cwd, "rev-parse", "HEAD");
-    const snapshot = await resolveReviewSnapshot(cwd, {
-      from,
-      to,
-      includeUncommittedChanges: false,
-    });
+    const snapshot = await resolveReviewSnapshot(cwd, { committed: { from, to } });
 
     const workspace = await materializeReviewWorkspace(snapshot);
 

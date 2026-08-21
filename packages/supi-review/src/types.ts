@@ -9,14 +9,24 @@ import type { ReviewWorkspaceCleanupWarning } from "./workspace/review-workspace
 /** A full Git commit id after target resolution. */
 export type CommitId = string;
 
-/** Public Review Target input. Omitted fields use the current filesystem target. */
-export interface ReviewTargetSpec {
+/** Public Review Target input. Omit it, or use an empty object, for the current filesystem. */
+export type ReviewTargetSpec =
+  | { workingTree?: never; committed?: never }
+  | { workingTree: WorkingTreeReviewTarget; committed?: never }
+  | { workingTree?: never; committed: CommittedReviewTarget };
+
+/** Target source for the frozen current filesystem. */
+export interface WorkingTreeReviewTarget {
   /** Optional before commit syntax. The Review Engine resolves it once. */
   from?: string;
-  /** Optional after commit syntax. It is valid only when uncommitted changes are excluded. */
+}
+
+/** Target source for exact committed Git state. */
+export interface CommittedReviewTarget {
+  /** Optional before commit syntax. The Review Engine resolves it once. */
+  from?: string;
+  /** Optional after commit syntax. It defaults to HEAD. */
   to?: string;
-  /** Include the current filesystem and non-ignored untracked files. Defaults to true. */
-  includeUncommittedChanges?: boolean;
 }
 
 /** Exact target state used by the Review Engine after endpoint resolution. */

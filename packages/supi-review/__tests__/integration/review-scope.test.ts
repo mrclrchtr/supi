@@ -93,7 +93,7 @@ describe("runReview batch Review Scope", () => {
 
     const outcome = await review(
       cwd,
-      { to: historical, includeUncommittedChanges: false },
+      { committed: { to: historical } },
       { paths: ["historical.txt"] },
     );
 
@@ -141,10 +141,7 @@ describe("runReview batch Review Scope", () => {
     writeFileSync(join(cwd, "baseline-only.txt"), "ignored recreation\n");
     writeFileSync(join(cwd, "visible-baseline.txt"), "visible recreation\n");
 
-    const snapshot = await resolveReviewSnapshot(cwd, {
-      from,
-      includeUncommittedChanges: true,
-    });
+    const snapshot = await resolveReviewSnapshot(cwd, { workingTree: { from } });
     expect(snapshot.changes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ status: "D", path: "baseline-only.txt" }),
@@ -163,7 +160,7 @@ describe("runReview batch Review Scope", () => {
 
     const outcome = await runReview({
       cwd,
-      target: { from, includeUncommittedChanges: true },
+      target: { workingTree: { from } },
       scope: { paths: ["baseline-only.txt"] },
       review: { tasks: [changeTask] },
       reviewerModel: model,

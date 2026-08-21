@@ -12,38 +12,14 @@ import {
   untrackedPatchChange,
 } from "./change-metadata.ts";
 import { DIFF_FLAGS, diffUntrackedFile, parseNullList } from "./diff.ts";
-
-function validateTargetShape(target: ReviewTargetSpec): void {
-  if (!target || typeof target !== "object" || Array.isArray(target)) {
-    throw new Error("Review Target must be an object.");
-  }
-  const allowedFields = new Set(["from", "to", "includeUncommittedChanges"]);
-  for (const field of Object.keys(target)) {
-    if (!allowedFields.has(field))
-      throw new Error(`Review Target field ${field} is not supported.`);
-  }
-  for (const field of ["from", "to"] as const) {
-    if (target[field] !== undefined && typeof target[field] !== "string") {
-      throw new Error(`Review Target ${field} must be a Git revision string.`);
-    }
-  }
-  if (
-    target.includeUncommittedChanges !== undefined &&
-    typeof target.includeUncommittedChanges !== "boolean"
-  ) {
-    throw new Error("Review Target includeUncommittedChanges must be a boolean.");
-  }
-}
+import { normalizeReviewTarget, reviewTargetEndpoints } from "./input.ts";
 
 function normalizedEndpoint(value: string | undefined, name: "from" | "to"): string | undefined {
   if (value === undefined) return undefined;
-  const endpoint = value.trim();
-  if (!endpoint) throw new Error(`Review Target ${name} must not be blank.`);
-  if (/\s/u.test(value)) throw new Error(`Review Target ${name} must not contain whitespace.`);
-  if (endpoint.includes("..") || endpoint.startsWith("^") || /\^[@!-]/u.test(endpoint)) {
+  if (value.includes("..") || value.startsWith("^") || /\^[@!-]/u.test(value)) {
     throw new Error(`Review Target ${name} must name one commit, not a commit range.`);
   }
-  return endpoint;
+  return value;
 }
 
 async function describeInvalidEndpoint(
@@ -216,14 +192,12 @@ export async function resolveReviewSnapshot(
   requested: ReviewTargetSpec = {},
   signal?: AbortSignal,
 ): Promise<ReviewSnapshot> {
-  validateTargetShape(requested);
+  const normalizedTarget = normalizeReviewTarget(requested);
   const repositoryRoot = await resolveGitRepositoryRoot(cwd, signal);
-  const from = normalizedEndpoint(requested.from, "from");
-  const to = normalizedEndpoint(requested.to, "to");
-  const includeUncommittedChanges = requested.includeUncommittedChanges ?? true;
-  if (includeUncommittedChanges && to !== undefined) {
-    throw new Error("Review Target to is not valid when includeUncommittedChanges is true.");
-  }
+  const endpoints = reviewTargetEndpoints(normalizedTarget);
+  const from = normalizedEndpoint(endpoints.from, "from");
+  const to = normalizedEndpoint(endpoints.to, "to");
+  const includeUncommittedChanges = endpoints.kind === "workingTree";
 
   const head = await capturedHead(repositoryRoot, signal);
   const [fromCommit, explicitToCommit] = await Promise.all([
@@ -240,11 +214,7 @@ export async function resolveReviewSnapshot(
     toCommit,
     includeUncommittedChanges,
   };
-  const requestedTarget = {
-    ...(from ? { from } : {}),
-    ...(to ? { to } : {}),
-    includeUncommittedChanges,
-  };
+  const requestedTarget = normalizedTarget;
   const metadata = includeUncommittedChanges
     ? await filesystemSnapshot(repositoryRoot, target, signal)
     : await committedSnapshot(repositoryRoot, target, signal);

@@ -56,17 +56,24 @@ function quotedEndpoint(value: unknown): string | undefined {
 
 function formatRequestedTarget(target: unknown): string {
   if (!isRecord(target)) return "requested target: current filesystem";
-  const from = quotedEndpoint(target.from);
-  const to = quotedEndpoint(target.to);
-  const includeUncommittedChanges = target.includeUncommittedChanges !== false;
-  if (!from && !to && includeUncommittedChanges) return "requested target: current filesystem";
+  const workingTree = isRecord(target.workingTree) ? target.workingTree : undefined;
+  const committed = isRecord(target.committed) ? target.committed : undefined;
+  if (!workingTree && !committed) return "requested target: current filesystem";
 
+  if (workingTree) {
+    const from = quotedEndpoint(workingTree.from);
+    return from
+      ? `requested target: from ${from} · uncommitted changes included`
+      : "requested target: current filesystem";
+  }
+
+  const from = quotedEndpoint(committed?.from);
+  const to = quotedEndpoint(committed?.to);
   const endpoints = [
     ...(from ? [`from ${from}`] : []),
-    ...(to ? [`to ${to}`] : []),
-    ...(!to && !includeUncommittedChanges ? ['default to "HEAD"'] : []),
+    ...(to ? [`to ${to}`] : ['default to "HEAD"']),
   ];
-  return `requested target: ${endpoints.join(" · ")} · ${includeUncommittedChanges ? "uncommitted changes included" : "uncommitted changes excluded"}`;
+  return `requested target: ${endpoints.join(" · ")} · uncommitted changes excluded`;
 }
 
 function formatTaskModes(tasks: unknown): string {

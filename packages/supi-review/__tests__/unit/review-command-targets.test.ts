@@ -165,8 +165,8 @@ describe("/supi-review exact target picker", () => {
     ]);
     expect(mocks.runReview).toHaveBeenCalledWith(
       expect.objectContaining({
-        target: { from: head, includeUncommittedChanges: true },
-        expectedSnapshotTarget: { from: head, includeUncommittedChanges: true },
+        target: { workingTree: { from: head } },
+        expectedSnapshotTarget: { workingTree: { from: head } },
       }),
     );
     expect(mocks.runGit.mock.calls.some(([, args]) => args[0] === "merge-base")).toBe(false);
@@ -188,8 +188,8 @@ describe("/supi-review exact target picker", () => {
     expect(mocks.runGit).toHaveBeenCalledWith("/project", ["merge-base", base, head]);
     expect(mocks.runReview).toHaveBeenCalledWith(
       expect.objectContaining({
-        target: { from: base, includeUncommittedChanges: true },
-        expectedSnapshotTarget: { from: base, includeUncommittedChanges: true },
+        target: { workingTree: { from: base } },
+        expectedSnapshotTarget: { workingTree: { from: base } },
       }),
     );
   });
@@ -210,8 +210,8 @@ describe("/supi-review exact target picker", () => {
     expect(mocks.runGit).toHaveBeenCalledWith("/project", ["merge-base", base, head]);
     expect(mocks.runReview).toHaveBeenCalledWith(
       expect.objectContaining({
-        target: { to: head, includeUncommittedChanges: false },
-        expectedSnapshotTarget: { from: base, to: head, includeUncommittedChanges: false },
+        target: { committed: { to: head } },
+        expectedSnapshotTarget: { committed: { from: base, to: head } },
       }),
     );
 
@@ -228,7 +228,7 @@ describe("/supi-review exact target picker", () => {
 
     expect(mocks.runReview).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        target: { from: base, to: head, includeUncommittedChanges: false },
+        target: { committed: { from: base, to: head } },
       }),
     );
   });
@@ -248,7 +248,7 @@ describe("/supi-review exact target picker", () => {
 
     expect(mocks.runReview).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        target: { from: parent, to: commit, includeUncommittedChanges: false },
+        target: { committed: { from: parent, to: commit } },
       }),
     );
 
@@ -277,8 +277,8 @@ describe("/supi-review exact target picker", () => {
     expect(rootCommand.select).toHaveBeenCalledWith("Review Mode for general", ["state"]);
     expect(mocks.runReview).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        target: { to: root, includeUncommittedChanges: false },
-        expectedSnapshotTarget: { to: root, includeUncommittedChanges: false },
+        target: { committed: { to: root } },
+        expectedSnapshotTarget: { committed: { to: root } },
       }),
     );
 

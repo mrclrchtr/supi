@@ -7,8 +7,8 @@ index 2d276fe88b..3fcff1fe3a 100644
 +For work-in-progress with no commit yet, the fixed point is HEAD and the
 +reviewed change is the working tree. The diff command is `git diff HEAD`; the
 +three-dot form is empty for uncommitted changes. When the Review Engine runs
-+the review, express the target as `from: HEAD` with
-+`includeUncommittedChanges: true`.
++the review, express the target as
++`target: { workingTree: { from: HEAD } }`.
 +
  Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here — not inside two parallel sub-agents.
 

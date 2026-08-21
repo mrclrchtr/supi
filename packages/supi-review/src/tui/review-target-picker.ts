@@ -60,9 +60,9 @@ export async function selectInteractiveTarget(
   const head = await selectedHead(ctx.cwd);
   if (kind === "Current work") {
     return {
-      selectedTarget: { from: head, includeUncommittedChanges: true },
-      stateTarget: { includeUncommittedChanges: true },
-      changeTarget: { from: head, includeUncommittedChanges: true },
+      selectedTarget: { workingTree: { from: head } },
+      stateTarget: { workingTree: {} },
+      changeTarget: { workingTree: { from: head } },
     };
   }
 
@@ -77,12 +77,12 @@ export async function selectInteractiveTarget(
 
   if (kind === "One commit") {
     const parent = await firstAvailableParent(ctx.cwd, choice.commit);
-    const stateTarget = { to: choice.commit, includeUncommittedChanges: false };
+    const stateTarget = { committed: { to: choice.commit } };
     return parent
       ? {
-          selectedTarget: { from: parent, ...stateTarget },
+          selectedTarget: { committed: { from: parent, to: choice.commit } },
           stateTarget,
-          changeTarget: { from: parent, ...stateTarget },
+          changeTarget: { committed: { from: parent, to: choice.commit } },
         }
       : { selectedTarget: stateTarget, stateTarget };
   }
@@ -91,16 +91,16 @@ export async function selectInteractiveTarget(
   if (!from) throw new Error("The selected branch has no common ancestor with HEAD.");
   if (kind === "Current work against a base branch") {
     return {
-      selectedTarget: { from, includeUncommittedChanges: true },
-      stateTarget: { includeUncommittedChanges: true },
-      changeTarget: { from, includeUncommittedChanges: true },
+      selectedTarget: { workingTree: { from } },
+      stateTarget: { workingTree: {} },
+      changeTarget: { workingTree: { from } },
     };
   }
 
-  const changeTarget = { from, to: head, includeUncommittedChanges: false };
+  const changeTarget = { committed: { from, to: head } };
   return {
     selectedTarget: changeTarget,
-    stateTarget: { to: head, includeUncommittedChanges: false },
+    stateTarget: { committed: { to: head } },
     changeTarget,
   };
 }

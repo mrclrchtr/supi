@@ -75,7 +75,7 @@ const head = "a".repeat(40);
 const model = { canonicalId: "provider/reviewer", model: {} } as ReviewModelSelection;
 const snapshot: ReviewSnapshot = {
   repositoryRoot: "/repo",
-  requestedTarget: { from: head, includeUncommittedChanges: true },
+  requestedTarget: { workingTree: { from: head } },
   target: { fromCommit: head, toCommit: head, includeUncommittedChanges: true },
   title: "Filesystem changes",
   changes: [{ status: "M", path: "src/a.ts", additions: 1, deletions: 0 }],
@@ -176,7 +176,7 @@ describe("/supi-review task editing", () => {
     expect(command.select).toHaveBeenCalledWith("Review Mode for task-2", ["change", "state"]);
     expect(mocks.runReview).toHaveBeenCalledWith(
       expect.objectContaining({
-        target: { from: head, includeUncommittedChanges: true },
+        target: { workingTree: { from: head } },
         review: {
           tasks: [
             { id: "general", instructions: "Change task.", mode: "change" },
@@ -233,7 +233,7 @@ describe("/supi-review task editing", () => {
     expect(mocks.runReview).toHaveBeenCalledWith(
       expect.objectContaining({
         expectedSnapshot: snapshot,
-        expectedSnapshotTarget: { from: head, includeUncommittedChanges: true },
+        expectedSnapshotTarget: { workingTree: { from: head } },
         planning,
         provenance: "planner-assisted",
         review: {
@@ -324,7 +324,7 @@ describe("/supi-review task editing", () => {
     expect(mocks.runReview).toHaveBeenCalledWith(
       expect.objectContaining({
         expectedSnapshot: snapshot,
-        expectedSnapshotTarget: { from: head, includeUncommittedChanges: true },
+        expectedSnapshotTarget: { workingTree: { from: head } },
       }),
     );
     expect(pi.sendMessage).not.toHaveBeenCalled();

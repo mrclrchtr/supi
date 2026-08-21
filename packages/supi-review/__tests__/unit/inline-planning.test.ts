@@ -28,7 +28,7 @@ import type { ReviewModelSelection, ReviewSnapshot } from "../../src/types.ts";
 const head = "a".repeat(40);
 const snapshot: ReviewSnapshot = {
   repositoryRoot: "/repo",
-  requestedTarget: { from: "base", includeUncommittedChanges: true },
+  requestedTarget: { workingTree: { from: "base" } },
   target: { fromCommit: "b".repeat(40), toCommit: head, includeUncommittedChanges: true },
   title: "Filesystem changes",
   changes: [{ status: "M", path: "src/a.ts", additions: 1, deletions: 0 }],
@@ -46,7 +46,7 @@ const mixedDraft = {
 function input() {
   return {
     cwd: "/repo",
-    target: { from: "base", includeUncommittedChanges: true },
+    target: { workingTree: { from: "base" } },
     plannerContext: "Implement issue #289.",
     plannerModel: model,
   };
@@ -174,7 +174,7 @@ describe("inline Planner Draft", () => {
     await expect(
       runReview({
         cwd: "/repo",
-        target: { includeUncommittedChanges: true },
+        target: { workingTree: {} },
         review: planned.planning.draft,
         reviewerModel: model,
         expectedSnapshot: planned.snapshot,

@@ -2,6 +2,7 @@ import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { REVIEW_LIMITS } from "../../review-limits.ts";
 import { normalizeReviewScope } from "../../review-scope.ts";
+import { normalizeReviewTarget, reviewTargetEndpoints } from "../../target/input.ts";
 import type { ReviewInput, ReviewScope, ReviewTargetSpec } from "../../types.ts";
 import { reviewInputSchema } from "./schemas.ts";
 
@@ -30,22 +31,39 @@ const scopePathsSchema = Type.Array(
   },
 );
 
-const targetSchema = Type.Object(
+const workingTreeTargetSchema = Type.Object(
   {
     from: Type.Optional(endpointSchema("before")),
-    to: Type.Optional(endpointSchema("after")),
-    includeUncommittedChanges: Type.Optional(
-      Type.Boolean({
-        default: true,
-        description:
-          "Include the current filesystem and non-ignored untracked files. Defaults to true. When true, omit to.",
-      }),
-    ),
   },
   {
     additionalProperties: false,
     description:
-      "Exact Review Target. Omit it, or use {}, for the current filesystem. Endpoints resolve once to full commits.",
+      "Review the frozen current filesystem, including staged, unstaged, and non-ignored untracked files. Optional from sets the committed before state.",
+  },
+);
+
+const committedTargetSchema = Type.Object(
+  {
+    from: Type.Optional(endpointSchema("before")),
+    to: Type.Optional(endpointSchema("after")),
+  },
+  {
+    additionalProperties: false,
+    description:
+      "Review exact committed Git state. Optional from and to select the before and after commits; to defaults to HEAD.",
+  },
+);
+
+const targetSchema = Type.Object(
+  {
+    workingTree: Type.Optional(workingTreeTargetSchema),
+    committed: Type.Optional(committedTargetSchema),
+  },
+  {
+    maxProperties: 1,
+    additionalProperties: false,
+    description:
+      "Exact Review Target. Omit it, or use {}, for the current filesystem. Select workingTree or committed; endpoints resolve once to full commits.",
   },
 );
 
@@ -77,25 +95,30 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function blankEndpointError(target: unknown): Error | undefined {
-  if (!isRecord(target)) return undefined;
-  for (const name of ["from", "to"] as const) {
-    const endpoint = target[name];
-    if (typeof endpoint === "string" && !endpoint.trim()) {
-      return new Error(`Review Target ${name} must not be blank.`);
-    }
-  }
-  return undefined;
-}
-
 function oldTargetError(target: unknown): Error | undefined {
   if (!isRecord(target)) return undefined;
-  const oldTarget = ["workingTree", "comparison", "commit", "currentState", "kind"].some(
-    (key) => key in target,
-  );
+  const oldTarget = [
+    "from",
+    "to",
+    "includeUncommittedChanges",
+    "comparison",
+    "commit",
+    "currentState",
+    "kind",
+  ].some((key) => key in target);
   return oldTarget
-    ? new Error("Review Target must use only from, to, and includeUncommittedChanges.")
+    ? new Error("Review Target must select a workingTree or committed target object.")
     : undefined;
+}
+
+function targetShapeError(target: unknown): Error | undefined {
+  if (target === undefined) return undefined;
+  try {
+    normalizeReviewTarget(target as ReviewTargetSpec);
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error : new Error("Invalid Review Target.");
+  }
 }
 
 function pathsInsideTargetError(target: unknown): Error | undefined {
@@ -103,17 +126,6 @@ function pathsInsideTargetError(target: unknown): Error | undefined {
   return "paths" in target
     ? new Error("Review paths must be a top-level argument, not part of the Review Target.")
     : undefined;
-}
-
-function endpointWhitespaceError(target: unknown): Error | undefined {
-  if (!isRecord(target)) return undefined;
-  for (const name of ["from", "to"] as const) {
-    const endpoint = target[name];
-    if (typeof endpoint === "string" && /\s/u.test(endpoint) && endpoint.trim()) {
-      return new Error(`Review Target ${name} must not contain whitespace.`);
-    }
-  }
-  return undefined;
 }
 
 function taskModeError(tasks: unknown): Error | undefined {
@@ -145,34 +157,16 @@ function invalidInputError(input: unknown): Error {
     return new Error("Review input must not use removed Finding Scope fields.");
   }
   return (
-    blankEndpointError(input.target) ??
-    endpointWhitespaceError(input.target) ??
     oldTargetError(input.target) ??
     pathsInsideTargetError(input.target) ??
+    targetShapeError(input.target) ??
     taskModeError(input.tasks) ??
     new Error("Invalid review execution input.")
   );
 }
 
 function normalizeTarget(target: ReviewTargetSpec | undefined): ReviewTargetSpec {
-  if (!target) return {};
-  const from = target.from?.trim();
-  const to = target.to?.trim();
-  if (target.from !== undefined && !from) throw new Error("Review Target from must not be blank.");
-  if (target.to !== undefined && !to) throw new Error("Review Target to must not be blank.");
-  if (target.from !== undefined && /\s/u.test(target.from)) {
-    throw new Error("Review Target from must not contain whitespace.");
-  }
-  if (target.to !== undefined && /\s/u.test(target.to)) {
-    throw new Error("Review Target to must not contain whitespace.");
-  }
-  return {
-    ...(from ? { from } : {}),
-    ...(to ? { to } : {}),
-    ...(target.includeUncommittedChanges !== undefined
-      ? { includeUncommittedChanges: target.includeUncommittedChanges }
-      : {}),
-  };
+  return normalizeReviewTarget(target);
 }
 
 /** Validate and narrow a caller-defined Review request after provider-level JSON parsing. */
@@ -182,15 +176,12 @@ export function parseRunReviewToolInput(input: unknown): RunReviewToolInput {
   const { target, paths, ...review } = parsed;
   const normalizedTarget = normalizeTarget(target);
   const scope = normalizeReviewScope(paths ? { paths } : undefined);
-  const includeUncommittedChanges = normalizedTarget.includeUncommittedChanges ?? true;
-  if (includeUncommittedChanges && normalizedTarget.to !== undefined) {
-    throw new Error("Review Target to is not valid when includeUncommittedChanges is true.");
-  }
+  const endpoints = reviewTargetEndpoints(normalizedTarget);
   const change = review.tasks.some((task) => task.mode === "change");
-  if (!change && normalizedTarget.from !== undefined) {
+  if (!change && endpoints.from !== undefined) {
     throw new Error("Review Targets for all-state tasks must not set from.");
   }
-  if (!includeUncommittedChanges && change && normalizedTarget.from === undefined) {
+  if (endpoints.kind === "committed" && change && endpoints.from === undefined) {
     throw new Error("A committed change Review Target requires an explicit from endpoint.");
   }
   return { target: normalizedTarget, scope, review };

@@ -13,8 +13,8 @@ Caller-defined code review tasks run in managed, Inspection-only Reviewer Sessio
 
 ## Targets and Review Workspaces
 
-- A Review Target has optional `from`, `to`, and `includeUncommittedChanges` fields. Omission selects the current filesystem. The Review Engine resolves endpoint syntax once to exact full commits. It does not compute a merge base in the public resolver.
-- Included uncommitted changes default `from` to captured `HEAD` for a change task. Their workspace checks out exact `from` and stages one canonical patch to the frozen filesystem, including non-ignored untracked files. The caller index is not evidence.
+- A Review Target selects at most one `workingTree` or `committed` source object. Omission, or an empty target, selects the current filesystem. The Review Engine resolves endpoint syntax once to exact full commits. It does not compute a merge base in the public resolver.
+- A `workingTree` change defaults `from` to captured `HEAD`. Its workspace checks out exact `from` and stages one canonical patch to the frozen filesystem, including non-ignored untracked files. The caller index is not evidence.
 - A committed change requires explicit `from`; `to` defaults to `HEAD`. Its workspace checks out exact `to`.
 - A state task receives only the frozen after state. An all-state batch rejects explicit `from` and can review a root `to`. A change task needs a non-empty canonical change; a committed change rejects a root `to`; a root `from` is valid.
 - Materialization re-compiles the linked workspace through the canonical patch compiler. Its receipt records exact endpoint state, uncommitted-change inclusion, expected and observed checkout, patch hashes, and changed-path count. After that, the caller checkout can change without changing Target Evidence.

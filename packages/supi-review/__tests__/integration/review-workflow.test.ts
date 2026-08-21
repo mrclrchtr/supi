@@ -100,11 +100,11 @@ describe("runReview exact Review Target workflow", () => {
     git(cwd, "tag", "light-tip", tip);
 
     for (const target of [
-      { from: base.slice(0, 12), to: "review-tip", includeUncommittedChanges: false },
-      { from: "HEAD^", to: "light-tip", includeUncommittedChanges: false },
-      { from: "HEAD~1", to: "HEAD", includeUncommittedChanges: false },
-      { from: "annotated-base", to: tip, includeUncommittedChanges: false },
-      { from: base, includeUncommittedChanges: false },
+      { committed: { from: base.slice(0, 12), to: "review-tip" } },
+      { committed: { from: "HEAD^", to: "light-tip" } },
+      { committed: { from: "HEAD~1", to: "HEAD" } },
+      { committed: { from: "annotated-base", to: tip } },
+      { committed: { from: base } },
     ]) {
       const outcome = await review(cwd, target, [changeTask]);
       expect(outcome.kind).toBe("completed");
@@ -137,9 +137,7 @@ describe("runReview exact Review Target workflow", () => {
       tree,
       blob,
     ]) {
-      const outcome = await review(cwd, { from, to: "HEAD", includeUncommittedChanges: false }, [
-        changeTask,
-      ]);
+      const outcome = await review(cwd, { committed: { from, to: "HEAD" } }, [changeTask]);
       expect(outcome.kind).toBe("no-target");
       if (outcome.kind === "no-target") expect(outcome.reason).toMatch(/blank|range|commit/i);
     }
@@ -147,9 +145,7 @@ describe("runReview exact Review Target workflow", () => {
       ["^HEAD", /range/i],
       ["HEAD ^", /whitespace/i],
     ] as const) {
-      const outcome = await review(cwd, { from, to: "HEAD", includeUncommittedChanges: false }, [
-        changeTask,
-      ]);
+      const outcome = await review(cwd, { committed: { from, to: "HEAD" } }, [changeTask]);
       expect(outcome).toMatchObject({ kind: "no-target", reason: expect.stringMatching(reason) });
     }
     expect(mocks.runReviewer).not.toHaveBeenCalled();
@@ -216,13 +212,9 @@ describe("runReview exact Review Target workflow", () => {
   it("rejects target and task cross-field conflicts before workspace creation", async () => {
     const before = git(cwd, "worktree", "list", "--porcelain");
     const inputs = [
-      { target: { to: "HEAD" }, tasks: [changeTask], reason: /includeUncommittedChanges/i },
-      {
-        target: { includeUncommittedChanges: false },
-        tasks: [changeTask],
-        reason: /explicit from/i,
-      },
-      { target: { from: "HEAD" }, tasks: [stateTask], reason: /all-state/i },
+      { target: { committed: { to: "HEAD" } }, tasks: [changeTask], reason: /explicit from/i },
+      { target: { committed: {} }, tasks: [changeTask], reason: /explicit from/i },
+      { target: { workingTree: { from: "HEAD" } }, tasks: [stateTask], reason: /all-state/i },
     ];
 
     for (const input of inputs) {
@@ -332,7 +324,7 @@ describe("runReview exact Review Target workflow", () => {
 
   it("allows state Review Mode at a root commit but rejects root as a committed change after endpoint", async () => {
     const root = git(cwd, "rev-parse", "HEAD");
-    const state = await review(cwd, { to: root, includeUncommittedChanges: false }, [stateTask]);
+    const state = await review(cwd, { committed: { to: root } }, [stateTask]);
     expect(state.kind).toBe("completed");
     if (state.kind === "completed") {
       expect(state.details.workspaceReceipt).toMatchObject({
@@ -342,9 +334,7 @@ describe("runReview exact Review Target workflow", () => {
       });
     }
 
-    const change = await review(cwd, { from: root, to: root, includeUncommittedChanges: false }, [
-      changeTask,
-    ]);
+    const change = await review(cwd, { committed: { from: root, to: root } }, [changeTask]);
     expect(change).toEqual({
       kind: "invalid",
       reason: "A committed change Review Target cannot use a root commit as to.",
@@ -363,9 +353,7 @@ describe("runReview exact Review Target workflow", () => {
     git(cwd, "commit", "-am", "later");
     const later = git(cwd, "rev-parse", "HEAD");
 
-    const outcome = await review(cwd, { from: root, to: later, includeUncommittedChanges: false }, [
-      changeTask,
-    ]);
+    const outcome = await review(cwd, { committed: { from: root, to: later } }, [changeTask]);
 
     expect(outcome.kind).toBe("completed");
   });
@@ -409,11 +397,7 @@ describe("runReview exact Review Target workflow", () => {
       };
     });
 
-    const outcome = await review(
-      nested,
-      { from: left, to: right, includeUncommittedChanges: false },
-      [changeTask],
-    );
+    const outcome = await review(nested, { committed: { from: left, to: right } }, [changeTask]);
 
     expect(outcome.kind).toBe("completed");
     if (outcome.kind === "completed") {
@@ -464,10 +448,7 @@ describe("runReview exact Review Target workflow", () => {
   it("rejects a filesystem change made between final and captured target resolution", async () => {
     const base = git(cwd, "rev-parse", "HEAD");
     writeFileSync(join(cwd, "tracked.txt"), "captured\n");
-    const captured = await resolveReviewSnapshot(cwd, {
-      from: base,
-      includeUncommittedChanges: true,
-    });
+    const captured = await resolveReviewSnapshot(cwd, { workingTree: { from: base } });
     mocks.afterSnapshotResolution = () => {
       mocks.afterSnapshotResolution = undefined;
       writeFileSync(join(cwd, "tracked.txt"), "newer\n");
@@ -475,11 +456,11 @@ describe("runReview exact Review Target workflow", () => {
 
     const outcome = await runReview({
       cwd,
-      target: { includeUncommittedChanges: true },
+      target: { workingTree: {} },
       review: { tasks: [stateTask] },
       reviewerModel: model,
       expectedSnapshot: captured,
-      expectedSnapshotTarget: { from: base, includeUncommittedChanges: true },
+      expectedSnapshotTarget: { workingTree: { from: base } },
     });
 
     expect(outcome).toEqual({
