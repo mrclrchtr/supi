@@ -16,16 +16,6 @@ import type {
 } from "./result.ts";
 import { formatSemanticHealthState } from "./semantic-state.ts";
 
-export type {
-  HealthData,
-  HealthDiagnosticObservation,
-  HealthDiagnosticScope,
-  HealthRefreshAttempt,
-  HealthRefreshState,
-  HealthSection,
-  SemanticHealthState,
-} from "./result.ts";
-
 export function renderHealthResult(result: HealthResultAssembly, cwd: string): string {
   const data = result.data;
   const lines: string[] = ["## Code Health", ""];

@@ -64,6 +64,9 @@
         "useImportType": "error"
       },
       "suspicious": {
+        // Import cycles can leave bindings undefined at module-evaluation time
+        // depending on load order; a corrupted tool schema reaches the provider.
+        "noImportCycles": "error",
         "noConsole": "error",
         "noDebugger": "error",
         "noExplicitAny": "error",

@@ -46,7 +46,7 @@ const CORE_EXPORTS = {
   "./api": "./src/api.ts",
   "./config": "./src/config.ts",
   "./context": "./src/context.ts",
-  "./debug": "./src/debug-registry.ts",
+  "./debug": "./src/debug.ts",
   "./evidence-badge": "./src/evidence-badge.ts",
   "./footer-registry": "./src/footer-registry.ts",
   "./llm": "./src/llm.ts",

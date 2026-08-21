@@ -4,9 +4,6 @@
 // supi-debug extension owns policy/configuration and exposes events through a
 // command/tool while this module stays dependency-free for producers.
 
-// biome-ignore lint/performance/noReExportAll: preserve the stable debug domain entry point
-export * from "./debug-timing.ts";
-
 export type DebugLevel = "debug" | "info" | "warning" | "error";
 export type DebugAgentAccess = "off" | "sanitized" | "raw";
 export interface DebugRegistryConfig {
