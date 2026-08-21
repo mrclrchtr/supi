@@ -51,7 +51,7 @@
     "@earendil-works/pi-coding-agent": "^0.84.1",
     "@mrclrchtr/supi-test-utils": "workspace:*",
     "@types/node": "25.9.5",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   },
   "pi": {
     "extensions": [

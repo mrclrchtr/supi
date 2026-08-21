@@ -44,7 +44,7 @@
   },
   "devDependencies": {
     "@types/node": "25.9.5",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   },
   "main": "src/api.ts",
   "exports": {
