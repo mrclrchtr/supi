@@ -50,6 +50,7 @@ Rules:
 - A tool directory holds only that tool's files. Shared modules live at `src/tool/` level; infrastructure that is not tool-specific lives in package-level domain folders (`target/`, `audit/`, git helpers, …).
 - Registration (the PI adapter) imports each tool's spec and guidance and holds no tool-specific logic.
 - Presentation for one tool lives in its directory (`render.ts` or `render/`); package-wide UI lives in `ui/`.
+- Keep spec and schema dependencies cycle-free: put shared parameter schemas and constants in leaf modules such as `input.ts`, and keep runtime modules from importing `spec.ts`; Biome's `noImportCycles` rule enforces this, and `scripts/__tests__/tool-schema-integrity.test.mjs` checks the serialized provider shape.
 - Optional files are allowed: tiny tools may not need separate execute or render modules. `spec.ts`, `guidance.ts` (when the tool ships prompt metadata), and `result.ts` exist for every tool that returns model-visible results.
 
 ## Context channel ownership
