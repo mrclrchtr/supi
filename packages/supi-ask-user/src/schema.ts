@@ -34,7 +34,7 @@ const ChoiceQuestionSchema = Type.Object({
   header: Type.String({ description: "Short label" }),
   prompt: Type.String({ description: "Question text" }),
   options: Type.Array(OptionSchema, {
-    description: "Allowed options with unique values",
+    description: "Each option requires `label` (shown text) and a unique `value` (returned id).",
     ...ChoiceOptionCount,
   }),
   multi: Type.Optional(
