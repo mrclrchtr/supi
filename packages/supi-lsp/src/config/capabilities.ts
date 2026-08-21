@@ -68,7 +68,7 @@ export const CLIENT_CAPABILITIES: ClientCapabilities = {
       documentChanges: true,
     },
     diagnostics: {
-      refreshSupport: false,
+      refreshSupport: true,
     },
   },
 };

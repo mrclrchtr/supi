@@ -249,6 +249,30 @@ describe.skipIf(!HAS_PYRIGHT)("LspClient pyright dynamic pull registration", () 
     expect(typeErrors.length).toBeGreaterThan(0);
   }, 20_000);
 
+  it("refreshes cached diagnostics after didOpen and didChange without explicit synchronization", async () => {
+    const refreshFile = path.join(tmpDir, "server-refresh.py");
+    const badContent = 'value: int = "bad"\n';
+    const goodContent = "value: int = 42\n";
+    fs.writeFileSync(refreshFile, badContent);
+
+    client.didOpen(refreshFile, badContent);
+    const diagnosticsAfterOpen = await waitFor(
+      () => Promise.resolve(client.getDiagnostics(refreshFile)),
+      (diagnostics) => diagnostics.some((diagnostic) => diagnostic.severity === 1),
+      { timeoutMs: 15_000, retryDelayMs: 100, label: "server-requested refresh after didOpen" },
+    );
+    expect(diagnosticsAfterOpen.some((diagnostic) => diagnostic.severity === 1)).toBe(true);
+
+    fs.writeFileSync(refreshFile, goodContent);
+    client.didChange(refreshFile, goodContent);
+    const diagnosticsAfterChange = await waitFor(
+      () => Promise.resolve(client.getDiagnostics(refreshFile)),
+      (diagnostics) => diagnostics.length === 0,
+      { timeoutMs: 15_000, retryDelayMs: 100, label: "server-requested refresh after didChange" },
+    );
+    expect(diagnosticsAfterChange).toHaveLength(0);
+  }, 30_000);
+
   it("disables pull when the dynamic registrations are unregistered", async () => {
     // Unregister exactly the ids the real server registered; capability loss
     // must disable pull without any stale support.

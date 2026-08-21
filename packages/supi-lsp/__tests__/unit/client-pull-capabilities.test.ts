@@ -52,7 +52,7 @@ describe("LSP client capability advertisement", () => {
       dynamicRegistration: true,
       relatedDocumentSupport: true,
     });
-    expect(CLIENT_CAPABILITIES.workspace?.diagnostics).toEqual({ refreshSupport: false });
+    expect(CLIENT_CAPABILITIES.workspace?.diagnostics).toEqual({ refreshSupport: true });
   });
 
   it("advertises only UTF-16 positions and text-only document changes", () => {
@@ -197,15 +197,6 @@ describe("LSP pull diagnostic capability detection (dynamic)", () => {
       registrations: [{ id: "reg-1", method: "textDocument/hover", registerOptions: {} }],
     });
     expect(client.hasDiagnosticProvider).toBe(false);
-  });
-
-  it("answers workspace/diagnostic/refresh without an error", () => {
-    // pyright sends this request when a document opens in pull mode even
-    // though refreshSupport is not advertised; an error response crashes it.
-    const client = createDynamicClient();
-    expect(
-      (client as AnyClient).handleServerRequest("workspace/diagnostic/refresh", {}),
-    ).toBeNull();
   });
 
   it("rejects malformed registration options without enabling pull", () => {

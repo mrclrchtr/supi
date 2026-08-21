@@ -708,11 +708,10 @@ export class LspClient {
       case "client/unregisterCapability":
         return this.handleUnregisterCapability(params);
       case "workspace/diagnostic/refresh":
-        // The client does not advertise refresh support, but pyright sends
-        // this request anyway when a document opens in pull mode. Answering
-        // with an error crashes pyright (exit 1); answering null keeps the
-        // server alive and pull-on-demand still serves fresh diagnostics.
-        return null;
+        // Refresh the tracked diagnostic set without blocking the server's
+        // request. The LSP response is always null; the pass records its
+        // terminal result asynchronously for local protocol diagnosis.
+        return this.handleServerDiagnosticRefreshRequest();
       case "window/workDoneProgress/create": {
         // A create reserves a token; it does not prove active work. The
         // token stays pending and readiness is untouched until a begin
@@ -725,6 +724,46 @@ export class LspClient {
       default:
         throw new JsonRpcRequestError(-32601, `Method not found: ${method}`);
     }
+  }
+
+  private handleServerDiagnosticRefreshRequest(): null {
+    // Defer the pass before invoking it. Its setup rereads and resynchronizes
+    // tracked documents, so even an async method can otherwise delay the null
+    // response on the JSON-RPC request stack.
+    void Promise.resolve()
+      .then(() => this.refreshOpenDiagnostics())
+      .then(
+        (evidence) => this.recordDiagnosticRefreshRequest("completed", evidence),
+        () => this.recordDiagnosticRefreshRequest("failed"),
+      )
+      // Consume failures from the telemetry callback as well as the pass.
+      .catch(() => {});
+    return null;
+  }
+
+  private recordDiagnosticRefreshRequest(
+    outcome: "completed" | "failed",
+    evidence?: DiagnosticEvidenceSummary,
+  ): void {
+    recordDebugEvent({
+      source: "lsp",
+      level: "debug",
+      category: "diagnostics.refresh-request",
+      message: `LSP diagnostic refresh request ${outcome}`,
+      cwd: boundCwd(this.cwd),
+      data:
+        outcome === "completed" && evidence
+          ? {
+              outcome,
+              server: truncateIdentity(this.name),
+              requested: evidence.requested,
+              confirmed: evidence.confirmed,
+              unconfirmed: evidence.unconfirmed,
+              failed: evidence.failed,
+              removed: evidence.removed,
+            }
+          : { outcome, server: truncateIdentity(this.name) },
+    });
   }
 
   private buildWorkspaceConfigurationResult(params: unknown): unknown[] {

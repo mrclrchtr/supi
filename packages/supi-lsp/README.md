@@ -37,7 +37,16 @@ The table records an initialize-handshake audit performed on 2026-08-21 against 
 | SQL | `sql-language-server` 1.7.1 | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
 | R | `R` 4.6.1 (languageserver) | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
 
-SuPi advertises static and dynamic pull support (`textDocument.diagnostic.dynamicRegistration: true`). A server that declares a valid `diagnosticProvider` in its initialize result gets pull diagnostics; a server that registers `textDocument/diagnostic` after initialization gets pull diagnostics for as long as its registration stays active. Registration parameters are validated and malformed values reject the request without enabling pull. Other registration methods are ignored. Protocol support is separate from the configured mode: a server may support pull yet stay in SuPi's push mode because the built-in configuration does not enable it.
+SuPi advertises static and dynamic pull support. It advertises server-requested refresh support too:
+
+- `textDocument.diagnostic.dynamicRegistration: true`
+- `workspace.diagnostics.refreshSupport: true`
+
+A server gets pull diagnostics when it declares a valid `diagnosticProvider` during initialization. A server also gets pull diagnostics after it registers `textDocument/diagnostic`. The pull support stays active until the server removes the registration. SuPi validates registration parameters. Invalid parameters do not enable pull support. SuPi ignores other registration methods.
+
+When a server sends `workspace/diagnostic/refresh`, SuPi returns `null` immediately. It then refreshes the owning client's tracked documents in the background. The refresh covers open, cached, and failed tracked documents. SuPi does not add workspace-wide `workspace/diagnostic` pulls.
+
+Protocol support is separate from the configured mode. A server may support pull diagnostics and still use SuPi's push mode because the built-in configuration does not enable pull mode.
 
 The LSP 3.18 specification adds `Diagnostic.message` markup content, guarded by the client capability `textDocument.diagnostic.markupMessageSupport`; SuPi's validator already accepts plaintext and markdown messages but does not advertise the capability. Other 3.18 features (snippet text edits, inline completion, folding-range refresh, multi-range formatting) are outside the diagnostic surface and are not implemented.
 
