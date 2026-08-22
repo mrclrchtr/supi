@@ -17,6 +17,7 @@ import {
   RECOVERY_CLIENT_STARTUP_BOUND_MS,
   withTimeout,
 } from "../client/client.ts";
+import type { ClientDiagnosticSnapshot } from "../client/client-document-state.ts";
 
 export { RECOVERY_CLIENT_STARTUP_BOUND_MS } from "../client/client.ts";
 
@@ -44,7 +45,11 @@ import {
   summarizeDiagnosticEvidence,
 } from "../diagnostics/evidence.ts";
 import { raceRequestControl } from "../session/readiness.ts";
-import type { ScopeDecisionEntry, ScopeDecisionSummary } from "../session/runtime-diagnostics.ts";
+import type {
+  ScopeDecisionEntry,
+  ScopeDecisionSummary,
+  WorkspaceDiagnosticReport,
+} from "../session/runtime-diagnostics.ts";
 import {
   displayRelativeFilePath,
   formatCoverageSummaryText,
@@ -801,6 +806,55 @@ export class LspManager {
       .filter((entry) => entry.openFiles.length > 0);
     return formatCoverageSummaryText(relevantEntries, maxServers, maxFiles);
   }
+  /**
+   * Capture one coherent diagnostic report from the current client snapshots.
+   *
+   * Summary and detailed projections share the same cache observation so a
+   * caller cannot combine entries from one generation with evidence from
+   * another.
+   */
+  getWorkspaceDiagnosticReport(maxSeverity: number = 2): WorkspaceDiagnosticReport {
+    this.pruneMissingFiles();
+    const snapshots = Array.from(this.clients.values()).map((client) =>
+      client.getDiagnosticSnapshot(),
+    );
+    const evidence = this.toWorkspaceDiagnosticEvidence(
+      snapshots.flatMap((snapshot) =>
+        snapshot.documents.map((document) => ({
+          file: relativeFilePathFromUri(document.uri, this.cwd),
+          status: document.status,
+        })),
+      ),
+    );
+    const current =
+      snapshots.every((snapshot) => snapshot.current) &&
+      evidence.documents.every((document) => document.status === "confirmed");
+    const fileDiags = new Map<string, { errors: number; warnings: number }>();
+    for (const snapshot of snapshots) {
+      for (const entry of snapshot.entries) {
+        collectDiagnosticSummaryCounts(fileDiags, entry, this.cwd, this.excludePatterns);
+      }
+    }
+
+    return {
+      summary: {
+        entries: Array.from(fileDiags.entries()).map(([file, counts]) => ({ file, ...counts })),
+        current,
+        evidence,
+      },
+      outstanding: {
+        entries: collectOutstandingDiagnosticsDetailed(
+          snapshots.map((snapshot) => snapshot.entries),
+          this.cwd,
+          this.excludePatterns,
+          maxSeverity,
+        ),
+        current,
+        evidence,
+      },
+    };
+  }
+
   /** Get a diagnostic summary across all servers and files. */
   getDiagnosticSummary(): DiagnosticSummary[] {
     return this.getDiagnosticSnapshot().entries;
@@ -845,15 +899,16 @@ export class LspManager {
     evidence: DiagnosticEvidenceSummary;
   } {
     this.pruneMissingFiles();
+    const snapshots = Array.from(this.clients.values()).map((client) =>
+      client.getDiagnosticSnapshot(),
+    );
     const evidence = this.toWorkspaceDiagnosticEvidence(
-      collectClientDiagnosticEvidenceDocuments(this.clients.values(), this.cwd),
+      collectClientDiagnosticEvidenceDocuments(snapshots, this.cwd),
     );
-    const clientCurrent = Array.from(this.clients.values()).every(
-      (client) => client.getDiagnosticSnapshot().current,
-    );
+    const clientCurrent = snapshots.every((snapshot) => snapshot.current);
     return {
       entries: collectOutstandingDiagnosticSummaryEntries(
-        this.clients.values(),
+        snapshots,
         this.cwd,
         this.excludePatterns,
         maxSeverity,
@@ -888,26 +943,26 @@ export class LspManager {
     evidence: DiagnosticEvidenceSummary;
   } {
     this.pruneMissingFiles();
-    const clients = Array.from(this.clients.values());
-    let clientCurrent = true;
-    const evidenceDocuments = clients.flatMap((client) => {
-      const snapshot = client.getDiagnosticSnapshot();
-      clientCurrent &&= snapshot.current;
-      return snapshot.documents.map((document) => ({
+    const snapshots = Array.from(this.clients.values()).map((client) =>
+      client.getDiagnosticSnapshot(),
+    );
+    const evidenceDocuments = snapshots.flatMap((snapshot) =>
+      snapshot.documents.map((document) => ({
         file: relativeFilePathFromUri(document.uri, this.cwd),
         status: document.status,
-      }));
-    });
+      })),
+    );
     const evidence = this.toWorkspaceDiagnosticEvidence(evidenceDocuments);
     return {
       entries: collectOutstandingDiagnosticsDetailed(
-        clients,
+        snapshots.map((snapshot) => snapshot.entries),
         this.cwd,
         this.excludePatterns,
         maxSeverity,
       ),
       current:
-        clientCurrent && evidence.documents.every((document) => document.status === "confirmed"),
+        snapshots.every((snapshot) => snapshot.current) &&
+        evidence.documents.every((document) => document.status === "confirmed"),
       evidence,
     };
   }
@@ -1156,11 +1211,11 @@ export class LspManager {
 }
 
 function collectClientDiagnosticEvidenceDocuments(
-  clients: Iterable<LspClient>,
+  snapshots: Iterable<ClientDiagnosticSnapshot>,
   cwd: string,
 ): DiagnosticEvidenceDocument[] {
-  return Array.from(clients).flatMap((client) =>
-    client.getDiagnosticSnapshot().documents.map((document) => ({
+  return Array.from(snapshots).flatMap((snapshot) =>
+    snapshot.documents.map((document) => ({
       file: relativeFilePathFromUri(document.uri, cwd),
       status: document.status,
     })),
@@ -1168,14 +1223,14 @@ function collectClientDiagnosticEvidenceDocuments(
 }
 
 function collectOutstandingDiagnosticSummaryEntries(
-  clients: Iterable<LspClient>,
+  snapshots: Iterable<ClientDiagnosticSnapshot>,
   cwd: string,
   excludePatterns: string[],
   maxSeverity: number,
 ): OutstandingDiagnosticSummaryEntry[] {
   const fileDiags = new Map<string, OutstandingDiagnosticSummaryEntry>();
-  for (const client of clients) {
-    for (const entry of client.getDiagnosticSnapshot().entries) {
+  for (const snapshot of snapshots) {
+    for (const entry of snapshot.entries) {
       const file = relativeFilePathFromUri(entry.uri, cwd);
       if (shouldIgnoreLspPath(file, cwd) || isExcludedByPattern(file, excludePatterns)) continue;
       const existing = fileDiags.get(file) ?? createOutstandingDiagnosticSummary(file);

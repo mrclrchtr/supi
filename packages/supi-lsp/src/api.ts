@@ -59,6 +59,7 @@ export type {
   RecoverDiagnosticsResult,
   RoutedMutationResponse,
   SemanticReadinessResult,
+  WorkspaceDiagnosticReport,
   WorkspaceDiagnosticSnapshot,
   WorkspaceDiagnosticSummaryEntry,
   WorkspaceLspDiagnosticSurface,

@@ -346,6 +346,84 @@ describe("code_health tool", () => {
     expect(result.content[0].text).toContain("1 file with issues");
   });
 
+  it("shows diagnostics from the final refresh report in the same code_health call", async () => {
+    registerMockProvider(tmpDir);
+    const evidence = {
+      requested: 2,
+      confirmed: 2,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [
+        { file: "src/existing.ts", status: "confirmed" as const },
+        { file: "src/new.ts", status: "confirmed" as const },
+      ],
+    };
+    const diagnostic = {
+      message: "New file has a type error",
+      severity: 1,
+      range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+    };
+    const runtime = mockReadyLsp({
+      getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue({
+        entries: [{ file: "src/existing.ts", errors: 1, warnings: 0 }],
+        current: true,
+        evidence: {
+          requested: 1,
+          confirmed: 1,
+          unconfirmed: 0,
+          failed: 0,
+          removed: 0,
+          documents: [{ file: "src/existing.ts", status: "confirmed" as const }],
+        },
+      }),
+      getOutstandingDiagnostics: vi.fn().mockReturnValue({
+        entries: [{ file: "src/existing.ts", diagnostics: [diagnostic] }],
+        current: true,
+        evidence,
+      }),
+      refreshOpenDiagnostics: vi.fn().mockResolvedValue(evidence),
+      recoverDiagnostics: vi.fn().mockResolvedValue({
+        attemptedClients: 1,
+        restartedClients: 0,
+        diagnosticEvidence: evidence,
+        diagnosticReport: {
+          summary: {
+            entries: [
+              { file: "src/existing.ts", errors: 1, warnings: 0 },
+              { file: "src/new.ts", errors: 1, warnings: 0 },
+            ],
+            current: true,
+            evidence,
+          },
+          outstanding: {
+            entries: [
+              { file: "src/existing.ts", diagnostics: [diagnostic] },
+              { file: "src/new.ts", diagnostics: [diagnostic] },
+            ],
+            current: true,
+            evidence,
+          },
+        },
+        staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+      }),
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const result = (await getTool(pi, "code_health").execute(
+      "test-final-diagnostic-report",
+      { include: ["diagnostics"], refresh: true, level: "detailed" },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ text: string }> };
+
+    expect(result.content[0].text).toContain("src/new.ts");
+    expect(result.content[0].text).toContain("2 requested, 2 confirmed");
+    expect(runtime.getWorkspaceDiagnosticSummary).not.toHaveBeenCalled();
+  });
+
   it("preserves an explicitly empty include list instead of applying defaults", async () => {
     registerMockProvider(tmpDir);
     mockReadyLsp();

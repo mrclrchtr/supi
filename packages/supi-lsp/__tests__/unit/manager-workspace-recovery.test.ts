@@ -28,6 +28,23 @@ describe("recoverWorkspaceDiagnostics", () => {
       removed: 0,
       documents: [{ file: "src/a.ts", status: "confirmed" as const }],
     };
+    const finalReport = {
+      summary: {
+        entries: [{ file: "src/a.ts", errors: 1, warnings: 0 }],
+        current: true,
+        evidence: finalEvidence,
+      },
+      outstanding: {
+        entries: [
+          {
+            file: "src/a.ts",
+            diagnostics: [makeDiagnostic("final diagnostic")],
+          },
+        ],
+        current: true,
+        evidence: finalEvidence,
+      },
+    };
     const manager = {
       clearAllPullResultIds: vi.fn(),
       notifyWorkspaceFileChanges: vi.fn(),
@@ -60,6 +77,7 @@ describe("recoverWorkspaceDiagnostics", () => {
         },
       ]),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getWorkspaceDiagnosticReport: vi.fn(() => finalReport),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -80,6 +98,8 @@ describe("recoverWorkspaceDiagnostics", () => {
       ],
     });
     expect(result.restartReason).toBe("readiness-stall");
+    expect(result.diagnosticReport).toBe(finalReport);
+    expect(manager.getWorkspaceDiagnosticReport).toHaveBeenCalledWith(2);
     expect(manager.refreshOpenDiagnostics).toHaveBeenCalledTimes(2);
   });
 
@@ -129,6 +149,7 @@ describe("recoverWorkspaceDiagnostics", () => {
         },
       ]),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -168,6 +189,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => evidence),
+      getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -230,6 +252,7 @@ describe("recoverWorkspaceDiagnostics", () => {
         },
       ]),
       getDiagnosticEvidence: vi.fn(() => confirmed),
+      getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -261,6 +284,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -302,6 +326,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -338,6 +363,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -402,6 +428,7 @@ describe("recoverWorkspaceDiagnostics", () => {
         },
       ]),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -456,6 +483,7 @@ describe("recoverWorkspaceDiagnostics", () => {
         },
       ]),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -496,6 +524,7 @@ describe("recoverWorkspaceDiagnostics", () => {
         },
       ]),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -558,6 +587,7 @@ describe("recoverWorkspaceDiagnostics", () => {
         },
       ]),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -583,6 +613,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -613,6 +644,7 @@ describe("recoverWorkspaceDiagnostics", () => {
         { key: "typescript:/project", supportsPull: false, unconfirmedFiles: ["src/a.ts"] },
       ]),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -677,6 +709,7 @@ describe("recoverWorkspaceDiagnostics", () => {
         },
       ]),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -711,6 +744,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -737,6 +771,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -766,6 +801,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => []),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
+      getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
       getCwd: vi.fn(() => "/project"),
     };
 
@@ -791,4 +827,12 @@ function emptyEvidence() {
     removed: 0,
     documents: [],
   } as const;
+}
+
+function emptyDiagnosticReport() {
+  const evidence = emptyEvidence();
+  return {
+    summary: { entries: [], current: true, evidence },
+    outstanding: { entries: [], current: true, evidence },
+  };
 }

@@ -8,6 +8,7 @@ import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
 import type {
   DiagnosticEvidenceDocument,
   DiagnosticEvidenceSummary,
+  WorkspaceDiagnosticReport,
   WorkspaceLspRuntime,
 } from "@mrclrchtr/supi-lsp/api";
 import { mergeDiagnosticEvidence } from "../../diagnostics/evidence.ts";
@@ -49,8 +50,10 @@ interface CollectDiagnosticsOptions {
   /** Collect individual messages per file (detailed level). */
   readonly detailed?: boolean;
   readonly requestControl?: CodeRequestControl;
-  /** Final evidence from an explicit workspace refresh, when one ran. */
+  /** Evidence from an explicit workspace refresh, when one ran. */
   readonly refreshEvidence?: DiagnosticEvidenceSummary;
+  /** Coherent final report from an explicit workspace refresh, when one ran. */
+  readonly refreshReport?: WorkspaceDiagnosticReport;
 }
 
 /** Collect diagnostics without widening the requested evidence scope. */
@@ -63,7 +66,13 @@ export async function collectDiagnostics(
     return unavailableDiagnostics(
       scope,
       unavailableReason,
-      unavailableScopeEvidence(scope, options.refreshEvidence, options.evidenceService, cwd),
+      unavailableScopeEvidence({
+        scope,
+        refreshEvidence: options.refreshEvidence,
+        refreshReport: options.refreshReport,
+        evidenceService: options.evidenceService,
+        cwd,
+      }),
       scope.kind === "file" ? fileScopeStatus(scope.path, cwd) : undefined,
     );
   }
@@ -76,6 +85,7 @@ export async function collectDiagnostics(
         cwd,
         detailed,
         refreshEvidence: options.refreshEvidence,
+        refreshReport: options.refreshReport,
       });
 }
 
@@ -85,17 +95,20 @@ interface TrackedFileDiagnosticOptions {
   readonly cwd: string;
   readonly detailed?: boolean;
   readonly refreshEvidence?: DiagnosticEvidenceSummary;
+  readonly refreshReport?: WorkspaceDiagnosticReport;
 }
 
 function collectTrackedFileDiagnostics(
   options: TrackedFileDiagnosticOptions,
 ): HealthDiagnosticObservation {
-  const { service, scope, cwd, detailed, refreshEvidence } = options;
+  const { service, scope, cwd, detailed, refreshEvidence, refreshReport } = options;
   try {
     const snapshot = detailed
-      ? collectWorkspaceDiagnosticsDetailed(service, scope.filter, cwd)
-      : collectWorkspaceDiagnostics(service, scope.filter, cwd);
-    const sourceEvidence = mergeEvidence(refreshEvidence, snapshot.evidence, cwd);
+      ? collectWorkspaceDiagnosticsDetailed(service, scope.filter, cwd, refreshReport)
+      : collectWorkspaceDiagnostics(service, scope.filter, cwd, refreshReport);
+    const sourceEvidence = refreshReport
+      ? snapshot.evidence
+      : mergeEvidence(refreshEvidence, snapshot.evidence, cwd);
     const scopedEvidence = selectTrackedFileEvidence(sourceEvidence, scope.filter, cwd);
     const evidence = ensureEvidenceCoversEntries(scopedEvidence, snapshot.entries, cwd);
     return evidenceIsComplete(evidence, snapshot.entries.length > 0, snapshot.current)
@@ -108,8 +121,9 @@ function collectTrackedFileDiagnostics(
           reason: diagnosticEvidenceReason(evidence),
         };
   } catch (error) {
-    const evidence = options.refreshEvidence
-      ? selectTrackedFileEvidence(options.refreshEvidence, scope.filter, cwd)
+    const evidenceSource = options.refreshReport?.summary.evidence ?? options.refreshEvidence;
+    const evidence = evidenceSource
+      ? selectTrackedFileEvidence(evidenceSource, scope.filter, cwd)
       : emptyEvidence();
     return unavailableDiagnostics(
       scope,
@@ -123,12 +137,13 @@ function collectWorkspaceDiagnostics(
   service: WorkspaceLspRuntime,
   scopeFilter: string | null,
   cwd: string,
+  report?: WorkspaceDiagnosticReport,
 ): {
   entries: HealthDiagnosticEntry[];
   current: boolean;
   evidence: DiagnosticEvidenceSummary;
 } {
-  const summary = service.getWorkspaceDiagnosticSummary();
+  const summary = report?.summary ?? service.getWorkspaceDiagnosticSummary();
   const result: HealthDiagnosticEntry[] = [];
 
   for (const entry of summary.entries) {
@@ -146,12 +161,13 @@ function collectWorkspaceDiagnosticsDetailed(
   service: WorkspaceLspRuntime,
   scopeFilter: string | null,
   cwd: string,
+  report?: WorkspaceDiagnosticReport,
 ): {
   entries: HealthDiagnosticEntry[];
   current: boolean;
   evidence: DiagnosticEvidenceSummary;
 } {
-  const outstanding = service.getOutstandingDiagnostics(2);
+  const outstanding = report?.outstanding ?? service.getOutstandingDiagnostics(2);
   const result: HealthDiagnosticEntry[] = [];
 
   for (const { file, diagnostics } of outstanding.entries) {
@@ -164,16 +180,24 @@ function collectWorkspaceDiagnosticsDetailed(
   return { entries: result, current: outstanding.current, evidence: outstanding.evidence };
 }
 
+interface UnavailableScopeEvidenceOptions {
+  readonly scope: HealthDiagnosticScope;
+  readonly refreshEvidence?: DiagnosticEvidenceSummary;
+  readonly refreshReport?: WorkspaceDiagnosticReport;
+  readonly evidenceService?: WorkspaceLspRuntime | null;
+  readonly cwd: string;
+}
+
 function unavailableScopeEvidence(
-  scope: HealthDiagnosticScope,
-  refreshEvidence: DiagnosticEvidenceSummary | undefined,
-  evidenceService: WorkspaceLspRuntime | null | undefined,
-  cwd: string,
+  options: UnavailableScopeEvidenceOptions,
 ): DiagnosticEvidenceSummary {
-  const runtimeEvidence = readRuntimeEvidence(evidenceService);
-  const knownEvidence = refreshEvidence
-    ? mergeDiagnosticEvidence(refreshEvidence, runtimeEvidence, cwd, "conservative")
-    : runtimeEvidence;
+  const { scope, refreshEvidence, refreshReport, evidenceService, cwd } = options;
+  const runtimeEvidence = refreshReport?.summary.evidence ?? readRuntimeEvidence(evidenceService);
+  const knownEvidence = refreshReport
+    ? runtimeEvidence
+    : refreshEvidence
+      ? mergeDiagnosticEvidence(refreshEvidence, runtimeEvidence, cwd, "conservative")
+      : runtimeEvidence;
   if (knownEvidence.requested === 0 && knownEvidence.documents.length === 0) {
     return scope.kind === "file" ? unavailableFileEvidence(scope.path) : emptyEvidence();
   }

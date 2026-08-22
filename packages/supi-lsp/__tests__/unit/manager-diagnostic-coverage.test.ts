@@ -52,6 +52,68 @@ describe("LspManager diagnostic evidence coverage", () => {
     });
   });
 
+  it("captures summary and detailed diagnostics from one client snapshot", () => {
+    const manager = createManager();
+    let snapshotCalls = 0;
+    clients(manager).set("typescript:/project", {
+      getDiagnosticSnapshot: () => {
+        snapshotCalls++;
+        if (snapshotCalls > 1) throw new Error("diagnostic cache was observed twice");
+        return {
+          entries: [
+            {
+              uri: "file:///project/src/new.ts",
+              diagnostics: [
+                {
+                  message: "New diagnostic",
+                  severity: 1,
+                  range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+                },
+              ],
+              current: true,
+            },
+          ],
+          documents: [{ uri: "file:///project/src/new.ts", current: true, status: "confirmed" }],
+          current: true,
+        };
+      },
+      pruneMissingFiles: () => [],
+    });
+
+    expect(manager.getWorkspaceDiagnosticReport()).toEqual({
+      summary: {
+        entries: [{ file: "src/new.ts", errors: 1, warnings: 0 }],
+        current: true,
+        evidence: {
+          requested: 1,
+          confirmed: 1,
+          unconfirmed: 0,
+          failed: 0,
+          removed: 0,
+          documents: [{ file: "src/new.ts", status: "confirmed" }],
+        },
+      },
+      outstanding: {
+        entries: [
+          {
+            file: "src/new.ts",
+            diagnostics: [expect.objectContaining({ message: "New diagnostic", severity: 1 })],
+          },
+        ],
+        current: true,
+        evidence: {
+          requested: 1,
+          confirmed: 1,
+          unconfirmed: 0,
+          failed: 0,
+          removed: 0,
+          documents: [{ file: "src/new.ts", status: "confirmed" }],
+        },
+      },
+    });
+    expect(snapshotCalls).toBe(1);
+  });
+
   it("reports an empty tracked set as complete with zero coverage", () => {
     const manager = createManager();
     clients(manager).set("typescript:/project", {

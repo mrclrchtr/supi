@@ -2,7 +2,7 @@ import {
   type CodeRequestControl,
   isCodeRequestInterruption,
 } from "@mrclrchtr/supi-code-runtime/api";
-import type { WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
+import type { WorkspaceDiagnosticReport, WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 import { recoverDiagnosticRuntime } from "../analysis/health/recovery.ts";
 import { mergeDiagnosticEvidence } from "../diagnostics/evidence.ts";
 import { refreshFileLspMaintenance, refreshLspMaintenance } from "../substrate/lsp/maintenance.ts";
@@ -18,10 +18,16 @@ interface HealthRefreshAttemptOptions {
   readonly reportRecoveryProgress?: () => void;
 }
 
+export interface HealthRefreshCollection {
+  readonly attempt: HealthRefreshAttempt;
+  /** Final report from the runtime, retained only for the current workflow. */
+  readonly diagnosticReport?: WorkspaceDiagnosticReport;
+}
+
 /** Run one file- or workspace-scoped health refresh attempt. */
 export async function collectHealthRefreshAttempt(
   options: HealthRefreshAttemptOptions,
-): Promise<HealthRefreshAttempt> {
+): Promise<HealthRefreshCollection> {
   if (options.diagnosticsScope.kind === "file") {
     return collectFileRefreshAttempt(options, options.diagnosticsScope);
   }
@@ -31,7 +37,7 @@ export async function collectHealthRefreshAttempt(
 async function collectFileRefreshAttempt(
   options: HealthRefreshAttemptOptions,
   scope: Extract<HealthDiagnosticScope, { kind: "file" }>,
-): Promise<Extract<HealthRefreshAttempt, { kind: "completed" }>> {
+): Promise<HealthRefreshCollection> {
   const maintenance = await refreshFileLspMaintenance({
     runtime: options.runtime,
     cwd: options.cwd,
@@ -46,25 +52,27 @@ async function collectFileRefreshAttempt(
     options.control,
   );
   return {
-    kind: "completed",
-    attemptedAt: options.attemptedAt,
-    elapsedMs: Date.now() - options.attemptedAt,
-    requestedDiagnosticScope: scope,
-    operationScope: "file-runtime",
-    attemptedActiveClients: readiness.kind === "ready" ? 1 : 0,
-    restartedClients: 0,
-    staleAssessment: {
-      scope: "file",
-      suspected: null,
-      matchedFileCount: maintenance.matchedStaleFileCount,
-      warning: null,
+    attempt: {
+      kind: "completed",
+      attemptedAt: options.attemptedAt,
+      elapsedMs: Date.now() - options.attemptedAt,
+      requestedDiagnosticScope: scope,
+      operationScope: "file-runtime",
+      attemptedActiveClients: readiness.kind === "ready" ? 1 : 0,
+      restartedClients: 0,
+      staleAssessment: {
+        scope: "file",
+        suspected: null,
+        matchedFileCount: maintenance.matchedStaleFileCount,
+        warning: null,
+      },
     },
   };
 }
 
 async function collectWorkspaceRefreshAttempt(
   options: HealthRefreshAttemptOptions,
-): Promise<HealthRefreshAttempt> {
+): Promise<HealthRefreshCollection> {
   const workspaceScope =
     options.diagnosticsScope.kind === "tracked-files" ? options.diagnosticsScope : null;
   const maintenance = await refreshLspMaintenance(
@@ -80,13 +88,15 @@ async function collectWorkspaceRefreshAttempt(
   updateSentinelSnapshot(options.sentinelSnapshot, maintenance.snapshot);
   if (maintenance.failureReason) {
     return {
-      kind: "failed",
-      attemptedAt: options.attemptedAt,
-      elapsedMs: Date.now() - options.attemptedAt,
-      requestedDiagnosticScope: options.diagnosticsScope,
-      operationScope: "workspace-runtime",
-      diagnosticEvidence: maintenance.diagnosticEvidence,
-      reason: maintenance.failureReason,
+      attempt: {
+        kind: "failed",
+        attemptedAt: options.attemptedAt,
+        elapsedMs: Date.now() - options.attemptedAt,
+        requestedDiagnosticScope: options.diagnosticsScope,
+        operationScope: "workspace-runtime",
+        diagnosticEvidence: maintenance.diagnosticEvidence,
+        reason: maintenance.failureReason,
+      },
     };
   }
 
@@ -106,43 +116,51 @@ async function collectWorkspaceRefreshAttempt(
     );
     if (recovery.refreshFailureReason) {
       return {
-        kind: "failed",
+        attempt: {
+          kind: "failed",
+          attemptedAt: options.attemptedAt,
+          elapsedMs: Date.now() - options.attemptedAt,
+          requestedDiagnosticScope: options.diagnosticsScope,
+          operationScope: "workspace-runtime",
+          diagnosticEvidence,
+          reason: recovery.refreshFailureReason,
+        },
+        diagnosticReport: recovery.diagnosticReport,
+      };
+    }
+    return {
+      attempt: {
+        kind: "completed",
         attemptedAt: options.attemptedAt,
         elapsedMs: Date.now() - options.attemptedAt,
         requestedDiagnosticScope: options.diagnosticsScope,
         operationScope: "workspace-runtime",
+        attemptedActiveClients: recovery.attemptedClients,
+        restartedClients: recovery.restartedClients,
         diagnosticEvidence,
-        reason: recovery.refreshFailureReason,
-      };
-    }
-    return {
-      kind: "completed",
-      attemptedAt: options.attemptedAt,
-      elapsedMs: Date.now() - options.attemptedAt,
-      requestedDiagnosticScope: options.diagnosticsScope,
-      operationScope: "workspace-runtime",
-      attemptedActiveClients: recovery.attemptedClients,
-      restartedClients: recovery.restartedClients,
-      diagnosticEvidence,
-      staleAssessment: {
-        scope: "workspace",
-        suspected: recovery.staleAssessment.suspected,
-        matchedFileCount: recovery.staleAssessment.matchedFiles.length,
-        warning: recovery.staleAssessment.warning,
+        staleAssessment: {
+          scope: "workspace",
+          suspected: recovery.staleAssessment.suspected,
+          matchedFileCount: recovery.staleAssessment.matchedFiles.length,
+          warning: recovery.staleAssessment.warning,
+        },
       },
+      diagnosticReport: recovery.diagnosticReport,
     };
   } catch (error) {
     // Cancellation must propagate; a cancelled caller no longer awaits a
     // recorded failed attempt.
     if (isCodeRequestInterruption(error, options.control)) throw error;
     return {
-      kind: "failed",
-      attemptedAt: options.attemptedAt,
-      elapsedMs: Date.now() - options.attemptedAt,
-      requestedDiagnosticScope: options.diagnosticsScope,
-      operationScope: "workspace-runtime",
-      diagnosticEvidence: maintenance.diagnosticEvidence,
-      reason: errorMessage(error),
+      attempt: {
+        kind: "failed",
+        attemptedAt: options.attemptedAt,
+        elapsedMs: Date.now() - options.attemptedAt,
+        requestedDiagnosticScope: options.diagnosticsScope,
+        operationScope: "workspace-runtime",
+        diagnosticEvidence: maintenance.diagnosticEvidence,
+        reason: errorMessage(error),
+      },
     };
   }
 }

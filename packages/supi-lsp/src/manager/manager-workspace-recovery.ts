@@ -16,6 +16,7 @@ import {
   assessStaleDiagnostics,
   type StaleDiagnosticAssessment,
 } from "../diagnostics/stale-diagnostics.ts";
+import type { WorkspaceDiagnosticReport } from "../session/runtime-diagnostics.ts";
 
 export interface WorkspaceRecoveryResult {
   /** Active clients targeted by the best-effort refresh, not confirmed successful refreshes. */
@@ -29,6 +30,8 @@ export interface WorkspaceRecoveryResult {
   restartReason?: RecoveryRestartReason;
   /** Final document-level evidence from this pass, starting from the caller's initial evidence when one was supplied. */
   diagnosticEvidence: DiagnosticEvidenceSummary;
+  /** Final diagnostic report captured after all refresh and recovery work. */
+  diagnosticReport: WorkspaceDiagnosticReport;
   /** Failure from the first refresh, when no later pass replaced it. */
   refreshFailureReason?: string;
   /** Wall-clock duration of the whole recovery pass, for telemetry. */
@@ -61,6 +64,7 @@ export interface WorkspaceRecoveryHost {
   isDiagnosticFile(filePath: string): boolean;
   getClientDiagnosticRoutes(): WorkspaceDiagnosticRoute[];
   getDiagnosticEvidence(): DiagnosticEvidenceSummary;
+  getWorkspaceDiagnosticReport(maxSeverity?: number): WorkspaceDiagnosticReport;
   getCwd(): string;
   restartClientsForFiles(
     filePaths: string[],
@@ -145,6 +149,7 @@ export async function recoverWorkspaceDiagnostics(
   // refresh-only pass must not report a clean result after the caller
   // cancelled the request.
   throwIfCodeRequestInterrupted(options.control);
+  const diagnosticReport = host.getWorkspaceDiagnosticReport(2);
 
   return recoveryResult();
 
@@ -156,6 +161,7 @@ export async function recoverWorkspaceDiagnostics(
       restartedServers: restartServerNames,
       ...(restartReason ? { restartReason } : {}),
       diagnosticEvidence,
+      diagnosticReport,
       ...(refreshFailureReason ? { refreshFailureReason } : {}),
       elapsedMs: Date.now() - recoveryStartedAt,
       staleAssessment,

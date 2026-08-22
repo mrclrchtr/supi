@@ -5,6 +5,7 @@ import {
   mapCodeQueryResult,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { LspClient } from "../client/client.ts";
+import type { DiagnosticEntry } from "../client/client-document-state.ts";
 import type { Diagnostic } from "../config/types.ts";
 import { relativeFilePathFromUri } from "../diagnostics/diagnostic-summary.ts";
 import { shouldIgnoreLspPath } from "../summary.ts";
@@ -27,15 +28,15 @@ export async function syncClientFileAndGetDiagnostics(
 }
 
 export function collectOutstandingDiagnosticsDetailed(
-  clients: Iterable<Pick<LspClient, "getAllDiagnostics">>,
+  clientEntries: Iterable<ReadonlyArray<DiagnosticEntry>>,
   cwd: string,
   excludePatterns: string[],
   maxSeverity: number,
 ): Array<{ file: string; diagnostics: Diagnostic[] }> {
   const fileDiags = new Map<string, Diagnostic[]>();
 
-  for (const client of clients) {
-    for (const entry of client.getAllDiagnostics()) {
+  for (const entries of clientEntries) {
+    for (const entry of entries) {
       const file = relativeFilePathFromUri(entry.uri, cwd);
       if (shouldIgnoreLspPath(file, cwd)) continue;
       if (isExcludedByPattern(file, excludePatterns)) continue;

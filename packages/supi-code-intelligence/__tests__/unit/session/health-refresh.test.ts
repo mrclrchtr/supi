@@ -234,6 +234,161 @@ describe("code_health refresh evidence", () => {
     );
   });
 
+  it("uses the final diagnostic report instead of the stale runtime snapshot", async () => {
+    const refreshEvidence = {
+      requested: 2,
+      confirmed: 2,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [
+        { file: "src/a.ts", status: "confirmed" as const },
+        { file: "src/new.ts", status: "confirmed" as const },
+      ],
+    };
+    const newDiagnostic = {
+      message: "Type 'string' is not assignable to type 'number'.",
+      severity: 1,
+      range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+    };
+    const finalReport = {
+      summary: {
+        entries: [
+          { file: "src/a.ts", errors: 1, warnings: 0 },
+          { file: "src/new.ts", errors: 1, warnings: 0 },
+        ],
+        current: true,
+        evidence: refreshEvidence,
+      },
+      outstanding: {
+        entries: [
+          { file: "src/a.ts", diagnostics: [newDiagnostic] },
+          { file: "src/new.ts", diagnostics: [newDiagnostic] },
+        ],
+        current: true,
+        evidence: refreshEvidence,
+      },
+    };
+    const runtime = readyRuntime({
+      getWorkspaceDiagnosticSummary: vi.fn(() => {
+        throw new Error("stale runtime snapshot must not be read");
+      }),
+      refreshOpenDiagnostics: async () => refreshEvidence,
+      getOutstandingDiagnostics: vi.fn(() => {
+        throw new Error("stale runtime snapshot must not be read");
+      }),
+      recoverDiagnostics: async () => ({
+        attemptedClients: 1,
+        restartedClients: 0,
+        diagnosticEvidence: refreshEvidence,
+        diagnosticReport: finalReport,
+        staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+      }),
+    });
+
+    const { outcome } = await run(
+      { kind: "ready", runtime },
+      { include: ["diagnostics"], refresh: true },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        diagnostics: {
+          kind: "completed",
+          entries: [
+            { file: path.join(cwd, "src/a.ts"), errors: 1, warnings: 0 },
+            { file: path.join(cwd, "src/new.ts"), errors: 1, warnings: 0 },
+          ],
+          evidence: refreshEvidence,
+        },
+      },
+    });
+  });
+
+  it("uses final detailed diagnostics from a restarted client report", async () => {
+    const evidence = {
+      requested: 2,
+      confirmed: 2,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [
+        { file: "src/a.ts", status: "confirmed" as const },
+        { file: "src/new.ts", status: "confirmed" as const },
+      ],
+    };
+    const finalReport = {
+      summary: {
+        entries: [{ file: "src/new.ts", errors: 1, warnings: 0 }],
+        current: true,
+        evidence,
+      },
+      outstanding: {
+        entries: [
+          {
+            file: "src/new.ts",
+            diagnostics: [
+              {
+                message: "New diagnostic after client restart",
+                severity: 1,
+                source: "typescript",
+                range: { start: { line: 2, character: 0 }, end: { line: 2, character: 1 } },
+              },
+            ],
+          },
+        ],
+        current: true,
+        evidence,
+      },
+    };
+    const runtime = readyRuntime({
+      getWorkspaceDiagnosticSummary: vi.fn(() => {
+        throw new Error("stale runtime snapshot must not be read");
+      }),
+      getOutstandingDiagnostics: vi.fn(() => {
+        throw new Error("stale runtime snapshot must not be read");
+      }),
+      refreshOpenDiagnostics: async () => evidence,
+      recoverDiagnostics: async () => ({
+        attemptedClients: 1,
+        restartedClients: 1,
+        diagnosticEvidence: evidence,
+        diagnosticReport: finalReport,
+        staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+      }),
+    });
+
+    const { outcome } = await run(
+      { kind: "ready", runtime },
+      { include: ["diagnostics"], refresh: true, level: "detailed" },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        refresh: { kind: "completed", restartedClients: 1 },
+        diagnostics: {
+          kind: "completed",
+          entries: [
+            {
+              file: path.join(cwd, "src/new.ts"),
+              errors: 1,
+              warnings: 0,
+              messages: [
+                expect.objectContaining({
+                  message: "New diagnostic after client restart",
+                  line: 3,
+                }),
+              ],
+            },
+          ],
+          evidence,
+        },
+      },
+    });
+  });
+
   it("reports a failed workspace refresh when the host refresh rejects", async () => {
     const refreshOpenDiagnostics = vi.fn(async () => {
       throw new Error("host refresh failed");

@@ -45,6 +45,7 @@ export type {
   DiagnosticEvidenceSummary,
   OutstandingDiagnosticSummaryEntry,
   RecoverDiagnosticsResult,
+  WorkspaceDiagnosticReport,
   WorkspaceDiagnosticSnapshot,
   WorkspaceDiagnosticSummaryEntry,
 } from "./runtime-diagnostics.ts";

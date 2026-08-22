@@ -4,6 +4,7 @@ import type { CapabilityState } from "@mrclrchtr/supi-code-runtime/api";
 import { isCodeRequestInterruption } from "@mrclrchtr/supi-code-runtime/api";
 import type {
   LspRuntimeController,
+  WorkspaceDiagnosticReport,
   WorkspaceLspRuntime,
   WorkspaceLspRuntimeState,
 } from "@mrclrchtr/supi-lsp/api";
@@ -72,7 +73,7 @@ export async function runHealthWorkflow(
   const serverInventoryAvailable = lspState.kind === "ready" || lspState.kind === "disabled";
 
   const diagnosticsScope = diagnosticScope(scopeFilter);
-  const refresh = await collectRefreshState({
+  const refreshCollection = await collectRefreshState({
     refreshRequested: request.refresh === true,
     diagnosticsRequested: included.includes("diagnostics"),
     runtime,
@@ -102,10 +103,12 @@ export async function runHealthWorkflow(
     detailed: level === "detailed",
     requestControl: control,
     refreshEvidence:
-      (refresh.kind === "completed" || refresh.kind === "failed") &&
-      refresh.operationScope === "workspace-runtime"
-        ? refresh.diagnosticEvidence
+      (refreshCollection.attempt.kind === "completed" ||
+        refreshCollection.attempt.kind === "failed") &&
+      refreshCollection.attempt.operationScope === "workspace-runtime"
+        ? refreshCollection.attempt.diagnosticEvidence
         : undefined,
+    refreshReport: refreshCollection.diagnosticReport,
   });
   // A cancellation that landed during diagnostic resolution must not produce
   // a completed health result the caller no longer awaits.
@@ -121,7 +124,7 @@ export async function runHealthWorkflow(
     structuralStatus: describeStructuralState(capabilityStates.structural),
     diagnostics,
     servers,
-    refresh,
+    refresh: refreshCollection.attempt,
     level,
     capabilityWarnings: capabilityWarnings?.hasWarnings ? capabilityWarnings : undefined,
   };
@@ -213,6 +216,11 @@ function collectCapabilityWarnings(
   return report.hasWarnings ? report : undefined;
 }
 
+interface HealthRefreshStateCollection {
+  readonly attempt: HealthRefreshState;
+  readonly diagnosticReport?: WorkspaceDiagnosticReport;
+}
+
 interface RefreshStateOptions {
   readonly refreshRequested: boolean;
   readonly diagnosticsRequested: boolean;
@@ -224,27 +232,35 @@ interface RefreshStateOptions {
 }
 
 /** Run the requested workspace-runtime refresh and retain only facts the runtime establishes. */
-async function collectRefreshState(options: RefreshStateOptions): Promise<HealthRefreshState> {
+async function collectRefreshState(
+  options: RefreshStateOptions,
+): Promise<HealthRefreshStateCollection> {
   const { deps, diagnosticsRequested, diagnosticsScope, lspState, runtime } = options;
   if (!diagnosticsRequested) {
     return {
-      kind: "not-requested",
-      reason: "Diagnostics were not requested.",
-      lastAttempt: deps.lastRefreshAttempt,
+      attempt: {
+        kind: "not-requested",
+        reason: "Diagnostics were not requested.",
+        lastAttempt: deps.lastRefreshAttempt,
+      },
     };
   }
   if (!options.refreshRequested) {
     return {
-      kind: "not-requested",
-      reason: "Refresh was not requested.",
-      lastAttempt: deps.lastRefreshAttempt,
+      attempt: {
+        kind: "not-requested",
+        reason: "Refresh was not requested.",
+        lastAttempt: deps.lastRefreshAttempt,
+      },
     };
   }
   if (!runtime) {
     return {
-      kind: "not-attempted",
-      reason: refreshUnavailableReason(lspState),
-      lastAttempt: deps.lastRefreshAttempt,
+      attempt: {
+        kind: "not-attempted",
+        reason: refreshUnavailableReason(lspState),
+        lastAttempt: deps.lastRefreshAttempt,
+      },
     };
   }
 
@@ -270,7 +286,7 @@ async function collectRefreshState(options: RefreshStateOptions): Promise<Health
           message: "Refreshing diagnostics and recovery state",
         }),
     });
-    deps.trackRefreshAttempt(attempt);
+    deps.trackRefreshAttempt(attempt.attempt);
     return attempt;
   } catch (error) {
     // Cancellation must propagate; a cancelled caller no longer awaits a
@@ -285,7 +301,7 @@ async function collectRefreshState(options: RefreshStateOptions): Promise<Health
       reason: errorMessage(error),
     };
     deps.trackRefreshAttempt(attempt);
-    return attempt;
+    return { attempt };
   }
 }
 

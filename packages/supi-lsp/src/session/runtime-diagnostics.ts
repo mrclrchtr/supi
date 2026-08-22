@@ -21,6 +21,20 @@ export interface WorkspaceDiagnosticSummaryEntry {
   warnings: number;
 }
 
+/**
+ * One coherent post-refresh observation of workspace diagnostics.
+ *
+ * Both projections are captured from the same client snapshots. The report is
+ * short-lived and must not be retained as the runtime's last refresh attempt.
+ */
+export interface WorkspaceDiagnosticReport {
+  summary: WorkspaceDiagnosticSnapshot<WorkspaceDiagnosticSummaryEntry>;
+  outstanding: WorkspaceDiagnosticSnapshot<{
+    file: string;
+    diagnostics: Diagnostic[];
+  }>;
+}
+
 /** Outstanding diagnostics grouped by file, including info and hint counts. */
 export interface OutstandingDiagnosticSummaryEntry {
   file: string;
@@ -36,8 +50,10 @@ export interface RecoverDiagnosticsResult {
   /** Active clients targeted by the best-effort refresh, not confirmed successful refreshes. */
   attemptedClients: number;
   restartedClients: number;
-  /** Final document-level evidence from this pass, starting from caller-supplied initial evidence when one was provided. */
+  /** Evidence collected by the refresh and recovery operations. */
   diagnosticEvidence: DiagnosticEvidenceSummary;
+  /** Final diagnostic report captured after all refresh and recovery work. */
+  diagnosticReport: WorkspaceDiagnosticReport;
   /** Failure from the first refresh, when no later pass replaced it. */
   refreshFailureReason?: string;
   /** Wall-clock duration of the whole recovery pass, for telemetry. */
