@@ -55,8 +55,8 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       typescript-language-server:
-        specifier: 5.3.0
-        version: 5.3.0
+        specifier: 6.0.0
+        version: 6.0.0
       vitest:
         specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.1(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
@@ -2401,9 +2401,9 @@ packages:
   typebox@1.3.7:
     resolution: {integrity: sha512-meKuifc33Pccx0O6PdIzYMq3Og8zvP4TIi/a+Bw3AEMZMxOD0+RHGQvpglEe6Zdy3wZ8nqn/j95h8LUZLk/6Hg==}
 
-  typescript-language-server@5.3.0:
-    resolution: {integrity: sha512-5puofxZHgFdAYtfNpmwCAvgtaYgg8wrUnH30m7Ze3QuguId5RNRadKASpOpyDxTyUdAF51FjhTdjntLw/EuWcQ==}
-    engines: {node: '>=20'}
+  typescript-language-server@6.0.0:
+    resolution: {integrity: sha512-LXtzY3UZGfghWA5eRU6/T5j1+YiGRgy14mR3GOKyTKlE1op1TYKQnLVxwBsmnXeDhGLuvzZyIHBAqvrekAITYQ==}
+    engines: {node: '>=22.22.2'}
     hasBin: true
 
   typescript@6.0.3:
@@ -4437,7 +4437,7 @@ snapshots:
 
   typebox@1.3.7: {}
 
-  typescript-language-server@5.3.0:
+  typescript-language-server@6.0.0:
     dependencies:
       vscode-jsonrpc: 5.0.1
       vscode-languageserver-protocol: 3.18.2
