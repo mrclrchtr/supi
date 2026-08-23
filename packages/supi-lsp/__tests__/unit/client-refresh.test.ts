@@ -135,6 +135,45 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
     }
   });
 
+  it("keeps the full second-window settle budget for delayed push batches", async () => {
+    vi.useFakeTimers();
+    const { tmpDir, uri } = createTempFileUri();
+    const client = createStartedClient();
+    openDocument(client, uri);
+    const sendNotification = notificationMock(client);
+    sendNotification.mockClear();
+    sendNotification.mockImplementation((method: string) => {
+      if (method === "textDocument/didOpen") {
+        // Publish near the end of the replacement window. A short retry
+        // budget confirms the old timeout while the full budget can settle.
+        setTimeout(() => client.handlePublishDiagnostics({ uri, diagnostics: [] }), 2_850);
+      }
+    });
+
+    try {
+      const pending = client.refreshOpenDiagnostics({ maxWaitMs: 3_000, quietMs: 100 });
+      await vi.advanceTimersByTimeAsync(3_000);
+      await vi.advanceTimersByTimeAsync(3_000);
+
+      expect(sendNotification).toHaveBeenCalledWith(
+        "textDocument/didOpen",
+        expect.objectContaining({
+          textDocument: expect.objectContaining({ uri }),
+        }),
+      );
+      await expect(pending).resolves.toMatchObject({
+        requested: 1,
+        confirmed: 1,
+        unconfirmed: 0,
+        failed: 0,
+        removed: 0,
+      });
+    } finally {
+      vi.useRealTimers();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it("returns exact confirmed and unconfirmed document coverage", async () => {
     const client = createStartedClient();
     const first = createTempFileUri();

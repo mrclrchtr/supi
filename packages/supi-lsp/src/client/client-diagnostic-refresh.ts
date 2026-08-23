@@ -418,8 +418,6 @@ export async function refreshClientOpenDiagnostics(
     const reopen = await reopenUnconfirmedDocuments({
       options,
       synchronizations,
-      maxWaitMs,
-      quietMs,
       observer,
     });
     if (reopen.performed) {
@@ -427,7 +425,9 @@ export async function refreshClientOpenDiagnostics(
       finalSettle = await options.waiters.waitForSettle(
         {
           syncStart: reopen.startedAt,
-          maxWaitMs: reopen.budgetMs,
+          // A large push-only project may still be processing the reopen
+          // batch. Give this replacement pass the initial collection budget.
+          maxWaitMs,
           quietMs,
           settleEpoch: options.waiters.settleEpoch,
           isComplete: () =>
@@ -520,18 +520,14 @@ async function collectPullEvidenceForRefresh(options: {
 async function reopenUnconfirmedDocuments(options: {
   options: ClientDiagnosticRefreshOptions;
   synchronizations: readonly DiagnosticSynchronization[];
-  maxWaitMs: number;
-  quietMs: number;
   observer: DiagnosticObserver;
 }): Promise<{
   performed: boolean;
   startedAt: number;
-  budgetMs: number;
   synchronizations: DiagnosticSynchronization[];
 }> {
-  const { options: refresh, synchronizations, maxWaitMs, quietMs, observer } = options;
+  const { options: refresh, synchronizations, observer } = options;
   const startedAt = Date.now();
-  const budgetMs = Math.min(maxWaitMs, quietMs * 4);
   const unconfirmed = synchronizations.filter(
     (item) => !hasFreshEvidence(refresh.diagnosticStore, item, refresh.evidenceRevision()),
   );
@@ -567,14 +563,13 @@ async function reopenUnconfirmedDocuments(options: {
     });
   }
   if (reopenedSynchronizations.length === 0) {
-    return { performed: false, startedAt, budgetMs, synchronizations: [...synchronizations] };
+    return { performed: false, startedAt, synchronizations: [...synchronizations] };
   }
   observer.reopened(reopenedSynchronizations.length);
   const reopenedByUri = new Map(reopenedSynchronizations.map((item) => [item.uri, item]));
   return {
     performed: true,
     startedAt,
-    budgetMs,
     synchronizations: synchronizations.map((item) => reopenedByUri.get(item.uri) ?? item),
   };
 }
