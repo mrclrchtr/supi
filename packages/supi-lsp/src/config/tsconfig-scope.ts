@@ -23,6 +23,11 @@ interface ParsedProjectConfig {
   usesDefaultInclude: boolean;
 }
 
+interface ParsedProjectConfigCacheEntry {
+  parsed: ParsedProjectConfig | null;
+  dependencies: Set<string>;
+}
+
 /** Whether a file is inside the compilation scope of its nearest project config. */
 export type FileScopeStatus = "included" | "excluded" | "no-config" | "out-of-tree";
 
@@ -50,9 +55,7 @@ export interface FileScopeDecision {
 }
 
 const nearestConfigCache = new Map<string, string | null>();
-const parsedConfigCache = new Map<string, ParsedProjectConfig | null>();
-/** Normalized local project-config dependencies for each cached config. */
-const projectConfigDependencyCache = new Map<string, Set<string>>();
+const parsedConfigCache = new Map<string, ParsedProjectConfigCacheEntry>();
 
 const tsInternal = ts as typeof ts & {
   getFileMatcherPatterns?: (
@@ -185,12 +188,15 @@ function getLocalProjectConfig(directory: string): string | null {
 function parseProjectConfig(configPath: string): ParsedProjectConfig | null {
   const normalizedConfigPath = normalizePath(configPath);
   const cached = parsedConfigCache.get(normalizedConfigPath);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) return cached.parsed;
 
-  projectConfigDependencyCache.set(normalizedConfigPath, collectExtendedProjectConfigs(configPath));
+  const cacheEntry: ParsedProjectConfigCacheEntry = {
+    parsed: null,
+    dependencies: collectExtendedProjectConfigs(configPath),
+  };
   const parsed = ts.getParsedCommandLineOfConfigFile(configPath, {}, createParseConfigHost());
   if (!parsed) {
-    parsedConfigCache.set(normalizedConfigPath, null);
+    parsedConfigCache.set(normalizedConfigPath, cacheEntry);
     return null;
   }
 
@@ -219,7 +225,8 @@ function parseProjectConfig(configPath: string): ParsedProjectConfig | null {
     supportedExtensions,
     usesDefaultInclude,
   } satisfies ParsedProjectConfig;
-  parsedConfigCache.set(normalizedConfigPath, result);
+  cacheEntry.parsed = result;
+  parsedConfigCache.set(normalizedConfigPath, cacheEntry);
   return result;
 }
 
@@ -343,7 +350,6 @@ function isWithinOrEqual(root: string, target: string): boolean {
 export function clearTsconfigCache(): void {
   nearestConfigCache.clear();
   parsedConfigCache.clear();
-  projectConfigDependencyCache.clear();
 }
 
 /**
@@ -359,13 +365,12 @@ export function invalidateTsconfigCacheForConfig(configPath: string): void {
   const normalizedConfigPath = normalizePath(configPath);
   const invalidated = new Set([normalizedConfigPath]);
 
-  for (const [cachedConfigPath, dependencies] of projectConfigDependencyCache) {
-    if (dependencies.has(normalizedConfigPath)) invalidated.add(cachedConfigPath);
+  for (const [cachedConfigPath, cacheEntry] of parsedConfigCache) {
+    if (cacheEntry.dependencies.has(normalizedConfigPath)) invalidated.add(cachedConfigPath);
   }
 
   for (const cachedConfigPath of invalidated) {
     parsedConfigCache.delete(cachedConfigPath);
-    projectConfigDependencyCache.delete(cachedConfigPath);
   }
 
   for (const [key, value] of nearestConfigCache) {
