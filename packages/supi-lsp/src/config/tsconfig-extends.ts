@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import ts from "typescript";
+import { normalizeTsconfigPath as normalizePath } from "./tsconfig-path.ts";
 
 /**
  * Collect recognized local project configs declared by `extends`, including
@@ -38,6 +39,12 @@ export function collectExtendedProjectConfigs(configPath: string): Set<string> {
   return dependencies;
 }
 
+/**
+ * Resolve a local project-config extends entry.
+ *
+ * Package names are not local paths and are deliberately ignored. TypeScript
+ * uses the `.json` suffix for extensionless local config references.
+ */
 function resolveLocalExtendedConfigPath(configPath: string, extendsValue: string): string | null {
   if (!path.isAbsolute(extendsValue) && !/^\.{1,2}(?:[\\/]|$)/.test(extendsValue)) {
     return null;
@@ -47,11 +54,6 @@ function resolveLocalExtendedConfigPath(configPath: string, extendsValue: string
   const candidate =
     path.extname(resolved).toLowerCase() === ".json" ? resolved : `${resolved}.json`;
   return isProjectConfigFileName(path.basename(candidate)) ? candidate : null;
-}
-
-function normalizePath(target: string): string {
-  const resolved = path.resolve(target).replaceAll("\\", "/");
-  return ts.sys.useCaseSensitiveFileNames ? resolved : resolved.toLowerCase();
 }
 
 /** Whether a file name is a tsconfig.json, jsconfig.json, or tsconfig.*.json name. */

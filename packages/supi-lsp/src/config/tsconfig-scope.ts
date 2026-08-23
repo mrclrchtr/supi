@@ -8,6 +8,7 @@
 import * as path from "node:path";
 import ts from "typescript";
 import { collectExtendedProjectConfigs } from "./tsconfig-extends.ts";
+import { normalizeTsconfigPath as normalizePath } from "./tsconfig-path.ts";
 
 export { isProjectConfigFileName } from "./tsconfig-extends.ts";
 
@@ -333,11 +334,6 @@ function createParseConfigHost(): ts.ParseConfigFileHost {
 function isWithinOrEqual(root: string, target: string): boolean {
   const relative = path.relative(root, target);
   return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== "..");
-}
-
-function normalizePath(target: string): string {
-  const resolved = path.resolve(target).replaceAll("\\", "/");
-  return ts.sys.useCaseSensitiveFileNames ? resolved : resolved.toLowerCase();
 }
 
 /**
