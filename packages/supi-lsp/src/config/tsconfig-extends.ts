@@ -43,7 +43,9 @@ export function collectExtendedProjectConfigs(configPath: string): Set<string> {
  * Resolve a local project-config extends entry.
  *
  * Package names are not local paths and are deliberately ignored. TypeScript
- * uses the `.json` suffix for extensionless local config references.
+ * uses the `.json` suffix for extensionless local config references. Only
+ * recognized project-config names are tracked; arbitrary local JSON files may
+ * still be parsed by TypeScript but are outside this invalidation contract.
  */
 function resolveLocalExtendedConfigPath(configPath: string, extendsValue: string): string | null {
   if (!path.isAbsolute(extendsValue) && !/^\.{1,2}(?:[\\/]|$)/.test(extendsValue)) {

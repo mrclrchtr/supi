@@ -450,6 +450,7 @@ describe("targeted tsconfig cache invalidation", () => {
         '{"extends":["./tsconfig.base.json","./tsconfig.extra.json"]}',
       );
       fs.writeFileSync(path.join(tempRoot, "tsconfig.extra.json"), "{}");
+      fs.writeFileSync(baseConfig, '{"include":["src/**/*.ts"]}');
       fs.writeFileSync(path.join(tempRoot, "src/app.ts"), "export const app = true;\n");
 
       expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("included");
