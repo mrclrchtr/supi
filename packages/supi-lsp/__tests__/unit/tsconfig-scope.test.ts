@@ -362,6 +362,140 @@ describe("targeted tsconfig cache invalidation", () => {
     }
   });
 
+  it("invalidates a cached root when a direct extended config changes", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-invalid-extends-direct-"));
+    try {
+      fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+      const rootConfig = path.join(tempRoot, "tsconfig.json");
+      const baseConfig = path.join(tempRoot, "tsconfig.base.json");
+      fs.writeFileSync(rootConfig, '{"extends":"./tsconfig.base.json"}');
+      fs.writeFileSync(baseConfig, '{"include":["src/**/*.ts"]}');
+      fs.writeFileSync(path.join(tempRoot, "src/app.ts"), "export const app = true;\n");
+
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("included");
+
+      fs.writeFileSync(baseConfig, '{"include":[]}');
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("included");
+
+      invalidateTsconfigCacheForConfig(baseConfig);
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("excluded");
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("invalidates a cached root when a transitive extended config changes", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-invalid-extends-transitive-"));
+    try {
+      fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+      const baseConfig = path.join(tempRoot, "tsconfig.base.json");
+      fs.writeFileSync(
+        path.join(tempRoot, "tsconfig.json"),
+        '{"extends":"./tsconfig.shared.json"}',
+      );
+      fs.writeFileSync(
+        path.join(tempRoot, "tsconfig.shared.json"),
+        '{"extends":"./tsconfig.base.json"}',
+      );
+      fs.writeFileSync(baseConfig, '{"include":["src/**/*.ts"]}');
+      fs.writeFileSync(path.join(tempRoot, "src/app.ts"), "export const app = true;\n");
+
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("included");
+
+      fs.writeFileSync(baseConfig, '{"include":[]}');
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("included");
+
+      invalidateTsconfigCacheForConfig(baseConfig);
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("excluded");
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("invalidates a cached root when an entry in an extends array changes", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-invalid-extends-array-"));
+    try {
+      fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+      const baseConfig = path.join(tempRoot, "tsconfig.base.json");
+      fs.writeFileSync(
+        path.join(tempRoot, "tsconfig.json"),
+        '{"extends":["./tsconfig.base.json","./tsconfig.extra.json"]}',
+      );
+      fs.writeFileSync(path.join(tempRoot, "tsconfig.extra.json"), "{}");
+      fs.writeFileSync(baseConfig, '{"include":["src/**/*.ts"]}');
+      fs.writeFileSync(path.join(tempRoot, "src/app.ts"), "export const app = true;\n");
+
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("included");
+
+      fs.writeFileSync(baseConfig, '{"include":[]}');
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("included");
+
+      invalidateTsconfigCacheForConfig(baseConfig);
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("excluded");
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("invalidates a cached root when an entry in an extends array is created", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-invalid-extends-array-create-"));
+    try {
+      fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+      const baseConfig = path.join(tempRoot, "tsconfig.base.json");
+      fs.writeFileSync(
+        path.join(tempRoot, "tsconfig.json"),
+        '{"extends":["./tsconfig.base.json","./tsconfig.extra.json"]}',
+      );
+      fs.writeFileSync(path.join(tempRoot, "tsconfig.extra.json"), "{}");
+      fs.writeFileSync(path.join(tempRoot, "src/app.ts"), "export const app = true;\n");
+
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("included");
+
+      fs.writeFileSync(baseConfig, '{"include":[]}');
+      invalidateTsconfigCacheForConfig(baseConfig);
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("excluded");
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("invalidates a cached root when an extended config is created", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-invalid-extends-create-"));
+    try {
+      fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+      const baseConfig = path.join(tempRoot, "tsconfig.base.json");
+      fs.writeFileSync(path.join(tempRoot, "tsconfig.json"), '{"extends":"./tsconfig.base.json"}');
+      fs.writeFileSync(path.join(tempRoot, "src/app.ts"), "export const app = true;\n");
+
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("included");
+
+      fs.writeFileSync(baseConfig, '{"include":[]}');
+      invalidateTsconfigCacheForConfig(baseConfig);
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("excluded");
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("invalidates a cached root when an extended config is deleted", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-invalid-extends-delete-"));
+    try {
+      fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+      const baseConfig = path.join(tempRoot, "tsconfig.base.json");
+      fs.writeFileSync(path.join(tempRoot, "tsconfig.json"), '{"extends":"./tsconfig.base.json"}');
+      fs.writeFileSync(baseConfig, '{"include":[]}');
+      fs.writeFileSync(path.join(tempRoot, "src/app.ts"), "export const app = true;\n");
+
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("excluded");
+
+      fs.rmSync(baseConfig);
+      invalidateTsconfigCacheForConfig(baseConfig);
+      expect(getFileScopeDecision("src/app.ts", tempRoot).status).toBe("included");
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it("re-resolves dirs that previously had no config when a config is created", () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-invalid-create-"));
     try {

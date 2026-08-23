@@ -7,6 +7,9 @@
 
 import * as path from "node:path";
 import ts from "typescript";
+import { collectExtendedProjectConfigs } from "./tsconfig-extends.ts";
+
+export { isProjectConfigFileName } from "./tsconfig-extends.ts";
 
 interface ParsedProjectConfig {
   configPath: string;
@@ -47,6 +50,8 @@ export interface FileScopeDecision {
 
 const nearestConfigCache = new Map<string, string | null>();
 const parsedConfigCache = new Map<string, ParsedProjectConfig | null>();
+/** Normalized local project-config dependencies for each cached config. */
+const projectConfigDependencyCache = new Map<string, Set<string>>();
 
 const tsInternal = ts as typeof ts & {
   getFileMatcherPatterns?: (
@@ -181,6 +186,7 @@ function parseProjectConfig(configPath: string): ParsedProjectConfig | null {
   const cached = parsedConfigCache.get(normalizedConfigPath);
   if (cached !== undefined) return cached;
 
+  projectConfigDependencyCache.set(normalizedConfigPath, collectExtendedProjectConfigs(configPath));
   const parsed = ts.getParsedCommandLineOfConfigFile(configPath, {}, createParseConfigHost());
   if (!parsed) {
     parsedConfigCache.set(normalizedConfigPath, null);
@@ -341,21 +347,33 @@ function normalizePath(target: string): string {
 export function clearTsconfigCache(): void {
   nearestConfigCache.clear();
   parsedConfigCache.clear();
+  projectConfigDependencyCache.clear();
 }
 
 /**
- * Invalidate cached state for one config file that changed or was created.
+ * Invalidate cached state for one config file that changed, was created, or
+ * was deleted.
  *
- * Removes the parsed config and every nearest-config lookup that resolved to
- * it, so the next decision re-reads the config from disk. The wholesale
+ * Removes the changed config and every cached root config that depends on it,
+ * so the next decision re-reads current config data. The wholesale
  * {@link clearTsconfigCache} stays for lifecycle events; change signals use
  * this targeted invalidation instead.
  */
 export function invalidateTsconfigCacheForConfig(configPath: string): void {
-  const resolved = path.resolve(configPath);
-  parsedConfigCache.delete(normalizePath(resolved));
+  const normalizedConfigPath = normalizePath(configPath);
+  const invalidated = new Set([normalizedConfigPath]);
+
+  for (const [cachedConfigPath, dependencies] of projectConfigDependencyCache) {
+    if (dependencies.has(normalizedConfigPath)) invalidated.add(cachedConfigPath);
+  }
+
+  for (const cachedConfigPath of invalidated) {
+    parsedConfigCache.delete(cachedConfigPath);
+    projectConfigDependencyCache.delete(cachedConfigPath);
+  }
+
   for (const [key, value] of nearestConfigCache) {
-    if (value !== null && path.resolve(value) === resolved) nearestConfigCache.delete(key);
+    if (value !== null && invalidated.has(normalizePath(value))) nearestConfigCache.delete(key);
   }
 }
 
@@ -374,13 +392,4 @@ export function invalidateTsconfigCacheForConfigDir(dir: string): void {
       nearestConfigCache.delete(key);
     }
   }
-}
-
-/** Whether a file name is a tsconfig.json, jsconfig.json, or tsconfig.*.json name. */
-export function isProjectConfigFileName(name: string): boolean {
-  return (
-    name === "tsconfig.json" ||
-    name === "jsconfig.json" ||
-    (name.startsWith("tsconfig.") && name.endsWith(".json"))
-  );
 }
