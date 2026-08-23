@@ -395,25 +395,28 @@ export async function refreshClientOpenDiagnostics(
     if (pull.completed) return buildEvidence();
   }
 
-  let finalSettle = await options.waiters.waitForSettle(
-    {
-      syncStart,
-      maxWaitMs,
-      quietMs,
-      settleEpoch,
-      isComplete: () =>
-        synchronizations.every((item) =>
-          hasFreshEvidence(options.diagnosticStore, item, options.evidenceRevision()),
-        ),
-      latestReceived: () =>
-        latestFreshEvidenceReceivedAt(
-          options.diagnosticStore,
-          synchronizations,
-          options.evidenceRevision(),
-        ),
-    },
-    options.options,
-  );
+  const waitForDiagnosticSettle = (settleStart: number, settleGeneration: number) =>
+    options.waiters.waitForSettle(
+      {
+        syncStart: settleStart,
+        maxWaitMs,
+        quietMs,
+        settleEpoch: settleGeneration,
+        isComplete: () =>
+          synchronizations.every((item) =>
+            hasFreshEvidence(options.diagnosticStore, item, options.evidenceRevision()),
+          ),
+        latestReceived: () =>
+          latestFreshEvidenceReceivedAt(
+            options.diagnosticStore,
+            synchronizations,
+            options.evidenceRevision(),
+          ),
+      },
+      options.options,
+    );
+
+  let finalSettle = await waitForDiagnosticSettle(syncStart, settleEpoch);
   if (!supportsPull && finalSettle.outcome === "timed-out") {
     const reopen = await reopenUnconfirmedDocuments({
       options,
@@ -422,27 +425,9 @@ export async function refreshClientOpenDiagnostics(
     });
     if (reopen.performed) {
       synchronizations = reopen.synchronizations;
-      finalSettle = await options.waiters.waitForSettle(
-        {
-          syncStart: reopen.startedAt,
-          // A large push-only project may still be processing the reopen
-          // batch. Give this replacement pass the initial collection budget.
-          maxWaitMs,
-          quietMs,
-          settleEpoch: options.waiters.settleEpoch,
-          isComplete: () =>
-            synchronizations.every((item) =>
-              hasFreshEvidence(options.diagnosticStore, item, options.evidenceRevision()),
-            ),
-          latestReceived: () =>
-            latestFreshEvidenceReceivedAt(
-              options.diagnosticStore,
-              synchronizations,
-              options.evidenceRevision(),
-            ),
-        },
-        options.options,
-      );
+      // A large push-only project may still be processing the reopen batch.
+      // The replacement pass uses the same collection budget as the initial pass.
+      finalSettle = await waitForDiagnosticSettle(reopen.startedAt, options.waiters.settleEpoch);
     }
   }
   observer.pushSettled(documentCount, finalSettle);
