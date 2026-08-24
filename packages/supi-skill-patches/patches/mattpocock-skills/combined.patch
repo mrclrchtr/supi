@@ -24,6 +24,20 @@ index 2d276fe88b..3fcff1fe3a 100644
 +example `verify-and-fix`). The policy governs what happens to the findings
 +after this report. A direct user instruction about the findings overrides the
 +policy; otherwise follow the policy.
+diff --git a/skills/engineering/implement/SKILL.md b/skills/engineering/implement/SKILL.md
+index 7a0b11f5..b5b17456 100644
+--- a/skills/engineering/implement/SKILL.md
++++ b/skills/engineering/implement/SKILL.md
+@@ -6,6 +6,8 @@ disable-model-invocation: true
+
+ Implement the work described by the user in the spec or tickets.
+
+-Use /tdd where possible, at pre-agreed seams.
++Investigate the code first. Then load `/tdd` and use it where it adds value,
++at seams agreed with the user. Do not force a TDD cycle for trivial behavior,
++but still write tests when they provide useful coverage.
+
+ Run typechecking regularly, single test files regularly, and the full test suite once at the end.
 diff --git a/skills/productivity/grilling/SKILL.md b/skills/productivity/grilling/SKILL.md
 index 95bd01e..b7d2644 100644
 --- a/skills/productivity/grilling/SKILL.md
