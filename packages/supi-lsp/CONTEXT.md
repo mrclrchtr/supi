@@ -30,6 +30,18 @@ _Avoid_: owner readiness, `Promise.all([])` readiness, treating a configured rou
 A freshness boundary that invalidates earlier diagnostic evidence after a document or workspace change. Evidence may cross the boundary only when the current document scope is confirmed; an old cache or an unversioned publication does not cross it.
 _Avoid_: cache clear, quiet period, clean result, workspace-wide freshness
 
+**Confirmed diagnostic evidence**:
+Diagnostic evidence that matches the current document synchronization and has remained settled under the push-publication policy; it can support a clean-result claim.
+_Avoid_: fresh evidence, current snapshot, semantic completion
+
+**Tentative diagnostic evidence**:
+Current diagnostic evidence from a synchronization that is not yet safe for a clean-result claim because another publication may follow.
+_Avoid_: confirmed evidence, final diagnostics, intermediate result
+
+**Diagnostic republish**:
+A later diagnostic publication for the same document synchronization.
+_Avoid_: replacement result, second result, duplicate diagnostic
+
 **Push-only diagnostic recovery**:
 A bounded recovery path for a server that publishes diagnostics but cannot answer pull requests. It may restart an affected client during an explicit refresh, but it must keep file-local freshness and report partial evidence when confirmation fails. Each route restarts at most once per invalidation generation, and the replacement startup has a fixed 5-second bound.
 _Avoid_: trust-next-push, automatic restart on status display, recovered diagnostics, restarting pull-capable routes
