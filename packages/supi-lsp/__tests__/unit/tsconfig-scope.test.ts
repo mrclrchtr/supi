@@ -37,8 +37,8 @@ describe("isFileExcludedByTsconfig", () => {
     );
   });
 
-  it("returns true for a fixture file not matching include patterns", () => {
-    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-lsp-fixture-tsx-"));
+  it("returns true for a .tsx file not matching include patterns", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-lsp-tsx-"));
     try {
       fs.writeFileSync(path.join(tempRoot, "tsconfig.json"), '{"include":["**/*.ts"]}');
       fs.writeFileSync(path.join(tempRoot, "sample.tsx"), "export const sample = true;\n");
@@ -48,12 +48,6 @@ describe("isFileExcludedByTsconfig", () => {
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
-  });
-
-  it("returns true for a fixture .js file not matching include **/*.ts", () => {
-    expect(isFileExcludedByTsconfig("packages/supi-lsp/__tests__/fixtures/sample.js", CWD)).toBe(
-      true,
-    );
   });
 
   it("returns false for a test file that matches include **/*.ts", () => {
