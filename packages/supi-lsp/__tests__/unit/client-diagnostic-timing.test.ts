@@ -279,6 +279,10 @@ describe("LSP diagnostic timing observations", () => {
     writeFileSync(file, "const reopenTiming = true;\n");
     const { client } = createRunningTestClient({ root: cwd, cwd });
     client.didOpen(file, "const reopenTiming = true;\n");
+    // A real disk change forces the didChange resynchronization whose clean
+    // result stays unpublished until the fallback didOpen. Unchanged content
+    // is retained without protocol work, so no reopen candidate would exist.
+    writeFileSync(file, "const reopenTimingChanged = true;\n");
     // The server stays silent through the first settle window, then
     // publishes on the fallback didOpen.
     setTimeout(

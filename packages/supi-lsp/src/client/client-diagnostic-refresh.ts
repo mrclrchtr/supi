@@ -218,35 +218,68 @@ export async function pullDiagnosticsForOpenDocuments(options: {
   }
 }
 
-/** Find open documents with current diagnostic evidence and matching disk content. */
-function findReusableDocumentUris(options: {
+/**
+ * Classify open documents for a push-only refresh by disk content.
+ *
+ * A document whose disk content still matches its open fingerprint stays in
+ * the server's current state:
+ * - with current evidence it is reusable (no protocol work, confirmed);
+ * - without current evidence it is retained: it keeps its synchronization and
+ *   the settle waits for the server's existing pipeline instead of forcing a
+ *   no-op didChange. Large push-only servers (typescript-language-server)
+ *   skip empty-to-empty publishes, so a no-op didChange of a clean file can
+ *   never confirm — it only invalidates in-progress evidence and restarts
+ *   full-program checks (#344).
+ *
+ * Documents outside the current evidence revision were invalidated by a
+ * workspace change and must resynchronize: their stale revision cannot
+ * produce fresh evidence without an explicit sync (ADR 0020).
+ */
+function classifyReusableDocuments(options: {
   openDocuments: ReadonlyMap<string, OpenDocumentState>;
   diagnosticStore: ReadonlyMap<string, DiagnosticCacheEntry>;
   evidenceRevision: number;
   failedFiles: ReadonlySet<string>;
-}): Set<string> {
-  const reusable = new Set<string>();
+}): {
+  reusableUris: Set<string>;
+  retainedUris: Set<string>;
+  preloadedContent: Map<string, string>;
+} {
+  const reusableUris = new Set<string>();
+  const retainedUris = new Set<string>();
+  const preloadedContent = new Map<string, string>();
   for (const [uri, document] of options.openDocuments) {
-    if (options.failedFiles.has(uriToFile(uri))) continue;
+    const filePath = uriToFile(uri);
+    if (options.failedFiles.has(filePath)) continue;
+    let content: string;
+    try {
+      content = readFileSync(filePath, "utf-8");
+    } catch {
+      // The resynchronization path classifies removed and unreadable files.
+      continue;
+    }
+    if (document.evidenceRevision !== options.evidenceRevision) {
+      // Invalidated generation: the resync didChange re-establishes proof.
+      preloadedContent.set(uri, content);
+      continue;
+    }
+    if (fingerprintDocumentContent(content) !== document.contentFingerprint) {
+      preloadedContent.set(uri, content);
+      continue;
+    }
     if (
-      !hasCurrentDiagnosticEvidence(
+      hasCurrentDiagnosticEvidence(
         document,
         options.diagnosticStore.get(uri),
         options.evidenceRevision,
       )
     ) {
-      continue;
-    }
-    try {
-      const content = readFileSync(uriToFile(uri), "utf-8");
-      if (fingerprintDocumentContent(content) === document.contentFingerprint) {
-        reusable.add(uri);
-      }
-    } catch {
-      // The normal resynchronization path handles files that cannot be read.
+      reusableUris.add(uri);
+    } else {
+      retainedUris.add(uri);
     }
   }
-  return reusable;
+  return { reusableUris, retainedUris, preloadedContent };
 }
 
 interface ClientDiagnosticRefreshOptions {
@@ -282,16 +315,20 @@ function prepareRefreshDocuments(
   evidenceRevision: number,
 ): PreparedRefreshDocuments {
   const reuseEnabled = !supportsPull && !options.forceResynchronize;
-  const reusableUris = reuseEnabled
-    ? findReusableDocumentUris({
+  const classification = reuseEnabled
+    ? classifyReusableDocuments({
         openDocuments: options.openDocuments,
         diagnosticStore: options.diagnosticStore,
         evidenceRevision,
         failedFiles: options.failedFiles(),
       })
-    : new Set<string>();
+    : undefined;
+  const reusableUris = classification?.reusableUris ?? new Set<string>();
+  const retainedUris = classification?.retainedUris ?? new Set<string>();
   const documentsToResynchronize = new Map(
-    Array.from(options.openDocuments).filter(([uri]) => !reusableUris.has(uri)),
+    Array.from(options.openDocuments).filter(
+      ([uri]) => !reusableUris.has(uri) && !retainedUris.has(uri),
+    ),
   );
   const resynchronization = resynchronizeOpenDocuments({
     openDocuments: documentsToResynchronize,
@@ -301,6 +338,7 @@ function prepareRefreshDocuments(
     evidenceRevision,
     sendNotification: (method, params) => options.host.sendNotification(method, params),
     uriToFile,
+    preloadedContent: classification?.preloadedContent,
     clearFile: options.clearFile,
     invalidateEvidence: options.invalidateEvidence,
     markUnversionedSyncMoment: options.markUnversionedSyncMoment,
@@ -316,7 +354,23 @@ function prepareRefreshDocuments(
       evidenceRevision: document.evidenceRevision,
     });
   }
-  const synchronizations = [...reusableSynchronizations, ...resynchronization.synchronizations];
+  // Retained documents keep their current synchronization: settle waits for
+  // the server's existing pipeline without any protocol work.
+  const retainedSynchronizations: DiagnosticSynchronization[] = [];
+  for (const uri of retainedUris) {
+    const document = options.openDocuments.get(uri);
+    if (!document) continue;
+    retainedSynchronizations.push({
+      uri,
+      synchronizationId: document.synchronizationId,
+      evidenceRevision: document.evidenceRevision,
+    });
+  }
+  const synchronizations = [
+    ...reusableSynchronizations,
+    ...retainedSynchronizations,
+    ...resynchronization.synchronizations,
+  ];
   const fullyReusable =
     reuseEnabled &&
     options.openDocuments.size > 0 &&
@@ -377,8 +431,7 @@ export async function refreshClientOpenDiagnostics(
 
   const settleEpoch = options.waiters.settleEpoch;
   observer.synchronized();
-  const documentCount = resynchronization.synchronizations.length;
-  if (documentCount === 0) {
+  if (synchronizations.length === 0) {
     observer.skipped(0);
     return buildEvidence();
   }
@@ -421,6 +474,7 @@ export async function refreshClientOpenDiagnostics(
     const reopen = await reopenUnconfirmedDocuments({
       options,
       synchronizations,
+      reopenCandidates: resynchronization.resynchronizedUris,
       observer,
     });
     if (reopen.performed) {
@@ -430,7 +484,7 @@ export async function refreshClientOpenDiagnostics(
       finalSettle = await waitForDiagnosticSettle(reopen.startedAt, options.waiters.settleEpoch);
     }
   }
-  observer.pushSettled(documentCount, finalSettle);
+  observer.pushSettled(synchronizations.length, finalSettle);
   // A cancelled settle must not publish evidence the caller no longer awaits.
   throwIfCodeRequestInterrupted(options.options);
   return buildEvidence();
@@ -494,27 +548,35 @@ async function collectPullEvidenceForRefresh(options: {
 }
 
 /**
- * Reopen-resync fallback (R2): on push-only routes an open document that
-
- * stays unconfirmed after the settle window receives no further push — a
- * clean file gets no push on didChange at all. Close and reopen each
- * unconfirmed document so the server publishes on didOpen, then settle
- * again within a bounded second window. The cache entry and version
- * history survive the reopen; other documents keep their server state.
+ * Reopen-resync fallback (R2): on push-only routes a document that was
+ * didChange-synchronized and stays unconfirmed after the settle window may
+ * have been skipped by the server — a clean file gets no push on didChange
+ * at all, but the server publishes on didOpen. Close and reopen each such
+ * document so the server publishes, then settle again within a bounded
+ * second window. The cache entry and version history survive the reopen;
+ * other documents keep their server state.
+ *
+ * Only documents this pass resynchronized are candidates: retained documents
+ * wait for the server's existing pipeline, and reopening them would cancel
+ * in-progress server work without fixing any publish gap (#344).
  */
 async function reopenUnconfirmedDocuments(options: {
   options: ClientDiagnosticRefreshOptions;
   synchronizations: readonly DiagnosticSynchronization[];
+  /** URIs that received a didChange in this pass and may need a reopen push. */
+  reopenCandidates: ReadonlySet<string>;
   observer: DiagnosticObserver;
 }): Promise<{
   performed: boolean;
   startedAt: number;
   synchronizations: DiagnosticSynchronization[];
 }> {
-  const { options: refresh, synchronizations, observer } = options;
+  const { options: refresh, synchronizations, reopenCandidates, observer } = options;
   const startedAt = Date.now();
   const unconfirmed = synchronizations.filter(
-    (item) => !hasFreshEvidence(refresh.diagnosticStore, item, refresh.evidenceRevision()),
+    (item) =>
+      reopenCandidates.has(item.uri) &&
+      !hasFreshEvidence(refresh.diagnosticStore, item, refresh.evidenceRevision()),
   );
   const reopenedSynchronizations: DiagnosticSynchronization[] = [];
   for (const item of unconfirmed) {

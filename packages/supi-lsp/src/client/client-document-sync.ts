@@ -125,6 +125,8 @@ interface ResynchronizeDocumentsOptions {
   evidenceRevision: number;
   sendNotification: NotificationSender;
   uriToFile(uri: string): string;
+  /** Disk content already read by classification; avoids a second read. */
+  preloadedContent?: ReadonlyMap<string, string>;
   clearFile(uri: string): void;
   invalidateEvidence(uri: string): void;
   markUnversionedSyncMoment(uri: string): void;
@@ -135,6 +137,8 @@ interface ResynchronizeDocumentsOptions {
 export interface ResynchronizeDocumentsResult {
   /** Documents that were synchronized and can receive fresh evidence. */
   synchronizations: DiagnosticSynchronization[];
+  /** URIs that received a new didChange synchronization in this pass. */
+  resynchronizedUris: ReadonlySet<string>;
   /** Existing tracked documents removed because their files no longer exist. */
   removedFiles: string[];
   /** Existing tracked documents that could not be read or synchronized. */
@@ -146,6 +150,7 @@ export function resynchronizeOpenDocuments(
   options: ResynchronizeDocumentsOptions,
 ): ResynchronizeDocumentsResult {
   const synchronizations: DiagnosticSynchronization[] = [];
+  const resynchronizedUris = new Set<string>();
   const removedFiles: string[] = [];
   const failedFiles: string[] = [];
   for (const [uri, document] of options.openDocuments) {
@@ -154,7 +159,7 @@ export function resynchronizeOpenDocuments(
       options.markUnversionedSyncMoment(uri);
       synchronizeDocument({
         uri,
-        content: readFileSync(filePath, "utf-8"),
+        content: options.preloadedContent?.get(uri) ?? readFileSync(filePath, "utf-8"),
         document,
         version: options.nextVersion(uri),
         synchronizationId: options.nextSynchronizationId(),
@@ -163,6 +168,7 @@ export function resynchronizeOpenDocuments(
         sendNotification: options.sendNotification,
       });
       options.clearFailedFile(uri);
+      resynchronizedUris.add(uri);
       synchronizations.push({
         uri,
         synchronizationId: document.synchronizationId,
@@ -181,5 +187,5 @@ export function resynchronizeOpenDocuments(
       // Keep the document open when a transient read fails.
     }
   }
-  return { synchronizations, removedFiles, failedFiles };
+  return { synchronizations, resynchronizedUris, removedFiles, failedFiles };
 }
