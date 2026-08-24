@@ -11,7 +11,7 @@
       "source": "mrclrchtr/supi",
       "sourceType": "github",
       "skillPath": "skills/engineering/code-review/SKILL.md",
-      "computedHash": "8fdeeb568da4b8a91ad4b736858fac0b27aecefcf88cbaaabe78788ada059e1a"
+      "computedHash": "8ecb787072976606066bb4872c2cb8bb15d475f99dbbcd09dc186f8584cb8357"
     },
     "codebase-design": {
       "source": "mrclrchtr/supi",
@@ -53,7 +53,7 @@
       "source": "mrclrchtr/supi",
       "sourceType": "github",
       "skillPath": "skills/engineering/implement/SKILL.md",
-      "computedHash": "3a80deaa2f2858cc20f7ca1792da9b74dd4689e0663be88c4164ede4a4affabf"
+      "computedHash": "13a02aab71fbabf30ea9eae113f9c4a47c05d832deb54c7107e611ec0941a0b0"
     },
     "improve-codebase-architecture": {
       "source": "mrclrchtr/supi",
