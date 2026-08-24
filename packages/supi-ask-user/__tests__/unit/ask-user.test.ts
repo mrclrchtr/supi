@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
+import { createPiMock, getTool, getTools, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it, vi } from "vitest";
 // We import the extension factory but we also export executeAskUser for direct testing
 import askUserExtension from "../../src/ask-user.ts";
@@ -65,9 +65,30 @@ function makeFormCtx(result: unknown): FormCtx {
 }
 
 describe("ask_user tool", () => {
-  it("registers the ask_user tool with blocking guidance metadata at factory time", () => {
-    const pi = createPiMock() as unknown as PiApi;
+  /** Fire session_start like a real pi session so prompting-surface config
+   *  resolution and mode-gated registration run. */
+  async function fireSessionStart(
+    pi: PiApi,
+    mode: "tui" | "rpc" | "json" | "print",
+  ): Promise<void> {
+    const ctx = makeCtx({ hasUI: true, mode }) as unknown as ReturnType<typeof makeCtx>;
+    // The mock session manager lacks getSessionId, which prompt-surface diagnostics read.
+    Object.assign(ctx.sessionManager, { getSessionId: vi.fn(() => "sid-1") });
+    for (const h of pi.getHandlers("session_start")) {
+      await (h as (...args: unknown[]) => unknown)({}, ctx);
+    }
+  }
+
+  /** Register the extension and start a TUI session, as pi does at startup. */
+  async function setupTuiExtension(options: { sessionName?: string } = {}): Promise<PiApi> {
+    const pi = createPiMock(options) as unknown as PiApi;
     askUserExtension(pi);
+    await fireSessionStart(pi, "tui");
+    return pi;
+  }
+
+  it("registers the ask_user tool with blocking guidance metadata after a TUI session starts", async () => {
+    const pi = await setupTuiExtension();
     const tool = getTool(pi, "ask_user");
 
     expect(tool.label).toBe("Ask User");
@@ -86,9 +107,24 @@ describe("ask_user tool", () => {
     expect(handler).toHaveLength(2);
   });
 
-  it("throws for invalid forms", async () => {
+  it("does not register the tool at factory time", () => {
     const pi = createPiMock() as unknown as PiApi;
     askUserExtension(pi);
+    expect(getTools(pi).some((tool) => tool.name === "ask_user")).toBe(false);
+  });
+
+  it.each(["rpc", "json", "print"] as const)(
+    "does not register the tool in %s mode",
+    async (mode) => {
+      const pi = createPiMock() as unknown as PiApi;
+      askUserExtension(pi);
+      await fireSessionStart(pi, mode);
+      expect(getTools(pi).some((tool) => tool.name === "ask_user")).toBe(false);
+    },
+  );
+
+  it("throws for invalid forms", async () => {
+    const pi = await setupTuiExtension();
     const tool = getTool(pi, "ask_user");
 
     await expect(
@@ -97,8 +133,7 @@ describe("ask_user tool", () => {
   });
 
   it("throws when custom form support is unavailable", async () => {
-    const pi = createPiMock({ sessionName: "My Session" }) as unknown as PiApi;
-    askUserExtension(pi);
+    const pi = await setupTuiExtension({ sessionName: "My Session" });
     const tool = getTool(pi, "ask_user");
     const ctx = makeUnsupportedCtx();
 
@@ -108,8 +143,7 @@ describe("ask_user tool", () => {
   });
 
   it("throws in RPC mode even though ctx.hasUI is true", async () => {
-    const pi = createPiMock({ sessionName: "My Session" }) as unknown as PiApi;
-    askUserExtension(pi);
+    const pi = await setupTuiExtension({ sessionName: "My Session" });
     const tool = getTool(pi, "ask_user");
     const ctx = makeFormCtx(undefined);
     const rpcCtx = { ...ctx, hasUI: true, mode: "rpc" };
@@ -120,8 +154,7 @@ describe("ask_user tool", () => {
   });
 
   it("records successful form submissions with outcome and responses", async () => {
-    const pi = createPiMock({ sessionName: "My Session" }) as unknown as PiApi;
-    askUserExtension(pi);
+    const pi = await setupTuiExtension({ sessionName: "My Session" });
     const tool = getTool(pi, "ask_user");
     const ctx = makeFormCtx({
       outcome: "submitted",
@@ -165,8 +198,7 @@ describe("ask_user tool", () => {
   });
 
   it("forwards the configured editor lookup to the form renderer", async () => {
-    const pi = createPiMock() as unknown as PiApi;
-    askUserExtension(pi);
+    const pi = await setupTuiExtension();
     const tool = getTool(pi, "ask_user");
     const ctx = makeFormCtx({
       outcome: "submitted",
@@ -189,8 +221,7 @@ describe("ask_user tool", () => {
   });
 
   it("aborts the turn when the form returns an internal cancel result", async () => {
-    const pi = createPiMock() as unknown as PiApi;
-    askUserExtension(pi);
+    const pi = await setupTuiExtension();
     const tool = getTool(pi, "ask_user");
     const ctx = makeFormCtx({ kind: "cancel" } as AskUserInteractionResult);
 
@@ -202,8 +233,7 @@ describe("ask_user tool", () => {
   });
 
   it("aborts the turn when the form returns an internal abort result", async () => {
-    const pi = createPiMock() as unknown as PiApi;
-    askUserExtension(pi);
+    const pi = await setupTuiExtension();
     const tool = getTool(pi, "ask_user");
     const ctx = makeFormCtx({ kind: "abort" } as AskUserInteractionResult);
 
@@ -215,8 +245,7 @@ describe("ask_user tool", () => {
   });
 
   it("rejects a second concurrent ask_user call", async () => {
-    const pi = createPiMock() as unknown as PiApi;
-    askUserExtension(pi);
+    const pi = await setupTuiExtension();
     const tool = getTool(pi, "ask_user");
 
     let resolveFirst: ((value: unknown) => void) | undefined;
@@ -252,8 +281,7 @@ describe("ask_user tool", () => {
   });
 
   it("emits start and end events around successful form interaction", async () => {
-    const pi = createPiMock() as unknown as PiApi;
-    askUserExtension(pi);
+    const pi = await setupTuiExtension();
     const tool = getTool(pi, "ask_user");
 
     await tool.execute(
@@ -285,8 +313,7 @@ describe("ask_user tool", () => {
   });
 
   it("handles needs_discussion outcome without aborting", async () => {
-    const pi = createPiMock({ sessionName: "My Session" }) as unknown as PiApi;
-    askUserExtension(pi);
+    const pi = await setupTuiExtension({ sessionName: "My Session" });
     const tool = getTool(pi, "ask_user");
     const ctx = makeFormCtx({
       outcome: "needs_discussion",

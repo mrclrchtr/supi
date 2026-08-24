@@ -113,7 +113,7 @@ On wide terminals, option details appear beside the choices. On narrow terminals
 
 ## Requirements, defaults, and limits
 
-- `ask_user` requires Pi's interactive TUI and custom component support. It does not run in RPC, JSON, or print mode.
+- `ask_user` requires Pi's interactive TUI and custom component support. The tool is only registered in TUI sessions and is not offered to the model in RPC, JSON, or print mode.
 - The package needs no additional binary, service, or API key.
 - Only one form can be active. The tool uses sequential execution, so sibling tool calls do not run beside a live form.
 - Cancelling a form cancels the current agent turn. It does not record a user response.
