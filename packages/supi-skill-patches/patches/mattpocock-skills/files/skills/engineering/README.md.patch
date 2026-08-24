@@ -1,0 +1,11 @@
+diff --git a/skills/engineering/README.md b/skills/engineering/README.md
+index 4a948b81..737133d8 100644
+--- a/skills/engineering/README.md
++++ b/skills/engineering/README.md
+@@ -28,5 +28,6 @@ Model- or user-reachable (rich trigger phrasing so the model can reach for them)
+ - **[domain-modeling](./domain-modeling/SKILL.md)** — Actively build and sharpen a project's domain model — challenge terms, stress-test with scenarios, update `CONTEXT.md` and ADRs inline.
+ - **[codebase-design](./codebase-design/SKILL.md)** — Shared discipline and vocabulary for designing deep modules: small interfaces, clean seams, testable through the interface.
+ - **[code-review](./code-review/SKILL.md)** — Two-axis review of the diff since a fixed point: **Standards** (does it follow the repo's coding standards, plus a Fowler smell baseline?) and **Spec** (does it faithfully implement the originating issue/spec?), run as parallel sub-agents.
++- **[commit](./commit/SKILL.md)** — Stage and verify a task-scoped change, write a repository-style message, and create one coherent Git commit.
+ - **[resolving-merge-conflicts](./resolving-merge-conflicts/SKILL.md)** — Work through an in-progress git merge or rebase conflict hunk by hunk, resolving by intent traced to each side's primary source, then finish the operation — never `--abort`.
+ - **[wizard](./wizard/SKILL.md)** — Generate an interactive bash wizard that walks a human through steps only they can perform: provisioning infrastructure, setting up credentials or CI secrets, walking an unfamiliar third-party dashboard, or running a one-off migration or cutover.

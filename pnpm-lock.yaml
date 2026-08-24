@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  mattpocock-skills@*: 022b92c78d787a853e267f5f1ec0d37dd7dd732a11bd30fc8b3856c7f3e3d3c6
+  mattpocock-skills@*: 37540d654ba02fd0fceb0b8f32ba82eaaffacfe2eebab368ecedc21177634981
 
 importers:
 
@@ -480,7 +480,7 @@ importers:
         version: 2.7.0
       mattpocock-skills:
         specifier: github:mattpocock/skills#v1.2.3
-        version: https://codeload.github.com/mattpocock/skills/tar.gz/6acc160e4e0cd062dbbbd7a1b26ae92855edf07e(patch_hash=022b92c78d787a853e267f5f1ec0d37dd7dd732a11bd30fc8b3856c7f3e3d3c6)
+        version: https://codeload.github.com/mattpocock/skills/tar.gz/6acc160e4e0cd062dbbbd7a1b26ae92855edf07e(patch_hash=37540d654ba02fd0fceb0b8f32ba82eaaffacfe2eebab368ecedc21177634981)
       vitest:
         specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
@@ -3951,7 +3951,7 @@ snapshots:
 
   marked@18.0.5: {}
 
-  mattpocock-skills@https://codeload.github.com/mattpocock/skills/tar.gz/6acc160e4e0cd062dbbbd7a1b26ae92855edf07e(patch_hash=022b92c78d787a853e267f5f1ec0d37dd7dd732a11bd30fc8b3856c7f3e3d3c6): {}
+  mattpocock-skills@https://codeload.github.com/mattpocock/skills/tar.gz/6acc160e4e0cd062dbbbd7a1b26ae92855edf07e(patch_hash=37540d654ba02fd0fceb0b8f32ba82eaaffacfe2eebab368ecedc21177634981): {}
 
   mdn-data@2.27.1: {}
 
