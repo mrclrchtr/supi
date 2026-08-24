@@ -36,10 +36,12 @@ export default function askUserExtension(pi: ExtensionAPI): void {
     }, 0);
   });
 
-  // Factory-time: register with package defaults.
-  registerAskUserTool(pi, lock, ASK_USER_PROMPT_SURFACE_DEFAULTS, getSessionName);
-
-  // session_start: re-register with resolved prompt surface (global + trusted project config).
+  // Register ask_user only for interactive TUI sessions: the form UI has no
+  // degraded fallback, so the tool must not be offered in RPC, JSON, or print
+  // modes. The run mode is only available on the event context, not at
+  // extension factory time, so registration happens on session_start instead
+  // of eagerly at load. Config diagnostics stay mode-independent and are
+  // still reported so misconfigured prompt surfaces surface in every mode.
   pi.on("session_start", async (_event, ctx) => {
     const { surface, diagnostics } = resolveToolPromptSurface({
       section: "ask-user",
@@ -47,9 +49,11 @@ export default function askUserExtension(pi: ExtensionAPI): void {
       defaults: ASK_USER_PROMPT_SURFACE_DEFAULTS,
       ctx,
     });
+    notifyToolPromptSurfaceDiagnostics(ctx, diagnostics);
+
+    if (ctx.mode !== "tui") return;
 
     registerAskUserTool(pi, lock, surface, getSessionName);
-    notifyToolPromptSurfaceDiagnostics(ctx, diagnostics);
   });
 }
 
