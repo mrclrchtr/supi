@@ -25,7 +25,7 @@ index 2d276fe88b..3fcff1fe3a 100644
 +after this report. A direct user instruction about the findings overrides the
 +policy; otherwise follow the policy.
 diff --git a/skills/engineering/implement/SKILL.md b/skills/engineering/implement/SKILL.md
-index 7a0b11f5..b5b17456 100644
+index 7a0b11f5..f651d32d 100644
 --- a/skills/engineering/implement/SKILL.md
 +++ b/skills/engineering/implement/SKILL.md
 @@ -6,6 +6,8 @@ disable-model-invocation: true
@@ -38,6 +38,11 @@ index 7a0b11f5..b5b17456 100644
 +but still write tests when they provide useful coverage.
 
  Run typechecking regularly, single test files regularly, and the full test suite once at the end.
+@@ -13,3 +15,3 @@
+ Once done, use /code-review to review the work.
+
+-Commit your work to the current branch.
++After the review, load `/commit` and follow its instructions to commit the changes.
 diff --git a/skills/productivity/grilling/SKILL.md b/skills/productivity/grilling/SKILL.md
 index 95bd01e..b7d2644 100644
 --- a/skills/productivity/grilling/SKILL.md
