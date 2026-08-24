@@ -8,6 +8,8 @@ Users install the committed skills through [skills.sh](https://skills.sh):
 npx skills add mrclrchtr/supi --skill code-review research
 ```
 
+This checkout links selected catalog skills into `.agents/skills/`, so local agents use the generated files directly. It does not need a skills.sh install.
+
 This package is not a PI extension and is not published to npm. Skills installed through skills.sh are static PI resources, so `@mrclrchtr/supi-skills` can enable them, hide them from model invocation, or disable them fully.
 
 ## Maintenance

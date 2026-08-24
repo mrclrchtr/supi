@@ -16,5 +16,8 @@ The generated patch that pnpm applies when one or more fragments are active.
 **Skill Mirror**:
 The committed root `skills/<group>/` output generated from the pinned dependency. Each selected group is replaced as one unit. skills.sh installs skills from this catalog.
 
+**Local Skill Link**:
+A project-local `.agents/skills/<name>` symlink to a selected skill in the root catalog. It lets local agents use the generated files without a second copy.
+
 **Upstream Inventory**:
 All observed upstream groups and skill names recorded in `upstream.json`. Its included-groups map selects mirrored groups. Inventory drift reports added, removed, or moved skills.
