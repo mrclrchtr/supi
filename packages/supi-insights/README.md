@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-insights
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-insights)](https://www.npmjs.com/package/@mrclrchtr/supi-insights)
+
 Adds a `/supi-insights` command to the [pi coding agent](https://github.com/earendil-works/pi) that analyzes your historical pi sessions and writes a shareable HTML report.
 
 ## Install

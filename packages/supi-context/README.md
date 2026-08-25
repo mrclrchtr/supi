@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-context — Context Window and Token Usage Monitor for Pi
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-context)](https://www.npmjs.com/package/@mrclrchtr/supi-context)
+
 Adds context window and token usage monitoring to the [Pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install

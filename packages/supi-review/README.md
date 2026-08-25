@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-review — Code Review for Pi
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-review)](https://www.npmjs.com/package/@mrclrchtr/supi-review)
+
 This Pi extension runs parallel, inspection-only code review tasks in one frozen Git workspace.
 
 ## Install

@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-tree-sitter
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers)
+
 Tree-sitter structural code analysis library for the [pi coding agent](https://github.com/earendil-works/pi).
 
 This is a **library-only** package — it has no pi extension surface. Use `@mrclrchtr/supi-code-intelligence`

@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-extras
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-extras)](https://www.npmjs.com/package/@mrclrchtr/supi-extras)
+
 Adds a bundle of small quality-of-life features to the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install

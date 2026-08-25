@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-web — Web Fetch and Context7 for Pi
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-web)](https://www.npmjs.com/package/@mrclrchtr/supi-web)
+
 Adds web fetch and Context7 documentation tools to the [Pi coding agent](https://github.com/earendil-works/pi), without making you paste sources into chat.
 
 ## What your agent gets

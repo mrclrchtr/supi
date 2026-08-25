@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-claude-md
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-claude-md)](https://www.npmjs.com/package/@mrclrchtr/supi-claude-md)
+
 CLAUDE.md/AGENTS.md maintenance skills for the [pi coding agent](https://github.com/earendil-works/pi).
 
 > Runtime instruction-file surfacing is owned by `@mrclrchtr/supi-code-intelligence`: use `code_orientation(focus="packages/...")` to see directory-local instruction files during orientation.

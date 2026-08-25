@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-ask-user — Ask-User Tool for Pi
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-ask-user)](https://www.npmjs.com/package/@mrclrchtr/supi-ask-user)
+
 Adds `ask_user`, a structured decision-form tool for the [Pi coding agent](https://github.com/earendil-works/pi). The agent can stop at one decision, show a keyboard form, and continue with structured answers.
 
 ## What it adds

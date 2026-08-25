@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-lsp
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers)
+
 Language Server Protocol runtime library for the [pi coding agent](https://github.com/earendil-works/pi).
 
 This package is library-only. It registers no model-callable tools; `@mrclrchtr/supi-code-intelligence` owns the public `code_*` family.

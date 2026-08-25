@@ -1,5 +1,7 @@
 # supi-skill-patches
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers)
+
 Private maintenance workspace for the SuPi-compatible skills in the root [`skills/`](../../skills) catalog.
 
 Users install the committed skills through [skills.sh](https://skills.sh):

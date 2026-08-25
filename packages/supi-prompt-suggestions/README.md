@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-prompt-suggestions
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-prompt-suggestions)](https://www.npmjs.com/package/@mrclrchtr/supi-prompt-suggestions)
+
 Advisory ghost-text prompt suggestions for the [pi coding agent](https://github.com/earendil-works/pi).
 
 <p align="center">

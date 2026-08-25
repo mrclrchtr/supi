@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-test-utils
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers)
+
 Shared test helpers for SuPi extension packages.
 
 This is a **workspace-internal** package (`"private": true`). It is meant for tests inside this repo, not for `pi install`.

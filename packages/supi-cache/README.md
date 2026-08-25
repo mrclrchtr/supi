@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-cache
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-cache)](https://www.npmjs.com/package/@mrclrchtr/supi-cache)
+
 Adds prompt-cache monitoring and cache-regression forensics to the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install

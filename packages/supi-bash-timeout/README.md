@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-bash-timeout
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-bash-timeout)](https://www.npmjs.com/package/@mrclrchtr/supi-bash-timeout)
+
 Adds one small safety feature to the [pi coding agent](https://github.com/earendil-works/pi): if the model calls `bash` without a timeout, this package fills one in.
 
 ## Install

@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-code-intelligence — LSP and Tree-sitter AST Code Intelligence for Pi
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-code-intelligence)](https://www.npmjs.com/package/@mrclrchtr/supi-code-intelligence)
+
 Gives the [Pi coding agent](https://github.com/earendil-works/pi) direct, model-callable LSP semantic navigation and Tree-sitter AST structural code analysis.
 
 ## LSP + AST, directly available to the agent

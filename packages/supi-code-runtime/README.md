@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-code-runtime
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers)
+
 Shared workspace context, capability contracts, and canonical types for the SuPi code-understanding stack.
 
 This is a **library-only package** — it has no pi extension surface, no user-facing tools, and no UI. It is not installed directly — `supi-lsp`, `supi-tree-sitter`, and `supi-code-intelligence` bundle it and use its shared abstractions to communicate capability availability.

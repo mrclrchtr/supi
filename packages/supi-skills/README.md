@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-skills
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-skills)](https://www.npmjs.com/package/@mrclrchtr/supi-skills)
+
 Adds scoped skill controls and `$skill-name` input shortcuts to the [PI coding agent](https://github.com/earendil-works/pi).
 
 ## Install

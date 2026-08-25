@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-agent
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-agent)](https://www.npmjs.com/package/@mrclrchtr/supi-agent)
+
 Profile catalogue, field-level profile settings, and resource policy for foreground Agent Runs in PI.
 
 This package is the policy layer for `@mrclrchtr/supi-agent-runtime`. It discovers Profile Directory sources from package defaults, `~/.pi/agent/supi/agents/`, and trusted project `.pi/supi/agents/` directories. It also contributes per-profile Model and Thinking rows to `/supi-settings`.

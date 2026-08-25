@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-core
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers)
+
 Shared infrastructure for SuPi extensions.
 
 This is a **pure library** — it does not register any pi commands or tools. The `/supi-settings` command is now available through `@mrclrchtr/supi-settings`.

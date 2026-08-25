@@ -6,6 +6,8 @@
 
 # @mrclrchtr/supi-settings
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-settings)](https://www.npmjs.com/package/@mrclrchtr/supi-settings)
+
 SuPi Settings is a Pi extension and a small public UI library. It adds one interactive screen for the project and global settings that loaded SuPi extensions contribute.
 
 This package is part of the SuPi release stack.
