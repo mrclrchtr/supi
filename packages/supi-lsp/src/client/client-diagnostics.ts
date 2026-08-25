@@ -38,7 +38,6 @@ import {
   type DiagnosticEntry,
   fingerprintDocumentContent,
   hasConfirmedDiagnosticEvidence,
-  hasCurrentDiagnosticEvidence,
   type OpenDocumentState,
 } from "./client-document-state.ts";
 import {
@@ -172,7 +171,11 @@ export class ClientDiagnostics {
   }
 
   pruneMissingFiles(): string[] {
-    const uris = new Set([...this.#openDocs.keys(), ...this.#diagnosticStore.keys()]);
+    const uris = new Set([
+      ...this.#openDocs.keys(),
+      ...this.#diagnosticStore.keys(),
+      ...this.#failedUris,
+    ]);
     const removedFiles: string[] = [];
 
     for (const uri of uris) {
@@ -180,7 +183,7 @@ export class ClientDiagnostics {
       if (getDiagnosticFileState(filePath) !== "removed") continue;
 
       const wasOpen = this.#openDocs.has(uri);
-      this.#failedUris.add(uri);
+      this.#failedUris.delete(uri);
       this.#unversionedPushSyncMoments.delete(uri);
       this.#closedVersionedBarrier.add(uri);
       clearTrackedDocumentState(this.#openDocs, this.#diagnosticStore, this.#waiters, uri);
@@ -303,7 +306,7 @@ export class ClientDiagnostics {
         if (document) document.evidenceRevision = -1;
       },
       clearFile: (uri) => {
-        this.#failedUris.add(uri);
+        this.#failedUris.delete(uri);
         this.#unversionedPushSyncMoments.delete(uri);
         this.#closedVersionedBarrier.add(uri);
         clearTrackedDocumentState(this.#openDocs, this.#diagnosticStore, this.#waiters, uri);
@@ -349,11 +352,9 @@ export class ClientDiagnostics {
     const contentUnchanged =
       openDocument?.contentFingerprint === fingerprintDocumentContent(content);
     const synchronizationCurrent = openDocument?.evidenceRevision === this.#evidenceRevision;
-    // The sync decision uses freshness, not confirmation: a current
-    // tentative entry must not force a no-op didChange that cancels the
-    // server's in-flight republish (ADR 0021, issue #344).
-    const cacheCurrent = hasCurrentDiagnosticEvidence(openDocument, cached, this.#evidenceRevision);
-    if (!contentUnchanged || !synchronizationCurrent || (cached !== undefined && !cacheCurrent)) {
+    // Equivalent content joins the current synchronization. Cached evidence
+    // cannot force a no-op didChange that cancels an in-flight push or pull.
+    if (!contentUnchanged || !synchronizationCurrent) {
       synchronizeTrackedDocument({
         uri,
         content,

@@ -252,13 +252,13 @@ export async function pullDiagnosticsForOpenDocuments(options: {
 }
 
 /**
- * Classify open documents for a push-only refresh by disk content.
+ * Classify open documents for a refresh by disk content.
  *
  * A document whose disk content still matches its open fingerprint stays in
  * the server's current state:
- * - with current evidence it is reusable (no protocol work, confirmed);
+ * - with current evidence it is reusable without document synchronization;
  * - without current evidence it is retained: it keeps its synchronization and
- *   the settle waits for the server's existing pipeline instead of forcing a
+ *   collection waits for the server's existing pipeline instead of forcing a
  *   no-op didChange. Large push-only servers (typescript-language-server)
  *   skip empty-to-empty publishes, so a no-op didChange of a clean file can
  *   never confirm — it only invalidates in-progress evidence and restarts
@@ -356,7 +356,7 @@ function prepareRefreshDocuments(
   supportsPull: boolean,
   evidenceRevision: number,
 ): PreparedRefreshDocuments {
-  const reuseEnabled = !supportsPull && !options.forceResynchronize;
+  const reuseEnabled = !options.forceResynchronize;
   const classification = reuseEnabled
     ? classifyReusableDocuments({
         openDocuments: options.openDocuments,
@@ -414,8 +414,11 @@ function prepareRefreshDocuments(
     ...retainedSynchronizations,
     ...resynchronization.synchronizations,
   ];
+  // Pull-capable routes still request current diagnostics even when every
+  // document synchronization is reusable.
   const fullyReusable =
     reuseEnabled &&
+    !supportsPull &&
     options.openDocuments.size > 0 &&
     reusableUris.size === options.openDocuments.size;
   return { resynchronization, synchronizations, fullyReusable };

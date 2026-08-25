@@ -140,6 +140,9 @@ describe("LspClient process failure", () => {
       documents: [{ uri: `file://${file}`, status: "removed", current: false }],
       current: false,
     });
+
+    expect(client.pruneMissingFiles()).toEqual([file]);
+    expect(client.getDiagnosticSnapshot().documents).toEqual([]);
   });
 
   it("keeps a cache-only document as removed after a process failure", async () => {

@@ -3,6 +3,7 @@ import {
   type CodeRequestControl,
   completedCodeQuery,
   isCodeRequestInterruption,
+  partialCodeQuery,
   throwIfCodeRequestInterrupted,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
@@ -68,9 +69,12 @@ export async function collectSynchronizedFileDiagnostics(
     return completedCodeQuery(options.diagnostics());
   }
   if (push === "tentative") {
-    // A tentative timeout must not reuse cached data: the retained cache
-    // stays internal until a republish confirms it (ADR 0021).
-    return unavailableCodeQuery(TENTATIVE_PUSH_UNAVAILABLE_REASON);
+    // A current tentative error is useful partial evidence, but an empty
+    // publication cannot establish that the document is clean (ADR 0021).
+    const diagnostics = options.diagnostics();
+    return diagnostics.length > 0
+      ? partialCodeQuery(diagnostics, TENTATIVE_PUSH_UNAVAILABLE_REASON)
+      : unavailableCodeQuery(TENTATIVE_PUSH_UNAVAILABLE_REASON);
   }
   return incompleteDiagnosticResult(
     options.cachedDiagnostics,

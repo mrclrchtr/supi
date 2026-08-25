@@ -3,8 +3,8 @@
 //
 // ADR 0021: the first valid push publication for a synchronization is
 // tentative. A republish promotes the retained cache. A tentative timeout
-// must not trigger the reopen-resync fallback, and tentative cache data
-// never enters the confirmed snapshot or outstanding diagnostic path.
+// must not trigger the reopen-resync fallback. Non-empty tentative data is
+// visible as partial evidence, but it never enters the confirmed path.
 
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -77,9 +77,11 @@ describe("push publication confirmation (issue #351)", () => {
       current: false,
       documents: [{ uri: file.uri, current: false, status: "unconfirmed" }],
     });
-    // The tentative entry stays internal: the confirmed snapshot carries no
-    // diagnostic entries for it.
-    expect(client.getAllDiagnostics()).toEqual([]);
+    // The tentative error is useful partial evidence, but its entry stays
+    // explicitly non-current until a republish confirms it.
+    expect(client.getAllDiagnostics()).toEqual([
+      { uri: file.uri, diagnostics: [makeDiagnostic("early")], current: false },
+    ]);
     expect(client.getDiagnostics(file.filePath)).toEqual([makeDiagnostic("early")]);
 
     publish(client, file.uri, [makeDiagnostic("early")]);
@@ -91,6 +93,24 @@ describe("push publication confirmation (issue #351)", () => {
     expect(client.getAllDiagnostics()).toEqual([
       { uri: file.uri, diagnostics: [makeDiagnostic("early")], current: true },
     ]);
+  });
+
+  it("removes a stale error when a repair gets a tentative empty publication", () => {
+    const file = createFile("tentative-repair.ts", "const value: number = 'bad';");
+    const { client } = createRunningTestClient();
+    client.didOpen(file.filePath, "const value: number = 'bad';");
+    publish(client, file.uri, [makeDiagnostic("type error")]);
+    publish(client, file.uri, [makeDiagnostic("type error")]);
+    expect(client.getAllDiagnostics()).toHaveLength(1);
+
+    client.didChange(file.filePath, "const value: number = 1;");
+    publish(client, file.uri, []);
+
+    expect(client.getAllDiagnostics()).toEqual([]);
+    expect(client.getDiagnosticSnapshot()).toMatchObject({
+      current: false,
+      documents: [{ uri: file.uri, current: false, status: "unconfirmed" }],
+    });
   });
 
   it("applies the tentative policy to didChange and reopen synchronizations", async () => {
@@ -115,7 +135,7 @@ describe("push publication confirmation (issue #351)", () => {
     });
   });
 
-  it("classifies a pre-existing tentative publication as tentative on timeout", async () => {
+  it("returns a pre-existing tentative error as partial evidence on timeout", async () => {
     vi.useFakeTimers();
     const file = createFile("pre-existing-tentative.ts");
     const { client, rpc } = createRunningTestClient();
@@ -130,7 +150,8 @@ describe("push publication confirmation (issue #351)", () => {
     await vi.advanceTimersByTimeAsync(3_100);
 
     await expect(pending).resolves.toEqual({
-      kind: "unavailable",
+      kind: "partial",
+      data: [makeDiagnostic("early")],
       reason: expect.stringContaining("diagnostic republish"),
     });
     // The tentative timeout must not reopen the document: no close/open pair
@@ -158,7 +179,7 @@ describe("push publication confirmation (issue #351)", () => {
     });
   });
 
-  it("returns unavailable with a republish reason when the push stays tentative", async () => {
+  it("returns a tentative error as partial evidence with a republish reason", async () => {
     vi.useFakeTimers();
     const file = createFile("tentative-timeout.ts");
     const { client } = createRunningTestClient();
@@ -168,7 +189,8 @@ describe("push publication confirmation (issue #351)", () => {
     await vi.advanceTimersByTimeAsync(4_000);
 
     await expect(pending).resolves.toEqual({
-      kind: "unavailable",
+      kind: "partial",
+      data: [makeDiagnostic("early")],
       reason: expect.stringContaining("diagnostic republish"),
     });
     // The existing diagnostics.timing shape stays stable; the tentative
@@ -241,7 +263,8 @@ describe("push publication confirmation (issue #351)", () => {
     publish(client, file.uri, [makeDiagnostic("early")]);
     await vi.advanceTimersByTimeAsync(3_100);
     await expect(first).resolves.toMatchObject({
-      kind: "unavailable",
+      kind: "partial",
+      data: [makeDiagnostic("early")],
       reason: expect.stringContaining("republish"),
     });
     // The server republishes after the operation already ended: the retained
@@ -258,12 +281,13 @@ describe("push publication confirmation (issue #351)", () => {
     expect(notificationMethods(rpc)).toEqual([]);
   });
 
-  it("completes concurrent collectors when the republish arrives", async () => {
+  it("completes concurrent collectors on one equivalent synchronization", async () => {
     const file = createFile("concurrent-waiters.ts");
-    const { client } = createRunningTestClient();
+    const { client, rpc } = createRunningTestClient();
 
     const first = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
     const second = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
+    expect(notificationMethods(rpc)).toEqual(["textDocument/didOpen"]);
     publish(client, file.uri, [makeDiagnostic("early")]);
     await new Promise((resolve) => setTimeout(resolve, 30));
     // One republish releases every waiter for the URI (ADR 0021).

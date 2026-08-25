@@ -43,8 +43,8 @@ Diagnostic evidence that matches the current document synchronization and has re
 _Avoid_: fresh evidence, current snapshot, semantic completion
 
 **Tentative diagnostic evidence**:
-Current diagnostic evidence from a synchronization that is not yet safe for a clean-result claim because another publication may follow.
-_Avoid_: confirmed evidence, final diagnostics, intermediate result
+Current diagnostic evidence from a synchronization that is not yet safe for a clean-result claim because another publication may follow. Non-empty tentative diagnostics can be shown as partial evidence, but maintenance actions use only confirmed entries. An empty tentative publication cannot establish a clean result.
+_Avoid_: confirmed evidence, final diagnostics, hidden error, clean result
 
 **Diagnostic republish**:
 A later diagnostic publication for the same document synchronization.

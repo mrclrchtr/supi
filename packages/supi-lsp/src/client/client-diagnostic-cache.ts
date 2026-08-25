@@ -232,13 +232,13 @@ function collectCachedDiagnostics(options: {
       entry,
       options.evidenceRevision,
     );
-    // Tentative cache data stays internal: a current tentative push never
-    // enters the confirmed snapshot or outstanding diagnostic path, because
-    // a later republish may replace it (ADR 0021).
-    if (entryCurrent && isTentativePushEntry(entry)) continue;
-    current &&= entryCurrent;
+    // A current tentative error is useful partial evidence. Keep its entry
+    // non-current so it cannot establish a clean or settled result (ADR 0021).
+    const tentative = entryCurrent && isTentativePushEntry(entry);
+    const confirmed = entryCurrent && !tentative;
+    current &&= confirmed;
     if (entry.diagnostics.length > 0) {
-      entries.push({ uri, diagnostics: entry.diagnostics, current: entryCurrent });
+      entries.push({ uri, diagnostics: entry.diagnostics, current: confirmed });
     }
   }
   return { entries, current };

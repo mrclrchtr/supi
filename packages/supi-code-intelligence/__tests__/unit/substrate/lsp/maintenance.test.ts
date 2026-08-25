@@ -67,6 +67,51 @@ async function runMaintenance(
   return result;
 }
 
+describe("refreshLspMaintenance diagnostic evidence", () => {
+  it("does not resynchronize a provisional stale-module error", async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "supi-maint-provisional-"));
+    const file = path.join(tmpDir, "src", "a.ts");
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, "export {};\n");
+    const evidence = {
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 1,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "unconfirmed" as const }],
+    };
+    const runtime = makeRuntime({
+      refreshOpenDiagnostics: vi.fn().mockResolvedValue(evidence),
+      getOutstandingDiagnostics: vi.fn().mockReturnValue({
+        entries: [
+          {
+            file: "src/a.ts",
+            diagnostics: [
+              {
+                severity: 1,
+                message: "Cannot find module 'pending'",
+                range: {
+                  start: { line: 0, character: 0 },
+                  end: { line: 0, character: 1 },
+                },
+              },
+            ],
+          },
+        ],
+        current: false,
+        evidence,
+      }),
+    });
+
+    await runMaintenance(runtime, tmpDir, new Map());
+
+    expect(runtime.closeFile).not.toHaveBeenCalled();
+    expect(runtime.trackFile).not.toHaveBeenCalled();
+    expect(runtime.refreshOpenDiagnostics).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("refreshLspMaintenance source discovery", () => {
   it("tracks a source file created after the first pass", async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "supi-maint-track-"));

@@ -303,10 +303,9 @@ function evidenceIsComplete(
   if (!snapshotCurrent && evidence.requested === 0) return false;
   if (evidence.requested === 0) return !hasDiagnosticEntries;
   return (
-    evidence.confirmed === evidence.requested &&
+    evidence.confirmed + evidence.removed === evidence.requested &&
     evidence.unconfirmed === 0 &&
-    evidence.failed === 0 &&
-    evidence.removed === 0
+    evidence.failed === 0
   );
 }
 

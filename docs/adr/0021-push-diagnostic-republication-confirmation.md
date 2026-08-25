@@ -1,6 +1,6 @@
 # Require republished evidence before confirming push diagnostics
 
-Push-only language servers can publish an early result and a later semantic result for one document synchronization. SuPi therefore distinguishes fresh, tentative, and confirmed diagnostic evidence. Every push synchronization, including `didOpen`, `didChange`, and reopen operations, needs a later valid publication for the same synchronization before SuPi confirms it; each publication restarts the quiet period. Pull responses remain sufficient confirmation. The existing `maxWaitMs` bounds each settle phase. If no republish arrives, health reports partial evidence without diagnostic entries and single-file queries report unavailable without data. Late publications promote the retained cache, and recovery does not start another reopen storm.
+Push-only language servers can publish an early result and a later semantic result for one document synchronization. SuPi therefore distinguishes fresh, tentative, and confirmed diagnostic evidence. Every push synchronization, including `didOpen`, `didChange`, and reopen operations, needs a later valid publication for the same synchronization before SuPi confirms it; each publication restarts the quiet period. Pull responses remain sufficient confirmation. The existing `maxWaitMs` bounds each settle phase. If no republish arrives, SuPi shows non-empty tentative diagnostics as partial evidence. An empty tentative publication stays unavailable and cannot establish a clean result. Late publications promote the retained cache, and recovery does not start another reopen storm.
 
 ## Considered options
 
@@ -11,4 +11,4 @@ Push-only language servers can publish an early result and a later semantic resu
 
 ## Consequences
 
-This prevents confirmed-clean claims without a republish, but it can temporarily hide valid diagnostic messages and clean results. Publication telemetry records one bounded per-synchronization summary and a separate ambient event for late publications. Debug telemetry may include the bounded workspace-relative file and synchronization identifier, but never diagnostic payloads or source content.
+This prevents confirmed-clean claims without a republish. It keeps tentative errors visible while a clean result stays unconfirmed. Maintenance actions use only confirmed diagnostic entries, so a tentative error cannot start a reopen cycle. Publication telemetry records one bounded per-synchronization summary and a separate ambient event for late publications. Debug telemetry may include the bounded workspace-relative file and synchronization identifier, but never diagnostic payloads or source content.

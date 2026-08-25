@@ -29,7 +29,7 @@ async function syncWithRepublish(
   maxSeverity: number,
 ): ReturnType<LspManager["syncFileAndGetDiagnostics"]> {
   const result = await manager.syncFileAndGetDiagnostics(filePath, maxSeverity);
-  if (result.kind !== "unavailable" || !result.reason.includes("diagnostic republish")) {
+  if (result.kind === "completed" || !result.reason.includes("diagnostic republish")) {
     return result;
   }
 

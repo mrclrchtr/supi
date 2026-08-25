@@ -470,6 +470,15 @@ describe("LspClient refreshOpenDiagnostics — file handling", () => {
       "textDocument/didClose",
       expect.objectContaining({ textDocument: { uri } }),
     );
+    expect(client.getDiagnosticSnapshot().documents).toEqual([]);
+    await expect(client.refreshOpenDiagnostics({ maxWaitMs: 50, quietMs: 20 })).resolves.toEqual({
+      requested: 0,
+      confirmed: 0,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [],
+    });
   });
 
   it("keeps an unreadable tracked path as failed coverage", async () => {

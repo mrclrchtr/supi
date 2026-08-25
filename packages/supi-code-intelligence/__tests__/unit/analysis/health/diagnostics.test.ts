@@ -397,15 +397,40 @@ describe("code_health diagnostic observations", () => {
     });
   });
 
-  it("keeps tentative push diagnostics out of partial health evidence", async () => {
+  it("treats a known removed file as a complete terminal outcome", async () => {
+    const removedEvidence = {
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 1,
+      documents: [{ file: "src/deleted.ts", status: "removed" as const }],
+    };
+    const observation = await collectDiagnostics({
+      service: service({}),
+      included: ["diagnostics"],
+      scope: diagnosticScope(null),
+      cwd,
+      unavailableReason: "not ready",
+      refreshEvidence: removedEvidence,
+    });
+
+    expect(observation).toEqual({
+      kind: "completed",
+      scope: { kind: "tracked-files", filter: null },
+      entries: [],
+      evidence: removedEvidence,
+    });
+  });
+
+  it("shows tentative push errors as partial health evidence", async () => {
     // ADR 0021: a first push publication is tentative. The snapshot exposes
-    // unconfirmed documents and no diagnostic entries, and the reason names
-    // the republish requirement instead of inventing a tentative status.
+    // its errors with unconfirmed evidence and does not claim a clean result.
     const observation = await collectDiagnostics({
       service: service({
         getWorkspaceDiagnosticSummary: () => ({
-          current: true,
-          entries: [],
+          current: false,
+          entries: [{ file: "src/a.ts", errors: 1, warnings: 0 }],
           evidence: {
             requested: 1,
             confirmed: 0,
@@ -425,7 +450,7 @@ describe("code_health diagnostic observations", () => {
     expect(observation).toEqual({
       kind: "partial",
       scope: { kind: "tracked-files", filter: null },
-      entries: [],
+      entries: [{ file: path.join(cwd, "src", "a.ts"), errors: 1, warnings: 0 }],
       evidence: {
         requested: 1,
         confirmed: 0,

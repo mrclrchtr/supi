@@ -3,7 +3,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LspClient } from "../../src/client/client.ts";
 import type { Diagnostic } from "../../src/config/types.ts";
 import { uriToFile } from "../../src/utils.ts";
@@ -66,6 +66,51 @@ describe("LSP pull diagnostics — refresh requests", () => {
       expect.objectContaining({ timeoutMs: expect.any(Number) }),
     );
     expect(client.getDiagnostics(file.filePath)[0]?.message).toBe("pull-diag-error");
+  });
+
+  it("shares an equivalent synchronization between a file query and refresh", async () => {
+    const file = createTempTsFile("concurrent-refresh.ts");
+    tmpDir = file.tmpDir;
+    const { client, rpc } = createPullTestClient();
+    openDocument(client, file.filePath);
+    rpc.sendNotification.mockClear();
+
+    const pullResolvers: Array<(value: unknown) => void> = [];
+    rpc.sendRequest.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          pullResolvers.push(resolve);
+        }),
+    );
+
+    const fileQuery = client.syncAndWaitForDiagnostics(
+      file.filePath,
+      fs.readFileSync(file.filePath, "utf-8"),
+    );
+    await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(1));
+    const refresh = client.refreshOpenDiagnostics({ maxWaitMs: 500, quietMs: 1 });
+    await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(2));
+
+    expect(rpc.sendNotification).not.toHaveBeenCalledWith(
+      "textDocument/didChange",
+      expect.anything(),
+    );
+    expect(pullResolvers).toHaveLength(2);
+    for (const resolve of pullResolvers) {
+      resolve({ kind: "full", items: [makeDiagnostic("current")] });
+    }
+
+    await expect(fileQuery).resolves.toEqual({
+      kind: "completed",
+      data: [makeDiagnostic("current")],
+    });
+    await expect(refresh).resolves.toMatchObject({
+      requested: 1,
+      confirmed: 1,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+    });
   });
 
   it("stores diagnostics from a gopls-style report with an empty kind", async () => {

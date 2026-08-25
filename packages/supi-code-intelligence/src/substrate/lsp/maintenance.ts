@@ -117,13 +117,11 @@ export async function refreshFileLspMaintenance(options: {
   throwIfCodeRequestInterrupted(control);
   const { snapshot } = await synchronizeSentinels(runtime, cwd, sentinelSnapshot);
   const target = nodePath.resolve(filePath);
-  const stale = runtime
-    .getOutstandingDiagnostics(1)
-    .entries.some(
-      (entry) =>
-        nodePath.resolve(cwd, entry.file) === target &&
-        entry.diagnostics.some((diagnostic) => isLikelyStaleDiagnostic(diagnostic)),
-    );
+  const stale = confirmedOutstandingDiagnostics(runtime, cwd).some(
+    (entry) =>
+      nodePath.resolve(cwd, entry.file) === target &&
+      entry.diagnostics.some((diagnostic) => isLikelyStaleDiagnostic(diagnostic)),
+  );
 
   runtime.pruneMissingFiles();
   if (stale) {
@@ -201,16 +199,28 @@ async function trackCreatedSourceFiles(
   }
 }
 
-/** Re-open files with stale module-resolution errors. */
+/** Return only diagnostics whose document evidence is confirmed. */
+function confirmedOutstandingDiagnostics(runtime: WorkspaceLspRuntime, cwd: string) {
+  const outstanding = runtime.getOutstandingDiagnostics(1);
+  const confirmedFiles = new Set(
+    outstanding.evidence.documents
+      .filter((document) => document.status === "confirmed")
+      .map((document) => nodePath.resolve(cwd, document.file)),
+  );
+  return outstanding.entries.filter((entry) =>
+    confirmedFiles.has(nodePath.resolve(cwd, entry.file)),
+  );
+}
+
+/** Re-open files with confirmed stale module-resolution errors. */
 async function resyncStaleModuleFiles(
   runtime: WorkspaceLspRuntime,
   cwd: string,
   control?: CodeRequestControl,
 ): Promise<{ evidence: DiagnosticEvidenceSummary; completed: boolean }> {
-  const outstanding = runtime.getOutstandingDiagnostics(1);
   const staleFiles: string[] = [];
 
-  for (const entry of outstanding.entries) {
+  for (const entry of confirmedOutstandingDiagnostics(runtime, cwd)) {
     if (entry.diagnostics.some((d) => isLikelyStaleDiagnostic(d))) {
       staleFiles.push(entry.file);
     }

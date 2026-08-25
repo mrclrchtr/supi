@@ -454,7 +454,7 @@ describe("code_health refresh evidence", () => {
       data: {
         refresh: { kind: "completed", diagnosticEvidence: removedEvidence },
         diagnostics: {
-          kind: "partial",
+          kind: "completed",
           evidence: removedEvidence,
         },
       },
@@ -470,16 +470,17 @@ describe("code_health refresh evidence", () => {
       removed: 0,
       documents: [{ file: "src/a.ts", status: "failed" as const }],
     };
+    const confirmedEvidence = {
+      requested: 1,
+      confirmed: 1,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "src/a.ts", status: "confirmed" as const }],
+    };
     const refreshOpenDiagnostics = vi
       .fn()
-      .mockResolvedValueOnce({
-        requested: 1,
-        confirmed: 1,
-        unconfirmed: 0,
-        failed: 0,
-        removed: 0,
-        documents: [{ file: "src/a.ts", status: "confirmed" as const }],
-      })
+      .mockResolvedValueOnce(confirmedEvidence)
       .mockRejectedValueOnce(new Error("refresh failed"));
     mkdirSync(path.join(cwd, "src"), { recursive: true });
     writeFileSync(path.join(cwd, "src/a.ts"), "export {};");
@@ -499,8 +500,8 @@ describe("code_health refresh evidence", () => {
             ],
           },
         ],
-        current: false,
-        evidence: failedEvidence,
+        current: true,
+        evidence: confirmedEvidence,
       }),
       trackFile: async () => false,
       closeFile: vi.fn(),
