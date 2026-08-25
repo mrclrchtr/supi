@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-review",
-  "version": "5.0.0",
+  "version": "6.0.0",
   "description": "Parallel inspection-only reviews of exact Git targets",
   "license": "MIT",
   "repository": {

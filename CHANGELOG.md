@@ -1,5 +1,71 @@
 # Changelog
 
+## [6.0.0](https://github.com/mrclrchtr/supi/compare/v5.0.0...v6.0.0) (2026-08-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **review:** use explicit target source objects
+* seven agent tools are renamed. Settings, agent profiles, scripts, or prompts that reference the old names must use debug, context_report, cache_forensics, agent_run, review_run, review_output, and review_audit instead.
+
+### Features
+
+* **code-intelligence:** include one-line manifest descriptions in the overview ([a2178c3](https://github.com/mrclrchtr/supi/commit/a2178c3095c3467d593e908e3e8a9a1fd6926fbe))
+* **code-intelligence:** render tsconfig scope verdict in file-scope health output ([7c807ba](https://github.com/mrclrchtr/supi/commit/7c807ba146a351d14b809e949962065ead8d9291))
+* **code-intelligence:** scope first-turn overview and drop unconditional next-query advice ([c8d6c38](https://github.com/mrclrchtr/supi/commit/c8d6c380b00660eae9829a030af8064da494cfa6))
+* **debug:** expand supi-tooling-retro evidence and failure capture ([0083f9a](https://github.com/mrclrchtr/supi/commit/0083f9a32dd1756af04b39be2fe65bb36d9e6a9e))
+* **lsp,code-intelligence:** discover new files on refresh and surface tsconfig scope decisions ([8e2e27c](https://github.com/mrclrchtr/supi/commit/8e2e27c476473b518e98d434a222b8f8b46cfce6))
+* **lsp:** improve server handshake and incremental sync ([87ea23c](https://github.com/mrclrchtr/supi/commit/87ea23c536503be332a8cb2fe1b3556c8e17de74))
+* **review:** use explicit target source objects ([25306c1](https://github.com/mrclrchtr/supi/commit/25306c16adda6dd5fc711023f724e84e72dcfb24))
+* **skills:** add skill for writing commit messages ([aa632b0](https://github.com/mrclrchtr/supi/commit/aa632b06c52fa1abe5fa4c373f306b77f7ca42e5))
+
+
+### Bug Fixes
+
+* address review findings on result ownership and tool layout ([de4cd79](https://github.com/mrclrchtr/supi/commit/de4cd79138bbd070ad3830b57fdf668256cb7aec))
+* **ask-user:** raise form height budget and fix scroll hints ([07ad301](https://github.com/mrclrchtr/supi/commit/07ad3013907cb779a08e60c753cd4a4c769acf8f))
+* **ask-user:** register ask_user only in TUI sessions ([4bb63fa](https://github.com/mrclrchtr/supi/commit/4bb63fa7ee4f2d2e9c2e08f51a757d2b332401e0))
+* **code-intelligence:** clarify semantic readiness timeouts ([62f2a8f](https://github.com/mrclrchtr/supi/commit/62f2a8f860d7f9c5e35b42f41909ad8e22e78433))
+* **code-intelligence:** make the overview budget warning visible ([2d14eab](https://github.com/mrclrchtr/supi/commit/2d14eab64764e6526cc823656924b17e9bcedc0c))
+* **code-intelligence:** remove wall-clock race from deterministic deadline tests ([d910fdf](https://github.com/mrclrchtr/supi/commit/d910fdfa9e73877101450e4b4455b68624715158))
+* **code-intelligence:** reuse maintenance refresh in health recovery ([924a77f](https://github.com/mrclrchtr/supi/commit/924a77f9192d3ae023580729409220d6d86052e5))
+* **deps:** lock file maintenance ([a698991](https://github.com/mrclrchtr/supi/commit/a6989911d63f717a882f8f6252c6065cd3cabea2))
+* **deps:** lock file maintenance ([9c6c419](https://github.com/mrclrchtr/supi/commit/9c6c41946f375cb2649398f223e7ad47df6469f6))
+* **deps:** update commitlint monorepo to v21.2.2 ([eb9d87f](https://github.com/mrclrchtr/supi/commit/eb9d87f10259fffde6319798e09e54067db761ba))
+* **deps:** update dependency @biomejs/biome to v2.5.10 ([5e46ef4](https://github.com/mrclrchtr/supi/commit/5e46ef453c089135987fd2903209780b3236b6e8))
+* **deps:** update dependency @biomejs/biome to v2.5.9 ([d448be3](https://github.com/mrclrchtr/supi/commit/d448be3e7674d73acfe347b8d14a252fbc37f6d3))
+* **deps:** update dependency hk to v1.56.0 ([b10a460](https://github.com/mrclrchtr/supi/commit/b10a4600e0cbc174e5200e90c74edcd1268ac311))
+* **deps:** update dependency hk to v1.56.1 ([edefd14](https://github.com/mrclrchtr/supi/commit/edefd147de416a306a09e015def9062a72ec0a3b))
+* **deps:** update dependency typebox to v1.3.13 ([8775038](https://github.com/mrclrchtr/supi/commit/8775038beff6e31d21031230e713763dc049862b))
+* **deps:** update dependency typebox to v1.3.15 ([dae1eba](https://github.com/mrclrchtr/supi/commit/dae1ebab42add3c7b1a4cad64220f28583f2bf1b))
+* **deps:** update dependency typebox to v1.3.16 ([294f6c4](https://github.com/mrclrchtr/supi/commit/294f6c4fbf3800fc0cb1657a1e37052726309b4a))
+* **deps:** update dependency typescript-language-server to v6 ([e38bd45](https://github.com/mrclrchtr/supi/commit/e38bd457d001b532ac2a271256b3527984fc2f1c))
+* **deps:** update dependency vitest to v4.1.11 ([74921d1](https://github.com/mrclrchtr/supi/commit/74921d1f8049d46b36ec393e13920f14a5ad382d))
+* **deps:** update pnpm to v11.22.0 ([c2bfb64](https://github.com/mrclrchtr/supi/commit/c2bfb64863e0e269be006ff08dff72cfbab085b5))
+* **lsp:** extend push diagnostic reopen wait ([3a9dcaf](https://github.com/mrclrchtr/supi/commit/3a9dcafb6dd601f7973d73170101080af45818a7))
+* **lsp:** handle server-requested diagnostic refresh ([4718d66](https://github.com/mrclrchtr/supi/commit/4718d66a16fb07dd804cd15ad19af10c5bdce574))
+* **lsp:** include every tracked document in scope-decision telemetry ([197c3d5](https://github.com/mrclrchtr/supi/commit/197c3d51d9d647615db13997ab51fec219ca7e49))
+* **lsp:** include files created after the first tsconfig parse on case-insensitive filesystems ([8288eaf](https://github.com/mrclrchtr/supi/commit/8288eaffd26faf184a6af2bda58545736397603e))
+* **lsp:** invalidate cached tsconfig extends dependents ([ce3a24b](https://github.com/mrclrchtr/supi/commit/ce3a24bf3018082f045bde62a531d520c74905a6))
+* **lsp:** keep code_health diagnostics coherent ([ba95f06](https://github.com/mrclrchtr/supi/commit/ba95f06673dac163632ad0c6807dd56c7545007c))
+* **lsp:** rename reopen timing phase and bound server identity ([c8a4f42](https://github.com/mrclrchtr/supi/commit/c8a4f4230a4bec45e14472080fb596b6edf18ea3))
+* **lsp:** require push diagnostic republishing ([bba9811](https://github.com/mrclrchtr/supi/commit/bba9811342b1f2417dac0b7dd03b3fad0080f1b7))
+* **lsp:** retain unchanged documents in push refresh ([53254cc](https://github.com/mrclrchtr/supi/commit/53254cc37420fd02d1894d9fd2db3383bfc56b64))
+* **lsp:** reuse current push diagnostic evidence ([63d280c](https://github.com/mrclrchtr/supi/commit/63d280cca4864d7af8387f4379fb8913435a026a))
+* **lsp:** strengthen diagnostic evidence handling ([44dd1bd](https://github.com/mrclrchtr/supi/commit/44dd1bde5857911b5f44943f1ef2ef03abb170cd))
+* **lsp:** tighten tsconfig extends cache coverage ([f15642c](https://github.com/mrclrchtr/supi/commit/f15642cc848cae7cdfea189b8ada6c1591cb7700))
+* **orientation:** reduce instruction revision noise ([f655ffc](https://github.com/mrclrchtr/supi/commit/f655ffcd9eec916fcece3a70b1c03b4f93065eb7))
+* **review:** break schema cycle that corrupted review_output parameters ([46e3503](https://github.com/mrclrchtr/supi/commit/46e3503674a4e3e7fa2f14971659a9bf1f26704f))
+* **skill-patches:** generate canonical patch text ([106612b](https://github.com/mrclrchtr/supi/commit/106612b6b063580408960509e078ab1d11ea93fe))
+* **skills:** include commit skill in generated mirror ([957a823](https://github.com/mrclrchtr/supi/commit/957a823057306901a59962e61675820f682aec31))
+* **supi-review:** make clean reviews pass and paths placement explicit ([886e81e](https://github.com/mrclrchtr/supi/commit/886e81e1069ffe3848acea010a561f2b43770bb3))
+* **web:** break spec/execute cycle in web_fetch_md ([8c20599](https://github.com/mrclrchtr/supi/commit/8c2059926b9450ed0b4e455f86964e5e3822b3fc))
+
+
+### Code Refactoring
+
+* drop supi_ prefix from tool names and add naming rules ([4f88da0](https://github.com/mrclrchtr/supi/commit/4f88da0497539ba1c9c14786f78149b3d574913f))
+
 ## [5.0.0](https://github.com/mrclrchtr/supi/compare/v4.10.0...v5.0.0) (2026-08-15)
 
 
