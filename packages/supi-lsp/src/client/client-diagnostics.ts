@@ -15,12 +15,17 @@ import { collectSynchronizedFileDiagnostics } from "./client-diagnostic-collecti
 import {
   type DiagnosticCacheEntry,
   type DiagnosticSynchronization,
+  hasCurrentEvidence,
   hasFreshPush,
   isCurrentSynchronization,
   isValidPublishDiagnosticsParams,
   nextDocumentVersion,
 } from "./client-diagnostic-evidence.ts";
 import type { ClientDiagnosticsHost } from "./client-diagnostic-host.ts";
+import {
+  DiagnosticPublicationTracker,
+  trackerFileIdentityFor,
+} from "./client-diagnostic-publication.ts";
 import {
   pullClientDiagnosticEvidenceFromHost,
   refreshClientOpenDiagnostics,
@@ -32,6 +37,7 @@ import {
   type ClientDiagnosticSnapshot,
   type DiagnosticEntry,
   fingerprintDocumentContent,
+  hasConfirmedDiagnosticEvidence,
   hasCurrentDiagnosticEvidence,
   type OpenDocumentState,
 } from "./client-document-state.ts";
@@ -52,6 +58,8 @@ export class ClientDiagnostics {
   readonly #waiters = new DiagnosticWaitRegistry();
   readonly #versionHistory = new Map<string, number>();
   readonly #failedUris = new Set<string>();
+  /** Bounded push-publication telemetry for one client's diagnostic state. */
+  readonly #publications: DiagnosticPublicationTracker;
   /** Client-side sync moment per URI: unversioned pushes before it stay rejected. */
   readonly #unversionedPushSyncMoments = new Map<string, number>();
   /** URIs closed by a lifecycle operation: versioned pushes stay fail-closed. */
@@ -59,7 +67,12 @@ export class ClientDiagnostics {
   #evidenceRevision = 0;
   #nextSynchronizationId = 0;
 
-  constructor(private readonly host: ClientDiagnosticsHost) {}
+  constructor(private readonly host: ClientDiagnosticsHost) {
+    this.#publications = new DiagnosticPublicationTracker(
+      { server: host.server, cwd: host.cwd },
+      trackerFileIdentityFor(host.cwd),
+    );
+  }
 
   get openFiles(): string[] {
     return Array.from(this.#openDocs.keys()).map(uriToFile);
@@ -224,17 +237,31 @@ export class ClientDiagnostics {
 
   handlePublishDiagnostics(params: unknown): void {
     if (!isValidPublishDiagnosticsParams(params)) return;
-    if (
-      !applyPushDiagnostics({
-        store: this.#diagnosticStore,
-        openDocuments: this.#openDocs,
-        params,
-        evidenceRevision: this.#evidenceRevision,
-        unversionedSyncMoment: this.#unversionedPushSyncMoments.get(params.uri),
-        closedVersionedBarrier: this.#closedVersionedBarrier.has(params.uri),
-      })
-    ) {
-      return;
+    const result = applyPushDiagnostics({
+      store: this.#diagnosticStore,
+      openDocuments: this.#openDocs,
+      params,
+      evidenceRevision: this.#evidenceRevision,
+      unversionedSyncMoment: this.#unversionedPushSyncMoments.get(params.uri),
+      closedVersionedBarrier: this.#closedVersionedBarrier.has(params.uri),
+    });
+    if (!result.accepted) return;
+    const entry = this.#diagnosticStore.get(params.uri);
+    if (entry?.synchronizationId !== undefined && entry.evidenceRevision !== undefined) {
+      this.#publications.record(
+        params.uri,
+        entry.synchronizationId,
+        entry.evidenceRevision,
+        entry.receivedAt,
+      );
+      if (result.promoted) {
+        this.#publications.promoted(
+          params.uri,
+          entry.synchronizationId,
+          entry.evidenceRevision,
+          entry.receivedAt,
+        );
+      }
     }
     this.#waiters.releaseFile(params.uri, "published");
     this.#waiters.notifySettle();
@@ -283,6 +310,17 @@ export class ClientDiagnostics {
       clearFailedFile: (uri) => this.#failedUris.delete(uri),
       forceResynchronize,
       options,
+      publications: {
+        emitSummary: (summaryOptions) =>
+          this.#publications.emitSummary({
+            ...summaryOptions,
+            identity: {
+              server: this.host.server,
+              cwd: this.host.cwd,
+              ...summaryOptions.identity,
+            },
+          }),
+      },
     });
   }
 
@@ -309,6 +347,9 @@ export class ClientDiagnostics {
     const contentUnchanged =
       openDocument?.contentFingerprint === fingerprintDocumentContent(content);
     const synchronizationCurrent = openDocument?.evidenceRevision === this.#evidenceRevision;
+    // The sync decision uses freshness, not confirmation: a current
+    // tentative entry must not force a no-op didChange that cancels the
+    // server's in-flight republish (ADR 0021, issue #344).
     const cacheCurrent = hasCurrentDiagnosticEvidence(openDocument, cached, this.#evidenceRevision);
     if (!contentUnchanged || !synchronizationCurrent || (cached !== undefined && !cacheCurrent)) {
       synchronizeTrackedDocument({
@@ -332,7 +373,7 @@ export class ClientDiagnostics {
     }
     if (
       contentUnchanged &&
-      hasCurrentDiagnosticEvidence(synchronization, cached, this.#evidenceRevision)
+      hasConfirmedDiagnosticEvidence(synchronization, cached, this.#evidenceRevision)
     ) {
       observer.cacheReused(1);
       return completedCodeQuery(cachedDiagnostics ?? []);
@@ -403,6 +444,13 @@ export class ClientDiagnostics {
           current: () => isCurrentSynchronization(this.#openDocs, attemptRequest),
           freshPush: () =>
             hasFreshPush(this.#diagnosticStore, attemptRequest, this.#evidenceRevision),
+          currentPushReceivedAt: () => {
+            const entry = this.#diagnosticStore.get(attemptRequest.uri);
+            return entry?.source === "push" &&
+              hasCurrentEvidence(this.#diagnosticStore, attemptRequest, this.#evidenceRevision)
+              ? entry.receivedAt
+              : undefined;
+          },
           diagnostics: () => this.getDiagnostics(filePath),
           pullDiagnostics: (timeoutMs, signal) =>
             pullClientDiagnosticEvidenceFromHost({
@@ -467,6 +515,23 @@ export class ClientDiagnostics {
       attemptMaxWaitMs = REOPEN_EVIDENCE_WAIT_MS;
     }
     observer.pushWaitCompleted(1, pushOutcome ?? "timed-out");
+    this.#publications.emitSummary({
+      operation: "sync-file",
+      identity: {
+        server: this.host.server,
+        cwd: this.host.cwd,
+        file: relativeDiagnosticFile(this.host.cwd, filePath),
+      },
+      synchronizations: [
+        {
+          uri,
+          synchronizationId: attemptRequest.synchronizationId,
+          evidenceRevision: attemptRequest.evidenceRevision ?? this.#evidenceRevision,
+          confirmed: result.kind === "completed",
+        },
+      ],
+      operationId: control?.operationId,
+    });
     return result;
   }
 }

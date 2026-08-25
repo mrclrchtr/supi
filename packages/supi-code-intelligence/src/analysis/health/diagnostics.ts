@@ -311,7 +311,12 @@ function evidenceIsComplete(
 }
 
 function diagnosticEvidenceReason(evidence: DiagnosticEvidenceSummary): string {
-  return `Diagnostic evidence is partial: ${evidence.requested} requested, ${evidence.confirmed} confirmed, ${evidence.unconfirmed} unconfirmed, ${evidence.failed} failed, ${evidence.removed} removed.`;
+  let reason = `Diagnostic evidence is partial: ${evidence.requested} requested, ${evidence.confirmed} confirmed, ${evidence.unconfirmed} unconfirmed, ${evidence.failed} failed, ${evidence.removed} removed.`;
+  if (evidence.unconfirmed > 0) {
+    reason +=
+      " Unconfirmed documents await a later diagnostic republish before their evidence can be confirmed (ADR 0021).";
+  }
+  return reason;
 }
 
 export function isDirectory(filePath: string): boolean {

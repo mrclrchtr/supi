@@ -16,6 +16,7 @@ import {
   type DiagnosticEvidenceSummary,
   type FileScopeDecision,
   getFileScopeDecision,
+  TENTATIVE_PUSH_UNAVAILABLE_REASON,
   type WorkspaceLspRuntime,
 } from "@mrclrchtr/supi-lsp/api";
 import type {
@@ -37,10 +38,14 @@ export async function collectScopedFileDiagnostics(options: {
   try {
     const result = await service.fileDiagnostics(scope.path, 4, requestControl);
     if (result.kind === "unavailable") {
+      const evidence =
+        result.reason === TENTATIVE_PUSH_UNAVAILABLE_REASON
+          ? singleFileEvidence(scope.path, "unconfirmed")
+          : unavailableFileEvidence(scope.path);
       return unavailableDiagnostics(
         scope,
         result.reason,
-        unavailableFileEvidence(scope.path),
+        evidence,
         fileScopeStatus(scope.path, cwd),
       );
     }

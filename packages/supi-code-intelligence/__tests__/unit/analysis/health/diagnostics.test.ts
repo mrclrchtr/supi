@@ -136,6 +136,37 @@ describe("code_health diagnostic observations", () => {
     });
   });
 
+  it("maps tentative push unavailability to unconfirmed file evidence", async () => {
+    const file = path.join(cwd, "src", "a.ts");
+    const observation = await collectDiagnostics({
+      service: service({
+        fileDiagnostics: async () => ({
+          kind: "unavailable",
+          reason:
+            "The current push publication is tentative: a later diagnostic republish for the same document synchronization is required.",
+        }),
+      }),
+      included: ["diagnostics"],
+      scope: diagnosticScope(file),
+      cwd,
+      unavailableReason: "not ready",
+    });
+
+    expect(observation).toMatchObject({
+      kind: "unavailable",
+      entries: [],
+      evidence: {
+        requested: 1,
+        confirmed: 0,
+        unconfirmed: 1,
+        failed: 0,
+        removed: 0,
+        documents: [{ file, status: "unconfirmed" }],
+      },
+      reason: expect.stringContaining("diagnostic republish"),
+    });
+  });
+
   it("keeps an unavailable file request from becoming an empty absence claim", async () => {
     const file = path.join(cwd, "src", "a.ts");
     const observation = await collectDiagnostics({
@@ -314,7 +345,7 @@ describe("code_health diagnostic observations", () => {
         removed: 0,
       },
       reason:
-        "Diagnostic evidence is partial: 2 requested, 1 confirmed, 1 unconfirmed, 0 failed, 0 removed.",
+        "Diagnostic evidence is partial: 2 requested, 1 confirmed, 1 unconfirmed, 0 failed, 0 removed. Unconfirmed documents await a later diagnostic republish before their evidence can be confirmed (ADR 0021).",
     });
     expect(JSON.stringify(observation)).not.toContain(outside);
   });
@@ -366,6 +397,48 @@ describe("code_health diagnostic observations", () => {
     });
   });
 
+  it("keeps tentative push diagnostics out of partial health evidence", async () => {
+    // ADR 0021: a first push publication is tentative. The snapshot exposes
+    // unconfirmed documents and no diagnostic entries, and the reason names
+    // the republish requirement instead of inventing a tentative status.
+    const observation = await collectDiagnostics({
+      service: service({
+        getWorkspaceDiagnosticSummary: () => ({
+          current: true,
+          entries: [],
+          evidence: {
+            requested: 1,
+            confirmed: 0,
+            unconfirmed: 1,
+            failed: 0,
+            removed: 0,
+            documents: [{ file: "src/a.ts", status: "unconfirmed" }],
+          },
+        }),
+      }),
+      included: ["diagnostics"],
+      scope: diagnosticScope(null),
+      cwd,
+      unavailableReason: "not ready",
+    });
+
+    expect(observation).toEqual({
+      kind: "partial",
+      scope: { kind: "tracked-files", filter: null },
+      entries: [],
+      evidence: {
+        requested: 1,
+        confirmed: 0,
+        unconfirmed: 1,
+        failed: 0,
+        removed: 0,
+        documents: [{ file: "src/a.ts", status: "unconfirmed" }],
+      },
+      reason:
+        "Diagnostic evidence is partial: 1 requested, 0 confirmed, 1 unconfirmed, 0 failed, 0 removed. Unconfirmed documents await a later diagnostic republish before their evidence can be confirmed (ADR 0021).",
+    });
+  });
+
   it("marks an invalidated empty tracked-file snapshot as partial", async () => {
     const observation = await collectDiagnostics({
       service: service({
@@ -401,7 +474,7 @@ describe("code_health diagnostic observations", () => {
         documents: [{ file: "src/a.ts", status: "unconfirmed" }],
       },
       reason:
-        "Diagnostic evidence is partial: 1 requested, 0 confirmed, 1 unconfirmed, 0 failed, 0 removed.",
+        "Diagnostic evidence is partial: 1 requested, 0 confirmed, 1 unconfirmed, 0 failed, 0 removed. Unconfirmed documents await a later diagnostic republish before their evidence can be confirmed (ADR 0021).",
     });
   });
 });

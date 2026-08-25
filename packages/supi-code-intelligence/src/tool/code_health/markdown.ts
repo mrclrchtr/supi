@@ -65,7 +65,7 @@ function renderRefreshStatus(
       return;
     case "not-requested":
       if (data.refresh.lastAttempt) {
-        renderLastAttempt(lines, data.refresh.lastAttempt, cwd);
+        renderRetainedAttempt(lines, data.refresh.lastAttempt, cwd);
       } else {
         lines.push(
           "**Diagnostic refresh attempt**: not requested this session. Use `refresh: true` to try one.",
@@ -107,14 +107,25 @@ function staleAssessmentText(
 }
 
 function renderLastAttempt(lines: string[], attempt: HealthRefreshAttempt, cwd: string): void {
-  const outcome =
-    attempt.kind === "completed"
-      ? completedRefreshText(attempt)
-      : `failed — ${attempt.reason}${attempt.diagnosticEvidence ? `; ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}` : ""}`;
+  const outcome = refreshAttemptOutcome(attempt);
   const label = refreshAttemptLabel(attempt);
   lines.push(
-    `**Last ${label.toLowerCase()}**: ${asSentence(outcome)} Started ${formatElapsed(Date.now() - attempt.attemptedAt)}; requested ${formatDiagnosticScope(attempt.requestedDiagnosticScope, cwd)}; operation scope: ${refreshOperationScopeText(attempt)}.`,
+    `**Previous ${label.toLowerCase()}**: ${asSentence(outcome)} Started ${formatElapsed(Date.now() - attempt.attemptedAt)}; requested ${formatDiagnosticScope(attempt.requestedDiagnosticScope, cwd)}; operation scope: ${refreshOperationScopeText(attempt)}.`,
   );
+}
+
+function renderRetainedAttempt(lines: string[], attempt: HealthRefreshAttempt, cwd: string): void {
+  const label =
+    attempt.operationScope === "file-runtime" ? "File LSP maintenance" : "Diagnostic refresh";
+  lines.push(
+    `**${label}**: not requested for this call. Previous attempt ${asSentence(refreshAttemptOutcome(attempt))} Started ${formatElapsed(Date.now() - attempt.attemptedAt)}; requested ${formatDiagnosticScope(attempt.requestedDiagnosticScope, cwd)}; operation scope: ${refreshOperationScopeText(attempt)}.`,
+  );
+}
+
+function refreshAttemptOutcome(attempt: HealthRefreshAttempt): string {
+  return attempt.kind === "completed"
+    ? completedRefreshText(attempt)
+    : `failed — ${attempt.reason}${attempt.diagnosticEvidence ? `; ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}` : ""}`;
 }
 
 function refreshOperationScopeText(attempt: HealthRefreshAttempt): string {

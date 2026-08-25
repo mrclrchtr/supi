@@ -304,7 +304,11 @@ describe("code_health result assembly", () => {
       }),
     );
 
-    expect(renderHealthResult(assembly, "/repo")).toContain("operation scope: file runtime");
+    const markdown = renderHealthResult(assembly, "/repo");
+    expect(markdown).toContain(
+      "**File LSP maintenance**: not requested for this call. Previous attempt completed",
+    );
+    expect(markdown).toContain("operation scope: file runtime");
   });
 
   it("names retained timing as a refresh attempt rather than diagnostic age", () => {
@@ -334,7 +338,9 @@ describe("code_health result assembly", () => {
     );
     const markdown = renderHealthResult(assembly, "/repo");
 
-    expect(markdown).toContain("Last diagnostic refresh attempt");
+    expect(markdown).toContain(
+      "**Diagnostic refresh**: not requested for this call. Previous attempt completed",
+    );
     expect(markdown).toContain("started");
     expect(markdown).not.toContain("Diagnostics are");
   });

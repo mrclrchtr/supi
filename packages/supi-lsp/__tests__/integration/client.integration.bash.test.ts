@@ -75,12 +75,20 @@ describe.skipIf(!HAS_BASH_LSP)("LspClient integration (bash-language-server)", (
     expect(client.openFiles).toContain(validFile);
   });
 
-  it("returns diagnostics (may be empty for valid syntax)", async () => {
+  it("handles one or more valid push publications without pull requests", async () => {
     const content = fs.readFileSync(validFile, "utf-8");
+    // External server versions can publish once or republish for one
+    // synchronization. ADR 0021 keeps one publication tentative and confirms
+    // a later valid publication, so both outcomes satisfy this integration.
     const diagnostics = await client.syncAndWaitForDiagnostics(validFile, content);
-    expect(diagnostics.kind).toBe("completed");
-    if (diagnostics.kind === "completed") expect(Array.isArray(diagnostics.data)).toBe(true);
-    // bash-language-server may or may not report diagnostics for valid syntax
+    if (diagnostics.kind === "completed") {
+      expect(Array.isArray(diagnostics.data)).toBe(true);
+    } else {
+      expect(diagnostics).toMatchObject({
+        kind: "unavailable",
+        reason: expect.stringContaining("republish"),
+      });
+    }
   }, 15_000);
 
   it("returns document symbols (best-effort)", async () => {

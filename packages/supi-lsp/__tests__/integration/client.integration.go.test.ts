@@ -79,15 +79,23 @@ describe.skipIf(!HAS_GOPLS)("LspClient integration (gopls push default)", () => 
     expect(client.hasDiagnosticProvider).toBe(false);
   }, 30_000);
 
-  it("collects push diagnostics without pull requests", async () => {
+  it("handles one or more valid push publications without pull requests", async () => {
     const content = fs.readFileSync(badFile, "utf-8");
-    const result = await waitFor(
-      () => client.syncAndWaitForDiagnostics(badFile, content),
-      (diagnostics) => diagnostics.kind !== "unavailable" && diagnostics.data.length > 0,
-      { timeoutMs: 20_000, retryDelayMs: 200, label: "push diagnostics for main.go" },
-    );
-    const typeErrors = completedDiagnostics(result).filter((d: Diagnostic) => d.severity === 1);
-    expect(typeErrors.length).toBeGreaterThan(0);
+    // The system gopls version can publish once or republish for one
+    // synchronization. ADR 0021 keeps one publication tentative and confirms
+    // a later valid publication, so both outcomes satisfy this integration.
+    const result = await client.syncAndWaitForDiagnostics(badFile, content);
+    if (result.kind === "completed") {
+      const typeErrors = completedDiagnostics(result).filter(
+        (diagnostic: Diagnostic) => diagnostic.severity === 1,
+      );
+      expect(typeErrors.length).toBeGreaterThan(0);
+    } else {
+      expect(result.reason).toContain("republish");
+      const retained = client.getDiagnostics(badFile);
+      expect(retained.length).toBeGreaterThan(0);
+      expect(retained.some((diagnostic: Diagnostic) => diagnostic.severity === 1)).toBe(true);
+    }
   }, 30_000);
 });
 

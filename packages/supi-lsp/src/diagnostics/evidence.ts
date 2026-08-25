@@ -1,3 +1,7 @@
+/** Reason for an unavailable single-file result when the push stays tentative. */
+export const TENTATIVE_PUSH_UNAVAILABLE_REASON =
+  "The current push publication is tentative: a later diagnostic republish for the same document synchronization is required.";
+
 /** A final evidence state for one tracked document. */
 export type DiagnosticEvidenceStatus = "confirmed" | "unconfirmed" | "failed" | "removed";
 

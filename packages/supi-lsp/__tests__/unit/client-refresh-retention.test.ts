@@ -85,10 +85,15 @@ describe("push-only refresh content retention (issue #344)", () => {
     rpc.sendNotification.mockClear();
 
     const schedule = new Map<string, ReturnType<typeof setTimeout>>();
-    // The in-flight pass publishes 2s after didOpen — inside the 3s window.
+    // The in-flight pass publishes twice 2s after didOpen — inside the 3s
+    // window: the first publication is tentative, the second confirms the
+    // retained synchronization (ADR 0021).
     schedule.set(
       file.uri,
-      setTimeout(() => publishEmpty(client, file.uri), 2_000),
+      setTimeout(() => {
+        publishEmpty(client, file.uri);
+        publishEmpty(client, file.uri);
+      }, 2_000),
     );
     modelResettingServer(rpc, schedule, (uri) => publishEmpty(client, uri), {
       initialMs: 4_000,
@@ -165,9 +170,12 @@ describe("push-only refresh content retention (issue #344)", () => {
     rpc.sendNotification.mockClear();
     rpc.sendNotification.mockImplementation((method: string, params: unknown) => {
       const uri = (params as { textDocument?: { uri?: string } })?.textDocument?.uri;
-      // The server publishes only on the fallback didOpen of the changed
-      // file; the retained file's in-flight publish never arrives in time.
+      // The server publishes twice on the fallback didOpen of the changed
+      // file: the first publication is tentative, the second confirms the
+      // reopened synchronization. The retained file's in-flight publish
+      // never arrives in time.
       if (method === "textDocument/didOpen" && uri === changed.uri) {
+        publishEmpty(client, changed.uri);
         publishEmpty(client, changed.uri);
       }
     });
@@ -203,7 +211,10 @@ describe("push-only refresh content retention (issue #344)", () => {
     client.notifyWorkspaceFileChanges([{ uri: file.uri, type: 2 }]);
     rpc.sendNotification.mockClear();
     rpc.sendNotification.mockImplementation((method: string) => {
-      if (method === "textDocument/didChange") publishEmpty(client, file.uri);
+      if (method === "textDocument/didChange") {
+        publishEmpty(client, file.uri);
+        publishEmpty(client, file.uri);
+      }
     });
 
     const evidence = await client.refreshOpenDiagnostics({ maxWaitMs: 200, quietMs: 10 });

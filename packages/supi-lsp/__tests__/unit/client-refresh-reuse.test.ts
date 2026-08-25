@@ -34,6 +34,15 @@ function publishCurrent(client: LspClient, file: TestFile, diagnostics: unknown[
   client.handlePublishDiagnostics({ uri: file.uri, version, diagnostics });
 }
 
+/**
+ * Publish the current version twice: the first publication stays tentative,
+ * the second confirms the current synchronization (ADR 0021).
+ */
+function publishConfirmed(client: LspClient, file: TestFile, diagnostics: unknown[]): void {
+  publishCurrent(client, file, diagnostics);
+  publishCurrent(client, file, diagnostics);
+}
+
 function notificationMethods(rpc: TestRpc): string[] {
   return rpc.sendNotification.mock.calls.map(([method]) => method as string);
 }
@@ -50,7 +59,7 @@ describe("push-only diagnostic refresh reuse", () => {
     const file = trackFile(createDiagnosticTestFile("reusable-clean.ts"));
     const { client, rpc } = createRunningTestClient();
     openFile(client, file);
-    publishCurrent(client, file, []);
+    publishConfirmed(client, file, []);
     rpc.sendNotification.mockClear();
 
     await expect(
@@ -72,7 +81,7 @@ describe("push-only diagnostic refresh reuse", () => {
     const diagnostics = [makeDiagnostic("current")];
     const { client, rpc } = createRunningTestClient();
     openFile(client, file);
-    publishCurrent(client, file, diagnostics);
+    publishConfirmed(client, file, diagnostics);
     rpc.sendNotification.mockClear();
 
     const evidence = await client.refreshOpenDiagnostics({ maxWaitMs: 100, quietMs: 1 });
@@ -88,14 +97,14 @@ describe("push-only diagnostic refresh reuse", () => {
     const { client, rpc } = createRunningTestClient();
     openFile(client, reusable);
     openFile(client, stale);
-    publishCurrent(client, reusable, []);
-    publishCurrent(client, stale, []);
+    publishConfirmed(client, reusable, []);
+    publishConfirmed(client, stale, []);
     fs.writeFileSync(stale.filePath, "const changed = true;");
     rpc.sendNotification.mockClear();
     rpc.sendNotification.mockImplementation((method: string, params: unknown) => {
       const uri = (params as { textDocument?: { uri?: string } }).textDocument?.uri;
       if (method === "textDocument/didChange" && uri === stale.uri) {
-        publishCurrent(client, stale, [makeDiagnostic("fresh")]);
+        publishConfirmed(client, stale, [makeDiagnostic("fresh")]);
       }
       return Promise.resolve();
     });
@@ -117,11 +126,11 @@ describe("push-only diagnostic refresh reuse", () => {
     const file = trackFile(createDiagnosticTestFile("disk-change.ts"));
     const { client, rpc } = createRunningTestClient();
     openFile(client, file);
-    publishCurrent(client, file, []);
+    publishConfirmed(client, file, []);
     fs.writeFileSync(file.filePath, "const changedOnDisk = true;");
     rpc.sendNotification.mockClear();
     rpc.sendNotification.mockImplementation((method: string) => {
-      if (method === "textDocument/didChange") publishCurrent(client, file, []);
+      if (method === "textDocument/didChange") publishConfirmed(client, file, []);
       return Promise.resolve();
     });
 
@@ -135,11 +144,11 @@ describe("push-only diagnostic refresh reuse", () => {
     const file = trackFile(createDiagnosticTestFile("revision-change.ts"));
     const { client, rpc } = createRunningTestClient();
     openFile(client, file);
-    publishCurrent(client, file, []);
+    publishConfirmed(client, file, []);
     client.notifyWorkspaceFileChanges([{ uri: file.uri, type: 2 }]);
     rpc.sendNotification.mockClear();
     rpc.sendNotification.mockImplementation((method: string) => {
-      if (method === "textDocument/didChange") publishCurrent(client, file, []);
+      if (method === "textDocument/didChange") publishConfirmed(client, file, []);
       return Promise.resolve();
     });
 

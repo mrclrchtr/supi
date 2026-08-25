@@ -6,8 +6,20 @@ type DiagnosticCollection = "cache" | "fallback" | "none" | "pull" | "push";
 type DiagnosticFreshness = "not-observed" | "observed";
 type DiagnosticOutcome = "completed" | "incomplete" | "skipped" | "timed-out";
 type DiagnosticPullOutcome = "completed" | "failed" | "not-supported" | "not-used" | "timed-out";
-type DiagnosticPushOutcome = "not-used" | "published" | "released" | "settled" | "timed-out";
-type DiagnosticSettleOutcome = "not-used" | "published" | "quiet" | "released" | "timed-out";
+type DiagnosticPushOutcome =
+  | "not-used"
+  | "published"
+  | "tentative"
+  | "released"
+  | "settled"
+  | "timed-out";
+type DiagnosticSettleOutcome =
+  | "not-used"
+  | "published"
+  | "tentative"
+  | "quiet"
+  | "released"
+  | "timed-out";
 type DiagnosticTimingOperation = "refresh-open" | "sync-file";
 
 /** Result of waiting for a quiet push-diagnostic window. */
@@ -17,7 +29,7 @@ export interface DiagnosticSettleResult {
 }
 
 /** Result of waiting for one file's push diagnostics. */
-export type DiagnosticPushWaitOutcome = "published" | "released" | "timed-out";
+export type DiagnosticPushWaitOutcome = "published" | "tentative" | "released" | "timed-out";
 
 interface DiagnosticTimingData {
   readonly collection: DiagnosticCollection;
@@ -166,14 +178,18 @@ export class DiagnosticObserver {
   }
 
   pushWaitCompleted(documentCount: number, push: DiagnosticPushWaitOutcome): void {
-    const timedOut = push === "timed-out";
+    const confirmed = push === "published";
+    // A tentative result used the full wait budget without a confirming
+    // republish. Keep its distinct push value and report the budget expiry.
+    const timedOut = push === "tentative" || push === "timed-out";
+    const observed = push === "published" || push === "tentative";
     this.#finish(
       {
         collection: this.supportsPull ? "fallback" : "push",
         documentCount,
         fallback: this.supportsPull,
-        freshness: push === "published" ? "observed" : "not-observed",
-        outcome: push === "published" ? "completed" : timedOut ? "timed-out" : "incomplete",
+        freshness: observed ? "observed" : "not-observed",
+        outcome: confirmed ? "completed" : timedOut ? "timed-out" : "incomplete",
         pull: this.#pull,
         push,
         reopen: this.#reopened,

@@ -112,6 +112,10 @@ describe("LSP pull diagnostics — refresh requests", () => {
       () => simulatePublish(client, file.uri, [makeDiagnostic("push-fallback")], true),
       20,
     );
+    setTimeout(
+      () => simulatePublish(client, file.uri, [makeDiagnostic("push-fallback")], true),
+      60,
+    );
 
     await client.refreshOpenDiagnostics({ maxWaitMs: 2000, quietMs: 80 });
 
@@ -364,6 +368,10 @@ describe("LSP pull diagnostics — refresh fallbacks", () => {
       () => simulatePublish(client, file.uri, [makeDiagnostic("push-fallback")], true),
       20,
     );
+    setTimeout(
+      () => simulatePublish(client, file.uri, [makeDiagnostic("push-fallback")], true),
+      60,
+    );
 
     await client.refreshOpenDiagnostics({ maxWaitMs: 2000, quietMs: 80 });
 
@@ -382,6 +390,7 @@ describe("LSP pull diagnostics — refresh fallbacks", () => {
         ),
     );
     setTimeout(() => simulatePublish(client, file.uri, [makeDiagnostic("push-timeout")], true), 20);
+    setTimeout(() => simulatePublish(client, file.uri, [makeDiagnostic("push-timeout")], true), 60);
 
     await client.refreshOpenDiagnostics({ maxWaitMs: 500, quietMs: 50 });
 
@@ -408,6 +417,7 @@ describe("LSP pull diagnostics — refresh fallbacks", () => {
       },
     );
     setTimeout(() => simulatePublish(client, secondUri, [makeDiagnostic("push-second")], true), 20);
+    setTimeout(() => simulatePublish(client, secondUri, [makeDiagnostic("push-second")], true), 60);
 
     await client.refreshOpenDiagnostics({ maxWaitMs: 2000, quietMs: 80 });
 
@@ -421,6 +431,7 @@ describe("LSP pull diagnostics — refresh fallbacks", () => {
     const { client, rpc } = createRunningTestClient();
     openDocument(client, file.filePath);
     setTimeout(() => simulatePublish(client, file.uri, [makeDiagnostic("push-diag")], true), 20);
+    setTimeout(() => simulatePublish(client, file.uri, [makeDiagnostic("push-diag")], true), 60);
 
     await client.refreshOpenDiagnostics({ maxWaitMs: 2000, quietMs: 80 });
 

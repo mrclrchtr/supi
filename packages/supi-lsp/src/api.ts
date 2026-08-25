@@ -37,6 +37,7 @@ export type {
 } from "./config/types.ts";
 export { FileChangeType } from "./config/types.ts";
 export { toLspPosition, toOneBasedPosition } from "./coordinates.ts";
+export { TENTATIVE_PUSH_UNAVAILABLE_REASON } from "./diagnostics/evidence.ts";
 export { isLikelyStaleDiagnostic } from "./diagnostics/stale-diagnostics.ts";
 export {
   scanWorkspaceSentinels,

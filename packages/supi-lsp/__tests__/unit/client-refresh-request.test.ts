@@ -120,7 +120,14 @@ describe("LSP server-requested diagnostic refresh", () => {
     rpc.sendNotification.mockClear();
     rpc.sendNotification.mockImplementation((method: string) => {
       if (method === "textDocument/didChange") {
+        // Publish twice: the first publication is tentative, the second
+        // confirms the resynchronized document (ADR 0021).
         const currentVersion = client.getOpenDocumentVersion(file.filePath);
+        client.handlePublishDiagnostics({
+          uri: file.uri,
+          version: currentVersion ?? undefined,
+          diagnostics: [],
+        });
         client.handlePublishDiagnostics({
           uri: file.uri,
           version: currentVersion ?? undefined,

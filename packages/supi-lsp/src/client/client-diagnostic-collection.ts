@@ -7,6 +7,7 @@ import {
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { Diagnostic } from "../config/types.ts";
+import { TENTATIVE_PUSH_UNAVAILABLE_REASON } from "../diagnostics/evidence.ts";
 import {
   type DiagnosticSynchronization,
   incompleteDiagnosticResult,
@@ -25,6 +26,8 @@ interface FileDiagnosticCollectionOptions {
   readonly waiters: DiagnosticWaitRegistry;
   readonly current: () => boolean;
   readonly freshPush: () => boolean;
+  /** Receive time of a current tentative push that is already cached. */
+  readonly currentPushReceivedAt: () => number | undefined;
   readonly diagnostics: () => Diagnostic[];
   readonly pullDiagnostics: (timeoutMs: number, signal: AbortSignal) => Promise<boolean>;
   /** Observe the push wait outcome without finishing the observer; the caller finishes once. */
@@ -58,20 +61,70 @@ export async function collectSynchronizedFileDiagnostics(
     return completedCodeQuery(options.diagnostics());
   }
 
-  const push = await options.waiters.waitForPush(
-    options.request.uri,
-    Math.max(0, options.maxWaitMs - (Date.now() - options.syncStart)),
-    control,
-  );
+  const push = await waitForConfirmedPush(options, control);
   if (options.onPushWait) options.onPushWait(push);
   else options.observer.pushWaitCompleted(1, push);
-  if (push === "published" && options.freshPush()) {
+  if (push === "published") {
     return completedCodeQuery(options.diagnostics());
+  }
+  if (push === "tentative") {
+    // A tentative timeout must not reuse cached data: the retained cache
+    // stays internal until a republish confirms it (ADR 0021).
+    return unavailableCodeQuery(TENTATIVE_PUSH_UNAVAILABLE_REASON);
   }
   return incompleteDiagnosticResult(
     options.cachedDiagnostics,
     push === "released" ? "released" : "timed-out",
   );
+}
+
+/**
+ * Wait until a confirmed push publication settles the synchronization.
+ *
+ * Every accepted publication releases the waiter. A confirmed push ends the
+ * wait as "published". A publication that stays tentative (no republish
+ * arrived for the same synchronization) ends as "tentative" when the budget
+ * expires. A wait with no publication at all keeps the waiter's
+ * "timed-out", and a lifecycle release stays "released".
+ */
+async function waitForConfirmedPush(
+  options: FileDiagnosticCollectionOptions,
+  control?: CodeRequestControl,
+): Promise<DiagnosticPushWaitOutcome> {
+  // A tentative publication may already sit in the cache when the wait
+  // starts (ADR 0021). Do not grant repeated callers a new full wait window:
+  // bound them by the first operation window or the cached publication age.
+  const initialPushReceivedAt = options.currentPushReceivedAt();
+  const waitDeadline = Math.min(
+    options.syncStart + options.maxWaitMs,
+    initialPushReceivedAt === undefined
+      ? Number.POSITIVE_INFINITY
+      : initialPushReceivedAt + options.maxWaitMs,
+  );
+  let observedPublication = initialPushReceivedAt !== undefined;
+  for (;;) {
+    throwIfCodeRequestInterrupted(control);
+    // A republish can arrive after the previous wait released but before the
+    // next waiter registers; re-check the store on every loop pass.
+    if (options.freshPush()) return "published";
+    const push = await options.waiters.waitForPush(
+      options.request.uri,
+      Math.max(0, waitDeadline - Date.now()),
+      control,
+    );
+    // A lifecycle release ends the wait definitively: a tentative
+    // publication observed earlier must not reclassify the release.
+    if (push === "released") return "released";
+    // A promotion can land while the timed-out waiter tears down; the cache
+    // must complete the wait before the timeout classifies the outcome.
+    if (options.freshPush()) return "published";
+    if (push === "timed-out") {
+      return observedPublication || options.currentPushReceivedAt() !== undefined
+        ? "tentative"
+        : "timed-out";
+    }
+    observedPublication = true;
+  }
 }
 
 async function collectPullEvidence(

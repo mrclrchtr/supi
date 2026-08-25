@@ -68,6 +68,12 @@ describe("LSP diagnostic timing observations", () => {
     writeFileSync(file, "const cacheRefresh = true;\n");
     const { client, rpc } = createRunningTestClient({ root: cwd, cwd });
     client.didOpen(file, "const cacheRefresh = true;\n");
+    // The first publication stays tentative; the second confirms.
+    client.handlePublishDiagnostics({
+      uri: `file://${file}`,
+      version: client.getOpenDocumentVersion(file) ?? undefined,
+      diagnostics: [],
+    });
     client.handlePublishDiagnostics({
       uri: `file://${file}`,
       version: client.getOpenDocumentVersion(file) ?? undefined,
@@ -119,6 +125,15 @@ describe("LSP diagnostic timing observations", () => {
           diagnostics: [],
         }),
       10,
+    );
+    setTimeout(
+      () =>
+        client.handlePublishDiagnostics({
+          uri: `file://${file}`,
+          version: client.getOpenDocumentVersion(file) ?? undefined,
+          diagnostics: [],
+        }),
+      40,
     );
 
     await client.refreshOpenDiagnostics({ maxWaitMs: 500, quietMs: 20 });
@@ -248,6 +263,15 @@ describe("LSP diagnostic timing observations", () => {
         }),
       10,
     );
+    setTimeout(
+      () =>
+        client.handlePublishDiagnostics({
+          uri: `file://${file}`,
+          version: client.getOpenDocumentVersion(file) ?? undefined,
+          diagnostics: [],
+        }),
+      40,
+    );
 
     await client.syncAndWaitForDiagnostics(file, "const single = true;\n");
 
@@ -284,10 +308,15 @@ describe("LSP diagnostic timing observations", () => {
     // is retained without protocol work, so no reopen candidate would exist.
     writeFileSync(file, "const reopenTimingChanged = true;\n");
     // The server stays silent through the first settle window, then
-    // publishes on the fallback didOpen.
+    // publishes twice on the fallback didOpen: the first publication is
+    // tentative, the second confirms the reopened synchronization.
     setTimeout(
       () => client.handlePublishDiagnostics({ uri: `file://${file}`, diagnostics: [] }),
       120,
+    );
+    setTimeout(
+      () => client.handlePublishDiagnostics({ uri: `file://${file}`, diagnostics: [] }),
+      135,
     );
 
     await client.refreshOpenDiagnostics({ maxWaitMs: 80, quietMs: 20 });

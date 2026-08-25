@@ -163,6 +163,25 @@ export interface DiagnosticCacheEntry {
   evidenceRevision?: number;
   version?: number;
   resultId?: string;
+  /**
+   * Valid publications observed for the entry's synchronization. The first
+   * valid publication for a synchronization is tentative; a later valid
+   * publication promotes the entry to confirmed (ADR 0021). A confirmed
+   * pull entry counts as the first publication when a push continues the
+   * same synchronization, so that push keeps the confirmation. Pull
+   * entries as such carry no count and are confirmed on arrival.
+   */
+  publications?: number;
+}
+
+/**
+ * Test whether one push entry is still tentative for its synchronization.
+ *
+ * A pull entry confirms on arrival; a push entry confirms only after a
+ * later valid publication for the same synchronization (ADR 0021).
+ */
+export function isTentativePushEntry(entry: DiagnosticCacheEntry | undefined): boolean {
+  return Boolean(entry && entry.source === "push" && (entry.publications ?? 1) < 2);
 }
 
 /** One document synchronization that needs current diagnostic evidence. */
@@ -204,6 +223,7 @@ export function hasFreshPush(
   const entry = store.get(synchronization.uri);
   return Boolean(
     entry?.source === "push" &&
+      !isTentativePushEntry(entry) &&
       entry.synchronizationId === synchronization.synchronizationId &&
       (synchronization.evidenceRevision === undefined ||
         entry.evidenceRevision === synchronization.evidenceRevision) &&
@@ -211,8 +231,11 @@ export function hasFreshPush(
   );
 }
 
-/** Test whether pull or push evidence confirms the supplied synchronization. */
-export function hasFreshEvidence(
+/**
+ * Test whether stored evidence matches a synchronization without a
+ * confirmation gate. A tentative push matches here but cannot confirm.
+ */
+export function hasCurrentEvidence(
   store: ReadonlyMap<string, DiagnosticCacheEntry>,
   synchronization: DiagnosticSynchronization,
   currentEvidenceRevision?: number,
@@ -227,8 +250,26 @@ export function hasFreshEvidence(
   );
 }
 
-/** Return the latest cache update that confirms one of the synchronizations. */
-export function latestFreshEvidenceReceivedAt(
+/** Test whether pull or push evidence confirms the supplied synchronization. */
+export function hasFreshEvidence(
+  store: ReadonlyMap<string, DiagnosticCacheEntry>,
+  synchronization: DiagnosticSynchronization,
+  currentEvidenceRevision?: number,
+): boolean {
+  return (
+    hasCurrentEvidence(store, synchronization, currentEvidenceRevision) &&
+    !isTentativePushEntry(store.get(synchronization.uri))
+  );
+}
+
+/**
+ * Return the latest cache update that matches one of the synchronizations.
+ *
+ * Every accepted publication restarts the settle quiet period, tentative
+ * publications included, so this helper does not apply the confirmation
+ * gate (ADR 0021).
+ */
+export function latestCurrentEvidenceReceivedAt(
   store: ReadonlyMap<string, DiagnosticCacheEntry>,
   synchronizations: DiagnosticSynchronization[],
   currentEvidenceRevision?: number,
@@ -236,7 +277,7 @@ export function latestFreshEvidenceReceivedAt(
   let latest = 0;
   for (const synchronization of synchronizations) {
     const entry = store.get(synchronization.uri);
-    if (hasFreshEvidence(store, synchronization, currentEvidenceRevision)) {
+    if (hasCurrentEvidence(store, synchronization, currentEvidenceRevision)) {
       latest = Math.max(latest, entry?.receivedAt ?? 0);
     }
   }

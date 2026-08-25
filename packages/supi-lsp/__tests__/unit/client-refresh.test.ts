@@ -68,7 +68,10 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
 
     try {
       const publishDelay = 30;
+      // The first publication is tentative; the second publication of the
+      // same synchronization confirms the document (ADR 0021).
       setTimeout(() => simulatePublish(client, uri, undefined, true), publishDelay);
+      setTimeout(() => simulatePublish(client, uri, undefined, true), publishDelay + 30);
       const start = Date.now();
 
       await client.refreshOpenDiagnostics({ maxWaitMs: 2000, quietMs: 80 });
@@ -106,8 +109,10 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
 
     try {
       // The server stays silent through the first settle window, then
-      // publishes on the fallback didOpen.
+      // publishes twice on the fallback didOpen: the first publication is
+      // tentative, the second confirms the reopened synchronization.
       setTimeout(() => client.handlePublishDiagnostics({ uri, diagnostics: [] }), 120);
+      setTimeout(() => client.handlePublishDiagnostics({ uri, diagnostics: [] }), 135);
       const start = Date.now();
       const evidence = await client.refreshOpenDiagnostics({ maxWaitMs: 80, quietMs: 20 });
       const elapsed = Date.now() - start;
@@ -144,8 +149,10 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
     sendNotification.mockClear();
     sendNotification.mockImplementation((method: string) => {
       if (method === "textDocument/didOpen") {
-        // Publish near the end of the replacement window. A short retry
-        // budget confirms the old timeout while the full budget can settle.
+        // Publish twice near the end of the replacement window: the first
+        // publication is tentative, the second confirms the reopened
+        // synchronization within the full second-window budget.
+        setTimeout(() => client.handlePublishDiagnostics({ uri, diagnostics: [] }), 2_780);
         setTimeout(() => client.handlePublishDiagnostics({ uri, diagnostics: [] }), 2_850);
       }
     });
@@ -182,7 +189,10 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
     openDocument(client, second.uri);
 
     try {
+      // The first document republishes within the window; the second stays
+      // silent and keeps the whole settle from completing.
       setTimeout(() => simulatePublish(client, first.uri, [], true), 10);
+      setTimeout(() => simulatePublish(client, first.uri, [], true), 40);
 
       await expect(
         client.refreshOpenDiagnostics({ maxWaitMs: 80, quietMs: 10 }),

@@ -174,15 +174,28 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
     expect(hasError).toBe(true);
   }, 15_000);
 
-  it("reuses current clean evidence for an unchanged file", async () => {
+  it("completes an unchanged file only from confirmed retained evidence", async () => {
     const content = fs.readFileSync(goodFile, "utf-8");
     const result = await client.syncAndWaitForDiagnostics(goodFile, content);
 
-    expect(result).toEqual({ kind: "completed", data: [] });
+    // ADR 0021 (issue #351): cache reuse requires a confirmed republish of
+    // the current synchronization. When the server's later semantic pass
+    // already republished, the unchanged file completes without protocol
+    // work; otherwise the retained single publication stays tentative and
+    // the result reports the republish requirement instead of reopening.
+    if (result.kind === "completed") {
+      expect(result).toEqual({ kind: "completed", data: [] });
+    } else {
+      expect(result).toMatchObject({
+        kind: "unavailable",
+        reason: expect.stringContaining("republish"),
+      });
+    }
   }, 10_000);
 
-  it("confirms fresh diagnostics after fixing a push-only file", async () => {
-    // First sync bad content
+  it("requires a republish before confirming a fixed push-only file", async () => {
+    // First sync bad content: the server's early and semantic publications
+    // confirm the failing state.
     const badContent = 'export const y: number = "wrong";\n';
     const fixFile = path.join(tmpDir, "fixme.ts");
     fs.writeFileSync(fixFile, badContent);
@@ -192,14 +205,18 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
     );
     expect(errorsBefore.length).toBeGreaterThan(0);
 
-    // Now fix it: the unversioned push after the sync moment confirms the
-    // clean result (or the reopen-resync fallback does), so the fresh
-    // evidence is completed, never partial.
+    // Now fix it: the fix's only publication for the new synchronization is
+    // the semantic empty result, which stays tentative. A confirmed-clean
+    // claim requires a later republish of the same synchronization
+    // (ADR 0021), so the single-file result is unavailable with the
+    // republish requirement.
     const goodContent = "export const y: number = 42;\n";
     fs.writeFileSync(fixFile, goodContent);
     const afterResult = await client.syncAndWaitForDiagnostics(fixFile, goodContent);
-    expect(afterResult.kind).toBe("completed");
-    if (afterResult.kind === "completed") expect(afterResult.data).toEqual([]);
+    expect(afterResult.kind).toBe("unavailable");
+    if (afterResult.kind === "unavailable") {
+      expect(afterResult.reason).toContain("republish");
+    }
   }, 15_000);
 
   it("returns code actions for diagnostic", async () => {

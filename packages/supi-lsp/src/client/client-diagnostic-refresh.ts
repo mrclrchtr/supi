@@ -14,14 +14,19 @@ import { detectLanguageId, fileToUri, uriToFile } from "../utils.ts";
 import {
   type DiagnosticCacheEntry,
   type DiagnosticSynchronization,
+  hasCurrentEvidence,
   hasFreshEvidence,
   hasFreshPush,
   isCurrentSynchronization,
-  latestFreshEvidenceReceivedAt,
+  latestCurrentEvidenceReceivedAt,
   nextDocumentVersion,
   raceDiagnosticPull,
 } from "./client-diagnostic-evidence.ts";
 import type { ClientDiagnosticsHost } from "./client-diagnostic-host.ts";
+import type {
+  DiagnosticPublicationIdentity,
+  DiagnosticPublicationSynchronization,
+} from "./client-diagnostic-publication.ts";
 import { pullDiagnosticEvidence } from "./client-diagnostic-pull.ts";
 import type { DiagnosticPullRequest } from "./client-diagnostic-request.ts";
 import {
@@ -32,7 +37,7 @@ import {
 import type { DiagnosticStateWait, DiagnosticWaitRegistry } from "./client-diagnostic-waiters.ts";
 import {
   fingerprintDocumentContent,
-  hasCurrentDiagnosticEvidence,
+  hasConfirmedDiagnosticEvidence,
   type OpenDocumentState,
 } from "./client-document-state.ts";
 import {
@@ -64,12 +69,15 @@ export function buildDiagnosticRefreshEvidence(options: {
   currentEvidenceRevision: number;
   openDocuments: ReadonlyMap<string, unknown>;
   diagnosticStore: ReadonlyMap<string, DiagnosticCacheEntry>;
+  /** Required quiet time after the latest push for this refresh result. */
+  pushQuietMs?: number;
 }): DiagnosticEvidenceSummary {
   const synchronizationByFile = new Map(
     options.synchronizations.map((item) => [uriToFile(item.uri), item]),
   );
   const removedFiles = new Set(options.resynchronization.removedFiles);
   const failedFiles = new Set(options.resynchronization.failedFiles);
+  const observedAt = Date.now();
   const documents = options.requestedFiles.map((file) => {
     const uri = fileToUri(file);
     const synchronization = synchronizationByFile.get(file);
@@ -88,7 +96,13 @@ export function buildDiagnosticRefreshEvidence(options: {
     }
     if (
       synchronization &&
-      hasFreshEvidence(options.diagnosticStore, synchronization, options.currentEvidenceRevision)
+      hasSettledRefreshEvidence({
+        store: options.diagnosticStore,
+        synchronization,
+        currentEvidenceRevision: options.currentEvidenceRevision,
+        pushQuietMs: options.pushQuietMs,
+        observedAt,
+      })
     ) {
       return { file, status: "confirmed" as const };
     }
@@ -98,6 +112,25 @@ export function buildDiagnosticRefreshEvidence(options: {
     };
   });
   return summarizeDiagnosticEvidence(documents);
+}
+
+/** Test whether fresh evidence can confirm this refresh result. */
+function hasSettledRefreshEvidence(options: {
+  store: ReadonlyMap<string, DiagnosticCacheEntry>;
+  synchronization: DiagnosticSynchronization;
+  currentEvidenceRevision: number;
+  pushQuietMs: number | undefined;
+  observedAt: number;
+}): boolean {
+  if (!hasFreshEvidence(options.store, options.synchronization, options.currentEvidenceRevision)) {
+    return false;
+  }
+  const entry = options.store.get(options.synchronization.uri);
+  return (
+    options.pushQuietMs === undefined ||
+    entry?.source !== "push" ||
+    options.observedAt - entry.receivedAt >= options.pushQuietMs
+  );
 }
 
 /** Pull one document and reject evidence from a stale client generation. */
@@ -268,7 +301,7 @@ function classifyReusableDocuments(options: {
       continue;
     }
     if (
-      hasCurrentDiagnosticEvidence(
+      hasConfirmedDiagnosticEvidence(
         document,
         options.diagnosticStore.get(uri),
         options.evidenceRevision,
@@ -300,6 +333,15 @@ interface ClientDiagnosticRefreshOptions {
   /** Server-requested refreshes bypass normal push-only evidence reuse. */
   readonly forceResynchronize?: boolean;
   readonly options: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl;
+  /** Push-publication telemetry surface for this client. */
+  readonly publications: {
+    emitSummary(options: {
+      readonly operation: "refresh-open";
+      readonly identity: DiagnosticPublicationIdentity;
+      readonly synchronizations: readonly DiagnosticPublicationSynchronization[];
+      readonly operationId?: string;
+    }): void;
+  };
 }
 
 interface PreparedRefreshDocuments {
@@ -409,7 +451,7 @@ export async function refreshClientOpenDiagnostics(
   const resynchronization = prepared.resynchronization;
   let synchronizations = prepared.synchronizations;
   let failedPullUris: ReadonlySet<string> = new Set();
-  const buildEvidence = () =>
+  const buildEvidence = (pushQuietMs?: number) =>
     buildDiagnosticRefreshEvidence({
       requestedFiles: options.requestedFiles,
       resynchronization,
@@ -420,6 +462,7 @@ export async function refreshClientOpenDiagnostics(
       currentEvidenceRevision: options.evidenceRevision(),
       openDocuments: options.openDocuments,
       diagnosticStore: options.diagnosticStore,
+      pushQuietMs,
     });
 
   // A fully reusable push-only refresh has no protocol work to collect.
@@ -460,7 +503,7 @@ export async function refreshClientOpenDiagnostics(
             hasFreshEvidence(options.diagnosticStore, item, options.evidenceRevision()),
           ),
         latestReceived: () =>
-          latestFreshEvidenceReceivedAt(
+          latestCurrentEvidenceReceivedAt(
             options.diagnosticStore,
             synchronizations,
             options.evidenceRevision(),
@@ -487,7 +530,25 @@ export async function refreshClientOpenDiagnostics(
   observer.pushSettled(synchronizations.length, finalSettle);
   // A cancelled settle must not publish evidence the caller no longer awaits.
   throwIfCodeRequestInterrupted(options.options);
-  return buildEvidence();
+  options.publications.emitSummary({
+    operation: "refresh-open",
+    identity: {
+      server: options.host.server,
+      cwd: options.host.cwd,
+    },
+    synchronizations: synchronizations.map((synchronization) => ({
+      uri: synchronization.uri,
+      synchronizationId: synchronization.synchronizationId,
+      evidenceRevision: synchronization.evidenceRevision ?? options.evidenceRevision(),
+      confirmed: hasFreshEvidence(
+        options.diagnosticStore,
+        synchronization,
+        options.evidenceRevision(),
+      ),
+    })),
+    operationId: options.options.operationId,
+  });
+  return buildEvidence(quietMs);
 }
 
 /**
@@ -576,7 +637,10 @@ async function reopenUnconfirmedDocuments(options: {
   const unconfirmed = synchronizations.filter(
     (item) =>
       reopenCandidates.has(item.uri) &&
-      !hasFreshEvidence(refresh.diagnosticStore, item, refresh.evidenceRevision()),
+      // A document with any current publication — tentative included — is
+      // not a reopen candidate: its server pipeline is alive and a republish
+      // can still promote the retained cache (ADR 0021).
+      !hasCurrentEvidence(refresh.diagnosticStore, item, refresh.evidenceRevision()),
   );
   const reopenedSynchronizations: DiagnosticSynchronization[] = [];
   for (const item of unconfirmed) {

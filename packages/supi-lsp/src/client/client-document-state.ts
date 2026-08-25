@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Diagnostic } from "../config/types.ts";
-import type { DiagnosticCacheEntry } from "./client-diagnostic-evidence.ts";
+import { type DiagnosticCacheEntry, isTentativePushEntry } from "./client-diagnostic-evidence.ts";
 
 /** One file's stored diagnostics as consumed by manager-level collection. */
 export interface DiagnosticEntry {
@@ -48,5 +48,21 @@ export function hasCurrentDiagnosticEvidence(
       document.evidenceRevision === evidenceRevision &&
       entry.synchronizationId === document.synchronizationId &&
       entry.evidenceRevision === evidenceRevision,
+  );
+}
+
+/**
+ * Test whether cached diagnostics confirm the current document state.
+ *
+ * A current tentative push matches the document state but cannot support a
+ * clean-result or cache-reuse claim until a republish confirms it (ADR 0021).
+ */
+export function hasConfirmedDiagnosticEvidence(
+  document: OpenDocumentState | undefined,
+  entry: DiagnosticCacheEntry | undefined,
+  evidenceRevision: number,
+): boolean {
+  return (
+    hasCurrentDiagnosticEvidence(document, entry, evidenceRevision) && !isTentativePushEntry(entry)
   );
 }
