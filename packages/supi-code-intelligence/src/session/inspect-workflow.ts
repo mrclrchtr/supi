@@ -2,6 +2,7 @@
 
 import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import { withSemanticRequestControl } from "../analysis/provider.ts";
+import { SEMANTIC_READINESS_TIMEOUT_REASON } from "../analysis/readiness.ts";
 import type { CapabilityAdapter, ReadinessOutcome } from "./capability-adapter.ts";
 import { parseInspectWorkflowInput } from "./input/workflows.ts";
 import { collectInspectSections } from "./inspect/collect.ts";
@@ -155,7 +156,7 @@ function semanticReadinessReason(readiness: ReadinessOutcome): string {
     case "ready":
       return "No semantic provider is active for this file.";
     case "timeout":
-      return "Semantic readiness timed out.";
+      return SEMANTIC_READINESS_TIMEOUT_REASON;
     case "unavailable":
       return readiness.reason;
   }

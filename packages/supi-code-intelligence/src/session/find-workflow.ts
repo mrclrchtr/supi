@@ -2,6 +2,7 @@
 
 import type { CodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
+import { SEMANTIC_READINESS_TIMEOUT_REASON } from "../analysis/readiness.ts";
 import { resolveScopeSet } from "../analysis/search/paths.ts";
 import { getStructuredPatternMatches } from "../analysis/search/pattern.ts";
 import { isCodeFindAstKind } from "../tool/code_find/ast-kinds.ts";
@@ -76,7 +77,7 @@ async function runSemanticSearch(options: {
     control,
   );
   if (readiness.kind === "timeout") {
-    return { kind: "unavailable", reason: "Semantic readiness timed out." };
+    return { kind: "unavailable", reason: SEMANTIC_READINESS_TIMEOUT_REASON };
   }
   if (readiness.kind === "unavailable") return readiness;
   throwIfAborted(control);

@@ -12,6 +12,10 @@ import {
 
 export const DEFAULT_SEMANTIC_STARTUP_TIMEOUT_MS = 15_000;
 
+/** Neutral reason for a typed semantic readiness timeout. */
+export const SEMANTIC_READINESS_TIMEOUT_REASON =
+  "Semantic provider did not become ready within the wait window; retry shortly.";
+
 export type SemanticStartupScope = { kind: "workspace" } | { kind: "file"; file: string };
 
 export async function ensureSemanticReadiness(

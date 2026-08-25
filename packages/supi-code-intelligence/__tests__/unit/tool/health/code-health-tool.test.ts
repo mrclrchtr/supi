@@ -4,7 +4,7 @@
  * Covers diagnostic summary, server status, and the health renderer.
  */
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
@@ -61,6 +61,7 @@ function mockReadyLsp(
   overrides: Partial<{
     getOutstandingDiagnostics: ReturnType<typeof vi.fn>;
     getProjectServers: ReturnType<typeof vi.fn>;
+    waitUntilReadyForFile: ReturnType<typeof vi.fn>;
     getWorkspaceDiagnosticSummary: ReturnType<typeof vi.fn>;
     fileDiagnostics: ReturnType<typeof vi.fn>;
     recoverDiagnostics: ReturnType<typeof vi.fn>;
@@ -77,6 +78,7 @@ function mockReadyLsp(
       current: true,
       evidence: emptyEvidence(),
     }),
+    waitUntilReadyForFile: vi.fn().mockResolvedValue({ kind: "ready" }),
     getProjectServers: vi.fn().mockReturnValue([
       {
         name: "typescript",
@@ -285,6 +287,42 @@ describe("code_health tool", () => {
     );
     expect(result.content[0].text).toContain("No active, ready project servers");
     expect(result.content[0].text).toContain("Diagnostics unavailable");
+  });
+
+  it("reports file readiness timeout in semantic and diagnostic reasons", async () => {
+    registerMockProvider(tmpDir);
+    const file = path.join(tmpDir, "src", "index.ts");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, "const value = 1;\n", "utf-8");
+    const reason = "Semantic provider did not become ready within the wait window; retry shortly.";
+    mockReadyLsp({
+      waitUntilReadyForFile: vi.fn().mockResolvedValue({ kind: "timeout" }),
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const result = (await getTool(pi, "code_health").execute(
+      "file-readiness-timeout",
+      { scope: "src/index.ts", include: ["diagnostics", "servers"] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ text: string }>;
+      details?: {
+        type: "health";
+        data: {
+          semanticState: { kind: string; reason?: string } | null;
+          diagnosticObservation: { kind: string; reason?: string };
+        };
+      };
+    };
+
+    expect(result.details?.data.semanticState).toEqual({ kind: "pending", reason });
+    expect(result.details?.data.diagnosticObservation).toEqual(
+      expect.objectContaining({ kind: "unavailable", reason }),
+    );
+    expect(result.content[0]?.text).toContain(reason);
   });
 
   it("recovers a non-ready server before deciding diagnostic availability", async () => {

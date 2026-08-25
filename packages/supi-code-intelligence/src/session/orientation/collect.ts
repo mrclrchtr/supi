@@ -183,7 +183,7 @@ async function buildEnrichedDefsSection(
       hasStructuralEvidence,
       hasSemanticEvidence: contextHasSemanticEvidence,
       status: contextHasSemanticEvidence ? "partial" : "unavailable",
-      reason: "Definition targets require a live language server.",
+      reason: deps.semanticReadinessReason ?? "Definition targets require a live language server.",
       evidenceLists: [],
     };
   }
@@ -292,7 +292,7 @@ async function buildDiagnosticsSection(
         },
       ],
       false,
-      "Diagnostics require a live language server.",
+      deps.semanticReadinessReason ?? "Diagnostics require a live language server.",
     );
   }
 

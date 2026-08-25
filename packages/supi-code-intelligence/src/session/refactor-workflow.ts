@@ -7,6 +7,7 @@ import type {
   SourceRange,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { toLspPosition } from "@mrclrchtr/supi-lsp/api";
+import { SEMANTIC_READINESS_TIMEOUT_REASON } from "../analysis/readiness.ts";
 import { applyWorkspaceEdit } from "../analysis/refactor/apply.ts";
 import {
   establishMutationAuthority,
@@ -93,7 +94,7 @@ export async function runRefactorPlanWorkflow(
     control,
   );
   if (readiness.kind === "timeout") {
-    return { kind: "unavailable", reason: "Semantic readiness timed out." };
+    return { kind: "unavailable", reason: SEMANTIC_READINESS_TIMEOUT_REASON };
   }
   if (readiness.kind === "unavailable") return readiness;
   throwIfAborted(control);

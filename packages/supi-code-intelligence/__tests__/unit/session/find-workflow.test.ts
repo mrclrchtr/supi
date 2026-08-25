@@ -1,7 +1,11 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  completedCodeQuery,
+  type SemanticProvider,
+  type StructuralProvider,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FindWorkflowOutcome } from "../../../src/session/find-types.ts";
 import { runFindWorkflow } from "../../../src/session/find-workflow.ts";
@@ -41,6 +45,54 @@ function structuralProvider(): StructuralProvider {
 }
 
 describe("runFindWorkflow", () => {
+  it("reports a semantic readiness timeout with retry guidance", async () => {
+    const workspaceSymbols = vi.fn<NonNullable<SemanticProvider["workspaceSymbols"]>>(async () =>
+      completedCodeQuery([]),
+    );
+    const semantic = { workspaceSymbols } as unknown as SemanticProvider;
+
+    const outcome = await runFindWorkflow(
+      { query: "target", mode: "semantic" },
+      {
+        cwd: tmpDir,
+        capability: new TestCapabilityAdapter({
+          semantic,
+          readiness: { kind: "timeout" },
+        }),
+      },
+    );
+
+    expect(outcome).toEqual({
+      kind: "unavailable",
+      reason: "Semantic provider did not become ready within the wait window; retry shortly.",
+    });
+    expect(workspaceSymbols).not.toHaveBeenCalled();
+  });
+
+  it("keeps a completed-empty semantic search as a valid no-data result", async () => {
+    const semantic = {
+      workspaceSymbols: async () => completedCodeQuery([]),
+    } as unknown as SemanticProvider;
+
+    const outcome = await runFindWorkflow(
+      { query: "missing", mode: "semantic" },
+      {
+        cwd: tmpDir,
+        capability: new TestCapabilityAdapter({ semantic }),
+      },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: { kind: "semantic", symbols: [], partialReason: null },
+    });
+    if (outcome.kind !== "completed") return;
+
+    const rendered = renderFindResult(assembleFindWorkflowResult(outcome));
+    expect(rendered).toContain("No LSP workspace-symbol results found");
+    expect(rendered).not.toContain("did not become ready within the wait window");
+  });
+
   it("reports an expired caller AST deadline as a timeout partial", async () => {
     writeFileSync(path.join(tmpDir, "alpha.ts"), "import target from 'target';\n");
     const imports = vi.fn<StructuralProvider["imports"]>(async () => ({

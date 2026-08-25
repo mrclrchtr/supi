@@ -9,6 +9,7 @@ import {
   findInstructionFilesForDirectory,
 } from "../analysis/instruction-files.ts";
 import { createStructuralCodeProvider, withSemanticRequestControl } from "../analysis/provider.ts";
+import { SEMANTIC_READINESS_TIMEOUT_REASON } from "../analysis/readiness.ts";
 import { normalizePath } from "../analysis/search/paths.ts";
 import { loadCodeIntelligenceConfig } from "../config.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
@@ -148,11 +149,13 @@ async function orientTarget(options: {
   const provider = semanticReady
     ? withSemanticRequestControl(deps.capability.getProvider(deps.cwd), control)
     : createStructuralCodeProvider(deps.capability.getStructuralProvider(deps.cwd));
+  const semanticReadinessReason =
+    readiness.kind === "timeout" ? SEMANTIC_READINESS_TIMEOUT_REASON : undefined;
   const lspRuntime = semanticReady
     ? deps.capability.getLspRuntimeState(deps.cwd)
     : {
         kind: "unavailable" as const,
-        reason: readiness.kind === "timeout" ? "Semantic readiness timed out" : readiness.reason,
+        reason: readiness.kind === "timeout" ? SEMANTIC_READINESS_TIMEOUT_REASON : readiness.reason,
       };
   const result = await executeOrientation(
     { target: entry, maxResults },
@@ -160,6 +163,7 @@ async function orientTarget(options: {
       model,
       provider,
       lspRuntime,
+      semanticReadinessReason,
       cwd: deps.cwd,
       requestControl: control,
     },

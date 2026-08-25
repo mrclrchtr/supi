@@ -19,6 +19,7 @@ import {
 } from "../analysis/health/diagnostics.ts";
 import { describeStructuralState } from "../analysis/health/recovery.ts";
 import { collectServers } from "../analysis/health/signals.ts";
+import { SEMANTIC_READINESS_TIMEOUT_REASON } from "../analysis/readiness.ts";
 import { resolveScope } from "../analysis/search/paths.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import { collectHealthRefreshAttempt } from "./health-refresh.ts";
@@ -157,7 +158,7 @@ async function establishSemanticHealthState(
     );
     if (readiness.kind === "ready") return { kind: "ready" };
     if (readiness.kind === "timeout") {
-      return { kind: "pending", reason: "File semantic readiness timed out" };
+      return { kind: "pending", reason: SEMANTIC_READINESS_TIMEOUT_REASON };
     }
     return { kind: "unavailable", reason: readiness.reason };
   }

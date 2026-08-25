@@ -529,6 +529,39 @@ describe("code_orientation tool", () => {
     expect(result.content[0].text).toContain("widget");
   });
 
+  it("reports a stored-target semantic readiness timeout in Orientation sections", async () => {
+    writeSource("src/widget.ts", "export function widget() { return 1; }\n");
+    registerMockProvider(tmpDir);
+    markLspReady();
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never, undefined, homeDir);
+    const targetId = await resolveTargetId(pi, "src/widget.ts", 1, 17);
+    markLspReady({
+      waitUntilReadyForFile: vi.fn().mockResolvedValue({ kind: "timeout" }),
+    });
+
+    const result = (await getTool(pi, "code_orientation").execute(
+      "orientation-readiness-timeout",
+      { focus: { target: { handle: targetId } } },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ text: string }>;
+      details?: {
+        type: "context";
+        data: { sections: Array<{ reason: string | null }> };
+      };
+    };
+    const reason = "Semantic provider did not become ready within the wait window; retry shortly.";
+
+    expect(result.content[0]?.text).toContain(reason);
+    expect(result.details?.data.sections).toEqual(
+      expect.arrayContaining([expect.objectContaining({ reason })]),
+    );
+  });
+
   it("hard-errors on invalid focus in orientation mode", async () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never, undefined, homeDir);

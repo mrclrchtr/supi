@@ -285,6 +285,38 @@ describe("code_inspect tool", () => {
     );
   });
 
+  it("keeps structural inspection when semantic readiness times out", async () => {
+    registerSemantic();
+    registerStructural();
+    mockReadyLsp({
+      waitUntilReadyForFile: vi.fn().mockResolvedValue({ kind: "timeout" }),
+    });
+
+    const result = (await executeInspect()) as {
+      content: Array<{ type: string; text: string }>;
+      details?: {
+        data: {
+          confidence: string;
+          sections: Array<{ key: string; status: string; reason: string | null }>;
+        };
+      };
+    };
+    const reason = "Semantic provider did not become ready within the wait window; retry shortly.";
+    const text = result.content[0]?.text ?? "";
+
+    expect(text).toContain(reason);
+    expect(result.details?.data.confidence).toBe("structural");
+    expect(result.details?.data.sections).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "node", status: "complete" }),
+        expect.objectContaining({ key: "enclosingSymbol", status: "complete" }),
+        expect.objectContaining({ key: "hover", status: "unavailable", reason }),
+        expect.objectContaining({ key: "definition", status: "unavailable", reason }),
+        expect.objectContaining({ key: "diagnostics", status: "unavailable", reason }),
+      ]),
+    );
+  });
+
   it("succeeds when completed-empty semantic sections are the only observations", async () => {
     registerSemantic({
       hover: async () => completedCodeQuery(null),

@@ -740,6 +740,20 @@ describe("target-workflow (deep session seam)", () => {
       }
     });
 
+    it("keeps anchored readiness timeouts actionable", async () => {
+      writeSource("src/mod.ts", "export function foo() {}\n");
+      const outcome = await resolveTargetWorkflow(
+        { anchor: { file: "src/mod.ts", line: 1, character: 17 } },
+        DEFAULT_POLICY,
+        buildDeps(new TestCapabilityAdapter({ readiness: { kind: "timeout" } })),
+      );
+
+      expect(outcome).toEqual({
+        kind: "unavailable",
+        reason: "LSP readiness timed out. Retry shortly or inspect code_health.",
+      });
+    });
+
     it("requires LSP readiness before structural anchor supplementation", async () => {
       writeSource("src/mod.ts", "export function foo() {}\n");
       let structuralCalls = 0;

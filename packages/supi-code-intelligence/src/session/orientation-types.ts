@@ -37,6 +37,8 @@ export interface OrientationDeps {
   readonly provider: CodeProvider | null;
   readonly cwd: string;
   readonly lspRuntime: WorkspaceLspRuntimeState;
+  /** Typed reason to surface when target semantic readiness timed out. */
+  readonly semanticReadinessReason?: string;
   readonly requestControl?: CodeRequestControl;
 }
 
