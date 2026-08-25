@@ -185,19 +185,13 @@ Update installed Pi packages:
 pi update --extensions
 ```
 
-Remove the release stack:
+Remove the SuPi stack (release + beta packages):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/uninstall.sh | bash
 ```
 
-Remove the release-plus-beta stack:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/uninstall-all.sh | bash
-```
-
-For project-local removal, add `-s -- -l` to either command:
+For project-local removal, add `-l`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/uninstall.sh | bash -s -- -l
