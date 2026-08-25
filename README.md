@@ -2,9 +2,13 @@
 
 # SuPi — Extension Stack for the Pi Coding Agent
 
+[![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers)
+
 SuPi (short for **Super Pi**) is an open-source TypeScript extension stack for the [Pi coding agent](https://github.com/earendil-works/pi). It adds LSP and Tree-sitter code intelligence, semantic refactoring, parallel code review, web and Context7 documentation access, structured ask-user forms, scoped skill controls, quick skill input, and context/cache observability.
 
 Install the recommended stack or pick only the packages you need. You keep prompting Pi normally; SuPi gives the agent additional tools and context it can use directly.
+
+**If SuPi helps you, [give the repository a star on GitHub](https://github.com/mrclrchtr/supi/stargazers). Stars help other Pi users find the project.**
 
 > SuPi is pre-release. Packages marked beta are the fastest-moving parts of the stack.
 
@@ -214,6 +218,8 @@ pi install npm:@mrclrchtr/supi-debug
 ```
 
 Share the result, or any friction you find in SuPi tools, prompts, skills, or injected context, as a [GitHub issue](https://github.com/mrclrchtr/supi/issues).
+
+If SuPi is useful to you, consider giving it a [star](https://github.com/mrclrchtr/supi/stargazers) as well.
 
 ## License
 

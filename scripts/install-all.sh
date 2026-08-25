@@ -62,6 +62,8 @@ if [[ ${#FAILED[@]} -eq 0 ]]; then
   echo "Done — ${#PACKAGES[@]} packages installed ($SCOPE)."
   echo ""
   echo "Run /reload in pi to pick up new extensions."
+  echo ""
+  echo "Enjoying SuPi? Star the repository: https://github.com/mrclrchtr/supi"
 else
   echo "Done with ${#FAILED[@]} failure(s): ${FAILED[*]}"
   exit 1
