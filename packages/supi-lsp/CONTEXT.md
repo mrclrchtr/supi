@@ -30,6 +30,14 @@ _Avoid_: owner readiness, `Promise.all([])` readiness, treating a configured rou
 A freshness boundary that invalidates earlier diagnostic evidence after a document or workspace change. Evidence may cross the boundary only when the current document scope is confirmed; an old cache or an unversioned publication does not cross it.
 _Avoid_: cache clear, quiet period, clean result, workspace-wide freshness
 
+**TypeScript program membership**:
+The live configured or inferred TypeScript programs that contain a file, in the model behind the running server's diagnostics. Distinct from config coverage state, which only checks the nearest tsconfig.
+_Avoid_: nearest-tsconfig coverage, config grouping, project meaning client route
+
+**Diagnostic impact scope**:
+The evidence set that a TypeScript file change must make suspect: the containing programs, transitive project-reference dependents, and conservative fallbacks for unresolved membership.
+_Avoid_: workspace-wide suspect set, changed-file-only scope
+
 **Confirmed diagnostic evidence**:
 Diagnostic evidence that matches the current document synchronization and has remained settled under the push-publication policy; it can support a clean-result claim.
 _Avoid_: fresh evidence, current snapshot, semantic completion
