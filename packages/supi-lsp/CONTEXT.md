@@ -14,6 +14,10 @@ _Avoid_: LspManager, LSP singleton, provider bag, client registry
 A best-effort workspace-runtime operation that clears pull state, refreshes active clients, and may restart an affected push-only client on a protocol-stall signal (readiness-stall or protocol-errors), never on unconfirmed evidence alone and never pull-capable routes. Its attempted-client count names targets, not confirmed successful diagnostic refreshes.
 _Avoid_: recovered diagnostics, freshness proof, per-client success inference
 
+**Process-crash recovery**:
+The route-level recovery for a previously running LSP client whose server process exits or emits a process error. It is separate from diagnostic recovery, which responds to diagnostic evidence or protocol stalls.
+_Avoid_: diagnostic recovery, startup retry, crash loop
+
 **LSP runtime controller**:
 The lifecycle/status module for one workspace. It starts and shuts down language-server infrastructure, publishes runtime state, and reports detected project servers. It does not own semantic workflow policy.
 _Avoid_: Workspace LSP runtime, semantic provider, query router
