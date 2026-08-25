@@ -13,7 +13,7 @@ import {
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
-import type { ProgressToken } from "vscode-languageserver-protocol";
+import { type ProgressToken, TextDocumentSyncKind } from "vscode-languageserver-protocol";
 import { CLIENT_CAPABILITIES } from "../config/capabilities.ts";
 import type {
   CodeAction,
@@ -198,6 +198,7 @@ export class LspClient {
       cwd: cwd,
       isOperational: () => this.rpc !== null && this._status === "running",
       supportsPullDiagnostics: () => this.hasDiagnosticProvider,
+      usesIncrementalDocumentSync: () => this.usesIncrementalDocumentSync,
       sendNotification: (method, params) => {
         if (this.rpc) void this.rpc.sendNotification(method, params);
       },
@@ -237,6 +238,13 @@ export class LspClient {
     return this.capabilities;
   }
 
+  /** Whether the server requires range-based document changes. */
+  get usesIncrementalDocumentSync(): boolean {
+    const sync = this.capabilities?.textDocumentSync;
+    const change = typeof sync === "number" ? sync : sync?.change;
+    return change === TextDocumentSyncKind.Incremental;
+  }
+
   /** Whether the server is currently not indexing and ready to serve queries. */
   get ready(): boolean {
     return this._isReady;
@@ -262,7 +270,7 @@ export class LspClient {
       this.process = spawn(cmd, args, {
         cwd: this.root,
         stdio: ["pipe", "pipe", "pipe"],
-        env: { ...process.env },
+        env: { ...process.env, ...this.config.env },
         // Run the server in its own process group so we can atomically
         // kill the entire tree (server + subprocesses like tsserver)
         // with `process.kill(-pid, signal)` on Unix or `taskkill /T` on Windows.
@@ -313,6 +321,12 @@ export class LspClient {
       const result = (await this.rpc.sendRequest("initialize", {
         processId: process.pid,
         rootUri: fileToUri(this.root),
+        workspaceFolders: [
+          {
+            uri: fileToUri(this.root),
+            name: path.basename(this.root) || this.root,
+          },
+        ],
         capabilities: CLIENT_CAPABILITIES,
         initializationOptions: this.config.initializationOptions,
       })) as InitializeResult;
@@ -322,7 +336,7 @@ export class LspClient {
         throw new Error(`Server selected unsupported position encoding "${positionEncoding}".`);
       }
       this.capabilities = result.capabilities;
-      void this.rpc.sendNotification("initialized", {});
+      await this.rpc.sendNotification("initialized", {});
       this._status = "running";
       this.publishLifecycle("startup");
 

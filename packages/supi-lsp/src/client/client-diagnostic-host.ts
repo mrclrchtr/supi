@@ -9,6 +9,7 @@ export interface ClientDiagnosticsHost {
   cwd?: string;
   isOperational(): boolean;
   supportsPullDiagnostics(): boolean;
+  usesIncrementalDocumentSync(): boolean;
   sendNotification(method: string, params: unknown): void;
   pullDocumentDiagnostics(request: DiagnosticPullRequest): Promise<DocumentDiagnosticReport | null>;
 }

@@ -118,6 +118,7 @@ export class ClientDiagnostics {
       version,
       synchronizationId: ++this.#nextSynchronizationId,
       evidenceRevision: this.#evidenceRevision,
+      content,
       contentFingerprint: fingerprintDocumentContent(content),
     });
     this.host.sendNotification("textDocument/didOpen", {
@@ -148,6 +149,7 @@ export class ClientDiagnostics {
       nextVersion: () => nextDocumentVersion(this.#versionHistory, uri),
       nextSynchronizationId: () => ++this.#nextSynchronizationId,
       evidenceRevision: this.#evidenceRevision,
+      incrementalSync: this.host.usesIncrementalDocumentSync(),
       waiters: this.#waiters,
       sendNotification: (method, params) => this.host.sendNotification(method, params),
       markUnversionedSyncMoment: () => this.#unversionedPushSyncMoments.set(uri, Date.now()),
@@ -359,6 +361,7 @@ export class ClientDiagnostics {
         nextVersion: () => nextDocumentVersion(this.#versionHistory, uri),
         nextSynchronizationId: () => ++this.#nextSynchronizationId,
         evidenceRevision: this.#evidenceRevision,
+        incrementalSync: this.host.usesIncrementalDocumentSync(),
         waiters: this.#waiters,
         sendNotification: (method, params) => this.host.sendNotification(method, params),
         markUnversionedSyncMoment: () => this.#unversionedPushSyncMoments.set(uri, Date.now()),

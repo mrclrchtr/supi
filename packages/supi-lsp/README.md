@@ -80,6 +80,28 @@ Configuration overrides merge with the built-in server definitions. Use `.pi/sup
 
 Gopls pull diagnostics stay opt-in while golang/go#70199 is open; without the option the built-in Go configuration stays in push mode. Kotlin's `--stdio` argument is already part of the built-in configuration and needs no override.
 
+### Custom server configuration
+
+A custom server needs a command and at least one file type:
+
+```json
+{
+  "lsp": {
+    "servers": {
+      "custom": {
+        "command": "custom-lsp",
+        "args": ["--stdio"],
+        "fileTypes": ["custom"],
+        "env": { "CUSTOM_LSP_LOG": "debug" },
+        "initializationOptions": { "mode": "project" }
+      }
+    }
+  }
+}
+```
+
+File types do not include a leading dot. If `rootMarkers` is omitted, the server uses the session root.
+
 The `lsp.enabled` and `lsp.active` settings are deprecated and ignored. Disable one language with `lsp.servers.<language>.enabled: false`. Use `/supi-ci-status` from `@mrclrchtr/supi-code-intelligence` to see detected, running, and missing servers.
 
 ## What it provides

@@ -125,15 +125,15 @@ function mergeSingleServer(
   override: Partial<ServerConfig>,
 ): ServerConfig | null {
   if (!base) {
-    // New custom language — must have all required fields
+    // A custom server needs a command and at least one file extension.
     if (
-      override.command &&
+      typeof override.command === "string" &&
+      override.command.length > 0 &&
       Array.isArray(override.fileTypes) &&
       override.fileTypes.length > 0 &&
-      Array.isArray(override.rootMarkers) &&
-      override.rootMarkers.length > 0
+      (override.rootMarkers === undefined || Array.isArray(override.rootMarkers))
     ) {
-      return override as ServerConfig;
+      return { ...override, rootMarkers: override.rootMarkers ?? [] } as ServerConfig;
     }
     return null;
   }

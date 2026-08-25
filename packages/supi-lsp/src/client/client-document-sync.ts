@@ -14,8 +14,37 @@ interface SynchronizeDocumentOptions {
   version: number;
   synchronizationId: number;
   evidenceRevision: number;
+  incrementalSync: boolean;
   waiters: DiagnosticWaitRegistry;
   sendNotification: NotificationSender;
+}
+
+function endPosition(content: string): { line: number; character: number } {
+  const lines = content.split(/\r\n|\r|\n/);
+  return { line: lines.length - 1, character: lines.at(-1)?.length ?? 0 };
+}
+
+/**
+ * For incremental sync, replace the old full range with the new text.
+ * This is a valid incremental edit and avoids a second text-diff engine.
+ */
+function contentChanges(
+  previousContent: string,
+  content: string,
+  incrementalSync: boolean,
+): unknown[] {
+  if (incrementalSync) {
+    return [
+      {
+        range: {
+          start: { line: 0, character: 0 },
+          end: endPosition(previousContent),
+        },
+        text: content,
+      },
+    ];
+  }
+  return [{ text: content }];
 }
 
 /** Advance and publish one explicit document synchronization. */
@@ -25,13 +54,19 @@ export function synchronizeDocument(options: SynchronizeDocumentOptions): void {
   options.document.version = options.version;
   options.document.synchronizationId = options.synchronizationId;
   options.document.evidenceRevision = options.evidenceRevision;
+  const changes = contentChanges(
+    options.document.content,
+    options.content,
+    options.incrementalSync,
+  );
+  options.document.content = options.content;
   options.document.contentFingerprint = fingerprintDocumentContent(options.content);
   options.sendNotification("textDocument/didChange", {
     textDocument: {
       uri: options.uri,
       version: options.version,
     } satisfies VersionedTextDocumentIdentifier,
-    contentChanges: [{ text: options.content }],
+    contentChanges: changes,
   });
 }
 
@@ -74,6 +109,7 @@ export function reopenDocument(options: {
   options.document.version = version;
   options.document.synchronizationId = options.nextSynchronizationId();
   options.document.evidenceRevision = options.evidenceRevision;
+  options.document.content = options.content;
   options.document.contentFingerprint = fingerprintDocumentContent(options.content);
   options.sendNotification("textDocument/didOpen", {
     textDocument: {
@@ -93,6 +129,7 @@ export function synchronizeTrackedDocument(options: {
   nextVersion(): number;
   nextSynchronizationId(): number;
   evidenceRevision: number;
+  incrementalSync: boolean;
   waiters: DiagnosticWaitRegistry;
   sendNotification: NotificationSender;
   markUnversionedSyncMoment?(): void;
@@ -111,6 +148,7 @@ export function synchronizeTrackedDocument(options: {
     version: options.nextVersion(),
     synchronizationId: options.nextSynchronizationId(),
     evidenceRevision: options.evidenceRevision,
+    incrementalSync: options.incrementalSync,
     waiters: options.waiters,
     sendNotification: options.sendNotification,
   });
@@ -123,6 +161,7 @@ interface ResynchronizeDocumentsOptions {
   nextVersion(uri: string): number;
   nextSynchronizationId(): number;
   evidenceRevision: number;
+  incrementalSync: boolean;
   sendNotification: NotificationSender;
   uriToFile(uri: string): string;
   /** Disk content already read by classification; avoids a second read. */
@@ -164,6 +203,7 @@ export function resynchronizeOpenDocuments(
         version: options.nextVersion(uri),
         synchronizationId: options.nextSynchronizationId(),
         evidenceRevision: options.evidenceRevision,
+        incrementalSync: options.incrementalSync,
         waiters: options.waiters,
         sendNotification: options.sendNotification,
       });

@@ -28,6 +28,8 @@ export interface OpenDocumentState {
   version: number;
   synchronizationId: number;
   evidenceRevision: number;
+  /** Last text sent to the server. Used to form incremental changes. */
+  content: string;
   contentFingerprint: string;
 }
 

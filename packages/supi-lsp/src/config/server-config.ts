@@ -5,8 +5,11 @@ export interface ServerConfig {
   command: string;
   args?: string[];
   fileTypes: string[];
+  /** Files that identify the project root. An empty list uses the session root. */
   rootMarkers: string[];
   enabled?: boolean;
+  /** Environment values added when the server process starts. */
+  env?: Record<string, string>;
   initializationOptions?: unknown;
   /** Maximum time to wait for a single $/progress cycle, in ms. Default: 10_000. */
   readinessTimeoutMs?: number;

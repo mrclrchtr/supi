@@ -181,6 +181,40 @@ describe("loadConfig", () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
+  it("accepts custom servers without root markers", () => {
+    const tmpDir = makeTmpDir();
+    fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "supi", "config.json"),
+      JSON.stringify({
+        lsp: {
+          servers: {
+            custom: {
+              command: "custom-lsp",
+              args: ["--stdio"],
+              fileTypes: ["custom"],
+              env: { CUSTOM_LSP_LOG: "debug" },
+              initializationOptions: { mode: "project" },
+            },
+          },
+        },
+      }),
+    );
+
+    const config = loadConfig(tmpDir);
+    expect(config.servers.custom).toEqual({
+      command: "custom-lsp",
+      args: ["--stdio"],
+      fileTypes: ["custom"],
+      rootMarkers: [],
+      env: { CUSTOM_LSP_LOG: "debug" },
+      initializationOptions: { mode: "project" },
+    });
+    expect(getServerForFile(config, "src/example.custom")?.[0]).toBe("custom");
+
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
   it("rejects incomplete custom servers", () => {
     const tmpDir = makeTmpDir();
     fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });

@@ -1,5 +1,8 @@
+import fs from "node:fs";
+
 let input = Buffer.alloc(0);
 const selectedEncoding = process.argv[2];
+const recordPath = process.argv[3];
 
 function send(message) {
   const body = JSON.stringify(message);
@@ -8,6 +11,12 @@ function send(message) {
 
 function handle(message) {
   if (message.method === "initialize") {
+    if (recordPath) {
+      fs.writeFileSync(
+        recordPath,
+        JSON.stringify({ params: message.params, env: process.env.SUPI_TEST_LSP_ENV }),
+      );
+    }
     const capabilities = selectedEncoding === "omit" ? {} : { positionEncoding: selectedEncoding };
     send({ jsonrpc: "2.0", id: message.id, result: { capabilities } });
     return;

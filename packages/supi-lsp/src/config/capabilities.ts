@@ -63,7 +63,7 @@ export const CLIENT_CAPABILITIES: ClientCapabilities = {
     workDoneProgress: true,
   },
   workspace: {
-    workspaceFolders: false,
+    workspaceFolders: true,
     workspaceEdit: {
       documentChanges: true,
     },

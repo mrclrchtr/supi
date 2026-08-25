@@ -378,6 +378,7 @@ function prepareRefreshDocuments(
     nextVersion: (uri) => nextDocumentVersion(options.versionHistory, uri),
     nextSynchronizationId: options.nextSynchronizationId,
     evidenceRevision,
+    incrementalSync: options.host.usesIncrementalDocumentSync(),
     sendNotification: (method, params) => options.host.sendNotification(method, params),
     uriToFile,
     preloadedContent: classification?.preloadedContent,
