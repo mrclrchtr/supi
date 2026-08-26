@@ -75,7 +75,7 @@
     "typescript": "6.0.3",
     "typescript-language-server": "6.0.0",
     "vitest": "4.1.11",
-    "web-tree-sitter": "0.26.12"
+    "web-tree-sitter": "0.26.13"
   },
   "pi": {
     "extensions": [
