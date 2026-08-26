@@ -105,7 +105,7 @@ describe("/supi-ci-status command", () => {
     });
   });
 
-  it("sets status bar with code-intelligence key when LSP ready with running servers", async () => {
+  it("sets status bar with readiness and typed route errors", async () => {
     const pi = createPiMock();
     registerCiStatusCommand(pi as never);
     pi.setActiveTools(["code_orientation"]);
@@ -114,7 +114,16 @@ describe("/supi-ci-status command", () => {
     Object.assign(ctx.ui, { setFooter: vi.fn() });
     registerMinimalSemantic("/project");
     const mockService = {
-      getProjectServers: vi.fn(() => [readyProjectServer()]),
+      getProjectServers: vi.fn(() => [
+        readyProjectServer(),
+        {
+          ...readyProjectServer(),
+          root: "/project/packages/app",
+          status: "error",
+          ready: false,
+          statusReason: "process-crash-recovery-exhausted",
+        },
+      ]),
       getOutstandingDiagnosticSummary: vi.fn(() => ({
         entries: [],
         current: true,
@@ -146,6 +155,7 @@ describe("/supi-ci-status command", () => {
     expect(call).toBeDefined();
     expect(call?.[1]).toBeDefined();
     expect(call?.[1]).toContain("1 server");
+    expect(call?.[1]).toContain("1 route error");
   });
 
   it("passes invalidated diagnostic freshness to the status dialog", async () => {

@@ -75,9 +75,14 @@ export interface SemanticProvider {
     filePath: string,
     control?: CodeRequestControl,
   ): Promise<CodeQueryResult<DocumentCodeSymbol[]>>;
+  /**
+   * Collect workspace symbols from routes that can contribute within the
+   * optional canonical path scopes.
+   */
   workspaceSymbols(
     query: string,
     control?: CodeRequestControl,
+    scopes?: readonly string[],
   ): Promise<CodeQueryResult<CodeSymbol[]>>;
 
   /** Optional definition capability with explicit completed-empty semantics. */

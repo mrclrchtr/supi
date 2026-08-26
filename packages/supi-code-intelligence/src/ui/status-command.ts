@@ -9,7 +9,7 @@ import {
   evaluateCapabilityWarnings,
   gatherCapabilityWarningInput,
 } from "../analysis/capability/capability-warnings.ts";
-import { formatProjectServerStatusReason } from "../analysis/health/server-status.ts";
+import { countProjectServerRouteStatuses } from "../analysis/health/server-status.ts";
 import { type CiStatusData, createCiStatusDialog } from "./status-overlay.ts";
 
 const STATUS_KEY = "code-intelligence";
@@ -121,6 +121,7 @@ async function gatherCiStatusData(cwd: string, pi: ExtensionAPI): Promise<CiStat
   const capabilityWarnings = evaluateCapabilityWarnings(gatherCapabilityWarningInput(cwd, null));
 
   return {
+    workspaceRoot: cwd,
     servers,
     diagnostics,
     serverInventoryAvailable,
@@ -203,24 +204,37 @@ function renderFooterLine(ctx: ExtensionContext, data: CiStatusData): string {
   if (totalWarnings > 0) {
     parts.push(t.fg("warning", `${totalWarnings} warning${totalWarnings === 1 ? "" : "s"}`));
   }
-  addProjectServerStatusReason(parts, data, t);
+  addProjectServerRouteCounts(parts, data, t);
   const structKind = data.capabilities.structural.kind;
   if (structKind === "ready") parts.push(t.fg("success", "✓ ts"));
   if (parts.length === 0) return t.fg("dim", "CI — no data available");
   return parts.join(t.fg("dim", "  "));
 }
 
-function addProjectServerStatusReason(
+function addProjectServerRouteCounts(
   parts: string[],
   data: CiStatusData,
   theme: ExtensionContext["ui"]["theme"],
 ): void {
-  for (const server of data.servers) {
-    const reason = formatProjectServerStatusReason(server.statusReason);
-    if (reason) {
-      parts.push(theme.fg("warning", reason));
-      return;
-    }
+  const counts = countProjectServerRouteStatuses(data.servers);
+  if (counts.recovering > 0) {
+    parts.push(
+      theme.fg(
+        "warning",
+        `${counts.recovering} route${counts.recovering === 1 ? "" : "s"} recovering`,
+      ),
+    );
+  }
+  if (counts.error > 0) {
+    parts.push(theme.fg("error", `${counts.error} route error${counts.error === 1 ? "" : "s"}`));
+  }
+  if (counts.unavailable > 0) {
+    parts.push(
+      theme.fg(
+        "warning",
+        `${counts.unavailable} route${counts.unavailable === 1 ? "" : "s"} unavailable`,
+      ),
+    );
   }
 }
 
@@ -246,7 +260,7 @@ function updateStatusAndWidget(ctx: ExtensionContext, data: CiStatusData): void 
   if (totalWarnings > 0) {
     parts.push(t.fg("warning", `${totalWarnings} warning${totalWarnings === 1 ? "" : "s"}`));
   }
-  addProjectServerStatusReason(parts, data, t);
+  addProjectServerRouteCounts(parts, data, t);
   const structKind = data.capabilities.structural.kind;
   if (structKind === "ready") parts.push(t.fg("success", "✓ ts"));
 

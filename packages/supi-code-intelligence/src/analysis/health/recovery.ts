@@ -4,6 +4,7 @@
 import type { CapabilityState, CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import type {
   DiagnosticEvidenceSummary,
+  ProcessCrashDiagnosticDemand,
   RecoverDiagnosticsResult,
   WorkspaceLspRuntime,
 } from "@mrclrchtr/supi-lsp/api";
@@ -16,6 +17,8 @@ interface RecoverOptions {
   control?: CodeRequestControl;
   /** Evidence from the maintenance refresh, so the recovery pass skips its own refresh. */
   initialEvidence?: DiagnosticEvidenceSummary;
+  /** Explicit demand for crashed diagnostic routes before diagnostic recovery. */
+  processCrashDemand?: ProcessCrashDiagnosticDemand;
 }
 
 /** Run the runtime's best-effort recovery and preserve its established outcome. */
@@ -26,6 +29,7 @@ export async function recoverDiagnosticRuntime(
   return opts.service.recoverDiagnostics({
     restartIfStillStale: true,
     ...(opts.initialEvidence !== undefined ? { initialEvidence: opts.initialEvidence } : {}),
+    ...(opts.processCrashDemand ? { processCrashDemand: opts.processCrashDemand } : {}),
     control: opts.control,
   });
 }

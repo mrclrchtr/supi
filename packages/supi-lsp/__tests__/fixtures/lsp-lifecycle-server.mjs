@@ -1,4 +1,6 @@
 import * as fs from "node:fs";
+import * as path from "node:path";
+import { pathToFileURL } from "node:url";
 
 let input = Buffer.alloc(0);
 const mode = process.argv[2] ?? "stable";
@@ -121,11 +123,32 @@ function publishDiagnostics(uri, version) {
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: the fixture dispatches several independent protocol scenarios.
 function handle(message) {
   if (message.method === "initialize") {
-    send({ jsonrpc: "2.0", id: message.id, result: { capabilities: {} } });
+    send({
+      jsonrpc: "2.0",
+      id: message.id,
+      result: { capabilities: { workspaceSymbolProvider: true } },
+    });
     return;
   }
   if (message.method === "initialized" && shouldCrash()) {
     setTimeout(() => process.exit(17), delayMs);
+    return;
+  }
+  if (message.method === "workspace/symbol") {
+    send({
+      jsonrpc: "2.0",
+      id: message.id,
+      result: [
+        {
+          name: `generation-${process.pid}`,
+          kind: 12,
+          location: {
+            uri: pathToFileURL(path.join(process.cwd(), "recovery.test")).href,
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+          },
+        },
+      ],
+    });
     return;
   }
   if (message.method === "textDocument/documentSymbol") {

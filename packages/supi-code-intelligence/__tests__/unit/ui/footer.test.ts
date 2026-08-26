@@ -52,6 +52,46 @@ describe("LSP footer lifecycle adapter", () => {
     expect(buildLspStatusText(state)).toBe("λ lsp • 1 ↻");
   });
 
+  it("groups crashed and plain errors while keeping unavailable distinct", () => {
+    const state = createLspAdapterState();
+    state.controller = {
+      workspaceRuntime: {
+        getProjectServers: () => [
+          {
+            name: "typescript",
+            root: "/project",
+            fileTypes: ["ts"],
+            status: "error",
+            statusReason: "process-crashed",
+            supportedActions: [],
+            openFiles: [],
+            ready: false,
+          },
+          {
+            name: "bash",
+            root: "/project",
+            fileTypes: ["sh"],
+            status: "error",
+            supportedActions: [],
+            openFiles: [],
+            ready: false,
+          },
+          {
+            name: "ruby",
+            root: "/project",
+            fileTypes: ["rb"],
+            status: "unavailable",
+            supportedActions: [],
+            openFiles: [],
+            ready: false,
+          },
+        ],
+      },
+    } as never;
+
+    expect(buildLspStatusText(state)).toBe("λ lsp • 2 ✗ • 1 ⊘");
+  });
+
   it("stops invalidation events when its listener is disposed", () => {
     const pi = createPiMock();
     const state = createLspAdapterState();

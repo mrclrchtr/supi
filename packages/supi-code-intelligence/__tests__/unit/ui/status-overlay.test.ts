@@ -48,6 +48,7 @@ function makeTui() {
 
 function makeData(overrides: Partial<CiStatusData> = {}): CiStatusData {
   return {
+    workspaceRoot: "/project",
     servers: [],
     serverInventoryAvailable: true,
     semanticAvailable: true,
@@ -96,9 +97,11 @@ describe("CiStatusDialog", () => {
 
       const rendered = dialog.render(100).join("\\n");
 
-      expect(rendered).toContain("process crashed; next file operation will recover");
+      expect(rendered).toContain("process crashed; next evidence operation will recover");
       expect(rendered).toContain("process recovery in progress");
       expect(rendered).toContain("process recovery exhausted; reload required");
+      expect(rendered).toContain("1 route recovering");
+      expect(rendered).toContain("2 route errors");
     });
 
     it("renders header with title and toggle hint", () => {
@@ -117,7 +120,7 @@ describe("CiStatusDialog", () => {
       expect(all).toContain("Servers");
       expect(all).toContain("typescript");
       expect(all).toContain("bash");
-      expect(all).toContain("/project");
+      expect(all).toContain("root: .");
     });
 
     it("hides servers section when empty and LSP not ready", () => {

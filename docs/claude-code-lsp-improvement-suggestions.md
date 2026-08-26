@@ -100,7 +100,7 @@ Relevant local documents:
 
 ## Selected improvement: process-crash recovery
 
-**Decision status:** selected for implementation in [GitHub issue #354](https://github.com/mrclrchtr/supi/issues/354); implementation has not started.
+**Decision status:** implemented for [GitHub issue #354](https://github.com/mrclrchtr/supi/issues/354). Live verification then broadened recovery demand from file-routed operations to all semantic evidence operations and explicit diagnostic refresh while keeping status observations passive.
 
 Select one focused runtime-reliability change. The current manager keeps a crashed client in the error state. A later file route removes that client, records a runtime error, and returns no client. Automatic diagnostic recovery cannot help because it selects only running push-only clients. Lifecycle reliability also has the strongest related evidence in the repository. The other suggestions have weak or no recorded demand.
 
@@ -108,8 +108,9 @@ Process-crash recovery is separate from diagnostic recovery and startup retry. I
 
 Required behavior:
 
-- Trigger recovery on the next file-routed semantic or explicit diagnostic operation. Do not trigger it from workspace-wide operations or passive status reads.
-- Let the triggering operation await the replacement and continue when startup succeeds.
+- Trigger recovery from semantic evidence operations and explicit diagnostic demand. File-routed operations recover their route. Workspace-symbol operations recover every required known route, selected by operation support and scope/root intersection. Unscoped operations recover every known supporting route.
+- Explicit broad diagnostic refresh recovers only crashed routes with retained tracked files in its scope. Server inventory, workspace readiness, and passive diagnostic snapshots do not trigger recovery.
+- Recover required routes in parallel. Let the triggering operation await each shared replacement and continue when startup succeeds.
 - Allow one automatic attempt for each server-and-root route in one workspace runtime. Consume the attempt when replacement startup begins, whether startup succeeds or fails.
 - Reset the attempt budget only when the workspace runtime reloads or restarts. Explicit diagnostic refresh cannot bypass the budget.
 - Do not add `restartOnCrash`, `maxRestarts`, or another crash-policy setting for this change.
@@ -124,9 +125,9 @@ Required behavior:
 
 Acceptance evidence:
 
-- Unit tests cover the one-attempt budget, concurrent callers, caller cancellation, status-reason transitions, startup failure, a later crash, and tracked-document restoration.
-- A real child-process integration test proves this sequence: a running server crashes, the next file-routed operation starts one replacement, and the same operation continues successfully.
-- Tests prove that a crash without a later file-routed operation does not start a replacement.
+- Unit tests cover the one-attempt budget, concurrent callers, caller cancellation, status-reason transitions, startup failure, a later crash, tracked-document restoration, scoped route selection, and partial workspace evidence.
+- Real child-process integration tests prove that file-routed and concurrent workspace-symbol demand continue through one shared replacement.
+- Tests prove that passive server inventory and diagnostic snapshots do not start a replacement.
 - Package TypeScript tests and repository verification pass.
 
 No ADR is required. The policy is easy to revise and does not meet the repository ADR threshold.

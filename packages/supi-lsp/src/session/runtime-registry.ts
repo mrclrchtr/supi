@@ -38,7 +38,10 @@ import type {
   WorkspaceLspRuntimeState,
 } from "./workspace-lsp-runtime.ts";
 
-export type { WorkspaceLspDiagnosticSurface } from "./runtime-diagnostic-surface.ts";
+export type {
+  ProcessCrashDiagnosticDemand,
+  WorkspaceLspDiagnosticSurface,
+} from "./runtime-diagnostic-surface.ts";
 export type {
   DiagnosticEvidenceDocument,
   DiagnosticEvidenceStatus,
@@ -179,8 +182,9 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   async workspaceSymbol(
     query: string,
     control?: CodeRequestControl,
+    scopes?: readonly string[],
   ): Promise<CodeQueryResult<SymbolInformation[] | WorkspaceSymbol[]>> {
-    return this.manager.workspaceSymbol(query, control);
+    return this.manager.workspaceSymbol(query, control, scopes);
   }
 
   async rename(
@@ -366,6 +370,8 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     quietMs?: number;
     /** Evidence from a refresh the caller already completed; skips this pass's own refresh when no watched-file changes apply. */
     initialEvidence?: DiagnosticEvidenceSummary;
+    /** Explicit demand to recover crashed routes with tracked files in scope. */
+    processCrashDemand?: import("./runtime-diagnostic-surface.ts").ProcessCrashDiagnosticDemand;
     control?: CodeRequestControl;
   }): Promise<RecoverDiagnosticsResult> {
     const recoveryStartedAt = Date.now();

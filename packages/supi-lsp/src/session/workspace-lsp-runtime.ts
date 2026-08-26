@@ -68,9 +68,11 @@ export interface WorkspaceLspRuntime extends WorkspaceLspDiagnosticSurface {
     filePath: string,
     control?: CodeRequestControl,
   ): Promise<CodeQueryResult<DocumentSymbol[] | SymbolInformation[]>>;
+  /** Collect symbols from routes that can contribute within the optional path scopes. */
   workspaceSymbol(
     query: string,
     control?: CodeRequestControl,
+    scopes?: readonly string[],
   ): Promise<CodeQueryResult<SymbolInformation[] | WorkspaceSymbol[]>>;
   rename(
     filePath: string,

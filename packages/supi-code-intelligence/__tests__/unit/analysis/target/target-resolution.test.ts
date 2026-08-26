@@ -2,6 +2,7 @@ import * as path from "node:path";
 import {
   type CodeQueryResult,
   completedCodeQuery,
+  partialCodeQuery,
   type SemanticProvider as SemanticSubstrate,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
@@ -65,14 +66,46 @@ describe("toLspPosition (formerly toZeroBased)", () => {
 });
 
 describe("resolveSymbolTarget", () => {
-  it("returns an explicit error when semantic symbol discovery is unavailable", async () => {
+  it("forwards resolved scope and request control to semantic discovery", async () => {
+    const workspaceSymbols = vi.fn().mockResolvedValue(completedCodeQuery([]));
+    const control = { deadline: Date.now() + 1_000 };
+
+    await resolveSymbolTarget(
+      "Widget",
+      "/project",
+      {
+        workspaceSymbols,
+      } as unknown as SemanticSubstrate,
+      {
+        path: "src",
+        control,
+      },
+    );
+
+    expect(workspaceSymbols).toHaveBeenCalledWith("Widget", control, ["/project/src"]);
+  });
+
+  it("does not report not-found when route evidence is incomplete", async () => {
+    const result = await resolveSymbolTarget("Widget", "/project", {
+      workspaceSymbols: vi
+        .fn()
+        .mockResolvedValue(partialCodeQuery([], "typescript route recovery exhausted")),
+    } as unknown as SemanticSubstrate);
+
+    expect(result).toEqual({
+      kind: "unavailable",
+      reason: "Symbol discovery for `Widget` is incomplete: typescript route recovery exhausted",
+    });
+  });
+
+  it("returns unavailable when semantic symbol discovery is unavailable", async () => {
     const result = await resolveSymbolTarget("Widget", "/project", {
       workspaceSymbols: vi.fn().mockResolvedValue(null),
     } as unknown as SemanticSubstrate);
 
-    expect(result.kind).toBe("error");
-    if (result.kind === "error") {
-      expect(result.message).toContain("is unavailable");
+    expect(result.kind).toBe("unavailable");
+    if (result.kind === "unavailable") {
+      expect(result.reason).toContain("is unavailable");
     }
   });
 

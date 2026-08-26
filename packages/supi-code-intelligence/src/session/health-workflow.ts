@@ -59,6 +59,7 @@ export async function runHealthWorkflow(
   if (prepared.kind === "invalid-input") return prepared;
   const { request, scopeFilter, included, level } = prepared.value;
   const semanticRequested = healthNeedsSemantic(included);
+  const fileReadinessRequested = included.includes("diagnostics");
   throwIfAborted(control);
 
   reportProgress(control, {
@@ -85,6 +86,7 @@ export async function runHealthWorkflow(
   });
   const semanticState = await establishSemanticHealthState({
     requested: semanticRequested,
+    fileReadinessRequested,
     runtime,
     scopeFilter,
     lspState,
@@ -139,6 +141,8 @@ function healthNeedsSemantic(included: readonly HealthSection[]): boolean {
 
 interface SemanticHealthStateOptions {
   requested: boolean;
+  /** Whether this call requests file-routed evidence rather than passive inventory. */
+  fileReadinessRequested: boolean;
   runtime: WorkspaceLspRuntime | null;
   scopeFilter: string | null;
   lspState: WorkspaceLspRuntimeState;
@@ -150,7 +154,7 @@ async function establishSemanticHealthState(
   options: SemanticHealthStateOptions,
 ): Promise<SemanticHealthState | null> {
   if (!options.requested) return null;
-  if (options.runtime && isScopedFile(options.scopeFilter)) {
+  if (options.fileReadinessRequested && options.runtime && isScopedFile(options.scopeFilter)) {
     const readiness = await options.runtime.waitUntilReadyForFile(
       options.scopeFilter,
       undefined,

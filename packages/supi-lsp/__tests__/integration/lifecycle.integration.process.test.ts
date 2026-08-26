@@ -180,6 +180,42 @@ describe("LSP manager lifecycle integration", () => {
     });
   }, 10_000);
 
+  it("shares one real replacement across concurrent workspace-symbol demand", async () => {
+    const root = createProject();
+    const sourceFile = path.join(root, "recovery.test");
+    const crashMarker = path.join(root, ".crashed-once");
+    fs.writeFileSync(sourceFile, "recovery fixture\n");
+    const transitions: ManagerLifecycleTransition[] = [];
+    const manager = new LspManager(config("crash-once", crashMarker), root, (transition) => {
+      transitions.push(transition);
+    });
+    managers.push(manager);
+
+    const original = await manager.startServerForRoot("test", root);
+    if (!original) throw new Error("Expected the original client to start.");
+    original.didOpen(sourceFile, fs.readFileSync(sourceFile, "utf8"));
+    await waitFor(
+      async () => transitions,
+      (events) => events.some((event) => event.kind === "crash"),
+      { timeoutMs: 2_000, retryDelayMs: 20, label: "workspace-symbol process crash" },
+    );
+
+    const runtime = createWorkspaceLspRuntimeOwner(manager).runtime;
+    const [first, second] = await Promise.all([
+      runtime.workspaceSymbol("generation", undefined, [sourceFile]),
+      runtime.workspaceSymbol("generation", undefined, [sourceFile]),
+    ]);
+
+    expect(first).toMatchObject({ kind: "completed" });
+    expect(second).toMatchObject({ kind: "completed" });
+    if (first.kind !== "completed" || second.kind !== "completed") {
+      throw new Error("Expected recovered workspace-symbol evidence.");
+    }
+    expect(first.data[0]?.name).toMatch(/^generation-\d+$/);
+    expect(second.data[0]?.name).toBe(first.data[0]?.name);
+    expect(transitions.filter((event) => event.kind === "startup")).toHaveLength(2);
+  }, 10_000);
+
   it("restarts a stalled push-only client and confirms diagnostics through the replacement", async () => {
     const root = createProject();
     const sourceFile = path.join(root, "fresh.test");

@@ -97,7 +97,8 @@ export function withSemanticRequestControl<T extends SemanticProvider>(
     references: (file, position) => provider.references(file, position, control),
     implementation: (file, position) => provider.implementation(file, position, control),
     documentSymbols: (file) => provider.documentSymbols(file, control),
-    workspaceSymbols: (query) => provider.workspaceSymbols(query, control),
+    workspaceSymbols: (query, _requestControl, scopes) =>
+      provider.workspaceSymbols(query, control, scopes),
     hover: provider.hover
       ? (file, position) => provider.hover?.(file, position, control)
       : undefined,

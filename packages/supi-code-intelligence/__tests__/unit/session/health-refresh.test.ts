@@ -230,7 +230,33 @@ describe("code_health refresh evidence", () => {
     // The maintenance pass refreshes once; the recovery pass reuses its evidence.
     expect(refreshOpenDiagnostics).toHaveBeenCalledTimes(1);
     expect(recoverDiagnostics).toHaveBeenCalledWith(
-      expect.objectContaining({ restartIfStillStale: true, initialEvidence: evidence }),
+      expect.objectContaining({
+        restartIfStillStale: true,
+        initialEvidence: evidence,
+        processCrashDemand: {},
+      }),
+    );
+  });
+
+  it("passes directory scope as explicit process-crash diagnostic demand", async () => {
+    const directory = path.join(cwd, "src");
+    mkdirSync(directory);
+    const evidence = emptyEvidence();
+    const recoverDiagnostics = vi.fn(async () => ({
+      attemptedClients: 0,
+      restartedClients: 0,
+      diagnosticEvidence: evidence,
+      staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+    }));
+    const runtime = readyRuntime({ recoverDiagnostics });
+
+    await run(
+      { kind: "ready", runtime },
+      { scope: "src", include: ["diagnostics"], refresh: true },
+    );
+
+    expect(recoverDiagnostics).toHaveBeenCalledWith(
+      expect.objectContaining({ processCrashDemand: { scopes: [directory] } }),
     );
   });
 

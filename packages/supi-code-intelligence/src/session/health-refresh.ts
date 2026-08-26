@@ -105,9 +105,13 @@ async function collectWorkspaceRefreshAttempt(
       service: options.runtime,
       control: options.control,
       progress: options.reportRecoveryProgress,
-      // The maintenance pass already refreshed every open document; reuse its
-      // evidence so the recovery pass skips a redundant second refresh.
+      // The maintenance pass already refreshed every running route. Reuse its
+      // evidence unless process-crash demand restores a required route; the
+      // runtime then performs a fresh pass that includes the replacement.
       initialEvidence: maintenance.diagnosticEvidence,
+      processCrashDemand: {
+        ...(workspaceScope?.filter ? { scopes: [workspaceScope.filter] } : {}),
+      },
     });
     const diagnosticEvidence = mergeDiagnosticEvidence(
       maintenance.diagnosticEvidence,

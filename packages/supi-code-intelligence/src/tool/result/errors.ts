@@ -100,6 +100,7 @@ export function healthErrorResult(content: string, reason?: string): CodeIntelRe
         capabilityWarnings: null,
         diagnosticFileCount: 0,
         serverCount: 0,
+        serverRouteStatusCounts: { recovering: 0, error: 0, unavailable: 0 },
       },
       status: "invalid-input",
       message: reason ?? content,

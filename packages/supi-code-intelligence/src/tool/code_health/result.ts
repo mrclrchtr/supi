@@ -1,5 +1,9 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
-import { formatProjectServerStatusReason } from "../../analysis/health/server-status.ts";
+import {
+  countProjectServerRouteStatuses,
+  formatProjectServerRoot,
+  formatProjectServerStatusReason,
+} from "../../analysis/health/server-status.ts";
 import type { HealthData, HealthSection } from "../../session/health-types.ts";
 import {
   assembleToolResult,
@@ -37,7 +41,7 @@ const SECTION_TITLES: Record<HealthSection, string> = {
 };
 
 /** Assemble public code_health evidence and details before presentation adapters render it. */
-export function assembleHealthResult(data: HealthData): HealthResultAssembly {
+export function assembleHealthResult(data: HealthData, cwd?: string): HealthResultAssembly {
   const projections = data.includedSections.map((section) => projectSection(section, data));
   const sections = projections.map((projection) => projection.section);
   const sectionDetails = projections.map((projection) => projection.details);
@@ -56,7 +60,7 @@ export function assembleHealthResult(data: HealthData): HealthResultAssembly {
     provenance,
   });
 
-  const displaySections = buildHealthDisplaySections(data);
+  const displaySections = buildHealthDisplaySections(data, cwd);
 
   return {
     data,
@@ -79,12 +83,13 @@ export function assembleHealthResult(data: HealthData): HealthResultAssembly {
       capabilityWarnings: data.capabilityWarnings ?? null,
       diagnosticFileCount: data.diagnostics.entries.length,
       serverCount: data.servers.length,
+      serverRouteStatusCounts: countProjectServerRouteStatuses(data.servers),
       evidenceLists: [...assembled.evidenceLists],
     },
   };
 }
 
-function buildHealthDisplaySections(data: HealthData): ToolDisplaySection[] {
+function buildHealthDisplaySections(data: HealthData, cwd?: string): ToolDisplaySection[] {
   const sections: ToolDisplaySection[] = [];
 
   if (data.includedSections.includes("diagnostics") && data.diagnostics.entries.length > 0) {
@@ -108,8 +113,10 @@ function buildHealthDisplaySections(data: HealthData): ToolDisplaySection[] {
         title: "Servers",
         items: data.servers,
         totalCount: data.servers.length,
-        format: (server) =>
-          `${server.name} (${server.fileTypes.join(", ")}) — ${server.status}${server.statusReason ? ` — ${formatProjectServerStatusReason(server.statusReason)}` : ""}`,
+        format: (server) => {
+          const root = cwd ? formatProjectServerRoot(cwd, server.root) : server.root;
+          return `${server.name} @ ${root} (${server.fileTypes.join(", ")}) — ${server.status}${server.statusReason ? ` — ${formatProjectServerStatusReason(server.statusReason)}` : ""}`;
+        },
       }),
     );
   }
@@ -257,7 +264,7 @@ export function finishHealthResult(outcome: HealthOutcome, cwd: string): CodeInt
     return healthErrorResult(`**Error:** ${outcome.message}`, outcome.message);
   }
 
-  const assembly = assembleHealthResult(outcome.data);
+  const assembly = assembleHealthResult(outcome.data, cwd);
   return {
     content: renderHealthResult(assembly, cwd),
     details: {

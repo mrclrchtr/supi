@@ -289,6 +289,41 @@ describe("code_health tool", () => {
     expect(result.content[0].text).toContain("Diagnostics unavailable");
   });
 
+  it("keeps file-scoped server-only health passive", async () => {
+    registerMockProvider(tmpDir);
+    const file = path.join(tmpDir, "src", "index.ts");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, "const value = 1;\n", "utf-8");
+    const waitUntilReadyForFile = vi.fn().mockResolvedValue({ kind: "ready" });
+    mockReadyLsp({
+      waitUntilReadyForFile,
+      getProjectServers: vi.fn(() => [
+        {
+          name: "typescript",
+          root: tmpDir,
+          fileTypes: ["ts"],
+          status: "error",
+          ready: false,
+          statusReason: "process-crashed",
+        },
+      ]),
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const result = (await getTool(pi, "code_health").execute(
+      "passive-file-server-status",
+      { scope: "src/index.ts", include: ["servers"], refresh: false },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ text: string }> };
+
+    expect(waitUntilReadyForFile).not.toHaveBeenCalled();
+    expect(result.content[0]?.text).toContain("workspace routes: 1 error");
+    expect(result.content[0]?.text).toContain("next evidence operation will recover");
+  });
+
   it("reports file readiness timeout in semantic and diagnostic reasons", async () => {
     registerMockProvider(tmpDir);
     const file = path.join(tmpDir, "src", "index.ts");

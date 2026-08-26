@@ -92,10 +92,9 @@ export function createLspSemanticProvider(lsp: WorkspaceLspRuntime): SemanticPro
     async workspaceSymbols(
       query: string,
       control?: CodeRequestControl,
+      scopes?: readonly string[],
     ): Promise<CodeQueryResult<CodeSymbol[]>> {
-      const result = control
-        ? await lsp.workspaceSymbol(query, control)
-        : await lsp.workspaceSymbol(query);
+      const result = await lsp.workspaceSymbol(query, control, scopes);
       return mapCodeQueryResult(result, (results) =>
         results.map((symbol) => toCodeSymbol(symbol as SymbolInformation)),
       );

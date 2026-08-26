@@ -55,6 +55,7 @@ function makeDetails(overrides: Record<string, unknown> = {}): Record<string, un
     capabilityWarnings: null,
     diagnosticFileCount: 2,
     serverCount: 1,
+    serverRouteStatusCounts: { recovering: 0, error: 0, unavailable: 0 },
     ...overrides,
   };
 }
@@ -110,6 +111,19 @@ describe("code_health TUI projection", () => {
 
   it("renders diagnostic coverage in the compact view", () => {
     expect(render(makeDetails())).toContain("req 0 · conf 0 · unconf 0 · failed 0 · removed 0");
+  });
+
+  it("renders typed workspace route counts without changing ready state", () => {
+    const details = makeDetails({
+      serverRouteStatusCounts: { recovering: 1, error: 2, unavailable: 1 },
+    });
+
+    const compact = render(details);
+    expect(compact).toContain("lsp ready workspace routes: 1 recovering");
+    expect(compact).toContain("errors, 1 unavailable");
+    const expanded = render(details, true);
+    expect(expanded).toContain("LSP: ready — workspace routes: 1 recovering");
+    expect(expanded).toContain("errors, 1 unavailable");
   });
 
   it("renders exact partial diagnostic coverage in the expanded view", () => {

@@ -17,7 +17,8 @@ export const codeHealthSpec = {
       scope: Type.Optional(ScopeParam),
       refresh: Type.Optional(
         Type.Boolean({
-          description: "Attempt diagnostic recovery before collecting; result reports the outcome.",
+          description:
+            "Attempt diagnostic and required process-crash recovery before collecting; result reports the outcome.",
         }),
       ),
       include: Type.Optional(

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import {
@@ -45,7 +45,7 @@ function structuralProvider(): StructuralProvider {
 }
 
 describe("runFindWorkflow", () => {
-  it("reports a semantic readiness timeout with retry guidance", async () => {
+  it("uses a registered semantic provider when crashed routes make readiness recoverable", async () => {
     const workspaceSymbols = vi.fn<NonNullable<SemanticProvider["workspaceSymbols"]>>(async () =>
       completedCodeQuery([]),
     );
@@ -57,7 +57,38 @@ describe("runFindWorkflow", () => {
         cwd: tmpDir,
         capability: new TestCapabilityAdapter({
           semantic,
+          readiness: { kind: "unavailable", reason: "No active ready routes" },
+          lspRuntime: {
+            kind: "ready",
+            runtime: {
+              getProjectServers: () => [
+                {
+                  status: "error",
+                  statusReason: "process-crashed",
+                },
+              ],
+            },
+          } as never,
+        }),
+      },
+    );
+
+    expect(outcome).toMatchObject({ kind: "completed" });
+    expect(workspaceSymbols).toHaveBeenCalledOnce();
+  });
+
+  it("keeps waiting for normal startup when a pending provider is registered", async () => {
+    const workspaceSymbols = vi.fn<NonNullable<SemanticProvider["workspaceSymbols"]>>(async () =>
+      completedCodeQuery([]),
+    );
+    const outcome = await runFindWorkflow(
+      { query: "target", mode: "semantic" },
+      {
+        cwd: tmpDir,
+        capability: new TestCapabilityAdapter({
+          semantic: { workspaceSymbols } as unknown as SemanticProvider,
           readiness: { kind: "timeout" },
+          lspRuntime: { kind: "pending" },
         }),
       },
     );
@@ -67,6 +98,21 @@ describe("runFindWorkflow", () => {
       reason: "Semantic provider did not become ready within the wait window; retry shortly.",
     });
     expect(workspaceSymbols).not.toHaveBeenCalled();
+  });
+
+  it("reports a readiness timeout when no semantic provider is registered", async () => {
+    const outcome = await runFindWorkflow(
+      { query: "target", mode: "semantic" },
+      {
+        cwd: tmpDir,
+        capability: new TestCapabilityAdapter({ readiness: { kind: "timeout" } }),
+      },
+    );
+
+    expect(outcome).toEqual({
+      kind: "unavailable",
+      reason: "Semantic provider did not become ready within the wait window; retry shortly.",
+    });
   });
 
   it("keeps a completed-empty semantic search as a valid no-data result", async () => {
@@ -91,6 +137,28 @@ describe("runFindWorkflow", () => {
     const rendered = renderFindResult(assembleFindWorkflowResult(outcome));
     expect(rendered).toContain("No LSP workspace-symbol results found");
     expect(rendered).not.toContain("did not become ready within the wait window");
+  });
+
+  it("forwards the resolved semantic scope set to workspace discovery", async () => {
+    const scopeA = path.join(tmpDir, "a");
+    const scopeB = path.join(tmpDir, "b");
+    mkdirSync(scopeA);
+    mkdirSync(scopeB);
+    const workspaceSymbols = vi.fn<SemanticProvider["workspaceSymbols"]>(async () =>
+      completedCodeQuery([]),
+    );
+
+    await runFindWorkflow(
+      { query: "target", mode: "semantic", scope: ["a", "b"] },
+      {
+        cwd: tmpDir,
+        capability: new TestCapabilityAdapter({
+          semantic: { workspaceSymbols } as unknown as SemanticProvider,
+        }),
+      },
+    );
+
+    expect(workspaceSymbols).toHaveBeenCalledWith("target", undefined, [scopeA, scopeB]);
   });
 
   it("reports an expired caller AST deadline as a timeout partial", async () => {

@@ -178,6 +178,21 @@ interface ProcessCrashRecoveryState {
 
 type ProcessCrashRecoveryOutcome = "attempt" | "success" | "failure" | "exhausted" | "cancelled";
 
+type ProcessCrashDemandResult = {
+  /** Whether at least one required crashed route supports the operation. */
+  hasSupport: boolean;
+  /** Required routes that remain unavailable after shared recovery settles. */
+  failures: string[];
+  /** In-scope tracked files from required routes that remain unavailable. */
+  failedFiles: string[];
+};
+
+type RequiredProcessCrashDemand = {
+  key: string;
+  recovery: ProcessCrashRecoveryState;
+  failedFiles: readonly string[];
+};
+
 // ── LspManager ────────────────────────────────────────────────────────
 export class LspManager {
   /** Active clients keyed by "serverName:root" */
@@ -292,24 +307,12 @@ export class LspManager {
     if (!route) return null;
 
     const recovery = this.processCrashRecoveries.get(route.key);
-    if (recovery) {
-      if (recovery.pending) {
-        if (!options.recoverProcessCrash) return null;
-        return this.waitForProcessCrashRecovery(recovery, options.control);
-      }
-      if (recovery.statusReason) {
-        if (
-          options.recoverProcessCrash &&
-          recovery.statusReason === "process-crashed" &&
-          !recovery.attemptConsumed
-        ) {
-          return this.startProcessCrashRecovery(recovery, route, options.control);
-        }
-        return null;
-      }
-      // A recovered route keeps its consumed budget but has no active reason.
-      // Passive callers can use its running client normally.
+    if (recovery && (recovery.pending || recovery.statusReason)) {
+      if (!options.recoverProcessCrash) return null;
+      return this.acquireProcessCrashReplacement(recovery, route, options.control);
     }
+    // A recovered route keeps its consumed budget but has no active reason.
+    // Passive callers can use its running client normally.
 
     return this.startServerForRoot(route.serverName, route.root);
   }
@@ -324,8 +327,8 @@ export class LspManager {
     const existing = this.clients.get(key);
     if (existing && existing.status === "running") return existing;
 
-    // A crashed route is retained until a file-routed operation starts its
-    // shared replacement. Proactive starts must not consume that budget.
+    // A crashed route is retained until evidence demand starts its shared
+    // replacement. Proactive starts must not consume that budget.
     if (existing && existing.status === "error" && this.processCrashRecoveries.has(key)) {
       return null;
     }
@@ -442,6 +445,75 @@ export class LspManager {
   ): Promise<LspClient | null> {
     if (!recovery.pending) return Promise.resolve(null);
     return raceRequestControl(recovery.pending, control);
+  }
+
+  private acquireProcessCrashReplacement(
+    recovery: ProcessCrashRecoveryState,
+    route: FileRoute,
+    control?: CodeRequestControl,
+  ): Promise<LspClient | null> {
+    if (recovery.pending) return this.waitForProcessCrashRecovery(recovery, control);
+    if (
+      recovery.statusReason === "process-crashed" &&
+      !recovery.attemptConsumed &&
+      !this.shuttingDown
+    ) {
+      return this.startProcessCrashRecovery(recovery, route, control);
+    }
+    return Promise.resolve(null);
+  }
+
+  /**
+   * Recover all crashed routes selected by one evidence-producing operation.
+   * Each route keeps its independent attempt budget and shared replacement.
+   */
+  private async recoverProcessCrashDemand(
+    selectFiles: (recovery: ProcessCrashRecoveryState) => readonly string[] | null,
+    control?: CodeRequestControl,
+  ): Promise<ProcessCrashDemandResult> {
+    const required = Array.from(this.processCrashRecoveries.entries()).flatMap(
+      ([key, recovery]): RequiredProcessCrashDemand[] => {
+        if (recovery.statusReason === undefined) return [];
+        const failedFiles = selectFiles(recovery);
+        return failedFiles === null ? [] : [{ key, recovery, failedFiles }];
+      },
+    );
+    if (required.length === 0) return { hasSupport: false, failures: [], failedFiles: [] };
+
+    await Promise.all(
+      required.map(async ({ key, recovery }) => {
+        const serverConfig = this.config.servers[recovery.failedClient.name];
+        if (!serverConfig) return;
+        await this.acquireProcessCrashReplacement(
+          recovery,
+          {
+            serverName: recovery.failedClient.name,
+            serverConfig,
+            root: recovery.failedClient.root,
+            key,
+          },
+          control,
+        );
+      }),
+    );
+
+    const failedDemands = required.filter(({ recovery }) => recovery.statusReason !== undefined);
+    return {
+      hasSupport: true,
+      failures: failedDemands.map(({ recovery }) => this.formatProcessCrashDemandFailure(recovery)),
+      failedFiles: Array.from(new Set(failedDemands.flatMap(({ failedFiles }) => failedFiles))),
+    };
+  }
+
+  private formatProcessCrashDemandFailure(recovery: ProcessCrashRecoveryState): string {
+    const root = (path.relative(this.cwd, recovery.failedClient.root) || ".").replaceAll("\\", "/");
+    const reason =
+      recovery.statusReason === "process-crash-recovery-exhausted"
+        ? "process recovery exhausted; reload required"
+        : recovery.statusReason === "process-crash-recovery-pending"
+          ? "process recovery in progress"
+          : "process crashed";
+    return `${recovery.failedClient.name} @ ${root} is unavailable — ${reason}.`;
   }
 
   private startProcessCrashRecovery(
@@ -1026,9 +1098,67 @@ export class LspManager {
     quietMs?: number;
     /** Evidence from a refresh the caller already completed; skips this pass's own refresh when no watched-file changes apply. */
     initialEvidence?: DiagnosticEvidenceSummary;
+    /** Explicit demand to recover crashed routes with tracked files in scope. */
+    processCrashDemand?: { scopes?: readonly string[] };
     control?: CodeRequestControl;
   }): Promise<WorkspaceRecoveryResult> {
-    return recoverWorkspaceDiagnosticsImpl(this, options);
+    const demand = options?.processCrashDemand
+      ? await this.recoverProcessCrashDemand((recovery) => {
+          const files = this.processCrashDiagnosticFiles(recovery, options.processCrashDemand);
+          return files.length > 0 ? files : null;
+        }, options.control)
+      : { hasSupport: false, failures: [], failedFiles: [] };
+    const recoveryOptions = demand.hasSupport
+      ? { ...options, initialEvidence: undefined }
+      : options;
+    const result = await recoverWorkspaceDiagnosticsImpl(this, recoveryOptions);
+    return this.addProcessCrashDiagnosticEvidence(result, demand);
+  }
+
+  private processCrashDiagnosticFiles(
+    recovery: ProcessCrashRecoveryState,
+    demand: { scopes?: readonly string[] } | undefined,
+  ): string[] {
+    if (!demand) return [];
+    const scopes = demand.scopes?.map((scope) => resolveSessionPath(this.cwd, scope));
+    return recovery.files.filter(
+      (file) =>
+        this.isDiagnosticFile(file) &&
+        (!scopes ||
+          scopes.length === 0 ||
+          scopes.some((scope) => projectRoots.isWithinOrEqual(scope, file))),
+    );
+  }
+
+  private addProcessCrashDiagnosticEvidence(
+    result: WorkspaceRecoveryResult,
+    demand: ProcessCrashDemandResult,
+  ): WorkspaceRecoveryResult {
+    if (demand.failures.length === 0) return result;
+    const byFile = new Map(
+      result.diagnosticEvidence.documents.map((document) => [document.file, document] as const),
+    );
+    for (const file of demand.failedFiles) {
+      const relativeFile = path.relative(this.cwd, file);
+      byFile.set(relativeFile, { file: relativeFile, status: "failed" });
+    }
+    const diagnosticEvidence = summarizeDiagnosticEvidence(Array.from(byFile.values()));
+    const diagnosticReport = {
+      summary: { ...result.diagnosticReport.summary, current: false, evidence: diagnosticEvidence },
+      outstanding: {
+        ...result.diagnosticReport.outstanding,
+        current: false,
+        evidence: diagnosticEvidence,
+      },
+    };
+    return {
+      ...result,
+      diagnosticEvidence,
+      diagnosticReport,
+      refreshFailureReason: [result.refreshFailureReason, ...demand.failures]
+        .filter(Boolean)
+        .join("; "),
+    };
   }
 
   /** Shut down all running LSP servers. */
@@ -1373,8 +1503,34 @@ export class LspManager {
   async workspaceSymbol(
     query: string,
     control?: CodeRequestControl,
+    scopes?: readonly string[],
   ): Promise<CodeQueryResult<(SymbolInformation | WorkspaceSymbol)[]>> {
-    const initial = await collectWorkspaceSymbols(this.clients.values(), query, control);
+    const resolvedScopes = scopes?.map((scope) => resolveSessionPath(this.cwd, scope));
+    const routeMatches = (client: LspClient) =>
+      this.workspaceSymbolRouteMatchesScopes(client, resolvedScopes);
+    if (resolvedScopes && !this.hasWorkspaceSymbolRouteForScopes(resolvedScopes)) {
+      return unavailableCodeQuery(
+        "No known LSP route intersects the requested workspace-symbol scope.",
+      );
+    }
+    const demand = await this.recoverProcessCrashDemand(
+      (recovery) =>
+        recovery.failedClient.serverCapabilities?.workspaceSymbolProvider &&
+        routeMatches(recovery.failedClient)
+          ? []
+          : null,
+      control,
+    );
+    const collect = async (clients: Iterable<LspClient>, value: string) =>
+      this.addWorkspaceSymbolDemandEvidence(
+        await collectWorkspaceSymbols(
+          Array.from(clients).filter((client) => routeMatches(client)),
+          value,
+          control,
+        ),
+        demand,
+      );
+    const initial = await collect(this.clients.values(), query);
     if (!initial.hasSupport || initial.results.length > 0) {
       return workspaceSymbolCollectionResult(initial);
     }
@@ -1382,11 +1538,50 @@ export class LspManager {
     const warmed = await this.warmWorkspaceSymbolProjectsUntilResult({
       findWarmTargets: findWorkspaceSymbolWarmTargets,
       getWarmPosition: getWorkspaceSymbolWarmPosition,
-      collect: (clients, value) => collectWorkspaceSymbols(clients, value, control),
+      collect,
+      routeMatches,
       query,
       control,
     });
     return workspaceSymbolCollectionResult(warmed.collection ?? initial);
+  }
+
+  private addWorkspaceSymbolDemandEvidence(
+    collection: WorkspaceSymbolCollection,
+    demand: ProcessCrashDemandResult,
+  ): WorkspaceSymbolCollection {
+    return {
+      ...collection,
+      hasSupport: collection.hasSupport || demand.hasSupport,
+      failures: [...collection.failures, ...demand.failures],
+    };
+  }
+
+  private hasWorkspaceSymbolRouteForScopes(scopes: readonly string[]): boolean {
+    const clients = [
+      ...this.clients.values(),
+      ...Array.from(this.processCrashRecoveries.values(), (recovery) => recovery.failedClient),
+    ];
+    return clients.some((client) => this.workspaceSymbolRouteMatchesScopes(client, scopes));
+  }
+
+  private workspaceSymbolRouteMatchesScopes(
+    client: LspClient,
+    scopes: readonly string[] | undefined,
+  ): boolean {
+    if (!scopes || scopes.length === 0) return true;
+    const key = clientKey(client.name, client.root);
+    return scopes.some((scope) => {
+      try {
+        if (fs.statSync(scope).isFile()) return this.resolveFileRoute(scope)?.key === key;
+      } catch {
+        return false;
+      }
+      return (
+        projectRoots.isWithinOrEqual(client.root, scope) ||
+        projectRoots.isWithinOrEqual(scope, client.root)
+      );
+    });
   }
   async ensureFileOpen(
     filePath: string,
@@ -1415,13 +1610,15 @@ export class LspManager {
       symbols: import("../config/types.ts").DocumentSymbol[] | SymbolInformation[] | null,
     ) => import("../config/types.ts").Position | null;
     collect: (clients: Iterable<LspClient>, query: string) => Promise<WorkspaceSymbolCollection>;
+    routeMatches?: (client: LspClient) => boolean;
     query: string;
     control?: CodeRequestControl;
   }): Promise<{ warmedAny: boolean; collection: WorkspaceSymbolCollection | null }> {
-    const { findWarmTargets, getWarmPosition, collect, query, control } = options;
+    const { findWarmTargets, getWarmPosition, collect, routeMatches, query, control } = options;
     let warmedAny = false;
 
     for (const client of Array.from(this.clients.values())) {
+      if (routeMatches && !routeMatches(client)) continue;
       if (client.status !== "running") continue;
       if (!client.serverCapabilities?.workspaceSymbolProvider) continue;
 

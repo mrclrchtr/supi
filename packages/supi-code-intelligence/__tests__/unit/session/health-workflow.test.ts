@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { CapabilityState } from "@mrclrchtr/supi-code-runtime/api";
 import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CapabilityAdapter } from "../../../src/session/capability-adapter.ts";
 import { runHealthWorkflow } from "../../../src/session/health-workflow.ts";
 
@@ -61,6 +61,42 @@ async function run(lspState: WorkspaceLspRuntimeState, semantic: CapabilityState
 }
 
 describe("semantic health state", () => {
+  it("keeps file-scoped server inventory passive", async () => {
+    const file = path.join(cwd, "probe.ts");
+    writeFileSync(file, "export const probe = true;\n");
+    const waitUntilReadyForFile = vi.fn().mockResolvedValue({ kind: "ready" });
+    const lspState = {
+      kind: "ready",
+      runtime: {
+        waitUntilReadyForFile,
+        getProjectServers: () => [
+          {
+            name: "typescript",
+            root: cwd,
+            fileTypes: ["ts"],
+            status: "error",
+            ready: false,
+            statusReason: "process-crashed",
+          },
+        ],
+      },
+    } as unknown as WorkspaceLspRuntimeState;
+
+    await runHealthWorkflow(
+      { scope: "probe.ts", include: ["servers"], refresh: false },
+      {
+        cwd,
+        capability: capability(lspState, { kind: "pending" }),
+        lspController: { getMissingServers: () => [] } as never,
+        lastRefreshAttempt: null,
+        trackRefreshAttempt: () => undefined,
+        sentinelSnapshot: new Map(),
+      },
+    );
+
+    expect(waitUntilReadyForFile).not.toHaveBeenCalled();
+  });
+
   it("lets a concrete ready project server override lagging pending publication", async () => {
     const outcome = await run(readyRuntime([{ status: "running", ready: true }]), {
       kind: "pending",

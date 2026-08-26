@@ -111,7 +111,7 @@ A valid target-selection outcome where a semantic symbol query reports candidate
 _Avoid_: symbol not found, invalid input, disambiguation, silent fallback
 
 **LSP-first target resolution**:
-The rule that ready semantic capability is required when a Resolved target or Target group is established or refined. A fresh stored target may still support structural consumers, while semantic consumers require live semantic readiness.
+The rule that a live semantic provider is required when a Resolved target or Target group is established or refined. Workspace-symbol demand can use a registered pending provider while it recovers required LSP routes; incomplete route evidence cannot establish not-found. A fresh stored target may still support structural consumers, while semantic consumers require live semantic evidence.
 _Avoid_: structural-only target creation, treating a structural identifier as semantic identity
 
 **Server status evidence**:
@@ -119,7 +119,7 @@ Runtime facts about LSP state and server inventory. A live runtime owner or expl
 _Avoid_: semantic evidence, treating unknown inventory as empty, treating disabled as unknown, inferring capability from runtime presence
 
 **Semantic health state**:
-The authoritative final readiness classification—ready, pending, inactive, disabled, or unavailable—for semantic diagnostics at the requested scope, determined after routing and requested recovery. A concrete ready project or file server establishes readiness even if capability publication lags; diagnostic observation status remains a separate completed/partial/unavailable fact, and server inventory remains workspace-wide.
+The authoritative final readiness classification—ready, pending, inactive, disabled, or unavailable—for semantic diagnostics at the requested scope, determined after routing and requested recovery. A concrete ready project or file server establishes readiness even if capability publication lags; at workspace scope, ready can coexist with an error on another LSP route. Diagnostic observation status remains a separate completed/partial/unavailable fact, and server inventory remains workspace-wide.
 _Avoid_: runtime availability, capability publication status, configured-route availability, vacuous readiness, optimistic diagnostics
 
 **Capability Warning**:
@@ -127,8 +127,12 @@ An actionable notice that Code intelligence capability is reduced or configured 
 _Avoid_: degraded coverage, coverage warning
 
 **Live health observation**:
-Tool evidence obtained by querying an available source during a `code_health` call. A completed file request may establish file-local absence; omitted or directory scope is only a tracked-file snapshot and never proves workspace completeness. A continuously maintained source may expose its current snapshot with freshness limitations disclosed; a batch source must collect during the call, so a precomputed report is not a Live health observation.
+Tool evidence obtained by querying an available source during a `code_health` call. A file-diagnostic request or explicit broad diagnostic refresh is evidence demand and can start Process-crash recovery; server inventory and passive diagnostic snapshots are observations only. A completed file request may establish file-local absence; omitted or directory scope is only a tracked-file snapshot and never proves workspace completeness. A continuously maintained source may expose its current snapshot with freshness limitations disclosed; a batch source must collect during the call, so a precomputed report is not a Live health observation.
 _Avoid_: live/runtime-backed signal, ambient report evidence, undisclosed cached evidence
+
+**LSP route status summary**:
+Aggregate Server status evidence shown beside Semantic health state as separate recovering and error route counts. It never changes the Semantic health state classification.
+_Avoid_: degraded semantic state, LSP health state, combined readiness
 
 **Point inspection observation**:
 One independently collected `code_inspect` section—syntax node, enclosing declaration, hover, definition, or nearby diagnostics—with explicit completed, partial, or unavailable state. Completed empty data is an absence fact at the requested point; it is not provider unavailability. The enclosing declaration is the narrowest full provider-reported range containing the point, and nearby diagnostics intersect the documented point-line window.

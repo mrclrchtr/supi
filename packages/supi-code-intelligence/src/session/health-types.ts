@@ -1,6 +1,7 @@
 import type {
   DiagnosticEvidenceSummary,
   FileScopeDecision,
+  ProjectServerInfo,
   ProjectServerStatusReason,
 } from "@mrclrchtr/supi-lsp/api";
 import type { CapabilityWarningReport } from "../analysis/capability/capability-warnings.ts";
@@ -26,7 +27,7 @@ export interface HealthServerInfo {
   readonly name: string;
   readonly root: string;
   readonly fileTypes: readonly string[];
-  readonly status: string;
+  readonly status: ProjectServerInfo["status"];
   readonly statusReason?: ProjectServerStatusReason;
   readonly ready: boolean;
 }

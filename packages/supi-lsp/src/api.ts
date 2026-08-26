@@ -58,6 +58,7 @@ export type {
   DiagnosticEvidenceStatus,
   DiagnosticEvidenceSummary,
   OutstandingDiagnosticSummaryEntry,
+  ProcessCrashDiagnosticDemand,
   RecoverDiagnosticsResult,
   RoutedMutationResponse,
   SemanticReadinessResult,

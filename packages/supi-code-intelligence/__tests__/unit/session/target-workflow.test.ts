@@ -264,7 +264,7 @@ describe("target-workflow (deep session seam)", () => {
   });
 
   describe("symbol query", () => {
-    it("resolves a unique symbol via workspace symbols", async () => {
+    it("uses a registered workspace-symbol provider for recoverable crashed routes", async () => {
       writeSource("src/mod.ts", "export function foo() {}\n");
       const semantic = makeTestSemantic([
         {
@@ -276,7 +276,21 @@ describe("target-workflow (deep session seam)", () => {
         },
       ]);
 
-      const adapter = new TestCapabilityAdapter({ semantic });
+      const adapter = new TestCapabilityAdapter({
+        semantic,
+        readiness: { kind: "unavailable", reason: "No active ready routes" },
+        lspRuntime: {
+          kind: "ready",
+          runtime: {
+            getProjectServers: () => [
+              {
+                status: "error",
+                statusReason: "process-crashed",
+              },
+            ],
+          },
+        } as never,
+      });
       const deps = buildDeps(adapter);
 
       const outcome = await resolveTargetWorkflow(
@@ -340,7 +354,7 @@ describe("target-workflow (deep session seam)", () => {
 
       expect(outcome.kind).toBe("unavailable");
       if (outcome.kind === "unavailable") {
-        expect(outcome.reason).toContain("semantic provider");
+        expect(outcome.reason).toContain("workspace-symbol provider");
       }
     });
   });

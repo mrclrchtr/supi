@@ -6,7 +6,11 @@
  */
 
 import type { CapabilityWarningReport } from "../../analysis/capability/capability-warnings.ts";
-import { formatProjectServerStatusReason } from "../../analysis/health/server-status.ts";
+import {
+  formatProjectServerRoot,
+  formatProjectServerRouteSummary,
+  formatProjectServerStatusReason,
+} from "../../analysis/health/server-status.ts";
 import type {
   HealthData,
   HealthDiagnosticObservation,
@@ -29,7 +33,9 @@ export function renderHealthResult(result: HealthResultAssembly, cwd: string): s
   renderRefreshStatus(lines, data, hasDiagnostics, cwd);
   if (hasDiagnostics) renderDiagnosticsSection(lines, data, cwd);
   if (semanticRequested) renderCapabilityWarningsSection(lines, result.details.capabilityWarnings);
-  if (hasSection("servers")) renderServersSection(lines, data, sectionStatus(result, "servers"));
+  if (hasSection("servers")) {
+    renderServersSection(lines, data, sectionStatus(result, "servers"), cwd);
+  }
   return lines.join("\n");
 }
 
@@ -159,7 +165,8 @@ function renderCapabilityWarningsSection(
 function renderStatusLine(lines: string[], data: HealthData, semanticRequested: boolean): void {
   if (!semanticRequested) return;
 
-  lines.push(`**LSP**: ${displaySemanticStatus(data)}`);
+  const routeSummary = formatProjectServerRouteSummary(data.servers);
+  lines.push(`**LSP**: ${displaySemanticStatus(data)}${routeSummary ? ` — ${routeSummary}` : ""}`);
   if (data.structuralStatus) lines.push(`**Structural**: ${data.structuralStatus}`);
   lines.push("");
 }
@@ -317,6 +324,7 @@ function renderServersSection(
   lines: string[],
   data: HealthData,
   status: "complete" | "partial" | "unavailable" | undefined,
+  cwd: string,
 ): void {
   lines.push("### Servers");
   lines.push("");
@@ -334,7 +342,7 @@ function renderServersSection(
         ? ` — ${formatProjectServerStatusReason(server.statusReason)}`
         : "";
       lines.push(
-        `- ${statusIcon} **${server.name}** (${server.fileTypes.join(", ")}) — ${server.status}${reason}`,
+        `- ${statusIcon} **${server.name}** @ \`${formatProjectServerRoot(cwd, server.root)}\` (${server.fileTypes.join(", ")}) — ${server.status}${reason}`,
       );
     }
   }

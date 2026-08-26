@@ -85,7 +85,7 @@ describe("code_health result assembly", () => {
     expect(markdown).not.toContain("Server status unavailable");
   });
 
-  it("shows a structured process-crash reason in server evidence", () => {
+  it("shows route identity, status reason, and aggregate error evidence", () => {
     const assembly = assembleHealthResult(
       makeHealthData({
         servers: [
@@ -99,10 +99,14 @@ describe("code_health result assembly", () => {
           },
         ],
       }),
+      "/repo",
     );
     const markdown = renderHealthResult(assembly, "/repo");
 
+    expect(markdown).toContain("**LSP**: ready — workspace routes: 1 error");
+    expect(markdown).toContain("**typescript** @ `.`");
     expect(markdown).toContain("process recovery exhausted; reload required");
+    expect(assembly.displaySections[0]?.lines[0]).toContain("typescript @ .");
     expect(assembly.displaySections[0]?.lines[0]).toContain(
       "process recovery exhausted; reload required",
     );

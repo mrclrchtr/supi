@@ -8,6 +8,14 @@ import type {
   WorkspaceDiagnosticSummaryEntry,
 } from "./runtime-diagnostics.ts";
 
+/**
+ * Explicit diagnostic demand that can recover previously running crashed
+ * routes. Omitted scopes include every route with retained tracked files.
+ */
+export interface ProcessCrashDiagnosticDemand {
+  readonly scopes?: readonly string[];
+}
+
 /** Diagnostic and recovery operations owned by a workspace LSP runtime. */
 export interface WorkspaceLspDiagnosticSurface {
   fileDiagnostics(
@@ -37,6 +45,8 @@ export interface WorkspaceLspDiagnosticSurface {
     quietMs?: number;
     /** Evidence from a refresh the caller already completed; skips this pass's own refresh when no watched-file changes apply. */
     initialEvidence?: DiagnosticEvidenceSummary;
+    /** Explicit demand to recover crashed routes with tracked files in scope. */
+    processCrashDemand?: ProcessCrashDiagnosticDemand;
     control?: CodeRequestControl;
   }): Promise<RecoverDiagnosticsResult>;
 }

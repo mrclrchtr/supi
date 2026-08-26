@@ -5,6 +5,10 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import {
+  formatProjectServerRouteStatusCounts,
+  type ProjectServerRouteStatusCounts,
+} from "../../analysis/health/server-status.ts";
+import {
   type EvidenceEntry,
   formatCallValue,
   type ResultOptios,
@@ -132,8 +136,11 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
   );
   if (semanticRequested) {
     const semanticStatus = readSemanticStatus(data);
+    const routeSummary = readServerRouteStatusSummary(data);
     const statusColor = semanticStatus.startsWith("ready") ? "success" : "warning";
-    segments.push(`${theme.fg("dim", "lsp")} ${theme.fg(statusColor, semanticStatus)}`);
+    segments.push(
+      `${theme.fg("dim", "lsp")} ${theme.fg(statusColor, semanticStatus)}${routeSummary ? ` ${theme.fg("warning", routeSummary)}` : ""}`,
+    );
   }
   const previousRefresh = readPreviousRefreshStatus(data);
   if (previousRefresh) segments.push(theme.fg("dim", previousRefresh));
@@ -179,7 +186,10 @@ function buildStatusBar(data: Record<string, unknown> | null, theme: Theme): Tex
   const lspColor = semanticStatus.startsWith("ready") ? "success" : "warning";
   const structuralColor = structuralStatus === "ready" ? "success" : "muted";
 
-  const lines: string[] = [`LSP: ${theme.fg(lspColor, semanticStatus)}`];
+  const routeSummary = readServerRouteStatusSummary(data);
+  const lines: string[] = [
+    `LSP: ${theme.fg(lspColor, semanticStatus)}${routeSummary ? ` — ${theme.fg("warning", routeSummary)}` : ""}`,
+  ];
   if (structuralStatus) {
     lines.push(`Tree-sitter: ${theme.fg(structuralColor, structuralStatus)}`);
   }
@@ -287,7 +297,8 @@ function buildHealthSectionSummary(data: Record<string, unknown> | null, theme: 
     if (section.status === "unavailable" || !section.available) {
       return `${label} unavailable`;
     }
-    return `${label} ${section.itemCount}`;
+    const routeSummary = section.key === "servers" ? readServerRouteStatusSummary(data) : null;
+    return `${label} ${section.itemCount}${routeSummary ? ` — ${routeSummary}` : ""}`;
   });
   return new Text(theme.fg("muted", lines.join("  ")), 0, 0);
 }
@@ -343,6 +354,16 @@ function isSectionStatus(value: unknown): value is HealthSectionSummary["status"
 
 function readSemanticStatus(data: Record<string, unknown> | null): string {
   return formatSemanticHealthState(readSemanticHealthState(data?.semanticState));
+}
+
+function readServerRouteStatusSummary(data: Record<string, unknown> | null): string | null {
+  const counts = readRecord(data?.serverRouteStatusCounts);
+  if (!counts) return null;
+  return formatProjectServerRouteStatusCounts({
+    recovering: typeof counts.recovering === "number" ? counts.recovering : 0,
+    error: typeof counts.error === "number" ? counts.error : 0,
+    unavailable: typeof counts.unavailable === "number" ? counts.unavailable : 0,
+  } satisfies ProjectServerRouteStatusCounts);
 }
 
 function readString(data: Record<string, unknown> | null, key: string): string | null {

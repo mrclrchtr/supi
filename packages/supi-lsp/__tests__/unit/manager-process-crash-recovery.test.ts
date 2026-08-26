@@ -315,16 +315,13 @@ describe("LspManager process-crash recovery", () => {
     ]);
   });
 
-  it("does not restart from passive or workspace-wide operations", async () => {
+  it("does not restart from passive operations", async () => {
     const { manager, file } = await startAndCrash();
     const initialClientCount = mocks.clients.length;
 
     await expect(manager.getClientForFile(file)).resolves.toBeNull();
     await expect(manager.waitUntilWorkspaceReady()).resolves.toBe(0);
     await expect(manager.refreshOpenDiagnostics()).resolves.toMatchObject({ failed: 1 });
-    await expect(manager.workspaceSymbol("tracked")).resolves.toMatchObject({
-      kind: "unavailable",
-    });
 
     expect(mocks.clients).toHaveLength(initialClientCount);
     expect(manager.getProjectServerInfo("test", manager.getCwd(), ["test"])).toMatchObject({
@@ -344,6 +341,9 @@ describe("LspManager process-crash recovery", () => {
     expect(manager.getProjectServerInfo("test", root, ["test"]).status).toBe("error");
     expect(manager.getProjectServerInfo("test", root, ["test"])).not.toHaveProperty("statusReason");
     await expect(manager.getClientForFile(file, { recoverProcessCrash: true })).resolves.toBeNull();
+    await expect(manager.workspaceSymbol("tracked", undefined, [file])).resolves.toMatchObject({
+      kind: "unavailable",
+    });
     expect(mocks.clients).toHaveLength(1);
     expect(mocks.recordDebugEvent).not.toHaveBeenCalledWith(
       expect.objectContaining({ category: "runtime.recovery" }),

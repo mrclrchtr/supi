@@ -251,5 +251,11 @@ export interface HealthDetails {
   capabilityWarnings: CapabilityWarningReport | null;
   diagnosticFileCount: number;
   serverCount: number;
+  /** Workspace-wide non-running LSP route counts, separate from semantic readiness. */
+  serverRouteStatusCounts: {
+    recovering: number;
+    error: number;
+    unavailable: number;
+  };
   evidenceLists?: EvidenceListMetadata[];
 }

@@ -23,6 +23,7 @@ import type {
 } from "../analysis/target/types.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import { parseTargetInput } from "./input/common.ts";
+import { resolveWorkspaceSemanticDemand } from "./semantic-demand.ts";
 import { registerTargetCandidates, type TargetWorkflowCandidate } from "./target-candidates.ts";
 import type { TargetInput, TargetSymbolKind } from "./target-input.ts";
 import {
@@ -201,22 +202,15 @@ async function resolveSymbolWorkflow(
     scope = resolved.path;
   }
 
-  const readiness = await deps.capability.ensureSemanticReadiness(
-    deps.cwd,
-    { kind: "workspace" },
-    control,
-  );
-  if (readiness.kind === "timeout") {
+  const semanticDemand = await resolveWorkspaceSemanticDemand(deps.capability, deps.cwd, control);
+  if (semanticDemand.kind === "timeout") {
     return { kind: "unavailable", reason: "LSP readiness timed out. Retry shortly." };
   }
-  if (readiness.kind === "unavailable") {
-    return { kind: "unavailable", reason: readiness.reason };
+  if (semanticDemand.kind === "unavailable") {
+    return { kind: "unavailable", reason: semanticDemand.reason };
   }
 
-  const provider = withSemanticRequestControl(
-    deps.capability.getSemanticProvider(deps.cwd),
-    control,
-  );
+  const provider = withSemanticRequestControl(semanticDemand.provider, control);
   if (!provider) {
     return {
       kind: "unavailable",
@@ -291,6 +285,9 @@ function toWorkflowOutcome(
   policy: TargetWorkflowPolicy,
   deps: TargetWorkflowDeps,
 ): TargetWorkflowOutcome {
+  if (outcome.kind === "unavailable") {
+    return { kind: "unavailable", reason: outcome.reason };
+  }
   if (outcome.kind === "error") {
     return { kind: "invalid-input", message: outcome.message };
   }

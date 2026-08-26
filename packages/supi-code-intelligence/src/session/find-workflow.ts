@@ -9,6 +9,7 @@ import { isCodeFindAstKind } from "../tool/code_find/ast-kinds.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import type { FindWorkflowInput, FindWorkflowOutcome } from "./find-types.ts";
 import { parseFindWorkflowInput } from "./input/workflows.ts";
+import { resolveWorkspaceSemanticDemand } from "./semantic-demand.ts";
 import { reportProgress, throwIfAborted, type WorkflowControl } from "./workflow-control.ts";
 
 export interface FindWorkflowDeps {
@@ -71,22 +72,14 @@ async function runSemanticSearch(options: {
   control?: WorkflowControl;
 }): Promise<FindWorkflowOutcome> {
   const { query, scopePaths, scopeLabel, maxResults, deps, control } = options;
-  const readiness = await deps.capability.ensureSemanticReadiness(
-    deps.cwd,
-    { kind: "workspace" },
-    control,
-  );
-  if (readiness.kind === "timeout") {
+  const semanticDemand = await resolveWorkspaceSemanticDemand(deps.capability, deps.cwd, control);
+  if (semanticDemand.kind === "timeout") {
     return { kind: "unavailable", reason: SEMANTIC_READINESS_TIMEOUT_REASON };
   }
-  if (readiness.kind === "unavailable") return readiness;
+  if (semanticDemand.kind === "unavailable") return semanticDemand;
   throwIfAborted(control);
 
-  const provider = deps.capability.getSemanticProvider(deps.cwd);
-  if (!provider?.workspaceSymbols) {
-    return { kind: "unavailable", reason: "No semantic workspace-symbol provider is active." };
-  }
-  const result = await provider.workspaceSymbols(query, control);
+  const result = await semanticDemand.provider.workspaceSymbols(query, control, scopePaths);
   // A cancellation that landed during the request must not publish symbols
   // the caller no longer awaits.
   throwIfAborted(control);

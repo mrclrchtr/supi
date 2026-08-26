@@ -8,6 +8,7 @@
 
 import * as path from "node:path";
 import {
+  type CodeQueryResult,
   type CodeRequestControl,
   type CodeSymbol,
   isCodeRequestInterruption,
@@ -114,33 +115,27 @@ export async function resolveSymbolTarget(
     control?: CodeRequestControl;
   },
 ): Promise<TargetOutcome> {
-  const result = await semantic.workspaceSymbols(symbol);
+  const scopePath = options?.path ? normalizePath(options.path, cwd) : null;
+  const result = await semantic.workspaceSymbols(
+    symbol,
+    options?.control,
+    scopePath ? [scopePath] : undefined,
+  );
   if (result.kind === "unavailable") {
     return {
-      kind: "error",
-      message: `Symbol discovery for \`${symbol}\` is unavailable: ${result.reason}`,
+      kind: "unavailable",
+      reason: `Symbol discovery for \`${symbol}\` is unavailable: ${result.reason}`,
     };
   }
-  if (result.data.length === 0) {
-    return {
-      kind: "error",
-      message: `Symbol not found: \`${symbol}\`. Try \`code_resolve\` to search for it, or use an anchor target (file/line/character) if you know the location.`,
-    };
-  }
+  if (result.data.length === 0) return emptySymbolOutcome(symbol, result, options?.path);
 
-  const scopePath = options?.path ? normalizePath(options.path, cwd) : null;
   const scoped = result.data.filter((candidate) =>
     scopePath ? isWithinOrEqual(scopePath, candidate.file) : true,
   );
   const eligible = options?.exportedOnly
     ? scoped.filter((candidate) => !NON_EXPORTED_KINDS.has(candidate.kind))
     : scoped;
-  if (eligible.length === 0) {
-    return {
-      kind: "error",
-      message: `Symbol not found: \`${symbol}\`${scopePath ? ` in path \`${options?.path}\`` : ""}. Try \`code_resolve\` to search for it, or use an anchor target (file/line/character) if you know the location.`,
-    };
-  }
+  if (eligible.length === 0) return emptySymbolOutcome(symbol, result, options?.path);
 
   const requestedKind = options?.kind;
   if (requestedKind) {
@@ -248,6 +243,23 @@ type CandidateOutcomeOptions = CandidateOutcomeBase &
  * exact provider result count for omission disclosure. No candidate is
  * promoted when the requested provider kind did not match.
  */
+function emptySymbolOutcome(
+  symbol: string,
+  result: Exclude<CodeQueryResult<CodeSymbol[]>, { kind: "unavailable" }>,
+  scope?: string,
+): TargetOutcome {
+  if (result.kind === "partial") {
+    return {
+      kind: "unavailable",
+      reason: `Symbol discovery for \`${symbol}\` is incomplete: ${result.reason}`,
+    };
+  }
+  return {
+    kind: "error",
+    message: `Symbol not found: \`${symbol}\`${scope ? ` in path \`${scope}\`` : ""}. Try \`code_resolve\` to search for it, or use an anchor target (file/line/character) if you know the location.`,
+  };
+}
+
 async function buildCandidateOutcome(
   options: CandidateOutcomeOptions,
 ): Promise<Extract<TargetOutcome, { kind: "disambiguation" | "kind-mismatch" }>> {

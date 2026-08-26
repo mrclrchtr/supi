@@ -18,7 +18,11 @@ import type {
   ProjectServerInfo,
 } from "@mrclrchtr/supi-lsp/api";
 import type { CapabilityWarningReport } from "../analysis/capability/capability-warnings.ts";
-import { formatProjectServerStatusReason } from "../analysis/health/server-status.ts";
+import {
+  countProjectServerRouteStatuses,
+  formatProjectServerRoot,
+  formatProjectServerStatusReason,
+} from "../analysis/health/server-status.ts";
 import { diagnosticMessageString } from "../substrate/lsp/utils.ts";
 
 /**
@@ -33,6 +37,8 @@ export interface CiDialogTheme {
 }
 
 export interface CiStatusData {
+  /** Canonical workspace root used to display LSP route roots. */
+  workspaceRoot: string;
   servers: ProjectServerInfo[];
   /** Whether the server list is complete status evidence. */
   serverInventoryAvailable: boolean;
@@ -264,29 +270,63 @@ export class CiStatusDialog {
   }
 
   private renderSummaryLine(width: number): string {
-    const t = this.theme;
-    const running = this.data.servers.filter((s) => s.status === "running").length;
-    const totalErrors = this.data.diagnostics.reduce((sum, d) => sum + d.errors, 0);
-    const totalWarnings = this.data.diagnostics.reduce((sum, d) => sum + d.warnings, 0);
-    const sep = t.fg("dim", " · ");
-
-    const parts: string[] = [];
-    if (running > 0) {
-      parts.push(t.fg("text", `${running} server${running === 1 ? "" : "s"}`));
-    }
-    if (totalErrors > 0) {
-      parts.push(t.fg("error", `${totalErrors} error${totalErrors === 1 ? "" : "s"}`));
-    }
-    if (totalWarnings > 0) {
-      parts.push(t.fg("warning", `${totalWarnings} warning${totalWarnings === 1 ? "" : "s"}`));
-    }
-    const structKind = this.data.capabilities.structural.kind;
-    if (structKind === "ready") parts.push(t.fg("success", "✓ ts ready"));
-    else if (structKind === "pending") parts.push(t.fg("dim", "ts pending…"));
-    else parts.push(t.fg("error", "ts unavailable"));
-
-    const joined = parts.length > 0 ? parts.join(sep) : t.fg("dim", "(no data)");
+    const parts = [
+      ...this.serverSummaryParts(),
+      ...this.diagnosticSummaryParts(),
+      ...this.routeSummaryParts(),
+      this.structuralSummaryPart(),
+    ];
+    const joined =
+      parts.length > 0
+        ? parts.join(this.theme.fg("dim", " · "))
+        : this.theme.fg("dim", "(no data)");
     return truncateToWidth(joined, width);
+  }
+
+  private serverSummaryParts(): string[] {
+    const running = this.data.servers.filter((server) => server.status === "running").length;
+    return running > 0
+      ? [this.theme.fg("text", `${running} server${running === 1 ? "" : "s"}`)]
+      : [];
+  }
+
+  private diagnosticSummaryParts(): string[] {
+    const errors = this.data.diagnostics.reduce((sum, entry) => sum + entry.errors, 0);
+    const warnings = this.data.diagnostics.reduce((sum, entry) => sum + entry.warnings, 0);
+    return [
+      errors > 0 ? this.theme.fg("error", `${errors} error${errors === 1 ? "" : "s"}`) : null,
+      warnings > 0
+        ? this.theme.fg("warning", `${warnings} warning${warnings === 1 ? "" : "s"}`)
+        : null,
+    ].filter((part): part is string => part !== null);
+  }
+
+  private routeSummaryParts(): string[] {
+    const counts = countProjectServerRouteStatuses(this.data.servers);
+    return [
+      counts.recovering > 0
+        ? this.theme.fg(
+            "warning",
+            `${counts.recovering} route${counts.recovering === 1 ? "" : "s"} recovering`,
+          )
+        : null,
+      counts.error > 0
+        ? this.theme.fg("error", `${counts.error} route error${counts.error === 1 ? "" : "s"}`)
+        : null,
+      counts.unavailable > 0
+        ? this.theme.fg(
+            "warning",
+            `${counts.unavailable} route${counts.unavailable === 1 ? "" : "s"} unavailable`,
+          )
+        : null,
+    ].filter((part): part is string => part !== null);
+  }
+
+  private structuralSummaryPart(): string {
+    const kind = this.data.capabilities.structural.kind;
+    if (kind === "ready") return this.theme.fg("success", "✓ ts ready");
+    if (kind === "pending") return this.theme.fg("dim", "ts pending…");
+    return this.theme.fg("error", "ts unavailable");
   }
 
   private addServerSection(container: Container): void {
@@ -329,7 +369,7 @@ export class CiStatusDialog {
           " " +
           t.fg(statusColor, icon) +
           " " +
-          t.fg("dim", `root: ${server.root}`),
+          t.fg("dim", `root: ${formatProjectServerRoot(this.data.workspaceRoot, server.root)}`),
         0,
         0,
       ),

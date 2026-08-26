@@ -10,12 +10,20 @@ See also: `packages/supi-code-intelligence/CONTEXT.md` and `packages/supi-code-r
 The workspace-scoped interface that owns file routing, semantic readiness and operations, tracked files, diagnostics, and recovery. It hides clients and the mutable manager, giving callers a deep operational seam with high locality inside `supi-lsp`.
 _Avoid_: LspManager, LSP singleton, provider bag, client registry
 
+**LSP route**:
+One language-server instance identified by its configured server and workspace root. Each route has independent lifecycle, status, and recovery state.
+_Avoid_: server, client route, project server
+
+**Required LSP route**:
+A known LSP route that supports a requested operation and can contribute evidence within its scope. Unscoped demand requires every supporting route.
+_Avoid_: eligible route, relevant server, all configured servers
+
 **Diagnostic recovery attempt**:
 A best-effort workspace-runtime operation that clears pull state, refreshes active clients, and may restart an affected push-only client on a protocol-stall signal (readiness-stall or protocol-errors), never on unconfirmed evidence alone and never pull-capable routes. Its attempted-client count names targets, not confirmed successful diagnostic refreshes.
 _Avoid_: recovered diagnostics, freshness proof, per-client success inference
 
 **Process-crash recovery**:
-The route-level recovery for a previously running LSP client whose server process exits or emits a process error. It is separate from diagnostic recovery, which responds to diagnostic evidence or protocol stalls.
+The route-level recovery for a previously running LSP client whose server process exits or emits a process error. Evidence demand starts and waits for one shared replacement for each required crashed route; passive status, inventory, and diagnostic snapshots do not start recovery. It is separate from diagnostic recovery, which responds to diagnostic evidence or protocol stalls.
 _Avoid_: diagnostic recovery, startup retry, crash loop
 
 **LSP runtime controller**:

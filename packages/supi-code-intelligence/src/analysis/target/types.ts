@@ -156,4 +156,5 @@ export type TargetOutcome =
       candidates: DisambiguationCandidateData[];
       omittedCount: number;
     }
+  | { kind: "unavailable"; reason: string }
   | { kind: "error"; message: string };

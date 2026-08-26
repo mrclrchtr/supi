@@ -123,7 +123,7 @@ If a server is missing, the agent can still use available workspace and structur
 
 ## Status and settings
 
-Open the status view to see detected languages, running or missing servers, and capability warnings:
+Open the status view to see each LSP route with its workspace-relative root, running or missing servers, typed route issue counts, and capability warnings:
 
 ```text
 /supi-ci-status

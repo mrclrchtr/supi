@@ -143,9 +143,10 @@ describe("workspace runtime behavior", () => {
       },
     ];
     const supportedPaths: string[] = [];
+    const workspaceSymbol = vi.fn(async () => completedCodeQuery([symbol]));
     const runtime = createRuntime(
       makeManager({
-        workspaceSymbol: async () => completedCodeQuery([symbol]),
+        workspaceSymbol,
         getKnownProjectServers: () => projectServers,
         canServeFile: (filePath: string) => {
           supportedPaths.push(filePath);
@@ -154,7 +155,10 @@ describe("workspace runtime behavior", () => {
       }),
     );
 
-    await expect(runtime.workspaceSymbol("greet")).resolves.toEqual(completedCodeQuery([symbol]));
+    await expect(runtime.workspaceSymbol("greet", undefined, ["/project/src"])).resolves.toEqual(
+      completedCodeQuery([symbol]),
+    );
+    expect(workspaceSymbol).toHaveBeenCalledWith("greet", undefined, ["/project/src"]);
     expect(runtime.getProjectServers()).toEqual(projectServers);
     expect(runtime.isSupportedSourceFile("@src/index.ts")).toBe(true);
     expect(supportedPaths).toEqual(["/project/src/index.ts"]);
