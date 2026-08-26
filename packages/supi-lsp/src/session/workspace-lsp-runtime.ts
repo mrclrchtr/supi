@@ -40,8 +40,8 @@ export interface RoutedMutationResponse<T> {
  * diagnostics, and recovery without exposing clients or the mutable manager.
  * File paths can be absolute or session-cwd-relative. A leading `@` is removed to
  * match Pi's built-in path-tool convention. Positions use raw 0-based LSP coordinates.
- * Provider request control is accepted
- * as metadata only in this expansion and is not interpreted by the runtime.
+ * Request control is forwarded to the routed client and limits the caller's
+ * wait without cancelling shared route recovery.
  */
 export interface WorkspaceLspRuntime extends WorkspaceLspDiagnosticSurface {
   hover(

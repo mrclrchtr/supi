@@ -1,4 +1,5 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import { formatProjectServerStatusReason } from "../../analysis/health/server-status.ts";
 import type { HealthData, HealthSection } from "../../session/health-types.ts";
 import {
   assembleToolResult,
@@ -107,7 +108,8 @@ function buildHealthDisplaySections(data: HealthData): ToolDisplaySection[] {
         title: "Servers",
         items: data.servers,
         totalCount: data.servers.length,
-        format: (server) => `${server.name} (${server.fileTypes.join(", ")}) — ${server.status}`,
+        format: (server) =>
+          `${server.name} (${server.fileTypes.join(", ")}) — ${server.status}${server.statusReason ? ` — ${formatProjectServerStatusReason(server.statusReason)}` : ""}`,
       }),
     );
   }

@@ -85,6 +85,29 @@ describe("code_health result assembly", () => {
     expect(markdown).not.toContain("Server status unavailable");
   });
 
+  it("shows a structured process-crash reason in server evidence", () => {
+    const assembly = assembleHealthResult(
+      makeHealthData({
+        servers: [
+          {
+            name: "typescript",
+            root: "/repo",
+            fileTypes: ["ts"],
+            status: "error",
+            statusReason: "process-crash-recovery-exhausted",
+            ready: false,
+          },
+        ],
+      }),
+    );
+    const markdown = renderHealthResult(assembly, "/repo");
+
+    expect(markdown).toContain("process recovery exhausted; reload required");
+    expect(assembly.displaySections[0]?.lines[0]).toContain(
+      "process recovery exhausted; reload required",
+    );
+  });
+
   it("does not turn an unavailable runtime into a complete empty server inventory", () => {
     const assembly = assembleHealthResult(
       makeHealthData({

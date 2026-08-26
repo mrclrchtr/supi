@@ -22,15 +22,25 @@ export function buildLspStatusText(lspState: LspAdapterState): string | undefine
   // Aggregate server states
   const ready = servers.filter((s) => s.status === "running" && s.ready).length;
   const starting = servers.filter((s) => s.status === "running" && !s.ready).length;
-  const error = servers.filter((s) => s.status === "error").length;
+  const recovering = servers.filter(
+    (s) => s.statusReason === "process-crash-recovery-pending",
+  ).length;
+  const crashed = servers.filter((s) => s.statusReason === "process-crashed").length;
+  const exhausted = servers.filter(
+    (s) => s.statusReason === "process-crash-recovery-exhausted",
+  ).length;
+  const error = servers.filter((s) => s.status === "error" && !s.statusReason).length;
   const unavailable = servers.filter((s) => s.status === "unavailable").length;
 
-  const hasServers = ready + starting + error + unavailable > 0;
+  const hasServers = ready + starting + recovering + crashed + exhausted + error + unavailable > 0;
   if (!hasServers && openFiles === 0) return undefined;
 
   const parts = ["λ lsp"];
   if (ready > 0) parts.push(`${ready} ✓`);
   if (starting > 0) parts.push(`${starting} ⟳`);
+  if (recovering > 0) parts.push(`${recovering} ↻`);
+  if (crashed > 0) parts.push(`${crashed} crashed`);
+  if (exhausted > 0) parts.push(`${exhausted} recovery exhausted`);
   if (error > 0) parts.push(`${error} ✗`);
   if (unavailable > 0) parts.push(`${unavailable} ⊘`);
   if (openFiles > 0) parts.push(`${openFiles} ${openFiles === 1 ? "open file" : "open files"}`);

@@ -26,8 +26,16 @@ export interface DetectedProjectServer {
   fileTypes: string[];
 }
 
+/** Structured reason for a route-level process-crash recovery state. */
+export type ProjectServerStatusReason =
+  | "process-crashed"
+  | "process-crash-recovery-pending"
+  | "process-crash-recovery-exhausted";
+
 export interface ProjectServerInfo extends DetectedProjectServer {
   status: "running" | "error" | "unavailable";
+  /** Structured lifecycle reason when process-crash recovery is active. */
+  statusReason?: ProjectServerStatusReason;
   supportedActions: string[];
   openFiles: string[];
   /** Whether the LSP server is currently not indexing and ready to serve queries. */

@@ -84,5 +84,6 @@ export type {
   LspConfig,
   MissingServer,
   ProjectServerInfo,
+  ProjectServerStatusReason,
   ServerConfig,
 } from "./server-config.ts";

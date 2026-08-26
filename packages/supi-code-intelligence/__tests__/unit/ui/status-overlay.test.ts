@@ -70,6 +70,37 @@ function makeDeps(overrides: Partial<CiStatusDialogDeps> = {}): CiStatusDialogDe
 
 describe("CiStatusDialog", () => {
   describe("rendering", () => {
+    it("renders process-crash recovery reasons in server rows", () => {
+      const servers: ProjectServerInfo[] = [
+        {
+          ...mockServers[0],
+          status: "error",
+          statusReason: "process-crashed",
+          ready: false,
+        },
+        {
+          ...mockServers[1],
+          status: "error",
+          statusReason: "process-crash-recovery-pending",
+          ready: false,
+        },
+        {
+          ...mockServers[1],
+          name: "rust",
+          status: "error",
+          statusReason: "process-crash-recovery-exhausted",
+          ready: false,
+        },
+      ];
+      const dialog = createCiStatusDialog(makeData({ servers }), makeDeps());
+
+      const rendered = dialog.render(100).join("\\n");
+
+      expect(rendered).toContain("process crashed; next file operation will recover");
+      expect(rendered).toContain("process recovery in progress");
+      expect(rendered).toContain("process recovery exhausted; reload required");
+    });
+
     it("renders header with title and toggle hint", () => {
       const dialog = createCiStatusDialog(makeData(), makeDeps());
       const lines = dialog.render(80);

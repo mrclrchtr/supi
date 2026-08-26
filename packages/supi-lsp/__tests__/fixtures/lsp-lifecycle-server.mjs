@@ -118,6 +118,7 @@ function publishDiagnostics(uri, version) {
   });
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: the fixture dispatches several independent protocol scenarios.
 function handle(message) {
   if (message.method === "initialize") {
     send({ jsonrpc: "2.0", id: message.id, result: { capabilities: {} } });
@@ -125,6 +126,24 @@ function handle(message) {
   }
   if (message.method === "initialized" && shouldCrash()) {
     setTimeout(() => process.exit(17), delayMs);
+    return;
+  }
+  if (message.method === "textDocument/documentSymbol") {
+    send({
+      jsonrpc: "2.0",
+      id: message.id,
+      result: [
+        {
+          name: `generation-${process.pid}`,
+          kind: 12,
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+          selectionRange: {
+            start: { line: 0, character: 0 },
+            end: { line: 0, character: 1 },
+          },
+        },
+      ],
+    });
     return;
   }
   if (mode === "progress" && message.method === "initialized") {

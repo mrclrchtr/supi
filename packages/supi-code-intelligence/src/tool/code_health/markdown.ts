@@ -6,6 +6,7 @@
  */
 
 import type { CapabilityWarningReport } from "../../analysis/capability/capability-warnings.ts";
+import { formatProjectServerStatusReason } from "../../analysis/health/server-status.ts";
 import type {
   HealthData,
   HealthDiagnosticObservation,
@@ -329,8 +330,11 @@ function renderServersSection(
   } else {
     for (const server of data.servers) {
       const statusIcon = server.status === "running" ? "✓" : "✗";
+      const reason = server.statusReason
+        ? ` — ${formatProjectServerStatusReason(server.statusReason)}`
+        : "";
       lines.push(
-        `- ${statusIcon} **${server.name}** (${server.fileTypes.join(", ")}) — ${server.status}`,
+        `- ${statusIcon} **${server.name}** (${server.fileTypes.join(", ")}) — ${server.status}${reason}`,
       );
     }
   }

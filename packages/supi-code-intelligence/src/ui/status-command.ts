@@ -9,6 +9,7 @@ import {
   evaluateCapabilityWarnings,
   gatherCapabilityWarningInput,
 } from "../analysis/capability/capability-warnings.ts";
+import { formatProjectServerStatusReason } from "../analysis/health/server-status.ts";
 import { type CiStatusData, createCiStatusDialog } from "./status-overlay.ts";
 
 const STATUS_KEY = "code-intelligence";
@@ -202,10 +203,25 @@ function renderFooterLine(ctx: ExtensionContext, data: CiStatusData): string {
   if (totalWarnings > 0) {
     parts.push(t.fg("warning", `${totalWarnings} warning${totalWarnings === 1 ? "" : "s"}`));
   }
+  addProjectServerStatusReason(parts, data, t);
   const structKind = data.capabilities.structural.kind;
   if (structKind === "ready") parts.push(t.fg("success", "✓ ts"));
   if (parts.length === 0) return t.fg("dim", "CI — no data available");
   return parts.join(t.fg("dim", "  "));
+}
+
+function addProjectServerStatusReason(
+  parts: string[],
+  data: CiStatusData,
+  theme: ExtensionContext["ui"]["theme"],
+): void {
+  for (const server of data.servers) {
+    const reason = formatProjectServerStatusReason(server.statusReason);
+    if (reason) {
+      parts.push(theme.fg("warning", reason));
+      return;
+    }
+  }
 }
 
 function truncateFooterLine(line: string, width: number): string {
@@ -230,6 +246,7 @@ function updateStatusAndWidget(ctx: ExtensionContext, data: CiStatusData): void 
   if (totalWarnings > 0) {
     parts.push(t.fg("warning", `${totalWarnings} warning${totalWarnings === 1 ? "" : "s"}`));
   }
+  addProjectServerStatusReason(parts, data, t);
   const structKind = data.capabilities.structural.kind;
   if (structKind === "ready") parts.push(t.fg("success", "✓ ts"));
 

@@ -65,4 +65,25 @@ describe("buildProjectServerInfo", () => {
     );
     expect(result.ready).toBe(false);
   });
+
+  it("reports every process-crash reason as an error status", () => {
+    for (const statusReason of [
+      "process-crashed",
+      "process-crash-recovery-pending",
+      "process-crash-recovery-exhausted",
+    ] as const) {
+      const result = buildProjectServerInfo(
+        {
+          serverName: "typescript",
+          root: "/project",
+          fileTypes: ["ts"],
+          client: makeClient({ status: "running", ready: true }),
+          statusReason,
+        },
+        cwd,
+      );
+
+      expect(result).toMatchObject({ status: "error", statusReason, ready: true });
+    }
+  });
 });

@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { FileChangeType, type FileEvent, type LspConfig } from "../../src/config/types.ts";
 import { LspManager, type ManagerLifecycleTransition } from "../../src/manager/manager.ts";
+import { createWorkspaceLspRuntimeOwner } from "../../src/session/runtime-registry.ts";
 import { fileToUri } from "../../src/utils.ts";
 import { waitFor } from "../helpers/integration-utils.ts";
 
@@ -143,6 +144,40 @@ describe("LSP manager lifecycle integration", () => {
     );
 
     expect(transitions.at(-1)).toMatchObject({ kind: "recovery", semanticReady: true });
+  }, 10_000);
+
+  it("recovers the same file-routed semantic operation after a process crash", async () => {
+    const root = createProject();
+    const sourceFile = path.join(root, "recovery.test");
+    const crashMarker = path.join(root, ".crashed-once");
+    fs.writeFileSync(sourceFile, "recovery fixture\n");
+    const transitions: ManagerLifecycleTransition[] = [];
+    const manager = new LspManager(config("crash-once", crashMarker), root, (transition) => {
+      transitions.push(transition);
+    });
+    managers.push(manager);
+
+    const original = await manager.startServerForRoot("test", root);
+    if (!original) throw new Error("Expected the original client to start.");
+    original.didOpen(sourceFile, fs.readFileSync(sourceFile, "utf8"));
+    await waitFor(
+      async () => transitions,
+      (events) => events.some((event) => event.kind === "crash"),
+      { timeoutMs: 2_000, retryDelayMs: 20, label: "initial LSP process crash" },
+    );
+    expect(transitions.filter((event) => event.kind === "startup")).toHaveLength(1);
+
+    const runtime = createWorkspaceLspRuntimeOwner(manager);
+    const result = await runtime.runtime.documentSymbols(sourceFile);
+
+    expect(result.kind).toBe("completed");
+    if (result.kind !== "completed") throw new Error("Expected recovered semantic evidence.");
+    expect(result.data[0]?.name).toMatch(/^generation-\d+$/);
+    expect(transitions.filter((event) => event.kind === "startup")).toHaveLength(2);
+    expect(manager.getProjectServerInfo("test", root, ["test"])).toMatchObject({
+      status: "running",
+      ready: true,
+    });
   }, 10_000);
 
   it("restarts a stalled push-only client and confirms diagnostics through the replacement", async () => {

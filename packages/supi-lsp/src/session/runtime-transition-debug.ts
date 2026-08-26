@@ -8,6 +8,7 @@ export interface TransitionServerEntry {
   readonly name: string;
   readonly status: ProjectServerInfo["status"];
   readonly ready: boolean;
+  readonly statusReason?: NonNullable<ProjectServerInfo["statusReason"]>;
 }
 
 /** Bound a project-server snapshot to MAX_SERVERS name/status/ready entries. */
@@ -18,6 +19,7 @@ function boundedServerEntries(
     name: truncateIdentity(server.name),
     status: server.status,
     ready: server.ready,
+    ...(server.statusReason ? { statusReason: server.statusReason } : {}),
   }));
 }
 

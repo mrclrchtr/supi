@@ -88,6 +88,29 @@ describe("LSP runtime transition telemetry", () => {
     });
   });
 
+  it("keeps process-crash status reasons in transition telemetry", () => {
+    const firstServer = servers[0];
+    if (!firstServer) throw new Error("Expected a test server.");
+    recordLspRuntimeTransition(
+      "/project",
+      transition({
+        projectServers: [
+          { ...firstServer, status: "error", ready: false, statusReason: "process-crashed" },
+        ],
+      }),
+    );
+
+    const data = mocks.recordDebugEvent.mock.calls[0]?.[0]?.data;
+    expect(data.servers).toEqual([
+      {
+        name: "typescript",
+        status: "error",
+        ready: false,
+        statusReason: "process-crashed",
+      },
+    ]);
+  });
+
   it("records crashes at warning level", () => {
     recordLspRuntimeTransition("/project", transition({ kind: "crash", semanticReady: false }));
 

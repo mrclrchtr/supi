@@ -18,6 +18,7 @@ import type {
   ProjectServerInfo,
 } from "@mrclrchtr/supi-lsp/api";
 import type { CapabilityWarningReport } from "../analysis/capability/capability-warnings.ts";
+import { formatProjectServerStatusReason } from "../analysis/health/server-status.ts";
 import { diagnosticMessageString } from "../substrate/lsp/utils.ts";
 
 /**
@@ -336,6 +337,11 @@ export class CiStatusDialog {
 
     const fileTypes = server.fileTypes.map((f) => `.${f}`).join(" ");
     container.addChild(new Text(t.fg("dim", `    files: ${fileTypes || "(none)"}`), 0, 0));
+
+    const statusReason = formatProjectServerStatusReason(server.statusReason);
+    if (statusReason) {
+      container.addChild(new Text(t.fg("warning", `    ${statusReason}`), 0, 0));
+    }
 
     if (server.openFiles.length > 0) {
       const shown = server.openFiles.slice(0, MAX_OPEN_FILES_SHOWN);

@@ -30,6 +30,28 @@ describe("LSP footer lifecycle adapter", () => {
     expect(buildLspStatusText(state)).toBe("λ lsp • 1 ✓ • 1 open file");
   });
 
+  it("shows process-crash recovery state separately from plain errors", () => {
+    const state = createLspAdapterState();
+    state.controller = {
+      workspaceRuntime: {
+        getProjectServers: () => [
+          {
+            name: "typescript",
+            root: "/project",
+            fileTypes: ["ts"],
+            status: "error",
+            statusReason: "process-crash-recovery-pending",
+            supportedActions: [],
+            openFiles: [],
+            ready: false,
+          },
+        ],
+      },
+    } as never;
+
+    expect(buildLspStatusText(state)).toBe("λ lsp • 1 ↻");
+  });
+
   it("stops invalidation events when its listener is disposed", () => {
     const pi = createPiMock();
     const state = createLspAdapterState();

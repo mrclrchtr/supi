@@ -15,6 +15,7 @@ export function collectServers(
     root: server.root,
     fileTypes: server.fileTypes,
     status: server.status,
+    ...(server.statusReason ? { statusReason: server.statusReason } : {}),
     ready: server.ready,
   }));
 }

@@ -335,8 +335,14 @@ export class LspClient {
       if (positionEncoding !== "utf-16") {
         throw new Error(`Server selected unsupported position encoding "${positionEncoding}".`);
       }
+      if (this._status !== "initializing") {
+        throw new Error(`${this.name}: client shutdown during initialize`);
+      }
       this.capabilities = result.capabilities;
       await this.rpc.sendNotification("initialized", {});
+      if (this._status !== "initializing") {
+        throw new Error(`${this.name}: client shutdown during initialize`);
+      }
       this._status = "running";
       this.publishLifecycle("startup");
 

@@ -30,6 +30,7 @@ export type {
   MissingServer,
   Position,
   ProjectServerInfo,
+  ProjectServerStatusReason,
   Range,
   SymbolInformation,
   WorkspaceEdit,

@@ -21,6 +21,7 @@ import type { ClientDiagnosticSnapshot } from "../client/client-document-state.t
 
 export { RECOVERY_CLIENT_STARTUP_BOUND_MS } from "../client/client.ts";
 
+import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import { getServerForFile } from "../config/config.ts";
 import { getFileScopeDecision } from "../config/tsconfig-scope.ts";
 import type {
@@ -29,10 +30,12 @@ import type {
   FileEvent,
   LspConfig,
   ProjectServerInfo,
+  ProjectServerStatusReason,
   ServerConfig,
   SymbolInformation,
   WorkspaceSymbol,
 } from "../config/types.ts";
+import { boundCwd, truncateIdentity } from "../debug-telemetry.ts";
 import {
   accumulateOutstandingDiagnostics,
   collectDiagnosticSummaryCounts,
@@ -151,6 +154,30 @@ export interface ManagerLifecycleTransition {
 
 type ManagerLifecycleListener = (transition: ManagerLifecycleTransition) => void;
 
+type FileClientRequestOptions = {
+  /** Allow this request to start the route's one process-crash recovery. */
+  recoverProcessCrash?: boolean;
+  /** Control only this caller's wait for a shared replacement. */
+  control?: CodeRequestControl;
+};
+
+interface ProcessCrashRecoveryState {
+  /** The one automatic attempt is consumed when a replacement starts. */
+  attemptConsumed: boolean;
+  /** Current user-facing reason, or undefined after successful recovery. */
+  statusReason: ProjectServerStatusReason | undefined;
+  /** The failed generation whose tracked files must be restored. */
+  failedClient: LspClient;
+  /** Files tracked by the failed route at the time of the crash. */
+  files: string[];
+  /** Shared replacement startup and document-restoration operation. */
+  pending: Promise<LspClient | null> | null;
+  /** Start time for the current replacement attempt, when one exists. */
+  attemptStartedAt?: number;
+}
+
+type ProcessCrashRecoveryOutcome = "attempt" | "success" | "failure" | "exhausted" | "cancelled";
+
 // ── LspManager ────────────────────────────────────────────────────────
 export class LspManager {
   /** Active clients keyed by "serverName:root" */
@@ -177,6 +204,14 @@ export class LspManager {
   private warmedSemanticProjects = new Set<string>();
   /** In-flight warm-up probes keyed by project key so concurrent callers share one probe. */
   private pendingWarmProbes = new Map<string, Promise<void>>();
+  /** One process-crash recovery budget and shared replacement per route. */
+  private processCrashRecoveries = new Map<string, ProcessCrashRecoveryState>();
+  /** Client generations that completed the initialize handshake. */
+  private initializedClientGenerations = new Map<string, number>();
+  /** Client generations whose process-failure fact was already handled. */
+  private handledCrashGenerations = new Map<string, number>();
+  /** Prevent late startup and lifecycle callbacks from republishing after shutdown. */
+  private shuttingDown = false;
   constructor(
     private readonly config: LspConfig,
     private readonly cwd: string,
@@ -247,11 +282,39 @@ export class LspManager {
   }
 
   /** Get or create an LSP client for the given file. */
-  async getClientForFile(filePath: string): Promise<LspClient | null> {
+  async getClientForFile(
+    filePath: string,
+    options: FileClientRequestOptions = {},
+  ): Promise<LspClient | null> {
+    throwIfCodeRequestInterrupted(options.control);
+    if (this.shuttingDown) return null;
     const route = this.resolveFileRoute(filePath);
-    return route ? this.startServerForRoot(route.serverName, route.root) : null;
+    if (!route) return null;
+
+    const recovery = this.processCrashRecoveries.get(route.key);
+    if (recovery) {
+      if (recovery.pending) {
+        if (!options.recoverProcessCrash) return null;
+        return this.waitForProcessCrashRecovery(recovery, options.control);
+      }
+      if (recovery.statusReason) {
+        if (
+          options.recoverProcessCrash &&
+          recovery.statusReason === "process-crashed" &&
+          !recovery.attemptConsumed
+        ) {
+          return this.startProcessCrashRecovery(recovery, route, options.control);
+        }
+        return null;
+      }
+      // A recovered route keeps its consumed budget but has no active reason.
+      // Passive callers can use its running client normally.
+    }
+
+    return this.startServerForRoot(route.serverName, route.root);
   }
   async startServerForRoot(serverName: string, root: string): Promise<LspClient | null> {
+    if (this.shuttingDown) return null;
     const serverConfig = this.config.servers[serverName];
     if (!serverConfig) return null;
     const key = clientKey(serverName, root);
@@ -260,6 +323,12 @@ export class LspManager {
     // Return existing client
     const existing = this.clients.get(key);
     if (existing && existing.status === "running") return existing;
+
+    // A crashed route is retained until a file-routed operation starts its
+    // shared replacement. Proactive starts must not consume that budget.
+    if (existing && existing.status === "error" && this.processCrashRecoveries.has(key)) {
+      return null;
+    }
 
     // If existing client errored, remove it
     if (existing && existing.status === "error") {
@@ -315,11 +384,267 @@ export class LspManager {
     client: LspClient,
     kind: LspClientLifecycleTransitionKind,
   ): void {
+    if (this.shuttingDown) return;
     if (this.clientGenerations.get(key) !== generation) return;
     if (this.clients.get(key) !== client) return;
+
+    if (kind === "startup") {
+      this.initializedClientGenerations.set(key, generation);
+    }
+    if (kind === "crash") {
+      if (this.handledCrashGenerations.get(key) === generation) return;
+      this.handledCrashGenerations.set(key, generation);
+      if (this.initializedClientGenerations.get(key) === generation) {
+        this.handleInitializedClientCrash(key, client);
+      }
+    }
+
     const aggregateKind =
       kind === "readiness" && generation > 1 && client.ready ? "recovery" : kind;
     this.publishLifecycle(aggregateKind);
+  }
+
+  private handleInitializedClientCrash(key: string, client: LspClient): void {
+    const existing = this.processCrashRecoveries.get(key);
+    if (existing?.attemptConsumed) {
+      if (existing.statusReason !== "process-crash-recovery-exhausted") {
+        existing.statusReason = "process-crash-recovery-exhausted";
+        this.recordProcessCrashRecoveryEvent(
+          client.name,
+          client.root,
+          "exhausted",
+          existing.pending ? existing.attemptStartedAt : Date.now(),
+        );
+      }
+      return;
+    }
+
+    this.processCrashRecoveries.set(key, {
+      attemptConsumed: false,
+      statusReason: "process-crashed",
+      failedClient: client,
+      files: this.trackedFilesForClient(client),
+      pending: null,
+    });
+  }
+
+  private trackedFilesForClient(client: LspClient): string[] {
+    const files = new Set(client.openFiles);
+    for (const document of client.getDiagnosticSnapshot().documents) {
+      files.add(uriToFile(document.uri));
+    }
+    return Array.from(files);
+  }
+
+  private waitForProcessCrashRecovery(
+    recovery: ProcessCrashRecoveryState,
+    control?: CodeRequestControl,
+  ): Promise<LspClient | null> {
+    if (!recovery.pending) return Promise.resolve(null);
+    return raceRequestControl(recovery.pending, control);
+  }
+
+  private startProcessCrashRecovery(
+    recovery: ProcessCrashRecoveryState,
+    route: FileRoute,
+    control?: CodeRequestControl,
+  ): Promise<LspClient | null> {
+    throwIfCodeRequestInterrupted(control);
+    recovery.attemptConsumed = true;
+    recovery.statusReason = "process-crash-recovery-pending";
+    recovery.attemptStartedAt = Date.now();
+    const pending = this.performProcessCrashRecovery(recovery, route);
+    recovery.pending = pending;
+    // A cancelled caller may be the only current waiter. Keep the shared
+    // replacement promise observed until it settles without adopting that
+    // caller's cancellation or deadline.
+    pending.catch(() => {});
+    this.recordProcessCrashRecoveryEvent(
+      route.serverName,
+      route.root,
+      "attempt",
+      recovery.attemptStartedAt,
+    );
+    this.publishLifecycle("recovery");
+    return raceRequestControl(pending, control);
+  }
+
+  private async performProcessCrashRecovery(
+    recovery: ProcessCrashRecoveryState,
+    route: FileRoute,
+  ): Promise<LspClient | null> {
+    const key = route.key;
+    const attemptStartedAt = recovery.attemptStartedAt;
+
+    try {
+      // A process-error event can leave the child alive. Stop the old tree
+      // before installing its replacement, but retain its captured evidence.
+      await recovery.failedClient.forceKill().catch(() => {});
+      if (this.isProcessCrashRecoveryCancelled(recovery, key)) {
+        this.recordProcessCrashRecoveryEvent(
+          route.serverName,
+          route.root,
+          "cancelled",
+          attemptStartedAt,
+        );
+        return null;
+      }
+
+      const replacement = this.installProcessCrashReplacement(recovery, route);
+      const started = await this.startProcessCrashReplacement(recovery, route, replacement);
+      if (!started) return null;
+
+      // A replacement can crash after initialize and before this operation
+      // resumes. Its lifecycle callback has already exhausted the route.
+      if (
+        started.status !== "running" ||
+        recovery.statusReason === "process-crash-recovery-exhausted"
+      ) {
+        return null;
+      }
+
+      this.unavailable.delete(key);
+      recovery.statusReason = undefined;
+      this.publishLifecycle("recovery");
+      this.restoreTrackedDocuments(started, recovery.files);
+      this.recordProcessCrashRecoveryEvent(
+        route.serverName,
+        route.root,
+        "success",
+        attemptStartedAt,
+      );
+      return started;
+    } finally {
+      if (this.processCrashRecoveries.get(key) === recovery) recovery.pending = null;
+    }
+  }
+
+  private isProcessCrashRecoveryCancelled(
+    recovery: ProcessCrashRecoveryState,
+    key: string,
+  ): boolean {
+    return this.shuttingDown || this.processCrashRecoveries.get(key) !== recovery;
+  }
+
+  private installProcessCrashReplacement(
+    recovery: ProcessCrashRecoveryState,
+    route: FileRoute,
+  ): LspClient {
+    const key = route.key;
+    if (this.clients.get(key) === recovery.failedClient) this.clients.delete(key);
+    this.clearWarmedWorkspaceSymbolProjects(route.serverName, route.root);
+    this.clearWarmedSemanticProjects(route.serverName, route.root);
+    this.clearPendingWarmProbes(route.serverName, route.root);
+
+    const replacement = this.createClient(route.serverName, route.serverConfig, route.root, key);
+    this.clients.set(key, replacement);
+    rememberKnownRoot(this.knownRoots, route.serverName, route.root);
+    return replacement;
+  }
+
+  private async startProcessCrashReplacement(
+    recovery: ProcessCrashRecoveryState,
+    route: FileRoute,
+    replacement: LspClient,
+  ): Promise<LspClient | null> {
+    try {
+      // LspClient's initialize request already has the 30-second transport
+      // bound. Do not apply the 5-second diagnostic-restart bound here.
+      await replacement.start();
+    } catch {
+      if (this.isProcessCrashRecoveryCancelled(recovery, route.key)) {
+        await replacement.forceKill().catch(() => {});
+        this.recordProcessCrashRecoveryEvent(
+          route.serverName,
+          route.root,
+          "cancelled",
+          recovery.attemptStartedAt,
+        );
+        return null;
+      }
+      if (recovery.statusReason !== "process-crash-recovery-exhausted") {
+        this.markProcessCrashRecoveryFailed(recovery, route.key, replacement);
+        this.recordProcessCrashRecoveryEvent(
+          route.serverName,
+          route.root,
+          "failure",
+          recovery.attemptStartedAt,
+        );
+      }
+      return null;
+    }
+
+    if (
+      this.isProcessCrashRecoveryCancelled(recovery, route.key) ||
+      this.clients.get(route.key) !== replacement
+    ) {
+      await replacement.forceKill().catch(() => {});
+      this.recordProcessCrashRecoveryEvent(
+        route.serverName,
+        route.root,
+        "cancelled",
+        recovery.attemptStartedAt,
+      );
+      return null;
+    }
+    return replacement;
+  }
+
+  /** Restore route documents from disk and retain failed-document evidence. */
+  private restoreTrackedDocuments(client: LspClient, files: readonly string[]): void {
+    const failedFiles: string[] = [];
+    for (const filePath of files) {
+      if (!fs.existsSync(filePath)) {
+        failedFiles.push(filePath);
+        continue;
+      }
+      try {
+        client.didOpen(filePath, fs.readFileSync(filePath, "utf-8"));
+      } catch {
+        failedFiles.push(filePath);
+      }
+    }
+    for (const filePath of failedFiles) client.markFailedFile(filePath);
+  }
+
+  private markProcessCrashRecoveryFailed(
+    recovery: ProcessCrashRecoveryState,
+    key: string,
+    replacement: LspClient,
+  ): void {
+    recovery.statusReason = "process-crash-recovery-exhausted";
+    this.unavailable.set(key, "start-failed");
+    if (this.clients.get(key) === replacement) this.clients.delete(key);
+    // A failed initialize may still leave a child process alive. The
+    // replacement is no longer owned by the manager before it is terminated.
+    void replacement.forceKill().catch(() => {});
+    this.publishLifecycle("recovery");
+  }
+
+  private recordProcessCrashRecoveryEvent(
+    serverName: string,
+    root: string,
+    outcome: ProcessCrashRecoveryOutcome,
+    startedAt?: number,
+  ): void {
+    try {
+      recordDebugEvent({
+        source: "lsp",
+        level: outcome === "failure" || outcome === "exhausted" ? "warning" : "debug",
+        category: "runtime.recovery",
+        message: `LSP process-crash recovery ${outcome}`,
+        cwd: boundCwd(this.cwd),
+        data: {
+          reason: "process-crash",
+          outcome,
+          server: truncateIdentity(serverName),
+          root: truncateIdentity(root),
+          elapsedMs: startedAt === undefined ? 0 : Math.max(0, Date.now() - startedAt),
+        },
+      });
+    } catch {
+      // Recovery telemetry must never change route behavior.
+    }
   }
 
   private publishLifecycle(kind: ManagerLifecycleTransitionKind): void {
@@ -360,11 +685,16 @@ export class LspManager {
     rememberKnownRoot(this.knownRoots, serverName, root);
     try {
       await client.start();
+      if (this.shuttingDown) {
+        await client.forceKill().catch(() => {});
+        if (this.clients.get(key) === client) this.clients.delete(key);
+        return null;
+      }
       this.unavailable.delete(key);
       return client;
     } catch {
       this.unavailable.set(key, "start-failed");
-      this.clients.delete(key);
+      if (this.clients.get(key) === client) this.clients.delete(key);
       return null;
     }
   }
@@ -408,6 +738,8 @@ export class LspManager {
       if (options?.pushOnly && client.hasDiagnosticProvider) continue;
 
       const key = clientKey(client.name, client.root);
+      const processRecovery = this.processCrashRecoveries.get(key);
+      if (processRecovery?.pending) continue;
       if (seen.has(key)) continue;
       seen.add(key);
       if (this.recoveryRestartEpochs.get(key) === this.invalidationEpoch) continue;
@@ -455,19 +787,8 @@ export class LspManager {
         RECOVERY_CLIENT_STARTUP_BOUND_MS,
         "replacement client startup bound exceeded",
       );
-      const failedFiles: string[] = [];
-      for (const filePath of files) {
-        if (!fs.existsSync(filePath)) {
-          failedFiles.push(filePath);
-          continue;
-        }
-        try {
-          replacement.didOpen(filePath, fs.readFileSync(filePath, "utf-8"));
-        } catch {
-          failedFiles.push(filePath);
-        }
-      }
-      for (const filePath of failedFiles) replacement.markFailedFile(filePath);
+      this.restoreTrackedDocuments(replacement, files);
+      this.clearUnconsumedProcessCrashState(key, client);
       return { files, restarted: true };
     } catch {
       this.clients.delete(key);
@@ -477,6 +798,13 @@ export class LspManager {
       void replacement.forceKill().catch(() => {});
       return { files, restarted: false };
     }
+  }
+
+  private clearUnconsumedProcessCrashState(key: string, failedClient: LspClient): void {
+    const recovery = this.processCrashRecoveries.get(key);
+    if (recovery?.failedClient !== failedClient || recovery.attemptConsumed) return;
+    this.processCrashRecoveries.delete(key);
+    this.publishLifecycle("recovery");
   }
 
   getProjectServerInfo(serverName: string, root: string, fileTypes: string[]): ProjectServerInfo {
@@ -489,6 +817,7 @@ export class LspManager {
         client: this.clients.get(key),
         unavailableReason:
           this.getUnavailableReason(key, this.config.servers[serverName]?.command) ?? undefined,
+        statusReason: this.processCrashRecoveries.get(key)?.statusReason,
       },
       this.cwd,
     );
@@ -505,6 +834,19 @@ export class LspManager {
         name: client.name,
         root: client.root,
         fileTypes: [...(this.config.servers[client.name]?.fileTypes ?? [])],
+      });
+    }
+    // Keep an exhausted recovery route visible after its failed replacement
+    // is removed from the active client pool.
+    for (const recovery of this.processCrashRecoveries.values()) {
+      const name = recovery.failedClient.name;
+      const root = recovery.failedClient.root;
+      const key = clientKey(name, root);
+      if (known.has(key)) continue;
+      known.set(key, {
+        name,
+        root,
+        fileTypes: [...(this.config.servers[name]?.fileTypes ?? [])],
       });
     }
     return Array.from(known.values())
@@ -524,7 +866,10 @@ export class LspManager {
   ): Promise<LspClient | null> {
     throwIfCodeRequestInterrupted(control);
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
-    const client = await this.getClientForFile(resolvedPath);
+    const client = await this.getClientForFile(resolvedPath, {
+      recoverProcessCrash: true,
+      control,
+    });
     if (!client) return null;
     // The caller's wait stops on cancellation even though the shared
     // readiness state keeps its own lifecycle.
@@ -582,7 +927,10 @@ export class LspManager {
     control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Diagnostic[]>> {
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
-    const client = await this.getClientForFile(resolvedPath);
+    const client = await this.getClientForFile(resolvedPath, {
+      recoverProcessCrash: true,
+      control,
+    });
     if (!client) {
       return unavailableCodeQuery(`No LSP client can collect diagnostics for ${resolvedPath}.`);
     }
@@ -685,13 +1033,18 @@ export class LspManager {
 
   /** Shut down all running LSP servers. */
   async shutdownAll(): Promise<void> {
-    const shutdowns = Array.from(this.clients.values()).map((c) => c.shutdown().catch(() => {}));
+    this.shuttingDown = true;
+    const clients = Array.from(this.clients.values());
+    const shutdowns = clients.map((client) => client.shutdown().catch(() => {}));
     await Promise.all(shutdowns);
     // Dispose every client so pending or active progress tokens and
     // readiness promises cannot outlive the manager.
-    for (const client of this.clients.values()) client.dispose();
+    for (const client of clients) client.dispose();
     this.clients.clear();
     this.clientGenerations.clear();
+    this.initializedClientGenerations.clear();
+    this.handledCrashGenerations.clear();
+    this.processCrashRecoveries.clear();
     this.recoveryRestartEpochs.clear();
     this.unavailable.clear();
     this.knownRoots.clear();
@@ -1035,9 +1388,12 @@ export class LspManager {
     });
     return workspaceSymbolCollectionResult(warmed.collection ?? initial);
   }
-  async ensureFileOpen(filePath: string): Promise<LspClient | null> {
+  async ensureFileOpen(
+    filePath: string,
+    options: FileClientRequestOptions = {},
+  ): Promise<LspClient | null> {
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
-    const client = await this.getClientForFile(resolvedPath);
+    const client = await this.getClientForFile(resolvedPath, options);
     if (!client) return null;
     try {
       client.didOpen(resolvedPath, fs.readFileSync(resolvedPath, "utf-8"));
