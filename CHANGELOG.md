@@ -1,5 +1,18 @@
 # Changelog
 
+## [6.0.1](https://github.com/mrclrchtr/supi/compare/v6.0.0...v6.0.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* **deps:** update dependency typebox to v1.3.17 ([ba68b9d](https://github.com/mrclrchtr/supi/commit/ba68b9ddd5229ab13ca67c3868195c7d9bc0baf3))
+* **deps:** update dependency typebox to v1.3.18 ([7da74dd](https://github.com/mrclrchtr/supi/commit/7da74dd3d1cf47f9775ce57ca16a73b9719d8b3d))
+* **deps:** update dependency typebox to v1.3.19 ([ab236a4](https://github.com/mrclrchtr/supi/commit/ab236a407bb934f73f88a89723af23492e499484))
+* **deps:** update dependency web-tree-sitter to v0.26.13 ([018d793](https://github.com/mrclrchtr/supi/commit/018d79369c03e74d6c726282fcf20171836c67c0))
+* **deps:** update dependency web-tree-sitter to v0.26.13 ([d57096b](https://github.com/mrclrchtr/supi/commit/d57096b0fa6e40855ac33102bd2d215e1d337431))
+* **deps:** update pnpm to v11.23.0 ([68d42fc](https://github.com/mrclrchtr/supi/commit/68d42fc75891d1ded33db41c0023811b97e79621))
+* **deps:** update pnpm to v11.24.0 ([578d7b6](https://github.com/mrclrchtr/supi/commit/578d7b6f12cf839d1e47a5d2117afd347fa5576a))
+
 ## [6.0.0](https://github.com/mrclrchtr/supi/compare/v5.0.0...v6.0.0) (2026-08-25)
 
 
