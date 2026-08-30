@@ -22,91 +22,29 @@ All grammar WASM files are **vendored** in `resources/grammars/<id>/` and shippe
 
 ### When to regenerate
 
-Run `node scripts/vendor-wasm.mjs` whenever `tree-sitter-*` devDependencies are bumped. Run `pnpm --filter @mrclrchtr/supi-tree-sitter check:wasm` in CI to verify checksums match.
+Run `pnpm --filter @mrclrchtr/supi-tree-sitter vendor:wasm` for grammar packages that ship prebuilt WASM.
 
-Vendored WASM metadata (`.wasm.json`) tracks the source npm package version and SHA256 so stale WASM is detected on CI.
-
-### Generator dependency updates
-
-Before you regenerate WASM after a generator dependency update, verify the resolved version. For `tree-sitter-cli`:
+After any `tree-sitter-cli` update, first verify the resolved version:
 
 ```bash
 pnpm --filter @mrclrchtr/supi-tree-sitter exec node -p "require('tree-sitter-cli/package.json').version"
 ```
 
-If it is old, rebuild the package dependencies, then verify again:
+Then run both generators:
+
+```bash
+pnpm --filter @mrclrchtr/supi-tree-sitter generate:kotlin-wasm
+pnpm --filter @mrclrchtr/supi-tree-sitter generate:sql-wasm
+```
+
+These generators refresh the CLI version in metadata; the WASM hashes may stay unchanged. If the installed version is stale, run:
 
 ```bash
 rm -rf packages/supi-tree-sitter/node_modules
 pnpm install --force
 ```
 
-## Source layout
-
-```text
-src/
-  api.ts              # public API surface (library-only, no pi extension)
-  index.ts            # re-export surface
-  types.ts            # shared type definitions
-  coordinates.ts      # 1-based UTF-16 coordinate conversion
-  language.ts         # file extension → grammar ID detection and WASM path resolution
-  operation-support.ts # extractor-specific extension support for structural search
-  syntax-node.ts      # syntax node interface
-  session/
-    structural-worker-client.ts # parent mailbox, cancellation, protocol, restart, and termination
-    structural-worker-protocol.ts # private versioned bounded message contract
-    structural-timing.ts # sanitized Worker timing observations and parent publication
-    service-registry.ts # shared session-scoped structural service registry (backed by core helper)
-    session.ts        # asynchronous Worker-proxy service and owned session factory
-    runtime-controller.ts # shared Structural Worker lifecycle controller
-    runtime-registration.ts # Runtime registration helpers
-  worker/
-    bootstrap.mjs     # package-owned jiti Worker bootstrap
-    worker-main.ts    # Worker request execution and bounded chunk publication
-    runtime.ts        # Worker-only grammar initialization and parse/query services
-    parsed-file-store.ts # Worker-only bounded LRU parsed-file and query ownership
-  tool/
-    call-sites.ts     # call-site extraction
-    callees.ts        # callee extraction
-    exports.ts        # export extraction
-    imports.ts        # import extraction
-    node-at.ts        # node_at action
-    outline.ts        # JavaScript/TypeScript outline extraction and dispatch
-    outline-polyglot.ts # non-JavaScript/TypeScript outline dispatch
-    outline-c-family.ts # C and C++ outline extraction
-    outline-jvm.ts    # Java and Kotlin outline extraction
-    outline-scripting.ts # Ruby, Bash/shell, and R outline extraction
-    outline-html-sql.ts # HTML id and SQL schema outline extraction
-    structure.ts      # re-exports from tool sub-modules
-  provider/
-    tree-sitter-provider.ts # StructuralProvider impl consumed by supi-code-intelligence
-```
-
-## Key files
-
-- `resources/grammars/<id>/` — vendored WASM files for all 15 supported grammars
-- `src/session/structural-worker-client.ts` — parent mailbox, request control, restart, and termination
-- `src/worker/runtime.ts` — Worker-only grammar initialization, parser reuse, and parse/query services
-- `src/worker/parsed-file-store.ts` — Worker-only parsed-file and compiled-query LRU ownership
-- `src/session/service-registry.ts` — shared session-scoped structural service registry
-- `src/session/session.ts` — runtime-backed service helpers and owned session factory
-- `src/provider/tree-sitter-provider.ts` — StructuralProvider impl consumed by supi-code-intelligence
-- `src/operation-support.ts` — operation-specific language support derived from extractor predicates/query registration
-- `src/tool/call-sites.ts` — call-site extraction (consumed by code_find AST call mode)
-- `scripts/generate-kotlin-wasm.mjs` — builds Kotlin WASM from source
-- `scripts/generate-sql-wasm.mjs` — builds SQL WASM from source
-
-## Validation
-
-```bash
-node scripts/vendor-wasm.mjs --check && \
-pnpm --filter @mrclrchtr/supi-tree-sitter check:kotlin-wasm && \
-pnpm --filter @mrclrchtr/supi-tree-sitter check:sql-wasm && \
-pnpm exec biome check packages/supi-tree-sitter && \
-pnpm vitest run packages/supi-tree-sitter/ && \
-pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json && \
-pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json
-```
+Vendored WASM metadata (`.wasm.json`) tracks the source npm package version and SHA256 so stale WASM is detected on CI.
 
 ## Gotchas
 
