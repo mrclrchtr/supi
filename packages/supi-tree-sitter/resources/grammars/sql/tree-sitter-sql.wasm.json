@@ -5,7 +5,7 @@
     "repository": "https://github.com/derekstride/tree-sitter-sql"
   },
   "generatedWith": {
-    "treeSitterCli": "0.26.12"
+    "treeSitterCli": "0.26.13"
   },
   "sha256": "9b93a15dc3eade66df4347731f2687b939daf987c8382660d6118e863604ab09",
   "trust": {
