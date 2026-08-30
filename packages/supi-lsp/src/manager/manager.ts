@@ -410,6 +410,9 @@ export class LspManager {
   private handleInitializedClientCrash(key: string, client: LspClient): void {
     const existing = this.processCrashRecoveries.get(key);
     if (existing?.attemptConsumed) {
+      existing.failedClient = client;
+      existing.files = this.trackedFilesForClient(client);
+      this.unavailable.set(key, "runtime-error");
       if (existing.statusReason !== "process-crash-recovery-exhausted") {
         existing.statusReason = "process-crash-recovery-exhausted";
         this.recordProcessCrashRecoveryEvent(

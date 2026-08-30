@@ -110,6 +110,8 @@ const mocks = vi.hoisted(() => {
       return [];
     }
 
+    clearPullResultIds(): void {}
+
     markFailedFile(file: string): void {
       this.failedFiles.add(file);
     }
@@ -300,6 +302,9 @@ describe("LspManager process-crash recovery", () => {
     if (!replacement) throw new Error("Expected the replacement client.");
     const fakeReplacement = replacement as unknown as FakeClient;
 
+    const replacementOnlyFile = path.join(root, "opened-after-recovery.test");
+    fs.writeFileSync(replacementOnlyFile, "replacement-only content\n");
+    fakeReplacement.didOpen(replacementOnlyFile, "replacement-only content\n");
     fakeReplacement.crash();
 
     expect(manager.getProjectServerInfo("test", root, ["test"])).toMatchObject({
@@ -313,6 +318,21 @@ describe("LspManager process-crash recovery", () => {
       "success",
       "exhausted",
     ]);
+
+    expect(manager.canServeFile(file)).toBe(false);
+    const diagnostics = await manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { scopes: [replacementOnlyFile] },
+    });
+    expect(diagnostics.refreshFailureReason).toContain("process recovery exhausted");
+    expect(diagnostics.diagnosticEvidence.documents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          file: path.relative(root, replacementOnlyFile),
+          status: "failed",
+        }),
+      ]),
+    );
   });
 
   it("does not restart from passive operations", async () => {
