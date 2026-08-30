@@ -12,6 +12,6 @@ but still write tests when they provide useful coverage.
 
 Run typechecking regularly, single test files regularly, and the full test suite once at the end.
 
-Once done, use /code-review to review the work.
+Once done, use `/code-review` to review the work.
 
 After the review, load `/commit` and follow its instructions to commit the changes.

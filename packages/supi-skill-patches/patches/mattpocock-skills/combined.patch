@@ -37,7 +37,7 @@ index 2d276fe88b..3fcff1fe3a 100644
 +policy; otherwise follow the policy.
 diff --git a/skills/engineering/commit/SKILL.md b/skills/engineering/commit/SKILL.md
 new file mode 100644
-index 00000000..ed734d67
+index 00000000..498f33be
 --- /dev/null
 +++ b/skills/engineering/commit/SKILL.md
 @@ -0,0 +1,44 @@
@@ -70,7 +70,7 @@ index 00000000..ed734d67
 +
 +   **Done when:** the diff audit passes and all hook results are known.
 +
-+4. **Write the message.** Match recent commit history first. Honor explicit message requirements. Use a concise subject with the repository's normal type, scope, mood, length, and punctuation. Add a body only when it explains why, a trade-off, a constraint, a side effect, or a required follow-up. Preserve required issue references and trailers; do not invent them.
++4. **Write the message.** Match recent commit history first. Honor explicit message requirements. Use a concise subject with the repository's normal type, scope, mood, length, and punctuation. Add a body only when it explains why, a trade-off, a constraint, a side effect, or a required follow-up. Add references to tickets if they exist; don't invent them.
 +
 +5. **Create the requested commit.** For a normal commit, pass the complete message through a quoted heredoc:
 +
@@ -86,7 +86,7 @@ index 00000000..ed734d67
 +
 +   **Done when:** `HEAD` contains the intended patch, the message follows repository style, check results are reported, and remaining changes are understood.
 diff --git a/skills/engineering/implement/SKILL.md b/skills/engineering/implement/SKILL.md
-index 7a0b11f5..f651d32d 100644
+index 7a0b11f5..afb4fafb 100644
 --- a/skills/engineering/implement/SKILL.md
 +++ b/skills/engineering/implement/SKILL.md
 @@ -6,6 +6,8 @@ disable-model-invocation: true
@@ -100,7 +100,8 @@ index 7a0b11f5..f651d32d 100644
 
  Run typechecking regularly, single test files regularly, and the full test suite once at the end.
 @@ -13,3 +15,3 @@
- Once done, use /code-review to review the work.
+-Once done, use /code-review to review the work.
++Once done, use `/code-review` to review the work.
 
 -Commit your work to the current branch.
 +After the review, load `/commit` and follow its instructions to commit the changes.

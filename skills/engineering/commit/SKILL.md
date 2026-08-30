@@ -27,7 +27,7 @@ A **commit candidate** is the exact patch that will enter the commit. A **cohere
 
    **Done when:** the diff audit passes and all hook results are known.
 
-4. **Write the message.** Match recent commit history first. Honor explicit message requirements. Use a concise subject with the repository's normal type, scope, mood, length, and punctuation. Add a body only when it explains why, a trade-off, a constraint, a side effect, or a required follow-up. Preserve required issue references and trailers; do not invent them.
+4. **Write the message.** Match recent commit history first. Honor explicit message requirements. Use a concise subject with the repository's normal type, scope, mood, length, and punctuation. Add a body only when it explains why, a trade-off, a constraint, a side effect, or a required follow-up. Add references to tickets if they exist; don't invent them.
 
 5. **Create the requested commit.** For a normal commit, pass the complete message through a quoted heredoc:
 
