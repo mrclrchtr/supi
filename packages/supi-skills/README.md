@@ -33,7 +33,7 @@ pi install ./packages/supi-skills
 - **Model invocation disabled** — PI loads the skill for explicit user commands but omits it from the model's skill catalog.
 - **Disabled** — PI does not load the skill or its command.
 
-Use `Tab` to switch between project and global scope. Project settings inherit global settings, and trusted project overrides take precedence. SuPi stores model-invocation preferences without changing `tool-rendering-review.md`; full load changes use PI resource settings and require `/reload`.
+Use `Tab` to switch between project and global scope. Project settings inherit global settings, and trusted project overrides take precedence. SuPi stores model-invocation preferences without changing `SKILL.md`; full load changes use PI resource settings and require `/reload`.
 
 Skills that an extension adds only at runtime support Enabled and Model invocation disabled. PI does not provide a persistent load setting for these resources. PI exposes only the active source after a name collision, so disabling a static winner can reveal a runtime source after reload. The refreshed row then shows the runtime limitation.
 
