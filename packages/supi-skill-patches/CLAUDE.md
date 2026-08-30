@@ -20,4 +20,4 @@ Private maintenance workspace for SuPi-compatible third-party skills.
 
 For a new catalog skill, add its patch fragment, then run `pnpm skills:patches:compose`, `pnpm install`, and `pnpm skills:sync`.
 
-Add and review patches one at a time only when they are necessary. Keep changes narrow. Each generated skill must include `LICENSE.mattpocock`.
+Add and review patches one at a time only when they are necessary. Keep changes narrow. Each generated skill must include a license. The mirror adds `LICENSE.mattpocock` when a skill has no license; add a license file to the patch for SuPi-owned skills.

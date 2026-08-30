@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { normalizePatchText, validatePatchBundle } from "../../src/patch-bundle.ts";
@@ -22,6 +22,15 @@ describe("skill patch maintenance", () => {
 
   it("keeps root skills synchronized with the patched dependency", () => {
     expect(validateSkillMirror()).toEqual([]);
+  });
+
+  it("keeps SuPi-owned skill licenses separate from upstream licenses", () => {
+    const skill = join(root, "skills/engineering/commit");
+
+    expect(readFileSync(join(skill, "LICENSE.mrclrchtr"), "utf8")).toContain(
+      "Copyright (c) 2026 Marcel Richter",
+    );
+    expect(existsSync(join(skill, "LICENSE.mattpocock"))).toBe(false);
   });
 
   it("uses Ask User for grilling rounds", () => {

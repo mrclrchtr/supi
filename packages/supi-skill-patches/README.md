@@ -33,4 +33,4 @@ Add and review one patch fragment for one upstream file. Do not add speculative 
 
 ## Credit
 
-The generated skills are adapted from [mattpocock/skills](https://github.com/mattpocock/skills), licensed under MIT. Each generated skill includes the upstream license.
+The generated upstream skills are adapted from [mattpocock/skills](https://github.com/mattpocock/skills), licensed under MIT, and retain that license. SuPi-owned catalog skills include their own license.

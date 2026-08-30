@@ -31,6 +31,7 @@ const upstreamRoot = dirname(
 );
 const upstreamSkillsRoot = join(upstreamRoot, "skills");
 const licensePath = join(upstreamRoot, "LICENSE");
+const upstreamLicenseName = "LICENSE.mattpocock";
 
 function readInventory(): UpstreamInventory {
   return JSON.parse(readFileSync(inventoryPath, "utf8")) as UpstreamInventory;
@@ -69,6 +70,12 @@ function relativeFiles(directory: string): string[] {
   return walkFiles(directory).map((path) => relative(directory, path));
 }
 
+function hasSkillLicense(directory: string): boolean {
+  return readdirSync(directory, { withFileTypes: true }).some(
+    (entry) => entry.isFile() && /^LICENSE(?:\..+)?$/u.test(entry.name),
+  );
+}
+
 /** Treat missing, unreadable, and non-file paths as drift instead of aborting validation. */
 function sameFile(left: string, right: string): boolean {
   try {
@@ -103,7 +110,10 @@ export function syncSkillMirror(): void {
       const target = join(stagingRoot, group);
       cpSync(join(upstreamSkillsRoot, group), target, { recursive: true });
       for (const name of groups[group] ?? []) {
-        cpSync(licensePath, join(target, name, "LICENSE.mattpocock"));
+        const skillTarget = join(target, name);
+        if (!hasSkillLicense(skillTarget)) {
+          cpSync(licensePath, join(skillTarget, upstreamLicenseName));
+        }
       }
     }
     for (const group of includedGroups) {
@@ -130,7 +140,11 @@ function validateGroup(group: string, names: string[]): string[] {
   const target = join(skillsRoot, group);
   if (!existsSync(target)) return [`Missing root skill group: ${group}`];
 
-  const generatedLicenses = new Set(names.map((name) => join(name, "LICENSE.mattpocock")));
+  const generatedLicenses = new Set(
+    names
+      .filter((name) => !hasSkillLicense(join(source, name)))
+      .map((name) => join(name, upstreamLicenseName)),
+  );
   const sourceFiles = relativeFiles(source);
   const targetFiles = relativeFiles(target).filter((path) => !generatedLicenses.has(path));
   const errors =
@@ -145,7 +159,8 @@ function validateGroup(group: string, names: string[]): string[] {
     }
   }
   for (const name of names) {
-    const targetLicense = join(target, name, "LICENSE.mattpocock");
+    if (hasSkillLicense(join(source, name))) continue;
+    const targetLicense = join(target, name, upstreamLicenseName);
     if (!existsSync(targetLicense) || !sameFile(licensePath, targetLicense)) {
       errors.push(`Upstream license is stale for skill: ${group}/${name}`);
     }
