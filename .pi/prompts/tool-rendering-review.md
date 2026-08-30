@@ -1,12 +1,11 @@
 ---
-name: tool-rendering-review
 description: Check a named SuPi package for correct PI tool rendering
-disable-model-invocation: true
+argument-hint: "[package path]"
 ---
 
 # Tool rendering review
 
-Review the package path supplied by the user. If no package is supplied, ask for it. Do not edit files.
+Review the package `${1}`.
 
 1. Read `docs/conventions/tool-rendering.md` first.
 2. Read the package `CLAUDE.md` and `CONTEXT.md`, then trace every `pi.registerTool()` call, including indirect registration.

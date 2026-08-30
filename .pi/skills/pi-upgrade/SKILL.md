@@ -35,7 +35,7 @@ The bundled helper (`scripts/check-pi-version`) handles the mechanical work:
 **Dry-run is the default recommendation.** The helper applies changes when run
 without `--dry-run`, so ask the user which mode to use before invoking it.
 
-Resolve `scripts/check-pi-version` relative to this `SKILL.md` file's directory;
+Resolve `scripts/check-pi-version` relative to this `tool-rendering-review.md` file's directory;
 do not assume the target project contains `.agents/skills/pi-upgrade`.
 
 ```bash
@@ -71,7 +71,7 @@ preference, follow it without asking again.
 ### Step 2: Run the helper
 
 Run from the project root. Resolve the helper as `<skill-dir>/scripts/check-pi-version`,
-where `<skill-dir>` is the directory containing this `SKILL.md`.
+where `<skill-dir>` is the directory containing this `tool-rendering-review.md`.
 
 If it returns `upToDate: true`, congratulate the user and stop.
 
