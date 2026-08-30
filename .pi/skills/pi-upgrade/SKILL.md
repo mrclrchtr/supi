@@ -36,7 +36,7 @@ The bundled helper (`scripts/check-pi-version`) handles the mechanical work:
 without `--dry-run`, so ask the user which mode to use before invoking it.
 
 Resolve `scripts/check-pi-version` relative to this `SKILL.md` file's directory;
-do not assume the target project contains `.agents/skills/pi-upgrade`.
+do not assume the target project contains `.pi/skills/pi-upgrade`.
 
 ```bash
 # Preview only (recommended/default)
