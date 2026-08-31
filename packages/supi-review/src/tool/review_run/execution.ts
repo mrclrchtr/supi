@@ -4,6 +4,11 @@ import {
 } from "@mrclrchtr/supi-agent-runtime/api";
 import { normalizeReviewInput } from "../../review-input.ts";
 import { buildReviewPacket } from "../../target/packet.ts";
+import {
+  clampReviewThinkingLevel,
+  REVIEWER_DEFAULT_THINKING_LEVEL,
+  type ReviewThinkingLevel,
+} from "../../thinking.ts";
 import type {
   ReviewerAuditRequest,
   ReviewerExtensionSetStatus,
@@ -55,6 +60,8 @@ function toTaskResult(
     mode: task.mode,
     packetHash,
     modelId: result.modelId,
+    requestedThinkingLevel: result.requestedThinkingLevel,
+    effectiveThinkingLevel: result.effectiveThinkingLevel,
     ...(result.usage ? { usage: result.usage } : {}),
     ...(result.capabilityWarnings ? { capabilityWarnings: result.capabilityWarnings } : {}),
     ...(result.submissionRecovery ? { submissionRecovery: result.submissionRecovery } : {}),
@@ -110,6 +117,7 @@ export async function executeReviewTasks(
   reviewInput: ReviewInput,
   scope: ReviewScope,
   model: ReviewModelSelection,
+  reviewerThinkingLevel: ReviewThinkingLevel = REVIEWER_DEFAULT_THINKING_LEVEL,
   projectTrusted?: boolean,
   signal?: AbortSignal,
   onUpdate?: ReviewExecutionUpdate,
@@ -122,6 +130,7 @@ export async function executeReviewTasks(
   const review = normalizeReviewInput(reviewInput);
   let completedCount = 0;
   const totalCount = review.tasks.length;
+  const effectiveThinkingLevel = clampReviewThinkingLevel(model.model, reviewerThinkingLevel);
   // Partial tool output is replaced repeatedly; retain the review context and task state for expanded views.
   const presentation = {
     targetTitle: snapshot.title,
@@ -179,6 +188,7 @@ export async function executeReviewTasks(
           prompt: packet.prompt,
           packetHash: packet.packetHash,
           model,
+          requestedThinkingLevel: reviewerThinkingLevel,
           ...(recoveryModel ? { recoveryModel } : {}),
           ...(recoveryModelId ? { recoveryModelId } : {}),
           providerAuthority,
@@ -218,6 +228,8 @@ export async function executeReviewTasks(
           mode: task.mode,
           packetHash: packet.packetHash,
           modelId: model.canonicalId,
+          requestedThinkingLevel: reviewerThinkingLevel,
+          effectiveThinkingLevel,
           failureCode: "unexpected-runner-failure",
           diagnostics: createUnobservedAgentRunDiagnostics(),
         };

@@ -50,7 +50,10 @@ export interface ReviewAuditTrace {
 export interface ReviewAuditRecordInput {
   task: ReviewTask;
   modelId: string;
+  /** Effective level passed to PI. */
   thinkingLevel: string;
+  /** Requested level, absent only in older v1 records. */
+  requestedThinkingLevel: string;
   protocolPrompt: string;
   packet: string;
   packetHash: string;
@@ -62,8 +65,10 @@ export interface ReviewAuditRecordInput {
 }
 
 /** Complete on-disk representation of an opt-in reviewer replay. */
-export interface ReviewAuditRecord extends ReviewAuditRecordInput {
+export interface ReviewAuditRecord extends Omit<ReviewAuditRecordInput, "requestedThinkingLevel"> {
   format: "supi-review-audit/v1";
+  /** Missing for v1 records created before requested levels were recorded. */
+  requestedThinkingLevel?: string;
   artifactId: string;
   createdAt: string;
   expiresAt: string;

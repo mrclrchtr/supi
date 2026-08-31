@@ -1,4 +1,3 @@
-import { clampThinkingLevel } from "@earendil-works/pi-ai";
 import {
   type AgentRunSessionView,
   createEarlyCancellationDiagnostics,
@@ -6,6 +5,7 @@ import {
 import { HEADLESS_INSPECTION_TOOL_NAMES } from "@mrclrchtr/supi-code-intelligence/headless";
 import { ReviewAuditTraceCollector } from "../../audit/review-audit.ts";
 import { summarizeReviewSnapshot } from "../../git.ts";
+import { clampReviewThinkingLevel, REVIEWER_DEFAULT_THINKING_LEVEL } from "../../thinking.ts";
 import type {
   ReviewerCapabilityWarning,
   ReviewerExtensionSetStatus,
@@ -31,10 +31,18 @@ function auditOutcome(result: ReviewerRunResult): {
 /** Run one caller-defined task in an isolated Inspection-only Reviewer Session. */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: review, recovery, and continuous audit stay in one adapter lifecycle.
 export async function runReviewer(invocation: ReviewerInvocation): Promise<ReviewerRunResult> {
+  const requestedThinkingLevel =
+    invocation.requestedThinkingLevel ?? REVIEWER_DEFAULT_THINKING_LEVEL;
+  const effectiveThinkingLevel = clampReviewThinkingLevel(
+    invocation.model.model,
+    requestedThinkingLevel,
+  );
   if (invocation.signal?.aborted) {
     return {
       kind: "canceled",
       modelId: invocation.model.canonicalId,
+      requestedThinkingLevel,
+      effectiveThinkingLevel,
       reviewerExtensionSetStatus: "unobserved",
       diagnostics: createEarlyCancellationDiagnostics(),
     };
@@ -48,7 +56,6 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
   const decline = createReviewRecoveryDeclineTool(recoveryTerminal);
   const warnings: ReviewerCapabilityWarning[] = [];
   const protocolPrompt = buildReviewerSystemPrompt(invocation.dependencyBootstrapConfigured);
-  const thinkingLevel = clampThinkingLevel(invocation.model.model, "max");
   let reviewerExtensionSetStatus: ReviewerExtensionSetStatus = "unobserved";
   let session: AgentRunSessionView | undefined;
   let trace: ReviewAuditTraceCollector | undefined;
@@ -69,7 +76,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     ...(invocation.providerAuthority ? { providerAuthority: invocation.providerAuthority } : {}),
     protocolPrompt,
     model: invocation.model.model,
-    thinkingLevel,
+    thinkingLevel: effectiveThinkingLevel,
     timeoutMs: undefined,
     prompt: invocation.prompt,
     signal: invocation.signal,
@@ -113,6 +120,8 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
   const result: ReviewerRunResult = {
     ...outcome,
     modelId: invocation.model.canonicalId,
+    requestedThinkingLevel,
+    effectiveThinkingLevel,
     reviewerExtensionSetStatus,
     ...(warnings.length > 0 ? { capabilityWarnings: warnings } : {}),
     ...(submissionRecovery ? { submissionRecovery } : {}),
@@ -132,7 +141,8 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     const audit = await invocation.audit.store.create({
       task: invocation.task,
       modelId: invocation.model.canonicalId,
-      thinkingLevel,
+      thinkingLevel: effectiveThinkingLevel,
+      requestedThinkingLevel,
       protocolPrompt,
       packet: invocation.prompt,
       packetHash: invocation.packetHash,

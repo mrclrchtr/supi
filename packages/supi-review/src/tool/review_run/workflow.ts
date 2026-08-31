@@ -11,6 +11,7 @@ import { normalizeReviewInput } from "../../review-input.ts";
 import { normalizeReviewScope, validateReviewScope } from "../../review-scope.ts";
 import { reviewTargetEndpoints } from "../../target/input.ts";
 import { snapshotsMatch } from "../../target/snapshot-match.ts";
+import type { ReviewThinkingLevel } from "../../thinking.ts";
 import type {
   PlannerRunResult,
   PlanningRecord,
@@ -41,6 +42,7 @@ export interface DraftReviewTasksInput {
   scope?: ReviewScope;
   plannerContext: string;
   plannerModel?: ReviewModelSelection;
+  plannerThinkingLevel?: ReviewThinkingLevel;
   signal?: AbortSignal;
   onUpdate?: OnUpdate;
 }
@@ -54,6 +56,8 @@ export interface RunReviewInput {
   /** Optional batch-level path focus, validated in the frozen after state. */
   scope?: ReviewScope;
   reviewerModel: ReviewModelSelection;
+  /** Requested thinking level for Reviewer Sessions in this workflow. */
+  reviewerThinkingLevel?: ReviewThinkingLevel;
   /** Optional explicit second model for Submission Recovery. */
   recoveryModel?: ReviewModelSelection;
   /** Requested recovery model id when configuration did not resolve. */
@@ -137,6 +141,7 @@ export async function draftReviewTasks(input: DraftReviewTasksInput) {
     result = await runPlanner({
       cwd: snapshot.repositoryRoot,
       model: input.plannerModel.model,
+      requestedThinkingLevel: input.plannerThinkingLevel,
       ...(input.providerAuthority ? { providerAuthority: input.providerAuthority } : {}),
       prompt: buildPlannerPrompt(snapshot, scope, input.plannerContext),
       signal: input.signal,
@@ -379,6 +384,7 @@ export async function runReview(input: RunReviewInput) {
       review,
       scope,
       input.reviewerModel,
+      input.reviewerThinkingLevel,
       input.projectTrusted,
       input.signal,
       input.onUpdate,

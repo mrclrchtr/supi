@@ -1,9 +1,9 @@
-import { clampThinkingLevel } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { createEarlyCancellationDiagnostics } from "@mrclrchtr/supi-agent-runtime/api";
 import { HEADLESS_INSPECTION_TOOL_NAMES } from "@mrclrchtr/supi-code-intelligence/headless";
 import { Value } from "typebox/value";
 import { normalizeReviewInput } from "../../review-input.ts";
+import { clampReviewThinkingLevel, PLANNER_DEFAULT_THINKING_LEVEL } from "../../thinking.ts";
 import type { PlannerDraft, PlannerInvocation, PlannerRunResult } from "../../types.ts";
 import { runIsolatedChild } from "./child-session.ts";
 import { REVIEW_CHILD_TOOL_SPECS } from "./child-tools.ts";
@@ -38,6 +38,8 @@ export async function runPlanner(invocation: PlannerInvocation): Promise<Planner
     return { kind: "canceled", diagnostics: createEarlyCancellationDiagnostics() };
   }
   const holder: { value?: PlannerDraft } = {};
+  const requestedThinkingLevel =
+    invocation.requestedThinkingLevel ?? PLANNER_DEFAULT_THINKING_LEVEL;
   const spec = REVIEW_CHILD_TOOL_SPECS.submitPlannerDraft;
   const submit = defineTool({
     ...spec,
@@ -57,7 +59,7 @@ export async function runPlanner(invocation: PlannerInvocation): Promise<Planner
     ...(invocation.providerAuthority ? { providerAuthority: invocation.providerAuthority } : {}),
     protocolPrompt: buildPlannerSystemPrompt(),
     model: invocation.model,
-    thinkingLevel: clampThinkingLevel(invocation.model, "low"),
+    thinkingLevel: clampReviewThinkingLevel(invocation.model, requestedThinkingLevel),
     timeoutMs: PLANNER_TIMEOUT_MS,
     prompt: invocation.prompt,
     signal: invocation.signal,

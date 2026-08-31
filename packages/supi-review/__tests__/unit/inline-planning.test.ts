@@ -75,6 +75,14 @@ describe("inline Planner Draft", () => {
     expect(prompt).not.toContain("Required Planner Draft mode");
   });
 
+  it("passes the configured Planner thinking level to the Planner child", async () => {
+    await draftReviewTasks({ ...input(), plannerThinkingLevel: "high" });
+
+    expect(mocks.runPlanner).toHaveBeenCalledWith(
+      expect.objectContaining({ requestedThinkingLevel: "high" }),
+    );
+  });
+
   it("includes normalized advisory scope without making it Review Criteria", async () => {
     await draftReviewTasks({
       ...input(),
@@ -154,6 +162,48 @@ describe("inline Planner Draft", () => {
 
     expect(mocks.resolveReviewSnapshot).toHaveBeenCalledTimes(1);
     expect(cleanup).toHaveBeenCalledOnce();
+  });
+
+  it("passes the configured Reviewer thinking level to every task", async () => {
+    const cleanup = vi.fn(async () => undefined);
+    mocks.materializeReviewWorkspace.mockResolvedValue({
+      cwd: "/frozen",
+      cleanup,
+      receipt: {
+        status: "verified",
+        fromCommit: "b".repeat(40),
+        toCommit: head,
+        includeUncommittedChanges: true,
+        expectedWorkspaceHead: "b".repeat(40),
+        observedWorkspaceHead: "b".repeat(40),
+        expectedDiffHash: snapshot.diffHash,
+        observedDiffHash: snapshot.diffHash,
+        changedPathCount: 1,
+      },
+    });
+    mocks.runReviewer.mockResolvedValue({
+      kind: "success",
+      modelId: model.canonicalId,
+      requestedThinkingLevel: "medium",
+      effectiveThinkingLevel: "medium",
+      reviewerExtensionSetStatus: "active",
+      value: { summary: "Done.", findings: [], criteriaCoverage: { status: "complete" } },
+    });
+
+    await expect(
+      runReview({
+        cwd: "/repo",
+        target: input().target,
+        review: mixedDraft,
+        reviewerModel: model,
+        reviewerThinkingLevel: "medium",
+      }),
+    ).resolves.toMatchObject({ kind: "completed" });
+
+    expect(mocks.runReviewer).toHaveBeenCalledTimes(2);
+    for (const [invocation] of mocks.runReviewer.mock.calls) {
+      expect(invocation).toMatchObject({ requestedThinkingLevel: "medium" });
+    }
   });
 
   it("revalidates the selected target before final all-state execution", async () => {

@@ -12,12 +12,16 @@ it("encodes the child-failure diagnostics invariant", () => {
     kind: "failed",
     failureCode: "session-creation-failed",
     modelId: "provider/model",
+    requestedThinkingLevel: "max",
+    effectiveThinkingLevel: "max",
     reviewerExtensionSetStatus: "unobserved",
   } satisfies ReviewerRunResult;
   const observedFailure = {
     kind: "failed",
     failureCode: "prompt-rejected",
     modelId: "provider/model",
+    requestedThinkingLevel: "max",
+    effectiveThinkingLevel: "max",
     reviewerExtensionSetStatus: "active",
     diagnostics,
   } satisfies ReviewerRunResult;
@@ -27,12 +31,16 @@ it("encodes the child-failure diagnostics invariant", () => {
     kind: "failed",
     failureCode: "prompt-rejected",
     modelId: "provider/model",
+    requestedThinkingLevel: "max",
+    effectiveThinkingLevel: "max",
     reviewerExtensionSetStatus: "active",
   };
   const creationDiagnostics: ReviewerRunResult = {
     kind: "failed",
     failureCode: "session-creation-failed",
     modelId: "provider/model",
+    requestedThinkingLevel: "max",
+    effectiveThinkingLevel: "max",
     reviewerExtensionSetStatus: "unobserved",
     // @ts-expect-error — session creation has no observed child lifecycle
     diagnostics,

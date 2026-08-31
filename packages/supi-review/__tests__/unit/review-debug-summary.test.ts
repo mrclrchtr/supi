@@ -12,6 +12,8 @@ const completedResult: ReviewTaskResult = {
   mode: "state",
   packetHash: "h".repeat(64),
   modelId: "provider/model",
+  requestedThinkingLevel: "max",
+  effectiveThinkingLevel: "max",
   status: "completed",
   verdict: "pass",
   findingCounts: {
@@ -62,6 +64,8 @@ describe("recordReviewTaskDebugSummary", () => {
       mode: "change",
       packetHash: "h".repeat(64),
       modelId: "provider/model",
+      requestedThinkingLevel: "max",
+      effectiveThinkingLevel: "max",
       status: "failed",
       failureCode: "missing-structured-output",
       diagnostics: { lifecycleTrace: { entries: [], droppedCount: 0 }, turns: 2, toolUses: 4 },

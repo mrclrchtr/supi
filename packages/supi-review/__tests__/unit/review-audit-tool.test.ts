@@ -33,6 +33,7 @@ function record(): ReviewAuditRecordInput {
     task: { id: "spec", instructions: "Review.", mode: "change" as const },
     modelId: "provider/model",
     thinkingLevel: "max",
+    requestedThinkingLevel: "max",
     protocolPrompt: "Protocol",
     packet: "Packet body",
     packetHash: "a".repeat(64),

@@ -41,6 +41,8 @@ const details: ReviewBatchDetails = {
       taskId: "state",
       mode: "state",
       modelId: "provider/reviewer",
+      requestedThinkingLevel: "max",
+      effectiveThinkingLevel: "max",
       packetHash: "c".repeat(64),
       verdict: "pass",
       findingCounts: {
@@ -108,8 +110,32 @@ describe("review_run TUI", () => {
       .join("\n");
 
     expect(output).toContain("state (state)");
+    expect(output).toContain("Thinking: max");
     expect(output).toContain("focus: path focus: 1 path");
     expect(output).toContain("workspace: verified · from");
+  });
+
+  it("shows when the effective thinking level was clamped", () => {
+    const output = renderRunResult(
+      {
+        content: [],
+        details: {
+          ...details,
+          results: [
+            {
+              ...details.results[0],
+              effectiveThinkingLevel: "high",
+            },
+          ],
+        },
+      },
+      { expanded: true, isPartial: false },
+      theme,
+    )
+      .render(200)
+      .join("\n");
+
+    expect(output).toContain("Thinking: max clamped to high");
   });
 
   it("uses render context for tool failures", () => {

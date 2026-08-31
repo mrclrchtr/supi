@@ -15,6 +15,7 @@ import {
   resolveRecoveryReviewModel,
 } from "../model.ts";
 import type { ReviewArtifactStore } from "../session/review-artifact-store.ts";
+import { type ReviewThinkingLevel, resolveReviewThinkingLevel } from "../thinking.ts";
 import { createReviewOutput } from "../tool/output-page.ts";
 import { formatReviewBatch } from "../tool/review_run/format.ts";
 import { queuePostReviewTurn } from "../tool/review_run/post-policy.ts";
@@ -212,6 +213,7 @@ async function draftInteractiveReview(
   ctx: CommandContext,
   target: ReviewTargetSpec,
   scope: ReviewScope,
+  plannerThinkingLevel?: ReviewThinkingLevel,
 ): Promise<InteractivePlannerDraft | undefined> {
   const config = loadReviewConfig(ctx.cwd);
   const plannerModel = resolveAgentReviewModel(ctx, config.plannerModel);
@@ -227,6 +229,7 @@ async function draftInteractiveReview(
       scope,
       plannerContext: collectPlannerContext(session.messages),
       plannerModel,
+      plannerThinkingLevel,
       signal,
     }),
   );
@@ -258,6 +261,7 @@ async function executeInteractiveReview(
     review: ReviewInput;
     scope: ReviewScope;
     reviewerModel: ReviewModelSelection;
+    reviewerThinkingLevel: ReviewThinkingLevel;
     expectedSnapshot: ReviewSnapshot;
     expectedSnapshotTarget: ReviewTargetSpec;
     planning?: PlanningRecord;
@@ -279,6 +283,7 @@ async function executeInteractiveReview(
         review: input.review,
         scope: input.scope,
         reviewerModel: input.reviewerModel,
+        reviewerThinkingLevel: input.reviewerThinkingLevel,
         ...(recoveryModel ? { recoveryModel } : {}),
         ...(config.recoveryModel !== "disabled" &&
         config.recoveryModel !== CURRENT_SESSION_REVIEW_MODEL &&
@@ -340,9 +345,31 @@ export async function runReviewCommand(
   ]);
   if (!planningChoice) return;
 
+  const config = loadReviewConfig(ctx.cwd);
+  let reviewerThinkingLevel: ReviewThinkingLevel;
+  let plannerThinkingLevel: ReviewThinkingLevel | undefined;
+  try {
+    reviewerThinkingLevel = resolveReviewThinkingLevel(config.reviewerThinkingLevel, "Reviewer");
+    plannerThinkingLevel =
+      planningChoice === "AI suggests tasks"
+        ? resolveReviewThinkingLevel(config.plannerThinkingLevel, "Planner")
+        : undefined;
+  } catch (error) {
+    ctx.ui.notify(
+      error instanceof Error ? error.message : "Invalid Review thinking level.",
+      "error",
+    );
+    return;
+  }
+
   const plannerDraft =
     planningChoice === "AI suggests tasks"
-      ? await draftInteractiveReview(ctx, selectedTarget.selectedTarget, scope)
+      ? await draftInteractiveReview(
+          ctx,
+          selectedTarget.selectedTarget,
+          scope,
+          plannerThinkingLevel,
+        )
       : undefined;
   if (planningChoice === "AI suggests tasks" && !plannerDraft) return;
   const snapshot =
@@ -380,6 +407,7 @@ export async function runReviewCommand(
     review: edited,
     scope,
     reviewerModel,
+    reviewerThinkingLevel,
     expectedSnapshot: snapshot,
     expectedSnapshotTarget: selectedTarget.selectedTarget,
     ...(usePlannerDraft && plannerDraft ? { planning: plannerDraft.planning } : {}),

@@ -64,6 +64,8 @@ const details: ReviewBatchDetails = {
       taskId: "spec",
       mode: "change",
       modelId: "provider/model",
+      requestedThinkingLevel: "max",
+      effectiveThinkingLevel: "max",
       packetHash: "c".repeat(64),
       verdict: "pass",
       findingCounts: {
@@ -84,6 +86,7 @@ describe("agent review tool usage", () => {
     vi.clearAllMocks();
     mocks.loadReviewConfig.mockReturnValue({
       agentModel: "provider/model",
+      reviewerThinkingLevel: "high",
       recoveryModel: "disabled",
       auditEnabled: false,
       bootstrapCommand: "",
@@ -132,6 +135,7 @@ describe("agent review tool usage", () => {
         target: {},
         scope: { paths: ["src/a.ts"] },
         review: { tasks: [{ id: "spec", instructions: "Review.", mode: "change" }] },
+        reviewerThinkingLevel: "high",
       }),
     );
   });

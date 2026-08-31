@@ -21,6 +21,8 @@ function makeDetails(options: { findings?: boolean; partial?: boolean } = {}): R
       taskId: "spec",
       mode: "change",
       modelId: "provider/model",
+      requestedThinkingLevel: "max",
+      effectiveThinkingLevel: "max",
       packetHash: "c".repeat(64),
       verdict: hasFindings ? "issues" : "pass",
       findingCounts: {
@@ -51,6 +53,8 @@ function makeDetails(options: { findings?: boolean; partial?: boolean } = {}): R
       taskId: "standards",
       mode: "state",
       modelId: "provider/model",
+      requestedThinkingLevel: "max",
+      effectiveThinkingLevel: "max",
       packetHash: "d".repeat(64),
       failureCode: "missing-structured-output",
     });

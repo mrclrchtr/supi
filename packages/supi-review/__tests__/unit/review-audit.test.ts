@@ -26,6 +26,7 @@ function recordInput() {
     task: { id: "spec", instructions: "Review the contract.", mode: "change" as const },
     modelId: "provider/model",
     thinkingLevel: "max",
+    requestedThinkingLevel: "max",
     protocolPrompt: "Review protocol",
     packet: "Exact review packet",
     packetHash: "c".repeat(64),

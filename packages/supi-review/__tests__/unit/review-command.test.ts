@@ -147,6 +147,8 @@ describe("/supi-review task editing", () => {
       agentToolEnabled: false,
       agentModel: "current",
       plannerModel: "provider/planner",
+      reviewerThinkingLevel: "high",
+      plannerThinkingLevel: "medium",
       recoveryModel: "disabled",
       auditEnabled: false,
       bootstrapCommand: "",
@@ -184,7 +186,56 @@ describe("/supi-review task editing", () => {
           ],
         },
         provenance: "caller-supplied",
+        reviewerThinkingLevel: "high",
       }),
+    );
+  });
+
+  it("rejects an invalid Planner level before AI planning starts", async () => {
+    mocks.loadReviewConfig.mockReturnValueOnce({
+      agentToolEnabled: false,
+      agentModel: "current",
+      plannerModel: "provider/planner",
+      reviewerThinkingLevel: "high",
+      plannerThinkingLevel: "invalid",
+      recoveryModel: "disabled",
+      auditEnabled: false,
+      bootstrapCommand: "",
+      postReviewPolicy: "report",
+    });
+    const command = commandContext(
+      ["Current work", "provider/reviewer", "Repository-wide review", "AI suggests tasks"],
+      [],
+    );
+
+    await runCommand(command);
+
+    expect(mocks.draftReviewTasks).not.toHaveBeenCalled();
+    expect(mocks.runReview).not.toHaveBeenCalled();
+    expect(command.ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid Planner thinking level"),
+      "error",
+    );
+  });
+
+  it("does not validate the Planner level for a manual Review", async () => {
+    mocks.loadReviewConfig.mockReturnValueOnce({
+      agentToolEnabled: false,
+      agentModel: "current",
+      plannerModel: "provider/planner",
+      reviewerThinkingLevel: "high",
+      plannerThinkingLevel: "invalid",
+      recoveryModel: "disabled",
+      auditEnabled: false,
+      bootstrapCommand: "",
+      postReviewPolicy: "report",
+    });
+    const command = commandContext(selectCurrentManual("state"), ["State task.", ""]);
+
+    await runCommand(command);
+
+    expect(mocks.runReview).toHaveBeenCalledWith(
+      expect.objectContaining({ reviewerThinkingLevel: "high" }),
     );
   });
 
@@ -222,6 +273,9 @@ describe("/supi-review task editing", () => {
 
     await runCommand(command);
 
+    expect(mocks.draftReviewTasks).toHaveBeenCalledWith(
+      expect.objectContaining({ plannerThinkingLevel: "medium" }),
+    );
     expect(command.select).toHaveBeenCalledWith("Review Mode for change (current: change)", [
       "change",
       "state",

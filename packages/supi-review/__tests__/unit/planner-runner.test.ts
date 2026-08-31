@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@earendil-works/pi-ai", async (original) => ({
   ...(await original()),
-  clampThinkingLevel: () => "low",
+  clampThinkingLevel: (_model: unknown, level: string) => level,
 }));
 vi.mock("../../src/tool/review_run/child-session.ts", () => ({
   runIsolatedChild: mocks.runIsolatedChild,
@@ -91,9 +91,18 @@ describe("runPlanner", () => {
     expect(mocks.runIsolatedChild).toHaveBeenCalledWith(
       expect.objectContaining({
         prompt: "bounded input",
+        thinkingLevel: "low",
         timeoutMs: 5 * 60 * 1_000,
         tools: ["submit_planner_draft"],
       }),
+    );
+  });
+
+  it("passes a configured Planner thinking level through the runtime adapter", async () => {
+    await runPlanner({ ...args, requestedThinkingLevel: "high" });
+
+    expect(mocks.runIsolatedChild).toHaveBeenCalledWith(
+      expect.objectContaining({ thinkingLevel: "high" }),
     );
   });
 

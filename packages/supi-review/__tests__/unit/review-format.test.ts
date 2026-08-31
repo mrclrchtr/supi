@@ -35,6 +35,8 @@ const details: ReviewBatchDetails = {
       taskId: "task",
       mode: "change",
       modelId: "provider/model",
+      requestedThinkingLevel: "max",
+      effectiveThinkingLevel: "max",
       packetHash: "c".repeat(64),
       verdict: "issues",
       findingCounts: {

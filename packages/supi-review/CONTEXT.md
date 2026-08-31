@@ -74,6 +74,18 @@ _Avoid_: access boundary, finding boundary, Review Criteria, Review Mode
 The required per-task policy that selects the evidence view. `change` requires one non-empty canonical change. `state` audits only the frozen after state. The Reviewer Protocol defines finding eligibility.
 _Avoid_: Finding Scope, target kind
 
+**Review Thinking Level**:
+A user-selected PI model reasoning level for one Review child role. Reviewer Sessions and Planner Drafts have separate Review Thinking Levels. When no value is selected, the role keeps its package default. It changes the model's reasoning budget only; it does not change Review Tasks, the Reviewer Protocol, finding eligibility, or inspection permissions.
+_Avoid_: review strategy, inspection depth, review effort
+
+**Requested Review Thinking Level**:
+The Review Thinking Level selected for a child role before the selected model's capability limits are applied. It expresses the user's intended reasoning budget.
+_Avoid_: effective level, review strategy, reasoning transcript
+
+**Effective Review Thinking Level**:
+The Review Thinking Level that a selected model can use after capability limits are applied. It may be lower than the Requested Review Thinking Level and is the level used by PI. New Local Reviewer Replays record both levels; older v1 records may not have the requested level.
+_Avoid_: configured level, review effort, reasoning transcript
+
 **Finding Verification**:
 The containing Agent's independent confirmation or refutation of each reported finding against Target Evidence before any mutation. It concludes by presenting the verified findings and asking the user what to do next.
 _Avoid_: Reviewer Session, review rerun, fixing

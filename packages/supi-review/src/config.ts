@@ -2,6 +2,12 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
 import { defineConfigSettings, registerSettings } from "@mrclrchtr/supi-core/settings";
 import { CURRENT_SESSION_REVIEW_MODEL } from "./model.ts";
+import {
+  PLANNER_DEFAULT_THINKING_LEVEL,
+  REVIEW_THINKING_LEVELS,
+  REVIEWER_DEFAULT_THINKING_LEVEL,
+  type ReviewThinkingLevel,
+} from "./thinking.ts";
 import { REVIEW_AUDIT_TOOL_NAME } from "./tool/review_audit/spec.ts";
 import { REVIEW_RUN_TOOL_NAME } from "./tool/review_run/spec.ts";
 
@@ -18,6 +24,10 @@ export interface ReviewConfig extends Record<string, unknown> {
   agentModel: string;
   /** Canonical Planner model id, or `current` for the active session model. */
   plannerModel: string;
+  /** Configured Reviewer thinking level; validated when Reviewer Sessions start. */
+  reviewerThinkingLevel: string;
+  /** Configured Planner thinking level; validated when Planner Drafts start. */
+  plannerThinkingLevel: string;
   /** Explicit canonical Submission Recovery model id, or `disabled`. */
   recoveryModel: string;
   /** Record every reviewer's local replay and enable replay retrieval. */
@@ -35,6 +45,8 @@ export const REVIEW_DEFAULTS: ReviewConfig = {
   agentToolEnabled: true,
   agentModel: CURRENT_SESSION_REVIEW_MODEL,
   plannerModel: CURRENT_SESSION_REVIEW_MODEL,
+  reviewerThinkingLevel: REVIEWER_DEFAULT_THINKING_LEVEL,
+  plannerThinkingLevel: PLANNER_DEFAULT_THINKING_LEVEL,
   recoveryModel: "disabled",
   auditEnabled: false,
   bootstrapCommand: "",
@@ -46,6 +58,8 @@ export function loadReviewConfig(cwd: string, homeDir?: string): ReviewConfig {
   const raw = loadSupiConfig(REVIEW_CONFIG_SECTION, cwd, REVIEW_DEFAULTS, { homeDir });
   const readModel = (value: unknown, fallback: string) =>
     typeof value === "string" && value.trim() ? value.trim() : fallback;
+  const readThinkingLevel = (value: unknown, fallback: ReviewThinkingLevel) =>
+    value === undefined ? fallback : typeof value === "string" ? value.trim() : String(value);
   const readBoolean = (value: unknown, fallback: boolean) => {
     if (typeof value === "boolean") return value;
     if (typeof value === "string") return value.trim().toLowerCase() === "true";
@@ -58,6 +72,14 @@ export function loadReviewConfig(cwd: string, homeDir?: string): ReviewConfig {
     agentToolEnabled: readBoolean(raw.agentToolEnabled, REVIEW_DEFAULTS.agentToolEnabled),
     agentModel: readModel(raw.agentModel, REVIEW_DEFAULTS.agentModel),
     plannerModel: readModel(raw.plannerModel, REVIEW_DEFAULTS.plannerModel),
+    reviewerThinkingLevel: readThinkingLevel(
+      raw.reviewerThinkingLevel,
+      REVIEW_DEFAULTS.reviewerThinkingLevel as ReviewThinkingLevel,
+    ),
+    plannerThinkingLevel: readThinkingLevel(
+      raw.plannerThinkingLevel,
+      REVIEW_DEFAULTS.plannerThinkingLevel as ReviewThinkingLevel,
+    ),
     recoveryModel: readModel(raw.recoveryModel, REVIEW_DEFAULTS.recoveryModel),
     auditEnabled: readBoolean(raw.auditEnabled, REVIEW_DEFAULTS.auditEnabled),
     bootstrapCommand: readCommand(raw.bootstrapCommand),
@@ -111,12 +133,26 @@ export function registerReviewSettings(pi: ExtensionAPI, homeDir?: string): void
           staticOptions: [currentOption],
         },
         {
+          kind: "enum",
+          key: "reviewerThinkingLevel",
+          label: "Reviewer thinking level",
+          description: "PI reasoning level for Reviewer Sessions.",
+          values: [...REVIEW_THINKING_LEVELS],
+        },
+        {
           kind: "modelPicker",
           key: "plannerModel",
           label: "Planner model",
           description: "Powers the optional Planner Draft in /supi-review.",
           includeDisabled: false,
           staticOptions: [currentOption],
+        },
+        {
+          kind: "enum",
+          key: "plannerThinkingLevel",
+          label: "Planner thinking level",
+          description: "PI reasoning level for Planner Drafts.",
+          values: [...REVIEW_THINKING_LEVELS],
         },
         {
           kind: "modelPicker",

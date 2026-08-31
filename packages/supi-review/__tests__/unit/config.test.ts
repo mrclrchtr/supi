@@ -22,6 +22,7 @@ import {
   registerReviewSettings,
 } from "../../src/config.ts";
 import { CURRENT_SESSION_REVIEW_MODEL } from "../../src/model.ts";
+import { resolveReviewThinkingLevel } from "../../src/thinking.ts";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "supi-review-config-test-"));
@@ -37,6 +38,8 @@ describe("review config", () => {
         agentToolEnabled: true,
         agentModel: CURRENT_SESSION_REVIEW_MODEL,
         plannerModel: CURRENT_SESSION_REVIEW_MODEL,
+        reviewerThinkingLevel: "max",
+        plannerThinkingLevel: "low",
         recoveryModel: "disabled",
         auditEnabled: false,
         bootstrapCommand: "",
@@ -59,6 +62,8 @@ describe("review config", () => {
           agentModel: "  openai/reviewer  ",
           plannerModel: "  openai/planner  ",
           recoveryModel: "  openai/recovery  ",
+          reviewerThinkingLevel: "  high  ",
+          plannerThinkingLevel: " medium ",
           bootstrapCommand: " pnpm install --frozen-lockfile ",
           postReviewPolicy: "verify-and-fix",
         },
@@ -70,10 +75,34 @@ describe("review config", () => {
         agentModel: "openai/reviewer",
         plannerModel: "openai/planner",
         recoveryModel: "openai/recovery",
+        reviewerThinkingLevel: "high",
+        plannerThinkingLevel: "medium",
         auditEnabled: false,
         bootstrapCommand: "pnpm install --frozen-lockfile",
         postReviewPolicy: "verify-and-fix",
       });
+    } finally {
+      fs.rmSync(homeDir, { recursive: true, force: true });
+    }
+  });
+
+  it("retains invalid thinking values until the affected role starts", () => {
+    const homeDir = makeTempDir();
+    const cwd = path.join(homeDir, "repo");
+    fs.mkdirSync(cwd, { recursive: true });
+    try {
+      writeSupiConfig(
+        { section: REVIEW_CONFIG_SECTION, scope: "project", cwd },
+        { plannerThinkingLevel: "unknown" },
+        { homeDir },
+      );
+
+      const config = loadReviewConfig(cwd, homeDir);
+      expect(config.plannerThinkingLevel).toBe("unknown");
+      expect(() => resolveReviewThinkingLevel(config.plannerThinkingLevel, "Planner")).toThrow(
+        "Invalid Planner thinking level",
+      );
+      expect(resolveReviewThinkingLevel(config.reviewerThinkingLevel, "Reviewer")).toBe("max");
     } finally {
       fs.rmSync(homeDir, { recursive: true, force: true });
     }
@@ -107,9 +136,19 @@ describe("review config", () => {
           expect.objectContaining({ kind: "boolean", key: "agentToolEnabled" }),
           expect.objectContaining({ kind: "modelPicker", key: "agentModel" }),
           expect.objectContaining({
+            kind: "enum",
+            key: "reviewerThinkingLevel",
+            values: ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
+          }),
+          expect.objectContaining({
             kind: "modelPicker",
             key: "plannerModel",
             description: "Powers the optional Planner Draft in /supi-review.",
+          }),
+          expect.objectContaining({
+            kind: "enum",
+            key: "plannerThinkingLevel",
+            values: ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
           }),
           expect.objectContaining({
             kind: "modelPicker",

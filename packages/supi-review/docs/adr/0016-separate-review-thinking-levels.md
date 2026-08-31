@@ -1,0 +1,3 @@
+# Separate Reviewer and Planner Thinking Levels
+
+`supi-review` uses separate project/global `reviewerThinkingLevel` and `plannerThinkingLevel` settings instead of one shared value. Reviewer Sessions default to `max`, Planner Drafts default to `low`, and Submission Recovery remains fixed at `low`; each selected value uses the PI thinking-level vocabulary and is clamped to the selected model. Separate settings preserve the existing quality and cost policies while allowing users to tune each role. Reviewer task details and opt-in replays distinguish the requested level from the effective level without adding this operational data to agent-facing review content.

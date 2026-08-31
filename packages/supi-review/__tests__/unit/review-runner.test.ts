@@ -123,7 +123,12 @@ describe("runReviewer", () => {
     });
 
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ packet: "exact packet bytes", packetHash: "c".repeat(64) }),
+      expect.objectContaining({
+        packet: "exact packet bytes",
+        packetHash: "c".repeat(64),
+        thinkingLevel: "off",
+        requestedThinkingLevel: "max",
+      }),
     );
     expect(JSON.stringify(create.mock.calls[0]?.[0])).not.toContain("private");
     expect(create.mock.calls[0]?.[0].messages).toEqual([
@@ -139,6 +144,7 @@ describe("runReviewer", () => {
       expect.objectContaining({
         prompt: "exact packet bytes",
         timeoutMs: undefined,
+        thinkingLevel: "off",
         tools: [
           "read",
           "bash",
@@ -180,6 +186,8 @@ describe("runReviewer", () => {
       kind: "success",
       value: { summary: "Done", findings: [], criteriaCoverage: { status: "complete" } },
       modelId: model.canonicalId,
+      requestedThinkingLevel: "max",
+      effectiveThinkingLevel: "off",
       reviewerExtensionSetStatus: "active",
     });
 
@@ -192,6 +200,8 @@ describe("runReviewer", () => {
       timeoutMs: 1234,
       diagnostics,
       modelId: model.canonicalId,
+      requestedThinkingLevel: "max",
+      effectiveThinkingLevel: "off",
       reviewerExtensionSetStatus: "active",
     });
 
@@ -203,6 +213,8 @@ describe("runReviewer", () => {
       kind: "failed",
       failureCode: "session-creation-failed",
       modelId: model.canonicalId,
+      requestedThinkingLevel: "max",
+      effectiveThinkingLevel: "off",
       reviewerExtensionSetStatus: "unobserved",
     });
   });

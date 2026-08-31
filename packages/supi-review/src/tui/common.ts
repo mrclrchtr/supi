@@ -105,6 +105,12 @@ export function renderReviewToolCall(
 
 // ── Task section (expanded) ──────────────────────────────────────
 
+function formatThinkingLevel(result: ReviewTaskResult): string {
+  return result.requestedThinkingLevel === result.effectiveThinkingLevel
+    ? `Thinking: ${result.requestedThinkingLevel}`
+    : `Thinking: ${result.requestedThinkingLevel} clamped to ${result.effectiveThinkingLevel}`;
+}
+
 /** Render a single finding's details into the container. */
 function renderFinding(container: Container, finding: ReviewFinding, theme: Theme): void {
   container.addChild(new Text(formatFindingLine(finding, theme), 1, 0));
@@ -257,6 +263,7 @@ export function buildTaskSection(
   const metaParts = [
     theme.fg("dim", `model: ${result.modelId}`),
     theme.fg("dim", `hash: ${result.packetHash.slice(0, 12)}…`),
+    theme.fg("dim", formatThinkingLevel(result)),
     ...(result.usage ? [theme.fg("dim", formatReviewUsage(result.usage))] : []),
   ];
   container.addChild(new Text(metaParts.join("  "), 1, 0));

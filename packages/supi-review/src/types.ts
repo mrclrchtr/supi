@@ -1,9 +1,10 @@
-import type { Model, Usage } from "@earendil-works/pi-ai";
+import type { Model, ModelThinkingLevel, Usage } from "@earendil-works/pi-ai";
 import type {
   AgentRunDiagnostics,
   AgentRunProviderAuthority,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import type { LocalReviewAuditStore } from "./audit/local-review-audit-store.ts";
+import type { ReviewThinkingLevel } from "./thinking.ts";
 import type { ReviewWorkspaceCleanupWarning } from "./workspace/review-workspace.ts";
 
 /** A full Git commit id after target resolution. */
@@ -233,6 +234,8 @@ export interface ReviewProgress {
 
 export interface PlannerInvocation {
   prompt: string;
+  /** Requested level for this Planner Draft; omitted values keep the package default. */
+  requestedThinkingLevel?: ReviewThinkingLevel;
   providerAuthority?: AgentRunProviderAuthority;
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
   model: Model<any>;
@@ -255,6 +258,8 @@ export interface ReviewerAuditRequest {
 
 export interface ReviewerInvocation {
   prompt: string;
+  /** Requested level for this Reviewer Session; omitted values keep the package default. */
+  requestedThinkingLevel?: ReviewThinkingLevel;
   providerAuthority?: AgentRunProviderAuthority;
   packetHash: string;
   task: ReviewTask;
@@ -277,6 +282,8 @@ export type ReviewerExtensionSetStatus = "active" | "degraded" | "unobserved";
 
 export type ReviewerRunResult = ChildRunOutcome<ReviewSubmission> & {
   modelId: string;
+  requestedThinkingLevel: ReviewThinkingLevel;
+  effectiveThinkingLevel: ModelThinkingLevel;
   reviewerExtensionSetStatus: ReviewerExtensionSetStatus;
   capabilityWarnings?: ReviewerCapabilityWarning[];
   audit?: ReviewAuditReference;
@@ -287,6 +294,10 @@ interface ReviewTaskResultIdentity {
   taskId: string;
   mode: ReviewMode;
   modelId: string;
+  /** Requested Reviewer Thinking Level for this task. */
+  requestedThinkingLevel: ReviewThinkingLevel;
+  /** Effective Reviewer Thinking Level after model capability clamping. */
+  effectiveThinkingLevel: ModelThinkingLevel;
   /** SHA-256 of the exact reviewer packet bytes. */
   packetHash: string;
   /** Aggregate nested-model usage for this task, when reported by the provider. */

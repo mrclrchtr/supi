@@ -89,6 +89,8 @@ Workspaces are marked and locked in the Git worktree list. Normal cleanup remove
 
 `review.agentModel` selects the reviewer model for agent-started Reviews. `review.plannerModel` selects the model for the optional Planner Draft in `/supi-review`. Both default to `current`, which uses the active session model.
 
+`review.reviewerThinkingLevel` selects the PI reasoning level for Reviewer Sessions. It defaults to `max`. `review.plannerThinkingLevel` selects the level for Planner Drafts. It defaults to `low`. Both settings use `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Project and global values are independent. The selected level is clamped to the selected model's capabilities. Invalid hand-written values stop the affected Review flow with a role-specific error.
+
 `review.recoveryModel` selects one optional explicit model for Submission Recovery. It defaults to `disabled`. `current` is not a valid implicit Recovery Model. If the configured model is unavailable, the original review still runs. Recovery records the failed model switch only if the chain reaches that model.
 
 `review.bootstrapCommand` defaults to empty. When set, the Review Engine runs the command once in the frozen Review Workspace before Reviewer Sessions start. When empty, a reviewer can run a Dependency Bootstrap command when needed.
@@ -131,7 +133,7 @@ A valid recovered submission produces the normal Task Verdict. A decline or exha
 
 ## Results and continuation
 
-Each task result includes its Review Mode, packet SHA-256, verdict, finding counts, and reviewer usage when available. Results remain separate. The Review Engine does not make a batch verdict.
+Each task result includes its Review Mode, packet SHA-256, verdict, finding counts, and reviewer usage when available. Expanded TUI task details also show the requested and effective Reviewer Thinking Levels. This operational metadata is user-visible only and is not added to agent-facing result content. Results remain separate. The Review Engine does not make a batch verdict.
 
 `blocksAcceptance` keeps its existing meaning. The Review Engine derives `issues` for a blocking finding. It derives `incomplete` for incomplete Criteria Coverage without a blocking finding, `pass_with_findings` for only non-blocking findings, and `pass` for no findings.
 
@@ -143,7 +145,7 @@ Parent-facing output from `review_run` or `/supi-review` is stored as a bounded 
 
 With an artifact id, the audit tool now returns **Replay Outline** by default. The outline gives one metadata-only row for each stable zero-based position in the persisted captured-message array. It includes role, content kinds and size, tool names, stop reason, and error presence. It does not include message prose, provider error text, tool arguments, tool results, arbitrary message fields, or file paths.
 
-Use `view: "message"` with `messageIndex` to page one selected persisted message. Use `view: "raw"` to page the exact complete replay JSON. Message and raw views remain private opt-in audit access and can contain repository evidence, provider errors, tool arguments, and tool output.
+Use `view: "message"` with `messageIndex` to page one selected persisted message. Use `view: "raw"` to page the exact complete replay JSON. Message and raw views remain private opt-in audit access and can contain repository evidence, provider errors, tool arguments, and tool output. New records keep `thinkingLevel` as the effective level and add `requestedThinkingLevel`; older records have no requested level.
 
 ## Post-review behavior
 

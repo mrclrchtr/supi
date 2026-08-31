@@ -9,17 +9,18 @@ import {
   resolveRecoveryReviewModel,
 } from "../../model.ts";
 import type { ReviewArtifactStore } from "../../session/review-artifact-store.ts";
+import { resolveReviewThinkingLevel } from "../../thinking.ts";
 import { parseRunReviewToolInput } from "./input-schema.ts";
 import { buildRunResult } from "./result.ts";
 import { runReview } from "./workflow.ts";
 
 function resolveReviewerModel(
   ctx: Parameters<Parameters<ExtensionAPI["registerTool"]>[0]["execute"]>[4],
+  configuredModelId: string,
 ) {
-  const config = loadReviewConfig(ctx.cwd);
-  const reviewer = resolveAgentReviewModel(ctx, config.agentModel);
+  const reviewer = resolveAgentReviewModel(ctx, configuredModelId);
   if (!reviewer)
-    throw new Error(`Configured reviewer model "${config.agentModel}" is unavailable.`);
+    throw new Error(`Configured reviewer model "${configuredModelId}" is unavailable.`);
   return reviewer;
 }
 
@@ -82,6 +83,11 @@ export function makeRunReviewExecute(
   return async (_id, params, signal, onUpdate, ctx) => {
     const input = parseRunReviewToolInput(params);
     const config = loadReviewConfig(ctx.cwd);
+    const reviewerThinkingLevel = resolveReviewThinkingLevel(
+      config.reviewerThinkingLevel,
+      "Reviewer",
+    );
+    const reviewerModel = resolveReviewerModel(ctx, config.agentModel);
     const auditStore = config.auditEnabled ? localAuditStore : undefined;
     const { statusSpinner, wrappedUpdate } = wireSpinnerToProgress(ctx, onUpdate);
 
@@ -98,7 +104,8 @@ export function makeRunReviewExecute(
         target: input.target,
         review: input.review,
         scope: input.scope,
-        reviewerModel: resolveReviewerModel(ctx),
+        reviewerModel,
+        reviewerThinkingLevel,
         ...(recoveryModel ? { recoveryModel } : {}),
         ...(config.recoveryModel !== "disabled" &&
         config.recoveryModel !== CURRENT_SESSION_REVIEW_MODEL &&
