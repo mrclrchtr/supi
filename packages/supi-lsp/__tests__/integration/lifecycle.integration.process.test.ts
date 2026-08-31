@@ -214,6 +214,74 @@ describe("LSP manager lifecycle integration", () => {
     });
   }, 10_000);
 
+  it("reports failed process-crash recovery during file readiness", async () => {
+    const root = createProject();
+    const sourceFile = path.join(root, "recovery.test");
+    fs.writeFileSync(sourceFile, "recovery fixture\n");
+    const transitions: ManagerLifecycleTransition[] = [];
+    const manager = new LspManager(config("crash"), root, (transition) => {
+      transitions.push(transition);
+    });
+    managers.push(manager);
+
+    const original = await manager.startServerForRoot("test", root);
+    if (!original) throw new Error("Expected the original client to start.");
+    original.didOpen(sourceFile, fs.readFileSync(sourceFile, "utf8"));
+    await waitFor(
+      async () => transitions,
+      (events) => events.some((event) => event.kind === "crash"),
+      { timeoutMs: 2_000, retryDelayMs: 20, label: "initial LSP process crash" },
+    );
+
+    const runtime = createWorkspaceLspRuntimeOwner(manager).runtime;
+    await expect(runtime.waitUntilReadyForFile(sourceFile)).resolves.toMatchObject({
+      kind: "unavailable",
+      processCrashRecovery: {
+        attemptedRoutes: 1,
+        recoveredRoutes: 0,
+        failedRoutes: 1,
+      },
+    });
+    expect(manager.getProjectServerInfo("test", root, ["test"])).toMatchObject({
+      status: "error",
+      statusReason: "process-crash-recovery-exhausted",
+    });
+  }, 10_000);
+
+  it("does not report old crash recovery after an unrelated restart failure", async () => {
+    const root = createProject();
+    const sourceFile = path.join(root, "recovery.test");
+    const crashMarker = path.join(root, ".crashed-once");
+    fs.writeFileSync(sourceFile, "recovery fixture\n");
+    const lspConfig = config("crash-once", crashMarker);
+    const manager = new LspManager(lspConfig, root);
+    managers.push(manager);
+
+    const original = await manager.startServerForRoot("test", root);
+    if (!original) throw new Error("Expected the original client to start.");
+    original.didOpen(sourceFile, fs.readFileSync(sourceFile, "utf8"));
+    await waitFor(
+      async () => manager.getProjectServerInfo("test", root, ["test"]),
+      (info) => info.statusReason === "process-crashed",
+      { timeoutMs: 2_000, retryDelayMs: 20, label: "initial LSP process crash" },
+    );
+
+    const runtime = createWorkspaceLspRuntimeOwner(manager).runtime;
+    await expect(runtime.documentSymbols(sourceFile)).resolves.toMatchObject({
+      kind: "completed",
+    });
+
+    lspConfig.servers.test.command = path.join(root, "missing-lsp-command");
+    await expect(manager.restartClientsForFiles([sourceFile])).resolves.toMatchObject([
+      { restarted: false },
+    ]);
+
+    await expect(runtime.waitUntilReadyForFile(sourceFile)).resolves.toEqual({
+      kind: "unavailable",
+      reason: "No LSP client can serve this file",
+    });
+  }, 10_000);
+
   it("shares one real replacement across concurrent workspace-symbol demand", async () => {
     const root = createProject();
     const sourceFile = path.join(root, "recovery.test");

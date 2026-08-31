@@ -202,6 +202,20 @@ type RequiredProcessCrashDemand = {
   failedFiles: readonly string[];
 };
 
+type ProcessCrashRecoveryRouteOutcome = "pending" | "recovered" | "failed";
+
+function summarizeProcessCrashRecoveryRoutes(
+  outcomes: Iterable<ProcessCrashRecoveryRouteOutcome>,
+): ProcessCrashRecoverySummary {
+  const summary = emptyProcessCrashRecoverySummary();
+  for (const outcome of outcomes) {
+    summary.attemptedRoutes++;
+    if (outcome === "recovered") summary.recoveredRoutes++;
+    if (outcome === "failed") summary.failedRoutes++;
+  }
+  return summary;
+}
+
 // ── LspManager ────────────────────────────────────────────────────────
 export class LspManager {
   /** Active clients keyed by "serverName:root" */
@@ -258,6 +272,23 @@ export class LspManager {
     if (!route) return false;
     if (this.getUnavailableReason(route.key, route.serverConfig.command)) return false;
     return this.isServerCommandAvailable(route.serverConfig.command);
+  }
+
+  /**
+   * Return the consumed process-crash outcome for a file readiness result.
+   * The result supports unavailable and non-resolved waits; it is null before
+   * an attempt is consumed and after successful recovery, so old success is
+   * not reported as a new outcome. This is a passive read and never starts
+   * recovery.
+   */
+  getProcessCrashRecoverySummaryForFile(filePath: string): ProcessCrashRecoverySummary | null {
+    const route = this.resolveFileRoute(resolveSessionPath(this.cwd, filePath));
+    const recovery = route ? this.processCrashRecoveries.get(route.key) : undefined;
+    if (!recovery?.attemptConsumed || recovery.statusReason === undefined) return null;
+
+    const outcome: ProcessCrashRecoveryRouteOutcome =
+      recovery.statusReason === "process-crash-recovery-exhausted" ? "failed" : "pending";
+    return summarizeProcessCrashRecoveryRoutes([outcome]);
   }
 
   /**
@@ -517,13 +548,13 @@ export class LspManager {
     );
 
     const failedDemands = required.filter(({ recovery }) => recovery.statusReason !== undefined);
+    const outcomes = required.map(
+      ({ recovery }): ProcessCrashRecoveryRouteOutcome =>
+        recovery.statusReason === undefined ? "recovered" : "failed",
+    );
     return {
       hasSupport: true,
-      processCrashRecovery: {
-        attemptedRoutes: required.length,
-        recoveredRoutes: required.length - failedDemands.length,
-        failedRoutes: failedDemands.length,
-      },
+      processCrashRecovery: summarizeProcessCrashRecoveryRoutes(outcomes),
       failures: failedDemands.map(({ recovery }) => this.formatProcessCrashDemandFailure(recovery)),
       failedFiles: Array.from(new Set(failedDemands.flatMap(({ failedFiles }) => failedFiles))),
     };
@@ -968,22 +999,14 @@ export class LspManager {
     const processCrashRecoveryRequested =
       recovery !== undefined && (recovery.pending !== null || recovery.statusReason !== undefined);
     if (processCrashRecoveryRequested) {
-      onProcessCrashRecovery?.({
-        attemptedRoutes: 1,
-        recoveredRoutes: 0,
-        failedRoutes: 0,
-      });
+      onProcessCrashRecovery?.(summarizeProcessCrashRecoveryRoutes(["pending"]));
     }
     const client = await this.getClientForFile(resolvedPath, {
       recoverProcessCrash: true,
       control,
     });
     const processCrashRecovery = processCrashRecoveryRequested
-      ? {
-          attemptedRoutes: 1,
-          recoveredRoutes: client ? 1 : 0,
-          failedRoutes: client ? 0 : 1,
-        }
+      ? summarizeProcessCrashRecoveryRoutes([client ? "recovered" : "failed"])
       : emptyProcessCrashRecoverySummary();
     if (!client) return { client: null, processCrashRecovery };
     // The caller's wait stops on cancellation even though the shared

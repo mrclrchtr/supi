@@ -29,6 +29,7 @@ function makeManager(overrides: Record<string, unknown>): Manager {
       entries: [],
       totalFiles: 0,
     }),
+    getProcessCrashRecoverySummaryForFile: () => null,
     ...overrides,
   } as unknown as Manager;
 }
@@ -215,6 +216,28 @@ describe("workspace runtime behavior", () => {
       failedRouteRuntime.waitUntilReadyForFile("src/index.ts", { timeoutMs: 100 }),
     ).resolves.toMatchObject({ kind: "unavailable" });
 
+    const failedUnavailableRouteRuntime = createRuntime(
+      makeManager({
+        canServeFile: () => false,
+        getProcessCrashRecoverySummaryForFile: () => ({
+          attemptedRoutes: 1,
+          recoveredRoutes: 0,
+          failedRoutes: 1,
+        }),
+      }),
+    );
+    await expect(
+      failedUnavailableRouteRuntime.waitUntilReadyForFile("src/index.ts", { timeoutMs: 100 }),
+    ).resolves.toEqual({
+      kind: "unavailable",
+      reason: "No LSP client can serve this file",
+      processCrashRecovery: {
+        attemptedRoutes: 1,
+        recoveredRoutes: 0,
+        failedRoutes: 1,
+      },
+    });
+
     const timeoutRuntime = createRuntime(
       makeManager({
         canServeFile: () => true,
@@ -247,6 +270,36 @@ describe("workspace runtime behavior", () => {
     ).resolves.toEqual({
       kind: "timeout",
       processCrashRecovery: { attemptedRoutes: 1, recoveredRoutes: 0, failedRoutes: 0 },
+    });
+  });
+
+  it("reports a failed recovery when the shared replacement fails after the eager attempt", async () => {
+    const runtime = createRuntime(
+      makeManager({
+        canServeFile: () => true,
+        getProcessCrashRecoverySummaryForFile: () => ({
+          attemptedRoutes: 1,
+          recoveredRoutes: 0,
+          failedRoutes: 1,
+        }),
+        waitUntilFileReady: (
+          _filePath: string,
+          _control: unknown,
+          reportRecovery?: (summary: {
+            attemptedRoutes: number;
+            recoveredRoutes: number;
+            failedRoutes: number;
+          }) => void,
+        ) => {
+          reportRecovery?.({ attemptedRoutes: 1, recoveredRoutes: 0, failedRoutes: 0 });
+          return new Promise<never>(() => {});
+        },
+      }),
+    );
+
+    await expect(runtime.waitUntilReadyForFile("src/index.ts", { timeoutMs: 1 })).resolves.toEqual({
+      kind: "timeout",
+      processCrashRecovery: { attemptedRoutes: 1, recoveredRoutes: 0, failedRoutes: 1 },
     });
   });
 

@@ -77,6 +77,25 @@ function hasProcessCrashRecovery(summary: ProcessCrashRecoverySummary): boolean 
   return summary.attemptedRoutes > 0 || summary.recoveredRoutes > 0 || summary.failedRoutes > 0;
 }
 
+/**
+ * Combine the eager and current state for one readiness wait.
+ * A current failure replaces the older pending view; max avoids double-counting
+ * one route when both views describe the same recovery attempt.
+ */
+function mergeProcessCrashRecoverySummaries(
+  eager: ProcessCrashRecoverySummary | undefined,
+  current: ProcessCrashRecoverySummary | null,
+): ProcessCrashRecoverySummary | undefined {
+  if (!eager) return current ?? undefined;
+  if (!current) return eager;
+  if (current.failedRoutes > 0) return current;
+  return {
+    attemptedRoutes: Math.max(eager.attemptedRoutes, current.attemptedRoutes),
+    recoveredRoutes: Math.max(eager.recoveredRoutes, current.recoveredRoutes),
+    failedRoutes: Math.max(eager.failedRoutes, current.failedRoutes),
+  };
+}
+
 /** Emit one aggregate tsconfig scope-decision event after a recovery pass. */
 function recordScopeDecisionEvent(manager: LspManager): void {
   try {
@@ -256,9 +275,11 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   ): Promise<SemanticReadinessResult> {
     const resolvedPath = this.resolveFilePath(filePath);
     if (!this.manager.canServeFile(resolvedPath)) {
+      const processCrashRecovery = this.manager.getProcessCrashRecoverySummaryForFile(resolvedPath);
       return {
         kind: "unavailable",
         reason: "No LSP client can serve this file",
+        ...(processCrashRecovery ? { processCrashRecovery } : {}),
       };
     }
 
@@ -271,9 +292,11 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       control,
     );
     if (readiness.kind !== "resolved") {
-      return eagerProcessCrashRecovery
-        ? { ...readiness, processCrashRecovery: eagerProcessCrashRecovery }
-        : readiness;
+      const processCrashRecovery = mergeProcessCrashRecoverySummaries(
+        eagerProcessCrashRecovery,
+        this.manager.getProcessCrashRecoverySummaryForFile(resolvedPath),
+      );
+      return processCrashRecovery ? { ...readiness, processCrashRecovery } : readiness;
     }
     const { client, processCrashRecovery } = readiness.value;
     const recovery = hasProcessCrashRecovery(processCrashRecovery) ? { processCrashRecovery } : {};
