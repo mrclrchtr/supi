@@ -1,5 +1,25 @@
 # Changelog
 
+## [6.1.0](https://github.com/mrclrchtr/supi/compare/v6.0.1...v6.1.0) (2026-08-31)
+
+
+### Features
+
+* **lsp:** recover crashed routes on file operations ([6803c4f](https://github.com/mrclrchtr/supi/commit/6803c4f9d69bd3551fed8581491595f850f14760))
+* **lsp:** recover routes for workspace demand ([56c5ce3](https://github.com/mrclrchtr/supi/commit/56c5ce358bebb3e5c100be7c8b32ba3616755eef))
+
+
+### Bug Fixes
+
+* **deps:** lock file maintenance ([e5b4d66](https://github.com/mrclrchtr/supi/commit/e5b4d66db7bc25c0f98ef53b1b7e4214f161b549))
+* **deps:** update dependency @biomejs/biome to v2.5.11 ([b3b37e5](https://github.com/mrclrchtr/supi/commit/b3b37e597490265826e47ac3c5db57e3690754ac))
+* **deps:** update dependency hk to v1.57.0 ([dac5c91](https://github.com/mrclrchtr/supi/commit/dac5c91981d5d6886e430f12c73da13f619c0466))
+* **deps:** update dependency tree-sitter-cli to v0.26.13 ([7aff464](https://github.com/mrclrchtr/supi/commit/7aff464b521218bf94c0ddfeac652b10d6b1dab2))
+* **deps:** update dependency vscode-languageserver-types to v3.18.3 ([f14e023](https://github.com/mrclrchtr/supi/commit/f14e02321e1a7cc2869710d855a4951530d2521c))
+* **lsp:** retain state after second process crash ([ad699d9](https://github.com/mrclrchtr/supi/commit/ad699d997584d56f973496c4d6d7591adb9c591e))
+* **skills:** correct commit skill license ([8306ee0](https://github.com/mrclrchtr/supi/commit/8306ee07a5c5cfaf4a5c460127c3cb2f61335f41))
+* **skills:** sync maintained skill patches ([649b845](https://github.com/mrclrchtr/supi/commit/649b8457a1b7ef15e10e6c7ba6048d9e2045a8aa))
+
 ## [6.0.1](https://github.com/mrclrchtr/supi/compare/v6.0.0...v6.0.1) (2026-08-28)
 
 
