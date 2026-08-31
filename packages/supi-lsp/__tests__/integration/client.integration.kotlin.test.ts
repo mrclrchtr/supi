@@ -11,19 +11,10 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { CodeQueryResult } from "@mrclrchtr/supi-code-runtime/api";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LspClient } from "../../src/client/client.ts";
 import type { Diagnostic, ServerConfig } from "../../src/config/types.ts";
 import { hasCommand, waitFor } from "../helpers/integration-utils.ts";
-
-function completedDiagnostics(result: CodeQueryResult<Diagnostic[]>): Diagnostic[] {
-  expect(result.kind).toBe("completed");
-  if (result.kind !== "completed") {
-    throw new Error(`Expected completed diagnostics, got ${result.kind}.`);
-  }
-  return result.data;
-}
 
 // The built-in Kotlin server definition, read from defaults.json so the test
 // exercises the actual shipped configuration (args must include `--stdio`).
@@ -94,16 +85,25 @@ describe.skipIf(!HAS_KOTLIN)("LspClient integration (kotlin-lsp)", () => {
 
   it("pulls diagnostics for a file with a type error", async () => {
     const content = fs.readFileSync(badFile, "utf-8");
-    const result = await waitFor(
-      () => client.syncAndWaitForDiagnostics(badFile, content),
-      (diagnostics) => diagnostics.kind !== "unavailable" && diagnostics.data.length > 0,
+    // kotlin-lsp can return a confirmed empty pull while its Gradle import is
+    // still running. A same-content sync then reuses that empty cache forever.
+    // Force a new pull on each retry so the assertion waits for the analysis
+    // result instead of polling a cached early response.
+    await client.syncAndWaitForDiagnostics(badFile, content);
+    const diagnostics = await waitFor(
+      async () => {
+        client.clearPullResultIds();
+        await client.refreshOpenDiagnostics({ maxWaitMs: 15_000 });
+        return client.getDiagnostics(badFile);
+      },
+      (nextDiagnostics) => nextDiagnostics.some((diagnostic) => diagnostic.severity === 1),
       {
         timeoutMs: 240_000,
         retryDelayMs: 1_000,
         label: "pull diagnostics for Main.kt",
       },
     );
-    const typeErrors = completedDiagnostics(result).filter((d: Diagnostic) => d.severity === 1);
+    const typeErrors = diagnostics.filter((d: Diagnostic) => d.severity === 1);
     expect(typeErrors.length).toBeGreaterThan(0);
   }, 300_000);
 });
