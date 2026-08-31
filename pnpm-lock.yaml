@@ -13,7 +13,7 @@ importers:
     dependencies:
       typebox:
         specifier: '*'
-        version: 1.3.16
+        version: 1.3.22
     devDependencies:
       '@biomejs/biome':
         specifier: 2.5.11
@@ -26,13 +26,13 @@ importers:
         version: 21.2.2
       '@earendil-works/pi-ai':
         specifier: ^0.84.1
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-coding-agent':
         specifier: ^0.84.1
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-tui':
         specifier: ^0.84.1
-        version: 0.84.2
+        version: 0.84.4
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
         version: link:packages/supi-test-utils
@@ -59,7 +59,7 @@ importers:
         version: 6.0.0
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
       web-tree-sitter:
         specifier: 0.26.13
         version: 0.26.13
@@ -68,13 +68,13 @@ importers:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.84.2
+        version: 0.84.4
       '@mrclrchtr/supi-agent-runtime':
         specifier: workspace:*
         version: link:../supi-agent-runtime
@@ -86,7 +86,7 @@ importers:
         version: link:../supi-core
       typebox:
         specifier: '*'
-        version: 1.3.16
+        version: 1.3.22
     devDependencies:
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
@@ -96,16 +96,16 @@ importers:
         version: 25.9.5
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-agent-runtime:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -115,38 +115,38 @@ importers:
         version: 25.9.5
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-ask-user:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.84.2
+        version: 0.84.4
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
       typebox:
         specifier: '*'
-        version: 1.3.16
+        version: 1.3.22
     devDependencies:
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
         version: link:../supi-test-utils
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-bash-timeout:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.84.2
+        version: 0.84.4
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -159,38 +159,38 @@ importers:
         version: 25.9.5
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-cache:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.84.2
+        version: 0.84.4
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
       typebox:
         specifier: '*'
-        version: 1.3.16
+        version: 1.3.22
     devDependencies:
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
         version: link:../supi-test-utils
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-claude-md:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
     devDependencies:
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
@@ -200,19 +200,19 @@ importers:
         version: 25.9.5
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-code-intelligence:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.84.2
+        version: 0.84.4
       '@mrclrchtr/supi-code-runtime':
         specifier: workspace:*
         version: link:../supi-code-runtime
@@ -227,7 +227,7 @@ importers:
         version: link:../supi-tree-sitter
       typebox:
         specifier: '*'
-        version: 1.3.16
+        version: 1.3.22
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
@@ -240,7 +240,7 @@ importers:
         version: 25.9.5
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-code-runtime:
     devDependencies:
@@ -249,88 +249,88 @@ importers:
         version: 25.9.5
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-context:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.84.2
+        version: 0.84.4
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
       typebox:
         specifier: '*'
-        version: 1.3.19
+        version: 1.3.22
     devDependencies:
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
         version: link:../supi-test-utils
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-core:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.84.2
+        version: 0.84.4
       typebox:
         specifier: '*'
-        version: 1.3.16
+        version: 1.3.22
     devDependencies:
       '@types/node':
         specifier: 25.9.5
         version: 25.9.5
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-debug:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.84.2
+        version: 0.84.4
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
       typebox:
         specifier: '*'
-        version: 1.3.16
+        version: 1.3.22
     devDependencies:
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
         version: link:../supi-test-utils
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-extras:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.84.2
+        version: 0.84.4
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -343,29 +343,29 @@ importers:
         version: link:../supi-test-utils
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-insights:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
       typebox:
         specifier: '*'
-        version: 1.3.16
+        version: 1.3.22
     devDependencies:
       '@types/node':
         specifier: 25.9.5
         version: 25.9.5
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-lsp:
     dependencies:
@@ -383,10 +383,10 @@ importers:
         version: 6.0.3
       vscode-jsonrpc:
         specifier: ^9.0.0
-        version: 9.0.1
+        version: 9.0.2
       vscode-languageserver-protocol:
         specifier: ^3.18.0
-        version: 3.18.2
+        version: 3.18.3
       vscode-languageserver-types:
         specifier: ^3.18.0
         version: 3.18.3
@@ -396,19 +396,19 @@ importers:
         version: link:../supi-test-utils
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-prompt-suggestions:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.84.2
+        version: 0.84.4
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -418,19 +418,19 @@ importers:
         version: 25.9.5
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-review:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.84.2
+        version: 0.84.4
       '@mrclrchtr/supi-agent-runtime':
         specifier: workspace:*
         version: link:../supi-agent-runtime
@@ -442,27 +442,27 @@ importers:
         version: link:../supi-core
       typebox:
         specifier: '*'
-        version: 1.3.16
+        version: 1.3.22
     devDependencies:
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
         version: link:../supi-test-utils
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-settings:
     dependencies:
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.84.2
+        version: 0.84.4
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
     devDependencies:
       '@earendil-works/pi-coding-agent':
         specifier: ^0.84.1
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
         version: link:../supi-test-utils
@@ -471,7 +471,7 @@ importers:
         version: 25.9.5
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-skill-patches:
     devDependencies:
@@ -483,16 +483,16 @@ importers:
         version: https://codeload.github.com/mattpocock/skills/tar.gz/6acc160e4e0cd062dbbbd7a1b26ae92855edf07e(patch_hash=42d70e62306cb11cec6cfac20d5c4ba88af65a4867dd2d66da5419523f37dd8a)
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-skills:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.84.2
+        version: 0.84.4
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -502,16 +502,16 @@ importers:
         version: link:../supi-test-utils
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-test-utils:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       vitest:
         specifier: ^4.1.5
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
     devDependencies:
       '@types/node':
         specifier: 25.9.5
@@ -588,19 +588,19 @@ importers:
         version: 0.23.2(tree-sitter@0.25.1)
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-web:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
-        version: 0.84.2(ws@8.21.3)
+        version: 0.84.4(ws@8.21.3)
       '@earendil-works/pi-tui':
         specifier: '*'
-        version: 0.84.2
+        version: 0.84.4
       '@mozilla/readability':
         specifier: ^0.6.0
         version: 0.6.0
@@ -615,7 +615,7 @@ importers:
         version: 1.0.2
       typebox:
         specifier: '*'
-        version: 1.3.16
+        version: 1.3.22
     devDependencies:
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
@@ -628,7 +628,7 @@ importers:
         version: 5.0.6
       vitest:
         specifier: 4.1.11
-        version: 4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
+        version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
 
 packages:
 
@@ -915,8 +915,8 @@ packages:
       '@csstools/css-parser-algorithms': ^4.0.0
       '@csstools/css-tokenizer': ^4.0.0
 
-  '@csstools/css-color-parser@4.2.0':
-    resolution: {integrity: sha512-5+5LEmFuY1AjXdYhmgjTJogtQnP1evJ1zrBZGUNZ0thkpwnnmKxcHdAMn/OtFjAb25zA+jKDVYVRl+5G7rjv1A==}
+  '@csstools/css-color-parser@4.2.1':
+    resolution: {integrity: sha512-YpAJZhaHplYQkG8ib+/Fx5Y0eF2lVWi3tIvMJA6i39TLyUNp2439cifzW8VMjhlqrBjHzK5hVGugRRm2zTKI/A==}
     engines: {node: '>=20.19.0'}
     peerDependencies:
       '@csstools/css-parser-algorithms': ^4.0.0
@@ -928,8 +928,8 @@ packages:
     peerDependencies:
       '@csstools/css-tokenizer': ^4.0.0
 
-  '@csstools/css-syntax-patches-for-csstree@1.1.8':
-    resolution: {integrity: sha512-CpMLjAvwQg3BL5S0IeqsZNMH7EQrEWi0kLKOC13ZBF0ZwERiLWlibNPJr8G1kdU3Ms/r2KiNrF81pUh2HwAHdg==}
+  '@csstools/css-syntax-patches-for-csstree@1.1.9':
+    resolution: {integrity: sha512-iGGw4OsAYsS6pD29MdJ2bX/nJx65a04ZZiw6x+VwWlP2DdXf6f++Zmuv/OzALpdyfVhjbduIIF2cXM7HWBIe9A==}
     peerDependencies:
       css-tree: ^3.2.1
     peerDependenciesMeta:
@@ -957,34 +957,34 @@ packages:
       tree_sitter:
         optional: true
 
-  '@earendil-works/pi-agent-core@0.84.2':
-    resolution: {integrity: sha512-8Pn3wSCxj0cfo5I6jxQYVB/3uuQRmHhAlEclyjqpOuMEdQMIODHizRogv56FLdbU+dTiGnybeHQ2N+sV1/L2YA==}
+  '@earendil-works/pi-agent-core@0.84.4':
+    resolution: {integrity: sha512-HyUnjaOXj6oN/6SNcr8A1J/ElRQA50FtIE0XUTSKAQVqmdlb9qdojOyUQwF/jULE5+yOEtGuVgi/N1RnBiNG+g==}
     engines: {node: '>=22.19.0'}
 
-  '@earendil-works/pi-ai@0.84.2':
-    resolution: {integrity: sha512-6MzsrYIYNVlE7SfpbL2yYb67Qo58p/7Q+xWG1RZvoX1P80aRCHSod2/13aFpxkow1lPO2LEh3c495J0Gwmyjig==}
-    engines: {node: '>=22.19.0'}
-    hasBin: true
-
-  '@earendil-works/pi-client@0.84.2':
-    resolution: {integrity: sha512-/RFSPhD/bZbpOp1oJj+UneSUFSgZhWxzcSENUY+8+8xhoBrWXMYI2t77XNx4Yf+c8YK2qTHquForhNcelYpXvg==}
-    engines: {node: '>=22.19.0'}
-
-  '@earendil-works/pi-coding-agent@0.84.2':
-    resolution: {integrity: sha512-l4E+B7hgXKWddRo8bC/eSue2aWZjEgJ9xIpf5p0Og+lq8a2TArCwJ0HCoCPCgaBP/tN4zbYH/wOwvx9pJpeLCA==}
+  '@earendil-works/pi-ai@0.84.4':
+    resolution: {integrity: sha512-AClAZxf5+c4RRu44NJPS6wyQy+Nmq+Mzyyrdvm4ZVMNuixelO02RZX4G4Aq1F145Yzp43wnM5S+hLlSI7ypfVw==}
     engines: {node: '>=22.19.0'}
     hasBin: true
 
-  '@earendil-works/pi-protocol@0.84.2':
-    resolution: {integrity: sha512-jbBh03fkeckWEroHpcZBr4w5/Ibat8WwdXFlXHivYQImrQNFtLpDeL0t1cku4hmK0q3pceIRQHkw4fwbM4YILQ==}
+  '@earendil-works/pi-client@0.84.4':
+    resolution: {integrity: sha512-q398WY/3ZQHTizk7IKxApzqFV0xt4yM9LkSkwyqeLK5Bj5RwRjOWxESt26z4LgNp4O+8hqhqFPf/8fj4H5rE4A==}
     engines: {node: '>=22.19.0'}
 
-  '@earendil-works/pi-telemetry@0.84.2':
-    resolution: {integrity: sha512-wg5caea7uIv1BHRBm2Y116RvFG4oSAiP5qk9tA2463PDGIr4K8M1Ceyyg5DOpF/shUUl0gk826yQJAeAcHYB9g==}
+  '@earendil-works/pi-coding-agent@0.84.4':
+    resolution: {integrity: sha512-jmOlrqUmvhh/siNWFRXjYLJzhKFIHNsAQaysRwzQPQFnPAaV/vhqHsLH/MBsIISA1Rjj7WTUFR3nJrpXoLx39w==}
+    engines: {node: '>=22.19.0'}
+    hasBin: true
+
+  '@earendil-works/pi-protocol@0.84.4':
+    resolution: {integrity: sha512-acyE9ozxkMiWiz/xyWpU0O9vwnYv0hyG889Vniv6Sg9c9zfsX+8MePnDNphBacY2Fvm1rxdsGmiVDSZl9yuDFA==}
     engines: {node: '>=22.19.0'}
 
-  '@earendil-works/pi-tui@0.84.2':
-    resolution: {integrity: sha512-ds2TLihOnM5sLJB3VpXV6y0uR5efVuHf4MN7yDpsty6hA2DUO/EDVzjp/0od0G2JslzVLMjT8T8zavtxVb+qbg==}
+  '@earendil-works/pi-telemetry@0.84.4':
+    resolution: {integrity: sha512-8e2CuxM+ht+hedQXTZmi5JVl6/xDK9RpSDL2+MbITevKYQhMZ/z6lJOTFgox3HQyGxO8mOZEtYGVeQNaD4OzqA==}
+    engines: {node: '>=22.19.0'}
+
+  '@earendil-works/pi-tui@0.84.4':
+    resolution: {integrity: sha512-nPUnwDkLtupPXnZQYrCwPFcuTydCDqTY6ZbFqhsL4S4kVq0AT418kPa/6uXwtaCD+MjBNBltb7ScTYX65yeE1w==}
     engines: {node: '>=22.19.0'}
 
   '@exodus/bytes@1.15.1':
@@ -1009,8 +1009,8 @@ packages:
     resolution: {integrity: sha512-7bQW+gkKa2kKZPeJf6+c6gFK9ARxQfn+FKy9ScTBppyKRWH2KzsmweXUoklqeEiHiNVWaeP5csIdsNq6w7QhzA==}
     engines: {node: '>=12.20'}
 
-  '@jridgewell/sourcemap-codec@1.5.5':
-    resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
+  '@jridgewell/sourcemap-codec@1.6.0':
+    resolution: {integrity: sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw==}
 
   '@mariozechner/clipboard-darwin-arm64@0.3.9':
     resolution: {integrity: sha512-BfgV7vCEWZwJwZJw03r6bP5+tf0iI/ANuQYCxi9RNn7FrWB3yzGuMKCrNLRl6V761vXRdL8+OqZ0wd4TqlsNOQ==}
@@ -1087,12 +1087,8 @@ packages:
     resolution: {integrity: sha512-juG5VWh4qAivzTAeMzvY9xs9HY5rAcr2E4I7tiSSCokRFi7XIZCAu92ZkSTsIj1OPceCifL3cpfteP3pDT9/QQ==}
     engines: {node: '>=14.0.0'}
 
-  '@opentelemetry/api@1.9.0':
-    resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
-    engines: {node: '>=8.0.0'}
-
-  '@oxc-project/types@0.146.0':
-    resolution: {integrity: sha512-XC0QsnnhVe7sLIWmYmdPw7x5P0h4W8vUU3Nv1ySgWXtvCz8NizoAEpGXA0sOYoJQV2Rl13LgURAHQ5cI5ILCSA==}
+  '@oxc-project/types@0.147.0':
+    resolution: {integrity: sha512-IJ3s6ltHLp45S0bh7phkX+gJO7A1Wuz2EaqpAhb8WjqDwbzMiWKHhyyT42tskaWjEYXtHtVCPpnBJVT9+dcRLg==}
 
   '@pnpm/catalogs.protocol-parser@1001.0.0':
     resolution: {integrity: sha512-9rHKCMRvhfv7TSAVSCVLI+8OZhi1OcT8lanAGqOPbGgQTkFrPH3PfEWJNxz43xqrXRa4HCFRAMu+g19su5eRLA==}
@@ -1190,98 +1186,98 @@ packages:
   '@protobufjs/utf8@1.1.2':
     resolution: {integrity: sha512-b1UQwcEZ4yCnMCD8DAL1VlbvBJE9/IX4FTIp7BG1xYpf29SLazLSrqUkj4w7Y5y7cCVP6E5tcqqcI0xemPkHug==}
 
-  '@rolldown/binding-android-arm-eabi@1.2.5':
-    resolution: {integrity: sha512-DLe/i+l8ynIBY7XEQ191TeZvCoowIGa18R+dIV30GW7DiOtp74i/xX8hs8GUjW5ARV7VZuie3d6AumSmCwbeRA==}
+  '@rolldown/binding-android-arm-eabi@1.2.6':
+    resolution: {integrity: sha512-b+jTcARdTiFLI6jB4a5XjTm0RWd6KcRfQj/I2356fxUZemiho9zQLxo0RtCuMDAyKcLo6cEltkgbQp6d1+sjjQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm]
     os: [android]
 
-  '@rolldown/binding-android-arm64@1.2.5':
-    resolution: {integrity: sha512-zXcwKlQApYAOELHd8PwKDFkagYF9Wy4e0RJ+0qnzl9Pjnpj75TEG8ufv40p2J7kCEfwZAsNiuzRIyNNMWT38ig==}
+  '@rolldown/binding-android-arm64@1.2.6':
+    resolution: {integrity: sha512-lkWU8ZJaRk9q3CIEY1Tc7vIFALp3Xw5NfGJo2hQg5oIqNgxWi1zI+IiDEK3r70BF5Dzol1tcXsnzsRc8NLhG+Q==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [android]
 
-  '@rolldown/binding-darwin-arm64@1.2.5':
-    resolution: {integrity: sha512-dK4QakI42nzWgJT5sm4y4y/O//D4OxM75/cH28RLV+nzIN9AY+YsbuUVrUTjlLjXR6vpyxFbSsbmNuJ6BP9sww==}
+  '@rolldown/binding-darwin-arm64@1.2.6':
+    resolution: {integrity: sha512-dgR56NYnvAszm7Ob1B2/Vn0e8bUQYZH2UjVaMMtMVOCKFSfjhfLmuA/9+O+F+ajUdG6B/bSssrKW6JJYASa8jA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [darwin]
 
-  '@rolldown/binding-darwin-x64@1.2.5':
-    resolution: {integrity: sha512-fqSALaUu1Wjd1nK2uW2kJDWdLCc8lx1IcY+MTY26Aurfdx19anlzhqXOgCFbBFQnlFDTn4TC1/7Nz4Bl2mLP3A==}
+  '@rolldown/binding-darwin-x64@1.2.6':
+    resolution: {integrity: sha512-vpVxFvUCFioJqug7OTvqptkc4yb8UX0AwfDmJpaR/0sWz+BUmqSVAf7c8JkUgnN8YLspb4a/N6NhTyMAmdyQ7Q==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [darwin]
 
-  '@rolldown/binding-freebsd-x64@1.2.5':
-    resolution: {integrity: sha512-/vCnNxlkxs9tKxNDcyWUePpJ/PgTzxIaVhoM5SmG8UV+GR/IcPam4VYxi7GIMo7PSDuNqlJqvprqii9NqqVCMw==}
+  '@rolldown/binding-freebsd-x64@1.2.6':
+    resolution: {integrity: sha512-h1wG6Y6K3JlRswxsI64qQJqBAy4vrLuHgRbc8CZMGSWTOFRY6ghMApM1NKzB2I0n5xV1fjkE18SuVl2QpLeNpA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [freebsd]
 
-  '@rolldown/binding-linux-arm-gnueabihf@1.2.5':
-    resolution: {integrity: sha512-abk0NLA519LxRCszmbE0jYKuQ9YPocOXTiOXOo6Yr+YAT95VH+PtqYAjOJvGKt3viEd/x4qzabAlwd5bHOOARg==}
+  '@rolldown/binding-linux-arm-gnueabihf@1.2.6':
+    resolution: {integrity: sha512-tbCiqub0q2MVWJKgF5PoAlNWCtQydiOYSLIkd8sByqK/6MMYLJRcSXSYodqYtd0O+Fw7QaVmKKlS4oL94YRZ0w==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm]
     os: [linux]
 
-  '@rolldown/binding-linux-arm64-gnu@1.2.5':
-    resolution: {integrity: sha512-Y7eALiJ8lr0M2HH103Js+g7V34wf6snlpZLAsHI90uLhr3PVlNsbFVAXJC9d/V6BnPyKtpSwI+NcB/RLxsQxuA==}
+  '@rolldown/binding-linux-arm64-gnu@1.2.6':
+    resolution: {integrity: sha512-oxK9+baEBPhZG5HB4URY+uU04zJWeZlH6Tb9rB5DK4DF9XR1uXNLXt5Q5ZsugTKayNCNLhkcwz/ye74hRI98dg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@rolldown/binding-linux-arm64-musl@1.2.5':
-    resolution: {integrity: sha512-xMvZgnbZg4YVnR/AX2b3oOPDTFYJvUVaJg5FedA/LuvexAtXibZQej4cnTkw3rjsJ/ggUROB64TdtETiim+FYA==}
+  '@rolldown/binding-linux-arm64-musl@1.2.6':
+    resolution: {integrity: sha512-muWCk27FVBEZtv0MsK8gnfSmgczA8KQ0uRVJbTABKhkRfQc38aUrcb7fhi3BNiyseFmgcRsoMfQsSNJ+DbZdSw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@rolldown/binding-linux-ppc64-gnu@1.2.5':
-    resolution: {integrity: sha512-GRjeqTUDHTo5GwntsLaAMcBahG3nlpjftXWZLN73HiYQlhwEowvarFgQnRnQZtIp4keXX7quXFbG38uPZBa2EA==}
+  '@rolldown/binding-linux-ppc64-gnu@1.2.6':
+    resolution: {integrity: sha512-eWDoSfU7Co2qj3vgB3Dt4lj1mG6CoWbcJQkRMP3XJplyCMtuaq3LHvPFjS9QIPvMGWVadJC04Xiy0IdcVPtnwQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [ppc64]
     os: [linux]
     libc: [glibc]
 
-  '@rolldown/binding-linux-s390x-gnu@1.2.5':
-    resolution: {integrity: sha512-vLNTR45F2Uwc8AufkNXPmB4VliaXs+FvcheEogIzOXzO4l+LzieXF5A/TWxLy5HtqpsRCHUfd0lPVrrdgXdLHQ==}
+  '@rolldown/binding-linux-s390x-gnu@1.2.6':
+    resolution: {integrity: sha512-2bWNjRSIayvupRKxXUY2tWG9fYdoUlTqWywHRvE8Eq3GvuQ+f2HeIkve697fIt+IQs/PV8yFsdWuhp1aJ1PdnA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [s390x]
     os: [linux]
     libc: [glibc]
 
-  '@rolldown/binding-linux-x64-gnu@1.2.5':
-    resolution: {integrity: sha512-Mgj59/HTuYeK9Gz2MA+mBWKnHsAgkBSec15ZMb1st3oIfFbX7gCjOae7GydHhzcyQi9Z/7M1QuN9bR3oFqF0jQ==}
+  '@rolldown/binding-linux-x64-gnu@1.2.6':
+    resolution: {integrity: sha512-KekI0gS0wLxe1UBSQSjenBVwou/JkcQPDzBPICGZjxUv9k3RteHDPBQaiOicZUFKRIH2wKEimGwVpnJsbPzu7w==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@rolldown/binding-linux-x64-musl@1.2.5':
-    resolution: {integrity: sha512-mY8AP0/ichsbhAxGnLa3d3+MwV0EfgrPND2bplI3Ym8T6R2pJ0N87bvrKVwNXmdy3jnr6eQBecdqx/HMknBmpA==}
+  '@rolldown/binding-linux-x64-musl@1.2.6':
+    resolution: {integrity: sha512-TvtPnfVr+HtyGiDmPK4VWmlNm7QhNNAcK5Q9A7aOXsI8545yCyaoMaicXrFZ72JzeYjaUVk7yT243zT0jzjFKQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@rolldown/binding-openharmony-arm64@1.2.5':
-    resolution: {integrity: sha512-8SLssA2oweAxyRgDp789ACfRb/3P+zNRJpzZxSizxF9m8NUDQ4+3xjo8ttjhVGGw6Qxb70oZiEtIjaKikCO7Yw==}
+  '@rolldown/binding-openharmony-arm64@1.2.6':
+    resolution: {integrity: sha512-iOo0VEay2XFhaCcH0sps5XIimkSuOnNaZrf6+ZkoSOQBJPKNU48RkmJv0/lSpipexu5P+ouFgafe5IGr/DiQfg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [openharmony]
 
-  '@rolldown/binding-win32-arm64-msvc@1.2.5':
-    resolution: {integrity: sha512-vGbruD5zquhoc8D9SViXgN2FBJtNdTyQ4DtG+SWiEGlJiAzoKcZ2xp+xuXCffhubVdt0NJlTZqkeRuERy7g8Cw==}
+  '@rolldown/binding-win32-arm64-msvc@1.2.6':
+    resolution: {integrity: sha512-y5NTmmasMS455JlOCO4ZM9krIchv3Mvm1crL1iUPGOPgEzSkves9n0SdC5Sjz6+qWDFhd8/JpfWMH8NSWNHe+A==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [win32]
 
-  '@rolldown/binding-win32-x64-msvc@1.2.5':
-    resolution: {integrity: sha512-e/SXpgISz+IoqVcSSI0rx/d/he8zqLex+/rCWpnHpmVfmPIUjag9H6P7zotf0gJHwPUhQxZ/mF8tr6acebT9yw==}
+  '@rolldown/binding-win32-x64-msvc@1.2.6':
+    resolution: {integrity: sha512-np8iZSLfXlAD4kWhiyq/u0Yt8oZDtRQ8lGhQaCXo2rl37KNjeU0GjJuwr4P3oeZ++ROfofsKNBqR5LTO8aXyWQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [win32]
@@ -1573,8 +1569,8 @@ packages:
   es-module-lexer@2.3.2:
     resolution: {integrity: sha512-poHGpORABojJJucnV9KbOavETW8lBVnphkW77ER5/BQ5Fz7oXSoCNek7IH3vR5nRjdsEz926ibFYX8KtLQmdyw==}
 
-  es-toolkit@1.51.0:
-    resolution: {integrity: sha512-zC2lQGkM7QX+Gm6iM3+WIdZJzthsEd14LvRNJneSO2hzyz/zNBENR8+YXWo1cKxgPBtV6ksPYHELbcwBRzmdCw==}
+  es-toolkit@1.52.0:
+    resolution: {integrity: sha512-XTNEJQh1tY1ZJVcf6ayP/2n4ZPyaHlW2FWs7xvw5ddPuhUVjLD3olQVQS7kf58JbAB48iL0uL/jerTrjtV3lDA==}
 
   escalade@3.2.0:
     resolution: {integrity: sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA==}
@@ -1660,10 +1656,6 @@ packages:
   get-stream@9.0.1:
     resolution: {integrity: sha512-kVCxPF3vQM/N0B1PmoqVUqgHP+EeVjmZSQn+1oCRPxd2P21P2F19lIgbR3HBosbB1PUhOAoctJnfEn2GbN2eZA==}
     engines: {node: '>=18'}
-
-  glob@13.0.6:
-    resolution: {integrity: sha512-Wjlyrolmm8uDpm/ogGyXZXb1Z+Ca2B8NbJwqBVg0axK9GbBeoS7yGV6vjXnYdGm6X53iehEuxxbyiKp8QmN4Vw==}
-    engines: {node: 18 || 20 || >=22}
 
   global-directory@5.0.0:
     resolution: {integrity: sha512-1pgFdhK3J2LeM+dVf2Pd424yHx2ou338lC0ErNP2hPx4j8eW1Sp0XqSjNxtk6Tc4Kr5wlWtSvz8cn2yb7/SG/w==}
@@ -1796,8 +1788,8 @@ packages:
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
-  js-yaml@4.3.1:
-    resolution: {integrity: sha512-CY6crGq313MX8GkwvB7tzgp99vjQxY1++5y10/BKN/GUfHqWaOGQMNZkBvqSzsZKWk/ijwHlWzzkLulsGHhjWQ==}
+  js-yaml@4.3.2:
+    resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
     hasBin: true
 
   jsdom@30.0.1:
@@ -1947,10 +1939,6 @@ packages:
     resolution: {integrity: sha512-MULkVLfKGYDFYejP07QOurDLLQpcjk7Fw+7jXS2R2czRQzR56yHRveU5NDJEOviH+hETZKSkIk5c+T23GjFUMg==}
     engines: {node: 18 || 20 || >=22}
 
-  minipass@7.1.3:
-    resolution: {integrity: sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A==}
-    engines: {node: '>=16 || 14 >=14.17'}
-
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
@@ -2040,37 +2028,33 @@ packages:
     resolution: {integrity: sha512-haREypq7xkM7ErfgIyA0z+Bj4AGKlMSdlQE2jvJo6huWD1EdkKYV+G/T4nq0YEF2vgTT8kqMFKo1uHn950r4SQ==}
     engines: {node: '>=12'}
 
-  path-scurry@2.0.2:
-    resolution: {integrity: sha512-3O/iVVsJAPsOnpwWIeD+d6z/7PmqApyQePUtCndjatj/9I5LylHvt5qluFaBT3I5h3r1ejfR056c+FCv+NnNXg==}
-    engines: {node: 18 || 20 || >=22}
-
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
-  picomatch@4.0.5:
-    resolution: {integrity: sha512-RvwwcruNjI1ncT5xRakeyS9Lf8lcItv34KD+aif+VH9kduAyfYBipGh12274xtenIPZ119/R9BdTBa8gAwSh0A==}
+  picomatch@4.0.7:
+    resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
 
   postcss@8.5.26:
     resolution: {integrity: sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==}
     engines: {node: ^10 || ^12 || >=14}
 
-  powershell-utils@0.2.0:
-    resolution: {integrity: sha512-ZlsFlG7MtSFCoc5xreOvBAozCJ6Pf06opgJjh9ONEv418xpZSAzNjstD36C6+JwOnfSqOW/9uDkqKjezTdxZhw==}
+  powershell-utils@0.2.1:
+    resolution: {integrity: sha512-C+y9x90UElAddDZmV4qOx9W53B61PO7cIqWz2dQsWlwswuq4mr8NEwytdGKboYbQlGZ3awrkTeNvcZiZNHnQ8A==}
     engines: {node: '>=20'}
 
-  pretty-ms@9.3.0:
-    resolution: {integrity: sha512-gjVS5hOP+M3wMm5nmNOucbIrqudzs9v/57bWRHQWLYklXqoXKrVfYW2W9+glfGsqtPgpiz5WwyEEB+ksXIx3gQ==}
+  pretty-ms@9.3.1:
+    resolution: {integrity: sha512-HzMy3Geq23nVALD/M2LliU+F+M+gVNsvkQWWqeBZ8HDiCgzo6YPJ/Omrmtq24EFrIsk0a3EkQGEd7bDOo+IhGA==}
     engines: {node: '>=18'}
 
   proper-lockfile@4.1.2:
     resolution: {integrity: sha512-TjNPblN4BwAWMXU8s9AEz4JmQxnD1NNL7bNOY/AKUzyamc379FWASUhc/K1pL2noVb+XmZKLL68cjzLsiOAMaA==}
 
-  protobufjs@7.6.5:
-    resolution: {integrity: sha512-/FPD0nUc9jH6rfFjji9IBqOz4pcSE3CsT1m7Ep6Mdb0LxSUMj8hgl6GomOvZzpNpAqqGaXA0P3VSrZLFzIhQrw==}
+  protobufjs@7.6.6:
+    resolution: {integrity: sha512-dYDWdjSl5RNb7SgPxGQcRU+GtvP7s2fpkrY0r432PcOIaZ0/rBcxEZnQN67iJhFuQiVw754JDoPruPCNdGsbjg==}
     engines: {node: '>=12.0.0'}
 
   punycode@2.3.1:
@@ -2101,8 +2085,8 @@ packages:
     resolution: {integrity: sha512-XQBQ3I8W1Cge0Seh+6gjj03LbmRFWuoszgK9ooCpwYIrhhoO80pfq4cUkU5DkknwfOfFteRwlZ56PYOGYyFWdg==}
     engines: {node: '>= 4'}
 
-  rolldown@1.2.5:
-    resolution: {integrity: sha512-VD2IE5PUG4Oj8zz2VGykiYd5wbnjdIiSsNQb8Qu5B+noEp+A78mu2iVvpp27g8es14Tk9rofNs5Tku9iQCS4fA==}
+  rolldown@1.2.6:
+    resolution: {integrity: sha512-vMM4q3aixf46GiF1Kok8jDPFsEpXgFWGjUHXNkNHNm+Y2adXAG2dbX91jkti3i0ZRsOlcmbuzAz1poObSHCmUA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
@@ -2212,11 +2196,11 @@ packages:
     resolution: {integrity: sha512-yau8yJdTt989Mm0Bd/236QnzEiPf2xLLTqUZRUJOo/3CB078LSwzei343DgtJVmfJKJE3TMINY1u42SQsP6mXw==}
     engines: {node: '>=14.0.0'}
 
-  tldts-core@7.4.10:
-    resolution: {integrity: sha512-KnQjp53ZekKgm/r3l+u8kJGGzYgrWdP8+Mql7a4vijh2WE0IrZWspQj/TpTxDho/YxO+AnOZnIjQcCD+q6iJsw==}
+  tldts-core@7.4.11:
+    resolution: {integrity: sha512-CW3WN2rIIE/Of21mulhgnGOwoDyEFNygyIBOONSdyAuSATgMMUCpLeUlB+E8sAwA5xRV9hYPl+kyZ9citHCaKg==}
 
-  tldts@7.4.10:
-    resolution: {integrity: sha512-GgouD1B+sWwvkaEq8vXC15DjQitxbvs12oIXELpconwm+Tg3zfcEv4jgzq3vtKverDXsg3VI8aRgNL2Nra0Iog==}
+  tldts@7.4.11:
+    resolution: {integrity: sha512-aBiNayCfTQxuIJBm06M+xR14cYaYlDlSXZbgsnKzKNxDKUVq7KFwTjwBSsb7m9Y5xO8WfPnBc63WaYFMTGlvqw==}
     hasBin: true
 
   tough-cookie@6.0.2:
@@ -2369,11 +2353,8 @@ packages:
     resolution: {integrity: sha512-RAH822pAdBgcNMAfWnCBU3CFZcfZ/i1eZjwFU/dsLKumyuuP3niueg2UAukXYF0E2AAoc82ZSSf9J0WQBinzHA==}
     engines: {node: '>=12.20'}
 
-  typebox@1.3.16:
-    resolution: {integrity: sha512-Jac8dgnin+g2p1w1v9sk92Wvp49ZqsmSgNhrXDK+RqrovsjiORMZvYZ8t8id9b9XQp6LMfaAwnIRSHGsM+3FMw==}
-
-  typebox@1.3.19:
-    resolution: {integrity: sha512-OGhGi3JkTMol9QW8Bc6tgSD4ghV8v5WubAi1XeYnlxdocHvgS7TQJ8FcFZrQhVhigQU0z7bRFAEsZ+wpkRdCfg==}
+  typebox@1.3.22:
+    resolution: {integrity: sha512-YoX6QdtuJR/+YpP/qXf9gJXTxvSuiUlKYgW3AilsOSLlsZe/VH6ILR5vhoJM5QXY//uzIRE7NYij3h2+nG9vRQ==}
 
   typebox@1.3.7:
     resolution: {integrity: sha512-meKuifc33Pccx0O6PdIzYMq3Og8zvP4TIi/a+Bw3AEMZMxOD0+RHGQvpglEe6Zdy3wZ8nqn/j95h8LUZLk/6Hg==}
@@ -2498,15 +2479,12 @@ packages:
     resolution: {integrity: sha512-JvONPptw3GAQGXlVV2utDcHx0BiY34FupW/kI6mZ5x06ER5DdPG/tXWMVHjTNULF5uKPOUUD0SaXg5QaubJL0A==}
     engines: {node: '>=8.0.0 || >=10.0.0'}
 
-  vscode-jsonrpc@9.0.1:
-    resolution: {integrity: sha512-rfuA6T75H6m5EkbhtEPzre9pT0HPcDI2MMy4+nPFIBks5J8JBAUHD4tRYSgaBOijIEC7SRkC1kKyXTLqbmh9jw==}
+  vscode-jsonrpc@9.0.2:
+    resolution: {integrity: sha512-SbQSV9yRemARxeXw6LU5sS6Zq0e9/DgCCX5yelH263ZQWukbTk8EF8fjTrr1dziasf4GwlJbvTwFnTrnQFWZXQ==}
     engines: {node: '>=14.0.0'}
 
-  vscode-languageserver-protocol@3.18.2:
-    resolution: {integrity: sha512-XRyDbT0Pp3sSNti3JmxVEUMySWCSi1hhM+/KUlCy1hV1zmrqpM1OwO12EAki8blhmLuIMpaJrYbo0OzGVfK2Qg==}
-
-  vscode-languageserver-types@3.18.0:
-    resolution: {integrity: sha512-8TsGPNMIMiiBdkORgRSvLjuiEIiAFtO+KssmYWxQ+uSVvlf7RjK8YKCOjPzZ+YA04jXEV7+7LvkSmHkhpNS99g==}
+  vscode-languageserver-protocol@3.18.3:
+    resolution: {integrity: sha512-DF49+WeV5py4zO5hhobp60jjsDSK0lAqA0OuKBLBvp423HPWQcCbhZz3JgyfIewsEz2f8U+X75xNIFHdiXZm2w==}
 
   vscode-languageserver-types@3.18.3:
     resolution: {integrity: sha512-XIlzJ7Qp/jzSI1ds7/FwPAWrPeTZA7pAtlW4hdJ1J6xXWJL6dR9QYnDhJOdLzdKhUQ5Mm6mvUMw+3DcOQQasPw==}
@@ -2609,7 +2587,7 @@ snapshots:
   '@asamuzakjp/css-color@6.0.7':
     dependencies:
       '@csstools/css-calc': 3.3.0(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)
-      '@csstools/css-color-parser': 4.2.0(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)
+      '@csstools/css-color-parser': 4.2.1(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)
       '@csstools/css-parser-algorithms': 4.0.0(@csstools/css-tokenizer@4.0.0)
       '@csstools/css-tokenizer': 4.0.0
       lru-cache: 11.5.2
@@ -2913,7 +2891,7 @@ snapshots:
   '@commitlint/ensure@21.2.0':
     dependencies:
       '@commitlint/types': 21.2.0
-      es-toolkit: 1.51.0
+      es-toolkit: 1.52.0
 
   '@commitlint/execute-rule@21.0.1': {}
 
@@ -2942,7 +2920,7 @@ snapshots:
       '@commitlint/types': 21.2.0
       cosmiconfig: 9.0.2(typescript@6.0.3)
       cosmiconfig-typescript-loader: 6.3.0(@types/node@25.9.5)(cosmiconfig@9.0.2(typescript@6.0.3))(typescript@6.0.3)
-      es-toolkit: 1.51.0
+      es-toolkit: 1.52.0
       is-plain-obj: 4.1.0
       picocolors: 1.1.1
     transitivePeerDependencies:
@@ -2971,7 +2949,7 @@ snapshots:
     dependencies:
       '@commitlint/config-validator': 21.2.0
       '@commitlint/types': 21.2.0
-      es-toolkit: 1.51.0
+      es-toolkit: 1.52.0
       global-directory: 5.0.0
       resolve-from: 5.0.0
 
@@ -3010,7 +2988,7 @@ snapshots:
       '@csstools/css-parser-algorithms': 4.0.0(@csstools/css-tokenizer@4.0.0)
       '@csstools/css-tokenizer': 4.0.0
 
-  '@csstools/css-color-parser@4.2.0(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)':
+  '@csstools/css-color-parser@4.2.1(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)':
     dependencies:
       '@csstools/color-helpers': 6.1.1
       '@csstools/css-calc': 3.3.0(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)
@@ -3021,7 +2999,7 @@ snapshots:
     dependencies:
       '@csstools/css-tokenizer': 4.0.0
 
-  '@csstools/css-syntax-patches-for-csstree@1.1.8(css-tree@3.2.1)':
+  '@csstools/css-syntax-patches-for-csstree@1.1.9(css-tree@3.2.1)':
     optionalDependencies:
       css-tree: 3.2.1
 
@@ -3040,10 +3018,10 @@ snapshots:
       node-gyp-build: 4.8.4
       tree-sitter: 0.25.1
 
-  '@earendil-works/pi-agent-core@0.84.2(ws@8.21.3)':
+  '@earendil-works/pi-agent-core@0.84.4(ws@8.21.3)':
     dependencies:
-      '@earendil-works/pi-ai': 0.84.2(ws@8.21.3)
-      '@earendil-works/pi-telemetry': 0.84.2
+      '@earendil-works/pi-ai': 0.84.4(ws@8.21.3)
+      '@earendil-works/pi-telemetry': 0.84.4
       diff: 8.0.4
       ignore: 7.0.5
       typebox: 1.3.7
@@ -3056,13 +3034,12 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-ai@0.84.2(ws@8.21.3)':
+  '@earendil-works/pi-ai@0.84.4(ws@8.21.3)':
     dependencies:
       '@anthropic-ai/sdk': 0.91.1
       '@aws-sdk/client-bedrock-runtime': 3.1048.0
-      '@earendil-works/pi-telemetry': 0.84.2
+      '@earendil-works/pi-telemetry': 0.84.4
       '@google/genai': 1.52.0
-      '@opentelemetry/api': 1.9.0
       '@smithy/node-http-handler': 4.7.3
       http-proxy-agent: 7.0.2
       https-proxy-agent: 7.0.6
@@ -3077,22 +3054,21 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-client@0.84.2':
+  '@earendil-works/pi-client@0.84.4':
     dependencies:
-      '@earendil-works/pi-protocol': 0.84.2
+      '@earendil-works/pi-protocol': 0.84.4
 
-  '@earendil-works/pi-coding-agent@0.84.2(ws@8.21.3)':
+  '@earendil-works/pi-coding-agent@0.84.4(ws@8.21.3)':
     dependencies:
-      '@earendil-works/pi-agent-core': 0.84.2(ws@8.21.3)
-      '@earendil-works/pi-ai': 0.84.2(ws@8.21.3)
-      '@earendil-works/pi-client': 0.84.2
-      '@earendil-works/pi-protocol': 0.84.2
-      '@earendil-works/pi-tui': 0.84.2
+      '@earendil-works/pi-agent-core': 0.84.4(ws@8.21.3)
+      '@earendil-works/pi-ai': 0.84.4(ws@8.21.3)
+      '@earendil-works/pi-client': 0.84.4
+      '@earendil-works/pi-protocol': 0.84.4
+      '@earendil-works/pi-tui': 0.84.4
       '@silvia-odwyer/photon-node': 0.3.4
       chalk: 5.6.2
       cross-spawn: 7.0.6
       diff: 8.0.4
-      glob: 13.0.6
       grok-mermaid: 0.2.2
       highlight.js: 10.7.3
       hosted-git-info: 9.0.3
@@ -3114,13 +3090,13 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-protocol@0.84.2':
+  '@earendil-works/pi-protocol@0.84.4':
     dependencies:
       typebox: 1.3.7
 
-  '@earendil-works/pi-telemetry@0.84.2': {}
+  '@earendil-works/pi-telemetry@0.84.4': {}
 
-  '@earendil-works/pi-tui@0.84.2':
+  '@earendil-works/pi-tui@0.84.4':
     dependencies:
       get-east-asian-width: 1.6.0
       marked: 18.0.5
@@ -3131,7 +3107,7 @@ snapshots:
     dependencies:
       google-auth-library: 10.9.1
       p-retry: 4.6.2
-      protobufjs: 7.6.5
+      protobufjs: 7.6.6
       ws: 8.21.3
     transitivePeerDependencies:
       - bufferutil
@@ -3140,7 +3116,7 @@ snapshots:
 
   '@gwhitney/detect-indent@7.0.1': {}
 
-  '@jridgewell/sourcemap-codec@1.5.5': {}
+  '@jridgewell/sourcemap-codec@1.6.0': {}
 
   '@mariozechner/clipboard-darwin-arm64@0.3.9':
     optional: true
@@ -3190,9 +3166,7 @@ snapshots:
 
   '@mozilla/readability@0.6.0': {}
 
-  '@opentelemetry/api@1.9.0': {}
-
-  '@oxc-project/types@0.146.0': {}
+  '@oxc-project/types@0.147.0': {}
 
   '@pnpm/catalogs.protocol-parser@1001.0.0': {}
 
@@ -3303,49 +3277,49 @@ snapshots:
 
   '@protobufjs/utf8@1.1.2': {}
 
-  '@rolldown/binding-android-arm-eabi@1.2.5':
+  '@rolldown/binding-android-arm-eabi@1.2.6':
     optional: true
 
-  '@rolldown/binding-android-arm64@1.2.5':
+  '@rolldown/binding-android-arm64@1.2.6':
     optional: true
 
-  '@rolldown/binding-darwin-arm64@1.2.5':
+  '@rolldown/binding-darwin-arm64@1.2.6':
     optional: true
 
-  '@rolldown/binding-darwin-x64@1.2.5':
+  '@rolldown/binding-darwin-x64@1.2.6':
     optional: true
 
-  '@rolldown/binding-freebsd-x64@1.2.5':
+  '@rolldown/binding-freebsd-x64@1.2.6':
     optional: true
 
-  '@rolldown/binding-linux-arm-gnueabihf@1.2.5':
+  '@rolldown/binding-linux-arm-gnueabihf@1.2.6':
     optional: true
 
-  '@rolldown/binding-linux-arm64-gnu@1.2.5':
+  '@rolldown/binding-linux-arm64-gnu@1.2.6':
     optional: true
 
-  '@rolldown/binding-linux-arm64-musl@1.2.5':
+  '@rolldown/binding-linux-arm64-musl@1.2.6':
     optional: true
 
-  '@rolldown/binding-linux-ppc64-gnu@1.2.5':
+  '@rolldown/binding-linux-ppc64-gnu@1.2.6':
     optional: true
 
-  '@rolldown/binding-linux-s390x-gnu@1.2.5':
+  '@rolldown/binding-linux-s390x-gnu@1.2.6':
     optional: true
 
-  '@rolldown/binding-linux-x64-gnu@1.2.5':
+  '@rolldown/binding-linux-x64-gnu@1.2.6':
     optional: true
 
-  '@rolldown/binding-linux-x64-musl@1.2.5':
+  '@rolldown/binding-linux-x64-musl@1.2.6':
     optional: true
 
-  '@rolldown/binding-openharmony-arm64@1.2.5':
+  '@rolldown/binding-openharmony-arm64@1.2.6':
     optional: true
 
-  '@rolldown/binding-win32-arm64-msvc@1.2.5':
+  '@rolldown/binding-win32-arm64-msvc@1.2.6':
     optional: true
 
-  '@rolldown/binding-win32-x64-msvc@1.2.5':
+  '@rolldown/binding-win32-x64-msvc@1.2.6':
     optional: true
 
   '@rolldown/pluginutils@1.0.1': {}
@@ -3543,7 +3517,7 @@ snapshots:
       is-wayland: 0.1.0
       is-wsl: 3.1.1
       is64bit: 2.0.0
-      powershell-utils: 0.2.0
+      powershell-utils: 0.2.1
 
   cliui@9.0.1:
     dependencies:
@@ -3577,7 +3551,7 @@ snapshots:
     dependencies:
       env-paths: 2.2.1
       import-fresh: 3.3.1
-      js-yaml: 4.3.1
+      js-yaml: 4.3.2
       parse-json: 5.2.0
     optionalDependencies:
       typescript: 6.0.3
@@ -3632,7 +3606,7 @@ snapshots:
 
   es-module-lexer@2.3.2: {}
 
-  es-toolkit@1.51.0: {}
+  es-toolkit@1.52.0: {}
 
   escalade@3.2.0: {}
 
@@ -3664,7 +3638,7 @@ snapshots:
       is-plain-obj: 4.1.0
       is-stream: 4.0.1
       npm-run-path: 6.0.0
-      pretty-ms: 9.3.0
+      pretty-ms: 9.3.1
       signal-exit: 4.1.0
       strip-final-newline: 4.0.0
       yoctocolors: 2.2.0
@@ -3679,9 +3653,9 @@ snapshots:
 
   fast-uri@3.1.6: {}
 
-  fdir@6.5.0(picomatch@4.0.5):
+  fdir@6.5.0(picomatch@4.0.7):
     optionalDependencies:
-      picomatch: 4.0.5
+      picomatch: 4.0.7
 
   fetch-blob@3.2.0:
     dependencies:
@@ -3725,12 +3699,6 @@ snapshots:
     dependencies:
       '@sec-ant/readable-stream': 0.4.1
       is-stream: 4.0.1
-
-  glob@13.0.6:
-    dependencies:
-      minimatch: 10.2.5
-      minipass: 7.1.3
-      path-scurry: 2.0.2
 
   global-directory@5.0.0:
     dependencies:
@@ -3836,7 +3804,7 @@ snapshots:
 
   js-tokens@4.0.0: {}
 
-  js-yaml@4.3.1:
+  js-yaml@4.3.2:
     dependencies:
       argparse: 2.0.1
 
@@ -3845,7 +3813,7 @@ snapshots:
       '@asamuzakjp/css-color': 6.0.7
       '@asamuzakjp/dom-selector': 8.3.2
       '@bramus/specificity': 2.4.2
-      '@csstools/css-syntax-patches-for-csstree': 1.1.8(css-tree@3.2.1)
+      '@csstools/css-syntax-patches-for-csstree': 1.1.9(css-tree@3.2.1)
       '@exodus/bytes': 1.15.1
       css-tree: 3.2.1
       data-urls: 7.0.0
@@ -3953,7 +3921,7 @@ snapshots:
 
   magic-string@0.30.21:
     dependencies:
-      '@jridgewell/sourcemap-codec': 1.5.5
+      '@jridgewell/sourcemap-codec': 1.6.0
 
   marked@18.0.5: {}
 
@@ -3968,8 +3936,6 @@ snapshots:
   minimatch@10.2.5:
     dependencies:
       brace-expansion: 5.0.9
-
-  minipass@7.1.3: {}
 
   ms@2.1.3: {}
 
@@ -4038,16 +4004,11 @@ snapshots:
 
   path-key@4.0.0: {}
 
-  path-scurry@2.0.2:
-    dependencies:
-      lru-cache: 11.5.2
-      minipass: 7.1.3
-
   pathe@2.0.3: {}
 
   picocolors@1.1.1: {}
 
-  picomatch@4.0.5: {}
+  picomatch@4.0.7: {}
 
   postcss@8.5.26:
     dependencies:
@@ -4055,9 +4016,9 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  powershell-utils@0.2.0: {}
+  powershell-utils@0.2.1: {}
 
-  pretty-ms@9.3.0:
+  pretty-ms@9.3.1:
     dependencies:
       parse-ms: 4.0.0
 
@@ -4067,7 +4028,7 @@ snapshots:
       retry: 0.12.0
       signal-exit: 3.0.7
 
-  protobufjs@7.6.5:
+  protobufjs@7.6.6:
     dependencies:
       '@protobufjs/aspromise': 1.1.2
       '@protobufjs/base64': 1.1.2
@@ -4085,7 +4046,7 @@ snapshots:
 
   read-yaml-file@2.1.0:
     dependencies:
-      js-yaml: 4.3.1
+      js-yaml: 4.3.2
       strip-bom: 4.0.0
 
   require-from-string@2.0.2: {}
@@ -4098,26 +4059,26 @@ snapshots:
 
   retry@0.13.1: {}
 
-  rolldown@1.2.5:
+  rolldown@1.2.6:
     dependencies:
-      '@oxc-project/types': 0.146.0
+      '@oxc-project/types': 0.147.0
       '@rolldown/pluginutils': 1.0.1
     optionalDependencies:
-      '@rolldown/binding-android-arm-eabi': 1.2.5
-      '@rolldown/binding-android-arm64': 1.2.5
-      '@rolldown/binding-darwin-arm64': 1.2.5
-      '@rolldown/binding-darwin-x64': 1.2.5
-      '@rolldown/binding-freebsd-x64': 1.2.5
-      '@rolldown/binding-linux-arm-gnueabihf': 1.2.5
-      '@rolldown/binding-linux-arm64-gnu': 1.2.5
-      '@rolldown/binding-linux-arm64-musl': 1.2.5
-      '@rolldown/binding-linux-ppc64-gnu': 1.2.5
-      '@rolldown/binding-linux-s390x-gnu': 1.2.5
-      '@rolldown/binding-linux-x64-gnu': 1.2.5
-      '@rolldown/binding-linux-x64-musl': 1.2.5
-      '@rolldown/binding-openharmony-arm64': 1.2.5
-      '@rolldown/binding-win32-arm64-msvc': 1.2.5
-      '@rolldown/binding-win32-x64-msvc': 1.2.5
+      '@rolldown/binding-android-arm-eabi': 1.2.6
+      '@rolldown/binding-android-arm64': 1.2.6
+      '@rolldown/binding-darwin-arm64': 1.2.6
+      '@rolldown/binding-darwin-x64': 1.2.6
+      '@rolldown/binding-freebsd-x64': 1.2.6
+      '@rolldown/binding-linux-arm-gnueabihf': 1.2.6
+      '@rolldown/binding-linux-arm64-gnu': 1.2.6
+      '@rolldown/binding-linux-arm64-musl': 1.2.6
+      '@rolldown/binding-linux-ppc64-gnu': 1.2.6
+      '@rolldown/binding-linux-s390x-gnu': 1.2.6
+      '@rolldown/binding-linux-x64-gnu': 1.2.6
+      '@rolldown/binding-linux-x64-musl': 1.2.6
+      '@rolldown/binding-openharmony-arm64': 1.2.6
+      '@rolldown/binding-win32-arm64-msvc': 1.2.6
+      '@rolldown/binding-win32-x64-msvc': 1.2.6
 
   run-jxa@3.0.0:
     dependencies:
@@ -4194,20 +4155,20 @@ snapshots:
 
   tinyglobby@0.2.17:
     dependencies:
-      fdir: 6.5.0(picomatch@4.0.5)
-      picomatch: 4.0.5
+      fdir: 6.5.0(picomatch@4.0.7)
+      picomatch: 4.0.7
 
   tinyrainbow@3.1.1: {}
 
-  tldts-core@7.4.10: {}
+  tldts-core@7.4.11: {}
 
-  tldts@7.4.10:
+  tldts@7.4.11:
     dependencies:
-      tldts-core: 7.4.10
+      tldts-core: 7.4.11
 
   tough-cookie@6.0.2:
     dependencies:
-      tldts: 7.4.10
+      tldts: 7.4.11
 
   tr46@6.0.0:
     dependencies:
@@ -4333,16 +4294,14 @@ snapshots:
 
   type-fest@2.19.0: {}
 
-  typebox@1.3.16: {}
-
-  typebox@1.3.19: {}
+  typebox@1.3.22: {}
 
   typebox@1.3.7: {}
 
   typescript-language-server@6.0.0:
     dependencies:
       vscode-jsonrpc: 5.0.1
-      vscode-languageserver-protocol: 3.18.2
+      vscode-languageserver-protocol: 3.18.3
 
   typescript@6.0.3: {}
 
@@ -4363,9 +4322,9 @@ snapshots:
   vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.33.0
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       postcss: 8.5.26
-      rolldown: 1.2.5
+      rolldown: 1.2.6
       tinyglobby: 0.2.17
     optionalDependencies:
       '@types/node': 25.9.5
@@ -4373,7 +4332,7 @@ snapshots:
       jiti: 2.7.0
       yaml: 2.9.0
 
-  vitest@4.1.11(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0)):
+  vitest@4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0)):
     dependencies:
       '@vitest/expect': 4.1.11
       '@vitest/mocker': 4.1.11(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
@@ -4387,7 +4346,7 @@ snapshots:
       magic-string: 0.30.21
       obug: 2.1.4
       pathe: 2.0.3
-      picomatch: 4.0.5
+      picomatch: 4.0.7
       std-env: 4.2.0
       tinybench: 2.9.0
       tinyexec: 1.3.0
@@ -4396,7 +4355,6 @@ snapshots:
       vite: 8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0)
       why-is-node-running: 2.3.0
     optionalDependencies:
-      '@opentelemetry/api': 1.9.0
       '@types/node': 25.9.5
       jsdom: 30.0.1
     transitivePeerDependencies:
@@ -4404,14 +4362,12 @@ snapshots:
 
   vscode-jsonrpc@5.0.1: {}
 
-  vscode-jsonrpc@9.0.1: {}
+  vscode-jsonrpc@9.0.2: {}
 
-  vscode-languageserver-protocol@3.18.2:
+  vscode-languageserver-protocol@3.18.3:
     dependencies:
-      vscode-jsonrpc: 9.0.1
-      vscode-languageserver-types: 3.18.0
-
-  vscode-languageserver-types@3.18.0: {}
+      vscode-jsonrpc: 9.0.2
+      vscode-languageserver-types: 3.18.3
 
   vscode-languageserver-types@3.18.3: {}
 
@@ -4465,7 +4421,7 @@ snapshots:
 
   write-yaml-file@5.0.0:
     dependencies:
-      js-yaml: 4.3.1
+      js-yaml: 4.3.2
       write-file-atomic: 5.0.1
 
   ws@8.21.3: {}
