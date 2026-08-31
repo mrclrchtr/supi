@@ -45,11 +45,37 @@ export interface OutstandingDiagnosticSummaryEntry {
   hints: number;
 }
 
+/**
+ * Outcome of explicit process-crash recovery demand in one diagnostic pass.
+ *
+ * Routes are counted rather than client generations because process-crash
+ * recovery owns one budget per LSP route. `attemptedRoutes` is the number of
+ * crashed routes selected by the demand; a route can be failed already or
+ * have a shared replacement in progress when the demand observes it.
+ */
+export interface ProcessCrashRecoverySummary {
+  attemptedRoutes: number;
+  recoveredRoutes: number;
+  failedRoutes: number;
+}
+
+/** Create the empty outcome for a pass with no process-crash demand. */
+export function emptyProcessCrashRecoverySummary(): ProcessCrashRecoverySummary {
+  return {
+    attemptedRoutes: 0,
+    recoveredRoutes: 0,
+    failedRoutes: 0,
+  };
+}
+
 /** Result from a workspace diagnostic recovery pass. */
 export interface RecoverDiagnosticsResult {
   /** Active clients targeted by the best-effort refresh, not confirmed successful refreshes. */
   attemptedClients: number;
+  /** Clients restarted by stale-diagnostic recovery, not process-crash recovery. */
   restartedClients: number;
+  /** Separate outcome for process-crash route recovery selected by this pass. */
+  processCrashRecovery: ProcessCrashRecoverySummary;
   /** Evidence collected by the refresh and recovery operations. */
   diagnosticEvidence: DiagnosticEvidenceSummary;
   /** Final diagnostic report captured after all refresh and recovery work. */

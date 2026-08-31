@@ -30,7 +30,11 @@ import { boundServerNames, truncateIdentity } from "../debug-telemetry.ts";
 import type { LspManager } from "../manager/manager.ts";
 import { resolveSessionPath } from "../utils.ts";
 import { raceReadinessValue } from "./readiness.ts";
-import type { DiagnosticEvidenceSummary, RecoverDiagnosticsResult } from "./runtime-diagnostics.ts";
+import type {
+  DiagnosticEvidenceSummary,
+  ProcessCrashRecoverySummary,
+  RecoverDiagnosticsResult,
+} from "./runtime-diagnostics.ts";
 import type {
   RoutedMutationResponse,
   SemanticReadinessResult,
@@ -42,15 +46,17 @@ export type {
   ProcessCrashDiagnosticDemand,
   WorkspaceLspDiagnosticSurface,
 } from "./runtime-diagnostic-surface.ts";
-export type {
-  DiagnosticEvidenceDocument,
-  DiagnosticEvidenceStatus,
-  DiagnosticEvidenceSummary,
-  OutstandingDiagnosticSummaryEntry,
-  RecoverDiagnosticsResult,
-  WorkspaceDiagnosticReport,
-  WorkspaceDiagnosticSnapshot,
-  WorkspaceDiagnosticSummaryEntry,
+export {
+  type DiagnosticEvidenceDocument,
+  type DiagnosticEvidenceStatus,
+  type DiagnosticEvidenceSummary,
+  emptyProcessCrashRecoverySummary,
+  type OutstandingDiagnosticSummaryEntry,
+  type ProcessCrashRecoverySummary,
+  type RecoverDiagnosticsResult,
+  type WorkspaceDiagnosticReport,
+  type WorkspaceDiagnosticSnapshot,
+  type WorkspaceDiagnosticSummaryEntry,
 } from "./runtime-diagnostics.ts";
 export type {
   RoutedMutationResponse,
@@ -65,6 +71,10 @@ function isRange(value: Position | Range): value is Range {
 
 function unavailableFileQuery<T>(operation: string, file: string): CodeQueryResult<T> {
   return unavailableCodeQuery(`No routed LSP client could complete ${operation} for ${file}.`);
+}
+
+function hasProcessCrashRecovery(summary: ProcessCrashRecoverySummary): boolean {
+  return summary.attemptedRoutes > 0 || summary.recoveredRoutes > 0 || summary.failedRoutes > 0;
 }
 
 /** Emit one aggregate tsconfig scope-decision event after a recovery pass. */
@@ -252,19 +262,29 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       };
     }
 
+    let eagerProcessCrashRecovery: ProcessCrashRecoverySummary | undefined;
     const readiness = await raceReadinessValue(
-      this.manager.waitUntilFileReady(resolvedPath, control),
+      this.manager.waitUntilFileReady(resolvedPath, control, (summary) => {
+        eagerProcessCrashRecovery = summary;
+      }),
       options.timeoutMs,
       control,
     );
-    if (readiness.kind !== "resolved") return readiness;
-    if (readiness.value === null) {
+    if (readiness.kind !== "resolved") {
+      return eagerProcessCrashRecovery
+        ? { ...readiness, processCrashRecovery: eagerProcessCrashRecovery }
+        : readiness;
+    }
+    const { client, processCrashRecovery } = readiness.value;
+    const recovery = hasProcessCrashRecovery(processCrashRecovery) ? { processCrashRecovery } : {};
+    if (!client) {
       return {
         kind: "unavailable",
         reason: "The routed LSP client could not be started for this file",
+        ...recovery,
       };
     }
-    return { kind: "ready" };
+    return { kind: "ready", ...recovery };
   }
 
   /**
@@ -389,6 +409,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
           elapsedMs: result.elapsedMs,
           attemptedClients: result.attemptedClients,
           restartedClients: result.restartedClients,
+          processCrashRecovery: result.processCrashRecovery,
           attemptedServers: boundServerNames(result.attemptedServers ?? []),
           restartedServers: boundServerNames(result.restartedServers ?? []),
           ...(result.restartReason ? { reason: result.restartReason } : {}),

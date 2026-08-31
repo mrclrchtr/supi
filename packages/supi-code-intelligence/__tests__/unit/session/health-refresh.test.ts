@@ -238,6 +238,43 @@ describe("code_health refresh evidence", () => {
     );
   });
 
+  it("preserves process-crash recovery separately from stale restarts", async () => {
+    const evidence = emptyEvidence();
+    const runtime = readyRuntime({
+      recoverDiagnostics: async () => ({
+        attemptedClients: 1,
+        restartedClients: 0,
+        processCrashRecovery: {
+          attemptedRoutes: 1,
+          recoveredRoutes: 1,
+          failedRoutes: 0,
+        },
+        diagnosticEvidence: evidence,
+        staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+      }),
+    });
+
+    const { outcome } = await run(
+      { kind: "ready", runtime },
+      { include: ["diagnostics"], refresh: true },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        refresh: {
+          kind: "completed",
+          restartedClients: 0,
+          processCrashRecovery: {
+            attemptedRoutes: 1,
+            recoveredRoutes: 1,
+            failedRoutes: 0,
+          },
+        },
+      },
+    });
+  });
+
   it("passes directory scope as explicit process-crash diagnostic demand", async () => {
     const directory = path.join(cwd, "src");
     mkdirSync(directory);
@@ -705,7 +742,14 @@ describe("code_health refresh evidence", () => {
       refreshOpenDiagnostics,
       recoverDiagnostics,
       fileDiagnostics,
-      waitUntilReadyForFile: vi.fn(async () => ({ kind: "ready" })),
+      waitUntilReadyForFile: vi.fn(async () => ({
+        kind: "ready",
+        processCrashRecovery: {
+          attemptedRoutes: 1,
+          recoveredRoutes: 1,
+          failedRoutes: 0,
+        },
+      })),
     });
 
     const { outcome } = await run(
@@ -720,6 +764,11 @@ describe("code_health refresh evidence", () => {
           kind: "completed",
           operationScope: "file-runtime",
           attemptedActiveClients: 1,
+          processCrashRecovery: {
+            attemptedRoutes: 1,
+            recoveredRoutes: 1,
+            failedRoutes: 0,
+          },
         },
         diagnostics: { kind: "completed" },
       },

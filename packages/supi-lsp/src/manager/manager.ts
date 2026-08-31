@@ -48,10 +48,12 @@ import {
   summarizeDiagnosticEvidence,
 } from "../diagnostics/evidence.ts";
 import { raceRequestControl } from "../session/readiness.ts";
-import type {
-  ScopeDecisionEntry,
-  ScopeDecisionSummary,
-  WorkspaceDiagnosticReport,
+import {
+  emptyProcessCrashRecoverySummary,
+  type ProcessCrashRecoverySummary,
+  type ScopeDecisionEntry,
+  type ScopeDecisionSummary,
+  type WorkspaceDiagnosticReport,
 } from "../session/runtime-diagnostics.ts";
 import {
   displayRelativeFilePath,
@@ -161,6 +163,11 @@ type FileClientRequestOptions = {
   control?: CodeRequestControl;
 };
 
+interface FileReadinessResult {
+  client: LspClient | null;
+  processCrashRecovery: ProcessCrashRecoverySummary;
+}
+
 interface ProcessCrashRecoveryState {
   /** The one automatic attempt is consumed when a replacement starts. */
   attemptConsumed: boolean;
@@ -181,6 +188,8 @@ type ProcessCrashRecoveryOutcome = "attempt" | "success" | "failure" | "exhauste
 type ProcessCrashDemandResult = {
   /** Whether at least one required crashed route supports the operation. */
   hasSupport: boolean;
+  /** Separate route-level result for this explicit process-crash demand. */
+  processCrashRecovery: ProcessCrashRecoverySummary;
   /** Required routes that remain unavailable after shared recovery settles. */
   failures: string[];
   /** In-scope tracked files from required routes that remain unavailable. */
@@ -481,7 +490,14 @@ export class LspManager {
         return failedFiles === null ? [] : [{ key, recovery, failedFiles }];
       },
     );
-    if (required.length === 0) return { hasSupport: false, failures: [], failedFiles: [] };
+    if (required.length === 0) {
+      return {
+        hasSupport: false,
+        processCrashRecovery: emptyProcessCrashRecoverySummary(),
+        failures: [],
+        failedFiles: [],
+      };
+    }
 
     await Promise.all(
       required.map(async ({ key, recovery }) => {
@@ -503,6 +519,11 @@ export class LspManager {
     const failedDemands = required.filter(({ recovery }) => recovery.statusReason !== undefined);
     return {
       hasSupport: true,
+      processCrashRecovery: {
+        attemptedRoutes: required.length,
+        recoveredRoutes: required.length - failedDemands.length,
+        failedRoutes: failedDemands.length,
+      },
       failures: failedDemands.map(({ recovery }) => this.formatProcessCrashDemandFailure(recovery)),
       failedFiles: Array.from(new Set(failedDemands.flatMap(({ failedFiles }) => failedFiles))),
     };
@@ -938,20 +959,39 @@ export class LspManager {
   async waitUntilFileReady(
     filePath: string,
     control?: CodeRequestControl,
-  ): Promise<LspClient | null> {
+    onProcessCrashRecovery?: (summary: ProcessCrashRecoverySummary) => void,
+  ): Promise<FileReadinessResult> {
     throwIfCodeRequestInterrupted(control);
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
+    const route = this.resolveFileRoute(resolvedPath);
+    const recovery = route ? this.processCrashRecoveries.get(route.key) : undefined;
+    const processCrashRecoveryRequested =
+      recovery !== undefined && (recovery.pending !== null || recovery.statusReason !== undefined);
+    if (processCrashRecoveryRequested) {
+      onProcessCrashRecovery?.({
+        attemptedRoutes: 1,
+        recoveredRoutes: 0,
+        failedRoutes: 0,
+      });
+    }
     const client = await this.getClientForFile(resolvedPath, {
       recoverProcessCrash: true,
       control,
     });
-    if (!client) return null;
+    const processCrashRecovery = processCrashRecoveryRequested
+      ? {
+          attemptedRoutes: 1,
+          recoveredRoutes: client ? 1 : 0,
+          failedRoutes: client ? 0 : 1,
+        }
+      : emptyProcessCrashRecoverySummary();
+    if (!client) return { client: null, processCrashRecovery };
     // The caller's wait stops on cancellation even though the shared
     // readiness state keeps its own lifecycle.
     await client.getReady(control);
     await this.warmSemanticProject(client, resolvedPath, true, control);
     throwIfCodeRequestInterrupted(control);
-    return client;
+    return { client, processCrashRecovery };
   }
 
   /**
@@ -1110,12 +1150,20 @@ export class LspManager {
           const files = this.processCrashDiagnosticFiles(recovery, options.processCrashDemand);
           return files.length > 0 ? files : null;
         }, options.control)
-      : { hasSupport: false, failures: [], failedFiles: [] };
+      : {
+          hasSupport: false,
+          processCrashRecovery: emptyProcessCrashRecoverySummary(),
+          failures: [],
+          failedFiles: [],
+        };
     const recoveryOptions = demand.hasSupport
       ? { ...options, initialEvidence: undefined }
       : options;
     const result = await recoverWorkspaceDiagnosticsImpl(this, recoveryOptions);
-    return this.addProcessCrashDiagnosticEvidence(result, demand);
+    return this.addProcessCrashDiagnosticEvidence(
+      { ...result, processCrashRecovery: demand.processCrashRecovery },
+      demand,
+    );
   }
 
   private processCrashDiagnosticFiles(

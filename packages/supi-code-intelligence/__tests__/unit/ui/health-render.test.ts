@@ -107,6 +107,77 @@ describe("code_health TUI projection", () => {
     });
 
     expect(render(details, true)).toContain("refresh attempt completed no-op");
+    expect(render(details, true)).not.toContain("stale diagnostic restarts");
+  });
+
+  it("does not add stale restart text to a retained no-op attempt", () => {
+    const details = makeDetails({
+      refresh: {
+        kind: "not-requested",
+        reason: "Refresh was not requested.",
+        lastAttempt: {
+          kind: "completed",
+          attemptedActiveClients: 0,
+          restartedClients: 0,
+          operationScope: "workspace-runtime",
+          processCrashRecovery: {
+            attemptedRoutes: 0,
+            recoveredRoutes: 0,
+            failedRoutes: 0,
+          },
+          diagnosticEvidence: {
+            requested: 0,
+            confirmed: 0,
+            unconfirmed: 0,
+            failed: 0,
+            removed: 0,
+            documents: [],
+          },
+        },
+      },
+    });
+
+    expect(render(details)).not.toContain("stale diagnostic restarts");
+  });
+
+  it("renders process-crash recovery separately from stale restarts", () => {
+    const details = makeDetails({
+      refresh: {
+        kind: "completed",
+        attemptedAt: 1,
+        requestedDiagnosticScope: { kind: "tracked-files", filter: null },
+        operationScope: "workspace-runtime",
+        attemptedActiveClients: 1,
+        restartedClients: 0,
+        processCrashRecovery: {
+          attemptedRoutes: 1,
+          recoveredRoutes: 1,
+          failedRoutes: 0,
+        },
+        diagnosticEvidence: {
+          requested: 0,
+          confirmed: 0,
+          unconfirmed: 0,
+          failed: 0,
+          removed: 0,
+          documents: [],
+        },
+        staleAssessment: {
+          scope: "workspace",
+          suspected: false,
+          matchedFileCount: 0,
+          warning: null,
+        },
+      },
+    });
+
+    const expanded = render(details, true);
+    expect(expanded).toContain("stale diagnostic restarts: 0");
+    expect(expanded).toContain("clients restarted");
+    expect(expanded).toContain("process-crash recovery: 1 route recovered");
+
+    const compact = render(details);
+    expect(compact).toContain("process-crash recovery: 1 route recovered");
   });
 
   it("renders diagnostic coverage in the compact view", () => {

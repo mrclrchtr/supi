@@ -1,6 +1,7 @@
 import type {
   DiagnosticEvidenceSummary,
   FileScopeDecision,
+  ProcessCrashRecoverySummary,
   ProjectServerInfo,
   ProjectServerStatusReason,
 } from "@mrclrchtr/supi-lsp/api";
@@ -103,7 +104,10 @@ interface CompletedHealthRefreshAttempt {
   readonly requestedDiagnosticScope: HealthDiagnosticScope;
   /** Active clients targeted by the best-effort operation; this is not a confirmed-success count. */
   readonly attemptedActiveClients: number;
+  /** Clients restarted by stale-diagnostic recovery. */
   readonly restartedClients: number;
+  /** Separate outcome for process-crash route recovery. */
+  readonly processCrashRecovery: ProcessCrashRecoverySummary;
   readonly staleAssessment: HealthStaleAssessment;
 }
 
@@ -125,8 +129,16 @@ export type HealthRefreshAttempt =
       readonly elapsedMs: number;
       readonly requestedDiagnosticScope: HealthDiagnosticScope;
       readonly operationScope: HealthRefreshOperationScope;
+      /** Active clients targeted before the operation failed, when available. */
+      readonly attemptedActiveClients?: number;
+      /** Clients restarted by stale-diagnostic recovery, when available. */
+      readonly restartedClients?: number;
+      /** Stale-diagnostic assessment, when the recovery pass returned one. */
+      readonly staleAssessment?: HealthStaleAssessment;
       /** Evidence collected before the operation failed, when available. */
       readonly diagnosticEvidence?: DiagnosticEvidenceSummary;
+      /** Process-crash outcome, when the recovery pass returned one. */
+      readonly processCrashRecovery?: ProcessCrashRecoverySummary;
       readonly reason: string;
     };
 

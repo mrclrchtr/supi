@@ -180,6 +180,40 @@ describe("LSP manager lifecycle integration", () => {
     });
   }, 10_000);
 
+  it("reports process-crash recovery separately during diagnostic refresh", async () => {
+    const root = createProject();
+    const sourceFile = path.join(root, "recovery.test");
+    const crashMarker = path.join(root, ".crashed-once");
+    fs.writeFileSync(sourceFile, "recovery fixture\n");
+    const manager = new LspManager(config("crash-once", crashMarker), root);
+    managers.push(manager);
+
+    const original = await manager.startServerForRoot("test", root);
+    if (!original) throw new Error("Expected the original client to start.");
+    original.didOpen(sourceFile, fs.readFileSync(sourceFile, "utf8"));
+    await waitFor(
+      async () => manager.getProjectServerInfo("test", root, ["test"]),
+      (info) => info.statusReason === "process-crashed",
+      { timeoutMs: 2_000, retryDelayMs: 20, label: "diagnostic refresh process crash" },
+    );
+
+    const runtime = createWorkspaceLspRuntimeOwner(manager).runtime;
+    const result = await runtime.recoverDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { scopes: [sourceFile] },
+    });
+
+    expect(result.processCrashRecovery).toEqual({
+      attemptedRoutes: 1,
+      recoveredRoutes: 1,
+      failedRoutes: 0,
+    });
+    expect(result.restartedClients).toBe(0);
+    expect(manager.getProjectServerInfo("test", root, ["test"])).toMatchObject({
+      status: "running",
+    });
+  }, 10_000);
+
   it("shares one real replacement across concurrent workspace-symbol demand", async () => {
     const root = createProject();
     const sourceFile = path.join(root, "recovery.test");

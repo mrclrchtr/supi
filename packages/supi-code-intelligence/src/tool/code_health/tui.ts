@@ -24,7 +24,11 @@ import {
   type ToolResult,
 } from "../../ui/tui/common.ts";
 import type { CodeHealthToolParams } from "./execute.ts";
-import { readPreviousRefreshStatus, readRefreshStatus } from "./refresh-status.ts";
+import {
+  readCompactRefreshStatus,
+  readPreviousRefreshStatus,
+  readRefreshStatus,
+} from "./refresh-status.ts";
 import { formatSemanticHealthState, readSemanticHealthState } from "./semantic-state.ts";
 
 /** ── renderCall ────────────────────────────────────────────────── */
@@ -142,8 +146,8 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
       `${theme.fg("dim", "lsp")} ${theme.fg(statusColor, semanticStatus)}${routeSummary ? ` ${theme.fg("warning", routeSummary)}` : ""}`,
     );
   }
-  const previousRefresh = readPreviousRefreshStatus(data);
-  if (previousRefresh) segments.push(theme.fg("dim", previousRefresh));
+  const refreshStatus = readCompactRefreshStatus(data) ?? readPreviousRefreshStatus(data);
+  if (refreshStatus) segments.push(theme.fg("dim", refreshStatus));
   const capabilityWarningCount = readCapabilityWarnings(data).length;
   if (capabilityWarningCount > 0) {
     const label = capabilityWarningCount === 1 ? "capability warning" : "capability warnings";

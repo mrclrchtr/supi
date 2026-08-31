@@ -2,7 +2,11 @@ import {
   type CodeRequestControl,
   isCodeRequestInterruption,
 } from "@mrclrchtr/supi-code-runtime/api";
-import type { WorkspaceDiagnosticReport, WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
+import {
+  emptyProcessCrashRecoverySummary,
+  type WorkspaceDiagnosticReport,
+  type WorkspaceLspRuntime,
+} from "@mrclrchtr/supi-lsp/api";
 import { recoverDiagnosticRuntime } from "../analysis/health/recovery.ts";
 import { mergeDiagnosticEvidence } from "../diagnostics/evidence.ts";
 import { refreshFileLspMaintenance, refreshLspMaintenance } from "../substrate/lsp/maintenance.ts";
@@ -60,6 +64,7 @@ async function collectFileRefreshAttempt(
       operationScope: "file-runtime",
       attemptedActiveClients: readiness.kind === "ready" ? 1 : 0,
       restartedClients: 0,
+      processCrashRecovery: readiness.processCrashRecovery ?? emptyProcessCrashRecoverySummary(),
       staleAssessment: {
         scope: "file",
         suspected: null,
@@ -126,7 +131,16 @@ async function collectWorkspaceRefreshAttempt(
           elapsedMs: Date.now() - options.attemptedAt,
           requestedDiagnosticScope: options.diagnosticsScope,
           operationScope: "workspace-runtime",
+          attemptedActiveClients: recovery.attemptedClients,
+          restartedClients: recovery.restartedClients,
+          staleAssessment: {
+            scope: "workspace",
+            suspected: recovery.staleAssessment.suspected,
+            matchedFileCount: recovery.staleAssessment.matchedFiles.length,
+            warning: recovery.staleAssessment.warning,
+          },
           diagnosticEvidence,
+          processCrashRecovery: recovery.processCrashRecovery,
           reason: recovery.refreshFailureReason,
         },
         diagnosticReport: recovery.diagnosticReport,
@@ -141,6 +155,7 @@ async function collectWorkspaceRefreshAttempt(
         operationScope: "workspace-runtime",
         attemptedActiveClients: recovery.attemptedClients,
         restartedClients: recovery.restartedClients,
+        processCrashRecovery: recovery.processCrashRecovery,
         diagnosticEvidence,
         staleAssessment: {
           scope: "workspace",

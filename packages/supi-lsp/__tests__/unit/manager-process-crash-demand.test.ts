@@ -244,6 +244,11 @@ describe("workspace-symbol process-crash demand", () => {
     });
 
     expect(result.attemptedClients).toBe(2);
+    expect(result.processCrashRecovery).toEqual({
+      attemptedRoutes: 1,
+      recoveredRoutes: 1,
+      failedRoutes: 0,
+    });
     expect(mocks.clients).toHaveLength(3);
     expect(fixture.manager.getProjectServerInfo("test", fixture.rootB, ["test"])).toMatchObject({
       status: "running",
@@ -278,6 +283,11 @@ describe("workspace-symbol process-crash demand", () => {
 
     expect(result.refreshFailureReason).toContain("test @ b is unavailable");
     expect(result.refreshFailureReason).toContain("process recovery exhausted; reload required");
+    expect(result.processCrashRecovery).toEqual({
+      attemptedRoutes: 1,
+      recoveredRoutes: 0,
+      failedRoutes: 1,
+    });
     expect(result.diagnosticEvidence).toMatchObject({
       failed: 1,
       documents: expect.arrayContaining([

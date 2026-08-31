@@ -54,6 +54,17 @@ function emptyEvidence() {
   } as const;
 }
 
+function fileReadiness(
+  client: LspClient | null,
+  processCrashRecovery = {
+    attemptedRoutes: 0,
+    recoveredRoutes: 0,
+    failedRoutes: 0,
+  },
+) {
+  return { client, processCrashRecovery };
+}
+
 const symbol: SymbolInformation = {
   name: "greet",
   kind: 12,
@@ -172,7 +183,7 @@ describe("workspace runtime behavior", () => {
         canServeFile: (filePath: string) => filePath === "/project/src/index.ts",
         waitUntilFileReady: async (filePath: string) => {
           readyPaths.push(filePath);
-          return client;
+          return fileReadiness(client);
         },
       }),
     );
@@ -182,10 +193,22 @@ describe("workspace runtime behavior", () => {
     ).resolves.toEqual({ kind: "ready" });
     expect(readyPaths).toEqual(["/project/src/index.ts"]);
 
+    const recoveredRuntime = createRuntime(
+      makeManager({
+        canServeFile: () => true,
+        waitUntilFileReady: async () =>
+          fileReadiness(client, { attemptedRoutes: 1, recoveredRoutes: 1, failedRoutes: 0 }),
+      }),
+    );
+    await expect(recoveredRuntime.waitUntilReadyForFile("src/index.ts")).resolves.toEqual({
+      kind: "ready",
+      processCrashRecovery: { attemptedRoutes: 1, recoveredRoutes: 1, failedRoutes: 0 },
+    });
+
     const failedRouteRuntime = createRuntime(
       makeManager({
         canServeFile: () => true,
-        waitUntilFileReady: async () => null,
+        waitUntilFileReady: async () => fileReadiness(null),
       }),
     );
     await expect(
@@ -201,6 +224,30 @@ describe("workspace runtime behavior", () => {
     await expect(
       timeoutRuntime.waitUntilReadyForFile("src/index.ts", { timeoutMs: 1 }),
     ).resolves.toEqual({ kind: "timeout" });
+
+    const recoveryTimeoutRuntime = createRuntime(
+      makeManager({
+        canServeFile: () => true,
+        waitUntilFileReady: (
+          _filePath: string,
+          _control: unknown,
+          reportRecovery?: (summary: {
+            attemptedRoutes: number;
+            recoveredRoutes: number;
+            failedRoutes: number;
+          }) => void,
+        ) => {
+          reportRecovery?.({ attemptedRoutes: 1, recoveredRoutes: 0, failedRoutes: 0 });
+          return new Promise<never>(() => {});
+        },
+      }),
+    );
+    await expect(
+      recoveryTimeoutRuntime.waitUntilReadyForFile("src/index.ts", { timeoutMs: 1 }),
+    ).resolves.toEqual({
+      kind: "timeout",
+      processCrashRecovery: { attemptedRoutes: 1, recoveredRoutes: 0, failedRoutes: 0 },
+    });
   });
 
   it("reports workspace readiness only when at least one live client is ready", async () => {

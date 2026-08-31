@@ -16,12 +16,19 @@ import {
   assessStaleDiagnostics,
   type StaleDiagnosticAssessment,
 } from "../diagnostics/stale-diagnostics.ts";
-import type { WorkspaceDiagnosticReport } from "../session/runtime-diagnostics.ts";
+import {
+  emptyProcessCrashRecoverySummary,
+  type ProcessCrashRecoverySummary,
+  type WorkspaceDiagnosticReport,
+} from "../session/runtime-diagnostics.ts";
 
 export interface WorkspaceRecoveryResult {
   /** Active clients targeted by the best-effort refresh, not confirmed successful refreshes. */
   attemptedClients: number;
+  /** Clients restarted by stale-diagnostic recovery, not process-crash recovery. */
   restartedClients: number;
+  /** No process-crash demand is handled by this generic recovery pass. */
+  processCrashRecovery: ProcessCrashRecoverySummary;
   /** Server names of the active clients targeted by this pass, for telemetry identity. */
   attemptedServers: string[];
   /** Server names of the clients restarted during this pass, for telemetry identity. */
@@ -157,6 +164,7 @@ export async function recoverWorkspaceDiagnostics(
     return {
       attemptedClients,
       restartedClients,
+      processCrashRecovery: emptyProcessCrashRecoverySummary(),
       attemptedServers,
       restartedServers: restartServerNames,
       ...(restartReason ? { restartReason } : {}),

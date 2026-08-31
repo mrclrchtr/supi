@@ -13,6 +13,11 @@ import { createWorkspaceLspRuntimeOwner } from "../../src/session/runtime-regist
 const recoveryResult = {
   attemptedClients: 0,
   restartedClients: 0,
+  processCrashRecovery: {
+    attemptedRoutes: 1,
+    recoveredRoutes: 1,
+    failedRoutes: 0,
+  },
   diagnosticEvidence: {
     requested: 0,
     confirmed: 0,
@@ -85,5 +90,11 @@ describe("workspace runtime recovery scope telemetry", () => {
       .map((event) => event.category);
     expect(categories).toContain("runtime.recovery");
     expect(categories).toContain("diagnostics.scope");
+    const recoveryEvent = mocks.recordDebugEvent.mock.calls
+      .map((call) => call[0])
+      .find((event) => event.category === "runtime.recovery");
+    expect(recoveryEvent).toMatchObject({
+      data: { processCrashRecovery: recoveryResult.processCrashRecovery },
+    });
   });
 });

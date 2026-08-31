@@ -1,3 +1,6 @@
+import type { ProcessCrashRecoverySummary } from "@mrclrchtr/supi-lsp/api";
+import { formatProcessCrashRecovery, formatStaleDiagnosticRestarts } from "./refresh-outcome.ts";
+
 /** Render current and retained health refresh status for the TUI. */
 
 export function readRefreshStatus(data: Record<string, unknown> | null): string | null {
@@ -5,25 +8,10 @@ export function readRefreshStatus(data: Record<string, unknown> | null): string 
   if (!refresh) return null;
 
   switch (refresh.kind) {
-    case "completed": {
-      const attempted = readNumber(refresh.attemptedActiveClients);
-      const restarted = readNumber(refresh.restartedClients);
-      const stale = readRecord(refresh.staleAssessment);
-      const noOp = attempted === 0 && restarted === 0;
-      const label = refreshAttemptLabel(refresh);
-      const base = noOp
-        ? `${label} completed no-op`
-        : `${label} completed: ${attempted} clients targeted, ${restarted} restarted`;
-      const evidence = formatDiagnosticEvidence(readRecord(refresh.diagnosticEvidence));
-      const withEvidence = evidence ? `${base}; ${evidence}` : base;
-      return stale?.suspected === true
-        ? `${withEvidence}; stale pattern suspected in ${readNumber(stale.matchedFileCount)} files`
-        : withEvidence;
-    }
-    case "failed": {
-      const evidence = formatDiagnosticEvidence(readRecord(refresh.diagnosticEvidence));
-      return `${refreshAttemptLabel(refresh)} failed${typeof refresh.reason === "string" ? `: ${refresh.reason}` : ""}${evidence ? `; ${evidence}` : ""}`;
-    }
+    case "completed":
+      return formatCompletedRefreshStatus(refresh);
+    case "failed":
+      return formatFailedRefreshStatus(refresh);
     case "not-attempted":
       return `refresh attempt not started${formatLastRefreshSuffix(refresh)}`;
     case "not-requested":
@@ -31,6 +19,75 @@ export function readRefreshStatus(data: Record<string, unknown> | null): string 
     default:
       return null;
   }
+}
+
+function formatCompletedRefreshStatus(refresh: Record<string, unknown>): string {
+  const attempted = readNumber(refresh.attemptedActiveClients);
+  const restarted = readNumber(refresh.restartedClients);
+  const processCrashRecovery = formatProcessCrashRecovery(
+    readProcessCrashRecovery(refresh.processCrashRecovery),
+  );
+  const noOp = attempted === 0 && restarted === 0 && processCrashRecovery === null;
+  const label = refreshAttemptLabel(refresh);
+  const base = noOp
+    ? `${label} completed no-op`
+    : `${label} completed: ${attempted} clients targeted`;
+  const outcomes = formatRefreshOutcomes(refresh, restarted, processCrashRecovery, noOp);
+  const withOutcome = outcomes.length > 0 ? `${base}; ${outcomes.join("; ")}` : base;
+  const evidence = formatDiagnosticEvidence(readRecord(refresh.diagnosticEvidence));
+  const withEvidence = evidence ? `${withOutcome}; ${evidence}` : withOutcome;
+  const stale = readRecord(refresh.staleAssessment);
+  return stale?.suspected === true
+    ? `${withEvidence}; stale pattern suspected in ${readNumber(stale.matchedFileCount)} files`
+    : withEvidence;
+}
+
+function formatFailedRefreshStatus(refresh: Record<string, unknown>): string {
+  const processCrashRecovery = formatProcessCrashRecovery(
+    readProcessCrashRecovery(refresh.processCrashRecovery),
+  );
+  const staleRestart = formatStaleDiagnosticRestartsForRecord(refresh);
+  const evidence = formatDiagnosticEvidence(readRecord(refresh.diagnosticEvidence));
+  const reason = typeof refresh.reason === "string" ? `: ${refresh.reason}` : "";
+  return `${refreshAttemptLabel(refresh)} failed${reason}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${evidence ? `; ${evidence}` : ""}`;
+}
+
+function formatRefreshOutcomes(
+  refresh: Record<string, unknown>,
+  restarted: number,
+  processCrashRecovery: string | null,
+  noOp: boolean,
+): string[] {
+  const outcomes: string[] = [];
+  if (refresh.operationScope === "workspace-runtime" && !noOp) {
+    outcomes.push(formatStaleDiagnosticRestarts(restarted));
+  }
+  if (processCrashRecovery) outcomes.push(processCrashRecovery);
+  return outcomes;
+}
+
+/** Render only the material current recovery outcome for compact TUI chrome. */
+export function readCompactRefreshStatus(data: Record<string, unknown> | null): string | null {
+  const refresh = readRecord(data?.refresh);
+  if (!refresh || (refresh.kind !== "completed" && refresh.kind !== "failed")) return null;
+
+  const processCrashRecovery = formatProcessCrashRecovery(
+    readProcessCrashRecovery(refresh.processCrashRecovery),
+  );
+  if (refresh.kind === "failed") {
+    const staleRestart = formatStaleDiagnosticRestartsForRecord(refresh);
+    return (
+      [staleRestart, processCrashRecovery]
+        .filter((value): value is string => value !== null)
+        .join("; ") || null
+    );
+  }
+  if (!processCrashRecovery && readNumber(refresh.restartedClients) === 0) return null;
+
+  const staleRestart = formatStaleDiagnosticRestartsForRecord(refresh);
+  return [staleRestart, processCrashRecovery]
+    .filter((value): value is string => value !== null)
+    .join("; ");
 }
 
 export function readPreviousRefreshStatus(data: Record<string, unknown> | null): string | null {
@@ -41,11 +98,18 @@ export function readPreviousRefreshStatus(data: Record<string, unknown> | null):
   const attempt = readRecord(refresh.lastAttempt);
   if (!attempt) return null;
   const evidence = formatCompactDiagnosticEvidence(readRecord(attempt.diagnosticEvidence));
+  const processCrashRecovery = formatProcessCrashRecovery(
+    readProcessCrashRecovery(attempt.processCrashRecovery),
+  );
+  const staleRestart = formatStaleDiagnosticRestartsForRecord(attempt);
+  const outcome = [staleRestart, processCrashRecovery, evidence]
+    .filter((value): value is string => value !== null)
+    .join("; ");
   if (attempt.kind === "failed") {
-    return `last ${refreshAttemptLabel(attempt)} failed${evidence ? ` (${evidence})` : ""}`;
+    return `last ${refreshAttemptLabel(attempt)} failed${outcome ? ` (${outcome})` : ""}`;
   }
   if (attempt.kind === "completed") {
-    return `last ${refreshAttemptLabel(attempt)} completed${evidence ? ` (${evidence})` : ""}`;
+    return `last ${refreshAttemptLabel(attempt)} completed${outcome ? ` (${outcome})` : ""}`;
   }
   return null;
 }
@@ -54,16 +118,41 @@ function refreshAttemptLabel(attempt: Record<string, unknown>): string {
   return attempt.operationScope === "file-runtime" ? "file maintenance attempt" : "refresh attempt";
 }
 
+function formatStaleDiagnosticRestartsForRecord(attempt: Record<string, unknown>): string | null {
+  if (
+    attempt.operationScope !== "workspace-runtime" ||
+    typeof attempt.restartedClients !== "number"
+  ) {
+    return null;
+  }
+  const processCrashRecovery = formatProcessCrashRecovery(
+    readProcessCrashRecovery(attempt.processCrashRecovery),
+  );
+  const noOp =
+    attempt.kind === "completed" &&
+    readNumber(attempt.attemptedActiveClients) === 0 &&
+    attempt.restartedClients === 0 &&
+    processCrashRecovery === null;
+  return noOp ? null : formatStaleDiagnosticRestarts(attempt.restartedClients);
+}
+
 function formatLastRefreshSuffix(refresh: Record<string, unknown>): string {
   const attempt = readRecord(refresh.lastAttempt);
   if (!attempt) return "";
   const evidence = formatDiagnosticEvidence(readRecord(attempt.diagnosticEvidence));
+  const staleRestart = formatStaleDiagnosticRestartsForRecord(attempt);
+  const processCrashRecovery = formatProcessCrashRecovery(
+    readProcessCrashRecovery(attempt.processCrashRecovery),
+  );
+  const outcome = [staleRestart, processCrashRecovery, evidence]
+    .filter((value): value is string => value !== null)
+    .join("; ");
   if (attempt.kind === "failed") {
     const reason = typeof attempt.reason === "string" ? `: ${attempt.reason}` : "";
-    return `; last ${refreshAttemptLabel(attempt)} failed${reason}${evidence ? `; ${evidence}` : ""}`;
+    return `; last ${refreshAttemptLabel(attempt)} failed${reason}${outcome ? `; ${outcome}` : ""}`;
   }
   if (attempt.kind === "completed") {
-    return `; last ${refreshAttemptLabel(attempt)} completed${evidence ? `; ${evidence}` : ""}`;
+    return `; last ${refreshAttemptLabel(attempt)} completed${outcome ? `; ${outcome}` : ""}`;
   }
   return "";
 }
@@ -78,6 +167,22 @@ function formatDiagnosticEvidence(evidence: Record<string, unknown> | null): str
   const counts = readEvidenceCounts(evidence);
   if (!counts) return null;
   return `${counts[0]} requested, ${counts[1]} confirmed, ${counts[2]} unconfirmed, ${counts[3]} failed, ${counts[4]} removed`;
+}
+
+function readProcessCrashRecovery(value: unknown): ProcessCrashRecoverySummary | null {
+  const summary = readRecord(value);
+  if (!summary) return null;
+  const attemptedRoutes = summary.attemptedRoutes;
+  const recoveredRoutes = summary.recoveredRoutes;
+  const failedRoutes = summary.failedRoutes;
+  if (
+    !isEvidenceCount(attemptedRoutes) ||
+    !isEvidenceCount(recoveredRoutes) ||
+    !isEvidenceCount(failedRoutes)
+  ) {
+    return null;
+  }
+  return { attemptedRoutes, recoveredRoutes, failedRoutes };
 }
 
 function readEvidenceCounts(evidence: Record<string, unknown> | null): number[] | null {

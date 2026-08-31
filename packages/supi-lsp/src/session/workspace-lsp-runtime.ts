@@ -14,6 +14,7 @@ import type {
   WorkspaceSymbol,
 } from "../config/types.ts";
 import type { WorkspaceLspDiagnosticSurface } from "./runtime-diagnostic-surface.ts";
+import type { ProcessCrashRecoverySummary } from "./runtime-diagnostics.ts";
 
 export type WorkspaceLspRuntimeState =
   | { kind: "ready"; runtime: WorkspaceLspRuntime }
@@ -23,9 +24,22 @@ export type WorkspaceLspRuntimeState =
   | { kind: "unavailable"; reason: string };
 
 export type SemanticReadinessResult =
-  | { kind: "ready" }
-  | { kind: "timeout" }
-  | { kind: "unavailable"; reason: string };
+  | {
+      kind: "ready";
+      /** Process-crash route recovery observed while establishing file readiness. */
+      processCrashRecovery?: ProcessCrashRecoverySummary;
+    }
+  | {
+      kind: "timeout";
+      /** Process-crash route recovery observed before the readiness timeout. */
+      processCrashRecovery?: ProcessCrashRecoverySummary;
+    }
+  | {
+      kind: "unavailable";
+      reason: string;
+      /** Process-crash route recovery observed before readiness became unavailable. */
+      processCrashRecovery?: ProcessCrashRecoverySummary;
+    };
 
 /** One mutation response and the exact provider roots from its semantic route. */
 export interface RoutedMutationResponse<T> {

@@ -11,6 +11,11 @@ import {
   formatProjectServerRouteSummary,
   formatProjectServerStatusReason,
 } from "../../analysis/health/server-status.ts";
+import {
+  formatProcessCrashRecovery,
+  formatRefreshElapsed,
+  formatStaleDiagnosticRestarts as formatStaleDiagnosticRestartsText,
+} from "./refresh-outcome.ts";
 import type {
   HealthData,
   HealthDiagnosticObservation,
@@ -59,8 +64,12 @@ function renderRefreshStatus(
       const evidence = data.refresh.diagnosticEvidence
         ? `; ${formatDiagnosticEvidence(data.refresh.diagnosticEvidence)}`
         : "";
+      const processCrashRecovery = data.refresh.processCrashRecovery
+        ? formatProcessCrashRecovery(data.refresh.processCrashRecovery)
+        : null;
+      const staleRestart = formatStaleDiagnosticRestarts(data.refresh);
       lines.push(
-        `**${refreshAttemptLabel(data.refresh)}**: failed — ${data.refresh.reason}${evidence}`,
+        `**${refreshAttemptLabel(data.refresh)}**: failed — ${data.refresh.reason}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${evidence}`,
       );
       lines.push("");
       return;
@@ -85,13 +94,22 @@ function renderRefreshStatus(
 function completedRefreshText(
   attempt: Extract<HealthRefreshAttempt, { kind: "completed" }>,
 ): string {
-  const base =
-    attempt.attemptedActiveClients === 0 && attempt.restartedClients === 0
-      ? "completed no-op — no active clients were targeted"
-      : `completed — ${attempt.attemptedActiveClients} active client${plural(attempt.attemptedActiveClients)} targeted, ${attempt.restartedClients} restarted`;
+  const processCrashRecovery = formatProcessCrashRecovery(attempt.processCrashRecovery);
+  const noOp =
+    attempt.attemptedActiveClients === 0 &&
+    attempt.restartedClients === 0 &&
+    processCrashRecovery === null;
+  const base = noOp
+    ? "completed no-op — no active clients were targeted"
+    : `completed — ${attempt.attemptedActiveClients} active client${plural(attempt.attemptedActiveClients)} targeted`;
+  const staleRestart = noOp ? null : formatStaleDiagnosticRestarts(attempt);
+  const outcome = [staleRestart, processCrashRecovery].filter(
+    (value): value is string => value !== null,
+  );
+  const withOutcome = outcome.length > 0 ? `${base}; ${outcome.join("; ")}` : base;
   return attempt.operationScope === "workspace-runtime"
-    ? `${base}; ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}`
-    : base;
+    ? `${withOutcome}; ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}`
+    : withOutcome;
 }
 
 function refreshAttemptLabel(attempt: Pick<HealthRefreshAttempt, "operationScope">): string {
@@ -117,7 +135,7 @@ function renderLastAttempt(lines: string[], attempt: HealthRefreshAttempt, cwd: 
   const outcome = refreshAttemptOutcome(attempt);
   const label = refreshAttemptLabel(attempt);
   lines.push(
-    `**Previous ${label.toLowerCase()}**: ${asSentence(outcome)} Started ${formatElapsed(Date.now() - attempt.attemptedAt)}; requested ${formatDiagnosticScope(attempt.requestedDiagnosticScope, cwd)}; operation scope: ${refreshOperationScopeText(attempt)}.`,
+    `**Previous ${label.toLowerCase()}**: ${asSentence(outcome)} Started ${formatRefreshElapsed(Date.now() - attempt.attemptedAt)}; requested ${formatDiagnosticScope(attempt.requestedDiagnosticScope, cwd)}; operation scope: ${refreshOperationScopeText(attempt)}.`,
   );
 }
 
@@ -125,24 +143,35 @@ function renderRetainedAttempt(lines: string[], attempt: HealthRefreshAttempt, c
   const label =
     attempt.operationScope === "file-runtime" ? "File LSP maintenance" : "Diagnostic refresh";
   lines.push(
-    `**${label}**: not requested for this call. Previous attempt ${asSentence(refreshAttemptOutcome(attempt))} Started ${formatElapsed(Date.now() - attempt.attemptedAt)}; requested ${formatDiagnosticScope(attempt.requestedDiagnosticScope, cwd)}; operation scope: ${refreshOperationScopeText(attempt)}.`,
+    `**${label}**: not requested for this call. Previous attempt ${asSentence(refreshAttemptOutcome(attempt))} Started ${formatRefreshElapsed(Date.now() - attempt.attemptedAt)}; requested ${formatDiagnosticScope(attempt.requestedDiagnosticScope, cwd)}; operation scope: ${refreshOperationScopeText(attempt)}.`,
   );
 }
 
 function refreshAttemptOutcome(attempt: HealthRefreshAttempt): string {
-  return attempt.kind === "completed"
-    ? completedRefreshText(attempt)
-    : `failed — ${attempt.reason}${attempt.diagnosticEvidence ? `; ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}` : ""}`;
+  if (attempt.kind === "completed") return completedRefreshText(attempt);
+  const processCrashRecovery = attempt.processCrashRecovery
+    ? formatProcessCrashRecovery(attempt.processCrashRecovery)
+    : null;
+  const staleRestart = formatStaleDiagnosticRestarts(attempt);
+  const evidence = attempt.diagnosticEvidence
+    ? `; ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}`
+    : "";
+  return `failed — ${attempt.reason}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${evidence}`;
 }
 
 function refreshOperationScopeText(attempt: HealthRefreshAttempt): string {
   return attempt.operationScope === "file-runtime" ? "file runtime" : "workspace runtime";
 }
 
-function formatElapsed(milliseconds: number): string {
-  const seconds = Math.max(0, Math.round(milliseconds / 1_000));
-  if (seconds < 60) return `${seconds}s ago`;
-  return `${Math.round(seconds / 60)}m ago`;
+function formatStaleDiagnosticRestarts(attempt: {
+  kind?: HealthRefreshAttempt["kind"];
+  operationScope: HealthRefreshAttempt["operationScope"];
+  restartedClients?: number;
+}): string | null {
+  if (attempt.operationScope !== "workspace-runtime" || attempt.restartedClients === undefined) {
+    return null;
+  }
+  return formatStaleDiagnosticRestartsText(attempt.restartedClients);
 }
 
 function renderCapabilityWarningsSection(
