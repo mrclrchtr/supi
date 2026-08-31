@@ -150,7 +150,7 @@ export async function enumerateAstFiles(
 class AstFileEnumerator {
   readonly #operations: AstScanOperations;
   readonly #now: () => number;
-  readonly #grammarExtensions = new Set(getSupportedExtensions());
+  readonly #grammarExtensions: ReadonlySet<string> = new Set(getSupportedExtensions());
   readonly #operationExtensions: ReadonlySet<string>;
   readonly #files = new Set<string>();
   readonly #visitedDirectories = new Set<string>();

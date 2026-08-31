@@ -315,10 +315,10 @@ describe("ParsedFileStore compiled-query reuse", () => {
     const compile = vi.fn(() => makeQuery(compiled));
     const execute = vi.fn((query: Pick<Query, "matches">) => query);
 
-    const q1 = store.withQuery("typescript", "(identifier) @id", compile, execute);
-    const q2 = store.withQuery("typescript", "(string) @value", compile, execute);
-    const q1Hit = store.withQuery("typescript", "(identifier) @id", compile, execute);
-    const q3 = store.withQuery("typescript", "(number) @value", compile, execute);
+    const q1 = store.withQuery("typescript", "(identifier) @id", { compile, execute });
+    const q2 = store.withQuery("typescript", "(string) @value", { compile, execute });
+    const q1Hit = store.withQuery("typescript", "(identifier) @id", { compile, execute });
+    const q3 = store.withQuery("typescript", "(number) @value", { compile, execute });
 
     expect(compile).toHaveBeenCalledTimes(3);
     expect(q1.cache.state).toBe("miss");
@@ -342,10 +342,10 @@ describe("ParsedFileStore compiled-query reuse", () => {
     const compile = () => makeQuery(compiled);
     const execute = (query: Pick<Query, "matches">) => query;
 
-    store.withQuery("typescript", "aa", compile, execute);
-    store.withQuery("typescript", "bbb", compile, execute);
-    store.withQuery("typescript", "aa", compile, execute);
-    const result = store.withQuery("typescript", "cccc", compile, execute);
+    store.withQuery("typescript", "aa", { compile, execute });
+    store.withQuery("typescript", "bbb", { compile, execute });
+    store.withQuery("typescript", "aa", { compile, execute });
+    const result = store.withQuery("typescript", "cccc", { compile, execute });
 
     expect(result.cache).toEqual({ state: "miss", retained: true, evictionCount: 1 });
     expect(compiled[0]?.delete).not.toHaveBeenCalled();
@@ -361,14 +361,12 @@ describe("ParsedFileStore compiled-query reuse", () => {
     const compiled: FakeQuery[] = [];
 
     expect(() =>
-      store.withQuery(
-        "typescript",
-        "id",
-        () => makeQuery(compiled),
-        () => {
+      store.withQuery("typescript", "id", {
+        compile: () => makeQuery(compiled),
+        execute: () => {
           throw new Error("execution failed");
         },
-      ),
+      }),
     ).toThrow("execution failed");
     expect(compiled[0]?.delete).toHaveBeenCalledOnce();
     store.dispose();
@@ -382,9 +380,9 @@ describe("ParsedFileStore compiled-query reuse", () => {
     const compile = () => makeQuery(compiled);
     const execute = (query: Pick<Query, "matches">) => query;
 
-    const ts = store.withQuery("typescript", "id", compile, execute);
-    const js = store.withQuery("javascript", "id", compile, execute);
-    const large = store.withQuery("typescript", "(identifier)", compile, execute);
+    const ts = store.withQuery("typescript", "id", { compile, execute });
+    const js = store.withQuery("javascript", "id", { compile, execute });
+    const large = store.withQuery("typescript", "(identifier)", { compile, execute });
 
     expect(ts.cache.state).toBe("miss");
     expect(js.cache.state).toBe("miss");

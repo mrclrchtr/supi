@@ -4,8 +4,6 @@ import { Worker } from "node:worker_threads";
 import {
   type CodeRequestControl,
   CodeRequestDeadlineError,
-  isCodeRequestDeadlineError,
-  isCodeRequestInterruption,
   throwIfCodeRequestInterrupted,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { isDebugOperationId, startDebugTimer } from "@mrclrchtr/supi-core/debug";
@@ -20,6 +18,7 @@ import {
   STRUCTURAL_WORKER_PROTOCOL_VERSION,
   type StructuralWorkerOperation,
   type StructuralWorkerToParentMessage,
+  validateStructuralWorkerOperation,
   validateWorkerToParentMessage,
 } from "./structural-worker-protocol.ts";
 
@@ -122,6 +121,10 @@ export class StructuralWorkerClient {
     input: StructuralWorkerOperation,
     control?: CodeRequestControl,
   ): Promise<TreeSitterResult<T>> {
+    const validation = validateStructuralWorkerOperation(input);
+    if (validation.kind === "invalid") {
+      return { kind: "validation-error", message: validation.reason };
+    }
     throwIfCodeRequestInterrupted(control);
     if (this.#closed) return runtimeError("Structural Worker is shut down");
     if (control?.operationId !== undefined && !isDebugOperationId(control.operationId)) {
@@ -308,6 +311,9 @@ export class StructuralWorkerClient {
     const active = this.#active;
     if (!active || active.id !== message.requestId)
       return this.#protocolFailure("Unknown chunk request id");
+    if (active.finalSequence !== null) {
+      return this.#protocolFailure("Structural Worker sent a chunk after the final chunk");
+    }
     if (active.awaitingAck !== null) {
       return this.#protocolFailure("Structural Worker sent more than one unacknowledged chunk");
     }
@@ -530,9 +536,7 @@ export class StructuralWorkerClient {
     if (request.settled) return;
     request.settled = true;
     request.cleanupControl();
-    if (isCodeRequestInterruption(error, request.control) || isCodeRequestDeadlineError(error))
-      request.reject(error);
-    else request.reject(error);
+    request.reject(error);
   }
 }
 

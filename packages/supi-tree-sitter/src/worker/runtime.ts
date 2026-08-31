@@ -372,16 +372,6 @@ export class TreeSitterRuntime {
     }
   }
 
-  /** Get the grammar ID for a file, or undefined if unsupported. */
-  getGrammarId(filePath: string): GrammarId | undefined {
-    return detectGrammar(filePath);
-  }
-
-  /** Resolve a file path from cwd. */
-  resolvePath(filePath: string): string {
-    return resolveToolPath(this.cwd, filePath);
-  }
-
   /** Dispose all held tree, query, and parser resources. */
   dispose(): void {
     if (this.disposed) return;

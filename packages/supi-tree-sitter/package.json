@@ -30,7 +30,6 @@
     "src/**/*.mjs",
     "src/**/*.json",
     "resources",
-    "scripts/*.mjs",
     "!__tests__"
   ],
   "scripts": {
@@ -75,7 +74,6 @@
     "vitest": "4.1.11",
     "@mrclrchtr/supi-test-utils": "workspace:*"
   },
-  "main": "src/api.ts",
   "exports": {
     "./api": "./src/api.ts",
     "./package.json": "./package.json",

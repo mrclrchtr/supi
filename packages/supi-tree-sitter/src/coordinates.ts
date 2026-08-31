@@ -81,6 +81,25 @@ export function nodeToRange(
   };
 }
 
+/** Validate that a public position exists in the source bounds. */
+export function validatePublicPositionBounds(
+  line: number,
+  character: number,
+  source: string,
+): { kind: "validation-error"; message: string } | null {
+  const lines = splitSourceLines(source);
+  if (line > lines.length) {
+    return { kind: "validation-error", message: "line is beyond end of file" };
+  }
+
+  const lineText = lines[line - 1] ?? "";
+  if (character > lineText.length + 1) {
+    return { kind: "validation-error", message: "character is beyond end of line" };
+  }
+
+  return null;
+}
+
 /** Split source into logical lines without CRLF line-ending bytes. */
 export function splitSourceLines(source: string): string[] {
   return source.replace(/\r\n?/g, "\n").split("\n");

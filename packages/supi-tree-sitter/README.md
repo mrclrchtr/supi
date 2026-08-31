@@ -25,7 +25,6 @@ npm install @mrclrchtr/supi-tree-sitter
 
 This package provides the parser-backed structural substrate consumed by `@mrclrchtr/supi-code-intelligence`:
 
-- a shared session-scoped Tree-sitter service for structural analysis
 - an owned parsing session API for direct library consumers
 - a `StructuralProvider` adapter published through `./provider/tree-sitter-provider`
 - a long-lived owned Structural Worker that keeps Pi responsive during parser-backed work
@@ -59,18 +58,20 @@ Outline collection supports every listed family. HTML outlines contain elements 
 `@mrclrchtr/supi-tree-sitter` is the **structural substrate** in SuPi's
 code-understanding stack. It depends on `@mrclrchtr/supi-core` and
 `@mrclrchtr/supi-code-runtime` for shared contracts, and provides structural
-analysis via a session-scoped Tree-sitter service that publishes its
-capabilities into the shared workspace runtime.
+analysis via a lifecycle controller that publishes its capabilities into
+the shared workspace runtime.
 
 ```text
 supi-code-runtime  ← shared contracts + workspace runtime
     ↑
-supi-tree-sitter  ← one owned Structural Worker + session-scoped service + runtime capabilities
+supi-tree-sitter  ← one owned Structural Worker + runtime capabilities
 ```
 
 ## Package surfaces
 
-- `@mrclrchtr/supi-tree-sitter/api` — reusable parsing session factory, shared session-scoped structural service access, and shared result types
+There is no package-root export. Use one of these explicit subpaths:
+
+- `@mrclrchtr/supi-tree-sitter/api` — reusable parsing session factory, lifecycle controller, language helpers, and shared result types
 - `@mrclrchtr/supi-tree-sitter/provider/tree-sitter-provider` — shared StructuralProvider adapter
 
 This is a **library-only** package. Public tool registration and pi event handlers belong to `@mrclrchtr/supi-code-intelligence`.
@@ -87,17 +88,6 @@ const outline = await session.outline("src/index.ts");
 const callees = await session.calleesAt("src/index.ts", 42, 10);
 
 await session.dispose();
-```
-
-Shared session-scoped service example:
-
-```ts
-import { getSessionTreeSitterService } from "@mrclrchtr/supi-tree-sitter/api";
-
-const state = getSessionTreeSitterService("/project");
-if (state.kind === "ready") {
-  const outline = await state.service.outline("src/index.ts");
-}
 ```
 
 ## Structural performance baseline
@@ -117,7 +107,6 @@ All structural service operations accept optional `CodeRequestControl`. The pare
 ## Source
 
 - `src/api.ts` — public library entrypoint
-- `src/index.ts` — re-export surface
 - `src/worker/bootstrap.mjs` — package-owned Worker bootstrap and direct `jiti` loader
 - `src/worker/runtime.ts` — Worker-only parser and query runtime
 - `src/worker/parsed-file-store.ts` — Worker-only parsed-file and compiled-query reuse
@@ -125,6 +114,5 @@ All structural service operations accept optional `CodeRequestControl`. The pare
 - `src/session/runtime-controller.ts` — generation-fenced shared Worker lifecycle
 - `src/session/session.ts` — asynchronous Worker-proxy service and owned session API
 - `src/operation-support.ts` — authoritative operation-specific extension support
-- `src/session/service-registry.ts` — shared session-scoped structural service registry
 - `src/provider/tree-sitter-provider.ts` — `StructuralProvider` adapter consumed by `@mrclrchtr/supi-code-intelligence`
 - `src/tool/outline.ts`, `src/tool/outline-*.ts`, `src/tool/imports.ts`, `src/tool/exports.ts`, `src/tool/node-at.ts`, `src/tool/callees.ts`, `src/tool/call-sites.ts` — Worker-internal structural analyses

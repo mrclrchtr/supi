@@ -128,13 +128,6 @@ export interface TreeSitterSession extends TreeSitterService {
   dispose(): Promise<void>;
 }
 
-/** Session-scoped shared structural service published by the extension runtime. */
-export type SessionTreeSitterService = TreeSitterService;
-
-export type SessionTreeSitterServiceState =
-  | { kind: "ready"; service: SessionTreeSitterService }
-  | { kind: "unavailable"; reason: string };
-
 /** Supported grammar identifiers. */
 export type GrammarId =
   | "javascript"

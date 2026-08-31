@@ -120,8 +120,8 @@ describe("Structural Worker review regressions", () => {
       await expect(
         client.execute({ operation: "canParse", file: `${"x".repeat(600_000)}.ts` }),
       ).resolves.toEqual({
-        kind: "runtime-error",
-        message: "Structural Worker message exceeds the byte limit",
+        kind: "validation-error",
+        message: "Invalid structural operation",
       });
       expect(worker.posts).toEqual([]);
     } finally {

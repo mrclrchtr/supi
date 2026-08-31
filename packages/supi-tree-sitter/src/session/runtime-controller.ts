@@ -2,16 +2,12 @@
 
 import { fileURLToPath } from "node:url";
 import type { WorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import type { SessionTreeSitterService, TreeSitterService, TreeSitterSession } from "../types.ts";
-import {
-  registerTreeSitterCapabilities,
-  unregisterTreeSitterCapabilities,
-} from "./runtime-registration.ts";
-import { clearSessionTreeSitterService, setSessionTreeSitterService } from "./service-registry.ts";
+import { createTreeSitterProvider } from "../provider/tree-sitter-provider.ts";
+import type { TreeSitterService, TreeSitterSession } from "../types.ts";
 import { createTreeSitterSession } from "./session.ts";
 
 /** Starting state before or after shutdown. */
-export type TsControllerState = TsControllerInitial | TsControllerReady | TsControllerUnavailable;
+type TsControllerState = TsControllerInitial | TsControllerReady | TsControllerUnavailable;
 
 interface TsControllerInitial {
   kind: "initial";
@@ -29,20 +25,20 @@ interface TsControllerUnavailable {
 }
 
 /** Result type from {@link TreeSitterRuntimeController.start}. */
-export type TsStartResult = { kind: "ready" } | { kind: "unavailable"; reason: string };
+type TsStartResult = { kind: "ready" } | { kind: "unavailable"; reason: string };
 
 /** Pi-independent lifecycle for one shared workspace Structural Worker. */
 export class TreeSitterRuntimeController {
   readonly #cwd: string;
   #state: TsControllerState = { kind: "initial" };
-  #runtime: WorkspaceRuntime | null;
+  readonly #runtime: WorkspaceRuntime;
   #pendingSession: TreeSitterSession | null = null;
   #generation = 0;
   #transition = Promise.resolve();
 
-  constructor(cwd: string, runtime?: WorkspaceRuntime) {
+  constructor(cwd: string, runtime: WorkspaceRuntime) {
     this.#cwd = cwd;
-    this.#runtime = runtime ?? null;
+    this.#runtime = runtime;
   }
 
   get cwd(): string {
@@ -53,12 +49,8 @@ export class TreeSitterRuntimeController {
     return this.#state.kind;
   }
 
-  get service(): SessionTreeSitterService | null {
+  get service(): TreeSitterService | null {
     return this.#state.kind === "ready" ? this.#state.service : null;
-  }
-
-  setRuntime(runtime: WorkspaceRuntime): void {
-    this.#runtime = runtime;
   }
 
   /** Start and validate one Structural Worker before capability publication. */
@@ -95,8 +87,7 @@ export class TreeSitterRuntimeController {
       if (generation !== this.#generation || this.#pendingSession !== session) {
         return supersededStart();
       }
-      setSessionTreeSitterService(this.#cwd, session);
-      if (this.#runtime) registerTreeSitterCapabilities(this.#runtime, this.#cwd, session);
+      this.#runtime.registerStructural(this.#cwd, createTreeSitterProvider(session));
       this.#pendingSession = null;
       this.#state = { kind: "ready", session, service: session };
       return { kind: "ready" };
@@ -119,8 +110,7 @@ export class TreeSitterRuntimeController {
   }
 
   #takeOwnedSessions(): Set<TreeSitterSession> {
-    if (this.#runtime) unregisterTreeSitterCapabilities(this.#runtime, this.#cwd);
-    clearSessionTreeSitterService(this.#cwd);
+    this.#runtime.clearStructural(this.#cwd);
     const sessions = new Set<TreeSitterSession>();
     if (this.#pendingSession) sessions.add(this.#pendingSession);
     if (this.#state.kind === "ready") sessions.add(this.#state.session);

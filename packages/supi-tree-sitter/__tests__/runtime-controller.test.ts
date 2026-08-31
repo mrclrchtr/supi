@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { WorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, describe, expect, it } from "vitest";
 import { TreeSitterRuntimeController } from "../src/session/runtime-controller.ts";
 
@@ -17,95 +18,38 @@ afterEach(() => {
     try {
       fs.rmSync(dir, { recursive: true, force: true });
     } catch {
-      // Already cleaned up
+      // Already cleaned up.
     }
   }
   TMP_DIRS.length = 0;
 });
 
-// ── Runtime controller ───────────────────────────────────────
-
 describe("TreeSitterRuntimeController", () => {
-  it("exports TreeSitterRuntimeController class", () => {
-    expect(typeof TreeSitterRuntimeController).toBe("function");
-  });
+  it("publishes and clears the structural provider through WorkspaceRuntime", async () => {
+    const cwd = makeProjectDir();
+    fs.writeFileSync(path.join(cwd, "test.ts"), "export const value = 1;\n");
+    const runtime = new WorkspaceRuntime();
+    const controller = new TreeSitterRuntimeController(cwd, runtime);
 
-  it("creates a controller that can be started and shut down", async () => {
-    const tmpDir = makeProjectDir();
+    await expect(controller.start()).resolves.toEqual({ kind: "ready" });
+    expect(controller.kind).toBe("ready");
 
-    const controller = new TreeSitterRuntimeController(tmpDir);
-    expect(controller.cwd).toBe(tmpDir);
+    const published = runtime.getWorkspace(cwd).structural;
+    expect(published.state).toEqual({ kind: "ready" });
+    expect(published.provider).not.toBeNull();
+    if (published.provider) {
+      await expect(published.provider.outline("test.ts")).resolves.toMatchObject({
+        kind: "success",
+        data: [expect.objectContaining({ name: "value" })],
+      });
+    }
+
+    await controller.shutdown();
+
+    expect(runtime.getWorkspace(cwd).structural).toEqual({
+      state: { kind: "unavailable", reason: "No provider registered for this workspace" },
+      provider: null,
+    });
     expect(controller.kind).toBe("initial");
-
-    // Start then shutdown
-    const result = await controller.start();
-    if (result.kind === "ready") {
-      expect(controller.kind).toBe("ready");
-      expect(controller.service).toBeTruthy();
-    } else {
-      // web-tree-sitter may not be available in all environments
-      expect(["unavailable"]).toContain(result.kind);
-    }
-
-    // Shutdown should be safe
-    await controller.shutdown();
-    expect(controller.kind).toBe("initial");
-  });
-
-  it("exposes ready state when tree-sitter initializes", async () => {
-    const tmpDir = makeProjectDir();
-    // Write a small JS file so the session has something parseable
-    fs.writeFileSync(path.join(tmpDir, "test.js"), "const x = 1;");
-
-    const controller = new TreeSitterRuntimeController(tmpDir);
-    const result = await controller.start();
-    // In CI the WASM may or may not be available — accept either
-    expect(["ready", "unavailable"]).toContain(result.kind);
-
-    await controller.shutdown();
-  });
-
-  it("can start twice safely (idempotent restart)", async () => {
-    const tmpDir = makeProjectDir();
-
-    const controller = new TreeSitterRuntimeController(tmpDir);
-
-    // First start
-    const _result1 = await controller.start();
-    await controller.shutdown();
-
-    // Second start after shutdown
-    const result2 = await controller.start();
-    if (result2.kind === "ready") {
-      expect(controller.service).toBeTruthy();
-    }
-    await controller.shutdown();
-  });
-
-  it("exposes only the asynchronous service after start", async () => {
-    const tmpDir = makeProjectDir();
-
-    const controller = new TreeSitterRuntimeController(tmpDir);
-    const result = await controller.start();
-
-    if (result.kind === "ready") {
-      expect(controller.kind).toBe("ready");
-      const service = controller.service;
-      expect(service).toBeTruthy();
-      expect((controller as unknown as Record<string, unknown>).runtime).toBeUndefined();
-      if (service) {
-        expect(typeof service.canParse).toBe("function");
-      }
-    }
-
-    await controller.shutdown();
-  });
-
-  it("shutdown is safe when not started", async () => {
-    const tmpDir = makeProjectDir();
-
-    const controller = new TreeSitterRuntimeController(tmpDir);
-    // Should not throw
-    await controller.shutdown();
   });
 });

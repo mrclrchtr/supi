@@ -44,7 +44,13 @@ export function createTreeSitterService(client: StructuralWorkerClient): TreeSit
       const control = typeof depthOrOptions === "string" ? undefined : depthOrOptions?.control;
       return execute<CalleesAtResult>(
         client,
-        { operation: "calleesAt", file, line, character, depth },
+        {
+          operation: "calleesAt",
+          file,
+          line,
+          character,
+          ...(depth === undefined ? {} : { depth }),
+        },
         control,
       );
     },

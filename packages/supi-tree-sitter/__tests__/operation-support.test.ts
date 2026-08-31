@@ -1,48 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { getStructuralSearchSupportedExtensions, getSupportedExtensions } from "../src/api.ts";
+import { detectGrammar } from "../src/language.ts";
 
-const JS_TS_EXTENSIONS = [".js", ".jsx", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx"];
-const OUTLINE_EXTENSIONS = [
-  ...JS_TS_EXTENSIONS,
-  ".py",
-  ".pyi",
-  ".rs",
-  ".go",
-  ".c",
-  ".h",
-  ".cpp",
-  ".hpp",
-  ".cc",
-  ".cxx",
-  ".hxx",
-  ".c++",
-  ".h++",
-  ".java",
-  ".kt",
-  ".kts",
-  ".rb",
-  ".gemspec",
-  ".sh",
-  ".bash",
-  ".zsh",
-  ".ksh",
-  ".html",
-  ".htm",
-  ".xhtml",
-  ".r",
-  ".sql",
-];
+const JS_TS_GRAMMARS = new Set(["javascript", "typescript", "tsx"]);
 const CALL_UNSUPPORTED_EXTENSIONS = new Set([".html", ".htm", ".xhtml", ".sql"]);
+
+function extensionsForGrammars(grammars: ReadonlySet<string>): string[] {
+  return getSupportedExtensions().filter((extension) =>
+    grammars.has(detectGrammar(`file${extension}`) ?? ""),
+  );
+}
 
 describe("structural search operation support", () => {
   it("declares every parser extension eligible for outlines", () => {
-    expect(getStructuralSearchSupportedExtensions("outline")).toEqual(OUTLINE_EXTENSIONS);
+    expect(getStructuralSearchSupportedExtensions("outline")).toEqual(getSupportedExtensions());
   });
 
   it.each(["imports", "exports"] as const)(
     "declares only JavaScript and TypeScript extensions for %s",
     (operation) => {
-      expect(getStructuralSearchSupportedExtensions(operation)).toEqual(JS_TS_EXTENSIONS);
+      expect(getStructuralSearchSupportedExtensions(operation)).toEqual(
+        extensionsForGrammars(JS_TS_GRAMMARS),
+      );
     },
   );
 

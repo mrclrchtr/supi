@@ -3,6 +3,7 @@
 import { nodeToRange } from "../coordinates.ts";
 import type { SyntaxNodeLike } from "../syntax-node.ts";
 import type { OutlineItem } from "../types.ts";
+import { extractBindingIdentifiers } from "./js-binding-pattern.ts";
 import { extractPolyglotOutlineItems } from "./outline-polyglot.ts";
 
 /** Node types that can be extracted directly as outline items. */
@@ -18,6 +19,7 @@ const OUTLINE_DECLARATION_NODE_TYPES = new Set([
   "method_definition",
   "public_field_definition",
   "variable_declarator",
+  "lexical_declaration",
   "ambient_declaration",
   "internal_module",
   "module",
@@ -39,20 +41,27 @@ function collectItems(node: SyntaxNodeLike, source: string): OutlineItem[] {
       continue;
     }
 
-    const item = extractItem(child, source);
-    if (item) items.push(item);
+    const extractedItems = extractItems(child, source);
+    if (extractedItems) items.push(...extractedItems);
     else items.push(...collectItems(child, source));
   }
 
   return items;
 }
 
+function extractItems(node: SyntaxNodeLike, source: string): OutlineItem[] | null {
+  if (node.type === "lexical_declaration") return extractLexicalDeclarationItems(node, source);
+  if (node.type === "ambient_declaration") return extractAmbientDeclarationItems(node, source);
+  if (node.type === "export_statement") return extractExportStatement(node, source);
+
+  const item = extractItem(node, source);
+  return item ? [item] : null;
+}
+
 function extractItem(node: SyntaxNodeLike, source: string): OutlineItem | null {
   switch (node.type) {
-    case "export_statement":
-      return extractExportStatement(node, source);
     case "lexical_declaration":
-      return extractLexicalDeclaration(node, source);
+      return extractLexicalDeclarationItems(node, source)[0] ?? null;
     case "function_declaration":
     case "generator_function_declaration":
     case "function_signature":
@@ -72,7 +81,7 @@ function extractItem(node: SyntaxNodeLike, source: string): OutlineItem | null {
     case "public_field_definition":
       return extractFieldDefinition(node, source);
     case "variable_declarator":
-      return extractVariableDeclarator(node, source);
+      return extractVariableDeclaratorItems(node, source)[0] ?? null;
     case "ambient_declaration":
       return extractAmbientDeclaration(node, source);
     case "internal_module":
@@ -83,38 +92,36 @@ function extractItem(node: SyntaxNodeLike, source: string): OutlineItem | null {
   }
 }
 
-/** Extract an outline item from an export wrapper without exposing non-extractable syntax nodes. */
-function extractExportStatement(node: SyntaxNodeLike, source: string): OutlineItem | null {
+/** Extract outline items from an export wrapper without exposing local syntax nodes. */
+function extractExportStatement(node: SyntaxNodeLike, source: string): OutlineItem[] {
   const decl = node.children.find((child) => OUTLINE_DECLARATION_NODE_TYPES.has(child.type));
   if (decl) {
+    if (decl.type === "lexical_declaration") return extractLexicalDeclarationItems(decl, source);
+    if (decl.type === "ambient_declaration") return extractAmbientDeclarationItems(decl, source);
     const item = extractItem(decl, source);
-    if (item) return item;
+    if (item) return [item];
   }
 
   if (hasDefaultKeyword(node)) {
-    return {
-      name: "default",
-      kind: "export",
-      range: nodeToRange(node, source),
-    };
+    return [{ name: "default", kind: "export", range: nodeToRange(node, source) }];
   }
 
   const exportClause = node.children.find((child) => child.type === "export_clause");
-  if (exportClause) {
-    return {
-      name: node.text.replace(/^export\s+/, "").substring(0, 60),
-      kind: "export",
-      range: nodeToRange(node, source),
-    };
-  }
-
-  return null;
+  return exportClause
+    ? [
+        {
+          name: node.text.replace(/^export\s+/, "").substring(0, 60),
+          kind: "export",
+          range: nodeToRange(node, source),
+        },
+      ]
+    : [];
 }
 
-function extractLexicalDeclaration(node: SyntaxNodeLike, source: string): OutlineItem | null {
-  const declarators = node.children.filter((child) => child.type === "variable_declarator");
-  if (declarators.length !== 1) return null;
-  return extractVariableDeclarator(declarators[0] as SyntaxNodeLike, source);
+function extractLexicalDeclarationItems(node: SyntaxNodeLike, source: string): OutlineItem[] {
+  return node.children
+    .filter((child) => child.type === "variable_declarator")
+    .flatMap((declarator) => extractVariableDeclaratorItems(declarator, source));
 }
 
 function extractNamedDeclaration(
@@ -154,14 +161,11 @@ function extractEnumDeclaration(node: SyntaxNodeLike, source: string): OutlineIt
   return { ...item, children: collectEnumMembers(node, source) };
 }
 
-function extractVariableDeclarator(node: SyntaxNodeLike, source: string): OutlineItem | null {
-  const nameNode = findNameNode(node);
-  if (!nameNode) return null;
-  return {
-    name: nameNode.text,
-    kind: detectKind(node),
-    range: nodeToRange(node, source),
-  };
+function extractVariableDeclaratorItems(node: SyntaxNodeLike, source: string): OutlineItem[] {
+  const names = extractBindingIdentifiers(node.childForFieldName("name"));
+  const kind = detectKind(node);
+  const range = nodeToRange(node, source);
+  return names.map((name) => ({ name, kind, range }));
 }
 
 function extractFieldDefinition(node: SyntaxNodeLike, source: string): OutlineItem | null {
@@ -174,9 +178,18 @@ function extractFieldDefinition(node: SyntaxNodeLike, source: string): OutlineIt
   };
 }
 
-function extractAmbientDeclaration(node: SyntaxNodeLike, source: string): OutlineItem | null {
+function extractAmbientDeclarationItems(node: SyntaxNodeLike, source: string): OutlineItem[] {
   const declaration = node.children.find((child) => OUTLINE_DECLARATION_NODE_TYPES.has(child.type));
-  return declaration ? extractItem(declaration, source) : null;
+  if (!declaration) return [];
+  if (declaration.type === "lexical_declaration") {
+    return extractLexicalDeclarationItems(declaration, source);
+  }
+  const item = extractItem(declaration, source);
+  return item ? [item] : [];
+}
+
+function extractAmbientDeclaration(node: SyntaxNodeLike, source: string): OutlineItem | null {
+  return extractAmbientDeclarationItems(node, source)[0] ?? null;
 }
 
 function extractModuleDeclaration(node: SyntaxNodeLike, source: string): OutlineItem | null {

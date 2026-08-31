@@ -2,15 +2,13 @@
 
 ## Scope
 
-`@mrclrchtr/supi-tree-sitter` is a **library-only** package with one explicit surface:
-- `@mrclrchtr/supi-tree-sitter/api` → `src/api.ts` / `src/index.ts` → exports asynchronous service APIs (`createTreeSitterSession()`, `getSessionTreeSitterService()`), language and operation-support helpers, the lifecycle controller, and shared result types. Raw runtime and extraction helpers are Worker-internal.
+`@mrclrchtr/supi-tree-sitter` is a **library-only** package with two explicit surfaces:
+- `@mrclrchtr/supi-tree-sitter/api` → `src/api.ts` → exports the owned session factory, lifecycle controller, language and operation-support helpers, and shared result types.
+- `@mrclrchtr/supi-tree-sitter/provider/tree-sitter-provider` → `src/provider/tree-sitter-provider.ts` → exports the shared `StructuralProvider` adapter.
+
+Raw runtime and extraction helpers are Worker-internal.
 
 This package has **no pi extension surface** — no `pi.extensions`, no `src/extension.ts`, no `./extension` export. Public tool registration and session lifecycle handlers live in `@mrclrchtr/supi-code-intelligence`. The package does not depend on `supi-lsp` and must remain correct when installed independently.
-
-## Public surfaces
-
-- `@mrclrchtr/supi-tree-sitter/api` → `src/api.ts` → reusable library surface (session factory, shared service access, structural extraction functions, shared types)
-- `@mrclrchtr/supi-tree-sitter/provider/tree-sitter-provider` → `src/provider/tree-sitter-provider.ts` → shared `StructuralProvider` adapter
 
 ## WASM vendoring strategy
 
@@ -75,6 +73,6 @@ Vendored WASM metadata (`.wasm.json`) tracks the source npm package version and 
 2. `supi-lsp` — live semantic analysis through language servers (library-only)
 3. `supi-code-intelligence` — unified agent-facing layer above both (**the sole host for extension registration**)
 
-Keep this package independent of `supi-lsp` internals. Any shared utilities belong in `supi-core`.
+Keep this package independent of `supi-lsp` internals. Put shared capability state in `supi-code-runtime` and generic utilities in `supi-core`.
 
-The package publishes a shared session-scoped Tree-sitter service through `getSessionTreeSitterService(cwd)`. Its backing storage delegates to `createSessionStateRegistry()` from `@mrclrchtr/supi-core/api`, while the Tree-sitter package keeps its own `ready | unavailable` wrapper local. Peer packages that only need structural operations should prefer that shared service over repeatedly creating owned sessions. Use `createTreeSitterSession()` only when you need an explicitly owned Worker lifecycle, and await its disposal.
+`WorkspaceRuntime` is the only process-shared provider seam. `TreeSitterRuntimeController` receives a `WorkspaceRuntime` in its constructor and registers or clears the structural provider for its cwd. Use `createTreeSitterSession()` only when you need an explicitly owned Worker lifecycle, and await its disposal.

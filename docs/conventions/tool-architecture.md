@@ -146,8 +146,8 @@ A reusable runtime should expose a workspace-scoped interface, not its mutable m
 Current examples:
 
 - `supi-lsp` exports `WorkspaceLspRuntime`; `LspRuntimeController` owns lifecycle and status while the runtime owns semantic operations, routing, diagnostics, and recovery.
-- `supi-tree-sitter` exports a session-scoped structural runtime for parser reuse.
-- `supi-code-runtime` brokers canonical semantic and structural capability state.
+- `supi-tree-sitter` exports an owned structural runtime for parser reuse; its lifecycle controller publishes the provider through `WorkspaceRuntime`.
+- `supi-code-runtime` brokers canonical semantic and structural capability state. `WorkspaceRuntime` is the only process-shared provider seam.
 
 Reuse the core session-registry helper for normalized workspace-keyed state. Keep package-specific state unions and wait policy local.
 

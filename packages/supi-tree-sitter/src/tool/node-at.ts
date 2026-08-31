@@ -1,7 +1,7 @@
 // Node-at-position lookup.
 
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
-import { nodeToRange, publicToTreeSitter, splitSourceLines } from "../coordinates.ts";
+import { nodeToRange, publicToTreeSitter, validatePublicPositionBounds } from "../coordinates.ts";
 import type { NodeAtResult, SourceRange, TreeSitterResult } from "../types.ts";
 import type { TreeSitterRuntime } from "../worker/runtime.ts";
 
@@ -28,7 +28,7 @@ export async function lookupNodeAt(
   const { tree, source } = parseResult.data;
 
   try {
-    const boundsError = validateBounds(line, character, source);
+    const boundsError = validatePublicPositionBounds(line, character, source);
     if (boundsError) return boundsError;
 
     const tsPoint = publicToTreeSitter(line, character, source);
@@ -50,25 +50,6 @@ export async function lookupNodeAt(
   } finally {
     tree.delete();
   }
-}
-
-/** Validate that a requested public position exists in the source text. */
-function validateBounds(
-  line: number,
-  character: number,
-  source: string,
-): TreeSitterResult<NodeAtResult> | null {
-  const lines = splitSourceLines(source);
-  if (line > lines.length) {
-    return { kind: "validation-error", message: "line is beyond end of file" };
-  }
-
-  const lineText = lines[line - 1] ?? "";
-  if (character > lineText.length + 1) {
-    return { kind: "validation-error", message: "character is beyond end of line" };
-  }
-
-  return null;
 }
 
 function collectAncestry(

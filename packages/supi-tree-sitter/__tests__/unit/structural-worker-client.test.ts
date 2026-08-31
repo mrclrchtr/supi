@@ -62,6 +62,25 @@ describe("StructuralWorkerClient", () => {
     }
   });
 
+  it("settles invalid operation input before it crosses the Worker boundary", async () => {
+    const worker = new FakeWorker();
+    const client = new StructuralWorkerClient("/workspace", () => worker);
+    try {
+      await expect(
+        client.execute({
+          operation: "calleesAt",
+          file: "test.ts",
+          line: 1,
+          character: 1,
+          depth: "sideways",
+        } as never),
+      ).resolves.toEqual({ kind: "validation-error", message: "Invalid structural operation" });
+      expect(worker.posts).toEqual([]);
+    } finally {
+      await client.dispose();
+    }
+  });
+
   it("rejects a malformed Debug Operation ID before it crosses the Worker boundary", async () => {
     const worker = new FakeWorker();
     const client = new StructuralWorkerClient("/workspace", () => worker);
@@ -73,6 +92,54 @@ describe("StructuralWorkerClient", () => {
         ),
       ).resolves.toEqual({ kind: "runtime-error", message: "Invalid Debug Operation ID" });
       expect(worker.posts).toEqual([]);
+    } finally {
+      await client.dispose();
+    }
+  });
+
+  it("rejects chunks that arrive after the first final chunk", async () => {
+    const worker = new FakeWorker();
+    const client = new StructuralWorkerClient("/workspace", ({ generation }) => {
+      queueMicrotask(() => worker.emit(ready(generation)));
+      return worker;
+    });
+    try {
+      const outcome = client.execute({ operation: "outline", file: "test.ts" });
+      await vi.waitFor(() => expect(requests(worker)).toEqual(["test.ts"]));
+      const active = request(worker, 0);
+      const [payload] = encodeStructuralResult({ kind: "success", data: [] });
+      worker.emit({
+        kind: "chunk",
+        version: STRUCTURAL_WORKER_PROTOCOL_VERSION,
+        generation: 1,
+        requestId: active.requestId,
+        sequence: 0,
+        final: true,
+        encodedBytes: payload?.byteLength ?? 0,
+        payload,
+      });
+      await vi.waitFor(() =>
+        expect(worker.posts.some((post) => (post as { kind?: string }).kind === "chunk-ack")).toBe(
+          true,
+        ),
+      );
+      worker.emit({
+        kind: "chunk",
+        version: STRUCTURAL_WORKER_PROTOCOL_VERSION,
+        generation: 1,
+        requestId: active.requestId,
+        sequence: 1,
+        final: true,
+        encodedBytes: payload?.byteLength ?? 0,
+        payload,
+      });
+
+      await expect(outcome).resolves.toEqual({
+        kind: "runtime-error",
+        message:
+          "Structural Worker protocol failure: Structural Worker sent a chunk after the final chunk",
+      });
+      await vi.waitFor(() => expect(worker.terminate).toHaveBeenCalledOnce());
     } finally {
       await client.dispose();
     }

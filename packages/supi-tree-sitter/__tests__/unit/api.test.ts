@@ -23,9 +23,12 @@ describe("supi-tree-sitter API surface", () => {
     expect(api.TreeSitterRuntimeController).toBeDefined();
   });
 
-  it("exports getSessionTreeSitterService", async () => {
-    const api = await import("@mrclrchtr/supi-tree-sitter/api");
-    expect(typeof api.getSessionTreeSitterService).toBe("function");
+  it("does not export removed compatibility helpers", async () => {
+    const api: Record<string, unknown> = await import("@mrclrchtr/supi-tree-sitter/api");
+    expect(api.getSessionTreeSitterService).toBeUndefined();
+    expect(api.isSupportedFile).toBeUndefined();
+    expect(api.getSupportedExtension).toBeUndefined();
+    expect(api.isJsTsGrammar).toBeUndefined();
   });
 
   it("exports createTreeSitterSession", async () => {

@@ -4,6 +4,7 @@ import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { detectGrammar } from "../language.ts";
 import type { CallSiteMatch, GrammarId, TreeSitterResult } from "../types.ts";
 import type { TreeSitterRuntime } from "../worker/runtime.ts";
+import { normalizeCallName } from "./call-name.ts";
 
 // ── Per-grammar call-site queries ─────────────────────────────────────
 
@@ -21,18 +22,16 @@ const CALL_SITE_QUERIES: Partial<Record<GrammarId, string>> = {
   javascript: JS_TS_CALL_SITE_QUERY,
   typescript: JS_TS_CALL_SITE_QUERY,
   tsx: JS_TS_CALL_SITE_QUERY,
-  python:
-    "(call function: (identifier) @call) (call function: (attribute attribute: (identifier) @call))",
-  rust: "(call_expression function: (identifier) @call) (call_expression function: (field_expression field: (field_identifier) @call)) (macro_invocation macro: (identifier) @call)",
-  go: "(call_expression function: (identifier) @call) (call_expression function: (selector_expression field: (field_identifier) @call))",
-  c: "(call_expression function: (identifier) @call)",
-  cpp: "(call_expression function: (identifier) @call) (call_expression function: (field_expression field: (field_identifier) @call))",
-  java: "(method_invocation name: (identifier) @call) (object_creation_expression type: (type_identifier) @call)",
-  kotlin:
-    "(call_expression . (simple_identifier) @call) (call_expression . (navigation_expression . (simple_identifier) @call))",
-  ruby: "(call method: (identifier) @call)",
+  python: "(call function: (_) @call)",
+  rust: "(call_expression function: (_) @call) (macro_invocation macro: (_) @call)",
+  go: "(call_expression function: (_) @call)",
+  c: "(call_expression function: (_) @call)",
+  cpp: "(call_expression function: (_) @call)",
+  java: "(method_invocation) @call (object_creation_expression type: (_) @call)",
+  kotlin: "(call_expression) @call",
+  ruby: "(call) @call",
   bash: "(command name: (command_name) @call)",
-  r: "(call function: (identifier) @call)",
+  r: "(call function: (_) @call)",
 };
 
 /** Return whether the call-site extractor has a query for one grammar. */
@@ -78,7 +77,7 @@ export async function extractCallSites(
 
   for (const capture of captures) {
     // Normalize: trim whitespace and collapse internal whitespace to single space
-    const name = capture.text.trim().replace(/\s+/g, " ");
+    const name = normalizeCallName(capture.text, grammarId, capture.nodeType);
     if (name.length === 0) continue;
 
     // Deduplicate by name + line

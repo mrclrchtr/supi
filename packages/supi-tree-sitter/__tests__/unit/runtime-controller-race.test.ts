@@ -1,3 +1,4 @@
+import { WorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TreeSitterSession } from "../../src/types.ts";
 
@@ -18,8 +19,6 @@ function deferred<T>(): Deferred<T> {
 const mocks = vi.hoisted(() => ({
   probes: [] as Array<Deferred<{ kind: "success"; data: { file: string; language: string } }>>,
   sessions: [] as Array<{ canParse: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }>,
-  published: vi.fn(),
-  cleared: vi.fn(),
 }));
 
 vi.mock("../../src/session/session.ts", () => ({
@@ -35,25 +34,19 @@ vi.mock("../../src/session/session.ts", () => ({
   },
 }));
 
-vi.mock("../../src/session/service-registry.ts", () => ({
-  setSessionTreeSitterService: mocks.published,
-  clearSessionTreeSitterService: mocks.cleared,
-}));
-
 import { TreeSitterRuntimeController } from "../../src/session/runtime-controller.ts";
 
 beforeEach(() => {
   mocks.probes.length = 0;
   mocks.sessions.length = 0;
-  mocks.published.mockClear();
-  mocks.cleared.mockClear();
 });
 
 describe("TreeSitterRuntimeController startup races", () => {
   it("does not publish when shutdown wins during startup", async () => {
     const probe = deferred<{ kind: "success"; data: { file: string; language: string } }>();
     mocks.probes.push(probe);
-    const controller = new TreeSitterRuntimeController("/project");
+    const runtime = new WorkspaceRuntime();
+    const controller = new TreeSitterRuntimeController("/project", runtime);
 
     const pending = controller.start();
     await vi.waitFor(() => expect(mocks.sessions).toHaveLength(1));
@@ -62,7 +55,7 @@ describe("TreeSitterRuntimeController startup races", () => {
 
     await expect(pending).resolves.toEqual({ kind: "unavailable", reason: "Startup superseded" });
     expect(mocks.sessions[0]?.dispose).toHaveBeenCalledOnce();
-    expect(mocks.published).not.toHaveBeenCalled();
+    expect(runtime.getWorkspace("/project").structural.provider).toBeNull();
     expect(controller.kind).toBe("initial");
   });
 
@@ -70,7 +63,8 @@ describe("TreeSitterRuntimeController startup races", () => {
     const firstProbe = deferred<{ kind: "success"; data: { file: string; language: string } }>();
     const secondProbe = deferred<{ kind: "success"; data: { file: string; language: string } }>();
     mocks.probes.push(firstProbe, secondProbe);
-    const controller = new TreeSitterRuntimeController("/project");
+    const runtime = new WorkspaceRuntime();
+    const controller = new TreeSitterRuntimeController("/project", runtime);
 
     const first = controller.start();
     await vi.waitFor(() => expect(mocks.sessions).toHaveLength(1));
@@ -83,7 +77,8 @@ describe("TreeSitterRuntimeController startup races", () => {
     await expect(first).resolves.toEqual({ kind: "unavailable", reason: "Startup superseded" });
     expect(mocks.sessions[0]?.dispose).toHaveBeenCalledOnce();
     expect(mocks.sessions[1]?.dispose).not.toHaveBeenCalled();
-    expect(mocks.published).toHaveBeenCalledOnce();
+    expect(runtime.getWorkspace("/project").structural.provider).not.toBeNull();
     expect(controller.service).toBe(mocks.sessions[1]);
+    await controller.shutdown();
   });
 });

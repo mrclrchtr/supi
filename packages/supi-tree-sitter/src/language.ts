@@ -12,7 +12,7 @@ import type { GrammarId, SupportedExtension } from "./types.ts";
 const sourceDir = path.dirname(fileURLToPath(import.meta.url));
 
 /** Mapping from file extension to grammar identifier. */
-const EXTENSION_GRAMMAR: Record<string, GrammarId> = {
+const EXTENSION_GRAMMAR = {
   ".js": "javascript",
   ".jsx": "javascript",
   ".mjs": "javascript",
@@ -48,17 +48,12 @@ const EXTENSION_GRAMMAR: Record<string, GrammarId> = {
   ".xhtml": "html",
   ".r": "r",
   ".sql": "sql",
-};
+} satisfies Record<SupportedExtension, GrammarId>;
 
-const SUPPORTED_EXTENSIONS = new Set<string>(Object.keys(EXTENSION_GRAMMAR));
-
-/** Check if a file extension is supported. */
-export function isSupportedFile(filePath: string): boolean {
-  return detectGrammar(filePath) !== undefined;
-}
+const SUPPORTED_EXTENSIONS = Object.keys(EXTENSION_GRAMMAR) as SupportedExtension[];
 
 /** Return all supported file extensions (with leading dot). */
-export function getSupportedExtensions(): string[] {
+export function getSupportedExtensions(): SupportedExtension[] {
   return [...SUPPORTED_EXTENSIONS];
 }
 
@@ -69,23 +64,10 @@ export function getSupportedExtensionGrammarEntries(): Array<
   return Object.entries(EXTENSION_GRAMMAR) as Array<readonly [SupportedExtension, GrammarId]>;
 }
 
-/** Get the file extension if it's supported, otherwise undefined. */
-export function getSupportedExtension(filePath: string): SupportedExtension | undefined {
-  const ext = path.extname(filePath).toLowerCase();
-  return SUPPORTED_EXTENSIONS.has(ext) ? (ext as SupportedExtension) : undefined;
-}
-
 /** Detect the grammar for a file. Returns undefined if unsupported. */
 export function detectGrammar(filePath: string): GrammarId | undefined {
   const ext = path.extname(filePath).toLowerCase();
-  return EXTENSION_GRAMMAR[ext];
-}
-
-const JS_TS_GRAMMARS: ReadonlySet<GrammarId> = new Set(["javascript", "typescript", "tsx"]);
-
-/** Returns true if the grammar is one the JS/TS extractors understand. */
-export function isJsTsGrammar(grammarId: GrammarId): boolean {
-  return JS_TS_GRAMMARS.has(grammarId);
+  return EXTENSION_GRAMMAR[ext as SupportedExtension];
 }
 
 /** Grammar WASM file names within the vendored resources directory. */

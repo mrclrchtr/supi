@@ -1,4 +1,3 @@
-import type { StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it, vi } from "vitest";
 import { createTreeSitterProvider } from "../../src/provider/tree-sitter-provider.ts";
 import type {
@@ -58,17 +57,6 @@ function mockService(overrides?: Partial<TreeSitterService>): TreeSitterService 
 }
 
 describe("TreeSitterProvider", () => {
-  it("creates a StructuralProvider from a TreeSitterService", () => {
-    const service = mockService();
-    const provider: StructuralProvider = createTreeSitterProvider(service);
-    expect(typeof provider.outline).toBe("function");
-    expect(typeof provider.exports).toBe("function");
-    expect(typeof provider.imports).toBe("function");
-    expect(typeof provider.nodeAt).toBe("function");
-    expect(typeof provider.calleesAt).toBe("function");
-    expect(typeof provider.callSites).toBe("function");
-  });
-
   describe("outline", () => {
     it("preserves the exact provider request control without activating it", async () => {
       const outline = vi.fn().mockResolvedValue({ kind: "success", data: [] });
@@ -90,7 +78,7 @@ describe("TreeSitterProvider", () => {
 
       await provider.outline("test.ts");
 
-      expect(outline).toHaveBeenCalledWith("test.ts");
+      expect(outline).toHaveBeenCalledWith("test.ts", undefined);
     });
 
     it("maps success results", async () => {

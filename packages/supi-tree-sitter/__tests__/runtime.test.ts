@@ -86,17 +86,6 @@ describe("TreeSitterRuntime", () => {
     });
   });
 
-  describe("parser reuse", () => {
-    it("reuses parser across multiple calls", async () => {
-      const runtime = new TreeSitterRuntime(FIXTURE_DIR);
-      const result1 = await runtime.parseFile("sample.ts");
-      const result2 = await runtime.parseFile("sample.ts");
-      expect(result1.kind).toBe("success");
-      expect(result2.kind).toBe("success");
-      runtime.dispose();
-    });
-  });
-
   describe("queryFile", () => {
     it("executes a valid query", async () => {
       const runtime = new TreeSitterRuntime(FIXTURE_DIR);
@@ -147,13 +136,6 @@ describe("TreeSitterRuntime", () => {
       const result = await runtime.queryFile("readme.md", "(identifier)");
       expect(result.kind).toBe("unsupported-language");
       runtime.dispose();
-    });
-  });
-
-  describe("dispose", () => {
-    it("cleans up resources without error", () => {
-      const runtime = new TreeSitterRuntime("/tmp");
-      expect(() => runtime.dispose()).not.toThrow();
     });
   });
 });

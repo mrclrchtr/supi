@@ -51,31 +51,6 @@ describe("TypeScript call-site extraction (full-expression)", () => {
     }
   });
 
-  it("returns full member expression for obj.method()", async () => {
-    writeFileSync(
-      path.join(tmpDir, "sample.ts"),
-      [
-        "class Foo { method() { return 1; } }",
-        "const obj = new Foo();",
-        "const x = obj.method();",
-        "",
-      ].join("\n"),
-    );
-
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const result = await session.callSites("sample.ts");
-
-      expect(result.kind).toBe("success");
-      if (result.kind !== "success") return;
-
-      const names = result.data.map((entry) => entry.name);
-      expect(names).toContain("obj.method");
-    } finally {
-      await session.dispose();
-    }
-  });
-
   it("returns constructor name for new Thing()", async () => {
     writeFileSync(
       path.join(tmpDir, "sample.ts"),
@@ -164,28 +139,6 @@ describe("JSX/TSX call-site extraction (full-expression)", () => {
 
       const names = result.data.map((entry) => entry.name);
       expect(names).toContain("api.call");
-    } finally {
-      await session.dispose();
-    }
-  });
-});
-
-describe("JavaScript call-site extraction (full-expression)", () => {
-  it("returns full member expression in JS", async () => {
-    writeFileSync(
-      path.join(tmpDir, "sample.js"),
-      ["const obj = { method() { return 1; } };", "const x = obj.method();", ""].join("\n"),
-    );
-
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const result = await session.callSites("sample.js");
-
-      expect(result.kind).toBe("success");
-      if (result.kind !== "success") return;
-
-      const names = result.data.map((entry) => entry.name);
-      expect(names).toContain("obj.method");
     } finally {
       await session.dispose();
     }

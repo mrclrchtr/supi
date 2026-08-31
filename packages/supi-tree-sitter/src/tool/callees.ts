@@ -1,9 +1,12 @@
 // Structural callee extraction — enclosing-scope lookup with per-language queries.
 
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
+import { validatePublicPositionBounds } from "../coordinates.ts";
 import { detectGrammar } from "../language.ts";
 import type { GrammarId, SourceRange, TreeSitterResult } from "../types.ts";
 import { queryParsedFile, type TreeSitterRuntime } from "../worker/runtime.ts";
+import { normalizeCallName } from "./call-name.ts";
+import { extractScopeName } from "./scope.ts";
 
 /** Result shape returned by lookupCalleesAt. */
 export interface CalleesAtResult {
@@ -25,13 +28,13 @@ const CALLEE_QUERIES: Partial<Record<GrammarId, string>> = {
   typescript: "(call_expression function: (_) @callee) (new_expression constructor: (_) @callee)",
   tsx: "(call_expression function: (_) @callee) (new_expression constructor: (_) @callee)",
   python: "(call function: (_) @callee)",
-  rust: "(call_expression function: (_) @callee) (macro_invocation) @callee",
+  rust: "(call_expression function: (_) @callee) (macro_invocation macro: (_) @callee)",
   go: "(call_expression function: (_) @callee)",
   c: "(call_expression function: (_) @callee)",
   cpp: "(call_expression function: (_) @callee)",
-  java: "(method_invocation name: (_) @callee) (object_creation_expression type: (_) @callee)",
-  kotlin: "(call_expression . (_) @callee)",
-  ruby: "(call method: (_) @callee)",
+  java: "(method_invocation) @callee (object_creation_expression type: (_) @callee)",
+  kotlin: "(call_expression) @callee",
+  ruby: "(call) @callee",
   bash: "(command . (_) @callee)",
   r: "(call function: (_) @callee)",
 };
@@ -57,63 +60,22 @@ const ENCLOSING_SCOPE_TYPES: Record<GrammarId, ReadonlySet<string>> = {
     "arrow_function",
     "function_expression",
   ]),
-  python: new Set(["function_definition"]),
-  rust: new Set(["function_item"]),
-  go: new Set(["function_declaration"]),
+  python: new Set(["function_definition", "lambda"]),
+  rust: new Set(["function_item", "closure_expression"]),
+  go: new Set(["function_declaration", "method_declaration", "func_literal"]),
   c: new Set(["function_definition"]),
-  cpp: new Set(["function_definition"]),
-  java: new Set(["method_declaration"]),
-  kotlin: new Set(["function_declaration"]),
-  ruby: new Set(["method"]),
+  cpp: new Set(["function_definition", "lambda_expression"]),
+  java: new Set(["method_declaration", "constructor_declaration", "lambda_expression"]),
+  kotlin: new Set(["function_declaration", "lambda_literal", "anonymous_function"]),
+  ruby: new Set(["method", "block", "do_block", "lambda"]),
   bash: new Set(["function_definition"]),
   r: new Set(["function_definition"]),
   html: new Set(),
   sql: new Set(),
 };
 
-// ── Name extraction from enclosing scope text ─────────────────────────
-
-/** Extract a best-effort name from an enclosing scope node's source text. */
-function extractScopeName(_type: string, text: string): string {
-  // JS/TS/Go/Rust: `function foo` or `fn foo` or `def foo`
-  // Python: `def foo`
-  const firstLine = text.split("\n")[0] ?? text;
-  const match = firstLine.match(/(?:function|fn|func|def|method)\s+(\w+)/);
-  if (match?.[1]) return match[1];
-
-  // Ruby: `def foo`
-  const rubyMatch = firstLine.match(/def\s+(\w+)/);
-  if (rubyMatch?.[1]) return rubyMatch[1];
-
-  // Bash: `foo()`
-  const bashMatch = firstLine.match(/^(\w+)\s*\(\)/);
-  if (bashMatch?.[1]) return bashMatch[1];
-
-  // Kotlin/Java: `fun foo` or `fun Foo.bar()` — extract the last name part
-  const kotlinMatch = firstLine.match(/fun\s+(?:[\w.]+\.)?(\w+)/);
-  if (kotlinMatch?.[1]) return kotlinMatch[1];
-
-  // C++: type name(params) { — heuristic: first word before `(`
-  const cLikeMatch = firstLine.match(
-    /(\w+)\s*\([^)]*\)\s*(?:const\s*)?(?:override\s*)?(?:final\s*)?[{;]/,
-  );
-  if (cLikeMatch?.[1]) return cLikeMatch[1];
-
-  return "anonymous";
-}
-
 // ── Main entrypoint ──────────────────────────────────────────────────
 
-/**
- * Extract direct structural callee calls for a file at the given position.
- *
- * 1. Parses the file with the Tree-sitter runtime.
- * 2. Finds the enclosing function/method/callback scope at the position.
- * 3. Runs a grammar-specific callee query.
- * 4. Filters to captures within that enclosing scope.
- * 5. Excludes nested function/method/callback scopes that do not contain the anchor.
- * 6. Deduplicates by name.
- */
 /** Validate that coordinates are usable and grammar is supported. */
 function validateCalleeInput(
   filePath: string,
@@ -168,6 +130,16 @@ function findEnclosingScope(
   return null;
 }
 
+/**
+ * Extract direct structural callee calls for a file at the given position.
+ *
+ * 1. Parses the file with the Tree-sitter runtime.
+ * 2. Finds the enclosing function/method/callback scope at the position.
+ * 3. Runs a grammar-specific callee query.
+ * 4. Filters to captures within that enclosing scope.
+ * 5. Excludes nested function/method/callback scopes that do not contain the anchor.
+ * 6. Deduplicates by name.
+ */
 // biome-ignore lint/complexity/useMaxParams: provider function needs runtime + coordinates + depth
 export async function lookupCalleesAt(
   runtime: TreeSitterRuntime,
@@ -189,6 +161,9 @@ export async function lookupCalleesAt(
   const { tree, source } = parseResult.data;
 
   try {
+    const boundsError = validatePublicPositionBounds(line, character, source);
+    if (boundsError) return boundsError;
+
     const scopes = ENCLOSING_SCOPE_TYPES[grammarId];
     const tsPoint = { row: line - 1, column: character - 1 };
     const node = tree.rootNode.descendantForPosition(tsPoint);
@@ -230,10 +205,17 @@ export async function lookupCalleesAt(
       };
     }
 
-    const callees = filterCalleeCaptures(queryResult.data, enclosingNode, scopes, tsPoint, depth);
+    const callees = filterCalleeCaptures(
+      queryResult.data,
+      grammarId,
+      enclosingNode,
+      scopes,
+      tsPoint,
+      depth,
+    );
 
     const enclosingRange = nodeToSourceRange(enclosingNode);
-    const scopeName = extractScopeName(enclosingNode.type, enclosingNode.text);
+    const scopeName = extractScopeName(enclosingNode);
 
     return {
       kind: "success",
@@ -329,7 +311,8 @@ function containsPoint(
 // biome-ignore lint/complexity/useMaxParams: filtering needs captures + node context + depth
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: filtering combines scope containment, column-aware inner-scope exclusion, and dedup in one cohesive pass
 function filterCalleeCaptures(
-  captures: Array<{ range: SourceRange; text: string }>,
+  captures: Array<{ nodeType: string; range: SourceRange; text: string }>,
+  grammarId: GrammarId,
   // biome-ignore lint/suspicious/noExplicitAny: tree-sitter SyntaxNode is complex
   enclosingNode: any,
   scopeTypes: ReadonlySet<string>,
@@ -382,7 +365,7 @@ function filterCalleeCaptures(
       if (isInInner) continue;
     }
 
-    const name = capture.text.replace(/\s+/g, "").slice(0, 60);
+    const name = normalizeCallName(capture.text, grammarId, capture.nodeType);
     if (name.length === 0 || seen.has(name)) continue;
     seen.add(name);
 

@@ -1,24 +1,6 @@
-import { getSupportedExtensionGrammarEntries, isJsTsGrammar } from "./language.ts";
+import { getSupportedExtensionGrammarEntries } from "./language.ts";
 import { supportsCallSitesGrammar } from "./tool/call-sites.ts";
 import type { GrammarId, SupportedExtension } from "./types.ts";
-
-const OUTLINE_GRAMMARS: ReadonlySet<GrammarId> = new Set([
-  "javascript",
-  "typescript",
-  "tsx",
-  "python",
-  "rust",
-  "go",
-  "c",
-  "cpp",
-  "java",
-  "kotlin",
-  "ruby",
-  "bash",
-  "html",
-  "r",
-  "sql",
-]);
 
 /** Structural collection operations whose language support defines an AST Scan universe. */
 const STRUCTURAL_SEARCH_OPERATIONS = ["outline", "imports", "exports", "call-sites"] as const;
@@ -49,10 +31,10 @@ export function supportsGrammarOperation(
     case "call-sites":
       return supportsCallSitesGrammar(grammar);
     case "outline":
-      return OUTLINE_GRAMMARS.has(grammar);
+      return true;
     case "imports":
     case "exports":
-      return isJsTsGrammar(grammar);
+      return grammar === "javascript" || grammar === "typescript" || grammar === "tsx";
     default:
       throw new TypeError(`Unsupported structural search operation: ${String(operation)}`);
   }

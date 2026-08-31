@@ -1,14 +1,12 @@
 import { detectGrammar } from "../language.ts";
 import { supportsGrammarOperation } from "../operation-support.ts";
 import type { StructuralWorkerOperation } from "../session/structural-worker-protocol.ts";
-import {
-  extractCallSites,
-  extractExports,
-  extractImports,
-  extractOutline,
-  lookupCalleesAt,
-  lookupNodeAt,
-} from "../tool/structure.ts";
+import { extractCallSites } from "../tool/call-sites.ts";
+import { lookupCalleesAt } from "../tool/callees.ts";
+import { extractExports } from "../tool/exports.ts";
+import { extractImports } from "../tool/imports.ts";
+import { lookupNodeAt } from "../tool/node-at.ts";
+import { collectOutline as extractOutline } from "../tool/outline.ts";
 import type { TreeSitterResult } from "../types.ts";
 import {
   type StructuralRequestControl,

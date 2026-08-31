@@ -1,5 +1,4 @@
 // biome-ignore-all lint/style/noExcessiveLinesPerFile: one private protocol module defines and validates the full closed contract
-import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { isDebugOperationId } from "@mrclrchtr/supi-core/debug";
 import type { TreeSitterResult } from "../types.ts";
 import type { StructuralTimingEvent } from "./structural-timing.ts";
@@ -120,6 +119,45 @@ export type StructuralProtocolValidation<T> =
   | { readonly kind: "valid"; readonly message: T }
   | { readonly kind: "invalid"; readonly reason: string };
 
+/** Validate one operation before it enters the Structural Worker mailbox. */
+export function validateStructuralWorkerOperation(
+  value: unknown,
+): StructuralProtocolValidation<StructuralWorkerOperation> {
+  if (!isRecord(value) || typeof value.operation !== "string") {
+    return invalid("Invalid structural operation");
+  }
+
+  switch (value.operation) {
+    case "canParse":
+    case "outline":
+    case "imports":
+    case "exports":
+    case "callSites":
+      return hasExactKeys(value, ["operation", "file"]) && isFileValue(value.file)
+        ? valid(value as unknown as StructuralWorkerOperation)
+        : invalid("Invalid structural operation");
+    case "query":
+      return hasExactKeys(value, ["operation", "file", "query"]) &&
+        isFileValue(value.file) &&
+        isQueryValue(value.query)
+        ? valid(value as unknown as StructuralWorkerOperation)
+        : invalid("Invalid structural operation");
+    case "nodeAt":
+      return hasExactKeys(value, ["operation", "file", "line", "character"]) &&
+        isFileValue(value.file) &&
+        isPositiveInteger(value.line) &&
+        isPositiveInteger(value.character)
+        ? valid(value as unknown as StructuralWorkerOperation)
+        : invalid("Invalid structural operation");
+    case "calleesAt":
+      return isCalleesAtOperation(value)
+        ? valid(value as unknown as StructuralWorkerOperation)
+        : invalid("Invalid structural operation");
+    default:
+      return invalid("Invalid structural operation");
+  }
+}
+
 /** Validate an untrusted request before the Structural Worker executes it. */
 export function validateStructuralWorkerRequest(
   value: unknown,
@@ -128,7 +166,7 @@ export function validateStructuralWorkerRequest(
   const required = ["kind", "version", "generation", "requestId", "input", "cancellationFlag"];
   const allowed = new Set([...required, "operationId", "deadline"]);
   if (
-    required.some((key) => !(key in value)) ||
+    required.some((key) => !Object.hasOwn(value, key)) ||
     Object.keys(value).some((key) => !allowed.has(key))
   ) {
     return invalid("Invalid structural request envelope");
@@ -138,7 +176,6 @@ export function validateStructuralWorkerRequest(
     value.version !== STRUCTURAL_WORKER_PROTOCOL_VERSION ||
     !isPositiveInteger(value.generation) ||
     !isRequestId(value.requestId) ||
-    !isRecord(value.input) ||
     !(value.cancellationFlag instanceof SharedArrayBuffer) ||
     value.cancellationFlag.byteLength !== Int32Array.BYTES_PER_ELEMENT ||
     (value.deadline !== undefined &&
@@ -147,7 +184,71 @@ export function validateStructuralWorkerRequest(
   ) {
     return invalid("Invalid structural request");
   }
-  return valid(value as unknown as StructuralWorkerRequestMessage);
+  const operation = validateStructuralWorkerOperation(value.input);
+  return operation.kind === "valid"
+    ? valid(value as unknown as StructuralWorkerRequestMessage)
+    : invalid(operation.reason);
+}
+
+/** Validate an untrusted cancellation envelope before it reaches the Worker state machine. */
+export function validateStructuralWorkerCancel(
+  value: unknown,
+): StructuralProtocolValidation<StructuralWorkerCancelMessage> {
+  if (!isRecord(value)) return invalid("Structural Worker cancel must be an object");
+  if (!hasExactKeys(value, ["kind", "version", "generation", "requestId"])) {
+    return invalid("Invalid structural cancel envelope");
+  }
+  if (
+    value.kind !== "cancel" ||
+    value.version !== STRUCTURAL_WORKER_PROTOCOL_VERSION ||
+    !isPositiveInteger(value.generation) ||
+    !isRequestId(value.requestId)
+  ) {
+    return invalid("Invalid structural cancel");
+  }
+  return valid(value as unknown as StructuralWorkerCancelMessage);
+}
+
+/** Validate an untrusted chunk acknowledgement before it reaches the Worker state machine. */
+export function validateStructuralWorkerChunkAck(
+  value: unknown,
+): StructuralProtocolValidation<StructuralWorkerChunkAckMessage> {
+  if (!isRecord(value)) return invalid("Structural Worker chunk acknowledgement must be an object");
+  if (!hasExactKeys(value, ["kind", "version", "generation", "requestId", "sequence"])) {
+    return invalid("Invalid structural chunk acknowledgement envelope");
+  }
+  if (
+    value.kind !== "chunk-ack" ||
+    value.version !== STRUCTURAL_WORKER_PROTOCOL_VERSION ||
+    !isPositiveInteger(value.generation) ||
+    !isRequestId(value.requestId) ||
+    !isNonNegativeInteger(value.sequence)
+  ) {
+    return invalid("Invalid structural chunk acknowledgement");
+  }
+  return valid(value as unknown as StructuralWorkerChunkAckMessage);
+}
+
+/** Validate any untrusted message sent from the parent to the Structural Worker. */
+export function validateParentToStructuralWorkerMessage(
+  value: unknown,
+): StructuralProtocolValidation<ParentToStructuralWorkerMessage> {
+  if (!isRecord(value)) return invalid("Structural Worker parent message must be an object");
+  switch (value.kind) {
+    case "request":
+      return validateStructuralWorkerRequest(value);
+    case "cancel":
+      return validateStructuralWorkerCancel(value);
+    case "chunk-ack":
+      return validateStructuralWorkerChunkAck(value);
+    default:
+      return invalid("Unknown Structural Worker parent message kind");
+  }
+}
+
+/** Read a generation only when the parent message has a safe positive integer shape. */
+export function getStructuralWorkerMessageGeneration(value: unknown): number | undefined {
+  return isRecord(value) && isPositiveInteger(value.generation) ? value.generation : undefined;
 }
 
 /** Encode one complete structural result into fixed-size binary chunks. */
@@ -217,11 +318,6 @@ export function validateWorkerToParentMessage(
     default:
       return invalid("Unknown Structural Worker message kind");
   }
-}
-
-/** Build the exact request control represented by one Worker request. */
-export interface StructuralWorkerRequestControl extends CodeRequestControl {
-  readonly cancellationFlag: Int32Array;
 }
 
 function validateChunk(
@@ -439,8 +535,37 @@ function isPositiveInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && Number(value) > 0;
 }
 
+function isNonNegativeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && Number(value) >= 0;
+}
+
 function isRequestId(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= 128;
+}
+
+function isCalleesAtOperation(value: Record<string, unknown>): boolean {
+  const keysValid =
+    hasExactKeys(value, ["operation", "file", "line", "character"]) ||
+    hasExactKeys(value, ["operation", "file", "line", "character", "depth"]);
+  return (
+    keysValid &&
+    isFileValue(value.file) &&
+    isPositiveInteger(value.line) &&
+    isPositiveInteger(value.character) &&
+    (!("depth" in value) || value.depth === "direct" || value.depth === "deep")
+  );
+}
+
+function isFileValue(value: unknown): value is string {
+  return isNonBlankString(value, 16_384);
+}
+
+function isQueryValue(value: unknown): value is string {
+  return isNonBlankString(value, 10_000);
+}
+
+function isNonBlankString(value: unknown, maxLength: number): value is string {
+  return typeof value === "string" && value.trim().length > 0 && value.length <= maxLength;
 }
 
 function valid<T>(message: T): StructuralProtocolValidation<T> {

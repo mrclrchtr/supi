@@ -5,6 +5,7 @@ import { nodeToRange } from "../coordinates.ts";
 import type { SyntaxNodeLike } from "../syntax-node.ts";
 import type { ExportRecord, TreeSitterResult } from "../types.ts";
 import type { TreeSitterRuntime } from "../worker/runtime.ts";
+import { extractBindingIdentifiers } from "./js-binding-pattern.ts";
 
 /** Extract export records from a supported file. */
 export async function extractExports(
@@ -120,13 +121,9 @@ function extractLexicalDeclarationExports(
 ): void {
   for (const child of decl.children) {
     if (child.type !== "variable_declarator") continue;
-    const nameNode = findNameNode(child);
-    if (!nameNode) continue;
-    exports.push({
-      name: nameNode.text,
-      kind: "variable",
-      range: nodeToRange(child, source),
-    });
+    const names = extractBindingIdentifiers(child.childForFieldName("name"));
+    const range = nodeToRange(child, source);
+    for (const name of names) exports.push({ name, kind: "variable", range });
   }
 }
 
@@ -138,6 +135,11 @@ function extractAmbientDeclarationExport(
 ): void {
   const nested = decl.children.find((child) => child.type !== "declare" && child.type !== ";");
   if (!nested) return;
+
+  if (nested.type === "lexical_declaration") {
+    extractLexicalDeclarationExports(nested, source, exports);
+    return;
+  }
 
   const name = getDeclarationName(nested);
   if (!name) return;

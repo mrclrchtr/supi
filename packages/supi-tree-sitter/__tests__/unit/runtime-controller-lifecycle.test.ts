@@ -1,3 +1,4 @@
+import { WorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it, vi } from "vitest";
 import type { TreeSitterSession } from "../../src/types.ts";
 
@@ -18,7 +19,8 @@ import { TreeSitterRuntimeController } from "../../src/session/runtime-controlle
 
 describe("TreeSitterRuntimeController failed initialization", () => {
   it("awaits session disposal when Worker validation fails", async () => {
-    const controller = new TreeSitterRuntimeController("/project");
+    const runtime = new WorkspaceRuntime();
+    const controller = new TreeSitterRuntimeController("/project", runtime);
 
     await expect(controller.start()).resolves.toEqual({
       kind: "unavailable",
@@ -26,5 +28,6 @@ describe("TreeSitterRuntimeController failed initialization", () => {
     });
     expect(mocks.dispose).toHaveBeenCalledOnce();
     expect(controller.service).toBeNull();
+    expect(runtime.getWorkspace("/project").structural.provider).toBeNull();
   });
 });

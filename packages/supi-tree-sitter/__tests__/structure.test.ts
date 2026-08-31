@@ -116,14 +116,15 @@ describe("outline extraction", () => {
     );
   });
 
-  it("returns empty array for file with no declarations", async () => {
+  it("returns an empty outline for an empty file", async () => {
     const runtime = new TreeSitterRuntime(FIXTURE_DIR);
     const parseResult = await runtime.parseFile("empty.ts");
+    expect(parseResult.kind).toBe("success");
     if (parseResult.kind !== "success") {
-      // empty.ts doesn't exist, skip
       runtime.dispose();
       return;
     }
+
     const { tree, source } = parseResult.data;
     const items = collectOutline(tree.rootNode, source);
     tree.delete();

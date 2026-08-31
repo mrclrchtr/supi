@@ -4,11 +4,11 @@ import type { StructuralTimingEvent } from "../session/structural-timing.ts";
 import { assertStructuralProtocolMessageSize } from "../session/structural-worker-message-size.ts";
 import {
   encodeStructuralResult,
-  type ParentToStructuralWorkerMessage,
+  getStructuralWorkerMessageGeneration,
   STRUCTURAL_WORKER_PROTOCOL_VERSION,
   type StructuralWorkerChunkAckMessage,
   type StructuralWorkerRequestMessage,
-  validateStructuralWorkerRequest,
+  validateParentToStructuralWorkerMessage,
 } from "../session/structural-worker-protocol.ts";
 import type { TreeSitterResult } from "../types.ts";
 import type { StructuralRequestControl } from "./request-control.ts";
@@ -56,21 +56,37 @@ export async function runStructuralWorker(
   };
 
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: protocol dispatch keeps request, cancel, and acknowledgement validation together
-  parentPort.on("message", (message: ParentToStructuralWorkerMessage) => {
-    if (message.version !== STRUCTURAL_WORKER_PROTOCOL_VERSION) return;
+  parentPort.on("message", (value: unknown) => {
+    const validation = validateParentToStructuralWorkerMessage(value);
+    if (validation.kind === "invalid") {
+      const generation = getStructuralWorkerMessageGeneration(value);
+      if (generation !== undefined && generation !== workerData.generation) return;
+      throw new Error(`Structural Worker protocol violation: ${validation.reason}`);
+    }
+
+    const message = validation.message;
     if (message.generation !== workerData.generation) return;
     if (message.kind === "cancel") {
-      if (active?.message.requestId === message.requestId) active.abortController.abort();
+      if (!active) return;
+      assertActiveRequestOwner(active, message.requestId);
+      active.abortController.abort();
       return;
     }
     if (message.kind === "chunk-ack") {
-      if (active?.message.requestId === message.requestId) sendNextChunk(message);
+      if (!active) return;
+      assertActiveRequestOwner(active, message.requestId);
+      if (!active.awaitingAck || message.sequence !== active.nextSequence - 1) {
+        throw new Error(
+          "Structural Worker protocol violation: Invalid chunk acknowledgement state",
+        );
+      }
+      sendNextChunk(message);
       return;
     }
-    if (message.kind !== "request" || active) return;
-    const validation = validateStructuralWorkerRequest(message);
-    if (validation.kind === "invalid") return;
-    void execute(validation.message);
+    if (active) {
+      throw new Error("Structural Worker protocol violation: Structural Worker request is busy");
+    }
+    void execute(message);
   });
 
   try {
@@ -185,6 +201,14 @@ export async function runStructuralWorker(
       outcome: active.outcome,
     });
     active = null;
+  }
+
+  function assertActiveRequestOwner(request: ActiveWorkerRequest, requestId: string): void {
+    if (request.message.requestId !== requestId) {
+      throw new Error(
+        "Structural Worker protocol violation: Message does not own the active request",
+      );
+    }
   }
 
   function updateInterruptionOutcome(request: ActiveWorkerRequest): void {

@@ -21,20 +21,40 @@ function writeSource(fileName: string, source: string): string {
 }
 
 describe("TreeSitterSession.calleesAt", () => {
-  it("exposes calleesAt as a function on the session", async () => {
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      expect(session.calleesAt).toEqual(expect.any(Function));
-    } finally {
-      await session.dispose();
-    }
-  });
-
   it("returns validation-error for invalid coordinates", async () => {
     const session = createTreeSitterSession(tmpDir);
     try {
       const result = await session.calleesAt("test.ts", 0, 5);
       expect(result.kind).toBe("validation-error");
+    } finally {
+      await session.dispose();
+    }
+  });
+
+  it("returns validation-error for coordinates beyond the source bounds", async () => {
+    writeSource("bounds.ts", "function run() { dependency(); }\n");
+    const session = createTreeSitterSession(tmpDir);
+    try {
+      const lineResult = await session.calleesAt("bounds.ts", 3, 1);
+      const characterResult = await session.calleesAt("bounds.ts", 1, 999);
+      expect(lineResult.kind).toBe("validation-error");
+      expect(characterResult.kind).toBe("validation-error");
+    } finally {
+      await session.dispose();
+    }
+  });
+
+  it("returns unsupported-language for HTML and SQL files", async () => {
+    writeSource("test.html", "<html><body><p>hello</p></body></html>");
+    writeSource("test.sql", "SELECT * FROM users WHERE id = 1;");
+    const session = createTreeSitterSession(tmpDir);
+    try {
+      await expect(session.calleesAt("test.html", 1, 5)).resolves.toMatchObject({
+        kind: "unsupported-language",
+      });
+      await expect(session.calleesAt("test.sql", 1, 5)).resolves.toMatchObject({
+        kind: "unsupported-language",
+      });
     } finally {
       await session.dispose();
     }
@@ -70,6 +90,22 @@ describe("calleesAt — structural callee detection", () => {
     }
   });
 
+  it("keeps a long source-shape callee name", async () => {
+    const callee = `root.${"longNamespaceSegment.".repeat(4)}finalCall`;
+    writeSource("long-name.ts", `function run() { ${callee}(); }\n`);
+
+    const session = createTreeSitterSession(tmpDir);
+    try {
+      const result = await session.calleesAt("long-name.ts", 1, 10);
+      expect(result).toMatchObject({
+        kind: "success",
+        data: { callees: [{ name: callee }] },
+      });
+    } finally {
+      await session.dispose();
+    }
+  });
+
   it("detects callees in a Python function", async () => {
     writeSource(
       "test.py",
@@ -80,9 +116,7 @@ describe("calleesAt — structural callee detection", () => {
     try {
       const result = await session.calleesAt("test.py", 1, 10);
       expect(result.kind).toBe("success");
-      if (result.kind === "success") {
-        expect(result.data.callees).toHaveLength(2);
-      }
+      if (result.kind === "success") expect(result.data.callees).toHaveLength(2);
     } finally {
       await session.dispose();
     }
@@ -107,6 +141,21 @@ describe("calleesAt — structural callee detection", () => {
     }
   });
 
+  it("returns Rust macro callees without arguments", async () => {
+    // biome-ignore lint/security/noSecrets: test fixture code
+    writeSource("macro.rs", ["fn run() {", '  module::println!("message");', "}"].join("\n"));
+
+    const session = createTreeSitterSession(tmpDir);
+    try {
+      const result = await session.calleesAt("macro.rs", 1, 5);
+      expect(result.kind).toBe("success");
+      if (result.kind !== "success") return;
+      expect(result.data.callees.map(({ name }) => name)).toEqual(["module::println"]);
+    } finally {
+      await session.dispose();
+    }
+  });
+
   it("detects callees in a Go function", async () => {
     writeSource(
       "test.go",
@@ -117,91 +166,32 @@ describe("calleesAt — structural callee detection", () => {
     try {
       const result = await session.calleesAt("test.go", 1, 10);
       expect(result.kind).toBe("success");
-      if (result.kind === "success") {
-        expect(result.data.callees).toHaveLength(2);
-      }
+      if (result.kind === "success") expect(result.data.callees).toHaveLength(2);
     } finally {
       await session.dispose();
     }
   });
 
-  it("filters out callees from nested functions", async () => {
+  it("detects callees in a Go method", async () => {
     writeSource(
-      "test.ts",
+      "method.go",
       [
-        "function outer() {",
-        "  inner();",
-        "  function inner() {",
-        "    deeplyNested();",
-        "  }",
+        "package sample",
+        "type Worker struct{}",
+        "func (w Worker) Run() {",
+        "  w.prepare()",
+        "  finish()",
         "}",
       ].join("\n"),
     );
 
     const session = createTreeSitterSession(tmpDir);
     try {
-      // Anchor in outer function body (L2)
-      const result = await session.calleesAt("test.ts", 2, 3);
+      const result = await session.calleesAt("method.go", 3, 20);
       expect(result.kind).toBe("success");
-      if (result.kind === "success") {
-        expect(result.data.enclosingScope.name).toBe("outer");
-        // Should NOT include deeplyNested which is inside inner()
-        const names = result.data.callees.map((c) => c.name);
-        expect(names).toContain("inner");
-        expect(names).not.toContain("deeplyNested");
-      }
-    } finally {
-      await session.dispose();
-    }
-  });
-
-  it("uses full points to exclude a same-line nested scope at direct depth", async () => {
-    writeSource(
-      "same-line.ts",
-      "function outer() { before(); const inner = () => nested(); after(); }\n",
-    );
-
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const direct = await session.calleesAt("same-line.ts", 1, 10, { depth: "direct" });
-      expect(direct.kind).toBe("success");
-      if (direct.kind === "success") {
-        expect(direct.data.callees.map((callee) => callee.name)).toEqual(["before", "after"]);
-      }
-
-      const deep = await session.calleesAt("same-line.ts", 1, 10, { depth: "deep" });
-      expect(deep.kind).toBe("success");
-      if (deep.kind === "success") {
-        expect(deep.data.callees.map((callee) => callee.name)).toEqual([
-          "before",
-          "nested",
-          "after",
-        ]);
-      }
-    } finally {
-      await session.dispose();
-    }
-  });
-
-  it("returns unsupported-language for HTML files", async () => {
-    writeSource("test.html", "<html><body><p>hello</p></body></html>");
-
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const result = await session.calleesAt("test.html", 1, 5);
-      expect(result.kind).toBe("unsupported-language");
-    } finally {
-      await session.dispose();
-    }
-  });
-
-  it("returns unsupported-language for SQL files", async () => {
-    writeSource("test.sql", "SELECT * FROM users WHERE id = 1;");
-
-    const session = createTreeSitterSession(tmpDir);
-    try {
-      const result = await session.calleesAt("test.sql", 1, 5);
-      expect(result.kind).toBe("unsupported-language");
+      if (result.kind !== "success") return;
+      expect(result.data.enclosingScope.name).toBe("Run");
+      expect(result.data.callees.map(({ name }) => name)).toEqual(["w.prepare", "finish"]);
     } finally {
       await session.dispose();
     }

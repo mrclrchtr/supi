@@ -59,6 +59,25 @@ describe("HTML and SQL outline extraction", () => {
     expect(items[0]?.range.startLine).toBe(2);
   });
 
+  it("normalizes quoted SQL identifiers and recovers quoted constraints", async () => {
+    const items = await outline(
+      "quoted.sql",
+      [
+        'CREATE TABLE "order""items" (',
+        '  "column""name" text CONSTRAINT "valid""code" CHECK ("column""name" <> \'\'),',
+        "  plain text DEFAULT 'keep this literal'",
+        ");",
+      ].join("\n"),
+    );
+
+    expect(items).toEqual([expect.objectContaining({ name: 'order"items', kind: "table" })]);
+    expect(items[0]?.children?.map(({ name, kind }) => [name, kind])).toEqual([
+      ['column"name', "field"],
+      ['valid"code', "constraint"],
+      ["plain", "field"],
+    ]);
+  });
+
   it("extracts SQL schema objects and table/type members without query-local names", async () => {
     const items = await outline(
       "schema.sql",

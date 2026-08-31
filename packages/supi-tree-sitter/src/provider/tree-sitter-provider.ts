@@ -35,31 +35,27 @@ export function createTreeSitterProvider(service: TreeSitterService): Structural
     },
 
     async exports(file, control?) {
-      const result = control ? await service.exports(file, control) : await service.exports(file);
+      const result = await service.exports(file, control);
       return mapTreeSitterResult(result, mapExportRecords);
     },
 
     async outline(file, control?) {
-      const result = control ? await service.outline(file, control) : await service.outline(file);
+      const result = await service.outline(file, control);
       return mapTreeSitterResult(result, mapOutlineItems);
     },
 
     async imports(file, control?) {
-      const result = control ? await service.imports(file, control) : await service.imports(file);
+      const result = await service.imports(file, control);
       return mapTreeSitterResult(result, mapImportRecords);
     },
 
     async nodeAt(file, line, character, control?) {
-      const result = control
-        ? await service.nodeAt(file, line, character, control)
-        : await service.nodeAt(file, line, character);
+      const result = await service.nodeAt(file, line, character, control);
       return mapTreeSitterResult(result, mapNodeAtResult);
     },
 
     async callSites(file, control?) {
-      const result = control
-        ? await service.callSites(file, control)
-        : await service.callSites(file);
+      const result = await service.callSites(file, control);
       return mapTreeSitterResult(result, mapCallSites);
     },
   };

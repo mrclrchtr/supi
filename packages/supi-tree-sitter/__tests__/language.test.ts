@@ -1,203 +1,88 @@
 import { existsSync } from "node:fs";
+import * as path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  detectGrammar,
-  getSupportedExtension,
-  isSupportedFile,
-  resolveGrammarWasmPath,
-} from "../src/language.ts";
+import { detectGrammar, getSupportedExtensions, resolveGrammarWasmPath } from "../src/language.ts";
+import type { GrammarId } from "../src/types.ts";
 
-describe("isSupportedFile", () => {
-  it.each([
-    ["file.ts", true],
-    ["file.tsx", true],
-    ["file.js", true],
-    ["file.jsx", true],
-    ["file.mts", true],
-    ["file.cts", true],
-    ["file.mjs", true],
-    ["file.cjs", true],
-    ["file.py", true],
-    ["file.pyi", true],
-    ["file.rs", true],
-    ["file.go", true],
-    ["go.mod", false],
-    ["file.c", true],
-    ["file.cpp", true],
-    ["file.java", true],
-    ["file.kt", true],
-    ["file.kts", true],
-    ["file.rb", true],
-    ["project.gemspec", true],
-    ["file.sh", true],
-    ["file.bash", true],
-    ["file.zsh", true],
-    ["file.ksh", true],
-    ["file.html", true],
-    ["file.htm", true],
-    ["file.xhtml", true],
-    ["file.r", true],
-    ["file.sql", true],
-    ["Makefile", false],
-    ["file.TS", true], // case-insensitive
-  ])("%s → %s", (filePath, expected) => {
-    expect(isSupportedFile(filePath)).toBe(expected);
+const LANGUAGE_CASES = [
+  { file: "file.js", grammar: "javascript" },
+  { file: "file.jsx", grammar: "javascript" },
+  { file: "file.mjs", grammar: "javascript" },
+  { file: "file.cjs", grammar: "javascript" },
+  { file: "file.ts", grammar: "typescript" },
+  { file: "file.mts", grammar: "typescript" },
+  { file: "file.cts", grammar: "typescript" },
+  { file: "file.tsx", grammar: "tsx" },
+  { file: "file.py", grammar: "python" },
+  { file: "file.pyi", grammar: "python" },
+  { file: "file.rs", grammar: "rust" },
+  { file: "file.go", grammar: "go" },
+  { file: "file.c", grammar: "c" },
+  { file: "file.h", grammar: "c" },
+  { file: "file.cpp", grammar: "cpp" },
+  { file: "file.hpp", grammar: "cpp" },
+  { file: "file.cc", grammar: "cpp" },
+  { file: "file.cxx", grammar: "cpp" },
+  { file: "file.hxx", grammar: "cpp" },
+  { file: "file.c++", grammar: "cpp" },
+  { file: "file.h++", grammar: "cpp" },
+  { file: "file.java", grammar: "java" },
+  { file: "file.kt", grammar: "kotlin" },
+  { file: "file.kts", grammar: "kotlin" },
+  { file: "file.rb", grammar: "ruby" },
+  { file: "project.gemspec", grammar: "ruby" },
+  { file: "file.sh", grammar: "bash" },
+  { file: "file.bash", grammar: "bash" },
+  { file: "file.zsh", grammar: "bash" },
+  { file: "file.ksh", grammar: "bash" },
+  { file: "file.html", grammar: "html" },
+  { file: "file.htm", grammar: "html" },
+  { file: "file.xhtml", grammar: "html" },
+  { file: "file.r", grammar: "r" },
+  { file: "file.sql", grammar: "sql" },
+] satisfies ReadonlyArray<{ file: string; grammar: GrammarId }>;
+
+const GRAMMAR_RESOURCES = [
+  { grammar: "javascript", file: "tree-sitter-javascript.wasm" },
+  { grammar: "typescript", file: "tree-sitter-typescript.wasm" },
+  { grammar: "tsx", file: "tree-sitter-tsx.wasm" },
+  { grammar: "python", file: "tree-sitter-python.wasm" },
+  { grammar: "rust", file: "tree-sitter-rust.wasm" },
+  { grammar: "go", file: "tree-sitter-go.wasm" },
+  { grammar: "c", file: "tree-sitter-c.wasm" },
+  { grammar: "cpp", file: "tree-sitter-cpp.wasm" },
+  { grammar: "java", file: "tree-sitter-java.wasm" },
+  { grammar: "kotlin", file: "tree-sitter-kotlin.wasm" },
+  { grammar: "ruby", file: "tree-sitter-ruby.wasm" },
+  { grammar: "bash", file: "tree-sitter-bash.wasm" },
+  { grammar: "html", file: "tree-sitter-html.wasm" },
+  { grammar: "r", file: "tree-sitter-r.wasm" },
+  { grammar: "sql", file: "tree-sitter-sql.wasm" },
+] satisfies ReadonlyArray<{ grammar: GrammarId; file: string }>;
+
+describe("language registry", () => {
+  it.each(LANGUAGE_CASES)("maps $file to $grammar", ({ file, grammar }) => {
+    expect(detectGrammar(file)).toBe(grammar);
+  });
+
+  it.each(["go.mod", "Makefile", "file.txt"])("%s is not a parser source file", (file) => {
+    expect(detectGrammar(file)).toBeUndefined();
+  });
+
+  it("matches extensions without regard to case", () => {
+    expect(detectGrammar("file.TS")).toBe("typescript");
+  });
+
+  it("returns every registered extension", () => {
+    expect(getSupportedExtensions()).toEqual(LANGUAGE_CASES.map(({ file }) => path.extname(file)));
   });
 });
 
-describe("getSupportedExtension", () => {
-  it("returns the extension for supported files", () => {
-    expect(getSupportedExtension("index.ts")).toBe(".ts");
-    expect(getSupportedExtension("component.tsx")).toBe(".tsx");
-    expect(getSupportedExtension("main.py")).toBe(".py");
-    expect(getSupportedExtension("lib.rs")).toBe(".rs");
-  });
-
-  it("returns undefined for unsupported files", () => {
-    expect(getSupportedExtension("Makefile")).toBeUndefined();
-    expect(getSupportedExtension("readme.txt")).toBeUndefined();
-  });
-});
-
-describe("detectGrammar", () => {
-  it("maps JS-family extensions to javascript grammar", () => {
-    expect(detectGrammar("app.js")).toBe("javascript");
-    expect(detectGrammar("app.jsx")).toBe("javascript");
-    expect(detectGrammar("app.mjs")).toBe("javascript");
-    expect(detectGrammar("app.cjs")).toBe("javascript");
-  });
-
-  it("maps TS extensions to typescript grammar", () => {
-    expect(detectGrammar("mod.ts")).toBe("typescript");
-    expect(detectGrammar("mod.mts")).toBe("typescript");
-    expect(detectGrammar("mod.cts")).toBe("typescript");
-  });
-
-  it("maps TSX extension to tsx grammar", () => {
-    expect(detectGrammar("comp.tsx")).toBe("tsx");
-  });
-
-  it("maps Python extensions to python grammar", () => {
-    expect(detectGrammar("main.py")).toBe("python");
-    expect(detectGrammar("types.pyi")).toBe("python");
-  });
-
-  it("maps Rust extensions to rust grammar", () => {
-    expect(detectGrammar("lib.rs")).toBe("rust");
-  });
-
-  it("maps Go source files to go grammar without treating module manifests as source", () => {
-    expect(detectGrammar("main.go")).toBe("go");
-    expect(detectGrammar("go.mod")).toBeUndefined();
-  });
-
-  it("maps C/C++ extensions to c and cpp grammars", () => {
-    expect(detectGrammar("main.c")).toBe("c");
-    expect(detectGrammar("main.h")).toBe("c");
-    expect(detectGrammar("main.cpp")).toBe("cpp");
-    expect(detectGrammar("main.hpp")).toBe("cpp");
-  });
-
-  it("maps Java extensions to java grammar", () => {
-    expect(detectGrammar("App.java")).toBe("java");
-  });
-
-  it("maps Kotlin extensions to kotlin grammar", () => {
-    expect(detectGrammar("App.kt")).toBe("kotlin");
-    expect(detectGrammar("build.gradle.kts")).toBe("kotlin");
-  });
-
-  it("maps Ruby extensions to ruby grammar", () => {
-    expect(detectGrammar("app.rb")).toBe("ruby");
-    expect(detectGrammar("project.gemspec")).toBe("ruby");
-  });
-
-  it("maps Shell extensions to bash grammar", () => {
-    expect(detectGrammar("script.sh")).toBe("bash");
-    expect(detectGrammar("script.bash")).toBe("bash");
-    expect(detectGrammar("script.zsh")).toBe("bash");
-    expect(detectGrammar("script.ksh")).toBe("bash");
-  });
-
-  it("maps HTML extensions to html grammar", () => {
-    expect(detectGrammar("index.html")).toBe("html");
-    expect(detectGrammar("index.htm")).toBe("html");
-    expect(detectGrammar("index.xhtml")).toBe("html");
-  });
-
-  it("maps R extension to r grammar", () => {
-    expect(detectGrammar("analysis.r")).toBe("r");
-  });
-
-  it("maps SQL extension to sql grammar", () => {
-    expect(detectGrammar("schema.sql")).toBe("sql");
-  });
-
-  it("returns undefined for unsupported extensions", () => {
-    expect(detectGrammar("main.txt")).toBeUndefined();
-  });
-});
-
-describe("resolveGrammarWasmPath", () => {
-  it("resolves javascript grammar WASM path", () => {
-    const path = resolveGrammarWasmPath("javascript");
-    expect(path).toContain("tree-sitter-javascript");
-    expect(path).toMatch(/tree-sitter-javascript\.wasm$/);
-  });
-
-  it("resolves typescript grammar WASM path", () => {
-    const path = resolveGrammarWasmPath("typescript");
-    expect(path).toContain("tree-sitter-typescript");
-    expect(path).toMatch(/tree-sitter-typescript\.wasm$/);
-  });
-
-  it("resolves tsx grammar WASM path", () => {
-    const path = resolveGrammarWasmPath("tsx");
-    expect(path).toMatch(/resources[/]grammars[/]tsx/);
-    expect(path).toMatch(/tree-sitter-tsx\.wasm$/);
-  });
-
-  it("resolves python grammar WASM path", () => {
-    const path = resolveGrammarWasmPath("python");
-    expect(path).toContain("tree-sitter-python");
-    expect(path).toMatch(/tree-sitter-python\.wasm$/);
-  });
-
-  it("resolves rust grammar WASM path", () => {
-    const path = resolveGrammarWasmPath("rust");
-    expect(path).toContain("tree-sitter-rust");
-    expect(path).toMatch(/tree-sitter-rust\.wasm$/);
-  });
-
-  it("resolves Kotlin to the vendored fwcd WASM", () => {
-    const wasmPath = resolveGrammarWasmPath("kotlin");
-    expect(wasmPath).toMatch(/resources[\\/]grammars[\\/]kotlin/);
-    expect(wasmPath).toMatch(/tree-sitter-kotlin\.wasm$/);
-    expect(existsSync(wasmPath)).toBe(true);
-  });
-
-  it("resolves bash grammar WASM path", () => {
-    const wasmPath = resolveGrammarWasmPath("bash");
-    expect(wasmPath).toContain("tree-sitter-bash");
-    expect(wasmPath).toMatch(/tree-sitter-bash\.wasm$/);
-  });
-
-  it("resolves html grammar WASM path", () => {
-    const wasmPath = resolveGrammarWasmPath("html");
-    expect(wasmPath).toContain("tree-sitter-html");
-    expect(wasmPath).toMatch(/tree-sitter-html\.wasm$/);
-  });
-
-  it("resolves r grammar WASM path", () => {
-    const wasmPath = resolveGrammarWasmPath("r");
-    expect(wasmPath).toMatch(/resources[/]grammars[/]r/);
-    expect(wasmPath).toMatch(/tree-sitter-r\.wasm$/);
-  });
-
-  it("resolves SQL to the vendored WASM", () => {
-    const wasmPath = resolveGrammarWasmPath("sql");
-    expect(wasmPath).toMatch(/resources[\\/]grammars[\\/]sql/);
-    expect(wasmPath).toMatch(/tree-sitter-sql\.wasm$/);
+describe("grammar resources", () => {
+  it.each(GRAMMAR_RESOURCES)("resolves the $grammar WASM resource", ({ grammar, file }) => {
+    const wasmPath = resolveGrammarWasmPath(grammar);
+    expect(wasmPath).toContain(path.join("resources", "grammars", grammar));
+    expect(wasmPath.endsWith(file)).toBe(true);
     expect(existsSync(wasmPath)).toBe(true);
   });
 });

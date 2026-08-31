@@ -196,10 +196,8 @@ export class ParsedFileStore {
   withQuery<T>(
     grammarId: GrammarId,
     queryText: string,
-    compileOrExecution: (() => Query) | QueryExecution<T>,
-    legacyExecute?: (query: Pick<Query, "matches">, cache: StructuralCacheObservation) => T,
+    execution: QueryExecution<T>,
   ): { readonly data: T; readonly cache: StructuralCacheObservation } {
-    const execution = normalizeQueryExecution(compileOrExecution, legacyExecute);
     this.#assertActive();
     throwIfStructuralRequestInterrupted(execution.control);
     const key = queryKey(grammarId, queryText);
@@ -363,17 +361,6 @@ export class ParsedFileStore {
   #assertActive(): void {
     if (this.#disposed) throw new Error("Parsed-file store has been disposed");
   }
-}
-
-function normalizeQueryExecution<T>(
-  compileOrExecution: (() => Query) | QueryExecution<T>,
-  legacyExecute:
-    | ((query: Pick<Query, "matches">, cache: StructuralCacheObservation) => T)
-    | undefined,
-): QueryExecution<T> {
-  if (typeof compileOrExecution !== "function") return compileOrExecution;
-  if (!legacyExecute) throw new Error("Query execution callback is required");
-  return { compile: compileOrExecution, execute: legacyExecute };
 }
 
 function fileReadMessage(error: unknown): string {
