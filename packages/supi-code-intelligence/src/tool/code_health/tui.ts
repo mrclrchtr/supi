@@ -25,6 +25,7 @@ import {
 } from "../../ui/tui/common.ts";
 import type { CodeHealthToolParams } from "./execute.ts";
 import {
+  isPendingFileReadiness,
   readCompactRefreshStatus,
   readPreviousRefreshStatus,
   readRefreshStatus,
@@ -129,6 +130,7 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
   const semanticRequested = sections.some(
     (section) => section.key === "diagnostics" || section.key === "servers",
   );
+  const fileReadinessPending = isPendingFileReadiness(data);
   const segments = sections.map((section) =>
     formatSectionSummary(
       section,
@@ -136,6 +138,7 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
         ? formatCompactDiagnosticEvidence(readDiagnosticEvidence(data))
         : null,
       theme,
+      fileReadinessPending,
     ),
   );
   if (semanticRequested) {
@@ -162,11 +165,14 @@ function formatSectionSummary(
   section: HealthSectionSummary,
   coverage: string | null,
   theme: Theme,
+  fileReadinessPending: boolean,
 ): string {
   const label = sectionLabel(section.key);
   const coverageSuffix = coverage ? ` (${coverage})` : "";
   if (section.status === "unavailable" || !section.available) {
-    return `${theme.fg("dim", label)} ${theme.fg("warning", "unavailable")}${coverageSuffix}`;
+    const status =
+      section.key === "diagnostics" && fileReadinessPending ? "pending" : "unavailable";
+    return `${theme.fg("dim", label)} ${theme.fg("warning", status)}${coverageSuffix}`;
   }
   if (section.status === "partial") {
     return `${theme.fg("dim", label)} ${theme.fg("warning", "partial")}${coverageSuffix}`;
@@ -311,7 +317,10 @@ function buildDiagnosticSummary(data: Record<string, unknown> | null, theme: The
   const section = readHealthSections(data).find((entry) => entry.key === "diagnostics");
   if (!section) return new Text("", 0, 0);
   if (section.status === "unavailable" || !section.available) {
-    return new Text(theme.fg("warning", "Diagnostics unavailable"), 0, 0);
+    const label = isPendingFileReadiness(data)
+      ? "Diagnostics pending — LSP may still be warming; retry shortly"
+      : "Diagnostics unavailable";
+    return new Text(theme.fg("warning", label), 0, 0);
   }
   const trackedFiles = diagnosticScopeKind(data) === "tracked-files";
   if (section.status === "partial") {

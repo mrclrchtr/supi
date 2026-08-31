@@ -197,6 +197,50 @@ describe("code_health result assembly", () => {
     expect(markdown).not.toContain("No errors or warnings found for");
   });
 
+  it("describes pending file readiness as warming instead of unavailable", () => {
+    const assembly = assembleHealthResult(
+      makeHealthData({
+        semanticState: { kind: "ready" },
+        diagnostics: {
+          kind: "unavailable",
+          scope: { kind: "file", path: "/repo/src/a.ts" },
+          entries: [],
+          evidence: fileEvidence("unconfirmed"),
+          reason: "Fresh diagnostics were not confirmed for the current document synchronization.",
+        },
+        refresh: {
+          kind: "completed",
+          attemptedAt: 1,
+          elapsedMs: 1,
+          requestedDiagnosticScope: { kind: "file", path: "/repo/src/a.ts" },
+          operationScope: "file-runtime",
+          attemptedActiveClients: 0,
+          fileReadiness: "pending",
+          restartedClients: 0,
+          processCrashRecovery: {
+            attemptedRoutes: 0,
+            recoveredRoutes: 0,
+            failedRoutes: 0,
+          },
+          staleAssessment: {
+            scope: "file",
+            suspected: null,
+            matchedFileCount: 0,
+            warning: null,
+          },
+        },
+      }),
+      "/repo",
+    );
+
+    const markdown = renderHealthResult(assembly, "/repo");
+    expect(markdown).toContain(
+      "File LSP maintenance attempt**: readiness pending — LSP may still be warming; retry shortly.",
+    );
+    expect(markdown).toContain("Diagnostics pending — LSP may still be warming; retry shortly.");
+    expect(markdown).not.toContain("completed no-op");
+  });
+
   it("does not duplicate punctuation in dynamic refresh text", () => {
     const assembly = assembleHealthResult(
       makeHealthData({

@@ -10,7 +10,11 @@ import {
 import { recoverDiagnosticRuntime } from "../analysis/health/recovery.ts";
 import { mergeDiagnosticEvidence } from "../diagnostics/evidence.ts";
 import { refreshFileLspMaintenance, refreshLspMaintenance } from "../substrate/lsp/maintenance.ts";
-import type { HealthDiagnosticScope, HealthRefreshAttempt } from "./health-types.ts";
+import type {
+  HealthDiagnosticScope,
+  HealthFileReadiness,
+  HealthRefreshAttempt,
+} from "./health-types.ts";
 
 interface HealthRefreshAttemptOptions {
   readonly runtime: WorkspaceLspRuntime;
@@ -55,6 +59,8 @@ async function collectFileRefreshAttempt(
     undefined,
     options.control,
   );
+  const fileReadiness: HealthFileReadiness =
+    readiness.kind === "ready" ? "ready" : readiness.kind === "timeout" ? "pending" : "unavailable";
   return {
     attempt: {
       kind: "completed",
@@ -63,6 +69,7 @@ async function collectFileRefreshAttempt(
       requestedDiagnosticScope: scope,
       operationScope: "file-runtime",
       attemptedActiveClients: readiness.kind === "ready" ? 1 : 0,
+      fileReadiness,
       restartedClients: 0,
       processCrashRecovery: readiness.processCrashRecovery ?? emptyProcessCrashRecoverySummary(),
       staleAssessment: {

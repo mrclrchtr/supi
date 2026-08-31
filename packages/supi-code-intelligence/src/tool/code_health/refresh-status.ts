@@ -1,5 +1,10 @@
 import type { ProcessCrashRecoverySummary } from "@mrclrchtr/supi-lsp/api";
-import { formatProcessCrashRecovery, formatStaleDiagnosticRestarts } from "./refresh-outcome.ts";
+import {
+  formatProcessCrashRecovery,
+  formatStaleDiagnosticRestarts,
+  isFileReadinessPending,
+} from "./refresh-outcome.ts";
+import { readSemanticHealthState } from "./semantic-state.ts";
 
 /** Render current and retained health refresh status for the TUI. */
 
@@ -9,7 +14,7 @@ export function readRefreshStatus(data: Record<string, unknown> | null): string 
 
   switch (refresh.kind) {
     case "completed":
-      return formatCompletedRefreshStatus(refresh);
+      return formatCompletedRefreshStatus(refresh, isPendingFileReadiness(data));
     case "failed":
       return formatFailedRefreshStatus(refresh);
     case "not-attempted":
@@ -21,17 +26,23 @@ export function readRefreshStatus(data: Record<string, unknown> | null): string 
   }
 }
 
-function formatCompletedRefreshStatus(refresh: Record<string, unknown>): string {
+function formatCompletedRefreshStatus(
+  refresh: Record<string, unknown>,
+  fileReadinessPending: boolean,
+): string {
   const attempted = readNumber(refresh.attemptedActiveClients);
   const restarted = readNumber(refresh.restartedClients);
   const processCrashRecovery = formatProcessCrashRecovery(
     readProcessCrashRecovery(refresh.processCrashRecovery),
   );
-  const noOp = attempted === 0 && restarted === 0 && processCrashRecovery === null;
+  const noOp =
+    !fileReadinessPending && attempted === 0 && restarted === 0 && processCrashRecovery === null;
   const label = refreshAttemptLabel(refresh);
-  const base = noOp
-    ? `${label} completed no-op`
-    : `${label} completed: ${attempted} clients targeted`;
+  const base = fileReadinessPending
+    ? `${label} waiting — LSP may still be warming; retry shortly`
+    : noOp
+      ? `${label} completed no-op`
+      : `${label} completed: ${attempted} clients targeted`;
   const outcomes = formatRefreshOutcomes(refresh, restarted, processCrashRecovery, noOp);
   const withOutcome = outcomes.length > 0 ? `${base}; ${outcomes.join("; ")}` : base;
   const evidence = formatDiagnosticEvidence(readRecord(refresh.diagnosticEvidence));
@@ -82,10 +93,18 @@ export function readCompactRefreshStatus(data: Record<string, unknown> | null): 
         .join("; ") || null
     );
   }
-  if (!processCrashRecovery && readNumber(refresh.restartedClients) === 0) return null;
+  const fileReadinessPending = isPendingFileReadiness(data);
+  if (
+    !processCrashRecovery &&
+    readNumber(refresh.restartedClients) === 0 &&
+    !fileReadinessPending
+  ) {
+    return null;
+  }
 
   const staleRestart = formatStaleDiagnosticRestartsForRecord(refresh);
-  return [staleRestart, processCrashRecovery]
+  const readiness = fileReadinessPending ? "LSP may still be warming; retry shortly" : null;
+  return [staleRestart, processCrashRecovery, readiness]
     .filter((value): value is string => value !== null)
     .join("; ");
 }
@@ -102,14 +121,19 @@ export function readPreviousRefreshStatus(data: Record<string, unknown> | null):
     readProcessCrashRecovery(attempt.processCrashRecovery),
   );
   const staleRestart = formatStaleDiagnosticRestartsForRecord(attempt);
-  const outcome = [staleRestart, processCrashRecovery, evidence]
+  const fileReadinessPending =
+    attempt.kind === "completed" &&
+    isFileReadinessPending(attempt, readSemanticHealthState(data?.semanticState));
+  const readiness = fileReadinessPending ? "LSP may still be warming; retry shortly" : null;
+  const outcome = [readiness, staleRestart, processCrashRecovery, evidence]
     .filter((value): value is string => value !== null)
     .join("; ");
   if (attempt.kind === "failed") {
     return `last ${refreshAttemptLabel(attempt)} failed${outcome ? ` (${outcome})` : ""}`;
   }
   if (attempt.kind === "completed") {
-    return `last ${refreshAttemptLabel(attempt)} completed${outcome ? ` (${outcome})` : ""}`;
+    const status = fileReadinessPending ? "waiting" : "completed";
+    return `last ${refreshAttemptLabel(attempt)} ${status}${outcome ? ` (${outcome})` : ""}`;
   }
   return null;
 }
@@ -144,7 +168,10 @@ function formatLastRefreshSuffix(refresh: Record<string, unknown>): string {
   const processCrashRecovery = formatProcessCrashRecovery(
     readProcessCrashRecovery(attempt.processCrashRecovery),
   );
-  const outcome = [staleRestart, processCrashRecovery, evidence]
+  const fileReadinessPending =
+    attempt.kind === "completed" && isFileReadinessPending(attempt, null);
+  const readiness = fileReadinessPending ? "LSP may still be warming; retry shortly" : null;
+  const outcome = [readiness, staleRestart, processCrashRecovery, evidence]
     .filter((value): value is string => value !== null)
     .join("; ");
   if (attempt.kind === "failed") {
@@ -152,7 +179,8 @@ function formatLastRefreshSuffix(refresh: Record<string, unknown>): string {
     return `; last ${refreshAttemptLabel(attempt)} failed${reason}${outcome ? `; ${outcome}` : ""}`;
   }
   if (attempt.kind === "completed") {
-    return `; last ${refreshAttemptLabel(attempt)} completed${outcome ? `; ${outcome}` : ""}`;
+    const status = fileReadinessPending ? "waiting" : "completed";
+    return `; last ${refreshAttemptLabel(attempt)} ${status}${outcome ? `; ${outcome}` : ""}`;
   }
   return "";
 }
@@ -167,6 +195,16 @@ function formatDiagnosticEvidence(evidence: Record<string, unknown> | null): str
   const counts = readEvidenceCounts(evidence);
   if (!counts) return null;
   return `${counts[0]} requested, ${counts[1]} confirmed, ${counts[2]} unconfirmed, ${counts[3]} failed, ${counts[4]} removed`;
+}
+
+export function isPendingFileReadiness(data: Record<string, unknown> | null): boolean {
+  const observation = readRecord(data?.diagnosticObservation);
+  const scope = readRecord(observation?.scope);
+  if (scope?.kind !== "file") return false;
+
+  const refresh = readRecord(data?.refresh);
+  const attempt = refresh && typeof refresh.operationScope === "string" ? refresh : null;
+  return isFileReadinessPending(attempt, readSemanticHealthState(data?.semanticState));
 }
 
 function readProcessCrashRecovery(value: unknown): ProcessCrashRecoverySummary | null {

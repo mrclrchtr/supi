@@ -110,6 +110,81 @@ describe("code_health TUI projection", () => {
     expect(render(details, true)).not.toContain("stale diagnostic restarts");
   });
 
+  it("labels pending file readiness as warming in compact and expanded views", () => {
+    const details = makeDetails({
+      semanticState: { kind: "ready" },
+      sections: [
+        {
+          key: "diagnostics",
+          title: "Diagnostics",
+          status: "unavailable",
+          confidence: "unavailable",
+          provenance: [],
+          itemCount: 0,
+          available: false,
+        },
+        {
+          key: "servers",
+          title: "Servers",
+          status: "complete",
+          confidence: "semantic",
+          provenance: [{ source: "semantic", capability: "LSP" }],
+          itemCount: 1,
+          available: true,
+        },
+      ],
+      diagnosticObservation: {
+        kind: "unavailable",
+        scope: { kind: "file", path: "/repo/src/a.ts" },
+        entries: [],
+        evidence: {
+          requested: 1,
+          confirmed: 0,
+          unconfirmed: 1,
+          failed: 0,
+          removed: 0,
+          documents: [{ file: "/repo/src/a.ts", status: "unconfirmed" }],
+        },
+        reason: "Fresh diagnostics were not confirmed.",
+      },
+      refresh: {
+        kind: "completed",
+        operationScope: "file-runtime",
+        attemptedActiveClients: 0,
+        fileReadiness: "pending",
+        restartedClients: 0,
+      },
+    });
+
+    const compact = render(details).replace(/\s+/g, " ");
+    expect(compact).toContain("diag pending");
+    expect(compact).toContain("LSP may still be warming; retry shortly");
+
+    const expanded = render(details, true).replace(/\s+/g, " ");
+    expect(expanded).toContain("file maintenance attempt waiting");
+    expect(expanded).toContain("Diagnostics pending — LSP may still be warming; retry shortly");
+    expect(expanded).not.toContain("Diagnostics unavailable");
+
+    const retained = render(
+      {
+        ...details,
+        semanticState: { kind: "pending", reason: "LSP is still starting" },
+        refresh: {
+          kind: "not-requested",
+          lastAttempt: {
+            kind: "completed",
+            operationScope: "file-runtime",
+            fileReadiness: "pending",
+            attemptedActiveClients: 0,
+            restartedClients: 0,
+          },
+        },
+      },
+      true,
+    ).replace(/\s+/g, " ");
+    expect(retained).toContain("last file maintenance attempt waiting");
+  });
+
   it("does not add stale restart text to a retained no-op attempt", () => {
     const details = makeDetails({
       refresh: {

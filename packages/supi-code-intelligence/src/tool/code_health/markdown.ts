@@ -11,14 +11,15 @@ import {
   formatProjectServerRouteSummary,
   formatProjectServerStatusReason,
 } from "../../analysis/health/server-status.ts";
+import { makeRelative, renderFileScopeStatus } from "./file-scope-markdown.ts";
 import {
   formatProcessCrashRecovery,
   formatRefreshElapsed,
   formatStaleDiagnosticRestarts as formatStaleDiagnosticRestartsText,
+  isFileReadinessPending,
 } from "./refresh-outcome.ts";
 import type {
   HealthData,
-  HealthDiagnosticObservation,
   HealthDiagnosticScope,
   HealthRefreshAttempt,
   HealthResultAssembly,
@@ -53,13 +54,15 @@ function renderRefreshStatus(
   if (!hasDiagnostics) return;
 
   switch (data.refresh.kind) {
-    case "completed":
+    case "completed": {
+      const fileReadinessPending = isFileReadinessPending(data.refresh, data.semanticState);
       lines.push(
-        `**${refreshAttemptLabel(data.refresh)}**: ${asSentence(completedRefreshText(data.refresh))}`,
+        `**${refreshAttemptLabel(data.refresh)}**: ${asSentence(completedRefreshText(data.refresh, fileReadinessPending))}`,
       );
       lines.push(`**Stale assessment**: ${asSentence(staleAssessmentText(data.refresh))}`);
       lines.push("");
       return;
+    }
     case "failed": {
       const evidence = data.refresh.diagnosticEvidence
         ? `; ${formatDiagnosticEvidence(data.refresh.diagnosticEvidence)}`
@@ -93,15 +96,19 @@ function renderRefreshStatus(
 
 function completedRefreshText(
   attempt: Extract<HealthRefreshAttempt, { kind: "completed" }>,
+  fileReadinessPending = attempt.fileReadiness === "pending",
 ): string {
   const processCrashRecovery = formatProcessCrashRecovery(attempt.processCrashRecovery);
   const noOp =
+    !fileReadinessPending &&
     attempt.attemptedActiveClients === 0 &&
     attempt.restartedClients === 0 &&
     processCrashRecovery === null;
-  const base = noOp
-    ? "completed no-op — no active clients were targeted"
-    : `completed — ${attempt.attemptedActiveClients} active client${plural(attempt.attemptedActiveClients)} targeted`;
+  const base = fileReadinessPending
+    ? "readiness pending — LSP may still be warming; retry shortly"
+    : noOp
+      ? "completed no-op — no active clients were targeted"
+      : `completed — ${attempt.attemptedActiveClients} active client${plural(attempt.attemptedActiveClients)} targeted`;
   const staleRestart = noOp ? null : formatStaleDiagnosticRestarts(attempt);
   const outcome = [staleRestart, processCrashRecovery].filter(
     (value): value is string => value !== null,
@@ -222,49 +229,6 @@ function renderDiagnosticsSection(lines: string[], data: HealthData, cwd: string
   lines.push("");
 }
 
-/**
- * Render the tsconfig coverage verdict for a single-file health request.
- *
- * Written in plain vocabulary (no basis terms) so a reader without tsconfig
- * background can act on it: the sentence names the deciding config and states
- * whether the file's errors are part of workspace diagnostics. The structured
- * decision basis stays in the diagnostics.scope debug event.
- */
-function renderFileScopeStatus(
-  lines: string[],
-  observation: Extract<
-    HealthDiagnosticObservation,
-    { kind: "completed" | "partial" | "unavailable" }
-  >,
-  cwd: string,
-): void {
-  if (observation.scope.kind !== "file" || !observation.scopeStatus) return;
-
-  const decision = observation.scopeStatus;
-  switch (decision.status) {
-    case "included":
-      lines.push(
-        `**Tsconfig**: covered by ${formatConfigPath(decision.configPath, cwd)} — part of workspace diagnostics.`,
-      );
-      return;
-    case "excluded":
-      lines.push(
-        `**Tsconfig**: NOT covered by ${formatConfigPath(decision.configPath, cwd)} — not part of workspace diagnostics.`,
-      );
-      return;
-    case "no-config":
-      lines.push("**Tsconfig**: no tsconfig.json or jsconfig.json found — nothing filtered.");
-      return;
-    case "out-of-tree":
-      lines.push("**Tsconfig**: outside the project root — not part of workspace diagnostics.");
-  }
-}
-
-function formatConfigPath(configPath: string | null, cwd: string): string {
-  if (!configPath) return "no config";
-  return `\`${makeRelative(cwd, configPath)}\``;
-}
-
 function formatDiagnosticEvidence(evidence: {
   requested: number;
   confirmed: number;
@@ -279,7 +243,14 @@ function renderDiagnosticObservation(lines: string[], data: HealthData, cwd: str
   const observation = data.diagnostics;
   if (observation.kind === "not-requested") return;
   if (observation.kind === "unavailable") {
-    lines.push(`Diagnostics unavailable — ${asSentence(observation.reason)}`);
+    if (
+      observation.scope.kind === "file" &&
+      isFileReadinessPending(currentRefreshAttempt(data), data.semanticState)
+    ) {
+      lines.push("Diagnostics pending — LSP may still be warming; retry shortly.");
+    } else {
+      lines.push(`Diagnostics unavailable — ${asSentence(observation.reason)}`);
+    }
     return;
   }
   if (observation.kind === "partial") {
@@ -296,6 +267,10 @@ function renderDiagnosticObservation(lines: string[], data: HealthData, cwd: str
     return;
   }
   renderDiagnosticEntries(lines, data, cwd);
+}
+
+function currentRefreshAttempt(data: HealthData): HealthRefreshAttempt | null {
+  return data.refresh.kind === "completed" || data.refresh.kind === "failed" ? data.refresh : null;
 }
 
 function asSentence(text: string): string {
@@ -399,8 +374,4 @@ function formatDiagnosticScope(scope: HealthDiagnosticScope, cwd: string): strin
 
 function plural(count: number): string {
   return count === 1 ? "" : "s";
-}
-
-function makeRelative(cwd: string, file: string): string {
-  return file.startsWith(cwd) ? file.slice(cwd.length + 1) : file;
 }

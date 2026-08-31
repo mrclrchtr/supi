@@ -1,4 +1,20 @@
 import type { ProcessCrashRecoverySummary } from "@mrclrchtr/supi-lsp/api";
+import type { SemanticHealthState } from "../../session/health-types.ts";
+
+/** Report whether a file health result is waiting for semantic readiness. */
+export function isFileReadinessPending(
+  attempt: { operationScope?: string; fileReadiness?: string } | null | undefined,
+  semanticState: SemanticHealthState | null | undefined,
+): boolean {
+  if (attempt?.operationScope !== undefined) {
+    return (
+      attempt.operationScope === "file-runtime" &&
+      (attempt.fileReadiness === "pending" ||
+        (attempt.fileReadiness === undefined && semanticState?.kind === "pending"))
+    );
+  }
+  return semanticState?.kind === "pending";
+}
 
 /** Format the outcome of stale-diagnostic client restarts. */
 export function formatStaleDiagnosticRestarts(restartedClients: number): string {

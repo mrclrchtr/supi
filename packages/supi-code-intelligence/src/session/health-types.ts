@@ -94,6 +94,9 @@ export interface HealthStaleAssessment {
 
 export type HealthRefreshOperationScope = "file-runtime" | "workspace-runtime";
 
+/** Readiness result for a file-scoped maintenance attempt. */
+export type HealthFileReadiness = "ready" | "pending" | "unavailable";
+
 /** Shared facts for one completed refresh or file-maintenance attempt. */
 interface CompletedHealthRefreshAttempt {
   readonly kind: "completed";
@@ -104,6 +107,8 @@ interface CompletedHealthRefreshAttempt {
   readonly requestedDiagnosticScope: HealthDiagnosticScope;
   /** Active clients targeted by the best-effort operation; this is not a confirmed-success count. */
   readonly attemptedActiveClients: number;
+  /** File readiness after the bounded wait, when this is file-scoped. */
+  readonly fileReadiness?: HealthFileReadiness;
   /** Clients restarted by stale-diagnostic recovery. */
   readonly restartedClients: number;
   /** Separate outcome for process-crash route recovery. */
@@ -139,6 +144,8 @@ export type HealthRefreshAttempt =
       readonly diagnosticEvidence?: DiagnosticEvidenceSummary;
       /** Process-crash outcome, when the recovery pass returned one. */
       readonly processCrashRecovery?: ProcessCrashRecoverySummary;
+      /** File readiness outcome, when a file-scoped attempt failed. */
+      readonly fileReadiness?: HealthFileReadiness;
       readonly reason: string;
     };
 

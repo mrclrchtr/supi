@@ -801,6 +801,32 @@ describe("code_health refresh evidence", () => {
     expect(recoverDiagnostics).not.toHaveBeenCalled();
   });
 
+  it("records bounded file readiness as pending instead of a no-op", async () => {
+    const file = path.join(cwd, "source.ts");
+    writeFileSync(file, "export const value = 1;\n");
+    const runtime = readyRuntime({
+      waitUntilReadyForFile: vi.fn(async () => ({ kind: "timeout" })),
+    });
+
+    const { outcome } = await run(
+      { kind: "ready", runtime },
+      { scope: file, include: ["diagnostics"], refresh: true },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: {
+        semanticState: { kind: "pending" },
+        refresh: {
+          kind: "completed",
+          operationScope: "file-runtime",
+          attemptedActiveClients: 0,
+          fileReadiness: "pending",
+        },
+      },
+    });
+  });
+
   it("rejects a file-scoped refresh when the caller is already aborted", async () => {
     const file = path.join(cwd, "source.ts");
     writeFileSync(file, "export const value = 1;\n");

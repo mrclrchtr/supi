@@ -361,6 +361,7 @@ describe("code_health tool", () => {
     expect(result.details?.data.diagnosticObservation).toEqual(
       expect.objectContaining({ kind: "unavailable", reason }),
     );
+    expect(result.content[0]?.text).toContain("Diagnostics pending — LSP may still be warming");
     expect(result.content[0]?.text).toContain(reason);
   });
 

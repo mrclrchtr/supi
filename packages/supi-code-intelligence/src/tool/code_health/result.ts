@@ -19,6 +19,7 @@ export type {
   HealthDiagnosticEntry,
   HealthDiagnosticObservation,
   HealthDiagnosticScope,
+  HealthFileReadiness,
   HealthRefreshAttempt,
   HealthRefreshState,
   HealthSection,
