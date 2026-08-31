@@ -16,7 +16,6 @@ function server(
     fileTypes: ["ts"],
     status,
     statusReason,
-    supportedActions: [],
     openFiles: [],
     ready: status === "running",
   };

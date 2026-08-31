@@ -146,7 +146,6 @@ function createReadyTestLspRuntime(cwd: string): WorkspaceLspRuntime {
         root: cwd,
         fileTypes: ["ts"],
         status: "running",
-        supportedActions: [],
         openFiles: [],
         ready: true,
       },

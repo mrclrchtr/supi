@@ -21,9 +21,18 @@ import type { ClientDiagnosticSnapshot } from "../client/client-document-state.t
 
 export { RECOVERY_CLIENT_STARTUP_BOUND_MS } from "../client/client.ts";
 
-import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
+import {
+  recordDebugEvent,
+  truncateDebugIdentity as truncateIdentity,
+} from "@mrclrchtr/supi-core/debug";
+import { resolveToolPath as resolveSessionPath, uriToFile } from "@mrclrchtr/supi-core/path";
 import { getServerForFile } from "../config/config.ts";
-import { getFileScopeDecision } from "../config/tsconfig-scope.ts";
+import {
+  getFileScopeDecision,
+  invalidateTsconfigCacheForConfig,
+  invalidateTsconfigCacheForConfigDir,
+  isProjectConfigFileName,
+} from "../config/tsconfig-scope.ts";
 import type {
   DetectedProjectServer,
   Diagnostic,
@@ -35,7 +44,8 @@ import type {
   SymbolInformation,
   WorkspaceSymbol,
 } from "../config/types.ts";
-import { boundCwd, truncateIdentity } from "../debug-telemetry.ts";
+import { FileChangeType } from "../config/types.ts";
+import { boundCwd } from "../debug-telemetry.ts";
 import {
   accumulateOutstandingDiagnostics,
   collectDiagnosticSummaryCounts,
@@ -69,7 +79,7 @@ import {
   normalizeRelevantPaths,
   shouldIgnoreLspPath,
 } from "../summary.ts";
-import { commandExists, resolveSessionPath, uriToFile } from "../utils.ts";
+import { commandExists } from "../utils.ts";
 import {
   type AutomaticLspPathPolicy,
   createDefaultAutomaticLspPathPolicy,
@@ -229,8 +239,10 @@ export class LspManager {
   private unavailable = new Map<string, UnavailableReason>();
   /** Memoized per-command availability of LSP server binaries on PATH */
   private commandAvailability = new Map<string, boolean>();
-  /** Guards against concurrent client creation for the same server:root key */
+  /** Guards against concurrent client creation for the same server:root key. */
   private pendingStarts = new Map<string, Promise<LspClient | null>>();
+  /** Shared diagnostic-recovery restart for each replaceable client route. */
+  private pendingRestarts = new Map<string, Promise<{ files: string[]; restarted: boolean }>>();
   /** Monotonic ownership generation for each replaceable client route. */
   private clientGenerations = new Map<string, number>();
   /** Preferred project roots discovered by proactive scan or lazy startup */
@@ -886,32 +898,60 @@ export class LspManager {
     const seen = new Set<string>();
 
     for (const filePath of filePaths) {
-      const client = this.getExistingClientForFile(filePath);
-      if (!client) continue;
-      if (options?.pushOnly && client.hasDiagnosticProvider) continue;
-
-      const key = clientKey(client.name, client.root);
-      const processRecovery = this.processCrashRecoveries.get(key);
-      if (processRecovery?.pending) continue;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      if (this.recoveryRestartEpochs.get(key) === this.invalidationEpoch) continue;
+      const candidate = this.getRestartCandidate(filePath, options?.pushOnly === true, seen);
+      if (!candidate) continue;
+      const { client, key } = candidate;
 
       // Observe cancellation between route restarts so a cancelled pass does
       // not keep restarting further clients.
       throwIfCodeRequestInterrupted(options?.control);
-      const result = await this.restartClient(client);
-      this.recoveryRestartEpochs.set(key, this.invalidationEpoch);
+      const restartPromise = this.pendingRestarts.get(key) ?? this.startSharedRestart(client, key);
+      const result = await raceRequestControl(restartPromise, options?.control);
       restarted.push({ key, serverName: client.name, ...result });
     }
 
     return restarted;
   }
 
+  private startSharedRestart(
+    client: LspClient,
+    key: string,
+  ): Promise<{ files: string[]; restarted: boolean }> {
+    const restartEpoch = this.invalidationEpoch;
+    const restartPromise = this.restartClient(client).then((result) => {
+      this.recoveryRestartEpochs.set(key, restartEpoch);
+      return result;
+    });
+    this.pendingRestarts.set(key, restartPromise);
+    void restartPromise
+      .finally(() => {
+        if (this.pendingRestarts.get(key) === restartPromise) this.pendingRestarts.delete(key);
+      })
+      .catch(() => {});
+    return restartPromise;
+  }
+
+  private getRestartCandidate(
+    filePath: string,
+    pushOnly: boolean,
+    seen: Set<string>,
+  ): { client: LspClient; key: string } | null {
+    const client = this.getExistingClientForFile(filePath);
+    if (!client || (pushOnly && client.hasDiagnosticProvider)) return null;
+
+    const key = clientKey(client.name, client.root);
+    if (this.processCrashRecoveries.get(key)?.pending || seen.has(key)) return null;
+    seen.add(key);
+    if (this.recoveryRestartEpochs.get(key) === this.invalidationEpoch) return null;
+    return { client, key };
+  }
+
   private async restartClient(client: LspClient): Promise<{ files: string[]; restarted: boolean }> {
     const key = clientKey(client.name, client.root);
     const serverConfig = this.config.servers[client.name];
-    if (!serverConfig) return { files: [], restarted: false };
+    if (!serverConfig || this.clients.get(key) !== client) {
+      return { files: [], restarted: false };
+    }
 
     const openFiles = client.openFiles;
     const trackedDiagnosticFiles = client
@@ -924,6 +964,7 @@ export class LspManager {
       // Ignore shutdown failures when forcing a restart.
     }
 
+    if (this.clients.get(key) !== client) return { files, restarted: false };
     this.clients.delete(key);
     this.unavailable.delete(key);
     this.clearWarmedWorkspaceSymbolProjects(client.name, client.root);
@@ -940,12 +981,18 @@ export class LspManager {
         RECOVERY_CLIENT_STARTUP_BOUND_MS,
         "replacement client startup bound exceeded",
       );
+      if (this.clients.get(key) !== replacement || this.shuttingDown) {
+        void replacement.forceKill().catch(() => {});
+        return { files, restarted: false };
+      }
       this.restoreTrackedDocuments(replacement, files);
       this.clearUnconsumedProcessCrashState(key, client);
       return { files, restarted: true };
     } catch {
-      this.clients.delete(key);
-      this.unavailable.set(key, "start-failed");
+      if (this.clients.get(key) === replacement) {
+        this.clients.delete(key);
+        this.unavailable.set(key, "start-failed");
+      }
       // A bound-exceeded start may have spawned a live process; terminate
       // the tree so the orphan cannot outlive the failed restart.
       void replacement.forceKill().catch(() => {});
@@ -1152,6 +1199,7 @@ export class LspManager {
    */
   noteWorkspaceChanges(changes: FileEvent[]): void {
     if (changes.length > 0) this.invalidationEpoch++;
+    invalidateProjectConfigCaches(changes);
     this.notifyWorkspaceFileChanges(changes);
   }
 
@@ -1284,6 +1332,7 @@ export class LspManager {
     this.warmedWorkspaceSymbolProjects.clear();
     this.warmedSemanticProjects.clear();
     this.pendingWarmProbes.clear();
+    this.pendingRestarts.clear();
   }
   /** Get status of all servers. */
   getRunningClientCount(): number {
@@ -1739,28 +1788,21 @@ export class LspManager {
       for (const target of warmTargets) {
         const projectKey = this.workspaceSymbolProjectKey(client.name, target.projectRoot);
         if (this.warmedWorkspaceSymbolProjects.has(projectKey)) continue;
-        if (this.hasOpenFileInProject(client, target.projectRoot)) {
-          this.warmedWorkspaceSymbolProjects.add(projectKey);
-          continue;
-        }
 
         const openedClient = await this.ensureFileOpen(target.file);
         if (!openedClient) continue;
 
         // A cancelled pass must not mark projects warmed on its way out.
         throwIfCodeRequestInterrupted(control);
-        this.warmedWorkspaceSymbolProjects.add(projectKey);
-        warmedAny = true;
-
-        const symbols = control
-          ? await openedClient.documentSymbols(target.file, control)
-          : await openedClient.documentSymbols(target.file);
-        if (symbols.kind !== "unavailable") {
-          const hoverPosition = getWarmPosition(symbols.data);
-          if (hoverPosition) {
-            if (control) await openedClient.hover(target.file, hoverPosition, control);
-            else await openedClient.hover(target.file, hoverPosition);
-          }
+        const available = await this.probeDocumentSymbols(
+          openedClient,
+          target.file,
+          getWarmPosition,
+          control,
+        );
+        if (available) {
+          this.warmedWorkspaceSymbolProjects.add(projectKey);
+          warmedAny = true;
         }
 
         const collected = await collect(this.clients.values(), query);
@@ -1805,39 +1847,56 @@ export class LspManager {
     try {
       await raceRequestControl(probe, control);
     } finally {
-      this.pendingWarmProbes.delete(projectKey);
+      if (this.pendingWarmProbes.get(projectKey) === probe) {
+        this.pendingWarmProbes.delete(projectKey);
+      }
     }
   }
 
   private async performWarmProbe(
-    _client: LspClient,
+    client: LspClient,
     resolvedFile: string,
     projectKey: string,
     control?: CodeRequestControl,
   ): Promise<void> {
+    const key = clientKey(client.name, client.root);
+    if (this.clients.get(key) !== client) return;
     const openedClient = await this.ensureFileOpen(resolvedFile);
-    if (!openedClient) return;
-
-    this.warmedSemanticProjects.add(projectKey);
+    if (!openedClient || openedClient !== client || this.clients.get(key) !== client) return;
 
     // The probe is shared state for concurrent callers. One caller's
     // cancellation must not cancel the shared in-flight queries, so only the
     // Debug Operation ID is forwarded; each caller races its own wait above.
     const sharedControl = { operationId: control?.operationId };
-    const symbols = await openedClient.documentSymbols(resolvedFile, sharedControl);
-    if (symbols.kind === "unavailable") return;
-    const hoverPosition = getWorkspaceSymbolWarmPosition(symbols.data);
-    if (hoverPosition) {
-      await openedClient.hover(resolvedFile, hoverPosition, sharedControl);
+    const available = await this.probeDocumentSymbols(
+      openedClient,
+      resolvedFile,
+      getWorkspaceSymbolWarmPosition,
+      sharedControl,
+    );
+    if (available && this.clients.get(key) === client) {
+      this.warmedSemanticProjects.add(projectKey);
     }
   }
 
-  private hasOpenFileInProject(client: LspClient, projectRoot: string): boolean {
-    return client.openFiles.some(
-      (openFile) =>
-        this.automaticPathPolicy.isEligible(openFile) &&
-        projectRoots.isWithinOrEqual(projectRoot, openFile),
-    );
+  private async probeDocumentSymbols(
+    client: LspClient,
+    file: string,
+    getWarmPosition: (
+      symbols: import("../config/types.ts").DocumentSymbol[] | SymbolInformation[] | null,
+    ) => import("../config/types.ts").Position | null,
+    control?: CodeRequestControl,
+  ): Promise<boolean> {
+    const symbols = control
+      ? await client.documentSymbols(file, control)
+      : await client.documentSymbols(file);
+    if (symbols.kind === "unavailable") return false;
+    const hoverPosition = getWarmPosition(symbols.data);
+    if (hoverPosition) {
+      if (control) await client.hover(file, hoverPosition, control);
+      else await client.hover(file, hoverPosition);
+    }
+    return true;
   }
 
   private workspaceSymbolProjectKey(serverName: string, projectRoot: string): string {
@@ -1868,6 +1927,17 @@ export class LspManager {
       if (key === prefix || key.startsWith(`${prefix}${path.sep}`)) {
         this.pendingWarmProbes.delete(key);
       }
+    }
+  }
+}
+
+function invalidateProjectConfigCaches(changes: readonly FileEvent[]): void {
+  for (const change of changes) {
+    const configPath = uriToFile(change.uri);
+    if (!isProjectConfigFileName(path.basename(configPath))) continue;
+    invalidateTsconfigCacheForConfig(configPath);
+    if (change.type === FileChangeType.Created) {
+      invalidateTsconfigCacheForConfigDir(path.dirname(configPath));
     }
   }
 }

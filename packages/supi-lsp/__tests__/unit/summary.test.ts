@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { clearTsconfigCache } from "../../src/config/tsconfig-scope.ts";
-import { isInProjectTree, isProjectSource, shouldIgnoreLspPath } from "../../src/summary.ts";
+import { isInProjectTree, shouldIgnoreLspPath } from "../../src/summary.ts";
 import { createAutomaticLspPathPolicy } from "../../src/workspace-path-policy.ts";
 
 let tmpDir: string;
@@ -54,16 +54,6 @@ describe("isInProjectTree", () => {
 
   it("returns false for out-of-tree files", () => {
     expect(isInProjectTree("/other/project/file.ts", policy)).toBe(false);
-  });
-});
-
-describe("isProjectSource", () => {
-  it("matches isInProjectTree (no tsconfig exclusion)", () => {
-    // A tsconfig-excluded file should still be considered a project source
-    // for formatting/navigation purposes
-    expect(isProjectSource(path.join(tmpDir, "src", "__tests__", "app.test.ts"), policy)).toBe(
-      true,
-    );
   });
 });
 

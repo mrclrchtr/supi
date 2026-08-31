@@ -5,7 +5,7 @@ import type { ManagerLifecycleTransition } from "../../src/manager/manager.ts";
 
 const mocks = vi.hoisted(() => ({
   clearRuntime: vi.fn(),
-  loadLspSettings: vi.fn().mockReturnValue({ enabled: true, active: [], exclude: [] }),
+  loadLspSettings: vi.fn().mockReturnValue({ exclude: [] }),
   scanProjectCapabilities: vi.fn().mockReturnValue([]),
   managers: [] as Array<{
     emit(transition: unknown): void;
@@ -89,7 +89,6 @@ const readyServer: ProjectServerInfo = {
   root: "/project",
   fileTypes: ["ts"],
   status: "running",
-  supportedActions: [],
   openFiles: [],
   ready: true,
 };
@@ -107,7 +106,7 @@ function managerTransition(
 afterEach(() => {
   mocks.managers.length = 0;
   mocks.owners.length = 0;
-  mocks.loadLspSettings.mockReset().mockReturnValue({ enabled: true, active: [], exclude: [] });
+  mocks.loadLspSettings.mockReset().mockReturnValue({ exclude: [] });
   mocks.scanProjectCapabilities.mockReset().mockReturnValue([]);
   vi.clearAllMocks();
 });
@@ -155,11 +154,7 @@ describe("LspRuntimeController lifecycle projection", () => {
     expect(firstPolicy.isEligible("/project/generated/file.ts")).toBe(true);
     expect(firstPolicy.isEligible("/project/.pi/private.ts")).toBe(false);
 
-    mocks.loadLspSettings.mockReturnValue({
-      enabled: true,
-      active: [],
-      exclude: ["generated/"],
-    });
+    mocks.loadLspSettings.mockReturnValue({ exclude: ["generated/"] });
     await controller.start();
 
     const secondPolicy = mocks.scanProjectCapabilities.mock.calls[1]?.[3] as {

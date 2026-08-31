@@ -1,11 +1,12 @@
 /** Runtime parsers for health and refactor session workflows. */
 
 import type { HealthSection, HealthWorkflowInput } from "../health-types.ts";
-import type {
-  PublicSourceRange,
-  RefactorApplyWorkflowInput,
-  RefactorOperationInput,
-  RefactorPlanWorkflowInput,
+import {
+  PUBLIC_REFACTOR_OPERATION_NAMES,
+  type PublicSourceRange,
+  type RefactorApplyWorkflowInput,
+  type RefactorOperationInput,
+  type RefactorPlanWorkflowInput,
 } from "../refactor-types.ts";
 import type { RefactorTargetInput } from "../target-input.ts";
 import {
@@ -94,22 +95,23 @@ export function parseRefactorPlanWorkflowInput(
 function parseRefactorOperation(value: unknown): InputValidation<RefactorOperationInput> {
   const record = requireRecord(value, "operation");
   if (record.kind === "invalid-input") return record;
-  const keysError = requireOnlyKeys(
-    record.value,
-    ["rename_symbol", "extract_function", "extract_variable"],
-    "operation",
-  );
+  const keysError = requireOnlyKeys(record.value, PUBLIC_REFACTOR_OPERATION_NAMES, "operation");
   if (keysError) return invalid(keysError);
-  const selected = (["rename_symbol", "extract_function", "extract_variable"] as const).filter(
-    (key) => record.value[key] !== undefined,
-  );
+  const selected = PUBLIC_REFACTOR_OPERATION_NAMES.filter((key) => record.value[key] !== undefined);
   if (selected.length !== 1) return invalid("Select exactly one refactor operation.");
 
   const name = selected[0];
   const payload = requireRecord(record.value[name], `operation.${name}`);
   if (payload.kind === "invalid-input") return payload;
   if (name === "rename_symbol") return parseRenameOperation(payload.value);
-  return parseExtractOperation(name, payload.value);
+  if (name === "extract_function" || name === "extract_variable") {
+    return parseExtractOperation(name, payload.value);
+  }
+  const payloadError = requireOnlyKeys(payload.value, [], `operation.${name}`);
+  if (payloadError) return invalid(payloadError);
+  return name === "update_imports"
+    ? valid({ update_imports: {} })
+    : valid({ delete_dead_code: {} });
 }
 
 function parseRenameOperation(

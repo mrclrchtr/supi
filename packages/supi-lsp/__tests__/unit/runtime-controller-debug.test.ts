@@ -4,7 +4,6 @@ import {
   boundCwd,
   LSP_REQUEST_TIMEOUT_ERROR_CODE,
   MAX_SERVERS,
-  truncateIdentity,
 } from "../../src/debug-telemetry.ts";
 
 const mocks = vi.hoisted(() => ({
@@ -13,6 +12,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@mrclrchtr/supi-core/debug", () => ({
   recordDebugEvent: mocks.recordDebugEvent,
+  truncateDebugIdentity: (value: string) =>
+    value.length <= 512 ? value : `${value.slice(0, 511)}…`,
 }));
 
 import type { LspRuntimeTransition } from "../../src/session/runtime-controller.ts";
@@ -24,7 +25,6 @@ const servers: ProjectServerInfo[] = [
     root: "/project",
     fileTypes: ["ts"],
     status: "running",
-    supportedActions: [],
     openFiles: ["src/a.ts", "src/b.ts"],
     ready: true,
   },
@@ -33,7 +33,6 @@ const servers: ProjectServerInfo[] = [
     root: "/project",
     fileTypes: ["sh"],
     status: "running",
-    supportedActions: [],
     openFiles: [],
     ready: false,
   },
@@ -42,7 +41,6 @@ const servers: ProjectServerInfo[] = [
     root: "/project",
     fileTypes: ["py"],
     status: "error",
-    supportedActions: [],
     openFiles: [],
     ready: false,
   },
@@ -132,7 +130,6 @@ describe("LSP runtime transition telemetry", () => {
         root: "/project",
         fileTypes: ["ts"],
         status: "running" as const,
-        supportedActions: [],
         openFiles: [],
         ready: index % 2 === 0,
       }),
@@ -162,10 +159,8 @@ describe("LSP runtime transition telemetry", () => {
     expect(data.servers[0].name.length).toBe(512);
   });
 
-  it("documents the bounded-identity constants", () => {
+  it("bounds telemetry constants and cwd identity", () => {
     expect(MAX_SERVERS).toBe(16);
-    expect(truncateIdentity("short")).toBe("short");
-    expect(truncateIdentity("x".repeat(512))).toBe("x".repeat(512));
     expect(LSP_REQUEST_TIMEOUT_ERROR_CODE).toBe(-32095);
     // Event-level cwd bounding: undefined stays absent, long roots truncate.
     expect(boundCwd(undefined)).toBeUndefined();

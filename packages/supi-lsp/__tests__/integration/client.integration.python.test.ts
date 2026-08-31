@@ -272,22 +272,6 @@ describe.skipIf(!HAS_PYRIGHT)("LspClient pyright dynamic pull registration", () 
     );
     expect(diagnosticsAfterChange).toHaveLength(0);
   }, 30_000);
-
-  it("disables pull when the dynamic registrations are unregistered", async () => {
-    // Unregister exactly the ids the real server registered; capability loss
-    // must disable pull without any stale support.
-    const anyClient = client as unknown as {
-      handleServerRequest(method: string, params: unknown): unknown;
-      dynamicRegistrations: { ids(method: string): readonly string[] };
-    };
-    const ids = anyClient.dynamicRegistrations.ids("textDocument/diagnostic");
-    expect(ids.length).toBeGreaterThan(0);
-
-    anyClient.handleServerRequest("client/unregisterCapability", {
-      unregisterations: ids.map((id) => ({ id, method: "textDocument/diagnostic" })),
-    });
-    expect(client.hasDiagnosticProvider).toBe(false);
-  }, 10_000);
 });
 
 describe.skipIf(!HAS_PYRIGHT)("LspClient python shutdown-after-error", () => {

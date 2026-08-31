@@ -123,7 +123,7 @@ The authoritative final readiness classification—ready, pending, inactive, dis
 _Avoid_: runtime availability, capability publication status, configured-route availability, vacuous readiness, optimistic diagnostics
 
 **Capability Warning**:
-An actionable notice that Code intelligence capability is reduced or configured through obsolete settings. It concerns the ability to produce code evidence, not software test coverage.
+An actionable notice that Code intelligence capability is reduced. It concerns the ability to produce code evidence, not software test coverage.
 _Avoid_: degraded coverage, coverage warning
 
 **Live health observation**:
@@ -199,7 +199,7 @@ A syntax-derived outgoing-call evidence atom from the enclosing executable scope
 _Avoid_: semantic callee, caller, reference, treating nested callback calls as direct parent calls
 
 **Refactor plan**:
-A stored, fingerprinted description of a proposed code refactor — its target, operation (e.g. rename or extract), and the exact text edits — produced for inspection and applied later, never silently. Non-mutating by construction.
+A stored, fingerprinted description of a proposed code refactor — its target, operation (such as rename, extract, import cleanup, or dead-code deletion), and exact text edits — produced for inspection and applied later, never silently. Non-mutating by construction.
 _Avoid_: "refactor action", "code action result" (those are advisory, not stored plans)
 
 **Plan-then-apply (planner/applier split)**:

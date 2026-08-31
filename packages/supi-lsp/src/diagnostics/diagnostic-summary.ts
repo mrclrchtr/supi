@@ -1,7 +1,8 @@
+import { uriToFile } from "@mrclrchtr/supi-core/path";
 import { type Diagnostic, DiagnosticSeverity } from "../config/types.ts";
 import type { OutstandingDiagnosticSummaryEntry } from "../manager/manager-types.ts";
 import { displayRelativeFilePath } from "../summary.ts";
-import { uriToFile } from "../utils.ts";
+import { effectiveDiagnosticSeverity } from "./diagnostic-severity.ts";
 
 export function collectDiagnosticSummaryCounts(
   fileDiags: Map<string, { errors: number; warnings: number }>,
@@ -14,8 +15,9 @@ export function collectDiagnosticSummaryCounts(
 
   const current = fileDiags.get(file) ?? { errors: 0, warnings: 0 };
   for (const diagnostic of entry.diagnostics) {
-    if (diagnostic.severity === DiagnosticSeverity.Error) current.errors++;
-    else if (diagnostic.severity === DiagnosticSeverity.Warning) current.warnings++;
+    const severity = effectiveDiagnosticSeverity(diagnostic);
+    if (severity === DiagnosticSeverity.Error) current.errors++;
+    else if (severity === DiagnosticSeverity.Warning) current.warnings++;
   }
   fileDiags.set(file, current);
 }
@@ -44,7 +46,7 @@ export function accumulateOutstandingDiagnostics(
     if (!isDiagnosticWithinThreshold(diagnostic, maxSeverity)) continue;
 
     next.total++;
-    incrementOutstandingDiagnosticCount(next, diagnostic.severity);
+    incrementOutstandingDiagnosticCount(next, effectiveDiagnosticSeverity(diagnostic));
   }
 
   return next;
@@ -54,11 +56,8 @@ export function relativeFilePathFromUri(uri: string, cwd: string): string {
   return displayRelativeFilePath(uriToFile(uri), cwd);
 }
 
-function isDiagnosticWithinThreshold(
-  diagnostic: Diagnostic,
-  maxSeverity: number,
-): diagnostic is Diagnostic & { severity: number } {
-  return diagnostic.severity !== undefined && diagnostic.severity <= maxSeverity;
+function isDiagnosticWithinThreshold(diagnostic: Diagnostic, maxSeverity: number): boolean {
+  return effectiveDiagnosticSeverity(diagnostic) <= maxSeverity;
 }
 
 function incrementOutstandingDiagnosticCount(

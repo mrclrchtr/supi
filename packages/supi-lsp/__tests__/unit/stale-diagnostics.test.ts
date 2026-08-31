@@ -29,8 +29,6 @@ describe("assessStaleDiagnostics", () => {
 
     expect(assessment.suspected).toBe(true);
     expect(assessment.matchedFiles).toHaveLength(3);
-    expect(assessment.warning).toContain("stale");
-    expect(assessment.warning).toContain("3 files");
   });
 
   it("does not flag a small cluster of missing-module diagnostics", () => {

@@ -50,6 +50,8 @@ Public code-intelligence refactors currently use:
 - `rename_symbol` → `textDocument/rename`
 - `extract_function` → matching precise code action
 - `extract_variable` → matching precise code action
+- `update_imports` → matching precise organize-imports code action
+- `delete_dead_code` → matching precise unused-code code action
 
 Only precise text edits cross into refactor plans. Resource/file operations remain unavailable.
 
@@ -79,11 +81,8 @@ During shutdown, `vscode-jsonrpc` may emit `Cannot call write after a stream was
 
 Always-on policy:
 
-- `lsp.enabled` is deprecated and ignored.
-- `lsp.active` is deprecated and ignored.
-- `lsp.servers.<language>.enabled: false` is the only opt-out.
+- `lsp.servers.<language>.enabled: false` is the language opt-out.
 - If every server definition is disabled, startup is a successful disabled state, not a ready runtime with zero servers.
-- `getDeprecatedLspKeys()` lets downstream packages report old keys.
 
 `lsp.exclude` contains gitignore-style patterns for automatic LSP workspace work: discovery, startup, warm-up, tracking, file lists, guidance, and diagnostic summaries not tied to one request. The policy also reads root and nested `.gitignore` files. Built-in private, generated, and dependency directories stay excluded and cannot be enabled again. Explicit semantic requests for one exact file can still route an excluded file; this does not add the file to later automatic work. Diagnostic output keeps its configured suppression.
 

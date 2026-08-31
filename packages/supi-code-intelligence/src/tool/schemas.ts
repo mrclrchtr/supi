@@ -1,5 +1,9 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
+import {
+  PUBLIC_REFACTOR_OPERATION_NAMES,
+  type PublicRefactorOperationName,
+} from "../session/refactor-types.ts";
 import { TARGET_SYMBOL_KINDS } from "../session/target-input.ts";
 
 export const ScopeParam = Type.String({
@@ -127,18 +131,24 @@ const RangeParam = Type.Object(
 
 const NewNameParam = Type.String({ description: "New symbol name.", minLength: 1 });
 
+const RefactorOperationProperties = {
+  rename_symbol: Type.Object({ newName: NewNameParam }, { additionalProperties: false }),
+  extract_function: Type.Object(
+    { newName: NewNameParam, range: RangeParam },
+    { additionalProperties: false },
+  ),
+  extract_variable: Type.Object(
+    { newName: NewNameParam, range: RangeParam },
+    { additionalProperties: false },
+  ),
+  update_imports: Type.Object({}, { additionalProperties: false }),
+  delete_dead_code: Type.Object({}, { additionalProperties: false }),
+} satisfies Record<PublicRefactorOperationName, TSchema>;
+
 export const RefactorOperationParam = exactOneSelector(
-  {
-    rename_symbol: Type.Object({ newName: NewNameParam }, { additionalProperties: false }),
-    extract_function: Type.Object(
-      { newName: NewNameParam, range: RangeParam },
-      { additionalProperties: false },
-    ),
-    extract_variable: Type.Object(
-      { newName: NewNameParam, range: RangeParam },
-      { additionalProperties: false },
-    ),
-  },
+  Object.fromEntries(
+    PUBLIC_REFACTOR_OPERATION_NAMES.map((name) => [name, RefactorOperationProperties[name]]),
+  ),
   "Exactly one refactor operation.",
 );
 

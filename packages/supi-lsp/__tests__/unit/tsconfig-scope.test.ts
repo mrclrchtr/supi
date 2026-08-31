@@ -542,6 +542,27 @@ describe("targeted tsconfig cache invalidation", () => {
     }
   });
 
+  it("replaces a cached lower-priority config when a nested tsconfig is created", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-invalid-nested-create-"));
+    try {
+      const nestedRoot = path.join(tempRoot, "packages/app");
+      fs.mkdirSync(path.join(nestedRoot, "src"), { recursive: true });
+      fs.writeFileSync(path.join(nestedRoot, "jsconfig.json"), '{"include":["**/*.ts"]}');
+      fs.writeFileSync(path.join(nestedRoot, "src/app.ts"), "export const app = true;\n");
+
+      expect(getFileScopeDecision("packages/app/src/app.ts", tempRoot).status).toBe("included");
+
+      const nestedConfig = path.join(nestedRoot, "tsconfig.json");
+      fs.writeFileSync(nestedConfig, '{"include":["other/**/*.ts"]}');
+      invalidateTsconfigCacheForConfig(nestedConfig);
+      invalidateTsconfigCacheForConfigDir(nestedRoot);
+
+      expect(getFileScopeDecision("packages/app/src/app.ts", tempRoot).status).toBe("excluded");
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it("keeps unrelated parsed configs intact after targeted invalidation", () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-invalid-other-"));
     try {

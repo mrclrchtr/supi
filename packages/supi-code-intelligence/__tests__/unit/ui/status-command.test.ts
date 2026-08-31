@@ -40,7 +40,6 @@ function readyProjectServer() {
     status: "running",
     ready: true,
     fileTypes: ["ts", "tsx"],
-    supportedActions: [],
     openFiles: [],
   };
 }

@@ -1,18 +1,18 @@
 /**
  * Capability Warning evaluation for reduced semantic and structural analysis.
  *
- * Normalizes LSP startup state, Tree-sitter health, and deprecated config keys
- * into a structured report consumed by the startup notice, /supi-ci-status,
+ * Normalizes LSP startup state and Tree-sitter health into a structured report
+ * consumed by the startup notice, /supi-ci-status,
  * and code_health.
  */
 
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { loadSupiConfigForScope } from "@mrclrchtr/supi-core/config";
-import { getDeprecatedLspKeys, loadConfig, scanMissingServers } from "@mrclrchtr/supi-lsp/api";
+import { loadConfig, scanMissingServers } from "@mrclrchtr/supi-lsp/api";
 
 /** One actionable warning about reduced Code intelligence capability. */
 export interface CapabilityWarning {
-  type: "deprecated-key" | "language-disabled" | "missing-server" | "structural-unavailable";
+  type: "language-disabled" | "missing-server" | "structural-unavailable";
   message: string;
   language?: string;
   detail?: string;
@@ -31,7 +31,6 @@ export interface CapabilityWarningMissingServerSource {
 
 /** Current runtime/config facts needed to evaluate Capability Warnings. */
 export interface CapabilityWarningInput {
-  deprecatedKeys: ReturnType<typeof getDeprecatedLspKeys>;
   explicitlyDisabledLanguages: string[];
   missingServers: Array<{ name: string; command: string; foundExtensions: string[] }>;
   structuralState: { kind: string; reason?: string };
@@ -40,21 +39,6 @@ export interface CapabilityWarningInput {
 /** Evaluate current capability/configuration facts into a structured warning report. */
 export function evaluateCapabilityWarnings(input: CapabilityWarningInput): CapabilityWarningReport {
   const warnings: CapabilityWarning[] = [];
-
-  if (input.deprecatedKeys.projectEnabled || input.deprecatedKeys.globalEnabled) {
-    warnings.push({
-      type: "deprecated-key",
-      message:
-        "lsp.enabled is deprecated and ignored. Use lsp.servers.<language>.enabled: false for per-language disable.",
-    });
-  }
-  if (input.deprecatedKeys.projectActive || input.deprecatedKeys.globalActive) {
-    warnings.push({
-      type: "deprecated-key",
-      message:
-        "lsp.active is deprecated and ignored. All detected servers are attempted unless explicitly disabled.",
-    });
-  }
 
   for (const language of input.explicitlyDisabledLanguages) {
     warnings.push({
@@ -143,7 +127,6 @@ export function gatherCapabilityWarningInput(
   cwd: string,
   lspController: CapabilityWarningMissingServerSource | null,
 ): CapabilityWarningInput {
-  const deprecatedKeys = getDeprecatedLspKeys(cwd);
   const structuralState = getDefaultWorkspaceRuntime().getWorkspace(cwd).structural.state;
   const explicitlyDisabledLanguages = detectExplicitlyDisabledLanguages(cwd);
   const missingServers = lspController
@@ -151,7 +134,6 @@ export function gatherCapabilityWarningInput(
     : scanMissingServers(loadConfig(cwd), cwd);
 
   return {
-    deprecatedKeys,
     explicitlyDisabledLanguages,
     missingServers,
     structuralState,

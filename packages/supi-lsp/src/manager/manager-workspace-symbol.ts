@@ -102,14 +102,6 @@ export function workspaceSymbolCollectionResult(
   return completedCodeQuery(collection.results);
 }
 
-export async function managerWorkspaceSymbol(
-  clients: Iterable<LspClient>,
-  query: string,
-  control?: CodeRequestControl,
-): Promise<CodeQueryResult<WorkspaceSymbolLike[]>> {
-  return workspaceSymbolCollectionResult(await collectWorkspaceSymbols(clients, query, control));
-}
-
 export function findWorkspaceSymbolWarmTargets(
   root: string,
   rootMarkers: string[],

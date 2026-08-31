@@ -123,8 +123,13 @@ describe("focused code intelligence tool registration", () => {
 
     const planner = propertiesOf(getTool(pi, "code_refactor_plan"));
     expect(planner).toHaveProperty("operation");
-    expect(JSON.stringify(planner.operation)).toContain("rename_symbol");
-    expect(JSON.stringify(planner.operation)).not.toContain('"rename"');
+    const operations = JSON.stringify(planner.operation);
+    expect(operations).toContain("rename_symbol");
+    expect(operations).toContain("update_imports");
+    expect(operations).toContain("delete_dead_code");
+    expect(operations).not.toContain('"rename"');
+    expect(operations).not.toContain("rename_file");
+    expect(operations).not.toContain("move_file");
 
     expect(Object.keys(propertiesOf(getTool(pi, "code_refactor_apply")))).toEqual(["planId"]);
   });

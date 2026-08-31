@@ -122,7 +122,7 @@ A custom server needs a command and at least one file type:
 
 File types do not include a leading dot. If `rootMarkers` is omitted, the server uses the session root.
 
-The `lsp.enabled` and `lsp.active` settings are deprecated and ignored. Disable one language with `lsp.servers.<language>.enabled: false`. Use `/supi-ci-status` from `@mrclrchtr/supi-code-intelligence` to see detected, running, and missing servers.
+Disable one language with `lsp.servers.<language>.enabled: false`. Use `/supi-ci-status` from `@mrclrchtr/supi-code-intelligence` to see detected, running, and missing servers.
 
 ## What it provides
 
@@ -209,7 +209,7 @@ Detected servers start concurrently. In a polyglot workspace, disable unneeded l
 }
 ```
 
-The old `lsp.enabled` and `lsp.active` settings are deprecated and ignored. If every server definition is disabled, the controller publishes an explicit `disabled` runtime state instead of an empty `ready` runtime. When a ready owner has no active client yet, it stays published for lazy routing while semantic capability remains pending.
+If every server definition is disabled, the controller publishes an explicit `disabled` runtime state instead of an empty `ready` runtime. When a ready owner has no active client yet, it stays published for lazy routing while semantic capability remains pending.
 
 ## Architecture
 

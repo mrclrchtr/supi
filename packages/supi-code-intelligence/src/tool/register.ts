@@ -1,7 +1,10 @@
 import { createHmac, randomBytes } from "node:crypto";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { recordDebugEvent, startDebugTimer } from "@mrclrchtr/supi-core/debug";
-import { truncateIdentity } from "@mrclrchtr/supi-lsp/debug-telemetry";
+import {
+  recordDebugEvent,
+  startDebugTimer,
+  truncateDebugIdentity as truncateIdentity,
+} from "@mrclrchtr/supi-core/debug";
 import type { WorkspaceCodeIntelligenceSession } from "../session/session.ts";
 import {
   CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES,

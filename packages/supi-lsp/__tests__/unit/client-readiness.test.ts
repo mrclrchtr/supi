@@ -4,12 +4,13 @@ import { CodeRequestDeadlineError } from "@mrclrchtr/supi-code-runtime/api";
 import {
   configureDebugRegistry,
   getDebugEvents,
+  DEBUG_IDENTITY_TRUNCATION_MARKER as IDENTITY_TRUNCATION_MARKER,
+  MAX_DEBUG_IDENTITY_STRING as MAX_IDENTITY_STRING,
   resetDebugRegistry,
 } from "@mrclrchtr/supi-core/debug";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProgressToken } from "vscode-languageserver-protocol";
 import { LspClient } from "../../src/client/client.ts";
-import { IDENTITY_TRUNCATION_MARKER, MAX_IDENTITY_STRING } from "../../src/debug-telemetry.ts";
 
 // biome-ignore lint/suspicious/noExplicitAny: accessing private members for testing
 type AnyClient = any;

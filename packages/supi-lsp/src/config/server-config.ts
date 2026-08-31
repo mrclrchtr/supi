@@ -36,7 +36,6 @@ export interface ProjectServerInfo extends DetectedProjectServer {
   status: "running" | "error" | "unavailable";
   /** Structured lifecycle reason when process-crash recovery is active. */
   statusReason?: ProjectServerStatusReason;
-  supportedActions: string[];
   openFiles: string[];
   /** Whether the LSP server is currently not indexing and ready to serve queries. */
   ready: boolean;

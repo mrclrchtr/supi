@@ -3,6 +3,7 @@ import {
   type CodeRequestControl,
   isCodeRequestInterruption,
 } from "@mrclrchtr/supi-code-runtime/api";
+import { uriToFile } from "@mrclrchtr/supi-core/path";
 import type { LspClient } from "../client/client.ts";
 import { getDiagnosticFileState } from "../client/client-file-state.ts";
 import {
@@ -10,7 +11,6 @@ import {
   type DiagnosticEvidenceSummary,
   summarizeDiagnosticEvidence,
 } from "../diagnostics/evidence.ts";
-import { uriToFile } from "../utils.ts";
 
 export function closeFileAcrossClients(clients: Iterable<LspClient>, filePath: string): void {
   const resolvedPath = path.resolve(filePath);

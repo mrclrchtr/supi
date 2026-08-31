@@ -1,6 +1,8 @@
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
-import { startDebugTimer } from "@mrclrchtr/supi-core/debug";
-import { truncateIdentity } from "@mrclrchtr/supi-lsp/debug-telemetry";
+import {
+  startDebugTimer,
+  truncateDebugIdentity as truncateIdentity,
+} from "@mrclrchtr/supi-core/debug";
 import type { StructuralSearchOperation } from "@mrclrchtr/supi-tree-sitter/api";
 import type { StructuredFileAnalysis, StructuredPatternParams } from "./pattern-analysis.ts";
 

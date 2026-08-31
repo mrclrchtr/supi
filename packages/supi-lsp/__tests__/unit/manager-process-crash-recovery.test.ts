@@ -124,6 +124,7 @@ type FakeClient = InstanceType<typeof mocks.FakeClient>;
 
 vi.mock("@mrclrchtr/supi-core/debug", () => ({
   recordDebugEvent: mocks.recordDebugEvent,
+  truncateDebugIdentity: (value: string) => value,
 }));
 
 vi.mock("../../src/client/client.ts", () => ({

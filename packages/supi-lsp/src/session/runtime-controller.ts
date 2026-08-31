@@ -9,12 +9,14 @@
 
 // biome-ignore lint/style/noExcessiveLinesPerFile: session lifecycle, capability projection, and telemetry stay in one controller.
 import type { WorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
+import {
+  recordDebugEvent,
+  truncateDebugIdentity as truncateIdentity,
+} from "@mrclrchtr/supi-core/debug";
 import { loadConfig } from "../config/config.ts";
 import { type LspSettings, loadLspSettings } from "../config/lsp-settings.ts";
 import { clearTsconfigCache } from "../config/tsconfig-scope.ts";
 import type { DetectedProjectServer, LspConfig, ProjectServerInfo } from "../config/types.ts";
-import { truncateIdentity } from "../debug-telemetry.ts";
 import { LspManager, type ManagerLifecycleTransition } from "../manager/manager.ts";
 import {
   type AutomaticLspPathPolicy,
@@ -211,7 +213,6 @@ export class LspRuntimeController {
    *
    * Always attempts detected servers unless they were explicitly disabled
    * per language via `lsp.servers.<language>.enabled: false`.
-   * The global `lsp.enabled` and `lsp.active` keys are deprecated and ignored.
    *
    * Returns the start result and updates the controller's state.
    */
@@ -224,11 +225,6 @@ export class LspRuntimeController {
     if (generation !== this.#readinessGeneration) return supersededStartResult();
 
     const lspSettings = loadLspSettings(this.#cwd);
-    // Note: lspSettings.enabled is ignored — the global switch is deprecated.
-    // Per-language `lsp.servers.<language>.enabled: false` is the supported
-    // way to opt out and is already handled by loadConfig.
-    // lspSettings.active is also ignored — the allowlist is deprecated.
-
     const config = loadConfig(this.#cwd);
 
     try {
@@ -410,7 +406,6 @@ export class LspRuntimeController {
       projectServers: projectServers.map((server) => ({
         ...server,
         fileTypes: [...server.fileTypes],
-        supportedActions: [...server.supportedActions],
         openFiles: [...server.openFiles],
       })),
     };

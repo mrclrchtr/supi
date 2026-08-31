@@ -4,11 +4,11 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { fileToUri } from "@mrclrchtr/supi-core/path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadConfig } from "../../src/config/config.ts";
 import type { Diagnostic } from "../../src/config/types.ts";
 import { LspManager } from "../../src/manager/manager.ts";
-import { fileToUri } from "../../src/utils.ts";
 import { createAutomaticLspPathPolicy } from "../../src/workspace-path-policy.ts";
 import { hasCommand, waitFor } from "../helpers/integration-utils.ts";
 

@@ -1,13 +1,8 @@
 // Public API surface for the LSP session-scoped service.
 
 export { type LoadConfigOptions, loadConfig } from "./config/config.ts";
-export type { DeprecatedLspKeys, LspSettings } from "./config/lsp-settings.ts";
-export {
-  getDeprecatedLspKeys,
-  getLspDisabledMessage,
-  hasDeprecatedLspKeys,
-  loadLspSettings,
-} from "./config/lsp-settings.ts";
+export type { LspSettings } from "./config/lsp-settings.ts";
+export { loadLspSettings } from "./config/lsp-settings.ts";
 export {
   clearTsconfigCache,
   type FileScopeDecision,

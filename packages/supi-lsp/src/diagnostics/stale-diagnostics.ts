@@ -32,7 +32,6 @@ export function assessStaleDiagnostics(
 }
 
 export function isLikelyStaleDiagnostic(diagnostic: Diagnostic): boolean {
-  if (diagnostic.severity === undefined) return false;
   if (diagnostic.code !== undefined) {
     if (typeof diagnostic.code === "number" && MODULE_RESOLUTION_CODES.has(diagnostic.code)) {
       return true;

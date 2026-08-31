@@ -4,9 +4,8 @@ import * as path from "node:path";
 import { dedupeTopmostRoots } from "@mrclrchtr/supi-core/project";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LspConfig } from "../../src/config/types.ts";
-import { LspManager } from "../../src/manager/manager.ts";
+import type { LspManager } from "../../src/manager/manager.ts";
 import {
-  introspectCapabilities,
   scanMissingServers,
   scanProjectCapabilities,
   startDetectedServers,
@@ -208,130 +207,5 @@ describe("dedupeTopmostRoots", () => {
     expect(
       dedupeTopmostRoots(["/tmp/project/packages/a", "/tmp/project", "/tmp/project/packages/b"]),
     ).toEqual(["/tmp/project"]);
-  });
-});
-
-describe("introspectCapabilities", () => {
-  it("returns unavailable status for detected roots without running clients", () => {
-    const root = makeTmpProject();
-    const manager = new LspManager(makeConfig(), root);
-
-    const info = introspectCapabilities(manager, [
-      {
-        name: "typescript",
-        root,
-        fileTypes: ["ts", "tsx"],
-      },
-    ]);
-
-    expect(info).toEqual([
-      expect.objectContaining({
-        name: "typescript",
-        root,
-        fileTypes: ["ts", "tsx"],
-        status: "unavailable",
-        supportedActions: [],
-        openFiles: [],
-      }),
-    ]);
-  });
-
-  it("includes lazily-started servers discovered after the initial scan", () => {
-    const root = makeTmpProject();
-    const manager = new LspManager(makeConfig(), root);
-
-    (
-      manager as unknown as {
-        clients: Map<
-          string,
-          {
-            name: string;
-            root: string;
-            status: "running";
-            openFiles: string[];
-            serverCapabilities: {
-              hoverProvider: boolean;
-              referencesProvider: boolean;
-            };
-          }
-        >;
-      }
-    ).clients.set("typescript:/tmp/lazy", {
-      name: "typescript",
-      root: "/tmp/lazy",
-      status: "running",
-      openFiles: [path.join(root, "src", "index.ts")],
-      serverCapabilities: {
-        hoverProvider: true,
-        referencesProvider: true,
-      },
-    });
-
-    const info = introspectCapabilities(manager, []);
-    const expectedActions = [
-      ["diagnostics", " [optional file]"].join(""),
-      ["hover", "(file,line,char)"].join(""),
-      ["references", "(file,line,char)"].join(""),
-    ];
-
-    expect(info).toEqual([
-      expect.objectContaining({
-        name: "typescript",
-        root: "/tmp/lazy",
-        fileTypes: ["ts", "tsx"],
-        status: "running",
-        supportedActions: expectedActions,
-        openFiles: ["src/index.ts"],
-      }),
-    ]);
-  });
-
-  it("reports implementation and workspace-symbol support when available", () => {
-    const root = makeTmpProject();
-    const manager = new LspManager(makeConfig(), root);
-
-    (
-      manager as unknown as {
-        clients: Map<
-          string,
-          {
-            name: string;
-            root: string;
-            status: "running";
-            openFiles: string[];
-            serverCapabilities: {
-              implementationProvider: boolean;
-              workspaceSymbolProvider: boolean;
-            };
-          }
-        >;
-      }
-    ).clients.set(`typescript:${root}`, {
-      name: "typescript",
-      root,
-      status: "running",
-      openFiles: [],
-      serverCapabilities: {
-        implementationProvider: true,
-        workspaceSymbolProvider: true,
-      },
-    });
-
-    const info = introspectCapabilities(manager, []);
-
-    expect(info).toEqual([
-      expect.objectContaining({
-        name: "typescript",
-        root,
-        fileTypes: ["ts", "tsx"],
-        status: "running",
-        supportedActions: [
-          "diagnostics [optional file]",
-          "implementation(file,line,char)",
-          "workspace_symbols(query)",
-        ],
-        openFiles: [],
-      }),
-    ]);
   });
 });

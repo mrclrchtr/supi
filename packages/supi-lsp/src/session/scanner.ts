@@ -5,7 +5,6 @@ import type {
   DetectedProjectServer,
   LspConfig,
   MissingServer,
-  ProjectServerInfo,
   ServerConfig,
 } from "../config/types.ts";
 import type { LspManager } from "../manager/manager.ts";
@@ -119,13 +118,6 @@ export async function startDetectedServers(
 ): Promise<void> {
   const eligible = detected.filter((entry) => policy.isEligible(entry.root, "directory"));
   await Promise.all(eligible.map((entry) => manager.startServerForRoot(entry.name, entry.root)));
-}
-
-export function introspectCapabilities(
-  manager: LspManager,
-  detected: DetectedProjectServer[],
-): ProjectServerInfo[] {
-  return manager.getKnownProjectServers(detected);
 }
 
 /**

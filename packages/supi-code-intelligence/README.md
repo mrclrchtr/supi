@@ -81,7 +81,7 @@ The package adds eight tools that Pi selects as needed:
 | `code_graph` | Follow LSP references and implementations plus AST calls made by a symbol |
 | `code_find` | Search LSP workspace symbols or parsed AST source structure rather than raw text |
 | `code_health` | Check live diagnostics, language servers, and code-intelligence availability |
-| `code_refactor_plan` | Preview a precise rename or extraction without changing files |
+| `code_refactor_plan` | Preview a precise rename, extraction, import cleanup, or dead-code deletion without changing files |
 | `code_refactor_apply` | Apply a fresh refactor plan after safety checks |
 
 Pi's built-in `grep` remains the right tool for literal or regular-expression searches; these tools add symbol and source-structure awareness.

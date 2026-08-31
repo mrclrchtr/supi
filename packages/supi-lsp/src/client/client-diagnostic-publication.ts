@@ -9,9 +9,12 @@
 // and timing data. They never carry diagnostic payloads or source text.
 
 import * as path from "node:path";
-import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
-import { boundCwd, truncateIdentity } from "../debug-telemetry.ts";
-import { uriToFile } from "../utils.ts";
+import {
+  recordDebugEvent,
+  truncateDebugIdentity as truncateIdentity,
+} from "@mrclrchtr/supi-core/debug";
+import { uriToFile } from "@mrclrchtr/supi-core/path";
+import { boundCwd } from "../debug-telemetry.ts";
 
 /** Maximum tracked synchronizations before the oldest entry is evicted. */
 export const MAX_TRACKED_SYNCHRONIZATIONS = 64;

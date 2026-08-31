@@ -26,23 +26,6 @@ export function registerPendingLspCapabilities(
   runtime.registerSemanticPending(cwd, provider);
 }
 
-/**
- * Register LSP capabilities for a workspace cwd as ready.
- *
- * Wraps WorkspaceLspRuntime into a SemanticProvider via the existing semantic
- * adapter and publishes it into the shared workspace runtime so that
- * code-intelligence and other consumers can discover semantic analysis
- * availability.
- */
-export function registerLspCapabilities(
-  runtime: WorkspaceRuntime,
-  cwd: string,
-  service: WorkspaceLspRuntime,
-): void {
-  const provider = createLspSemanticProvider(service);
-  runtime.registerSemantic(cwd, provider);
-}
-
 /** Promote an already-registered pending semantic provider to ready. */
 export function markLspCapabilitiesReady(runtime: WorkspaceRuntime, cwd: string): void {
   runtime.markSemanticReady(cwd);

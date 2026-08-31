@@ -1,12 +1,7 @@
-import {
-  completedCodeQuery,
-  type StructuralProvider,
-  WorkspaceRuntime,
-} from "@mrclrchtr/supi-code-runtime/api";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { type StructuralProvider, WorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   markLspCapabilitiesReady,
-  registerLspCapabilities,
   registerPendingLspCapabilities,
   unregisterLspCapabilities,
 } from "../../src/session/runtime-registration.ts";
@@ -14,229 +9,36 @@ import type { WorkspaceLspRuntime } from "../../src/session/runtime-registry.ts"
 
 describe("LSP runtime registration", () => {
   let runtime: WorkspaceRuntime;
+  const service = {} as WorkspaceLspRuntime;
 
   beforeEach(() => {
     runtime = new WorkspaceRuntime();
   });
 
-  it("publishes semantic capability when registered with a ready LSP service", () => {
-    const service = createMockLspService();
-
-    registerLspCapabilities(runtime, "/project", service);
-
-    const ws = runtime.getWorkspace("/project");
-    expect(ws.semantic.state.kind).toBe("ready");
-    expect(ws.semantic.provider).not.toBeNull();
-  });
-
-  it("publishes semantic capability in pending state before promotion", () => {
-    const service = createMockLspService();
-
+  it("publishes a pending semantic provider before readiness", () => {
     registerPendingLspCapabilities(runtime, "/project", service);
 
-    const ws = runtime.getWorkspace("/project");
-    expect(ws.semantic.state.kind).toBe("pending");
-    expect(ws.semantic.provider).not.toBeNull();
+    const workspace = runtime.getWorkspace("/project");
+    expect(workspace.semantic.state.kind).toBe("pending");
+    expect(workspace.semantic.provider).not.toBeNull();
+  });
+
+  it("promotes the pending semantic provider to ready", () => {
+    registerPendingLspCapabilities(runtime, "/project", service);
 
     markLspCapabilitiesReady(runtime, "/project");
+
     expect(runtime.getWorkspace("/project").semantic.state.kind).toBe("ready");
   });
 
-  it("does not publish structural capability", () => {
-    const service = createMockLspService();
-
-    registerLspCapabilities(runtime, "/project", service);
-
-    const ws = runtime.getWorkspace("/project");
-    expect(ws.semantic.state.kind).toBe("ready");
-    expect(ws.structural.state.kind).toBe("unavailable");
-  });
-
-  it("unregisters capabilities on session shutdown", () => {
-    const service = createMockLspService();
-
-    registerLspCapabilities(runtime, "/project", service);
-    unregisterLspCapabilities(runtime, "/project");
-
-    const ws = runtime.getWorkspace("/project");
-    expect(ws.semantic.state.kind).toBe("unavailable");
-  });
-
-  it("leaves structural capability intact when unregistering LSP alone", () => {
-    const tsService = createMockTsService();
-    runtime.registerStructural("/project", tsService);
-    registerLspCapabilities(runtime, "/project", createMockLspService());
+  it("clears only the semantic capability on shutdown", () => {
+    runtime.registerStructural("/project", {} as StructuralProvider);
+    registerPendingLspCapabilities(runtime, "/project", service);
 
     unregisterLspCapabilities(runtime, "/project");
 
-    const ws = runtime.getWorkspace("/project");
-    expect(ws.semantic.state.kind).toBe("unavailable");
-    expect(ws.structural.state.kind).toBe("ready");
-  });
-
-  it("supports multiple cwds independently", () => {
-    const serviceA = createMockLspService();
-    const serviceB = createMockLspService();
-
-    registerLspCapabilities(runtime, "/project-a", serviceA);
-    registerLspCapabilities(runtime, "/project-b", serviceB);
-
-    expect(runtime.getWorkspace("/project-a").semantic.state.kind).toBe("ready");
-    expect(runtime.getWorkspace("/project-b").semantic.state.kind).toBe("ready");
-
-    unregisterLspCapabilities(runtime, "/project-a");
-    expect(runtime.getWorkspace("/project-a").semantic.state.kind).toBe("unavailable");
-    expect(runtime.getWorkspace("/project-b").semantic.state.kind).toBe("ready");
-  });
-
-  it("creates a SemanticProvider that delegates to the LSP service", async () => {
-    const service = createMockLspService();
-    const referencesSpy = vi.spyOn(service, "references");
-
-    registerLspCapabilities(runtime, "/project", service);
-
-    const ws = runtime.getWorkspace("/project");
-    const provider = ws.semantic.provider;
-
-    expect(provider).not.toBeNull();
-    await provider?.references("test.ts", { line: 0, character: 0 });
-    expect(referencesSpy).toHaveBeenCalledWith("test.ts", { line: 0, character: 0 });
-  });
-
-  it("propagates reference results from the LSP service through the provider", async () => {
-    const mockLocations = [
-      {
-        uri: "file:///src/a.ts",
-        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
-      },
-    ];
-    const service = createMockLspService({
-      references: vi.fn().mockResolvedValue(completedCodeQuery(mockLocations)),
-    });
-
-    registerLspCapabilities(runtime, "/project", service);
-
-    const ws = runtime.getWorkspace("/project");
-    expect(ws.semantic.provider).not.toBeNull();
-    const provider = ws.semantic.provider as NonNullable<typeof ws.semantic.provider>;
-    const result = await provider.references("test.ts", { line: 0, character: 0 });
-    expect(result).toEqual({ kind: "completed", data: mockLocations });
-  });
-
-  describe("refactor readiness", () => {
-    it("reports refactorAvailable=true when LSP service supports rename", () => {
-      const service = createMockLspService({
-        rename: vi.fn().mockResolvedValue({
-          changes: { "file:///src/index.ts": [] },
-        }),
-      });
-
-      registerLspCapabilities(runtime, "/project", service);
-
-      const ws = runtime.getWorkspace("/project");
-      expect(ws.semantic.refactorAvailable).toBe(true);
-    });
-
-    it("reports refactorAvailable=true when LSP service supports code actions", () => {
-      const service = createMockLspService({
-        codeActions: vi.fn().mockResolvedValue([]),
-      });
-
-      registerLspCapabilities(runtime, "/project", service);
-
-      const ws = runtime.getWorkspace("/project");
-      expect(ws.semantic.refactorAvailable).toBe(true);
-    });
-
-    it("reports refactorAvailable=true even when LSP rename returns null (capability is method-presence-based)", () => {
-      const service = createMockLspService({
-        rename: vi.fn().mockResolvedValue(null),
-      });
-
-      registerLspCapabilities(runtime, "/project", service);
-
-      const ws = runtime.getWorkspace("/project");
-      // WorkspaceLspRuntime always has rename and codeActions → adapter always exposes them → refactorAvailable is true
-      expect(ws.semantic.refactorAvailable).toBe(true);
-    });
+    const workspace = runtime.getWorkspace("/project");
+    expect(workspace.semantic.state.kind).toBe("unavailable");
+    expect(workspace.structural.state.kind).toBe("ready");
   });
 });
-
-function emptyEvidence() {
-  return {
-    requested: 0,
-    confirmed: 0,
-    unconfirmed: 0,
-    failed: 0,
-    removed: 0,
-    documents: [],
-  } as const;
-}
-
-function createMockLspService(overrides?: Partial<WorkspaceLspRuntime>): WorkspaceLspRuntime {
-  const defaults: Record<string, unknown> = {
-    references: vi.fn().mockResolvedValue(completedCodeQuery([])),
-    implementation: vi.fn().mockResolvedValue(completedCodeQuery(null)),
-    documentSymbols: vi.fn().mockResolvedValue(completedCodeQuery([])),
-    workspaceSymbol: vi.fn().mockResolvedValue(completedCodeQuery([])),
-    hover: vi.fn().mockResolvedValue(completedCodeQuery(null)),
-    definition: vi.fn().mockResolvedValue(completedCodeQuery(null)),
-    rename: vi.fn().mockResolvedValue(null),
-    codeActions: vi.fn().mockResolvedValue(null),
-    fileDiagnostics: vi.fn().mockResolvedValue(completedCodeQuery([])),
-    getProjectServers: vi.fn().mockReturnValue([]),
-    isSupportedSourceFile: vi.fn().mockReturnValue(true),
-    getWorkspaceDiagnosticSummary: vi
-      .fn()
-      .mockReturnValue({ entries: [], current: true, evidence: emptyEvidence() }),
-    getOutstandingDiagnostics: vi
-      .fn()
-      .mockReturnValue({ entries: [], current: true, evidence: emptyEvidence() }),
-    getOutstandingDiagnosticSummary: vi
-      .fn()
-      .mockReturnValue({ entries: [], current: true, evidence: emptyEvidence() }),
-    recoverDiagnostics: vi.fn().mockResolvedValue({
-      attemptedClients: 0,
-      restartedClients: 0,
-      diagnosticEvidence: emptyEvidence(),
-      staleAssessment: { suspected: false, matchedFiles: [], warning: null },
-    }),
-    resolveFilePath: vi.fn().mockImplementation((f: string) => f),
-  };
-  return { ...defaults, ...overrides } as unknown as WorkspaceLspRuntime;
-}
-
-function createMockTsService(): StructuralProvider {
-  return {
-    calleesAt: vi.fn().mockResolvedValue({
-      kind: "unsupported-language" as const,
-      file: "x",
-      message: "mock",
-    }),
-    exports: vi.fn().mockResolvedValue({
-      kind: "unsupported-language" as const,
-      file: "x",
-      message: "mock",
-    }),
-    outline: vi.fn().mockResolvedValue({
-      kind: "unsupported-language" as const,
-      file: "x",
-      message: "mock",
-    }),
-    imports: vi.fn().mockResolvedValue({
-      kind: "unsupported-language" as const,
-      file: "x",
-      message: "mock",
-    }),
-    nodeAt: vi.fn().mockResolvedValue({
-      kind: "unsupported-language" as const,
-      file: "x",
-      message: "mock",
-    }),
-    callSites: vi.fn().mockResolvedValue({
-      kind: "unsupported-language" as const,
-      file: "x",
-      message: "mock",
-    }),
-  };
-}

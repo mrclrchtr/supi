@@ -1,51 +1,8 @@
-import { findProjectRoot } from "@mrclrchtr/supi-core/project";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  commandExists,
-  detectLanguageId,
-  fileToUri,
-  getFileExtension,
-  resolveSessionPath,
-  uriToFile,
-} from "../../src/utils.ts";
-
-describe("fileToUri", () => {
-  it("converts absolute unix path", () => {
-    const uri = fileToUri("/home/user/file.ts");
-    expect(uri).toBe("file:///home/user/file.ts");
-  });
-
-  it("percent-encodes special characters (spaces, hashes)", () => {
-    const uri = fileToUri("/home/user/my project/file.ts");
-    expect(uri).toBe("file:///home/user/my%20project/file.ts");
-  });
-});
-
-describe("uriToFile", () => {
-  it("converts file URI to path", () => {
-    expect(uriToFile("file:///home/user/file.ts")).toBe("/home/user/file.ts");
-  });
-
-  it("decodes percent-encoded characters", () => {
-    expect(uriToFile("file:///home/user/my%20project/file.ts")).toBe(
-      "/home/user/my project/file.ts",
-    );
-  });
-
-  it("passes through non-file URIs", () => {
-    expect(uriToFile("https://example.com")).toBe("https://example.com");
-  });
-});
-
-describe("resolveSessionPath", () => {
-  it("resolves relative paths from the session cwd", () => {
-    expect(resolveSessionPath("/project", "src/index.ts")).toBe("/project/src/index.ts");
-  });
-
-  it("strips the leading @ path prefix", () => {
-    expect(resolveSessionPath("/project", "@src/index.ts")).toBe("/project/src/index.ts");
-  });
-});
+import { commandExists, detectLanguageId } from "../../src/utils.ts";
 
 describe("detectLanguageId", () => {
   it.each([
@@ -75,34 +32,36 @@ describe("detectLanguageId", () => {
   });
 });
 
-describe("getFileExtension", () => {
-  it("extracts extension without dot", () => {
-    expect(getFileExtension("file.ts")).toBe("ts");
-    expect(getFileExtension("path/to/file.py")).toBe("py");
-  });
-
-  it("returns empty for no extension", () => {
-    expect(getFileExtension("Makefile")).toBe("");
-  });
-});
-
-describe("findProjectRoot", () => {
-  it("finds root by marker", () => {
-    // process.cwd() should have package.json
-    const root = findProjectRoot(`${process.cwd()}/lsp`, ["package.json"], "/tmp");
-    expect(root).toBe(process.cwd());
-  });
-
-  it("returns fallback when no marker found", () => {
-    const root = findProjectRoot("/tmp", ["nonexistent-marker-file-xyz"], "/fallback");
-    expect(root).toBe("/fallback");
-  });
-});
-
 describe("commandExists", () => {
   it("finds node on PATH", () => {
     expect(commandExists("node")).toBe(true);
   });
+
+  it("rejects a directory used as an absolute command", () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-command-dir-"));
+    try {
+      expect(commandExists(directory)).toBe(false);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it.runIf(process.platform !== "win32")(
+    "requires an absolute command file to be executable",
+    () => {
+      const directory = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-command-file-"));
+      const command = path.join(directory, "server");
+      try {
+        fs.writeFileSync(command, "#!/bin/sh\nexit 0\n");
+        fs.chmodSync(command, 0o644);
+        expect(commandExists(command)).toBe(false);
+        fs.chmodSync(command, 0o755);
+        expect(commandExists(command)).toBe(true);
+      } finally {
+        fs.rmSync(directory, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("returns false for nonexistent command", () => {
     expect(commandExists("definitely-not-a-real-command-xyz")).toBe(false);

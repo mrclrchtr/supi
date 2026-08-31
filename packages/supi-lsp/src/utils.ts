@@ -3,12 +3,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-export {
-  fileToUri,
-  resolveToolPath as resolveSessionPath,
-  uriToFile,
-} from "@mrclrchtr/supi-core/path";
-
 // ── Language ID Detection ─────────────────────────────────────────────
 
 const EXT_TO_LANGUAGE: Record<string, string> = {
@@ -68,11 +62,6 @@ export function detectLanguageId(filePath: string): string {
   return EXT_TO_LANGUAGE[ext] ?? ext;
 }
 
-/** Get the file extension (without dot) from a file path. */
-export function getFileExtension(filePath: string): string {
-  return path.extname(filePath).slice(1).toLowerCase();
-}
-
 // ── PATH Validation ───────────────────────────────────────────────────
 
 /**
@@ -80,9 +69,9 @@ export function getFileExtension(filePath: string): string {
  * Uses synchronous check to avoid complexity.
  */
 export function commandExists(command: string): boolean {
-  // If it's an absolute path, check directly
+  // If it is an absolute path, validate the exact executable file.
   if (path.isAbsolute(command)) {
-    return fs.existsSync(command);
+    return isExecutableFile(command);
   }
 
   const pathDirs = (process.env.PATH ?? "").split(path.delimiter);
@@ -92,13 +81,18 @@ export function commandExists(command: string): boolean {
   for (const dir of pathDirs) {
     for (const ext of extensions) {
       const fullPath = path.join(dir, command + ext);
-      try {
-        fs.accessSync(fullPath, fs.constants.X_OK);
-        return true;
-      } catch {
-        // Not found here, continue
-      }
+      if (isExecutableFile(fullPath)) return true;
     }
   }
   return false;
+}
+
+function isExecutableFile(filePath: string): boolean {
+  try {
+    if (!fs.statSync(filePath).isFile()) return false;
+    fs.accessSync(filePath, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
 }

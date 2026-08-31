@@ -1,6 +1,9 @@
-import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
+import {
+  recordDebugEvent,
+  truncateDebugIdentity as truncateIdentity,
+} from "@mrclrchtr/supi-core/debug";
 import type { ProjectServerInfo } from "../config/types.ts";
-import { MAX_SERVERS, truncateIdentity } from "../debug-telemetry.ts";
+import { MAX_SERVERS } from "../debug-telemetry.ts";
 import type { LspRuntimeTransition } from "./runtime-controller.ts";
 
 /** One bounded server entry in a runtime-transition payload. */

@@ -379,15 +379,14 @@ export function invalidateTsconfigCacheForConfig(configPath: string): void {
 }
 
 /**
- * Invalidate nearest-config lookups that found nothing under `dir`.
+ * Invalidate nearest-config lookups under a directory that gained a config.
  *
- * Used when a config is created: directories below the new config that
- * previously resolved to no config may now resolve to it.
+ * A new config can replace either a no-config result or a cached lower-priority
+ * config, such as `jsconfig.json` when `tsconfig.json` is created.
  */
 export function invalidateTsconfigCacheForConfigDir(dir: string): void {
   const normalizedDir = normalizePath(dir);
-  for (const [key, value] of nearestConfigCache) {
-    if (value !== null) continue;
+  for (const key of nearestConfigCache.keys()) {
     const keyDir = key.split("::", 1)[0];
     if (keyDir === normalizedDir || keyDir.startsWith(`${normalizedDir}/`)) {
       nearestConfigCache.delete(key);

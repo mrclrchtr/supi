@@ -3,10 +3,10 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { uriToFile } from "@mrclrchtr/supi-core/path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LspClient } from "../../src/client/client.ts";
 import type { Diagnostic } from "../../src/config/types.ts";
-import { uriToFile } from "../../src/utils.ts";
 import {
   createPullTestClient,
   createRunningTestClient,

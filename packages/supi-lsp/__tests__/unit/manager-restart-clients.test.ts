@@ -1,10 +1,10 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { fileToUri } from "@mrclrchtr/supi-core/path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FileChangeType } from "../../src/config/types.ts";
 import { LspManager, RECOVERY_CLIENT_STARTUP_BOUND_MS } from "../../src/manager/manager.ts";
-import { fileToUri } from "../../src/utils.ts";
 
 const tempDirs: string[] = [];
 
@@ -231,6 +231,91 @@ describe("LspManager restartClientsForFiles", () => {
       sessionCwd,
       `typescript:${sessionCwd}`,
     );
+  });
+
+  it("shares one in-flight restart between concurrent recovery calls", async () => {
+    const sessionCwd = createProject();
+    const manager = makeManager(sessionCwd);
+    const file = path.join(sessionCwd, "a.ts");
+    fs.writeFileSync(file, "const a = 1;\n");
+    const client = makeClient({ root: sessionCwd, openFiles: [file] });
+    const clients = (manager as unknown as { clients: Map<string, unknown> }).clients;
+    clients.set(`typescript:${sessionCwd}`, client);
+
+    let finishRestart!: (value: { files: string[]; restarted: boolean }) => void;
+    const restartResult = new Promise<{ files: string[]; restarted: boolean }>((resolve) => {
+      finishRestart = resolve;
+    });
+    const restartClient = vi
+      .spyOn(
+        manager as unknown as {
+          restartClient: (
+            target: typeof client,
+          ) => Promise<{ files: string[]; restarted: boolean }>;
+        },
+        "restartClient",
+      )
+      .mockReturnValue(restartResult);
+
+    const first = manager.restartClientsForFiles([file]);
+    const second = manager.restartClientsForFiles([file]);
+
+    expect(restartClient).toHaveBeenCalledTimes(1);
+    finishRestart({ files: [file], restarted: true });
+    const expected = [
+      {
+        key: `typescript:${sessionCwd}`,
+        serverName: "typescript",
+        files: [file],
+        restarted: true,
+      },
+    ];
+    await expect(first).resolves.toEqual(expected);
+    await expect(second).resolves.toEqual(expected);
+  });
+
+  it("keeps a shared restart registered after one caller cancels", async () => {
+    const sessionCwd = createProject();
+    const manager = makeManager(sessionCwd);
+    const file = path.join(sessionCwd, "a.ts");
+    fs.writeFileSync(file, "const a = 1;\n");
+    const client = makeClient({ root: sessionCwd, openFiles: [file] });
+    const clients = (manager as unknown as { clients: Map<string, unknown> }).clients;
+    clients.set(`typescript:${sessionCwd}`, client);
+
+    let finishRestart!: (value: { files: string[]; restarted: boolean }) => void;
+    const restartResult = new Promise<{ files: string[]; restarted: boolean }>((resolve) => {
+      finishRestart = resolve;
+    });
+    const restartClient = vi
+      .spyOn(
+        manager as unknown as {
+          restartClient: (
+            target: typeof client,
+          ) => Promise<{ files: string[]; restarted: boolean }>;
+        },
+        "restartClient",
+      )
+      .mockReturnValue(restartResult);
+    const controller = new AbortController();
+
+    const cancelled = manager.restartClientsForFiles([file], {
+      control: { signal: controller.signal },
+    });
+    controller.abort(new Error("caller cancelled"));
+    await expect(cancelled).rejects.toThrow("caller cancelled");
+
+    const joined = manager.restartClientsForFiles([file]);
+    expect(restartClient).toHaveBeenCalledTimes(1);
+    finishRestart({ files: [file], restarted: true });
+    await expect(joined).resolves.toEqual([
+      {
+        key: `typescript:${sessionCwd}`,
+        serverName: "typescript",
+        files: [file],
+        restarted: true,
+      },
+    ]);
   });
 
   it("restarts each route at most once per invalidation generation", async () => {

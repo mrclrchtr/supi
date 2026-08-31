@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
+import { completedCodeQuery, unavailableCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LspManager } from "../../src/manager/manager.ts";
 import { findWorkspaceSymbolWarmTargets } from "../../src/manager/manager-workspace-symbol.ts";
@@ -87,7 +87,146 @@ describe("findWorkspaceSymbolWarmTargets", () => {
   });
 });
 
+describe("LspManager semantic readiness warm-up", () => {
+  it("keeps a replacement probe registered when an old probe settles", async () => {
+    const root = makeTempRoot();
+    const manager = new LspManager(
+      {
+        servers: {
+          typescript: {
+            command: "node",
+            args: [],
+            fileTypes: ["ts"],
+            rootMarkers: ["package.json"],
+          },
+        },
+      },
+      root,
+    );
+    let resolveFirst!: (result: ReturnType<typeof completedCodeQuery<never[]>>) => void;
+    let resolveSecond!: (result: ReturnType<typeof completedCodeQuery<never[]>>) => void;
+    const firstResult = new Promise<ReturnType<typeof completedCodeQuery<never[]>>>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const secondResult = new Promise<ReturnType<typeof completedCodeQuery<never[]>>>((resolve) => {
+      resolveSecond = resolve;
+    });
+    const firstClient = {
+      name: "typescript",
+      root,
+      documentSymbols: vi.fn(() => firstResult),
+      hover: vi.fn(),
+    };
+    const secondClient = {
+      name: "typescript",
+      root,
+      documentSymbols: vi.fn(() => secondResult),
+      hover: vi.fn(),
+    };
+    const key = `typescript:${root}`;
+    const clients = getClients(manager);
+    clients.set(key, firstClient);
+    vi.spyOn(manager, "ensureFileOpen").mockImplementation(async () => clients.get(key) as never);
+    const warmSemanticProject = (
+      manager as unknown as {
+        warmSemanticProject(client: unknown, file: string): Promise<void>;
+      }
+    ).warmSemanticProject.bind(manager);
+    const pending = (manager as unknown as { pendingWarmProbes: Map<string, Promise<void>> })
+      .pendingWarmProbes;
+    const file = join(root, "src", "index.ts");
+
+    const first = warmSemanticProject(firstClient, file);
+    await vi.waitFor(() => expect(firstClient.documentSymbols).toHaveBeenCalled());
+    pending.delete(key);
+    clients.set(key, secondClient);
+    const second = warmSemanticProject(secondClient, file);
+    await vi.waitFor(() => expect(secondClient.documentSymbols).toHaveBeenCalled());
+
+    resolveFirst(completedCodeQuery([]));
+    await first;
+    expect(pending.has(key)).toBe(true);
+
+    resolveSecond(completedCodeQuery([]));
+    await second;
+    expect(pending.has(key)).toBe(false);
+  });
+
+  it("retries a semantic probe that returned unavailable", async () => {
+    const root = makeTempRoot();
+    const manager = new LspManager(
+      {
+        servers: {
+          typescript: {
+            command: "node",
+            args: [],
+            fileTypes: ["ts"],
+            rootMarkers: ["package.json"],
+          },
+        },
+      },
+      root,
+    );
+    const client = {
+      name: "typescript",
+      root,
+      status: "running",
+      ready: true,
+      getReady: vi.fn().mockResolvedValue(undefined),
+      documentSymbols: vi
+        .fn()
+        .mockResolvedValueOnce(unavailableCodeQuery("not ready"))
+        .mockResolvedValueOnce(completedCodeQuery([])),
+      hover: vi.fn(),
+    };
+    getClients(manager).set(`typescript:${root}`, client);
+    vi.spyOn(manager, "ensureFileOpen").mockResolvedValue(client as never);
+
+    await manager.waitUntilWorkspaceReady();
+    await manager.waitUntilWorkspaceReady();
+
+    expect(client.documentSymbols).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("LspManager.workspaceSymbol cold warm-up", () => {
+  it("retries a workspace-symbol probe that returned unavailable", async () => {
+    const root = makeTempRoot();
+    const manager = new LspManager(
+      {
+        servers: {
+          typescript: {
+            command: "node",
+            args: [],
+            fileTypes: ["ts"],
+            rootMarkers: ["package.json"],
+          },
+        },
+      },
+      root,
+    );
+    const client = {
+      name: "typescript",
+      root,
+      status: "running",
+      openFiles: [] as string[],
+      serverCapabilities: { workspaceSymbolProvider: true },
+      workspaceSymbol: vi.fn().mockResolvedValue(completedCodeQuery([])),
+      documentSymbols: vi
+        .fn()
+        .mockResolvedValueOnce(unavailableCodeQuery("not ready"))
+        .mockResolvedValueOnce(completedCodeQuery([])),
+      hover: vi.fn(),
+    };
+    getClients(manager).set(`typescript:${root}`, client);
+    vi.spyOn(manager, "ensureFileOpen").mockResolvedValue(client as never);
+
+    await manager.workspaceSymbol("Widget");
+    await manager.workspaceSymbol("Widget");
+
+    expect(client.documentSymbols).toHaveBeenCalledTimes(2);
+  });
+
   it("warms a cold workspace-symbol client and returns warmed results", async () => {
     const root = makeTempRoot();
     const manager = new LspManager(

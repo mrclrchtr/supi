@@ -1,8 +1,7 @@
 // LSP settings registration for the code-intelligence umbrella extension.
 //
-// Always-on LSP policy: the global `lsp.enabled` and `lsp.active` keys
-// are deprecated and ignored. Per-language disable via
-// `lsp.servers.<language>.enabled: false` is the only supported opt-out.
+// Per-language disable via `lsp.servers.<language>.enabled: false` is the
+// supported opt-out.
 //
 // Registered fields:
 // - exclude: stringList
@@ -21,11 +20,9 @@ import {
 } from "@mrclrchtr/supi-core/settings";
 import { type LspSettings, loadConfig } from "@mrclrchtr/supi-lsp/api";
 
-const LSP_DEFAULTS: LspSettings = {
-  enabled: true,
-  active: [],
-  exclude: [],
-};
+const LSP_DEFAULTS = {
+  exclude: [] as string[],
+} satisfies LspSettings;
 
 /** Discover configured servers from the defaults + effective LSP config. */
 function getConfiguredServers(cwd: string): string[] {

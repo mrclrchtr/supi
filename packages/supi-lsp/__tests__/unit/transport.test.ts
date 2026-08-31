@@ -2,6 +2,8 @@ import { PassThrough } from "node:stream";
 import {
   configureDebugRegistry,
   getDebugEvents,
+  DEBUG_IDENTITY_TRUNCATION_MARKER as IDENTITY_TRUNCATION_MARKER,
+  MAX_DEBUG_IDENTITY_STRING as MAX_IDENTITY_STRING,
   resetDebugRegistry,
 } from "@mrclrchtr/supi-core/debug";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,11 +15,7 @@ import {
   StreamMessageWriter,
 } from "vscode-jsonrpc/node";
 import { JsonRpcClient, JsonRpcRequestError } from "../../src/client/transport.ts";
-import {
-  IDENTITY_TRUNCATION_MARKER,
-  LSP_REQUEST_TIMEOUT_ERROR_CODE,
-  MAX_IDENTITY_STRING,
-} from "../../src/debug-telemetry.ts";
+import { LSP_REQUEST_TIMEOUT_ERROR_CODE } from "../../src/debug-telemetry.ts";
 
 /**
  * Creates a client JsonRpcClient connected to a server MessageConnection
@@ -288,10 +286,7 @@ describe("JsonRpcClient", () => {
       diagnostics: [],
     });
 
-    // Give microtask queue a tick
-    await new Promise((r) => setTimeout(r, 10));
-
-    expect(received).toHaveLength(1);
+    await vi.waitFor(() => expect(received).toHaveLength(1));
     expect(received[0].method).toBe("textDocument/publishDiagnostics");
   });
 
@@ -405,6 +400,23 @@ describe("JsonRpcClient", () => {
     await expect(request).rejects.toThrow("timed out");
     expect(timer).toBeDefined();
     expect(clearTimeoutSpy).toHaveBeenCalledWith(timer);
+  });
+
+  it("does not send a request when the caller signal is already aborted", async () => {
+    const writes: string[] = [];
+    serverIn.on("data", (chunk) => writes.push(String(chunk)));
+    const controller = new AbortController();
+    controller.abort(new Error("request cancelled before send"));
+
+    await expect(
+      client.sendRequest("slow/pre-aborted", undefined, { signal: controller.signal }),
+    ).rejects.toThrow("request cancelled before send");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(writes.join("")).not.toContain("slow/pre-aborted");
+    expect(getDebugEvents({ source: "lsp", category: "request.timing" }).events[0]?.data).toEqual(
+      expect.objectContaining({ outcome: "cancelled" }),
+    );
   });
 
   it("cancels an in-flight request and clears its timer when aborted", async () => {

@@ -27,43 +27,22 @@ function makeClient(
 describe("buildProjectServerInfo", () => {
   const cwd = "/project";
 
-  it("sets ready to true when client.ready is true", () => {
+  it.each([
+    { client: makeClient({ ready: true }), expected: true },
+    { client: makeClient({ ready: false }), expected: false },
+    { client: undefined, expected: false },
+  ])("projects client readiness as $expected", ({ client, expected }) => {
     const result = buildProjectServerInfo(
       {
         serverName: "typescript",
         root: "/project",
         fileTypes: ["ts", "tsx"],
-        client: makeClient({ ready: true }),
+        client,
       },
       cwd,
     );
-    expect(result.ready).toBe(true);
-  });
 
-  it("sets ready to false when client.ready is false", () => {
-    const result = buildProjectServerInfo(
-      {
-        serverName: "typescript",
-        root: "/project",
-        fileTypes: ["ts", "tsx"],
-        client: makeClient({ ready: false }),
-      },
-      cwd,
-    );
-    expect(result.ready).toBe(false);
-  });
-
-  it("sets ready to false when client is undefined", () => {
-    const result = buildProjectServerInfo(
-      {
-        serverName: "typescript",
-        root: "/project",
-        fileTypes: ["ts", "tsx"],
-        client: undefined,
-      },
-      cwd,
-    );
-    expect(result.ready).toBe(false);
+    expect(result.ready).toBe(expected);
   });
 
   it("reports every process-crash reason as an error status", () => {

@@ -5,6 +5,7 @@ const debugMocks = vi.hoisted(() => ({ recordDebugEvent: vi.fn() }));
 
 vi.mock("@mrclrchtr/supi-core/debug", () => ({
   recordDebugEvent: debugMocks.recordDebugEvent,
+  truncateDebugIdentity: (value: string) => value,
 }));
 
 import type { LspClient } from "../../src/client/client.ts";

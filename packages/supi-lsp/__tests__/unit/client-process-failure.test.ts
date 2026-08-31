@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   spawn: vi.fn(),
   diagnosticRequests: 0,
+  initializeError: null as Error | null,
   transports: [] as Array<{ disposed: boolean }>,
 }));
 
@@ -26,6 +27,7 @@ vi.mock("../../src/client/transport.ts", () => ({
 
     async sendRequest(method: string) {
       if (method === "initialize") {
+        if (mocks.initializeError) throw mocks.initializeError;
         return {
           capabilities: {
             diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false },
@@ -77,6 +79,7 @@ describe("LspClient process failure", () => {
     process = createProcess();
     mocks.spawn.mockReturnValue(process as ReturnType<typeof spawnType>);
     mocks.diagnosticRequests = 0;
+    mocks.initializeError = null;
     mocks.transports.length = 0;
   });
 
@@ -99,6 +102,42 @@ describe("LspClient process failure", () => {
 
     expect(transitions).toEqual(["startup"]);
   });
+
+  it.runIf(globalThis.process.platform !== "win32")(
+    "terminates the process group when standard streams are missing",
+    async () => {
+      Object.assign(process, { stdin: null });
+      const kill = vi.spyOn(globalThis.process, "kill").mockReturnValue(true);
+      const client = new LspClient(
+        "test",
+        { command: "test-lsp", fileTypes: ["ts"], rootMarkers: ["package.json"] },
+        "/project",
+      );
+
+      await expect(client.start()).rejects.toThrow("missing stdin/stdout");
+
+      expect(kill).toHaveBeenCalledWith(-42_000, "SIGTERM");
+      expect(process.kill).not.toHaveBeenCalled();
+    },
+  );
+
+  it.runIf(globalThis.process.platform !== "win32")(
+    "terminates the process group when initialization fails",
+    async () => {
+      mocks.initializeError = new Error("initialize failed");
+      const kill = vi.spyOn(globalThis.process, "kill").mockReturnValue(true);
+      const client = new LspClient(
+        "test",
+        { command: "test-lsp", fileTypes: ["ts"], rootMarkers: ["package.json"] },
+        "/project",
+      );
+
+      await expect(client.start()).rejects.toThrow("initialize failed");
+
+      expect(kill).toHaveBeenCalledWith(-42_000, "SIGTERM");
+      expect(process.kill).not.toHaveBeenCalled();
+    },
+  );
 
   it("releases a pending file diagnostic waiter when the server process fails", async () => {
     const client = new LspClient(

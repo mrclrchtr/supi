@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileToUri, uriToFile } from "@mrclrchtr/supi-core/path";
 import { FileChangeType, type FileEvent } from "../config/types.ts";
-import { fileToUri, uriToFile } from "../utils.ts";
 import {
   type AutomaticLspPathPolicy,
   createDefaultAutomaticLspPathPolicy,
@@ -110,12 +110,6 @@ export function syncWorkspaceSentinelSnapshot(
     }),
     sourceChanges,
   };
-}
-
-/** Determine whether a file path should trigger workspace recovery. */
-export function isWorkspaceRecoveryTrigger(filePath: string, cwd: string): boolean {
-  const root = path.resolve(cwd);
-  return isWorkspaceSentinelPath(path.resolve(root, filePath), root);
 }
 
 function isWorkspaceSentinelPath(filePath: string, root: string): boolean {

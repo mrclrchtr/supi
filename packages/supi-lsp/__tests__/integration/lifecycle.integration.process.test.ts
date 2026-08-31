@@ -2,11 +2,11 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { fileToUri } from "@mrclrchtr/supi-core/path";
 import { afterEach, describe, expect, it } from "vitest";
 import { FileChangeType, type FileEvent, type LspConfig } from "../../src/config/types.ts";
 import { LspManager, type ManagerLifecycleTransition } from "../../src/manager/manager.ts";
 import { createWorkspaceLspRuntimeOwner } from "../../src/session/runtime-registry.ts";
-import { fileToUri } from "../../src/utils.ts";
 import { waitFor } from "../helpers/integration-utils.ts";
 
 const server = fileURLToPath(new URL("../fixtures/lsp-lifecycle-server.mjs", import.meta.url));

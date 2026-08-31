@@ -45,7 +45,6 @@ export function registerLspSessionLifecycle(
     await state.providerLease?.release();
     state.providerLease = null;
     state.controller = null;
-    state.lspActive = false;
     state.sentinelSnapshot = new Map();
 
     const lease = await acquireWorkspaceProviderHost(ctx.cwd, {
@@ -53,7 +52,6 @@ export function registerLspSessionLifecycle(
     });
     state.providerLease = lease;
     state.controller = lease.lspController;
-    state.lspActive = lease.lspController?.kind === "ready";
     state.sentinelSnapshot = lease.sentinelSnapshot;
     await onStarted?.(ctx);
     startLifecycleSubscription();
@@ -64,7 +62,6 @@ export function registerLspSessionLifecycle(
     await state.providerLease?.release();
     state.providerLease = null;
     state.controller = null;
-    state.lspActive = false;
     state.sentinelSnapshot = new Map();
     dispatchStateChange();
   });

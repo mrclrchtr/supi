@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@mrclrchtr/supi-core/debug", () => ({
   recordDebugEvent: mocks.recordDebugEvent,
+  truncateDebugIdentity: (value: string) => value,
 }));
 
 import { createWorkspaceLspRuntimeOwner } from "../../src/session/runtime-registry.ts";

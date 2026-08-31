@@ -1,8 +1,12 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { getServerForFile, loadConfig } from "../../src/config/config.ts";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function makeTmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "lsp-config-test-"));
@@ -60,6 +64,127 @@ describe("loadConfig", () => {
     expect(config.servers.zig).toBeDefined();
     expect(config.servers.zig?.command).toBe("zls");
 
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it("falls back by field when a built-in server override is invalid", () => {
+    const tmpDir = makeTmpDir();
+    fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "supi", "config.json"),
+      JSON.stringify({
+        lsp: {
+          servers: {
+            typescript: {
+              command: "vtsls",
+              args: "--invalid",
+              env: { VALID: "yes", INVALID: 1 },
+              unexpected: true,
+            },
+          },
+        },
+      }),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const config = loadConfig(tmpDir);
+
+    expect(config.servers.typescript?.command).toBe("vtsls");
+    expect(config.servers.typescript?.args).toEqual(["--stdio"]);
+    expect(config.servers.typescript?.env).toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("args, env, unexpected"));
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it("emits one warning for invalid built-in fields across config scopes", () => {
+    const tmpDir = makeTmpDir();
+    fs.mkdirSync(path.join(tmpDir, ".pi", "agent", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "agent", "supi", "config.json"),
+      JSON.stringify({ lsp: { servers: { typescript: { args: "--invalid" } } } }),
+    );
+    fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "supi", "config.json"),
+      JSON.stringify({ lsp: { servers: { typescript: { env: { INVALID: 1 } } } } }),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const config = withHomeDir(tmpDir, () => loadConfig(tmpDir));
+
+    expect(config.servers.typescript?.args).toEqual(["--stdio"]);
+    expect(config.servers.typescript?.env).toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("args, env"));
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it("skips an invalid custom server definition", () => {
+    const tmpDir = makeTmpDir();
+    fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "supi", "config.json"),
+      JSON.stringify({
+        lsp: {
+          servers: {
+            zig: { command: "zls", args: "--stdio", fileTypes: ["zig"] },
+          },
+        },
+      }),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const config = loadConfig(tmpDir);
+
+    expect(config.servers.zig).toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(1);
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it("bounds the warning for an invalid custom server", () => {
+    const tmpDir = makeTmpDir();
+    const longName = `server-${"n".repeat(700)}`;
+    const longField = `field-${"f".repeat(700)}`;
+    fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "supi", "config.json"),
+      JSON.stringify({
+        lsp: { servers: { [longName]: { command: "custom-lsp", [longField]: true } } },
+      }),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const config = loadConfig(tmpDir);
+
+    expect(config.servers[longName]).toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(1);
+    const message = String(warn.mock.calls[0]?.[0]);
+    expect(message.length).toBeLessThan(1_100);
+    expect(message).toContain("…");
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it("skips a custom server when a later scope contains an invalid field", () => {
+    const tmpDir = makeTmpDir();
+    fs.mkdirSync(path.join(tmpDir, ".pi", "agent", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "agent", "supi", "config.json"),
+      JSON.stringify({
+        lsp: { servers: { zig: { command: "zls", fileTypes: ["zig"] } } },
+      }),
+    );
+    fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "supi", "config.json"),
+      JSON.stringify({ lsp: { servers: { zig: { args: "--invalid" } } } }),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const config = withHomeDir(tmpDir, () => loadConfig(tmpDir));
+
+    expect(config.servers.zig).toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(1);
     fs.rmSync(tmpDir, { recursive: true });
   });
 
@@ -231,25 +356,6 @@ describe("loadConfig", () => {
 
     const config = loadConfig(tmpDir);
     expect(config.servers.zig).toBeUndefined();
-
-    fs.rmSync(tmpDir, { recursive: true });
-  });
-
-  it("top-level lsp.enabled: false does NOT affect per-language server config loading", () => {
-    const tmpDir = makeTmpDir();
-    fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
-    fs.writeFileSync(
-      path.join(tmpDir, ".pi", "supi", "config.json"),
-      JSON.stringify({
-        lsp: { enabled: false },
-      }),
-    );
-
-    const config = loadConfig(tmpDir);
-    // lsp.enabled is a session-level toggle, not a server-level filter.
-    // Server configs should still load regardless.
-    expect(config.servers.typescript).toBeDefined();
-    expect(config.servers.python).toBeDefined();
 
     fs.rmSync(tmpDir, { recursive: true });
   });

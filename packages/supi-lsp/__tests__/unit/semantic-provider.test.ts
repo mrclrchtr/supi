@@ -158,6 +158,26 @@ describe("LspSemanticProvider", () => {
       expect(result).toEqual({ kind: "completed", data: [] });
     });
 
+    it("drops locations with invalid protocol coordinates", async () => {
+      const lsp = createMockLsp({
+        references: vi.fn().mockResolvedValue([
+          {
+            uri: "file:///src/index.ts",
+            range: { start: { line: -1, character: 0 }, end: { line: 0, character: 1 } },
+          },
+          {
+            uri: "file:///src/other.ts",
+            range: { start: { line: 1.5, character: 0 }, end: { line: 2, character: 1 } },
+          },
+        ]),
+      });
+      const provider = createLspSemanticProvider(lsp);
+
+      const result = await provider.references("test.ts", { line: 0, character: 0 });
+
+      expect(completedData(result)).toEqual([]);
+    });
+
     it("maps Location[] to CodeLocation[]", async () => {
       const lsp = createMockLsp({
         references: vi.fn().mockResolvedValue([
@@ -257,6 +277,35 @@ describe("LspSemanticProvider", () => {
       });
     });
 
+    it("drops document symbols with invalid declaration coordinates", async () => {
+      const lsp = createMockLsp({
+        documentSymbols: vi.fn().mockResolvedValue([
+          {
+            name: "negative",
+            kind: 12,
+            range: { start: { line: -1, character: 0 }, end: { line: 0, character: 1 } },
+            selectionRange: {
+              start: { line: -1, character: 0 },
+              end: { line: 0, character: 1 },
+            },
+          },
+          {
+            name: "reversed",
+            kind: 12,
+            range: { start: { line: 2, character: 0 }, end: { line: 1, character: 0 } },
+            selectionRange: {
+              start: { line: 2, character: 0 },
+              end: { line: 1, character: 0 },
+            },
+          },
+        ]),
+      });
+
+      const result = await createLspSemanticProvider(lsp).documentSymbols("test.ts");
+
+      expect(completedData(result)).toEqual([]);
+    });
+
     it("keeps every flat SymbolInformation observation unknown", async () => {
       const lsp = createMockLsp({
         documentSymbols: vi.fn().mockResolvedValue([
@@ -324,6 +373,25 @@ describe("LspSemanticProvider", () => {
       const provider = createLspSemanticProvider(lsp);
       const result = await provider.workspaceSymbols("foo");
       expect(result).toEqual({ kind: "completed", data: [] });
+    });
+
+    it("drops workspace symbols with invalid coordinates", async () => {
+      const lsp = createMockLsp({
+        workspaceSymbol: vi.fn().mockResolvedValue([
+          {
+            name: "fractional",
+            kind: 12,
+            location: {
+              uri: "file:///src/index.ts",
+              range: { start: { line: 1.5, character: 0 }, end: { line: 2, character: 0 } },
+            },
+          },
+        ]),
+      });
+
+      const result = await createLspSemanticProvider(lsp).workspaceSymbols("fractional");
+
+      expect(completedData(result)).toEqual([]);
     });
 
     it("maps SymbolInformation to CodeSymbol", async () => {

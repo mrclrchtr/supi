@@ -35,7 +35,6 @@ describe("LSP shared-host lifecycle", () => {
 
     expect(mocks.acquire).toHaveBeenCalledWith("/untrusted", { projectTrusted: false });
     expect(state.controller).toBeNull();
-    expect(state.lspActive).toBe(false);
   });
 
   it("retains the shared controller and sentinel snapshot for a trusted project", async () => {
@@ -54,7 +53,6 @@ describe("LSP shared-host lifecycle", () => {
 
     expect(mocks.acquire).toHaveBeenCalledWith("/trusted", { projectTrusted: true });
     expect(state.controller).toBe(controller);
-    expect(state.lspActive).toBe(true);
     expect(state.sentinelSnapshot).toBe(snapshot);
   });
 

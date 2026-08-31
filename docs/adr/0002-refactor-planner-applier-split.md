@@ -4,7 +4,7 @@
 
 **Decision.** Split the refactor surface into two tools joined by a session-scoped plan handle.
 
-- `code_refactor_plan` is a **pure planner**: it computes precise semantic edits for exactly one nested operation payload (`rename_symbol`, `extract_function`, or `extract_variable`) and returns a `planId`. It never mutates files. It requires a **name anchor** (per ADR 0003) — LSP rename needs the identifier; a declaration anchor is refused with an observable note.
+- `code_refactor_plan` is a **pure planner**: it computes precise semantic edits for exactly one nested operation payload (`rename_symbol`, `extract_function`, `extract_variable`, `update_imports`, or `delete_dead_code`) and returns a `planId`. It never mutates files. `rename_symbol` requires a **name anchor** (per ADR 0003) because LSP rename needs the identifier; the code-action operations can use a declaration anchor.
 - `code_refactor_apply` is the **sole mutator**: it applies a previously stored plan by `planId`. It does not require a live semantic provider. The Workspace code-intelligence session checks stored SHA-256 file fingerprints (`isPlanFresh` in `src/session/refactor-plans.ts`) and revalidates edit ranges and overlap before writing. Stale plans are rejected with an explicit request to regenerate. No heuristic text fallback.
 - Plans live in the Workspace code-intelligence session's in-memory map. `planId` is `plan-<12hex>` derived from operation, target coordinates, and a time discriminator. Plans are removed after successful apply and are never persisted across sessions.
 
@@ -22,6 +22,6 @@
 
 - Two-step UX: agents call `code_refactor_plan`, review the preview, then `code_refactor_apply` with the `planId`. This is intentional — it preserves a review checkpoint.
 - `planId`s are session-scoped and expire on any fingerprint change to their touched files; re-applying a stale plan is a hard error, not a silent re-plan.
-- Extract operations require an LSP code action that returns precise text edits; absent that, `code_refactor_plan` returns `unavailable` / `ambiguous` honestly rather than approximating.
+- Extract, import-cleanup, and dead-code operations require an LSP code action that returns precise text edits; absent that, `code_refactor_plan` returns `unavailable` / `ambiguous` honestly rather than approximating.
 - `code_refactor_apply` remains text-edit-only in this phase; file/resource operations are out of scope until shared runtime support exists.
-- `code_refactor_plan`'s name-anchor requirement (ADR 0003) means a target resolved only to a declaration anchor cannot be renamed — re-resolve to the identifier first.
+- `rename_symbol` cannot use a target that has only a declaration anchor; re-resolve to the identifier first.

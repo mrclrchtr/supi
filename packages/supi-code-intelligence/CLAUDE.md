@@ -65,10 +65,8 @@ Each registered public `code_*` call derives one opaque Debug Operation ID in th
 
 ## Always-on LSP policy
 
-- `lsp.enabled` and `lsp.active` are deprecated and ignored.
 - Per-language opt-out is `lsp.servers.<language>.enabled: false`; if all definitions are disabled, the controller publishes `disabled`, not `ready`.
 - Server-inventory evidence is distinct from the authoritative five-branch Semantic health state. Diagnostics require an active ready server, not merely a ready runtime owner; concrete ready-server evidence wins over lagging capability publication. Diagnostic refresh attempts recovery before the final state is derived.
-- Deprecated keys surface through `/supi-ci-status`, `code_health`, and a one-time message after the grace period.
 
 ## Refactor safety
 

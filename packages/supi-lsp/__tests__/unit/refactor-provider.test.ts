@@ -252,16 +252,8 @@ describe("LspRefactorProvider", () => {
     });
   });
 
-  describe("rename is absent when LSP does not support it", () => {
-    it("does not expose rename when WorkspaceLspRuntime.rename returns null always", () => {
-      const lsp = createMockLsp({
-        rename: vi.fn().mockResolvedValue(null),
-      });
-      const provider: SemanticProvider = createLspSemanticProvider(lsp);
-      expect(provider.rename).toBeDefined();
-    });
-
-    it("rename adapter delegates through the LSP service", async () => {
+  describe("rename adapter", () => {
+    it("delegates through the LSP service", async () => {
       const renameSpy = vi.fn().mockResolvedValue(
         routed({
           changes: { "file:///src/index.ts": [] },
@@ -277,14 +269,6 @@ describe("LspRefactorProvider", () => {
   });
 
   describe("operation-aware refactor planning", () => {
-    it("exposes a generic refactor method for operation-aware planning", () => {
-      const lsp = createMockLsp();
-      const provider = createLspSemanticProvider(lsp) as OperationAwareSemanticProvider;
-
-      expect(provider.refactor).toBeDefined();
-      expect(typeof provider.refactor).toBe("function");
-    });
-
     it("routes rename_symbol through the rename request instead of code actions", async () => {
       const renameSpy = vi.fn().mockResolvedValue(
         routed({
@@ -350,6 +334,28 @@ describe("LspRefactorProvider", () => {
       expect(codeActionsSpy).toHaveBeenCalled();
       expect(renameSpy).not.toHaveBeenCalled();
       expect(result?.kind).toBe("precise");
+    });
+
+    it.each(["rename_file", "move_file"] as const)("keeps %s unavailable", async (operation) => {
+      const renameSpy = vi.fn();
+      const codeActionsSpy = vi.fn();
+      const provider = createLspSemanticProvider(
+        createMockLsp({ rename: renameSpy, codeActions: codeActionsSpy }),
+      ) as OperationAwareSemanticProvider;
+
+      const result = await provider.refactor?.({
+        operation,
+        file: "/src/index.ts",
+        position: { line: 0, character: 0 },
+        destination: "/src/next.ts",
+      });
+
+      expect(result).toEqual({
+        kind: "unavailable",
+        reason: `Refactor operation "${operation}" is not supported yet. File/resource operations are deferred.`,
+      });
+      expect(renameSpy).not.toHaveBeenCalled();
+      expect(codeActionsSpy).not.toHaveBeenCalled();
     });
 
     it("routes delete_dead_code through code actions and rejects edit-less actions", async () => {

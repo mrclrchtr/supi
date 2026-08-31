@@ -3,6 +3,11 @@
 // Kept separate from debug-registry.ts so debug-timing.ts can import the
 // registry without creating an import cycle through the barrel re-export.
 
+export {
+  DEBUG_IDENTITY_TRUNCATION_MARKER,
+  MAX_DEBUG_IDENTITY_STRING,
+  truncateDebugIdentity,
+} from "./debug-identity.ts";
 // biome-ignore lint/performance/noReExportAll: preserve the stable debug domain entry point
 export * from "./debug-registry.ts";
 // biome-ignore lint/performance/noReExportAll: preserve the stable debug domain entry point

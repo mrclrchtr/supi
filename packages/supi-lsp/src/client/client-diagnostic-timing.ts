@@ -1,6 +1,9 @@
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
-import { startDebugTimer } from "@mrclrchtr/supi-core/debug";
-import { boundCwd, truncateIdentity } from "../debug-telemetry.ts";
+import {
+  startDebugTimer,
+  truncateDebugIdentity as truncateIdentity,
+} from "@mrclrchtr/supi-core/debug";
+import { boundCwd } from "../debug-telemetry.ts";
 
 type DiagnosticCollection = "cache" | "fallback" | "none" | "pull" | "push";
 type DiagnosticFreshness = "not-observed" | "observed";

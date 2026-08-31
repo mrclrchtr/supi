@@ -49,35 +49,6 @@ export {
   WorkspaceSymbol,
 } from "vscode-languageserver-types";
 
-// Alias for backward compatibility — our code uses ClientDiagnosticCapabilities
-import type { DiagnosticClientCapabilities } from "vscode-languageserver-protocol";
-export type ClientDiagnosticCapabilities = DiagnosticClientCapabilities;
-
-// ── JSON-RPC types (local — replaced by vscode-jsonrpc in transport task) ──
-export type JsonRpcId = number | string;
-
-export interface JsonRpcRequest {
-  jsonrpc: "2.0";
-  id: JsonRpcId;
-  method: string;
-  params?: unknown;
-}
-
-export interface JsonRpcResponse {
-  jsonrpc: "2.0";
-  id: JsonRpcId | null;
-  result?: unknown;
-  error?: { code: number; message: string; data?: unknown };
-}
-
-export interface JsonRpcNotification {
-  jsonrpc: "2.0";
-  method: string;
-  params?: unknown;
-}
-
-export type JsonRpcMessage = JsonRpcRequest | JsonRpcResponse | JsonRpcNotification;
-
 // ── SuPi-specific server config ──────────────────────────────────────
 export type {
   DetectedProjectServer,

@@ -1,6 +1,6 @@
 import * as path from "node:path";
+import { resolveToolPath as resolveSessionPath } from "@mrclrchtr/supi-core/path";
 import * as projectRoots from "@mrclrchtr/supi-core/project";
-import { resolveSessionPath } from "../utils.ts";
 
 /** Unique key for a client identified by server name and root. */
 export function clientKey(serverName: string, root: string): string {

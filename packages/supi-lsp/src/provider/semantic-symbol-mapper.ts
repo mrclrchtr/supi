@@ -30,20 +30,34 @@ function toCodeLocation(item: Location | LocationLink): CodeLocation | null {
   const loc = item as Record<string, unknown>;
   const uri = loc.uri ?? loc.targetUri;
   if (typeof uri !== "string") return null;
-  const range = loc.targetSelectionRange ?? loc.targetRange ?? loc.range;
-  if (!range || typeof range !== "object") return null;
-  const r = range as { start: Record<string, unknown>; end: Record<string, unknown> };
-  if (!r.start || !r.end) return null;
-  return {
-    uri,
-    range: {
-      start: {
-        line: (r.start.line as number) ?? 0,
-        character: (r.start.character as number) ?? 0,
-      },
-      end: { line: (r.end.line as number) ?? 0, character: (r.end.character as number) ?? 0 },
-    },
-  };
+  const range = toValidRange(loc.targetSelectionRange ?? loc.targetRange ?? loc.range);
+  return range ? { uri, range } : null;
+}
+
+function toValidRange(value: unknown): SourceRange | null {
+  if (!value || typeof value !== "object") return null;
+  const range = value as { start?: unknown; end?: unknown };
+  const start = toValidPosition(range.start);
+  const end = toValidPosition(range.end);
+  return start && end && !isPositionBefore(end, start) ? { start, end } : null;
+}
+
+function toValidPosition(value: unknown): { line: number; character: number } | null {
+  if (!value || typeof value !== "object") return null;
+  const position = value as Record<string, unknown>;
+  return Number.isInteger(position.line) &&
+    (position.line as number) >= 0 &&
+    Number.isInteger(position.character) &&
+    (position.character as number) >= 0
+    ? { line: position.line as number, character: position.character as number }
+    : null;
+}
+
+function isPositionBefore(
+  left: { line: number; character: number },
+  right: { line: number; character: number },
+): boolean {
+  return left.line < right.line || (left.line === right.line && left.character < right.character);
 }
 
 const SYMBOL_KIND_NAMES: Record<number, string> = {
@@ -102,8 +116,19 @@ function flattenDocumentSymbols(
     let document: DocumentSymbol | null = null;
     if (isSymbolInformation(sym)) information = sym;
     else document = sym;
-    const declStart = document?.range.start ?? information?.location.range.start;
-    if (!declStart) continue;
+    const declarationRange = toValidRange(document?.range ?? information?.location.range);
+    if (!declarationRange) {
+      if (document?.children?.length) {
+        result.push(
+          ...flattenDocumentSymbols(document.children, filePath, sym.name, {
+            sourceLines: context.sourceLines,
+            nesting: "nested",
+          }),
+        );
+      }
+      continue;
+    }
+    const declStart = declarationRange.start;
     const nameStart = document
       ? resolveDocumentSymbolNameStart(document, context.sourceLines)
       : null;
@@ -149,8 +174,9 @@ function resolveDocumentSymbolNameStart(
   symbol: DocumentSymbol,
   sourceLines: readonly string[] | null,
 ): { line: number; character: number } | null {
-  const selectionStart = symbol.selectionRange?.start;
-  if (!selectionStart) return null;
+  const selectionRange = toValidRange(symbol.selectionRange);
+  if (!selectionRange) return null;
+  const selectionStart = selectionRange.start;
   if (!sourceLines) return selectionStart;
   const sourceLine = sourceLines[selectionStart.line];
   if (sourceLine === undefined) return null;
@@ -160,25 +186,30 @@ function resolveDocumentSymbolNameStart(
   ) {
     return selectionStart;
   }
-  const rangeStart = symbol.range?.start;
-  const rangeEnd = symbol.range?.end;
-  const from = rangeStart?.line === selectionStart.line ? rangeStart.character : 0;
-  const until = rangeEnd?.line === selectionStart.line ? rangeEnd.character : sourceLine.length;
+  const declarationRange = toValidRange(symbol.range);
+  if (!declarationRange) return null;
+  const from =
+    declarationRange.start.line === selectionStart.line ? declarationRange.start.character : 0;
+  const until =
+    declarationRange.end.line === selectionStart.line
+      ? declarationRange.end.character
+      : sourceLine.length;
   const character = sourceLine.indexOf(symbol.name, from);
   if (character < 0 || character + symbol.name.length > until) return null;
   return { line: selectionStart.line, character };
 }
 
-/** Map one workspace symbol to the shared representation. */
-export function toCodeSymbol(sym: SymbolInformation): CodeSymbol {
-  const start = sym.location?.range?.start;
+/** Map one valid workspace symbol to the shared representation. */
+export function toCodeSymbol(sym: SymbolInformation): CodeSymbol | null {
+  const location = toCodeLocation(sym.location);
+  if (!location) return null;
   return {
     name: sym.name,
     kind: symbolKindName(sym.kind),
-    file: uriToFile(sym.location?.uri ?? ""),
+    file: uriToFile(location.uri),
     declarationAnchor: {
-      line: start ? start.line + 1 : 0,
-      character: start ? start.character + 1 : 0,
+      line: location.range.start.line + 1,
+      character: location.range.start.character + 1,
     },
     container: sym.containerName ?? null,
   };

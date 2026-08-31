@@ -5,12 +5,13 @@ import {
   isCodeRequestInterruption,
   throwIfCodeRequestInterrupted,
 } from "@mrclrchtr/supi-code-runtime/api";
+import { fileToUri, uriToFile } from "@mrclrchtr/supi-core/path";
 import type { TextDocumentIdentifier } from "../config/types.ts";
 import {
   type DiagnosticEvidenceSummary,
   summarizeDiagnosticEvidence,
 } from "../diagnostics/evidence.ts";
-import { detectLanguageId, fileToUri, uriToFile } from "../utils.ts";
+import { detectLanguageId } from "../utils.ts";
 import {
   type DiagnosticCacheEntry,
   type DiagnosticSynchronization,

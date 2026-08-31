@@ -9,7 +9,11 @@ import {
   throwIfCodeRequestInterrupted,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
-import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
+import {
+  recordDebugEvent,
+  truncateDebugIdentity as truncateIdentity,
+} from "@mrclrchtr/supi-core/debug";
+import { resolveToolPath as resolveSessionPath } from "@mrclrchtr/supi-core/path";
 import { createSessionStateRegistry } from "@mrclrchtr/supi-core/session";
 import type {
   CodeAction,
@@ -26,13 +30,12 @@ import type {
   WorkspaceEdit,
   WorkspaceSymbol,
 } from "../config/types.ts";
-import { boundServerNames, truncateIdentity } from "../debug-telemetry.ts";
+import { boundServerNames } from "../debug-telemetry.ts";
 import type {
   WorkspaceSentinelScanOptions,
   WorkspaceSentinelSyncResult,
 } from "../diagnostics/workspace-sentinels.ts";
 import type { LspManager } from "../manager/manager.ts";
-import { resolveSessionPath } from "../utils.ts";
 import { raceReadinessValue } from "./readiness.ts";
 import type {
   DiagnosticEvidenceSummary,

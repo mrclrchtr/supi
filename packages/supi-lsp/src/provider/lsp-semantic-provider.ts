@@ -96,7 +96,10 @@ export function createLspSemanticProvider(lsp: WorkspaceLspRuntime): SemanticPro
     ): Promise<CodeQueryResult<CodeSymbol[]>> {
       const result = await lsp.workspaceSymbol(query, control, scopes);
       return mapCodeQueryResult(result, (results) =>
-        results.map((symbol) => toCodeSymbol(symbol as SymbolInformation)),
+        results.flatMap((symbol) => {
+          const mapped = toCodeSymbol(symbol as SymbolInformation);
+          return mapped ? [mapped] : [];
+        }),
       );
     },
 

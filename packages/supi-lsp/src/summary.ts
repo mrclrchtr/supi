@@ -97,11 +97,6 @@ export function isInProjectTree(filePath: string, policy: AutomaticLspPathPolicy
   return policy.isEligible(filePath);
 }
 
-/** Check whether the supplied automatic path policy allows a source path. */
-export function isProjectSource(filePath: string, policy: AutomaticLspPathPolicy): boolean {
-  return isInProjectTree(filePath, policy);
-}
-
 /** Check automatic and tsconfig diagnostic scope for one file path. */
 export function shouldIgnoreLspPath(
   filePath: string,

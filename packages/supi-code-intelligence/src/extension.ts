@@ -6,8 +6,10 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
-import { truncateIdentity } from "@mrclrchtr/supi-lsp/debug-telemetry";
+import {
+  recordDebugEvent,
+  truncateDebugIdentity as truncateIdentity,
+} from "@mrclrchtr/supi-core/debug";
 import { buildArchitectureModel } from "./analysis/architecture/discovery.ts";
 import { createCodeIntelligenceApp } from "./app/app.ts";
 import { registerCodeIntelligenceSettings, resolveOverviewEnabled } from "./config.ts";

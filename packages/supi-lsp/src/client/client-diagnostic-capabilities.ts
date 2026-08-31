@@ -66,11 +66,6 @@ export class ClientDynamicRegistrations {
     return (this.idsByMethod.get(method)?.size ?? 0) > 0;
   }
 
-  /** Snapshot of the active registration ids for a method. */
-  ids(method: string): readonly string[] {
-    return [...(this.idsByMethod.get(method) ?? [])];
-  }
-
   /** Drop all registrations — capability loss on shutdown, crash, or disposal. */
   clear(): void {
     this.idsByMethod.clear();

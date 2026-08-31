@@ -1,11 +1,4 @@
-/**
- * Tests for the updated LSP settings UI (always-on policy).
- *
- * Verifies that the settings UI:
- * - no longer has an "Enable LSP" toggle
- * - no longer has an "Active Servers" allowlist
- * - has a "Disabled Servers" control
- */
+/** Tests for the always-on LSP settings UI. */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -27,13 +20,7 @@ vi.mock("@mrclrchtr/supi-core/config", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@mrclrchtr/supi-core/config")>();
   return {
     ...actual,
-    loadSupiConfigSectionForScope: vi.fn(() => ({
-      enabled: true,
-      severity: 1,
-      active: [],
-      exclude: [],
-      servers: {},
-    })),
+    loadSupiConfigSectionForScope: vi.fn(() => ({ exclude: [], servers: {} })),
   };
 });
 
@@ -52,7 +39,7 @@ afterEach(() => {
 });
 
 describe("LSP settings UI", () => {
-  it("replaces Enable LSP and Active Servers with Disabled Servers", {
+  it("registers exclusion and disabled-server controls", {
     timeout: 30_000,
   }, async () => {
     const { registerLspSettings } = await import("../../../../src/substrate/lsp/settings.ts");
@@ -70,19 +57,12 @@ describe("LSP settings UI", () => {
 
     const keys = fields.map((f) => f.key);
 
-    // Removed items
-    expect(keys).not.toContain("enabled");
-    expect(keys).not.toContain("active");
-    expect(keys).not.toContain("severity");
-
-    // Present items
     expect(keys).toContain("disabled_servers");
     expect(keys).toContain("exclude");
     expect(fields.find((field) => field.key === "exclude")?.description).toContain(
       "automatic LSP workspace work",
     );
 
-    // Disabled Servers is a custom field with a submenu
     const disabledServers = fields.find((f) => f.key === "disabled_servers");
     expect(disabledServers?.kind).toBe("custom");
     expect(disabledServers?.submenu).toBeDefined();

@@ -1,5 +1,5 @@
 export const toolDescription =
-  "Preview one semantic rename or extraction and return a planId without mutating files.";
+  "Preview one semantic rename, extraction, import cleanup, or dead-code deletion and return a planId without mutating files.";
 
 export const promptSnippet = "preview a precise semantic refactor";
 

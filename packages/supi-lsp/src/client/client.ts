@@ -12,7 +12,11 @@ import {
   throwIfCodeRequestInterrupted,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
-import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
+import {
+  recordDebugEvent,
+  truncateDebugIdentity as truncateIdentity,
+} from "@mrclrchtr/supi-core/debug";
+import { fileToUri } from "@mrclrchtr/supi-core/path";
 import { type ProgressToken, TextDocumentSyncKind } from "vscode-languageserver-protocol";
 import { CLIENT_CAPABILITIES } from "../config/capabilities.ts";
 import type {
@@ -35,10 +39,9 @@ import type {
   WorkspaceEdit,
   WorkspaceSymbol,
 } from "../config/types.ts";
-import { boundCwd, truncateIdentity } from "../debug-telemetry.ts";
+import { boundCwd } from "../debug-telemetry.ts";
 import type { DiagnosticEvidenceSummary } from "../diagnostics/evidence.ts";
 import { raceRequestControl } from "../session/readiness.ts";
-import { fileToUri } from "../utils.ts";
 import {
   ClientDynamicRegistrations,
   DOCUMENT_DIAGNOSTIC_METHOD,
@@ -139,6 +142,15 @@ function killProcessTree(pid: number): void {
   } catch {
     // Process group may already be dead — ignore.
   }
+}
+
+/** Terminate a failed startup without leaving server descendants running. */
+function killFailedStartupProcess(child: ChildProcess): void {
+  if (child.pid) {
+    killProcessTree(child.pid);
+    return;
+  }
+  child.kill();
 }
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -285,7 +297,7 @@ export class LspClient {
     if (!this.process.stdin || !this.process.stdout) {
       const failure = new Error(`${cmd}: missing stdin/stdout`);
       this.handleProcessFailure(failure);
-      this.process.kill();
+      killFailedStartupProcess(this.process);
       throw failure;
     }
 
@@ -350,7 +362,7 @@ export class LspClient {
     } catch (err) {
       const failure = new Error(`${this.name}: initialize failed: ${err}`, { cause: err });
       this.handleProcessFailure(failure);
-      this.process.kill();
+      killFailedStartupProcess(this.process);
       throw failure;
     }
   }

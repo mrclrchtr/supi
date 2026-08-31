@@ -6,7 +6,7 @@ import {
   getDebugEvents,
   resetDebugRegistry,
 } from "@mrclrchtr/supi-core/debug";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPullTestClient, createRunningTestClient } from "../helpers/client-test-harness.ts";
 
 let cwd = "";
@@ -299,48 +299,55 @@ describe("LSP diagnostic timing observations", () => {
   });
 
   it("records the reopen-resync fallback count for a clean push-only file", async () => {
-    const file = join(cwd, "reopen-timing.ts");
-    writeFileSync(file, "const reopenTiming = true;\n");
-    const { client } = createRunningTestClient({ root: cwd, cwd });
-    client.didOpen(file, "const reopenTiming = true;\n");
-    // A real disk change forces the didChange resynchronization whose clean
-    // result stays unpublished until the fallback didOpen. Unchanged content
-    // is retained without protocol work, so no reopen candidate would exist.
-    writeFileSync(file, "const reopenTimingChanged = true;\n");
-    // The server stays silent through the first settle window, then
-    // publishes twice on the fallback didOpen: the first publication is
-    // tentative, the second confirms the reopened synchronization.
-    setTimeout(
-      () => client.handlePublishDiagnostics({ uri: `file://${file}`, diagnostics: [] }),
-      120,
-    );
-    setTimeout(
-      () => client.handlePublishDiagnostics({ uri: `file://${file}`, diagnostics: [] }),
-      135,
-    );
+    vi.useFakeTimers();
+    try {
+      const file = join(cwd, "reopen-timing.ts");
+      writeFileSync(file, "const reopenTiming = true;\n");
+      const { client } = createRunningTestClient({ root: cwd, cwd });
+      client.didOpen(file, "const reopenTiming = true;\n");
+      // A real disk change forces the didChange resynchronization whose clean
+      // result stays unpublished until the fallback didOpen. Unchanged content
+      // is retained without protocol work, so no reopen candidate would exist.
+      writeFileSync(file, "const reopenTimingChanged = true;\n");
+      // The server stays silent through the first settle window, then
+      // publishes twice on the fallback didOpen: the first publication is
+      // tentative, the second confirms the reopened synchronization.
+      setTimeout(
+        () => client.handlePublishDiagnostics({ uri: `file://${file}`, diagnostics: [] }),
+        120,
+      );
+      setTimeout(
+        () => client.handlePublishDiagnostics({ uri: `file://${file}`, diagnostics: [] }),
+        135,
+      );
 
-    await client.refreshOpenDiagnostics({ maxWaitMs: 80, quietMs: 20 });
+      const refresh = client.refreshOpenDiagnostics({ maxWaitMs: 80, quietMs: 20 });
+      await vi.advanceTimersByTimeAsync(200);
+      await refresh;
 
-    expect(
-      getDebugEvents({ source: "lsp", category: "diagnostics.timing" }).events[0]?.data,
-    ).toEqual(
-      expect.objectContaining({
-        operation: "refresh-open",
-        collection: "push",
-        pull: "not-supported",
-        reopen: 1,
-        freshness: "observed",
-        outcome: "completed",
-        // The reopen mark names the preceding first settle window; the
-        // final phase covers the reopen fallback and second settle.
-        timing: expect.objectContaining({
-          phasesMs: expect.objectContaining({
-            synchronize: expect.any(Number),
-            "first-settle": expect.any(Number),
-            "push-settle": expect.any(Number),
+      expect(
+        getDebugEvents({ source: "lsp", category: "diagnostics.timing" }).events[0]?.data,
+      ).toEqual(
+        expect.objectContaining({
+          operation: "refresh-open",
+          collection: "push",
+          pull: "not-supported",
+          reopen: 1,
+          freshness: "observed",
+          outcome: "completed",
+          // The reopen mark names the preceding first settle window; the
+          // final phase covers the reopen fallback and second settle.
+          timing: expect.objectContaining({
+            phasesMs: expect.objectContaining({
+              synchronize: expect.any(Number),
+              "first-settle": expect.any(Number),
+              "push-settle": expect.any(Number),
+            }),
           }),
         }),
-      }),
-    );
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

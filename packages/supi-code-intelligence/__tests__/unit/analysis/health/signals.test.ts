@@ -17,7 +17,6 @@ describe("collectServers", () => {
           root: "/project",
           fileTypes: ["ts"],
           status: "error" as const,
-          supportedActions: [],
           openFiles: [],
           ready: false,
           statusReason,

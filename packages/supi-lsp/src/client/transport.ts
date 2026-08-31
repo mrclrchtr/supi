@@ -7,7 +7,10 @@ import {
   type CodeRequestControl,
   CodeRequestDeadlineError,
 } from "@mrclrchtr/supi-code-runtime/api";
-import { startDebugTimer } from "@mrclrchtr/supi-core/debug";
+import {
+  startDebugTimer,
+  truncateDebugIdentity as truncateIdentity,
+} from "@mrclrchtr/supi-core/debug";
 import {
   CancellationTokenSource,
   createMessageConnection,
@@ -18,7 +21,7 @@ import {
   StreamMessageReader,
   StreamMessageWriter,
 } from "vscode-jsonrpc/node";
-import { boundCwd, LSP_REQUEST_TIMEOUT_ERROR_CODE, truncateIdentity } from "../debug-telemetry.ts";
+import { boundCwd, LSP_REQUEST_TIMEOUT_ERROR_CODE } from "../debug-telemetry.ts";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -112,34 +115,40 @@ export class JsonRpcClient {
     const methodClass = classifyRequestMethod(method);
     const boundedMethod = truncateIdentity(method);
     const timer = startDebugTimer();
+    // A request cancelled before dispatch must not produce protocol traffic.
+    if (signal?.aborted) {
+      return rejectUndispatchedRequest(
+        signal.reason ?? new Error(`Request ${method} was cancelled`),
+        {
+          timer,
+          operationId: options?.operationId,
+          observation: { method: boundedMethod, methodClass, outcome: "cancelled" },
+          identity: { server: this.server, cwd: this.cwd },
+        },
+      );
+    }
     // An expired absolute deadline must not even send the request: the caller
     // no longer awaits a result, so no protocol traffic may start.
     if (deadlineMs !== undefined && deadlineMs <= 0) {
-      recordRequestTiming(
+      return rejectUndispatchedRequest(new CodeRequestDeadlineError(), {
         timer,
-        options?.operationId,
-        {
+        operationId: options?.operationId,
+        observation: {
           method: boundedMethod,
           methodClass,
           outcome: "timed-out",
           errorCode: LSP_REQUEST_TIMEOUT_ERROR_CODE,
         },
-        { server: this.server, cwd: this.cwd },
-      );
-      return Promise.reject(new CodeRequestDeadlineError());
+        identity: { server: this.server, cwd: this.cwd },
+      });
     }
     if (this.closed || !this.connection) {
-      recordRequestTiming(
+      return rejectUndispatchedRequest(new Error("JSON-RPC client is closed"), {
         timer,
-        options?.operationId,
-        {
-          method: boundedMethod,
-          methodClass,
-          outcome: "cancelled",
-        },
-        { server: this.server, cwd: this.cwd },
-      );
-      return Promise.reject(new Error("JSON-RPC client is closed"));
+        operationId: options?.operationId,
+        observation: { method: boundedMethod, methodClass, outcome: "cancelled" },
+        identity: { server: this.server, cwd: this.cwd },
+      });
     }
     const tokenSource = new CancellationTokenSource();
     let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -342,6 +351,19 @@ function jsonRpcErrorCode(error: unknown): number | undefined {
   if (typeof error !== "object" || error === null) return undefined;
   const code = (error as { code?: unknown }).code;
   return typeof code === "number" && Number.isInteger(code) ? code : undefined;
+}
+
+function rejectUndispatchedRequest(
+  error: unknown,
+  timing: {
+    timer: ReturnType<typeof startDebugTimer>;
+    operationId: string | undefined;
+    observation: RequestTimingObservation;
+    identity: { server?: string; cwd?: string };
+  },
+): Promise<never> {
+  recordRequestTiming(timing.timer, timing.operationId, timing.observation, timing.identity);
+  return Promise.reject(error);
 }
 
 function recordRequestTiming(

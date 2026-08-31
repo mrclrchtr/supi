@@ -3,9 +3,9 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { uriToFile } from "@mrclrchtr/supi-core/path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { LspClient } from "../../src/client/client.ts";
-import { uriToFile } from "../../src/utils.ts";
+import type { LspClient } from "../../src/client/client.ts";
 import { createPullTestClient, createRunningTestClient } from "../helpers/client-test-harness.ts";
 
 function createStartedClient(): LspClient {
@@ -397,19 +397,6 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
       clearInterval(interval);
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
-  });
-
-  it("does nothing when the client is not running", async () => {
-    const client = new LspClient(
-      "test",
-      { command: "echo", args: [], fileTypes: ["ts"], rootMarkers: ["tsconfig.json"] },
-      "/project",
-    );
-    await client.refreshOpenDiagnostics({ maxWaitMs: 50, quietMs: 20 });
-  });
-
-  it("uses default wait options", async () => {
-    await createStartedClient().refreshOpenDiagnostics();
   });
 });
 

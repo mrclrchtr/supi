@@ -35,8 +35,3 @@ export function summarizeDiagnosticEvidence(
   for (const document of documents) counts[document.status]++;
   return { ...counts, documents: [...documents] };
 }
-
-/** Return an empty evidence summary for a refresh with no tracked documents. */
-export function emptyDiagnosticEvidence(): DiagnosticEvidenceSummary {
-  return summarizeDiagnosticEvidence([]);
-}

@@ -88,6 +88,18 @@ describe("session runtime input validation", () => {
     }
   });
 
+  it.each(["update_imports", "delete_dead_code"] as const)(
+    "accepts the safe %s refactor operation",
+    (operation) => {
+      expect(
+        parseRefactorPlanWorkflowInput({
+          target: { handle: "tg-1" },
+          operation: { [operation]: {} },
+        }),
+      ).toMatchObject({ kind: "valid", value: { operation: { [operation]: {} } } });
+    },
+  );
+
   it.each([
     [
       "rejects fractional inspection coordinates",

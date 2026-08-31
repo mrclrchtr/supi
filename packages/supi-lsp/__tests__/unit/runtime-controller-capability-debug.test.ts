@@ -30,7 +30,7 @@ vi.mock("../../src/config/config.ts", () => ({
   }),
 }));
 vi.mock("../../src/config/lsp-settings.ts", () => ({
-  loadLspSettings: vi.fn().mockReturnValue({ enabled: true, active: [], exclude: [] }),
+  loadLspSettings: vi.fn().mockReturnValue({ exclude: [] }),
 }));
 vi.mock("../../src/config/tsconfig-scope.ts", () => ({ clearTsconfigCache: vi.fn() }));
 vi.mock("../../src/diagnostics/workspace-sentinels.ts", () => ({
@@ -83,7 +83,6 @@ const readyServer: ProjectServerInfo = {
   root: "/project",
   fileTypes: ["ts"],
   status: "running",
-  supportedActions: [],
   openFiles: [],
   ready: true,
 };

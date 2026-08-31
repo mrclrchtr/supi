@@ -1,5 +1,5 @@
+import { uriToFile } from "@mrclrchtr/supi-core/path";
 import type { PublishDiagnosticsParams } from "../config/types.ts";
-import { uriToFile } from "../utils.ts";
 import {
   type DiagnosticCacheEntry,
   isTentativePushEntry,

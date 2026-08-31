@@ -7,9 +7,10 @@ import {
   throwIfCodeRequestInterrupted,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
+import { fileToUri, uriToFile } from "@mrclrchtr/supi-core/path";
 import type { Diagnostic, TextDocumentItem } from "../config/types.ts";
 import type { DiagnosticEvidenceSummary } from "../diagnostics/evidence.ts";
-import { detectLanguageId, fileToUri, uriToFile } from "../utils.ts";
+import { detectLanguageId } from "../utils.ts";
 import { applyPushDiagnostics, buildClientDiagnosticSnapshot } from "./client-diagnostic-cache.ts";
 import { collectSynchronizedFileDiagnostics } from "./client-diagnostic-collection.ts";
 import {

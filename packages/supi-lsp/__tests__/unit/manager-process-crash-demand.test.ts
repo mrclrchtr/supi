@@ -143,6 +143,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@mrclrchtr/supi-core/debug", () => ({
   recordDebugEvent: mocks.recordDebugEvent,
+  truncateDebugIdentity: (value: string) => value,
 }));
 
 vi.mock("../../src/client/client.ts", () => ({

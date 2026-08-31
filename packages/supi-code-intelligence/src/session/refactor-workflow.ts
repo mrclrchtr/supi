@@ -26,13 +26,14 @@ import {
   isPlanFresh,
   type RefactorPlan,
 } from "./refactor-plans.ts";
-import type {
-  PublicSourceRange,
-  RefactorApplyWorkflowInput,
-  RefactorApplyWorkflowOutcome,
-  RefactorOperationInput,
-  RefactorPlanWorkflowInput,
-  RefactorPlanWorkflowOutcome,
+import {
+  PUBLIC_REFACTOR_OPERATION_NAMES,
+  type PublicSourceRange,
+  type RefactorApplyWorkflowInput,
+  type RefactorApplyWorkflowOutcome,
+  type RefactorOperationInput,
+  type RefactorPlanWorkflowInput,
+  type RefactorPlanWorkflowOutcome,
 } from "./refactor-types.ts";
 import { resolveTargetWorkflow, type TargetWorkflowDeps } from "./target-workflow.ts";
 import { reportProgress, throwIfAborted, type WorkflowControl } from "./workflow-control.ts";
@@ -208,13 +209,11 @@ function parseOperation(input: RefactorOperationInput):
   | {
       kind: "ok";
       operation: RefactorOperation;
-      newName: string;
+      newName?: string;
       range?: PublicSourceRange;
     }
   | { kind: "invalid-input"; message: string } {
-  const keys = ["rename_symbol", "extract_function", "extract_variable"].filter(
-    (key) => key in input,
-  );
+  const keys = PUBLIC_REFACTOR_OPERATION_NAMES.filter((key) => key in input);
   if (keys.length !== 1) {
     return { kind: "invalid-input", message: "Select exactly one refactor operation." };
   }
@@ -233,11 +232,17 @@ function parseOperation(input: RefactorOperationInput):
       range: input.extract_function.range,
     };
   }
+  if ("extract_variable" in input) {
+    return {
+      kind: "ok",
+      operation: "extract_variable",
+      newName: input.extract_variable.newName,
+      range: input.extract_variable.range,
+    };
+  }
   return {
     kind: "ok",
-    operation: "extract_variable",
-    newName: input.extract_variable.newName,
-    range: input.extract_variable.range,
+    operation: "update_imports" in input ? "update_imports" : "delete_dead_code",
   };
 }
 
@@ -265,13 +270,13 @@ async function planWithProvider(
     file: string;
     position: { line: number; character: number };
     range?: SourceRange;
-    newName: string;
+    newName?: string;
   },
   control?: WorkflowControl,
 ): Promise<RefactorResult> {
   if (!provider) return { kind: "unavailable", reason: "No semantic provider is active." };
   if (provider.refactor) return provider.refactor(request, control);
-  if (request.operation === "rename_symbol" && provider.rename) {
+  if (request.operation === "rename_symbol" && request.newName !== undefined && provider.rename) {
     return provider.rename(request.file, request.position, request.newName, control);
   }
   return {

@@ -1,15 +1,14 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { uriToFile } from "@mrclrchtr/supi-core/path";
 import { afterEach, describe, expect, it } from "vitest";
 import { FileChangeType } from "../../src/config/types.ts";
 import {
   diffWorkspaceSentinelSnapshot,
-  isWorkspaceRecoveryTrigger,
   scanWorkspaceSentinels,
   syncWorkspaceSentinelSnapshot,
 } from "../../src/diagnostics/workspace-sentinels.ts";
-import { uriToFile } from "../../src/utils.ts";
 import { createAutomaticLspPathPolicy } from "../../src/workspace-path-policy.ts";
 
 let tmpDir = "";
@@ -72,16 +71,6 @@ describe("workspace sentinels", () => {
       { uri: "file:///project/packages/app/package.json", type: FileChangeType.Created },
       { uri: "file:///project/tsconfig.json", type: FileChangeType.Deleted },
     ]);
-  });
-
-  it("treats generated declaration files as recovery triggers", () => {
-    expect(isWorkspaceRecoveryTrigger("/project/src/generated/types.d.ts", "/project")).toBe(true);
-  });
-
-  it("does not treat plain source files as recovery triggers", () => {
-    expect(isWorkspaceRecoveryTrigger("/project/src/module.ts", "/project")).toBe(false);
-    expect(isWorkspaceRecoveryTrigger("/project/src/component.tsx", "/project")).toBe(false);
-    expect(isWorkspaceRecoveryTrigger("/project/lib/util.js", "/project")).toBe(false);
   });
 
   it("continues scanning past permission errors in subdirectories", () => {

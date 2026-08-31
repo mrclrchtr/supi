@@ -22,7 +22,6 @@ export interface LspAdapterState {
   controller: LspRuntimeController | null;
   providerLease: WorkspaceProviderHostLease | null;
   inspector: LspInspectorState;
-  lspActive: boolean;
   /** Snapshot of workspace sentinel files (package.json, tsconfig, lockfiles) for change detection. */
   sentinelSnapshot: Map<string, number>;
   /** Fired for runtime lifecycle changes that require a footer render. */
@@ -34,7 +33,6 @@ export function createLspAdapterState(): LspAdapterState {
     controller: null,
     providerLease: null,
     inspector: { handle: null, close: null },
-    lspActive: false,
     sentinelSnapshot: new Map(),
     stateChanges: new EventTarget(),
   };

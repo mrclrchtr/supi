@@ -6,162 +6,74 @@ import {
   evaluateCapabilityWarnings,
 } from "../../../../src/analysis/capability/capability-warnings.ts";
 
+const healthyInput = {
+  explicitlyDisabledLanguages: [],
+  missingServers: [],
+  structuralState: { kind: "ready" },
+};
+
 describe("evaluateCapabilityWarnings", () => {
-  it("returns deprecation warning when lsp.enabled is present in config", () => {
+  it("reports explicitly disabled language servers", () => {
     const result = evaluateCapabilityWarnings({
-      deprecatedKeys: {
-        projectEnabled: true,
-        globalEnabled: false,
-        projectActive: false,
-        globalActive: false,
-      },
-      explicitlyDisabledLanguages: [],
-      missingServers: [],
-      structuralState: { kind: "ready" },
-    });
-
-    expect(result.hasWarnings).toBe(true);
-    expect(
-      result.warnings.some((w) => w.type === "deprecated-key" && w.message.includes("lsp.enabled")),
-    ).toBe(true);
-  });
-
-  it("returns deprecation warning when lsp.active is present in config", () => {
-    const result = evaluateCapabilityWarnings({
-      deprecatedKeys: {
-        projectEnabled: false,
-        globalEnabled: false,
-        projectActive: true,
-        globalActive: false,
-      },
-      explicitlyDisabledLanguages: [],
-      missingServers: [],
-      structuralState: { kind: "ready" },
-    });
-
-    expect(result.hasWarnings).toBe(true);
-    expect(
-      result.warnings.some((w) => w.type === "deprecated-key" && w.message.includes("lsp.active")),
-    ).toBe(true);
-  });
-
-  it("returns language-disabled warning for explicitly disabled language servers", () => {
-    const result = evaluateCapabilityWarnings({
-      deprecatedKeys: {
-        projectEnabled: false,
-        globalEnabled: false,
-        projectActive: false,
-        globalActive: false,
-      },
+      ...healthyInput,
       explicitlyDisabledLanguages: ["python"],
-      missingServers: [],
-      structuralState: { kind: "ready" },
     });
 
-    expect(result.hasWarnings).toBe(true);
-    expect(
-      result.warnings.some(
-        (warning) =>
-          warning.type === "language-disabled" &&
-          warning.language === "python" &&
-          warning.message.includes("Semantic capability reduced"),
-      ),
-    ).toBe(true);
+    expect(result.warnings).toEqual([
+      expect.objectContaining({ type: "language-disabled", language: "python" }),
+    ]);
   });
 
-  it("returns missing-server warning when a server binary is not on PATH", () => {
+  it("reports missing server binaries", () => {
     const result = evaluateCapabilityWarnings({
-      deprecatedKeys: {
-        projectEnabled: false,
-        globalEnabled: false,
-        projectActive: false,
-        globalActive: false,
-      },
-      explicitlyDisabledLanguages: [],
+      ...healthyInput,
       missingServers: [{ name: "python", command: "pyright-langserver", foundExtensions: ["py"] }],
-      structuralState: { kind: "ready" },
     });
 
-    expect(result.hasWarnings).toBe(true);
-    expect(
-      result.warnings.some((w) => w.type === "missing-server" && w.language === "python"),
-    ).toBe(true);
+    expect(result.warnings).toEqual([
+      expect.objectContaining({ type: "missing-server", language: "python" }),
+    ]);
   });
 
-  it("returns structural-unavailable warning when tree-sitter is unavailable", () => {
+  it("reports structural capability failure", () => {
     const result = evaluateCapabilityWarnings({
-      deprecatedKeys: {
-        projectEnabled: false,
-        globalEnabled: false,
-        projectActive: false,
-        globalActive: false,
-      },
-      explicitlyDisabledLanguages: [],
-      missingServers: [],
+      ...healthyInput,
       structuralState: { kind: "unavailable", reason: "tree-sitter initialization failed" },
     });
 
-    expect(result.hasWarnings).toBe(true);
-    expect(
-      result.warnings.some(
-        (warning) =>
-          warning.type === "structural-unavailable" &&
-          warning.message.includes("Structural capability unavailable"),
-      ),
-    ).toBe(true);
+    expect(result.warnings).toEqual([expect.objectContaining({ type: "structural-unavailable" })]);
   });
 
-  it("returns empty warnings when everything is healthy", () => {
-    const result = evaluateCapabilityWarnings({
-      deprecatedKeys: {
-        projectEnabled: false,
-        globalEnabled: false,
-        projectActive: false,
-        globalActive: false,
-      },
-      explicitlyDisabledLanguages: [],
-      missingServers: [],
-      structuralState: { kind: "ready" },
+  it("returns no warnings when all capabilities are healthy", () => {
+    expect(evaluateCapabilityWarnings(healthyInput)).toEqual({
+      hasWarnings: false,
+      warnings: [],
     });
+  });
+});
 
-    expect(result.hasWarnings).toBe(false);
-    expect(result.warnings).toEqual([]);
+describe("CapabilityWarningState", () => {
+  const report = {
+    hasWarnings: true,
+    warnings: [{ type: "missing-server" as const, message: "test warning" }],
+  };
+
+  it("holds warnings until the grace period ends", () => {
+    expect(new CapabilityWarningState().getPendingWarnings(report, 60_000)).toEqual([]);
   });
 
-  describe("CapabilityWarningState", () => {
-    it("respects grace period — no pending warnings before grace expires", () => {
-      const state = new CapabilityWarningState();
-      const report = {
-        hasWarnings: true,
-        warnings: [{ type: "deprecated-key" as const, message: "test warning" }],
-      };
+  it("does not emit an unchanged warning report twice", () => {
+    const state = new CapabilityWarningState();
 
-      // With a long grace period, no warnings should be pending
-      const pending = state.getPendingWarnings(report, 60_000);
-      expect(pending).toEqual([]);
-    });
+    expect(state.getPendingWarnings(report, 0)).toHaveLength(1);
+    expect(state.getPendingWarnings(report, 0)).toEqual([]);
+  });
 
-    it("deduplicates — same warning report not emitted twice", () => {
-      const state = new CapabilityWarningState();
-      const report = {
-        hasWarnings: true,
-        warnings: [{ type: "deprecated-key" as const, message: "test warning" }],
-      };
+  it("does not consume emission state for an empty report", () => {
+    const state = new CapabilityWarningState();
 
-      expect(state.getPendingWarnings(report, 0)).toHaveLength(1);
-      expect(state.getPendingWarnings(report, 0)).toEqual([]);
-    });
-
-    it("does not consume emission state for an empty report", () => {
-      const state = new CapabilityWarningState();
-      expect(state.getPendingWarnings({ hasWarnings: false, warnings: [] }, 0)).toEqual([]);
-      expect(state.hasEmitted).toBe(false);
-
-      const warningReport = {
-        hasWarnings: true,
-        warnings: [{ type: "deprecated-key" as const, message: "test warning" }],
-      };
-      expect(state.getPendingWarnings(warningReport, 0)).toHaveLength(1);
-    });
+    expect(state.getPendingWarnings({ hasWarnings: false, warnings: [] }, 0)).toEqual([]);
+    expect(state.hasEmitted).toBe(false);
+    expect(state.getPendingWarnings(report, 0)).toHaveLength(1);
   });
 });

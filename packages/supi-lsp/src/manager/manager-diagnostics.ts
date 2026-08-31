@@ -7,6 +7,7 @@ import {
 import type { LspClient } from "../client/client.ts";
 import type { DiagnosticEntry } from "../client/client-document-state.ts";
 import type { Diagnostic } from "../config/types.ts";
+import { effectiveDiagnosticSeverity } from "../diagnostics/diagnostic-severity.ts";
 import { relativeFilePathFromUri } from "../diagnostics/diagnostic-summary.ts";
 
 /** Sync one file and return diagnostics up to the supplied severity threshold. */
@@ -50,7 +51,5 @@ export function collectOutstandingDiagnosticsDetailed(
 }
 
 function filterDiagnosticsBySeverity(diagnostics: Diagnostic[], maxSeverity: number): Diagnostic[] {
-  return diagnostics.filter(
-    (diagnostic) => diagnostic.severity !== undefined && diagnostic.severity <= maxSeverity,
-  );
+  return diagnostics.filter((diagnostic) => effectiveDiagnosticSeverity(diagnostic) <= maxSeverity);
 }

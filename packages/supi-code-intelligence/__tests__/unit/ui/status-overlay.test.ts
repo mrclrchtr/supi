@@ -15,7 +15,6 @@ const mockServers: ProjectServerInfo[] = [
     root: "/project",
     status: "running",
     fileTypes: ["ts", "tsx", "js", "jsx"],
-    supportedActions: ["hover", "definition"],
     openFiles: ["src/index.ts", "src/utils.ts"],
     ready: true,
   },
@@ -24,7 +23,6 @@ const mockServers: ProjectServerInfo[] = [
     root: "/project",
     status: "running",
     fileTypes: ["sh", "bash"],
-    supportedActions: ["hover"],
     openFiles: [],
     ready: true,
   },
@@ -384,30 +382,6 @@ describe("CiStatusDialog", () => {
       );
       const lines = dialog.render(80).join("\n");
       expect(lines).not.toContain("Capability Warnings");
-    });
-
-    it("shows a deprecation warning for an ignored lsp.enabled key", () => {
-      const dialog = createCiStatusDialog(
-        makeData({
-          servers: mockServers,
-          diagnostics: [],
-          capabilities: {
-            semantic: { kind: "ready", providerAvailable: true },
-            structural: { kind: "ready", providerAvailable: true },
-            refactorAvailable: true,
-          },
-          capabilityWarnings: {
-            hasWarnings: true,
-            warnings: [
-              { type: "deprecated-key", message: "lsp.enabled is deprecated and ignored" },
-            ],
-          },
-        }),
-        makeDeps(),
-      );
-      const lines = dialog.render(80).join("\n");
-      expect(lines).toContain("deprecated");
-      expect(lines).toContain("lsp.enabled");
     });
 
     it("shows a structural warning when tree-sitter is unavailable", () => {

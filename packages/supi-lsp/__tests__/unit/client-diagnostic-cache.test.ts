@@ -1,9 +1,9 @@
 // LspClient diagnostic publication and version-gating behavior.
 
+import { fileToUri } from "@mrclrchtr/supi-core/path";
 import { describe, expect, it } from "vitest";
 import type { LspClient } from "../../src/client/client.ts";
 import type { PublishDiagnosticsParams } from "../../src/config/types.ts";
-import { fileToUri } from "../../src/utils.ts";
 import { createRunningTestClient } from "../helpers/client-test-harness.ts";
 
 const FILE = "/project/a.ts";
@@ -11,6 +11,7 @@ const URI = fileToUri(FILE);
 
 function makeDiagnostic(message: string) {
   return {
+    severity: 1 as const,
     message,
     range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
   };
@@ -35,6 +36,19 @@ describe("LspClient diagnostic cache", () => {
     publish(client, { uri: URI, diagnostics: [makeDiagnostic("err")] });
 
     expect(client.getDiagnostics(FILE)).toEqual([makeDiagnostic("err")]);
+  });
+
+  it("accepts a diagnostic with omitted severity", () => {
+    const { client } = createRunningTestClient();
+    openAtVersion(client, 1);
+    const diagnostic = {
+      message: "unspecified severity",
+      range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+    };
+
+    publish(client, { uri: URI, diagnostics: [diagnostic] });
+
+    expect(client.getDiagnostics(FILE)).toEqual([diagnostic]);
   });
 
   it("replaces an earlier publication for the same document", () => {

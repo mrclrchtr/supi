@@ -36,7 +36,7 @@ describe("syncClientFileAndGetDiagnostics", () => {
     try {
       await expect(syncClientFileAndGetDiagnostics(client, file, 1)).resolves.toEqual({
         kind: "completed",
-        data: [diagnostics[0]],
+        data: [diagnostics[0], diagnostics[2]],
       });
       expect(syncAndWaitForDiagnostics).toHaveBeenCalledWith(file, content);
       expect(clearPullResultIds).not.toHaveBeenCalled();
