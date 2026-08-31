@@ -1,4 +1,3 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
 import {
   type CodeQueryResult,
@@ -7,7 +6,6 @@ import {
   partialCodeQuery,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
-import { walkProject } from "@mrclrchtr/supi-core/project";
 import type { LspClient } from "../client/client.ts";
 import type {
   DocumentSymbol,
@@ -15,10 +13,14 @@ import type {
   SymbolInformation,
   WorkspaceSymbol,
 } from "../config/types.ts";
+import {
+  type AutomaticLspPathPolicy,
+  createDefaultAutomaticLspPathPolicy,
+  walkAutomaticLspTree,
+} from "../workspace-path-policy.ts";
 
 type WorkspaceSymbolLike = SymbolInformation | WorkspaceSymbol;
 
-const SKIP_DIRS = new Set(["node_modules", ".git", ".pnpm", "dist", "build", "coverage"]);
 const DEFAULT_WARM_FILE_DEPTH = 4;
 const DEFAULT_MARKER_SCAN_DEPTH = 6;
 
@@ -30,6 +32,8 @@ export interface WorkspaceSymbolWarmTarget {
 export interface WorkspaceSymbolWarmOptions {
   maxFileDepth?: number;
   maxMarkerDepth?: number;
+  /** Runtime-owned automatic path policy. */
+  policy?: AutomaticLspPathPolicy;
 }
 
 export function getWorkspaceSymbolWarmPosition(
@@ -116,12 +120,13 @@ export function findWorkspaceSymbolWarmTargets(
   const allowed = new Set(fileTypes.map((fileType) => fileType.toLowerCase()));
   const maxFileDepth = options.maxFileDepth ?? DEFAULT_WARM_FILE_DEPTH;
   const maxMarkerDepth = options.maxMarkerDepth ?? DEFAULT_MARKER_SCAN_DEPTH;
+  const policy = options.policy ?? createDefaultAutomaticLspPathPolicy(resolvedRoot);
   if (allowed.size === 0) return [];
 
-  const markerRoots = collectMarkerRoots(resolvedRoot, rootMarkers, maxMarkerDepth);
+  const markerRoots = collectMarkerRoots(resolvedRoot, rootMarkers, maxMarkerDepth, policy);
   const targets = markerRoots
     .map((entry) => {
-      const file = findWarmFileRecursive(entry.root, allowed, maxFileDepth);
+      const file = findWarmFileRecursive(entry.root, allowed, maxFileDepth, policy);
       return file ? { projectRoot: entry.root, file, priority: entry.priority } : null;
     })
     .filter((entry): entry is { projectRoot: string; file: string; priority: number } =>
@@ -137,7 +142,7 @@ export function findWorkspaceSymbolWarmTargets(
 
   if (targets.length > 0) return targets;
 
-  const fallback = findWarmFileRecursive(resolvedRoot, allowed, maxFileDepth);
+  const fallback = findWarmFileRecursive(resolvedRoot, allowed, maxFileDepth, policy);
   return fallback ? [{ projectRoot: resolvedRoot, file: fallback }] : [];
 }
 
@@ -150,13 +155,15 @@ function collectMarkerRoots(
   root: string,
   rootMarkers: string[],
   maxDepth: number,
+  policy: AutomaticLspPathPolicy,
 ): MarkerRootEntry[] {
   if (rootMarkers.length === 0) return [];
 
   const markerIndex = new Map(rootMarkers.map((marker, index) => [marker, index]));
   const matches = new Map<string, number>();
 
-  walkProject(root, maxDepth, (directory, entryNames) => {
+  walkAutomaticLspTree(policy, root, maxDepth, (directory, entries) => {
+    const entryNames = new Set(entries.map((entry) => entry.name));
     const matchedPriority = rootMarkers.reduce<number | null>((best, marker) => {
       if (!entryNames.has(marker)) return best;
       const next = markerIndex.get(marker) ?? Number.MAX_SAFE_INTEGER;
@@ -181,31 +188,17 @@ function findWarmFileRecursive(
   directory: string,
   allowed: Set<string>,
   depth: number,
+  policy: AutomaticLspPathPolicy,
 ): string | null {
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(directory, { withFileTypes: true });
-  } catch {
-    return null;
-  }
-
-  const sortedEntries = [...entries].sort((a, b) => a.name.localeCompare(b.name));
-
-  for (const entry of sortedEntries) {
-    if (!entry.isFile()) continue;
-    const ext = path.extname(entry.name).slice(1).toLowerCase();
-    if (!allowed.has(ext)) continue;
-    return path.join(directory, entry.name);
-  }
-
-  if (depth <= 0) return null;
-
-  for (const entry of sortedEntries) {
-    if (!entry.isDirectory()) continue;
-    if (SKIP_DIRS.has(entry.name)) continue;
-    const nested = findWarmFileRecursive(path.join(directory, entry.name), allowed, depth - 1);
-    if (nested) return nested;
-  }
-
-  return null;
+  let warmFile: string | null = null;
+  walkAutomaticLspTree(policy, directory, depth, (currentDirectory, entries) => {
+    for (const entry of entries) {
+      if (!entry.isFile() && !entry.isSymbolicLink()) continue;
+      if (!allowed.has(path.extname(entry.name).slice(1).toLowerCase())) continue;
+      warmFile = path.join(currentDirectory, entry.name);
+      return true;
+    }
+    return false;
+  });
+  return warmFile;
 }

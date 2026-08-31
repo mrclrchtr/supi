@@ -10,6 +10,18 @@ See also: `packages/supi-code-intelligence/CONTEXT.md` and `packages/supi-code-r
 The workspace-scoped interface that owns file routing, semantic readiness and operations, tracked files, diagnostics, and recovery. It hides clients and the mutable manager, giving callers a deep operational seam with high locality inside `supi-lsp`.
 _Avoid_: LspManager, LSP singleton, provider bag, client registry
 
+**Automatic LSP path policy**:
+The fixed, runtime-owned path rules for automatic workspace work. It matches paths against the built-in private/generated/dependency directories, `lsp.exclude`, root and nested `.gitignore` rules, and the resolved workspace root. It stops before excluded directories, does not visit symbolic-link directories, and is used for discovery, startup, warm-up, file lists, created-file tracking, guidance, and diagnostic summaries not tied to one request. Regular symbolic-link files remain allowed when their target is a file. The runtime creates one policy at startup and creates a new one on reload.
+_Avoid_: local LSP skip set, one-off exclude check, explicit-file policy
+
+**Automatic LSP intent**:
+Work that SuPi performs from workspace state without one exact user-selected file: project detection, route startup, warm-up, file lists, created-file tracking, guidance, and diagnostic summaries not tied to one request. It uses the Automatic LSP path policy.
+_Avoid_: explicit semantic request, unrestricted workspace walk
+
+**Explicit LSP intent**:
+A semantic request for one exact file selected by the user or agent. It may route a file excluded from automatic work. This exception does not add the file to automatic discovery, warm-up, tracking, file lists, or guidance; configured diagnostic suppression still applies to diagnostic output.
+_Avoid_: automatic source support, ambient request, excluded means unavailable
+
 **LSP route**:
 One language-server instance identified by its configured server and workspace root. Each route has independent lifecycle, status, and recovery state.
 _Avoid_: server, client route, project server

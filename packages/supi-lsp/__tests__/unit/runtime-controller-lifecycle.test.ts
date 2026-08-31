@@ -5,11 +5,12 @@ import type { ManagerLifecycleTransition } from "../../src/manager/manager.ts";
 
 const mocks = vi.hoisted(() => ({
   clearRuntime: vi.fn(),
+  loadLspSettings: vi.fn().mockReturnValue({ enabled: true, active: [], exclude: [] }),
+  scanProjectCapabilities: vi.fn().mockReturnValue([]),
   managers: [] as Array<{
     emit(transition: unknown): void;
     getKnownProjectServers: ReturnType<typeof vi.fn>;
     registerDetectedServers: ReturnType<typeof vi.fn>;
-    setExcludePatterns: ReturnType<typeof vi.fn>;
     shutdownAll: ReturnType<typeof vi.fn>;
   }>,
   owners: [] as Array<{
@@ -34,17 +35,14 @@ vi.mock("../../src/config/config.ts", () => ({
   }),
 }));
 vi.mock("../../src/config/lsp-settings.ts", () => ({
-  loadLspSettings: vi.fn().mockReturnValue({ enabled: true, active: [], exclude: [] }),
+  loadLspSettings: mocks.loadLspSettings,
 }));
 vi.mock("../../src/config/tsconfig-scope.ts", () => ({ clearTsconfigCache: vi.fn() }));
-vi.mock("../../src/diagnostics/workspace-sentinels.ts", () => ({
-  scanWorkspaceSentinels: vi.fn(),
-}));
+vi.mock("../../src/diagnostics/workspace-sentinels.ts", () => ({}));
 vi.mock("../../src/manager/manager.ts", () => ({
   LspManager: class {
     getKnownProjectServers = vi.fn().mockReturnValue([]);
     registerDetectedServers = vi.fn();
-    setExcludePatterns = vi.fn();
     shutdownAll = vi.fn().mockResolvedValue(undefined);
 
     constructor(
@@ -77,7 +75,7 @@ vi.mock("../../src/session/runtime-registry.ts", () => ({
 }));
 vi.mock("../../src/session/scanner.ts", () => ({
   scanMissingServers: vi.fn().mockReturnValue([]),
-  scanProjectCapabilities: vi.fn().mockReturnValue([]),
+  scanProjectCapabilities: mocks.scanProjectCapabilities,
   startDetectedServers: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -109,6 +107,8 @@ function managerTransition(
 afterEach(() => {
   mocks.managers.length = 0;
   mocks.owners.length = 0;
+  mocks.loadLspSettings.mockReset().mockReturnValue({ enabled: true, active: [], exclude: [] });
+  mocks.scanProjectCapabilities.mockReset().mockReturnValue([]);
   vi.clearAllMocks();
 });
 
@@ -143,6 +143,32 @@ describe("LspRuntimeController lifecycle projection", () => {
       false,
     ]);
     expect(transitions.map((transition) => transition.generation)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("rebuilds the automatic path policy on runtime restart", async () => {
+    const controller = new LspRuntimeController("/project", new WorkspaceRuntime());
+
+    await controller.start();
+    const firstPolicy = mocks.scanProjectCapabilities.mock.calls[0]?.[3] as {
+      isEligible(candidate: string, kind?: "file" | "directory"): boolean;
+    };
+    expect(firstPolicy.isEligible("/project/generated/file.ts")).toBe(true);
+    expect(firstPolicy.isEligible("/project/.pi/private.ts")).toBe(false);
+
+    mocks.loadLspSettings.mockReturnValue({
+      enabled: true,
+      active: [],
+      exclude: ["generated/"],
+    });
+    await controller.start();
+
+    const secondPolicy = mocks.scanProjectCapabilities.mock.calls[1]?.[3] as {
+      isEligible(candidate: string, kind?: "file" | "directory"): boolean;
+    };
+    expect(secondPolicy.isEligible("/project/generated/file.ts")).toBe(false);
+    expect(secondPolicy.isEligible("/project/src/file.ts")).toBe(true);
+
+    await controller.shutdown();
   });
 
   it("replays the latest transition to a late subscriber", async () => {

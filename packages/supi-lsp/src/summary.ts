@@ -3,6 +3,7 @@ import type {
   ActiveCoverageSummaryEntry,
   OutstandingDiagnosticSummaryEntry,
 } from "./manager/manager-types.ts";
+import type { AutomaticLspPathPolicy } from "./workspace-path-policy.ts";
 
 /**
  * Display form for a file path used both for human-readable LSP output and as
@@ -67,9 +68,14 @@ export function normalizeRelevantPaths(relevantPaths: string[]): string[] {
  *  - candidate has no "/" and no ".": treat as a directory name anywhere in the path
  *  - otherwise: treat as a filename and match the basename
  */
-export function isPathRelevant(filePath: string, relevantPaths: string[], cwd: string): boolean {
+export function isPathRelevant(
+  filePath: string,
+  relevantPaths: string[],
+  cwd: string,
+  policy: AutomaticLspPathPolicy,
+): boolean {
   const normalizedFilePath = normalizeRelevantPath(filePath);
-  if (shouldIgnoreLspPath(normalizedFilePath, cwd)) return false;
+  if (shouldIgnoreLspPath(normalizedFilePath, cwd, policy)) return false;
 
   return relevantPaths.some((candidate) => {
     if (normalizedFilePath === candidate) return true;
@@ -86,48 +92,26 @@ export function isPathRelevant(filePath: string, relevantPaths: string[], cwd: s
 
 import { isFileExcludedByTsconfig } from "./config/tsconfig-scope.ts";
 
-/** Check whether a file path is inside the project tree (within cwd, not node_modules/.pnpm/out-of-tree).
- *  Does NOT check tsconfig exclusion — use `shouldIgnoreLspPath` for diagnostics/guidance filtering. */
-export function isInProjectTree(filePath: string, cwd: string): boolean {
-  const normalized = normalizeRelevantPath(filePath);
-  if (
-    normalized === "node_modules" ||
-    normalized.startsWith("node_modules/") ||
-    normalized.includes("/node_modules/") ||
-    normalized === ".pnpm" ||
-    normalized.startsWith(".pnpm/") ||
-    normalized.includes("/.pnpm/")
-  ) {
-    return false;
-  }
-
-  const absolutePath = path.resolve(cwd, filePath);
-  const relativePath = path.relative(cwd, absolutePath);
-  return !(relativePath.startsWith(`..${path.sep}`) || relativePath === "..");
+/** Check whether the supplied automatic path policy allows a file path. */
+export function isInProjectTree(filePath: string, policy: AutomaticLspPathPolicy): boolean {
+  return policy.isEligible(filePath);
 }
 
-/** Check whether a file path is inside the current project (not ignored and within cwd). */
-export function isProjectSource(filePath: string, cwd: string): boolean {
-  return isInProjectTree(filePath, cwd);
+/** Check whether the supplied automatic path policy allows a source path. */
+export function isProjectSource(filePath: string, policy: AutomaticLspPathPolicy): boolean {
+  return isInProjectTree(filePath, policy);
 }
 
-export function shouldIgnoreLspPath(filePath: string, cwd: string): boolean {
-  if (!isInProjectTree(filePath, cwd)) return true;
+/** Check automatic and tsconfig diagnostic scope for one file path. */
+export function shouldIgnoreLspPath(
+  filePath: string,
+  cwd: string,
+  policy: AutomaticLspPathPolicy,
+): boolean {
+  if (!isInProjectTree(filePath, policy)) return true;
 
   const normalized = normalizeRelevantPath(filePath);
-  if (
-    normalized === "node_modules" ||
-    normalized.startsWith("node_modules/") ||
-    normalized.includes("/node_modules/") ||
-    normalized === ".pnpm" ||
-    normalized.startsWith(".pnpm/") ||
-    normalized.includes("/.pnpm/") ||
-    isFileExcludedByTsconfig(normalized, cwd)
-  ) {
-    return true;
-  }
-
-  return false;
+  return isFileExcludedByTsconfig(normalized, cwd);
 }
 
 function normalizeRelevantPath(filePath: string): string {

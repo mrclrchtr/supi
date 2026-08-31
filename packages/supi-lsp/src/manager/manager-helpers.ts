@@ -1,6 +1,5 @@
 import * as path from "node:path";
 import * as projectRoots from "@mrclrchtr/supi-core/project";
-import { isGlobMatch } from "../pattern-matcher.ts";
 import { resolveSessionPath } from "../utils.ts";
 
 /** Unique key for a client identified by server name and root. */
@@ -31,11 +30,4 @@ export function rememberKnownRoot(
 ): void {
   const roots = knownRoots.get(serverName) ?? [];
   knownRoots.set(serverName, projectRoots.mergeKnownRoots(roots, root));
-}
-
-/** Check if a file path matches any user-configured exclude pattern. */
-export function isExcludedByPattern(file: string, excludePatterns: string[]): boolean {
-  return (
-    excludePatterns.length > 0 && excludePatterns.some((pattern) => isGlobMatch(file, pattern))
-  );
 }

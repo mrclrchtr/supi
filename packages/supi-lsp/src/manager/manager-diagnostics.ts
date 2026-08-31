@@ -8,8 +8,6 @@ import type { LspClient } from "../client/client.ts";
 import type { DiagnosticEntry } from "../client/client-document-state.ts";
 import type { Diagnostic } from "../config/types.ts";
 import { relativeFilePathFromUri } from "../diagnostics/diagnostic-summary.ts";
-import { shouldIgnoreLspPath } from "../summary.ts";
-import { isExcludedByPattern } from "./manager-helpers.ts";
 
 /** Sync one file and return diagnostics up to the supplied severity threshold. */
 export async function syncClientFileAndGetDiagnostics(
@@ -30,7 +28,7 @@ export async function syncClientFileAndGetDiagnostics(
 export function collectOutstandingDiagnosticsDetailed(
   clientEntries: Iterable<ReadonlyArray<DiagnosticEntry>>,
   cwd: string,
-  excludePatterns: string[],
+  includeFile: (file: string) => boolean,
   maxSeverity: number,
 ): Array<{ file: string; diagnostics: Diagnostic[] }> {
   const fileDiags = new Map<string, Diagnostic[]>();
@@ -38,8 +36,7 @@ export function collectOutstandingDiagnosticsDetailed(
   for (const entries of clientEntries) {
     for (const entry of entries) {
       const file = relativeFilePathFromUri(entry.uri, cwd);
-      if (shouldIgnoreLspPath(file, cwd)) continue;
-      if (isExcludedByPattern(file, excludePatterns)) continue;
+      if (!includeFile(file)) continue;
       const filtered = filterDiagnosticsBySeverity(entry.diagnostics, maxSeverity);
       if (filtered.length === 0) continue;
       const existing = fileDiags.get(file) ?? [];

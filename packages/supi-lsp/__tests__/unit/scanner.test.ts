@@ -2,10 +2,16 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { dedupeTopmostRoots } from "@mrclrchtr/supi-core/project";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LspConfig } from "../../src/config/types.ts";
 import { LspManager } from "../../src/manager/manager.ts";
-import { introspectCapabilities, scanProjectCapabilities } from "../../src/session/scanner.ts";
+import {
+  introspectCapabilities,
+  scanMissingServers,
+  scanProjectCapabilities,
+  startDetectedServers,
+} from "../../src/session/scanner.ts";
+import { createAutomaticLspPathPolicy } from "../../src/workspace-path-policy.ts";
 
 const tmpDirs: string[] = [];
 
@@ -113,6 +119,87 @@ describe("scanProjectCapabilities", () => {
 
     const results = scanProjectCapabilities(makeConfig(), root);
     expect(results).toEqual([]);
+  });
+
+  it("uses one policy for built-ins, configured excludes, and repository negation", () => {
+    const root = makeTmpProject();
+    writeFile(root, ".cache/project/tsconfig.json");
+    writeFile(root, ".pi/npm/tsconfig.json");
+    writeFile(root, "configured/tsconfig.json");
+    writeFile(root, "ignored/drop/tsconfig.json");
+    writeFile(root, "ignored/keep/tsconfig.json");
+    writeFile(root, ".github/actions/tsconfig.json");
+    fs.writeFileSync(path.join(root, ".gitignore"), "ignored/*\n!ignored/keep/\n");
+    const policy = createAutomaticLspPathPolicy(root, ["configured/"]);
+
+    const results = scanProjectCapabilities(makeConfig(), root, 3, policy);
+
+    expect(results.map((entry) => path.relative(root, entry.root))).toEqual([
+      ".github/actions",
+      "ignored/keep",
+    ]);
+  });
+
+  it("does not detect an extension-only route from a cached shell file", () => {
+    const root = makeTmpProject();
+    writeFile(root, ".cache/scripts/setup.sh");
+    const config: LspConfig = {
+      servers: {
+        bash: { command: "node", args: [], fileTypes: ["sh"], rootMarkers: [] },
+      },
+    };
+
+    expect(scanProjectCapabilities(config, root)).toEqual([]);
+  });
+
+  it("does not report a missing server from an excluded source file", () => {
+    const root = makeTmpProject();
+    writeFile(root, ".cache/scripts/setup.sh");
+    const config: LspConfig = {
+      servers: {
+        bash: {
+          command: "definitely-missing-bash-server-xyz",
+          args: [],
+          fileTypes: ["sh"],
+          rootMarkers: [],
+        },
+      },
+    };
+
+    expect(scanMissingServers(config, root)).toEqual([]);
+
+    writeFile(root, "scripts/setup.sh");
+    expect(scanMissingServers(config, root)).toEqual([
+      {
+        name: "bash",
+        command: "definitely-missing-bash-server-xyz",
+        foundExtensions: ["sh"],
+      },
+    ]);
+  });
+
+  it("starts only detected roots allowed by the automatic policy", async () => {
+    const root = makeTmpProject();
+    const manager = {
+      getCwd: () => root,
+      startServerForRoot: vi.fn().mockResolvedValue(null),
+    } as unknown as LspManager;
+    const policy = createAutomaticLspPathPolicy(root, ["excluded/"]);
+
+    await startDetectedServers(
+      manager,
+      [
+        { name: "typescript", root: path.join(root, "excluded"), fileTypes: ["ts"] },
+        { name: "typescript", root: path.join(root, ".github"), fileTypes: ["ts"] },
+      ],
+      policy,
+    );
+
+    expect(manager.startServerForRoot).toHaveBeenCalledTimes(1);
+    expect(manager.startServerForRoot).toHaveBeenCalledWith(
+      "typescript",
+      path.join(root, ".github"),
+    );
   });
 });
 

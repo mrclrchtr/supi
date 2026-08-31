@@ -17,6 +17,7 @@ vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
   };
 });
 
+import { syncWorkspaceSentinelSnapshot } from "@mrclrchtr/supi-lsp/api";
 import { refreshLspMaintenance } from "../../../../src/substrate/lsp/maintenance.ts";
 
 let tmpDir = "";
@@ -43,6 +44,11 @@ function emptyEvidence() {
 
 function makeRuntime(overrides: Record<string, unknown> = {}) {
   return {
+    isSupportedSourceFile: vi.fn().mockReturnValue(true),
+    syncWorkspaceSentinelSnapshot: vi.fn(
+      (previous: Map<string, number>, options: { includeSourceFiles?: boolean }) =>
+        syncWorkspaceSentinelSnapshot(tmpDir, previous, options),
+    ),
     trackFile: vi.fn().mockResolvedValue(true),
     noteWorkspaceChanges: vi.fn(),
     refreshOpenDiagnostics: vi.fn().mockResolvedValue(emptyEvidence()),
@@ -137,6 +143,26 @@ describe("refreshLspMaintenance source discovery", () => {
 
     expect(runtime.trackFile).toHaveBeenCalledTimes(1);
     expect(runtime.trackFile).toHaveBeenCalledWith(path.join(tmpDir, "late.ts"));
+  });
+
+  it("does not track a created file that automatic source support excludes", async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "supi-maint-excluded-"));
+    fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), '{ "include": ["**/*.ts"] }');
+    const runtime = makeRuntime({ isSupportedSourceFile: vi.fn().mockReturnValue(false) });
+    const sentinelSnapshot = new Map<string, number>();
+    await runMaintenance(runtime, tmpDir, sentinelSnapshot, {
+      scope: tmpDir,
+      trackSources: true,
+    });
+
+    fs.writeFileSync(path.join(tmpDir, "late.ts"), "export const late = true;\n");
+    await runMaintenance(runtime, tmpDir, sentinelSnapshot, {
+      scope: tmpDir,
+      trackSources: true,
+    });
+
+    expect(runtime.isSupportedSourceFile).toHaveBeenCalledWith(path.join(tmpDir, "late.ts"));
+    expect(runtime.trackFile).not.toHaveBeenCalled();
   });
 
   it("does not track files outside the requested scope", async () => {

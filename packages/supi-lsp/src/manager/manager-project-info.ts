@@ -10,6 +10,8 @@ interface ProjectServerInfoInput {
   client: LspClient | undefined;
   unavailableReason?: "missing-command" | "start-failed" | "runtime-error";
   statusReason?: ProjectServerStatusReason;
+  /** Filter files from ambient project status without changing explicit routing. */
+  includeOpenFile?: (file: string) => boolean;
 }
 
 export function buildProjectServerInfo(
@@ -33,7 +35,10 @@ export function buildProjectServerInfo(
     status,
     ...(input.statusReason ? { statusReason: input.statusReason } : {}),
     supportedActions: getSupportedLspServerActions(input.client?.serverCapabilities),
-    openFiles: input.client?.openFiles.map((file) => displayRelativeFilePath(file, cwd)) ?? [],
+    openFiles:
+      input.client?.openFiles
+        .filter((file) => input.includeOpenFile?.(file) ?? true)
+        .map((file) => displayRelativeFilePath(file, cwd)) ?? [],
     ready: input.client?.ready ?? false,
   };
 }

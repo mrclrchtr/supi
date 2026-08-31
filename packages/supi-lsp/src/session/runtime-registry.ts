@@ -27,6 +27,10 @@ import type {
   WorkspaceSymbol,
 } from "../config/types.ts";
 import { boundServerNames, truncateIdentity } from "../debug-telemetry.ts";
+import type {
+  WorkspaceSentinelScanOptions,
+  WorkspaceSentinelSyncResult,
+} from "../diagnostics/workspace-sentinels.ts";
 import type { LspManager } from "../manager/manager.ts";
 import { resolveSessionPath } from "../utils.ts";
 import { raceReadinessValue } from "./readiness.ts";
@@ -337,9 +341,22 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     return this.manager.getKnownProjectServers([]);
   }
 
-  /** Check whether the file can be served semantically for explicit LSP operations. */
+  /** Check whether automatic LSP work can use and serve the source file. */
   isSupportedSourceFile(filePath: string): boolean {
-    return this.manager.canServeFile(this.resolveFilePath(filePath));
+    return this.manager.isSupportedSourceFile(this.resolveFilePath(filePath));
+  }
+
+  /** Inventory automatic workspace sentinel and source paths. */
+  scanWorkspaceSentinels(options: WorkspaceSentinelScanOptions = {}): Map<string, number> {
+    return this.manager.scanWorkspaceSentinels(options);
+  }
+
+  /** Refresh the automatic workspace sentinel and source inventory. */
+  syncWorkspaceSentinelSnapshot(
+    previous: Map<string, number>,
+    options: WorkspaceSentinelScanOptions = {},
+  ): WorkspaceSentinelSyncResult {
+    return this.manager.syncWorkspaceSentinelSnapshot(previous, options);
   }
 
   /** Track a file in its routed client without exposing that client. */

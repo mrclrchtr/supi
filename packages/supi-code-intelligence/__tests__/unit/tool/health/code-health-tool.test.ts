@@ -21,10 +21,6 @@ vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
   return {
     ...actual,
     getWorkspaceLspRuntime: mockLspFns.getWorkspaceLspRuntime,
-    syncWorkspaceSentinelSnapshot: vi.fn((_cwd: string, prev: Map<string, number>) => ({
-      snapshot: prev,
-      changes: [],
-    })),
     isLikelyStaleDiagnostic: vi.fn(() => false),
   };
 });
@@ -68,6 +64,8 @@ function mockReadyLsp(
     pruneMissingFiles: ReturnType<typeof vi.fn>;
     refreshOpenDiagnostics: ReturnType<typeof vi.fn>;
     noteWorkspaceChanges: ReturnType<typeof vi.fn>;
+    syncWorkspaceSentinelSnapshot: ReturnType<typeof vi.fn>;
+    isSupportedSourceFile: ReturnType<typeof vi.fn>;
     closeFile: ReturnType<typeof vi.fn>;
     trackFile: ReturnType<typeof vi.fn>;
   }> = {},
@@ -103,6 +101,12 @@ function mockReadyLsp(
     pruneMissingFiles: vi.fn().mockReturnValue([]),
     refreshOpenDiagnostics: vi.fn().mockResolvedValue(emptyEvidence()),
     noteWorkspaceChanges: vi.fn(),
+    syncWorkspaceSentinelSnapshot: vi.fn((previous: Map<string, number>) => ({
+      snapshot: previous,
+      changes: [],
+      sourceChanges: [],
+    })),
+    isSupportedSourceFile: vi.fn().mockReturnValue(true),
     closeFile: vi.fn(),
     trackFile: vi.fn().mockResolvedValue(true),
     ...overrides,

@@ -24,7 +24,6 @@ import {
   isLikelyStaleDiagnostic,
   isProjectConfigFileName,
   raceRequestControl,
-  syncWorkspaceSentinelSnapshot,
   type WorkspaceLspRuntime,
 } from "@mrclrchtr/supi-lsp/api";
 import { mergeDiagnosticEvidence } from "../../diagnostics/evidence.ts";
@@ -56,7 +55,7 @@ export async function refreshLspMaintenance(
   sentinelSnapshot: Map<string, number>,
   options: LspMaintenanceOptions = {},
 ): Promise<WorkspaceLspMaintenanceResult> {
-  const { snapshot } = await synchronizeSentinels(runtime, cwd, sentinelSnapshot, options);
+  const { snapshot } = await synchronizeSentinels(runtime, sentinelSnapshot, options);
   let diagnosticEvidence = emptyEvidence();
   let failureReason: string | undefined;
 
@@ -115,7 +114,7 @@ export async function refreshFileLspMaintenance(options: {
   const { runtime, cwd, sentinelSnapshot, filePath, control } = options;
   // A cancelled caller stops before any maintenance work starts.
   throwIfCodeRequestInterrupted(control);
-  const { snapshot } = await synchronizeSentinels(runtime, cwd, sentinelSnapshot);
+  const { snapshot } = await synchronizeSentinels(runtime, sentinelSnapshot);
   const target = nodePath.resolve(filePath);
   const stale = confirmedOutstandingDiagnostics(runtime, cwd).some(
     (entry) =>
@@ -149,12 +148,11 @@ export async function refreshFileLspMaintenance(options: {
  */
 async function synchronizeSentinels(
   runtime: WorkspaceLspRuntime,
-  cwd: string,
   sentinelSnapshot: Map<string, number>,
   options: LspMaintenanceOptions = {},
 ) {
   const primed = sentinelSnapshot.size > 0;
-  const state = syncWorkspaceSentinelSnapshot(cwd, sentinelSnapshot, {
+  const state = runtime.syncWorkspaceSentinelSnapshot(sentinelSnapshot, {
     includeSourceFiles: true,
   });
 
@@ -193,6 +191,7 @@ async function trackCreatedSourceFiles(
     if (change.type !== FileChangeType.Created) continue;
     const filePath = uriToFile(change.uri);
     if (scope && !isWithinOrEqual(scope, filePath)) continue;
+    if (!runtime.isSupportedSourceFile(filePath)) continue;
     // Best-effort: a file no client can serve stays untracked and is
     // simply absent from evidence until a later explicit request.
     await runtime.trackFile(filePath);

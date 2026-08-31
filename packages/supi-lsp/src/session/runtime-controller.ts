@@ -15,8 +15,11 @@ import { type LspSettings, loadLspSettings } from "../config/lsp-settings.ts";
 import { clearTsconfigCache } from "../config/tsconfig-scope.ts";
 import type { DetectedProjectServer, LspConfig, ProjectServerInfo } from "../config/types.ts";
 import { truncateIdentity } from "../debug-telemetry.ts";
-import { scanWorkspaceSentinels } from "../diagnostics/workspace-sentinels.ts";
 import { LspManager, type ManagerLifecycleTransition } from "../manager/manager.ts";
+import {
+  type AutomaticLspPathPolicy,
+  createAutomaticLspPathPolicy,
+} from "../workspace-path-policy.ts";
 import {
   markLspCapabilitiesReady,
   registerPendingLspCapabilities,
@@ -58,6 +61,7 @@ interface LspControllerReady {
   projectServers: ProjectServerInfo[];
   detectedServers: DetectedProjectServer[];
   settings: LspSettings;
+  automaticPathPolicy: AutomaticLspPathPolicy;
 }
 
 interface LspControllerDisabled {
@@ -287,26 +291,34 @@ export class LspRuntimeController {
     if (Object.keys(config.servers).length === 0) return this.setDisabled(generation);
     this.#state = { kind: "pending" };
 
+    const automaticPathPolicy = createAutomaticLspPathPolicy(this.#cwd, settings.exclude);
     let manager: LspManager;
-    manager = new LspManager(config, this.#cwd, (transition) => {
-      this.handleManagerLifecycle(manager, generation, transition);
-    });
+    manager = new LspManager(
+      config,
+      this.#cwd,
+      (transition) => {
+        this.handleManagerLifecycle(manager, generation, transition);
+      },
+      automaticPathPolicy,
+    );
     this.#activeManager = manager;
     this.#latestManagerTransition = null;
     this.publishLifecycle("startup", false, []);
-    manager.setExcludePatterns(settings.exclude);
     setWorkspaceLspRuntimeState(this.#cwd, { kind: "pending" });
 
-    const detectedServers = scanProjectCapabilities(config, this.#cwd);
+    const detectedServers = scanProjectCapabilities(
+      config,
+      this.#cwd,
+      undefined,
+      automaticPathPolicy,
+    );
     manager.registerDetectedServers(detectedServers);
-    await startDetectedServers(manager, detectedServers);
+    await startDetectedServers(manager, detectedServers, automaticPathPolicy);
     if (generation !== this.#readinessGeneration) {
       if (this.#activeManager === manager) this.#activeManager = null;
       await manager.shutdownAll();
       return supersededStartResult();
     }
-
-    scanWorkspaceSentinels(this.#cwd);
 
     const runtimeOwner = createWorkspaceLspRuntimeOwner(manager);
     const workspaceRuntime = runtimeOwner.runtime;
@@ -333,6 +345,7 @@ export class LspRuntimeController {
       projectServers,
       detectedServers,
       settings,
+      automaticPathPolicy,
     };
 
     this.projectSemanticReadiness(workspaceRuntime, semanticReady);
@@ -452,6 +465,6 @@ export class LspRuntimeController {
   getMissingServers(): Array<{ name: string; command: string }> {
     if (this.#state.kind !== "ready") return [];
     const config = loadConfig(this.#cwd);
-    return scanMissingServers(config, this.#cwd);
+    return scanMissingServers(config, this.#cwd, undefined, this.#state.automaticPathPolicy);
   }
 }

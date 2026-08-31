@@ -2,8 +2,12 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { FileChangeType, type FileEvent } from "../config/types.ts";
 import { fileToUri, uriToFile } from "../utils.ts";
+import {
+  type AutomaticLspPathPolicy,
+  createDefaultAutomaticLspPathPolicy,
+  walkAutomaticLspTree,
+} from "../workspace-path-policy.ts";
 
-const IGNORED_DIRECTORIES = new Set(["node_modules", ".pnpm", ".git", "dist", "coverage"]);
 const ROOT_LOCKFILES = ["pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lockb"];
 
 export interface WorkspaceSentinelScanOptions {
@@ -13,6 +17,8 @@ export interface WorkspaceSentinelScanOptions {
    * the diff then reports them as `sourceChanges` so the caller can pull them.
    */
   includeSourceFiles?: boolean;
+  /** Runtime-owned automatic path policy. */
+  policy?: AutomaticLspPathPolicy;
 }
 
 /** Build a fresh snapshot of workspace sentinel files and their mtimes. */
@@ -25,11 +31,19 @@ export function scanWorkspaceSentinels(
 
   if (!fs.existsSync(resolvedCwd)) return snapshot;
 
-  try {
-    walkWorkspace(resolvedCwd, resolvedCwd, snapshot, options.includeSourceFiles ?? false);
-  } catch {
-    return snapshot;
-  }
+  const policy = options.policy ?? createDefaultAutomaticLspPathPolicy(resolvedCwd);
+  walkAutomaticLspTree(policy, resolvedCwd, Number.MAX_SAFE_INTEGER, (directory, entries) => {
+    for (const entry of entries) {
+      if (!entry.isFile() && !entry.isSymbolicLink()) continue;
+      const filePath = path.join(directory, entry.name);
+      if (!options.includeSourceFiles && !isWorkspaceSentinelPath(filePath, resolvedCwd)) continue;
+      try {
+        snapshot.set(filePath, fs.statSync(filePath).mtimeMs);
+      } catch {
+        // File deleted between readdir and stat — skip.
+      }
+    }
+  });
 
   return snapshot;
 }
@@ -60,6 +74,13 @@ export function diffWorkspaceSentinelSnapshot(
   return changes.sort((a, b) => a.uri.localeCompare(b.uri));
 }
 
+/** One policy-filtered workspace inventory refresh. */
+export interface WorkspaceSentinelSyncResult {
+  snapshot: Map<string, number>;
+  changes: FileEvent[];
+  sourceChanges: FileEvent[];
+}
+
 /**
  * Refresh a previous snapshot and return the new snapshot plus change events.
  *
@@ -72,7 +93,7 @@ export function syncWorkspaceSentinelSnapshot(
   cwd: string,
   previous: Map<string, number>,
   options: WorkspaceSentinelScanOptions = {},
-): { snapshot: Map<string, number>; changes: FileEvent[]; sourceChanges: FileEvent[] } {
+): WorkspaceSentinelSyncResult {
   const snapshot = scanWorkspaceSentinels(cwd, options);
   const changes = diffWorkspaceSentinelSnapshot(previous, snapshot);
   if (!options.includeSourceFiles) return { snapshot, changes, sourceChanges: [] };
@@ -95,41 +116,6 @@ export function syncWorkspaceSentinelSnapshot(
 export function isWorkspaceRecoveryTrigger(filePath: string, cwd: string): boolean {
   const root = path.resolve(cwd);
   return isWorkspaceSentinelPath(path.resolve(root, filePath), root);
-}
-
-function walkWorkspace(
-  root: string,
-  directory: string,
-  snapshot: Map<string, number>,
-  includeSourceFiles: boolean,
-): void {
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(directory, { withFileTypes: true });
-  } catch {
-    // Permission error or deleted directory — skip it rather than
-    // failing the entire scan. A partial snapshot still detects
-    // changes in accessible subtrees.
-    return;
-  }
-
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      if (IGNORED_DIRECTORIES.has(entry.name)) continue;
-      walkWorkspace(root, path.join(directory, entry.name), snapshot, includeSourceFiles);
-      continue;
-    }
-
-    if (!entry.isFile()) continue;
-
-    const filePath = path.join(directory, entry.name);
-    if (!includeSourceFiles && !isWorkspaceSentinelPath(filePath, root)) continue;
-    try {
-      snapshot.set(filePath, fs.statSync(filePath).mtimeMs);
-    } catch {
-      // File deleted between readdir and stat — skip.
-    }
-  }
 }
 
 function isWorkspaceSentinelPath(filePath: string, root: string): boolean {

@@ -160,7 +160,7 @@ describe("workspace runtime behavior", () => {
       makeManager({
         workspaceSymbol,
         getKnownProjectServers: () => projectServers,
-        canServeFile: (filePath: string) => {
+        isSupportedSourceFile: (filePath: string) => {
           supportedPaths.push(filePath);
           return true;
         },
@@ -174,6 +174,27 @@ describe("workspace runtime behavior", () => {
     expect(runtime.getProjectServers()).toEqual(projectServers);
     expect(runtime.isSupportedSourceFile("@src/index.ts")).toBe(true);
     expect(supportedPaths).toEqual(["/project/src/index.ts"]);
+  });
+
+  it("keeps explicit semantic routing separate from automatic source support", async () => {
+    const hover: Hover = { contents: "explicit excluded file" };
+    const client = {
+      hover: vi.fn().mockResolvedValue(completedCodeQuery(hover)),
+    } as unknown as LspClient;
+    const manager = makeManager({
+      isSupportedSourceFile: vi.fn().mockReturnValue(false),
+      ensureFileOpen: vi.fn().mockResolvedValue(client),
+    });
+    const runtime = createRuntime(manager);
+
+    expect(runtime.isSupportedSourceFile(".pi/cache/source.ts")).toBe(false);
+    await expect(runtime.hover(".pi/cache/source.ts", { line: 0, character: 0 })).resolves.toEqual(
+      completedCodeQuery(hover),
+    );
+    expect(manager.ensureFileOpen).toHaveBeenCalledWith("/project/.pi/cache/source.ts", {
+      recoverProcessCrash: true,
+      control: undefined,
+    });
   });
 
   it("reports file readiness only when routing establishes a concrete client", async () => {
@@ -571,6 +592,25 @@ describe("workspace runtime behavior", () => {
       }),
     );
     debugMocks.recordDebugEvent.mockClear();
+  });
+
+  it("owns automatic sentinel and source inventory through the runtime seam", () => {
+    const snapshot = new Map([["/project/tsconfig.json", 1]]);
+    const synced = { snapshot, changes: [], sourceChanges: [] };
+    const manager = makeManager({
+      scanWorkspaceSentinels: vi.fn().mockReturnValue(snapshot),
+      syncWorkspaceSentinelSnapshot: vi.fn().mockReturnValue(synced),
+    });
+    const runtime = createRuntime(manager);
+
+    expect(runtime.scanWorkspaceSentinels({ includeSourceFiles: true })).toBe(snapshot);
+    expect(runtime.syncWorkspaceSentinelSnapshot(new Map(), { includeSourceFiles: true })).toBe(
+      synced,
+    );
+    expect(manager.scanWorkspaceSentinels).toHaveBeenCalledWith({ includeSourceFiles: true });
+    expect(manager.syncWorkspaceSentinelSnapshot).toHaveBeenCalledWith(new Map(), {
+      includeSourceFiles: true,
+    });
   });
 
   it("coordinates tracking, refresh, and workspace-change invalidation", async () => {

@@ -1,18 +1,16 @@
 import { type Diagnostic, DiagnosticSeverity } from "../config/types.ts";
 import type { OutstandingDiagnosticSummaryEntry } from "../manager/manager-types.ts";
-import { isGlobMatch } from "../pattern-matcher.ts";
-import { displayRelativeFilePath, shouldIgnoreLspPath } from "../summary.ts";
+import { displayRelativeFilePath } from "../summary.ts";
 import { uriToFile } from "../utils.ts";
 
 export function collectDiagnosticSummaryCounts(
   fileDiags: Map<string, { errors: number; warnings: number }>,
   entry: { uri: string; diagnostics: Diagnostic[] },
   cwd: string,
-  excludePatterns?: string[],
+  includeFile: (file: string) => boolean,
 ): void {
   const file = relativeFilePathFromUri(entry.uri, cwd);
-  if (shouldIgnoreLspPath(file, cwd)) return;
-  if (excludePatterns?.some((p) => isGlobMatch(file, p))) return;
+  if (!includeFile(file)) return;
 
   const current = fileDiags.get(file) ?? { errors: 0, warnings: 0 };
   for (const diagnostic of entry.diagnostics) {

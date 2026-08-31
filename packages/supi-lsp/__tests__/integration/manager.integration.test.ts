@@ -9,6 +9,7 @@ import { loadConfig } from "../../src/config/config.ts";
 import type { Diagnostic } from "../../src/config/types.ts";
 import { LspManager } from "../../src/manager/manager.ts";
 import { fileToUri } from "../../src/utils.ts";
+import { createAutomaticLspPathPolicy } from "../../src/workspace-path-policy.ts";
 import { hasCommand, waitFor } from "../helpers/integration-utils.ts";
 
 // typescript-language-server resolves tsserver from the project root's
@@ -105,7 +106,6 @@ describe.skipIf(!HAS_TS_LSP)("LspManager integration", () => {
   beforeAll(() => {
     const config = loadConfig(tmpDir);
     manager = new LspManager(config, tmpDir);
-    manager.setExcludePatterns([]);
   });
 
   afterAll(async () => {
@@ -178,49 +178,28 @@ describe.skipIf(!HAS_TS_LSP)("LspManager integration", () => {
     expect(brokenEntry?.errors).toBeGreaterThan(0);
   });
 
-  it("excludes files matching exclude patterns from diagnostic summary", async () => {
-    await syncWithRepublish(manager, path.join(tmpDir, "broken.ts"), 1);
-    const summary = manager.getDiagnosticSummary();
-    // Verify broken.ts is present before exclusion
-    const beforeEntry = summary.find((s) => s.file.includes("broken"));
-    expect(beforeEntry).toBeDefined();
-
-    manager.setExcludePatterns(["broken.ts"]);
+  it("excludes configured paths from ambient diagnostics and coverage", async () => {
+    const filteredManager = new LspManager(
+      loadConfig(tmpDir),
+      tmpDir,
+      undefined,
+      createAutomaticLspPathPolicy(tmpDir, ["broken.ts"]),
+    );
     try {
-      const filtered = manager.getDiagnosticSummary();
-      const brokenEntry = filtered.find((s) => s.file.includes("broken"));
-      expect(brokenEntry).toBeUndefined();
-    } finally {
-      manager.setExcludePatterns([]);
-    }
-  });
+      await syncWithRepublish(filteredManager, path.join(tmpDir, "broken.ts"), 4);
 
-  it("excludes files matching exclude patterns from outstanding diagnostics", async () => {
-    await syncWithRepublish(manager, path.join(tmpDir, "broken.ts"), 4);
-    const outstanding = manager.getOutstandingDiagnosticSummary(4);
-    const beforeEntry = outstanding.find((s) => s.file.includes("broken"));
-    expect(beforeEntry).toBeDefined();
-
-    manager.setExcludePatterns(["broken.ts"]);
-    try {
-      const filtered = manager.getOutstandingDiagnosticSummary(4);
-      const brokenEntry = filtered.find((s) => s.file.includes("broken"));
-      expect(brokenEntry).toBeUndefined();
+      expect(filteredManager.getDiagnosticSummary()).toEqual([]);
+      expect(filteredManager.getOutstandingDiagnosticSummary(4)).toEqual([]);
+      expect(
+        filteredManager
+          .getActiveCoverageSummary()
+          .flatMap((entry) => entry.openFiles)
+          .some((file) => file.includes("broken")),
+      ).toBe(false);
     } finally {
-      manager.setExcludePatterns([]);
+      await filteredManager.shutdownAll();
     }
-  });
-
-  it("excludes files matching exclude patterns from coverage", () => {
-    manager.setExcludePatterns(["broken.ts"]);
-    try {
-      const filtered = manager.getActiveCoverageSummary();
-      const brokenEntry = filtered.find((c) => c.openFiles.some((f) => f.includes("broken")));
-      expect(brokenEntry).toBeUndefined();
-    } finally {
-      manager.setExcludePatterns([]);
-    }
-  });
+  }, 10_000);
 
   it("shuts down all servers cleanly", async () => {
     await manager.shutdownAll();

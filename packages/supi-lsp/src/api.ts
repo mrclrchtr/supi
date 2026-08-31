@@ -43,6 +43,8 @@ export { isLikelyStaleDiagnostic } from "./diagnostics/stale-diagnostics.ts";
 export {
   scanWorkspaceSentinels,
   syncWorkspaceSentinelSnapshot,
+  type WorkspaceSentinelScanOptions,
+  type WorkspaceSentinelSyncResult,
 } from "./diagnostics/workspace-sentinels.ts";
 export { raceReadinessValue, raceRequestControl } from "./session/readiness.ts";
 export type {
@@ -78,3 +80,9 @@ export {
   waitForWorkspaceLspRuntime,
 } from "./session/runtime-registry.ts";
 export { scanMissingServers } from "./session/scanner.ts";
+export {
+  AUTOMATIC_LSP_EXCLUDED_DIRECTORIES,
+  type AutomaticLspPathPolicy,
+  createAutomaticLspPathPolicy,
+  createDefaultAutomaticLspPathPolicy,
+} from "./workspace-path-policy.ts";

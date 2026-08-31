@@ -47,6 +47,12 @@ import {
   type DiagnosticEvidenceSummary,
   summarizeDiagnosticEvidence,
 } from "../diagnostics/evidence.ts";
+import {
+  scanWorkspaceSentinels as scanAutomaticWorkspaceSentinels,
+  syncWorkspaceSentinelSnapshot as syncAutomaticWorkspaceSentinelSnapshot,
+  type WorkspaceSentinelScanOptions,
+  type WorkspaceSentinelSyncResult,
+} from "../diagnostics/workspace-sentinels.ts";
 import { raceRequestControl } from "../session/readiness.ts";
 import {
   emptyProcessCrashRecoverySummary,
@@ -65,6 +71,10 @@ import {
 } from "../summary.ts";
 import { commandExists, resolveSessionPath, uriToFile } from "../utils.ts";
 import {
+  type AutomaticLspPathPolicy,
+  createDefaultAutomaticLspPathPolicy,
+} from "../workspace-path-policy.ts";
+import {
   closeFileAcrossClients,
   pruneMissingFilesFromClients,
   refreshOpenDiagnosticsForClients,
@@ -73,12 +83,7 @@ import {
   collectOutstandingDiagnosticsDetailed,
   syncClientFileAndGetDiagnostics,
 } from "./manager-diagnostics.ts";
-import {
-  clientKey,
-  isExcludedByPattern,
-  rememberKnownRoot,
-  resolveRootForFile,
-} from "./manager-helpers.ts";
+import { clientKey, rememberKnownRoot, resolveRootForFile } from "./manager-helpers.ts";
 import { buildProjectServerInfo } from "./manager-project-info.ts";
 import type {
   ActiveCoverageSummaryEntry,
@@ -230,8 +235,6 @@ export class LspManager {
   private clientGenerations = new Map<string, number>();
   /** Preferred project roots discovered by proactive scan or lazy startup */
   private knownRoots = new Map<string, string[]>();
-  /** User-configured gitignore-style exclude patterns */
-  private excludePatterns: string[] = [];
   /** Monotonic workspace invalidation generation advanced by each invalidation event. */
   private invalidationEpoch = 0;
   /** Invalidation generation in which each route last received a recovery restart. */
@@ -254,17 +257,19 @@ export class LspManager {
     private readonly config: LspConfig,
     private readonly cwd: string,
     private readonly onLifecycleTransition?: ManagerLifecycleListener,
+    private readonly automaticPathPolicy: AutomaticLspPathPolicy = createDefaultAutomaticLspPathPolicy(
+      cwd,
+    ),
   ) {}
   getCwd(): string {
     return this.cwd;
   }
-  setExcludePatterns(patterns: string[]): void {
-    this.excludePatterns = patterns;
-  }
 
   // ── Public API ────────────────────────────────────────────────────
   registerDetectedServers(detected: DetectedProjectServer[]): void {
-    this.knownRoots = projectRoots.buildKnownRootsMap(detected);
+    this.knownRoots = projectRoots.buildKnownRootsMap(
+      detected.filter((entry) => this.automaticPathPolicy.isEligible(entry.root, "directory")),
+    );
   }
   /** Check whether a file path has an available LSP server for explicit semantic operations. */
   canServeFile(filePath: string): boolean {
@@ -292,18 +297,39 @@ export class LspManager {
   }
 
   /**
-   * Check whether a file should participate in runtime guidance and diagnostics.
-   * This is stricter than {@link canServeFile} and intentionally filters dependency
-   * and tsconfig-excluded paths from UI/context behavior.
+   * Check whether a file should participate in automatic LSP work.
+   * This is stricter than {@link canServeFile} and applies the workspace path
+   * policy plus tsconfig diagnostic suppression.
    */
   isSupportedSourceFile(filePath: string): boolean {
-    // Dependency directories are intentionally excluded from recent-path
-    // tracking and diagnostic summaries (shouldIgnoreLspPath). Keep runtime
-    // guidance activation consistent: reading or editing a file under
-    // node_modules / .pnpm must not arm LSP guidance for dependency sources.
-    if (shouldIgnoreLspPath(filePath, this.cwd)) return false;
+    if (!this.isAutomaticScopePath(filePath)) return false;
     return this.canServeFile(filePath);
   }
+
+  /** Inventory automatic workspace sentinel and source paths with the runtime policy. */
+  scanWorkspaceSentinels(options: WorkspaceSentinelScanOptions = {}): Map<string, number> {
+    return scanAutomaticWorkspaceSentinels(this.cwd, {
+      ...options,
+      policy: this.automaticPathPolicy,
+    });
+  }
+
+  /** Refresh the automatic workspace inventory with the runtime policy. */
+  syncWorkspaceSentinelSnapshot(
+    previous: Map<string, number>,
+    options: WorkspaceSentinelScanOptions = {},
+  ): WorkspaceSentinelSyncResult {
+    return syncAutomaticWorkspaceSentinelSnapshot(this.cwd, previous, {
+      ...options,
+      policy: this.automaticPathPolicy,
+    });
+  }
+
+  /** Apply automatic path exclusions plus diagnostic tsconfig suppression. */
+  private isAutomaticScopePath(filePath: string): boolean {
+    return !shouldIgnoreLspPath(filePath, this.cwd, this.automaticPathPolicy);
+  }
+
   private isServerCommandAvailable(command: string): boolean {
     // Only memoize positive lookups. A negative result may become stale if the
     // user installs the binary mid-session (e.g. `mise install`), and
@@ -945,6 +971,7 @@ export class LspManager {
         unavailableReason:
           this.getUnavailableReason(key, this.config.servers[serverName]?.command) ?? undefined,
         statusReason: this.processCrashRecoveries.get(key)?.statusReason,
+        includeOpenFile: (file) => this.isAutomaticScopePath(file),
       },
       this.cwd,
     );
@@ -952,6 +979,7 @@ export class LspManager {
   getKnownProjectServers(detected: DetectedProjectServer[]): ProjectServerInfo[] {
     const known = new Map<string, DetectedProjectServer>();
     for (const entry of detected) {
+      if (!this.automaticPathPolicy.isEligible(entry.root, "directory")) continue;
       known.set(clientKey(entry.name, entry.root), entry);
     }
     for (const client of this.clients.values()) {
@@ -1052,6 +1080,7 @@ export class LspManager {
         firstReady.root,
         serverConfig.rootMarkers,
         serverConfig.fileTypes,
+        { policy: this.automaticPathPolicy },
       )[0];
       if (target) await this.warmSemanticProject(firstReady, target.file, false, control);
     }
@@ -1268,13 +1297,9 @@ export class LspManager {
       .map((client) => client.name);
   }
 
-  /** Check whether a path belongs to the configured diagnostic evidence scope. */
+  /** Check whether a path belongs to the automatic diagnostic evidence scope. */
   isDiagnosticFile(filePath: string): boolean {
-    const relative = path.relative(this.cwd, path.resolve(this.cwd, filePath));
-    return (
-      !shouldIgnoreLspPath(relative, this.cwd) &&
-      !isExcludedByPattern(relative, this.excludePatterns)
-    );
+    return this.isAutomaticScopePath(filePath);
   }
 
   getDiagnosticEvidence(): DiagnosticEvidenceSummary {
@@ -1289,7 +1314,7 @@ export class LspManager {
         name: client.name,
         status: client.status === "running" ? "running" : "error",
         root: client.root,
-        openFiles: client.openFiles,
+        openFiles: client.openFiles.filter((file) => this.isAutomaticScopePath(file)),
       });
     }
     return { servers };
@@ -1330,8 +1355,7 @@ export class LspManager {
       const openFiles = activeServers.get(server.name) ?? new Set<string>();
       for (const file of server.openFiles) {
         const relativeFile = displayRelativeFilePath(file, this.cwd);
-        if (shouldIgnoreLspPath(relativeFile, this.cwd)) continue;
-        if (isExcludedByPattern(relativeFile, this.excludePatterns)) continue;
+        if (!this.isAutomaticScopePath(relativeFile)) continue;
         openFiles.add(relativeFile);
       }
       activeServers.set(server.name, openFiles);
@@ -1357,7 +1381,7 @@ export class LspManager {
       .map((entry) => ({
         ...entry,
         openFiles: entry.openFiles.filter((file) =>
-          isPathRelevant(file, normalizedPaths, this.cwd),
+          isPathRelevant(file, normalizedPaths, this.cwd, this.automaticPathPolicy),
         ),
       }))
       .filter((entry) => entry.openFiles.length > 0);
@@ -1389,7 +1413,9 @@ export class LspManager {
     const fileDiags = new Map<string, { errors: number; warnings: number }>();
     for (const snapshot of snapshots) {
       for (const entry of snapshot.entries) {
-        collectDiagnosticSummaryCounts(fileDiags, entry, this.cwd, this.excludePatterns);
+        collectDiagnosticSummaryCounts(fileDiags, entry, this.cwd, (file) =>
+          this.isAutomaticScopePath(file),
+        );
       }
     }
 
@@ -1403,7 +1429,7 @@ export class LspManager {
         entries: collectOutstandingDiagnosticsDetailed(
           snapshots.map((snapshot) => snapshot.entries),
           this.cwd,
-          this.excludePatterns,
+          (file) => this.isAutomaticScopePath(file),
           maxSeverity,
         ),
         current,
@@ -1435,7 +1461,9 @@ export class LspManager {
         });
       }
       for (const entry of snapshot.entries) {
-        collectDiagnosticSummaryCounts(fileDiags, entry, this.cwd, this.excludePatterns);
+        collectDiagnosticSummaryCounts(fileDiags, entry, this.cwd, (file) =>
+          this.isAutomaticScopePath(file),
+        );
       }
     }
     const evidence = this.toWorkspaceDiagnosticEvidence(evidenceDocuments);
@@ -1467,7 +1495,7 @@ export class LspManager {
       entries: collectOutstandingDiagnosticSummaryEntries(
         snapshots,
         this.cwd,
-        this.excludePatterns,
+        (file) => this.isAutomaticScopePath(file),
         maxSeverity,
       ),
       current:
@@ -1484,7 +1512,7 @@ export class LspManager {
     if (normalizedPaths.length === 0) return null;
     return formatOutstandingDiagnosticsSummaryText(
       this.getOutstandingDiagnosticSummary(maxSeverity).filter((entry) =>
-        isPathRelevant(entry.file, normalizedPaths, this.cwd),
+        isPathRelevant(entry.file, normalizedPaths, this.cwd, this.automaticPathPolicy),
       ),
       maxFiles,
     );
@@ -1514,7 +1542,7 @@ export class LspManager {
       entries: collectOutstandingDiagnosticsDetailed(
         snapshots.map((snapshot) => snapshot.entries),
         this.cwd,
-        this.excludePatterns,
+        (file) => this.isAutomaticScopePath(file),
         maxSeverity,
       ),
       current:
@@ -1543,6 +1571,7 @@ export class LspManager {
     for (const client of this.clients.values()) {
       for (const document of client.getDiagnosticSnapshot().documents) {
         const file = relativeFilePathFromUri(document.uri, this.cwd);
+        if (!this.isAutomaticScopePath(file)) continue;
         totalFiles++;
         accumulateScopeDecision(accumulator, file, getFileScopeDecision(file, this.cwd));
       }
@@ -1562,8 +1591,7 @@ export class LspManager {
     const byFile = new Map<string, DiagnosticEvidenceDocument>();
     for (const document of documents) {
       const file = path.relative(this.cwd, path.resolve(this.cwd, document.file));
-      if (shouldIgnoreLspPath(file, this.cwd)) continue;
-      if (isExcludedByPattern(file, this.excludePatterns)) continue;
+      if (!this.isAutomaticScopePath(file)) continue;
       const existing = byFile.get(file);
       if (!existing || evidenceStatusRank(document.status) > evidenceStatusRank(existing.status)) {
         byFile.set(file, { file, status: document.status });
@@ -1610,7 +1638,10 @@ export class LspManager {
     }
 
     const warmed = await this.warmWorkspaceSymbolProjectsUntilResult({
-      findWarmTargets: findWorkspaceSymbolWarmTargets,
+      findWarmTargets: (root, rootMarkers, fileTypes) =>
+        findWorkspaceSymbolWarmTargets(root, rootMarkers, fileTypes, {
+          policy: this.automaticPathPolicy,
+        }),
       getWarmPosition: getWorkspaceSymbolWarmPosition,
       collect,
       routeMatches,
@@ -1802,7 +1833,11 @@ export class LspManager {
   }
 
   private hasOpenFileInProject(client: LspClient, projectRoot: string): boolean {
-    return client.openFiles.some((openFile) => projectRoots.isWithinOrEqual(projectRoot, openFile));
+    return client.openFiles.some(
+      (openFile) =>
+        this.automaticPathPolicy.isEligible(openFile) &&
+        projectRoots.isWithinOrEqual(projectRoot, openFile),
+    );
   }
 
   private workspaceSymbolProjectKey(serverName: string, projectRoot: string): string {
@@ -1852,14 +1887,14 @@ function collectClientDiagnosticEvidenceDocuments(
 function collectOutstandingDiagnosticSummaryEntries(
   snapshots: Iterable<ClientDiagnosticSnapshot>,
   cwd: string,
-  excludePatterns: string[],
+  includeFile: (file: string) => boolean,
   maxSeverity: number,
 ): OutstandingDiagnosticSummaryEntry[] {
   const fileDiags = new Map<string, OutstandingDiagnosticSummaryEntry>();
   for (const snapshot of snapshots) {
     for (const entry of snapshot.entries) {
       const file = relativeFilePathFromUri(entry.uri, cwd);
-      if (shouldIgnoreLspPath(file, cwd) || isExcludedByPattern(file, excludePatterns)) continue;
+      if (!includeFile(file)) continue;
       const existing = fileDiags.get(file) ?? createOutstandingDiagnosticSummary(file);
       const next = accumulateOutstandingDiagnostics(existing, entry.diagnostics, maxSeverity);
       if (next.total > 0) fileDiags.set(file, next);

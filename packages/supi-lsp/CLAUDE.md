@@ -85,7 +85,7 @@ Always-on policy:
 - If every server definition is disabled, startup is a successful disabled state, not a ready runtime with zero servers.
 - `getDeprecatedLspKeys()` lets downstream packages report old keys.
 
-`lsp.exclude` contains gitignore-style patterns used only by diagnostics and coverage. Explicit semantic requests are not filtered. `isGlobMatch()` supports anchored `/`, directory-only trailing `/`, `**`, and single-segment `*`.
+`lsp.exclude` contains gitignore-style patterns for automatic LSP workspace work: discovery, startup, warm-up, tracking, file lists, guidance, and diagnostic summaries not tied to one request. The policy also reads root and nested `.gitignore` files. Built-in private, generated, and dependency directories stay excluded and cannot be enabled again. Explicit semantic requests for one exact file can still route an excluded file; this does not add the file to later automatic work. Diagnostic output keeps its configured suppression.
 
 `didOpen` language IDs must follow the server's document contract rather than blindly reuse the extension: ERB uses `erb`, Go module manifests use `go.mod`, and shell dialect extensions use `shellscript`.
 

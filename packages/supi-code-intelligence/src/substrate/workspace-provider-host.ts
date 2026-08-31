@@ -1,7 +1,7 @@
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import { LspRuntimeController, scanWorkspaceSentinels } from "@mrclrchtr/supi-lsp/api";
+import { LspRuntimeController } from "@mrclrchtr/supi-lsp/api";
 import { TreeSitterRuntimeController } from "@mrclrchtr/supi-tree-sitter/api";
 
 const HOSTS = Symbol.for("supi-code-intelligence/workspace-provider-hosts");
@@ -77,7 +77,7 @@ class WorkspaceProviderHost {
       lspController: projectTrusted ? this.#lsp : null,
       sentinelSnapshot:
         projectTrusted && this.#lsp?.kind === "ready"
-          ? scanWorkspaceSentinels(this.cwd)
+          ? (this.#lsp.workspaceRuntime?.scanWorkspaceSentinels() ?? new Map())
           : new Map(),
       release: async () => {
         if (released) return;

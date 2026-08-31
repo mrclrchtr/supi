@@ -153,7 +153,7 @@ export function registerLspSettings(pi: ExtensionAPI): void {
           kind: "stringList" as const,
           key: "exclude",
           label: "Exclude Patterns",
-          description: "Gitignore patterns to suppress LSP diagnostics (comma-separated)",
+          description: "Gitignore patterns for automatic LSP workspace work (comma-separated)",
         },
         {
           kind: "custom" as const,

@@ -10,6 +10,7 @@ import {
   syncWorkspaceSentinelSnapshot,
 } from "../../src/diagnostics/workspace-sentinels.ts";
 import { uriToFile } from "../../src/utils.ts";
+import { createAutomaticLspPathPolicy } from "../../src/workspace-path-policy.ts";
 
 let tmpDir = "";
 
@@ -194,6 +195,34 @@ describe("workspace sentinels with source files", () => {
         .sort((a, b) => a.localeCompare(b)),
     ).toEqual(["late.ts"]);
     expect(next.sourceChanges.every((c) => c.type === FileChangeType.Created)).toBe(true);
+  });
+
+  it("uses the runtime policy for source and sentinel inventory", () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-sentinels-policy-"));
+    for (const relativePath of [
+      ".cache/cached.ts",
+      ".pi/npm/private.ts",
+      "configured/drop.ts",
+      "ignored/drop.ts",
+      "ignored/keep.ts",
+      ".github/workflow.ts",
+      ".pi/npm/package.json",
+    ]) {
+      const file = path.join(tmpDir, relativePath);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, "export {};\n");
+    }
+    fs.writeFileSync(path.join(tmpDir, ".gitignore"), "ignored/*\n!ignored/keep.ts\n");
+    const policy = createAutomaticLspPathPolicy(tmpDir, ["configured/"]);
+
+    const snapshot = scanWorkspaceSentinels(tmpDir, { includeSourceFiles: true, policy });
+    const sourceFiles = [...snapshot.keys()]
+      .filter((file) => file.endsWith(".ts"))
+      .map((file) => path.relative(tmpDir, file))
+      .sort((a, b) => a.localeCompare(b));
+
+    expect(sourceFiles).toEqual([".github/workflow.ts", "ignored/keep.ts"]);
+    expect([...snapshot.keys()]).not.toContain(path.join(tmpDir, ".pi", "npm", "package.json"));
   });
 
   it("returns no sourceChanges when includeSourceFiles is not set", () => {

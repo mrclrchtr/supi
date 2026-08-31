@@ -5,6 +5,7 @@ import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LspManager } from "../../src/manager/manager.ts";
 import { findWorkspaceSymbolWarmTargets } from "../../src/manager/manager-workspace-symbol.ts";
+import { createAutomaticLspPathPolicy } from "../../src/workspace-path-policy.ts";
 
 const tempDirs: string[] = [];
 
@@ -49,6 +50,40 @@ describe("findWorkspaceSymbolWarmTargets", () => {
       projectRoot: packageRoot,
       file: join(packageRoot, "src", "feature.ts"),
     });
+  });
+
+  it("does not select a built-in or configured excluded warm file", () => {
+    const root = makeTempRoot();
+    rmSync(join(root, "src"), { recursive: true, force: true });
+    for (const relativePath of [
+      ".cache/cached.ts",
+      ".pi/npm/private.ts",
+      "configured/drop.ts",
+      ".storybook/eligible.ts",
+    ]) {
+      const file = join(root, relativePath);
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, "export {};\n");
+    }
+    const policy = createAutomaticLspPathPolicy(root, ["configured/"]);
+
+    expect(findWorkspaceSymbolWarmTargets(root, ["package.json"], ["ts"], { policy })).toEqual([
+      { projectRoot: root, file: join(root, ".storybook", "eligible.ts") },
+    ]);
+  });
+
+  it("selects a repository-negated warm file", () => {
+    const root = makeTempRoot();
+    rmSync(join(root, "src"), { recursive: true, force: true });
+    mkdirSync(join(root, "generated"), { recursive: true });
+    writeFileSync(join(root, ".gitignore"), "generated/*\n!generated/keep.ts\n");
+    writeFileSync(join(root, "generated", "drop.ts"), "export {};\n");
+    writeFileSync(join(root, "generated", "keep.ts"), "export {};\n");
+    const policy = createAutomaticLspPathPolicy(root, []);
+
+    expect(findWorkspaceSymbolWarmTargets(root, ["package.json"], ["ts"], { policy })).toEqual([
+      { projectRoot: root, file: join(root, "generated", "keep.ts") },
+    ]);
   });
 });
 

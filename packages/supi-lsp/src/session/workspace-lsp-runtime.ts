@@ -13,6 +13,10 @@ import type {
   WorkspaceEdit,
   WorkspaceSymbol,
 } from "../config/types.ts";
+import type {
+  WorkspaceSentinelScanOptions,
+  WorkspaceSentinelSyncResult,
+} from "../diagnostics/workspace-sentinels.ts";
 import type { WorkspaceLspDiagnosticSurface } from "./runtime-diagnostic-surface.ts";
 import type { ProcessCrashRecoverySummary } from "./runtime-diagnostics.ts";
 
@@ -110,7 +114,15 @@ export interface WorkspaceLspRuntime extends WorkspaceLspDiagnosticSurface {
     control?: CodeRequestControl,
   ): Promise<SemanticReadinessResult>;
   getProjectServers(): ProjectServerInfo[];
+  /** Check whether automatic LSP work can use and serve the source file. */
   isSupportedSourceFile(filePath: string): boolean;
+  /** Inventory policy-eligible workspace sentinels and optional source files. */
+  scanWorkspaceSentinels(options?: WorkspaceSentinelScanOptions): Map<string, number>;
+  /** Refresh one policy-eligible workspace sentinel and source inventory. */
+  syncWorkspaceSentinelSnapshot(
+    previous: Map<string, number>,
+    options?: WorkspaceSentinelScanOptions,
+  ): WorkspaceSentinelSyncResult;
   trackFile(filePath: string): Promise<boolean>;
   closeFile(filePath: string): void;
   pruneMissingFiles(): readonly string[];

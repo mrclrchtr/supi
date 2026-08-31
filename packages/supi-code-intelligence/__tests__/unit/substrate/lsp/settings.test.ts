@@ -61,7 +61,7 @@ describe("LSP settings UI", () => {
     expect(settingsSpies.define).toHaveBeenCalledTimes(1);
     expect(settingsSpies.register).toHaveBeenCalledTimes(1);
     const callArgs = settingsSpies.define.mock.calls[0]?.[0] as {
-      fields?: Array<{ key: string; kind: string; submenu?: unknown }>;
+      fields?: Array<{ key: string; kind: string; description?: string; submenu?: unknown }>;
     };
     const fields = callArgs?.fields;
     if (!fields) {
@@ -78,6 +78,9 @@ describe("LSP settings UI", () => {
     // Present items
     expect(keys).toContain("disabled_servers");
     expect(keys).toContain("exclude");
+    expect(fields.find((field) => field.key === "exclude")?.description).toContain(
+      "automatic LSP workspace work",
+    );
 
     // Disabled Servers is a custom field with a submenu
     const disabledServers = fields.find((f) => f.key === "disabled_servers");

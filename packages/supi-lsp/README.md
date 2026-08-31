@@ -82,6 +82,24 @@ Configuration overrides merge with the built-in server definitions. Use `.pi/sup
 
 Gopls pull diagnostics stay opt-in while golang/go#70199 is open; without the option the built-in Go configuration stays in push mode. Kotlin's `--stdio` argument is already part of the built-in configuration and needs no override.
 
+### Automatic workspace path policy
+
+Automatic LSP work uses one path policy that does not change for each workspace runtime. It covers project discovery, route startup, warm-up, sentinel and source-file lists, created-file tracking, runtime guidance, and diagnostic summaries not tied to one request.
+
+The policy excludes these directories by default: `.git`, `.cache`, `.pi`, `.pnpm`, `node_modules`, `dist`, `build`, `out`, `coverage`, `.next`, `.nuxt`, `.turbo`, and `__pycache__`. It also applies `lsp.exclude` patterns and root or nested `.gitignore` rules. Patterns use gitignore syntax, including rules relative to each directory and `!` rules. Built-in exclusions cannot be enabled again. Symbolic-link directories are not visited. Other dot-directories, such as `.github` and `.storybook`, remain allowed.
+
+Set `lsp.exclude` in project or global SuPi configuration:
+
+```json
+{
+  "lsp": {
+    "exclude": ["generated/**", "!generated/keep.ts"]
+  }
+}
+```
+
+An exact semantic request can still route an excluded file when a compatible server is available. This does not add the file to automatic work. Configured diagnostic suppression still applies to diagnostic output.
+
 ### Custom server configuration
 
 A custom server needs a command and at least one file type:
@@ -212,7 +230,7 @@ See [`docs/adr/0016-workspace-lsp-runtime-interface.md`](../../docs/adr/0016-wor
 
 ## Package exports
 
-- `@mrclrchtr/supi-lsp/api` — runtime/controller/config types and registry operations
+- `@mrclrchtr/supi-lsp/api` — runtime/controller/config types, registry operations, and automatic path-policy helpers
 - `@mrclrchtr/supi-lsp/provider/lsp-semantic-provider` — semantic provider adapter
 
 ## Source

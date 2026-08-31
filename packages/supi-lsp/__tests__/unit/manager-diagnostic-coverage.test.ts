@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { LspManager } from "../../src/manager/manager.ts";
+import { createAutomaticLspPathPolicy } from "../../src/workspace-path-policy.ts";
 
 const config = {
   servers: {
@@ -19,6 +20,39 @@ function createManager(): LspManager {
 function clients(manager: LspManager): Map<string, unknown> {
   return (manager as unknown as { clients: Map<string, unknown> }).clients;
 }
+
+describe("LspManager automatic path support", () => {
+  it("keeps explicit route capability while excluding automatic source support", () => {
+    const policy = createAutomaticLspPathPolicy("/project", ["generated/**"]);
+    const manager = new LspManager(config, "/project", undefined, policy);
+
+    expect(manager.canServeFile("/project/.pi/source.ts")).toBe(true);
+    expect(manager.isSupportedSourceFile("/project/.pi/source.ts")).toBe(false);
+    expect(manager.canServeFile("/project/generated/source.ts")).toBe(true);
+    expect(manager.isSupportedSourceFile("/project/generated/source.ts")).toBe(false);
+  });
+
+  it("filters excluded files from runtime guidance", () => {
+    const manager = new LspManager(
+      config,
+      "/project",
+      undefined,
+      createAutomaticLspPathPolicy("/project", ["generated/**"]),
+    );
+    clients(manager).set("typescript:/project", {
+      name: "typescript",
+      root: "/project",
+      status: "running",
+      ready: true,
+      openFiles: ["/project/src/app.ts", "/project/.pi/private.ts", "/project/generated/drop.ts"],
+      serverCapabilities: {},
+      getDiagnosticSnapshot: () => ({ entries: [], documents: [], current: true }),
+      pruneMissingFiles: () => [],
+    });
+
+    expect(manager.getKnownProjectServers([])[0]?.openFiles).toEqual(["src/app.ts"]);
+  });
+});
 
 describe("LspManager diagnostic evidence coverage", () => {
   it("does not call an empty tracked set clean when one document is stale", () => {
@@ -112,6 +146,50 @@ describe("LspManager diagnostic evidence coverage", () => {
       },
     });
     expect(snapshotCalls).toBe(1);
+  });
+
+  it("filters excluded paths from ambient diagnostic summaries and evidence", () => {
+    const manager = new LspManager(
+      config,
+      "/project",
+      undefined,
+      createAutomaticLspPathPolicy("/project", ["generated/**"]),
+    );
+    const makeEntry = (file: string) => ({
+      uri: `file:///project/${file}`,
+      diagnostics: [
+        {
+          message: file,
+          severity: 1,
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+        },
+      ],
+      current: true,
+    });
+    const entries = [
+      makeEntry("src/app.ts"),
+      makeEntry(".pi/private.ts"),
+      makeEntry("generated/drop.ts"),
+    ];
+    clients(manager).set("typescript:/project", {
+      getDiagnosticSnapshot: () => ({
+        entries,
+        documents: entries.map((entry) => ({
+          uri: entry.uri,
+          current: true,
+          status: "confirmed",
+        })),
+        current: true,
+      }),
+      pruneMissingFiles: () => [],
+    });
+
+    const report = manager.getWorkspaceDiagnosticReport();
+    expect(report.summary.entries).toEqual([{ file: "src/app.ts", errors: 1, warnings: 0 }]);
+    expect(report.outstanding.entries.map((entry) => entry.file)).toEqual(["src/app.ts"]);
+    expect(report.summary.evidence.documents).toEqual([
+      { file: "src/app.ts", status: "confirmed" },
+    ]);
   });
 
   it("reports an empty tracked set as complete with zero coverage", () => {

@@ -2,7 +2,11 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import * as os from "node:os";
 import * as path from "node:path";
 import { type CapabilityState, completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
-import type { WorkspaceLspRuntime, WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
+import {
+  syncWorkspaceSentinelSnapshot,
+  type WorkspaceLspRuntime,
+  type WorkspaceLspRuntimeState,
+} from "@mrclrchtr/supi-lsp/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CapabilityAdapter } from "../../../src/session/capability-adapter.ts";
 import type { HealthRefreshAttempt } from "../../../src/session/health-types.ts";
@@ -50,6 +54,13 @@ function readyRuntime(overrides: Record<string, unknown> = {}): WorkspaceLspRunt
     }),
     pruneMissingFiles: () => [],
     refreshOpenDiagnostics: async () => emptyEvidence(),
+    syncWorkspaceSentinelSnapshot: (
+      previous: Map<string, number>,
+      options: Parameters<typeof syncWorkspaceSentinelSnapshot>[2],
+    ) => syncWorkspaceSentinelSnapshot(cwd, previous, options),
+    isSupportedSourceFile: () => true,
+    trackFile: async () => true,
+    closeFile: () => undefined,
     noteWorkspaceChanges: () => undefined,
     recoverDiagnostics: async () => ({
       attemptedClients: 0,

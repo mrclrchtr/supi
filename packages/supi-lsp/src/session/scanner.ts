@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { dedupeTopmostRoots, walkProject } from "@mrclrchtr/supi-core/project";
+import { dedupeTopmostRoots } from "@mrclrchtr/supi-core/project";
 import type {
   DetectedProjectServer,
   LspConfig,
@@ -10,6 +10,11 @@ import type {
 } from "../config/types.ts";
 import type { LspManager } from "../manager/manager.ts";
 import { commandExists } from "../utils.ts";
+import {
+  type AutomaticLspPathPolicy,
+  createDefaultAutomaticLspPathPolicy,
+  walkAutomaticLspTree,
+} from "../workspace-path-policy.ts";
 
 const DEFAULT_MAX_DEPTH = 3;
 
@@ -17,8 +22,14 @@ export function scanProjectCapabilities(
   config: LspConfig,
   cwd: string,
   maxDepth: number = DEFAULT_MAX_DEPTH,
+  policy: AutomaticLspPathPolicy = createDefaultAutomaticLspPathPolicy(cwd),
 ): DetectedProjectServer[] {
-  const { markerMatches, extensionBasedServers } = collectServerHints(config, cwd, maxDepth);
+  const { markerMatches, extensionBasedServers } = collectServerHints(
+    config,
+    cwd,
+    maxDepth,
+    policy,
+  );
 
   return Object.entries(config.servers)
     .flatMap(([serverName, server]) => {
@@ -45,11 +56,12 @@ function collectServerHints(
   config: LspConfig,
   cwd: string,
   maxDepth: number,
+  policy: AutomaticLspPathPolicy,
 ): { markerMatches: Map<string, Set<string>>; extensionBasedServers: Set<string> } {
   const ctx: HintContext = { markerMatches: new Map(), extensionBasedServers: new Set() };
 
-  walkProject(cwd, maxDepth, (directory, entryNames) => {
-    inspectDirectory(directory, entryNames, config.servers, ctx);
+  walkAutomaticLspTree(policy, cwd, maxDepth, (directory, entries) => {
+    inspectDirectory(directory, new Set(entries.map((entry) => entry.name)), config.servers, ctx);
   });
 
   return { markerMatches: ctx.markerMatches, extensionBasedServers: ctx.extensionBasedServers };
@@ -103,8 +115,10 @@ function hasMatchingFile(directory: string, entryNames: Set<string>, fileTypes: 
 export async function startDetectedServers(
   manager: LspManager,
   detected: DetectedProjectServer[],
+  policy: AutomaticLspPathPolicy = createDefaultAutomaticLspPathPolicy(manager.getCwd()),
 ): Promise<void> {
-  await Promise.all(detected.map((entry) => manager.startServerForRoot(entry.name, entry.root)));
+  const eligible = detected.filter((entry) => policy.isEligible(entry.root, "directory"));
+  await Promise.all(eligible.map((entry) => manager.startServerForRoot(entry.name, entry.root)));
 }
 
 export function introspectCapabilities(
@@ -123,17 +137,14 @@ export function scanMissingServers(
   config: LspConfig,
   cwd: string,
   maxDepth: number = DEFAULT_MAX_DEPTH,
+  policy: AutomaticLspPathPolicy = createDefaultAutomaticLspPathPolicy(cwd),
 ): MissingServer[] {
   const foundExtensions = new Set<string>();
 
-  walkProject(cwd, maxDepth, (directory, entryNames) => {
-    for (const name of entryNames) {
-      try {
-        if (!fs.statSync(path.join(directory, name)).isFile()) continue;
-      } catch {
-        continue;
-      }
-      const ext = path.extname(name).slice(1).toLowerCase();
+  walkAutomaticLspTree(policy, cwd, maxDepth, (_directory, entries) => {
+    for (const entry of entries) {
+      if (!entry.isFile() && !entry.isSymbolicLink()) continue;
+      const ext = path.extname(entry.name).slice(1).toLowerCase();
       if (ext) foundExtensions.add(ext);
     }
   });

@@ -33,7 +33,6 @@ vi.mock("../../src/diagnostics/workspace-sentinels.ts", () => ({
 }));
 vi.mock("../../src/manager/manager.ts", () => ({
   LspManager: class {
-    setExcludePatterns = vi.fn();
     registerDetectedServers = vi.fn();
     shutdownAll = mocks.shutdownAll;
 
