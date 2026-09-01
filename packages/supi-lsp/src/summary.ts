@@ -94,7 +94,7 @@ import { isFileExcludedByTsconfig } from "./config/tsconfig-scope.ts";
 
 /** Check whether the supplied automatic path policy allows a file path. */
 export function isInProjectTree(filePath: string, policy: AutomaticLspPathPolicy): boolean {
-  return policy.isEligible(filePath);
+  return policy.isEligible(filePath, "file");
 }
 
 /** Check automatic and tsconfig diagnostic scope for one file path. */

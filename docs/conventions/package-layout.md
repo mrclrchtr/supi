@@ -146,8 +146,8 @@ Use the hybrid structure below without forcing every file into a folder:
 src/
   api.ts
   coordinates.ts
-  pattern-matcher.ts
   summary.ts
+  workspace-path-policy.ts
   utils.ts
   client/
   config/

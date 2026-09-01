@@ -59,9 +59,9 @@ describe("LSP settings UI", () => {
 
     expect(keys).toContain("disabled_servers");
     expect(keys).toContain("exclude");
-    expect(fields.find((field) => field.key === "exclude")?.description).toContain(
-      "automatic LSP workspace work",
-    );
+    const excludeDescription = fields.find((field) => field.key === "exclude")?.description;
+    expect(excludeDescription).toContain("automatic LSP workspace work");
+    expect(excludeDescription).toContain("Exact file requests stay available");
 
     const disabledServers = fields.find((f) => f.key === "disabled_servers");
     expect(disabledServers?.kind).toBe("custom");

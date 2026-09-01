@@ -150,7 +150,8 @@ export function registerLspSettings(pi: ExtensionAPI): void {
           kind: "stringList" as const,
           key: "exclude",
           label: "Exclude Patterns",
-          description: "Gitignore patterns for automatic LSP workspace work (comma-separated)",
+          description:
+            "Comma-separated gitignore patterns for automatic LSP workspace work. Exact file requests stay available.",
         },
         {
           kind: "custom" as const,

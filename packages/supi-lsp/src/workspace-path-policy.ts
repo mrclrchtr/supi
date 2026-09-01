@@ -26,7 +26,10 @@ const BUILT_IN_EXCLUSIONS = new Set(AUTOMATIC_LSP_EXCLUDED_DIRECTORIES);
 export interface AutomaticLspPathPolicy {
   /** Canonical absolute workspace root used for all matching. */
   readonly workspaceRoot: string;
-  /** True when automatic LSP work can use the path. */
+  /**
+   * True when automatic LSP work can use the path.
+   * The policy reads the path kind when the caller does not supply it.
+   */
   isEligible(candidate: string, kind?: "file" | "directory"): boolean;
 }
 
@@ -40,17 +43,14 @@ export function createAutomaticLspPathPolicy(
   const repositoryRules = compileRepositoryRules(canonicalRoot, configuredExclusions);
   return Object.freeze({
     workspaceRoot: canonicalRoot,
-    isEligible(candidate: string, kind: "file" | "directory" = "file"): boolean {
+    isEligible(candidate: string, kind?: "file" | "directory"): boolean {
       const relativePath = normalizeCandidate(canonicalRoot, workspaceRoot, candidate);
-      if (
-        relativePath === null ||
-        !isAutomaticCandidateAllowed(workspaceRoot, relativePath, kind)
-      ) {
-        return false;
-      }
+      if (relativePath === null) return false;
+      const candidateKind = kind ?? readCandidateKind(canonicalRoot, relativePath);
+      if (!isAutomaticCandidateAllowed(workspaceRoot, relativePath, candidateKind)) return false;
       return isEligibleRelativePath(
         relativePath,
-        kind === "directory",
+        candidateKind === "directory",
         configuredExclusions,
         repositoryRules,
       );
@@ -78,6 +78,7 @@ export function walkAutomaticLspTree(
   depth: number,
   onDirectory: (directory: string, entries: readonly Dirent[]) => boolean | undefined,
 ): void {
+  if (!policy.isEligible(directory, "directory")) return;
   walkDirectoryTree({
     directory,
     depth,
@@ -218,6 +219,14 @@ function relativeToRuleBase(base: string, relativePath: string): string | null {
   if (base === "") return relativePath;
   if (relativePath === base) return "";
   return relativePath.startsWith(`${base}/`) ? relativePath.slice(base.length + 1) : null;
+}
+
+function readCandidateKind(canonicalRoot: string, relativePath: string): "file" | "directory" {
+  try {
+    return statSync(path.resolve(canonicalRoot, relativePath)).isDirectory() ? "directory" : "file";
+  } catch {
+    return "file";
+  }
 }
 
 function isAutomaticCandidateAllowed(

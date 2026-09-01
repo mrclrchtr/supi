@@ -57,7 +57,9 @@ describe("automatic LSP path policy", () => {
       "out",
     ]);
     for (const directory of AUTOMATIC_LSP_EXCLUDED_DIRECTORIES) {
-      expect(policy.isEligible(write(root, `${directory}/source.ts`))).toBe(false);
+      const source = write(root, `${directory}/source.ts`);
+      expect(policy.isEligible(source)).toBe(false);
+      expect(policy.isEligible(dirname(source))).toBe(false);
     }
     expect(policy.isEligible(write(root, "src/build"))).toBe(true);
     expect(policy.isEligible(write(root, ".github/source.ts"))).toBe(true);
@@ -112,6 +114,19 @@ describe("automatic LSP path policy", () => {
       "!node_modules/keep.ts",
     ]);
     expect(builtInPolicy.isEligible(write(root, "node_modules/keep.ts"))).toBe(false);
+  });
+
+  it("prunes an excluded starting directory", () => {
+    const root = makeWorkspace();
+    const excludedRoot = dirname(write(root, ".cache/source.ts"));
+    const policy = createAutomaticLspPathPolicy(root, []);
+    const visited: string[] = [];
+
+    walkAutomaticLspTree(policy, excludedRoot, 3, (directory) => {
+      visited.push(directory);
+    });
+
+    expect(visited).toEqual([]);
   });
 
   it("does not traverse symbolic-link directories and permits regular symbolic-link files", () => {
