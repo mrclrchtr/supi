@@ -1,5 +1,23 @@
 # Changelog
 
+## [6.2.0](https://github.com/mrclrchtr/supi/compare/v6.1.0...v6.2.0) (2026-09-01)
+
+
+### Features
+
+* **code-health:** separate process-crash recovery results ([6d77031](https://github.com/mrclrchtr/supi/commit/6d770316551ae67071d9bf38efe56e69a309ac58))
+* **lsp:** unify automatic workspace path policy ([3420dca](https://github.com/mrclrchtr/supi/commit/3420dca07832c2fa668a5b842ddffc5c23186dbe))
+* **review:** configure thinking levels ([e191c39](https://github.com/mrclrchtr/supi/commit/e191c3998dc6d98b726d8ab884920e035240df28))
+
+
+### Bug Fixes
+
+* **code-health:** clarify file readiness status ([a730b24](https://github.com/mrclrchtr/supi/commit/a730b246917ed592c0d49b77fcc9aa4316086c05))
+* **deps:** update pnpm to v11.25.0 ([d33d27a](https://github.com/mrclrchtr/supi/commit/d33d27a4d23ba69cfd2d46ab6660e35934e0d6b6))
+* **lsp:** improve runtime safety and simplify surfaces ([30dfd04](https://github.com/mrclrchtr/supi/commit/30dfd047df357ff0c354c594ce923142348d76c9))
+* **lsp:** preserve failed process-crash recovery results ([1166d08](https://github.com/mrclrchtr/supi/commit/1166d08df5560823e29195677e746271e682fca3))
+* **tree-sitter:** improve structural accuracy and runtime safety ([6135b9a](https://github.com/mrclrchtr/supi/commit/6135b9a07c9f931e391dc56172e89fc89e998689))
+
 ## [6.1.0](https://github.com/mrclrchtr/supi/compare/v6.0.1...v6.1.0) (2026-08-31)
 
 
