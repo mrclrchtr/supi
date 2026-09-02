@@ -14,6 +14,8 @@ export interface AgentsOverlayRun {
   readonly taskId: string;
   readonly profileId: string;
   readonly status: BatchTaskStatus;
+  /** Stable failure stage for a non-completed task. */
+  readonly failureCode?: string;
   readonly modelId?: string;
   readonly thinkingLevel?: ModelThinkingLevel;
   readonly turns: number;
@@ -22,6 +24,8 @@ export interface AgentsOverlayRun {
   readonly recentActivity?: readonly string[];
   readonly humanTruncated: boolean;
   readonly modelTruncated: boolean;
+  /** Human-facing final assistant text for a completed task. */
+  readonly finalText?: string;
   readonly taskMetadata?: AgentConversationView["taskMetadata"];
   readonly sharedContext?: string;
   readonly conversationView?: AgentConversationView;

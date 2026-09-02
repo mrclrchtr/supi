@@ -120,11 +120,98 @@ describe("AgentsDialog", () => {
     expect(text).toContain("human output truncated");
   });
 
+  it("renders the final result separately from the retained conversation", () => {
+    const completed = data({
+      runs: [
+        {
+          ...data().runs[0],
+          key: "last:inspect",
+          active: false,
+          status: "completed",
+          finalText: "The caller is in `src/index.ts`.",
+        },
+      ],
+    });
+    const dialog = new AgentsDialog(completed, dependencies());
+    const text = dialog.render(100).join("\n");
+
+    expect(text).toContain("Result");
+    expect(text).toContain("The caller is in `src/index.ts`.");
+  });
+
+  it("shortens a long final result so the conversation remains visible", () => {
+    const finalText = Array.from({ length: 30 }, (_, index) => `result line ${index + 1}`).join(
+      "\n",
+    );
+    const completed = data({
+      runs: [
+        {
+          ...data().runs[0],
+          key: "last:inspect",
+          active: false,
+          status: "completed",
+          finalText,
+        },
+      ],
+    });
+    const dialog = new AgentsDialog(completed, dependencies());
+    const text = dialog.render(100).join("\n");
+
+    expect(text).toContain("Result shortened for overlay");
+    expect(text).toContain("result line 8");
+    expect(text).not.toContain("result line 30");
+    expect(text).toContain("Conversation");
+    expect(text).toContain("assistant: I found the caller.");
+  });
+
+  it("does not report a trailing newline as truncated output", () => {
+    const finalText = Array.from({ length: 8 }, (_, index) => `result line ${index + 1}`).join(
+      "\n",
+    );
+    const completed = data({
+      runs: [
+        {
+          ...data().runs[0],
+          key: "last:inspect",
+          active: false,
+          status: "completed",
+          finalText: `${finalText}\n`,
+        },
+      ],
+    });
+    const dialog = new AgentsDialog(completed, dependencies());
+
+    expect(dialog.render(100).join("\n")).not.toContain("Result shortened for overlay");
+  });
+
+  it("does not render a result section for a failed task", () => {
+    const failed = data({
+      runs: [
+        {
+          ...data().runs[0],
+          key: "last:inspect",
+          active: false,
+          status: "failed",
+          failureCode: "prompt-rejected",
+          finalText: "",
+        },
+      ],
+    });
+    const dialog = new AgentsDialog(failed, dependencies());
+    const text = dialog.render(100).join("\n");
+
+    expect(text).toContain("failed (prompt-rejected)");
+    expect(text).not.toContain("Result");
+  });
+
   it("shows effective profile provenance and bounded diagnostics on their tabs", () => {
     const dialog = new AgentsDialog(data(), dependencies());
 
     dialog.handleInput("\t");
     const profiles = dialog.render(100).join("\n");
+    expect(profiles).toContain("Runs 1");
+    expect(profiles).toContain("Profiles 1");
+    expect(profiles).toContain("Diagnostics 1");
     expect(profiles).toContain("Read-only code exploration");
     expect(profiles).toContain("Strongest source: package — /profiles/explore");
     expect(profiles).toContain("Model (global): openai/gpt-5");

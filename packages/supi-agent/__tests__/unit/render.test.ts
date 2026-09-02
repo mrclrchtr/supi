@@ -23,7 +23,7 @@ describe("renderResult", () => {
     expect(result).toBeDefined();
   });
 
-  it("renders collapsed final with task status", () => {
+  it("renders collapsed final with task status, progress, and an output preview", () => {
     const result = renderResult(
       {
         details: {
@@ -34,49 +34,74 @@ describe("renderResult", () => {
               status: "completed",
               turns: 5,
               toolUses: 3,
-              humanTruncated: false,
-              modelTruncated: false,
-            },
-          ],
-        },
-      },
-      { expanded: false, isPartial: false },
-      mockTheme as never,
-    );
-    expect(result).toBeDefined();
-  });
-
-  it("renders expanded final with task details", () => {
-    const result = renderResult(
-      {
-        details: {
-          tasks: [
-            {
-              taskId: "t1",
-              profileId: "explore",
-              status: "completed",
-              turns: 5,
-              toolUses: 3,
-              finalTextFull: "result text",
+              finalTextFull: "Found the caller.\nMore detail follows.",
               humanTruncated: false,
               modelTruncated: false,
               usage: { totalTokens: 1000 },
             },
           ],
+          aggregateUsage: { totalTokens: 1000 },
+        },
+      },
+      { expanded: false, isPartial: false },
+      mockTheme as never,
+    );
+    const text = result.render(240).join("\n");
+
+    expect(text).toContain("Agent Run finished");
+    expect(text).toContain("1 completed");
+    expect(text).toContain("1,000 tokens");
+    expect(text).toContain("Found the caller.");
+  });
+
+  it("renders expanded final with task details and the result body", () => {
+    const result = renderResult(
+      {
+        details: {
+          tasks: [
+            {
+              taskId: "t1",
+              profileId: "explore",
+              status: "completed",
+              turns: 5,
+              toolUses: 3,
+              finalTextFull: "## Findings\n\nThe caller is in `src/index.ts`.",
+              humanTruncated: false,
+              modelTruncated: false,
+              usage: { totalTokens: 1000 },
+            },
+          ],
+          aggregateUsage: { totalTokens: 1000 },
         },
       },
       { expanded: true, isPartial: false },
       mockTheme as never,
     );
-    expect(result).toBeDefined();
+    const text = result.render(240).join("\n");
+
+    expect(text).toContain("Agent Run finished");
+    expect(text).toContain("Findings");
+    expect(text).toContain("src/index.ts");
+    expect(text).toContain("1,000 tokens");
   });
 
-  it("renders error state", () => {
+  it("renders error state from PI's renderer context", () => {
     const result = renderResult(
-      { isError: true },
+      { content: [{ type: "text", text: "Provider rejected the request\nDetails omitted" }] },
       { expanded: false, isPartial: false },
       mockTheme as never,
+      { isError: true },
     );
-    expect(result).toBeDefined();
+    const text = result.render(240).join("\n");
+    const expanded = renderResult(
+      { content: [{ type: "text", text: "Provider rejected the request\nDetails omitted" }] },
+      { expanded: true, isPartial: false },
+      mockTheme as never,
+      { isError: true },
+    );
+    const expandedText = expanded.render(240).join("\n");
+
+    expect(text).toContain("Agent Run failed: Provider rejected the request");
+    expect(expandedText).toContain("Details omitted");
   });
 });

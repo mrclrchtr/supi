@@ -159,11 +159,15 @@ export class AgentsDialog {
 
   #tabs(): string {
     const theme = this.dependencies.theme;
-    return TABS.map((tab, index) =>
-      index === this.#tabIndex
-        ? theme.fg("accent", `[${title(tab)}]`)
-        : theme.fg("dim", title(tab)),
-    ).join(theme.fg("dim", "  "));
+    const counts = {
+      runs: this.data.runs.length,
+      profiles: this.data.profiles.length,
+      diagnostics: this.data.diagnostics.length,
+    };
+    return TABS.map((tab, index) => {
+      const label = `${title(tab)} ${counts[tab]}`;
+      return index === this.#tabIndex ? theme.fg("accent", `[${label}]`) : theme.fg("dim", label);
+    }).join(theme.fg("dim", "  "));
   }
 
   #moveSelection(delta: number): void {

@@ -239,6 +239,7 @@ describe("/agents command", () => {
         status: "completed",
         turns: 1,
         toolUses: 1,
+        finalTextFull: "The inspection is complete.",
         modelId: "test/model",
         thinkingLevel: "low",
         humanTruncated: false,
@@ -260,6 +261,7 @@ describe("/agents command", () => {
     expect(text).toContain("finished");
     expect(text).toContain("completed");
     expect(text).toContain("last");
+    expect(text).toContain("The inspection is complete.");
     captured.component().dispose?.();
   });
 

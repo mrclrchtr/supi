@@ -12,6 +12,8 @@ import type {
 import { AGENTS_CONVERSATION_PAGE_SIZE } from "./agents-overlay-data.ts";
 
 const LIST_WINDOW_SIZE = 8;
+const MAX_OVERLAY_RESULT_CHARS = 4_000;
+const MAX_OVERLAY_RESULT_LINES = 8;
 
 interface RunSectionOptions {
   container: Container;
@@ -37,6 +39,7 @@ export function renderRunsSection(options: RunSectionOptions): void {
   container.addChild(new Spacer(1));
   container.addChild(new Text(theme.fg("accent", theme.bold("Selected task")), 1, 0));
   renderRunMetadata(container, run, theme);
+  renderRunResult(container, run, theme);
   container.addChild(new Spacer(1));
   container.addChild(new Text(theme.fg("accent", theme.bold("Conversation")), 1, 0));
   renderConversation(container, run.conversationView, conversationEnd, theme);
@@ -119,14 +122,16 @@ function addRunRow(
   theme: Theme,
 ): void {
   const scope = run.active ? "active" : "last";
-  const line = `${selected ? theme.fg("accent", "▶") : " "} ${statusIcon(run.status, theme)} ${run.taskId} (${run.profileId}) · ${run.status} · ${scope}`;
+  const metrics = `${run.turns} turns · ${run.toolUses} tools`;
+  const line = `${selected ? theme.fg("accent", "▶") : " "} ${statusIcon(run.status, theme)} ${run.taskId} (${run.profileId}) · ${run.status} · ${metrics} · ${scope}`;
   container.addChild(new Text(selected ? theme.fg("accent", line) : theme.fg("dim", line), 1, 0));
 }
 
 function renderRunMetadata(container: Container, run: AgentsOverlayRun, theme: Theme): void {
+  const status = run.failureCode ? `${run.status} (${run.failureCode})` : run.status;
   container.addChild(
     new Text(
-      `${statusIcon(run.status, theme)} ${run.status} · ${run.modelId ?? "model unavailable"} · thinking ${run.thinkingLevel ?? "unavailable"}`,
+      `${statusIcon(run.status, theme)} ${status} · ${run.modelId ?? "model unavailable"} · thinking ${run.thinkingLevel ?? "unavailable"}`,
       1,
       0,
     ),
@@ -155,6 +160,44 @@ function renderRunMetadata(container: Container, run: AgentsOverlayRun, theme: T
   if (truncation.length > 0) {
     container.addChild(new Text(theme.fg("warning", truncation.join(" · ")), 1, 0));
   }
+}
+
+function renderRunResult(container: Container, run: AgentsOverlayRun, theme: Theme): void {
+  if (run.status !== "completed" || run.finalText === undefined) return;
+  const bounded = boundOverlayResult(run.finalText);
+  container.addChild(new Spacer(1));
+  container.addChild(new Text(theme.fg("accent", theme.bold("Result")), 1, 0));
+  container.addChild(
+    new Text(
+      theme.fg("muted", bounded.text.trim() ? bounded.text : "No final output retained."),
+      1,
+      0,
+    ),
+  );
+  if (bounded.truncated) {
+    container.addChild(
+      new Text(
+        theme.fg(
+          "warning",
+          "Result shortened for overlay; expand the Agent Run output for the full text.",
+        ),
+        1,
+        0,
+      ),
+    );
+  }
+}
+
+function boundOverlayResult(text: string): { text: string; truncated: boolean } {
+  const characterBound = text.length > MAX_OVERLAY_RESULT_CHARS;
+  const characterText = text.slice(0, MAX_OVERLAY_RESULT_CHARS).replace(/\r\n?/g, "\n");
+  const trimmedText = characterText.trimEnd();
+  const lines = trimmedText ? trimmedText.split("\n") : [];
+  const lineBound = lines.length > MAX_OVERLAY_RESULT_LINES;
+  return {
+    text: lines.slice(0, MAX_OVERLAY_RESULT_LINES).join("\n"),
+    truncated: characterBound || lineBound,
+  };
 }
 
 function renderConversation(
