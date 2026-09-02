@@ -19,6 +19,34 @@ export interface ReviewTaskDebugSummaryInput {
   result: ReviewTaskResult;
 }
 
+type ReviewDebugTokens = NonNullable<ReviewProgress["tokens"]>;
+
+function tokensFromUsage(usage: ReviewTaskResult["usage"]): ReviewDebugTokens | undefined {
+  if (!usage) return undefined;
+  return {
+    input: usage.input,
+    output: usage.output,
+    ...(usage.reasoning === undefined ? {} : { reasoning: usage.reasoning }),
+    total: usage.totalTokens,
+    cacheRead: usage.cacheRead,
+    cacheWrite: usage.cacheWrite,
+  };
+}
+
+/**
+ * Prefer observed progress totals and supplement only missing final reasoning usage.
+ * This preserves live metrics while covering terminal paths without a progress update.
+ */
+function resolveDebugTokens(
+  observed: ReviewProgress["tokens"],
+  usage: ReviewTaskResult["usage"],
+): ReviewDebugTokens | undefined {
+  if (!observed) return tokensFromUsage(usage);
+  const reasoning = usage?.reasoning;
+  if (observed.reasoning !== undefined || reasoning === undefined) return observed;
+  return { ...observed, reasoning };
+}
+
 function cacheHitRate(tokens: ReviewProgress["tokens"]): number | undefined {
   if (!tokens) return undefined;
   const cacheRead = tokens.cacheRead ?? 0;
@@ -36,7 +64,8 @@ function cacheHitRate(tokens: ReviewProgress["tokens"]): number | undefined {
 export function recordReviewTaskDebugSummary(input: ReviewTaskDebugSummaryInput): void {
   const { result } = input;
   const diagnostics = "diagnostics" in result ? result.diagnostics : undefined;
-  const tokens = input.progress?.tokens ?? diagnostics?.tokens;
+  const observedTokens = input.progress?.tokens ?? diagnostics?.tokens;
+  const tokens = resolveDebugTokens(observedTokens, result.usage);
   const hitRate = cacheHitRate(tokens);
   const data = {
     taskId: input.taskId,
@@ -46,6 +75,8 @@ export function recordReviewTaskDebugSummary(input: ReviewTaskDebugSummaryInput)
     packetBytes: input.packetBytes,
     durationMs: input.durationMs,
     status: result.status,
+    requestedThinkingLevel: result.requestedThinkingLevel,
+    effectiveThinkingLevel: result.effectiveThinkingLevel,
     reviewerExtensionSetStatus: input.reviewerExtensionSetStatus,
     ...(result.status === "completed" ? { verdict: result.verdict } : {}),
     ...(result.status === "failed" ? { failureCode: result.failureCode } : {}),

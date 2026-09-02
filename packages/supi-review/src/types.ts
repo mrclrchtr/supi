@@ -226,6 +226,8 @@ export interface ReviewProgress {
   tokens?: {
     input: number;
     output: number;
+    /** Reasoning tokens, when the provider reports them. */
+    reasoning?: number;
     total: number;
     cacheRead?: number;
     cacheWrite?: number;

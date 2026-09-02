@@ -53,6 +53,7 @@ function toReviewProgress(progress: AgentRunProgress): ReviewProgress {
           tokens: {
             input: usage.input,
             output: usage.output,
+            ...(usage.reasoning === undefined ? {} : { reasoning: usage.reasoning }),
             total: usage.totalTokens,
             cacheRead: usage.cacheRead,
             cacheWrite: usage.cacheWrite,
