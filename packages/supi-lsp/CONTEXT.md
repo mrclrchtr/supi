@@ -23,12 +23,20 @@ A semantic request for one exact file selected by the user or agent. It may rout
 _Avoid_: automatic source support, ambient request, excluded means unavailable
 
 **LSP route**:
-One language-server instance identified by its configured server and workspace root. Each route has independent lifecycle, status, and recovery state.
-_Avoid_: server, client route, project server
+The stable identity of one configured language server for one workspace root. A route can continue across a failed server process and its replacement. Lifecycle, status, and recovery state belong to the route, not to one process generation.
+_Avoid_: server, client route, project server, process directory, working directory
 
 **Required LSP route**:
 A known LSP route that supports a requested operation and can contribute evidence within its scope. Unscoped demand requires every supporting route.
 _Avoid_: eligible route, relevant server, all configured servers
+
+**Broad diagnostic refresh**:
+An explicit diagnostic evidence operation for tracked files in the full workspace or one selected directory. It can consider more than one LSP route and can select crashed routes from retained tracked-file paths.
+_Avoid_: workspace-runtime refresh, workspace-wide proof, passive snapshot
+
+**File diagnostic refresh**:
+An explicit diagnostic evidence operation for one exact file. It routes that file directly and does not depend on broad-refresh retained-file selection.
+_Avoid_: file-runtime refresh, broad diagnostic refresh, passive file snapshot
 
 **Diagnostic recovery attempt**:
 A best-effort workspace-runtime operation that clears pull state, refreshes active clients, and may restart an affected push-only client on a protocol-stall signal (readiness-stall or protocol-errors), never on unconfirmed evidence alone and never pull-capable routes. Its attempted-client count names targets, not confirmed successful diagnostic refreshes.
@@ -37,6 +45,10 @@ _Avoid_: recovered diagnostics, freshness proof, per-client success inference
 **Process-crash recovery**:
 The route-level recovery for a previously running LSP client whose server process exits or emits a process error. Evidence demand starts and waits for one shared replacement for each required crashed route; passive status, inventory, and diagnostic snapshots do not start recovery. It is separate from diagnostic recovery, which responds to diagnostic evidence or protocol stalls.
 _Avoid_: diagnostic recovery, startup retry, crash loop
+
+**Process-crash refresh outcome**:
+The final result that an explicit diagnostic refresh gives for one LSP route that was crashed when recovery selection started. It distinguishes successful recovery, a skip because no retained tracked file qualified in the selected area, recovery failure during this refresh, and an attempt that was already exhausted.
+_Avoid_: current server status, aggregate client count, passive inventory
 
 **LSP runtime controller**:
 The lifecycle/status module for one workspace. It starts and shuts down language-server infrastructure, publishes runtime state, and reports detected project servers. It does not own semantic workflow policy.
