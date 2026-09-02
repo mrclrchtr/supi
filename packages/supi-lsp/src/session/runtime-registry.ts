@@ -39,7 +39,7 @@ import type { LspManager } from "../manager/manager.ts";
 import { raceReadinessValue } from "./readiness.ts";
 import type {
   DiagnosticEvidenceSummary,
-  ProcessCrashRecoverySummary,
+  ProcessCrashRecoveryReport,
   RecoverDiagnosticsResult,
 } from "./runtime-diagnostics.ts";
 import type {
@@ -57,9 +57,13 @@ export {
   type DiagnosticEvidenceDocument,
   type DiagnosticEvidenceStatus,
   type DiagnosticEvidenceSummary,
-  emptyProcessCrashRecoverySummary,
+  emptyProcessCrashRecoveryReport,
+  MAX_PROCESS_CRASH_RECOVERY_ENTRIES,
   type OutstandingDiagnosticSummaryEntry,
-  type ProcessCrashRecoverySummary,
+  type ProcessCrashRecoveryEntry,
+  type ProcessCrashRecoveryNextAction,
+  type ProcessCrashRecoveryOutcome,
+  type ProcessCrashRecoveryReport,
   type RecoverDiagnosticsResult,
   type WorkspaceDiagnosticReport,
   type WorkspaceDiagnosticSnapshot,
@@ -80,27 +84,13 @@ function unavailableFileQuery<T>(operation: string, file: string): CodeQueryResu
   return unavailableCodeQuery(`No routed LSP client could complete ${operation} for ${file}.`);
 }
 
-function hasProcessCrashRecovery(summary: ProcessCrashRecoverySummary): boolean {
-  return summary.attemptedRoutes > 0 || summary.recoveredRoutes > 0 || summary.failedRoutes > 0;
-}
-
-/**
- * Combine the eager and current state for one readiness wait.
- * A current failure replaces the older pending view; max avoids double-counting
- * one route when both views describe the same recovery attempt.
- */
-function mergeProcessCrashRecoverySummaries(
-  eager: ProcessCrashRecoverySummary | undefined,
-  current: ProcessCrashRecoverySummary | null,
-): ProcessCrashRecoverySummary | undefined {
-  if (!eager) return current ?? undefined;
-  if (!current) return eager;
-  if (current.failedRoutes > 0) return current;
-  return {
-    attemptedRoutes: Math.max(eager.attemptedRoutes, current.attemptedRoutes),
-    recoveredRoutes: Math.max(eager.recoveredRoutes, current.recoveredRoutes),
-    failedRoutes: Math.max(eager.failedRoutes, current.failedRoutes),
-  };
+function hasProcessCrashRecovery(report: ProcessCrashRecoveryReport): boolean {
+  return (
+    report.recoveredRoutes > 0 ||
+    report.skippedRoutes > 0 ||
+    report.failedRoutes > 0 ||
+    report.exhaustedRoutes > 0
+  );
 }
 
 /** Emit one aggregate tsconfig scope-decision event after a recovery pass. */
@@ -282,7 +272,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   ): Promise<SemanticReadinessResult> {
     const resolvedPath = this.resolveFilePath(filePath);
     if (!this.manager.canServeFile(resolvedPath)) {
-      const processCrashRecovery = this.manager.getProcessCrashRecoverySummaryForFile(resolvedPath);
+      const processCrashRecovery = this.manager.getProcessCrashRecoveryReportForFile(resolvedPath);
       return {
         kind: "unavailable",
         reason: "No LSP client can serve this file",
@@ -290,19 +280,20 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       };
     }
 
-    let eagerProcessCrashRecovery: ProcessCrashRecoverySummary | undefined;
+    let eagerProcessCrashRecovery: ProcessCrashRecoveryReport | undefined;
     const readiness = await raceReadinessValue(
-      this.manager.waitUntilFileReady(resolvedPath, control, (summary) => {
-        eagerProcessCrashRecovery = summary;
+      this.manager.waitUntilFileReady(resolvedPath, control, (report) => {
+        eagerProcessCrashRecovery = report;
       }),
       options.timeoutMs,
       control,
     );
     if (readiness.kind !== "resolved") {
-      const processCrashRecovery = mergeProcessCrashRecoverySummaries(
-        eagerProcessCrashRecovery,
-        this.manager.getProcessCrashRecoverySummaryForFile(resolvedPath),
-      );
+      // A timeout can happen before shared recovery settles. Do not create a
+      // route outcome for work that has no final result yet.
+      const currentProcessCrashRecovery =
+        this.manager.getProcessCrashRecoveryReportForFile(resolvedPath);
+      const processCrashRecovery = currentProcessCrashRecovery ?? eagerProcessCrashRecovery;
       return processCrashRecovery ? { ...readiness, processCrashRecovery } : readiness;
     }
     const { client, processCrashRecovery } = readiness.value;

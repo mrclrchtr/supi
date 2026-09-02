@@ -3,7 +3,7 @@ import {
   isCodeRequestInterruption,
 } from "@mrclrchtr/supi-code-runtime/api";
 import {
-  emptyProcessCrashRecoverySummary,
+  emptyProcessCrashRecoveryReport,
   type WorkspaceDiagnosticReport,
   type WorkspaceLspRuntime,
 } from "@mrclrchtr/supi-lsp/api";
@@ -71,7 +71,7 @@ async function collectFileRefreshAttempt(
       attemptedActiveClients: readiness.kind === "ready" ? 1 : 0,
       fileReadiness,
       restartedClients: 0,
-      processCrashRecovery: readiness.processCrashRecovery ?? emptyProcessCrashRecoverySummary(),
+      processCrashRecovery: readiness.processCrashRecovery ?? emptyProcessCrashRecoveryReport(),
       staleAssessment: {
         scope: "file",
         suspected: null,
@@ -107,6 +107,7 @@ async function collectWorkspaceRefreshAttempt(
         requestedDiagnosticScope: options.diagnosticsScope,
         operationScope: "workspace-runtime",
         diagnosticEvidence: maintenance.diagnosticEvidence,
+        processCrashRecovery: emptyProcessCrashRecoveryReport(),
         reason: maintenance.failureReason,
       },
     };
@@ -185,6 +186,7 @@ async function collectWorkspaceRefreshAttempt(
         requestedDiagnosticScope: options.diagnosticsScope,
         operationScope: "workspace-runtime",
         diagnosticEvidence: maintenance.diagnosticEvidence,
+        processCrashRecovery: emptyProcessCrashRecoveryReport(),
         reason: errorMessage(error),
       },
     };

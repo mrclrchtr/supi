@@ -1,4 +1,7 @@
-import type { ProcessCrashRecoverySummary } from "@mrclrchtr/supi-lsp/api";
+import type {
+  ProcessCrashRecoveryEntry,
+  ProcessCrashRecoveryReport,
+} from "@mrclrchtr/supi-lsp/api";
 import type { SemanticHealthState } from "../../session/health-types.ts";
 
 /** Report whether a file health result is waiting for semantic readiness. */
@@ -21,17 +24,44 @@ export function formatStaleDiagnosticRestarts(restartedClients: number): string 
   return `stale diagnostic restarts: ${restartedClients} client${plural(restartedClients)} restarted`;
 }
 
-/** Format a non-empty process-crash route recovery outcome. */
-export function formatProcessCrashRecovery(
-  summary: ProcessCrashRecoverySummary | null | undefined,
+/** Format process-crash counts for the compact health view. */
+export function formatCompactProcessCrashRecovery(
+  report: ProcessCrashRecoveryReport | null | undefined,
 ): string | null {
   if (
-    !summary ||
-    (summary.attemptedRoutes === 0 && summary.recoveredRoutes === 0 && summary.failedRoutes === 0)
+    !report ||
+    (report.recoveredRoutes === 0 &&
+      report.skippedRoutes === 0 &&
+      report.failedRoutes === 0 &&
+      report.exhaustedRoutes === 0)
   ) {
     return null;
   }
-  return `process-crash recovery: ${summary.recoveredRoutes} route${plural(summary.recoveredRoutes)} recovered (${summary.attemptedRoutes} attempted, ${summary.failedRoutes} failed)`;
+  return `process-crash recovery: ${report.recoveredRoutes} route${plural(report.recoveredRoutes)} recovered (${report.skippedRoutes} skipped, ${report.failedRoutes} failed, ${report.exhaustedRoutes} exhausted)`;
+}
+
+/** Format process-crash counts and bounded route entries for detailed health output. */
+export function formatProcessCrashRecovery(
+  report: ProcessCrashRecoveryReport | null | undefined,
+): string | null {
+  const summary = formatCompactProcessCrashRecovery(report);
+  if (!summary || !report) return summary;
+  const entries = report.entries.map(formatProcessCrashRecoveryEntry);
+  const omitted =
+    report.omittedEntries > 0
+      ? `${report.omittedEntries} more route${plural(report.omittedEntries)}`
+      : null;
+  const details = [...entries, omitted]
+    .filter((value): value is string => value !== null)
+    .join("; ");
+  return details ? `${summary}; ${details}` : summary;
+}
+
+function formatProcessCrashRecoveryEntry(entry: ProcessCrashRecoveryEntry): string {
+  const outcome = entry.outcome.replaceAll("-", " ");
+  const action = entry.nextAction ? `; next: ${entry.nextAction.replaceAll("-", " ")}` : "";
+  const failure = entry.failureMessage ? `; ${entry.failureMessage}` : "";
+  return `${entry.name} @ ${entry.root}: ${outcome}${action}${failure}`;
 }
 
 /** Format the age of a retained refresh attempt for a status line. */

@@ -56,7 +56,10 @@ export type {
   DiagnosticEvidenceSummary,
   OutstandingDiagnosticSummaryEntry,
   ProcessCrashDiagnosticDemand,
-  ProcessCrashRecoverySummary,
+  ProcessCrashRecoveryEntry,
+  ProcessCrashRecoveryNextAction,
+  ProcessCrashRecoveryOutcome,
+  ProcessCrashRecoveryReport,
   RecoverDiagnosticsResult,
   RoutedMutationResponse,
   SemanticReadinessResult,
@@ -69,8 +72,9 @@ export type {
 } from "./session/runtime-registry.ts";
 export {
   clearWorkspaceLspRuntime,
-  emptyProcessCrashRecoverySummary,
+  emptyProcessCrashRecoveryReport,
   getWorkspaceLspRuntime,
+  MAX_PROCESS_CRASH_RECOVERY_ENTRIES,
   setWorkspaceLspRuntimeState,
   waitForWorkspaceLspRuntime,
 } from "./session/runtime-registry.ts";

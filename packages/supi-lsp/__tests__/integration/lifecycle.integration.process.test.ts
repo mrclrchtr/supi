@@ -20,12 +20,16 @@ function createProject(): string {
   return root;
 }
 
-function config(mode: "stable" | "crash" | "crash-once", crashMarker?: string): LspConfig {
+function config(
+  mode: "stable" | "crash" | "crash-once",
+  crashMarker?: string,
+  delayMs = 50,
+): LspConfig {
   return {
     servers: {
       test: {
         command: process.execPath,
-        args: [server, mode, "50", ...(crashMarker ? [crashMarker] : [])],
+        args: [server, mode, String(delayMs), ...(crashMarker ? [crashMarker] : [])],
         fileTypes: ["test"],
         rootMarkers: ["package.json"],
       },
@@ -204,9 +208,12 @@ describe("LSP manager lifecycle integration", () => {
     });
 
     expect(result.processCrashRecovery).toEqual({
-      attemptedRoutes: 1,
       recoveredRoutes: 1,
+      skippedRoutes: 0,
       failedRoutes: 0,
+      exhaustedRoutes: 0,
+      entries: [{ name: "test", root: ".", outcome: "recovered" }],
+      omittedEntries: 0,
     });
     expect(result.restartedClients).toBe(0);
     expect(manager.getProjectServerInfo("test", root, ["test"])).toMatchObject({
@@ -219,7 +226,7 @@ describe("LSP manager lifecycle integration", () => {
     const sourceFile = path.join(root, "recovery.test");
     fs.writeFileSync(sourceFile, "recovery fixture\n");
     const transitions: ManagerLifecycleTransition[] = [];
-    const manager = new LspManager(config("crash"), root, (transition) => {
+    const manager = new LspManager(config("crash", undefined, 0), root, (transition) => {
       transitions.push(transition);
     });
     managers.push(manager);
@@ -237,9 +244,19 @@ describe("LSP manager lifecycle integration", () => {
     await expect(runtime.waitUntilReadyForFile(sourceFile)).resolves.toMatchObject({
       kind: "unavailable",
       processCrashRecovery: {
-        attemptedRoutes: 1,
         recoveredRoutes: 0,
+        skippedRoutes: 0,
         failedRoutes: 1,
+        exhaustedRoutes: 0,
+        entries: [
+          {
+            name: "test",
+            root: ".",
+            outcome: "recovery-failed",
+            nextAction: "reload-workspace",
+          },
+        ],
+        omittedEntries: 0,
       },
     });
     expect(manager.getProjectServerInfo("test", root, ["test"])).toMatchObject({

@@ -47,7 +47,7 @@ The route-level recovery for a previously running LSP client whose server proces
 _Avoid_: diagnostic recovery, startup retry, crash loop
 
 **Process-crash refresh outcome**:
-The final result that an explicit diagnostic refresh gives for one LSP route that was crashed when recovery selection started. It distinguishes successful recovery, a skip because no retained tracked file qualified in the selected area, recovery failure during this refresh, and an attempt that was already exhausted.
+The bounded route-level report that an explicit diagnostic refresh gives for each LSP route that was crashed when recovery selection started. It has exact recovered, skipped, failed, and exhausted counts, up to 16 entries, and an exact omitted-entry count. Each entry has the configured server name, workspace-relative root, stable outcome, and a typed next action for non-recovered routes. A skipped route uses `use-exact-file`; a failed or exhausted route uses `reload-workspace`.
 _Avoid_: current server status, aggregate client count, passive inventory
 
 **LSP runtime controller**:

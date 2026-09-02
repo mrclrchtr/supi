@@ -196,9 +196,12 @@ describe("code_health TUI projection", () => {
           restartedClients: 0,
           operationScope: "workspace-runtime",
           processCrashRecovery: {
-            attemptedRoutes: 0,
             recoveredRoutes: 0,
+            skippedRoutes: 0,
             failedRoutes: 0,
+            exhaustedRoutes: 0,
+            entries: [],
+            omittedEntries: 0,
           },
           diagnosticEvidence: {
             requested: 0,
@@ -225,9 +228,12 @@ describe("code_health TUI projection", () => {
         attemptedActiveClients: 1,
         restartedClients: 0,
         processCrashRecovery: {
-          attemptedRoutes: 1,
           recoveredRoutes: 1,
+          skippedRoutes: 0,
           failedRoutes: 0,
+          exhaustedRoutes: 0,
+          entries: [{ name: "typescript", root: ".", outcome: "recovered" }],
+          omittedEntries: 0,
         },
         diagnosticEvidence: {
           requested: 0,
@@ -250,9 +256,62 @@ describe("code_health TUI projection", () => {
     expect(expanded).toContain("stale diagnostic restarts: 0");
     expect(expanded).toContain("clients restarted");
     expect(expanded).toContain("process-crash recovery: 1 route recovered");
+    expect(expanded.replace(/\s+/g, " ")).toContain("typescript @ .: recovered");
 
     const compact = render(details);
     expect(compact).toContain("process-crash recovery: 1 route recovered");
+    expect(compact).not.toContain("typescript @ .: recovered");
+  });
+
+  it("shows all process-crash counts in compact view and route details when expanded", () => {
+    const details = makeDetails({
+      refresh: {
+        kind: "completed",
+        attemptedActiveClients: 1,
+        restartedClients: 0,
+        operationScope: "workspace-runtime",
+        processCrashRecovery: {
+          recoveredRoutes: 1,
+          skippedRoutes: 1,
+          failedRoutes: 1,
+          exhaustedRoutes: 1,
+          entries: [
+            {
+              name: "failed",
+              root: "a",
+              outcome: "recovery-failed",
+              nextAction: "reload-workspace",
+              failureMessage: "startup failed",
+            },
+            {
+              name: "exhausted",
+              root: "b",
+              outcome: "recovery-exhausted",
+              nextAction: "reload-workspace",
+            },
+            {
+              name: "skipped",
+              root: "c",
+              outcome: "skipped-no-retained-file",
+              nextAction: "use-exact-file",
+            },
+            { name: "recovered", root: "d", outcome: "recovered" },
+          ],
+          omittedEntries: 0,
+        },
+      },
+    });
+
+    const compact = render(details);
+    expect(compact).toContain("1 route recovered (1 skipped, 1 failed, 1 exhausted)");
+    expect(compact).not.toContain("failed @ a");
+
+    const expanded = render(details, true).replace(/\s+/g, " ");
+    expect(expanded).toContain(
+      "failed @ a: recovery failed; next: reload workspace; startup failed",
+    );
+    expect(expanded).toContain("exhausted @ b: recovery exhausted; next: reload workspace");
+    expect(expanded).toContain("skipped @ c: skipped no retained file; next: use exact file");
   });
 
   it("renders diagnostic coverage in the compact view", () => {

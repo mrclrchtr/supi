@@ -65,8 +65,8 @@ import {
 } from "../diagnostics/workspace-sentinels.ts";
 import { raceRequestControl } from "../session/readiness.ts";
 import {
-  emptyProcessCrashRecoverySummary,
-  type ProcessCrashRecoverySummary,
+  emptyProcessCrashRecoveryReport,
+  type ProcessCrashRecoveryReport,
   type ScopeDecisionEntry,
   type ScopeDecisionSummary,
   type WorkspaceDiagnosticReport,
@@ -94,6 +94,11 @@ import {
   syncClientFileAndGetDiagnostics,
 } from "./manager-diagnostics.ts";
 import { clientKey, rememberKnownRoot, resolveRootForFile } from "./manager-helpers.ts";
+import {
+  boundProcessCrashFailureMessage,
+  buildProcessCrashRecoveryReport,
+  type ProcessCrashRecoveryRouteResult,
+} from "./manager-process-crash-report.ts";
 import { buildProjectServerInfo } from "./manager-project-info.ts";
 import type {
   ActiveCoverageSummaryEntry,
@@ -180,7 +185,7 @@ type FileClientRequestOptions = {
 
 interface FileReadinessResult {
   client: LspClient | null;
-  processCrashRecovery: ProcessCrashRecoverySummary;
+  processCrashRecovery: ProcessCrashRecoveryReport;
 }
 
 interface ProcessCrashRecoveryState {
@@ -196,40 +201,56 @@ interface ProcessCrashRecoveryState {
   pending: Promise<LspClient | null> | null;
   /** Start time for the current replacement attempt, when one exists. */
   attemptStartedAt?: number;
+  /** Bounded caught Error.message from a failed replacement startup. */
+  failureMessage?: string;
 }
 
-type ProcessCrashRecoveryOutcome = "attempt" | "success" | "failure" | "exhausted" | "cancelled";
-
 type ProcessCrashDemandResult = {
-  /** Whether at least one required crashed route supports the operation. */
+  /** Whether at least one crashed route supports the operation. */
   hasSupport: boolean;
+  /** Whether replacement work changed the route set and needs a fresh pass. */
+  requiresFreshEvidence: boolean;
   /** Separate route-level result for this explicit process-crash demand. */
-  processCrashRecovery: ProcessCrashRecoverySummary;
+  processCrashRecovery: ProcessCrashRecoveryReport;
   /** Required routes that remain unavailable after shared recovery settles. */
   failures: string[];
   /** In-scope tracked files from required routes that remain unavailable. */
   failedFiles: string[];
 };
 
+type ProcessCrashRecoverySnapshot = {
+  readonly key: string;
+  /** Mutable state handle used only to await the shared replacement. */
+  readonly recovery: ProcessCrashRecoveryState;
+  readonly failedClient: LspClient;
+  readonly name: string;
+  readonly root: string;
+  readonly statusReason: NonNullable<ProcessCrashRecoveryState["statusReason"]>;
+  readonly files: readonly string[];
+};
+
 type RequiredProcessCrashDemand = {
-  key: string;
-  recovery: ProcessCrashRecoveryState;
+  snapshot: ProcessCrashRecoverySnapshot;
   failedFiles: readonly string[];
 };
 
-type ProcessCrashRecoveryRouteOutcome = "pending" | "recovered" | "failed";
+type ImmediateProcessCrashDemand = {
+  route: ProcessCrashRecoveryRouteResult;
+  failedFiles: readonly string[];
+  reportOnly: boolean;
+};
 
-function summarizeProcessCrashRecoveryRoutes(
-  outcomes: Iterable<ProcessCrashRecoveryRouteOutcome>,
-): ProcessCrashRecoverySummary {
-  const summary = emptyProcessCrashRecoverySummary();
-  for (const outcome of outcomes) {
-    summary.attemptedRoutes++;
-    if (outcome === "recovered") summary.recoveredRoutes++;
-    if (outcome === "failed") summary.failedRoutes++;
-  }
-  return summary;
-}
+type ProcessCrashDemandSelection = {
+  immediate: ImmediateProcessCrashDemand[];
+  required: RequiredProcessCrashDemand[];
+};
+
+type ProcessCrashRecoveryTelemetryOutcome =
+  | "attempt"
+  | "success"
+  | "failure"
+  | "exhausted"
+  | "cancelled";
 
 // ── LspManager ────────────────────────────────────────────────────────
 export class LspManager {
@@ -292,20 +313,24 @@ export class LspManager {
   }
 
   /**
-   * Return the consumed process-crash outcome for a file readiness result.
-   * The result supports unavailable and non-resolved waits; it is null before
-   * an attempt is consumed and after successful recovery, so old success is
-   * not reported as a new outcome. This is a passive read and never starts
-   * recovery.
+   * Return an exhausted process-crash outcome for a file readiness result.
+   * This is a passive read and never starts recovery. A crashed or pending
+   * route has no final result until an explicit operation observes it.
    */
-  getProcessCrashRecoverySummaryForFile(filePath: string): ProcessCrashRecoverySummary | null {
+  getProcessCrashRecoveryReportForFile(filePath: string): ProcessCrashRecoveryReport | null {
     const route = this.resolveFileRoute(resolveSessionPath(this.cwd, filePath));
     const recovery = route ? this.processCrashRecoveries.get(route.key) : undefined;
-    if (!recovery?.attemptConsumed || recovery.statusReason === undefined) return null;
-
-    const outcome: ProcessCrashRecoveryRouteOutcome =
-      recovery.statusReason === "process-crash-recovery-exhausted" ? "failed" : "pending";
-    return summarizeProcessCrashRecoveryRoutes([outcome]);
+    if (!route || recovery?.statusReason !== "process-crash-recovery-exhausted") return null;
+    return buildProcessCrashRecoveryReport(
+      [
+        {
+          name: route.serverName,
+          root: route.root,
+          outcome: "recovery-exhausted",
+        },
+      ],
+      this.cwd,
+    );
   }
 
   /**
@@ -509,6 +534,7 @@ export class LspManager {
       failedClient: client,
       files: this.trackedFilesForClient(client),
       pending: null,
+      failureMessage: undefined,
     });
   }
 
@@ -547,66 +573,192 @@ export class LspManager {
   /**
    * Recover all crashed routes selected by one evidence-producing operation.
    * Each route keeps its independent attempt budget and shared replacement.
+   * Selection uses one immutable route-fact snapshot so scope and retention
+   * facts cannot change halfway through the demand.
    */
   private async recoverProcessCrashDemand(
-    selectFiles: (recovery: ProcessCrashRecoveryState) => readonly string[] | null,
+    selectFiles: (snapshot: ProcessCrashRecoverySnapshot) => readonly string[] | null,
     control?: CodeRequestControl,
+    options: { skipWhenNoRetainedFile?: boolean } = {},
   ): Promise<ProcessCrashDemandResult> {
-    const required = Array.from(this.processCrashRecoveries.entries()).flatMap(
-      ([key, recovery]): RequiredProcessCrashDemand[] => {
-        if (recovery.statusReason === undefined) return [];
-        const failedFiles = selectFiles(recovery);
-        return failedFiles === null ? [] : [{ key, recovery, failedFiles }];
-      },
+    const { immediate, required } = this.selectProcessCrashDemandRoutes(
+      this.snapshotProcessCrashRoutes(),
+      selectFiles,
+      options,
     );
+    const hasSupport = immediate.length > 0 || required.length > 0;
     if (required.length === 0) {
+      const failures = immediate
+        .filter((entry) => !entry.reportOnly)
+        .map((entry) => this.formatProcessCrashDemandFailure(entry.route, entry.route.outcome));
       return {
-        hasSupport: false,
-        processCrashRecovery: emptyProcessCrashRecoverySummary(),
-        failures: [],
-        failedFiles: [],
+        hasSupport,
+        requiresFreshEvidence: false,
+        processCrashRecovery: buildProcessCrashRecoveryReport(
+          immediate.map(({ route }) => route),
+          this.cwd,
+        ),
+        failures,
+        failedFiles: Array.from(
+          new Set(
+            immediate
+              .filter((entry) => !entry.reportOnly)
+              .flatMap(({ failedFiles }) => failedFiles),
+          ),
+        ),
       };
     }
 
     await Promise.all(
-      required.map(async ({ key, recovery }) => {
-        const serverConfig = this.config.servers[recovery.failedClient.name];
+      required.map(async ({ snapshot }) => {
+        const serverConfig = this.config.servers[snapshot.name];
         if (!serverConfig) return;
         await this.acquireProcessCrashReplacement(
-          recovery,
+          snapshot.recovery,
           {
-            serverName: recovery.failedClient.name,
+            serverName: snapshot.name,
             serverConfig,
-            root: recovery.failedClient.root,
-            key,
+            root: snapshot.root,
+            key: snapshot.key,
           },
           control,
         );
       }),
     );
 
-    const failedDemands = required.filter(({ recovery }) => recovery.statusReason !== undefined);
-    const outcomes = required.map(
-      ({ recovery }): ProcessCrashRecoveryRouteOutcome =>
-        recovery.statusReason === undefined ? "recovered" : "failed",
+    const observedRequired = required.filter(
+      ({ snapshot }) => !this.isProcessCrashDemandCancelled(snapshot),
     );
+    const failedDemands = observedRequired.filter(
+      ({ snapshot }) => snapshot.recovery.statusReason !== undefined,
+    );
+    const recoveredRoutes = observedRequired.map(
+      ({ snapshot }): ProcessCrashRecoveryRouteResult => ({
+        name: snapshot.name,
+        root: snapshot.root,
+        outcome: snapshot.recovery.statusReason === undefined ? "recovered" : "recovery-failed",
+        ...(snapshot.recovery.statusReason === undefined || !snapshot.recovery.failureMessage
+          ? {}
+          : { failureMessage: snapshot.recovery.failureMessage }),
+      }),
+    );
+    const failedImmediate = immediate.filter((entry) => !entry.reportOnly);
     return {
-      hasSupport: true,
-      processCrashRecovery: summarizeProcessCrashRecoveryRoutes(outcomes),
-      failures: failedDemands.map(({ recovery }) => this.formatProcessCrashDemandFailure(recovery)),
-      failedFiles: Array.from(new Set(failedDemands.flatMap(({ failedFiles }) => failedFiles))),
+      hasSupport,
+      requiresFreshEvidence: observedRequired.length > 0,
+      processCrashRecovery: buildProcessCrashRecoveryReport(
+        [...immediate.map(({ route }) => route), ...recoveredRoutes],
+        this.cwd,
+      ),
+      failures: [
+        ...failedImmediate.map((entry) =>
+          this.formatProcessCrashDemandFailure(entry.route, entry.route.outcome),
+        ),
+        ...failedDemands.map(({ snapshot }) =>
+          this.formatProcessCrashDemandFailure(snapshot.recovery, "recovery-failed"),
+        ),
+      ],
+      failedFiles: Array.from(
+        new Set([
+          ...failedImmediate.flatMap(({ failedFiles }) => failedFiles),
+          ...failedDemands.flatMap(({ failedFiles }) => failedFiles),
+        ]),
+      ),
     };
   }
 
-  private formatProcessCrashDemandFailure(recovery: ProcessCrashRecoveryState): string {
-    const root = (path.relative(this.cwd, recovery.failedClient.root) || ".").replaceAll("\\", "/");
+  private isProcessCrashDemandCancelled(snapshot: ProcessCrashRecoverySnapshot): boolean {
+    return (
+      snapshot.recovery.statusReason !== undefined &&
+      (this.shuttingDown || this.processCrashRecoveries.get(snapshot.key) !== snapshot.recovery)
+    );
+  }
+
+  private selectProcessCrashDemandRoutes(
+    snapshots: readonly ProcessCrashRecoverySnapshot[],
+    selectFiles: (snapshot: ProcessCrashRecoverySnapshot) => readonly string[] | null,
+    options: { skipWhenNoRetainedFile?: boolean },
+  ): ProcessCrashDemandSelection {
+    const immediate: ImmediateProcessCrashDemand[] = [];
+    const required: RequiredProcessCrashDemand[] = [];
+
+    for (const snapshot of snapshots) {
+      const failedFiles = selectFiles(snapshot);
+      if (failedFiles === null) continue;
+
+      const exhausted = snapshot.statusReason === "process-crash-recovery-exhausted";
+      const noRetainedFile = failedFiles.length === 0;
+      if (exhausted) {
+        immediate.push({
+          route: {
+            name: snapshot.name,
+            root: snapshot.root,
+            outcome: "recovery-exhausted",
+          },
+          failedFiles,
+          reportOnly: options.skipWhenNoRetainedFile === true && noRetainedFile,
+        });
+        continue;
+      }
+      if (
+        options.skipWhenNoRetainedFile === true &&
+        noRetainedFile &&
+        snapshot.statusReason === "process-crashed"
+      ) {
+        immediate.push({
+          route: {
+            name: snapshot.name,
+            root: snapshot.root,
+            outcome: "skipped-no-retained-file",
+          },
+          failedFiles,
+          reportOnly: true,
+        });
+        continue;
+      }
+      required.push({ snapshot, failedFiles });
+    }
+    return { immediate, required };
+  }
+
+  private snapshotProcessCrashRoutes(): ProcessCrashRecoverySnapshot[] {
+    return Array.from(this.processCrashRecoveries.entries()).flatMap(([key, recovery]) => {
+      if (recovery.statusReason === undefined) return [];
+      return [
+        {
+          key,
+          recovery,
+          failedClient: recovery.failedClient,
+          name: recovery.failedClient.name,
+          root: recovery.failedClient.root,
+          statusReason: recovery.statusReason,
+          files: [...recovery.files],
+        },
+      ];
+    });
+  }
+
+  private formatProcessCrashDemandFailure(
+    recovery: ProcessCrashRecoveryState | ProcessCrashRecoveryRouteResult,
+    outcome?: ProcessCrashRecoveryRouteResult["outcome"],
+  ): string {
+    const isRouteResult = "outcome" in recovery;
+    const name = isRouteResult ? recovery.name : recovery.failedClient.name;
+    const root = isRouteResult
+      ? recovery.root
+      : (path.relative(this.cwd, recovery.failedClient.root) || ".").replaceAll("\\", "/");
+    const routeOutcome =
+      outcome ??
+      (isRouteResult
+        ? recovery.outcome
+        : recovery.statusReason === "process-crash-recovery-exhausted"
+          ? "recovery-exhausted"
+          : "recovery-failed");
     const reason =
-      recovery.statusReason === "process-crash-recovery-exhausted"
+      routeOutcome === "recovery-exhausted"
         ? "process recovery exhausted; reload required"
-        : recovery.statusReason === "process-crash-recovery-pending"
-          ? "process recovery in progress"
-          : "process crashed";
-    return `${recovery.failedClient.name} @ ${root} is unavailable — ${reason}.`;
+        : "process recovery failed";
+    return `${name} @ ${root} is unavailable — ${reason}.`;
   }
 
   private startProcessCrashRecovery(
@@ -670,6 +822,7 @@ export class LspManager {
 
       this.unavailable.delete(key);
       recovery.statusReason = undefined;
+      recovery.failureMessage = undefined;
       this.publishLifecycle("recovery");
       this.restoreTrackedDocuments(started, recovery.files);
       this.recordProcessCrashRecoveryEvent(
@@ -716,7 +869,7 @@ export class LspManager {
       // LspClient's initialize request already has the 30-second transport
       // bound. Do not apply the 5-second diagnostic-restart bound here.
       await replacement.start();
-    } catch {
+    } catch (error) {
       if (this.isProcessCrashRecoveryCancelled(recovery, route.key)) {
         await replacement.forceKill().catch(() => {});
         this.recordProcessCrashRecoveryEvent(
@@ -728,7 +881,7 @@ export class LspManager {
         return null;
       }
       if (recovery.statusReason !== "process-crash-recovery-exhausted") {
-        this.markProcessCrashRecoveryFailed(recovery, route.key, replacement);
+        this.markProcessCrashRecoveryFailed(recovery, route.key, replacement, error);
         this.recordProcessCrashRecoveryEvent(
           route.serverName,
           route.root,
@@ -776,8 +929,13 @@ export class LspManager {
     recovery: ProcessCrashRecoveryState,
     key: string,
     replacement: LspClient,
+    error: unknown,
   ): void {
     recovery.statusReason = "process-crash-recovery-exhausted";
+    recovery.failureMessage =
+      error instanceof Error && error.message
+        ? boundProcessCrashFailureMessage(error.message)
+        : undefined;
     this.unavailable.set(key, "start-failed");
     if (this.clients.get(key) === replacement) this.clients.delete(key);
     // A failed initialize may still leave a child process alive. The
@@ -789,7 +947,7 @@ export class LspManager {
   private recordProcessCrashRecoveryEvent(
     serverName: string,
     root: string,
-    outcome: ProcessCrashRecoveryOutcome,
+    outcome: ProcessCrashRecoveryTelemetryOutcome,
     startedAt?: number,
   ): void {
     try {
@@ -1065,31 +1223,101 @@ export class LspManager {
   async waitUntilFileReady(
     filePath: string,
     control?: CodeRequestControl,
-    onProcessCrashRecovery?: (summary: ProcessCrashRecoverySummary) => void,
+    onProcessCrashRecovery?: (report: ProcessCrashRecoveryReport) => void,
   ): Promise<FileReadinessResult> {
     throwIfCodeRequestInterrupted(control);
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
     const route = this.resolveFileRoute(resolvedPath);
     const recovery = route ? this.processCrashRecoveries.get(route.key) : undefined;
-    const processCrashRecoveryRequested =
-      recovery !== undefined && (recovery.pending !== null || recovery.statusReason !== undefined);
-    if (processCrashRecoveryRequested) {
-      onProcessCrashRecovery?.(summarizeProcessCrashRecoveryRoutes(["pending"]));
-    }
+    const statusAtStart = recovery?.statusReason;
+    const processCrashRecoveryRequested = statusAtStart !== undefined;
     const client = await this.getClientForFile(resolvedPath, {
       recoverProcessCrash: true,
       control,
     });
-    const processCrashRecovery = processCrashRecoveryRequested
-      ? summarizeProcessCrashRecoveryRoutes([client ? "recovered" : "failed"])
-      : emptyProcessCrashRecoverySummary();
+    const processCrashRecovery = this.buildFileProcessCrashRecoveryReport(
+      route,
+      recovery,
+      statusAtStart,
+      client,
+    );
+    if (processCrashRecoveryRequested) onProcessCrashRecovery?.(processCrashRecovery);
     if (!client) return { client: null, processCrashRecovery };
-    // The caller's wait stops on cancellation even though the shared
-    // readiness state keeps its own lifecycle.
-    await client.getReady(control);
-    await this.warmSemanticProject(client, resolvedPath, true, control);
-    throwIfCodeRequestInterrupted(control);
+    try {
+      await client.getReady(control);
+      await this.warmSemanticProject(client, resolvedPath, true, control);
+      throwIfCodeRequestInterrupted(control);
+    } catch (error) {
+      const failedRecovery = this.buildFileProcessCrashFailureReport(
+        route,
+        recovery,
+        statusAtStart,
+        error,
+      );
+      if (failedRecovery) {
+        onProcessCrashRecovery?.(failedRecovery);
+        return { client: null, processCrashRecovery: failedRecovery };
+      }
+      throw error;
+    }
     return { client, processCrashRecovery };
+  }
+
+  private buildFileProcessCrashRecoveryReport(
+    route: FileRoute | null,
+    recovery: ProcessCrashRecoveryState | undefined,
+    statusAtStart: ProcessCrashRecoveryState["statusReason"],
+    client: LspClient | null,
+  ): ProcessCrashRecoveryReport {
+    if (statusAtStart === undefined) return emptyProcessCrashRecoveryReport();
+    return buildProcessCrashRecoveryReport(
+      [
+        {
+          name: route?.serverName ?? "unknown",
+          root: route?.root ?? this.cwd,
+          outcome:
+            statusAtStart === "process-crash-recovery-exhausted"
+              ? "recovery-exhausted"
+              : client
+                ? "recovered"
+                : "recovery-failed",
+          ...(client || !recovery?.failureMessage
+            ? {}
+            : { failureMessage: recovery.failureMessage }),
+        },
+      ],
+      this.cwd,
+    );
+  }
+
+  private buildFileProcessCrashFailureReport(
+    route: FileRoute | null,
+    recovery: ProcessCrashRecoveryState | undefined,
+    statusAtStart: ProcessCrashRecoveryState["statusReason"],
+    error: unknown,
+  ): ProcessCrashRecoveryReport | null {
+    if (
+      statusAtStart === undefined ||
+      statusAtStart === "process-crash-recovery-exhausted" ||
+      recovery?.statusReason !== "process-crash-recovery-exhausted"
+    ) {
+      return null;
+    }
+    return buildProcessCrashRecoveryReport(
+      [
+        {
+          name: route?.serverName ?? "unknown",
+          root: route?.root ?? this.cwd,
+          outcome: "recovery-failed",
+          ...(error instanceof Error && error.message
+            ? { failureMessage: boundProcessCrashFailureMessage(error.message) }
+            : recovery.failureMessage
+              ? { failureMessage: recovery.failureMessage }
+              : {}),
+        },
+      ],
+      this.cwd,
+    );
   }
 
   /**
@@ -1245,18 +1473,26 @@ export class LspManager {
     processCrashDemand?: { scopes?: readonly string[] };
     control?: CodeRequestControl;
   }): Promise<WorkspaceRecoveryResult> {
-    const demand = options?.processCrashDemand
-      ? await this.recoverProcessCrashDemand((recovery) => {
-          const files = this.processCrashDiagnosticFiles(recovery, options.processCrashDemand);
-          return files.length > 0 ? files : null;
-        }, options.control)
+    const processCrashDemand = options?.processCrashDemand;
+    const demand = processCrashDemand
+      ? await this.recoverProcessCrashDemand(
+          (snapshot) => {
+            if (!this.processCrashDiagnosticRouteInScope(snapshot, processCrashDemand)) {
+              return null;
+            }
+            return this.processCrashDiagnosticFiles(snapshot, processCrashDemand);
+          },
+          options?.control,
+          { skipWhenNoRetainedFile: true },
+        )
       : {
           hasSupport: false,
-          processCrashRecovery: emptyProcessCrashRecoverySummary(),
+          requiresFreshEvidence: false,
+          processCrashRecovery: emptyProcessCrashRecoveryReport(),
           failures: [],
           failedFiles: [],
         };
-    const recoveryOptions = demand.hasSupport
+    const recoveryOptions = demand.requiresFreshEvidence
       ? { ...options, initialEvidence: undefined }
       : options;
     const result = await recoverWorkspaceDiagnosticsImpl(this, recoveryOptions);
@@ -1266,19 +1502,32 @@ export class LspManager {
     );
   }
 
+  private processCrashDiagnosticRouteInScope(
+    snapshot: ProcessCrashRecoverySnapshot,
+    demand: { scopes?: readonly string[] },
+  ): boolean {
+    return this.processCrashDiagnosticScopes(demand).some(
+      (scope) =>
+        projectRoots.isWithinOrEqual(scope, snapshot.root) ||
+        projectRoots.isWithinOrEqual(snapshot.root, scope),
+    );
+  }
+
   private processCrashDiagnosticFiles(
-    recovery: ProcessCrashRecoveryState,
-    demand: { scopes?: readonly string[] } | undefined,
+    snapshot: ProcessCrashRecoverySnapshot,
+    demand: { scopes?: readonly string[] },
   ): string[] {
-    if (!demand) return [];
-    const scopes = demand.scopes?.map((scope) => resolveSessionPath(this.cwd, scope));
-    return recovery.files.filter(
+    const scopes = this.processCrashDiagnosticScopes(demand);
+    return snapshot.files.filter(
       (file) =>
         this.isDiagnosticFile(file) &&
-        (!scopes ||
-          scopes.length === 0 ||
-          scopes.some((scope) => projectRoots.isWithinOrEqual(scope, file))),
+        scopes.some((scope) => projectRoots.isWithinOrEqual(scope, file)),
     );
+  }
+
+  private processCrashDiagnosticScopes(demand: { scopes?: readonly string[] }): string[] {
+    const scopes = demand.scopes?.map((scope) => resolveSessionPath(this.cwd, scope));
+    return scopes && scopes.length > 0 ? scopes : [this.cwd];
   }
 
   private addProcessCrashDiagnosticEvidence(
@@ -1665,9 +1914,9 @@ export class LspManager {
       );
     }
     const demand = await this.recoverProcessCrashDemand(
-      (recovery) =>
-        recovery.failedClient.serverCapabilities?.workspaceSymbolProvider &&
-        routeMatches(recovery.failedClient)
+      (snapshot) =>
+        snapshot.failedClient.serverCapabilities?.workspaceSymbolProvider &&
+        routeMatches(snapshot.failedClient)
           ? []
           : null,
       control,

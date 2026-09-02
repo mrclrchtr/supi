@@ -86,6 +86,8 @@ The package adds eight tools that Pi selects as needed:
 
 Pi's built-in `grep` remains the right tool for literal or regular-expression searches; these tools add symbol and source-structure awareness.
 
+`code_health({ refresh: true })` reports process-crash recovery as route-level data. It shows exact recovered, skipped, failed, and exhausted counts. It shows up to 16 server and workspace-relative root entries, plus the exact number of omitted entries. A skipped route gives the `use-exact-file` action. A failed or exhausted route gives the `reload-workspace` action. Markdown and expanded TUI output show route entries and bounded failure details. Compact TUI output shows the counts. Current and retained refresh results use the same outcome format.
+
 ## Install
 
 ```bash

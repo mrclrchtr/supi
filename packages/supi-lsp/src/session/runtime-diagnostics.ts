@@ -45,26 +45,54 @@ export interface OutstandingDiagnosticSummaryEntry {
   hints: number;
 }
 
-/**
- * Outcome of explicit process-crash recovery demand in one diagnostic pass.
- *
- * Routes are counted rather than client generations because process-crash
- * recovery owns one budget per LSP route. `attemptedRoutes` is the number of
- * crashed routes selected by the demand; a route can be failed already or
- * have a shared replacement in progress when the demand observes it.
- */
-export interface ProcessCrashRecoverySummary {
-  attemptedRoutes: number;
-  recoveredRoutes: number;
-  failedRoutes: number;
+/** Stable outcome for one route in an explicit process-crash report. */
+export type ProcessCrashRecoveryOutcome =
+  | "recovered"
+  | "skipped-no-retained-file"
+  | "recovery-failed"
+  | "recovery-exhausted";
+
+/** Typed next action for a non-recovered process-crash route. */
+export type ProcessCrashRecoveryNextAction = "use-exact-file" | "reload-workspace";
+
+/** One bounded route entry in a process-crash recovery report. */
+export interface ProcessCrashRecoveryEntry {
+  /** Configured server name. */
+  readonly name: string;
+  /** Workspace-relative route root. */
+  readonly root: string;
+  readonly outcome: ProcessCrashRecoveryOutcome;
+  /** Available action when the route was not recovered. */
+  readonly nextAction?: ProcessCrashRecoveryNextAction;
+  /** Bounded caught Error.message for a failed recovery, when available. */
+  readonly failureMessage?: string;
+}
+
+/** Maximum number of route entries retained in a process-crash report. */
+export const MAX_PROCESS_CRASH_RECOVERY_ENTRIES = 16;
+
+/** Bounded, route-specific result of one explicit process-crash demand. */
+export interface ProcessCrashRecoveryReport {
+  /** Exact counts include entries omitted from the visible route list. */
+  readonly recoveredRoutes: number;
+  readonly skippedRoutes: number;
+  readonly failedRoutes: number;
+  readonly exhaustedRoutes: number;
+  /** At most 16 entries, ordered by action priority, root, and server name. */
+  readonly entries: readonly ProcessCrashRecoveryEntry[];
+  /** Exact number of route entries not included in {@link entries}. */
+  readonly omittedEntries: number;
 }
 
 /** Create the empty outcome for a pass with no process-crash demand. */
-export function emptyProcessCrashRecoverySummary(): ProcessCrashRecoverySummary {
+export function emptyProcessCrashRecoveryReport(): ProcessCrashRecoveryReport {
   return {
-    attemptedRoutes: 0,
     recoveredRoutes: 0,
+    skippedRoutes: 0,
     failedRoutes: 0,
+    exhaustedRoutes: 0,
+    entries: [],
+    omittedEntries: 0,
   };
 }
 
@@ -75,7 +103,7 @@ export interface RecoverDiagnosticsResult {
   /** Clients restarted by stale-diagnostic recovery, not process-crash recovery. */
   restartedClients: number;
   /** Separate outcome for process-crash route recovery selected by this pass. */
-  processCrashRecovery: ProcessCrashRecoverySummary;
+  processCrashRecovery: ProcessCrashRecoveryReport;
   /** Evidence collected by the refresh and recovery operations. */
   diagnosticEvidence: DiagnosticEvidenceSummary;
   /** Final diagnostic report captured after all refresh and recovery work. */

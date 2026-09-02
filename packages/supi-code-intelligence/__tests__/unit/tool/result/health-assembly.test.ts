@@ -14,6 +14,17 @@ function cleanEvidence() {
   } as const;
 }
 
+function emptyProcessCrashRecovery() {
+  return {
+    recoveredRoutes: 0,
+    skippedRoutes: 0,
+    failedRoutes: 0,
+    exhaustedRoutes: 0,
+    entries: [],
+    omittedEntries: 0,
+  } as const;
+}
+
 function fileEvidence(status: "confirmed" | "unconfirmed" | "failed") {
   return {
     requested: 1,
@@ -217,11 +228,7 @@ describe("code_health result assembly", () => {
           attemptedActiveClients: 0,
           fileReadiness: "pending",
           restartedClients: 0,
-          processCrashRecovery: {
-            attemptedRoutes: 0,
-            recoveredRoutes: 0,
-            failedRoutes: 0,
-          },
+          processCrashRecovery: emptyProcessCrashRecovery(),
           staleAssessment: {
             scope: "file",
             suspected: null,
@@ -252,11 +259,7 @@ describe("code_health result assembly", () => {
           operationScope: "workspace-runtime",
           attemptedActiveClients: 1,
           restartedClients: 0,
-          processCrashRecovery: {
-            attemptedRoutes: 0,
-            recoveredRoutes: 0,
-            failedRoutes: 0,
-          },
+          processCrashRecovery: emptyProcessCrashRecovery(),
           diagnosticEvidence: cleanEvidence(),
           staleAssessment: {
             scope: "workspace",
@@ -285,9 +288,12 @@ describe("code_health result assembly", () => {
           attemptedActiveClients: 1,
           restartedClients: 0,
           processCrashRecovery: {
-            attemptedRoutes: 1,
             recoveredRoutes: 1,
+            skippedRoutes: 0,
             failedRoutes: 0,
+            exhaustedRoutes: 0,
+            entries: [{ name: "typescript", root: ".", outcome: "recovered" }],
+            omittedEntries: 0,
           },
           diagnosticEvidence: cleanEvidence(),
           staleAssessment: {
@@ -304,6 +310,7 @@ describe("code_health result assembly", () => {
 
     expect(markdown).toContain("stale diagnostic restarts: 0 clients");
     expect(markdown).toContain("process-crash recovery: 1 route recovered");
+    expect(markdown).toContain("typescript @ .: recovered");
   });
 
   it("shows a failed process-crash outcome without conflating stale restarts", () => {
@@ -318,9 +325,20 @@ describe("code_health result assembly", () => {
           attemptedActiveClients: 1,
           restartedClients: 0,
           processCrashRecovery: {
-            attemptedRoutes: 1,
             recoveredRoutes: 0,
+            skippedRoutes: 0,
             failedRoutes: 1,
+            exhaustedRoutes: 0,
+            entries: [
+              {
+                name: "typescript",
+                root: ".",
+                outcome: "recovery-failed",
+                nextAction: "reload-workspace",
+                failureMessage: "replacement failed",
+              },
+            ],
+            omittedEntries: 0,
           },
           reason: "process recovery exhausted",
         },
@@ -345,11 +363,7 @@ describe("code_health result assembly", () => {
           operationScope: "file-runtime",
           attemptedActiveClients: 1,
           restartedClients: 0,
-          processCrashRecovery: {
-            attemptedRoutes: 0,
-            recoveredRoutes: 0,
-            failedRoutes: 0,
-          },
+          processCrashRecovery: emptyProcessCrashRecovery(),
           staleAssessment: {
             scope: "file",
             suspected: null,
@@ -376,11 +390,7 @@ describe("code_health result assembly", () => {
           operationScope: "workspace-runtime",
           attemptedActiveClients: 0,
           restartedClients: 0,
-          processCrashRecovery: {
-            attemptedRoutes: 0,
-            recoveredRoutes: 0,
-            failedRoutes: 0,
-          },
+          processCrashRecovery: emptyProcessCrashRecovery(),
           diagnosticEvidence: cleanEvidence(),
           staleAssessment: {
             scope: "workspace",
@@ -441,11 +451,7 @@ describe("code_health result assembly", () => {
             operationScope: "file-runtime",
             attemptedActiveClients: 1,
             restartedClients: 0,
-            processCrashRecovery: {
-              attemptedRoutes: 0,
-              recoveredRoutes: 0,
-              failedRoutes: 0,
-            },
+            processCrashRecovery: emptyProcessCrashRecovery(),
             staleAssessment: {
               scope: "workspace",
               suspected: false,
@@ -478,11 +484,7 @@ describe("code_health result assembly", () => {
             operationScope: "workspace-runtime",
             attemptedActiveClients: 1,
             restartedClients: 0,
-            processCrashRecovery: {
-              attemptedRoutes: 0,
-              recoveredRoutes: 0,
-              failedRoutes: 0,
-            },
+            processCrashRecovery: emptyProcessCrashRecovery(),
             diagnosticEvidence: cleanEvidence(),
             staleAssessment: {
               scope: "workspace",

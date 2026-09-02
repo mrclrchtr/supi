@@ -246,9 +246,12 @@ describe("workspace-symbol process-crash demand", () => {
 
     expect(result.attemptedClients).toBe(2);
     expect(result.processCrashRecovery).toEqual({
-      attemptedRoutes: 1,
       recoveredRoutes: 1,
+      skippedRoutes: 0,
       failedRoutes: 0,
+      exhaustedRoutes: 0,
+      entries: [{ name: "test", root: "b", outcome: "recovered" }],
+      omittedEntries: 0,
     });
     expect(mocks.clients).toHaveLength(3);
     expect(fixture.manager.getProjectServerInfo("test", fixture.rootB, ["test"])).toMatchObject({
@@ -257,18 +260,114 @@ describe("workspace-symbol process-crash demand", () => {
     });
   });
 
-  it("does not recover a diagnostic route without a tracked file in scope", async () => {
-    const fixture = await createTwoCrashedRoutes({ crashA: false });
+  it("skips a crashed route without retained files without consuming its attempt", async () => {
+    const fixture = await createTwoCrashedRoutes({ crashA: false, trackB: false });
 
-    await fixture.manager.recoverWorkspaceDiagnostics({
+    const skipped = await fixture.manager.recoverWorkspaceDiagnostics({
       restartIfStillStale: false,
-      processCrashDemand: { scopes: [fixture.rootA] },
+      processCrashDemand: { scopes: [fixture.rootB] },
     });
 
+    expect(skipped.processCrashRecovery).toEqual({
+      recoveredRoutes: 0,
+      skippedRoutes: 1,
+      failedRoutes: 0,
+      exhaustedRoutes: 0,
+      entries: [
+        {
+          name: "test",
+          root: "b",
+          outcome: "skipped-no-retained-file",
+          nextAction: "use-exact-file",
+        },
+      ],
+      omittedEntries: 0,
+    });
     expect(mocks.clients).toHaveLength(2);
     expect(fixture.manager.getProjectServerInfo("test", fixture.rootB, ["test"])).toMatchObject({
       statusReason: "process-crashed",
     });
+  });
+
+  it("does not consume a route attempt when retained files are outside the scope", async () => {
+    const fixture = await createTwoCrashedRoutes({ crashA: false });
+    const nestedScope = path.join(fixture.rootB, "nested");
+    fs.mkdirSync(nestedScope);
+
+    const skipped = await fixture.manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { scopes: [nestedScope] },
+    });
+    expect(skipped.processCrashRecovery.skippedRoutes).toBe(1);
+    expect(mocks.clients).toHaveLength(2);
+
+    const recovered = await fixture.manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { scopes: [fixture.fileB] },
+    });
+    expect(recovered.processCrashRecovery.recoveredRoutes).toBe(1);
+    expect(mocks.clients).toHaveLength(3);
+  });
+
+  it("selects an overlapping route before applying retained-file scope", async () => {
+    const fixture = await createTwoCrashedRoutes();
+    const nestedScope = path.join(fixture.rootA, "nested");
+    fs.mkdirSync(nestedScope);
+
+    const result = await fixture.manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { scopes: [nestedScope] },
+    });
+
+    expect(result.processCrashRecovery).toEqual({
+      recoveredRoutes: 0,
+      skippedRoutes: 1,
+      failedRoutes: 0,
+      exhaustedRoutes: 0,
+      entries: [
+        {
+          name: "test",
+          root: "a",
+          outcome: "skipped-no-retained-file",
+          nextAction: "use-exact-file",
+        },
+      ],
+      omittedEntries: 0,
+    });
+    expect(mocks.clients).toHaveLength(2);
+  });
+
+  it("reports an exhausted route without attempting it again", async () => {
+    const fixture = await createTwoCrashedRoutes({ crashA: false });
+    mocks.startBehaviors.push(async () => {
+      throw new Error("replacement failed");
+    });
+
+    await fixture.manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { scopes: [fixture.fileB] },
+    });
+    const exhausted = await fixture.manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { scopes: [fixture.fileB] },
+    });
+
+    expect(exhausted.processCrashRecovery).toEqual({
+      recoveredRoutes: 0,
+      skippedRoutes: 0,
+      failedRoutes: 0,
+      exhaustedRoutes: 1,
+      entries: [
+        {
+          name: "test",
+          root: "b",
+          outcome: "recovery-exhausted",
+          nextAction: "reload-workspace",
+        },
+      ],
+      omittedEntries: 0,
+    });
+    expect(mocks.clients).toHaveLength(3);
   });
 
   it("keeps failed diagnostic evidence when a required route cannot recover", async () => {
@@ -283,11 +382,22 @@ describe("workspace-symbol process-crash demand", () => {
     });
 
     expect(result.refreshFailureReason).toContain("test @ b is unavailable");
-    expect(result.refreshFailureReason).toContain("process recovery exhausted; reload required");
+    expect(result.refreshFailureReason).toContain("process recovery failed");
     expect(result.processCrashRecovery).toEqual({
-      attemptedRoutes: 1,
       recoveredRoutes: 0,
+      skippedRoutes: 0,
       failedRoutes: 1,
+      exhaustedRoutes: 0,
+      entries: [
+        {
+          name: "test",
+          root: "b",
+          outcome: "recovery-failed",
+          nextAction: "reload-workspace",
+          failureMessage: "replacement failed",
+        },
+      ],
+      omittedEntries: 0,
     });
     expect(result.diagnosticEvidence).toMatchObject({
       failed: 1,
@@ -318,12 +428,14 @@ describe("workspace-symbol process-crash demand", () => {
     expect(result).toMatchObject({
       kind: "partial",
       data: [expect.objectContaining({ name: "tracked" })],
-      reason: expect.stringContaining("process recovery exhausted; reload required"),
+      reason: expect.stringContaining("process recovery failed"),
     });
   });
 });
 
-async function createTwoCrashedRoutes(options: { crashA?: boolean } = {}): Promise<{
+async function createTwoCrashedRoutes(
+  options: { crashA?: boolean; trackB?: boolean } = {},
+): Promise<{
   manager: LspManager;
   rootA: string;
   rootB: string;
@@ -354,8 +466,10 @@ async function createTwoCrashedRoutes(options: { crashA?: boolean } = {}): Promi
   fakeA.becomeReady();
   fakeB.becomeReady();
   fakeA.didOpen(fileA);
-  fakeB.didOpen(fileB);
-  fakeB.didOpen(fileBOutside);
+  if (options.trackB !== false) {
+    fakeB.didOpen(fileB);
+    fakeB.didOpen(fileBOutside);
+  }
   if (options.crashA !== false) fakeA.crash();
   fakeB.crash();
   return { manager, rootA, rootB, fileA, fileB, fileBOutside };

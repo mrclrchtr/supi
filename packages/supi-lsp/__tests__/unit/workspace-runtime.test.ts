@@ -18,6 +18,7 @@ import type {
   SymbolInformation,
 } from "../../src/config/types.ts";
 import type { LspManager as Manager } from "../../src/manager/manager.ts";
+import type { ProcessCrashRecoveryReport } from "../../src/session/runtime-diagnostics.ts";
 import { createWorkspaceLspRuntimeOwner } from "../../src/session/runtime-registry.ts";
 
 function makeManager(overrides: Record<string, unknown>): Manager {
@@ -30,7 +31,7 @@ function makeManager(overrides: Record<string, unknown>): Manager {
       entries: [],
       totalFiles: 0,
     }),
-    getProcessCrashRecoverySummaryForFile: () => null,
+    getProcessCrashRecoveryReportForFile: () => null,
     ...overrides,
   } as unknown as Manager;
 }
@@ -58,10 +59,13 @@ function emptyEvidence() {
 
 function fileReadiness(
   client: LspClient | null,
-  processCrashRecovery = {
-    attemptedRoutes: 0,
+  processCrashRecovery: ProcessCrashRecoveryReport = {
     recoveredRoutes: 0,
+    skippedRoutes: 0,
     failedRoutes: 0,
+    exhaustedRoutes: 0,
+    entries: [],
+    omittedEntries: 0,
   },
 ) {
   return { client, processCrashRecovery };
@@ -220,12 +224,26 @@ describe("workspace runtime behavior", () => {
       makeManager({
         canServeFile: () => true,
         waitUntilFileReady: async () =>
-          fileReadiness(client, { attemptedRoutes: 1, recoveredRoutes: 1, failedRoutes: 0 }),
+          fileReadiness(client, {
+            recoveredRoutes: 1,
+            skippedRoutes: 0,
+            failedRoutes: 0,
+            exhaustedRoutes: 0,
+            entries: [{ name: "typescript", root: ".", outcome: "recovered" }],
+            omittedEntries: 0,
+          }),
       }),
     );
     await expect(recoveredRuntime.waitUntilReadyForFile("src/index.ts")).resolves.toEqual({
       kind: "ready",
-      processCrashRecovery: { attemptedRoutes: 1, recoveredRoutes: 1, failedRoutes: 0 },
+      processCrashRecovery: {
+        recoveredRoutes: 1,
+        skippedRoutes: 0,
+        failedRoutes: 0,
+        exhaustedRoutes: 0,
+        entries: [{ name: "typescript", root: ".", outcome: "recovered" }],
+        omittedEntries: 0,
+      },
     });
 
     const failedRouteRuntime = createRuntime(
@@ -241,10 +259,21 @@ describe("workspace runtime behavior", () => {
     const failedUnavailableRouteRuntime = createRuntime(
       makeManager({
         canServeFile: () => false,
-        getProcessCrashRecoverySummaryForFile: () => ({
-          attemptedRoutes: 1,
+        getProcessCrashRecoveryReportForFile: () => ({
           recoveredRoutes: 0,
+          skippedRoutes: 0,
           failedRoutes: 1,
+          exhaustedRoutes: 0,
+          entries: [
+            {
+              name: "typescript",
+              root: ".",
+              outcome: "recovery-failed",
+              nextAction: "reload-workspace",
+              failureMessage: "replacement failed",
+            },
+          ],
+          omittedEntries: 0,
         }),
       }),
     );
@@ -254,9 +283,20 @@ describe("workspace runtime behavior", () => {
       kind: "unavailable",
       reason: "No LSP client can serve this file",
       processCrashRecovery: {
-        attemptedRoutes: 1,
         recoveredRoutes: 0,
+        skippedRoutes: 0,
         failedRoutes: 1,
+        exhaustedRoutes: 0,
+        entries: [
+          {
+            name: "typescript",
+            root: ".",
+            outcome: "recovery-failed",
+            nextAction: "reload-workspace",
+            failureMessage: "replacement failed",
+          },
+        ],
+        omittedEntries: 0,
       },
     });
 
@@ -270,50 +310,64 @@ describe("workspace runtime behavior", () => {
       timeoutRuntime.waitUntilReadyForFile("src/index.ts", { timeoutMs: 1 }),
     ).resolves.toEqual({ kind: "timeout" });
 
-    const recoveryTimeoutRuntime = createRuntime(
+    const pendingRecoveryRuntime = createRuntime(
       makeManager({
         canServeFile: () => true,
-        waitUntilFileReady: (
-          _filePath: string,
-          _control: unknown,
-          reportRecovery?: (summary: {
-            attemptedRoutes: number;
-            recoveredRoutes: number;
-            failedRoutes: number;
-          }) => void,
-        ) => {
-          reportRecovery?.({ attemptedRoutes: 1, recoveredRoutes: 0, failedRoutes: 0 });
-          return new Promise<never>(() => {});
-        },
+        waitUntilFileReady: () => new Promise<never>(() => {}),
       }),
     );
     await expect(
-      recoveryTimeoutRuntime.waitUntilReadyForFile("src/index.ts", { timeoutMs: 1 }),
-    ).resolves.toEqual({
-      kind: "timeout",
-      processCrashRecovery: { attemptedRoutes: 1, recoveredRoutes: 0, failedRoutes: 0 },
-    });
+      pendingRecoveryRuntime.waitUntilReadyForFile("src/index.ts", { timeoutMs: 1 }),
+    ).resolves.toEqual({ kind: "timeout" });
   });
 
   it("reports a failed recovery when the shared replacement fails after the eager attempt", async () => {
     const runtime = createRuntime(
       makeManager({
         canServeFile: () => true,
-        getProcessCrashRecoverySummaryForFile: () => ({
-          attemptedRoutes: 1,
+        getProcessCrashRecoveryReportForFile: () => ({
           recoveredRoutes: 0,
+          skippedRoutes: 0,
           failedRoutes: 1,
+          exhaustedRoutes: 0,
+          entries: [
+            {
+              name: "typescript",
+              root: ".",
+              outcome: "recovery-failed",
+              nextAction: "reload-workspace",
+              failureMessage: "replacement failed",
+            },
+          ],
+          omittedEntries: 0,
         }),
         waitUntilFileReady: (
           _filePath: string,
           _control: unknown,
-          reportRecovery?: (summary: {
-            attemptedRoutes: number;
+          reportRecovery?: (report: {
             recoveredRoutes: number;
+            skippedRoutes: number;
             failedRoutes: number;
+            exhaustedRoutes: number;
+            entries: readonly unknown[];
+            omittedEntries: number;
           }) => void,
         ) => {
-          reportRecovery?.({ attemptedRoutes: 1, recoveredRoutes: 0, failedRoutes: 0 });
+          reportRecovery?.({
+            recoveredRoutes: 0,
+            skippedRoutes: 1,
+            failedRoutes: 0,
+            exhaustedRoutes: 0,
+            entries: [
+              {
+                name: "typescript",
+                root: ".",
+                outcome: "skipped-no-retained-file",
+                nextAction: "use-exact-file",
+              },
+            ],
+            omittedEntries: 0,
+          });
           return new Promise<never>(() => {});
         },
       }),
@@ -321,7 +375,22 @@ describe("workspace runtime behavior", () => {
 
     await expect(runtime.waitUntilReadyForFile("src/index.ts", { timeoutMs: 1 })).resolves.toEqual({
       kind: "timeout",
-      processCrashRecovery: { attemptedRoutes: 1, recoveredRoutes: 0, failedRoutes: 1 },
+      processCrashRecovery: {
+        recoveredRoutes: 0,
+        skippedRoutes: 0,
+        failedRoutes: 1,
+        exhaustedRoutes: 0,
+        entries: [
+          {
+            name: "typescript",
+            root: ".",
+            outcome: "recovery-failed",
+            nextAction: "reload-workspace",
+            failureMessage: "replacement failed",
+          },
+        ],
+        omittedEntries: 0,
+      },
     });
   });
 

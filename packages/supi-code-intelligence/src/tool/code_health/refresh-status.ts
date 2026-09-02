@@ -1,5 +1,11 @@
-import type { ProcessCrashRecoverySummary } from "@mrclrchtr/supi-lsp/api";
 import {
+  MAX_PROCESS_CRASH_RECOVERY_ENTRIES,
+  type ProcessCrashRecoveryEntry,
+  type ProcessCrashRecoveryOutcome,
+  type ProcessCrashRecoveryReport,
+} from "@mrclrchtr/supi-lsp/api";
+import {
+  formatCompactProcessCrashRecovery,
   formatProcessCrashRecovery,
   formatStaleDiagnosticRestarts,
   isFileReadinessPending,
@@ -82,7 +88,7 @@ export function readCompactRefreshStatus(data: Record<string, unknown> | null): 
   const refresh = readRecord(data?.refresh);
   if (!refresh || (refresh.kind !== "completed" && refresh.kind !== "failed")) return null;
 
-  const processCrashRecovery = formatProcessCrashRecovery(
+  const processCrashRecovery = formatCompactProcessCrashRecovery(
     readProcessCrashRecovery(refresh.processCrashRecovery),
   );
   if (refresh.kind === "failed") {
@@ -117,7 +123,7 @@ export function readPreviousRefreshStatus(data: Record<string, unknown> | null):
   const attempt = readRecord(refresh.lastAttempt);
   if (!attempt) return null;
   const evidence = formatCompactDiagnosticEvidence(readRecord(attempt.diagnosticEvidence));
-  const processCrashRecovery = formatProcessCrashRecovery(
+  const processCrashRecovery = formatCompactProcessCrashRecovery(
     readProcessCrashRecovery(attempt.processCrashRecovery),
   );
   const staleRestart = formatStaleDiagnosticRestartsForRecord(attempt);
@@ -207,20 +213,60 @@ export function isPendingFileReadiness(data: Record<string, unknown> | null): bo
   return isFileReadinessPending(attempt, readSemanticHealthState(data?.semanticState));
 }
 
-function readProcessCrashRecovery(value: unknown): ProcessCrashRecoverySummary | null {
-  const summary = readRecord(value);
-  if (!summary) return null;
-  const attemptedRoutes = summary.attemptedRoutes;
-  const recoveredRoutes = summary.recoveredRoutes;
-  const failedRoutes = summary.failedRoutes;
+function readProcessCrashRecovery(value: unknown): ProcessCrashRecoveryReport | null {
+  const report = readRecord(value);
+  if (!report) return null;
+  const recoveredRoutes = report.recoveredRoutes;
+  const skippedRoutes = report.skippedRoutes;
+  const failedRoutes = report.failedRoutes;
+  const exhaustedRoutes = report.exhaustedRoutes;
+  const omittedEntries = report.omittedEntries;
   if (
-    !isEvidenceCount(attemptedRoutes) ||
     !isEvidenceCount(recoveredRoutes) ||
-    !isEvidenceCount(failedRoutes)
+    !isEvidenceCount(skippedRoutes) ||
+    !isEvidenceCount(failedRoutes) ||
+    !isEvidenceCount(exhaustedRoutes) ||
+    !isEvidenceCount(omittedEntries) ||
+    !Array.isArray(report.entries) ||
+    report.entries.length > MAX_PROCESS_CRASH_RECOVERY_ENTRIES
   ) {
     return null;
   }
-  return { attemptedRoutes, recoveredRoutes, failedRoutes };
+  const entries = report.entries
+    .map(readProcessCrashRecoveryEntry)
+    .filter((entry): entry is ProcessCrashRecoveryEntry => entry !== null);
+  if (entries.length !== report.entries.length) return null;
+  return { recoveredRoutes, skippedRoutes, failedRoutes, exhaustedRoutes, entries, omittedEntries };
+}
+
+function readProcessCrashRecoveryEntry(value: unknown): ProcessCrashRecoveryEntry | null {
+  const entry = readRecord(value);
+  if (!entry || typeof entry.name !== "string" || typeof entry.root !== "string") return null;
+  if (!isProcessCrashRecoveryOutcome(entry.outcome)) return null;
+  if (
+    entry.nextAction !== undefined &&
+    entry.nextAction !== "use-exact-file" &&
+    entry.nextAction !== "reload-workspace"
+  ) {
+    return null;
+  }
+  if (entry.failureMessage !== undefined && typeof entry.failureMessage !== "string") return null;
+  return {
+    name: entry.name,
+    root: entry.root,
+    outcome: entry.outcome,
+    ...(entry.nextAction !== undefined ? { nextAction: entry.nextAction } : {}),
+    ...(entry.failureMessage !== undefined ? { failureMessage: entry.failureMessage } : {}),
+  };
+}
+
+function isProcessCrashRecoveryOutcome(value: unknown): value is ProcessCrashRecoveryOutcome {
+  return (
+    value === "recovered" ||
+    value === "skipped-no-retained-file" ||
+    value === "recovery-failed" ||
+    value === "recovery-exhausted"
+  );
 }
 
 function readEvidenceCounts(evidence: Record<string, unknown> | null): number[] | null {

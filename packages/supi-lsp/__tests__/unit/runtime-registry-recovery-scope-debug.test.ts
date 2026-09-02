@@ -15,9 +15,12 @@ const recoveryResult = {
   attemptedClients: 0,
   restartedClients: 0,
   processCrashRecovery: {
-    attemptedRoutes: 1,
     recoveredRoutes: 1,
+    skippedRoutes: 0,
     failedRoutes: 0,
+    exhaustedRoutes: 0,
+    entries: [{ name: "typescript", root: ".", outcome: "recovered" }],
+    omittedEntries: 0,
   },
   diagnosticEvidence: {
     requested: 0,

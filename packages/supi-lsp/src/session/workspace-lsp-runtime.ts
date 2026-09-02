@@ -18,7 +18,7 @@ import type {
   WorkspaceSentinelSyncResult,
 } from "../diagnostics/workspace-sentinels.ts";
 import type { WorkspaceLspDiagnosticSurface } from "./runtime-diagnostic-surface.ts";
-import type { ProcessCrashRecoverySummary } from "./runtime-diagnostics.ts";
+import type { ProcessCrashRecoveryReport } from "./runtime-diagnostics.ts";
 
 export type WorkspaceLspRuntimeState =
   | { kind: "ready"; runtime: WorkspaceLspRuntime }
@@ -31,18 +31,18 @@ export type SemanticReadinessResult =
   | {
       kind: "ready";
       /** Process-crash route recovery observed while establishing file readiness. */
-      processCrashRecovery?: ProcessCrashRecoverySummary;
+      processCrashRecovery?: ProcessCrashRecoveryReport;
     }
   | {
       kind: "timeout";
       /** Process-crash route recovery observed before the readiness timeout. */
-      processCrashRecovery?: ProcessCrashRecoverySummary;
+      processCrashRecovery?: ProcessCrashRecoveryReport;
     }
   | {
       kind: "unavailable";
       reason: string;
       /** Process-crash route recovery observed before readiness became unavailable. */
-      processCrashRecovery?: ProcessCrashRecoverySummary;
+      processCrashRecovery?: ProcessCrashRecoveryReport;
     };
 
 /** One mutation response and the exact provider roots from its semantic route. */
