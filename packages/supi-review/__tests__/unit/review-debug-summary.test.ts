@@ -13,7 +13,7 @@ const completedResult: ReviewTaskResult = {
   packetHash: "h".repeat(64),
   modelId: "provider/model",
   requestedThinkingLevel: "max",
-  effectiveThinkingLevel: "max",
+  effectiveThinkingLevel: "high",
   status: "completed",
   verdict: "pass",
   findingCounts: {
@@ -38,7 +38,7 @@ const input = {
     turns: 3,
     toolUses: 12,
     toolErrors: 1,
-    tokens: { input: 100, output: 50, total: 150 },
+    tokens: { input: 100, output: 50, total: 150, reasoning: 25 },
   },
 };
 
@@ -53,7 +53,80 @@ describe("recordReviewTaskDebugSummary", () => {
     expect(getDebugEvents({ source: "supi-review" }).events[0]).toMatchObject({
       source: "supi-review",
       category: "review-task",
-      data: expect.objectContaining({ taskId: "spec", mode: "state", verdict: "pass" }),
+      data: expect.objectContaining({
+        taskId: "spec",
+        mode: "state",
+        verdict: "pass",
+        requestedThinkingLevel: "max",
+        effectiveThinkingLevel: "high",
+        usage: expect.objectContaining({ reasoning: 25 }),
+      }),
+    });
+  });
+
+  it("uses final result usage when progress has no usage", () => {
+    configureDebugRegistry({ enabled: true });
+    const result: ReviewTaskResult = {
+      ...completedResult,
+      usage: {
+        input: 100,
+        output: 50,
+        cacheRead: 200,
+        cacheWrite: 0,
+        totalTokens: 350,
+        reasoning: 25,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+    };
+    recordReviewTaskDebugSummary({
+      ...input,
+      progress: { turns: 3, toolUses: 12, toolErrors: 1 },
+      result,
+    });
+
+    expect(getDebugEvents({ source: "supi-review" }).events[0]).toMatchObject({
+      data: expect.objectContaining({
+        usage: {
+          input: 100,
+          output: 50,
+          total: 350,
+          cacheRead: 200,
+          cacheWrite: 0,
+          reasoning: 25,
+        },
+      }),
+    });
+  });
+
+  it("supplements observed usage with final reasoning", () => {
+    configureDebugRegistry({ enabled: true });
+    const result: ReviewTaskResult = {
+      ...completedResult,
+      usage: {
+        input: 200,
+        output: 100,
+        cacheRead: 400,
+        cacheWrite: 0,
+        totalTokens: 700,
+        reasoning: 25,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+    };
+    recordReviewTaskDebugSummary({
+      ...input,
+      progress: {
+        turns: 3,
+        toolUses: 12,
+        toolErrors: 1,
+        tokens: { input: 100, output: 50, total: 150, cacheRead: 200, cacheWrite: 0 },
+      },
+      result,
+    });
+
+    expect(getDebugEvents({ source: "supi-review" }).events[0]).toMatchObject({
+      data: expect.objectContaining({
+        usage: { input: 100, output: 50, total: 150, cacheRead: 200, cacheWrite: 0, reasoning: 25 },
+      }),
     });
   });
 

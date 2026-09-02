@@ -104,7 +104,20 @@ describe("runIsolatedChild", () => {
       handle({ kind: "success", value: "done" }, [
         { status: "starting", turns: 0, toolUses: 0, toolErrors: 0 },
         { status: "running", turns: 0, toolUses: 0, toolErrors: 0 },
-        { status: "running", turns: 1, toolUses: 0, toolErrors: 1 },
+        {
+          status: "running",
+          turns: 1,
+          toolUses: 0,
+          toolErrors: 1,
+          usage: {
+            input: 10,
+            output: 5,
+            totalTokens: 15,
+            cacheRead: 2,
+            cacheWrite: 0,
+            reasoning: 3,
+          },
+        },
         { status: "stopping", turns: 1, toolUses: 0, toolErrors: 1 },
         { status: "completed", turns: 1, toolUses: 0, toolErrors: 1 },
       ]),
@@ -113,9 +126,38 @@ describe("runIsolatedChild", () => {
     await runIsolatedChild({ ...config, onProgress });
 
     expect(onProgress).toHaveBeenCalledTimes(1);
-    expect(onProgress).toHaveBeenCalledWith({ turns: 1, toolUses: 0, toolErrors: 1 });
+    expect(onProgress).toHaveBeenCalledWith({
+      turns: 1,
+      toolUses: 0,
+      toolErrors: 1,
+      tokens: { input: 10, output: 5, total: 15, cacheRead: 2, cacheWrite: 0, reasoning: 3 },
+    });
     const resourceAgentDir = mocks.createResources.mock.calls[0]?.[2];
     const runtimeAgentDir = mocks.startAgentRun.mock.calls[0]?.[0].inputs.agentDir;
     expect(runtimeAgentDir).toBe(resourceAgentDir);
+  });
+
+  it("omits reasoning when the provider does not report it", async () => {
+    const onProgress = vi.fn();
+    mocks.startAgentRun.mockReturnValue(
+      handle({ kind: "success", value: "done" }, [
+        {
+          status: "running",
+          turns: 1,
+          toolUses: 0,
+          toolErrors: 0,
+          usage: { input: 10, output: 5, totalTokens: 15, cacheRead: 2, cacheWrite: 0 },
+        },
+      ]),
+    );
+
+    await runIsolatedChild({ ...config, onProgress });
+
+    expect(onProgress).toHaveBeenCalledWith({
+      turns: 1,
+      toolUses: 0,
+      toolErrors: 0,
+      tokens: { input: 10, output: 5, total: 15, cacheRead: 2, cacheWrite: 0 },
+    });
   });
 });
