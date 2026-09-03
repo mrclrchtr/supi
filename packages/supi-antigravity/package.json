@@ -1,0 +1,79 @@
+{
+  "name": "@mrclrchtr/supi-antigravity",
+  "version": "6.2.0",
+  "description": "Bounded Antigravity tasks with isolated workspace access and evidence",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrclrchtr/supi.git",
+    "directory": "packages/supi-antigravity"
+  },
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-antigravity#readme",
+  "bugs": {
+    "url": "https://github.com/mrclrchtr/supi/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "supi",
+    "antigravity",
+    "agent",
+    "web",
+    "workspace"
+  ],
+  "type": "module",
+  "files": [
+    "src/**/*.ts",
+    "scripts/live-probe.ts",
+    "README.md",
+    "CLAUDE.md",
+    "CONTEXT.md",
+    "docs/adr/*.md"
+  ],
+  "dependencies": {
+    "@mrclrchtr/supi-core": "workspace:*"
+  },
+  "bundledDependencies": [
+    "@mrclrchtr/supi-core"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-ai": {
+      "optional": true
+    },
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    },
+    "@earendil-works/pi-tui": {
+      "optional": true
+    },
+    "typebox": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@mrclrchtr/supi-test-utils": "workspace:*",
+    "@types/node": "25.9.5",
+    "vitest": "4.1.11"
+  },
+  "pi": {
+    "extensions": [
+      "./src/extension.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-antigravity/assets/social-preview.png"
+  },
+  "exports": {
+    "./extension": "./src/extension.ts",
+    "./package.json": "./package.json"
+  }
+}

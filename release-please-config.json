@@ -6,6 +6,7 @@
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         "packages/supi-agent/package.json",
+        "packages/supi-antigravity/package.json",
         "packages/supi-agent-runtime/package.json",
         "packages/supi-ask-user/package.json",
         "packages/supi-bash-timeout/package.json",

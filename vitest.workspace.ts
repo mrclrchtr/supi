@@ -1,6 +1,7 @@
 export default [
   "scripts",
   "packages/supi-agent",
+  "packages/supi-antigravity",
   "packages/supi-agent-runtime",
   "packages/supi-ask-user",
   "packages/supi-bash-timeout",

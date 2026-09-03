@@ -1,0 +1,92 @@
+#!/usr/bin/env node
+import { spawn } from "node:child_process";
+import { existsSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+const args = process.argv.slice(2);
+if (args.includes("--version")) {
+  process.stdout.write("1.1.25\n");
+  process.exit(0);
+}
+if (args[0] === "models") {
+  process.stdout.write(
+    "model\tdescription\ngemini-3.8-flash-low\tFlash\ngemini-3.1-pro-high\tPro\n",
+  );
+  process.exit(0);
+}
+if (args.includes("/hooks")) {
+  process.stdout.write(
+    JSON.stringify(
+      existsSync(join(process.cwd(), ".agy-hooks-active"))
+        ? { hooks: [{ scope: "project", status: "active" }] }
+        : { hooks: [] },
+    ),
+  );
+  process.exit(0);
+}
+
+let input = "";
+process.stdin.on("data", (chunk) => {
+  input += chunk.toString();
+});
+process.stdin.on("end", () => {
+  const conversationIndex = args.indexOf("--conversation");
+  const conversationId = conversationIndex >= 0 ? args[conversationIndex + 1] : "fake-conversation";
+  if (input.includes("malformed")) {
+    process.stdout.write("not-json\n");
+    return;
+  }
+  if (input.includes("oversized")) {
+    process.stdout.write(`${"x".repeat(128 * 1024 + 1)}\n`);
+    return;
+  }
+  if (input.includes("exit-nonzero")) {
+    process.stderr.write("fixture process failure\n");
+    process.exitCode = 7;
+    return;
+  }
+  if (input.includes("spawn-child")) {
+    const match = input.match(/child-pid-file=([^\s]+)/);
+    const child = spawn("sleep", ["30"], { stdio: "ignore" });
+    if (match && child.pid) writeFileSync(match[1], String(child.pid));
+  }
+  const emitResult = () => {
+    process.stdout.write(`${JSON.stringify({ type: "system", session_id: conversationId })}\n`);
+    if (input.includes("fail")) {
+      process.stdout.write(
+        `${JSON.stringify({ type: "result", status: "error", session_id: conversationId })}\n`,
+      );
+      return;
+    }
+    if (input.includes("permission")) {
+      process.stdout.write(
+        `${JSON.stringify({ type: "tool_use", id: "tool-1", name: "write_file", input: { path: "README.md" } })}\n`,
+      );
+      process.stdout.write(
+        `${JSON.stringify({ type: "tool_result", tool_use_id: "tool-1", name: "write_file", status: "error", message: "Permission denied" })}\n`,
+      );
+    } else if (input.includes("workspace")) {
+      process.stdout.write(
+        `${JSON.stringify({ type: "tool_use", id: "tool-1", name: "read_file", input: { path: "README.md" } })}\n`,
+      );
+      process.stdout.write(
+        `${JSON.stringify({ type: "tool_result", tool_use_id: "tool-1", name: "read_file", status: "success" })}\n`,
+      );
+    } else {
+      process.stdout.write(
+        `${JSON.stringify({ type: "tool_use", id: "tool-1", name: "search_web", input: { url: "https://nodejs.org/api/child_process.html" } })}\n`,
+      );
+      process.stdout.write(
+        `${JSON.stringify({ type: "tool_result", tool_use_id: "tool-1", name: "search_web", status: "success" })}\n`,
+      );
+    }
+    const workspaceEvidence = input.includes("workspace")
+      ? [{ path: "README.md", summary: "fixture file" }]
+      : [];
+    process.stdout.write(
+      `${JSON.stringify({ type: "result", status: "success", session_id: conversationId, usage: { input_tokens: 4, output_tokens: 6 }, result: { answer: input.includes("follow") ? "The prior consultation is retained." : "Node documentation explains child process cancellation.", sources: [{ title: "Node.js child_process", url: "https://nodejs.org/api/child_process.html" }], workspaceEvidence } })}\n`,
+    );
+  };
+  if (input.includes("delay")) setTimeout(emitResult, 250);
+  else emitResult();
+});

@@ -4,6 +4,7 @@ Multi-context monorepo. Each package is an independent context with its own `CON
 
 - **supi-agent** → `packages/supi-agent/CONTEXT.md`
 - **supi-agent-runtime** → `packages/supi-agent-runtime/CONTEXT.md`
+- **supi-antigravity** → `packages/supi-antigravity/CONTEXT.md`
 - **supi-ask-user** → `packages/supi-ask-user/CONTEXT.md`
 - **supi-bash-timeout** → `packages/supi-bash-timeout/CONTEXT.md`
 - **supi-cache** → `packages/supi-cache/CONTEXT.md`
