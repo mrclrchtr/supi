@@ -72,6 +72,7 @@ describe("bounded Antigravity streams", () => {
     });
     accumulator.consume({ type: "tool_result", tool_use_id: "file-1", status: "success" });
     accumulator.consume({ type: "permission_denied", name: "command" });
+    accumulator.consume({ type: "permission_denied" });
     accumulator.consume({
       type: "result",
       status: "success",
@@ -83,7 +84,7 @@ describe("bounded Antigravity streams", () => {
       conversationId: "conversation-1",
       observedToolNames: ["search_web", "read_file", "command"],
       observedToolCounts: { search_web: 1, read_file: 1, command: 1 },
-      permissionDenials: 1,
+      permissionDenials: 2,
     });
     expect(accumulator.finish().observedSourceHashes).toHaveLength(1);
     expect(accumulator.finish().observedWorkspacePathHashes).toHaveLength(1);

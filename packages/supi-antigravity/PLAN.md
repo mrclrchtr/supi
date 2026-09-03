@@ -184,6 +184,8 @@ Use:
 --disable-slash-commands
 ```
 
+For workspace-access runs, also pass `--add-dir <canonical-working-directory>`. agy requires this explicit sandbox workspace registration. Do not pass it for Consultation Workspace runs.
+
 For follow-ups, also use:
 
 ```text

@@ -17,9 +17,12 @@ import {
   isTerminalEvent,
   isToolResultEvent,
   isToolStartEvent,
+  safeString,
   toolInput,
   toolName,
 } from "./event-values.ts";
+import { normalizeProtocolEvent } from "./protocol.ts";
+import { mergeUsage, readUsage } from "./usage.ts";
 
 interface PendingTool {
   name: string;
@@ -29,6 +32,13 @@ interface PendingTool {
   denied?: boolean;
 }
 
+interface ToolResultClassification {
+  kind: "pending" | "failure" | "success";
+  denied: boolean;
+}
+
+const MAX_COMPLETED_TOOL_IDS = 4_096;
+
 /**
  * Reduces parsed events to bounded execution facts. Raw events and tool payloads
  * are not retained after each event is processed.
@@ -36,6 +46,7 @@ interface PendingTool {
 export class AntigravityEventAccumulator {
   readonly #workspaceDirectory: string | undefined;
   #pendingTools = new Map<string, PendingTool>();
+  #completedToolIds = new Set<string>();
   #conversationId: string | undefined;
   #candidate: Record<string, unknown> | undefined;
   #terminalSeen = false;
@@ -45,6 +56,7 @@ export class AntigravityEventAccumulator {
   #toolCounts = new Map<string, number>();
   #successfulToolNames = new Set<string>();
   #permissionDenials = 0;
+  #unattributedPermissionDenialSeen = false;
   #sourceHashes = new Set<string>();
   #workspacePathHashes = new Set<string>();
 
@@ -56,28 +68,38 @@ export class AntigravityEventAccumulator {
   consume(event: Record<string, unknown>): void {
     if (this.#terminalSeen)
       throw new Error("Antigravity returned events after its terminal event.");
-    this.#conversationId = conversationId(event) ?? this.#conversationId;
-    this.#usage = mergeUsage(this.#usage, readUsage(event));
-    const nestedTools = consumeNestedToolBlocks(this, event);
-    if (nestedTools) return;
+    const normalizedEvent = normalizeProtocolEvent(event);
+    this.#conversationId =
+      conversationId(event) ?? conversationId(normalizedEvent) ?? this.#conversationId;
+    this.#usage = mergeUsage(this.#usage, mergeUsage(readUsage(event), readUsage(normalizedEvent)));
+    const terminal = isTerminalEvent(normalizedEvent);
+    const nestedTools = consumeNestedToolBlocks(this, normalizedEvent);
+    if (nestedTools && !terminal) return;
 
-    if (isToolStartEvent(event)) {
-      this.#rememberToolStart(event);
+    if (isToolStartEvent(normalizedEvent)) {
+      this.#rememberToolStart(normalizedEvent);
       return;
     }
-    if (isToolResultEvent(event)) {
-      this.#consumeToolResult(event);
+    if (isToolResultEvent(normalizedEvent)) {
+      this.#consumeToolResult(normalizedEvent);
       return;
     }
-    if (isTerminalEvent(event)) {
-      this.#consumeTerminal(event);
+    if (terminal) {
+      this.#consumeTerminal(normalizedEvent);
       return;
     }
 
-    const directName = toolName(event);
-    if (directName && isSuccessfulActivity(event)) this.#recordSuccessfulTool(directName, event);
-    if (directName && isPermissionDenial(event)) this.#recordObservedTool(directName);
-    if (isPermissionDenial(event)) this.#permissionDenials += 1;
+    const directName = toolName(normalizedEvent);
+    if (directName && isSuccessfulActivity(normalizedEvent)) {
+      this.#recordSuccessfulTool(directName, normalizedEvent);
+    }
+    const denied = isPermissionDenial(normalizedEvent);
+    if (denied && !isNonToolStepUpdate(normalizedEvent)) {
+      const counted = directName
+        ? this.#recordPermissionDenial(directName, normalizedEvent)
+        : this.#recordUnattributedPermissionDenial();
+      if (counted) this.#permissionDenials += 1;
+    }
   }
 
   /** Finish the reduction and validate terminal structured output. */
@@ -101,55 +123,101 @@ export class AntigravityEventAccumulator {
     };
   }
 
-  /** Consume a nested tool block from an assistant or tool-result message. */
-  consumeToolBlock(event: Record<string, unknown>): void {
-    if (isToolStartEvent(event)) {
-      this.#rememberToolStart(event);
-      return;
-    }
-    if (isToolResultEvent(event)) this.#consumeToolResult(event);
-  }
-
   #rememberToolStart(event: Record<string, unknown>): void {
     const name = toolName(event);
     if (!name) return;
     const input = toolInput(event) ?? event;
     const denied = isPermissionDenial(event);
-    const pending: PendingTool = {
-      name,
-      observed: true,
-      ...(extractUrl(input) ? { urlHash: hashEvidence(extractUrl(input) as string) } : {}),
-      ...(extractWorkspacePath(input)
-        ? { pathHash: this.#hashWorkspacePath(extractWorkspacePath(input) as string) }
-        : {}),
-      ...(denied ? { denied: true } : {}),
-    };
-    this.#recordObservedTool(name);
+    const urlHash = hashValue(extractUrl(input));
+    const path = extractWorkspacePath(input);
+    const pathHash = path ? this.#hashWorkspacePath(path) : undefined;
     const id = eventId(event);
+    if (id) this.#completedToolIds.delete(id);
+    const previous = id ? this.#pendingTools.get(id) : undefined;
+    const pending = mergePendingTool(
+      {
+        name,
+        observed: true,
+        ...(urlHash ? { urlHash } : {}),
+        ...(pathHash ? { pathHash } : {}),
+        ...(denied ? { denied: true } : {}),
+      },
+      previous,
+    );
+    if (!previous) this.#recordObservedTool(name);
     if (id) this.#pendingTools.set(id, pending);
     if (isSuccessfulActivity(event)) this.#recordSuccessfulTool(name, event, pending);
-    if (isPermissionDenial(event)) this.#permissionDenials += 1;
+    if (denied && !previous?.denied) this.#permissionDenials += 1;
   }
 
   #consumeToolResult(event: Record<string, unknown>): void {
     const id = eventId(event);
+    // Without an ID, each result is a distinct observation because duplicates are unknowable.
+    if (id && this.#completedToolIds.has(id)) return;
     const pending = id ? this.#pendingTools.get(id) : undefined;
-    if (id) this.#pendingTools.delete(id);
     const name = toolName(event) ?? pending?.name;
     if (!name) return;
-    const status = eventStatus(event);
-    if (!pending?.observed) this.#recordObservedTool(name);
-    if (isPermissionDenial(event) || isErrorStatus(status)) {
-      if (isPermissionDenial(event) && !pending?.denied) this.#permissionDenials += 1;
+    const classification = classifyToolResult(event);
+    if (classification.kind === "pending") {
+      this.#recordPendingToolResult(id, name, pending);
       return;
     }
-    if (!isSuccessStatus(status)) return;
+    if (id) this.#completeToolResult(id);
+    if (classification.kind === "failure") {
+      this.#recordFailedToolResult(name, pending, classification.denied);
+      return;
+    }
     this.#recordSuccessfulTool(name, event, pending);
+  }
+
+  #recordPendingToolResult(
+    id: string | undefined,
+    name: string,
+    pending: PendingTool | undefined,
+  ): void {
+    if (!pending?.observed) this.#recordObservedTool(name);
+    if (id && !pending) this.#pendingTools.set(id, { name, observed: true });
+  }
+
+  #completeToolResult(id: string): void {
+    this.#pendingTools.delete(id);
+    this.#rememberCompletedToolId(id);
+  }
+
+  #recordFailedToolResult(name: string, pending: PendingTool | undefined, denied: boolean): void {
+    if (denied && !pending?.denied) this.#permissionDenials += 1;
+    if (!pending?.observed) this.#recordObservedTool(name);
+  }
+
+  #rememberCompletedToolId(id: string): void {
+    this.#completedToolIds.add(id);
+    if (this.#completedToolIds.size <= MAX_COMPLETED_TOOL_IDS) return;
+    const oldest = this.#completedToolIds.values().next().value;
+    if (typeof oldest === "string") this.#completedToolIds.delete(oldest);
   }
 
   #recordObservedTool(name: string): void {
     this.#toolNames = this.#toolNames.includes(name) ? this.#toolNames : [...this.#toolNames, name];
     this.#toolCounts.set(name, (this.#toolCounts.get(name) ?? 0) + 1);
+  }
+
+  #recordUnattributedPermissionDenial(): boolean {
+    if (this.#unattributedPermissionDenialSeen) return false;
+    this.#unattributedPermissionDenialSeen = true;
+    return true;
+  }
+
+  #recordPermissionDenial(name: string, event: Record<string, unknown>): boolean {
+    const id = eventId(event);
+    if (id && this.#completedToolIds.has(id)) return false;
+    const pending = id ? this.#pendingTools.get(id) : undefined;
+    if (pending?.denied) return false;
+    if (!pending?.observed) this.#recordObservedTool(name);
+    if (id) {
+      if (pending) pending.denied = true;
+      else this.#pendingTools.set(id, { name, observed: true, denied: true });
+    }
+    return true;
   }
 
   #recordSuccessfulTool(name: string, event: Record<string, unknown>, pending?: PendingTool): void {
@@ -203,11 +271,17 @@ function consumeNestedToolBlocks(
   let consumed = false;
   for (const block of content) {
     if (!isRecord(block)) continue;
-    if (!isToolStartEvent(block) && !isToolResultEvent(block)) continue;
-    accumulator.consumeToolBlock(block);
+    const normalizedBlock = normalizeProtocolEvent(block);
+    if (!isToolActivityBlock(normalizedBlock)) continue;
+    accumulator.consume(normalizedBlock);
     consumed = true;
   }
   return consumed;
+}
+
+function isToolActivityBlock(event: Record<string, unknown>): boolean {
+  if (isToolStartEvent(event) || isToolResultEvent(event)) return true;
+  return eventType(event) === "step_update" && !isNonToolStepUpdate(event);
 }
 
 function hasExplicitSuccess(event: Record<string, unknown>, status: string | undefined): boolean {
@@ -223,6 +297,21 @@ function isSuccessfulActivity(event: Record<string, unknown>): boolean {
     isSuccessStatus(status) &&
     (status !== undefined || event.success === true || event.ok === true)
   );
+}
+
+function isNonToolStepUpdate(event: Record<string, unknown>): boolean {
+  const type = eventType(event);
+  if (!["assistant", "step_update"].includes(type)) return false;
+  const declaredType = safeString(event.step_type ?? event.stepType, 40)?.toLowerCase();
+  if (declaredType) return declaredType !== "tool";
+  return toolName(event) === undefined && !isRecord(event.tool_info) && !isRecord(event.toolInfo);
+}
+
+function classifyToolResult(event: Record<string, unknown>): ToolResultClassification {
+  const status = eventStatus(event);
+  const denied = isPermissionDenial(event);
+  if (denied || isErrorStatus(status)) return { kind: "failure", denied };
+  return { kind: isSuccessStatus(status) ? "success" : "pending", denied };
 }
 
 function isPermissionDenial(event: Record<string, unknown>): boolean {
@@ -260,56 +349,17 @@ function safeDenialText(value: unknown, depth = 0): string {
     .join(" ");
 }
 
+function mergePendingTool(current: PendingTool, previous: PendingTool | undefined): PendingTool {
+  if (previous?.urlHash && !current.urlHash) current.urlHash = previous.urlHash;
+  if (previous?.pathHash && !current.pathHash) current.pathHash = previous.pathHash;
+  if (previous?.denied) current.denied = true;
+  return current;
+}
+
 function hashValue(value: string | undefined): string | undefined {
   return value ? hashEvidence(value) : undefined;
 }
 
 function normalizeWorkspacePath(value: string): string {
   return normalizePath(value.replaceAll("\\", "/")).replace(/^\.\//, "");
-}
-
-function readUsage(event: Record<string, unknown>): AntigravityUsage | undefined {
-  const value = isRecord(event.usage)
-    ? event.usage
-    : isRecord(event.token_usage)
-      ? event.token_usage
-      : isRecord(event.tokenUsage)
-        ? event.tokenUsage
-        : undefined;
-  if (!value) return undefined;
-  const inputTokens = finiteToken(value.input_tokens ?? value.inputTokens ?? value.prompt_tokens);
-  const outputTokens = finiteToken(
-    value.output_tokens ?? value.outputTokens ?? value.completion_tokens,
-  );
-  const totalTokens = finiteToken(value.total_tokens ?? value.totalTokens ?? value.total);
-  if (inputTokens === undefined && outputTokens === undefined && totalTokens === undefined)
-    return undefined;
-  return {
-    ...(inputTokens === undefined ? {} : { inputTokens }),
-    ...(outputTokens === undefined ? {} : { outputTokens }),
-    ...(totalTokens === undefined ? {} : { totalTokens }),
-  };
-}
-
-function finiteToken(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
-}
-
-function mergeUsage(
-  left: AntigravityUsage | undefined,
-  right: AntigravityUsage | undefined,
-): AntigravityUsage | undefined {
-  if (!left) return right;
-  if (!right) return left;
-  return {
-    ...(left.inputTokens === undefined && right.inputTokens === undefined
-      ? {}
-      : { inputTokens: right.inputTokens ?? left.inputTokens }),
-    ...(left.outputTokens === undefined && right.outputTokens === undefined
-      ? {}
-      : { outputTokens: right.outputTokens ?? left.outputTokens }),
-    ...(left.totalTokens === undefined && right.totalTokens === undefined
-      ? {}
-      : { totalTokens: right.totalTokens ?? left.totalTokens }),
-  };
 }

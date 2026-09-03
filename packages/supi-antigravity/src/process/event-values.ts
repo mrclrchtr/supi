@@ -4,6 +4,24 @@ const MAX_SAFE_TEXT = 64 * 1024;
 const MAX_TOOL_NAME = 80;
 const MAX_ID_LENGTH = 512;
 
+export const SUCCESS_STATES: ReadonlySet<string> = new Set([
+  "success",
+  "succeeded",
+  "done",
+  "completed",
+  "complete",
+  "ok",
+]);
+export const ERROR_STATES: ReadonlySet<string> = new Set([
+  "error",
+  "failed",
+  "failure",
+  "aborted",
+  "cancelled",
+  "canceled",
+  "timeout",
+]);
+
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -15,7 +33,7 @@ export function safeString(value: unknown, maxLength = MAX_SAFE_TEXT): string | 
 }
 
 export function eventType(event: Record<string, unknown>): string {
-  return (safeString(event.type, 40) ?? "").toLowerCase();
+  return (safeString(event.type, 40) ?? safeString(event.event, 40) ?? "").toLowerCase();
 }
 
 export function eventStatus(event: Record<string, unknown>): string | undefined {
@@ -33,16 +51,11 @@ export function eventStatus(event: Record<string, unknown>): string | undefined 
 }
 
 export function isSuccessStatus(status: string | undefined): boolean {
-  return (
-    status === undefined || ["success", "succeeded", "completed", "complete", "ok"].includes(status)
-  );
+  return status === undefined || SUCCESS_STATES.has(status);
 }
 
 export function isErrorStatus(status: string | undefined): boolean {
-  return (
-    status !== undefined &&
-    ["error", "failed", "failure", "aborted", "cancelled", "canceled"].includes(status)
-  );
+  return status !== undefined && ERROR_STATES.has(status);
 }
 
 export function eventId(event: Record<string, unknown>): string | undefined {
@@ -55,8 +68,16 @@ export function eventId(event: Record<string, unknown>): string | undefined {
   ];
   for (const source of sources) {
     if (!source) continue;
-    for (const key of ["tool_use_id", "toolUseId", "tool_call_id", "toolCallId", "id"]) {
-      const value = safeString(source[key], MAX_ID_LENGTH);
+    for (const key of [
+      "tool_use_id",
+      "toolUseId",
+      "tool_call_id",
+      "toolCallId",
+      "step_index",
+      "stepIndex",
+      "id",
+    ]) {
+      const value = safeIdentifier(source[key]);
       if (value) return value;
     }
   }
@@ -84,6 +105,7 @@ export function toolName(event: Record<string, unknown>): string | undefined {
     isRecord(event.toolCall) ? event.toolCall : undefined,
     isRecord(event.tool_use) ? event.tool_use : undefined,
     isRecord(event.toolUse) ? event.toolUse : undefined,
+    isRecord(event.step_update) ? event.step_update : undefined,
   ];
   for (const source of sources) {
     const name = source ? nameFromSource(source) : undefined;
@@ -110,6 +132,13 @@ export function normalizeToolName(value: string): string {
     .slice(0, MAX_TOOL_NAME);
 }
 
+function safeIdentifier(value: unknown): string | undefined {
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) {
+    return String(value);
+  }
+  return safeString(value, MAX_ID_LENGTH);
+}
+
 export function toolInput(event: Record<string, unknown>): Record<string, unknown> | undefined {
   const nested = [
     event.tool_call,
@@ -119,6 +148,8 @@ export function toolInput(event: Record<string, unknown>): Record<string, unknow
     event.tool,
     event.input,
     event.arguments,
+    event.tool_info,
+    event.toolInfo,
   ];
   for (const value of nested) {
     const input = inputFromValue(value);
@@ -132,25 +163,50 @@ function inputFromValue(value: unknown): Record<string, unknown> | undefined {
   if (isRecord(value.input)) return value.input;
   if (isRecord(value.arguments)) return value.arguments;
   if (isRecord(value.args)) return value.args;
+  if (isRecord(value.parameters)) return value.parameters;
   return value;
 }
 
 export function extractUrl(value: unknown): string | undefined {
+  return readBoundedField(value, ["url", "uri", "link"], (candidate) =>
+    /^https?:\/\//i.test(candidate),
+  );
+}
+
+export function extractWorkspacePath(value: unknown): string | undefined {
+  return readBoundedField(value, [
+    "path",
+    "file",
+    "file_path",
+    "relative_path",
+    "directory_path",
+    "search_path",
+    "search_directory",
+    "absolute_path",
+    "directory",
+  ]);
+}
+
+function readBoundedField(
+  value: unknown,
+  names: readonly string[],
+  predicate: (candidate: string) => boolean = () => true,
+): string | undefined {
   if (!isRecord(value)) return undefined;
-  for (const key of ["url", "uri", "link"]) {
-    const candidate = safeString(value[key], 4_096);
-    if (candidate && /^https?:\/\//i.test(candidate)) return candidate;
+  const fields = Object.entries(value);
+  for (const name of names) {
+    const normalizedName = normalizeFieldName(name);
+    for (const [key, field] of fields) {
+      if (normalizeFieldName(key) !== normalizedName) continue;
+      const candidate = safeString(field, 4_096);
+      if (candidate && predicate(candidate)) return candidate;
+    }
   }
   return undefined;
 }
 
-export function extractWorkspacePath(value: unknown): string | undefined {
-  if (!isRecord(value)) return undefined;
-  for (const key of ["path", "file", "file_path", "filePath", "relative_path", "relativePath"]) {
-    const candidate = safeString(value[key], 4_096);
-    if (candidate) return candidate;
-  }
-  return undefined;
+function normalizeFieldName(value: string): string {
+  return value.toLowerCase().replace(/[-_]/g, "");
 }
 
 export function hashEvidence(value: string): string {

@@ -85,7 +85,7 @@ describe("supi-antigravity extension", () => {
     await tool.execute(
       "call-hooks",
       {
-        prompt: "workspace",
+        prompt: "require-add-dir workspace",
         new: { workspace: true, model: "gemini-3.8-flash-low" },
       },
       undefined,
@@ -176,7 +176,7 @@ describe("supi-antigravity extension", () => {
     const first = await tool.execute(
       "call-1",
       {
-        prompt: "first",
+        prompt: "require-no-add-dir first",
         new: { workspace: false, model: "gemini-3.8-flash-low" },
       },
       undefined,
@@ -193,7 +193,7 @@ describe("supi-antigravity extension", () => {
     const followUp = await tool.execute(
       "call-2",
       {
-        prompt: "follow this",
+        prompt: "require-no-add-dir follow this",
         continue: { handle: details.handle },
       },
       undefined,
@@ -203,6 +203,36 @@ describe("supi-antigravity extension", () => {
     expect(followUp.details).toEqual(expect.objectContaining({ handle: details.handle }));
     expect((followUp.details as { rawAntigravityId: string }).rawAntigravityId).toBe(
       "fake-conversation",
+    );
+
+    const workspaceFirst = await tool.execute(
+      "call-workspace-1",
+      {
+        prompt: "require-add-dir workspace",
+        new: { workspace: true, model: "gemini-3.8-flash-low" },
+      },
+      undefined,
+      undefined,
+      context,
+    );
+    const workspaceHandle = (workspaceFirst.details as { handle: string }).handle;
+    const workspaceFollowUp = await tool.execute(
+      "call-workspace-2",
+      {
+        prompt: "require-add-dir workspace follow",
+        continue: { handle: workspaceHandle },
+      },
+      undefined,
+      undefined,
+      context,
+    );
+    expect(workspaceFollowUp.details).toEqual(
+      expect.objectContaining({
+        handle: workspaceHandle,
+        workspaceUsed: true,
+        observedToolNames: ["read_file"],
+        observedWorkspaceEvidence: [expect.any(Object)],
+      }),
     );
 
     await expect(

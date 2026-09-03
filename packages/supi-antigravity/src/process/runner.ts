@@ -20,6 +20,7 @@ export function buildAntigravityRunArguments(
   schemaPath: string,
   model: string,
   conversationId?: string,
+  workspaceDirectory?: string,
 ): string[] {
   return [
     "--input-format",
@@ -33,6 +34,7 @@ export function buildAntigravityRunArguments(
     "--print-timeout",
     "5m",
     "--sandbox",
+    ...(workspaceDirectory ? ["--add-dir", workspaceDirectory] : []),
     "--disable-slash-commands",
     ...(conversationId ? ["--conversation", conversationId] : []),
   ];
@@ -55,6 +57,8 @@ export async function runAntigravityConversation(options: {
   prompt: string;
   model: string;
   conversationId?: string;
+  /** Add the selected project directory to agy's sandbox workspace. */
+  workspaceDirectory?: string;
   schema: Record<string, unknown>;
   signal?: AbortSignal;
   timeoutMs?: number;
@@ -70,7 +74,12 @@ export async function runAntigravityConversation(options: {
   const schemaPath = join(schemaDirectory, "answer.json");
   try {
     await writeFile(schemaPath, `${JSON.stringify(options.schema)}\n`, { mode: 0o600 });
-    const args = buildAntigravityRunArguments(schemaPath, options.model, options.conversationId);
+    const args = buildAntigravityRunArguments(
+      schemaPath,
+      options.model,
+      options.conversationId,
+      options.workspaceDirectory,
+    );
     const accumulator = new AntigravityEventAccumulator({ workspaceDirectory: options.cwd });
     let eventCount = 0;
     await runBoundedChildProcess({

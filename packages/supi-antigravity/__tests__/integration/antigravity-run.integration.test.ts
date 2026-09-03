@@ -34,6 +34,7 @@ function runFixtureConversation(
   options: {
     signal?: AbortSignal;
     timeoutMs?: number;
+    workspaceDirectory?: string;
     schemaDirectoryParent?: string;
     onProcessStart?: () => void;
   } = {},
@@ -72,6 +73,7 @@ describe("antigravity_run process integration", () => {
     });
     expect(facts.conversationId).toBe("fake-conversation");
     expect(facts.successfulToolNames).toEqual(["search_web"]);
+    expect(facts.usage).toEqual({ inputTokens: 4, outputTokens: 6 });
     expect(facts.answer.sources[0]?.url).toMatch(/^https:\/\//);
   });
 
@@ -82,7 +84,9 @@ describe("antigravity_run process integration", () => {
     expect(permissionFacts.successfulToolNames).toEqual([]);
 
     await writeFile(join(paths.consultationWorkspace, "README.md"), "fixture\n");
-    const workspaceFacts = await runFixtureConversation(paths, "workspace");
+    const workspaceFacts = await runFixtureConversation(paths, "require-add-dir workspace", {
+      workspaceDirectory: paths.consultationWorkspace,
+    });
     expect(workspaceFacts.successfulToolNames).toEqual(["read_file"]);
     expect(workspaceFacts.observedWorkspacePathHashes).toHaveLength(1);
 

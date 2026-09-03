@@ -158,7 +158,7 @@ export function runBoundedChildProcess(
       options.onProcessStart?.();
       if (options.prompt !== undefined) {
         const userEvent = JSON.stringify({
-          type: "user",
+          event: "user",
           message: { role: "user", content: options.prompt },
         });
         child.stdin?.end(`${userEvent}\n`);

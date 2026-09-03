@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { cp, lstat, mkdtemp, readdir, readFile, readlink, rm } from "node:fs/promises";
+import { cp, lstat, mkdtemp, readdir, readFile, readlink, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { isWebToolName, isWorkspaceToolName } from "../src/activity.ts";
@@ -56,7 +56,7 @@ async function main(): Promise<void> {
     throw new Error("Antigravity follow-up did not retain the Conversation Handle context.");
   }
 
-  const fixture = await mkdtemp(join(tmpdir(), "supi-antigravity-live-"));
+  const fixture = await realpath(await mkdtemp(join(tmpdir(), "supi-antigravity-live-")));
   try {
     await cp(join(import.meta.dirname, "../__tests__/fixtures/subprocess-cancellation"), fixture, {
       recursive: true,
@@ -68,6 +68,7 @@ async function main(): Promise<void> {
       prompt:
         "Inspect the TypeScript subprocess-cancellation fixture. Consult official Node.js documentation and explain the cancellation risk. Return file paths and source URLs.",
       model: MODEL,
+      workspaceDirectory: fixture,
       schema: ANTIGRAVITY_ANSWER_SCHEMA as Record<string, unknown>,
     });
     requireWebEvidence(workspace);

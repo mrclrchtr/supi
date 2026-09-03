@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const args = process.argv.slice(2);
@@ -30,6 +30,26 @@ process.stdin.on("data", (chunk) => {
   input += chunk.toString();
 });
 process.stdin.on("end", () => {
+  const userEvent = JSON.parse(input.trim());
+  if (userEvent.event !== "user") {
+    process.stderr.write("fixture expected an event-based user message\n");
+    process.exitCode = 1;
+    return;
+  }
+  if (input.includes("require-add-dir")) {
+    const addDirIndex = args.indexOf("--add-dir");
+    const selectedWorkspace = addDirIndex >= 0 ? args[addDirIndex + 1] : undefined;
+    if (!selectedWorkspace || realpathSync(selectedWorkspace) !== realpathSync(process.cwd())) {
+      process.stderr.write("fixture expected the selected workspace directory\n");
+      process.exitCode = 1;
+      return;
+    }
+  }
+  if (input.includes("require-no-add-dir") && args.includes("--add-dir")) {
+    process.stderr.write("fixture did not expect a workspace directory\n");
+    process.exitCode = 1;
+    return;
+  }
   const conversationIndex = args.indexOf("--conversation");
   const conversationId = conversationIndex >= 0 ? args[conversationIndex + 1] : "fake-conversation";
   if (input.includes("malformed")) {
@@ -50,42 +70,64 @@ process.stdin.on("end", () => {
     const child = spawn("sleep", ["30"], { stdio: "ignore" });
     if (match && child.pid) writeFileSync(match[1], String(child.pid));
   }
+  const emitEvent = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
+  let nextStepIndex = 1;
+  const emitToolStep = (stepIndex, state, name, parameters, error) => {
+    emitEvent({
+      event: "step_update",
+      step_update: {
+        conversation_id: conversationId,
+        step_index: stepIndex,
+        state,
+        step_type: "tool",
+        tool_name: name,
+        tool_info: {
+          name,
+          ...(parameters ? { parameters } : {}),
+          ...(error ? { error } : {}),
+        },
+      },
+    });
+  };
+  const emitToolPair = (name, parameters, terminalState, error) => {
+    const stepIndex = nextStepIndex++;
+    emitToolStep(stepIndex, "ACTIVE", name, parameters);
+    emitToolStep(stepIndex, terminalState, name, parameters, error);
+  };
   const emitResult = () => {
-    process.stdout.write(`${JSON.stringify({ type: "system", session_id: conversationId })}\n`);
+    emitEvent({ event: "init", conversation_id: conversationId, init: {} });
     if (input.includes("fail")) {
-      process.stdout.write(
-        `${JSON.stringify({ type: "result", status: "error", session_id: conversationId })}\n`,
-      );
+      emitEvent({
+        event: "result",
+        result: { conversation_id: conversationId, status: "ERROR" },
+      });
       return;
     }
     if (input.includes("permission")) {
-      process.stdout.write(
-        `${JSON.stringify({ type: "tool_use", id: "tool-1", name: "write_file", input: { path: "README.md" } })}\n`,
-      );
-      process.stdout.write(
-        `${JSON.stringify({ type: "tool_result", tool_use_id: "tool-1", name: "write_file", status: "error", message: "Permission denied" })}\n`,
-      );
+      emitToolPair("write_file", { path: "README.md" }, "ERROR", { message: "Permission denied" });
     } else if (input.includes("workspace")) {
-      process.stdout.write(
-        `${JSON.stringify({ type: "tool_use", id: "tool-1", name: "read_file", input: { path: "README.md" } })}\n`,
-      );
-      process.stdout.write(
-        `${JSON.stringify({ type: "tool_result", tool_use_id: "tool-1", name: "read_file", status: "success" })}\n`,
-      );
+      emitToolPair("read_file", { path: "README.md" }, "DONE");
     } else {
-      process.stdout.write(
-        `${JSON.stringify({ type: "tool_use", id: "tool-1", name: "search_web", input: { url: "https://nodejs.org/api/child_process.html" } })}\n`,
-      );
-      process.stdout.write(
-        `${JSON.stringify({ type: "tool_result", tool_use_id: "tool-1", name: "search_web", status: "success" })}\n`,
-      );
+      emitToolPair("search_web", { Url: "https://nodejs.org/api/child_process.html" }, "DONE");
     }
     const workspaceEvidence = input.includes("workspace")
       ? [{ path: "README.md", summary: "fixture file" }]
       : [];
-    process.stdout.write(
-      `${JSON.stringify({ type: "result", status: "success", session_id: conversationId, usage: { input_tokens: 4, output_tokens: 6 }, result: { answer: input.includes("follow") ? "The prior consultation is retained." : "Node documentation explains child process cancellation.", sources: [{ title: "Node.js child_process", url: "https://nodejs.org/api/child_process.html" }], workspaceEvidence } })}\n`,
-    );
+    emitEvent({
+      event: "result",
+      result: {
+        conversation_id: conversationId,
+        status: "SUCCESS",
+        usage: { input_tokens: 4, output_tokens: 6 },
+        structured_output: {
+          answer: input.includes("follow")
+            ? "The prior consultation is retained."
+            : "Node documentation explains child process cancellation.",
+          sources: [{ title: "Node.js child_process", url: "https://nodejs.org/api/child_process.html" }],
+          workspaceEvidence,
+        },
+      },
+    });
   };
   if (input.includes("delay")) setTimeout(emitResult, 250);
   else emitResult();
