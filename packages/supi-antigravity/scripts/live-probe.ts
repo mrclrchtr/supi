@@ -66,7 +66,7 @@ async function main(): Promise<void> {
       paths,
       cwd: fixture,
       prompt:
-        "Inspect the TypeScript subprocess-cancellation fixture. Consult official Node.js documentation and explain the cancellation risk. Return file paths and source URLs.",
+        "Inspect the TypeScript subprocess-cancellation fixture. Consult official Node.js documentation and explain the cancellation risk. Return relative file paths within the fixture and source URLs. Do not return absolute file paths.",
       model: MODEL,
       workspaceDirectory: fixture,
       schema: ANTIGRAVITY_ANSWER_SCHEMA as Record<string, unknown>,
