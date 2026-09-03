@@ -61,8 +61,8 @@ importers:
         specifier: 4.1.11
         version: 4.1.11(@types/node@25.9.5)(jsdom@30.0.1)(vite@8.2.2(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
       web-tree-sitter:
-        specifier: 0.26.13
-        version: 0.26.13
+        specifier: 0.27.0
+        version: 0.27.0
 
   packages/supi-agent:
     dependencies:
@@ -529,8 +529,8 @@ importers:
         specifier: ^2.7.0
         version: 2.7.0
       web-tree-sitter:
-        specifier: ^0.26.8
-        version: 0.26.13
+        specifier: ^0.27.0
+        version: 0.27.0
     devDependencies:
       '@davisvaughan/tree-sitter-r':
         specifier: 1.3.0
@@ -2500,8 +2500,8 @@ packages:
     resolution: {integrity: sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==}
     engines: {node: '>= 8'}
 
-  web-tree-sitter@0.26.13:
-    resolution: {integrity: sha512-5bUZ7vbQ1kcondet96wzP974+JfCZDeQ7bTpacICm2nnvHpa5cO0ByRsoMcAhUP+743vpkb4m0BFlVSm+Ye9VA==}
+  web-tree-sitter@0.27.0:
+    resolution: {integrity: sha512-XK08gj6RwTMQatAG7uVRP8MunqotL/XC19vHgkSPKmELgbGPBj4ECvB8haHOUnyj6ls2B8t42UTro14zxGgAHg==}
 
   webidl-conversions@8.0.1:
     resolution: {integrity: sha512-BMhLD/Sw+GbJC21C/UgyaZX41nPt8bUTg+jWyDeg7e7YN4xOM05YPSIXceACnXVtqyEw/LMClUQMtMZ+PGGpqQ==}
@@ -4382,7 +4382,7 @@ snapshots:
 
   web-streams-polyfill@3.3.3: {}
 
-  web-tree-sitter@0.26.13: {}
+  web-tree-sitter@0.27.0: {}
 
   webidl-conversions@8.0.1: {}
 
