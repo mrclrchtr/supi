@@ -22,9 +22,18 @@ interface UpstreamInventory {
   groups: Record<string, string[]>;
 }
 
+interface SkillMarketplacePlugin {
+  name: string;
+  source: string;
+  description: string;
+  skills: string[];
+}
+
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workspaceRoot = resolve(packageRoot, "../..");
 const skillsRoot = join(workspaceRoot, "skills");
+const skillMarketplaceManifestPath = join(workspaceRoot, ".claude-plugin/marketplace.json");
+const legacySkillPluginManifestPath = join(workspaceRoot, ".claude-plugin/plugin.json");
 const inventoryPath = join(packageRoot, "upstream.json");
 const upstreamRoot = dirname(
   createRequire(import.meta.url).resolve("mattpocock-skills/package.json"),
@@ -76,6 +85,14 @@ function hasSkillLicense(directory: string): boolean {
   );
 }
 
+function hasNamedFile(directory: string, name: string): boolean {
+  try {
+    return statSync(join(directory, name)).isFile();
+  } catch {
+    return false;
+  }
+}
+
 /** Treat missing, unreadable, and non-file paths as drift instead of aborting validation. */
 function sameFile(left: string, right: string): boolean {
   try {
@@ -87,11 +104,91 @@ function sameFile(left: string, right: string): boolean {
 }
 
 function includedGroupNames(inventory: UpstreamInventory): string[] {
-  return Object.keys(inventory.includedGroups);
+  return Object.keys(inventory.includedGroups).sort((left, right) => left.localeCompare(right));
 }
 
 function formatInventory(inventory: UpstreamInventory): string {
   return `${JSON.stringify(inventory, null, 2)}\n`;
+}
+
+function isSupiOwnedSkill(group: string, name: string): boolean {
+  return hasNamedFile(join(upstreamSkillsRoot, group, name), "LICENSE.mrclrchtr");
+}
+
+function publicSkillPaths(
+  inventory: UpstreamInventory,
+  groups: Record<string, string[]>,
+  supiOwned: boolean,
+): string[] {
+  return includedGroupNames(inventory).flatMap((group) =>
+    (groups[group] ?? [])
+      .filter((name) => isSupiOwnedSkill(group, name) === supiOwned)
+      .map((name) => `./skills/${group}/${name}`),
+  );
+}
+
+function formatSkillMarketplaceManifest(
+  inventory: UpstreamInventory,
+  groups: Record<string, string[]>,
+): string {
+  const mattpocockSkills = publicSkillPaths(inventory, groups, false);
+  const supiSkills = publicSkillPaths(inventory, groups, true);
+  const plugins: SkillMarketplacePlugin[] = [];
+  if (mattpocockSkills.length > 0) {
+    plugins.push({
+      name: "mattpocock-skills",
+      source: "./",
+      description: "Skills adapted from Matt Pocock's public collection.",
+      skills: mattpocockSkills,
+    });
+  }
+  if (supiSkills.length > 0) {
+    plugins.push({
+      name: "supi-skills",
+      source: "./",
+      description: "SuPi-owned public agent skills.",
+      skills: supiSkills,
+    });
+  }
+
+  const manifest = JSON.stringify(
+    {
+      name: "supi",
+      owner: {
+        name: "SuPi",
+        url: "https://github.com/mrclrchtr/supi",
+      },
+      description: "SuPi's public agent skills.",
+      plugins,
+    },
+    null,
+    2,
+  )
+    // Keep generated JSON in the same form as Biome for single-item arrays.
+    .replace(/("skills": )\[\n\s+("[^"\n]+")\n\s+\]/gu, "$1[$2]");
+  return `${manifest}\n`;
+}
+
+function validateSkillMarketplaceManifest(
+  inventory: UpstreamInventory,
+  groups: Record<string, string[]>,
+): string[] {
+  try {
+    if (existsSync(legacySkillPluginManifestPath)) {
+      return [
+        "Legacy skills plugin manifest found; run `pnpm skills:sync` to remove .claude-plugin/plugin.json",
+      ];
+    }
+    if (
+      readFileSync(skillMarketplaceManifestPath, "utf8") ===
+      formatSkillMarketplaceManifest(inventory, groups)
+    ) {
+      return [];
+    }
+  } catch {
+    // Treat a missing or unreadable manifest as drift.
+  }
+  return ["Generated skills marketplace manifest is stale: .claude-plugin/marketplace.json"];
 }
 
 /** Copy each selected pinned upstream skill group into the root skills catalog. */
@@ -103,6 +200,7 @@ export function syncSkillMirror(): void {
     if (!groups[group]) throw new Error(`Included upstream group disappeared: ${group}`);
   }
   mkdirSync(skillsRoot, { recursive: true });
+  mkdirSync(dirname(skillMarketplaceManifestPath), { recursive: true });
 
   const stagingRoot = mkdtempSync(join(workspaceRoot, ".supi-skills-sync-"));
   try {
@@ -124,6 +222,8 @@ export function syncSkillMirror(): void {
     rmSync(stagingRoot, { recursive: true, force: true });
   }
 
+  rmSync(legacySkillPluginManifestPath, { force: true });
+  writeFileSync(skillMarketplaceManifestPath, formatSkillMarketplaceManifest(inventory, groups));
   writeFileSync(
     inventoryPath,
     formatInventory({
@@ -179,5 +279,6 @@ export function validateSkillMirror(): string[] {
   const skillErrors = includedGroupNames(inventory).flatMap((group) =>
     validateGroup(group, inventory.groups[group] ?? []),
   );
-  return [...inventoryErrors, ...skillErrors];
+  const manifestErrors = validateSkillMarketplaceManifest(inventory, actualGroups);
+  return [...inventoryErrors, ...skillErrors, ...manifestErrors];
 }

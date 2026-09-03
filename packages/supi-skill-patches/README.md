@@ -10,7 +10,7 @@ Users install the committed skills through [skills.sh](https://skills.sh):
 npx skills add mrclrchtr/supi --skill code-review research
 ```
 
-This checkout links selected catalog skills into `.pi/skills/`, so local agents use the generated files directly. It does not need a skills.sh install.
+This checkout links selected catalog skills into `.pi/skills/`, so local agents use the generated files directly. `pnpm skills:sync` also generates `.claude-plugin/marketplace.json`, which groups the public catalog into Matt Pocock and SuPi skills in the skills.sh installer. It does not need a skills.sh install.
 
 This package is not a PI extension and is not published to npm. Skills installed through skills.sh are static PI resources, so `@mrclrchtr/supi-skills` can enable them, hide them from model invocation, or disable them fully.
 
@@ -23,7 +23,7 @@ One patch fragment exists for each changed upstream file under `patches/mattpoco
 ```bash
 pnpm skills:patches:compose # rebuild the pnpm patch from fragments
 pnpm install                # apply the patch to the pinned dependency
-pnpm skills:sync            # refresh root skills and upstream.json
+pnpm skills:sync            # refresh root skills, upstream.json, and the skills.sh grouping manifest
 pnpm skills:check           # check patch and generated-skill drift
 ```
 

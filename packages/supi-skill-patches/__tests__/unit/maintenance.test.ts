@@ -24,6 +24,36 @@ describe("skill patch maintenance", () => {
     expect(validateSkillMirror()).toEqual([]);
   });
 
+  it("groups public catalog skills by source", () => {
+    const manifest = JSON.parse(
+      readFileSync(join(root, ".claude-plugin/marketplace.json"), "utf8"),
+    ) as {
+      plugins: Array<{ name: string; skills: string[] }>;
+    };
+
+    expect(manifest.plugins.map((plugin) => plugin.name)).toEqual([
+      "mattpocock-skills",
+      "supi-skills",
+    ]);
+    expect(
+      manifest.plugins.every((plugin) =>
+        plugin.skills.every((path) => path.startsWith("./skills/")),
+      ),
+    ).toBe(true);
+
+    const inventory = JSON.parse(
+      readFileSync(join(root, "packages/supi-skill-patches/upstream.json"), "utf8"),
+    ) as { includedGroups: Record<string, true>; groups: Record<string, string[]> };
+    const catalogPaths = Object.keys(inventory.includedGroups).flatMap((group) =>
+      (inventory.groups[group] ?? []).map((name) => `./skills/${group}/${name}`),
+    );
+    const groupedPaths = manifest.plugins.flatMap((plugin) => plugin.skills);
+
+    expect(groupedPaths).toHaveLength(catalogPaths.length);
+    expect(new Set(groupedPaths)).toEqual(new Set(catalogPaths));
+    expect(manifest.plugins[1]?.skills).toEqual(["./skills/engineering/commit"]);
+  });
+
   it("keeps SuPi-owned skill licenses separate from upstream licenses", () => {
     const skill = join(root, "skills/engineering/commit");
 
