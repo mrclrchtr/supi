@@ -6,7 +6,7 @@
     "releaseAsset": "https://github.com/fwcd/tree-sitter-kotlin/releases/download/0.3.8/tree-sitter-kotlin.wasm"
   },
   "generatedWith": {
-    "treeSitterCli": "0.26.13"
+    "treeSitterCli": "0.27.0"
   },
-  "sha256": "e08447e36ad5d86f39f91f13defce0636aea1490b8d65dafde6fa72649422061"
+  "sha256": "7f522f2e3ef633735b3e2bdea165071b5ad0a99d6201e84acab49017590f812a"
 }

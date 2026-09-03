@@ -554,8 +554,8 @@ importers:
         specifier: 0.24.1
         version: 0.24.1(tree-sitter@0.25.1)
       tree-sitter-cli:
-        specifier: 0.26.13
-        version: 0.26.13
+        specifier: 0.27.0
+        version: 0.27.0
       tree-sitter-cpp:
         specifier: 0.23.4
         version: 0.23.4(tree-sitter@0.25.1)
@@ -2235,8 +2235,8 @@ packages:
       tree-sitter:
         optional: true
 
-  tree-sitter-cli@0.26.13:
-    resolution: {integrity: sha512-SIC74lxT2jsygxaIGGb50Bpf8jtll24aXju98Y3eJienBTXCRQ+5k3YigwN31pASEUZKcKh98EPSZWky7ugUMA==}
+  tree-sitter-cli@0.27.0:
+    resolution: {integrity: sha512-E42kR0og1mFlZBxPj7K4fBXCTjxPTGe19U9RXGWNq0FQKzXOxIp8bhCYFMKhddiVZUsJwW35MYGU9Q1oVYtpbA==}
     engines: {node: '>=12.0.0'}
     hasBin: true
 
@@ -4198,7 +4198,7 @@ snapshots:
     optionalDependencies:
       tree-sitter: 0.25.1
 
-  tree-sitter-cli@0.26.13: {}
+  tree-sitter-cli@0.27.0: {}
 
   tree-sitter-cpp@0.23.4(tree-sitter@0.25.1):
     dependencies:
