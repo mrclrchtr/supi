@@ -2,6 +2,8 @@
 name: update-package-readme
 description: Update one SuPi package README and its direct user-facing Markdown references from installed Pi docs and verified package evidence.
 disable-model-invocation: true
+metadata:
+  internal: true
 ---
 
 # Update one package README

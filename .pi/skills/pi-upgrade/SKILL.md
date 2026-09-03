@@ -6,6 +6,8 @@ description: >
   package.json against releases on `earendil-works/pi`. Use this skill whenever
   the user asks to upgrade pi, update pi, check pi changelogs/releases, or
   migrate off the deprecated `@mariozechner/*` packages.
+metadata:
+  internal: true
 ---
 
 # PI Upgrade Advisor
