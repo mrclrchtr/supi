@@ -5,9 +5,9 @@
     "repository": "https://github.com/derekstride/tree-sitter-sql"
   },
   "generatedWith": {
-    "treeSitterCli": "0.26.13"
+    "treeSitterCli": "0.27.0"
   },
-  "sha256": "9b93a15dc3eade66df4347731f2687b939daf987c8382660d6118e863604ab09",
+  "sha256": "e03fb5079e88cfe0807056c284fd2b0589cee35df9bbb3d07e72f2f4178de8de",
   "trust": {
     "note": "The @derekstride/tree-sitter-sql npm package is a devDependency only. It is never resolved at runtime; the vendored WASM above is the sole runtime artifact. This workspace explicitly disables the package's npx-based install script via pnpm allowBuilds. The WASM was built locally from the installed package source. See scripts/generate-sql-wasm.mjs for the rebuild procedure.",
     "alternativesConsidered": [
