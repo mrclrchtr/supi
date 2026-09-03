@@ -1,5 +1,27 @@
 # Changelog
 
+## [6.3.0](https://github.com/mrclrchtr/supi/compare/v6.2.0...v6.3.0) (2026-09-03)
+
+
+### Features
+
+* **agent:** improve run result rendering ([821059e](https://github.com/mrclrchtr/supi/commit/821059e218d657ce1db0dec743c3bf6b993820f3))
+* **lsp:** explain process-crash refresh outcomes ([#368](https://github.com/mrclrchtr/supi/issues/368)) ([3df7f5e](https://github.com/mrclrchtr/supi/commit/3df7f5e299acb801cb6403f969b6260a62022ca6))
+* **review:** record reasoning usage in debug summaries ([23872da](https://github.com/mrclrchtr/supi/commit/23872da5ef19a83ad654e71365192a4c92df25d9))
+* **skills:** group catalog by source ([412b6b3](https://github.com/mrclrchtr/supi/commit/412b6b343162337bed9acb4144c2b19875a28dc9))
+* **tree-sitter:** improve WASM maintenance scripts ([c4937f8](https://github.com/mrclrchtr/supi/commit/c4937f8ce00dd6ac72e8e913cbba5c39bac5a587))
+
+
+### Bug Fixes
+
+* **deps:** update dependency ignore to v7.0.7 ([4f0aaea](https://github.com/mrclrchtr/supi/commit/4f0aaea3938d54d525ea77511273c3acfe2cee3a))
+* **deps:** update dependency ignore to v7.0.8 ([f5152fc](https://github.com/mrclrchtr/supi/commit/f5152fc76eed5b49502f8f9426aafd44081be725))
+* **deps:** update dependency tree-sitter-cli to v0.27.0 ([a270c94](https://github.com/mrclrchtr/supi/commit/a270c9489684ab0e35257d7fa3c613adba850fda))
+* **deps:** update dependency typebox to v1.3.23 ([adc6331](https://github.com/mrclrchtr/supi/commit/adc6331ed78e2616e37b03548af54b639412bb87))
+* **deps:** update dependency web-tree-sitter to v0.27.0 ([07e708f](https://github.com/mrclrchtr/supi/commit/07e708f0bee36824482934801c150efd887752f7))
+* **lsp:** close automatic path policy gaps ([30a40b4](https://github.com/mrclrchtr/supi/commit/30a40b42cd267cdb023f62c13253f12808ec1b61))
+* **skills:** hide project-local skills from catalog ([60dac81](https://github.com/mrclrchtr/supi/commit/60dac811abd2760ca26ed93f53a60ed935dc620d))
+
 ## [6.2.0](https://github.com/mrclrchtr/supi/compare/v6.1.0...v6.2.0) (2026-09-01)
 
 
