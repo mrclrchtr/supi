@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-ask-user",
-  "version": "6.2.0",
+  "version": "6.3.0",
   "description": "Structured choice and text forms for agent-user decisions",
   "license": "MIT",
   "repository": {
