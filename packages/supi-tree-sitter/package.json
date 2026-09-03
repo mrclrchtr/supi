@@ -30,12 +30,15 @@
     "src/**/*.mjs",
     "src/**/*.json",
     "resources",
+    "!resources/**/.supi-wasm-*",
     "!__tests__"
   ],
   "scripts": {
     "bench:structural": "vitest bench __tests__/benchmark/structural-baseline.bench.ts --run",
     "vendor:wasm": "node scripts/vendor-wasm.mjs",
     "check:wasm": "node scripts/vendor-wasm.mjs --check",
+    "check:all-wasm": "node scripts/check-all-wasm.mjs",
+    "generate:all-wasm": "node scripts/generate-all-wasm.mjs",
     "generate:kotlin-wasm": "node scripts/generate-kotlin-wasm.mjs",
     "check:kotlin-wasm": "node scripts/generate-kotlin-wasm.mjs --check",
     "generate:sql-wasm": "node scripts/generate-sql-wasm.mjs",

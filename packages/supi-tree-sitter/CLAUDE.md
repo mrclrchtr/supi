@@ -20,7 +20,7 @@ All grammar WASM files are **vendored** in `resources/grammars/<id>/` and shippe
 
 ### When to regenerate
 
-Run `pnpm --filter @mrclrchtr/supi-tree-sitter vendor:wasm` for grammar packages that ship prebuilt WASM.
+Run `pnpm --filter @mrclrchtr/supi-tree-sitter generate:all-wasm` to refresh every artifact. Use `vendor:wasm` only when the pre-built grammar packages changed.
 
 After any `tree-sitter-cli` update, first verify the resolved version:
 
@@ -28,14 +28,20 @@ After any `tree-sitter-cli` update, first verify the resolved version:
 pnpm --filter @mrclrchtr/supi-tree-sitter exec node -p "require('tree-sitter-cli/package.json').version"
 ```
 
-Then run both generators:
+Then regenerate every artifact in one step:
 
 ```bash
-pnpm --filter @mrclrchtr/supi-tree-sitter generate:kotlin-wasm
-pnpm --filter @mrclrchtr/supi-tree-sitter generate:sql-wasm
+pnpm --filter @mrclrchtr/supi-tree-sitter generate:all-wasm
 ```
 
-These generators refresh the CLI version in metadata; the WASM hashes may stay unchanged. If the installed version is stale, run:
+This refreshes the CLI version in metadata; the WASM hashes may stay unchanged.
+Use one command to check every vendored artifact in CI or before publishing:
+
+```bash
+pnpm --filter @mrclrchtr/supi-tree-sitter check:all-wasm
+```
+
+If the installed version is stale, run:
 
 ```bash
 rm -rf packages/supi-tree-sitter/node_modules

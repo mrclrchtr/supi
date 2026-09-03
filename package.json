@@ -50,8 +50,8 @@
     "check": "pnpm biome && pnpm typecheck && pnpm skills:check && pnpm test",
     "check:ai": "pnpm biome:ai && pnpm typecheck:ai && pnpm skills:check && pnpm test:ai",
     "check:fix": "pnpm biome:fix",
-    "verify": "pnpm --filter @mrclrchtr/supi-tree-sitter check:wasm && pnpm --filter @mrclrchtr/supi-tree-sitter check:kotlin-wasm && pnpm --filter @mrclrchtr/supi-tree-sitter check:sql-wasm && pnpm check && pnpm pack:verify",
-    "verify:ai": "pnpm --filter @mrclrchtr/supi-tree-sitter check:wasm && pnpm --filter @mrclrchtr/supi-tree-sitter check:kotlin-wasm && pnpm --filter @mrclrchtr/supi-tree-sitter check:sql-wasm && pnpm check:ai && pnpm pack:verify"
+    "verify": "pnpm --filter @mrclrchtr/supi-tree-sitter check:all-wasm && pnpm check && pnpm pack:verify",
+    "verify:ai": "pnpm --filter @mrclrchtr/supi-tree-sitter check:all-wasm && pnpm check:ai && pnpm pack:verify"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

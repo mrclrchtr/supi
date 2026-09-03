@@ -1,34 +1,42 @@
 #!/usr/bin/env node
+
 /**
- * Vendors Tree-sitter grammar WASM files from their installed npm packages
- * into the package's resources/ directory.
+ * Vendor Tree-sitter grammar WASM files from installed npm packages.
  *
  * Grammars whose npm packages ship pre-built WASM files are copied directly.
- * Kotlin and SQL are handled by dedicated generator scripts because their
- * npm packages do not include WASM files.
+ * Kotlin and SQL are handled by the dedicated generator scripts.
  *
  * Usage:
  *   node scripts/vendor-wasm.mjs           # Copy WASM files
  *   node scripts/vendor-wasm.mjs --check   # Verify checksums
+ *   node scripts/vendor-wasm.mjs --help    # Show all options
  */
 
-import { createHash } from "node:crypto";
-import * as fs from "node:fs";
-import { createRequire } from "node:module";
-import * as path from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { checkVendoredWasm } from "./wasm-checks.mjs";
+import {
+  assertSourceWasm,
+  GENERATE_ALL_WASM_COMMAND,
+  isMain,
+  packageRoot,
+  readInstalledPackage,
+  runScript,
+  sha256,
+  writeWasmArtifacts,
+} from "./wasm-utils.mjs";
 
-const require = createRequire(import.meta.url);
-const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const packageRoot = path.resolve(scriptDir, "..");
-const resourcesDir = path.join(packageRoot, "resources", "grammars");
-const checkMode = process.argv.includes("--check");
+const resourcesDir = join(packageRoot, "resources", "grammars");
+const USAGE = `Usage: node scripts/vendor-wasm.mjs [--check]
+
+Copy or check pre-built Tree-sitter grammar WASM files.
+
+Options:
+  --check  Check vendored files against installed npm packages
+  --help   Show this help`;
 
 /**
- * Map: grammarId → { npmPackage, wasmFile }
- * Only grammars whose npm packages ship .wasm files belong here.
- * Kotlin and SQL use dedicated generator scripts (generate-kotlin-wasm.mjs,
- * generate-sql-wasm.mjs) because their packages do not include WASM.
+ * Map: grammar ID → source package and WASM file.
+ * Kotlin and SQL are built by their dedicated generator scripts.
  */
 const GRAMMAR_SOURCES = {
   javascript: { npmPackage: "tree-sitter-javascript", wasmFile: "tree-sitter-javascript.wasm" },
@@ -46,122 +54,74 @@ const GRAMMAR_SOURCES = {
   r: { npmPackage: "@davisvaughan/tree-sitter-r", wasmFile: "tree-sitter-r.wasm" },
 };
 
-function sha256(filePath) {
-  return createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
-}
-
-function readPackage(packageName) {
-  const packageJsonPath = require.resolve(`${packageName}/package.json`);
+function artifactPaths(grammarId, wasmFile) {
+  const grammarDir = join(resourcesDir, grammarId);
   return {
-    dir: path.dirname(packageJsonPath),
-    json: JSON.parse(fs.readFileSync(packageJsonPath, "utf-8")),
+    wasmPath: join(grammarDir, wasmFile),
+    metadataPath: join(grammarDir, `${wasmFile}.json`),
   };
 }
 
 function vendorGrammar(grammarId, source) {
-  const pkg = readPackage(source.npmPackage);
-  const srcWasmPath = path.join(pkg.dir, source.wasmFile);
+  const sourcePackage = readInstalledPackage(source.npmPackage);
+  const sourceWasmPath = assertSourceWasm(source.npmPackage, sourcePackage.dir, source.wasmFile);
+  const artifacts = artifactPaths(grammarId, source.wasmFile);
+  const checksum = sha256(sourceWasmPath);
 
-  if (!fs.existsSync(srcWasmPath)) {
-    throw new Error(
-      `WASM file not found in ${source.npmPackage} at ${srcWasmPath}. ` +
-        `Ensure the package is installed (pnpm install) and ships a .wasm file.`,
-    );
-  }
-
-  const grammarDir = path.join(resourcesDir, grammarId);
-  const destWasmPath = path.join(grammarDir, source.wasmFile);
-  const metadataPath = path.join(grammarDir, `${source.wasmFile}.json`);
-
-  fs.mkdirSync(grammarDir, { recursive: true });
-  fs.copyFileSync(srcWasmPath, destWasmPath);
-
-  const checksum = sha256(destWasmPath);
-  const metadata = {
-    source: {
-      npmPackage: source.npmPackage,
-      version: pkg.json.version,
+  writeWasmArtifacts({
+    sourceWasmPath,
+    artifacts,
+    metadata: {
+      source: {
+        npmPackage: source.npmPackage,
+        version: sourcePackage.json.version,
+      },
+      sha256: checksum,
     },
-    sha256: checksum,
-  };
-  fs.writeFileSync(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
+  });
 
   process.stdout.write(
-    `${grammarId}: ${source.wasmFile} (${source.npmPackage} ${pkg.json.version}, ${checksum})\n`,
+    `${grammarId}: ${source.wasmFile} (${source.npmPackage} ${sourcePackage.json.version}, ${checksum})\n`,
   );
 }
 
-function checkGrammar(grammarId, source) {
-  const grammarDir = path.join(resourcesDir, grammarId);
-  const wasmPath = path.join(grammarDir, source.wasmFile);
-  const metadataPath = path.join(grammarDir, `${source.wasmFile}.json`);
-  const errors = [];
-
-  if (!fs.existsSync(wasmPath)) {
-    errors.push(`${grammarId}: missing vendored WASM at ${wasmPath}`);
-    return errors;
+/** Copy every pre-built grammar WASM file and refresh its metadata. */
+export function vendorWasm() {
+  for (const [grammarId, source] of Object.entries(GRAMMAR_SOURCES)) {
+    vendorGrammar(grammarId, source);
   }
-  if (!fs.existsSync(metadataPath)) {
-    errors.push(`${grammarId}: missing metadata at ${metadataPath}`);
-    return errors;
-  }
-
-  try {
-    const pkg = readPackage(source.npmPackage);
-    const sourceWasmPath = path.join(pkg.dir, source.wasmFile);
-    if (!fs.existsSync(sourceWasmPath)) {
-      errors.push(`${grammarId}: installed package is missing ${source.wasmFile}`);
-      return errors;
-    }
-    const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf-8"));
-    const actualSha = sha256(wasmPath);
-    const sourceSha = sha256(sourceWasmPath);
-
-    if (metadata.source?.npmPackage !== source.npmPackage) {
-      errors.push(`${grammarId}: metadata source npmPackage mismatch`);
-    }
-    if (metadata.source?.version !== pkg.json.version) {
-      errors.push(
-        `${grammarId}: metadata version ${metadata.source?.version} !== installed ${pkg.json.version}`,
-      );
-    }
-    if (actualSha !== sourceSha) {
-      errors.push(
-        `${grammarId}: vendored sha256 ${actualSha} !== installed package source ${sourceSha}`,
-      );
-    }
-    if (metadata.sha256 !== actualSha) {
-      errors.push(`${grammarId}: metadata sha256 ${metadata.sha256} !== vendored ${actualSha}`);
-    }
-    if (metadata.sha256 !== sourceSha) {
-      errors.push(
-        `${grammarId}: metadata sha256 ${metadata.sha256} !== installed package source ${sourceSha}`,
-      );
-    }
-  } catch (err) {
-    errors.push(`${grammarId}: ${err.message}`);
-  }
-
-  return errors;
+  process.stdout.write("All pre-built Tree-sitter WASM files generated.\n");
 }
 
-// Main
-if (checkMode) {
-  let allErrors = [];
+/** Check every pre-built grammar against its installed npm package. */
+export function checkWasm() {
+  const allErrors = [];
   for (const [grammarId, source] of Object.entries(GRAMMAR_SOURCES)) {
-    const errors = checkGrammar(grammarId, source);
-    allErrors = allErrors.concat(errors);
+    const artifacts = artifactPaths(grammarId, source.wasmFile);
+    allErrors.push(
+      ...checkVendoredWasm({
+        grammarId,
+        packageName: source.npmPackage,
+        wasmFile: source.wasmFile,
+        artifacts,
+      }),
+    );
   }
 
   if (allErrors.length > 0) {
     throw new Error(
-      `Vendored WASM checks failed:\n- ${allErrors.join("\n- ")}\nRun: node scripts/vendor-wasm.mjs`,
+      `Pre-built Tree-sitter WASM checks failed:\n- ${allErrors.join("\n- ")}\nRun: ${GENERATE_ALL_WASM_COMMAND}`,
     );
   }
-  process.stdout.write("All vendored WASM files are current.\n");
-} else {
-  for (const [grammarId, source] of Object.entries(GRAMMAR_SOURCES)) {
-    vendorGrammar(grammarId, source);
-  }
-  process.stdout.write("All vendored WASM files generated.\n");
+  process.stdout.write("All pre-built Tree-sitter WASM files are current.\n");
+}
+
+if (isMain(import.meta.url)) {
+  runScript(process.argv.slice(2), USAGE, ({ check }) => {
+    if (check) {
+      checkWasm();
+    } else {
+      vendorWasm();
+    }
+  });
 }
