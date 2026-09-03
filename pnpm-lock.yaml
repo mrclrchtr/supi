@@ -377,7 +377,7 @@ importers:
         version: link:../supi-core
       ignore:
         specifier: ^7.0.5
-        version: 7.0.7
+        version: 7.0.8
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1707,8 +1707,8 @@ packages:
     resolution: {integrity: sha512-Hs59xBNfUIunMFgWAbGX5cq6893IbWg4KnrjbYwX3tx0ztorVgTDA6B2sxf8ejHJ4wz8BqGUMYlnzNBer5NvGg==}
     engines: {node: '>= 4'}
 
-  ignore@7.0.7:
-    resolution: {integrity: sha512-dML0wP6oak21rsNYCJpJB6O1BJIEwNpGrTw0URPfAk4hm0e3pRfCtzkfB6olBcXcVlU2rouCyz7lCyRB0OMVCA==}
+  ignore@7.0.8:
+    resolution: {integrity: sha512-YYNsSlXBjMk92SKnkwvB5LOVSa6OznlFUGcsvrFgNJbJCd0M1XKeFVRc8ZByeCqz32FivYNHJVooLmdqrmvp/Q==}
     engines: {node: '>= 4'}
 
   import-fresh@3.3.1:
@@ -3756,7 +3756,7 @@ snapshots:
 
   ignore@7.0.5: {}
 
-  ignore@7.0.7: {}
+  ignore@7.0.8: {}
 
   import-fresh@3.3.1:
     dependencies:
