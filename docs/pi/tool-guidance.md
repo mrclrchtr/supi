@@ -53,6 +53,20 @@ Context surfaces bill differently (`context-architecture.md#2-cache-lifecycle-an
 | Result `content` | Tool-result messages | Tier 2: full once when appended, cached after, re-paid on misses. Keep it decision-sufficient. |
 | `details`, `appendEntry`, spill files | Extension state and files | Free — never sent to the model (`context-architecture.md#1-what-extensions-pay-for--and-what-is-free`). |
 
+### Decision-first placement
+
+Design model-facing text from the calling agent's next decision. Give each fact one authoritative home at the narrowest surface that can answer that decision.
+
+| Calling-agent decision | Authoritative surface | Information |
+| --- | --- | --- |
+| Should I call this tool? | Tool `description` | Caller-visible outcome, selection cases, and critical routing or safety facts. |
+| Which input branch or shape do I need? | Schema structure and the nearest object description | Branch purpose, defaults, and cross-field rules that the structure cannot express. |
+| What value belongs in this field? | Leaf parameter description | Non-obvious meaning or format not clear from the name, type, and schema constraints. |
+| What do I do after the call? | Result `content` | Answer, warning, omission, and next action needed for the following decision. |
+| Does the model need this fact? | `details`, state, spill files, or human docs when the answer is no | Implementation, diagnostics, durable evidence, and bulk data. |
+
+A short snippet can summarize the tool capability. It does not become a second fact home. Model-facing text must describe the caller's decision, not the extension's internal workflow.
+
 Placement rules:
 
 1. **Pre-call facts** belong in `description`, the parameter schema, or optional prompt metadata.
@@ -61,7 +75,7 @@ Placement rules:
    - Put exact fields, enum values, cardinality, ranges, object structure, and parameter-local rules in the parameter schema.
    - Put one short capability summary in `promptSnippet`.
    - Put only noncritical routing, ordering, or execution reminders in `promptGuidelines`.
-   Each detailed fact has one authoritative field. A snippet can summarize the main capability. Human docs can restate behavior without copying model-facing text.
+   A snippet can summarize the main capability. Human docs can restate behavior without copying model-facing text.
 2. **Post-call facts** — what the model needs after calling — go in result `content`, decision-first: answer and totals before evidence, compact formats (paths, counts, IDs) over dumps.
 3. **Everything the model does not read** goes to free channels: `details` for state, evidence, and diagnostics (zero cost, durable, drives UI and state reconstruction); spill files for bulk output — `content` carries a short preview plus the path.
 4. Never duplicate facts between `content` and `details`. Never echo input arguments or boilerplate headers back in results. Return handles and pointers instead of data the model can re-query.
@@ -133,9 +147,23 @@ Schema basics (TypeBox `Type.Object`, `Type.Optional`, `StringEnum` from `@earen
 
 SuPi rules:
 
-- Parameter schemas are paid model input when the provider sends the tool definition. Cache placement is provider-specific. Keep field descriptions short and prefer enums over prose enumerations. Add descriptions only to fields the model must fill.
+- Parameter schemas are paid model input when the provider sends the tool definition. Cache placement is provider-specific.
+- Let machine-readable constraints carry required or optional status, cardinality, numeric or string bounds, enums, patterns, and object shape. Add prose only when the consequence is not clear and can change a valid call.
+- Give a leaf field a description only when its name, type, constraints, and parent description are not enough to select a correct value.
+- Put a rule shared by sibling fields once on their nearest common object description. Put a cross-field rule on the description of the input choice it constrains; use a common object only when the rule constrains multiple choices.
+- A root parameter-schema description does not replace the required tool `description`. Omit the root description when it only repeats the tool outcome.
+- Source-level reuse does not reduce wire size. A reused schema helper is serialized at every use, including its description. Move shared prose to the nearest common parent when this keeps the meaning clear.
+- Keep descriptions caller-facing. State what an input selects or means, not how the extension processes it.
 - Keep the public schema current. Do not add deprecated fields solely for old sessions; use `prepareArguments(args)` as the only legacy/resume shim.
 - Export a custom tool input type when other extensions/events need typed `isToolCallEventType<"tool", Input>()` checks.
+
+### Schema description audit
+
+1. Serialize the complete `parameters` object that the provider receives. Imported, spread, and reused schemas can add repeated descriptions that are not obvious in one source file.
+2. List every description by schema path and size. Character counts are a stable comparison proxy; provider token counts vary.
+3. For each fact, identify the calling-agent decision that it changes. Delete facts already clear from schema structure. Move remaining facts to their narrowest authoritative surface.
+4. Verify moved and shortened claims against runtime validation and tests. Keep the schema call-sufficient, not implementation-complete.
+5. Test the serialized wire shape and critical semantics after the edit. Prefer structural and concept assertions to full prose snapshots unless exact wording is part of the contract. Source typing alone does not prove that the provider schema is complete.
 
 ## Execution and Results
 
@@ -206,6 +234,9 @@ SuPi additions:
 - [ ] Model-facing guidance is concise, information-dense, and omits low-value hints.
 - [ ] Result `content` holds only what the model must read; evidence, state, and bulk output live in `details` or spill files.
 - [ ] No fact duplicated between `content` and `details`; inputs are not echoed in results.
+- [ ] Parameter prose does not restate required status, bounds, enums, patterns, or object shape unless a non-obvious consequence changes a valid call.
+- [ ] Shared parameter rules live once on the nearest common object; leaf descriptions contain only leaf-specific meaning.
+- [ ] The complete serialized schema was checked for repeated descriptions, and its wire shape has a test.
 - [ ] Important parameters have descriptions; string enums use `StringEnum`; schemas stay compact.
 - [ ] `prepareArguments()` is only a legacy compatibility shim.
 - [ ] `execute()` honors `signal`, streams progress when useful, and throws for real failures.
