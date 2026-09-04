@@ -12,13 +12,13 @@ Checklist for designing, registering, and improving model-callable tools in PI e
 
 | Field | Model-facing destination | Presence | What to write |
 | --- | --- | --- | --- |
-| `description` | Pi puts it in the active provider tool definition (`context.tools`; usually the provider `tools` field). Pi does not copy it into the default `Available tools` list. | Required by `ToolDefinition`. Pi does not send the definition while the tool is inactive. | Write the compact pre-call contract. Include purpose, selection boundaries, preconditions, side effects, important limits, and all critical routing, ordering, and safety rules. Put exact argument mechanics in the parameter schema. |
+| `description` | Pi puts it in the active provider tool definition (`context.tools`; usually the provider `tools` field). Pi does not copy it into the default `Available tools` list. | Required by `ToolDefinition`. Pi does not send the definition while the tool is inactive. | Write the compact selection contract: the caller-visible outcome, why and when to select the tool, and only the non-obvious constraints that can change selection or safe use. Put exact argument mechanics in the parameter schema. |
 | `promptSnippet` | Pi puts it in the default system prompt under `Available tools`. The format is `- <tool name>: <snippet>`. | Optional. Only an active tool with a non-empty snippet appears. Omission does not remove an active provider tool definition. | Write one short capability phrase. Add one distinguishing qualifier only when it improves selection. Do not put detailed rules or a second schema here. |
 | `promptGuidelines` | Pi puts it in the default system prompt under `Guidelines` as flat bullets. | Optional and active-only. Pi does not add it when a custom system prompt replaces the default prompt. | Write optional routing, ordering, or execution reminders. Tool use must remain correct and safe when these reminders are absent. Name the tool in every bullet. |
 
 Use these rules:
 
-- `description` is the required pre-call contract.
+- `description` is the required selection contract.
 - `promptSnippet` is an optional one-line catalog entry.
 - `promptGuidelines` contains optional active-only reminders.
 
@@ -27,14 +27,19 @@ Use these rules:
 Example prompt fields:
 
 ```typescript
-const modelFacingFields = {
+const searchToolFields = {
   description:
     "Search file contents for a pattern. Return matching lines with file paths and line numbers. Respect .gitignore and report truncation.",
   promptSnippet: "Search file contents for patterns (respects .gitignore)",
 };
+
+const consultationToolFields = {
+  description:
+    "Consult an external model for focused web research, workspace analysis, or an independent second opinion.",
+};
 ```
 
-The snippet summarizes the main capability. The description contains the pre-call contract.
+The search snippet summarizes the main capability. The consultation description states only the caller-visible capability and selection cases. Its provider and permission controls do not belong in the description unless they change tool selection or a required safety decision.
 
 ## Content Budget and Placement
 
@@ -51,8 +56,9 @@ Context surfaces bill differently (`context-architecture.md#2-cache-lifecycle-an
 Placement rules:
 
 1. **Pre-call facts** belong in `description`, the parameter schema, or optional prompt metadata.
-   - Put purpose, selection rules, preconditions, side effects, important limits, and all critical rules in `description`.
-   - Put exact fields, enum values, cardinality, ranges, and object structure in the parameter schema.
+   - Put the caller-visible outcome and why and when to select the tool in `description`.
+   - Add a precondition, side effect, limit, routing rule, ordering rule, or safety rule to `description` only when it can materially change selection or safe use.
+   - Put exact fields, enum values, cardinality, ranges, object structure, and parameter-local rules in the parameter schema.
    - Put one short capability summary in `promptSnippet`.
    - Put only noncritical routing, ordering, or execution reminders in `promptGuidelines`.
    Each detailed fact has one authoritative field. A snippet can summarize the main capability. Human docs can restate behavior without copying model-facing text.
@@ -88,9 +94,16 @@ Mechanics of `description`, `promptSnippet`, and `promptGuidelines`: installed P
 ### Tool `description`
 
 - A `description` is required on every `ToolDefinition`.
-- Write a compact pre-call contract. State what the tool does and when to select it. Include required capability, side effects, and important result limits.
-- Put all critical selection, routing, ordering, and safety rules here. Tool use must remain correct when optional prompt metadata is absent.
-- Keep exact fields, enum values, cardinality, and ranges in the parameter schema. The description can summarize inputs when this helps selection. Do not repeat the full schema.
+- Start with the caller-visible outcome. State why and when the model should select the tool.
+- Add a non-obvious pre-call constraint only when its omission can cause a wrong tool choice, an invalid call, an unsafe decision, or a material surprise.
+- Keep critical cross-tool routing and ordering rules in the description. Tool use must remain correct when optional prompt metadata is absent.
+- Keep exact fields, enum values, cardinality, ranges, and parameter-local rules in the parameter schema. The description can summarize an input only when the summary improves selection.
+- Keep post-call evidence, provenance, omissions, warnings, and next actions in result `content`, at the point where the model needs them.
+- Describe the capability rather than its implementation. Omit provider names, binaries, protocols, storage, permission mechanisms, and internal lifecycle facts unless one changes selection, trust, cost, or safe use.
+- Do not copy human-facing security or operational notes into the description only because they are important. Include them only when the calling model must use them before the call.
+- Prefer the one-sentence form: `<verb> <caller-visible outcome> for <selection cases>.`
+- Prefer provider-neutral wording when provider identity does not matter to the caller. This wording does not require a provider abstraction; the tool name and schema can remain provider-specific.
+- Apply the deletion test to each sentence: if its removal does not change selection, argument validity, or a required safety decision, delete it.
 - Pi sends the description with the provider tool definition. It does not send `promptSnippet` or `promptGuidelines` in that definition.
 
 ### `promptSnippet`
@@ -103,7 +116,7 @@ Mechanics of `description`, `promptSnippet`, and `promptGuidelines`: installed P
 ### `promptGuidelines`
 
 - Use this field only for optional active-tool routing, ordering, or execution reminders.
-- Tool use must remain correct and safe when a guideline is absent. Put all critical behavior in `description`.
+- Tool use must remain correct and safe when a guideline is absent. Put critical selection and safe-use facts in `description` or the parameter schema.
 - Every bullet must name the tool because Pi adds the bullets without a tool heading. For example: `Use my_tool when ...`.
 - A parameter reminder must also name the tool. For example: `Pass refresh: true to code_health to recover stale diagnostics`.
 - Pi omits guidelines for inactive tools and does not add them automatically to custom system prompts.
@@ -183,7 +196,10 @@ SuPi additions:
 ## Shipping Checklist
 
 - [ ] Name follows the Naming rules: snake_case, no `supi_` prefix, no unintended built-in replacement.
-- [ ] `description` is the compact pre-call contract. It contains all critical selection, routing, ordering, safety, limit, and side-effect information.
+- [ ] `description` states the caller-visible outcome and why and when to select the tool.
+- [ ] Every additional description sentence can change selection, argument validity, or a required safety decision.
+- [ ] Description wording is provider-neutral unless provider identity changes selection, trust, cost, or safe use.
+- [ ] All critical cross-tool routing and ordering rules remain correct without optional prompt metadata.
 - [ ] `promptSnippet` is present only if the tool should appear in the default `Available tools` list. It is one short capability phrase.
 - [ ] `promptGuidelines` contains only optional active-tool reminders. Every bullet explicitly names the tool.
 - [ ] Each detailed model-facing fact has one authoritative field. A snippet only summarizes the main capability.

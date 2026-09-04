@@ -8,10 +8,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANTIGRAVITY_CONFIG_SECTION } from "../../src/config.ts";
 import { ANTIGRAVITY_HANDLE_ENTRY_TYPE } from "../../src/conversation/handles.ts";
 import antigravityExtension from "../../src/extension.ts";
+import { toolDescription } from "../../src/tool/antigravity_run/guidance.ts";
 import { fixtureDirectory } from "../helpers/test-paths.ts";
 
 type RegisteredTool = {
   name: string;
+  description: string;
+  promptSnippet?: string;
+  promptGuidelines?: readonly string[];
   execute: (
     ...args: unknown[]
   ) => Promise<{ content: Array<{ type: string; text?: string }>; details?: unknown }>;
@@ -172,6 +176,9 @@ describe("supi-antigravity extension", () => {
     expect(pi.tools).toHaveLength(1);
     const tool = pi.tools[0] as RegisteredTool;
     expect(tool.name).toBe("antigravity_run");
+    expect(tool.description).toBe(toolDescription);
+    expect(tool.promptSnippet).toBeUndefined();
+    expect(tool.promptGuidelines).toBeUndefined();
 
     const first = await tool.execute(
       "call-1",

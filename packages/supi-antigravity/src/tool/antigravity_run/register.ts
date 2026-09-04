@@ -3,7 +3,7 @@ import type { ConversationHandleStore } from "../../conversation/handles.ts";
 import type { IsolatedAntigravityPaths } from "../../isolated-home.ts";
 import type { CuratedModel } from "../../types.ts";
 import { makeAntigravityRunExecute } from "./execute.ts";
-import { promptGuidelines, promptSnippet, toolDescription } from "./guidance.ts";
+import { toolDescription } from "./guidance.ts";
 import { renderAntigravityCall, renderAntigravityResult } from "./render.ts";
 import { antigravityRunSpec, buildAntigravityRunParameters } from "./spec.ts";
 
@@ -22,8 +22,6 @@ export function registerAntigravityRunTool(options: RegisterAntigravityRunOption
   options.pi.registerTool({
     ...antigravityRunSpec,
     description: toolDescription,
-    promptSnippet,
-    promptGuidelines,
     parameters,
     renderCall: renderAntigravityCall,
     renderResult: renderAntigravityResult,
