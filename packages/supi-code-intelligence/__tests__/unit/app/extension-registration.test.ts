@@ -98,7 +98,7 @@ describe("focused code intelligence tool registration", () => {
       { name: "code_graph", patterns: [/source shape/i, /symbol identity/i] },
       {
         name: "code_refactor_plan",
-        patterns: [/semantic refactor without changing files/i, /fall back to text edits/i],
+        patterns: [/semantic refactor without changing files/i, /falling back to text edits/i],
       },
       {
         name: "code_refactor_apply",
@@ -142,6 +142,7 @@ describe("focused code intelligence tool registration", () => {
 
     const resolveGuidelines = (getTool(pi, "code_resolve").promptGuidelines ?? []).join("\n");
     expect(resolveGuidelines).toMatch(/later tool requires a target handle/i);
+    expect(getTool(pi, "code_refactor_plan").promptGuidelines).toEqual([]);
 
     for (const name of CODE_INTELLIGENCE_TOOL_NAMES) {
       const guidelines: string[] = getTool(pi, name).promptGuidelines ?? [];
