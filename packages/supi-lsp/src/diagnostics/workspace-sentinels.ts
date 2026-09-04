@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { fileToUri, uriToFile } from "@mrclrchtr/supi-core/path";
+import { fileToUri } from "@mrclrchtr/supi-core/path";
 import { FileChangeType, type FileEvent } from "../config/types.ts";
 import {
   type AutomaticLspPathPolicy,
@@ -11,12 +11,6 @@ import {
 const ROOT_LOCKFILES = ["pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lockb"];
 
 export interface WorkspaceSentinelScanOptions {
-  /**
-   * Also track every regular source file (not just sentinels). The workspace
-   * refresh path uses this to discover files created since the last refresh;
-   * the diff then reports them as `sourceChanges` so the caller can pull them.
-   */
-  includeSourceFiles?: boolean;
   /** Runtime-owned automatic path policy. */
   policy?: AutomaticLspPathPolicy;
 }
@@ -36,7 +30,7 @@ export function scanWorkspaceSentinels(
     for (const entry of entries) {
       if (!entry.isFile() && !entry.isSymbolicLink()) continue;
       const filePath = path.join(directory, entry.name);
-      if (!options.includeSourceFiles && !isWorkspaceSentinelPath(filePath, resolvedCwd)) continue;
+      if (!isWorkspaceSentinelPath(filePath, resolvedCwd)) continue;
       try {
         snapshot.set(filePath, fs.statSync(filePath).mtimeMs);
       } catch {
@@ -78,38 +72,16 @@ export function diffWorkspaceSentinelSnapshot(
 export interface WorkspaceSentinelSyncResult {
   snapshot: Map<string, number>;
   changes: FileEvent[];
-  sourceChanges: FileEvent[];
 }
 
-/**
- * Refresh a previous snapshot and return the new snapshot plus change events.
- *
- * When `includeSourceFiles` is set, the returned `changes` list keeps
- * sentinel-file events only; source-file events are returned separately in
- * `sourceChanges` so the caller can act on them without interpreting every
- * regular file edit as a config-level workspace change.
- */
+/** Refresh a previous sentinel snapshot and return its change events. */
 export function syncWorkspaceSentinelSnapshot(
   cwd: string,
   previous: Map<string, number>,
   options: WorkspaceSentinelScanOptions = {},
 ): WorkspaceSentinelSyncResult {
   const snapshot = scanWorkspaceSentinels(cwd, options);
-  const changes = diffWorkspaceSentinelSnapshot(previous, snapshot);
-  if (!options.includeSourceFiles) return { snapshot, changes, sourceChanges: [] };
-
-  const sourceChanges = changes.filter((change) => {
-    const filePath = uriToFile(change.uri);
-    return !isWorkspaceSentinelPath(filePath, cwd);
-  });
-  return {
-    snapshot,
-    changes: changes.filter((change) => {
-      const filePath = uriToFile(change.uri);
-      return isWorkspaceSentinelPath(filePath, cwd);
-    }),
-    sourceChanges,
-  };
+  return { snapshot, changes: diffWorkspaceSentinelSnapshot(previous, snapshot) };
 }
 
 function isWorkspaceSentinelPath(filePath: string, root: string): boolean {

@@ -108,6 +108,134 @@ describe("LspManager concurrency guard", () => {
     }
   });
 
+  it("limits bulk tracking concurrency to four operations", async () => {
+    const sessionCwd = makeTempRoot();
+    const manager = new LspManager(
+      {
+        servers: {
+          typescript: {
+            command: "node",
+            args: [],
+            fileTypes: ["ts"],
+            rootMarkers: ["package.json"],
+          },
+        },
+      },
+      sessionCwd,
+    );
+    const files = Array.from({ length: 20 }, (_, index) => {
+      const file = join(sessionCwd, `source-${index}.ts`);
+      writeFileSync(file, "export {};\n");
+      return file;
+    });
+    let active = 0;
+    let maximum = 0;
+    const fakeClient = { status: "running", openFiles: [] };
+    const ensureFileOpenSpy = vi.spyOn(manager, "ensureFileOpen").mockImplementation(async () => {
+      active++;
+      maximum = Math.max(maximum, active);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      active--;
+      return fakeClient as never;
+    });
+
+    try {
+      const result = await manager.bulkTrackFiles(files);
+
+      expect(result.outcomes).toHaveLength(files.length);
+      expect(result.outcomes.every((outcome) => outcome.kind === "tracked")).toBe(true);
+      expect(maximum).toBeLessThanOrEqual(4);
+      expect(ensureFileOpenSpy).toHaveBeenCalledTimes(files.length);
+    } finally {
+      ensureFileOpenSpy.mockRestore();
+      rmSync(sessionCwd, { recursive: true, force: true });
+    }
+  });
+
+  it("does not start a route for unsupported bulk paths", async () => {
+    const sessionCwd = makeTempRoot();
+    const manager = new LspManager(
+      {
+        servers: {
+          typescript: {
+            command: "node",
+            args: [],
+            fileTypes: ["ts"],
+            rootMarkers: ["package.json"],
+          },
+        },
+      },
+      sessionCwd,
+    );
+    const unsupported = join(sessionCwd, "source.js");
+    writeFileSync(unsupported, "export {};\n");
+    const performStartSpy = vi
+      .spyOn(
+        LspManager.prototype as unknown as { performStart: () => Promise<null> },
+        "performStart",
+      )
+      .mockImplementation(() => Promise.resolve(null));
+
+    try {
+      await expect(manager.bulkTrackFiles([unsupported])).resolves.toEqual({
+        outcomes: [{ file: unsupported, kind: "unsupported", reason: "not-automatic-source" }],
+      });
+      expect(performStartSpy).not.toHaveBeenCalled();
+    } finally {
+      performStartSpy.mockRestore();
+      rmSync(sessionCwd, { recursive: true, force: true });
+    }
+  });
+
+  it("does not open a file after cancellation during shared route startup", async () => {
+    const sessionCwd = makeTempRoot();
+    const manager = new LspManager(
+      {
+        servers: {
+          typescript: {
+            command: "node",
+            args: [],
+            fileTypes: ["ts"],
+            rootMarkers: ["package.json"],
+          },
+        },
+      },
+      sessionCwd,
+    );
+    const file = join(sessionCwd, "source.ts");
+    writeFileSync(file, "export {};\n");
+    const client = {
+      didOpen: vi.fn(),
+      openFiles: [],
+      status: "running",
+    };
+    let resolveStart: (value: unknown) => void = () => undefined;
+    const start = new Promise<unknown>((resolve) => {
+      resolveStart = resolve;
+    });
+    const performStartSpy = vi
+      .spyOn(
+        LspManager.prototype as unknown as { performStart: () => Promise<unknown> },
+        "performStart",
+      )
+      .mockImplementation(() => start);
+    const controller = new AbortController();
+    const tracking = manager.bulkTrackFiles([file], { signal: controller.signal });
+
+    try {
+      controller.abort(new Error("cancelled bulk tracking"));
+      await expect(tracking).rejects.toThrow("cancelled bulk tracking");
+      resolveStart(client);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(client.didOpen).not.toHaveBeenCalled();
+    } finally {
+      resolveStart(client);
+      performStartSpy.mockRestore();
+      rmSync(sessionCwd, { recursive: true, force: true });
+    }
+  });
+
   it("returns existing running client without starting a new one", async () => {
     const sessionCwd = makeTempRoot();
     const manager = new LspManager(MINIMAL_CONFIG, sessionCwd);

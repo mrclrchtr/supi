@@ -26,6 +26,7 @@ import {
   truncateDebugIdentity as truncateIdentity,
 } from "@mrclrchtr/supi-core/debug";
 import { resolveToolPath as resolveSessionPath, uriToFile } from "@mrclrchtr/supi-core/path";
+import { isMissingFileError } from "../client/client-file-state.ts";
 import { getServerForFile } from "../config/config.ts";
 import {
   getFileScopeDecision,
@@ -63,6 +64,10 @@ import {
   type WorkspaceSentinelScanOptions,
   type WorkspaceSentinelSyncResult,
 } from "../diagnostics/workspace-sentinels.ts";
+import {
+  scanWorkspaceSources as scanAutomaticWorkspaceSources,
+  type WorkspaceSourceInventory,
+} from "../diagnostics/workspace-sources.ts";
 import { raceRequestControl } from "../session/readiness.ts";
 import {
   emptyProcessCrashRecoveryReport,
@@ -71,6 +76,11 @@ import {
   type ScopeDecisionSummary,
   type WorkspaceDiagnosticReport,
 } from "../session/runtime-diagnostics.ts";
+import {
+  type BulkTrackFileOutcome,
+  type BulkTrackFilesResult,
+  MAX_BULK_TRACK_FILES,
+} from "../session/workspace-lsp-runtime.ts";
 import {
   displayRelativeFilePath,
   formatCoverageSummaryText,
@@ -124,6 +134,7 @@ type UnavailableReason = "missing-command" | "start-failed" | "runtime-error";
 
 /** Maximum tracked-file entries retained in one scope-decision telemetry summary. */
 const SCOPE_DECISION_MAX_ENTRIES = 24;
+const MAX_CONCURRENT_BULK_TRACKS = 4;
 
 interface ScopeDecisionAccumulator {
   entries: ScopeDecisionEntry[];
@@ -286,6 +297,9 @@ export class LspManager {
   private handledCrashGenerations = new Map<string, number>();
   /** Prevent late startup and lifecycle callbacks from republishing after shutdown. */
   private shuttingDown = false;
+  /** Coalesce per-file tracking transitions into one bulk transition. */
+  private trackedFilesBatchDepth = 0;
+  private trackedFilesBatchChanged = false;
   constructor(
     private readonly config: LspConfig,
     private readonly cwd: string,
@@ -343,7 +357,7 @@ export class LspManager {
     return this.canServeFile(filePath);
   }
 
-  /** Inventory automatic workspace sentinel and source paths with the runtime policy. */
+  /** Inventory automatic workspace sentinels with the runtime policy. */
   scanWorkspaceSentinels(options: WorkspaceSentinelScanOptions = {}): Map<string, number> {
     return scanAutomaticWorkspaceSentinels(this.cwd, {
       ...options,
@@ -351,7 +365,16 @@ export class LspManager {
     });
   }
 
-  /** Refresh the automatic workspace inventory with the runtime policy. */
+  /** Scan configured LSP source extensions with the runtime path policy. */
+  scanWorkspaceSources(control?: CodeRequestControl): Promise<WorkspaceSourceInventory> {
+    return scanAutomaticWorkspaceSources(this.cwd, {
+      fileTypes: Object.values(this.config.servers).flatMap((server) => server.fileTypes),
+      policy: this.automaticPathPolicy,
+      control,
+    });
+  }
+
+  /** Refresh the automatic workspace sentinel with the runtime policy. */
   syncWorkspaceSentinelSnapshot(
     previous: Map<string, number>,
     options: WorkspaceSentinelScanOptions = {},
@@ -417,9 +440,14 @@ export class LspManager {
     // A recovered route keeps its consumed budget but has no active reason.
     // Passive callers can use its running client normally.
 
-    return this.startServerForRoot(route.serverName, route.root);
+    return this.startServerForRoot(route.serverName, route.root, options.control);
   }
-  async startServerForRoot(serverName: string, root: string): Promise<LspClient | null> {
+  async startServerForRoot(
+    serverName: string,
+    root: string,
+    control?: CodeRequestControl,
+  ): Promise<LspClient | null> {
+    throwIfCodeRequestInterrupted(control);
     if (this.shuttingDown) return null;
     const serverConfig = this.config.servers[serverName];
     if (!serverConfig) return null;
@@ -450,17 +478,18 @@ export class LspManager {
     // This prevents spawning duplicate server processes when two
     // callers race through getClientForFile before either await yields.
     const pending = this.pendingStarts.get(key);
-    if (pending) return pending;
+    if (pending) return raceRequestControl(pending, control);
 
     const startPromise = this.performStart(serverName, serverConfig, root, key);
     this.pendingStarts.set(key, startPromise);
-    try {
-      return await startPromise;
-    } finally {
-      if (this.pendingStarts.get(key) === startPromise) {
-        this.pendingStarts.delete(key);
-      }
-    }
+    // Keep the shared startup registered until it settles. A cancelled
+    // caller only stops waiting; it must not allow a duplicate route start.
+    void startPromise
+      .finally(() => {
+        if (this.pendingStarts.get(key) === startPromise) this.pendingStarts.delete(key);
+      })
+      .catch(() => {});
+    return raceRequestControl(startPromise, control);
   }
 
   private createClient(
@@ -503,6 +532,11 @@ export class LspManager {
       if (this.initializedClientGenerations.get(key) === generation) {
         this.handleInitializedClientCrash(key, client);
       }
+    }
+
+    if (kind === "tracked-files" && this.trackedFilesBatchDepth > 0) {
+      this.trackedFilesBatchChanged = true;
+      return;
     }
 
     const aggregateKind =
@@ -1387,6 +1421,118 @@ export class LspManager {
       return unavailableCodeQuery(`Diagnostic collection failed for ${resolvedPath}: ${detail}`);
     }
   }
+  /**
+   * Track a bounded set of automatic source files with shared route starts.
+   * Inputs after the first 256 unique paths are ignored.
+   */
+  async bulkTrackFiles(
+    filePaths: readonly string[],
+    control?: CodeRequestControl,
+  ): Promise<BulkTrackFilesResult> {
+    throwIfCodeRequestInterrupted(control);
+    const selected = Array.from(
+      new Set(filePaths.map((filePath) => resolveSessionPath(this.cwd, filePath))),
+    ).slice(0, MAX_BULK_TRACK_FILES);
+    if (selected.length === 0) return { outcomes: [] };
+
+    this.trackedFilesBatchDepth++;
+    const outcomes = new Array<BulkTrackFileOutcome>(selected.length);
+    const workerCount = Math.min(MAX_CONCURRENT_BULK_TRACKS, selected.length);
+    let nextIndex = 0;
+    const worker = async (): Promise<void> => {
+      for (;;) {
+        throwIfCodeRequestInterrupted(control);
+        const index = nextIndex++;
+        if (index >= selected.length) return;
+        outcomes[index] = await this.trackBulkFile(selected[index], control);
+      }
+    };
+    const workers = Array.from({ length: workerCount }, () => worker());
+    try {
+      await Promise.all(workers);
+      return { outcomes };
+    } catch (error) {
+      // Let every worker observe cancellation before the batch transition is
+      // published. Shared route startup may continue, but no worker may open
+      // another document after this caller stops waiting.
+      await Promise.allSettled(workers);
+      throw error;
+    } finally {
+      this.trackedFilesBatchDepth--;
+      if (this.trackedFilesBatchDepth === 0 && this.trackedFilesBatchChanged) {
+        this.trackedFilesBatchChanged = false;
+        this.publishLifecycle("tracked-files");
+      }
+    }
+  }
+
+  private async trackBulkFile(
+    filePath: string,
+    control?: CodeRequestControl,
+  ): Promise<BulkTrackFileOutcome> {
+    const resolvedPath = resolveSessionPath(this.cwd, filePath);
+    if (!this.isConfiguredAutomaticSourceFile(resolvedPath)) {
+      return { file: resolvedPath, kind: "unsupported", reason: "not-automatic-source" };
+    }
+    const fileStatus = this.inspectSourceFile(resolvedPath);
+    if (fileStatus !== "regular") {
+      if (fileStatus === "missing") {
+        return { file: resolvedPath, kind: "unsupported", reason: "missing" };
+      }
+      if (fileStatus === "not-automatic-source") {
+        return { file: resolvedPath, kind: "unsupported", reason: "not-automatic-source" };
+      }
+      return {
+        file: resolvedPath,
+        kind: "unavailable",
+        reason: "The source file could not be inspected.",
+      };
+    }
+    if (this.isFileTracked(resolvedPath)) {
+      return { file: resolvedPath, kind: "already-tracked" };
+    }
+
+    throwIfCodeRequestInterrupted(control);
+    // Recheck the automatic source-support rule after the inventory scan. A
+    // config, exclusion, or route can change while a refresh is in flight.
+    if (!this.isSupportedSourceFile(resolvedPath)) {
+      return {
+        file: resolvedPath,
+        kind: "unavailable",
+        reason: "No available LSP route can serve this source file.",
+      };
+    }
+
+    const client = await this.ensureFileOpen(resolvedPath, { control });
+    if (!client) {
+      return {
+        file: resolvedPath,
+        kind: "unavailable",
+        reason: "The LSP route could not open this source file.",
+      };
+    }
+    return { file: resolvedPath, kind: "tracked" };
+  }
+
+  private isConfiguredAutomaticSourceFile(filePath: string): boolean {
+    return this.isAutomaticScopePath(filePath) && getServerForFile(this.config, filePath) !== null;
+  }
+
+  private inspectSourceFile(
+    filePath: string,
+  ): "regular" | "missing" | "not-automatic-source" | "unavailable" {
+    try {
+      return fs.statSync(filePath).isFile() ? "regular" : "not-automatic-source";
+    } catch (error) {
+      if (isMissingFileError(error)) return "missing";
+      return "unavailable";
+    }
+  }
+
+  private isFileTracked(filePath: string): boolean {
+    return this.getExistingClientForFile(filePath)?.openFiles.includes(filePath) ?? false;
+  }
+
   /** Close a file across any active LSP clients and clear its cached diagnostics. */
   closeFile(filePath: string): void {
     closeFileAcrossClients(this.clients.values(), resolveSessionPath(this.cwd, filePath));
@@ -1994,9 +2140,14 @@ export class LspManager {
     const client = await this.getClientForFile(resolvedPath, options);
     if (!client) return null;
     try {
-      client.didOpen(resolvedPath, fs.readFileSync(resolvedPath, "utf-8"));
+      const content = fs.readFileSync(resolvedPath, "utf-8");
+      // Route startup can be shared. The document open belongs to this
+      // caller, so check again after the shared wait before sending didOpen.
+      throwIfCodeRequestInterrupted(options.control);
+      client.didOpen(resolvedPath, content);
       return client;
-    } catch {
+    } catch (error) {
+      if (isCodeRequestInterruption(error, options.control)) throw error;
       this.closeFile(resolvedPath);
       return null;
     }

@@ -43,6 +43,7 @@ import type {
   RecoverDiagnosticsResult,
 } from "./runtime-diagnostics.ts";
 import type {
+  BulkTrackFilesResult,
   RoutedMutationResponse,
   SemanticReadinessResult,
   WorkspaceLspRuntime,
@@ -70,6 +71,8 @@ export {
   type WorkspaceDiagnosticSummaryEntry,
 } from "./runtime-diagnostics.ts";
 export type {
+  BulkTrackFileOutcome,
+  BulkTrackFilesResult,
   RoutedMutationResponse,
   SemanticReadinessResult,
   WorkspaceLspRuntime,
@@ -345,12 +348,25 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     return this.manager.scanWorkspaceSentinels(options);
   }
 
-  /** Refresh the automatic workspace sentinel and source inventory. */
+  /** Scan configured source extensions under the automatic path policy. */
+  scanWorkspaceSources(control?: CodeRequestControl) {
+    return this.manager.scanWorkspaceSources(control);
+  }
+
+  /** Refresh the automatic workspace sentinel. */
   syncWorkspaceSentinelSnapshot(
     previous: Map<string, number>,
     options: WorkspaceSentinelScanOptions = {},
   ): WorkspaceSentinelSyncResult {
     return this.manager.syncWorkspaceSentinelSnapshot(previous, options);
+  }
+
+  /** Track a bounded set of source files without exposing clients. */
+  bulkTrackFiles(
+    filePaths: readonly string[],
+    control?: CodeRequestControl,
+  ): Promise<BulkTrackFilesResult> {
+    return this.manager.bulkTrackFiles(filePaths, control);
   }
 
   /** Track a file in its routed client without exposing that client. */

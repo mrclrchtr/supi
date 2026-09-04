@@ -276,6 +276,50 @@ describe("code_health result assembly", () => {
     expect(markdown).not.toContain("remain..");
   });
 
+  it("shows source discovery limits separately from diagnostic evidence", () => {
+    const assembly = assembleHealthResult(
+      makeHealthData({
+        refresh: {
+          kind: "completed",
+          attemptedAt: 1,
+          elapsedMs: 1,
+          requestedDiagnosticScope: { kind: "tracked-files", filter: null },
+          operationScope: "workspace-runtime",
+          attemptedActiveClients: 1,
+          restartedClients: 0,
+          processCrashRecovery: emptyProcessCrashRecovery(),
+          diagnosticEvidence: fileEvidence("confirmed"),
+          sourceTracking: {
+            status: "limited",
+            reason: "file-limit",
+            observedFileCount: 50_001,
+            discovered: [],
+            tracked: [],
+            unsupported: [],
+            unavailable: [],
+            deferred: 4,
+          },
+          staleAssessment: {
+            scope: "workspace",
+            suspected: false,
+            matchedFileCount: 0,
+            warning: null,
+          },
+        },
+      }),
+    );
+
+    const markdown = renderHealthResult(assembly, "/repo");
+
+    expect(assembly.details.refresh).toMatchObject({
+      sourceTracking: { status: "limited", reason: "file-limit", deferred: 4 },
+    });
+    expect(markdown).toContain(
+      "**Source discovery**: source discovery: limited (file-limit); 50001 source files observed, 0 discovered, 0 tracked, 0 unsupported, 0 unavailable, 4 deferred.",
+    );
+    expect(markdown).toContain("Evidence coverage**: 0 requested, 0 confirmed");
+  });
+
   it("separates process-crash recovery from stale diagnostic restarts", () => {
     const assembly = assembleHealthResult(
       makeHealthData({

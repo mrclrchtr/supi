@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -132,8 +135,8 @@ const config = {
   },
 };
 
-function createManager(transitions: ManagerLifecycleTransition[]): LspManager {
-  return new LspManager(config, "/project", (transition) => transitions.push(transition));
+function createManager(transitions: ManagerLifecycleTransition[], cwd = "/project"): LspManager {
+  return new LspManager(config, cwd, (transition) => transitions.push(transition));
 }
 
 function expectServerReady(servers: readonly ProjectServerInfo[], ready: boolean): void {
@@ -193,6 +196,42 @@ describe("LspManager lifecycle aggregation", () => {
 
     expect(transitions.at(-1)).toMatchObject({ kind: "tracked-files" });
     expect(transitions.at(-1)?.projectServers[0]?.openFiles).toEqual(["src/a.ts"]);
+  });
+
+  it("bounds bulk tracking and publishes one aggregate tracked-files transition", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "lsp-bulk-tracking-"));
+    writeFileSync(join(cwd, "package.json"), "{}\n");
+    const files = Array.from({ length: 300 }, (_, index) => {
+      const file = join(cwd, `source-${index}.ts`);
+      writeFileSync(file, "export {};\n");
+      return file;
+    });
+    const transitions: ManagerLifecycleTransition[] = [];
+    const manager = createManager(transitions, cwd);
+
+    try {
+      const result = await manager.bulkTrackFiles(files);
+      const client = mocks.clients[0];
+
+      expect(result.outcomes).toHaveLength(256);
+      expect(result.outcomes.every((outcome) => outcome.kind === "tracked")).toBe(true);
+      expect(client?.openFiles).toHaveLength(256);
+      expect(transitions.filter((transition) => transition.kind === "tracked-files")).toHaveLength(
+        1,
+      );
+
+      const repeated = await manager.bulkTrackFiles(files.slice(0, 2));
+      expect(repeated.outcomes.map((outcome) => outcome.kind)).toEqual([
+        "already-tracked",
+        "already-tracked",
+      ]);
+      expect(transitions.filter((transition) => transition.kind === "tracked-files")).toHaveLength(
+        1,
+      );
+    } finally {
+      await manager.shutdownAll();
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 
   it("reports workspace readiness when one concrete client is ready", async () => {

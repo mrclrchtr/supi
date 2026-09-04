@@ -10,6 +10,7 @@ import {
 import { recoverDiagnosticRuntime } from "../analysis/health/recovery.ts";
 import { mergeDiagnosticEvidence } from "../diagnostics/evidence.ts";
 import { refreshFileLspMaintenance, refreshLspMaintenance } from "../substrate/lsp/maintenance.ts";
+import type { LspMaintenanceState } from "../substrate/lsp/source-tracking.ts";
 import type {
   HealthDiagnosticScope,
   HealthFileReadiness,
@@ -21,13 +22,15 @@ interface HealthRefreshAttemptOptions {
   readonly diagnosticsScope: HealthDiagnosticScope;
   readonly attemptedAt: number;
   readonly cwd: string;
-  readonly sentinelSnapshot: Map<string, number>;
+  readonly maintenanceState: LspMaintenanceState;
   readonly control?: CodeRequestControl;
   readonly reportRecoveryProgress?: () => void;
 }
 
 export interface HealthRefreshCollection {
   readonly attempt: HealthRefreshAttempt;
+  /** Next typed maintenance state, committed only after the attempt returns. */
+  readonly maintenanceState: LspMaintenanceState;
   /** Final report from the runtime, retained only for the current workflow. */
   readonly diagnosticReport?: WorkspaceDiagnosticReport;
 }
@@ -49,11 +52,10 @@ async function collectFileRefreshAttempt(
   const maintenance = await refreshFileLspMaintenance({
     runtime: options.runtime,
     cwd: options.cwd,
-    sentinelSnapshot: options.sentinelSnapshot,
+    maintenanceState: options.maintenanceState,
     filePath: scope.path,
     control: options.control,
   });
-  updateSentinelSnapshot(options.sentinelSnapshot, maintenance.snapshot);
   const readiness = await options.runtime.waitUntilReadyForFile(
     scope.path,
     undefined,
@@ -62,6 +64,7 @@ async function collectFileRefreshAttempt(
   const fileReadiness: HealthFileReadiness =
     readiness.kind === "ready" ? "ready" : readiness.kind === "timeout" ? "pending" : "unavailable";
   return {
+    maintenanceState: maintenance.maintenanceState,
     attempt: {
       kind: "completed",
       attemptedAt: options.attemptedAt,
@@ -90,16 +93,16 @@ async function collectWorkspaceRefreshAttempt(
   const maintenance = await refreshLspMaintenance(
     options.runtime,
     options.cwd,
-    options.sentinelSnapshot,
+    options.maintenanceState,
     {
       control: options.control,
       scope: workspaceScope?.filter ?? null,
       trackSources: workspaceScope !== null,
     },
   );
-  updateSentinelSnapshot(options.sentinelSnapshot, maintenance.snapshot);
   if (maintenance.failureReason) {
     return {
+      maintenanceState: maintenance.maintenanceState,
       attempt: {
         kind: "failed",
         attemptedAt: options.attemptedAt,
@@ -108,6 +111,7 @@ async function collectWorkspaceRefreshAttempt(
         operationScope: "workspace-runtime",
         diagnosticEvidence: maintenance.diagnosticEvidence,
         processCrashRecovery: emptyProcessCrashRecoveryReport(),
+        ...(maintenance.sourceTracking ? { sourceTracking: maintenance.sourceTracking } : {}),
         reason: maintenance.failureReason,
       },
     };
@@ -133,6 +137,7 @@ async function collectWorkspaceRefreshAttempt(
     );
     if (recovery.refreshFailureReason) {
       return {
+        maintenanceState: maintenance.maintenanceState,
         attempt: {
           kind: "failed",
           attemptedAt: options.attemptedAt,
@@ -149,12 +154,14 @@ async function collectWorkspaceRefreshAttempt(
           },
           diagnosticEvidence,
           processCrashRecovery: recovery.processCrashRecovery,
+          ...(maintenance.sourceTracking ? { sourceTracking: maintenance.sourceTracking } : {}),
           reason: recovery.refreshFailureReason,
         },
         diagnosticReport: recovery.diagnosticReport,
       };
     }
     return {
+      maintenanceState: maintenance.maintenanceState,
       attempt: {
         kind: "completed",
         attemptedAt: options.attemptedAt,
@@ -165,6 +172,7 @@ async function collectWorkspaceRefreshAttempt(
         restartedClients: recovery.restartedClients,
         processCrashRecovery: recovery.processCrashRecovery,
         diagnosticEvidence,
+        ...(maintenance.sourceTracking ? { sourceTracking: maintenance.sourceTracking } : {}),
         staleAssessment: {
           scope: "workspace",
           suspected: recovery.staleAssessment.suspected,
@@ -179,6 +187,7 @@ async function collectWorkspaceRefreshAttempt(
     // recorded failed attempt.
     if (isCodeRequestInterruption(error, options.control)) throw error;
     return {
+      maintenanceState: maintenance.maintenanceState,
       attempt: {
         kind: "failed",
         attemptedAt: options.attemptedAt,
@@ -187,15 +196,11 @@ async function collectWorkspaceRefreshAttempt(
         operationScope: "workspace-runtime",
         diagnosticEvidence: maintenance.diagnosticEvidence,
         processCrashRecovery: emptyProcessCrashRecoveryReport(),
+        ...(maintenance.sourceTracking ? { sourceTracking: maintenance.sourceTracking } : {}),
         reason: errorMessage(error),
       },
     };
   }
-}
-
-function updateSentinelSnapshot(target: Map<string, number>, next: Map<string, number>): void {
-  target.clear();
-  for (const [key, value] of next) target.set(key, value);
 }
 
 function errorMessage(error: unknown): string {

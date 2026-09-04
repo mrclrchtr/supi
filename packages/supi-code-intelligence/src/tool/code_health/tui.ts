@@ -29,6 +29,7 @@ import {
   readCompactRefreshStatus,
   readPreviousRefreshStatus,
   readRefreshStatus,
+  readSourceTrackingStatus,
 } from "./refresh-status.ts";
 import { formatSemanticHealthState, readSemanticHealthState } from "./semantic-state.ts";
 
@@ -192,6 +193,8 @@ function buildStatusBar(data: Record<string, unknown> | null, theme: Theme): Tex
   const semanticStatus = readSemanticStatus(data);
   const structuralStatus = readString(data, "structuralStatus");
   const refreshStatus = readRefreshStatus(data);
+  const refresh = readRecord(data?.refresh);
+  const sourceTracking = readSourceTrackingStatus(readRecord(refresh?.sourceTracking));
 
   const lspColor = semanticStatus.startsWith("ready") ? "success" : "warning";
   const structuralColor = structuralStatus === "ready" ? "success" : "muted";
@@ -204,6 +207,7 @@ function buildStatusBar(data: Record<string, unknown> | null, theme: Theme): Tex
     lines.push(`Tree-sitter: ${theme.fg(structuralColor, structuralStatus)}`);
   }
   if (refreshStatus) lines.push(`Diagnostics: ${theme.fg("dim", refreshStatus)}`);
+  if (sourceTracking) lines.push(`Source discovery: ${theme.fg("dim", sourceTracking)}`);
 
   return new Text(lines.join("  "), 0, 0);
 }

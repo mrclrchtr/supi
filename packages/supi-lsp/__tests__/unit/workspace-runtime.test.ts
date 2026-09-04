@@ -664,23 +664,29 @@ describe("workspace runtime behavior", () => {
     debugMocks.recordDebugEvent.mockClear();
   });
 
-  it("owns automatic sentinel and source inventory through the runtime seam", () => {
+  it("owns automatic sentinel and source inventory through the runtime seam", async () => {
     const snapshot = new Map([["/project/tsconfig.json", 1]]);
-    const synced = { snapshot, changes: [], sourceChanges: [] };
+    const synced = { snapshot, changes: [] };
+    const inventory = {
+      status: "complete" as const,
+      reason: null,
+      observedFileCount: 1,
+      files: ["/project/src/index.ts"],
+    };
     const manager = makeManager({
       scanWorkspaceSentinels: vi.fn().mockReturnValue(snapshot),
+      scanWorkspaceSources: vi.fn().mockResolvedValue(inventory),
       syncWorkspaceSentinelSnapshot: vi.fn().mockReturnValue(synced),
     });
     const runtime = createRuntime(manager);
+    const control = { operationId: "op-AAAAAAAAAAAAAAAAAAAAAA" };
 
-    expect(runtime.scanWorkspaceSentinels({ includeSourceFiles: true })).toBe(snapshot);
-    expect(runtime.syncWorkspaceSentinelSnapshot(new Map(), { includeSourceFiles: true })).toBe(
-      synced,
-    );
-    expect(manager.scanWorkspaceSentinels).toHaveBeenCalledWith({ includeSourceFiles: true });
-    expect(manager.syncWorkspaceSentinelSnapshot).toHaveBeenCalledWith(new Map(), {
-      includeSourceFiles: true,
-    });
+    expect(runtime.scanWorkspaceSentinels()).toBe(snapshot);
+    await expect(runtime.scanWorkspaceSources(control)).resolves.toBe(inventory);
+    expect(runtime.syncWorkspaceSentinelSnapshot(new Map())).toBe(synced);
+    expect(manager.scanWorkspaceSentinels).toHaveBeenCalledWith({});
+    expect(manager.scanWorkspaceSources).toHaveBeenCalledWith(control);
+    expect(manager.syncWorkspaceSentinelSnapshot).toHaveBeenCalledWith(new Map(), {});
   });
 
   it("coordinates tracking, refresh, and workspace-change invalidation", async () => {

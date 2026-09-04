@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CapabilityAdapter } from "../../../src/session/capability-adapter.ts";
 import type { HealthRefreshAttempt } from "../../../src/session/health-types.ts";
 import { runHealthWorkflow } from "../../../src/session/health-workflow.ts";
+import type { LspMaintenanceState } from "../../../src/substrate/lsp/source-tracking.ts";
 
 let cwd: string;
 
@@ -23,6 +24,14 @@ function emptyEvidence() {
     removed: 0,
     documents: [],
   } as const;
+}
+
+function emptyMaintenanceState(): LspMaintenanceState {
+  return {
+    sentinelSnapshot: new Map(),
+    sourceBaseline: null,
+    createdSourceQueue: [],
+  };
 }
 
 beforeEach(() => {
@@ -54,10 +63,15 @@ function readyRuntime(overrides: Record<string, unknown> = {}): WorkspaceLspRunt
     }),
     pruneMissingFiles: () => [],
     refreshOpenDiagnostics: async () => emptyEvidence(),
-    syncWorkspaceSentinelSnapshot: (
-      previous: Map<string, number>,
-      options: Parameters<typeof syncWorkspaceSentinelSnapshot>[2],
-    ) => syncWorkspaceSentinelSnapshot(cwd, previous, options),
+    scanWorkspaceSources: vi.fn().mockResolvedValue({
+      status: "complete" as const,
+      reason: null,
+      observedFileCount: 0,
+      files: [],
+    }),
+    bulkTrackFiles: async () => ({ outcomes: [] }),
+    syncWorkspaceSentinelSnapshot: (previous: Map<string, number>) =>
+      syncWorkspaceSentinelSnapshot(cwd, previous),
     isSupportedSourceFile: () => true,
     trackFile: async () => true,
     closeFile: () => undefined,
@@ -101,7 +115,8 @@ async function run(
       lspController: { getMissingServers: () => [] } as never,
       lastRefreshAttempt,
       trackRefreshAttempt,
-      sentinelSnapshot: new Map(),
+      maintenanceState: emptyMaintenanceState(),
+      updateMaintenanceState: vi.fn(),
     },
     control,
   );
@@ -140,6 +155,7 @@ describe("code_health refresh evidence", () => {
       { include: ["diagnostics"], refresh: true },
     );
 
+    expect(runtime.scanWorkspaceSources).toHaveBeenCalledTimes(1);
     expect(outcome).toMatchObject({
       kind: "completed",
       data: {
@@ -809,6 +825,7 @@ describe("code_health refresh evidence", () => {
       },
     });
     expect(fileDiagnostics).toHaveBeenCalledTimes(1);
+    expect(runtime.scanWorkspaceSources).not.toHaveBeenCalled();
     expect(refreshOpenDiagnostics).not.toHaveBeenCalled();
     expect(recoverDiagnostics).not.toHaveBeenCalled();
   });

@@ -22,6 +22,18 @@ _Avoid_: explicit semantic request, unrestricted workspace walk
 A semantic request for one exact file selected by the user or agent. It may route a file excluded from automatic work. This exception does not add the file to automatic discovery, warm-up, tracking, file lists, or guidance; configured diagnostic suppression still applies to diagnostic output.
 _Avoid_: automatic source support, ambient request, excluded means unavailable
 
+**Source baseline**:
+The latest complete set of automatic-policy-eligible files with a configured LSP extension. The first complete inventory establishes it without treating existing files as created; a limited inventory does not replace it.
+_Avoid_: sentinel snapshot, current file list, source mtime snapshot
+
+**Created-source queue**:
+A deduplicated queue of source paths found after the Source baseline. A broad diagnostic refresh processes up to 256 paths, retains out-of-scope and unavailable paths, and removes paths after tracked, already-tracked, or unsupported outcomes.
+_Avoid_: source change list, unbounded tracking queue, diagnostic evidence
+
+**Limited source discovery**:
+A source inventory that stops at the safety limit or a material filesystem error. It reports its reason and observed count, does not infer additions or removals, and does not replace the Source baseline.
+_Avoid_: complete source scan, exact omitted count, source failure
+
 **LSP route**:
 The stable identity of one configured language server for one workspace root. A route can continue across a failed server process and its replacement. Lifecycle, status, and recovery state belong to the route, not to one process generation.
 _Avoid_: server, client route, project server, process directory, working directory

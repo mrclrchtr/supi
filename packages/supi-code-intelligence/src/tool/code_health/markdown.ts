@@ -15,6 +15,7 @@ import { makeRelative, renderFileScopeStatus } from "./file-scope-markdown.ts";
 import {
   formatProcessCrashRecovery,
   formatRefreshElapsed,
+  formatSourceTracking,
   formatStaleDiagnosticRestarts as formatStaleDiagnosticRestartsText,
   isFileReadinessPending,
 } from "./refresh-outcome.ts";
@@ -57,8 +58,9 @@ function renderRefreshStatus(
     case "completed": {
       const fileReadinessPending = isFileReadinessPending(data.refresh, data.semanticState);
       lines.push(
-        `**${refreshAttemptLabel(data.refresh)}**: ${asSentence(completedRefreshText(data.refresh, fileReadinessPending))}`,
+        `**${refreshAttemptLabel(data.refresh)}**: ${asSentence(completedRefreshText(data.refresh, fileReadinessPending, false))}`,
       );
+      renderSourceTracking(lines, data.refresh);
       lines.push(`**Stale assessment**: ${asSentence(staleAssessmentText(data.refresh))}`);
       lines.push("");
       return;
@@ -74,6 +76,7 @@ function renderRefreshStatus(
       lines.push(
         `**${refreshAttemptLabel(data.refresh)}**: failed — ${data.refresh.reason}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${evidence}`,
       );
+      renderSourceTracking(lines, data.refresh);
       lines.push("");
       return;
     }
@@ -97,6 +100,7 @@ function renderRefreshStatus(
 function completedRefreshText(
   attempt: Extract<HealthRefreshAttempt, { kind: "completed" }>,
   fileReadinessPending = attempt.fileReadiness === "pending",
+  includeSourceTracking = true,
 ): string {
   const processCrashRecovery = formatProcessCrashRecovery(attempt.processCrashRecovery);
   const noOp =
@@ -110,13 +114,24 @@ function completedRefreshText(
       ? "completed no-op — no active clients were targeted"
       : `completed — ${attempt.attemptedActiveClients} active client${plural(attempt.attemptedActiveClients)} targeted`;
   const staleRestart = noOp ? null : formatStaleDiagnosticRestarts(attempt);
-  const outcome = [staleRestart, processCrashRecovery].filter(
-    (value): value is string => value !== null,
-  );
+  const sourceTracking = formatSourceTracking(attempt.sourceTracking);
+  const outcome = [
+    includeSourceTracking ? sourceTracking : null,
+    staleRestart,
+    processCrashRecovery,
+  ].filter((value): value is string => value !== null);
   const withOutcome = outcome.length > 0 ? `${base}; ${outcome.join("; ")}` : base;
   return attempt.operationScope === "workspace-runtime"
     ? `${withOutcome}; ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}`
     : withOutcome;
+}
+
+function renderSourceTracking(
+  lines: string[],
+  attempt: Pick<HealthRefreshAttempt, "sourceTracking">,
+): void {
+  const sourceTracking = formatSourceTracking(attempt.sourceTracking);
+  if (sourceTracking) lines.push(`**Source discovery**: ${asSentence(sourceTracking)}`);
 }
 
 function refreshAttemptLabel(attempt: Pick<HealthRefreshAttempt, "operationScope">): string {
@@ -160,10 +175,11 @@ function refreshAttemptOutcome(attempt: HealthRefreshAttempt): string {
     ? formatProcessCrashRecovery(attempt.processCrashRecovery)
     : null;
   const staleRestart = formatStaleDiagnosticRestarts(attempt);
+  const sourceTracking = formatSourceTracking(attempt.sourceTracking);
   const evidence = attempt.diagnosticEvidence
     ? `; ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}`
     : "";
-  return `failed — ${attempt.reason}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${evidence}`;
+  return `failed — ${attempt.reason}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${sourceTracking ? `; ${sourceTracking}` : ""}${evidence}`;
 }
 
 function refreshOperationScopeText(attempt: HealthRefreshAttempt): string {

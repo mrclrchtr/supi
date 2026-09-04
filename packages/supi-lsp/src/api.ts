@@ -1,5 +1,6 @@
 // Public API surface for the LSP session-scoped service.
 
+export { isMissingFileError } from "./client/client-file-state.ts";
 export { type LoadConfigOptions, loadConfig } from "./config/config.ts";
 export type { LspSettings } from "./config/lsp-settings.ts";
 export { loadLspSettings } from "./config/lsp-settings.ts";
@@ -41,6 +42,12 @@ export {
   type WorkspaceSentinelScanOptions,
   type WorkspaceSentinelSyncResult,
 } from "./diagnostics/workspace-sentinels.ts";
+export {
+  scanWorkspaceSources,
+  type WorkspaceSourceInventory,
+  type WorkspaceSourceInventoryReason,
+  type WorkspaceSourceScanOptions,
+} from "./diagnostics/workspace-sources.ts";
 export { raceReadinessValue, raceRequestControl } from "./session/readiness.ts";
 export type {
   LspControllerState,
@@ -51,6 +58,8 @@ export type {
 } from "./session/runtime-controller.ts";
 export { LspRuntimeController } from "./session/runtime-controller.ts";
 export type {
+  BulkTrackFileOutcome,
+  BulkTrackFilesResult,
   DiagnosticEvidenceDocument,
   DiagnosticEvidenceStatus,
   DiagnosticEvidenceSummary,
@@ -79,6 +88,7 @@ export {
   waitForWorkspaceLspRuntime,
 } from "./session/runtime-registry.ts";
 export { scanMissingServers } from "./session/scanner.ts";
+export { MAX_BULK_TRACK_FILES } from "./session/workspace-lsp-runtime.ts";
 export {
   AUTOMATIC_LSP_EXCLUDED_DIRECTORIES,
   type AutomaticLspPathPolicy,

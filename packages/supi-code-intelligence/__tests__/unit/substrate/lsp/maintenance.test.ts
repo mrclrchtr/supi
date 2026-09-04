@@ -17,8 +17,13 @@ vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
   };
 });
 
-import { syncWorkspaceSentinelSnapshot } from "@mrclrchtr/supi-lsp/api";
+import {
+  createAutomaticLspPathPolicy,
+  scanWorkspaceSources,
+  syncWorkspaceSentinelSnapshot,
+} from "@mrclrchtr/supi-lsp/api";
 import { refreshLspMaintenance } from "../../../../src/substrate/lsp/maintenance.ts";
+import type { LspMaintenanceState } from "../../../../src/substrate/lsp/source-tracking.ts";
 
 let tmpDir = "";
 
@@ -42,14 +47,40 @@ function emptyEvidence() {
   };
 }
 
-function makeRuntime(overrides: Record<string, unknown> = {}) {
+function createMaintenanceState(): LspMaintenanceState {
   return {
+    sentinelSnapshot: new Map(),
+    sourceBaseline: null,
+    createdSourceQueue: [],
+  };
+}
+
+function makeRuntime(overrides: Record<string, unknown> = {}) {
+  const runtime = {
     isSupportedSourceFile: vi.fn().mockReturnValue(true),
-    syncWorkspaceSentinelSnapshot: vi.fn(
-      (previous: Map<string, number>, options: { includeSourceFiles?: boolean }) =>
-        syncWorkspaceSentinelSnapshot(tmpDir, previous, options),
+    scanWorkspaceSources: vi.fn((control?: never) =>
+      scanWorkspaceSources(tmpDir, {
+        fileTypes: ["ts"],
+        policy: createAutomaticLspPathPolicy(tmpDir, []),
+        control,
+      }),
+    ),
+    syncWorkspaceSentinelSnapshot: vi.fn((previous: Map<string, number>) =>
+      syncWorkspaceSentinelSnapshot(tmpDir, previous),
     ),
     trackFile: vi.fn().mockResolvedValue(true),
+    bulkTrackFiles: vi.fn(async (filePaths: readonly string[]) => ({
+      outcomes: await Promise.all(
+        filePaths.map(async (file) => {
+          if (!runtime.isSupportedSourceFile(file)) {
+            return { file, kind: "unsupported" as const, reason: "not-automatic-source" as const };
+          }
+          return (await runtime.trackFile(file))
+            ? { file, kind: "tracked" as const }
+            : { file, kind: "unavailable" as const, reason: "track failed" };
+        }),
+      ),
+    })),
     noteWorkspaceChanges: vi.fn(),
     refreshOpenDiagnostics: vi.fn().mockResolvedValue(emptyEvidence()),
     getOutstandingDiagnostics: vi.fn().mockReturnValue({ entries: [] }),
@@ -58,19 +89,17 @@ function makeRuntime(overrides: Record<string, unknown> = {}) {
     pruneMissingFiles: vi.fn().mockReturnValue([]),
     ...overrides,
   };
+  return runtime;
 }
 
-/** Run maintenance and copy the returned snapshot back, like the session state sync. */
+/** Run maintenance and return the immutable state for the next pass. */
 async function runMaintenance(
   runtime: unknown,
   cwd: string,
-  snapshot: Map<string, number>,
+  state: LspMaintenanceState,
   options: { scope?: string | null; trackSources?: boolean } = {},
 ) {
-  const result = await refreshLspMaintenance(runtime as never, cwd, snapshot, options);
-  snapshot.clear();
-  for (const [key, value] of result.snapshot) snapshot.set(key, value);
-  return result;
+  return refreshLspMaintenance(runtime as never, cwd, state, options);
 }
 
 describe("refreshLspMaintenance diagnostic evidence", () => {
@@ -110,7 +139,7 @@ describe("refreshLspMaintenance diagnostic evidence", () => {
       }),
     });
 
-    await runMaintenance(runtime, tmpDir, new Map());
+    await runMaintenance(runtime, tmpDir, createMaintenanceState());
 
     expect(runtime.closeFile).not.toHaveBeenCalled();
     expect(runtime.trackFile).not.toHaveBeenCalled();
@@ -126,42 +155,71 @@ describe("refreshLspMaintenance source discovery", () => {
     const runtime = makeRuntime();
 
     // Priming pass establishes the baseline; nothing is tracked.
-    await runMaintenance(runtime, tmpDir, new Map(), { scope: tmpDir, trackSources: true });
-    const sentinelSnapshot = new Map<string, number>();
-    await runMaintenance(runtime, tmpDir, sentinelSnapshot, {
-      scope: tmpDir,
-      trackSources: true,
-    });
+    let state = createMaintenanceState();
+    state = (await runMaintenance(runtime, tmpDir, state, { scope: tmpDir, trackSources: true }))
+      .maintenanceState;
     expect(runtime.trackFile).not.toHaveBeenCalled();
 
     // Create a file after the baseline; the next pass must track it.
     fs.writeFileSync(path.join(tmpDir, "late.ts"), "export const late = true;\n");
-    await runMaintenance(runtime, tmpDir, sentinelSnapshot, {
+    state = (await runMaintenance(runtime, tmpDir, state, { scope: tmpDir, trackSources: true }))
+      .maintenanceState;
+
+    expect(runtime.bulkTrackFiles).toHaveBeenCalledTimes(1);
+    expect(runtime.trackFile).toHaveBeenCalledWith(path.join(tmpDir, "late.ts"));
+  });
+
+  it("continues diagnostic refresh when source discovery is limited", async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "supi-maint-limited-"));
+    const evidence = {
+      requested: 1,
+      confirmed: 1,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: [{ file: "existing.ts", status: "confirmed" as const }],
+    };
+    const runtime = makeRuntime({
+      scanWorkspaceSources: vi.fn().mockResolvedValue({
+        status: "limited",
+        reason: "filesystem-error",
+        observedFileCount: 3,
+        files: [],
+      }),
+      refreshOpenDiagnostics: vi.fn().mockResolvedValue(evidence),
+    });
+    const state = {
+      ...createMaintenanceState(),
+      sourceBaseline: new Set([path.join(tmpDir, "existing.ts")]),
+    };
+
+    const result = await runMaintenance(runtime, tmpDir, state, {
       scope: tmpDir,
       trackSources: true,
     });
 
-    expect(runtime.trackFile).toHaveBeenCalledTimes(1);
-    expect(runtime.trackFile).toHaveBeenCalledWith(path.join(tmpDir, "late.ts"));
+    expect(result.sourceTracking).toMatchObject({
+      status: "limited",
+      reason: "filesystem-error",
+      deferred: 0,
+    });
+    expect(runtime.refreshOpenDiagnostics).toHaveBeenCalledTimes(1);
+    expect(result.maintenanceState.sourceBaseline).toBe(state.sourceBaseline);
   });
 
   it("does not track a created file that automatic source support excludes", async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "supi-maint-excluded-"));
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), '{ "include": ["**/*.ts"] }');
     const runtime = makeRuntime({ isSupportedSourceFile: vi.fn().mockReturnValue(false) });
-    const sentinelSnapshot = new Map<string, number>();
-    await runMaintenance(runtime, tmpDir, sentinelSnapshot, {
-      scope: tmpDir,
-      trackSources: true,
-    });
+    let state = createMaintenanceState();
+    state = (await runMaintenance(runtime, tmpDir, state, { scope: tmpDir, trackSources: true }))
+      .maintenanceState;
 
     fs.writeFileSync(path.join(tmpDir, "late.ts"), "export const late = true;\n");
-    await runMaintenance(runtime, tmpDir, sentinelSnapshot, {
-      scope: tmpDir,
-      trackSources: true,
-    });
+    await runMaintenance(runtime, tmpDir, state, { scope: tmpDir, trackSources: true });
 
     expect(runtime.isSupportedSourceFile).toHaveBeenCalledWith(path.join(tmpDir, "late.ts"));
+    expect(runtime.bulkTrackFiles).toHaveBeenCalledWith([path.join(tmpDir, "late.ts")], undefined);
     expect(runtime.trackFile).not.toHaveBeenCalled();
   });
 
@@ -175,21 +233,16 @@ describe("refreshLspMaintenance source discovery", () => {
     fs.writeFileSync(path.join(a, "existing.ts"), "export const ok = true;\n");
     const runtime = makeRuntime();
 
-    const sentinelSnapshot = new Map<string, number>();
-    await runMaintenance(runtime, tmpDir, sentinelSnapshot, {
-      scope: tmpDir,
-      trackSources: true,
-    });
+    let state = createMaintenanceState();
+    state = (await runMaintenance(runtime, tmpDir, state, { scope: tmpDir, trackSources: true }))
+      .maintenanceState;
     expect(runtime.trackFile).not.toHaveBeenCalled();
 
     fs.writeFileSync(path.join(a, "late.ts"), "export const late = true;\n");
     fs.writeFileSync(path.join(b, "other.ts"), "export const other = true;\n");
 
     // Scope to directory a only: b's creation must stay untracked.
-    await runMaintenance(runtime, tmpDir, sentinelSnapshot, {
-      scope: path.join(a),
-      trackSources: true,
-    });
+    await runMaintenance(runtime, tmpDir, state, { scope: a, trackSources: true });
 
     expect(runtime.trackFile).toHaveBeenCalledTimes(1);
     expect(runtime.trackFile).toHaveBeenCalledWith(path.join(a, "late.ts"));
@@ -201,13 +254,14 @@ describe("refreshLspMaintenance source discovery", () => {
     fs.writeFileSync(path.join(tmpDir, "existing.ts"), "export const ok = true;\n");
     const runtime = makeRuntime();
 
-    // File-scoped passes widen the snapshot for priming but never track.
-    const sentinelSnapshot = new Map<string, number>();
-    await runMaintenance(runtime, tmpDir, sentinelSnapshot, { scope: tmpDir });
+    // File-scoped passes do not scan or track sources.
+    const state = createMaintenanceState();
+    await runMaintenance(runtime, tmpDir, state, { scope: tmpDir });
     fs.writeFileSync(path.join(tmpDir, "late.ts"), "export const late = true;\n");
-    await runMaintenance(runtime, tmpDir, sentinelSnapshot, { scope: tmpDir });
+    await runMaintenance(runtime, tmpDir, state, { scope: tmpDir });
 
-    expect(runtime.trackFile).not.toHaveBeenCalled();
+    expect(runtime.scanWorkspaceSources).not.toHaveBeenCalled();
+    expect(runtime.bulkTrackFiles).not.toHaveBeenCalled();
   });
 
   it("forwards sentinel changes and invalidates config fixes", async () => {
@@ -215,21 +269,21 @@ describe("refreshLspMaintenance source discovery", () => {
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), '{ "include": ["**/*.ts"] }');
     fs.writeFileSync(path.join(tmpDir, "existing.ts"), "export const ok = true;\n");
     const runtime = makeRuntime();
-    const snapshot = new Map<string, number>();
+    let state = createMaintenanceState();
 
-    // Priming pass settles the baseline and clears the spy state; an
-    // unchanged pass must emit no events and invalidate nothing.
-    await runMaintenance(runtime, tmpDir, snapshot, { scope: tmpDir });
+    // Priming pass settles the sentinel state; an unchanged pass must emit no
+    // events and invalidate nothing.
+    state = (await runMaintenance(runtime, tmpDir, state, { scope: tmpDir })).maintenanceState;
     mocks.invalidateConfig.mockClear();
     runtime.noteWorkspaceChanges.mockClear();
-    await runMaintenance(runtime, tmpDir, snapshot, { scope: tmpDir });
+    state = (await runMaintenance(runtime, tmpDir, state, { scope: tmpDir })).maintenanceState;
     expect(mocks.invalidateConfig).not.toHaveBeenCalled();
     expect(runtime.noteWorkspaceChanges).not.toHaveBeenCalled();
 
     // A config change is forwarded and invalidated; a pure source change is not.
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), '{ "include": ["**/*.ts"] }\n');
     fs.writeFileSync(path.join(tmpDir, "existing.ts"), "export const ok = 2;\n");
-    await runMaintenance(runtime, tmpDir, snapshot, { scope: tmpDir });
+    await runMaintenance(runtime, tmpDir, state, { scope: tmpDir });
 
     expect(mocks.invalidateConfig).toHaveBeenCalledWith(path.join(tmpDir, "tsconfig.json"));
     const forwarded = runtime.noteWorkspaceChanges.mock.calls.flat()[0] as Array<{

@@ -3,6 +3,7 @@ import type {
   ProcessCrashRecoveryReport,
 } from "@mrclrchtr/supi-lsp/api";
 import type { SemanticHealthState } from "../../session/health-types.ts";
+import type { SourceTrackingReport } from "../../substrate/lsp/source-tracking.ts";
 
 /** Report whether a file health result is waiting for semantic readiness. */
 export function isFileReadinessPending(
@@ -62,6 +63,16 @@ function formatProcessCrashRecoveryEntry(entry: ProcessCrashRecoveryEntry): stri
   const action = entry.nextAction ? `; next: ${entry.nextAction.replaceAll("-", " ")}` : "";
   const failure = entry.failureMessage ? `; ${entry.failureMessage}` : "";
   return `${entry.name} @ ${entry.root}: ${outcome}${action}${failure}`;
+}
+
+/** Format source discovery and bounded tracking counts separately from diagnostics. */
+export function formatSourceTracking(
+  report: SourceTrackingReport | null | undefined,
+): string | null {
+  if (!report) return null;
+  const inventory =
+    report.status === "complete" ? "complete" : `limited (${report.reason ?? "unknown reason"})`;
+  return `source discovery: ${inventory}; ${report.observedFileCount} source files observed, ${report.discovered.length} discovered, ${report.tracked.length} tracked, ${report.unsupported.length} unsupported, ${report.unavailable.length} unavailable, ${report.deferred} deferred`;
 }
 
 /** Format the age of a retained refresh attempt for a status line. */

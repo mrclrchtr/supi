@@ -13,7 +13,6 @@ import {
   isCodeRequestInterruption,
   throwIfCodeRequestInterrupted,
 } from "@mrclrchtr/supi-code-runtime/api";
-import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
 import { uriToFile } from "@mrclrchtr/supi-core/path";
 import type { DiagnosticEvidenceSummary } from "@mrclrchtr/supi-lsp/api";
 import {
@@ -27,6 +26,12 @@ import {
   type WorkspaceLspRuntime,
 } from "@mrclrchtr/supi-lsp/api";
 import { mergeDiagnosticEvidence } from "../../diagnostics/evidence.ts";
+import {
+  type LspMaintenanceState,
+  type SourceTrackingReport,
+  trackCreatedSources,
+  withSentinelSnapshot,
+} from "./source-tracking.ts";
 
 /** Options shared by the workspace and file-scoped maintenance passes. */
 export interface LspMaintenanceOptions {
@@ -36,11 +41,7 @@ export interface LspMaintenanceOptions {
    * tracks created files inside this prefix; null disables the scope bound.
    */
   scope?: string | null;
-  /**
-   * Track files created since the last refresh so the following refresh pull
-   * includes them. Only the workspace-runtime path sets this; the snapshot is
-   * still widened on file-scoped passes so later diffs stay correct.
-   */
+  /** Track source additions only for a broad tracked-file refresh. */
   trackSources?: boolean;
 }
 
@@ -52,10 +53,11 @@ export interface LspMaintenanceOptions {
 export async function refreshLspMaintenance(
   runtime: WorkspaceLspRuntime,
   cwd: string,
-  sentinelSnapshot: Map<string, number>,
+  maintenanceState: LspMaintenanceState,
   options: LspMaintenanceOptions = {},
 ): Promise<WorkspaceLspMaintenanceResult> {
-  const { snapshot } = await synchronizeSentinels(runtime, sentinelSnapshot, options);
+  const synchronized = await synchronizeSentinels(runtime, cwd, maintenanceState, options);
+  const { snapshot, nextState, sourceTracking } = synchronized;
   let diagnosticEvidence = emptyEvidence();
   let failureReason: string | undefined;
 
@@ -80,15 +82,21 @@ export async function refreshLspMaintenance(
 
   return {
     snapshot,
+    maintenanceState: nextState,
     diagnosticEvidence,
+    ...(sourceTracking ? { sourceTracking } : {}),
     ...(failureReason ? { failureReason } : {}),
   };
 }
 
 /** Sentinel state and diagnostic evidence retained from one workspace pass. */
 export interface WorkspaceLspMaintenanceResult {
+  /** The next typed maintenance state for the session. */
+  maintenanceState: LspMaintenanceState;
   /** The next sentinel snapshot for the session-owned maintenance state. */
   snapshot: Map<string, number>;
+  /** Source discovery and bounded tracking facts for broad refreshes. */
+  sourceTracking?: SourceTrackingReport;
   /** Evidence from every diagnostic refresh performed by this pass. */
   diagnosticEvidence: DiagnosticEvidenceSummary;
   /** Failure from the first workspace refresh, when no fresh pass completed. */
@@ -97,6 +105,8 @@ export interface WorkspaceLspMaintenanceResult {
 
 /** Sentinel state and stale-file facts from one file-scoped pass. */
 export interface FileLspMaintenanceResult {
+  /** The next typed maintenance state for the session. */
+  maintenanceState: LspMaintenanceState;
   /** The next sentinel snapshot for the session-owned maintenance state. */
   snapshot: Map<string, number>;
   /** Number of stale files that matched the requested file. */
@@ -107,14 +117,14 @@ export interface FileLspMaintenanceResult {
 export async function refreshFileLspMaintenance(options: {
   runtime: WorkspaceLspRuntime;
   cwd: string;
-  sentinelSnapshot: Map<string, number>;
+  maintenanceState: LspMaintenanceState;
   filePath: string;
   control?: CodeRequestControl;
 }): Promise<FileLspMaintenanceResult> {
-  const { runtime, cwd, sentinelSnapshot, filePath, control } = options;
+  const { runtime, cwd, maintenanceState, filePath, control } = options;
   // A cancelled caller stops before any maintenance work starts.
   throwIfCodeRequestInterrupted(control);
-  const { snapshot } = await synchronizeSentinels(runtime, sentinelSnapshot);
+  const { snapshot, nextState } = await synchronizeSentinels(runtime, cwd, maintenanceState);
   const target = nodePath.resolve(filePath);
   const stale = confirmedOutstandingDiagnostics(runtime, cwd).some(
     (entry) =>
@@ -132,38 +142,51 @@ export async function refreshFileLspMaintenance(options: {
   runtime.pruneMissingFiles();
   throwIfCodeRequestInterrupted(control);
 
-  return { snapshot, matchedStaleFileCount: stale ? 1 : 0 };
+  return {
+    snapshot,
+    maintenanceState: nextState,
+    matchedStaleFileCount: stale ? 1 : 0,
+  };
 }
 
 /**
- * Sync the widened workspace snapshot, forward sentinel changes, and track
- * source files newly created since the last pass.
+ * Sync sentinel state and, only for broad refreshes, process source additions.
  *
- * The snapshot is widened to every regular file on every pass so later diffs
- * see genuine creations. Only sentinel-file events are forwarded as workspace
- * changes (config semantics unchanged); created source files are tracked only
- * on the workspace-runtime path and only once the snapshot was primed by an
- * earlier pass — the first pass establishes the baseline and cannot tell a
- * just-created file from a long-existing one.
+ * Sentinel state and source state use separate baselines. A complete source
+ * inventory establishes the first baseline without treating existing files as
+ * created. Limited inventories leave the previous source state unchanged.
  */
 async function synchronizeSentinels(
   runtime: WorkspaceLspRuntime,
-  sentinelSnapshot: Map<string, number>,
+  cwd: string,
+  maintenanceState: LspMaintenanceState,
   options: LspMaintenanceOptions = {},
-) {
-  const primed = sentinelSnapshot.size > 0;
-  const state = runtime.syncWorkspaceSentinelSnapshot(sentinelSnapshot, {
-    includeSourceFiles: true,
-  });
-
+): Promise<{
+  snapshot: Map<string, number>;
+  nextState: LspMaintenanceState;
+  sourceTracking?: SourceTrackingReport;
+}> {
+  const state = runtime.syncWorkspaceSentinelSnapshot(maintenanceState.sentinelSnapshot);
   invalidateChangedProjectConfigs(state.changes);
   if (state.changes.length > 0) runtime.noteWorkspaceChanges(state.changes);
 
-  if (options.trackSources && primed) {
-    await trackCreatedSourceFiles(runtime, state.sourceChanges, options.scope);
+  const nextSentinelState = withSentinelSnapshot(maintenanceState, state.snapshot);
+  if (!options.trackSources) {
+    return { snapshot: state.snapshot, nextState: nextSentinelState };
   }
 
-  return state;
+  const sourceResult = await trackCreatedSources({
+    runtime,
+    cwd,
+    state: nextSentinelState,
+    scope: options.scope,
+    control: options.control,
+  });
+  return {
+    snapshot: state.snapshot,
+    nextState: sourceResult.state,
+    sourceTracking: sourceResult.report,
+  };
 }
 
 /** Invalidate cached tsconfig scope parses only for config files that changed. */
@@ -178,23 +201,6 @@ function invalidateChangedProjectConfigs(changes: readonly FileEvent[]): void {
     if (change.type === FileChangeType.Created) {
       invalidateTsconfigCacheForConfigDir(nodePath.dirname(filePath));
     }
-  }
-}
-
-/** Track source files newly created since the last pass, within the scope bound. */
-async function trackCreatedSourceFiles(
-  runtime: WorkspaceLspRuntime,
-  sourceChanges: readonly FileEvent[],
-  scope: string | null | undefined,
-): Promise<void> {
-  for (const change of sourceChanges) {
-    if (change.type !== FileChangeType.Created) continue;
-    const filePath = uriToFile(change.uri);
-    if (scope && !isWithinOrEqual(scope, filePath)) continue;
-    if (!runtime.isSupportedSourceFile(filePath)) continue;
-    // Best-effort: a file no client can serve stays untracked and is
-    // simply absent from evidence until a later explicit request.
-    await runtime.trackFile(filePath);
   }
 }
 

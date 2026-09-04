@@ -21,6 +21,7 @@ import { describeStructuralState } from "../analysis/health/recovery.ts";
 import { collectServers } from "../analysis/health/signals.ts";
 import { SEMANTIC_READINESS_TIMEOUT_REASON } from "../analysis/readiness.ts";
 import { resolveScope } from "../analysis/search/paths.ts";
+import type { LspMaintenanceState } from "../substrate/lsp/source-tracking.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import { collectHealthRefreshAttempt } from "./health-refresh.ts";
 import type {
@@ -45,8 +46,10 @@ export interface HealthWorkflowDeps {
   readonly lspController: LspRuntimeController | null;
   readonly lastRefreshAttempt: HealthRefreshAttempt | null;
   readonly trackRefreshAttempt: (attempt: HealthRefreshAttempt) => void;
-  /** Workspace sentinel snapshot for change detection. */
-  readonly sentinelSnapshot: Map<string, number>;
+  /** Typed sentinel, source-baseline, and created-source queue state. */
+  readonly maintenanceState: LspMaintenanceState;
+  /** Commit maintenance state only after a health attempt completes. */
+  readonly updateMaintenanceState: (state: LspMaintenanceState) => void;
 }
 
 /** Collect health facts without rendering a public result. */
@@ -282,7 +285,7 @@ async function collectRefreshState(
       diagnosticsScope,
       attemptedAt,
       cwd: options.deps.cwd,
-      sentinelSnapshot: options.deps.sentinelSnapshot,
+      maintenanceState: options.deps.maintenanceState,
       control: options.control,
       reportRecoveryProgress: () =>
         reportProgress(options.control, {
@@ -291,6 +294,7 @@ async function collectRefreshState(
           message: "Refreshing diagnostics and recovery state",
         }),
     });
+    deps.updateMaintenanceState(attempt.maintenanceState);
     deps.trackRefreshAttempt(attempt.attempt);
     return attempt;
   } catch (error) {

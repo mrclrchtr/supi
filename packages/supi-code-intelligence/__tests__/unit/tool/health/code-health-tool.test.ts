@@ -65,6 +65,8 @@ function mockReadyLsp(
     refreshOpenDiagnostics: ReturnType<typeof vi.fn>;
     noteWorkspaceChanges: ReturnType<typeof vi.fn>;
     syncWorkspaceSentinelSnapshot: ReturnType<typeof vi.fn>;
+    scanWorkspaceSources: ReturnType<typeof vi.fn>;
+    bulkTrackFiles: ReturnType<typeof vi.fn>;
     isSupportedSourceFile: ReturnType<typeof vi.fn>;
     closeFile: ReturnType<typeof vi.fn>;
     trackFile: ReturnType<typeof vi.fn>;
@@ -104,8 +106,14 @@ function mockReadyLsp(
     syncWorkspaceSentinelSnapshot: vi.fn((previous: Map<string, number>) => ({
       snapshot: previous,
       changes: [],
-      sourceChanges: [],
     })),
+    scanWorkspaceSources: vi.fn().mockResolvedValue({
+      status: "complete",
+      reason: null,
+      observedFileCount: 0,
+      files: [],
+    }),
+    bulkTrackFiles: vi.fn().mockResolvedValue({ outcomes: [] }),
     isSupportedSourceFile: vi.fn().mockReturnValue(true),
     closeFile: vi.fn(),
     trackFile: vi.fn().mockResolvedValue(true),

@@ -14,6 +14,14 @@ import { readSemanticHealthState } from "./semantic-state.ts";
 
 /** Render current and retained health refresh status for the TUI. */
 
+/** Read source discovery counts from structured health details. */
+export function readSourceTrackingStatus(source: Record<string, unknown> | null): string | null {
+  if (!source || (source.status !== "complete" && source.status !== "limited")) return null;
+  const reason =
+    source.status === "limited" && typeof source.reason === "string" ? ` (${source.reason})` : "";
+  return `${source.status}${reason}: ${readNumber(source.observedFileCount)} observed, ${readArrayLength(source.discovered)} discovered, ${readArrayLength(source.tracked)} tracked, ${readArrayLength(source.unsupported)} unsupported, ${readArrayLength(source.unavailable)} unavailable, ${readNumber(source.deferred)} deferred`;
+}
+
 export function readRefreshStatus(data: Record<string, unknown> | null): string | null {
   const refresh = readRecord(data?.refresh);
   if (!refresh) return null;
@@ -88,19 +96,21 @@ export function readCompactRefreshStatus(data: Record<string, unknown> | null): 
   const refresh = readRecord(data?.refresh);
   if (!refresh || (refresh.kind !== "completed" && refresh.kind !== "failed")) return null;
 
+  const sourceTracking = formatSourceTracking(readRecord(refresh.sourceTracking));
   const processCrashRecovery = formatCompactProcessCrashRecovery(
     readProcessCrashRecovery(refresh.processCrashRecovery),
   );
   if (refresh.kind === "failed") {
     const staleRestart = formatStaleDiagnosticRestartsForRecord(refresh);
     return (
-      [staleRestart, processCrashRecovery]
+      [sourceTracking, staleRestart, processCrashRecovery]
         .filter((value): value is string => value !== null)
         .join("; ") || null
     );
   }
   const fileReadinessPending = isPendingFileReadiness(data);
   if (
+    !sourceTracking &&
     !processCrashRecovery &&
     readNumber(refresh.restartedClients) === 0 &&
     !fileReadinessPending
@@ -110,7 +120,7 @@ export function readCompactRefreshStatus(data: Record<string, unknown> | null): 
 
   const staleRestart = formatStaleDiagnosticRestartsForRecord(refresh);
   const readiness = fileReadinessPending ? "LSP may still be warming; retry shortly" : null;
-  return [staleRestart, processCrashRecovery, readiness]
+  return [sourceTracking, staleRestart, processCrashRecovery, readiness]
     .filter((value): value is string => value !== null)
     .join("; ");
 }
@@ -123,6 +133,7 @@ export function readPreviousRefreshStatus(data: Record<string, unknown> | null):
   const attempt = readRecord(refresh.lastAttempt);
   if (!attempt) return null;
   const evidence = formatCompactDiagnosticEvidence(readRecord(attempt.diagnosticEvidence));
+  const sourceTracking = formatSourceTracking(readRecord(attempt.sourceTracking));
   const processCrashRecovery = formatCompactProcessCrashRecovery(
     readProcessCrashRecovery(attempt.processCrashRecovery),
   );
@@ -131,7 +142,7 @@ export function readPreviousRefreshStatus(data: Record<string, unknown> | null):
     attempt.kind === "completed" &&
     isFileReadinessPending(attempt, readSemanticHealthState(data?.semanticState));
   const readiness = fileReadinessPending ? "LSP may still be warming; retry shortly" : null;
-  const outcome = [readiness, staleRestart, processCrashRecovery, evidence]
+  const outcome = [readiness, sourceTracking, staleRestart, processCrashRecovery, evidence]
     .filter((value): value is string => value !== null)
     .join("; ");
   if (attempt.kind === "failed") {
@@ -170,6 +181,7 @@ function formatLastRefreshSuffix(refresh: Record<string, unknown>): string {
   const attempt = readRecord(refresh.lastAttempt);
   if (!attempt) return "";
   const evidence = formatDiagnosticEvidence(readRecord(attempt.diagnosticEvidence));
+  const sourceTracking = formatSourceTracking(readRecord(attempt.sourceTracking));
   const staleRestart = formatStaleDiagnosticRestartsForRecord(attempt);
   const processCrashRecovery = formatProcessCrashRecovery(
     readProcessCrashRecovery(attempt.processCrashRecovery),
@@ -177,7 +189,7 @@ function formatLastRefreshSuffix(refresh: Record<string, unknown>): string {
   const fileReadinessPending =
     attempt.kind === "completed" && isFileReadinessPending(attempt, null);
   const readiness = fileReadinessPending ? "LSP may still be warming; retry shortly" : null;
-  const outcome = [readiness, staleRestart, processCrashRecovery, evidence]
+  const outcome = [readiness, sourceTracking, staleRestart, processCrashRecovery, evidence]
     .filter((value): value is string => value !== null)
     .join("; ");
   if (attempt.kind === "failed") {
@@ -189,6 +201,15 @@ function formatLastRefreshSuffix(refresh: Record<string, unknown>): string {
     return `; last ${refreshAttemptLabel(attempt)} ${status}${outcome ? `; ${outcome}` : ""}`;
   }
   return "";
+}
+
+function formatSourceTracking(source: Record<string, unknown> | null): string | null {
+  const status = readSourceTrackingStatus(source);
+  return status ? `source discovery ${status}` : null;
+}
+
+function readArrayLength(value: unknown): number {
+  return Array.isArray(value) ? value.length : 0;
 }
 
 function formatCompactDiagnosticEvidence(evidence: Record<string, unknown> | null): string | null {

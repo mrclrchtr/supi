@@ -17,8 +17,12 @@ import type {
   WorkspaceSentinelScanOptions,
   WorkspaceSentinelSyncResult,
 } from "../diagnostics/workspace-sentinels.ts";
+import type { WorkspaceSourceInventory } from "../diagnostics/workspace-sources.ts";
 import type { WorkspaceLspDiagnosticSurface } from "./runtime-diagnostic-surface.ts";
 import type { ProcessCrashRecoveryReport } from "./runtime-diagnostics.ts";
+
+/** Maximum number of files processed by one automatic bulk-tracking call. */
+export const MAX_BULK_TRACK_FILES = 256;
 
 export type WorkspaceLspRuntimeState =
   | { kind: "ready"; runtime: WorkspaceLspRuntime }
@@ -51,6 +55,22 @@ export interface RoutedMutationResponse<T> {
   readonly value: T;
   /** Roots that the routed client owns for this mutation response. */
   readonly authorizedMutationRoots: readonly string[];
+}
+
+/** Outcome for one path selected by a bounded automatic tracking batch. */
+export type BulkTrackFileOutcome =
+  | { readonly file: string; readonly kind: "tracked" }
+  | { readonly file: string; readonly kind: "already-tracked" }
+  | {
+      readonly file: string;
+      readonly kind: "unsupported";
+      readonly reason: "missing" | "not-automatic-source";
+    }
+  | { readonly file: string; readonly kind: "unavailable"; readonly reason: string };
+
+/** Result of one bounded automatic tracking batch. */
+export interface BulkTrackFilesResult {
+  readonly outcomes: readonly BulkTrackFileOutcome[];
 }
 
 /**
@@ -116,13 +136,23 @@ export interface WorkspaceLspRuntime extends WorkspaceLspDiagnosticSurface {
   getProjectServers(): ProjectServerInfo[];
   /** Check whether automatic LSP work can use and serve the source file. */
   isSupportedSourceFile(filePath: string): boolean;
-  /** Inventory policy-eligible workspace sentinels and optional source files. */
+  /** Inventory policy-eligible workspace sentinels. */
   scanWorkspaceSentinels(options?: WorkspaceSentinelScanOptions): Map<string, number>;
-  /** Refresh one policy-eligible workspace sentinel and source inventory. */
+  /** Scan configured source extensions under the automatic path policy. */
+  scanWorkspaceSources(control?: CodeRequestControl): Promise<WorkspaceSourceInventory>;
+  /** Refresh one policy-eligible workspace sentinel. */
   syncWorkspaceSentinelSnapshot(
     previous: Map<string, number>,
     options?: WorkspaceSentinelScanOptions,
   ): WorkspaceSentinelSyncResult;
+  /**
+   * Track a bounded, deduplicated set of automatic source files. Inputs after
+   * the first 256 unique paths are ignored; callers must retain those paths.
+   */
+  bulkTrackFiles(
+    filePaths: readonly string[],
+    control?: CodeRequestControl,
+  ): Promise<BulkTrackFilesResult>;
   trackFile(filePath: string): Promise<boolean>;
   closeFile(filePath: string): void;
   pruneMissingFiles(): readonly string[];

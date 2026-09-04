@@ -20,6 +20,10 @@ import { realpathSync } from "node:fs";
 import * as path from "node:path";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { LspRuntimeController } from "@mrclrchtr/supi-lsp/api";
+import {
+  createLspMaintenanceState,
+  type LspMaintenanceState,
+} from "../substrate/lsp/source-tracking.ts";
 import { type CapabilityAdapter, WorkspaceCapabilityAdapter } from "./capability-adapter.ts";
 import type { FindWorkflowInput, FindWorkflowOutcome } from "./find-types.ts";
 import { runFindWorkflow } from "./find-workflow.ts";
@@ -162,8 +166,8 @@ export class WorkspaceCodeIntelligenceSession {
    */
   #lspController: LspRuntimeController | null = null;
 
-  /** Workspace sentinel snapshot for change detection across explicit queries. */
-  #sentinelSnapshot: Map<string, number> = new Map();
+  /** Typed sentinel, source-baseline, and created-source queue state. */
+  #maintenanceState: LspMaintenanceState = createLspMaintenanceState();
 
   /** Whether the project owning this session is trusted for config loading. */
   #projectTrusted = false;
@@ -196,7 +200,7 @@ export class WorkspaceCodeIntelligenceSession {
    * Called by the extension entry point after LSP initialization.
    */
   seedSentinelSnapshot(snapshot: Map<string, number>): void {
-    this.#sentinelSnapshot = snapshot;
+    this.#maintenanceState = createLspMaintenanceState(snapshot);
   }
 
   /** Restore overview state from the active session branch. */
@@ -283,7 +287,10 @@ export class WorkspaceCodeIntelligenceSession {
         trackRefreshAttempt: (attempt) => {
           this.#lastHealthRefreshAttempt = attempt;
         },
-        sentinelSnapshot: this.#sentinelSnapshot,
+        maintenanceState: this.#maintenanceState,
+        updateMaintenanceState: (state) => {
+          this.#maintenanceState = state;
+        },
       },
       control,
     );
@@ -429,7 +436,7 @@ export class WorkspaceCodeIntelligenceSession {
     this.#workflowTargets.clear();
     this.#surfacedInstructionDirs.clear();
     this.#nativeInstructionPaths.clear();
-    this.#sentinelSnapshot.clear();
+    this.#maintenanceState = createLspMaintenanceState();
     this.#lspController = null;
     this.#projectTrusted = false;
   }

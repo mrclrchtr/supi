@@ -6,8 +6,17 @@ import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CapabilityAdapter } from "../../../src/session/capability-adapter.ts";
 import { runHealthWorkflow } from "../../../src/session/health-workflow.ts";
+import type { LspMaintenanceState } from "../../../src/substrate/lsp/source-tracking.ts";
 
 let cwd: string;
+
+function emptyMaintenanceState(): LspMaintenanceState {
+  return {
+    sentinelSnapshot: new Map(),
+    sourceBaseline: null,
+    createdSourceQueue: [],
+  };
+}
 
 beforeEach(() => {
   cwd = mkdtempSync(path.join(os.tmpdir(), "health-workflow-"));
@@ -55,7 +64,8 @@ async function run(lspState: WorkspaceLspRuntimeState, semantic: CapabilityState
       lspController: { getMissingServers: () => [] } as never,
       lastRefreshAttempt: null,
       trackRefreshAttempt: () => undefined,
-      sentinelSnapshot: new Map(),
+      maintenanceState: emptyMaintenanceState(),
+      updateMaintenanceState: () => undefined,
     },
   );
 }
@@ -90,7 +100,8 @@ describe("semantic health state", () => {
         lspController: { getMissingServers: () => [] } as never,
         lastRefreshAttempt: null,
         trackRefreshAttempt: () => undefined,
-        sentinelSnapshot: new Map(),
+        maintenanceState: emptyMaintenanceState(),
+        updateMaintenanceState: () => undefined,
       },
     );
 

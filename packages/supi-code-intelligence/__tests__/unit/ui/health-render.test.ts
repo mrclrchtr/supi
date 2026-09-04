@@ -110,6 +110,48 @@ describe("code_health TUI projection", () => {
     expect(render(details, true)).not.toContain("stale diagnostic restarts");
   });
 
+  it("renders source discovery status separately from diagnostic refresh status", () => {
+    const details = makeDetails({
+      refresh: {
+        kind: "completed",
+        attemptedAt: 1,
+        requestedDiagnosticScope: { kind: "tracked-files", filter: null },
+        operationScope: "workspace-runtime",
+        attemptedActiveClients: 1,
+        restartedClients: 0,
+        diagnosticEvidence: {
+          requested: 1,
+          confirmed: 1,
+          unconfirmed: 0,
+          failed: 0,
+          removed: 0,
+          documents: [],
+        },
+        sourceTracking: {
+          status: "limited",
+          reason: "filesystem-error",
+          observedFileCount: 10,
+          discovered: [],
+          tracked: [],
+          unsupported: [],
+          unavailable: [],
+          deferred: 2,
+        },
+        staleAssessment: {
+          scope: "workspace",
+          suspected: false,
+          matchedFileCount: 0,
+          warning: null,
+        },
+      },
+    });
+
+    expect(render(details, true)).toContain("Source discovery: limited");
+    expect(render(details, true)).toContain("filesystem-error");
+    expect(render(details)).toContain("source discovery limited");
+    expect(render(details)).toContain("filesystem-error");
+  });
+
   it("labels pending file readiness as warming in compact and expanded views", () => {
     const details = makeDetails({
       semanticState: { kind: "ready" },
