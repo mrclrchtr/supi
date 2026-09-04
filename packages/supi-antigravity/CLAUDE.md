@@ -8,7 +8,7 @@
 
 - Keep the Model Catalogue immutable until the next session start or reload.
 - Register `antigravity_run` only after `agy` version and curated-model discovery succeeds.
-- Use the Isolated Antigravity Home for every Antigravity process. Do not copy the normal Antigravity profile, credentials, or PI provider environment.
+- Use the Isolated Antigravity Home for every Antigravity process. On macOS, create and unlock its private keychain, exposed as the login keychain, before starting `agy`. Do not copy the normal Antigravity profile, credentials, or PI provider environment.
 - Spawn `agy` directly with an argument array. Keep stdout, stderr, tool parameters, tool output, and transcript data bounded and out of PI state.
 - Treat the Inspection Permission Set as an Antigravity policy, not an operating-system sandbox. Project hooks and accepted `read_url(*)` targets remain explicit limitations.
 - Keep new and follow-up inputs exact-one. Follow-ups inherit model and workspace from their Conversation Handle.

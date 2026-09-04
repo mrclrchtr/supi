@@ -1,6 +1,16 @@
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readlink,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   formatAntigravityLoginCommand,
@@ -8,6 +18,7 @@ import {
   INSPECTION_PERMISSION_SET,
   initializeConsultationWorkspace,
   mergeInspectionSettings,
+  prepareIsolatedAntigravityHome,
 } from "../../src/isolated-home.ts";
 
 const temporaryDirectories: string[] = [];
@@ -77,6 +88,96 @@ describe("Isolated Antigravity Home", () => {
     await expect(
       stat(join(paths.consultationWorkspace, ".git", "hooks", "pre-commit")),
     ).rejects.toThrow();
+  });
+
+  it("creates a private macOS keychain for the isolated home", async () => {
+    const root = await temporaryDirectory("supi-antigravity-keychain-");
+    const paths = getIsolatedAntigravityPaths(root);
+    const calls: string[][] = [];
+    const privateKeychainPath = join(
+      root,
+      "supi",
+      "antigravity",
+      "home",
+      "Library",
+      "Keychains",
+      "antigravity.keychain-db",
+    );
+    const runSecurityCommand = async (args: readonly string[]): Promise<void> => {
+      calls.push([...args]);
+      if (args[0] === "create-keychain") {
+        const keychainPath = args.at(-1);
+        if (!keychainPath) throw new Error("The test keychain path is missing.");
+        await writeFile(keychainPath, "");
+      }
+    };
+
+    await prepareIsolatedAntigravityHome(paths, {
+      platform: "darwin",
+      runSecurityCommand,
+    });
+
+    expect(calls).toEqual([
+      ["create-keychain", "-p", "", privateKeychainPath],
+      ["unlock-keychain", "-p", "", privateKeychainPath],
+    ]);
+    expect(paths.keychainPath).toMatch(/Library\/Keychains\/login\.keychain-db$/);
+    expect((await lstat(paths.keychainPath)).isSymbolicLink()).toBe(true);
+    expect(await readlink(paths.keychainPath)).toBe("antigravity.keychain-db");
+    expect((await stat(privateKeychainPath)).mode & 0o777).toBe(0o600);
+
+    await prepareIsolatedAntigravityHome(paths, {
+      platform: "darwin",
+      runSecurityCommand,
+    });
+    expect(calls).toEqual([
+      ["create-keychain", "-p", "", privateKeychainPath],
+      ["unlock-keychain", "-p", "", privateKeychainPath],
+      ["unlock-keychain", "-p", "", privateKeychainPath],
+    ]);
+  });
+
+  it("replaces a legacy real login keychain without using its password", async () => {
+    const root = await temporaryDirectory("supi-antigravity-keychain-migration-");
+    const paths = getIsolatedAntigravityPaths(root);
+    const privateKeychainPath = join(dirname(paths.keychainPath), "antigravity.keychain-db");
+    await mkdir(dirname(paths.keychainPath), { recursive: true });
+    await writeFile(paths.keychainPath, "legacy keychain");
+    const calls: string[][] = [];
+    const runSecurityCommand = async (args: readonly string[]): Promise<void> => {
+      calls.push([...args]);
+      if (args[0] === "create-keychain") {
+        const keychainPath = args.at(-1);
+        if (!keychainPath) throw new Error("The test keychain path is missing.");
+        await writeFile(keychainPath, "");
+      }
+    };
+
+    await prepareIsolatedAntigravityHome(paths, {
+      platform: "darwin",
+      runSecurityCommand,
+    });
+
+    expect((await lstat(paths.keychainPath)).isSymbolicLink()).toBe(true);
+    expect(calls).toEqual([
+      ["create-keychain", "-p", "", privateKeychainPath],
+      ["unlock-keychain", "-p", "", privateKeychainPath],
+    ]);
+  });
+
+  it("does not create a keychain on Linux", async () => {
+    const root = await temporaryDirectory("supi-antigravity-linux-");
+    const paths = getIsolatedAntigravityPaths(root);
+    const runSecurityCommand = async (): Promise<void> => {
+      throw new Error("Security commands are not supported on Linux.");
+    };
+
+    await prepareIsolatedAntigravityHome(paths, {
+      platform: "linux",
+      runSecurityCommand,
+    });
+
+    await expect(stat(paths.keychainPath)).rejects.toThrow();
   });
 
   it("prints the resolved isolated sign-in command", async () => {

@@ -21,7 +21,7 @@ Antigravity's permission-controlled ability to retrieve external sources during 
 _Avoid_: SuPi web search, automatic web access, web mode
 
 **Isolated Antigravity Home**:
-The package-owned Antigravity profile that keeps configuration, authentication, customizations, and conversation state separate from the user's normal Antigravity profile. It is stable across Antigravity Runs so Conversation Handles can continue.
+The package-owned Antigravity profile that keeps configuration, authentication, customizations, and conversation state separate from the user's normal Antigravity profile. On macOS, it also owns a private keychain exposed as the login keychain for Antigravity credentials. It is stable across Antigravity Runs so Conversation Handles can continue.
 _Avoid_: user home, temporary home, sandbox
 
 **Inspection Permission Set**:

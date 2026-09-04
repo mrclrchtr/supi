@@ -23,7 +23,9 @@ cd "<consultation-workspace>" &&
 HOME="<isolated-home>" AGY_CLI_DISABLE_AUTO_UPDATE=true agy
 ```
 
-Run the command, sign in, exit Antigravity, and reload Pi. The installed `agy` version must be at least `1.1.24`.
+On macOS, the package also creates and unlocks a private keychain inside the Isolated Antigravity Home. This avoids the macOS warning about a missing default keychain without prompting for the normal keychain password. Run the command, sign in, exit Antigravity, and reload Pi. The installed `agy` version must be at least `1.1.24`.
+
+If macOS displays `antigravity.` in the warning, the final `.` is sentence punctuation. It is not part of a keychain name.
 
 ## `antigravity_run`
 
