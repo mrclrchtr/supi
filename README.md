@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/github/license/mrclrchtr/supi)](LICENSE)
 [![Tweet](https://img.shields.io/twitter/url/http/shields.io.svg?style=social)](https://twitter.com/intent/tweet?text=SuPi%20is%20an%20open-source%20extension%20stack%20for%20the%20Pi%20coding%20agent%3A%20LSP%20%2B%20Tree-sitter%20code%20intelligence%2C%20semantic%20refactoring%2C%20code%20review%2C%20web%20docs%2C%20and%20more&url=https%3A%2F%2Fgithub.com%2Fmrclrchtr%2Fsupi&hashtags=pi,codingagent)
 
-SuPi (short for **Super Pi**) is an open-source TypeScript extension stack for the [Pi coding agent](https://github.com/earendil-works/pi). It adds LSP and Tree-sitter code intelligence, semantic refactoring, parallel code review, web and Context7 documentation access, structured ask-user forms, scoped skill controls, quick skill input, and context/cache observability.
+SuPi (short for **Super Pi**) is an open-source TypeScript extension stack for the [Pi coding agent](https://github.com/earendil-works/pi). It adds LSP and Tree-sitter code intelligence, semantic refactoring, parallel code review, web and Context7 documentation access, structured ask-user forms, scoped skill controls, quick skill input, and context/session observability.
 
 Install the recommended stack or pick only the packages you need. You keep prompting Pi normally; SuPi gives the agent additional tools and context it can use directly.
 
@@ -36,7 +36,7 @@ Tree-sitter support is bundled. Full LSP features require the matching language-
 - **Structured decisions** — ask you focused choice or text questions through a keyboard-driven form with [`supi-ask-user`](packages/supi-ask-user/README.md).
 - **Review workflows** — run independent, inspection-only reviews of exact Git targets with [`supi-review`](packages/supi-review/README.md).
 - **Agent Profile policy** — discover explicit `explore` and `general` profiles with bounded resource envelopes through [`supi-agent`](packages/supi-agent/README.md).
-- **Operational awareness** — inspect context pressure, prompt-cache health, and SuPi debug events with `supi-context`, `supi-cache`, and `supi-debug`.
+- **Operational awareness** — inspect context pressure, cache history and forensics, and SuPi debug events with `supi-context`, `supi-cache`, and `supi-debug`. PI owns live cache statistics and cache-miss notices.
 - **Repository guidance** — maintain `CLAUDE.md` and `AGENTS.md` files with the skills in [`supi-claude-md`](packages/supi-claude-md/README.md).
 - **Skills on your terms** — use [`supi-skills`](packages/supi-skills/README.md) to choose, globally or per project, whether Pi can select each skill automatically, whether only you can start it, or whether it is disabled. Type `$` to search and start installed skills without remembering their full command names.
 - **Session polish** — prompt stashing, shortcuts, activity indicators, advisory prompt suggestions, and default shell timeouts.
@@ -129,7 +129,7 @@ Most packages in this section are installed by `install-all.sh` on top of the re
 | [`supi-review`](packages/supi-review/README.md) | Caller-defined, inspection-only reviews in managed child sessions | `pi install npm:@mrclrchtr/supi-review` |
 | [`supi-agent`](packages/supi-agent/README.md) | Explicit Agent Profile catalogue and child resource policy | `pi install npm:@mrclrchtr/supi-agent` |
 | [`supi-antigravity`](packages/supi-antigravity/README.md) | **Agent** — bounded Antigravity consultations with isolated workspace access and evidence | `pi install npm:@mrclrchtr/supi-antigravity` |
-| [`supi-cache`](packages/supi-cache/README.md) | Prompt-cache monitoring and cross-session regression forensics | `pi install npm:@mrclrchtr/supi-cache` |
+| [`supi-cache`](packages/supi-cache/README.md) | Prompt-cache history and cross-session regression forensics | `pi install npm:@mrclrchtr/supi-cache` |
 | [`supi-insights`](packages/supi-insights/README.md) | Historical session analytics and shareable HTML reports | `pi install npm:@mrclrchtr/supi-insights` |
 | [`supi-claude-md`](packages/supi-claude-md/README.md) | Skills for auditing and revising repository instruction files | `pi install npm:@mrclrchtr/supi-claude-md` |
 | [`supi-bash-timeout`](packages/supi-bash-timeout/README.md) | Default timeouts so forgotten shell limits do not stall the session | `pi install npm:@mrclrchtr/supi-bash-timeout` |

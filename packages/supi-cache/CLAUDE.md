@@ -2,52 +2,64 @@
 
 ## Scope
 
-`@mrclrchtr/supi-cache` is a real-time prompt cache health monitor plus a cross-session forensics engine. It tracks per-turn cache hit rates, detects regressions with root-cause diagnosis (compaction, model change, prompt change), and provides two user commands and an agent-callable tool.
+`@mrclrchtr/supi-cache` provides per-turn cache history and cross-session cache forensics. PI owns live cache statistics, cache-miss notices, compaction notices, and provider recovery notices.
 
 ## Architecture
 
 ```
 src/
-├── monitor/          Real-time, event-driven monitoring
-│   ├── monitor.ts    Extension factory — event wiring, commands, tool registration
-│   ├── state.ts      Per-turn TurnRecord store + regression detection + cause tracking
-│   └── status.ts     Compact turn cache-hit stats-line contribution ("TCH80%↑")
-├── forensics/        Cross-session, query-driven investigation
-│   ├── forensics.ts  Engine: SessionManager.listAll → parse → extract → query
-│   ├── extract.ts    Branch walking: cache turn extraction + timestamp-aligned tool windows
+├── forensics/        Native session extraction, queries, reports, and extension wiring
+│   ├── extension.ts  Commands, renderers, and tool registration
+│   ├── extract.ts    Native assistant usage, legacy record migration, tool windows
+│   ├── forensics.ts  SessionManager.listAll → parse → extract → query
 │   ├── queries.ts    Pure query functions: hotspots, breakdown, correlate, idle
-│   ├── redact.ts     Shape fingerprint computation + human-detail stripping
+│   ├── redact.ts     Shape fingerprint computation and human-detail stripping
+│   ├── turns.ts      Normalized cache turns and legacy cause helpers
 │   └── types.ts      ForensicsFinding, CauseBreakdown, ToolCallShape, ParamShape
-├── report/           TUI rendering for commands
-│   ├── history.ts    /supi-cache-history — per-turn table with regression details
-│   └── forensics.ts  /supi-cache-forensics — themed breakdown/hotspot/correlate/idle views
+├── report/
+│   ├── history.ts    /supi-cache-history — per-turn table
+│   └── forensics.ts  /supi-cache-forensics — themed query views
 ├── tool/
-│   └── guidance.ts   promptGuidelines + promptSnippet + toolDescription for `cache_forensics`
-├── fingerprint.ts    Prompt component fingerprinting (context files, tools, skills, etc.)
-├── config.ts         Shared config (supi-cache section, legacy fallback for cache-monitor)
-├── settings-registration.ts  /supi-settings wiring
+│   └── cache_forensics/  prompt metadata, execution, result, and registration
+├── fingerprint.ts    Prompt fingerprints retained for old monitor records
+├── config.ts         Forensics thresholds with legacy config fallback
+├── settings-registration.ts  Cache-forensics threshold settings
 └── hash.ts           FNV-1a fast string hashing
 
-Tests live in `__tests__/unit/`, mirroring the source domain structure:
-`unit/monitor/`, `unit/forensics/`, `unit/report/`, plus flat `unit/config.test.ts`
-and `unit/fingerprint.test.ts`.
+Tests live in `__tests__/unit/`, mirroring the source domains.
 ```
 
-## Commands and tools
+The old live monitor, footer contribution, and notification path were removed
+because PI now provides those surfaces. The settings module now exposes only
+forensics thresholds.
+
+## Commands and tool
 
 | Surface  | Name | Purpose |
 |----------|------|---------|
-| Command  | `/supi-cache-history` | Per-turn cache metrics table for the current session |
-| Command  | `/supi-cache-forensics` | Cross-session regression investigation with TUI report |
-| Tool     | `cache_forensics` | Agent-callable — returns structured JSON with shape fingerprints |
+| Command  | `/supi-cache-history` | Per-turn cache usage table for the current branch |
+| Command  | `/supi-cache-forensics` | Cross-session cache investigation |
+| Tool     | `cache_forensics` | Agent-callable query with redacted shape fingerprints |
 
-Documented rendering exception (`docs/conventions/tool-rendering.md` § Scope): `cache_forensics` is deliberately machine-only. Its result is a bounded JSON envelope for agent consumption, so it uses PI's generic transcript fallback and defines no `renderCall`/`renderResult`. Human forensics output goes through the `/supi-cache-forensics` command renderer instead.
+The `cache_forensics` tool is machine-only. List patterns return at most 50
+findings by default and accept a limit up to 200. Its result is a bounded JSON
+envelope for agent use. Human forensics output uses the command renderer.
 
 ## Key gotchas
 
-- Config section is `supi-cache` with a backwards-compatible fallback read from the old `cache-monitor` section.
-- `idleThresholdMinutes` (default 5) classifies `unknown`-cause regressions as `idle` when the inter-turn gap exceeds the threshold.
-- `regressionThreshold` (default 25) gates which unknown-cause drops become forensics findings — drops below this threshold are excluded from hotspots, breakdowns, and idle detection unless the turn has a persisted cause.
-- Tool correlation windows align by turn timestamps, not by assistant message count, so no-usage assistant messages don't skew the window.
-- The forensics engine strips `_prefixed` fields (`_pathsInvolved`, `_commandSummaries`) before returning to the agent — these are human-only details shown in the TUI renderer.
-- `resolveTurnCause()` in `state.ts` handles note-to-cause fallback for legacy session records that only have `note` strings (e.g. `"⚠ compaction"`).
+- Native assistant message usage is the source of truth. Old `supi-cache-turn`
+  entries are read only to retain legacy causes and prompt fingerprints.
+- Native prompt tokens are `input + cacheRead + cacheWrite`, matching PI.
+- A compaction or branch-summary entry resets the comparison window. A native
+  `model_change` entry identifies the next model request.
+- Native sessions cannot identify prompt-component changes because PI does not
+  persist system-prompt fingerprints. Prompt-change details only remain for old
+  records that contain them.
+- Forensics thresholds read the `cache` section, then the old `cache-monitor`
+  section. The old `enabled` and `notifications` values are ignored. Configure
+  live PI notices with `showCacheMissNotices`.
+- Tool correlation uses native assistant timestamps, not assistant-message count.
+- The forensics engine strips `_prefixed` fields before returning results to the
+  agent. These fields are for human report details only.
+- Do not import PI's private `dist/core/cache-stats` module. It is not a public
+  package export. Keep the native extraction adapter small and provider-neutral.

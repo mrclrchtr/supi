@@ -4,9 +4,10 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import type { Static } from "typebox";
-import { loadCacheMonitorConfig } from "../../config.ts";
+import { loadCacheForensicsConfig } from "../../config.ts";
 import { runForensics } from "../../forensics/forensics.ts";
 import { stripHumanDetail } from "../../forensics/redact.ts";
+import { normalizeFindingsLimit } from "../../forensics/types.ts";
 import { buildForensicsResult, type ForensicsBoundQuery } from "./result.ts";
 import type { cacheForensicsSpec } from "./spec.ts";
 
@@ -27,18 +28,20 @@ export type CacheForensicsExecute = (
 export function makeCacheForensicsExecute(): CacheForensicsExecute {
   // biome-ignore lint/complexity/useMaxParams: pi tool execute signature
   return async (_toolCallId, params, _signal, _onUpdate, ctx) => {
-    const config = loadCacheMonitorConfig(ctx.cwd);
+    const config = loadCacheForensicsConfig(ctx.cwd);
     const query: ForensicsBoundQuery = {
       pattern: (params.pattern as string) ?? "breakdown",
       since: (params.since as string) ?? "7d",
       minDrop: (params.minDrop as number) ?? 0,
       maxSessions: (params.maxSessions as number) ?? 100,
+      limit: normalizeFindingsLimit(params.limit),
     };
     const result = await runForensics({
       pattern: query.pattern as ForensicsPattern,
       since: query.since,
       minDrop: query.minDrop,
       maxSessions: query.maxSessions,
+      maxFindings: query.limit,
       idleThresholdMinutes: config.idleThresholdMinutes,
       regressionThreshold: config.regressionThreshold,
     });

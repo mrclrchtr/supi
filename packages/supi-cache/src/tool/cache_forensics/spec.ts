@@ -1,5 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
+import { DEFAULT_FINDINGS_LIMIT, MAX_FINDINGS_LIMIT } from "../../forensics/types.ts";
 import { makeCacheForensicsExecute } from "./execute.ts";
 
 export const CACHE_FORENSICS_TOOL_NAME = "cache_forensics";
@@ -29,6 +30,14 @@ export const cacheForensicsSpec = {
       Type.Number({
         description: "Maximum sessions to scan. Default: 100",
         default: 100,
+      }),
+    ),
+    limit: Type.Optional(
+      Type.Integer({
+        minimum: 1,
+        maximum: MAX_FINDINGS_LIMIT,
+        description: `Maximum findings to return. Default: ${DEFAULT_FINDINGS_LIMIT}`,
+        default: DEFAULT_FINDINGS_LIMIT,
       }),
     ),
   }),

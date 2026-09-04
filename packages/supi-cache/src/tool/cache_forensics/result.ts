@@ -19,6 +19,7 @@ export interface ForensicsBoundQuery {
   since: string;
   minDrop: number;
   maxSessions: number;
+  limit: number;
 }
 
 /** Result of bounding a forensics tool output. */
@@ -55,7 +56,7 @@ export function boundForensicsOutput(
   result: ForensicsResult,
   query: ForensicsBoundQuery,
 ): BoundedForensicsOutput {
-  const full = JSON.stringify(result, null, 2);
+  const full = JSON.stringify(normalizeForensicsOutput(result), null, 2);
   const { lines, bytes } = measure(full);
   if (lines <= DEFAULT_MAX_LINES && bytes <= DEFAULT_MAX_BYTES) {
     return { text: full, truncated: false };
@@ -76,10 +77,26 @@ export function boundForensicsOutput(
     since: query.since,
     minDrop: query.minDrop,
     maxSessions: query.maxSessions,
+    limit: query.limit,
+    ...(result.findingsTotal !== undefined ? { findingsTotal: result.findingsTotal } : {}),
+    ...(result.findingsLimit !== undefined ? { findingsLimit: result.findingsLimit } : {}),
     sessionsScanned: result.sessionsScanned,
     turnsAnalyzed: result.turnsAnalyzed,
   };
   return { text: JSON.stringify(envelope, null, 2), truncated: true, fullOutputPath };
+}
+
+function normalizeForensicsOutput(result: ForensicsResult): ForensicsResult {
+  if (!result.findings) return result;
+
+  return {
+    ...result,
+    findings: result.findings.map((finding) =>
+      finding.missedCost === undefined
+        ? finding
+        : { ...finding, missedCost: Number(finding.missedCost.toFixed(6)) },
+    ),
+  };
 }
 
 /** Assemble the model-facing cache_forensics result for one bounded query. */

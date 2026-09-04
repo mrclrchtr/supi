@@ -1,37 +1,53 @@
-// Configuration for supi-cache.
-//
-// Config shape (in supi shared config, "cache" section):
-// {
-//   "enabled": true,              // enable/disable cache monitoring
-//   "notifications": true,        // show regression warning notifications
-//   "regressionThreshold": 25,    // percentage-point drop that triggers a warning
-//   "idleThresholdMinutes": 5     // gap in minutes to classify as idle-time regression
-// }
+// Configuration for historical cache forensics.
 
-import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
+import { loadSupiConfigSectionForScope } from "@mrclrchtr/supi-core/config";
 
-export interface CacheMonitorConfig extends Record<string, unknown> {
-  /** Enable/disable cache monitoring. Default: true */
-  enabled: boolean;
-  /** Show regression warning notifications. Default: true */
-  notifications: boolean;
-  /** Percentage-point drop that triggers a regression warning. Default: 25 */
+/** Settings that affect cache-forensics queries. */
+export interface CacheForensicsConfig extends Record<string, unknown> {
+  /** Percentage-point drop used for unknown-cause findings. */
   regressionThreshold: number;
-  /** Gap in minutes between turns to classify as idle-time regression. Default: 5 */
+  /** Gap in minutes used to classify unknown findings as idle. */
   idleThresholdMinutes: number;
 }
 
-export const CACHE_MONITOR_DEFAULTS: CacheMonitorConfig = {
-  enabled: true,
-  notifications: true,
+export const CACHE_FORENSICS_DEFAULTS: CacheForensicsConfig = {
   regressionThreshold: 25,
   idleThresholdMinutes: 5,
 };
 
-export function loadCacheMonitorConfig(cwd: string, homeDir?: string): CacheMonitorConfig {
-  // Read the new section first, then fall back to the old section for upgrades.
-  const merged = loadSupiConfig("cache", cwd, CACHE_MONITOR_DEFAULTS, { homeDir });
-  const legacy = loadSupiConfig("cache-monitor", cwd, CACHE_MONITOR_DEFAULTS, { homeDir });
-  // Prefer new-section values when present; keep defaults as the base.
-  return { ...CACHE_MONITOR_DEFAULTS, ...legacy, ...merged };
+/**
+ * Load forensics thresholds from the current or legacy cache section.
+ *
+ * The old `enabled` and `notifications` settings are intentionally ignored.
+ * Pi owns live cache notices through `showCacheMissNotices`.
+ */
+export function loadCacheForensicsConfig(cwd: string, homeDir?: string): CacheForensicsConfig {
+  const legacy = loadSection("cache-monitor", cwd, homeDir);
+  const current = loadSection("cache", cwd, homeDir);
+  const merged = { ...CACHE_FORENSICS_DEFAULTS, ...legacy, ...current };
+
+  return {
+    regressionThreshold: finiteNumber(
+      merged.regressionThreshold,
+      CACHE_FORENSICS_DEFAULTS.regressionThreshold,
+    ),
+    idleThresholdMinutes: finiteNumber(
+      merged.idleThresholdMinutes,
+      CACHE_FORENSICS_DEFAULTS.idleThresholdMinutes,
+    ),
+  };
+}
+
+function loadSection(
+  section: string,
+  cwd: string,
+  homeDir: string | undefined,
+): Record<string, unknown> {
+  const global = loadSupiConfigSectionForScope(section, cwd, { scope: "global", homeDir }) ?? {};
+  const project = loadSupiConfigSectionForScope(section, cwd, { scope: "project", homeDir }) ?? {};
+  return { ...global, ...project };
+}
+
+function finiteNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }

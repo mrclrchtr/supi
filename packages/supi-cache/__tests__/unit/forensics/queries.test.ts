@@ -3,6 +3,7 @@ import {
   breakdownCauses,
   detectIdleRegressions,
   findHotspots,
+  limitFindings,
 } from "../../../src/forensics/queries.ts";
 import type { ForensicsFinding } from "../../../src/forensics/types.ts";
 
@@ -44,6 +45,27 @@ describe("findHotspots", () => {
     expect(result).toHaveLength(2);
     expect(result.map((f) => f.drop)).toEqual([50, 30]);
   });
+
+  it.concurrent("excludes structural events without a measurable drop", () => {
+    const findings = [
+      makeFinding({ drop: 0, cause: { type: "compaction" } }),
+      makeFinding({ drop: 25 }),
+    ];
+
+    expect(findHotspots(findings)).toEqual([findings[1]]);
+  });
+});
+
+describe("limitFindings", () => {
+  it.concurrent("keeps the requested top findings without changing their order", () => {
+    const findings = [
+      makeFinding({ drop: 70 }),
+      makeFinding({ drop: 50 }),
+      makeFinding({ drop: 30 }),
+    ];
+
+    expect(limitFindings(findings, 2)).toEqual(findings.slice(0, 2));
+  });
 });
 
 describe("breakdownCauses", () => {
@@ -58,6 +80,7 @@ describe("breakdownCauses", () => {
     const result = breakdownCauses(findings);
     expect(result).toEqual({
       compaction: 2,
+      branch_summary: 0,
       model_change: 0,
       prompt_change: 1,
       unknown: 1,

@@ -113,7 +113,7 @@ When multiple SuPi packages need the same path, URI, config, or session helper s
 | `supi` | keep flat meta-package surface (`src/api.ts`, `src/extension.ts`) |
 | `supi-ask-user` | per-tool `tool/ask_user/`; interactive form stays in `ui/` |
 | `supi-bash-timeout` | stay flat unless it grows |
-| `supi-cache` | domain-first: `forensics/`, `monitor/`, `report/` + per-tool `tool/cache_forensics/` |
+| `supi-cache` | domain-first: `forensics/`, `report/` + per-tool `tool/cache_forensics/` |
 | `supi-claude-md` | skills-only behavior with thin `resources_discover` extension; keep flat |
 | `supi-code-intelligence` | per-tool directories for the eight `code_*` tools + shared tool modules; keep `app/`, `session/`, `substrate/`, `analysis/`, `ui/` |
 | `supi-code-runtime` | library-only: flat source with `capability/` + `workspace/`; no pi extension |

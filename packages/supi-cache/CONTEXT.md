@@ -1,5 +1,3 @@
 # supi-cache
 
-Prompt cache health monitoring and cross-session forensics for PI. Provides `/supi-cache` command and `cache_forensics` tool.
-
-See also: root `CONTEXT.md` (Context Usage Monitor, Context Efficiency).
+Per-turn cache history and cross-session cache forensics for PI. PI owns live cache statistics and cache-miss notifications. The package provides `/supi-cache-history`, `/supi-cache-forensics`, and `cache_forensics`.

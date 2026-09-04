@@ -20,7 +20,14 @@ describe("formatForensicsReport", () => {
     const lines = formatForensicsReport(
       {
         pattern: "breakdown",
-        breakdown: { compaction: 2, model_change: 1, prompt_change: 0, unknown: 1, idle: 0 },
+        breakdown: {
+          compaction: 2,
+          branch_summary: 0,
+          model_change: 1,
+          prompt_change: 0,
+          unknown: 1,
+          idle: 0,
+        },
         findings: [
           {
             sessionId: "a",
@@ -94,7 +101,14 @@ describe("formatForensicsReport", () => {
     const lines = formatForensicsReport(
       {
         pattern: "breakdown",
-        breakdown: { compaction: 0, model_change: 0, prompt_change: 0, unknown: 5, idle: 3 },
+        breakdown: {
+          compaction: 0,
+          branch_summary: 0,
+          model_change: 0,
+          prompt_change: 0,
+          unknown: 5,
+          idle: 3,
+        },
         findings: [],
         sessionsScanned: 2,
         turnsAnalyzed: 50,
@@ -104,6 +118,22 @@ describe("formatForensicsReport", () => {
 
     expect(lines.some((l: string) => l.includes("idle regressions"))).toBe(true);
     expect(lines.some((l: string) => l.includes("unknown drops with turn gaps"))).toBe(true);
+  });
+
+  it("shows when a list result was limited", () => {
+    const lines = formatForensicsReport(
+      {
+        pattern: "hotspots",
+        findings: [],
+        findingsTotal: 75,
+        findingsLimit: 50,
+        sessionsScanned: 4,
+        turnsAnalyzed: 100,
+      },
+      mockTheme,
+    );
+
+    expect(lines.some((l: string) => l.includes("Showing 0 of 75 findings (limit 50)"))).toBe(true);
   });
 
   it("renders hotspot findings with cause and drop", () => {

@@ -1,1 +1,1 @@
-export { default } from "./monitor/monitor.ts";
+export { default } from "./forensics/extension.ts";

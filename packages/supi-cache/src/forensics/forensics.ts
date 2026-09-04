@@ -2,20 +2,35 @@
 
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { getActiveBranchEntries } from "@mrclrchtr/supi-core/session";
-import { resolveTurnCause } from "../monitor/state.ts";
 import {
   extractCacheTurnEntries,
   extractToolCallWindows,
   findPreviousComparableTurn,
   parseSessionFile,
 } from "./extract.ts";
-import { breakdownCauses, correlateTools, detectIdleRegressions, findHotspots } from "./queries.ts";
-import type { CauseBreakdown, ForensicsFinding, ForensicsOptions } from "./types.ts";
+import {
+  breakdownCauses,
+  correlateTools,
+  detectIdleRegressions,
+  findHotspots,
+  limitFindings,
+} from "./queries.ts";
+import { type CacheTurn, resolveTurnCause } from "./turns.ts";
+import {
+  type CauseBreakdown,
+  type ForensicsFinding,
+  type ForensicsOptions,
+  normalizeFindingsLimit,
+} from "./types.ts";
 
 export interface ForensicsResult {
   pattern: ForensicsOptions["pattern"];
   /** Present for hotspots, correlate, and idle patterns. */
   findings?: ForensicsFinding[];
+  /** Total findings before the result limit, when the result was limited. */
+  findingsTotal?: number;
+  /** Maximum findings returned, when the result was limited. */
+  findingsLimit?: number;
   /** Present for breakdown pattern. */
   breakdown?: CauseBreakdown;
   sessionsScanned: number;
@@ -37,6 +52,7 @@ export async function runForensics(options: ForensicsOptions): Promise<Forensics
   const sinceMs = parseDuration(options.since);
   const cutoff = Date.now() - sinceMs;
   const maxSessions = options.maxSessions ?? 100;
+  const maxFindings = normalizeFindingsLimit(options.maxFindings);
   const idleThreshold = options.idleThresholdMinutes ?? 5;
   const regressionThreshold = options.regressionThreshold ?? 25;
   const lookback = options.lookback ?? 2;
@@ -78,7 +94,13 @@ export async function runForensics(options: ForensicsOptions): Promise<Forensics
   switch (options.pattern) {
     case "hotspots": {
       const findings = findHotspots(allFindings, minDrop);
-      return { pattern: "hotspots", findings, sessionsScanned, turnsAnalyzed };
+      return makeFindingsResult({
+        pattern: "hotspots",
+        findings,
+        maxFindings,
+        sessionsScanned,
+        turnsAnalyzed,
+      });
     }
     case "breakdown": {
       const bd = breakdownCauses(allFindings);
@@ -91,11 +113,28 @@ export async function runForensics(options: ForensicsOptions): Promise<Forensics
     }
     case "correlate": {
       const findings = correlateTools(allFindings);
-      return { pattern: "correlate", findings, sessionsScanned, turnsAnalyzed };
+      return makeFindingsResult({
+        pattern: "correlate",
+        findings,
+        maxFindings,
+        sessionsScanned,
+        turnsAnalyzed,
+      });
     }
     case "idle": {
-      const findings = allFindings.filter((f) => f.cause.type === "idle");
-      return { pattern: "idle", findings, sessionsScanned, turnsAnalyzed };
+      const findings = allFindings
+        .filter((f) => f.cause.type === "idle")
+        .sort((a, b) => {
+          const gap = (b.idleGapMinutes ?? 0) - (a.idleGapMinutes ?? 0);
+          return gap !== 0 ? gap : b.drop - a.drop;
+        });
+      return makeFindingsResult({
+        pattern: "idle",
+        findings,
+        maxFindings,
+        sessionsScanned,
+        turnsAnalyzed,
+      });
     }
     default: {
       return { pattern: options.pattern, sessionsScanned, turnsAnalyzed };
@@ -103,11 +142,32 @@ export async function runForensics(options: ForensicsOptions): Promise<Forensics
   }
 }
 
+function makeFindingsResult(options: {
+  pattern: ForensicsOptions["pattern"];
+  findings: ForensicsFinding[];
+  maxFindings: number;
+  sessionsScanned: number;
+  turnsAnalyzed: number;
+}): ForensicsResult {
+  const limitedFindings = limitFindings(options.findings, options.maxFindings);
+  const wasLimited = limitedFindings.length < options.findings.length;
+
+  return {
+    pattern: options.pattern,
+    findings: limitedFindings,
+    sessionsScanned: options.sessionsScanned,
+    turnsAnalyzed: options.turnsAnalyzed,
+    ...(wasLimited
+      ? { findingsTotal: options.findings.length, findingsLimit: options.maxFindings }
+      : {}),
+  };
+}
+
 /** Build findings from a single session's turns. */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: regression detection requires multiple condition checks
 export function buildFindings(
   sessionId: string,
-  turns: import("../monitor/state.ts").TurnRecord[],
+  turns: CacheTurn[],
   toolWindows: Map<number, import("./types.ts").ToolCallShape[]>,
   regressionThreshold: number,
 ): ForensicsFinding[] {
@@ -132,7 +192,12 @@ export function buildFindings(
     }
 
     const gapMs = prevTurn !== undefined ? turn.timestamp - prevTurn.timestamp : 0;
-    const idleGapMinutes = gapMs > 0 ? Math.round(gapMs / 1000 / 60) : undefined;
+    const idleGapMinutes =
+      turn.idleMs !== undefined
+        ? Math.round(turn.idleMs / 1000 / 60)
+        : gapMs > 0
+          ? Math.round(gapMs / 1000 / 60)
+          : undefined;
 
     const toolsBefore = toolWindows.get(turn.turnIndex) ?? [];
     const { pathsInvolved, commandSummaries } = extractHumanDetail(toolsBefore);
@@ -146,6 +211,9 @@ export function buildFindings(
       cause: resolvedCause ?? { type: "unknown" },
       toolsBefore,
       idleGapMinutes,
+      ...(turn.missedTokens !== undefined ? { missedTokens: turn.missedTokens } : {}),
+      ...(turn.missedCost !== undefined ? { missedCost: turn.missedCost } : {}),
+      ...(turn.modelChanged ? { modelChanged: true } : {}),
       ...(pathsInvolved.length > 0 ? { _pathsInvolved: pathsInvolved } : {}),
       ...(commandSummaries.length > 0 ? { _commandSummaries: commandSummaries } : {}),
     });

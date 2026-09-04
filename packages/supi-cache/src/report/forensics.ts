@@ -6,6 +6,8 @@ import type { CauseBreakdown, ForensicsFinding } from "../forensics/types.ts";
 export interface ForensicsReportSnapshot {
   pattern: string;
   findings?: ForensicsFinding[];
+  findingsTotal?: number;
+  findingsLimit?: number;
   breakdown?: CauseBreakdown;
   sessionsScanned: number;
   turnsAnalyzed: number;
@@ -25,6 +27,17 @@ export function formatForensicsReport(snapshot: ForensicsReportSnapshot, theme: 
     ),
   );
   lines.push("");
+
+  const returnedFindings = snapshot.findings?.length ?? 0;
+  if (snapshot.findingsTotal !== undefined && snapshot.findingsLimit !== undefined) {
+    lines.push(
+      theme.fg(
+        "dim",
+        `Showing ${returnedFindings} of ${snapshot.findingsTotal} findings (limit ${snapshot.findingsLimit})`,
+      ),
+    );
+    lines.push("");
+  }
 
   if (snapshot.pattern === "breakdown" && snapshot.breakdown) {
     lines.push(
@@ -128,6 +141,11 @@ function formatFindings(findings: ForensicsFinding[], pattern: string, theme: Th
     if (f.previousRate !== undefined && f.currentRate !== undefined) {
       lines.push(`    ${f.previousRate}% → ${f.currentRate}%`);
     }
+    if (f.missedTokens !== undefined) {
+      const cost =
+        f.missedCost !== undefined && f.missedCost >= 0.01 ? ` (~$${f.missedCost.toFixed(2)})` : "";
+      lines.push(theme.fg("dim", `    ${f.missedTokens.toLocaleString()} tokens re-billed${cost}`));
+    }
 
     if (pattern === "correlate" || pattern === "idle") {
       if (f.toolsBefore.length > 0) {
@@ -153,6 +171,8 @@ function formatCause(cause: ForensicsFinding["cause"]): string {
   switch (cause.type) {
     case "compaction":
       return "compaction";
+    case "branch_summary":
+      return "branch summary";
     case "model_change":
       return `model changed${cause.model !== "unknown" ? ` to ${cause.model}` : ""}`;
     case "prompt_change":

@@ -33,7 +33,7 @@ function makeResult(findings: ForensicsFinding[]): ForensicsResult {
   };
 }
 
-const query = { pattern: "hotspots", since: "7d", minDrop: 5, maxSessions: 100 };
+const query = { pattern: "hotspots", since: "7d", minDrop: 5, maxSessions: 100, limit: 50 };
 
 describe("boundForensicsOutput", () => {
   it("returns serialized JSON unchanged when it fits both limits", () => {
@@ -45,9 +45,16 @@ describe("boundForensicsOutput", () => {
     expect(output.text).toBe(JSON.stringify(result, null, 2));
   });
 
+  it("rounds floating-point missed costs in serialized findings", () => {
+    const result = makeResult([{ ...makeFinding("s1", 1), missedCost: 0.39730000000000004 }]);
+    const output = boundForensicsOutput(result, query);
+
+    expect(JSON.parse(output.text).findings[0].missedCost).toBe(0.3973);
+  });
+
   it("returns a summary envelope when the result exceeds the line limit", () => {
     const findings = Array.from({ length: 410 }, (_, i) => makeFinding(`session-${i}`, i));
-    const result = makeResult(findings);
+    const result = { ...makeResult(findings), findingsTotal: 410, findingsLimit: 50 };
     const output = boundForensicsOutput(result, query);
 
     const full = JSON.stringify(result, null, 2);
@@ -68,6 +75,9 @@ describe("boundForensicsOutput", () => {
     expect(parsed.since).toBe("7d");
     expect(parsed.minDrop).toBe(5);
     expect(parsed.maxSessions).toBe(100);
+    expect(parsed.limit).toBe(50);
+    expect(parsed.findingsTotal).toBe(410);
+    expect(parsed.findingsLimit).toBe(50);
     expect(parsed.sessionsScanned).toBe(12);
     expect(parsed.turnsAnalyzed).toBe(300);
 

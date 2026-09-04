@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-cache",
   "version": "6.3.1",
-  "description": "Monitor prompt-cache health and investigate regressions",
+  "description": "Inspect prompt-cache history and investigate regressions",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -21,7 +21,7 @@
     "pi-coding-agent",
     "pi-extension",
     "prompt-cache",
-    "cache-monitoring",
+    "cache-history",
     "cache-forensics",
     "analytics"
   ],

@@ -5,14 +5,19 @@ import type { CauseBreakdown, ForensicsFinding } from "./types.ts";
 /**
  * Rank regression turns by hit-rate drop magnitude.
  *
- * Only includes turns with a computable drop (both current and previous
- * turns have defined hitRate). Results are sorted descending by drop.
+ * Structural events without a measurable drop remain available to breakdown
+ * queries, but they are not hotspots. Results are sorted descending by drop.
  */
 export function findHotspots(
   findings: ForensicsFinding[],
   minDrop: number = 0,
 ): ForensicsFinding[] {
-  return findings.filter((f) => f.drop >= minDrop).sort((a, b) => b.drop - a.drop);
+  return findings.filter((f) => f.drop > 0 && f.drop >= minDrop).sort((a, b) => b.drop - a.drop);
+}
+
+/** Keep the top findings after a query has applied its own filtering and sort. */
+export function limitFindings(findings: ForensicsFinding[], limit: number): ForensicsFinding[] {
+  return findings.slice(0, limit);
 }
 
 /**
@@ -24,6 +29,7 @@ export function findHotspots(
 export function breakdownCauses(findings: ForensicsFinding[]): CauseBreakdown {
   const breakdown: CauseBreakdown = {
     compaction: 0,
+    branch_summary: 0,
     model_change: 0,
     prompt_change: 0,
     unknown: 0,
@@ -47,9 +53,9 @@ export function breakdownCauses(findings: ForensicsFinding[]): CauseBreakdown {
  * extracted from the N assistant messages before that turn.
  */
 export function correlateTools(findings: ForensicsFinding[]): ForensicsFinding[] {
-  // toolWindows are already attached during extraction; this query just
-  // filters findings to those that have toolsBefore data.
-  return findings.filter((f) => f.toolsBefore.length > 0);
+  // Tool windows are already attached during extraction; this query filters
+  // and ranks findings so a result limit keeps the largest drops.
+  return findings.filter((f) => f.toolsBefore.length > 0).sort((a, b) => b.drop - a.drop);
 }
 
 /**

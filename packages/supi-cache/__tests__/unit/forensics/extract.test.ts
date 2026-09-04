@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   extractCacheTurnEntries,
+  extractNativeCacheTurns,
   extractToolCallWindows,
   findPreviousComparableTurn,
 } from "../../../src/forensics/extract.ts";
-import type { TurnRecord } from "../../../src/monitor/state.ts";
+import type { TurnRecord } from "../../../src/forensics/turns.ts";
 
 /** Return an ISO string for the given epoch milliseconds. */
 function iso(epochMs: number): string {
@@ -72,6 +73,248 @@ describe("extractCacheTurnEntries", () => {
       },
     ];
     expect(extractCacheTurnEntries(branch as never)).toEqual([]);
+  });
+});
+
+function assistantEntry(
+  id: string,
+  timestamp: number,
+  usage: { input: number; cacheRead: number; cacheWrite: number },
+  modelInfo: { provider?: string; model?: string } = {},
+) {
+  const provider = modelInfo.provider ?? "anthropic";
+  const model = modelInfo.model ?? "claude";
+
+  return {
+    type: "message",
+    id,
+    parentId: null,
+    timestamp: iso(timestamp),
+    message: {
+      role: "assistant",
+      provider,
+      model,
+      timestamp,
+      content: [],
+      usage: {
+        ...usage,
+        output: 10,
+        totalTokens: usage.input + usage.cacheRead + usage.cacheWrite + 10,
+        cost: {
+          input: usage.input / 1000,
+          cacheRead: usage.cacheRead / 10000,
+          cacheWrite: usage.cacheWrite / 1000,
+          output: 0,
+          total: 0,
+        },
+      },
+      stopReason: "stop",
+    },
+  };
+}
+
+describe("native cache extraction", () => {
+  it("uses native assistant usage and includes cache writes in the hit rate", () => {
+    const branch = [
+      assistantEntry("1", 1000, { cacheRead: 8000, cacheWrite: 2000, input: 2000 }),
+      assistantEntry("2", 2000, { cacheRead: 5000, cacheWrite: 0, input: 5000 }),
+    ];
+
+    const turns = extractNativeCacheTurns(branch as never);
+
+    expect(turns).toHaveLength(2);
+    expect(turns[0]).toMatchObject({
+      cacheRead: 8000,
+      cacheWrite: 2000,
+      input: 2000,
+      hitRate: 67,
+      note: "cold start",
+    });
+    expect(turns[1]).toMatchObject({
+      hitRate: 50,
+      missedTokens: 5000,
+      modelChanged: false,
+    });
+  });
+
+  it("counts a zero-cache request as a miss after cache activity", () => {
+    const branch = [
+      assistantEntry("1", 1000, { cacheRead: 9000, cacheWrite: 0, input: 1000 }),
+      assistantEntry("2", 2000, { cacheRead: 0, cacheWrite: 0, input: 10000 }),
+    ];
+
+    const turns = extractNativeCacheTurns(branch as never);
+
+    expect(turns[1]).toMatchObject({ hitRate: 0, missedTokens: 10000 });
+  });
+
+  it("uses native entries instead of old duplicate custom records", () => {
+    const branch = [
+      assistantEntry("1", 1000, { cacheRead: 8000, cacheWrite: 0, input: 2000 }),
+      {
+        type: "custom",
+        customType: "supi-cache-turn",
+        id: "2",
+        parentId: "1",
+        timestamp: iso(1001),
+        data: {
+          turnIndex: 1,
+          cacheRead: 1,
+          cacheWrite: 0,
+          input: 999,
+          hitRate: 0,
+          timestamp: 1000,
+        },
+      },
+    ];
+
+    const turns = extractCacheTurnEntries(branch as never);
+
+    expect(turns).toHaveLength(1);
+    expect(turns[0]).toMatchObject({ cacheRead: 8000, input: 2000, hitRate: 80 });
+  });
+
+  it("derives model changes and resets comparison after compaction", () => {
+    const branch = [
+      assistantEntry("1", 1000, { cacheRead: 9000, cacheWrite: 0, input: 1000 }),
+      {
+        type: "model_change",
+        id: "2",
+        parentId: "1",
+        timestamp: iso(2000),
+        provider: "openai",
+        modelId: "gpt-5",
+      },
+      assistantEntry(
+        "3",
+        3000,
+        { cacheRead: 0, cacheWrite: 5000, input: 5000 },
+        {
+          provider: "openai",
+          model: "gpt-5",
+        },
+      ),
+      {
+        type: "compaction",
+        id: "4",
+        parentId: "3",
+        timestamp: iso(4000),
+        summary: "summary",
+        firstKeptEntryId: "3",
+        tokensBefore: 10000,
+      },
+      assistantEntry(
+        "5",
+        5000,
+        { cacheRead: 0, cacheWrite: 1000, input: 9000 },
+        {
+          provider: "openai",
+          model: "gpt-5",
+        },
+      ),
+      assistantEntry(
+        "6",
+        6000,
+        { cacheRead: 5000, cacheWrite: 0, input: 5000 },
+        {
+          provider: "openai",
+          model: "gpt-5",
+        },
+      ),
+    ];
+
+    const turns = extractNativeCacheTurns(branch as never);
+
+    expect(turns[1]).toMatchObject({
+      cause: { type: "model_change", model: "openai/gpt-5" },
+      modelChanged: true,
+    });
+    expect(turns[2]).toMatchObject({
+      cause: { type: "compaction" },
+      cacheReset: true,
+    });
+    expect(findPreviousComparableTurn(turns, 2)).toBeUndefined();
+    expect(findPreviousComparableTurn(turns, 3)).toBe(turns[2]);
+  });
+
+  it("handles branch summaries as cache resets", () => {
+    const branch = [
+      assistantEntry("1", 1000, { cacheRead: 9000, cacheWrite: 0, input: 1000 }),
+      {
+        type: "branch_summary",
+        id: "2",
+        parentId: "1",
+        timestamp: iso(2000),
+        fromId: "1",
+        summary: "summary",
+      },
+      assistantEntry("3", 3000, { cacheRead: 0, cacheWrite: 5000, input: 5000 }),
+    ];
+
+    const turns = extractNativeCacheTurns(branch as never);
+
+    expect(turns[1]).toMatchObject({
+      cause: { type: "branch_summary" },
+      cacheReset: true,
+    });
+  });
+
+  it("keeps prompt fingerprints from old monitor records", () => {
+    const fingerprint = {
+      customPromptHash: 1,
+      appendSystemPromptHash: 0,
+      promptGuidelinesHash: 0,
+      selectedToolsHash: 0,
+      toolSnippetsHash: 0,
+      contextFiles: [],
+      skills: [],
+    };
+    const branch = [
+      assistantEntry("1", 1000, { cacheRead: 9000, cacheWrite: 0, input: 1000 }),
+      {
+        type: "custom",
+        customType: "supi-cache-turn",
+        id: "2",
+        parentId: "1",
+        timestamp: iso(1001),
+        data: {
+          turnIndex: 1,
+          cacheRead: 9000,
+          cacheWrite: 0,
+          input: 1000,
+          hitRate: 90,
+          timestamp: 1000,
+          promptFingerprint: fingerprint,
+        },
+      },
+      assistantEntry("3", 2000, { cacheRead: 500, cacheWrite: 0, input: 9500 }),
+      {
+        type: "custom",
+        customType: "supi-cache-turn",
+        id: "4",
+        parentId: "3",
+        timestamp: iso(2001),
+        data: {
+          turnIndex: 2,
+          cacheRead: 500,
+          cacheWrite: 0,
+          input: 9500,
+          hitRate: 5,
+          timestamp: 2000,
+          note: "⚠ prompt changed",
+          cause: { type: "prompt_change" },
+          promptFingerprint: { ...fingerprint, customPromptHash: 2 },
+        },
+      },
+    ];
+
+    const turns = extractCacheTurnEntries(branch as never);
+
+    expect(turns[0].promptFingerprint).toEqual(fingerprint);
+    expect(turns[1]).toMatchObject({
+      cause: { type: "prompt_change" },
+      note: "⚠ prompt changed",
+    });
   });
 });
 

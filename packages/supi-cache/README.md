@@ -8,7 +8,9 @@
 
 [![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-cache)](https://www.npmjs.com/package/@mrclrchtr/supi-cache)
 
-Adds prompt-cache monitoring and cache-regression forensics to the [pi coding agent](https://github.com/earendil-works/pi).
+Adds per-turn prompt-cache history and cross-session cache forensics to the [pi coding agent](https://github.com/earendil-works/pi).
+
+PI provides live cache statistics and cache-miss notices. Enable its transcript notices with `showCacheMissNotices` in PI settings. This package does not add a second live monitor or a second notification path.
 
 ## Install
 
@@ -16,7 +18,7 @@ Adds prompt-cache monitoring and cache-regression forensics to the [pi coding ag
 pi install npm:@mrclrchtr/supi-cache
 ```
 
-This is a **beta** package. Install individually.
+This is a **beta** package. Install it individually.
 
 For local development:
 
@@ -26,18 +28,18 @@ pi install ./packages/supi-cache
 
 ## What you get
 
-After install, the package does two things:
+After install, the package provides two views:
 
-1. **Monitor the current session**
-   - records per-turn cache usage from assistant messages
-   - updates a footer status for cache health
-   - warns when the cache hit rate drops enough to count as a regression
-   - tries to explain the drop as compaction, model change, prompt change, or unknown
+1. **Current-branch history**
+   - reads usage from native PI assistant messages
+   - shows input, cache reads, cache writes, and hit rate for each request
+   - keeps old prompt-change notes and fingerprints when they exist
 
-2. **Investigate past sessions**
-   - scans session files for cache regressions across time
-   - groups findings into a few built-in query patterns
-   - keeps agent-facing results redacted to structural fingerprints instead of raw command text or file paths
+2. **Historical forensics**
+   - scans active branches across past sessions
+   - finds cache hotspots and idle-time drops
+   - groups model changes, compactions, branch summaries, prompt changes, and unknown causes
+   - correlates drops with redacted tool-call shapes
 
 ![Cache history report](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-cache-history.png)
 
@@ -45,15 +47,15 @@ After install, the package does two things:
 
 ### `/supi-cache-history`
 
-Shows cache history for the current session.
+Shows per-turn cache usage for the current branch.
 
-The report includes per-turn values for:
+The report includes:
 
 - input tokens
-- cache read tokens
-- cache write tokens
-- hit rate
-- notes about detected regressions
+- cache-read tokens
+- cache-write tokens
+- cache hit rate
+- known cause notes from current or old session records
 
 ### `/supi-cache-forensics`
 
@@ -61,54 +63,50 @@ Runs a cross-session investigation.
 
 Supported patterns:
 
-- `breakdown` — count regressions by cause
-- `hotspots` — show the largest drops
-- `correlate` — show which preceding tool calls correlate with drops
-- `idle` — show drops after long gaps between turns
+- `breakdown` — count findings by cause
+- `hotspots` — show the largest hit-rate drops
+- `correlate` — show preceding redacted tool shapes, ranked by hit-rate drop
+- `idle` — show drops after long gaps between requests
 
 Useful flags:
 
 - `--since 7d`
 - `--pattern breakdown`
 - `--min-drop 20`
+- `--limit 50` (maximum findings returned; list patterns default to 50)
 
 ![Cache forensics report](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-cache-forensics.png)
 
 ### `cache_forensics`
 
-Adds one model-callable tool with the same four patterns: `hotspots`, `breakdown`, `correlate`, and `idle`.
+Adds one model-callable tool with the same four patterns. The result uses structural tool fingerprints and removes raw command and path details before it reaches the model.
 
-The tool returns JSON text. Before results are returned to the model, human-only details such as `_pathsInvolved` and `_commandSummaries` are stripped out.
+List patterns return at most 50 findings by default. Use the tool's `limit` parameter, or the command's `--limit` flag, to request up to 200 findings. Hotspots exclude structural events with no measurable drop. The result is also bounded to 2,000 lines or 51,200 bytes. Large results are written to a private temporary file and return a summary envelope.
 
-## Settings
+## Configuration
 
-This package registers a **Cache** section in `/supi-settings`.
-
-Available settings:
-
-- `enabled` — turn monitoring on or off
-- `notifications` — show warning notifications for regressions
-- `regressionThreshold` — percentage-point drop that counts as a regression warning
-- `idleThresholdMinutes` — inactivity gap used to classify idle-time regressions
-
-Defaults:
+Forensics reads these optional values from the `cache` section. They are also available in `/supi-settings` under **Cache Forensics**:
 
 ```json
 {
-  "supi-cache": {
-    "enabled": true,
-    "notifications": true,
+  "cache": {
     "regressionThreshold": 25,
     "idleThresholdMinutes": 5
   }
 }
 ```
 
-The config loader also reads the legacy `cache-monitor` section for upgrades, but `supi-cache` is the current config section.
+The loader also reads these two values from the old `cache-monitor` section. Old `enabled` and `notifications` values are ignored. Configure live PI cache notices with PI's `showCacheMissNotices` setting.
+
+## Native session data
+
+Native assistant-message usage is the source of truth. The package also reads old `supi-cache-turn` custom entries so old sessions keep their prompt-change details. New sessions do not create custom cache records.
 
 ## Source
 
-- `src/monitor/monitor.ts` — live monitoring, commands, and tool registration
+- `src/forensics/extension.ts` — commands, renderers, and tool registration
+- `src/forensics/extract.ts` — native usage extraction and legacy migration
 - `src/forensics/forensics.ts` — cross-session scan pipeline
-- `src/report/history.ts` — current-session history report
+- `src/report/history.ts` — current-branch history report
 - `src/report/forensics.ts` — cross-session forensics report
+- `src/tool/cache_forensics/` — agent tool

@@ -2,12 +2,11 @@
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { diffFingerprints } from "../fingerprint.ts";
-import { CAUSE_NOTE, type TurnRecord } from "../monitor/state.ts";
+import { CAUSE_NOTE, type TurnRecord } from "../forensics/turns.ts";
 
 /** Snapshot payload persisted in message.details for the report renderer. */
 export interface CacheReportSnapshot {
   turns: TurnRecord[];
-  cacheSupported: boolean;
 }
 
 /**
@@ -133,6 +132,8 @@ function getCauseLabel(turn: TurnRecord): string | undefined {
     switch (turn.cause.type) {
       case "compaction":
         return "compaction";
+      case "branch_summary":
+        return "branch summary";
       case "model_change":
         return "model changed";
       case "prompt_change":
