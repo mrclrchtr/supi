@@ -11,7 +11,7 @@ describe("tabSpinner extension", () => {
     vi.useRealTimers();
   });
 
-  it("shows spinner during agent_start and ✓ on agent_end", async () => {
+  it("shows spinner during agent_start and ✓ on agent_settled", async () => {
     const pi = createPiMock({ sessionName: "my-project" });
     tabSpinner(pi as unknown as Parameters<typeof tabSpinner>[0]);
 
@@ -53,12 +53,12 @@ describe("tabSpinner extension", () => {
       event: unknown,
       context: unknown,
     ) => Promise<unknown>;
-    const agEnd = pi.handlers.get("agent_end")?.[0] as (
+    const agSettled = pi.handlers.get("agent_settled")?.[0] as (
       event: unknown,
       context: unknown,
     ) => Promise<unknown>;
     expect(agStart).toBeDefined();
-    expect(agEnd).toBeDefined();
+    expect(agSettled).toBeDefined();
 
     // Start the agent
     await agStart({}, ctx);
@@ -69,8 +69,8 @@ describe("tabSpinner extension", () => {
     const spinnerTitle = titles[titles.length - 1];
     expect(spinnerTitle).toBe("⠋ π - my-project - foo");
 
-    // End the agent — done state is deferred briefly to avoid retry flicker
-    await agEnd({}, ctx);
+    // Settle the agent — done state is deferred briefly to avoid retry flicker
+    await agSettled({}, ctx);
     expect(titles[titles.length - 1]).toBe("⠋ π - my-project - foo");
     vi.advanceTimersByTime(200);
     expect(titles[titles.length - 1]).toBe("✓ π - my-project - foo");
@@ -271,7 +271,7 @@ describe("tabSpinner extension", () => {
     tabSpinner(pi as unknown as Parameters<typeof tabSpinner>[0]);
 
     const startHandlers = pi.getHandlers("agent_start");
-    const endHandlers = pi.getHandlers("agent_end");
+    const settledHandlers = pi.getHandlers("agent_settled");
 
     const titles: string[] = [];
     const ctx = makeCtx({
@@ -293,8 +293,8 @@ describe("tabSpinner extension", () => {
     vi.advanceTimersByTime(80);
     expect(titles[0]).toMatch(/^⠙ π - my-project - tmp$/);
 
-    // agent_end still shows ✓ when agent finishes
-    await endHandlers[0]({}, ctx);
+    // agent_settled still shows ✓ when agent finishes
+    await settledHandlers[0]({}, ctx);
     vi.advanceTimersByTime(200);
     expect(titles[titles.length - 1]).toBe("✓ π - my-project - tmp");
   });
@@ -304,7 +304,7 @@ describe("tabSpinner extension", () => {
     tabSpinner(pi as unknown as Parameters<typeof tabSpinner>[0]);
 
     const startHandlers = pi.getHandlers("agent_start");
-    const endHandlers = pi.getHandlers("agent_end");
+    const settledHandlers = pi.getHandlers("agent_settled");
     const turnStartHandlers = pi.getHandlers("turn_start");
 
     const titles: string[] = [];
@@ -321,7 +321,7 @@ describe("tabSpinner extension", () => {
     vi.advanceTimersByTime(80);
     titles.length = 0;
 
-    await endHandlers[0]({}, ctx);
+    await settledHandlers[0]({}, ctx);
     vi.advanceTimersByTime(100);
     expect(titles).toHaveLength(1);
     expect(titles[0]).toMatch(/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏] π - my-project - tmp$/);
@@ -333,12 +333,12 @@ describe("tabSpinner extension", () => {
     expect(titles).not.toContain("✓ π - my-project - tmp");
   });
 
-  it("skips the settle window when agent_end exposes willRetry", async () => {
+  it("waits for agent_settled before showing completion", async () => {
     const pi = createPiMock({ sessionName: "my-project" });
     tabSpinner(pi as unknown as Parameters<typeof tabSpinner>[0]);
 
     const startHandlers = pi.getHandlers("agent_start");
-    const endHandlers = pi.getHandlers("agent_end");
+    const settledHandlers = pi.getHandlers("agent_settled");
 
     const titles: string[] = [];
     const ctx = makeCtx({
@@ -351,14 +351,13 @@ describe("tabSpinner extension", () => {
     }
 
     await startHandlers[0]({}, ctx);
-    vi.advanceTimersByTime(80);
-    titles.length = 0;
-
-    await endHandlers[0]({ willRetry: true }, ctx);
+    await startHandlers[0]({}, ctx);
     vi.advanceTimersByTime(240);
-    expect(titles).toHaveLength(3);
-    expect(titles.at(-1)).toMatch(/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏] π - my-project - tmp$/);
     expect(titles).not.toContain("✓ π - my-project - tmp");
+
+    await settledHandlers[0]({}, ctx);
+    vi.advanceTimersByTime(200);
+    expect(titles.at(-1)).toBe("✓ π - my-project - tmp");
   });
 
   it("updates the spinner title when session_info_changed fires after session_start", async () => {

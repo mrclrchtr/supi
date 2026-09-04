@@ -120,17 +120,21 @@ function getHandler(
   return list[0];
 }
 
-function makeAgentEndEvent(text: string, stopReason = "stop") {
-  return {
-    messages: [
-      { role: "user", content: [{ type: "text", text: "hello" }] },
-      {
+function setLastAssistant(
+  ctx: ReturnType<typeof setup>["ctx"],
+  text: string,
+  stopReason = "stop",
+): void {
+  (ctx.sessionManager.getBranch as ReturnType<typeof vi.fn>).mockReturnValue([
+    {
+      type: "message",
+      message: {
         role: "assistant",
         stopReason,
         content: [{ type: "text", text }],
       },
-    ],
-  };
+    },
+  ]);
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -153,9 +157,9 @@ describe("supi-prompt-suggestions extension lifecycle", () => {
     expect(handlers.has("session_start")).toBe(true);
   });
 
-  it("registers agent_end handler", () => {
+  it("registers agent_settled handler", () => {
     const { handlers } = setup();
-    expect(handlers.has("agent_end")).toBe(true);
+    expect(handlers.has("agent_settled")).toBe(true);
   });
 
   it("registers agent_start handler", () => {
@@ -209,16 +213,17 @@ describe("supi-prompt-suggestions extension lifecycle", () => {
     expect(ctx.ui.setEditorComponent).not.toHaveBeenCalled();
   });
 
-  // ── agent_end → suggestion generation ─────────────────────
+  // ── agent_settled → suggestion generation ─────────────────
 
-  it("starts suggestion generation on agent_end with assistant text", () => {
+  it("starts suggestion generation on agent_settled with assistant text", () => {
     const { handlers, ctx } = setup();
     // Simulate session_start first to initialize spinner + editor
     const startHandler = getHandler(handlers, "session_start");
     startHandler({}, ctx);
+    setLastAssistant(ctx, "The bug is in the parser module.");
 
-    const endHandler = getHandler(handlers, "agent_end");
-    endHandler(makeAgentEndEvent("The bug is in the parser module."), ctx);
+    const settledHandler = getHandler(handlers, "agent_settled");
+    settledHandler({}, ctx);
 
     expect(mockGeneratorStart).toHaveBeenCalled();
   });
@@ -227,9 +232,10 @@ describe("supi-prompt-suggestions extension lifecycle", () => {
     const { handlers, ctx } = setup();
     const startHandler = getHandler(handlers, "session_start");
     startHandler({}, ctx);
+    setLastAssistant(ctx, "   ");
 
-    const endHandler = getHandler(handlers, "agent_end");
-    endHandler(makeAgentEndEvent("   "), ctx);
+    const settledHandler = getHandler(handlers, "agent_settled");
+    settledHandler({}, ctx);
 
     expect(mockGeneratorStart).not.toHaveBeenCalled();
   });
@@ -238,9 +244,10 @@ describe("supi-prompt-suggestions extension lifecycle", () => {
     const { handlers, ctx } = setup();
     const startHandler = getHandler(handlers, "session_start");
     startHandler({}, ctx);
+    setLastAssistant(ctx, "Partial output", "aborted");
 
-    const endHandler = getHandler(handlers, "agent_end");
-    endHandler(makeAgentEndEvent("Partial output", "aborted"), ctx);
+    const settledHandler = getHandler(handlers, "agent_settled");
+    settledHandler({}, ctx);
 
     expect(mockGeneratorStart).not.toHaveBeenCalled();
   });
@@ -249,8 +256,8 @@ describe("supi-prompt-suggestions extension lifecycle", () => {
     const { handlers, ctx } = setup();
     ctx.mode = "json";
 
-    const endHandler = getHandler(handlers, "agent_end");
-    endHandler(makeAgentEndEvent("The bug is in the parser module."), ctx);
+    const settledHandler = getHandler(handlers, "agent_settled");
+    settledHandler({}, ctx);
 
     expect(mockGeneratorStart).not.toHaveBeenCalled();
   });
@@ -260,9 +267,10 @@ describe("supi-prompt-suggestions extension lifecycle", () => {
     (ctx.ui.getEditorText as ReturnType<typeof vi.fn>).mockReturnValue("draft prompt");
     const startHandler = getHandler(handlers, "session_start");
     startHandler({}, ctx);
+    setLastAssistant(ctx, "The bug is in the parser module.");
 
-    const endHandler = getHandler(handlers, "agent_end");
-    endHandler(makeAgentEndEvent("The bug is in the parser module."), ctx);
+    const settledHandler = getHandler(handlers, "agent_settled");
+    settledHandler({}, ctx);
 
     expect(mockGeneratorStart).not.toHaveBeenCalled();
   });
@@ -275,8 +283,9 @@ describe("supi-prompt-suggestions extension lifecycle", () => {
     const factoryFn = (ctx.ui.setEditorComponent as ReturnType<typeof vi.fn>).mock.calls[0][0];
     factoryFn();
 
-    const endHandler = getHandler(handlers, "agent_end");
-    endHandler(makeAgentEndEvent("The bug is in the parser module."), ctx);
+    setLastAssistant(ctx, "The bug is in the parser module.");
+    const settledHandler = getHandler(handlers, "agent_settled");
+    settledHandler({}, ctx);
 
     const callbacks = mockGeneratorStart.mock.calls[0][2] as {
       onStatus: (status: { kind: "generating" }) => void;

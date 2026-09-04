@@ -7,7 +7,7 @@
  * @module
  */
 
-import type { AgentEndEvent, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { StatusSpinner } from "@mrclrchtr/supi-core/api";
 import { type GhostTextCallbacks, GhostTextEditor } from "./editor/editor.ts";
 import type { GenerationStatus, SuggestionGenerator } from "./generation/generator.ts";
@@ -25,6 +25,11 @@ interface SessionMessageEntry {
     content?: SessionTextContent;
   };
 }
+
+type SessionBranchEntry = {
+  type: string;
+  message?: SessionMessageEntry["message"];
+};
 
 // ── SessionLifecycle ───────────────────────────────────────────────────────
 
@@ -55,11 +60,11 @@ export class SessionLifecycle {
     this.installEditor(ctx);
   }
 
-  /** Extract the last assistant message and fire suggestion generation. */
-  onAgentEnd(event: AgentEndEvent, ctx: ExtensionContext): void {
+  /** Extract the last settled assistant message and fire suggestion generation. */
+  onAgentSettled(ctx: ExtensionContext): void {
     if (ctx.mode !== "tui") return;
 
-    const lastAssistant = extractLastAssistantText(event);
+    const lastAssistant = extractLastAssistantText(ctx.sessionManager.getBranch());
     if (!lastAssistant) {
       this.statusSpinner?.stop();
       this.generationInFlight = false;
@@ -181,10 +186,12 @@ export class SessionLifecycle {
 
 // ── Free helpers ───────────────────────────────────────────────────────────
 
-function extractLastAssistantText(event: AgentEndEvent): string | null {
-  const messages = event.messages;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
+function extractLastAssistantText(entries: readonly SessionBranchEntry[]): string | null {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i];
+    if (entry?.type !== "message") continue;
+
+    const msg = entry.message;
     if (msg?.role === "assistant") {
       if (msg.stopReason !== "stop") return null;
       const textContent = extractTextContent(msg.content).trim();

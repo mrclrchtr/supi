@@ -223,15 +223,19 @@ export default function tabSpinner(pi: ExtensionAPI) {
       resumePendingAgent(ctx);
       return;
     }
+    if (hasActiveAgent) {
+      rememberContext(ctx);
+      return;
+    }
     hasActiveAgent = true;
     increment(ctx);
   });
 
   pi.on("turn_start", async (_event, ctx) => resumePendingAgent(ctx));
 
-  pi.on("agent_end", async (event) => {
-    const retryAwareEvent = event as { willRetry?: boolean };
-    if (retryAwareEvent.willRetry) return;
+  pi.on("agent_settled", async (_event, ctx) => {
+    if (!hasActiveAgent) return;
+    rememberContext(ctx);
     hasActiveAgent = false;
     agentEnded();
   });

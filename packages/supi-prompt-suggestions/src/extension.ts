@@ -20,7 +20,7 @@ export default function (pi: ExtensionAPI): void {
   const session = new SessionLifecycle(generator);
 
   pi.on("session_start", (_event, ctx) => session.onStart(ctx));
-  pi.on("agent_end", (event, ctx) => session.onAgentEnd(event, ctx));
+  pi.on("agent_settled", (_event, ctx) => session.onAgentSettled(ctx));
   pi.on("agent_start", () => session.onAgentStart());
   pi.on("session_shutdown", () => session.onShutdown());
 }

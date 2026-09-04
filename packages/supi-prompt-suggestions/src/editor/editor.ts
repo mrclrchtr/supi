@@ -43,7 +43,11 @@ export class GhostTextEditor extends CustomEditor {
     options: GhostTextEditorOptions,
   ) {
     const { callbacks, ...editorOptions } = options;
-    super(tui, theme, keybindings, editorOptions);
+    const customEditorOptions = {
+      ...editorOptions,
+      embedWorkingStatus: true,
+    };
+    super(tui, theme, keybindings, customEditorOptions);
     this.callbacks = callbacks;
   }
 
