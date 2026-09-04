@@ -18,8 +18,8 @@ describe("agent review schemas", () => {
     expect(publishedSchema).toContain('"to"');
     expect(publishedSchema).toContain('"workingTree"');
     expect(publishedSchema).toContain('"committed"');
-    expect(publishedSchema).toContain("Review the frozen current filesystem");
-    expect(publishedSchema).toContain("Review exact committed Git state");
+    expect(publishedSchema).toContain("Freeze the current filesystem");
+    expect(publishedSchema).toContain("Freeze committed state");
     // biome-ignore lint/security/noSecrets: Removed schema field name assertion.
     expect(publishedSchema).not.toContain('"includeUncommittedChanges"');
     expect(publishedSchema).not.toContain('"direct"');

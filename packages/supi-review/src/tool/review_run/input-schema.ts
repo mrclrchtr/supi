@@ -6,12 +6,11 @@ import { normalizeReviewTarget, reviewTargetEndpoints } from "../../target/input
 import type { ReviewInput, ReviewScope, ReviewTargetSpec } from "../../types.ts";
 import { reviewInputSchema } from "./schemas.ts";
 
-function endpointSchema(role: "before" | "after") {
+function endpointSchema() {
   return Type.String({
     minLength: 1,
     maxLength: 512,
     pattern: "^\\S+$",
-    description: `Git revision for the exact ${role} state. Branches, hashes, ~, ^, and lightweight or annotated tags are valid. It must resolve to one commit; whitespace, ranges, trees, blobs, and blank values are not valid.`,
   });
 }
 
@@ -20,37 +19,36 @@ const scopePathsSchema = Type.Array(
     minLength: 1,
     maxLength: REVIEW_LIMITS.reviewScopePathCharacters,
     pattern: "\\S",
-    description:
-      "Repository-relative path that focuses every Review Task. A leading @ is accepted. The path must exist in the frozen after state.",
+    description: "Repository-relative path in the frozen after state; a leading @ is accepted.",
   }),
   {
     minItems: 1,
     maxItems: REVIEW_LIMITS.reviewScopePathsPerTarget,
     description:
-      "Optional advisory path focus for this batch. This argument sits at the top level of the tool call, alongside target; do not place it inside target. It does not limit repository inspection, changed-path evidence, or findings.",
+      "Advisory focus for all tasks; it does not limit inspection, changed-path evidence, or findings.",
   },
 );
 
 const workingTreeTargetSchema = Type.Object(
   {
-    from: Type.Optional(endpointSchema("before")),
+    from: Type.Optional(endpointSchema()),
   },
   {
     additionalProperties: false,
     description:
-      "Review the frozen current filesystem, including staged, unstaged, and non-ignored untracked files. Optional from sets the committed before state.",
+      "Freeze the current filesystem, including staged, unstaged, and non-ignored untracked files; from selects the before commit.",
   },
 );
 
 const committedTargetSchema = Type.Object(
   {
-    from: Type.Optional(endpointSchema("before")),
-    to: Type.Optional(endpointSchema("after")),
+    from: Type.Optional(endpointSchema()),
+    to: Type.Optional(endpointSchema()),
   },
   {
     additionalProperties: false,
     description:
-      "Review exact committed Git state. Optional from and to select the before and after commits; to defaults to HEAD.",
+      "Freeze committed state; from and to select before and after commits. The to endpoint defaults to HEAD. Change tasks require from and cannot use a root commit as to.",
   },
 );
 
@@ -63,7 +61,7 @@ const targetSchema = Type.Object(
     maxProperties: 1,
     additionalProperties: false,
     description:
-      "Exact Review Target. Omit it, or use {}, for the current filesystem. Select workingTree or committed; endpoints resolve once to full commits.",
+      "Omit target or use {} for the current filesystem; otherwise select workingTree or committed. All-state batches must omit from. Endpoints must resolve to commits; ranges, trees, and blobs are invalid.",
   },
 );
 
@@ -74,10 +72,7 @@ export const runReviewSchema = Type.Object(
     paths: Type.Optional(scopePathsSchema),
     ...reviewInputSchema.properties,
   },
-  {
-    additionalProperties: false,
-    description: "Run one complete caller-defined Review against one exact Review Target.",
-  },
+  { additionalProperties: false },
 );
 
 interface RawRunReviewInput extends ReviewInput {

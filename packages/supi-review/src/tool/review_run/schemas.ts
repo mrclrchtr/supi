@@ -9,18 +9,17 @@ export const reviewTaskSchema = Type.Object(
       minLength: 1,
       maxLength: REVIEW_LIMITS.taskIdCharacters,
       pattern: "\\S",
-      description: "Unique task id used to match its result, such as standards or spec.",
+      description: "Task id for its result, such as standards or spec.",
     }),
     instructions: Type.String({
       minLength: 1,
       maxLength: REVIEW_LIMITS.taskInstructionCharacters,
       pattern: "\\S",
-      description:
-        "Self-contained review objective and criteria. Tasks run independently and cannot see each other's progress.",
+      description: "Self-contained review objective and criteria for one task.",
     }),
     mode: StringEnum(["change", "state"] as const, {
       description:
-        "Required evidence view. change reviews one non-empty before-and-after change. state reviews only the frozen after state.",
+        "Evidence view: change uses one non-empty before-and-after change; state uses only the frozen after state.",
     }),
     criteriaSources: Type.Optional(
       Type.Array(
@@ -30,15 +29,13 @@ export const reviewTaskSchema = Type.Object(
               minLength: 1,
               maxLength: REVIEW_LIMITS.criteriaReferenceCharacters,
               pattern: "\\S",
-              description:
-                "Authoritative source identifier, such as an issue reference, URL, or repository-relative document path.",
+              description: "Issue reference, URL, or repository-relative document path.",
             }),
             summary: Type.String({
               minLength: 1,
               maxLength: REVIEW_LIMITS.criteriaSummaryCharacters,
               pattern: "\\S",
-              description:
-                "Caller summary of the source used before the reviewer retrieves the source itself.",
+              description: "Source summary; the reviewer retrieves more detail only when needed.",
             }),
           },
           { additionalProperties: false },
@@ -46,7 +43,7 @@ export const reviewTaskSchema = Type.Object(
         {
           minItems: 1,
           maxItems: REVIEW_LIMITS.criteriaSourcesPerTask,
-          description: "Authoritative issues or documents this task's Review Criteria derive from.",
+          description: "Authoritative sources for this task's Review Criteria.",
         },
       ),
     ),
@@ -61,14 +58,13 @@ export const reviewInputSchema = Type.Object(
       Type.String({
         maxLength: REVIEW_LIMITS.sharedContextCharacters,
         pattern: "\\S",
-        description: "Context copied to every reviewer; omit task-specific instructions.",
+        description: "Context for all tasks; exclude task-specific instructions.",
       }),
     ),
     tasks: Type.Array(reviewTaskSchema, {
       minItems: 1,
       maxItems: 4,
-      description:
-        "One to four independent tasks, in caller order. Task ids must be unique; tasks run concurrently.",
+      description: "Results keep caller order; task ids must be unique.",
     }),
   },
   {
