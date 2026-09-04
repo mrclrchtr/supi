@@ -1,9 +1,8 @@
 export const toolDescription =
-  "Orient around the workspace or one path, module, or target focus before surgical work. Omit focus for workspace Orientation. Workspace Orientation includes manifest and dependency inventories. For one-file work, use focused path Orientation. Directory focus may surface local instruction files.";
+  "Return observed workspace or focused code context to choose what source to inspect next. Omit `focus` for workspace context. A directory focus can surface local instruction files.";
 
-export const promptSnippet = "workspace/path/module/symbol Orientation";
+export const promptSnippet = "orient around workspace or code context";
 
 export const promptGuidelines = [
-  "Use code_orientation before broad file reading when you need direct workspace, package, directory, file, or symbol facts.",
-  "Use code_graph for relationships and code_health for provider or diagnostic state.",
+  "Use code_orientation before broad source reading when workspace or path context can narrow the files.",
 ];

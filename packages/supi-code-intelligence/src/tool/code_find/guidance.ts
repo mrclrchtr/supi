@@ -1,8 +1,8 @@
 export const toolDescription =
-  'Search source shape with mode:"ast" or LSP workspace symbols with mode:"semantic". Modes never silently fall back. Unscoped AST scans cover visible supported files, skipping hidden and generated/dependency directories.';
+  "Search code structure or workspace symbols for structural or semantic matches. It never silently falls back to another mode or to text search.";
 
-export const promptSnippet = "explicit structural or semantic code search";
+export const promptSnippet = "search code structure or workspace symbols";
 
 export const promptGuidelines = [
-  "Use code_find for structural or semantic search evidence; use PI grep for literal/regex source search and code_graph references for symbol-identity relationships.",
+  "Use code_find for structural or semantic search, grep for text search, and code_graph for symbol relationships.",
 ];

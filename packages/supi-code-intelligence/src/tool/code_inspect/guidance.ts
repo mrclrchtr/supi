@@ -1,6 +1,8 @@
 export const toolDescription =
-  "Inspect one exact point for syntax, the narrowest enclosing declaration, hover, definition, and nearby diagnostics. Use for point facts, not broad Orientation.";
+  "Inspect one source location for syntax, its enclosing declaration, hover information, definitions, and nearby diagnostics. Use it for point-local facts, not broad code context.";
 
-export const promptSnippet = "factual point inspection";
+export const promptSnippet = "inspect a source location";
 
-export const promptGuidelines: string[] = [];
+export const promptGuidelines = [
+  "Use code_inspect for diagnostics near a source location; use code_health for broader diagnostics or language-server status.",
+];

@@ -1,8 +1,8 @@
 export const toolDescription =
-  "Preview one semantic rename, extraction, import cleanup, or dead-code deletion and return a planId without mutating files.";
+  "Preview a precise semantic refactor without changing files. It does not fall back to text edits.";
 
 export const promptSnippet = "preview a precise semantic refactor";
 
 export const promptGuidelines = [
-  "Use code_refactor_plan for preview only, then call code_refactor_apply with its planId.",
+  "Use code_refactor_plan before code_refactor_apply to review the proposed edits.",
 ];

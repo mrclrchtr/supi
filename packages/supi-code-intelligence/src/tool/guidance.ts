@@ -1,10 +1,8 @@
-// Model-facing prompt surfaces for the eight public code-intelligence tools.
-//
-// Ownership map (docs/pi/tool-guidance.md): each model-facing fact lives in
-// exactly one home — the per-tool guidance module. This aggregator assembles
-// the canonical surface map consumed by registration.
-// Parameter mechanics (formats, enum semantics, cross-field rules) live in
-// schemas.ts / per-tool spec.ts and are not repeated here.
+/**
+ * Each tool owns its model-facing text. This module assembles the canonical
+ * surface map used by registration. Parameter mechanics stay in specs and
+ * shared schemas.
+ */
 
 import type { CodeIntelligenceToolName } from "../types/index.ts";
 import {
@@ -48,9 +46,13 @@ import {
   promptSnippet as resolveSnippet,
 } from "./code_resolve/guidance.ts";
 
+/** Model-facing fields registered for one public code-intelligence tool. */
 export interface CodeIntelligenceToolPromptSurface {
+  /** Selection contract in the active provider tool definition. */
   description: string;
+  /** One-line capability phrase in the default tool list. */
   promptSnippet: string;
+  /** Optional active-tool routing or ordering reminders. */
   promptGuidelines: string[];
 }
 
@@ -59,7 +61,7 @@ export type CodeIntelligenceToolPromptSurfaceMap = Record<
   CodeIntelligenceToolPromptSurface
 >;
 
-export const CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES: CodeIntelligenceToolPromptSurfaceMap = {
+export const CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES = {
   code_resolve: {
     description: resolveDescription,
     promptSnippet: resolveSnippet,
@@ -100,4 +102,4 @@ export const CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES: CodeIntelligenceToolPromptS
     promptSnippet: applySnippet,
     promptGuidelines: applyGuidelines,
   },
-};
+} satisfies CodeIntelligenceToolPromptSurfaceMap;

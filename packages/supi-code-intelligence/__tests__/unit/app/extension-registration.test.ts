@@ -74,45 +74,79 @@ describe("focused code intelligence tool registration", () => {
     expect(getTool(pi, "code_health")).not.toHaveProperty("prepareArguments");
   });
 
-  it("retains selection-critical guidance in registered descriptions", () => {
+  it("keeps selection-critical distinctions in registered descriptions", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    const resolveDescription = getTool(pi, "code_resolve").description ?? "";
-    expect(resolveDescription).toContain("Anchors must identify real symbols");
+    const selectionContracts = [
+      {
+        name: "code_resolve",
+        patterns: [/real symbol anchor/i, /target handles/i, /does not fall back to text search/i],
+      },
+      {
+        name: "code_inspect",
+        patterns: [/source location/i, /point-local facts/i, /not broad code context/i],
+      },
+      {
+        name: "code_orientation",
+        patterns: [/omit `focus` for workspace context/i, /instruction files/i],
+      },
+      {
+        name: "code_find",
+        patterns: [/structural or semantic matches/i, /never silently falls back.*text search/i],
+      },
+      { name: "code_graph", patterns: [/source shape/i, /symbol identity/i] },
+      {
+        name: "code_refactor_plan",
+        patterns: [/semantic refactor without changing files/i, /fall back to text edits/i],
+      },
+      {
+        name: "code_refactor_apply",
+        patterns: [/fresh stored refactor plan/i, /change its files/i, /regenerate a plan/i],
+      },
+      {
+        name: "code_health",
+        patterns: [
+          /live diagnostics and language-server health/i,
+          /diagnostic snapshots.*whole workspace/i,
+          /server inventory and route-status counts.*workspace-wide/i,
+        ],
+      },
+    ] as const;
 
-    const findDescription = getTool(pi, "code_find").description ?? "";
-    expect(findDescription).toContain('mode:"ast"');
-    expect(findDescription).toContain("LSP workspace symbols");
-    expect(findDescription).toContain("Modes never silently fall back");
-
-    expect(getTool(pi, "code_graph").description).toContain("not symbol identity");
-    expect(getTool(pi, "code_health").description).toContain("Report live diagnostics");
-    expect(getTool(pi, "code_orientation").description).toContain(
-      "Workspace Orientation includes manifest and dependency inventories.",
-    );
-    expect(getTool(pi, "code_refactor_plan").description).toContain("without mutating files");
-    expect(getTool(pi, "code_refactor_apply").description).toContain("by planId");
+    for (const { name, patterns } of selectionContracts) {
+      const description = getTool(pi, name).description ?? "";
+      for (const pattern of patterns) {
+        expect(description, `${name} description`).toMatch(pattern);
+      }
+    }
   });
 
-  it("keeps cross-tool routing in guidelines and names a tool in every bullet", () => {
+  it("keeps a short snippet for every always-active tool", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    const findGuidelines = (getTool(pi, "code_find").promptGuidelines ?? []).join("\n");
-    expect(findGuidelines).toContain("PI grep for literal/regex source search");
+    for (const name of CODE_INTELLIGENCE_TOOL_NAMES) {
+      const snippet = getTool(pi, name).promptSnippet;
+      expect(typeof snippet, `${name} promptSnippet`).toBe("string");
+      if (typeof snippet !== "string") continue;
 
-    const orientationGuidelines = (getTool(pi, "code_orientation").promptGuidelines ?? []).join(
-      "\n",
-    );
-    expect(orientationGuidelines).toContain("Use code_graph for relationships");
+      expect(snippet.trim(), `${name} promptSnippet`).not.toBe("");
+      expect(snippet.length, `${name} promptSnippet`).toBeLessThanOrEqual(80);
+    }
+  });
 
-    // PI adds no heading or prefix to guideline bullets, so every bullet must
-    // name its tool explicitly.
+  it("names the owning tool in every guideline bullet", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const resolveGuidelines = (getTool(pi, "code_resolve").promptGuidelines ?? []).join("\n");
+    expect(resolveGuidelines).toMatch(/later tool requires a target handle/i);
+
     for (const name of CODE_INTELLIGENCE_TOOL_NAMES) {
       const guidelines: string[] = getTool(pi, name).promptGuidelines ?? [];
       for (const bullet of guidelines) {
-        expect(bullet).toMatch(/code_[a-z_]+/);
+        expect(bullet, `${name} guideline`).toContain(name);
       }
     }
   });

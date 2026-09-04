@@ -1,8 +1,8 @@
 export const toolDescription =
-  "Report live diagnostics as observations, language-server route status, and final semantic health state. Tracked-file snapshots do not prove workspace completeness; server inventory and route issue counts are workspace-wide. Server-only calls are passive.";
+  "Report live diagnostics and language-server health. Diagnostic snapshots do not prove that the whole workspace is clean; server inventory and route-status counts are always workspace-wide.";
 
-export const promptSnippet = "live workspace health observations";
+export const promptSnippet = "check live diagnostics and language-server health";
 
 export const promptGuidelines = [
-  "Use code_health with refresh:true before relying on potentially stale diagnostics; explicit refresh can recover crashed routes with tracked files in scope.",
+  "Use code_health with `refresh: true` before relying on diagnostics that can be stale.",
 ];
