@@ -1,5 +1,14 @@
 # Changelog
 
+## [6.3.1](https://github.com/mrclrchtr/supi/compare/v6.3.0...v6.3.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* **deps:** update dependency typebox to v1.3.24 ([ba45be1](https://github.com/mrclrchtr/supi/commit/ba45be15f68f33f2dfa5a24d150609a1d507f1ef))
+* **deps:** update dependency typebox to v1.3.25 ([5a2b2b5](https://github.com/mrclrchtr/supi/commit/5a2b2b5ac86133380d2804fcb0a5ebffa4802e3f))
+* **deps:** update pnpm/action-setup action to v6.1.0 ([8074727](https://github.com/mrclrchtr/supi/commit/8074727518e0d0924ffcdcf09b59cd3c19d2512a))
+
 ## [6.3.0](https://github.com/mrclrchtr/supi/compare/v6.2.0...v6.3.0) (2026-09-03)
 
 
