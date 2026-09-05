@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-cache",
-  "version": "6.3.0",
+  "version": "6.3.1",
   "description": "Monitor prompt-cache health and investigate regressions",
   "license": "MIT",
   "repository": {

@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-code-intelligence",
-  "version": "6.3.0",
+  "version": "6.3.1",
   "description": "LSP and AST navigation, search, diagnostics, and refactoring",
   "license": "MIT",
   "repository": {
