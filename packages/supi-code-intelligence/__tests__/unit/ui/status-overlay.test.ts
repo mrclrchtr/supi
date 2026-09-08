@@ -97,7 +97,7 @@ describe("CiStatusDialog", () => {
 
       expect(rendered).toContain("process crashed; next evidence operation will recover");
       expect(rendered).toContain("process recovery in progress");
-      expect(rendered).toContain("process recovery exhausted; reload required");
+      expect(rendered).toContain("process recovery exhausted; try another explicit health refresh");
       expect(rendered).toContain("1 route recovering");
       expect(rendered).toContain("2 route errors");
     });

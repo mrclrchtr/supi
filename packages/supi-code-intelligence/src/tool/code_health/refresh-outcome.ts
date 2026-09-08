@@ -1,6 +1,8 @@
 import type {
   ProcessCrashRecoveryEntry,
   ProcessCrashRecoveryReport,
+  StartupRetryEntry,
+  StartupRetryReport,
 } from "@mrclrchtr/supi-lsp/api";
 import type { SemanticHealthState } from "../../session/health-types.ts";
 import type { SourceTrackingReport } from "../../substrate/lsp/source-tracking.ts";
@@ -59,6 +61,36 @@ export function formatProcessCrashRecovery(
 }
 
 function formatProcessCrashRecoveryEntry(entry: ProcessCrashRecoveryEntry): string {
+  const outcome = entry.outcome.replaceAll("-", " ");
+  const action = entry.nextAction ? `; next: ${entry.nextAction.replaceAll("-", " ")}` : "";
+  const failure = entry.failureMessage ? `; ${entry.failureMessage}` : "";
+  return `${entry.name} @ ${entry.root}: ${outcome}${action}${failure}`;
+}
+
+/** Format initial-start retry counts for the compact health view. */
+export function formatCompactStartupRetry(
+  report: StartupRetryReport | null | undefined,
+): string | null {
+  if (!report || (report.recoveredRoutes === 0 && report.failedRoutes === 0)) return null;
+  return `startup retry: ${report.recoveredRoutes} route${plural(report.recoveredRoutes)} recovered (${report.failedRoutes} failed)`;
+}
+
+/** Format initial-start retry counts and bounded route entries. */
+export function formatStartupRetry(report: StartupRetryReport | null | undefined): string | null {
+  const summary = formatCompactStartupRetry(report);
+  if (!summary || !report) return summary;
+  const entries = report.entries.map(formatStartupRetryEntry);
+  const omitted =
+    report.omittedEntries > 0
+      ? `${report.omittedEntries} more route${plural(report.omittedEntries)}`
+      : null;
+  const details = [...entries, omitted]
+    .filter((value): value is string => value !== null)
+    .join("; ");
+  return details ? `${summary}; ${details}` : summary;
+}
+
+function formatStartupRetryEntry(entry: StartupRetryEntry): string {
   const outcome = entry.outcome.replaceAll("-", " ");
   const action = entry.nextAction ? `; next: ${entry.nextAction.replaceAll("-", " ")}` : "";
   const failure = entry.failureMessage ? `; ${entry.failureMessage}` : "";

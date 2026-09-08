@@ -72,6 +72,10 @@ export type {
   RecoverDiagnosticsResult,
   RoutedMutationResponse,
   SemanticReadinessResult,
+  StartupRetryEntry,
+  StartupRetryNextAction,
+  StartupRetryOutcome,
+  StartupRetryReport,
   WorkspaceDiagnosticReport,
   WorkspaceDiagnosticSnapshot,
   WorkspaceDiagnosticSummaryEntry,
@@ -82,6 +86,7 @@ export type {
 export {
   clearWorkspaceLspRuntime,
   emptyProcessCrashRecoveryReport,
+  emptyStartupRetryReport,
   getWorkspaceLspRuntime,
   MAX_PROCESS_CRASH_RECOVERY_ENTRIES,
   setWorkspaceLspRuntimeState,

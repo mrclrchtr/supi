@@ -253,7 +253,7 @@ describe("LSP manager lifecycle integration", () => {
             name: "test",
             root: ".",
             outcome: "recovery-failed",
-            nextAction: "reload-workspace",
+            nextAction: "refresh",
           },
         ],
         omittedEntries: 0,

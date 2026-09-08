@@ -57,7 +57,7 @@ export function formatProjectServerStatusReason(
     case "process-crash-recovery-pending":
       return "process recovery in progress";
     case "process-crash-recovery-exhausted":
-      return "process recovery exhausted; reload required";
+      return "process recovery exhausted; try another explicit health refresh";
     default:
       return null;
   }

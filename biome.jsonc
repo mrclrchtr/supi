@@ -127,7 +127,7 @@
       }
     },
     {
-      "includes": ["packages/supi-code-intelligence/src/use-case/generate-relations.ts"],
+      "includes": ["packages/supi-code-intelligence/src/tool/code_health/markdown.ts"],
       "linter": {
         "rules": {
           "style": {

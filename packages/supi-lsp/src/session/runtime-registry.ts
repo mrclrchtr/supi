@@ -41,6 +41,7 @@ import type {
   DiagnosticEvidenceSummary,
   ProcessCrashRecoveryReport,
   RecoverDiagnosticsResult,
+  StartupRetryReport,
 } from "./runtime-diagnostics.ts";
 import type {
   BulkTrackFilesResult,
@@ -59,6 +60,7 @@ export {
   type DiagnosticEvidenceStatus,
   type DiagnosticEvidenceSummary,
   emptyProcessCrashRecoveryReport,
+  emptyStartupRetryReport,
   MAX_PROCESS_CRASH_RECOVERY_ENTRIES,
   type OutstandingDiagnosticSummaryEntry,
   type ProcessCrashRecoveryEntry,
@@ -66,6 +68,10 @@ export {
   type ProcessCrashRecoveryOutcome,
   type ProcessCrashRecoveryReport,
   type RecoverDiagnosticsResult,
+  type StartupRetryEntry,
+  type StartupRetryNextAction,
+  type StartupRetryOutcome,
+  type StartupRetryReport,
   type WorkspaceDiagnosticReport,
   type WorkspaceDiagnosticSnapshot,
   type WorkspaceDiagnosticSummaryEntry,
@@ -270,11 +276,11 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
    */
   async waitUntilReadyForFile(
     filePath: string,
-    options: { timeoutMs?: number } = {},
+    options: { timeoutMs?: number; retryFailedRoute?: boolean } = {},
     control?: CodeRequestControl,
   ): Promise<SemanticReadinessResult> {
     const resolvedPath = this.resolveFilePath(filePath);
-    if (!this.manager.canServeFile(resolvedPath)) {
+    if (!options.retryFailedRoute && !this.manager.canServeFile(resolvedPath)) {
       const processCrashRecovery = this.manager.getProcessCrashRecoveryReportForFile(resolvedPath);
       return {
         kind: "unavailable",
@@ -284,31 +290,44 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     }
 
     let eagerProcessCrashRecovery: ProcessCrashRecoveryReport | undefined;
+    let eagerStartupRetry: StartupRetryReport | undefined;
     const readiness = await raceReadinessValue(
-      this.manager.waitUntilFileReady(resolvedPath, control, (report) => {
-        eagerProcessCrashRecovery = report;
+      this.manager.waitUntilFileReady(resolvedPath, control, {
+        retryFailedRoute: options.retryFailedRoute === true,
+        onProcessCrashRecovery: (report) => {
+          eagerProcessCrashRecovery = report;
+        },
+        onStartupRetry: (report) => {
+          eagerStartupRetry = report;
+        },
       }),
       options.timeoutMs,
       control,
     );
     if (readiness.kind !== "resolved") {
-      // A timeout can happen before shared recovery settles. Do not create a
-      // route outcome for work that has no final result yet.
+      // A timeout can happen before shared recovery settles. Keep only route
+      // outcomes that completed before the timeout.
       const currentProcessCrashRecovery =
         this.manager.getProcessCrashRecoveryReportForFile(resolvedPath);
       const processCrashRecovery = currentProcessCrashRecovery ?? eagerProcessCrashRecovery;
-      return processCrashRecovery ? { ...readiness, processCrashRecovery } : readiness;
+      return {
+        ...readiness,
+        ...(eagerStartupRetry ? { startupRetry: eagerStartupRetry } : {}),
+        ...(processCrashRecovery ? { processCrashRecovery } : {}),
+      };
     }
-    const { client, processCrashRecovery } = readiness.value;
+    const { client, processCrashRecovery, startupRetry } = readiness.value;
     const recovery = hasProcessCrashRecovery(processCrashRecovery) ? { processCrashRecovery } : {};
+    const startup = startupRetry && startupRetry.entries.length > 0 ? { startupRetry } : {};
     if (!client) {
       return {
         kind: "unavailable",
         reason: "The routed LSP client could not be started for this file",
+        ...startup,
         ...recovery,
       };
     }
-    return { kind: "ready", ...recovery };
+    return { kind: "ready", ...startup, ...recovery };
   }
 
   /**
@@ -433,14 +452,14 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     return this.manager.getOutstandingDiagnosticSummarySnapshot(maxSeverity);
   }
 
-  /** Trigger a workspace-wide diagnostics refresh and stale-state recovery pass. */
+  /** Retry failed routes and run a workspace-wide diagnostic recovery pass. */
   async recoverDiagnostics(options?: {
     restartIfStillStale?: boolean;
     maxWaitMs?: number;
     quietMs?: number;
     /** Evidence from a refresh the caller already completed; skips this pass's own refresh when no watched-file changes apply. */
     initialEvidence?: DiagnosticEvidenceSummary;
-    /** Explicit demand to recover crashed routes with tracked files in scope. */
+    /** Explicit demand to retry failed startup and crashed routes in scope. */
     processCrashDemand?: import("./runtime-diagnostic-surface.ts").ProcessCrashDiagnosticDemand;
     control?: CodeRequestControl;
   }): Promise<RecoverDiagnosticsResult> {
@@ -460,6 +479,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
           attemptedClients: result.attemptedClients,
           restartedClients: result.restartedClients,
           processCrashRecovery: result.processCrashRecovery,
+          startupRetry: result.startupRetry,
           attemptedServers: boundServerNames(result.attemptedServers ?? []),
           restartedServers: boundServerNames(result.restartedServers ?? []),
           ...(result.restartReason ? { reason: result.restartReason } : {}),

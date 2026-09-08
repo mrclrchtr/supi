@@ -18,7 +18,9 @@ import {
 } from "../diagnostics/stale-diagnostics.ts";
 import {
   emptyProcessCrashRecoveryReport,
+  emptyStartupRetryReport,
   type ProcessCrashRecoveryReport,
+  type StartupRetryReport,
   type WorkspaceDiagnosticReport,
 } from "../session/runtime-diagnostics.ts";
 
@@ -29,6 +31,8 @@ export interface WorkspaceRecoveryResult {
   restartedClients: number;
   /** No process-crash demand is handled by this generic recovery pass. */
   processCrashRecovery: ProcessCrashRecoveryReport;
+  /** No initial-start retry is handled by this generic recovery pass. */
+  startupRetry: StartupRetryReport;
   /** Server names of the active clients targeted by this pass, for telemetry identity. */
   attemptedServers: string[];
   /** Server names of the clients restarted during this pass, for telemetry identity. */
@@ -165,6 +169,7 @@ export async function recoverWorkspaceDiagnostics(
       attemptedClients,
       restartedClients,
       processCrashRecovery: emptyProcessCrashRecoveryReport(),
+      startupRetry: emptyStartupRetryReport(),
       attemptedServers,
       restartedServers: restartServerNames,
       ...(restartReason ? { restartReason } : {}),

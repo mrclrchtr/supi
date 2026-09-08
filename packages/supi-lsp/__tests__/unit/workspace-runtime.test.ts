@@ -269,7 +269,7 @@ describe("workspace runtime behavior", () => {
               name: "typescript",
               root: ".",
               outcome: "recovery-failed",
-              nextAction: "reload-workspace",
+              nextAction: "refresh",
               failureMessage: "replacement failed",
             },
           ],
@@ -292,7 +292,7 @@ describe("workspace runtime behavior", () => {
             name: "typescript",
             root: ".",
             outcome: "recovery-failed",
-            nextAction: "reload-workspace",
+            nextAction: "refresh",
             failureMessage: "replacement failed",
           },
         ],
@@ -321,6 +321,42 @@ describe("workspace runtime behavior", () => {
     ).resolves.toEqual({ kind: "timeout" });
   });
 
+  it("retains an explicit startup report when readiness times out", async () => {
+    const startupRetry = {
+      recoveredRoutes: 0,
+      failedRoutes: 1,
+      entries: [
+        {
+          name: "typescript",
+          root: ".",
+          outcome: "retry-failed" as const,
+          nextAction: "refresh" as const,
+        },
+      ],
+      omittedEntries: 0,
+    };
+    const runtime = createRuntime(
+      makeManager({
+        canServeFile: () => true,
+        waitUntilFileReady: (
+          _filePath: string,
+          _control: unknown,
+          callbacks?: {
+            onStartupRetry?: (report: typeof startupRetry) => void;
+          },
+        ) => {
+          callbacks?.onStartupRetry?.(startupRetry);
+          return new Promise<never>(() => {});
+        },
+      }),
+    );
+
+    await expect(runtime.waitUntilReadyForFile("src/index.ts", { timeoutMs: 1 })).resolves.toEqual({
+      kind: "timeout",
+      startupRetry,
+    });
+  });
+
   it("reports a failed recovery when the shared replacement fails after the eager attempt", async () => {
     const runtime = createRuntime(
       makeManager({
@@ -335,7 +371,7 @@ describe("workspace runtime behavior", () => {
               name: "typescript",
               root: ".",
               outcome: "recovery-failed",
-              nextAction: "reload-workspace",
+              nextAction: "refresh",
               failureMessage: "replacement failed",
             },
           ],
@@ -344,16 +380,18 @@ describe("workspace runtime behavior", () => {
         waitUntilFileReady: (
           _filePath: string,
           _control: unknown,
-          reportRecovery?: (report: {
-            recoveredRoutes: number;
-            skippedRoutes: number;
-            failedRoutes: number;
-            exhaustedRoutes: number;
-            entries: readonly unknown[];
-            omittedEntries: number;
-          }) => void,
+          callbacks?: {
+            onProcessCrashRecovery?: (report: {
+              recoveredRoutes: number;
+              skippedRoutes: number;
+              failedRoutes: number;
+              exhaustedRoutes: number;
+              entries: readonly unknown[];
+              omittedEntries: number;
+            }) => void;
+          },
         ) => {
-          reportRecovery?.({
+          callbacks?.onProcessCrashRecovery?.({
             recoveredRoutes: 0,
             skippedRoutes: 1,
             failedRoutes: 0,
@@ -385,7 +423,7 @@ describe("workspace runtime behavior", () => {
             name: "typescript",
             root: ".",
             outcome: "recovery-failed",
-            nextAction: "reload-workspace",
+            nextAction: "refresh",
             failureMessage: "replacement failed",
           },
         ],

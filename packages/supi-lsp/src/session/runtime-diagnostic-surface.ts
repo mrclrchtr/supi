@@ -14,6 +14,8 @@ import type {
  */
 export interface ProcessCrashDiagnosticDemand {
   readonly scopes?: readonly string[];
+  /** Allow one bounded retry for failed routes during explicit health refresh. */
+  readonly explicit?: boolean;
 }
 
 /** Diagnostic and recovery operations owned by a workspace LSP runtime. */
@@ -45,7 +47,7 @@ export interface WorkspaceLspDiagnosticSurface {
     quietMs?: number;
     /** Evidence from a refresh the caller already completed; skips this pass's own refresh when no watched-file changes apply. */
     initialEvidence?: DiagnosticEvidenceSummary;
-    /** Explicit demand to recover crashed routes with tracked files in scope. */
+    /** Explicit demand to retry crashed and failed routes in scope. */
     processCrashDemand?: ProcessCrashDiagnosticDemand;
     control?: CodeRequestControl;
   }): Promise<RecoverDiagnosticsResult>;

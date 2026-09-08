@@ -71,11 +71,14 @@ import {
 import { raceRequestControl } from "../session/readiness.ts";
 import {
   emptyProcessCrashRecoveryReport,
+  emptyStartupRetryReport,
   type ProcessCrashRecoveryReport,
   type ScopeDecisionEntry,
   type ScopeDecisionSummary,
+  type StartupRetryReport,
   type WorkspaceDiagnosticReport,
 } from "../session/runtime-diagnostics.ts";
+import { scanProjectCapabilities } from "../session/scanner.ts";
 import {
   type BulkTrackFileOutcome,
   type BulkTrackFilesResult,
@@ -107,7 +110,9 @@ import { clientKey, rememberKnownRoot, resolveRootForFile } from "./manager-help
 import {
   boundProcessCrashFailureMessage,
   buildProcessCrashRecoveryReport,
+  buildStartupRetryReport,
   type ProcessCrashRecoveryRouteResult,
+  type StartupRetryRouteResult,
 } from "./manager-process-crash-report.ts";
 import { buildProjectServerInfo } from "./manager-project-info.ts";
 import type {
@@ -197,6 +202,45 @@ type FileClientRequestOptions = {
 interface FileReadinessResult {
   client: LspClient | null;
   processCrashRecovery: ProcessCrashRecoveryReport;
+  startupRetry: StartupRetryReport;
+}
+
+interface FileReadinessCallbacks {
+  readonly onProcessCrashRecovery?: (report: ProcessCrashRecoveryReport) => void;
+  readonly onStartupRetry?: (report: StartupRetryReport) => void;
+}
+
+interface FailedStartState {
+  readonly serverName: string;
+  readonly root: string;
+  readonly failureMessage?: string;
+}
+
+interface ExplicitRouteCandidate {
+  readonly route: FileRoute;
+  readonly processCrashRecovery?: ProcessCrashRecoveryState;
+  readonly startupFailure?: FailedStartState;
+}
+
+interface ExplicitRouteAttemptResult {
+  readonly candidate: ExplicitRouteCandidate;
+  readonly kind: "startup" | "discovery" | "process-crash" | "none";
+  readonly client: LspClient | null;
+  readonly attempted: boolean;
+  readonly failureMessage?: string;
+}
+
+interface ExplicitRouteAttemptLease {
+  readonly promise: Promise<ExplicitRouteAttemptResult>;
+  users: number;
+  settled: boolean;
+}
+
+interface ExplicitRouteClassification {
+  startupResult?: StartupRetryRouteResult;
+  processResult?: ProcessCrashRecoveryRouteResult;
+  failure?: string;
+  failedFiles: string[];
 }
 
 interface ProcessCrashRecoveryState {
@@ -223,6 +267,8 @@ type ProcessCrashDemandResult = {
   requiresFreshEvidence: boolean;
   /** Separate route-level result for this explicit process-crash demand. */
   processCrashRecovery: ProcessCrashRecoveryReport;
+  /** Separate result for explicit initial-start retries. */
+  startupRetry: StartupRetryReport;
   /** Required routes that remain unavailable after shared recovery settles. */
   failures: string[];
   /** In-scope tracked files from required routes that remain unavailable. */
@@ -269,6 +315,10 @@ export class LspManager {
   private clients = new Map<string, LspClient>();
   /** Per-root startup failures keyed by "serverName:root" */
   private unavailable = new Map<string, UnavailableReason>();
+  /** Initial-start failures that an explicit health refresh may retry. */
+  private failedStarts = new Map<string, FailedStartState>();
+  /** Shared explicit route attempts for concurrent health refresh calls. */
+  private explicitRouteAttempts = new Map<string, ExplicitRouteAttemptLease>();
   /** Memoized per-command availability of LSP server binaries on PATH */
   private commandAvailability = new Map<string, boolean>();
   /** Guards against concurrent client creation for the same server:root key. */
@@ -446,13 +496,16 @@ export class LspManager {
     serverName: string,
     root: string,
     control?: CodeRequestControl,
+    options: { retryFailedStart?: boolean } = {},
   ): Promise<LspClient | null> {
     throwIfCodeRequestInterrupted(control);
     if (this.shuttingDown) return null;
     const serverConfig = this.config.servers[serverName];
     if (!serverConfig) return null;
     const key = clientKey(serverName, root);
-    if (this.getUnavailableReason(key, serverConfig.command)) return null;
+    const retryFailedStart = options.retryFailedStart === true;
+    if (retryFailedStart) this.unavailable.delete(key);
+    if (!retryFailedStart && this.getUnavailableReason(key, serverConfig.command)) return null;
 
     // Return existing client
     const existing = this.clients.get(key);
@@ -468,10 +521,16 @@ export class LspManager {
     if (existing && existing.status === "error") {
       this.clients.delete(key);
       this.unavailable.set(key, "runtime-error");
+      this.failedStarts.set(key, {
+        serverName,
+        root,
+        failureMessage: "The LSP client is not running.",
+      });
       this.clearWarmedWorkspaceSymbolProjects(existing.name, existing.root);
       this.clearWarmedSemanticProjects(existing.name, existing.root);
       this.clearPendingWarmProbes(existing.name, existing.root);
-      return null;
+      if (!retryFailedStart) return null;
+      this.unavailable.delete(key);
     }
 
     // Deduplicate concurrent starts for the same server:root pair.
@@ -592,16 +651,316 @@ export class LspManager {
     recovery: ProcessCrashRecoveryState,
     route: FileRoute,
     control?: CodeRequestControl,
+    options: { allowExhausted?: boolean } = {},
   ): Promise<LspClient | null> {
     if (recovery.pending) return this.waitForProcessCrashRecovery(recovery, control);
-    if (
-      recovery.statusReason === "process-crashed" &&
-      !recovery.attemptConsumed &&
-      !this.shuttingDown
-    ) {
+    const automaticAttempt =
+      recovery.statusReason === "process-crashed" && !recovery.attemptConsumed;
+    const explicitAttempt =
+      options.allowExhausted === true &&
+      recovery.statusReason === "process-crash-recovery-exhausted";
+    if ((automaticAttempt || explicitAttempt) && !this.shuttingDown) {
       return this.startProcessCrashRecovery(recovery, route, control);
     }
     return Promise.resolve(null);
+  }
+
+  /** Retry failed routes selected by one explicit health refresh. */
+  private async recoverExplicitRouteDemand(
+    demand: { scopes?: readonly string[] },
+    control?: CodeRequestControl,
+  ): Promise<ProcessCrashDemandResult> {
+    throwIfCodeRequestInterrupted(control);
+    const scopes = this.processCrashDiagnosticScopes(demand);
+    const candidates = this.selectExplicitRouteCandidates(scopes);
+    return this.withExplicitRouteAttempts(candidates, control, async (results) => {
+      throwIfCodeRequestInterrupted(control);
+      for (const result of results) {
+        if (result.kind === "process-crash" && result.attempted) {
+          this.recoveryRestartEpochs.set(result.candidate.route.key, this.invalidationEpoch);
+        }
+      }
+      this.observeExplicitReadyRoutes(scopes);
+      const classified = this.classifyExplicitRouteAttempts(results, scopes);
+      return {
+        hasSupport: candidates.length > 0,
+        requiresFreshEvidence: results.some((result) => result.attempted),
+        startupRetry: buildStartupRetryReport(classified.startupResults, this.cwd),
+        processCrashRecovery: buildProcessCrashRecoveryReport(classified.processResults, this.cwd),
+        failures: classified.failures,
+        failedFiles: Array.from(new Set(classified.failedFiles)),
+      };
+    });
+  }
+
+  private classifyExplicitRouteAttempts(
+    results: readonly ExplicitRouteAttemptResult[],
+    scopes: readonly string[],
+  ): {
+    startupResults: StartupRetryRouteResult[];
+    processResults: ProcessCrashRecoveryRouteResult[];
+    failures: string[];
+    failedFiles: string[];
+  } {
+    const classified: {
+      startupResults: StartupRetryRouteResult[];
+      processResults: ProcessCrashRecoveryRouteResult[];
+      failures: string[];
+      failedFiles: string[];
+    } = {
+      startupResults: [],
+      processResults: [],
+      failures: [],
+      failedFiles: [],
+    } satisfies {
+      startupResults: StartupRetryRouteResult[];
+      processResults: ProcessCrashRecoveryRouteResult[];
+      failures: string[];
+      failedFiles: string[];
+    };
+    for (const result of results) {
+      const outcome = this.classifyExplicitRouteAttempt(result, scopes);
+      if (outcome.startupResult) classified.startupResults.push(outcome.startupResult);
+      if (outcome.processResult) classified.processResults.push(outcome.processResult);
+      if (outcome.failure) classified.failures.push(outcome.failure);
+      classified.failedFiles.push(...outcome.failedFiles);
+    }
+    return classified;
+  }
+
+  private classifyExplicitRouteAttempt(
+    result: ExplicitRouteAttemptResult,
+    scopes: readonly string[],
+  ): ExplicitRouteClassification {
+    if (!result.attempted) return { failedFiles: [] };
+    const recovered = result.client?.status === "running";
+    const startup = this.classifyExplicitStartupAttempt(result, recovered);
+    if (startup) return startup;
+    if (result.kind !== "process-crash") return { failedFiles: [] };
+    return this.classifyExplicitProcessAttempt(result, scopes, recovered);
+  }
+
+  private classifyExplicitStartupAttempt(
+    result: ExplicitRouteAttemptResult,
+    recovered: boolean,
+  ): ExplicitRouteClassification | null {
+    if (result.kind !== "startup" && !(result.kind === "discovery" && !recovered)) {
+      return null;
+    }
+    const { route } = result.candidate;
+    return {
+      startupResult: {
+        name: route.serverName,
+        root: route.root,
+        outcome: recovered ? "recovered" : "retry-failed",
+        ...(recovered || !result.failureMessage ? {} : { failureMessage: result.failureMessage }),
+      },
+      ...(recovered
+        ? {}
+        : { failure: this.formatStartupRetryFailure(route, result.failureMessage) }),
+      failedFiles: [],
+    };
+  }
+
+  private classifyExplicitProcessAttempt(
+    result: ExplicitRouteAttemptResult,
+    scopes: readonly string[],
+    recovered: boolean,
+  ): ExplicitRouteClassification {
+    const { route } = result.candidate;
+    const processResult: ProcessCrashRecoveryRouteResult = {
+      name: route.serverName,
+      root: route.root,
+      outcome: recovered ? "recovered" : "recovery-failed",
+      ...(!recovered && result.failureMessage ? { failureMessage: result.failureMessage } : {}),
+    };
+    return {
+      processResult,
+      ...(recovered
+        ? {}
+        : {
+            failure: this.formatProcessCrashDemandFailure(
+              { name: route.serverName, root: route.root, outcome: "recovery-failed" },
+              "recovery-failed",
+            ),
+          }),
+      failedFiles: recovered ? [] : this.explicitFailedFiles(result.candidate, scopes),
+    };
+  }
+
+  private selectExplicitRouteCandidates(scopes: readonly string[]): ExplicitRouteCandidate[] {
+    const candidates = new Map<string, ExplicitRouteCandidate>();
+    const add = (serverName: string, root: string): void => {
+      if (!this.automaticPathPolicy.isEligible(root, "directory")) return;
+      const serverConfig = this.config.servers[serverName];
+      if (!serverConfig) return;
+      const route = { serverName, serverConfig, root, key: clientKey(serverName, root) };
+      if (!this.explicitRouteInScope(root, scopes)) return;
+      const recovery = this.processCrashRecoveries.get(route.key);
+      const startupFailure = this.failedStarts.get(route.key);
+      if (this.clients.get(route.key)?.status === "running" && !recovery?.statusReason) {
+        candidates.set(route.key, { route });
+        return;
+      }
+      candidates.set(route.key, {
+        route,
+        ...(recovery ? { processCrashRecovery: recovery } : {}),
+        ...(startupFailure ? { startupFailure } : {}),
+      });
+    };
+
+    const exactFile =
+      scopes.length === 1 && this.inspectSourceFile(scopes[0]) === "regular" ? scopes[0] : null;
+    const exactRoute = exactFile ? this.resolveFileRoute(exactFile) : null;
+    if (exactRoute) {
+      add(exactRoute.serverName, exactRoute.root);
+      return Array.from(candidates.values());
+    }
+
+    const detected = scanProjectCapabilities(
+      this.config,
+      this.cwd,
+      undefined,
+      this.automaticPathPolicy,
+    );
+    for (const entry of detected) {
+      rememberKnownRoot(this.knownRoots, entry.name, entry.root);
+      add(entry.name, entry.root);
+    }
+    for (const failure of this.failedStarts.values()) add(failure.serverName, failure.root);
+    for (const snapshot of this.snapshotProcessCrashRoutes()) add(snapshot.name, snapshot.root);
+    return Array.from(candidates.values()).sort(
+      (first, second) =>
+        first.route.root.localeCompare(second.route.root) ||
+        first.route.serverName.localeCompare(second.route.serverName),
+    );
+  }
+
+  private explicitRouteInScope(root: string, scopes: readonly string[]): boolean {
+    return scopes.some(
+      (scope) =>
+        projectRoots.isWithinOrEqual(scope, root) || projectRoots.isWithinOrEqual(root, scope),
+    );
+  }
+
+  private async withExplicitRouteAttempts<T>(
+    candidates: readonly ExplicitRouteCandidate[],
+    control: CodeRequestControl | undefined,
+    callback: (results: ExplicitRouteAttemptResult[]) => Promise<T>,
+  ): Promise<T> {
+    throwIfCodeRequestInterrupted(control);
+    const leased: string[] = [];
+    try {
+      const promises = candidates.map((candidate) => {
+        throwIfCodeRequestInterrupted(control);
+        const key = candidate.route.key;
+        const existing = this.explicitRouteAttempts.get(key);
+        if (existing) {
+          existing.users++;
+          leased.push(key);
+          return raceRequestControl(existing.promise, control);
+        }
+        const promise = this.performExplicitRouteAttempt(candidate);
+        const lease: ExplicitRouteAttemptLease = { promise, users: 1, settled: false };
+        this.explicitRouteAttempts.set(key, lease);
+        void promise
+          .finally(() => {
+            lease.settled = true;
+            if (lease.users === 0 && this.explicitRouteAttempts.get(key) === lease) {
+              this.explicitRouteAttempts.delete(key);
+            }
+          })
+          .catch(() => {});
+        leased.push(key);
+        return raceRequestControl(promise, control);
+      });
+      const results = await Promise.all(promises);
+      return await callback(results);
+    } finally {
+      for (const key of leased) {
+        const lease = this.explicitRouteAttempts.get(key);
+        if (!lease) continue;
+        lease.users--;
+        if (lease.users === 0 && lease.settled) this.explicitRouteAttempts.delete(key);
+      }
+    }
+  }
+
+  private async performExplicitRouteAttempt(
+    candidate: ExplicitRouteCandidate,
+  ): Promise<ExplicitRouteAttemptResult> {
+    const { route } = candidate;
+    const recovery = this.processCrashRecoveries.get(route.key) ?? candidate.processCrashRecovery;
+    if (recovery?.statusReason) {
+      const client = await this.acquireProcessCrashReplacement(recovery, route, undefined, {
+        allowExhausted: true,
+      });
+      return {
+        candidate,
+        kind: "process-crash",
+        client,
+        attempted: true,
+        ...(recovery.failureMessage ? { failureMessage: recovery.failureMessage } : {}),
+      };
+    }
+
+    const existing = this.clients.get(route.key);
+    if (existing?.status === "running") {
+      return { candidate, kind: "none", client: existing, attempted: false };
+    }
+    const retryStartup = candidate.startupFailure !== undefined || existing?.status === "error";
+    const client = await this.startServerForRoot(route.serverName, route.root, undefined, {
+      retryFailedStart: true,
+    });
+    const failureMessage =
+      this.failedStarts.get(route.key)?.failureMessage ?? candidate.startupFailure?.failureMessage;
+    return {
+      candidate,
+      kind: retryStartup ? "startup" : "discovery",
+      client,
+      attempted: true,
+      ...(failureMessage ? { failureMessage } : {}),
+    };
+  }
+
+  private observeExplicitReadyRoutes(scopes: readonly string[]): void {
+    for (const client of this.clients.values()) {
+      if (client.status !== "running" || !client.ready) continue;
+      if (!this.explicitRouteInScope(client.root, scopes)) continue;
+      this.observeExplicitRouteReady(client);
+    }
+  }
+
+  private observeExplicitRouteReady(client: LspClient): void {
+    if (client.status !== "running" || !client.ready) return;
+    const key = clientKey(client.name, client.root);
+    const recovery = this.processCrashRecoveries.get(key);
+    if (recovery) {
+      recovery.attemptConsumed = false;
+      recovery.statusReason = undefined;
+      recovery.failureMessage = undefined;
+      this.processCrashRecoveries.delete(key);
+    }
+    this.failedStarts.delete(key);
+    this.unavailable.delete(key);
+  }
+
+  private explicitFailedFiles(
+    candidate: ExplicitRouteCandidate,
+    scopes: readonly string[],
+  ): string[] {
+    const files = candidate.processCrashRecovery?.files ?? [];
+    return files.filter(
+      (file) =>
+        this.isDiagnosticFile(file) &&
+        scopes.some((scope) => projectRoots.isWithinOrEqual(scope, file)),
+    );
+  }
+
+  private formatStartupRetryFailure(route: FileRoute, failureMessage?: string): string {
+    const root = (path.relative(this.cwd, route.root) || ".").replaceAll("\\", "/");
+    const detail = failureMessage ? `: ${boundProcessCrashFailureMessage(failureMessage)}` : "";
+    return `${route.serverName} @ ${root} is unavailable — startup retry failed${detail}; try another explicit health refresh.`;
   }
 
   /**
@@ -628,6 +987,7 @@ export class LspManager {
       return {
         hasSupport,
         requiresFreshEvidence: false,
+        startupRetry: emptyStartupRetryReport(),
         processCrashRecovery: buildProcessCrashRecoveryReport(
           immediate.map(({ route }) => route),
           this.cwd,
@@ -680,6 +1040,7 @@ export class LspManager {
     return {
       hasSupport,
       requiresFreshEvidence: observedRequired.length > 0,
+      startupRetry: emptyStartupRetryReport(),
       processCrashRecovery: buildProcessCrashRecoveryReport(
         [...immediate.map(({ route }) => route), ...recoveredRoutes],
         this.cwd,
@@ -790,8 +1151,8 @@ export class LspManager {
           : "recovery-failed");
     const reason =
       routeOutcome === "recovery-exhausted"
-        ? "process recovery exhausted; reload required"
-        : "process recovery failed";
+        ? "process recovery exhausted; try another explicit health refresh"
+        : "process recovery failed; try another explicit health refresh";
     return `${name} @ ${root} is unavailable — ${reason}.`;
   }
 
@@ -1030,6 +1391,11 @@ export class LspManager {
     // Validate command exists
     if (!commandExists(serverConfig.command)) {
       this.unavailable.set(key, "missing-command");
+      this.failedStarts.set(key, {
+        serverName,
+        root,
+        failureMessage: `Configured server command is not available: ${serverConfig.command}`,
+      });
       return null;
     }
 
@@ -1048,9 +1414,15 @@ export class LspManager {
         return null;
       }
       this.unavailable.delete(key);
+      this.failedStarts.delete(key);
       return client;
-    } catch {
+    } catch (error) {
       this.unavailable.set(key, "start-failed");
+      this.failedStarts.set(key, {
+        serverName,
+        root,
+        ...(error instanceof Error && error.message ? { failureMessage: error.message } : {}),
+      });
       if (this.clients.get(key) === client) this.clients.delete(key);
       return null;
     }
@@ -1230,6 +1602,17 @@ export class LspManager {
         fileTypes: [...(this.config.servers[client.name]?.fileTypes ?? [])],
       });
     }
+    // Keep an initial-start failure visible after its failed client is
+    // removed from the active client pool.
+    for (const failure of this.failedStarts.values()) {
+      const key = clientKey(failure.serverName, failure.root);
+      if (known.has(key)) continue;
+      known.set(key, {
+        name: failure.serverName,
+        root: failure.root,
+        fileTypes: [...(this.config.servers[failure.serverName]?.fileTypes ?? [])],
+      });
+    }
     // Keep an exhausted recovery route visible after its failed replacement
     // is removed from the active client pool.
     for (const recovery of this.processCrashRecoveries.values()) {
@@ -1257,10 +1640,115 @@ export class LspManager {
   async waitUntilFileReady(
     filePath: string,
     control?: CodeRequestControl,
-    onProcessCrashRecovery?: (report: ProcessCrashRecoveryReport) => void,
+    options: { retryFailedRoute?: boolean } & FileReadinessCallbacks = {},
   ): Promise<FileReadinessResult> {
     throwIfCodeRequestInterrupted(control);
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
+    if (options.retryFailedRoute) {
+      const route = this.resolveFileRoute(resolvedPath);
+      if (!route || !this.automaticPathPolicy.isEligible(route.root, "directory")) {
+        return {
+          client: null,
+          processCrashRecovery: emptyProcessCrashRecoveryReport(),
+          startupRetry: emptyStartupRetryReport(),
+        };
+      }
+      const candidates: ExplicitRouteCandidate[] = [
+        {
+          route,
+          ...(this.processCrashRecoveries.get(route.key)
+            ? { processCrashRecovery: this.processCrashRecoveries.get(route.key) }
+            : {}),
+          ...(this.failedStarts.get(route.key)
+            ? { startupFailure: this.failedStarts.get(route.key) }
+            : {}),
+        },
+      ];
+      return this.withExplicitRouteAttempts(candidates, control, (results) =>
+        this.completeExplicitFileReadiness(resolvedPath, control, options, results[0]),
+      );
+    }
+    return this.waitUntilFileReadyInternal(resolvedPath, control, options.onProcessCrashRecovery);
+  }
+
+  private async completeExplicitFileReadiness(
+    resolvedPath: string,
+    control: CodeRequestControl | undefined,
+    callbacks: FileReadinessCallbacks,
+    result: ExplicitRouteAttemptResult | undefined,
+  ): Promise<FileReadinessResult> {
+    const startupRetry = result
+      ? this.buildExplicitFileStartupReport(result)
+      : emptyStartupRetryReport();
+    if (startupRetry.entries.length > 0) callbacks.onStartupRetry?.(startupRetry);
+    let readiness: FileReadinessResult;
+    try {
+      readiness = await this.waitUntilFileReadyInternal(
+        resolvedPath,
+        control,
+        callbacks.onProcessCrashRecovery,
+      );
+    } catch (error) {
+      if (result?.kind !== "process-crash" || isCodeRequestInterruption(error, control)) {
+        throw error;
+      }
+      const processCrashRecovery = this.buildExplicitFileProcessCrashReport(result, null, error);
+      callbacks.onProcessCrashRecovery?.(processCrashRecovery);
+      return {
+        client: null,
+        processCrashRecovery,
+        startupRetry,
+      };
+    }
+    if (!result) return readiness;
+    if (readiness.client?.ready) this.observeExplicitRouteReady(readiness.client);
+    const processCrashRecovery =
+      result.kind === "process-crash"
+        ? this.mergeExplicitFileProcessCrashReports(
+            this.buildExplicitFileProcessCrashReport(result, readiness.client),
+            readiness.processCrashRecovery,
+          )
+        : readiness.processCrashRecovery;
+    if (processCrashRecovery.entries.length > 0) {
+      callbacks.onProcessCrashRecovery?.(processCrashRecovery);
+    }
+    return {
+      client: readiness.client,
+      processCrashRecovery,
+      startupRetry,
+    };
+  }
+
+  private mergeExplicitFileProcessCrashReports(
+    explicit: ProcessCrashRecoveryReport,
+    observed: ProcessCrashRecoveryReport,
+  ): ProcessCrashRecoveryReport {
+    if (observed.failedRoutes === 0) return explicit;
+    const observedFailure = observed.entries.find(
+      (entry) => entry.outcome === "recovery-failed" && entry.failureMessage,
+    );
+    if (!observedFailure?.failureMessage) return explicit;
+    return {
+      ...explicit,
+      entries: explicit.entries.map((entry) =>
+        entry.name === observedFailure.name && entry.root === observedFailure.root
+          ? { ...entry, failureMessage: observedFailure.failureMessage }
+          : entry,
+      ),
+    };
+  }
+
+  private buildExplicitFileStartupReport(result: ExplicitRouteAttemptResult): StartupRetryReport {
+    return result.kind === "startup" || (result.kind === "discovery" && !result.client)
+      ? this.buildExplicitFileStartupRetryReport(result)
+      : emptyStartupRetryReport();
+  }
+
+  private async waitUntilFileReadyInternal(
+    resolvedPath: string,
+    control: CodeRequestControl | undefined,
+    onProcessCrashRecovery?: (report: ProcessCrashRecoveryReport) => void,
+  ): Promise<FileReadinessResult> {
     const route = this.resolveFileRoute(resolvedPath);
     const recovery = route ? this.processCrashRecoveries.get(route.key) : undefined;
     const statusAtStart = recovery?.statusReason;
@@ -1276,7 +1764,13 @@ export class LspManager {
       client,
     );
     if (processCrashRecoveryRequested) onProcessCrashRecovery?.(processCrashRecovery);
-    if (!client) return { client: null, processCrashRecovery };
+    if (!client) {
+      return {
+        client: null,
+        processCrashRecovery,
+        startupRetry: emptyStartupRetryReport(),
+      };
+    }
     try {
       await client.getReady(control);
       await this.warmSemanticProject(client, resolvedPath, true, control);
@@ -1290,11 +1784,62 @@ export class LspManager {
       );
       if (failedRecovery) {
         onProcessCrashRecovery?.(failedRecovery);
-        return { client: null, processCrashRecovery: failedRecovery };
+        return {
+          client: null,
+          processCrashRecovery: failedRecovery,
+          startupRetry: emptyStartupRetryReport(),
+        };
       }
       throw error;
     }
-    return { client, processCrashRecovery };
+    return {
+      client,
+      processCrashRecovery,
+      startupRetry: emptyStartupRetryReport(),
+    };
+  }
+
+  private buildExplicitFileStartupRetryReport(
+    result: ExplicitRouteAttemptResult,
+  ): StartupRetryReport {
+    const recovered = result.client?.status === "running";
+    return buildStartupRetryReport(
+      [
+        {
+          name: result.candidate.route.serverName,
+          root: result.candidate.route.root,
+          outcome: recovered ? "recovered" : "retry-failed",
+          ...(recovered || !result.failureMessage ? {} : { failureMessage: result.failureMessage }),
+        },
+      ],
+      this.cwd,
+    );
+  }
+
+  private buildExplicitFileProcessCrashReport(
+    result: ExplicitRouteAttemptResult,
+    client: LspClient | null,
+    failure?: unknown,
+  ): ProcessCrashRecoveryReport {
+    const failureMessage =
+      failure instanceof Error && failure.message
+        ? boundProcessCrashFailureMessage(failure.message)
+        : result.failureMessage;
+    return buildProcessCrashRecoveryReport(
+      [
+        {
+          name: result.candidate.route.serverName,
+          root: result.candidate.route.root,
+          outcome: client?.status === "running" ? "recovered" : "recovery-failed",
+          ...(!client?.status || client.status !== "running"
+            ? failureMessage
+              ? { failureMessage }
+              : {}
+            : {}),
+        },
+      ],
+      this.cwd,
+    );
   }
 
   private buildFileProcessCrashRecoveryReport(
@@ -1615,35 +2160,46 @@ export class LspManager {
     quietMs?: number;
     /** Evidence from a refresh the caller already completed; skips this pass's own refresh when no watched-file changes apply. */
     initialEvidence?: DiagnosticEvidenceSummary;
-    /** Explicit demand to recover crashed routes with tracked files in scope. */
-    processCrashDemand?: { scopes?: readonly string[] };
+    /** Explicit demand to retry crashed and failed routes in scope. */
+    processCrashDemand?: { scopes?: readonly string[]; explicit?: boolean };
     control?: CodeRequestControl;
   }): Promise<WorkspaceRecoveryResult> {
     const processCrashDemand = options?.processCrashDemand;
-    const demand = processCrashDemand
-      ? await this.recoverProcessCrashDemand(
-          (snapshot) => {
-            if (!this.processCrashDiagnosticRouteInScope(snapshot, processCrashDemand)) {
-              return null;
-            }
-            return this.processCrashDiagnosticFiles(snapshot, processCrashDemand);
-          },
-          options?.control,
-          { skipWhenNoRetainedFile: true },
-        )
-      : {
-          hasSupport: false,
-          requiresFreshEvidence: false,
-          processCrashRecovery: emptyProcessCrashRecoveryReport(),
-          failures: [],
-          failedFiles: [],
-        };
+    const demand = processCrashDemand?.explicit
+      ? await this.recoverExplicitRouteDemand(processCrashDemand, options?.control)
+      : processCrashDemand
+        ? await this.recoverProcessCrashDemand(
+            (snapshot) => {
+              if (!this.processCrashDiagnosticRouteInScope(snapshot, processCrashDemand)) {
+                return null;
+              }
+              return this.processCrashDiagnosticFiles(snapshot, processCrashDemand);
+            },
+            options?.control,
+            { skipWhenNoRetainedFile: true },
+          )
+        : {
+            hasSupport: false,
+            requiresFreshEvidence: false,
+            processCrashRecovery: emptyProcessCrashRecoveryReport(),
+            startupRetry: emptyStartupRetryReport(),
+            failures: [],
+            failedFiles: [],
+          };
     const recoveryOptions = demand.requiresFreshEvidence
       ? { ...options, initialEvidence: undefined }
       : options;
     const result = await recoverWorkspaceDiagnosticsImpl(this, recoveryOptions);
+    if (processCrashDemand?.explicit) {
+      throwIfCodeRequestInterrupted(options?.control);
+      this.observeExplicitReadyRoutes(this.processCrashDiagnosticScopes(processCrashDemand));
+    }
     return this.addProcessCrashDiagnosticEvidence(
-      { ...result, processCrashRecovery: demand.processCrashRecovery },
+      {
+        ...result,
+        processCrashRecovery: demand.processCrashRecovery,
+        startupRetry: demand.startupRetry,
+      },
       demand,
     );
   }
@@ -1721,6 +2277,8 @@ export class LspManager {
     this.initializedClientGenerations.clear();
     this.handledCrashGenerations.clear();
     this.processCrashRecoveries.clear();
+    this.failedStarts.clear();
+    this.explicitRouteAttempts.clear();
     this.recoveryRestartEpochs.clear();
     this.unavailable.clear();
     this.knownRoots.clear();

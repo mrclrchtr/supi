@@ -4,6 +4,8 @@ import {
 } from "@mrclrchtr/supi-code-runtime/api";
 import {
   emptyProcessCrashRecoveryReport,
+  emptyStartupRetryReport,
+  type SemanticReadinessResult,
   type WorkspaceDiagnosticReport,
   type WorkspaceLspRuntime,
 } from "@mrclrchtr/supi-lsp/api";
@@ -29,6 +31,8 @@ interface HealthRefreshAttemptOptions {
 
 export interface HealthRefreshCollection {
   readonly attempt: HealthRefreshAttempt;
+  /** File readiness observed by the same explicit refresh call. */
+  readonly fileReadiness?: SemanticReadinessResult;
   /** Next typed maintenance state, committed only after the attempt returns. */
   readonly maintenanceState: LspMaintenanceState;
   /** Final report from the runtime, retained only for the current workflow. */
@@ -58,12 +62,13 @@ async function collectFileRefreshAttempt(
   });
   const readiness = await options.runtime.waitUntilReadyForFile(
     scope.path,
-    undefined,
+    { retryFailedRoute: true },
     options.control,
   );
   const fileReadiness: HealthFileReadiness =
     readiness.kind === "ready" ? "ready" : readiness.kind === "timeout" ? "pending" : "unavailable";
   return {
+    fileReadiness: readiness,
     maintenanceState: maintenance.maintenanceState,
     attempt: {
       kind: "completed",
@@ -75,6 +80,7 @@ async function collectFileRefreshAttempt(
       fileReadiness,
       restartedClients: 0,
       processCrashRecovery: readiness.processCrashRecovery ?? emptyProcessCrashRecoveryReport(),
+      startupRetry: readiness.startupRetry ?? emptyStartupRetryReport(),
       staleAssessment: {
         scope: "file",
         suspected: null,
@@ -111,6 +117,7 @@ async function collectWorkspaceRefreshAttempt(
         operationScope: "workspace-runtime",
         diagnosticEvidence: maintenance.diagnosticEvidence,
         processCrashRecovery: emptyProcessCrashRecoveryReport(),
+        startupRetry: emptyStartupRetryReport(),
         ...(maintenance.sourceTracking ? { sourceTracking: maintenance.sourceTracking } : {}),
         reason: maintenance.failureReason,
       },
@@ -127,6 +134,7 @@ async function collectWorkspaceRefreshAttempt(
       // runtime then performs a fresh pass that includes the replacement.
       initialEvidence: maintenance.diagnosticEvidence,
       processCrashDemand: {
+        explicit: true,
         ...(workspaceScope?.filter ? { scopes: [workspaceScope.filter] } : {}),
       },
     });
@@ -154,6 +162,7 @@ async function collectWorkspaceRefreshAttempt(
           },
           diagnosticEvidence,
           processCrashRecovery: recovery.processCrashRecovery,
+          startupRetry: recovery.startupRetry,
           ...(maintenance.sourceTracking ? { sourceTracking: maintenance.sourceTracking } : {}),
           reason: recovery.refreshFailureReason,
         },
@@ -171,6 +180,7 @@ async function collectWorkspaceRefreshAttempt(
         attemptedActiveClients: recovery.attemptedClients,
         restartedClients: recovery.restartedClients,
         processCrashRecovery: recovery.processCrashRecovery,
+        startupRetry: recovery.startupRetry,
         diagnosticEvidence,
         ...(maintenance.sourceTracking ? { sourceTracking: maintenance.sourceTracking } : {}),
         staleAssessment: {
@@ -196,6 +206,7 @@ async function collectWorkspaceRefreshAttempt(
         operationScope: "workspace-runtime",
         diagnosticEvidence: maintenance.diagnosticEvidence,
         processCrashRecovery: emptyProcessCrashRecoveryReport(),
+        startupRetry: emptyStartupRetryReport(),
         ...(maintenance.sourceTracking ? { sourceTracking: maintenance.sourceTracking } : {}),
         reason: errorMessage(error),
       },

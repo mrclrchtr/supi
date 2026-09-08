@@ -19,7 +19,7 @@ import type {
 } from "../diagnostics/workspace-sentinels.ts";
 import type { WorkspaceSourceInventory } from "../diagnostics/workspace-sources.ts";
 import type { WorkspaceLspDiagnosticSurface } from "./runtime-diagnostic-surface.ts";
-import type { ProcessCrashRecoveryReport } from "./runtime-diagnostics.ts";
+import type { ProcessCrashRecoveryReport, StartupRetryReport } from "./runtime-diagnostics.ts";
 
 /** Maximum number of files processed by one automatic bulk-tracking call. */
 export const MAX_BULK_TRACK_FILES = 256;
@@ -34,17 +34,23 @@ export type WorkspaceLspRuntimeState =
 export type SemanticReadinessResult =
   | {
       kind: "ready";
+      /** Initial-start retry observed while establishing file readiness. */
+      startupRetry?: StartupRetryReport;
       /** Process-crash route recovery observed while establishing file readiness. */
       processCrashRecovery?: ProcessCrashRecoveryReport;
     }
   | {
       kind: "timeout";
+      /** Initial-start retry observed before the readiness timeout. */
+      startupRetry?: StartupRetryReport;
       /** Process-crash route recovery observed before the readiness timeout. */
       processCrashRecovery?: ProcessCrashRecoveryReport;
     }
   | {
       kind: "unavailable";
       reason: string;
+      /** Initial-start retry observed before readiness became unavailable. */
+      startupRetry?: StartupRetryReport;
       /** Process-crash route recovery observed before readiness became unavailable. */
       processCrashRecovery?: ProcessCrashRecoveryReport;
     };
@@ -124,9 +130,13 @@ export interface WorkspaceLspRuntime extends WorkspaceLspDiagnosticSurface {
     control?: CodeRequestControl,
   ): Promise<RoutedMutationResponse<CodeAction[] | null> | null>;
   getOpenDocumentVersion(filePath: string): number | null;
+  /**
+   * Wait for file readiness; an explicit refresh may make one shared route
+   * retry for this call without changing ordinary request recovery limits.
+   */
   waitUntilReadyForFile(
     filePath: string,
-    options?: { timeoutMs?: number },
+    options?: { timeoutMs?: number; retryFailedRoute?: boolean },
     control?: CodeRequestControl,
   ): Promise<SemanticReadinessResult>;
   waitUntilReadyForWorkspace(

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => {
   const clients: FakeClientShape[] = [];
   const recordDebugEvent = vi.fn();
   const startBehaviors: Array<() => void | Promise<void>> = [];
+  const readinessBehaviors: Array<() => void | Promise<void>> = [];
 
   interface FakeClientShape {
     name: string;
@@ -45,6 +46,16 @@ const mocks = vi.hoisted(() => {
       }
       this.status = "running";
       this.listener?.("startup");
+    }
+
+    async getReady(): Promise<void> {
+      const behavior = readinessBehaviors.shift();
+      if (behavior) await behavior();
+      if (!this.ready) throw new Error("The fake client is not ready.");
+    }
+
+    documentSymbols(): Promise<{ kind: "completed"; data: [] }> {
+      return Promise.resolve({ kind: "completed", data: [] });
     }
 
     becomeReady(): void {
@@ -138,7 +149,7 @@ const mocks = vi.hoisted(() => {
     }
   }
 
-  return { clients, FakeClient, recordDebugEvent, startBehaviors };
+  return { clients, FakeClient, readinessBehaviors, recordDebugEvent, startBehaviors };
 });
 
 vi.mock("@mrclrchtr/supi-core/debug", () => ({
@@ -170,6 +181,7 @@ const managers: LspManager[] = [];
 
 beforeEach(() => {
   mocks.clients.length = 0;
+  mocks.readinessBehaviors.length = 0;
   mocks.startBehaviors.length = 0;
   mocks.recordDebugEvent.mockClear();
 });
@@ -180,6 +192,283 @@ afterEach(async () => {
 });
 
 describe("workspace-symbol process-crash demand", () => {
+  it("retries a failed initial startup during an explicit refresh", async () => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-startup-retry-"));
+    tempRoots.push(workspace);
+    const file = path.join(workspace, "source.test");
+    fs.writeFileSync(file, "source\n");
+    const manager = new LspManager(config, workspace);
+    managers.push(manager);
+    mocks.startBehaviors.push(async () => {
+      throw new Error("initial startup failed");
+    });
+
+    await expect(manager.startServerForRoot("test", workspace)).resolves.toBeNull();
+    mocks.startBehaviors.push(() => {
+      (mocks.clients.at(-1) as InstanceType<typeof mocks.FakeClient> | undefined)?.becomeReady();
+    });
+
+    const result = await manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { explicit: true, scopes: [file] },
+    });
+
+    expect(result.startupRetry).toEqual({
+      recoveredRoutes: 1,
+      failedRoutes: 0,
+      entries: [{ name: "test", root: ".", outcome: "recovered" }],
+      omittedEntries: 0,
+    });
+    expect(manager.getProjectServerInfo("test", workspace, ["test"])).toMatchObject({
+      status: "running",
+      ready: true,
+    });
+  });
+
+  it("retries a failed initial startup through exact-file readiness", async () => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-file-startup-retry-"));
+    tempRoots.push(workspace);
+    const file = path.join(workspace, "source.test");
+    fs.writeFileSync(file, "source\n");
+    const manager = new LspManager(config, workspace);
+    managers.push(manager);
+    mocks.startBehaviors.push(async () => {
+      throw new Error("initial startup failed");
+    });
+
+    await expect(manager.startServerForRoot("test", workspace)).resolves.toBeNull();
+    mocks.startBehaviors.push(() => {
+      (mocks.clients.at(-1) as InstanceType<typeof mocks.FakeClient> | undefined)?.becomeReady();
+    });
+
+    const result = await manager.waitUntilFileReady(file, undefined, {
+      retryFailedRoute: true,
+    });
+
+    expect(result.startupRetry).toEqual({
+      recoveredRoutes: 1,
+      failedRoutes: 0,
+      entries: [{ name: "test", root: ".", outcome: "recovered" }],
+      omittedEntries: 0,
+    });
+    expect(result.client?.ready).toBe(true);
+  });
+
+  it("retries an exhausted crash route through exact-file readiness", async () => {
+    const fixture = await createTwoCrashedRoutes({ crashA: false });
+    mocks.startBehaviors.push(async () => {
+      throw new Error("automatic replacement failed");
+    });
+    await expect(
+      fixture.manager.getClientForFile(fixture.fileB, { recoverProcessCrash: true }),
+    ).resolves.toBeNull();
+
+    mocks.startBehaviors.push(() => {
+      (mocks.clients.at(-1) as InstanceType<typeof mocks.FakeClient> | undefined)?.becomeReady();
+    });
+
+    const result = await fixture.manager.waitUntilFileReady(fixture.fileB, undefined, {
+      retryFailedRoute: true,
+    });
+
+    expect(result.processCrashRecovery).toEqual({
+      recoveredRoutes: 1,
+      skippedRoutes: 0,
+      failedRoutes: 0,
+      exhaustedRoutes: 0,
+      entries: [{ name: "test", root: "b", outcome: "recovered" }],
+      omittedEntries: 0,
+    });
+    expect(result.startupRetry.entries).toHaveLength(0);
+    expect(result.client?.ready).toBe(true);
+  });
+
+  it("reports a readiness failure after an explicit crash retry", async () => {
+    const fixture = await createTwoCrashedRoutes({ crashA: false });
+    mocks.startBehaviors.push(async () => {
+      throw new Error("automatic replacement failed");
+    });
+    await expect(
+      fixture.manager.getClientForFile(fixture.fileB, { recoverProcessCrash: true }),
+    ).resolves.toBeNull();
+
+    mocks.startBehaviors.push(() => {
+      (mocks.clients.at(-1) as InstanceType<typeof mocks.FakeClient> | undefined)?.becomeReady();
+    });
+    mocks.readinessBehaviors.push(async () => {
+      throw new Error("readiness failed");
+    });
+
+    const result = await fixture.manager.waitUntilFileReady(fixture.fileB, undefined, {
+      retryFailedRoute: true,
+    });
+
+    expect(result.processCrashRecovery).toMatchObject({
+      recoveredRoutes: 0,
+      failedRoutes: 1,
+      entries: [
+        {
+          name: "test",
+          root: "b",
+          outcome: "recovery-failed",
+          failureMessage: "readiness failed",
+        },
+      ],
+    });
+    expect(result.startupRetry.entries).toHaveLength(0);
+  });
+
+  it("discovers and starts a configured route that is now available", async () => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-discovery-retry-"));
+    tempRoots.push(workspace);
+    fs.writeFileSync(path.join(workspace, "route.marker"), "");
+    fs.writeFileSync(path.join(workspace, "source.test"), "source\n");
+    const manager = new LspManager(
+      {
+        servers: {
+          test: { ...config.servers.test, rootMarkers: ["route.marker"] },
+        },
+      },
+      workspace,
+    );
+    managers.push(manager);
+
+    const result = await manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { explicit: true, scopes: [workspace] },
+    });
+
+    expect(result.startupRetry).toEqual({
+      recoveredRoutes: 0,
+      failedRoutes: 0,
+      entries: [],
+      omittedEntries: 0,
+    });
+    expect(manager.getProjectServerInfo("test", workspace, ["test"])).toMatchObject({
+      status: "running",
+    });
+    expect(mocks.clients).toHaveLength(1);
+  });
+
+  it("reports a failed first start discovered during an explicit refresh", async () => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-discovery-failure-"));
+    tempRoots.push(workspace);
+    fs.writeFileSync(path.join(workspace, "route.marker"), "");
+    fs.writeFileSync(path.join(workspace, "source.test"), "source\n");
+    const manager = new LspManager(
+      {
+        servers: {
+          test: { ...config.servers.test, rootMarkers: ["route.marker"] },
+        },
+      },
+      workspace,
+    );
+    managers.push(manager);
+    mocks.startBehaviors.push(async () => {
+      throw new Error("discovered startup failed");
+    });
+
+    const result = await manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { explicit: true, scopes: [workspace] },
+    });
+
+    expect(result.startupRetry).toMatchObject({
+      recoveredRoutes: 0,
+      failedRoutes: 1,
+      entries: [
+        {
+          name: "test",
+          root: ".",
+          outcome: "retry-failed",
+          nextAction: "refresh",
+          failureMessage: "discovered startup failed",
+        },
+      ],
+    });
+    expect(result.refreshFailureReason).toContain("startup retry failed");
+  });
+
+  it("retries an exhausted route on later explicit refreshes and restores its budget", async () => {
+    const fixture = await createTwoCrashedRoutes({
+      crashA: false,
+      rootMarkers: ["route.marker"],
+    });
+    mocks.startBehaviors.push(async () => {
+      throw new Error("automatic replacement failed");
+    });
+    await fixture.manager.getClientForFile(fixture.fileB, { recoverProcessCrash: true });
+
+    mocks.startBehaviors.push(async () => {
+      throw new Error("explicit replacement failed");
+    });
+    const failed = await fixture.manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { explicit: true, scopes: [fixture.fileB] },
+    });
+    expect(failed.processCrashRecovery).toMatchObject({
+      failedRoutes: 1,
+      entries: [
+        {
+          name: "test",
+          root: "b",
+          outcome: "recovery-failed",
+          nextAction: "refresh",
+        },
+      ],
+    });
+
+    mocks.startBehaviors.push(() => {
+      (mocks.clients.at(-1) as InstanceType<typeof mocks.FakeClient> | undefined)?.becomeReady();
+    });
+    const recovered = await fixture.manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { explicit: true, scopes: [fixture.fileB] },
+    });
+    expect(recovered.processCrashRecovery).toMatchObject({
+      recoveredRoutes: 1,
+      entries: [{ name: "test", root: "b", outcome: "recovered" }],
+    });
+
+    const replacement = mocks.clients.at(-1) as InstanceType<typeof mocks.FakeClient> | undefined;
+    if (!replacement) throw new Error("Expected the explicit replacement.");
+    replacement.crash();
+    mocks.startBehaviors.push(() => undefined);
+    await expect(
+      fixture.manager.getClientForFile(fixture.fileB, { recoverProcessCrash: true }),
+    ).resolves.toBeTruthy();
+    expect(mocks.clients).toHaveLength(6);
+  });
+
+  it("shares an explicit retry after the first caller is cancelled", async () => {
+    const fixture = await createTwoCrashedRoutes({
+      crashA: false,
+      rootMarkers: ["route.marker"],
+    });
+    const start = deferred<void>();
+    mocks.startBehaviors.push(() => start.promise);
+    const controller = new AbortController();
+    const cancelled = fixture.manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { explicit: true, scopes: [fixture.rootB] },
+      control: { signal: controller.signal },
+    });
+    await vi.waitFor(() => expect(mocks.clients).toHaveLength(3));
+
+    controller.abort(new Error("refresh cancelled"));
+    await expect(cancelled).rejects.toThrow("refresh cancelled");
+
+    const later = fixture.manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { explicit: true, scopes: [fixture.rootB] },
+    });
+    start.resolve();
+    await expect(later).resolves.toMatchObject({
+      processCrashRecovery: { recoveredRoutes: 1 },
+    });
+    expect(mocks.clients).toHaveLength(3);
+  });
+
   it("reports a scope-specific unavailable reason when no route intersects", async () => {
     const fixture = await createTwoCrashedRoutes({ crashA: false });
     const unrelatedScope = path.join(fixture.manager.getCwd(), "c");
@@ -362,7 +651,7 @@ describe("workspace-symbol process-crash demand", () => {
           name: "test",
           root: "b",
           outcome: "recovery-exhausted",
-          nextAction: "reload-workspace",
+          nextAction: "refresh",
         },
       ],
       omittedEntries: 0,
@@ -393,7 +682,7 @@ describe("workspace-symbol process-crash demand", () => {
           name: "test",
           root: "b",
           outcome: "recovery-failed",
-          nextAction: "reload-workspace",
+          nextAction: "refresh",
           failureMessage: "replacement failed",
         },
       ],
@@ -434,7 +723,7 @@ describe("workspace-symbol process-crash demand", () => {
 });
 
 async function createTwoCrashedRoutes(
-  options: { crashA?: boolean; trackB?: boolean } = {},
+  options: { crashA?: boolean; trackB?: boolean; rootMarkers?: string[] } = {},
 ): Promise<{
   manager: LspManager;
   rootA: string;
@@ -449,6 +738,10 @@ async function createTwoCrashedRoutes(
   const rootB = path.join(workspace, "b");
   fs.mkdirSync(rootA);
   fs.mkdirSync(rootB);
+  for (const marker of options.rootMarkers ?? []) {
+    fs.writeFileSync(path.join(rootA, marker), "");
+    fs.writeFileSync(path.join(rootB, marker), "");
+  }
   const fileA = path.join(rootA, "tracked.test");
   const fileB = path.join(rootB, "tracked.test");
   const fileBOutside = path.join(rootB, "outside.test");
@@ -456,7 +749,15 @@ async function createTwoCrashedRoutes(
   fs.writeFileSync(fileB, "b\n");
   fs.writeFileSync(fileBOutside, "outside\n");
 
-  const manager = new LspManager(config, workspace);
+  const managerConfig = options.rootMarkers
+    ? {
+        ...config,
+        servers: {
+          test: { ...config.servers.test, rootMarkers: options.rootMarkers },
+        },
+      }
+    : config;
+  const manager = new LspManager(managerConfig, workspace);
   managers.push(manager);
   const clientA = await manager.startServerForRoot("test", rootA);
   const clientB = await manager.startServerForRoot("test", rootB);

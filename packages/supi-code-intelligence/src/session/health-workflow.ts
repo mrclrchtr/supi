@@ -4,6 +4,7 @@ import type { CapabilityState } from "@mrclrchtr/supi-code-runtime/api";
 import { isCodeRequestInterruption } from "@mrclrchtr/supi-code-runtime/api";
 import type {
   LspRuntimeController,
+  SemanticReadinessResult,
   WorkspaceDiagnosticReport,
   WorkspaceLspRuntime,
   WorkspaceLspRuntimeState,
@@ -80,7 +81,6 @@ export async function runHealthWorkflow(
   const diagnosticsScope = diagnosticScope(scopeFilter);
   const refreshCollection = await collectRefreshState({
     refreshRequested: request.refresh === true,
-    diagnosticsRequested: included.includes("diagnostics"),
     runtime,
     lspState,
     diagnosticsScope,
@@ -94,6 +94,7 @@ export async function runHealthWorkflow(
     scopeFilter,
     lspState,
     capabilityState: capabilityStates.semantic,
+    refreshReadiness: refreshCollection.fileReadiness,
     control,
   });
   const semanticReady = semanticState?.kind === "ready";
@@ -146,6 +147,8 @@ interface SemanticHealthStateOptions {
   requested: boolean;
   /** Whether this call requests file-routed evidence rather than passive inventory. */
   fileReadinessRequested: boolean;
+  /** Readiness observed by the explicit refresh phase, when one ran. */
+  refreshReadiness?: SemanticReadinessResult;
   runtime: WorkspaceLspRuntime | null;
   scopeFilter: string | null;
   lspState: WorkspaceLspRuntimeState;
@@ -157,12 +160,17 @@ async function establishSemanticHealthState(
   options: SemanticHealthStateOptions,
 ): Promise<SemanticHealthState | null> {
   if (!options.requested) return null;
-  if (options.fileReadinessRequested && options.runtime && isScopedFile(options.scopeFilter)) {
-    const readiness = await options.runtime.waitUntilReadyForFile(
-      options.scopeFilter,
-      undefined,
-      options.control,
-    );
+  if (options.fileReadinessRequested && isScopedFile(options.scopeFilter)) {
+    const readiness =
+      options.refreshReadiness ??
+      (options.runtime
+        ? await options.runtime.waitUntilReadyForFile(
+            options.scopeFilter,
+            undefined,
+            options.control,
+          )
+        : null);
+    if (!readiness) return deriveNonReadySemanticState(options.lspState, options.capabilityState);
     if (readiness.kind === "ready") return { kind: "ready" };
     if (readiness.kind === "timeout") {
       return { kind: "pending", reason: SEMANTIC_READINESS_TIMEOUT_REASON };
@@ -226,12 +234,12 @@ function collectCapabilityWarnings(
 
 interface HealthRefreshStateCollection {
   readonly attempt: HealthRefreshState;
+  readonly fileReadiness?: SemanticReadinessResult;
   readonly diagnosticReport?: WorkspaceDiagnosticReport;
 }
 
 interface RefreshStateOptions {
   readonly refreshRequested: boolean;
-  readonly diagnosticsRequested: boolean;
   readonly runtime: WorkspaceLspRuntime | null;
   readonly lspState: WorkspaceLspRuntimeState;
   readonly diagnosticsScope: HealthDiagnosticScope;
@@ -243,16 +251,7 @@ interface RefreshStateOptions {
 async function collectRefreshState(
   options: RefreshStateOptions,
 ): Promise<HealthRefreshStateCollection> {
-  const { deps, diagnosticsRequested, diagnosticsScope, lspState, runtime } = options;
-  if (!diagnosticsRequested) {
-    return {
-      attempt: {
-        kind: "not-requested",
-        reason: "Diagnostics were not requested.",
-        lastAttempt: deps.lastRefreshAttempt,
-      },
-    };
-  }
+  const { deps, diagnosticsScope, lspState, runtime } = options;
   if (!options.refreshRequested) {
     return {
       attempt: {
@@ -296,7 +295,10 @@ async function collectRefreshState(
     });
     deps.updateMaintenanceState(attempt.maintenanceState);
     deps.trackRefreshAttempt(attempt.attempt);
-    return attempt;
+    return {
+      ...attempt,
+      ...(attempt.fileReadiness ? { fileReadiness: attempt.fileReadiness } : {}),
+    };
   } catch (error) {
     // Cancellation must propagate; a cancelled caller no longer awaits a
     // recorded failed attempt or the refresh data it would carry.

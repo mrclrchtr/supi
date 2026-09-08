@@ -1,10 +1,4 @@
-/**
- * Markdown renderer for code_health results.
- *
- * Renders structured health data from the code_health executor into
- * readable markdown sections keyed by requested `include` values.
- */
-
+/** Markdown renderer for code_health results. */
 import type { CapabilityWarningReport } from "../../analysis/capability/capability-warnings.ts";
 import {
   formatProjectServerRoot,
@@ -17,6 +11,7 @@ import {
   formatRefreshElapsed,
   formatSourceTracking,
   formatStaleDiagnosticRestarts as formatStaleDiagnosticRestartsText,
+  formatStartupRetry,
   isFileReadinessPending,
 } from "./refresh-outcome.ts";
 import type {
@@ -52,49 +47,61 @@ function renderRefreshStatus(
   hasDiagnostics: boolean,
   cwd: string,
 ): void {
-  if (!hasDiagnostics) return;
-
-  switch (data.refresh.kind) {
-    case "completed": {
-      const fileReadinessPending = isFileReadinessPending(data.refresh, data.semanticState);
-      lines.push(
-        `**${refreshAttemptLabel(data.refresh)}**: ${asSentence(completedRefreshText(data.refresh, fileReadinessPending, false))}`,
-      );
-      renderSourceTracking(lines, data.refresh);
-      lines.push(`**Stale assessment**: ${asSentence(staleAssessmentText(data.refresh))}`);
-      lines.push("");
-      return;
-    }
-    case "failed": {
-      const evidence = data.refresh.diagnosticEvidence
-        ? `; ${formatDiagnosticEvidence(data.refresh.diagnosticEvidence)}`
-        : "";
-      const processCrashRecovery = data.refresh.processCrashRecovery
-        ? formatProcessCrashRecovery(data.refresh.processCrashRecovery)
-        : null;
-      const staleRestart = formatStaleDiagnosticRestarts(data.refresh);
-      lines.push(
-        `**${refreshAttemptLabel(data.refresh)}**: failed — ${data.refresh.reason}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${evidence}`,
-      );
-      renderSourceTracking(lines, data.refresh);
-      lines.push("");
-      return;
-    }
-    case "not-attempted":
-      lines.push(`**Diagnostic refresh attempt**: not started — ${data.refresh.reason}`);
-      if (data.refresh.lastAttempt) renderLastAttempt(lines, data.refresh.lastAttempt, cwd);
-      lines.push("");
-      return;
-    case "not-requested":
-      if (data.refresh.lastAttempt) {
-        renderRetainedAttempt(lines, data.refresh.lastAttempt, cwd);
-      } else {
-        lines.push(
-          "**Diagnostic refresh attempt**: not requested this session. Use `refresh: true` to try one.",
-        );
-      }
-      lines.push("");
+  if (!hasDiagnostics && data.refresh.kind !== "completed" && data.refresh.kind !== "failed") {
+    return;
   }
+  if (data.refresh.kind === "completed") {
+    renderCompletedRefreshStatus(lines, data);
+    return;
+  }
+  if (data.refresh.kind === "failed") {
+    renderFailedRefreshStatus(lines, data.refresh);
+    return;
+  }
+  if (data.refresh.kind === "not-attempted") {
+    lines.push(`**Diagnostic refresh attempt**: not started — ${data.refresh.reason}`);
+    if (data.refresh.lastAttempt) renderLastAttempt(lines, data.refresh.lastAttempt, cwd);
+    lines.push("");
+    return;
+  }
+  if (data.refresh.lastAttempt) {
+    renderRetainedAttempt(lines, data.refresh.lastAttempt, cwd);
+  } else {
+    lines.push(
+      "**Diagnostic refresh attempt**: not requested this session. Use `refresh: true` to try one.",
+    );
+  }
+  lines.push("");
+}
+
+function renderCompletedRefreshStatus(lines: string[], data: HealthData): void {
+  if (data.refresh.kind !== "completed") return;
+  const fileReadinessPending = isFileReadinessPending(data.refresh, data.semanticState);
+  lines.push(
+    `**${refreshAttemptLabel(data.refresh)}**: ${asSentence(completedRefreshText(data.refresh, fileReadinessPending, false))}`,
+  );
+  renderSourceTracking(lines, data.refresh);
+  lines.push(`**Stale assessment**: ${asSentence(staleAssessmentText(data.refresh))}`);
+  lines.push("");
+}
+
+function renderFailedRefreshStatus(
+  lines: string[],
+  attempt: Extract<HealthRefreshAttempt, { kind: "failed" }>,
+): void {
+  const evidence = attempt.diagnosticEvidence
+    ? `; ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}`
+    : "";
+  const processCrashRecovery = attempt.processCrashRecovery
+    ? formatProcessCrashRecovery(attempt.processCrashRecovery)
+    : null;
+  const startupRetry = attempt.startupRetry ? formatStartupRetry(attempt.startupRetry) : null;
+  const staleRestart = formatStaleDiagnosticRestarts(attempt);
+  lines.push(
+    `**${refreshAttemptLabel(attempt)}**: failed — ${attempt.reason}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${startupRetry ? `; ${startupRetry}` : ""}${evidence}`,
+  );
+  renderSourceTracking(lines, attempt);
+  lines.push("");
 }
 
 function completedRefreshText(
@@ -103,11 +110,13 @@ function completedRefreshText(
   includeSourceTracking = true,
 ): string {
   const processCrashRecovery = formatProcessCrashRecovery(attempt.processCrashRecovery);
+  const startupRetry = formatStartupRetry(attempt.startupRetry);
   const noOp =
     !fileReadinessPending &&
     attempt.attemptedActiveClients === 0 &&
     attempt.restartedClients === 0 &&
-    processCrashRecovery === null;
+    processCrashRecovery === null &&
+    startupRetry === null;
   const base = fileReadinessPending
     ? "readiness pending — LSP may still be warming; retry shortly"
     : noOp
@@ -119,6 +128,7 @@ function completedRefreshText(
     includeSourceTracking ? sourceTracking : null,
     staleRestart,
     processCrashRecovery,
+    startupRetry,
   ].filter((value): value is string => value !== null);
   const withOutcome = outcome.length > 0 ? `${base}; ${outcome.join("; ")}` : base;
   return attempt.operationScope === "workspace-runtime"
@@ -174,12 +184,13 @@ function refreshAttemptOutcome(attempt: HealthRefreshAttempt): string {
   const processCrashRecovery = attempt.processCrashRecovery
     ? formatProcessCrashRecovery(attempt.processCrashRecovery)
     : null;
+  const startupRetry = attempt.startupRetry ? formatStartupRetry(attempt.startupRetry) : null;
   const staleRestart = formatStaleDiagnosticRestarts(attempt);
   const sourceTracking = formatSourceTracking(attempt.sourceTracking);
   const evidence = attempt.diagnosticEvidence
     ? `; ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}`
     : "";
-  return `failed — ${attempt.reason}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${sourceTracking ? `; ${sourceTracking}` : ""}${evidence}`;
+  return `failed — ${attempt.reason}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${startupRetry ? `; ${startupRetry}` : ""}${sourceTracking ? `; ${sourceTracking}` : ""}${evidence}`;
 }
 
 function refreshOperationScopeText(attempt: HealthRefreshAttempt): string {

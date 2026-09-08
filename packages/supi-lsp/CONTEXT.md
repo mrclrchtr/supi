@@ -55,11 +55,15 @@ A best-effort workspace-runtime operation that clears pull state, refreshes acti
 _Avoid_: recovered diagnostics, freshness proof, per-client success inference
 
 **Process-crash recovery**:
-The route-level recovery for a previously running LSP client whose server process exits or emits a process error. Evidence demand starts and waits for one shared replacement for each required crashed route; passive status, inventory, and diagnostic snapshots do not start recovery. It is separate from diagnostic recovery, which responds to diagnostic evidence or protocol stalls.
+The route-level recovery for a previously running LSP client whose server process exits or emits a process error. Ordinary evidence demand starts and waits for one shared replacement for each required crashed route; explicit health refresh can retry an exhausted route once per call. Passive status, inventory, and diagnostic snapshots do not start recovery. It is separate from diagnostic recovery, which responds to diagnostic evidence or protocol stalls.
 _Avoid_: diagnostic recovery, startup retry, crash loop
 
+**Initial-start retry**:
+The explicit-health-refresh attempt to start a route whose initial client startup failed. It is separate from process-crash recovery, gets one attempt per route per refresh call, and reports `recovered` or `retry-failed`; a failed retry recommends another explicit `refresh`.
+_Avoid_: process-crash replacement, unlimited startup loop, diagnostic confirmation
+
 **Process-crash refresh outcome**:
-The bounded route-level report that an explicit diagnostic refresh gives for each LSP route that was crashed when recovery selection started. It has exact recovered, skipped, failed, and exhausted counts, up to 16 entries, and an exact omitted-entry count. Each entry has the configured server name, workspace-relative root, stable outcome, and a typed next action for non-recovered routes. A skipped route uses `use-exact-file`; a failed or exhausted route uses `reload-workspace`.
+The bounded route-level report that an explicit health refresh gives for each process-crash route it attempts or skips. It has exact recovered, skipped, failed, and exhausted counts, up to 16 entries, and an exact omitted-entry count. Each entry has the configured server name, workspace-relative root, stable outcome, and a typed next action for non-recovered routes. A skipped route uses `use-exact-file`; a failed or exhausted route uses `refresh`.
 _Avoid_: current server status, aggregate client count, passive inventory
 
 **LSP runtime controller**:

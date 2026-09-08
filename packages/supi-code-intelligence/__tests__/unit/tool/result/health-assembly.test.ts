@@ -116,10 +116,10 @@ describe("code_health result assembly", () => {
 
     expect(markdown).toContain("**LSP**: ready — workspace routes: 1 error");
     expect(markdown).toContain("**typescript** @ `.`");
-    expect(markdown).toContain("process recovery exhausted; reload required");
+    expect(markdown).toContain("process recovery exhausted; try another explicit health refresh");
     expect(assembly.displaySections[0]?.lines[0]).toContain("typescript @ .");
     expect(assembly.displaySections[0]?.lines[0]).toContain(
-      "process recovery exhausted; reload required",
+      "process recovery exhausted; try another explicit health refresh",
     );
   });
 
@@ -378,7 +378,7 @@ describe("code_health result assembly", () => {
                 name: "typescript",
                 root: ".",
                 outcome: "recovery-failed",
-                nextAction: "reload-workspace",
+                nextAction: "refresh",
                 failureMessage: "replacement failed",
               },
             ],

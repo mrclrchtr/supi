@@ -18,7 +18,7 @@ export const codeHealthSpec = {
       refresh: Type.Optional(
         Type.Boolean({
           description:
-            "Attempt diagnostic and required process-crash recovery before collecting; result reports the outcome.",
+            "Retry failed LSP routes and collect fresh diagnostic health evidence; result reports route recovery separately from diagnostic confirmation.",
         }),
       ),
       include: Type.Optional(

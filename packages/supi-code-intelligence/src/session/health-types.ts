@@ -4,6 +4,7 @@ import type {
   ProcessCrashRecoveryReport,
   ProjectServerInfo,
   ProjectServerStatusReason,
+  StartupRetryReport,
 } from "@mrclrchtr/supi-lsp/api";
 import type { CapabilityWarningReport } from "../analysis/capability/capability-warnings.ts";
 import type { SourceTrackingReport } from "../substrate/lsp/source-tracking.ts";
@@ -114,6 +115,8 @@ interface CompletedHealthRefreshAttempt {
   readonly restartedClients: number;
   /** Separate outcome for process-crash route recovery. */
   readonly processCrashRecovery: ProcessCrashRecoveryReport;
+  /** Separate outcome for initial-start retries. */
+  readonly startupRetry?: StartupRetryReport;
   readonly staleAssessment: HealthStaleAssessment;
   /** Source discovery and bounded tracking facts for broad refreshes. */
   readonly sourceTracking?: SourceTrackingReport;
@@ -147,6 +150,8 @@ export type HealthRefreshAttempt =
       readonly diagnosticEvidence?: DiagnosticEvidenceSummary;
       /** Process-crash outcome, when the recovery pass returned one. */
       readonly processCrashRecovery?: ProcessCrashRecoveryReport;
+      /** Initial-start retry outcome, when the recovery pass returned one. */
+      readonly startupRetry?: StartupRetryReport;
       /** Source discovery and bounded tracking facts for broad refreshes. */
       readonly sourceTracking?: SourceTrackingReport;
       /** File readiness outcome, when a file-scoped attempt failed. */

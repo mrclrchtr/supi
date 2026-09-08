@@ -37,14 +37,14 @@ describe("process-crash recovery report", () => {
           name: "failed-server",
           root: "c",
           outcome: "recovery-failed",
-          nextAction: "reload-workspace",
+          nextAction: "refresh",
           failureMessage: "startup failed",
         },
         {
           name: "exhausted-server",
           root: "b",
           outcome: "recovery-exhausted",
-          nextAction: "reload-workspace",
+          nextAction: "refresh",
         },
         {
           name: "skipped-server",

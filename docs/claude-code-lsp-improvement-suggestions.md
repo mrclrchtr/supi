@@ -100,7 +100,7 @@ Relevant local documents:
 
 ## Selected improvement: process-crash recovery
 
-**Decision status:** implemented for [GitHub issue #354](https://github.com/mrclrchtr/supi/issues/354). Live verification then broadened recovery demand from file-routed operations to all semantic evidence operations and explicit diagnostic refresh while keeping status observations passive.
+**Decision status:** implemented for [GitHub issue #354](https://github.com/mrclrchtr/supi/issues/354) and revised by [GitHub issue #377](https://github.com/mrclrchtr/supi/issues/377). Live verification broadened recovery demand from file-routed operations to all semantic evidence operations; explicit health refresh now retries failed routes while keeping status observations passive.
 
 Select one focused runtime-reliability change. The current manager keeps a crashed client in the error state. A later file route removes that client, records a runtime error, and returns no client. Automatic diagnostic recovery cannot help because it selects only running push-only clients. Lifecycle reliability also has the strongest related evidence in the repository. The other suggestions have weak or no recorded demand.
 
@@ -109,10 +109,10 @@ Process-crash recovery is separate from diagnostic recovery and startup retry. I
 Required behavior:
 
 - Trigger recovery from semantic evidence operations and explicit diagnostic demand. File-routed operations recover their route. Workspace-symbol operations recover every required known route, selected by operation support and scope/root intersection. Unscoped operations recover every known supporting route.
-- Explicit broad diagnostic refresh recovers only crashed routes with retained tracked files in its scope. Server inventory, workspace readiness, and passive diagnostic snapshots do not trigger recovery.
-- Recover required routes in parallel. Let the triggering operation await each shared replacement and continue when startup succeeds.
+- Explicit health refresh retries failed startup and crashed routes whose roots overlap its scope, including routes without retained tracked files. Bounded discovery can find configured servers that are now available in Pi's environment. Server inventory, workspace readiness, and passive diagnostic snapshots do not trigger recovery.
+- Recover selected routes in parallel. Let the triggering operation await each shared replacement and continue when startup succeeds.
 - Allow one automatic attempt for each server-and-root route in one workspace runtime. Consume the attempt when replacement startup begins, whether startup succeeds or fails.
-- Reset the attempt budget only when the workspace runtime reloads or restarts. Explicit diagnostic refresh cannot bypass the budget.
+- Permit one startup or replacement attempt per route in each explicit refresh call. Later refresh calls can try again. When refresh observes an in-scope route ready, restore its one automatic process-crash attempt; do not treat readiness as diagnostic evidence.
 - Do not add `restartOnCrash`, `maxRestarts`, or another crash-policy setting for this change.
 - Share one in-progress replacement between concurrent callers.
 - If one caller is cancelled or reaches its deadline, stop that caller's wait. Let the shared replacement continue.

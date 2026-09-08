@@ -3,11 +3,15 @@ import {
   type ProcessCrashRecoveryEntry,
   type ProcessCrashRecoveryOutcome,
   type ProcessCrashRecoveryReport,
+  type StartupRetryEntry,
+  type StartupRetryReport,
 } from "@mrclrchtr/supi-lsp/api";
 import {
   formatCompactProcessCrashRecovery,
+  formatCompactStartupRetry,
   formatProcessCrashRecovery,
   formatStaleDiagnosticRestarts,
+  formatStartupRetry,
   isFileReadinessPending,
 } from "./refresh-outcome.ts";
 import { readSemanticHealthState } from "./semantic-state.ts";
@@ -49,15 +53,26 @@ function formatCompletedRefreshStatus(
   const processCrashRecovery = formatProcessCrashRecovery(
     readProcessCrashRecovery(refresh.processCrashRecovery),
   );
+  const startupRetry = formatStartupRetry(readStartupRetry(refresh.startupRetry));
   const noOp =
-    !fileReadinessPending && attempted === 0 && restarted === 0 && processCrashRecovery === null;
+    !fileReadinessPending &&
+    attempted === 0 &&
+    restarted === 0 &&
+    processCrashRecovery === null &&
+    startupRetry === null;
   const label = refreshAttemptLabel(refresh);
   const base = fileReadinessPending
     ? `${label} waiting — LSP may still be warming; retry shortly`
     : noOp
       ? `${label} completed no-op`
       : `${label} completed: ${attempted} clients targeted`;
-  const outcomes = formatRefreshOutcomes(refresh, restarted, processCrashRecovery, noOp);
+  const outcomes = formatRefreshOutcomes({
+    refresh,
+    restarted,
+    processCrashRecovery,
+    startupRetry,
+    noOp,
+  });
   const withOutcome = outcomes.length > 0 ? `${base}; ${outcomes.join("; ")}` : base;
   const evidence = formatDiagnosticEvidence(readRecord(refresh.diagnosticEvidence));
   const withEvidence = evidence ? `${withOutcome}; ${evidence}` : withOutcome;
@@ -71,23 +86,26 @@ function formatFailedRefreshStatus(refresh: Record<string, unknown>): string {
   const processCrashRecovery = formatProcessCrashRecovery(
     readProcessCrashRecovery(refresh.processCrashRecovery),
   );
+  const startupRetry = formatStartupRetry(readStartupRetry(refresh.startupRetry));
   const staleRestart = formatStaleDiagnosticRestartsForRecord(refresh);
   const evidence = formatDiagnosticEvidence(readRecord(refresh.diagnosticEvidence));
   const reason = typeof refresh.reason === "string" ? `: ${refresh.reason}` : "";
-  return `${refreshAttemptLabel(refresh)} failed${reason}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${evidence ? `; ${evidence}` : ""}`;
+  return `${refreshAttemptLabel(refresh)} failed${reason}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${startupRetry ? `; ${startupRetry}` : ""}${evidence ? `; ${evidence}` : ""}`;
 }
 
-function formatRefreshOutcomes(
-  refresh: Record<string, unknown>,
-  restarted: number,
-  processCrashRecovery: string | null,
-  noOp: boolean,
-): string[] {
+function formatRefreshOutcomes(options: {
+  refresh: Record<string, unknown>;
+  restarted: number;
+  processCrashRecovery: string | null;
+  startupRetry: string | null;
+  noOp: boolean;
+}): string[] {
   const outcomes: string[] = [];
-  if (refresh.operationScope === "workspace-runtime" && !noOp) {
-    outcomes.push(formatStaleDiagnosticRestarts(restarted));
+  if (options.refresh.operationScope === "workspace-runtime" && !options.noOp) {
+    outcomes.push(formatStaleDiagnosticRestarts(options.restarted));
   }
-  if (processCrashRecovery) outcomes.push(processCrashRecovery);
+  if (options.processCrashRecovery) outcomes.push(options.processCrashRecovery);
+  if (options.startupRetry) outcomes.push(options.startupRetry);
   return outcomes;
 }
 
@@ -100,10 +118,11 @@ export function readCompactRefreshStatus(data: Record<string, unknown> | null): 
   const processCrashRecovery = formatCompactProcessCrashRecovery(
     readProcessCrashRecovery(refresh.processCrashRecovery),
   );
+  const startupRetry = formatCompactStartupRetry(readStartupRetry(refresh.startupRetry));
   if (refresh.kind === "failed") {
     const staleRestart = formatStaleDiagnosticRestartsForRecord(refresh);
     return (
-      [sourceTracking, staleRestart, processCrashRecovery]
+      [sourceTracking, staleRestart, processCrashRecovery, startupRetry]
         .filter((value): value is string => value !== null)
         .join("; ") || null
     );
@@ -112,6 +131,7 @@ export function readCompactRefreshStatus(data: Record<string, unknown> | null): 
   if (
     !sourceTracking &&
     !processCrashRecovery &&
+    !startupRetry &&
     readNumber(refresh.restartedClients) === 0 &&
     !fileReadinessPending
   ) {
@@ -120,7 +140,7 @@ export function readCompactRefreshStatus(data: Record<string, unknown> | null): 
 
   const staleRestart = formatStaleDiagnosticRestartsForRecord(refresh);
   const readiness = fileReadinessPending ? "LSP may still be warming; retry shortly" : null;
-  return [sourceTracking, staleRestart, processCrashRecovery, readiness]
+  return [sourceTracking, staleRestart, processCrashRecovery, startupRetry, readiness]
     .filter((value): value is string => value !== null)
     .join("; ");
 }
@@ -137,12 +157,20 @@ export function readPreviousRefreshStatus(data: Record<string, unknown> | null):
   const processCrashRecovery = formatCompactProcessCrashRecovery(
     readProcessCrashRecovery(attempt.processCrashRecovery),
   );
+  const startupRetry = formatCompactStartupRetry(readStartupRetry(attempt.startupRetry));
   const staleRestart = formatStaleDiagnosticRestartsForRecord(attempt);
   const fileReadinessPending =
     attempt.kind === "completed" &&
     isFileReadinessPending(attempt, readSemanticHealthState(data?.semanticState));
   const readiness = fileReadinessPending ? "LSP may still be warming; retry shortly" : null;
-  const outcome = [readiness, sourceTracking, staleRestart, processCrashRecovery, evidence]
+  const outcome = [
+    readiness,
+    sourceTracking,
+    staleRestart,
+    processCrashRecovery,
+    startupRetry,
+    evidence,
+  ]
     .filter((value): value is string => value !== null)
     .join("; ");
   if (attempt.kind === "failed") {
@@ -186,10 +214,18 @@ function formatLastRefreshSuffix(refresh: Record<string, unknown>): string {
   const processCrashRecovery = formatProcessCrashRecovery(
     readProcessCrashRecovery(attempt.processCrashRecovery),
   );
+  const startupRetry = formatStartupRetry(readStartupRetry(attempt.startupRetry));
   const fileReadinessPending =
     attempt.kind === "completed" && isFileReadinessPending(attempt, null);
   const readiness = fileReadinessPending ? "LSP may still be warming; retry shortly" : null;
-  const outcome = [readiness, sourceTracking, staleRestart, processCrashRecovery, evidence]
+  const outcome = [
+    readiness,
+    sourceTracking,
+    staleRestart,
+    processCrashRecovery,
+    startupRetry,
+    evidence,
+  ]
     .filter((value): value is string => value !== null)
     .join("; ");
   if (attempt.kind === "failed") {
@@ -234,6 +270,43 @@ export function isPendingFileReadiness(data: Record<string, unknown> | null): bo
   return isFileReadinessPending(attempt, readSemanticHealthState(data?.semanticState));
 }
 
+function readStartupRetry(value: unknown): StartupRetryReport | null {
+  const report = readRecord(value);
+  if (!report) return null;
+  const recoveredRoutes = report.recoveredRoutes;
+  const failedRoutes = report.failedRoutes;
+  const omittedEntries = report.omittedEntries;
+  if (
+    !isEvidenceCount(recoveredRoutes) ||
+    !isEvidenceCount(failedRoutes) ||
+    !isEvidenceCount(omittedEntries) ||
+    !Array.isArray(report.entries) ||
+    report.entries.length > MAX_PROCESS_CRASH_RECOVERY_ENTRIES
+  ) {
+    return null;
+  }
+  const entries = report.entries
+    .map(readStartupRetryEntry)
+    .filter((entry): entry is StartupRetryEntry => entry !== null);
+  if (entries.length !== report.entries.length) return null;
+  return { recoveredRoutes, failedRoutes, entries, omittedEntries };
+}
+
+function readStartupRetryEntry(value: unknown): StartupRetryEntry | null {
+  const entry = readRecord(value);
+  if (!entry || typeof entry.name !== "string" || typeof entry.root !== "string") return null;
+  if (entry.outcome !== "recovered" && entry.outcome !== "retry-failed") return null;
+  if (entry.nextAction !== undefined && entry.nextAction !== "refresh") return null;
+  if (entry.failureMessage !== undefined && typeof entry.failureMessage !== "string") return null;
+  return {
+    name: entry.name,
+    root: entry.root,
+    outcome: entry.outcome,
+    ...(entry.nextAction !== undefined ? { nextAction: entry.nextAction } : {}),
+    ...(entry.failureMessage !== undefined ? { failureMessage: entry.failureMessage } : {}),
+  };
+}
+
 function readProcessCrashRecovery(value: unknown): ProcessCrashRecoveryReport | null {
   const report = readRecord(value);
   if (!report) return null;
@@ -267,7 +340,7 @@ function readProcessCrashRecoveryEntry(value: unknown): ProcessCrashRecoveryEntr
   if (
     entry.nextAction !== undefined &&
     entry.nextAction !== "use-exact-file" &&
-    entry.nextAction !== "reload-workspace"
+    entry.nextAction !== "refresh"
   ) {
     return null;
   }

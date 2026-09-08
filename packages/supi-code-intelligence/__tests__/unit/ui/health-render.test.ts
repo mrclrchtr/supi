@@ -322,14 +322,14 @@ describe("code_health TUI projection", () => {
               name: "failed",
               root: "a",
               outcome: "recovery-failed",
-              nextAction: "reload-workspace",
+              nextAction: "refresh",
               failureMessage: "startup failed",
             },
             {
               name: "exhausted",
               root: "b",
               outcome: "recovery-exhausted",
-              nextAction: "reload-workspace",
+              nextAction: "refresh",
             },
             {
               name: "skipped",
@@ -349,10 +349,8 @@ describe("code_health TUI projection", () => {
     expect(compact).not.toContain("failed @ a");
 
     const expanded = render(details, true).replace(/\s+/g, " ");
-    expect(expanded).toContain(
-      "failed @ a: recovery failed; next: reload workspace; startup failed",
-    );
-    expect(expanded).toContain("exhausted @ b: recovery exhausted; next: reload workspace");
+    expect(expanded).toContain("failed @ a: recovery failed; next: refresh; startup failed");
+    expect(expanded).toContain("exhausted @ b: recovery exhausted; next: refresh");
     expect(expanded).toContain("skipped @ c: skipped no retained file; next: use exact file");
   });
 

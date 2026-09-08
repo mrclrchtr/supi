@@ -5,6 +5,8 @@ import {
   type ProcessCrashRecoveryNextAction,
   type ProcessCrashRecoveryOutcome,
   type ProcessCrashRecoveryReport,
+  type StartupRetryEntry,
+  type StartupRetryReport,
 } from "../session/runtime-diagnostics.ts";
 
 /** One route result before its root is projected to a workspace-relative path. */
@@ -77,7 +79,7 @@ function nextAction(outcome: ProcessCrashRecoveryOutcome): ProcessCrashRecoveryN
       return "use-exact-file";
     case "recovery-failed":
     case "recovery-exhausted":
-      return "reload-workspace";
+      return "refresh";
     case "recovered":
       return null;
   }
@@ -103,4 +105,51 @@ function countRoutes(
   outcome: ProcessCrashRecoveryOutcome,
 ): number {
   return routes.filter((route) => route.outcome === outcome).length;
+}
+
+/** One initial-start route result before its root is projected. */
+export interface StartupRetryRouteResult {
+  readonly name: string;
+  readonly root: string;
+  readonly outcome: StartupRetryEntry["outcome"];
+  readonly failureMessage?: string;
+}
+
+/** Build a bounded, deterministic report for initial-start retries. */
+export function buildStartupRetryReport(
+  routes: readonly StartupRetryRouteResult[],
+  cwd: string,
+): StartupRetryReport {
+  const entries = routes
+    .map(
+      (route): StartupRetryEntry => ({
+        name: route.name,
+        root: relativeRoot(cwd, route.root),
+        outcome: route.outcome,
+        ...(route.outcome === "retry-failed"
+          ? {
+              nextAction: "refresh" as const,
+              ...(route.failureMessage
+                ? { failureMessage: boundProcessCrashFailureMessage(route.failureMessage) }
+                : {}),
+            }
+          : {}),
+      }),
+    )
+    .sort(compareStartupEntries);
+  const visibleEntries = entries.slice(0, MAX_PROCESS_CRASH_RECOVERY_ENTRIES);
+  return {
+    recoveredRoutes: routes.filter((route) => route.outcome === "recovered").length,
+    failedRoutes: routes.filter((route) => route.outcome === "retry-failed").length,
+    entries: visibleEntries,
+    omittedEntries: Math.max(0, entries.length - visibleEntries.length),
+  };
+}
+
+function compareStartupEntries(first: StartupRetryEntry, second: StartupRetryEntry): number {
+  return (
+    Number(first.outcome !== "retry-failed") - Number(second.outcome !== "retry-failed") ||
+    compareStrings(first.root, second.root) ||
+    compareStrings(first.name, second.name)
+  );
 }

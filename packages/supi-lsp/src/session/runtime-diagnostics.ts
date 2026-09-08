@@ -52,8 +52,8 @@ export type ProcessCrashRecoveryOutcome =
   | "recovery-failed"
   | "recovery-exhausted";
 
-/** Typed next action for a non-recovered process-crash route. */
-export type ProcessCrashRecoveryNextAction = "use-exact-file" | "reload-workspace";
+/** Typed next action for a route that needs another explicit health refresh. */
+export type ProcessCrashRecoveryNextAction = "use-exact-file" | "refresh";
 
 /** One bounded route entry in a process-crash recovery report. */
 export interface ProcessCrashRecoveryEntry {
@@ -84,6 +84,29 @@ export interface ProcessCrashRecoveryReport {
   readonly omittedEntries: number;
 }
 
+/** Stable outcome for one initial-start route handled by explicit refresh. */
+export type StartupRetryOutcome = "recovered" | "retry-failed";
+
+/** Typed next action for a failed initial-start retry. */
+export type StartupRetryNextAction = "refresh";
+
+/** One bounded route entry in an initial-start retry report. */
+export interface StartupRetryEntry {
+  readonly name: string;
+  readonly root: string;
+  readonly outcome: StartupRetryOutcome;
+  readonly nextAction?: StartupRetryNextAction;
+  readonly failureMessage?: string;
+}
+
+/** Bounded result of explicit retries for initial-start routes. */
+export interface StartupRetryReport {
+  readonly recoveredRoutes: number;
+  readonly failedRoutes: number;
+  readonly entries: readonly StartupRetryEntry[];
+  readonly omittedEntries: number;
+}
+
 /** Create the empty outcome for a pass with no process-crash demand. */
 export function emptyProcessCrashRecoveryReport(): ProcessCrashRecoveryReport {
   return {
@@ -96,6 +119,11 @@ export function emptyProcessCrashRecoveryReport(): ProcessCrashRecoveryReport {
   };
 }
 
+/** Create the empty outcome for a pass with no initial-start retry. */
+export function emptyStartupRetryReport(): StartupRetryReport {
+  return { recoveredRoutes: 0, failedRoutes: 0, entries: [], omittedEntries: 0 };
+}
+
 /** Result from a workspace diagnostic recovery pass. */
 export interface RecoverDiagnosticsResult {
   /** Active clients targeted by the best-effort refresh, not confirmed successful refreshes. */
@@ -104,6 +132,8 @@ export interface RecoverDiagnosticsResult {
   restartedClients: number;
   /** Separate outcome for process-crash route recovery selected by this pass. */
   processCrashRecovery: ProcessCrashRecoveryReport;
+  /** Separate outcome for explicit retries of failed initial-start routes. */
+  startupRetry: StartupRetryReport;
   /** Evidence collected by the refresh and recovery operations. */
   diagnosticEvidence: DiagnosticEvidenceSummary;
   /** Final diagnostic report captured after all refresh and recovery work. */

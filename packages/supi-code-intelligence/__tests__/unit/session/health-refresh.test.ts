@@ -76,12 +76,12 @@ function readyRuntime(overrides: Record<string, unknown> = {}): WorkspaceLspRunt
     trackFile: async () => true,
     closeFile: () => undefined,
     noteWorkspaceChanges: () => undefined,
-    recoverDiagnostics: async () => ({
+    recoverDiagnostics: vi.fn(async () => ({
       attemptedClients: 0,
       restartedClients: 0,
       diagnosticEvidence: emptyEvidence(),
       staleAssessment: { suspected: false, matchedFiles: [], warning: null },
-    }),
+    })),
     ...overrides,
   } as unknown as WorkspaceLspRuntime;
 }
@@ -260,7 +260,7 @@ describe("code_health refresh evidence", () => {
       expect.objectContaining({
         restartIfStillStale: true,
         initialEvidence: evidence,
-        processCrashDemand: {},
+        processCrashDemand: { explicit: true },
       }),
     );
   });
@@ -326,7 +326,7 @@ describe("code_health refresh evidence", () => {
     );
 
     expect(recoverDiagnostics).toHaveBeenCalledWith(
-      expect.objectContaining({ processCrashDemand: { scopes: [directory] } }),
+      expect.objectContaining({ processCrashDemand: { explicit: true, scopes: [directory] } }),
     );
   });
 
@@ -777,6 +777,12 @@ describe("code_health refresh evidence", () => {
       fileDiagnostics,
       waitUntilReadyForFile: vi.fn(async () => ({
         kind: "ready",
+        startupRetry: {
+          recoveredRoutes: 1,
+          failedRoutes: 0,
+          entries: [{ name: "typescript", root: ".", outcome: "recovered" }],
+          omittedEntries: 0,
+        },
         processCrashRecovery: {
           recoveredRoutes: 1,
           skippedRoutes: 0,
@@ -800,6 +806,12 @@ describe("code_health refresh evidence", () => {
           kind: "completed",
           operationScope: "file-runtime",
           attemptedActiveClients: 1,
+          startupRetry: {
+            recoveredRoutes: 1,
+            failedRoutes: 0,
+            entries: [{ name: "typescript", root: ".", outcome: "recovered" }],
+            omittedEntries: 0,
+          },
           processCrashRecovery: {
             recoveredRoutes: 1,
             skippedRoutes: 0,
@@ -825,6 +837,11 @@ describe("code_health refresh evidence", () => {
       },
     });
     expect(fileDiagnostics).toHaveBeenCalledTimes(1);
+    expect(runtime.waitUntilReadyForFile).toHaveBeenCalledWith(
+      file,
+      { retryFailedRoute: true },
+      undefined,
+    );
     expect(runtime.scanWorkspaceSources).not.toHaveBeenCalled();
     expect(refreshOpenDiagnostics).not.toHaveBeenCalled();
     expect(recoverDiagnostics).not.toHaveBeenCalled();
@@ -987,15 +1004,16 @@ describe("code_health refresh evidence", () => {
     expect(trackRefreshAttempt).not.toHaveBeenCalled();
   });
 
-  it("does not pretend a servers-only request asked for diagnostic refresh", async () => {
+  it("runs explicit route recovery for a servers-only refresh", async () => {
+    const runtime = readyRuntime();
     const { outcome } = await run(
-      { kind: "ready", runtime: readyRuntime() },
+      { kind: "ready", runtime },
       { include: ["servers"], refresh: true },
     );
 
-    expect(outcome).toMatchObject({
-      kind: "completed",
-      data: { refresh: { kind: "not-requested", reason: "Diagnostics were not requested." } },
-    });
+    expect(outcome).toMatchObject({ kind: "completed", data: { refresh: { kind: "completed" } } });
+    expect(runtime.recoverDiagnostics).toHaveBeenCalledWith(
+      expect.objectContaining({ processCrashDemand: { explicit: true } }),
+    );
   });
 });

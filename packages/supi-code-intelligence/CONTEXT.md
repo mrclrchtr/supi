@@ -127,8 +127,12 @@ An actionable notice that Code intelligence capability is reduced. It concerns t
 _Avoid_: degraded coverage, coverage warning
 
 **Live health observation**:
-Tool evidence obtained by querying an available source during a `code_health` call. A file-diagnostic request or explicit broad diagnostic refresh is evidence demand and can start Process-crash recovery; server inventory and passive diagnostic snapshots are observations only. A completed file request may establish file-local absence; omitted or directory scope is only a tracked-file snapshot and never proves workspace completeness. A continuously maintained source may expose its current snapshot with freshness limitations disclosed; a batch source must collect during the call, so a precomputed report is not a Live health observation.
+Tool evidence obtained by querying an available source during a `code_health` call. A file-diagnostic request or explicit health refresh is evidence demand and can retry failed LSP routes and start Process-crash recovery; server inventory and passive diagnostic snapshots are observations only. A completed file request may establish file-local absence; omitted or directory scope is only a tracked-file snapshot and never proves workspace completeness. A continuously maintained source may expose its current snapshot with freshness limitations disclosed; a batch source must collect during the call, so a precomputed report is not a Live health observation.
 _Avoid_: live/runtime-backed signal, ambient report evidence, undisclosed cached evidence
+
+**Explicit health refresh**:
+A `code_health` call with `refresh: true` that runs scoped LSP maintenance and permits one startup or process-crash route attempt per selected route. It reports route readiness separately from diagnostic evidence and applies to server-only output as well as diagnostics output.
+_Avoid_: passive server inventory, automatic retry loop, diagnostic confirmation
 
 **LSP route status summary**:
 Aggregate Server status evidence shown beside Semantic health state as separate recovering and error route counts. It never changes the Semantic health state classification.
