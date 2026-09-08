@@ -1,5 +1,23 @@
 # Changelog
 
+## [6.4.0](https://github.com/mrclrchtr/supi/compare/v6.3.1...v6.4.0) (2026-09-08)
+
+
+### Features
+
+* **antigravity:** add bounded consultation tool ([b846d83](https://github.com/mrclrchtr/supi/commit/b846d837b18c6c6ed8862994130a52c101693929))
+* **lsp:** bound broad source tracking ([2056bed](https://github.com/mrclrchtr/supi/commit/2056bed25264c1b1b060b894d91bbc2ce1d3fd86)), closes [#370](https://github.com/mrclrchtr/supi/issues/370)
+
+
+### Bug Fixes
+
+* **antigravity:** avoid macOS keychain prompts ([3cc61b8](https://github.com/mrclrchtr/supi/commit/3cc61b8eb7d7b4badc5adddc375dabaabda5453a))
+* **antigravity:** support live agy workspace runs ([19878e9](https://github.com/mrclrchtr/supi/commit/19878e9f0c4ee9c4fefb40ad81195f8535a938ba))
+* **ci:** pin npm publication to the release commit ([f8c9f66](https://github.com/mrclrchtr/supi/commit/f8c9f663e99eb3cce527f4812e74534c33cf1a94)), closes [#396](https://github.com/mrclrchtr/supi/issues/396)
+* **deps:** lock file maintenance ([a77486c](https://github.com/mrclrchtr/supi/commit/a77486c2b4239e38805a2fa6361992f103b57aaa))
+* **deps:** update pnpm to v12.3.2 ([345e68f](https://github.com/mrclrchtr/supi/commit/345e68f501d0700fd4097ef7e0398337745453ae))
+* **deps:** update pnpm to v12.3.4 ([82ef949](https://github.com/mrclrchtr/supi/commit/82ef949abb4494dd07c3ab3ab17ab82f3185fa1c))
+
 ## [6.3.1](https://github.com/mrclrchtr/supi/compare/v6.3.0...v6.3.1) (2026-09-06)
 
 
