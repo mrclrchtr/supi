@@ -105,7 +105,8 @@ jobs:
       pull-requests: write
     outputs:
       releases_created: ${{ steps.release.outputs.releases_created }}
-      paths_released: ${{ steps.release.outputs.paths_released }}
+      release_sha: ${{ steps.release.outputs.sha }}
+      release_version: ${{ steps.release.outputs.version }}
     steps:
       - name: Create release-please app token
         id: app-token
@@ -132,14 +133,32 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      RELEASE_SHA: ${{ needs.release-please.outputs.release_sha }}
+      RELEASE_VERSION: ${{ needs.release-please.outputs.release_version }}
     steps:
-      - name: Checkout
+      # Repository scripts are not available yet. Full validation follows checkout.
+      - name: Require release identity
+        run: |
+          if [[ ! "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::RELEASE_SHA: expected a 40-character commit SHA; actual '$RELEASE_SHA'"
+            exit 1
+          fi
+          if [[ -z "$RELEASE_VERSION" ]]; then
+            echo "::error::RELEASE_VERSION: expected a release version; actual '$RELEASE_VERSION'"
+            exit 1
+          fi
+
+      - name: Checkout release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+
+      - name: Validate release checkout
+        run: node scripts/release-validation.mjs
 
       - name: Set up workspace dependencies
         uses: ./.github/actions/setup-pnpm
 
       - name: Publish released packages from staged tarballs
-        env:
-          PATHS_RELEASED: ${{ needs.release-please.outputs.paths_released }}
         run: node scripts/publish-released.mjs
