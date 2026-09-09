@@ -177,6 +177,12 @@ describe("supi-antigravity extension", () => {
     const tool = pi.tools[0] as RegisteredTool;
     expect(tool.name).toBe("antigravity_run");
     expect(tool.description).toBe(toolDescription);
+    expect(tool.description).toMatch(/external model.*web research/);
+    expect(tool.description).toMatch(
+      /Prefer antigravity_run.*advice.*design alternatives.*second opinions/,
+    );
+    expect(tool.description).toMatch(/repository facts.*direct tools/);
+    expect(tool.description.length).toBeLessThanOrEqual(240);
     expect(tool.promptSnippet).toBeUndefined();
     expect(tool.promptGuidelines).toBeUndefined();
 

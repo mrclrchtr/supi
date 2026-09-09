@@ -47,7 +47,7 @@ export type AgentThinkingLevel = ModelThinkingLevel;
 
 /** Closed profile.json manifest after field-level source resolution. */
 export interface AgentProfileManifest {
-  /** Human-facing description, non-empty and capped at 200 characters. */
+  /** Task-selection description for callers and the UI, non-empty and capped at 200 characters. */
   readonly description: string;
   /** Fixed child capability IDs; an empty list is valid. */
   readonly tools: readonly AgentCapabilityId[];
@@ -93,7 +93,7 @@ export interface ProfileSourceEntry {
 /** One Profile ID and all of its source entries. */
 export interface ProfileCatalogueEntry {
   readonly id: string;
-  /** Human-facing description resolved from the available source fields. */
+  /** Task-selection description resolved from the available source fields. */
   readonly description: string;
   /** Source entries in package → global → project order. */
   readonly sources: readonly ProfileSourceEntry[];

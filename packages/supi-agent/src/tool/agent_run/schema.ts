@@ -8,13 +8,19 @@ import {
   MAX_TASKS,
 } from "./bounds.ts";
 
-/** Build the model-facing tool parameter schema from the current Profile Catalogue. */
+/** Build the tool schema with only effective Profile IDs and their resolved descriptions. */
 export function buildAgentRunSchema(catalogue: ProfileCatalogue): TSchema {
   const ids = catalogue.profileIds;
   const profileEnum =
     ids.length > 0
       ? StringEnum(ids as unknown as readonly string[] & [string, ...string[]], {
-          description: "Profile ID to delegate this task to.",
+          description: ids
+            .map((id) => {
+              const profile = catalogue.profiles.find((entry) => entry.id === id);
+              const description = (profile?.description ?? id).replace(/\s+/g, " ").trim();
+              return `${id}: ${description}`;
+            })
+            .join("\n"),
         })
       : Type.String({
           minLength: 1,
