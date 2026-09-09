@@ -10,7 +10,7 @@
 
 CLAUDE.md/AGENTS.md maintenance skills for the [pi coding agent](https://github.com/earendil-works/pi).
 
-> Runtime instruction-file surfacing is owned by `@mrclrchtr/supi-code-intelligence`: use `code_orientation(focus="packages/...")` to see directory-local instruction files during orientation.
+> `@mrclrchtr/supi-code-intelligence` shows instruction files during directory orientation in trusted projects. Use `code_orientation({ focus: { path: "packages/..." } })`.
 
 ## Install
 
@@ -39,8 +39,8 @@ The extension is intentionally thin: it only registers the bundled skills. It do
 
 Automatic tool-result injection was removed. Directory-local instruction files are now surfaced by `supi-code-intelligence` during explicit directory orientation:
 
-```text
-code_orientation(focus="packages/my-package")
+```javascript
+code_orientation({ focus: { path: "packages/my-package" } })
 ```
 
 That keeps arbitrary tool output clean while still making local instructions available when the agent intentionally orients into a package or directory.
