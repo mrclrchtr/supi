@@ -1,21 +1,6 @@
 # @mrclrchtr/supi-code-intelligence
 
-Code understanding, navigation, search, health, and semantic refactoring for PI. Registers exactly eight public `code_*` tools.
-
-Surfaces: `./extension` (PI registration) and `./api` (reusable type contracts). Reads capability state from `@mrclrchtr/supi-code-runtime` and attaches the workspace LSP runtime; it does not expose providers, clients, or managers through workflow outcomes.
-
-## Source modules
-
-| Module | Directory | Role |
-|---|---|---|
-| Entry | `src/extension.ts`, `src/app/` | PI wiring, composition, session lifecycle |
-| Public tools | `src/tool/code_*/` | Per-tool spec.ts, guidance.ts, execute.ts, result.ts, markdown/TUI adapters |
-| Tool metadata | per-tool `spec.ts` + `guidance.ts`; aggregators `specs.ts`, `guidance.ts`; shared schema vocabulary `schemas.ts` | Canonical eight-tool surface |
-| Result assembly | per-tool `result.ts` plus shared core `src/tool/result/` | Sections, evidence lists, totals, provenance, actions, details |
-| Workflows | `src/session/` | Workspace session, typed outcomes, target handles, refactor plans |
-| Analysis | `src/analysis/` | PI-free evidence collection and refactor safety |
-| Substrates | `src/substrate/` | Process-shared LSP and Tree-sitter provider-host lifecycle |
-| Shared UI | `src/ui/` | Status, footer, and shared TUI/markdown helpers |
+Keep `src/analysis/` independent of Pi. It owns evidence collection and refactor safety. Workflow outcomes must not expose providers, clients, or managers.
 
 ## Public tool gotchas
 
@@ -24,7 +9,7 @@ Surfaces: `./extension` (PI registration) and `./api` (reusable type contracts).
 - **`code_graph`**: accepts exactly one target handle/anchor/symbol. Relations are only `references`, structural `callees`, and `implements`; `all` means exactly those three. Callees are source-shape calls, not symbol identity. Semantic provider locations are canonically normalized before containment, declaration filtering, and deterministic deduplication; invalid locations are disclosed as partial evidence rather than counted as external.
 - **`code_find`**: `mode` is required and exactly `ast | semantic`; literal/regex search belongs to PI grep. AST kinds are exactly `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, and `enum`; test identity is not inferred. AST `call` matches by written name. Modes never silently fall back. `scope`, when present, is a non-empty string array. AST mode uses the owned, operation-aware Scan policy documented in the README: exact operation-ineligible files are invalid, unsupported-only directories are unavailable, mixed scopes disclose policy exclusions without becoming partial, and runtime limitations remain partial.
 - **`code_resolve`**: anchored resolution requires a real symbol. Whitespace/comment coordinates fail and recommend `code_inspect`. File selectors enumerate all declarations but materialize handles only for the bounded visible Target group, never a synthetic file-position handle. Canonical declaration line/occurrence distinguishes overloads; preferred display/name-anchor position is not identity. Exact structural name-anchor evidence may refine an underspecified LSP kind for identity without changing its displayed Provider-reported symbol kind. `symbolKind` is a strict provider-reported LSP kind filter; a valid query with only wrong-kind candidates returns a typed Symbol-kind mismatch with bounded handles.
-- **`code_refactor_plan`**: target is exactly one handle or anchor; operation is exactly one nested `rename_symbol`, `extract_function`, or `extract_variable` payload. No `rename` alias.
+- **`code_refactor_plan`**: target is exactly one handle or anchor. Select one nested operation. Read `src/session/refactor-types.ts` and `src/tool/schemas.ts` for supported names and payloads. No `rename` alias.
 - **`code_refactor_apply`**: revalidates SHA-256 fingerprints and edit safety. It acquires sorted per-file mutation queues and preserves cross-file rollback.
 - **`code_health`**: reports live `diagnostics` and `servers` observations. Capability Warnings supplement diagnostic/server requests; they are not an `include` section.
 
@@ -70,20 +55,8 @@ Each registered public `code_*` call derives one opaque Debug Operation ID in th
 
 ## Refactor safety
 
-Planning and application remain separate (ADR 0002). `validateEditAgainstFiles()` rejects invalid/overlapping edits. Application holds sorted file queues while rereading, validating, transforming, and committing. If a later write fails, earlier writes are rolled back.
+Planning and application remain separate (ADR 0002). `validateEditAgainstFiles()` rejects invalid/overlapping edits. Application holds sorted file queues while rereading, validating, transforming, and committing. If a later write fails, rollback is attempted and failures are reported. There is no durable crash-recovery journal.
 
 ## First-turn overview
 
 The hidden architecture overview is claimed atomically through session behavior and injected with `display: false` only while `code-intelligence.overviewEnabled` resolves true (default; project-scoped values apply only for trusted projects, and non-boolean values fail closed). It renders every discovered module, one-line manifest description, entrypoint, and manifest-declared relationship without truncation; descriptions and other repository facts are labeled as untrusted evidence, never instructions. Over-budget overviews (> 1000 tokens) warn but are never capped: `recordDebugEvent` always records the breach, and `ctx.ui.notify` shows it when a UI exists. The setting is pinned once per session — no mid-session toggle. Reload/resume reconstruction scans for the existing `code-intelligence-overview` custom message. Do not expose session state fields to app wiring.
-
-## TUI rendering
-
-Per-tool `renderCall`/`renderResult` live under `src/tool/<tool>/tui.ts`. `renderShell: "self"` strips PI's Box entirely; avoid it unless full-screen control is required.
-
-## Verification
-
-Use focused TypeScript/Vitest commands while iterating, then run `pnpm verify:ai`.
-
-## License
-
-MIT
