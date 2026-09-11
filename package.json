@@ -3,7 +3,7 @@
   "version": "6.4.0",
   "private": true,
   "description": "SuPi (Super Pi) — a curated extension stack for the Pi coding agent.",
-  "packageManager": "pnpm@12.3.4",
+  "packageManager": "pnpm@12.4.0",
   "license": "MIT",
   "repository": {
     "type": "git",
