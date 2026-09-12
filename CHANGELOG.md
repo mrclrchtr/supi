@@ -1,5 +1,18 @@
 # Changelog
 
+## [6.4.1](https://github.com/mrclrchtr/supi/compare/v6.4.0...v6.4.1) (2026-09-12)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @types/node to v25.9.6 ([d21caac](https://github.com/mrclrchtr/supi/commit/d21caacee4ea183fd8cf891fe0635f8437a69ea9))
+* **deps:** update dependency ignore to v7.0.9 ([1afd124](https://github.com/mrclrchtr/supi/commit/1afd124ff93400aa71d6f98994cd4f194d9d8835))
+* **deps:** update dependency typebox to v1.3.28 ([41536b2](https://github.com/mrclrchtr/supi/commit/41536b2211db13c40ab1558fecd1b669124ee0d1))
+* **deps:** update dependency typebox to v1.3.29 ([6724ac3](https://github.com/mrclrchtr/supi/commit/6724ac39f12afd2d22d57a660d3c2f5d099a44ff))
+* **deps:** update dependency typebox to v1.3.30 ([33e4e9b](https://github.com/mrclrchtr/supi/commit/33e4e9bb536a5f2976ea0591aa87e39a26b3264a))
+* **deps:** update pnpm to v12.4.0 ([a6f373d](https://github.com/mrclrchtr/supi/commit/a6f373df8e2dac42f1e8e9c85b0227eae4726d1b))
+* **lsp:** retry failed routes during explicit health refresh ([96eb746](https://github.com/mrclrchtr/supi/commit/96eb746098f8c1c56f222d2b8fd77a95f644ef52))
+
 ## [6.4.0](https://github.com/mrclrchtr/supi/compare/v6.3.1...v6.4.0) (2026-09-08)
 
 
