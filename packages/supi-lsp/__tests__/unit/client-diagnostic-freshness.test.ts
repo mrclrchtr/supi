@@ -35,7 +35,7 @@ describe("LSP single-file diagnostic freshness", () => {
     const { client } = createRunningTestClient();
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
-    // The first wait exhausts the settle budget; the reopen-resync fallback
+    // The first wait exhausts the settle budget; a second synchronization fallback
     // waits once more with a bounded budget before giving up.
     await vi.advanceTimersByTimeAsync(4_000);
 
@@ -63,8 +63,8 @@ describe("LSP single-file diagnostic freshness", () => {
     tmpDir = file.tmpDir;
     const { client, rpc } = createRunningTestClient();
     client.didOpen(file.filePath, "const x = 1;");
-    // Two publications confirm the synchronization; one stays tentative and
-    // cannot support a cache-reuse claim (ADR 0021).
+    // Push publications remain observations and cannot support a cache-reuse
+    // claim without request evidence (ADR 0022).
     publish(client, file.uri, [makeDiagnostic("current")]);
     publish(client, file.uri, [makeDiagnostic("current")]);
     rpc.sendNotification.mockClear();
@@ -72,9 +72,10 @@ describe("LSP single-file diagnostic freshness", () => {
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
     await vi.runAllTimersAsync();
 
-    await expect(pending).resolves.toEqual({
-      kind: "completed",
+    await expect(pending).resolves.toMatchObject({
+      kind: "partial",
       data: [makeDiagnostic("current")],
+      reason: expect.stringContaining("ambient evidence"),
     });
     expect(rpc.sendNotification).not.toHaveBeenCalled();
   });
@@ -89,7 +90,7 @@ describe("LSP single-file diagnostic freshness", () => {
     client.notifyWorkspaceFileChanges([{ uri: file.uri, type: 2 }]);
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
-    // The reopen-resync fallback adds a bounded second wait to the budget.
+    // The bounded synchronization wait adds a bounded second wait to the budget.
     await vi.advanceTimersByTimeAsync(4_000);
 
     await expect(pending).resolves.toMatchObject({
@@ -218,29 +219,25 @@ describe("LSP single-file diagnostic freshness", () => {
     expect(client.getDiagnostics(file.filePath)).toEqual([makeDiagnostic("current")]);
   });
 
-  it("accepts unversioned push again after a current versioned push crosses invalidation", async () => {
+  it("accepts an unversioned push after a current versioned push crosses invalidation", () => {
     const file = createTempTsFile("push-after-versioned.ts", "const x = 1;");
     tmpDir = file.tmpDir;
     const { client } = createRunningTestClient();
+    client.didOpen(file.filePath, "const x = 1;");
     client.notifyWorkspaceFileChanges([{ uri: file.uri, type: 2 }]);
+    client.didChange(file.filePath, "const x = 2;");
 
-    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
     const version = client.getOpenDocumentVersion(file.filePath);
     if (version === null) throw new Error("Expected an open document version.");
-    // The first publication is tentative; the second confirms the sync.
     client.handlePublishDiagnostics({ uri: file.uri, version, diagnostics: [] });
     client.handlePublishDiagnostics({ uri: file.uri, version, diagnostics: [] });
-    await expect(pending).resolves.toEqual({ kind: "completed", data: [] });
+    client.handlePublishDiagnostics({ uri: file.uri, diagnostics: [makeDiagnostic("current")] });
 
-    client.handlePublishDiagnostics({ uri: file.uri, diagnostics: [makeDiagnostic("current")] });
-    client.handlePublishDiagnostics({ uri: file.uri, diagnostics: [makeDiagnostic("current")] });
-    await expect(client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;")).resolves.toEqual({
-      kind: "completed",
-      data: [makeDiagnostic("current")],
-    });
+    expect(client.getDiagnostics(file.filePath)).toEqual([makeDiagnostic("current")]);
+    expect(client.getDiagnosticSnapshot()).toMatchObject({ current: false });
   });
 
-  it("keeps a pull-confirmed synchronization confirmed after a push publication", async () => {
+  it("does not let an ambient push replace request-confirmed evidence", async () => {
     const file = createTempTsFile("push-after-pull.ts", "const x = 1;");
     tmpDir = file.tmpDir;
     const { client, rpc } = createPullTestClient();
@@ -251,14 +248,17 @@ describe("LSP single-file diagnostic freshness", () => {
       data: [],
     });
 
-    // Mixed pull/push evidence (issue #351): a push publication for a
-    // synchronization a pull already confirmed keeps the confirmation. One
-    // push must not downgrade the retained cache to tentative, so the next
-    // unchanged sync completes from the retained cache.
-    client.handlePublishDiagnostics({ uri: file.uri, diagnostics: [makeDiagnostic("current")] });
+    // An unversioned ambient push is only an observation. It must not borrow
+    // request confirmation or replace the confirmed request result.
+    client.handlePublishDiagnostics({ uri: file.uri, diagnostics: [makeDiagnostic("ambient")] });
+    expect(client.getDiagnostics(file.filePath)).toEqual([]);
+    expect(client.getDiagnosticSnapshot()).toMatchObject({
+      current: true,
+      documents: [{ uri: file.uri, current: true, status: "confirmed" }],
+    });
     await expect(client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;")).resolves.toEqual({
       kind: "completed",
-      data: [makeDiagnostic("current")],
+      data: [],
     });
   });
 
@@ -310,7 +310,7 @@ describe("LSP single-file diagnostic freshness", () => {
     publish(client, file.uri, [makeDiagnostic("cached")]);
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 2;");
-    // The reopen-resync fallback adds a bounded second wait to the budget.
+    // The bounded synchronization wait adds a bounded second wait to the budget.
     await vi.advanceTimersByTimeAsync(4_000);
 
     await expect(pending).resolves.toMatchObject({
@@ -329,7 +329,7 @@ describe("LSP single-file diagnostic freshness", () => {
     publish(client, file.uri, []);
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 2;");
-    // The reopen-resync fallback adds a bounded second wait to the budget.
+    // The bounded synchronization wait adds a bounded second wait to the budget.
     await vi.advanceTimersByTimeAsync(4_000);
 
     await expect(pending).resolves.toMatchObject({ kind: "partial", data: [] });
@@ -407,24 +407,20 @@ describe("LSP single-file diagnostic freshness", () => {
     await expect(pending).rejects.toThrow("cancelled during push wait");
   });
 
-  it("rejects with the abort reason when cancelled during the push wait after a failed pull", async () => {
+  it("returns unavailable after a failed request without a push fallback", async () => {
     vi.useFakeTimers();
     const file = createTempTsFile("aborted-pull-fallback.ts");
     tmpDir = file.tmpDir;
     const { client, rpc } = createPullTestClient();
-    const controller = new AbortController();
     rpc.sendRequest.mockRejectedValue(new Error("pull failed"));
 
-    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;", {
-      signal: controller.signal,
-    });
+    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
     await vi.advanceTimersByTimeAsync(0);
-    controller.abort(new Error("cancelled during fallback push wait"));
 
-    await expect(pending).rejects.toThrow("cancelled during fallback push wait");
+    await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
   });
 
-  it("rejects a closed document's versioned push and re-stamps a post-reopen push", async () => {
+  it("rejects a closed document's versioned push and re-stamps a post-reopen push", () => {
     const file = createTempTsFile("reopened.ts");
     tmpDir = file.tmpDir;
     const { client } = createRunningTestClient();
@@ -433,63 +429,43 @@ describe("LSP single-file diagnostic freshness", () => {
     if (closedVersion === null) throw new Error("Expected an open document version.");
     client.didClose(file.filePath);
 
-    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 2;");
-    // A versioned push for the closed document version cannot be verified
-    // against the reopened document and stays fail-closed.
     client.handlePublishDiagnostics({
       uri: file.uri,
       version: closedVersion,
       diagnostics: [makeDiagnostic("closed")],
     });
     expect(client.getDiagnostics(file.filePath)).toEqual([]);
+
+    client.didOpen(file.filePath, "const x = 2;");
     const reopenedVersion = client.getOpenDocumentVersion(file.filePath);
     if (reopenedVersion === null) throw new Error("Expected a reopened document version.");
     expect(reopenedVersion).toBeGreaterThan(closedVersion);
-    // An unversioned push after the reopen's sync moment is accepted and
-    // re-stamped with the reopened document's synchronization state; the
-    // second unversioned push confirms the reopened synchronization.
-    client.handlePublishDiagnostics({
-      uri: file.uri,
-      diagnostics: [makeDiagnostic("current")],
-    });
     client.handlePublishDiagnostics({
       uri: file.uri,
       diagnostics: [makeDiagnostic("current")],
     });
 
-    await expect(pending).resolves.toEqual({
-      kind: "completed",
-      data: [makeDiagnostic("current")],
-    });
+    expect(client.getDiagnostics(file.filePath)).toEqual([makeDiagnostic("current")]);
+    expect(client.getDiagnosticSnapshot()).toMatchObject({ current: false });
   });
 
-  it("confirms a clean file through the reopen-resync fallback", async () => {
+  it("does not confirm a clean file from a silent push-only route", async () => {
     vi.useFakeTimers();
     const file = createTempTsFile("reopen-clean.ts", "const x = 1;");
     tmpDir = file.tmpDir;
     const { client, rpc } = createRunningTestClient();
-    // The server publishes nothing for the didChange but publishes twice on
-    // the fallback didOpen (3 100 ms and 3 200 ms in, after the first wait
-    // timed out): the first publication is tentative, the second confirms.
-    setTimeout(() => client.handlePublishDiagnostics({ uri: file.uri, diagnostics: [] }), 3_100);
-    setTimeout(() => client.handlePublishDiagnostics({ uri: file.uri, diagnostics: [] }), 3_200);
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
-    await vi.advanceTimersByTimeAsync(3_500);
+    await vi.advanceTimersByTimeAsync(3_100);
 
-    await expect(pending).resolves.toEqual({ kind: "completed", data: [] });
-    expect(rpc.sendNotification).toHaveBeenCalledWith("textDocument/didClose", {
-      textDocument: { uri: file.uri },
-    });
-    expect(rpc.sendNotification).toHaveBeenCalledWith(
-      "textDocument/didOpen",
-      expect.objectContaining({
-        textDocument: expect.objectContaining({ uri: file.uri, version: 2 }),
-      }),
+    await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
+    expect(rpc.sendNotification).not.toHaveBeenCalledWith(
+      "textDocument/didClose",
+      expect.anything(),
     );
   });
 
-  it("keeps the cache entry and version history across the reopen fallback", async () => {
+  it("keeps the cache entry and version history after an unconfirmed sync", async () => {
     vi.useFakeTimers();
     const file = createTempTsFile("reopen-cache.ts", "const x = 1;");
     tmpDir = file.tmpDir;
@@ -505,11 +481,11 @@ describe("LSP single-file diagnostic freshness", () => {
       kind: "partial",
       data: [makeDiagnostic("cached")],
     });
-    // The reopen used the protocol close/open pair and kept the document
-    // open with a continued version history; the cache entry survived.
-    expect(rpc.sendNotification).toHaveBeenCalledWith("textDocument/didClose", {
-      textDocument: { uri: file.uri },
-    });
+    // The failed collection keeps the document open and its version history.
+    expect(rpc.sendNotification).not.toHaveBeenCalledWith(
+      "textDocument/didClose",
+      expect.anything(),
+    );
     const versionAfter = client.getOpenDocumentVersion(file.filePath);
     if (versionBefore === null || versionAfter === null) {
       throw new Error("Expected open document versions.");
@@ -598,15 +574,13 @@ describe("LSP single-file diagnostic freshness", () => {
     expect(client.getDiagnostics(file.filePath)).toEqual([makeDiagnostic("current")]);
   });
 
-  it("completes only after a versioned push matches the synchronized document", async () => {
+  it("does not confirm a versioned push without an explicit request", async () => {
+    vi.useFakeTimers();
     const file = createTempTsFile("versioned-push.ts");
     tmpDir = file.tmpDir;
     const { client } = createRunningTestClient();
-    let settled = false;
 
-    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;").finally(() => {
-      settled = true;
-    });
+    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
     const version = client.getOpenDocumentVersion(file.filePath);
     if (version === null) throw new Error("Expected an open document version.");
     client.handlePublishDiagnostics({
@@ -614,35 +588,30 @@ describe("LSP single-file diagnostic freshness", () => {
       version: version + 1,
       diagnostics: [makeDiagnostic("future")],
     });
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(settled).toBe(false);
+    client.handlePublishDiagnostics({
+      uri: file.uri,
+      version,
+      diagnostics: [makeDiagnostic("current")],
+    });
+    await vi.advanceTimersByTimeAsync(3_100);
 
-    client.handlePublishDiagnostics({
-      uri: file.uri,
-      version,
-      diagnostics: [makeDiagnostic("current")],
-    });
-    client.handlePublishDiagnostics({
-      uri: file.uri,
-      version,
-      diagnostics: [makeDiagnostic("current")],
-    });
-    await expect(pending).resolves.toEqual({
-      kind: "completed",
+    await expect(pending).resolves.toMatchObject({
+      kind: "partial",
       data: [makeDiagnostic("current")],
     });
   });
 
-  it("accepts an unversioned empty push observed after synchronization", async () => {
+  it("does not confirm an unversioned empty push without an explicit request", async () => {
+    vi.useFakeTimers();
     const file = createTempTsFile("unversioned-push.ts");
     tmpDir = file.tmpDir;
     const { client } = createRunningTestClient();
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
     client.handlePublishDiagnostics({ uri: file.uri, diagnostics: [] });
-    client.handlePublishDiagnostics({ uri: file.uri, diagnostics: [] });
+    await vi.advanceTimersByTimeAsync(3_100);
 
-    await expect(pending).resolves.toEqual({ kind: "completed", data: [] });
+    await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
   });
 
   it("uses a full pull report for the synchronized document", async () => {
@@ -742,13 +711,14 @@ describe("LSP single-file diagnostic freshness", () => {
     const first = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
     await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(1));
     const second = client.syncAndWaitForDiagnostics(file.filePath, "const x = 2;");
+    // Requests for one route are serialized. Release the older request before
+    // the newer synchronization can use the route.
+    resolveFirst({ kind: "full", items: [makeDiagnostic("stale")] });
 
     await expect(second).resolves.toEqual({
       kind: "completed",
       data: [makeDiagnostic("current")],
     });
-    resolveFirst({ kind: "full", items: [makeDiagnostic("stale")] });
-
     await expect(first).resolves.toMatchObject({ kind: "unavailable" });
     expect(client.getDiagnostics(file.filePath)).toEqual([makeDiagnostic("current")]);
   });
@@ -776,25 +746,24 @@ describe("LSP single-file diagnostic freshness", () => {
     await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
   });
 
-  it("completes from a fresh push without waiting for a silent pull", async () => {
+  it("does not confirm ambient pushes while an explicit request is unresolved", async () => {
     const file = createTempTsFile("silent-pull.ts");
     tmpDir = file.tmpDir;
     const { client, rpc } = createPullTestClient();
     rpc.sendRequest.mockImplementation(() => new Promise(() => {}));
 
-    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
+    let settled = false;
+    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;").finally(() => {
+      settled = true;
+    });
     await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(1));
     publish(client, file.uri, [makeDiagnostic("push")]);
     publish(client, file.uri, [makeDiagnostic("push")]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(settled).toBe(false);
 
-    await expect(
-      Promise.race([
-        pending,
-        new Promise((_resolve, reject) =>
-          setTimeout(() => reject(new Error("diagnostic collection did not finish")), 250),
-        ),
-      ]),
-    ).resolves.toEqual({ kind: "completed", data: [makeDiagnostic("push")] });
+    client.didClose(file.filePath);
+    await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
   });
 
   it("releases a silent pull when the document closes", async () => {
@@ -838,7 +807,7 @@ describe("LSP single-file diagnostic freshness", () => {
     ).resolves.toMatchObject({ kind: "unavailable" });
   });
 
-  it("accepts a push observed while pull diagnostics are failing", async () => {
+  it("keeps ambient pushes partial when a diagnostic request fails", async () => {
     vi.useFakeTimers();
     const file = createTempTsFile("push-during-pull.ts");
     tmpDir = file.tmpDir;
@@ -851,27 +820,27 @@ describe("LSP single-file diagnostic freshness", () => {
     setTimeout(() => publish(client, file.uri, [makeDiagnostic("fresh-push")]), 40);
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
-    // The first publication stays tentative while the pull fails; the
-    // second publication confirms the synchronization.
     await vi.advanceTimersByTimeAsync(50);
 
-    await expect(pending).resolves.toEqual({
-      kind: "completed",
+    await expect(pending).resolves.toMatchObject({
+      kind: "partial",
       data: [makeDiagnostic("fresh-push")],
     });
+    expect(client.getDiagnostics(file.filePath)).toEqual([makeDiagnostic("fresh-push")]);
   });
 
-  it("falls back to a fresh push when pull diagnostics fail", async () => {
+  it("does not fall back to a push when a diagnostic request fails", async () => {
+    vi.useFakeTimers();
     const file = createTempTsFile("single-sync-fallback.ts");
     tmpDir = file.tmpDir;
     const { client, rpc } = createPullTestClient();
     rpc.sendRequest.mockRejectedValue(new Error("pull failed"));
     setTimeout(() => publish(client, file.uri, [makeDiagnostic("single-sync-push")]), 20);
-    setTimeout(() => publish(client, file.uri, [makeDiagnostic("single-sync-push")]), 60);
 
-    await expect(client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;")).resolves.toEqual({
-      kind: "completed",
-      data: [makeDiagnostic("single-sync-push")],
-    });
+    const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
+    await vi.advanceTimersByTimeAsync(100);
+
+    await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
+    expect(client.getDiagnostics(file.filePath)).toEqual([makeDiagnostic("single-sync-push")]);
   });
 });

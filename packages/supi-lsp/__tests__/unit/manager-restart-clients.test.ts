@@ -43,6 +43,7 @@ function makeClient(overrides: Record<string, unknown> = {}) {
     openFiles: [] as string[],
     status: "running" as const,
     hasDiagnosticProvider: false,
+    hasDiagnosticRequestAdapter: false,
     shutdown: vi.fn().mockResolvedValue(undefined),
     notifyWorkspaceFileChanges: vi.fn(),
     getDiagnosticSnapshot: () => ({
@@ -214,6 +215,7 @@ describe("LspManager restartClientsForFiles", () => {
       root: sessionCwd,
       openFiles: [rsFile],
       hasDiagnosticProvider: true,
+      hasDiagnosticRequestAdapter: true,
     });
     const clients = (manager as unknown as { clients: Map<string, unknown> }).clients;
     clients.set(`typescript:${sessionCwd}`, pushClient);

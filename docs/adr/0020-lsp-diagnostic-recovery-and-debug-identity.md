@@ -1,5 +1,14 @@
 # LSP diagnostic recovery and debug identity
 
+**Status:** Partially superseded by [ADR 0022](0022-request-confirmed-lsp-agnostic-diagnostics.md)
+
+> **Current policy:** ADR 0022 replaces this record's push-diagnostic confirmation rules. The retention, resynchronization, and protocol-stall-only restart intent remains active. The sync-moment gate is only an admission check for some stale publications; it does not confirm diagnostics. Diagnostic collection does not use a publication count, quiet time, or reopen to confirm a result. The debug identity rules in this record remain active.
+
+## Historical decision record
+
+The sections below preserve the pre-ADR 0022 investigation baseline. Their
+republish and reopen details are historical, not live behavior.
+
 SuPi keeps diagnostic freshness file-local.
 
 Pull-capable servers provide the strongest post-invalidation evidence. Push-only servers confirm fresh evidence through a time gate and a reopen-resync fallback, and may receive one targeted client restart per affected client route during an explicit refresh when the route shows a protocol-stall signal — at most one restart per workspace invalidation generation. Each restart has a fixed 5-second startup bound. The result stays partial when confirmation fails.

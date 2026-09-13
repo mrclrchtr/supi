@@ -163,7 +163,7 @@ describe("code_health refresh evidence", () => {
           kind: "partial",
           evidence,
           reason:
-            "Diagnostic evidence is partial: 2 requested, 1 confirmed, 1 unconfirmed, 0 failed, 0 removed. Unconfirmed documents await a later diagnostic republish before their evidence can be confirmed (ADR 0021).",
+            "Diagnostic evidence is partial: 2 requested, 1 confirmed, 1 unconfirmed, 0 failed, 0 removed. Unconfirmed documents have no request-based confirmation.",
         },
         refresh: { kind: "completed", diagnosticEvidence: evidence },
       },

@@ -1,3 +1,4 @@
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: Diagnostic validation and evidence application stay together.
 import {
   type CodeQueryResult,
   partialCodeQuery,
@@ -8,7 +9,6 @@ import type {
   DocumentDiagnosticReport,
   PublishDiagnosticsParams,
 } from "../config/types.ts";
-import type { DiagnosticStateWait } from "./client-diagnostic-waiters.ts";
 
 /** Validate one untrusted LSP diagnostic publication before it enters the cache. */
 export function isValidPublishDiagnosticsParams(value: unknown): value is PublishDiagnosticsParams {
@@ -154,34 +154,33 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Evidence source that established or observed one cached diagnostic set. */
+export type DiagnosticEvidenceSource = "pull" | "typescript" | "push";
+
 /** Stored diagnostic data and the protocol evidence that established it. */
 export interface DiagnosticCacheEntry {
   diagnostics: Diagnostic[];
   receivedAt: number;
-  source: "pull" | "push";
+  source: DiagnosticEvidenceSource;
   synchronizationId?: number;
   evidenceRevision?: number;
   version?: number;
   resultId?: string;
   /**
-   * Valid publications observed for the entry's synchronization. The first
-   * valid publication for a synchronization is tentative; a later valid
-   * publication promotes the entry to confirmed (ADR 0021). A confirmed
-   * pull entry counts as the first publication when a push continues the
-   * same synchronization, so that push keeps the confirmation. Pull
-   * entries as such carry no count and are confirmed on arrival.
+   * Number of ambient publications retained for compatibility with existing
+   * telemetry. Publication count never establishes confirmation.
    */
   publications?: number;
 }
 
 /**
- * Test whether one push entry is still tentative for its synchronization.
+ * Test whether one entry came from ambient push observation.
  *
- * A pull entry confirms on arrival; a push entry confirms only after a
- * later valid publication for the same synchronization (ADR 0021).
+ * Push publication count is not a completion contract. Every push stays
+ * tentative until a request-based evidence source replaces it.
  */
 export function isTentativePushEntry(entry: DiagnosticCacheEntry | undefined): boolean {
-  return Boolean(entry && entry.source === "push" && (entry.publications ?? 1) < 2);
+  return entry?.source === "push";
 }
 
 /** One document synchronization that needs current diagnostic evidence. */
@@ -211,23 +210,6 @@ export function isCurrentSynchronization(
     document?.synchronizationId === synchronization.synchronizationId &&
       (synchronization.evidenceRevision === undefined ||
         document.evidenceRevision === synchronization.evidenceRevision),
-  );
-}
-
-/** Test whether a fresh push confirms the supplied synchronization. */
-export function hasFreshPush(
-  store: ReadonlyMap<string, DiagnosticCacheEntry>,
-  synchronization: DiagnosticSynchronization,
-  currentEvidenceRevision?: number,
-): boolean {
-  const entry = store.get(synchronization.uri);
-  return Boolean(
-    entry?.source === "push" &&
-      !isTentativePushEntry(entry) &&
-      entry.synchronizationId === synchronization.synchronizationId &&
-      (synchronization.evidenceRevision === undefined ||
-        entry.evidenceRevision === synchronization.evidenceRevision) &&
-      (currentEvidenceRevision === undefined || entry.evidenceRevision === currentEvidenceRevision),
   );
 }
 
@@ -262,16 +244,10 @@ export function hasFreshEvidence(
   );
 }
 
-/**
- * Return the latest cache update that matches one of the synchronizations.
- *
- * Every accepted publication restarts the settle quiet period, tentative
- * publications included, so this helper does not apply the confirmation
- * gate (ADR 0021).
- */
+/** Return the latest ambient update for one of the synchronizations. */
 export function latestCurrentEvidenceReceivedAt(
   store: ReadonlyMap<string, DiagnosticCacheEntry>,
-  synchronizations: DiagnosticSynchronization[],
+  synchronizations: readonly DiagnosticSynchronization[],
   currentEvidenceRevision?: number,
 ): number {
   let latest = 0;
@@ -282,34 +258,6 @@ export function latestCurrentEvidenceReceivedAt(
     }
   }
   return latest;
-}
-
-interface PullRaceOptions {
-  readonly pull: Promise<boolean>;
-  readonly waitForChange: () => DiagnosticStateWait;
-  readonly freshPush: () => boolean;
-  readonly current: () => boolean;
-}
-
-/** Race a pull against fresh push evidence and lifecycle release. */
-export async function raceDiagnosticPull(
-  options: PullRaceOptions,
-): Promise<"pull" | "push" | "released"> {
-  const pull = options.pull.then((confirmed) =>
-    confirmed ? ("pull" as const) : ("released" as const),
-  );
-  while (options.current()) {
-    if (options.freshPush()) return "push";
-    const change = options.waitForChange();
-    let outcome: "changed" | "pull" | "released";
-    try {
-      outcome = await Promise.race([pull, change.promise.then(() => "changed" as const)]);
-    } finally {
-      change.cancel();
-    }
-    if (outcome !== "changed") return outcome;
-  }
-  return "released";
 }
 
 /** Return explicit partial or unavailable evidence after fresh collection fails. */
@@ -342,6 +290,7 @@ interface ApplyPullReportOptions {
   readonly synchronizationId: number | undefined;
   readonly evidenceRevision: number;
   readonly isRelatedUriTracked: (uri: string) => boolean;
+  readonly source?: Exclude<DiagnosticEvidenceSource, "push">;
 }
 
 /** Apply one valid full or linked unchanged pull report. */
@@ -365,12 +314,18 @@ export function applyPullReport(options: ApplyPullReportOptions): boolean {
     store.set(uri, {
       diagnostics: report.items,
       receivedAt: Date.now(),
-      source: "pull",
+      source: options.source ?? "pull",
       synchronizationId,
       evidenceRevision,
       resultId: report.resultId,
     });
-    applyRelatedPullReports(store, report, evidenceRevision, isRelatedUriTracked);
+    applyRelatedPullReports({
+      store,
+      report,
+      evidenceRevision,
+      isRelatedUriTracked,
+      source: options.source ?? "pull",
+    });
     return true;
   }
   if (!previous || previousResultId === undefined || typeof report.resultId !== "string") {
@@ -379,34 +334,41 @@ export function applyPullReport(options: ApplyPullReportOptions): boolean {
   store.set(uri, {
     ...previous,
     receivedAt: Date.now(),
-    source: "pull",
+    source: options.source ?? "pull",
     synchronizationId,
     evidenceRevision,
     resultId: report.resultId,
   });
-  applyRelatedPullReports(store, report, evidenceRevision, isRelatedUriTracked);
+  applyRelatedPullReports({
+    store,
+    report,
+    evidenceRevision,
+    isRelatedUriTracked,
+    source: options.source ?? "pull",
+  });
   return true;
 }
 
-function applyRelatedPullReports(
-  store: Map<string, DiagnosticCacheEntry>,
-  report: DocumentDiagnosticReport,
-  evidenceRevision: number,
-  isRelatedUriTracked: (uri: string) => boolean,
-): void {
-  for (const [relatedUri, relatedReport] of Object.entries(report.relatedDocuments ?? {})) {
+function applyRelatedPullReports(options: {
+  store: Map<string, DiagnosticCacheEntry>;
+  report: DocumentDiagnosticReport;
+  evidenceRevision: number;
+  isRelatedUriTracked: (uri: string) => boolean;
+  source: Exclude<DiagnosticEvidenceSource, "push">;
+}): void {
+  for (const [relatedUri, relatedReport] of Object.entries(options.report.relatedDocuments ?? {})) {
     if (!isValidDocumentDiagnosticReport(relatedReport, false)) continue;
     // Skip explicit unchanged reports; full reports (kind "full", "", or
     // absent) may enter the related-document store.
     if (relatedReport.kind === "unchanged") continue;
-    if (isRelatedUriTracked(relatedUri)) continue;
-    const existing = store.get(relatedUri);
-    if (existing?.evidenceRevision === evidenceRevision) continue;
-    store.set(relatedUri, {
+    if (options.isRelatedUriTracked(relatedUri)) continue;
+    const existing = options.store.get(relatedUri);
+    if (existing?.evidenceRevision === options.evidenceRevision) continue;
+    options.store.set(relatedUri, {
       diagnostics: relatedReport.items,
       receivedAt: Date.now(),
-      source: "pull",
-      evidenceRevision,
+      source: options.source,
+      evidenceRevision: options.evidenceRevision,
       resultId: relatedReport.resultId,
     });
   }

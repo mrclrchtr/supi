@@ -81,17 +81,17 @@ describe.skipIf(!HAS_GOPLS)("LspClient integration (gopls push default)", () => 
 
   it("handles one or more valid push publications without pull requests", async () => {
     const content = fs.readFileSync(badFile, "utf-8");
-    // The system gopls version can publish once or republish for one
-    // synchronization. ADR 0021 keeps one publication tentative and confirms
-    // a later valid publication, so both outcomes satisfy this integration.
+    // The system gopls version can publish once or publish later for one
+    // synchronization. Ambient publications stay observational, so this
+    // push-only result cannot be completed.
     const result = await client.syncAndWaitForDiagnostics(badFile, content);
     if (result.kind === "completed") {
-      const typeErrors = completedDiagnostics(result).filter(
-        (diagnostic: Diagnostic) => diagnostic.severity === 1,
-      );
+      expect.fail("Push-only diagnostics must not be completed.");
+    } else if (result.kind === "partial") {
+      const typeErrors = result.data.filter((diagnostic: Diagnostic) => diagnostic.severity === 1);
       expect(typeErrors.length).toBeGreaterThan(0);
     } else {
-      expect(result.reason).toContain("republish");
+      expect(result.reason).toContain("ambient evidence");
       const retained = client.getDiagnostics(badFile);
       expect(retained.length).toBeGreaterThan(0);
       expect(retained.some((diagnostic: Diagnostic) => diagnostic.severity === 1)).toBe(true);

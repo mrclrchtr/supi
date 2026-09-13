@@ -42,6 +42,16 @@ vi.mock("../../src/client/transport.ts", () => ({
     }
 
     async sendNotification() {}
+    sendRequestOwned(method: string, _params?: unknown, _options?: unknown) {
+      const result = this.sendRequest(method);
+      return {
+        result,
+        settled: result.then(
+          () => undefined,
+          () => undefined,
+        ),
+      };
+    }
     onNotification() {}
     onRequest() {}
 

@@ -17,22 +17,22 @@ import {
   type DiagnosticCacheEntry,
   type DiagnosticSynchronization,
   hasCurrentEvidence,
-  hasFreshPush,
   isCurrentSynchronization,
   isValidPublishDiagnosticsParams,
   nextDocumentVersion,
 } from "./client-diagnostic-evidence.ts";
 import type { ClientDiagnosticsHost } from "./client-diagnostic-host.ts";
+import { DiagnosticPublicationTracker } from "./client-diagnostic-publication.ts";
+import { startDiagnosticEvidenceFromAdapter } from "./client-diagnostic-pull.ts";
 import {
-  DiagnosticPublicationTracker,
-  trackerFileIdentityFor,
-} from "./client-diagnostic-publication.ts";
-import {
-  pullClientDiagnosticEvidenceFromHost,
   refreshClientOpenDiagnostics,
   sendDidCloseNotification,
 } from "./client-diagnostic-refresh.ts";
-import { DiagnosticObserver, type DiagnosticPushWaitOutcome } from "./client-diagnostic-timing.ts";
+import {
+  DiagnosticRequestInvalidatedError,
+  DiagnosticRequestScheduler,
+} from "./client-diagnostic-request.ts";
+import { DiagnosticObserver } from "./client-diagnostic-timing.ts";
 import { DiagnosticWaitRegistry } from "./client-diagnostic-waiters.ts";
 import {
   type ClientDiagnosticSnapshot,
@@ -41,21 +41,21 @@ import {
   hasConfirmedDiagnosticEvidence,
   type OpenDocumentState,
 } from "./client-document-state.ts";
-import {
-  clearTrackedDocumentState,
-  reopenDocument,
-  synchronizeTrackedDocument,
-} from "./client-document-sync.ts";
+import { clearTrackedDocumentState, synchronizeTrackedDocument } from "./client-document-sync.ts";
 import { getDiagnosticFileState } from "./client-file-state.ts";
 
 const DIAGNOSTIC_WAIT_MS = 3_000;
-/** Bounded push wait after a reopen-resync fallback, in milliseconds. */
-const REOPEN_EVIDENCE_WAIT_MS = 1_000;
+/** Bound abandoned adapter work without binding it to one caller's deadline. */
+const DIAGNOSTIC_REQUEST_OWNER_TIMEOUT_MS = 30_000;
 /** Own one client's document and diagnostic evidence; revisions prevent stale reuse. */
 export class ClientDiagnostics {
   readonly #openDocs = new Map<string, OpenDocumentState>();
   readonly #diagnosticStore = new Map<string, DiagnosticCacheEntry>();
   readonly #waiters = new DiagnosticWaitRegistry();
+  /** One shared, bounded request engine for this client route. */
+  readonly #requestScheduler = new DiagnosticRequestScheduler();
+  /** Invalidation signals for active per-file adapter collections. */
+  readonly #requestControllers = new Map<string, AbortController>();
   readonly #versionHistory = new Map<string, number>();
   readonly #failedUris = new Set<string>();
   /** Bounded push-publication telemetry for one client's diagnostic state. */
@@ -68,10 +68,10 @@ export class ClientDiagnostics {
   #nextSynchronizationId = 0;
 
   constructor(private readonly host: ClientDiagnosticsHost) {
-    this.#publications = new DiagnosticPublicationTracker(
-      { server: host.server, cwd: host.cwd },
-      trackerFileIdentityFor(host.cwd),
-    );
+    this.#publications = new DiagnosticPublicationTracker({
+      server: host.server,
+      cwd: host.cwd,
+    });
   }
 
   get openFiles(): string[] {
@@ -95,6 +95,7 @@ export class ClientDiagnostics {
     this.#unversionedPushSyncMoments.clear();
     this.#waiters.releaseAll();
     this.#waiters.cancelSettle();
+    this.#cancelAllDiagnosticRequests();
   }
 
   didOpen(filePath: string, content: string): void {
@@ -103,9 +104,12 @@ export class ClientDiagnostics {
     const uri = fileToUri(filePath);
     this.#failedUris.delete(uri);
     if (this.#openDocs.has(uri)) {
+      // An equivalent duplicate open is a no-op. A real content change is
+      // cancelled by didChange before it advances the synchronization.
       this.didChange(filePath, content);
       return;
     }
+    this.#cancelDiagnosticRequest(uri);
 
     const languageId = detectLanguageId(filePath);
     this.#waiters.cancelSettle();
@@ -142,6 +146,7 @@ export class ClientDiagnostics {
     }
     const nextFingerprint = fingerprintDocumentContent(content);
     if (doc.contentFingerprint === nextFingerprint) return;
+    this.#cancelDiagnosticRequest(uri);
     synchronizeTrackedDocument({
       uri,
       content,
@@ -165,6 +170,7 @@ export class ClientDiagnostics {
     this.#unversionedPushSyncMoments.delete(uri);
     this.#closedVersionedBarrier.add(uri);
     clearTrackedDocumentState(this.#openDocs, this.#diagnosticStore, this.#waiters, uri);
+    this.#cancelDiagnosticRequest(uri);
 
     if (wasOpen && this.host.isOperational()) {
       sendDidCloseNotification(this.host, uri);
@@ -187,6 +193,7 @@ export class ClientDiagnostics {
       this.#failedUris.delete(uri);
       this.#unversionedPushSyncMoments.delete(uri);
       this.#closedVersionedBarrier.add(uri);
+      this.#cancelDiagnosticRequest(uri);
       clearTrackedDocumentState(this.#openDocs, this.#diagnosticStore, this.#waiters, uri);
       removedFiles.push(filePath);
       if (wasOpen && this.host.isOperational()) sendDidCloseNotification(this.host, uri);
@@ -225,6 +232,7 @@ export class ClientDiagnostics {
   /** Invalidate cache proof while retaining its data as partial fallback. */
   invalidateCachedEvidence(): void {
     this.#evidenceRevision++;
+    this.#requestScheduler.clearPending();
     const knownUris = new Set([
       ...this.#openDocs.keys(),
       ...this.#diagnosticStore.keys(),
@@ -236,6 +244,7 @@ export class ClientDiagnostics {
     // pushes the server sends after the change can become fresh evidence.
     const moment = Date.now();
     for (const uri of knownUris) {
+      this.#cancelDiagnosticRequest(uri);
       this.#unversionedPushSyncMoments.set(uri, moment);
       this.#closedVersionedBarrier.add(uri);
     }
@@ -243,6 +252,7 @@ export class ClientDiagnostics {
 
   handlePublishDiagnostics(params: unknown): void {
     if (!isValidPublishDiagnosticsParams(params)) return;
+    const previousEntry = this.#diagnosticStore.get(params.uri);
     const result = applyPushDiagnostics({
       store: this.#diagnosticStore,
       openDocuments: this.#openDocs,
@@ -253,23 +263,20 @@ export class ClientDiagnostics {
     });
     if (!result.accepted) return;
     const entry = this.#diagnosticStore.get(params.uri);
-    if (entry?.synchronizationId !== undefined && entry.evidenceRevision !== undefined) {
+    if (
+      entry !== previousEntry &&
+      entry?.source === "push" &&
+      entry.synchronizationId !== undefined &&
+      entry.evidenceRevision !== undefined
+    ) {
       this.#publications.record(
         params.uri,
         entry.synchronizationId,
         entry.evidenceRevision,
         entry.receivedAt,
       );
-      if (result.promoted) {
-        this.#publications.promoted(
-          params.uri,
-          entry.synchronizationId,
-          entry.evidenceRevision,
-          entry.receivedAt,
-        );
-      }
     }
-    this.#waiters.releaseFile(params.uri, "published");
+    this.#waiters.releaseFile(params.uri, "observed");
     this.#waiters.notifySettle();
   }
   async refreshOpenDiagnostics(
@@ -302,18 +309,35 @@ export class ClientDiagnostics {
       isRelatedUriTracked: (uri) => this.#openDocs.has(uri) || this.#versionHistory.has(uri),
       nextSynchronizationId: () => ++this.#nextSynchronizationId,
       invalidateEvidence: (uri) => {
+        this.#cancelDiagnosticRequest(uri);
         this.#failedUris.add(uri);
         const document = this.#openDocs.get(uri);
         if (document) document.evidenceRevision = -1;
       },
       clearFile: (uri) => {
+        this.#cancelDiagnosticRequest(uri);
         this.#failedUris.delete(uri);
         this.#unversionedPushSyncMoments.delete(uri);
         this.#closedVersionedBarrier.add(uri);
         clearTrackedDocumentState(this.#openDocs, this.#diagnosticStore, this.#waiters, uri);
       },
-      markUnversionedSyncMoment: (uri) => this.#unversionedPushSyncMoments.set(uri, Date.now()),
+      markUnversionedSyncMoment: (uri) => {
+        this.#cancelDiagnosticRequest(uri);
+        this.#unversionedPushSyncMoments.set(uri, Date.now());
+      },
       clearFailedFile: (uri) => this.#failedUris.delete(uri),
+      requestDiagnostics: (requestOptions) =>
+        this.#collectDiagnosticRequestEvidence({
+          request: requestOptions.request,
+          timeoutMs: requestOptions.timeoutMs,
+          control: {
+            signal: requestOptions.signal,
+            deadline: requestOptions.deadline,
+            operationId: requestOptions.operationId,
+          },
+          deadline: requestOptions.deadline,
+          operationId: requestOptions.operationId,
+        }),
       forceResynchronize,
       options,
       publications: {
@@ -339,13 +363,15 @@ export class ClientDiagnostics {
     // synchronization or protocol traffic may start for a caller that no
     // longer awaits a result.
     throwIfCodeRequestInterrupted(control);
-    const supportsPull = this.host.supportsPullDiagnostics();
-    const observer = new DiagnosticObserver("sync-file", supportsPull, control, {
+    const uri = fileToUri(filePath);
+    const requestAdapter = this.host.diagnosticRequestAdapter.supports(uri)
+      ? this.host.diagnosticRequestAdapter
+      : undefined;
+    const observer = new DiagnosticObserver("sync-file", requestAdapter !== undefined, control, {
       server: this.host.server,
       cwd: this.host.cwd,
       file: relativeDiagnosticFile(this.host.cwd, filePath),
     });
-    const uri = fileToUri(filePath);
     const cached = this.#diagnosticStore.get(uri);
     const cachedDiagnostics = cached ? [...cached.diagnostics] : null;
     const syncStart = Date.now();
@@ -356,6 +382,10 @@ export class ClientDiagnostics {
     // Equivalent content joins the current synchronization. Cached evidence
     // cannot force a no-op didChange that cancels an in-flight push or pull.
     if (!contentUnchanged || !synchronizationCurrent) {
+      // A direct sync-file request can supersede an active collection just as
+      // didChange and refresh do. Keep the raw request occupied until it
+      // settles, but stop its obsolete diagnostic phases now.
+      this.#cancelDiagnosticRequest(uri);
       synchronizeTrackedDocument({
         uri,
         content,
@@ -388,12 +418,11 @@ export class ClientDiagnostics {
       synchronizationId: synchronization.synchronizationId,
       evidenceRevision: synchronization.evidenceRevision,
     };
-    return this.#collectFileDiagnosticsWithReopenRetry(
+    return this.#collectFileDiagnostics(
       {
         filePath,
-        content,
         uri,
-        supportsPull,
+        requestAdapter,
         syncStart,
         request,
         cachedDiagnostics,
@@ -403,16 +432,12 @@ export class ClientDiagnostics {
     );
   }
 
-  /**
-   * Collect diagnostics for one synchronized document, retrying once through
-   * a reopen-resync on push-only routes when the first wait times out.
-   */
-  async #collectFileDiagnosticsWithReopenRetry(
+  /** Collect diagnostics for one synchronized document. */
+  async #collectFileDiagnostics(
     options: {
       filePath: string;
-      content: string;
       uri: string;
-      supportsPull: boolean;
+      requestAdapter: ClientDiagnosticsHost["diagnosticRequestAdapter"] | undefined;
       syncStart: number;
       request: DiagnosticSynchronization;
       cachedDiagnostics: Diagnostic[] | null;
@@ -420,106 +445,39 @@ export class ClientDiagnostics {
     },
     control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Diagnostic[]>> {
-    const {
-      filePath,
-      content,
-      uri,
-      supportsPull,
-      syncStart,
-      request,
-      cachedDiagnostics,
-      observer,
-    } = options;
-    let pushOutcome: DiagnosticPushWaitOutcome | undefined;
-    let attemptRequest = request;
-    let attemptSyncStart = syncStart;
-    let attemptMaxWaitMs = DIAGNOSTIC_WAIT_MS;
-    let reopenedOnce = false;
-    let result: CodeQueryResult<Diagnostic[]>;
-    for (;;) {
-      result = await collectSynchronizedFileDiagnostics(
-        {
-          supportsPull,
-          syncStart: attemptSyncStart,
-          maxWaitMs: attemptMaxWaitMs,
-          request: attemptRequest,
-          cachedDiagnostics,
-          observer,
-          waiters: this.#waiters,
-          current: () => isCurrentSynchronization(this.#openDocs, attemptRequest),
-          freshPush: () =>
-            hasFreshPush(this.#diagnosticStore, attemptRequest, this.#evidenceRevision),
-          currentPushReceivedAt: () => {
-            const entry = this.#diagnosticStore.get(attemptRequest.uri);
-            return entry?.source === "push" &&
-              hasCurrentEvidence(this.#diagnosticStore, attemptRequest, this.#evidenceRevision)
-              ? entry.receivedAt
-              : undefined;
-          },
-          diagnostics: () => this.getDiagnostics(filePath),
-          pullDiagnostics: (timeoutMs, signal) =>
-            pullClientDiagnosticEvidenceFromHost({
-              host: this.host,
-              store: this.#diagnosticStore,
-              openDocuments: this.#openDocs,
-              currentEvidenceRevision: () => this.#evidenceRevision,
-              isRelatedUriTracked: (relatedUri) =>
-                this.#openDocs.has(relatedUri) || this.#versionHistory.has(relatedUri),
-              request: {
-                uri,
+    const { filePath, uri, requestAdapter, syncStart, request, cachedDiagnostics, observer } =
+      options;
+    const result = await collectSynchronizedFileDiagnostics(
+      {
+        requestDiagnostics: requestAdapter
+          ? (timeoutMs, deadline, requestControl) =>
+              this.#collectDiagnosticRequestEvidence({
+                request,
                 timeoutMs,
-                synchronizationId: attemptRequest.synchronizationId,
-                evidenceRevision: attemptRequest.evidenceRevision ?? this.#evidenceRevision,
-                signal,
-                deadline: control?.deadline,
+                control: requestControl,
+                deadline,
                 operationId: control?.operationId,
-              },
-            }),
-          onPushWait: (outcome) => {
-            pushOutcome = outcome;
-          },
-        },
-        control,
-      );
-      // Reopen-resync fallback (R2): on push-only routes a document that
-      // timed out with no push stays unconfirmed — a clean file gets no
-      // push on didChange at all. Close and reopen it over the protocol so
-      // the server publishes on didOpen, then wait once more with a bounded
-      // budget. The cache entry and version history survive the reopen.
-      const document = this.#openDocs.get(uri);
-      if (
-        supportsPull ||
-        reopenedOnce ||
-        result.kind === "completed" ||
-        pushOutcome !== "timed-out" ||
-        !document ||
-        !isCurrentSynchronization(this.#openDocs, attemptRequest)
-      ) {
-        break;
-      }
-      reopenDocument({
-        uri,
-        content,
-        document,
-        languageId: detectLanguageId(filePath),
-        nextVersion: () => nextDocumentVersion(this.#versionHistory, uri),
-        nextSynchronizationId: () => ++this.#nextSynchronizationId,
-        evidenceRevision: this.#evidenceRevision,
+              })
+          : undefined,
+        requestSource: requestAdapter?.sourceFor(uri),
+        syncStart,
+        maxWaitMs: DIAGNOSTIC_WAIT_MS,
+        request,
+        cachedDiagnostics,
+        observer,
         waiters: this.#waiters,
-        sendNotification: (method, params) => this.host.sendNotification(method, params),
-        markUnversionedSyncMoment: () => this.#unversionedPushSyncMoments.set(uri, Date.now()),
-      });
-      observer.reopened(1);
-      reopenedOnce = true;
-      attemptRequest = {
-        uri,
-        synchronizationId: document.synchronizationId,
-        evidenceRevision: document.evidenceRevision,
-      };
-      attemptSyncStart = Date.now();
-      attemptMaxWaitMs = REOPEN_EVIDENCE_WAIT_MS;
-    }
-    observer.pushWaitCompleted(1, pushOutcome ?? "timed-out");
+        current: () => isCurrentSynchronization(this.#openDocs, request),
+        currentPushObservation: () => {
+          const entry = this.#diagnosticStore.get(request.uri);
+          return entry?.source === "push" &&
+            hasCurrentEvidence(this.#diagnosticStore, request, this.#evidenceRevision)
+            ? { receivedAt: entry.receivedAt, hasDiagnostics: entry.diagnostics.length > 0 }
+            : undefined;
+        },
+        diagnostics: () => this.getDiagnostics(filePath),
+      },
+      control,
+    );
     this.#publications.emitSummary({
       operation: "sync-file",
       identity: {
@@ -530,14 +488,96 @@ export class ClientDiagnostics {
       synchronizations: [
         {
           uri,
-          synchronizationId: attemptRequest.synchronizationId,
-          evidenceRevision: attemptRequest.evidenceRevision ?? this.#evidenceRevision,
+          synchronizationId: request.synchronizationId,
+          evidenceRevision: request.evidenceRevision ?? this.#evidenceRevision,
           confirmed: result.kind === "completed",
         },
       ],
       operationId: control?.operationId,
     });
     return result;
+  }
+
+  /** Start one shared request and apply its report through the evidence gate. */
+  #collectDiagnosticRequestEvidence(options: {
+    request: DiagnosticSynchronization;
+    timeoutMs: number;
+    control?: CodeRequestControl;
+    deadline?: number;
+    operationId?: string;
+  }): Promise<boolean> {
+    const adapter = this.host.diagnosticRequestAdapter;
+    if (!adapter?.supports(options.request.uri)) return Promise.resolve(false);
+    const key = [
+      options.request.uri,
+      options.request.synchronizationId,
+      options.request.evidenceRevision ?? this.#evidenceRevision,
+    ].join("\x00");
+    const consumerDeadline =
+      options.deadline ??
+      (Number.isFinite(options.timeoutMs) ? Date.now() + options.timeoutMs : undefined);
+    const consumerControl: CodeRequestControl = {
+      signal: options.control?.signal,
+      ...(consumerDeadline !== undefined ? { deadline: consumerDeadline } : {}),
+    };
+    return this.#requestScheduler.run(
+      key,
+      () => {
+        if (!isCurrentSynchronization(this.#openDocs, options.request)) {
+          return { result: Promise.resolve(false), settled: Promise.resolve() };
+        }
+        const controller = new AbortController();
+        this.#requestControllers.set(options.request.uri, controller);
+        // The scheduler already races each caller against its own control.
+        // Keep the adapter job alive after that race so another caller can
+        // join the same underlying request. Its owner bound is independent
+        // of the first caller's deadline.
+        const ownerTimeoutMs = Number.isFinite(options.timeoutMs)
+          ? Math.max(options.timeoutMs, DIAGNOSTIC_REQUEST_OWNER_TIMEOUT_MS)
+          : DIAGNOSTIC_REQUEST_OWNER_TIMEOUT_MS;
+        const request = {
+          uri: options.request.uri,
+          previousResultId: this.#diagnosticStore.get(options.request.uri)?.resultId,
+          timeoutMs: ownerTimeoutMs,
+          signal: controller.signal,
+          operationId: options.operationId,
+        };
+        const execution = startDiagnosticEvidenceFromAdapter({
+          adapter,
+          request,
+          store: this.#diagnosticStore,
+          synchronizationId: options.request.synchronizationId,
+          evidenceRevision: options.request.evidenceRevision ?? this.#evidenceRevision,
+          currentRevision: () => this.#evidenceRevision,
+          isCurrentSynchronization: () => isCurrentSynchronization(this.#openDocs, options.request),
+          isRelatedUriTracked: (uri) => this.#openDocs.has(uri) || this.#versionHistory.has(uri),
+        });
+        void execution.settled
+          .finally(() => {
+            if (this.#requestControllers.get(options.request.uri) === controller) {
+              this.#requestControllers.delete(options.request.uri);
+            }
+          })
+          .catch(() => {});
+        return execution;
+      },
+      consumerControl,
+    );
+  }
+
+  #cancelDiagnosticRequest(uri: string): void {
+    this.#requestControllers
+      .get(uri)
+      ?.abort(new DiagnosticRequestInvalidatedError("Diagnostic request was superseded."));
+    const prefix = `${uri}\x00`;
+    this.#requestScheduler.clearPendingWhere((key) => key.startsWith(prefix));
+  }
+
+  #cancelAllDiagnosticRequests(): void {
+    for (const controller of this.#requestControllers.values()) {
+      controller.abort(new DiagnosticRequestInvalidatedError());
+    }
+    this.#requestScheduler.clearPending();
   }
 }
 

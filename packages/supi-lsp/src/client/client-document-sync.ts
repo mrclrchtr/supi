@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { TextDocumentItem, VersionedTextDocumentIdentifier } from "../config/types.ts";
+import type { VersionedTextDocumentIdentifier } from "../config/types.ts";
 import type { DiagnosticSynchronization } from "./client-diagnostic-evidence.ts";
 import type { DiagnosticWaitRegistry } from "./client-diagnostic-waiters.ts";
 import { fingerprintDocumentContent, type OpenDocumentState } from "./client-document-state.ts";
@@ -81,44 +81,6 @@ export function clearTrackedDocumentState(
   diagnosticStore.delete(uri);
   waiters.releaseFile(uri);
   waiters.cancelSettle();
-}
-
-/** Close and reopen one open document while preserving cache and version history. */
-export function reopenDocument(options: {
-  uri: string;
-  content: string;
-  document: OpenDocumentState;
-  languageId: string;
-  nextVersion(): number;
-  nextSynchronizationId(): number;
-  evidenceRevision: number;
-  waiters: DiagnosticWaitRegistry;
-  sendNotification: NotificationSender;
-  markUnversionedSyncMoment?(): void;
-}): void {
-  // Mirror didClose release semantics: pending waiters for this URI observe
-  // the protocol close, and the settle generation is cancelled so concurrent
-  // settles re-arm against the reopened state.
-  options.waiters.releaseFile(options.uri);
-  options.waiters.cancelSettle();
-  options.markUnversionedSyncMoment?.();
-  options.sendNotification("textDocument/didClose", {
-    textDocument: { uri: options.uri },
-  });
-  const version = options.nextVersion();
-  options.document.version = version;
-  options.document.synchronizationId = options.nextSynchronizationId();
-  options.document.evidenceRevision = options.evidenceRevision;
-  options.document.content = options.content;
-  options.document.contentFingerprint = fingerprintDocumentContent(options.content);
-  options.sendNotification("textDocument/didOpen", {
-    textDocument: {
-      uri: options.uri,
-      languageId: options.languageId,
-      version,
-      text: options.content,
-    } satisfies TextDocumentItem,
-  });
 }
 
 /** Synchronize one open document, or open it when the route is not tracked yet. */

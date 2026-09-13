@@ -49,6 +49,7 @@ export const CLIENT_CAPABILITIES: ClientCapabilities = {
     },
     publishDiagnostics: {
       relatedInformation: true,
+      tagSupport: { valueSet: [1, 2] },
       versionSupport: true,
     },
     diagnostic: {

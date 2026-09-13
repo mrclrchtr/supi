@@ -335,7 +335,7 @@ describe("LSP manager lifecycle integration", () => {
     expect(transitions.filter((event) => event.kind === "startup")).toHaveLength(2);
   }, 10_000);
 
-  it("restarts a stalled push-only client and confirms diagnostics through the replacement", async () => {
+  it("restarts a stalled push-only client and observes diagnostics through the replacement", async () => {
     const root = createProject();
     const sourceFile = path.join(root, "fresh.test");
     const marker = path.join(root, ".pushed-once");
@@ -360,8 +360,8 @@ describe("LSP manager lifecycle integration", () => {
     expect(recovery.restartReason).toBe("readiness-stall");
     expect(recovery.elapsedMs).toBeTypeOf("number");
     expect(recovery.diagnosticEvidence).toMatchObject({
-      confirmed: 1,
-      unconfirmed: 0,
+      confirmed: 0,
+      unconfirmed: 1,
       failed: 0,
       removed: 0,
     });

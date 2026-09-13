@@ -1,4 +1,4 @@
-// Push-only diagnostic refresh reuse and invalidation behavior.
+// Push-only diagnostic observation reuse and invalidation behavior.
 
 import * as fs from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
@@ -35,8 +35,8 @@ function publishCurrent(client: LspClient, file: TestFile, diagnostics: unknown[
 }
 
 /**
- * Publish the current version twice: the first publication stays tentative,
- * the second confirms the current synchronization (ADR 0021).
+ * Publish the current version twice. Both publications remain observations
+ * without request evidence (ADR 0022).
  */
 function publishConfirmed(client: LspClient, file: TestFile, diagnostics: unknown[]): void {
   publishCurrent(client, file, diagnostics);
@@ -66,11 +66,11 @@ describe("push-only diagnostic refresh reuse", () => {
       client.refreshOpenDiagnostics({ maxWaitMs: 100, quietMs: 1 }),
     ).resolves.toMatchObject({
       requested: 1,
-      confirmed: 1,
-      unconfirmed: 0,
+      confirmed: 0,
+      unconfirmed: 1,
       failed: 0,
       removed: 0,
-      documents: [{ file: file.filePath, status: "confirmed" }],
+      documents: [{ file: file.filePath, status: "unconfirmed" }],
     });
 
     expect(rpc.sendNotification).not.toHaveBeenCalled();
@@ -86,7 +86,7 @@ describe("push-only diagnostic refresh reuse", () => {
 
     const evidence = await client.refreshOpenDiagnostics({ maxWaitMs: 100, quietMs: 1 });
 
-    expect(evidence.documents).toEqual([{ file: file.filePath, status: "confirmed" }]);
+    expect(evidence.documents).toEqual([{ file: file.filePath, status: "unconfirmed" }]);
     expect(client.getDiagnostics(file.filePath)).toEqual(diagnostics);
     expect(rpc.sendNotification).not.toHaveBeenCalled();
   });
@@ -111,7 +111,7 @@ describe("push-only diagnostic refresh reuse", () => {
 
     const evidence = await client.refreshOpenDiagnostics({ maxWaitMs: 100, quietMs: 1 });
 
-    expect(evidence).toMatchObject({ requested: 2, confirmed: 2, unconfirmed: 0 });
+    expect(evidence).toMatchObject({ requested: 2, confirmed: 0, unconfirmed: 2 });
     expect(notificationMethods(rpc)).toEqual(["textDocument/didChange"]);
     expect(rpc.sendNotification).toHaveBeenCalledWith(
       "textDocument/didChange",
@@ -136,7 +136,7 @@ describe("push-only diagnostic refresh reuse", () => {
 
     const evidence = await client.refreshOpenDiagnostics({ maxWaitMs: 100, quietMs: 1 });
 
-    expect(evidence).toMatchObject({ requested: 1, confirmed: 1, unconfirmed: 0 });
+    expect(evidence).toMatchObject({ requested: 1, confirmed: 0, unconfirmed: 1 });
     expect(notificationMethods(rpc)).toEqual(["textDocument/didChange"]);
   });
 
@@ -154,7 +154,7 @@ describe("push-only diagnostic refresh reuse", () => {
 
     const evidence = await client.refreshOpenDiagnostics({ maxWaitMs: 100, quietMs: 1 });
 
-    expect(evidence).toMatchObject({ requested: 1, confirmed: 1, unconfirmed: 0 });
+    expect(evidence).toMatchObject({ requested: 1, confirmed: 0, unconfirmed: 1 });
     expect(notificationMethods(rpc)).toEqual(["textDocument/didChange"]);
   });
 });

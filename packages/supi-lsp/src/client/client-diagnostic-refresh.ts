@@ -1,7 +1,8 @@
-// biome-ignore-all lint/style/noExcessiveLinesPerFile: refresh orchestration, pull collection, and the reopen fallback stay in one cohesive module.
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: refresh orchestration and evidence collection stay in one cohesive module.
 import { readFileSync } from "node:fs";
 import {
   type CodeRequestControl,
+  isCodeRequestDeadlineError,
   isCodeRequestInterruption,
   throwIfCodeRequestInterrupted,
 } from "@mrclrchtr/supi-code-runtime/api";
@@ -11,31 +12,23 @@ import {
   type DiagnosticEvidenceSummary,
   summarizeDiagnosticEvidence,
 } from "../diagnostics/evidence.ts";
-import { detectLanguageId } from "../utils.ts";
+import { raceRequestControl } from "../session/readiness.ts";
 import {
   type DiagnosticCacheEntry,
   type DiagnosticSynchronization,
   hasCurrentEvidence,
   hasFreshEvidence,
-  hasFreshPush,
-  isCurrentSynchronization,
   latestCurrentEvidenceReceivedAt,
   nextDocumentVersion,
-  raceDiagnosticPull,
 } from "./client-diagnostic-evidence.ts";
 import type { ClientDiagnosticsHost } from "./client-diagnostic-host.ts";
 import type {
   DiagnosticPublicationIdentity,
   DiagnosticPublicationSynchronization,
 } from "./client-diagnostic-publication.ts";
-import { pullDiagnosticEvidence } from "./client-diagnostic-pull.ts";
-import type { DiagnosticPullRequest } from "./client-diagnostic-request.ts";
-import {
-  DiagnosticObserver,
-  DiagnosticPullError,
-  isDiagnosticTimeout,
-} from "./client-diagnostic-timing.ts";
-import type { DiagnosticStateWait, DiagnosticWaitRegistry } from "./client-diagnostic-waiters.ts";
+import { isDiagnosticRequestInvalidated } from "./client-diagnostic-request.ts";
+import { DiagnosticObserver, isDiagnosticTimeout } from "./client-diagnostic-timing.ts";
+import type { DiagnosticWaitRegistry } from "./client-diagnostic-waiters.ts";
 import {
   fingerprintDocumentContent,
   hasConfirmedDiagnosticEvidence,
@@ -43,7 +36,6 @@ import {
 } from "./client-document-state.ts";
 import {
   type ResynchronizeDocumentsResult,
-  reopenDocument,
   resynchronizeOpenDocuments,
 } from "./client-document-sync.ts";
 import { getDiagnosticFileState } from "./client-file-state.ts";
@@ -62,7 +54,7 @@ export function sendDidCloseNotification(
 export function buildDiagnosticRefreshEvidence(options: {
   requestedFiles: readonly string[];
   resynchronization: ResynchronizeDocumentsResult;
-  /** Synchronizations that prove evidence, after reopen-resync updates. */
+  /** Synchronizations that can prove evidence after this refresh. */
   synchronizations: readonly DiagnosticSynchronization[];
   failedPullUris: ReadonlySet<string>;
   failedFiles: ReadonlySet<string>;
@@ -70,15 +62,12 @@ export function buildDiagnosticRefreshEvidence(options: {
   currentEvidenceRevision: number;
   openDocuments: ReadonlyMap<string, unknown>;
   diagnosticStore: ReadonlyMap<string, DiagnosticCacheEntry>;
-  /** Required quiet time after the latest push for this refresh result. */
-  pushQuietMs?: number;
 }): DiagnosticEvidenceSummary {
   const synchronizationByFile = new Map(
     options.synchronizations.map((item) => [uriToFile(item.uri), item]),
   );
   const removedFiles = new Set(options.resynchronization.removedFiles);
   const failedFiles = new Set(options.resynchronization.failedFiles);
-  const observedAt = Date.now();
   const documents = options.requestedFiles.map((file) => {
     const uri = fileToUri(file);
     const synchronization = synchronizationByFile.get(file);
@@ -101,15 +90,27 @@ export function buildDiagnosticRefreshEvidence(options: {
         store: options.diagnosticStore,
         synchronization,
         currentEvidenceRevision: options.currentEvidenceRevision,
-        pushQuietMs: options.pushQuietMs,
-        observedAt,
       })
     ) {
       return { file, status: "confirmed" as const };
     }
+    const currentPushObservation = Boolean(
+      synchronization &&
+        options.diagnosticStore.get(uri)?.source === "push" &&
+        hasCurrentEvidence(
+          options.diagnosticStore,
+          synchronization,
+          options.currentEvidenceRevision,
+        ),
+    );
     return {
       file,
-      status: options.failedPullUris.has(uri) ? ("failed" as const) : ("unconfirmed" as const),
+      // A failed request with a current ambient push remains unconfirmed, not
+      // failed: the push is useful observation but cannot confirm the file.
+      status:
+        options.failedPullUris.has(uri) && !currentPushObservation
+          ? ("failed" as const)
+          : ("unconfirmed" as const),
     };
   });
   return summarizeDiagnosticEvidence(documents);
@@ -120,135 +121,101 @@ function hasSettledRefreshEvidence(options: {
   store: ReadonlyMap<string, DiagnosticCacheEntry>;
   synchronization: DiagnosticSynchronization;
   currentEvidenceRevision: number;
-  pushQuietMs: number | undefined;
-  observedAt: number;
 }): boolean {
-  if (!hasFreshEvidence(options.store, options.synchronization, options.currentEvidenceRevision)) {
-    return false;
-  }
-  const entry = options.store.get(options.synchronization.uri);
-  return (
-    options.pushQuietMs === undefined ||
-    entry?.source !== "push" ||
-    options.observedAt - entry.receivedAt >= options.pushQuietMs
-  );
+  return hasFreshEvidence(options.store, options.synchronization, options.currentEvidenceRevision);
 }
 
-/** Pull one document and reject evidence from a stale client generation. */
-export function pullClientDiagnosticEvidence(
-  options: Omit<DiagnosticPullRequest, "previousResultId"> & {
-    store: Map<string, DiagnosticCacheEntry>;
-    synchronizationId?: number;
-    evidenceRevision: number;
-    currentRevision(): number;
-    isCurrentSynchronization(): boolean;
-    isRelatedUriTracked(uri: string): boolean;
-    pull(
-      request: DiagnosticPullRequest,
-    ): Promise<import("../config/types.ts").DocumentDiagnosticReport | null>;
-  },
-): Promise<boolean> {
-  return pullDiagnosticEvidence(options);
-}
-
-/** Pull one document through a client's host and preserve generation checks. */
-export function pullClientDiagnosticEvidenceFromHost(options: {
-  host: Pick<ClientDiagnosticsHost, "pullDocumentDiagnostics">;
-  store: Map<string, DiagnosticCacheEntry>;
-  openDocuments: ReadonlyMap<string, { synchronizationId: number; evidenceRevision?: number }>;
-  currentEvidenceRevision(): number;
-  isRelatedUriTracked(uri: string): boolean;
-  request: Omit<DiagnosticPullRequest, "previousResultId"> & {
-    synchronizationId?: number;
-    evidenceRevision?: number;
-  };
-}): Promise<boolean> {
-  return pullClientDiagnosticEvidence({
-    store: options.store,
-    ...options.request,
-    evidenceRevision: options.request.evidenceRevision ?? options.currentEvidenceRevision(),
-    currentRevision: options.currentEvidenceRevision,
-    isCurrentSynchronization: () =>
-      options.request.synchronizationId === undefined ||
-      isCurrentSynchronization(options.openDocuments, {
-        uri: options.request.uri,
-        synchronizationId: options.request.synchronizationId,
-        evidenceRevision: options.request.evidenceRevision,
-      }),
-    isRelatedUriTracked: options.isRelatedUriTracked,
-    pull: (request) => options.host.pullDocumentDiagnostics(request),
-  });
-}
-
-/** Collect pull evidence for every synchronized document in one refresh. */
-export async function pullDiagnosticsForOpenDocuments(options: {
-  requests: readonly DiagnosticSynchronization[];
-  syncStart: number;
-  maxWaitMs: number;
-  signal?: AbortSignal;
-  deadline?: number;
-  operationId?: string;
-  currentEvidenceRevision: () => number;
-  openDocuments: ReadonlyMap<string, { evidenceRevision: number; synchronizationId: number }>;
-  diagnosticStore: ReadonlyMap<string, DiagnosticCacheEntry>;
-  waitForChange: () => DiagnosticStateWait;
-  pullDiagnostics: (options: {
+interface OpenDocumentRequestCollectionOptions {
+  readonly requests: readonly DiagnosticSynchronization[];
+  readonly syncStart: number;
+  readonly maxWaitMs: number;
+  readonly signal?: AbortSignal;
+  readonly deadline?: number;
+  readonly operationId?: string;
+  readonly pullDiagnostics: (options: {
     request: DiagnosticSynchronization;
     timeoutMs: number;
     signal: AbortSignal;
     operationId?: string;
     deadline?: number;
   }) => Promise<boolean>;
-}): Promise<void> {
-  const deadline = options.syncStart + options.maxWaitMs;
-  const results = await Promise.allSettled(
-    options.requests.map(async (request) => {
-      const remaining = deadline - Date.now();
-      if (remaining <= 0) throw new Error("pull diagnostic timeout");
-      const pullController = new AbortController();
-      // Link the caller's cancellation to this document's pull controller so
-      // an in-flight pull receives protocol cancellation and stops promptly.
-      const onAbort = () => pullController.abort(options.signal?.reason);
-      if (options.signal?.aborted) onAbort();
-      else options.signal?.addEventListener("abort", onAbort, { once: true });
-      try {
-        const outcome = await raceDiagnosticPull({
-          pull: options.pullDiagnostics({
-            request,
-            timeoutMs: remaining,
-            signal: pullController.signal,
-            operationId: options.operationId,
-            deadline: options.deadline,
-          }),
-          waitForChange: options.waitForChange,
-          freshPush: () =>
-            hasFreshPush(options.diagnosticStore, request, options.currentEvidenceRevision()),
-          current: () => isCurrentSynchronization(options.openDocuments, request),
-        });
-        if (outcome !== "pull") pullController.abort();
-        return outcome === "pull";
-      } finally {
-        options.signal?.removeEventListener("abort", onAbort);
-      }
-    }),
+}
+
+/** Collect request-based evidence sequentially within one refresh budget. */
+export async function pullDiagnosticsForOpenDocuments(
+  options: OpenDocumentRequestCollectionOptions,
+): Promise<{
+  failedUris: readonly string[];
+  incompleteUris: readonly string[];
+  timedOut: boolean;
+}> {
+  const deadline = Math.min(
+    options.syncStart + options.maxWaitMs,
+    options.deadline ?? Number.POSITIVE_INFINITY,
   );
+  const failedUris: string[] = [];
+  const incompleteUris: string[] = [];
+  let timedOut = false;
 
-  // A cancelled refresh must not degrade into failed coverage evidence:
-  // the caller no longer awaits a result.
+  for (const request of options.requests) {
+    throwIfCodeRequestInterrupted({ signal: options.signal, deadline: options.deadline });
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      timedOut = true;
+      break;
+    }
+    const outcome = await collectOneRefreshRequest(options, request, remaining, deadline);
+    if (outcome === "failed") failedUris.push(request.uri);
+    if (outcome === "incomplete") incompleteUris.push(request.uri);
+    if (outcome === "timed-out") {
+      timedOut = true;
+      break;
+    }
+  }
+
   throwIfCodeRequestInterrupted({ signal: options.signal, deadline: options.deadline });
+  return { failedUris, incompleteUris, timedOut };
+}
 
-  const incomplete = results.some((result) => result.status === "rejected" || !result.value);
-  if (incomplete && options.requests.length > 0) {
-    const failedUris = options.requests.flatMap((request, index) => {
-      const result = results[index];
-      return result?.status === "rejected" && !isDiagnosticTimeout(result.reason)
-        ? [request.uri]
-        : [];
+type RefreshRequestOutcome = "completed" | "failed" | "incomplete" | "timed-out";
+
+async function collectOneRefreshRequest(
+  options: OpenDocumentRequestCollectionOptions,
+  request: DiagnosticSynchronization,
+  timeoutMs: number,
+  collectionDeadline: number,
+): Promise<RefreshRequestOutcome> {
+  const pullController = new AbortController();
+  const onAbort = () => pullController.abort(options.signal?.reason);
+  if (options.signal?.aborted) onAbort();
+  else options.signal?.addEventListener("abort", onAbort, { once: true });
+  try {
+    const result = options.pullDiagnostics({
+      request,
+      timeoutMs,
+      signal: pullController.signal,
+      operationId: options.operationId,
+      // The adapter receives the per-refresh deadline. This prevents queued
+      // work from starting after the bounded refresh budget expires.
+      deadline: collectionDeadline,
     });
-    throw new DiagnosticPullError(
-      results.some((result) => result.status === "rejected" && isDiagnosticTimeout(result.reason)),
-      failedUris,
-    );
+    const completed = await raceRequestControl(result, {
+      signal: options.signal,
+      deadline: collectionDeadline,
+    });
+    return completed ? "completed" : "incomplete";
+  } catch (error) {
+    if (isDiagnosticRequestInvalidated(error)) return "incomplete";
+    if (
+      options.signal?.aborted ||
+      (options.deadline !== undefined && Date.now() >= options.deadline)
+    ) {
+      throw error;
+    }
+    if (isCodeRequestDeadlineError(error)) return "timed-out";
+    return isDiagnosticTimeout(error) ? "timed-out" : "failed";
+  } finally {
+    options.signal?.removeEventListener("abort", onAbort);
   }
 }
 
@@ -331,6 +298,14 @@ interface ClientDiagnosticRefreshOptions {
   readonly invalidateEvidence: (uri: string) => void;
   readonly markUnversionedSyncMoment: (uri: string) => void;
   readonly clearFailedFile: (uri: string) => void;
+  /** Shared request engine used for every request-based diagnostic source. */
+  readonly requestDiagnostics: (options: {
+    request: DiagnosticSynchronization;
+    timeoutMs: number;
+    signal?: AbortSignal;
+    deadline?: number;
+    operationId?: string;
+  }) => Promise<boolean>;
   /** Server-requested refreshes bypass normal push-only evidence reuse. */
   readonly forceResynchronize?: boolean;
   readonly options: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl;
@@ -354,7 +329,6 @@ interface PreparedRefreshDocuments {
 /** Classify reusable documents, then resynchronize only the remaining set. */
 function prepareRefreshDocuments(
   options: ClientDiagnosticRefreshOptions,
-  supportsPull: boolean,
   evidenceRevision: number,
 ): PreparedRefreshDocuments {
   const reuseEnabled = !options.forceResynchronize;
@@ -415,11 +389,8 @@ function prepareRefreshDocuments(
     ...retainedSynchronizations,
     ...resynchronization.synchronizations,
   ];
-  // Pull-capable routes still request current diagnostics even when every
-  // document synchronization is reusable.
   const fullyReusable =
     reuseEnabled &&
-    !supportsPull &&
     options.openDocuments.size > 0 &&
     reusableUris.size === options.openDocuments.size;
   return { resynchronization, synchronizations, fullyReusable };
@@ -433,11 +404,19 @@ export async function refreshClientOpenDiagnostics(
   // resynchronization or protocol traffic may start for a pass the caller
   // no longer awaits.
   throwIfCodeRequestInterrupted(options.options);
-  const supportsPull = options.host.supportsPullDiagnostics();
-  const observer = new DiagnosticObserver("refresh-open", supportsPull, options.options, {
-    server: options.host.server,
-    cwd: options.host.cwd,
-  });
+  const requestAdapter = options.host.diagnosticRequestAdapter;
+  const hasDiagnosticRequestAdapter = Array.from(options.openDocuments.keys()).some((uri) =>
+    requestAdapter.supports(uri),
+  );
+  const observer = new DiagnosticObserver(
+    "refresh-open",
+    hasDiagnosticRequestAdapter,
+    options.options,
+    {
+      server: options.host.server,
+      cwd: options.host.cwd,
+    },
+  );
   if (!options.host.isOperational()) {
     observer.skipped(options.requestedFiles.length);
     return summarizeDiagnosticEvidence(
@@ -452,11 +431,11 @@ export async function refreshClientOpenDiagnostics(
   const maxWaitMs = options.options.maxWaitMs ?? 3_000;
   const quietMs = options.options.quietMs ?? 200;
   const syncStart = Date.now();
-  const prepared = prepareRefreshDocuments(options, supportsPull, options.evidenceRevision());
+  const prepared = prepareRefreshDocuments(options, options.evidenceRevision());
   const resynchronization = prepared.resynchronization;
-  let synchronizations = prepared.synchronizations;
+  const synchronizations = prepared.synchronizations;
   let failedPullUris: ReadonlySet<string> = new Set();
-  const buildEvidence = (pushQuietMs?: number) =>
+  const buildEvidence = () =>
     buildDiagnosticRefreshEvidence({
       requestedFiles: options.requestedFiles,
       resynchronization,
@@ -467,15 +446,7 @@ export async function refreshClientOpenDiagnostics(
       currentEvidenceRevision: options.evidenceRevision(),
       openDocuments: options.openDocuments,
       diagnosticStore: options.diagnosticStore,
-      pushQuietMs,
     });
-
-  // A fully reusable push-only refresh has no protocol work to collect.
-  // Preserve the existing cache timing event format and return current evidence.
-  if (prepared.fullyReusable) {
-    observer.cacheReused(synchronizations.length);
-    return buildEvidence();
-  }
 
   const settleEpoch = options.waiters.settleEpoch;
   observer.synchronized();
@@ -484,63 +455,84 @@ export async function refreshClientOpenDiagnostics(
     return buildEvidence();
   }
 
-  if (supportsPull) {
-    const pull = await collectPullEvidenceForRefresh({
-      options,
-      synchronizations,
-      syncStart,
-      maxWaitMs,
-      observer,
-    });
-    failedPullUris = new Set(pull.failedPullUris);
-    if (pull.completed) return buildEvidence();
+  const requestSynchronizations = synchronizations.filter((synchronization) =>
+    requestAdapter.supports(synchronization.uri),
+  );
+  // A fully reusable push-only refresh has no protocol work to collect.
+  if (prepared.fullyReusable && requestSynchronizations.length === 0) {
+    observer.cacheReused(synchronizations.length);
+    return buildEvidence();
   }
+  const pushSynchronizations = synchronizations.filter(
+    (synchronization) => !requestSynchronizations.includes(synchronization),
+  );
 
-  const waitForDiagnosticSettle = (settleStart: number, settleGeneration: number) =>
+  const waitForDiagnosticSettle = (
+    targetSynchronizations: readonly DiagnosticSynchronization[],
+    settleStart: number,
+    settleGeneration: number,
+  ) =>
     options.waiters.waitForSettle(
       {
         syncStart: settleStart,
         maxWaitMs,
         quietMs,
         settleEpoch: settleGeneration,
-        isComplete: () =>
-          synchronizations.every((item) =>
-            hasFreshEvidence(options.diagnosticStore, item, options.evidenceRevision()),
-          ),
         latestReceived: () =>
           latestCurrentEvidenceReceivedAt(
             options.diagnosticStore,
-            synchronizations,
+            targetSynchronizations,
             options.evidenceRevision(),
           ),
       },
       options.options,
     );
 
-  let finalSettle = await waitForDiagnosticSettle(syncStart, settleEpoch);
-  if (!supportsPull && finalSettle.outcome === "timed-out") {
-    const reopen = await reopenUnconfirmedDocuments({
+  if (requestSynchronizations.length > 0) {
+    const request = await collectPullEvidenceForRefresh({
       options,
-      synchronizations,
-      reopenCandidates: resynchronization.resynchronizedUris,
-      observer,
+      synchronizations: requestSynchronizations,
+      syncStart,
+      maxWaitMs,
     });
-    if (reopen.performed) {
-      synchronizations = reopen.synchronizations;
-      // A large push-only project may still be processing the reopen batch.
-      // The replacement pass uses the same collection budget as the initial pass.
-      finalSettle = await waitForDiagnosticSettle(reopen.startedAt, options.waiters.settleEpoch);
+    failedPullUris = new Set(request.failedPullUris);
+    const source = requestSourceFor(options.host, requestSynchronizations);
+    if (pushSynchronizations.length === 0) {
+      if (request.completed) observer.requestCompleted(source, requestSynchronizations.length);
+      else observer.requestIncomplete(source, request.timedOut, requestSynchronizations.length);
+      throwIfCodeRequestInterrupted(options.options);
+      emitRefreshPublicationSummary(options, synchronizations);
+      return buildEvidence();
     }
+    if (request.completed) {
+      observer.requestCompleted(source, requestSynchronizations.length, false);
+    } else {
+      observer.requestIncomplete(source, request.timedOut, requestSynchronizations.length, false);
+    }
+    const finalSettle = await waitForDiagnosticSettle(pushSynchronizations, syncStart, settleEpoch);
+    observer.mixedSettled(source, synchronizations.length, finalSettle);
+    // Request failures are final for this bounded pass. Ambient pushes can
+    // remain useful observations, but they cannot confirm the request route.
+    throwIfCodeRequestInterrupted(options.options);
+    emitRefreshPublicationSummary(options, synchronizations);
+    return buildEvidence();
   }
+
+  const finalSettle = await waitForDiagnosticSettle(synchronizations, syncStart, settleEpoch);
   observer.pushSettled(synchronizations.length, finalSettle);
   // A cancelled settle must not publish evidence the caller no longer awaits.
   throwIfCodeRequestInterrupted(options.options);
+  emitRefreshPublicationSummary(options, synchronizations);
+  return buildEvidence();
+}
+
+function emitRefreshPublicationSummary(
+  options: ClientDiagnosticRefreshOptions,
+  synchronizations: readonly DiagnosticSynchronization[],
+): void {
   options.publications.emitSummary({
     operation: "refresh-open",
-    identity: {
-      server: options.host.server,
-      cwd: options.host.cwd,
-    },
+    identity: { server: options.host.server, cwd: options.host.cwd },
     synchronizations: synchronizations.map((synchronization) => ({
       uri: synchronization.uri,
       synchronizationId: synchronization.synchronizationId,
@@ -553,139 +545,56 @@ export async function refreshClientOpenDiagnostics(
     })),
     operationId: options.options.operationId,
   });
-  return buildEvidence(quietMs);
 }
 
-/**
- * Pull diagnostic evidence for every synchronized document, or fall through
- * to the push settle path when any pull fails. An interruption during the
- * pull phase stops the refresh instead of degrading into failed coverage.
- */
+/** Collect request evidence for every applicable synchronized document. */
 async function collectPullEvidenceForRefresh(options: {
   options: ClientDiagnosticRefreshOptions;
   synchronizations: readonly DiagnosticSynchronization[];
   syncStart: number;
   maxWaitMs: number;
-  observer: DiagnosticObserver;
-}): Promise<{ completed: boolean; failedPullUris: ReadonlySet<string> }> {
-  const { options: refresh, synchronizations, syncStart, maxWaitMs, observer } = options;
+}): Promise<{ completed: boolean; failedPullUris: ReadonlySet<string>; timedOut: boolean }> {
+  const { options: refresh, synchronizations, syncStart, maxWaitMs } = options;
   try {
-    await pullDiagnosticsForOpenDocuments({
+    const result = await pullDiagnosticsForOpenDocuments({
       requests: synchronizations,
       syncStart,
       maxWaitMs,
       signal: refresh.options.signal,
       deadline: refresh.options.deadline,
       operationId: refresh.options.operationId,
-      currentEvidenceRevision: refresh.evidenceRevision,
-      openDocuments: refresh.openDocuments,
-      diagnosticStore: refresh.diagnosticStore,
-      waitForChange: () => refresh.waiters.waitForChange(),
       pullDiagnostics: (pullOptions) =>
-        pullClientDiagnosticEvidenceFromHost({
-          host: refresh.host,
-          store: refresh.diagnosticStore,
-          openDocuments: refresh.openDocuments,
-          currentEvidenceRevision: refresh.evidenceRevision,
-          isRelatedUriTracked: refresh.isRelatedUriTracked,
-          request: {
-            uri: pullOptions.request.uri,
-            timeoutMs: pullOptions.timeoutMs,
-            synchronizationId: pullOptions.request.synchronizationId,
-            evidenceRevision:
-              refresh.openDocuments.get(pullOptions.request.uri)?.evidenceRevision ??
-              refresh.evidenceRevision(),
-            signal: pullOptions.signal,
-            deadline: pullOptions.deadline,
-            operationId: pullOptions.operationId,
-          },
+        refresh.requestDiagnostics({
+          request: pullOptions.request,
+          timeoutMs: pullOptions.timeoutMs,
+          signal: pullOptions.signal,
+          deadline: pullOptions.deadline,
+          operationId: pullOptions.operationId,
         }),
     });
-    observer.pullCompleted(synchronizations.length);
-    return { completed: true, failedPullUris: new Set() };
+    const failedPullUris = new Set(result.failedUris);
+    const incomplete =
+      result.incompleteUris.length > 0 || failedPullUris.size > 0 || result.timedOut;
+    return {
+      completed: !incomplete,
+      failedPullUris,
+      timedOut: result.timedOut,
+    };
   } catch (error) {
-    observer.pullFailed(error);
-    if (error instanceof DiagnosticPullError) {
-      return { completed: false, failedPullUris: new Set(error.failedUris) };
-    }
     if (isCodeRequestInterruption(error, refresh.options)) throw error;
-    return { completed: false, failedPullUris: new Set() };
+    return { completed: false, failedPullUris: new Set(), timedOut: false };
   }
 }
 
-/**
- * Reopen-resync fallback (R2): on push-only routes a document that was
- * didChange-synchronized and stays unconfirmed after the settle window may
- * have been skipped by the server — a clean file gets no push on didChange
- * at all, but the server publishes on didOpen. Close and reopen each such
- * document so the server publishes, then settle again within a bounded
- * second window. The cache entry and version history survive the reopen;
- * other documents keep their server state.
- *
- * Only documents this pass resynchronized are candidates: retained documents
- * wait for the server's existing pipeline, and reopening them would cancel
- * in-progress server work without fixing any publish gap (#344).
- */
-async function reopenUnconfirmedDocuments(options: {
-  options: ClientDiagnosticRefreshOptions;
-  synchronizations: readonly DiagnosticSynchronization[];
-  /** URIs that received a didChange in this pass and may need a reopen push. */
-  reopenCandidates: ReadonlySet<string>;
-  observer: DiagnosticObserver;
-}): Promise<{
-  performed: boolean;
-  startedAt: number;
-  synchronizations: DiagnosticSynchronization[];
-}> {
-  const { options: refresh, synchronizations, reopenCandidates, observer } = options;
-  const startedAt = Date.now();
-  const unconfirmed = synchronizations.filter(
-    (item) =>
-      reopenCandidates.has(item.uri) &&
-      // A document with any current publication — tentative included — is
-      // not a reopen candidate: its server pipeline is alive and a republish
-      // can still promote the retained cache (ADR 0021).
-      !hasCurrentEvidence(refresh.diagnosticStore, item, refresh.evidenceRevision()),
+function requestSourceFor(
+  host: ClientDiagnosticsHost,
+  synchronizations: readonly DiagnosticSynchronization[],
+): "pull" | "typescript" | "mixed" {
+  const sources = new Set(
+    synchronizations.map(
+      (synchronization) => host.diagnosticRequestAdapter.sourceFor(synchronization.uri) ?? "pull",
+    ),
   );
-  const reopenedSynchronizations: DiagnosticSynchronization[] = [];
-  for (const item of unconfirmed) {
-    const document = refresh.openDocuments.get(item.uri);
-    if (!document) continue;
-    const filePath = uriToFile(item.uri);
-    let content: string;
-    try {
-      content = readFileSync(filePath, "utf-8");
-    } catch {
-      // The file disappeared mid-refresh; keep the document as-is and
-      // report its current unconfirmed coverage.
-      continue;
-    }
-    reopenDocument({
-      uri: item.uri,
-      content,
-      document,
-      languageId: detectLanguageId(filePath),
-      nextVersion: () => nextDocumentVersion(refresh.versionHistory, item.uri),
-      nextSynchronizationId: refresh.nextSynchronizationId,
-      evidenceRevision: refresh.evidenceRevision(),
-      waiters: refresh.waiters,
-      sendNotification: (method, params) => refresh.host.sendNotification(method, params),
-      markUnversionedSyncMoment: () => refresh.markUnversionedSyncMoment(item.uri),
-    });
-    reopenedSynchronizations.push({
-      uri: item.uri,
-      synchronizationId: document.synchronizationId,
-      evidenceRevision: document.evidenceRevision,
-    });
-  }
-  if (reopenedSynchronizations.length === 0) {
-    return { performed: false, startedAt, synchronizations: [...synchronizations] };
-  }
-  observer.reopened(reopenedSynchronizations.length);
-  const reopenedByUri = new Map(reopenedSynchronizations.map((item) => [item.uri, item]));
-  return {
-    performed: true,
-    startedAt,
-    synchronizations: synchronizations.map((item) => reopenedByUri.get(item.uri) ?? item),
-  };
+  if (sources.size === 1) return sources.values().next().value as "pull" | "typescript";
+  return "mixed";
 }

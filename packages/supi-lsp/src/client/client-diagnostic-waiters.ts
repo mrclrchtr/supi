@@ -4,11 +4,11 @@ import {
   throwIfCodeRequestInterrupted,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type {
-  DiagnosticPushWaitOutcome,
+  DiagnosticPushObservationOutcome,
   DiagnosticSettleResult,
 } from "./client-diagnostic-timing.ts";
 
-type DiagnosticWaiter = (outcome: "published" | "released") => void;
+type DiagnosticWaiter = (outcome: "observed" | "released") => void;
 
 /** One cancellable wait for diagnostic state change. */
 export interface DiagnosticStateWait {
@@ -21,7 +21,6 @@ interface DiagnosticSettleOptions {
   readonly maxWaitMs: number;
   readonly quietMs: number;
   readonly settleEpoch: number;
-  readonly isComplete: () => boolean;
   readonly latestReceived: () => number;
 }
 
@@ -41,7 +40,7 @@ export class DiagnosticWaitRegistry {
     uri: string,
     timeoutMs: number,
     control?: CodeRequestControl,
-  ): Promise<DiagnosticPushWaitOutcome> {
+  ): Promise<DiagnosticPushObservationOutcome> {
     const deadlineRemaining =
       control?.deadline === undefined ? undefined : control.deadline - Date.now();
     const bindMs =
@@ -56,7 +55,7 @@ export class DiagnosticWaitRegistry {
       return Promise.resolve("timed-out");
     }
 
-    return new Promise<DiagnosticPushWaitOutcome>((resolve, reject) => {
+    return new Promise<DiagnosticPushObservationOutcome>((resolve, reject) => {
       const cleanup = () => {
         clearTimeout(timer);
         if (abortHandler) control?.signal?.removeEventListener("abort", abortHandler);
@@ -103,7 +102,7 @@ export class DiagnosticWaitRegistry {
   }
 
   /** Release pending push waiters for one URI. */
-  releaseFile(uri: string, outcome: "published" | "released" = "released"): void {
+  releaseFile(uri: string, outcome: "observed" | "released" = "released"): void {
     const waiters = this.#pushWaiters.get(uri);
     if (waiters) {
       this.#pushWaiters.delete(uri);
@@ -134,7 +133,7 @@ export class DiagnosticWaitRegistry {
     options: DiagnosticSettleOptions,
     control?: CodeRequestControl,
   ): Promise<DiagnosticSettleResult> {
-    const { syncStart, maxWaitMs, quietMs, settleEpoch, isComplete, latestReceived } = options;
+    const { syncStart, maxWaitMs, quietMs, settleEpoch, latestReceived } = options;
     const deadlineRemaining =
       control?.deadline === undefined ? undefined : control.deadline - Date.now();
     const deadline =
@@ -148,14 +147,11 @@ export class DiagnosticWaitRegistry {
       }
       const observedAt = latestReceived();
       const elapsed = Date.now() - observedAt;
-      const complete = isComplete();
-      if (observedAt > 0 && complete && elapsed >= quietMs) {
+      if (observedAt > 0 && elapsed >= quietMs) {
         return { outcome: "quiet", freshness: "observed" };
       }
       const waitMs =
-        observedAt > 0 && complete
-          ? Math.min(quietMs - elapsed, deadline - Date.now())
-          : deadline - Date.now();
+        observedAt > 0 ? Math.min(quietMs - elapsed, deadline - Date.now()) : deadline - Date.now();
       await this.#waitForStateChange(waitMs, control);
     }
     // A bound absolute deadline makes the settle outcome a deadline

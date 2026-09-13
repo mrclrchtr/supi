@@ -53,8 +53,8 @@ export interface WorkspaceRecoveryResult {
 /** One client route's diagnostic evidence capability for recovery targeting. */
 export interface WorkspaceDiagnosticRoute {
   key: string;
-  /** False for push-only clients, which cannot confirm freshness by pull. */
-  supportsPull: boolean;
+  /** False for push-only clients, which have no request adapter. */
+  hasDiagnosticRequestAdapter: boolean;
   /** Files tracked by the route whose evidence is unconfirmed. */
   unconfirmedFiles: string[];
   /** Protocol-stall signal observed on the route, or null when healthy. */
@@ -237,15 +237,14 @@ async function collectInitialEvidence(
 /**
  * Collect restart targets: push-only routes with a protocol-stall signal.
  *
- * Unconfirmed evidence alone never restarts a client: the reopen-resync
- * fallback handles unconfirmed push-only documents without discarding
- * server state (ADR 0020). Restarts require a readiness stall or repeated
- * protocol failures, and stay limited to push-only routes.
+ * Unconfirmed evidence alone never restarts a client. Restarts require a
+ * readiness stall or repeated protocol failures, and stay limited to routes
+ * without a diagnostic request adapter.
  */
 function collectRecoveryRestartTargets(host: WorkspaceRecoveryHost): RecoveryRestartTarget[] {
   const targets: RecoveryRestartTarget[] = [];
   for (const route of host.getClientDiagnosticRoutes()) {
-    if (route.supportsPull) continue;
+    if (route.hasDiagnosticRequestAdapter) continue;
     if (!route.stallSignal) continue;
     if (route.unconfirmedFiles.length === 0) continue;
     targets.push({

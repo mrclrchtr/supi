@@ -77,17 +77,16 @@ describe.skipIf(!HAS_BASH_LSP)("LspClient integration (bash-language-server)", (
 
   it("handles one or more valid push publications without pull requests", async () => {
     const content = fs.readFileSync(validFile, "utf-8");
-    // External server versions can publish once or republish for one
-    // synchronization. ADR 0021 keeps one publication tentative and confirms
-    // a later valid publication, so both outcomes satisfy this integration.
+    // External server versions can publish once or publish later for one
+    // synchronization. Ambient publications stay observational, so a clean
+    // push-only result cannot be completed.
     const diagnostics = await client.syncAndWaitForDiagnostics(validFile, content);
     if (diagnostics.kind === "completed") {
+      expect.fail("Push-only diagnostics must not be completed.");
+    } else if (diagnostics.kind === "partial") {
       expect(Array.isArray(diagnostics.data)).toBe(true);
     } else {
-      expect(diagnostics).toMatchObject({
-        kind: "unavailable",
-        reason: expect.stringContaining("republish"),
-      });
+      expect(diagnostics.reason).toContain("ambient evidence");
     }
   }, 15_000);
 

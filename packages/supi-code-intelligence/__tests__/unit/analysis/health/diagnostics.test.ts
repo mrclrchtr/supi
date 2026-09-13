@@ -1,7 +1,10 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
+import {
+  TENTATIVE_PUSH_UNAVAILABLE_REASON,
+  type WorkspaceLspRuntime,
+} from "@mrclrchtr/supi-lsp/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   collectDiagnostics,
@@ -142,8 +145,7 @@ describe("code_health diagnostic observations", () => {
       service: service({
         fileDiagnostics: async () => ({
           kind: "unavailable",
-          reason:
-            "The current push publication is tentative: a later diagnostic republish for the same document synchronization is required.",
+          reason: TENTATIVE_PUSH_UNAVAILABLE_REASON,
         }),
       }),
       included: ["diagnostics"],
@@ -163,7 +165,7 @@ describe("code_health diagnostic observations", () => {
         removed: 0,
         documents: [{ file, status: "unconfirmed" }],
       },
-      reason: expect.stringContaining("diagnostic republish"),
+      reason: expect.stringContaining("ambient evidence"),
     });
   });
 
@@ -345,7 +347,7 @@ describe("code_health diagnostic observations", () => {
         removed: 0,
       },
       reason:
-        "Diagnostic evidence is partial: 2 requested, 1 confirmed, 1 unconfirmed, 0 failed, 0 removed. Unconfirmed documents await a later diagnostic republish before their evidence can be confirmed (ADR 0021).",
+        "Diagnostic evidence is partial: 2 requested, 1 confirmed, 1 unconfirmed, 0 failed, 0 removed. Unconfirmed documents have no request-based confirmation.",
     });
     expect(JSON.stringify(observation)).not.toContain(outside);
   });
@@ -424,7 +426,7 @@ describe("code_health diagnostic observations", () => {
   });
 
   it("shows tentative push errors as partial health evidence", async () => {
-    // ADR 0021: a first push publication is tentative. The snapshot exposes
+    // A first push publication is tentative. The snapshot exposes
     // its errors with unconfirmed evidence and does not claim a clean result.
     const observation = await collectDiagnostics({
       service: service({
@@ -460,7 +462,7 @@ describe("code_health diagnostic observations", () => {
         documents: [{ file: "src/a.ts", status: "unconfirmed" }],
       },
       reason:
-        "Diagnostic evidence is partial: 1 requested, 0 confirmed, 1 unconfirmed, 0 failed, 0 removed. Unconfirmed documents await a later diagnostic republish before their evidence can be confirmed (ADR 0021).",
+        "Diagnostic evidence is partial: 1 requested, 0 confirmed, 1 unconfirmed, 0 failed, 0 removed. Unconfirmed documents have no request-based confirmation.",
     });
   });
 
@@ -499,7 +501,8 @@ describe("code_health diagnostic observations", () => {
         documents: [{ file: "src/a.ts", status: "unconfirmed" }],
       },
       reason:
-        "Diagnostic evidence is partial: 1 requested, 0 confirmed, 1 unconfirmed, 0 failed, 0 removed. Unconfirmed documents await a later diagnostic republish before their evidence can be confirmed (ADR 0021).",
+        "Diagnostic evidence is partial: 1 requested, 0 confirmed, 1 unconfirmed, 0 failed, 0 removed. Unconfirmed documents have no request-based confirmation.",
     });
+    if (observation.kind === "partial") expect(observation.reason).not.toContain("ambient");
   });
 });

@@ -84,7 +84,7 @@ The following areas should remain part of the design:
 
 - `WorkspaceLspRuntime` hides clients and `LspManager`.
 - Read-only operations preserve `completed`, `partial`, and `unavailable` results.
-- Push diagnostics use tentative and confirmed evidence.
+- Push diagnostics stay observed or tentative; request evidence establishes confirmed results.
 - Pull diagnostics use static and dynamic capability detection.
 - Readiness uses work-done progress and bounded waits.
 - Recovery uses bounded restart rules and diagnostic evidence checks.
@@ -95,8 +95,8 @@ Relevant local documents:
 - `packages/supi-lsp/CLAUDE.md`
 - `docs/adr/0002-refactor-planner-applier-split.md`
 - `docs/adr/0016-workspace-lsp-runtime-interface.md`
-- `docs/adr/0020-lsp-diagnostic-recovery-and-debug-identity.md`
-- `docs/adr/0021-push-diagnostic-republication-confirmation.md`
+- `docs/adr/0020-lsp-diagnostic-recovery-and-debug-identity.md` — retention, recovery, and debug identity
+- `docs/adr/0022-request-confirmed-lsp-agnostic-diagnostics.md` — current diagnostic evidence policy
 
 ## Selected improvement: process-crash recovery
 

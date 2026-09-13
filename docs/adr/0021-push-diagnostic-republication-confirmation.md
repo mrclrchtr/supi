@@ -1,5 +1,9 @@
 # Require republished evidence before confirming push diagnostics
 
+**Status:** Superseded by [ADR 0022](0022-request-confirmed-lsp-agnostic-diagnostics.md).
+
+The decision below is historical. Publication count, quiet time, and a late republish no longer confirm diagnostic evidence. ADR 0022 defines the current request-confirmed policy.
+
 Push-only language servers can publish an early result and a later semantic result for one document synchronization. SuPi therefore distinguishes fresh, tentative, and confirmed diagnostic evidence. Every push synchronization, including `didOpen`, `didChange`, and reopen operations, needs a later valid publication for the same synchronization before SuPi confirms it; each publication restarts the quiet period. Pull responses remain sufficient confirmation. The existing `maxWaitMs` bounds each settle phase. If no republish arrives, SuPi shows non-empty tentative diagnostics as partial evidence. An empty tentative publication stays unavailable and cannot establish a clean result. Late publications promote the retained cache, and recovery does not start another reopen storm.
 
 ## Considered options

@@ -10,18 +10,17 @@ function settleOptions(
     maxWaitMs: 5_000,
     quietMs: 200,
     settleEpoch: 0,
-    isComplete: () => false,
     latestReceived: () => 0,
     ...overrides,
   };
 }
 
 describe("DiagnosticWaitRegistry", () => {
-  it("resolves a push wait as published when the file is released", async () => {
+  it("resolves a push wait as observed when a publication arrives", async () => {
     const waiters = new DiagnosticWaitRegistry();
     const pending = waiters.waitForPush("file:///a.ts", 5_000);
-    waiters.releaseFile("file:///a.ts", "published");
-    await expect(pending).resolves.toBe("published");
+    waiters.releaseFile("file:///a.ts", "observed");
+    await expect(pending).resolves.toBe("observed");
   });
 
   it("resolves a push wait as timed-out when the relative timeout elapses", async () => {
@@ -86,19 +85,14 @@ describe("DiagnosticWaitRegistry", () => {
 
   it("resolves a settle wait as quiet when the state becomes quiet", async () => {
     const waiters = new DiagnosticWaitRegistry();
-    let complete = false;
     const pending = waiters.waitForSettle(
       settleOptions({
         maxWaitMs: 5_000,
         quietMs: 20,
-        isComplete: () => complete,
         latestReceived: () => 1,
       }),
     );
-    setTimeout(() => {
-      complete = true;
-      waiters.notifySettle();
-    }, 10);
+    setTimeout(() => waiters.notifySettle(), 10);
 
     await expect(pending).resolves.toEqual({ outcome: "quiet", freshness: "observed" });
   });

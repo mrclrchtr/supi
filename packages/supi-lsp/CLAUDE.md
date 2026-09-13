@@ -65,15 +65,19 @@ During shutdown, `vscode-jsonrpc` may emit `Cannot call write after a stream was
 
 ## Diagnostic behavior
 
-- `ClientDiagnostics` owns open documents, diagnostic cache entries, pending diagnostic waiters, pull refresh, and push-settle behavior. `LspClient` delegates through behavioral methods and does not expose these maps.
-- Session startup uses prune → refresh → prune because late `publishDiagnostics` can recreate stale entries.
-- Diagnostic reads also filter missing files with `existsSync`.
-- Workspace sentinels include `package.json`, root lockfiles, `tsconfig*`, and generated `*.d.ts` files.
-- Successful `write`/`edit` calls trigger soft recovery for sentinels and configured source extensions.
-- Recovery restarts clients only if stale clusters survive soft recovery.
-- Pull diagnostics are preferred when `diagnosticProvider` exists; otherwise wait for push diagnostics.
-- Clear pull `resultId` state after file creation so cross-file diagnostics recompute.
-- `didClose`, prune, refresh deletion, and shutdown must release pending waiters.
+See [ADR 0022](../../docs/adr/0022-request-confirmed-lsp-agnostic-diagnostics.md) for the full decision.
+
+- `ClientDiagnostics` owns open documents, cache entries, request scheduling, waiters, refresh, and push observation. `LspClient` delegates through behavioral methods and does not expose these maps.
+- Choose evidence per file in this order: valid native pull, the internal TypeScript request adapter, then ambient push observation. The TypeScript adapter requires the `typescript-language-server` command, an advertised `typescript.tsserverRequest`, and a matching configured file type. It collects syntax, semantic, and suggestion phases from the running tsserver.
+- Request evidence is file-scoped and applies only after the shared synchronization and evidence-revision checks. It is not proof for a workspace, every file in a TypeScript program, or every language.
+- Ambient `publishDiagnostics` is observed or tentative only. A version, publication count, quiet period, or republish never confirms clean. Non-empty observations may be partial; an empty observation is not a clean result.
+- One client route has one active request and a bounded pending queue. Duplicate requests for one file, synchronization, and revision share work. Caller cancellation or deadline stops only that caller's wait. Supersession drops queued jobs and stops future adapter phases; it does not cancel an active protocol request. The route stays occupied until actual settlement or connection disposal. The owner timeout attempts protocol cancellation but does not prove that the backend stopped. Late obsolete results are discarded.
+- Refresh returns exact `requested`, `confirmed`, `unconfirmed`, `failed`, and `removed` coverage. Retain unchanged documents, resync changed or invalidated documents, and do not close/open or send a no-op change to obtain diagnostic confirmation.
+- A client restart may reopen tracked documents to restore state. That reopen is recovery, not diagnostic confirmation. Recovery restarts push-only routes only for protocol-stall signals, never for unconfirmed evidence alone.
+- Session startup uses prune → refresh → prune because late `publishDiagnostics` can recreate stale entries. Diagnostic reads also filter missing files with `existsSync`.
+- Clear pull `resultId` state after file creation so cross-file diagnostics recompute. `didClose`, prune, refresh deletion, and shutdown must release pending waiters.
+- Workspace sentinels include `package.json`, root lockfiles, `tsconfig*`, and generated `*.d.ts` files. Successful `write`/`edit` calls trigger soft recovery for sentinels and configured source extensions.
+- Diagnostic timing records the request source. Publication counts remain bounded telemetry only.
 
 ## Configuration
 

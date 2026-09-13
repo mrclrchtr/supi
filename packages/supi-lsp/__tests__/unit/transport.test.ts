@@ -322,6 +322,27 @@ describe("JsonRpcClient", () => {
     );
   });
 
+  it("keeps an owned request occupied after its caller timeout", async () => {
+    let resolveResponse!: (value: string) => void;
+    const response = new Promise<string>((resolve) => {
+      resolveResponse = resolve;
+    });
+    server.onRequest("slow/owned", () => response);
+
+    const owned = client.sendRequestOwned("slow/owned", undefined, { timeoutMs: 20 });
+    await expect(owned.result).rejects.toThrow("timed out");
+    let settled = false;
+    void owned.settled.then(() => {
+      settled = true;
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(settled).toBe(false);
+
+    resolveResponse("done");
+    await owned.settled;
+    expect(settled).toBe(true);
+  });
+
   it("handles per-request timeout overrides", async () => {
     // Server never responds to this method
     const promise = client.sendRequest("slow/override", undefined, {

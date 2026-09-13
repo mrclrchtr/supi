@@ -4,7 +4,6 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { fileToUri } from "@mrclrchtr/supi-core/path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadConfig } from "../../src/config/config.ts";
 import type { Diagnostic } from "../../src/config/types.ts";
@@ -24,25 +23,11 @@ const HAS_TS_LSP = hasCommand("typescript-language-server") && fs.existsSync(TSS
 
 let tmpDir: string;
 
-async function syncWithRepublish(
+function syncDiagnostics(
   manager: LspManager,
   filePath: string,
   maxSeverity: number,
 ): ReturnType<LspManager["syncFileAndGetDiagnostics"]> {
-  const result = await manager.syncFileAndGetDiagnostics(filePath, maxSeverity);
-  if (result.kind === "completed" || !result.reason.includes("diagnostic republish")) {
-    return result;
-  }
-
-  // The real test server can publish one result for a synchronization. Model
-  // its later valid publication so manager assertions exercise confirmed
-  // evidence under ADR 0021.
-  const client = await manager.getClientForFile(filePath);
-  if (!client) return result;
-  client.handlePublishDiagnostics({
-    uri: fileToUri(filePath),
-    diagnostics: client.getDiagnostics(filePath),
-  });
   return manager.syncFileAndGetDiagnostics(filePath, maxSeverity);
 }
 
@@ -52,7 +37,7 @@ async function waitForDiagnostics(
   maxSeverity: number,
 ): Promise<Diagnostic[]> {
   const result = await waitFor(
-    () => syncWithRepublish(manager, filePath, maxSeverity),
+    () => syncDiagnostics(manager, filePath, maxSeverity),
     (diagnostics) => diagnostics.kind === "completed" && diagnostics.data.length > 0,
     { timeoutMs: 10_000, retryDelayMs: 200, label: `diagnostics for ${path.basename(filePath)}` },
   );
@@ -148,7 +133,7 @@ describe.skipIf(!HAS_TS_LSP)("LspManager integration", () => {
 
   it("reuses current clean evidence for an unchanged file", async () => {
     const validFile = path.join(tmpDir, "valid.ts");
-    const diags = await syncWithRepublish(manager, validFile, 1);
+    const diags = await syncDiagnostics(manager, validFile, 1);
     expect(diags).toEqual({ kind: "completed", data: [] });
   }, 10_000);
 
@@ -170,7 +155,7 @@ describe.skipIf(!HAS_TS_LSP)("LspManager integration", () => {
   });
 
   it("reports diagnostic summary", async () => {
-    await syncWithRepublish(manager, path.join(tmpDir, "broken.ts"), 1);
+    await syncDiagnostics(manager, path.join(tmpDir, "broken.ts"), 1);
     const summary = manager.getDiagnosticSummary();
     // Should have at least one file with errors (broken.ts)
     const brokenEntry = summary.find((s) => s.file.includes("broken"));
@@ -186,7 +171,7 @@ describe.skipIf(!HAS_TS_LSP)("LspManager integration", () => {
       createAutomaticLspPathPolicy(tmpDir, ["broken.ts"]),
     );
     try {
-      await syncWithRepublish(filteredManager, path.join(tmpDir, "broken.ts"), 4);
+      await syncDiagnostics(filteredManager, path.join(tmpDir, "broken.ts"), 4);
 
       expect(filteredManager.getDiagnosticSummary()).toEqual([]);
       expect(filteredManager.getOutstandingDiagnosticSummary(4)).toEqual([]);

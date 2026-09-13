@@ -1,5 +1,5 @@
-// Push diagnostic evidence must complete its quiet period before one refresh
-// reports it as confirmed (ADR 0021).
+// Push diagnostic observation must complete its quiet period before one
+// refresh reports its bounded result (ADR 0022).
 
 import * as fs from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -26,8 +26,8 @@ function notificationUris(
     .map(([, params]) => (params as { textDocument?: { uri?: string } }).textDocument?.uri);
 }
 
-describe("push diagnostic quiet confirmation", () => {
-  it("keeps a near-deadline republish unconfirmed for the current refresh", async () => {
+describe("push diagnostic quiet observation", () => {
+  it("keeps a near-deadline publication unconfirmed for the current refresh", async () => {
     vi.useFakeTimers();
     const file = createDiagnosticTestFile("near-deadline.ts");
     tempDirs.push(file.tmpDir);
@@ -45,11 +45,10 @@ describe("push diagnostic quiet confirmation", () => {
       unconfirmed: 1,
       documents: [{ file: file.filePath, status: "unconfirmed" }],
     });
-    // The later publication still promotes the retained cache for a future
-    // refresh without new protocol traffic.
+    // The later publication remains an observation for a future refresh.
     expect(client.getDiagnosticSnapshot()).toMatchObject({
-      current: true,
-      documents: [{ uri: file.uri, current: true, status: "confirmed" }],
+      current: false,
+      documents: [{ uri: file.uri, current: false, status: "unconfirmed" }],
     });
   });
 
@@ -68,11 +67,11 @@ describe("push diagnostic quiet confirmation", () => {
     await vi.advanceTimersByTimeAsync(1);
     await expect(second).resolves.toMatchObject({
       kind: "unavailable",
-      reason: expect.stringContaining("diagnostic republish"),
+      reason: expect.stringContaining("ambient evidence"),
     });
   });
 
-  it("reopens only silent documents in a mixed tentative batch", async () => {
+  it("keeps tentative and silent documents unconfirmed in a mixed batch", async () => {
     vi.useFakeTimers();
     const first = createDiagnosticTestFile("tentative.ts");
     const second = createDiagnosticTestFile("silent.ts");
@@ -99,15 +98,15 @@ describe("push diagnostic quiet confirmation", () => {
 
     await expect(pending).resolves.toMatchObject({
       requested: 2,
-      confirmed: 1,
-      unconfirmed: 1,
+      confirmed: 0,
+      unconfirmed: 2,
       documents: expect.arrayContaining([
         { file: first.filePath, status: "unconfirmed" },
-        { file: second.filePath, status: "confirmed" },
+        { file: second.filePath, status: "unconfirmed" },
       ]),
     });
     const calls = rpc.sendNotification.mock.calls;
-    expect(notificationUris(calls, "textDocument/didClose")).toEqual([second.uri]);
-    expect(notificationUris(calls, "textDocument/didOpen")).toEqual([second.uri]);
+    expect(notificationUris(calls, "textDocument/didClose")).toEqual([]);
+    expect(notificationUris(calls, "textDocument/didOpen")).toEqual([]);
   });
 });

@@ -1,10 +1,8 @@
-// Regression coverage for issue #351: push publications stay tentative
-// until a later valid publication confirms the same document synchronization.
+// Regression coverage for issue #351: push publications stay observational.
 //
-// ADR 0021: the first valid push publication for a synchronization is
-// tentative. A republish promotes the retained cache. A tentative timeout
-// must not trigger the reopen-resync fallback. Non-empty tentative data is
-// visible as partial evidence, but it never enters the confirmed path.
+// ADR 0022: push publication count is not a confirmation contract. A
+// non-empty observation is visible as partial evidence, but request evidence
+// is required for a confirmed result.
 
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -63,8 +61,8 @@ function createFile(
   return file;
 }
 
-describe("push publication confirmation (issue #351)", () => {
-  it("stays tentative until a republish confirms the synchronization", () => {
+describe("push publication observation (issue #351)", () => {
+  it("stays tentative after a later publication", () => {
     const file = createFile("tentative.ts");
     const { client } = createRunningTestClient();
     client.didOpen(file.filePath, "const x = 1;");
@@ -72,13 +70,13 @@ describe("push publication confirmation (issue #351)", () => {
     publish(client, file.uri, [makeDiagnostic("early")]);
 
     // A current tentative push must not claim current snapshot or document
-    // state: its data may still be replaced by a republish (issue #351).
+    // state: its data may still be replaced by a later publication (issue #351).
     expect(client.getDiagnosticSnapshot()).toMatchObject({
       current: false,
       documents: [{ uri: file.uri, current: false, status: "unconfirmed" }],
     });
     // The tentative error is useful partial evidence, but its entry stays
-    // explicitly non-current until a republish confirms it.
+    // explicitly non-current until request evidence confirms it.
     expect(client.getAllDiagnostics()).toEqual([
       { uri: file.uri, diagnostics: [makeDiagnostic("early")], current: false },
     ]);
@@ -87,11 +85,11 @@ describe("push publication confirmation (issue #351)", () => {
     publish(client, file.uri, [makeDiagnostic("early")]);
 
     expect(client.getDiagnosticSnapshot()).toMatchObject({
-      current: true,
-      documents: [{ uri: file.uri, current: true, status: "confirmed" }],
+      current: false,
+      documents: [{ uri: file.uri, current: false, status: "unconfirmed" }],
     });
     expect(client.getAllDiagnostics()).toEqual([
-      { uri: file.uri, diagnostics: [makeDiagnostic("early")], current: true },
+      { uri: file.uri, diagnostics: [makeDiagnostic("early")], current: false },
     ]);
   });
 
@@ -113,7 +111,7 @@ describe("push publication confirmation (issue #351)", () => {
     });
   });
 
-  it("applies the tentative policy to didChange and reopen synchronizations", async () => {
+  it("applies the tentative policy to didChange synchronizations", async () => {
     vi.useFakeTimers();
     const file = createFile("sync-tentative.ts", "const before = 1;");
     const { client, rpc } = createRunningTestClient();
@@ -126,7 +124,7 @@ describe("push publication confirmation (issue #351)", () => {
     publish(client, file.uri, []);
     await vi.advanceTimersByTimeAsync(3_100);
     await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
-    // The tentative timeout must not reopen the document: no close/open pair
+    // The tentative timeout must not add a close/open pair
     // may cancel the server's in-flight pipeline.
     expect(notificationMethods(rpc)).not.toContain("textDocument/didClose");
     expect(notificationMethods(rpc)).not.toContain("textDocument/didOpen");
@@ -141,7 +139,7 @@ describe("push publication confirmation (issue #351)", () => {
     const { client, rpc } = createRunningTestClient();
     client.didOpen(file.filePath, "const x = 1;");
     // One publication is cached before the wait starts; it stays tentative
-    // (ADR 0021). The waiter must classify a budget expiry as tentative even
+    // (ADR 0022). The waiter must classify a budget expiry as tentative even
     // though it never observed a publication itself (issue #351).
     publish(client, file.uri, [makeDiagnostic("early")]);
     rpc.sendNotification.mockClear();
@@ -152,9 +150,9 @@ describe("push publication confirmation (issue #351)", () => {
     await expect(pending).resolves.toEqual({
       kind: "partial",
       data: [makeDiagnostic("early")],
-      reason: expect.stringContaining("diagnostic republish"),
+      reason: expect.stringContaining("ambient evidence"),
     });
-    // The tentative timeout must not reopen the document: no close/open pair
+    // The tentative timeout must not add a close/open pair
     // may cancel the server's in-flight pipeline.
     expect(notificationMethods(rpc)).not.toContain("textDocument/didClose");
     expect(notificationMethods(rpc)).not.toContain("textDocument/didOpen");
@@ -179,7 +177,7 @@ describe("push publication confirmation (issue #351)", () => {
     });
   });
 
-  it("returns a tentative error as partial evidence with a republish reason", async () => {
+  it("returns an observed error as partial evidence after the wait budget", async () => {
     vi.useFakeTimers();
     const file = createFile("tentative-timeout.ts");
     const { client } = createRunningTestClient();
@@ -191,10 +189,9 @@ describe("push publication confirmation (issue #351)", () => {
     await expect(pending).resolves.toEqual({
       kind: "partial",
       data: [makeDiagnostic("early")],
-      reason: expect.stringContaining("diagnostic republish"),
+      reason: expect.stringContaining("ambient evidence"),
     });
-    // The existing diagnostics.timing shape stays stable; the tentative
-    // outcome adds one bounded value to the push vocabulary (ADR 0021).
+    // The observation remains incomplete even when it contains diagnostics.
     expect(
       getDebugEvents({ source: "lsp", category: "diagnostics.timing" }).events[0]?.data,
     ).toEqual(
@@ -202,7 +199,7 @@ describe("push publication confirmation (issue #351)", () => {
         operation: "sync-file",
         collection: "push",
         push: "tentative",
-        settle: "tentative",
+        settle: "timed-out",
         freshness: "observed",
         outcome: "timed-out",
         timedOut: true,
@@ -211,52 +208,44 @@ describe("push publication confirmation (issue #351)", () => {
     );
   });
 
-  it("completes single-file collection only after the republish", async () => {
-    const file = createFile("republish-collect.ts");
+  it("does not confirm single-file collection from a later publication", async () => {
+    vi.useFakeTimers();
+    const file = createFile("later-publication-collect.ts");
     const { client } = createRunningTestClient();
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
     publish(client, file.uri, [makeDiagnostic("early")]);
-    // The first publication must not settle the collection.
-    let settled = false;
-    void pending.finally(() => {
-      settled = true;
-    });
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(settled).toBe(false);
-    // The republish promotes the retained cache and completes the wait.
     publish(client, file.uri, [makeDiagnostic("early")]);
+    await vi.advanceTimersByTimeAsync(3_100);
 
-    await expect(pending).resolves.toEqual({
-      kind: "completed",
+    await expect(pending).resolves.toMatchObject({
+      kind: "partial",
       data: [makeDiagnostic("early")],
     });
   });
 
-  it("waits for a republish without resyncing retained unchanged content", async () => {
+  it("does not resync retained unchanged content after a later publication", async () => {
+    vi.useFakeTimers();
     const file = createFile("retained-wait.ts");
     const { client, rpc } = createRunningTestClient();
     client.didOpen(file.filePath, "const x = 1;");
     publish(client, file.uri, [makeDiagnostic("early")]);
     rpc.sendNotification.mockClear();
 
-    // The retained tentative entry must not trigger a no-op didChange: that
-    // would cancel the server's in-flight republish (issue #351, #344).
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(notificationMethods(rpc)).toEqual([]);
     publish(client, file.uri, [makeDiagnostic("early")]);
+    await vi.advanceTimersByTimeAsync(3_100);
 
-    await expect(pending).resolves.toEqual({
-      kind: "completed",
+    await expect(pending).resolves.toMatchObject({
+      kind: "partial",
       data: [makeDiagnostic("early")],
     });
     expect(notificationMethods(rpc)).toEqual([]);
   });
 
-  it("promotes a retained tentative cache late without a new refresh", async () => {
+  it("keeps a later publication observational without a new refresh", async () => {
     vi.useFakeTimers();
-    const file = createFile("late-republish.ts");
+    const file = createFile("late-publication.ts");
     const { client, rpc } = createRunningTestClient();
 
     const first = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
@@ -265,23 +254,20 @@ describe("push publication confirmation (issue #351)", () => {
     await expect(first).resolves.toMatchObject({
       kind: "partial",
       data: [makeDiagnostic("early")],
-      reason: expect.stringContaining("republish"),
+      reason: expect.stringContaining("ambient evidence"),
     });
-    // The server republishes after the operation already ended: the retained
-    // cache is promoted without any protocol traffic.
     rpc.sendNotification.mockClear();
     publish(client, file.uri, [makeDiagnostic("early")]);
 
-    const second = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
-    await vi.advanceTimersByTimeAsync(100);
-    await expect(second).resolves.toEqual({
-      kind: "completed",
-      data: [makeDiagnostic("early")],
+    expect(client.getDiagnosticSnapshot()).toMatchObject({
+      current: false,
+      documents: [{ uri: file.uri, status: "unconfirmed" }],
     });
     expect(notificationMethods(rpc)).toEqual([]);
   });
 
-  it("completes concurrent collectors on one equivalent synchronization", async () => {
+  it("returns partial evidence to concurrent collectors", async () => {
+    vi.useFakeTimers();
     const file = createFile("concurrent-waiters.ts");
     const { client, rpc } = createRunningTestClient();
 
@@ -289,13 +275,12 @@ describe("push publication confirmation (issue #351)", () => {
     const second = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
     expect(notificationMethods(rpc)).toEqual(["textDocument/didOpen"]);
     publish(client, file.uri, [makeDiagnostic("early")]);
-    await new Promise((resolve) => setTimeout(resolve, 30));
-    // One republish releases every waiter for the URI (ADR 0021).
     publish(client, file.uri, [makeDiagnostic("early")]);
+    await vi.advanceTimersByTimeAsync(3_100);
 
     await expect(Promise.all([first, second])).resolves.toEqual([
-      { kind: "completed", data: [makeDiagnostic("early")] },
-      { kind: "completed", data: [makeDiagnostic("early")] },
+      { kind: "partial", data: [makeDiagnostic("early")], reason: expect.any(String) },
+      { kind: "partial", data: [makeDiagnostic("early")], reason: expect.any(String) },
     ]);
   });
 
@@ -303,30 +288,32 @@ describe("push publication confirmation (issue #351)", () => {
     const file = createFile("quiet-restart.ts");
     const { client } = createRunningTestClient();
     client.didOpen(file.filePath, "const x = 1;");
-    // The first publication is tentative; the republish arrives 150 ms
-    // later. The settle must wait for the quiet window after the republish,
-    // not confirm after the first publication's quiet window.
+    // A later publication inside the quiet window restarts the observation
+    // window. The result remains unconfirmed because it is push-only.
     setTimeout(() => publish(client, file.uri, []), 30);
-    setTimeout(() => publish(client, file.uri, []), 180);
+    setTimeout(() => publish(client, file.uri, []), 60);
 
     const startedAt = Date.now();
-    await client.refreshOpenDiagnostics({ maxWaitMs: 2_000, quietMs: 40 });
+    const evidence = await client.refreshOpenDiagnostics({ maxWaitMs: 2_000, quietMs: 40 });
     const elapsed = Date.now() - startedAt;
 
-    expect(elapsed).toBeGreaterThanOrEqual(200);
+    expect(evidence).toMatchObject({ confirmed: 0, unconfirmed: 1 });
+    expect(elapsed).toBeGreaterThanOrEqual(90);
     expect(elapsed).toBeLessThan(1_000);
   });
 });
 
-describe("push publication telemetry (ADR 0021)", () => {
+describe("push publication telemetry (ADR 0022)", () => {
   it("records a bounded per-synchronization summary for sync-file", async () => {
+    vi.useFakeTimers();
     const file = createFile("summary-sync.ts");
     const { client, rpc } = createRunningTestClient({ root: os.tmpdir(), cwd: os.tmpdir() });
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
     publish(client, file.uri, []);
     publish(client, file.uri, []);
-    await expect(pending).resolves.toEqual({ kind: "completed", data: [] });
+    await vi.advanceTimersByTimeAsync(3_100);
+    await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
 
     const events = getDebugEvents({
       source: "lsp",
@@ -346,7 +333,7 @@ describe("push publication telemetry (ADR 0021)", () => {
               publications: 2,
               firstReceivedAt: expect.any(Number),
               lastReceivedAt: expect.any(Number),
-              confirmed: true,
+              confirmed: false,
             },
           ],
         },
@@ -357,7 +344,7 @@ describe("push publication telemetry (ADR 0021)", () => {
     expect(rpc.sendNotification).toHaveBeenCalled();
   });
 
-  it("records an ambient late-republish event after an unconfirmed operation", async () => {
+  it("keeps a later ambient publication observational", async () => {
     vi.useFakeTimers();
     const file = createFile("ambient-late.ts");
     const { client } = createRunningTestClient({ root: os.tmpdir(), cwd: os.tmpdir() });
@@ -373,18 +360,8 @@ describe("push publication telemetry (ADR 0021)", () => {
       source: "lsp",
       category: "diagnostics.publication",
     }).events;
-    expect(events).toEqual([
-      expect.objectContaining({
-        message: "LSP diagnostic late republish",
-        data: {
-          synchronizationId: expect.any(Number),
-          publications: 2,
-          receivedAt: expect.any(Number),
-          delayMs: expect.any(Number),
-          server: "test",
-          file: expect.stringContaining("ambient-late.ts"),
-        },
-      }),
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual(
       expect.objectContaining({
         message: "LSP diagnostic publication summary",
         data: expect.objectContaining({
@@ -392,7 +369,7 @@ describe("push publication telemetry (ADR 0021)", () => {
           synchronizations: [expect.objectContaining({ publications: 1, confirmed: false })],
         }),
       }),
-    ]);
+    );
     expect(JSON.stringify(events)).not.toContain("const x = 1;");
   });
 
@@ -401,7 +378,7 @@ describe("push publication telemetry (ADR 0021)", () => {
     const { client } = createRunningTestClient({ root: os.tmpdir(), cwd: os.tmpdir() });
     client.didOpen(file.filePath, "const x = 1;");
     setTimeout(() => publish(client, file.uri, []), 10);
-    setTimeout(() => publish(client, file.uri, []), 40);
+    setTimeout(() => publish(client, file.uri, []), 20);
 
     await client.refreshOpenDiagnostics({ maxWaitMs: 500, quietMs: 20 });
 
@@ -415,7 +392,7 @@ describe("push publication telemetry (ADR 0021)", () => {
         data: expect.objectContaining({
           operation: "refresh-open",
           server: "test",
-          synchronizations: [expect.objectContaining({ publications: 2, confirmed: true })],
+          synchronizations: [expect.objectContaining({ publications: 2, confirmed: false })],
         }),
       }),
     );

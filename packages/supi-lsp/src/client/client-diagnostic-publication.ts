@@ -1,19 +1,16 @@
 // Bounded push-publication telemetry for one client's diagnostic state.
 //
-// Push-only servers can publish an early result and a later semantic result
-// for one document synchronization (ADR 0021). This tracker records one
-// bounded per-synchronization publication summary per diagnostic operation
-// and one ambient event when a later publication promotes a synchronization
-// that an earlier operation already reported unconfirmed. Events carry only
-// bounded server, workspace, relative-file, synchronization identity, count,
-// and timing data. They never carry diagnostic payloads or source text.
+// Push-only servers can publish one or more results for one document
+// synchronization. This tracker records one bounded per-synchronization
+// publication summary per diagnostic operation. Events
+// carry only bounded server, workspace, relative-file, synchronization
+// identity, count, and timing data. They never carry diagnostic payloads or
+// source text. Publication counts remain telemetry only.
 
-import * as path from "node:path";
 import {
   recordDebugEvent,
   truncateDebugIdentity as truncateIdentity,
 } from "@mrclrchtr/supi-core/debug";
-import { uriToFile } from "@mrclrchtr/supi-core/path";
 import { boundCwd } from "../debug-telemetry.ts";
 
 /** Maximum tracked synchronizations before the oldest entry is evicted. */
@@ -59,8 +56,6 @@ interface SynchronizationPublicationState {
   publications: number;
   firstReceivedAt: number;
   lastReceivedAt: number;
-  /** When a finished operation first reported this synchronization unconfirmed. */
-  unconfirmedAt?: number;
 }
 
 function synchronizationKey(
@@ -75,10 +70,7 @@ function synchronizationKey(
 export class DiagnosticPublicationTracker {
   readonly #states = new Map<string, SynchronizationPublicationState>();
 
-  constructor(
-    private readonly identity: { server?: string; cwd?: string },
-    private readonly fileFor: (uri: string) => string | undefined,
-  ) {}
+  constructor(private readonly identity: { server?: string; cwd?: string }) {}
 
   /**
    * Record one accepted push publication for a synchronization.
@@ -116,9 +108,8 @@ export class DiagnosticPublicationTracker {
   /**
    * Emit one bounded per-synchronization publication summary.
    *
-   * Synchronizations with no observed push publication are omitted. A
-   * synchronization that ends unconfirmed is marked so a later promotion can
-   * emit the ambient late-republish event.
+   * Synchronizations with no observed push publication are omitted. The
+   * caller supplies the confirmation flag; publication counts do not change it.
    */
   emitSummary(options: {
     readonly operation: "refresh-open" | "sync-file";
@@ -127,7 +118,6 @@ export class DiagnosticPublicationTracker {
     readonly operationId?: string;
   }): void {
     const entries: DiagnosticPublicationSummaryEntry[] = [];
-    const now = Date.now();
     for (const synchronization of options.synchronizations) {
       const state = this.#states.get(
         synchronizationKey(
@@ -144,8 +134,6 @@ export class DiagnosticPublicationTracker {
         lastReceivedAt: state.lastReceivedAt,
         confirmed: synchronization.confirmed,
       });
-      if (!synchronization.confirmed) state.unconfirmedAt ??= now;
-      else state.unconfirmedAt = undefined;
     }
     if (entries.length === 0) return;
     recordDebugEvent({
@@ -167,51 +155,4 @@ export class DiagnosticPublicationTracker {
       },
     });
   }
-
-  /**
-   * Observe one promotion of a synchronization by a later publication.
-   *
-   * The ambient late-republish event fires only when a finished operation
-   * previously reported the synchronization unconfirmed. The mark is cleared
-   * so one promotion emits at most one event.
-   */
-  promoted(
-    uri: string,
-    synchronizationId: number,
-    evidenceRevision: number,
-    receivedAt: number = Date.now(),
-  ): void {
-    const state = this.#states.get(synchronizationKey(uri, synchronizationId, evidenceRevision));
-    const unconfirmedAt = state?.unconfirmedAt;
-    if (!state || state.publications < 2 || unconfirmedAt === undefined) return;
-    state.unconfirmedAt = undefined;
-    const file = this.fileFor(uri);
-    recordDebugEvent({
-      source: "lsp",
-      level: "debug",
-      category: "diagnostics.publication",
-      message: "LSP diagnostic late republish",
-      cwd: boundCwd(this.identity.cwd),
-      data: {
-        synchronizationId,
-        publications: state.publications,
-        receivedAt,
-        delayMs: Math.max(0, receivedAt - unconfirmedAt),
-        ...(this.identity.server !== undefined
-          ? { server: truncateIdentity(this.identity.server) }
-          : {}),
-        ...(file !== undefined ? { file: truncateIdentity(file) } : {}),
-      },
-    });
-  }
-}
-
-/** Return a workspace-relative diagnostic file path for telemetry identity. */
-export function trackerFileIdentityFor(
-  cwd: string | undefined,
-): (uri: string) => string | undefined {
-  return (uri) => {
-    if (cwd === undefined) return undefined;
-    return path.relative(cwd, path.resolve(cwd, uriToFile(uri)));
-  };
 }

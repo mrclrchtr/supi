@@ -23,42 +23,51 @@ interface ApplyPushOptions {
 /**
  * Apply one valid push publication.
  *
- * Returns whether the publication was accepted and whether it promoted a
- * tentative entry to confirmed. Fail-closed policy (ADR 0020): unversioned
- * pushes are rejected for closed and untracked URIs and for arrivals before
- * the URI's sync moment; versioned pushes for a URI closed by a lifecycle
- * operation are rejected because their version cannot be verified. An
- * unversioned push that arrives after the sync moment of an open document
- * is accepted and re-stamped with that document's current synchronization
- * state. The first valid publication for a synchronization is tentative; a
- * later valid publication for the same synchronization ID and evidence
- * revision promotes the cache to confirmed (ADR 0021).
+ * Ambient pushes are observations, not confirmation evidence. Fail-closed
+ * policy (ADR 0020): unversioned pushes are rejected for closed and
+ * untracked URIs and for arrivals before the URI's sync moment; versioned
+ * pushes for a URI closed by a lifecycle operation are rejected because their
+ * version cannot be verified. An unversioned push that arrives after the sync
+ * moment of an open document is accepted and re-stamped with that document's
+ * current synchronization state. Publication counts remain telemetry only.
  */
-export function applyPushDiagnostics(options: ApplyPushOptions): {
-  accepted: boolean;
-  promoted: boolean;
-} {
-  if (!isValidPublishDiagnosticsParams(options.params)) return { accepted: false, promoted: false };
+export function applyPushDiagnostics(options: ApplyPushOptions): { accepted: boolean } {
+  if (!isValidPublishDiagnosticsParams(options.params)) return { accepted: false };
   const openDocument = options.openDocuments.get(options.params.uri);
   if (options.params.version !== undefined) {
-    if (!Number.isInteger(options.params.version)) return { accepted: false, promoted: false };
+    if (!Number.isInteger(options.params.version)) return { accepted: false };
     if (openDocument && options.params.version !== openDocument.version) {
-      return { accepted: false, promoted: false };
+      return { accepted: false };
     }
-    if (!openDocument && options.closedVersionedBarrier)
-      return { accepted: false, promoted: false };
+    if (!openDocument && options.closedVersionedBarrier) return { accepted: false };
   }
-  if (!Array.isArray(options.params.diagnostics)) return { accepted: false, promoted: false };
-  if (!acceptUnversionedPush(options, openDocument)) return { accepted: false, promoted: false };
-  const entry = buildPushCacheEntry(options, openDocument);
+  if (!Array.isArray(options.params.diagnostics)) return { accepted: false };
+  if (!acceptUnversionedPush(options, openDocument)) return { accepted: false };
   const previous = options.store.get(options.params.uri);
-  const promoted =
-    entry.source === "push" &&
-    entry.publications !== undefined &&
-    entry.publications >= 2 &&
-    isTentativePushEntry(previous);
+  // A request-confirmed result owns the synchronization. Ambient pushes may
+  // still release waiters and telemetry, but they must not replace that result.
+  if (isCurrentRequestEvidence(previous, openDocument, options.evidenceRevision)) {
+    return { accepted: true };
+  }
+  const entry = buildPushCacheEntry(options, openDocument);
   options.store.set(options.params.uri, entry);
-  return { accepted: true, promoted };
+  return { accepted: true };
+}
+
+/** Test whether a request result still owns the current document generation. */
+function isCurrentRequestEvidence(
+  entry: DiagnosticCacheEntry | undefined,
+  document: OpenDocumentState | undefined,
+  evidenceRevision: number,
+): boolean {
+  return Boolean(
+    entry &&
+      entry.source !== "push" &&
+      document &&
+      entry.synchronizationId === document.synchronizationId &&
+      entry.evidenceRevision === evidenceRevision &&
+      document.evidenceRevision === evidenceRevision,
+  );
 }
 
 /** Gate one unversioned push publication against the sync-moment policy. */
@@ -77,9 +86,9 @@ function acceptUnversionedPush(
  * Build the stored entry for one accepted push publication.
  *
  * Time-gated unversioned acceptance re-stamps the entry with the open
- * document's current synchronization state, so the push proves that
- * document's synchronization. Versioned pushes keep the current-revision
- * check: a version match alone does not prove a current generation.
+ * document's current synchronization state. Versioned pushes keep the
+ * current-revision check: a version match alone does not prove a current
+ * generation.
  */
 function buildPushCacheEntry(
   options: ApplyPushOptions,
@@ -92,9 +101,8 @@ function buildPushCacheEntry(
   const evidenceRevision = openDocument?.evidenceRevision;
   const previous = options.store.get(options.params.uri);
   // A later valid publication for the same synchronization ID and evidence
-  // revision continues the entry's publication count: a confirmed pull
-  // entry keeps the synchronization confirmed, and a tentative push entry
-  // is promoted. Any other publication starts a fresh count.
+  // revision continues the entry's publication count for telemetry. Any
+  // other publication starts a fresh count.
   const sameSynchronization =
     synchronizationId !== undefined &&
     previous?.synchronizationId === synchronizationId &&
@@ -233,7 +241,7 @@ function collectCachedDiagnostics(options: {
       options.evidenceRevision,
     );
     // A current tentative error is useful partial evidence. Keep its entry
-    // non-current so it cannot establish a clean or settled result (ADR 0021).
+    // non-current so it cannot establish a clean or settled result.
     const tentative = entryCurrent && isTentativePushEntry(entry);
     const confirmed = entryCurrent && !tentative;
     current &&= confirmed;

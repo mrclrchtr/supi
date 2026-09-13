@@ -5,24 +5,20 @@ import {
 } from "@mrclrchtr/supi-core/debug";
 import { boundCwd } from "../debug-telemetry.ts";
 
-type DiagnosticCollection = "cache" | "fallback" | "none" | "pull" | "push";
+type DiagnosticCollection =
+  | "cache"
+  | "fallback"
+  | "mixed"
+  | "none"
+  | "pull"
+  | "push"
+  | "typescript";
 type DiagnosticFreshness = "not-observed" | "observed";
 type DiagnosticOutcome = "completed" | "incomplete" | "skipped" | "timed-out";
 type DiagnosticPullOutcome = "completed" | "failed" | "not-supported" | "not-used" | "timed-out";
-type DiagnosticPushOutcome =
-  | "not-used"
-  | "published"
-  | "tentative"
-  | "released"
-  | "settled"
-  | "timed-out";
-type DiagnosticSettleOutcome =
-  | "not-used"
-  | "published"
-  | "tentative"
-  | "quiet"
-  | "released"
-  | "timed-out";
+type DiagnosticRequestSource = "pull" | "typescript" | "mixed";
+type DiagnosticPushOutcome = "not-used" | "tentative" | "released" | "settled" | "timed-out";
+type DiagnosticSettleOutcome = "not-used" | "quiet" | "released" | "timed-out";
 type DiagnosticTimingOperation = "refresh-open" | "sync-file";
 
 /** Result of waiting for a quiet push-diagnostic window. */
@@ -31,8 +27,11 @@ export interface DiagnosticSettleResult {
   readonly freshness: DiagnosticFreshness;
 }
 
-/** Result of waiting for one file's push diagnostics. */
-export type DiagnosticPushWaitOutcome = "published" | "tentative" | "released" | "timed-out";
+/** Result of collecting one file's ambient push diagnostics. */
+export type DiagnosticPushWaitOutcome = "tentative" | "released" | "timed-out";
+
+/** Result of waiting for one ambient push observation. */
+export type DiagnosticPushObservationOutcome = "observed" | "released" | "timed-out";
 
 interface DiagnosticTimingData {
   readonly collection: DiagnosticCollection;
@@ -42,19 +41,8 @@ interface DiagnosticTimingData {
   readonly outcome: DiagnosticOutcome;
   readonly pull: DiagnosticPullOutcome;
   readonly push: DiagnosticPushOutcome;
-  readonly reopen: number;
   readonly settle: DiagnosticSettleOutcome;
   readonly timedOut: boolean;
-}
-
-/** Internal pull failure that retains timeout state and failed document URIs. */
-export class DiagnosticPullError extends Error {
-  constructor(
-    readonly timedOut: boolean,
-    readonly failedUris: readonly string[] = [],
-  ) {
-    super("pull diagnostics incomplete");
-  }
 }
 
 /** Bounded identity for one diagnostic timing observation. */
@@ -76,15 +64,16 @@ export interface DiagnosticTimingIdentity {
 export class DiagnosticObserver {
   readonly #timer = startDebugTimer();
   #pull: "failed" | "not-supported" | "timed-out";
-  #reopened = 0;
+  #requestSource: DiagnosticRequestSource | undefined;
+  #request: "failed" | "timed-out" | undefined;
 
   constructor(
     readonly operation: DiagnosticTimingOperation,
-    readonly supportsPull: boolean,
+    readonly hasDiagnosticRequestAdapter: boolean,
     readonly control?: CodeRequestControl,
     readonly identity?: DiagnosticTimingIdentity,
   ) {
-    this.#pull = supportsPull ? "failed" : "not-supported";
+    this.#pull = hasDiagnosticRequestAdapter ? "failed" : "not-supported";
   }
 
   synchronized(): void {
@@ -100,7 +89,6 @@ export class DiagnosticObserver {
       outcome: "skipped",
       pull: "not-used",
       push: "not-used",
-      reopen: 0,
       settle: "not-used",
       timedOut: false,
     });
@@ -115,7 +103,6 @@ export class DiagnosticObserver {
       outcome: "completed",
       pull: "not-used",
       push: "not-used",
-      reopen: 0,
       settle: "not-used",
       timedOut: false,
     });
@@ -131,7 +118,6 @@ export class DiagnosticObserver {
         outcome: "completed",
         pull: "completed",
         push: "not-used",
-        reopen: 0,
         settle: "not-used",
         timedOut: false,
       },
@@ -139,40 +125,119 @@ export class DiagnosticObserver {
     );
   }
 
-  pullFailed(error: unknown): void {
-    this.#pull = isDiagnosticTimeout(error) ? "timed-out" : "failed";
-    this.#timer.mark("pull");
+  /** Record a completed request-based collection. */
+  requestCompleted(source: DiagnosticRequestSource, documentCount: number, finish = true): void {
+    this.#requestSource = source;
+    this.#request = undefined;
+    if (source === "pull" && finish) {
+      this.pullCompleted(documentCount);
+      return;
+    }
+    if (!finish) {
+      this.#timer.mark("request");
+      return;
+    }
+    this.#finish(
+      {
+        collection: source === "typescript" ? "typescript" : "mixed",
+        documentCount,
+        fallback: false,
+        freshness: "observed",
+        outcome: "completed",
+        pull: this.hasDiagnosticRequestAdapter ? "not-used" : "not-supported",
+        push: "not-used",
+        settle: "not-used",
+        timedOut: false,
+      },
+      "request",
+    );
   }
 
-  pullTimedOut(): void {
-    this.#pull = "timed-out";
-    this.#timer.mark("pull");
+  /** Record a request failure without finishing the operation yet. */
+  requestFailed(source: DiagnosticRequestSource | undefined, error: unknown): void {
+    this.#requestSource = source;
+    this.#request = isDiagnosticTimeout(error) ? "timed-out" : "failed";
+    this.#timer.mark("request");
   }
 
-  /**
-   * Record that the reopen-resync fallback re-opened unconfirmed documents.
-   *
-   * The mark fires when the second settle window starts, so the measured
-   * phase is the preceding first settle window, not the reopen work.
-   */
-  reopened(count: number): void {
-    this.#reopened += count;
-    this.#timer.mark("first-settle");
+  /** Finish an incomplete request collection without using push confirmation. */
+  requestIncomplete(
+    source: DiagnosticRequestSource | undefined,
+    timedOut = false,
+    documentCount = 1,
+    finish = true,
+  ): void {
+    const requestSource = source ?? this.#requestSource ?? "pull";
+    this.#requestSource = requestSource;
+    this.#request = timedOut || this.#request === "timed-out" ? "timed-out" : "failed";
+    if (!finish) {
+      this.#timer.mark("request");
+      return;
+    }
+    this.#finish(
+      {
+        collection: requestSource === "typescript" ? "typescript" : requestSource,
+        documentCount,
+        fallback: false,
+        freshness: "not-observed",
+        outcome: this.#request === "timed-out" ? "timed-out" : "incomplete",
+        pull: requestSource === "pull" ? this.#request : "not-supported",
+        push: "not-used",
+        settle: "not-used",
+        timedOut: this.#request === "timed-out",
+      },
+      "request",
+    );
+  }
+
+  /** Finish a mixed request and push observation pass. */
+  mixedSettled(
+    source: DiagnosticRequestSource,
+    documentCount: number,
+    settle: DiagnosticSettleResult,
+  ): void {
+    const timedOut = settle.outcome === "timed-out" || this.#request === "timed-out";
+    const requestOutcome =
+      this.#request === "timed-out"
+        ? ("timed-out" as const)
+        : this.#request === "failed"
+          ? ("failed" as const)
+          : ("completed" as const);
+    this.#finish(
+      {
+        collection: "mixed",
+        documentCount,
+        fallback: false,
+        freshness: settle.freshness,
+        outcome: timedOut ? "timed-out" : "incomplete",
+        pull: source === "pull" ? requestOutcome : "not-supported",
+        push: timedOut ? "timed-out" : settle.outcome === "released" ? "released" : "settled",
+        settle: settle.outcome,
+        timedOut,
+      },
+      "push-settle",
+    );
+  }
+
+  /** Record a request that could not start within its collection budget. */
+  requestTimedOut(source: DiagnosticRequestSource | undefined): void {
+    this.#requestSource = source;
+    this.#request = "timed-out";
+    this.#timer.mark("request");
+    this.requestIncomplete(source, true);
   }
 
   pushSettled(documentCount: number, settle: DiagnosticSettleResult): void {
     const timedOut = settle.outcome === "timed-out";
-    const completed = settle.outcome === "quiet" && settle.freshness === "observed";
     this.#finish(
       {
-        collection: this.supportsPull ? "fallback" : "push",
+        collection: this.hasDiagnosticRequestAdapter ? "fallback" : "push",
         documentCount,
-        fallback: this.supportsPull,
+        fallback: this.hasDiagnosticRequestAdapter,
         freshness: settle.freshness,
-        outcome: completed ? "completed" : timedOut ? "timed-out" : "incomplete",
+        outcome: timedOut ? "timed-out" : "incomplete",
         pull: this.#pull,
         push: timedOut ? "timed-out" : settle.outcome === "released" ? "released" : "settled",
-        reopen: this.#reopened,
         settle: settle.outcome,
         timedOut: timedOut || this.#pull === "timed-out",
       },
@@ -181,30 +246,28 @@ export class DiagnosticObserver {
   }
 
   pushWaitCompleted(documentCount: number, push: DiagnosticPushWaitOutcome): void {
-    const confirmed = push === "published";
-    // A tentative result used the full wait budget without a confirming
-    // republish. Keep its distinct push value and report the budget expiry.
     const timedOut = push === "tentative" || push === "timed-out";
-    const observed = push === "published" || push === "tentative";
+    const observed = push === "tentative";
     this.#finish(
       {
-        collection: this.supportsPull ? "fallback" : "push",
+        collection: this.hasDiagnosticRequestAdapter ? "fallback" : "push",
         documentCount,
-        fallback: this.supportsPull,
+        fallback: this.hasDiagnosticRequestAdapter,
         freshness: observed ? "observed" : "not-observed",
-        outcome: confirmed ? "completed" : timedOut ? "timed-out" : "incomplete",
+        outcome: timedOut ? "timed-out" : "incomplete",
         pull: this.#pull,
         push,
-        reopen: this.#reopened,
-        settle: push,
+        settle: timedOut ? "timed-out" : push,
         timedOut: timedOut || this.#pull === "timed-out",
       },
       "push-settle",
     );
   }
 
-  #finish(data: DiagnosticTimingData, finalPhase?: "pull" | "push-settle" | "synchronize"): void {
-    const { reopen, ...observation } = data;
+  #finish(
+    data: DiagnosticTimingData,
+    finalPhase?: "pull" | "push-settle" | "request" | "synchronize",
+  ): void {
     this.#timer.finish(
       () => ({
         operationId: this.control?.operationId,
@@ -215,10 +278,7 @@ export class DiagnosticObserver {
         cwd: boundCwd(this.identity?.cwd),
         data: {
           operation: this.operation,
-          ...observation,
-          // Reopen fallback usage is recorded only when it happened; the
-          // default event shape stays stable for consumers of #322 telemetry.
-          ...(reopen > 0 ? { reopen } : {}),
+          ...data,
           ...(this.identity?.server !== undefined
             ? { server: truncateIdentity(this.identity.server) }
             : {}),
@@ -234,6 +294,5 @@ export class DiagnosticObserver {
 
 /** Return whether a diagnostic failure represents a timeout without retaining its message. */
 export function isDiagnosticTimeout(error: unknown): boolean {
-  if (error instanceof DiagnosticPullError) return error.timedOut;
   return error instanceof Error && /\btimed? ?out\b|\btimeout\b/i.test(error.message);
 }

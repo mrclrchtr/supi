@@ -1,6 +1,7 @@
 // JSON-RPC 2.0 transport — thin wrapper around vscode-jsonrpc.
 // Handles Content-Length framing, request/response correlation, timeouts,
 // and notification/request dispatching through vscode-jsonrpc's MessageConnection.
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: Transport lifetime and protocol handling stay together.
 
 import type { Readable, Writable } from "node:stream";
 import {
@@ -103,13 +104,44 @@ export class JsonRpcClient {
     this.requestHandler = handler;
   }
 
-  /** Send a request and wait for the correlated response, optionally overriding the timeout. */
-  sendRequest(
+  /**
+   * Send one request while exposing its underlying transport lifetime.
+   * Callers that time out can stop waiting on `result` and keep the route
+   * occupied until `settled` resolves.
+   */
+  sendRequestOwned(
     method: string,
     params?: unknown,
     options?: { timeoutMs?: number } & CodeRequestControl,
+  ): { result: Promise<unknown>; settled: Promise<void> } {
+    let settle!: () => void;
+    const settled = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    let result: Promise<unknown>;
+    try {
+      result = this.sendRequest(method, params, {
+        ...options,
+        onSettled: settle,
+        owned: true,
+      });
+    } catch (error) {
+      settle();
+      result = Promise.reject(error);
+    }
+    result.catch(() => {});
+    return { result, settled };
+  }
+
+  /** Send a request and wait for the correlated response, optionally overriding the timeout. */
+  // biome-ignore lint/complexity/noExcessiveLinesPerFunction: Request timeout and cancellation races stay together.
+  sendRequest(
+    method: string,
+    params?: unknown,
+    options?: { timeoutMs?: number; onSettled?: () => void; owned?: boolean } & CodeRequestControl,
   ): Promise<unknown> {
     const timeoutMs = options?.timeoutMs ?? this.timeoutMs;
+    const owned = options?.owned === true;
     const signal = options?.signal;
     const deadlineMs = options?.deadline === undefined ? undefined : options.deadline - Date.now();
     const methodClass = classifyRequestMethod(method);
@@ -117,7 +149,7 @@ export class JsonRpcClient {
     const timer = startDebugTimer();
     // A request cancelled before dispatch must not produce protocol traffic.
     if (signal?.aborted) {
-      return rejectUndispatchedRequest(
+      const result = rejectUndispatchedRequest(
         signal.reason ?? new Error(`Request ${method} was cancelled`),
         {
           timer,
@@ -126,11 +158,13 @@ export class JsonRpcClient {
           identity: { server: this.server, cwd: this.cwd },
         },
       );
+      options?.onSettled?.();
+      return result;
     }
     // An expired absolute deadline must not even send the request: the caller
     // no longer awaits a result, so no protocol traffic may start.
     if (deadlineMs !== undefined && deadlineMs <= 0) {
-      return rejectUndispatchedRequest(new CodeRequestDeadlineError(), {
+      const result = rejectUndispatchedRequest(new CodeRequestDeadlineError(), {
         timer,
         operationId: options?.operationId,
         observation: {
@@ -141,18 +175,24 @@ export class JsonRpcClient {
         },
         identity: { server: this.server, cwd: this.cwd },
       });
+      options?.onSettled?.();
+      return result;
     }
     if (this.closed || !this.connection) {
-      return rejectUndispatchedRequest(new Error("JSON-RPC client is closed"), {
+      const result = rejectUndispatchedRequest(new Error("JSON-RPC client is closed"), {
         timer,
         operationId: options?.operationId,
         observation: { method: boundedMethod, methodClass, outcome: "cancelled" },
         identity: { server: this.server, cwd: this.cwd },
       });
+      options?.onSettled?.();
+      return result;
     }
     const tokenSource = new CancellationTokenSource();
     let timeout: ReturnType<typeof setTimeout> | undefined;
+    let transportTimeout: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
+    let transportTimedOut = false;
     let aborted = false;
     const timerDelayMs = deadlineMs === undefined ? timeoutMs : Math.min(timeoutMs, deadlineMs);
     const timeoutError = Object.assign(
@@ -165,16 +205,34 @@ export class JsonRpcClient {
     // Catch the raw request promise to prevent unhandled rejections when
     // dispose() cancels the token without a preceding timeout.
     request.catch(() => {});
+    request.then(
+      () => {
+        if (transportTimeout !== undefined) clearTimeout(transportTimeout);
+        options?.onSettled?.();
+      },
+      () => {
+        if (transportTimeout !== undefined) clearTimeout(transportTimeout);
+        options?.onSettled?.();
+      },
+    );
+    if (owned) {
+      const transportTimeoutMs = Number.isFinite(timeoutMs)
+        ? Math.max(this.timeoutMs, timeoutMs)
+        : this.timeoutMs;
+      transportTimeout = setTimeout(() => {
+        transportTimedOut = true;
+        tokenSource.cancel();
+      }, transportTimeoutMs);
+    }
 
-    // Race the request against a single shared timeout that both cancels
-    // the JSON-RPC token and rejects the caller. Using one timer avoids
-    // a leak where the rejecting timer in a second Promise stays alive
-    // after a successful response.
+    // Race the request against the caller's timeout. Ordinary requests cancel
+    // the JSON-RPC token; owned requests leave it active so the route stays
+    // occupied until the raw request settles.
     let abortHandler: (() => void) | undefined;
     const abort = new Promise<never>((_resolve, reject) => {
       abortHandler = () => {
         aborted = true;
-        tokenSource.cancel();
+        if (!owned) tokenSource.cancel();
         // Reject with the caller's abort reason when one exists, matching the
         // canonical throwIfCodeRequestInterrupted() behavior.
         reject(signal?.reason ?? abortError);
@@ -187,7 +245,7 @@ export class JsonRpcClient {
       new Promise<never>((_resolve, reject) => {
         timeout = setTimeout(() => {
           timedOut = true;
-          tokenSource.cancel();
+          if (!owned) tokenSource.cancel();
           // A deadline that binds earlier than the timeout is a deadline
           // outcome, distinct from an ordinary per-request timeout.
           reject(
@@ -214,12 +272,10 @@ export class JsonRpcClient {
           return result;
         },
         (error: unknown) => {
-          const cancelled = timedOut || aborted || this.closed || isCancellationError(error);
-          const outcome: RequestOutcome = timedOut
-            ? "timed-out"
-            : cancelled
-              ? "cancelled"
-              : "failed";
+          const cancelled =
+            timedOut || transportTimedOut || aborted || this.closed || isCancellationError(error);
+          const outcome: RequestOutcome =
+            timedOut || transportTimedOut ? "timed-out" : cancelled ? "cancelled" : "failed";
           const errorCode = requestErrorCode(outcome, error);
           this.countProtocolStallFailure(outcome, errorCode, error);
           recordRequestTiming(

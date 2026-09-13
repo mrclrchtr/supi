@@ -40,6 +40,20 @@ function cleanupTmpDir(tmpDir: string): void {
   if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
 }
 
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+}
+
 describe("LSP pull diagnostics — refresh requests", () => {
   let tmpDir = "";
 
@@ -89,16 +103,15 @@ describe("LSP pull diagnostics — refresh requests", () => {
     );
     await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(1));
     const refresh = client.refreshOpenDiagnostics({ maxWaitMs: 500, quietMs: 1 });
-    await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(2));
+    // The file query and refresh share the same synchronization request.
+    await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(1));
 
     expect(rpc.sendNotification).not.toHaveBeenCalledWith(
       "textDocument/didChange",
       expect.anything(),
     );
-    expect(pullResolvers).toHaveLength(2);
-    for (const resolve of pullResolvers) {
-      resolve({ kind: "full", items: [makeDiagnostic("current")] });
-    }
+    expect(pullResolvers).toHaveLength(1);
+    pullResolvers[0]?.({ kind: "full", items: [makeDiagnostic("current")] });
 
     await expect(fileQuery).resolves.toEqual({
       kind: "completed",
@@ -149,22 +162,26 @@ describe("LSP pull diagnostics — refresh requests", () => {
     tmpDir = file.tmpDir;
     const { client, rpc } = createPullTestClient();
     openDocument(client, file.filePath);
-    rpc.sendRequest.mockResolvedValue({
+    const malformedReport = deferred<unknown>();
+    rpc.sendRequest.mockReturnValue(malformedReport.promise);
+
+    const refresh = client.refreshOpenDiagnostics({ maxWaitMs: 2000, quietMs: 80 });
+    await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(1));
+    malformedReport.resolve({
       kind: "bogus",
       items: [makeDiagnostic("never-stored")],
     });
-    setTimeout(
-      () => simulatePublish(client, file.uri, [makeDiagnostic("push-fallback")], true),
-      20,
-    );
-    setTimeout(
-      () => simulatePublish(client, file.uri, [makeDiagnostic("push-fallback")], true),
-      60,
-    );
 
-    await client.refreshOpenDiagnostics({ maxWaitMs: 2000, quietMs: 80 });
+    const evidence = await refresh;
 
-    expect(client.getDiagnostics(file.filePath)[0]?.message).toBe("push-fallback");
+    expect(evidence).toMatchObject({
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 0,
+      failed: 1,
+      removed: 0,
+    });
+    expect(client.getDiagnostics(file.filePath)).toEqual([]);
   });
 
   it("stores related document diagnostics from a pull response", async () => {
@@ -403,27 +420,32 @@ describe("LSP pull diagnostics — refresh fallbacks", () => {
     tmpDir = "";
   });
 
-  it("falls back to push settle when a pull fails", async () => {
+  it("keeps a valid ambient observation partial when a pull fails", async () => {
     const file = createTempTsFile();
     tmpDir = file.tmpDir;
     const { client, rpc } = createPullTestClient();
     openDocument(client, file.filePath);
-    rpc.sendRequest.mockRejectedValue(new Error("pull failed"));
-    setTimeout(
-      () => simulatePublish(client, file.uri, [makeDiagnostic("push-fallback")], true),
-      20,
-    );
-    setTimeout(
-      () => simulatePublish(client, file.uri, [makeDiagnostic("push-fallback")], true),
-      60,
-    );
+    const failedPull = deferred<unknown>();
+    rpc.sendRequest.mockReturnValue(failedPull.promise);
 
-    await client.refreshOpenDiagnostics({ maxWaitMs: 2000, quietMs: 80 });
+    const refresh = client.refreshOpenDiagnostics({ maxWaitMs: 2000, quietMs: 80 });
+    await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(1));
+    simulatePublish(client, file.uri, [makeDiagnostic("push-after-failure")], true);
+    failedPull.reject(new Error("pull failed"));
 
-    expect(client.getDiagnostics(file.filePath)[0]?.message).toBe("push-fallback");
+    const evidence = await refresh;
+
+    expect(evidence).toMatchObject({
+      requested: 1,
+      confirmed: 0,
+      unconfirmed: 1,
+      failed: 0,
+      removed: 0,
+    });
+    expect(client.getDiagnostics(file.filePath)).toEqual([makeDiagnostic("push-after-failure")]);
   });
 
-  it("falls back to push settle when a pull times out", async () => {
+  it("keeps a push observation partial when a pull times out", async () => {
     const file = createTempTsFile();
     tmpDir = file.tmpDir;
     const { client, rpc } = createPullTestClient();
@@ -437,12 +459,13 @@ describe("LSP pull diagnostics — refresh fallbacks", () => {
     setTimeout(() => simulatePublish(client, file.uri, [makeDiagnostic("push-timeout")], true), 20);
     setTimeout(() => simulatePublish(client, file.uri, [makeDiagnostic("push-timeout")], true), 60);
 
-    await client.refreshOpenDiagnostics({ maxWaitMs: 500, quietMs: 50 });
+    const evidence = await client.refreshOpenDiagnostics({ maxWaitMs: 500, quietMs: 50 });
 
+    expect(evidence).toMatchObject({ requested: 1, confirmed: 0, unconfirmed: 1 });
     expect(client.getDiagnostics(file.filePath)[0]?.message).toBe("push-timeout");
   });
 
-  it("falls back to push settle when one pull request fails", async () => {
+  it("does not fall back to a push when one pull request fails", async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-pull-test-"));
     const firstPath = path.join(tmpDir, "first.ts");
     const secondPath = path.join(tmpDir, "second.ts");
@@ -464,10 +487,11 @@ describe("LSP pull diagnostics — refresh fallbacks", () => {
     setTimeout(() => simulatePublish(client, secondUri, [makeDiagnostic("push-second")], true), 20);
     setTimeout(() => simulatePublish(client, secondUri, [makeDiagnostic("push-second")], true), 60);
 
-    await client.refreshOpenDiagnostics({ maxWaitMs: 2000, quietMs: 80 });
+    const evidence = await client.refreshOpenDiagnostics({ maxWaitMs: 2000, quietMs: 80 });
 
+    expect(evidence).toMatchObject({ requested: 2, confirmed: 1, failed: 1 });
     expect(client.getDiagnostics(firstPath)[0]?.message).toBe("pull-first");
-    expect(client.getDiagnostics(secondPath)[0]?.message).toBe("push-second");
+    expect(client.getDiagnostics(secondPath)).toEqual([]);
   });
 
   it("uses push settle when the server has no diagnostic provider", async () => {
@@ -478,8 +502,9 @@ describe("LSP pull diagnostics — refresh fallbacks", () => {
     setTimeout(() => simulatePublish(client, file.uri, [makeDiagnostic("push-diag")], true), 20);
     setTimeout(() => simulatePublish(client, file.uri, [makeDiagnostic("push-diag")], true), 60);
 
-    await client.refreshOpenDiagnostics({ maxWaitMs: 2000, quietMs: 80 });
+    const evidence = await client.refreshOpenDiagnostics({ maxWaitMs: 2000, quietMs: 80 });
 
+    expect(evidence).toMatchObject({ requested: 1, confirmed: 0, unconfirmed: 1 });
     expect(rpc.sendRequest).not.toHaveBeenCalled();
     expect(client.getDiagnostics(file.filePath)[0]?.message).toBe("push-diag");
   });

@@ -79,7 +79,7 @@ Evidence that a live LSP client is ready: workspace readiness requires at least 
 _Avoid_: owner readiness, `Promise.all([])` readiness, treating a configured route as a live client
 
 **Diagnostic evidence barrier**:
-A freshness boundary that invalidates earlier diagnostic evidence after a document or workspace change. Evidence may cross the boundary only when the current document scope is confirmed; an old cache or an unversioned publication does not cross it.
+A freshness boundary that invalidates earlier diagnostic evidence after a document or workspace change. Only evidence confirmed for the current document scope can cross it; an old cache or ambient publication cannot.
 _Avoid_: cache clear, quiet period, clean result, workspace-wide freshness
 
 **TypeScript program membership**:
@@ -91,16 +91,28 @@ The evidence set that a TypeScript file change must make suspect: the containing
 _Avoid_: workspace-wide suspect set, changed-file-only scope
 
 **Confirmed diagnostic evidence**:
-Diagnostic evidence that matches the current document synchronization and has remained settled under the push-publication policy; it can support a clean-result claim.
+Diagnostic evidence from a validated request that matches the current document synchronization and evidence revision. It can support a completed or clean result for that file.
 _Avoid_: fresh evidence, current snapshot, semantic completion
 
 **Tentative diagnostic evidence**:
-Current diagnostic evidence from a synchronization that is not yet safe for a clean-result claim because another publication may follow. Non-empty tentative diagnostics can be shown as partial evidence, but maintenance actions use only confirmed entries. An empty tentative publication cannot establish a clean result.
+Current diagnostic data that has not been confirmed by a diagnostic request. Non-empty data can be shown as partial evidence; empty data cannot support a clean result.
 _Avoid_: confirmed evidence, final diagnostics, hidden error, clean result
 
-**Diagnostic republish**:
-A later diagnostic publication for the same document synchronization.
-_Avoid_: replacement result, second result, duplicate diagnostic
+**Observed diagnostic evidence**:
+Diagnostic data accepted from an ambient push publication. It can provide useful partial output, but it cannot confirm diagnostic completion or replace request-confirmed evidence.
+_Avoid_: confirmed push, final push, publication proof
+
+**Diagnostic request adapter**:
+An internal route adapter that collects and normalizes file diagnostics through a request. It supplies confirmation only after the shared engine checks document freshness.
+_Avoid_: server exception, push confirmer, workspace proof
+
+**Owned transport lifetime**:
+The transport lifetime of an explicit diagnostic request is separate from the caller's wait. Supersession drops queued work and stops future adapter phases without cancelling an active protocol request; the route stays occupied until actual settlement or connection disposal. An owner timeout attempts protocol cancellation but does not prove that the backend stopped.
+_Avoid_: caller wait, result deadline, treating cancellation as settlement
+
+**Later ambient publication**:
+A later ambient diagnostic publication for the same document synchronization. It remains an observation and does not confirm the synchronization.
+_Avoid_: replacement result, confirmed result, publication proof
 
 **Push-only diagnostic recovery**:
 A bounded recovery path for a server that publishes diagnostics but cannot answer pull requests. It may restart an affected client during an explicit refresh, but it must keep file-local freshness and report partial evidence when confirmation fails. Each route restarts at most once per invalidation generation, and the replacement startup has a fixed 5-second bound.

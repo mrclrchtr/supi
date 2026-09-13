@@ -312,8 +312,7 @@ function evidenceIsComplete(
 function diagnosticEvidenceReason(evidence: DiagnosticEvidenceSummary): string {
   let reason = `Diagnostic evidence is partial: ${evidence.requested} requested, ${evidence.confirmed} confirmed, ${evidence.unconfirmed} unconfirmed, ${evidence.failed} failed, ${evidence.removed} removed.`;
   if (evidence.unconfirmed > 0) {
-    reason +=
-      " Unconfirmed documents await a later diagnostic republish before their evidence can be confirmed (ADR 0021).";
+    reason += " Unconfirmed documents have no request-based confirmation.";
   }
   return reason;
 }

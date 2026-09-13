@@ -3,6 +3,10 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { LspClient } from "../../src/client/client.ts";
+import {
+  isDocumentSelectorApplicable,
+  isValidDocumentSelector,
+} from "../../src/client/client-diagnostic-capabilities.ts";
 import { JsonRpcRequestError } from "../../src/client/transport.ts";
 import { CLIENT_CAPABILITIES } from "../../src/config/capabilities.ts";
 import type { ServerCapabilities } from "../../src/config/types.ts";
@@ -105,6 +109,30 @@ describe("LSP pull diagnostic capability detection (static)", () => {
   });
 });
 
+describe("LSP document selector matching", () => {
+  const uri = "file:///project/src/nested/main.ts";
+
+  it("supports LSP globstar, brace, bracket, star, and question patterns", () => {
+    expect(
+      isDocumentSelectorApplicable(
+        [{ language: "typescript", scheme: "file", pattern: "**/*.{ts,tsx}" }],
+        uri,
+      ),
+    ).toBe(true);
+    expect(isDocumentSelectorApplicable([{ pattern: "**/src/**/[mn]ain.??" }], uri)).toBe(true);
+    expect(isDocumentSelectorApplicable([{ pattern: "*.ts" }], uri)).toBe(true);
+    expect(isDocumentSelectorApplicable([{ pattern: "src/*.ts" }], uri)).toBe(false);
+    expect(isDocumentSelectorApplicable([{ pattern: "**/*.js" }], uri)).toBe(false);
+  });
+
+  it("fails closed for malformed selector shapes and glob syntax", () => {
+    expect(isValidDocumentSelector([{ language: 7 as never }])).toBe(false);
+    expect(isDocumentSelectorApplicable([{ language: 7 as never }], uri)).toBe(false);
+    expect(isDocumentSelectorApplicable([{ pattern: "**/[.ts" }], uri)).toBe(false);
+    expect(isDocumentSelectorApplicable("all", uri)).toBe(false);
+  });
+});
+
 describe("LSP pull diagnostic capability detection (dynamic)", () => {
   it("does not enable pull before any registration arrives", () => {
     expect(createDynamicClient().hasDiagnosticProvider).toBe(false);
@@ -189,6 +217,33 @@ describe("LSP pull diagnostic capability detection (dynamic)", () => {
       ],
     });
     expect(client.hasDiagnosticProvider).toBe(true);
+  });
+
+  it("applies dynamic document selectors to each diagnostic request", () => {
+    const client = createDynamicClient();
+    (client as AnyClient).handleServerRequest("client/registerCapability", {
+      registrations: [
+        {
+          id: "reg-1",
+          method: "textDocument/diagnostic",
+          registerOptions: {
+            interFileDependencies: true,
+            workspaceDiagnostics: false,
+            documentSelector: [{ language: "typescript", scheme: "file", pattern: "*.ts" }],
+          },
+        },
+      ],
+    });
+
+    expect((client as AnyClient).hasApplicableDiagnosticProvider("file:///project/main.ts")).toBe(
+      true,
+    );
+    expect((client as AnyClient).hasApplicableDiagnosticProvider("file:///project/main.js")).toBe(
+      false,
+    );
+    expect(
+      (client as AnyClient).hasApplicableDiagnosticProvider("untitled:///project/main.ts"),
+    ).toBe(false);
   });
 
   it("ignores registrations for other methods", () => {

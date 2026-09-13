@@ -14,21 +14,47 @@ type ClientInternals = {
 export type TestRpc = {
   sendNotification: ReturnType<typeof vi.fn>;
   sendRequest: ReturnType<typeof vi.fn>;
+  sendRequestOwned: ReturnType<typeof vi.fn>;
 };
 
 export function createRunningTestClient(
-  options: { capabilities?: ServerCapabilities; root?: string; cwd?: string } = {},
+  options: {
+    capabilities?: ServerCapabilities;
+    root?: string;
+    cwd?: string;
+    name?: string;
+    command?: string;
+    fileTypes?: string[];
+    initializationOptions?: unknown;
+  } = {},
 ): { client: LspClient; rpc: TestRpc } {
   const client = new LspClient(
-    "test",
-    { command: "echo", args: [], fileTypes: ["ts"], rootMarkers: ["tsconfig.json"] },
+    options.name ?? "test",
+    {
+      command: options.command ?? "echo",
+      args: [],
+      fileTypes: options.fileTypes ?? ["ts"],
+      rootMarkers: ["tsconfig.json"],
+      initializationOptions: options.initializationOptions,
+    },
     options.root ?? "/project",
     undefined,
     options.cwd ?? "/project",
   );
+  const sendRequest = vi.fn();
   const rpc: TestRpc = {
     sendNotification: vi.fn(async () => {}),
-    sendRequest: vi.fn(),
+    sendRequest,
+    sendRequestOwned: vi.fn((method: string, params: unknown, options: unknown) => {
+      const result = Promise.resolve(sendRequest(method, params, options));
+      return {
+        result,
+        settled: result.then(
+          () => undefined,
+          () => undefined,
+        ),
+      };
+    }),
   };
   Object.assign(client as unknown as ClientInternals, {
     _status: "running" as const,
@@ -56,6 +82,20 @@ export function createPullTestClient(options: { root?: string; cwd?: string } = 
     ...options,
     capabilities: {
       diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false },
+    },
+  });
+}
+
+export function createTypeScriptTestClient(
+  options: { root?: string; cwd?: string; initializationOptions?: unknown } = {},
+): { client: LspClient; rpc: TestRpc } {
+  return createRunningTestClient({
+    ...options,
+    name: "typescript-language-server",
+    command: "typescript-language-server",
+    fileTypes: ["ts", "tsx", "js", "jsx"],
+    capabilities: {
+      executeCommandProvider: { commands: ["typescript.tsserverRequest"] },
     },
   });
 }

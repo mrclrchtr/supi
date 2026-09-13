@@ -40,11 +40,11 @@ function openDocument(client: LspClient, uri: string): void {
   client.didOpen(uriToFile(uri), "const value = 1;");
 }
 
-function createTempFileUri(): { tmpDir: string; uri: string } {
+function createTempFileUri(): { tmpDir: string; filePath: string; uri: string } {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-refresh-test-"));
   const filePath = path.join(tmpDir, "test.ts");
   fs.writeFileSync(filePath, "const x = 1;");
-  return { tmpDir, uri: `file://${filePath}` };
+  return { tmpDir, filePath, uri: `file://${filePath}` };
 }
 
 function timeoutAfter(ms: number): Promise<never> {
@@ -68,8 +68,8 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
 
     try {
       const publishDelay = 30;
-      // The first publication is tentative; the second publication of the
-      // same synchronization confirms the document (ADR 0021).
+      // Push publications provide an observation. Request evidence is needed
+      // for a confirmed document state.
       setTimeout(() => simulatePublish(client, uri, undefined, true), publishDelay);
       setTimeout(() => simulatePublish(client, uri, undefined, true), publishDelay + 30);
       const start = Date.now();
@@ -101,77 +101,49 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
     }
   });
 
-  it("confirms a clean file through the reopen-resync fallback", async () => {
+  it("keeps a clean file unconfirmed on a silent push-only route", async () => {
     const client = createStartedClient();
     const { tmpDir, uri } = createTempFileUri();
     openDocument(client, uri);
     const sendNotification = notificationMock(client);
 
     try {
-      // The server stays silent through the first settle window, then
-      // publishes twice on the fallback didOpen: the first publication is
-      // tentative, the second confirms the reopened synchronization.
-      setTimeout(() => client.handlePublishDiagnostics({ uri, diagnostics: [] }), 120);
-      setTimeout(() => client.handlePublishDiagnostics({ uri, diagnostics: [] }), 135);
       const start = Date.now();
       const evidence = await client.refreshOpenDiagnostics({ maxWaitMs: 80, quietMs: 20 });
       const elapsed = Date.now() - start;
 
       expect(evidence).toMatchObject({
         requested: 1,
-        confirmed: 1,
-        unconfirmed: 0,
+        confirmed: 0,
+        unconfirmed: 1,
         failed: 0,
         removed: 0,
-        documents: [{ file: uriToFile(uri), status: "confirmed" }],
+        documents: [{ file: uriToFile(uri), status: "unconfirmed" }],
       });
-      // The reopen fallback ran after the first settle window: the total
-      // wait covers the settle budget plus the bounded second settle.
-      expect(elapsed).toBeGreaterThanOrEqual(100);
-      expect(sendNotification).toHaveBeenCalledWith("textDocument/didClose", {
-        textDocument: { uri },
-      });
-      expect(sendNotification).toHaveBeenCalledWith(
-        "textDocument/didOpen",
-        expect.objectContaining({ textDocument: expect.objectContaining({ uri }) }),
-      );
+      expect(elapsed).toBeGreaterThanOrEqual(70);
+      expect(sendNotification).not.toHaveBeenCalledWith("textDocument/didClose", expect.anything());
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 
-  it("keeps the full second-window settle budget for delayed push batches", async () => {
+  it("keeps one bounded settle window for delayed push batches", async () => {
     vi.useFakeTimers();
     const { tmpDir, uri } = createTempFileUri();
     const client = createStartedClient();
     openDocument(client, uri);
     const sendNotification = notificationMock(client);
     sendNotification.mockClear();
-    sendNotification.mockImplementation((method: string) => {
-      if (method === "textDocument/didOpen") {
-        // Publish twice near the end of the replacement window: the first
-        // publication is tentative, the second confirms the reopened
-        // synchronization within the full second-window budget.
-        setTimeout(() => client.handlePublishDiagnostics({ uri, diagnostics: [] }), 2_780);
-        setTimeout(() => client.handlePublishDiagnostics({ uri, diagnostics: [] }), 2_850);
-      }
-    });
+    sendNotification.mockImplementation(() => {});
 
     try {
       const pending = client.refreshOpenDiagnostics({ maxWaitMs: 3_000, quietMs: 100 });
       await vi.advanceTimersByTimeAsync(3_000);
-      await vi.advanceTimersByTimeAsync(3_000);
 
-      expect(sendNotification).toHaveBeenCalledWith(
-        "textDocument/didOpen",
-        expect.objectContaining({
-          textDocument: expect.objectContaining({ uri }),
-        }),
-      );
       await expect(pending).resolves.toMatchObject({
         requested: 1,
-        confirmed: 1,
-        unconfirmed: 0,
+        confirmed: 0,
+        unconfirmed: 1,
         failed: 0,
         removed: 0,
       });
@@ -189,8 +161,8 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
     openDocument(client, second.uri);
 
     try {
-      // The first document republishes within the window; the second stays
-      // silent and keeps the whole settle from completing.
+      // The first document publishes within the window; the second stays
+      // silent. Both remain unconfirmed on this push-only route.
       setTimeout(() => simulatePublish(client, first.uri, [], true), 10);
       setTimeout(() => simulatePublish(client, first.uri, [], true), 40);
 
@@ -198,12 +170,12 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
         client.refreshOpenDiagnostics({ maxWaitMs: 80, quietMs: 10 }),
       ).resolves.toMatchObject({
         requested: 2,
-        confirmed: 1,
-        unconfirmed: 1,
+        confirmed: 0,
+        unconfirmed: 2,
         failed: 0,
         removed: 0,
         documents: [
-          { file: uriToFile(first.uri), status: "confirmed" },
+          { file: uriToFile(first.uri), status: "unconfirmed" },
           { file: uriToFile(second.uri), status: "unconfirmed" },
         ],
       });
@@ -345,6 +317,30 @@ describe("LspClient refreshOpenDiagnostics — settle behavior", () => {
         unconfirmed: 0,
         failed: 1,
         removed: 0,
+      });
+    } finally {
+      fs.rmSync(file.tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps a current push observation unconfirmed after a request failure", async () => {
+    const file = createTempFileUri();
+    const { client, rpc } = createPullTestClient();
+    fs.writeFileSync(file.filePath, "const value = 1;");
+    openDocument(client, file.uri);
+    simulatePublish(client, file.uri);
+    rpc.sendRequest.mockRejectedValue(new Error("pull request failed"));
+
+    try {
+      await expect(
+        client.refreshOpenDiagnostics({ maxWaitMs: 40, quietMs: 10 }),
+      ).resolves.toMatchObject({
+        requested: 1,
+        confirmed: 0,
+        unconfirmed: 1,
+        failed: 0,
+        removed: 0,
+        documents: [{ file: uriToFile(file.uri), status: "unconfirmed" }],
       });
     } finally {
       fs.rmSync(file.tmpDir, { recursive: true, force: true });

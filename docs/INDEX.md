@@ -29,11 +29,14 @@ Reference material for agents that develop PI extensions in this repo. Docs here
 ## adr/ and agents/
 
 - `adr/` — architecture decision records. Read only the ADRs for the subsystem you change.
+- [ADR 0022: Request-confirmed, LSP-agnostic diagnostics](adr/0022-request-confirmed-lsp-agnostic-diagnostics.md) — current diagnostic source, confirmation, scheduling, and coverage policy; supersedes the diagnostic-confirmation parts of ADR 0020.
 - `agents/` — issue tracker and triage workflow for agent work in this repo.
 
 ## ops/
 
-`ops/` holds benchmarking and Snyk operational notes. They are not part of extension development.
+`ops/` holds operational notes and investigation reports.
+
+- [Issue 407: TypeScript diagnostics and request-based confirmation](ops/issue-407-push-diagnostics.md) — historical measurements and current implementation status for request-confirmed diagnostics.
 
 ## Maintenance rules
 

@@ -1501,7 +1501,7 @@ export class LspManager {
     seen: Set<string>,
   ): { client: LspClient; key: string } | null {
     const client = this.getExistingClientForFile(filePath);
-    if (!client || (pushOnly && client.hasDiagnosticProvider)) return null;
+    if (!client || (pushOnly && client.hasDiagnosticRequestAdapter)) return null;
 
     const key = clientKey(client.name, client.root);
     if (this.processCrashRecoveries.get(key)?.pending || seen.has(key)) return null;
@@ -2125,13 +2125,13 @@ export class LspManager {
   /** Return per-route diagnostic evidence capability for recovery targeting. */
   getClientDiagnosticRoutes(): Array<{
     key: string;
-    supportsPull: boolean;
+    hasDiagnosticRequestAdapter: boolean;
     unconfirmedFiles: string[];
     stallSignal: ReturnType<LspClient["getRecoveryStallSignal"]>;
   }> {
     const routes: Array<{
       key: string;
-      supportsPull: boolean;
+      hasDiagnosticRequestAdapter: boolean;
       unconfirmedFiles: string[];
       stallSignal: ReturnType<LspClient["getRecoveryStallSignal"]>;
     }> = [];
@@ -2144,7 +2144,7 @@ export class LspManager {
         .filter((file) => this.isDiagnosticFile(file));
       routes.push({
         key,
-        supportsPull: client.hasDiagnosticProvider,
+        hasDiagnosticRequestAdapter: client.hasDiagnosticRequestAdapter,
         unconfirmedFiles,
         stallSignal: client.getRecoveryStallSignal(),
       });

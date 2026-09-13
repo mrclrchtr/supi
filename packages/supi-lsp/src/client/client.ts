@@ -45,8 +45,16 @@ import { raceRequestControl } from "../session/readiness.ts";
 import {
   ClientDynamicRegistrations,
   DOCUMENT_DIAGNOSTIC_METHOD,
+  isDocumentSelectorApplicable,
   isValidDiagnosticOptions,
 } from "./client-diagnostic-capabilities.ts";
+import type {
+  DiagnosticPullRequest,
+  DiagnosticRequestAdapter,
+  DiagnosticRequestExecution,
+} from "./client-diagnostic-request.ts";
+import { createPriorityDiagnosticRequestAdapter } from "./client-diagnostic-request.ts";
+import { createTypeScriptDiagnosticRequestAdapter } from "./client-diagnostic-typescript.ts";
 import { ClientDiagnostics } from "./client-diagnostics.ts";
 import type { ClientDiagnosticSnapshot, DiagnosticEntry } from "./client-document-state.ts";
 import { JsonRpcClient, JsonRpcRequestError } from "./transport.ts";
@@ -176,6 +184,7 @@ export class LspClient {
   private rpc: JsonRpcClient | null = null;
   private _status: ClientStatus = "initializing";
   private capabilities: ServerCapabilities | null = null;
+  private readonly diagnosticRequestAdapter: DiagnosticRequestAdapter;
   private readonly diagnostics: ClientDiagnostics;
   /** Dynamic capability registrations for this client instance only. */
   private readonly dynamicRegistrations = new ClientDynamicRegistrations();
@@ -205,35 +214,40 @@ export class LspClient {
   ) {
     this.name = name;
     this.root = root;
+    const nativeDiagnosticAdapter: DiagnosticRequestAdapter = {
+      supports: (uri) => this.hasApplicableDiagnosticProvider(uri),
+      sourceFor: (uri) => (this.hasApplicableDiagnosticProvider(uri) ? "pull" : undefined),
+      collect: (request) => this.startNativeDiagnosticRequest(request),
+    };
+    const typescriptDiagnosticAdapter = createTypeScriptDiagnosticRequestAdapter({
+      fileTypes: config.fileTypes,
+      cwd: cwd ?? root,
+      isSupportedRoute: () => this.isSupportedTypeScriptRoute(),
+      hasCommand: () => this.hasTypeScriptRequestCommand(),
+      getReady: () => this.getReady(),
+      sendRequestOwned: (method, params, options) => {
+        const rpc = this.rpc;
+        if (!rpc || this._status !== "running") {
+          return {
+            result: Promise.reject(new Error("client not running")),
+            settled: Promise.resolve(),
+          };
+        }
+        return rpc.sendRequestOwned(method, params, options);
+      },
+    });
+    this.diagnosticRequestAdapter = createPriorityDiagnosticRequestAdapter([
+      nativeDiagnosticAdapter,
+      typescriptDiagnosticAdapter,
+    ]);
     this.diagnostics = new ClientDiagnostics({
       server: name,
       cwd: cwd,
       isOperational: () => this.rpc !== null && this._status === "running",
-      supportsPullDiagnostics: () => this.hasDiagnosticProvider,
+      diagnosticRequestAdapter: this.diagnosticRequestAdapter,
       usesIncrementalDocumentSync: () => this.usesIncrementalDocumentSync,
       sendNotification: (method, params) => {
         if (this.rpc) void this.rpc.sendNotification(method, params);
-      },
-      pullDocumentDiagnostics: async (request) => {
-        const rpc = this.rpc;
-        if (!rpc || this._status !== "running") throw new Error("client not running");
-        await this.getReady({
-          signal: request.signal,
-          deadline: request.deadline,
-        });
-        return rpc.sendRequest(
-          DOCUMENT_DIAGNOSTIC_METHOD,
-          {
-            textDocument: { uri: request.uri },
-            previousResultId: request.previousResultId,
-          },
-          {
-            timeoutMs: request.timeoutMs,
-            signal: request.signal,
-            deadline: request.deadline,
-            operationId: request.operationId,
-          },
-        ) as Promise<DocumentDiagnosticReport>;
       },
     });
   }
@@ -552,16 +566,106 @@ export class LspClient {
     this.diagnostics.clearPullResultIds();
   }
 
-  /** Check if server supports pull diagnostics. */
+  /** Check if the server advertises a valid native pull provider. */
   get hasDiagnosticProvider(): boolean {
-    // Static state: a valid `diagnosticProvider` in the initialize result.
-    // Dynamic state: an active registration for the diagnostic method. A
-    // malformed static shape or an empty dynamic set fails closed, so an
-    // unsupported server never gets pull requests.
     return (
       isValidDiagnosticOptions(this.capabilities?.diagnosticProvider) ||
       this.dynamicRegistrations.has(DOCUMENT_DIAGNOSTIC_METHOD)
     );
+  }
+
+  /** Whether this route has either native pull or the tested TypeScript adapter. */
+  get hasDiagnosticRequestAdapter(): boolean {
+    return this.hasDiagnosticProvider || this.isSupportedTypeScriptRouteAndCommand();
+  }
+
+  /** Select a native provider that applies to one document. */
+  private getDiagnosticProviderOptions(uri: string): Record<string, unknown> | undefined {
+    const staticOptions = this.capabilities?.diagnosticProvider;
+    const staticRecord = staticOptions as Record<string, unknown> | undefined;
+    if (
+      staticRecord !== undefined &&
+      isValidDiagnosticOptions(staticRecord) &&
+      isDocumentSelectorApplicable(staticRecord.documentSelector, uri)
+    ) {
+      return staticRecord;
+    }
+    for (const registration of this.dynamicRegistrations.get(DOCUMENT_DIAGNOSTIC_METHOD)) {
+      if (isDocumentSelectorApplicable(registration.options.documentSelector, uri)) {
+        return registration.options;
+      }
+    }
+    return undefined;
+  }
+
+  private hasApplicableDiagnosticProvider(uri: string): boolean {
+    return this.getDiagnosticProviderOptions(uri) !== undefined;
+  }
+
+  private isSupportedTypeScriptRoute(): boolean {
+    const command = path.basename(this.config.command).replace(/\.(?:cmd|exe)$/i, "");
+    return command === "typescript-language-server";
+  }
+
+  private isSupportedTypeScriptRouteAndCommand(): boolean {
+    return (
+      this.isSupportedTypeScriptRoute() &&
+      Array.isArray(this.capabilities?.executeCommandProvider?.commands) &&
+      this.capabilities.executeCommandProvider.commands.includes("typescript.tsserverRequest")
+    );
+  }
+
+  private hasTypeScriptRequestCommand(): boolean {
+    return this.isSupportedTypeScriptRouteAndCommand();
+  }
+
+  /** Start one native pull request without transferring caller ownership. */
+  private startNativeDiagnosticRequest(request: DiagnosticPullRequest): DiagnosticRequestExecution<{
+    source: "pull";
+    report: DocumentDiagnosticReport;
+  }> {
+    let activeSettled = Promise.resolve();
+    const result = (async () => {
+      const ownerDeadline = Number.isFinite(request.timeoutMs)
+        ? Date.now() + request.timeoutMs
+        : undefined;
+      await raceRequestControl(this.getReady(), {
+        signal: request.signal,
+        deadline: ownerDeadline,
+      });
+      const rpc = this.rpc;
+      if (!rpc || this._status !== "running") throw new Error("client not running");
+      const provider = this.getDiagnosticProviderOptions(request.uri);
+      if (!provider) throw new Error("No native diagnostic provider applies to this document.");
+      const owned = rpc.sendRequestOwned(
+        DOCUMENT_DIAGNOSTIC_METHOD,
+        {
+          textDocument: { uri: request.uri },
+          previousResultId: request.previousResultId,
+          ...(typeof provider.identifier === "string" ? { identifier: provider.identifier } : {}),
+        },
+        {
+          timeoutMs: request.timeoutMs,
+          deadline: ownerDeadline,
+          ...(request.operationId !== undefined ? { operationId: request.operationId } : {}),
+        },
+      );
+      activeSettled = owned.settled;
+      const report = (await raceRequestControl(owned.result, {
+        signal: request.signal,
+        deadline: ownerDeadline,
+      })) as DocumentDiagnosticReport;
+      return { source: "pull" as const, report };
+    })();
+    const settled = result
+      .then(
+        () => activeSettled,
+        () => activeSettled,
+      )
+      .then(() => undefined);
+    result.catch(() => {});
+    settled.catch(() => {});
+    return { result, settled };
   }
 
   /** Notify the server that watched workspace files changed. */
@@ -820,6 +924,10 @@ export class LspClient {
    */
   private handleRegisterCapability(params: unknown): null {
     const registrations = readRegistrations(params, "client/registerCapability");
+    const diagnosticRegistrations: Array<{
+      id: string;
+      options: Record<string, unknown>;
+    }> = [];
     for (const registration of registrations) {
       if (registration.method !== DOCUMENT_DIAGNOSTIC_METHOD) continue;
       if (!isValidDiagnosticOptions(registration.registerOptions)) {
@@ -828,7 +936,17 @@ export class LspClient {
           "Malformed textDocument/diagnostic registration options.",
         );
       }
-      this.dynamicRegistrations.register(registration.method, registration.id);
+      diagnosticRegistrations.push({
+        id: registration.id,
+        options: registration.registerOptions as Record<string, unknown>,
+      });
+    }
+    for (const registration of diagnosticRegistrations) {
+      this.dynamicRegistrations.register(
+        DOCUMENT_DIAGNOSTIC_METHOD,
+        registration.id,
+        registration.options,
+      );
     }
     return null;
   }
@@ -844,10 +962,14 @@ export class LspClient {
     if (!isRecord(params) || !Array.isArray(params.unregisterations)) {
       throw new JsonRpcRequestError(-32602, "Malformed client/unregisterCapability params.");
     }
+    const unregistrations: Array<{ id: string; method: string }> = [];
     for (const entry of params.unregisterations) {
       if (!isRecord(entry) || typeof entry.id !== "string" || typeof entry.method !== "string") {
         throw new JsonRpcRequestError(-32602, "Malformed client/unregisterCapability entry.");
       }
+      unregistrations.push({ id: entry.id, method: entry.method });
+    }
+    for (const entry of unregistrations) {
       if (entry.method !== DOCUMENT_DIAGNOSTIC_METHOD) continue;
       this.dynamicRegistrations.unregister(entry.method, entry.id);
     }

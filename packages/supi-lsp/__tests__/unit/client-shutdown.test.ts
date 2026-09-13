@@ -111,11 +111,21 @@ describe("LspClient shutdown", () => {
     (client as AnyClient).capabilities = {
       diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false },
     };
-    const sendRequest = vi.fn((method: string) =>
+    const sendRequest = vi.fn((method: string, _params?: unknown, _options?: unknown) =>
       method === "textDocument/diagnostic" ? new Promise(() => {}) : Promise.resolve(null),
     );
     (client as AnyClient).rpc = {
       sendRequest,
+      sendRequestOwned: vi.fn((method: string, params: unknown, options: unknown) => {
+        const result = sendRequest(method, params, options);
+        return {
+          result,
+          settled: result.then(
+            () => undefined,
+            () => undefined,
+          ),
+        };
+      }),
       sendNotification: vi.fn(async () => {}),
       dispose: vi.fn(),
     };

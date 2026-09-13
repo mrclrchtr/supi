@@ -56,8 +56,8 @@ export function hasCurrentDiagnosticEvidence(
 /**
  * Test whether cached diagnostics confirm the current document state.
  *
- * A current tentative push matches the document state but cannot support a
- * clean-result or cache-reuse claim until a republish confirms it (ADR 0021).
+ * A current push matches the document state but cannot support a clean-result
+ * or cache-reuse claim until request evidence replaces it.
  */
 export function hasConfirmedDiagnosticEvidence(
   document: OpenDocumentState | undefined,

@@ -120,8 +120,7 @@ describe("LSP server-requested diagnostic refresh", () => {
     rpc.sendNotification.mockClear();
     rpc.sendNotification.mockImplementation((method: string) => {
       if (method === "textDocument/didChange") {
-        // Publish twice: the first publication is tentative, the second
-        // confirms the resynchronized document (ADR 0021).
+        // Publish twice. Push publications stay observations.
         const currentVersion = client.getOpenDocumentVersion(file.filePath);
         client.handlePublishDiagnostics({
           uri: file.uri,
@@ -150,7 +149,7 @@ describe("LSP server-requested diagnostic refresh", () => {
     ).toEqual([
       expect.objectContaining({
         message: "LSP diagnostic refresh request completed",
-        data: expect.objectContaining({ requested: 1, confirmed: 1 }),
+        data: expect.objectContaining({ requested: 1, confirmed: 0, unconfirmed: 1 }),
       }),
     ]);
   });

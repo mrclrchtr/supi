@@ -71,7 +71,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       getClientDiagnosticRoutes: vi.fn(() => [
         {
           key: "typescript:/project",
-          supportsPull: false,
+          hasDiagnosticRequestAdapter: false,
           unconfirmedFiles: ["/project/src/a.ts", "/project/src/b.ts", "/project/src/c.ts"],
           stallSignal: "readiness-stall" as const,
         },
@@ -143,7 +143,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       getClientDiagnosticRoutes: vi.fn(() => [
         {
           key: "typescript:/project",
-          supportsPull: false,
+          hasDiagnosticRequestAdapter: false,
           unconfirmedFiles: ["/project/src/a.ts"],
           stallSignal: "protocol-errors" as const,
         },
@@ -246,7 +246,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       getClientDiagnosticRoutes: vi.fn(() => [
         {
           key: "typescript:/project",
-          supportsPull: false,
+          hasDiagnosticRequestAdapter: false,
           unconfirmedFiles: ["/project/src/a.ts"],
           stallSignal: "readiness-stall" as const,
         },
@@ -422,7 +422,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       getClientDiagnosticRoutes: vi.fn(() => [
         {
           key: "typescript:/project",
-          supportsPull: false,
+          hasDiagnosticRequestAdapter: false,
           unconfirmedFiles: ["/project/src/a.ts"],
           stallSignal: "readiness-stall" as const,
         },
@@ -477,7 +477,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       getClientDiagnosticRoutes: vi.fn(() => [
         {
           key: "typescript:/project",
-          supportsPull: false,
+          hasDiagnosticRequestAdapter: false,
           unconfirmedFiles: ["/project/src/a.ts", "/project/src/b.ts", "/project/src/c.ts"],
           stallSignal: null,
         },
@@ -518,7 +518,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       getClientDiagnosticRoutes: vi.fn(() => [
         {
           key: "typescript:/project",
-          supportsPull: false,
+          hasDiagnosticRequestAdapter: false,
           unconfirmedFiles: ["/project/src/a.ts"],
           stallSignal: "readiness-stall" as const,
         },
@@ -563,25 +563,25 @@ describe("recoverWorkspaceDiagnostics", () => {
       getClientDiagnosticRoutes: vi.fn(() => [
         {
           key: "typescript:/project",
-          supportsPull: false,
+          hasDiagnosticRequestAdapter: false,
           unconfirmedFiles: ["/project/src/a.ts"],
           stallSignal: "protocol-errors" as const,
         },
         {
           key: "rust:/project",
-          supportsPull: true,
+          hasDiagnosticRequestAdapter: true,
           unconfirmedFiles: ["/project/src/main.rs"],
           stallSignal: "readiness-stall" as const,
         },
         {
           key: "typescript:/project/lib",
-          supportsPull: false,
+          hasDiagnosticRequestAdapter: false,
           unconfirmedFiles: [],
           stallSignal: "readiness-stall" as const,
         },
         {
           key: "typescript:/project/other",
-          supportsPull: false,
+          hasDiagnosticRequestAdapter: false,
           unconfirmedFiles: ["/project/src/other.ts"],
           stallSignal: null,
         },
@@ -641,7 +641,11 @@ describe("recoverWorkspaceDiagnostics", () => {
       getRunningClientNames: vi.fn(() => ["typescript"]),
       isDiagnosticFile: vi.fn(() => true),
       getClientDiagnosticRoutes: vi.fn(() => [
-        { key: "typescript:/project", supportsPull: false, unconfirmedFiles: ["src/a.ts"] },
+        {
+          key: "typescript:/project",
+          hasDiagnosticRequestAdapter: false,
+          unconfirmedFiles: ["src/a.ts"],
+        },
       ]),
       getDiagnosticEvidence: vi.fn(() => emptyEvidence()),
       getWorkspaceDiagnosticReport: vi.fn(() => emptyDiagnosticReport()),
@@ -703,7 +707,7 @@ describe("recoverWorkspaceDiagnostics", () => {
       getClientDiagnosticRoutes: vi.fn(() => [
         {
           key: "typescript:/project",
-          supportsPull: false,
+          hasDiagnosticRequestAdapter: false,
           unconfirmedFiles: ["/project/src/a.ts"],
           stallSignal: "readiness-stall" as const,
         },

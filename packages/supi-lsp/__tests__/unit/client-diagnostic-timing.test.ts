@@ -68,7 +68,7 @@ describe("LSP diagnostic timing observations", () => {
     writeFileSync(file, "const cacheRefresh = true;\n");
     const { client, rpc } = createRunningTestClient({ root: cwd, cwd });
     client.didOpen(file, "const cacheRefresh = true;\n");
-    // The first publication stays tentative; the second confirms.
+    // Push publications remain observations without request evidence.
     client.handlePublishDiagnostics({
       uri: `file://${file}`,
       version: client.getOpenDocumentVersion(file) ?? undefined,
@@ -86,25 +86,21 @@ describe("LSP diagnostic timing observations", () => {
     const event = getDebugEvents({ source: "lsp", category: "diagnostics.timing" }).events[0];
     expect(event).toEqual(
       expect.objectContaining({
-        message: "LSP diagnostic refresh-open completed",
+        message: "LSP diagnostic refresh-open incomplete",
         cwd,
-        data: {
+        data: expect.objectContaining({
           operation: "refresh-open",
-          collection: "cache",
-          pull: "not-used",
-          push: "not-used",
+          collection: "push",
+          pull: "not-supported",
+          push: "settled",
           fallback: false,
-          settle: "not-used",
+          settle: "quiet",
           timedOut: false,
           freshness: "observed",
           documentCount: 1,
-          outcome: "completed",
+          outcome: "incomplete",
           server: "test",
-          timing: {
-            durationMs: expect.any(Number),
-            phasesMs: {},
-          },
-        },
+        }),
       }),
     );
     expect(event?.data).not.toHaveProperty("reopen");
@@ -142,22 +138,21 @@ describe("LSP diagnostic timing observations", () => {
       getDebugEvents({ source: "lsp", category: "diagnostics.timing" }).events[0]?.data,
     ).toEqual({
       operation: "refresh-open",
-      collection: "fallback",
+      collection: "pull",
       pull: "failed",
-      push: "settled",
-      fallback: true,
-      settle: "quiet",
+      push: "not-used",
+      fallback: false,
+      settle: "not-used",
       timedOut: false,
-      freshness: "observed",
+      freshness: "not-observed",
       documentCount: 1,
-      outcome: "completed",
+      outcome: "incomplete",
       server: "test",
       timing: {
         durationMs: expect.any(Number),
         phasesMs: {
           synchronize: expect.any(Number),
-          pull: expect.any(Number),
-          "push-settle": expect.any(Number),
+          request: expect.any(Number),
         },
       },
     });
@@ -184,9 +179,10 @@ describe("LSP diagnostic timing observations", () => {
       getDebugEvents({ source: "lsp", category: "diagnostics.timing" }).events[0]?.data,
     ).toEqual(
       expect.objectContaining({
-        collection: "fallback",
-        freshness: "observed",
-        outcome: "timed-out",
+        collection: "pull",
+        pull: "failed",
+        freshness: "not-observed",
+        outcome: "incomplete",
       }),
     );
   });
@@ -249,7 +245,7 @@ describe("LSP diagnostic timing observations", () => {
       }),
     );
   });
-  it("records single-file fallback publication as fresh diagnostic evidence", async () => {
+  it("records a failed single-file request without push confirmation", async () => {
     const file = join(cwd, "single.ts");
     writeFileSync(file, "const single = true;\n");
     const { client, rpc } = createPullTestClient({ root: cwd, cwd });
@@ -284,34 +280,29 @@ describe("LSP diagnostic timing observations", () => {
           server: "test",
           // The file identity is workspace-relative.
           file: "single.ts",
-          collection: "fallback",
+          collection: "pull",
           pull: "failed",
-          push: "published",
-          fallback: true,
-          settle: "published",
+          push: "not-used",
+          fallback: false,
+          settle: "not-used",
           timedOut: false,
-          freshness: "observed",
+          freshness: "not-observed",
           documentCount: 1,
-          outcome: "completed",
+          outcome: "incomplete",
         }),
       }),
     );
   });
 
-  it("records the reopen-resync fallback count for a clean push-only file", async () => {
+  it("records a bounded push-only timeout without a confirmation fallback", async () => {
     vi.useFakeTimers();
     try {
       const file = join(cwd, "reopen-timing.ts");
       writeFileSync(file, "const reopenTiming = true;\n");
       const { client } = createRunningTestClient({ root: cwd, cwd });
       client.didOpen(file, "const reopenTiming = true;\n");
-      // A real disk change forces the didChange resynchronization whose clean
-      // result stays unpublished until the fallback didOpen. Unchanged content
-      // is retained without protocol work, so no reopen candidate would exist.
-      writeFileSync(file, "const reopenTimingChanged = true;\n");
-      // The server stays silent through the first settle window, then
-      // publishes twice on the fallback didOpen: the first publication is
-      // tentative, the second confirms the reopened synchronization.
+      // A real disk change forces one didChange resynchronization. The push
+      // route stays unconfirmed and has no confirmation fallback.
       setTimeout(
         () => client.handlePublishDiagnostics({ uri: `file://${file}`, diagnostics: [] }),
         120,
@@ -332,15 +323,14 @@ describe("LSP diagnostic timing observations", () => {
           operation: "refresh-open",
           collection: "push",
           pull: "not-supported",
-          reopen: 1,
-          freshness: "observed",
-          outcome: "completed",
-          // The reopen mark names the preceding first settle window; the
-          // final phase covers the reopen fallback and second settle.
+          push: "timed-out",
+          settle: "timed-out",
+          freshness: "not-observed",
+          outcome: "timed-out",
+          timedOut: true,
           timing: expect.objectContaining({
             phasesMs: expect.objectContaining({
               synchronize: expect.any(Number),
-              "first-settle": expect.any(Number),
               "push-settle": expect.any(Number),
             }),
           }),

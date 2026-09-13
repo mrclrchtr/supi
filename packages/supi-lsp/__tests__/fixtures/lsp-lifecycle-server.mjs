@@ -30,8 +30,8 @@ if ((mode === "push" || mode === "stall-push") && crashMarker) {
 
 function schedulePush(textDocument) {
   const { uri, version } = textDocument;
-  // ADR 0021: a push-only server publishes an early result and a later
-  // semantic result for one synchronization; the later publication confirms.
+  // A push-only server can publish an early result and a later semantic
+  // result for one synchronization; neither publication confirms it.
   setTimeout(() => publishDiagnostics(uri, version), pushDelayMs);
   setTimeout(() => publishDiagnostics(uri, version), pushDelayMs + 30);
 }

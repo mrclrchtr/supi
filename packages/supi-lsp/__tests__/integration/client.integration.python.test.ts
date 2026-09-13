@@ -232,7 +232,7 @@ describe.skipIf(!HAS_PYRIGHT)("LspClient pyright dynamic pull registration", () 
     // dynamic registration even though the static provider is absent.
     await waitFor(
       () => Promise.resolve(client.hasDiagnosticProvider),
-      (supportsPull) => supportsPull,
+      (hasDiagnosticProvider) => hasDiagnosticProvider,
       { timeoutMs: 10_000, retryDelayMs: 100, label: "pyright dynamic registration" },
     );
     expect(client.hasDiagnosticProvider).toBe(true);

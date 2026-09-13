@@ -1,5 +1,4 @@
-import type { DocumentDiagnosticReport } from "../config/types.ts";
-import type { DiagnosticPullRequest } from "./client-diagnostic-request.ts";
+import type { DiagnosticRequestAdapter } from "./client-diagnostic-request.ts";
 
 /** Transport and capability operations required by diagnostic state. */
 export interface ClientDiagnosticsHost {
@@ -8,8 +7,8 @@ export interface ClientDiagnosticsHost {
   /** Absolute workspace root, for debug-telemetry identity. */
   cwd?: string;
   isOperational(): boolean;
-  supportsPullDiagnostics(): boolean;
+  /** Native pull and server-specific request evidence share this priority adapter. */
+  diagnosticRequestAdapter: DiagnosticRequestAdapter;
   usesIncrementalDocumentSync(): boolean;
   sendNotification(method: string, params: unknown): void;
-  pullDocumentDiagnostics(request: DiagnosticPullRequest): Promise<DocumentDiagnosticReport | null>;
 }

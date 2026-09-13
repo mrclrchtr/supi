@@ -90,8 +90,8 @@ describe.skipIf(!HAS_TS_LSP)("TypeScript diagnostic refresh probe", () => {
     const firstEvidence = await client.refreshOpenDiagnostics();
     const firstElapsedMs = Date.now() - firstStartedAt;
     // The server may publish one empty result or an early result followed by
-    // a semantic republish. ADR 0021 keeps the former tentative and confirms
-    // the latter.
+    // a later semantic publication. Request evidence confirms the result;
+    // ambient publications remain observations.
     const firstSnapshot = client.getDiagnosticSnapshot();
     expect(firstSnapshot.documents).toHaveLength(2);
     expect(firstSnapshot.current).toBe(firstEvidence.confirmed === 2);
@@ -122,8 +122,8 @@ describe.skipIf(!HAS_TS_LSP)("TypeScript diagnostic refresh probe", () => {
     // didClose, or didOpen for unchanged documents; it waits one bounded
     // settle for the server's existing pipeline instead.
     expect(documentNotifications).toEqual([]);
-    // The server may publish once or republish the semantic result. Both
-    // outcomes are valid under ADR 0021; the refresh must report exact
+    // The server may publish once or publish the semantic result later.
+    // Publications are observations; the refresh must report exact
     // coverage and keep the retained documents free of protocol traffic.
     expect(firstEvidence.confirmed + firstEvidence.unconfirmed).toBe(2);
     expect(secondEvidence.confirmed + secondEvidence.unconfirmed).toBe(2);
