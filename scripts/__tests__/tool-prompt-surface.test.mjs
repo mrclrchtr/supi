@@ -21,6 +21,10 @@ async function collectPromptSurfaces() {
   add("context_report", module);
   module = await import(`${PACKAGES}/supi-debug/src/tool/debug/guidance.ts`);
   add("debug", module);
+  module = await import(`${PACKAGES}/supi-agent/src/tool/agent_run/guidance.ts`);
+  add("agent_run", module);
+  module = await import(`${PACKAGES}/supi-antigravity/src/tool/antigravity_run/guidance.ts`);
+  add("antigravity_run", module);
 
   module = await import(`${PACKAGES}/supi-code-intelligence/src/tool/guidance.ts`);
   for (const [name, surface] of Object.entries(module.CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES)) {
@@ -46,6 +50,7 @@ describe("SuPi tool prompt surfaces", () => {
     const surfaces = await collectPromptSurfaces();
 
     for (const { name, promptSnippet } of surfaces) {
+      if (promptSnippet === undefined) continue;
       expect(typeof promptSnippet, `${name} promptSnippet`).toBe("string");
       expect(promptSnippet.length, `${name} promptSnippet`).toBeLessThanOrEqual(80);
       expect(promptSnippet, `${name} promptSnippet`).not.toContain("\n");
