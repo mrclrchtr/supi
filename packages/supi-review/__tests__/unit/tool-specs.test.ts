@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { promptGuidelines as auditGuidelines } from "../../src/tool/review_audit/guidance.ts";
+import {
+  toolDescription as auditDescription,
+  promptGuidelines as auditGuidelines,
+} from "../../src/tool/review_audit/guidance.ts";
 import { reviewAuditSpec } from "../../src/tool/review_audit/spec.ts";
 import { promptGuidelines as outputGuidelines } from "../../src/tool/review_output/guidance.ts";
 import { reviewOutputSpec } from "../../src/tool/review_output/spec.ts";
 import { REVIEW_CHILD_TOOL_SPECS } from "../../src/tool/review_run/child-tools.ts";
-import { promptGuidelines as runGuidelines } from "../../src/tool/review_run/guidance.ts";
+import {
+  toolDescription as runDescription,
+  promptGuidelines as runGuidelines,
+} from "../../src/tool/review_run/guidance.ts";
 import { reviewRunSpec } from "../../src/tool/review_run/spec.ts";
 
 describe("review tool specs", () => {
@@ -25,6 +31,15 @@ describe("review tool specs", () => {
     for (const { spec, guidelines } of parentTools) {
       for (const guideline of guidelines) expect(guideline).toContain(spec.name);
     }
+  });
+
+  it("keeps review and replay selection boundaries in descriptions", () => {
+    expect(runDescription).toMatch(/code reviews or criteria-based inspections/i);
+    expect(runDescription).toMatch(/agent_run for exploration or coding/i);
+    expect(runDescription).toMatch(/one frozen Review Target/i);
+    expect(auditDescription).toMatch(/Start with the metadata-only Replay Outline/i);
+    expect(auditDescription).toMatch(/repository evidence and tool output/i);
+    expect(auditGuidelines).toEqual([]);
   });
 
   it("builds structurally complete parameter schemas", () => {

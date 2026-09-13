@@ -51,9 +51,6 @@ This repo has two install surfaces:
 
 All runtime packages are published independently. There is no meta-package — each published package ships its own dependencies directly. `supi-skill-patches` is private maintenance tooling.
 
-- Packages that depend on other `@mrclrchtr/supi-*` packages must list them in both `dependencies` and `bundledDependencies`. This applies to packages that still ship `pi.extensions` (installable pi packages). Library-only packages (no `pi.extensions`, no `./extension` export) are regular npm dependencies and do not need bundling — transitive npm resolution is sufficient for them.
-- Installable packages that bundle extension-bearing `@mrclrchtr/supi-*` dependencies must reference those dependencies' extension entrypoints in `pi.extensions`.
-
 New installable extension packages should be added to the root `package.json` `pi.extensions` array for development convenience; library-only packages must not be added there.
 
 ## Packaging conventions

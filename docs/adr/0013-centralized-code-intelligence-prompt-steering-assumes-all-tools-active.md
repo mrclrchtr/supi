@@ -57,11 +57,13 @@ retains no-silent-fallback behavior. Low-value nudge bullets are dropped per
   `pi.setActiveTools` to narrow the `code_*` set**, revisit this ADR: centralized
   steering may vanish for the narrowed set, and dual-sided bullets (per P1) may
   need to return.
-- Selection-critical safety cues (`mode:"ast"`, no silent fallback, structural
-  callees not being symbol identity, the `code_health` Live health observation
-  boundary, and planner/applier mutation separation) remain in `description` and
-  are pinned by `extension-registration.test.ts`. Exact selector and mode/kind
-  mechanics remain in registered schemas and schema-focused tests. Sibling
-  routing may remain in guidelines under this ADR's all-tools-active assumption.
-- Truncation limits and conditional full-output spill behavior remain in each
-  `description` as required by `docs/pi/tool-guidance.md`.
+- Selection-critical safety cues (explicit search-mode boundaries, no mode
+  switching, structural callees not being symbol identity, the `code_health`
+  live-health observation boundary, and planner/applier mutation separation)
+  remain in `description` and are pinned by `extension-registration.test.ts`.
+  Exact selector and mode/kind mechanics remain in registered schemas and
+  schema-focused tests. Sibling routing may remain in guidelines under this
+  ADR's all-tools-active assumption.
+- Standard PI truncation limits stay out of tool descriptions unless they change
+  tool or input selection. Result builders still enforce these bounds and spill
+  complete output when necessary.

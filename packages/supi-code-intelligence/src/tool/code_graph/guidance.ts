@@ -1,5 +1,5 @@
 export const toolDescription =
-  "Find symbol references and implementations, and list calls from a target's enclosing scope. Callee results match source shape, not symbol identity.";
+  "Find semantic references and implementations, or non-symbol-aware structural calls written inside a target's enclosing scope.";
 
 export const promptSnippet = "trace code relationships";
 

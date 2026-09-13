@@ -1,6 +1,6 @@
 import { readFile, rm } from "node:fs/promises";
 import { dirname } from "node:path";
-import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize } from "@earendil-works/pi-coding-agent";
+import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@earendil-works/pi-coding-agent";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFns = vi.hoisted(() => ({
@@ -175,8 +175,9 @@ describe("supi-context extension surfaces", () => {
     contextExtension(pi as never);
     const ctx = { ...makeCtx(), mode: "tui" };
     const tool = getTool(pi, "context_report");
-    expect(tool.description).toContain(`${DEFAULT_MAX_LINES} lines`);
-    expect(tool.description).toContain(formatSize(DEFAULT_MAX_BYTES));
+    expect(tool.description).toContain("concise, constant-shape pressure snapshot");
+    expect(tool.description).toContain("full only when diagnostic attribution is needed");
+    expect(tool.description).not.toMatch(/2,000 lines|50 KB/i);
     const result = (await tool.execute("tool-call", {}, undefined, undefined, ctx)) as {
       content: Array<{ type: string; text: string }>;
       details: unknown;

@@ -93,9 +93,10 @@ describe("ask_user tool", () => {
 
     expect(tool.label).toBe("Ask User");
     expect((tool as { executionMode?: string }).executionMode).toBe("sequential");
-    expect(tool.description).toContain("interactive TUI decision form");
-    expect(tool.description).toContain("truncated");
-    expect(tool.promptSnippet).toContain("ask_user");
+    expect(tool.description).toContain("focused user decision blocks progress");
+    expect(tool.description).toContain("Not for status updates or broad surveys");
+    expect(tool.description).not.toMatch(/2,000 lines|50 KB/i);
+    expect(tool.promptSnippet).toBe("request a focused blocking user decision");
     expect(tool.promptGuidelines?.every((guideline) => guideline.includes("ask_user"))).toBe(true);
   });
 

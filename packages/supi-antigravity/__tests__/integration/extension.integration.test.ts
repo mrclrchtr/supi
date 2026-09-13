@@ -14,6 +14,7 @@ import { fixtureDirectory } from "../helpers/test-paths.ts";
 type RegisteredTool = {
   name: string;
   description: string;
+  parameters: unknown;
   promptSnippet?: string;
   promptGuidelines?: readonly string[];
   execute: (
@@ -177,12 +178,17 @@ describe("supi-antigravity extension", () => {
     const tool = pi.tools[0] as RegisteredTool;
     expect(tool.name).toBe("antigravity_run");
     expect(tool.description).toBe(toolDescription);
-    expect(tool.description).toMatch(/external model.*web research/);
-    expect(tool.description).toMatch(
-      /Prefer antigravity_run.*advice.*design alternatives.*second opinions/,
-    );
-    expect(tool.description).toMatch(/repository facts.*direct tools/);
-    expect(tool.description.length).toBeLessThanOrEqual(240);
+    expect(tool.description).toMatch(/external model.*web research.*design advice/i);
+    expect(tool.description).toMatch(/workspace analysis.*independent second opinion/i);
+    expect(tool.description).toMatch(/direct tools.*repository facts/i);
+    expect(tool.description).toMatch(/current workspace only.*repository evidence/i);
+    expect(tool.description.length).toBeLessThanOrEqual(320);
+
+    const schemaText = JSON.stringify(tool.parameters);
+    expect(schemaText).toMatch(/true exposes the current PI workspace/i);
+    expect(schemaText).toMatch(/false uses the empty Consultation Workspace/i);
+    expect(schemaText).toMatch(/inherit its model and workspace access/i);
+    expect(schemaText).toMatch(/new runs have no default/i);
     expect(tool.promptSnippet).toBeUndefined();
     expect(tool.promptGuidelines).toBeUndefined();
 

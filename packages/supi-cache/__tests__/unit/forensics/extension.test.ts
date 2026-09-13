@@ -8,7 +8,7 @@ vi.mock("../../../src/forensics/forensics.ts", () => ({
   runForensics: mockFns.runForensics,
 }));
 
-import { createPiMock, getHandlerOrThrow, makeCtx } from "@mrclrchtr/supi-test-utils";
+import { createPiMock, getHandlerOrThrow, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import cacheForensicsExtension from "../../../src/forensics/extension.ts";
 
 function assistantEntry(
@@ -115,6 +115,24 @@ describe("cacheForensicsExtension", () => {
       customType: "supi-cache-forensics-report",
       content: "2 sessions, 8 turns",
     });
+  });
+
+  it("registers historical-cache selection and pattern guidance", () => {
+    const pi = createPiMock();
+    cacheForensicsExtension(pi as never);
+
+    const tool = getTool(pi, "cache_forensics");
+    expect(tool.description).toMatch(/historical PI sessions/i);
+    expect(tool.description).toMatch(/redacted shape fingerprints/i);
+    expect(tool.description).not.toMatch(/breakdown.*hotspots.*correlate.*idle/i);
+
+    const schema = tool.parameters as {
+      properties: { pattern: { description?: string } };
+    };
+    expect(schema.properties.pattern.description).toMatch(/breakdown=cause totals/i);
+    expect(schema.properties.pattern.description).toMatch(/hotspots=largest drops/i);
+    expect(schema.properties.pattern.description).toMatch(/correlate=preceding tool shapes/i);
+    expect(schema.properties.pattern.description).toMatch(/idle=drops after long gaps/i);
   });
 
   it("does not expose a live message handler after registration", () => {

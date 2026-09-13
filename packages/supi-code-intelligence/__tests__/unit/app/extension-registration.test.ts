@@ -81,7 +81,11 @@ describe("focused code intelligence tool registration", () => {
     const selectionContracts = [
       {
         name: "code_resolve",
-        patterns: [/real symbol anchor/i, /target handles/i, /does not fall back to text search/i],
+        patterns: [
+          /real symbol anchor/i,
+          /target handles for later code tools/i,
+          /does not search file text/i,
+        ],
       },
       {
         name: "code_inspect",
@@ -93,21 +97,37 @@ describe("focused code intelligence tool registration", () => {
       },
       {
         name: "code_find",
-        patterns: [/structural or semantic matches/i, /never silently falls back.*text search/i],
+        patterns: [
+          /workspace symbols in semantic mode/i,
+          /names in AST mode/i,
+          /PI grep/i,
+          /does not switch to another search method/i,
+        ],
       },
-      { name: "code_graph", patterns: [/source shape/i, /symbol identity/i] },
+      {
+        name: "code_graph",
+        patterns: [/semantic references/i, /non-symbol-aware structural calls/i],
+      },
       {
         name: "code_refactor_plan",
-        patterns: [/semantic refactor without changing files/i, /falling back to text edits/i],
+        patterns: [
+          /store a semantic refactor preview without changing files/i,
+          /do not fall back/i,
+        ],
       },
       {
         name: "code_refactor_apply",
-        patterns: [/fresh stored refactor plan/i, /change its files/i, /regenerate a plan/i],
+        patterns: [
+          /freshness and edit-safety checks/i,
+          /changed files.*new plan/i,
+          /does not regenerate/i,
+        ],
       },
       {
         name: "code_health",
         patterns: [
           /live diagnostics and language-server health/i,
+          /refresh:true.*fresh diagnostic evidence/i,
           /diagnostic snapshots.*whole workspace/i,
           /server inventory and route-status counts.*workspace-wide/i,
         ],
@@ -140,8 +160,12 @@ describe("focused code intelligence tool registration", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    const resolveGuidelines = (getTool(pi, "code_resolve").promptGuidelines ?? []).join("\n");
-    expect(resolveGuidelines).toMatch(/later tool requires a target handle/i);
+    const findGuidelines = (getTool(pi, "code_find").promptGuidelines ?? []).join("\n");
+    expect(findGuidelines).toMatch(/broad code-aware discovery/i);
+    expect(findGuidelines).toMatch(/target identity/i);
+    expect(findGuidelines).toMatch(/relationships/i);
+    expect(getTool(pi, "code_resolve").promptGuidelines).toEqual([]);
+    expect(getTool(pi, "code_health").promptGuidelines).toEqual([]);
     expect(getTool(pi, "code_refactor_plan").promptGuidelines).toEqual([]);
 
     for (const name of CODE_INTELLIGENCE_TOOL_NAMES) {
@@ -150,6 +174,17 @@ describe("focused code intelligence tool registration", () => {
         expect(bullet, `${name} guideline`).toContain(name);
       }
     }
+  });
+
+  it("describes the mode-specific code_find query contract in its schema", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const find = propertiesOf(getTool(pi, "code_find"));
+    expect(JSON.stringify(find.query)).toMatch(/AST mode.*name.*module-specifier substring/i);
+    expect(JSON.stringify(find.query)).toMatch(/semantic mode.*workspace-symbol query/i);
+    expect(JSON.stringify(find.mode)).toMatch(/AST mode requires.*kind/i);
+    expect(JSON.stringify(find.mode)).toMatch(/semantic mode rejects.*kind/i);
   });
 
   it("uses an exact-one nested refactor operation and a plan-only apply input", () => {

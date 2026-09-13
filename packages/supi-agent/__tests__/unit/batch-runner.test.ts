@@ -167,6 +167,30 @@ describe("runDelegationBatch", () => {
     ).rejects.toThrow("Mutation-capable");
   });
 
+  it("rejects a mixed read-only and mutation-capable multi-task batch", async () => {
+    const profiles = [makeEntry("explore", ["read"]), makeEntry("impl", ["edit"])] as const;
+    const catalogue: ProfileCatalogue = {
+      profiles,
+      diagnostics: [],
+      profileIds: ["explore", "impl"],
+      omittedProfileCount: 0,
+      sourceDirectories: { package: "/profiles", global: "/global" },
+    };
+
+    await expect(
+      runDelegationBatch(
+        {
+          tasks: [
+            { id: "t1", profile: "explore", instructions: "inspect" },
+            { id: "t2", profile: "impl", instructions: "edit" },
+          ],
+        },
+        catalogue,
+        mockCtx(),
+      ),
+    ).rejects.toThrow("Mutation-capable");
+  });
+
   it("runs a read-only single-task batch and returns results", async () => {
     const catalogue = makeCatalogue(["explore"]);
     const { results } = await runDelegationBatch(

@@ -24,6 +24,22 @@ describe("skill patch maintenance", () => {
     expect(validateSkillMirror()).toEqual([]);
   });
 
+  it("routes patched review and research skills through available SuPi tools", () => {
+    const codeReview = readFileSync(join(root, "skills/engineering/code-review/SKILL.md"), "utf8");
+    expect(codeReview).toContain("Use `review_run` for this workflow");
+    expect(codeReview).toContain("Do not replace it with `agent_run`");
+    expect(codeReview).toContain("If `review_run` is unavailable");
+    expect(codeReview).toContain('mode: "change"');
+    expect(codeReview).not.toContain("Spawn both sub-agents");
+
+    const research = readFileSync(join(root, "skills/engineering/research/SKILL.md"), "utf8");
+    expect(research).toContain("current foreground task");
+    expect(research).toMatch(/use Context7/i);
+    expect(research).toMatch(/use `web_fetch_md`/i);
+    expect(research).toMatch(/use `antigravity_run` only for synthesis/i);
+    expect(research).not.toContain("background agent");
+  });
+
   it("groups public catalog skills by source", () => {
     const manifest = JSON.parse(
       readFileSync(join(root, ".claude-plugin/marketplace.json"), "utf8"),

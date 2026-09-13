@@ -55,6 +55,9 @@ describe("registered agent_run boundary", () => {
     const profile = schema.properties.tasks.items.properties.profile;
 
     expect(tool.description).toMatch(/repository evidence.*coding tasks/);
+    expect(tool.description).toMatch(/review_run.*code reviews/);
+    expect(tool.description).toMatch(/only.*read-only.*multiple tasks/i);
+    expect(tool.description).toMatch(/mutation-capable batch.*one task/i);
     expect(tool.description).not.toContain("antigravity_run");
     expect(tool.description?.length).toBeLessThanOrEqual(400);
     expect(tool.promptSnippet).toBeUndefined();

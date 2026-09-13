@@ -21,6 +21,11 @@ export const QueryParam = Type.String({
   description: "Human or code reference to resolve or search for.",
   minLength: 1,
 });
+export const FindQueryParam = Type.String({
+  description:
+    "AST mode: name or import module-specifier substring. Semantic mode: workspace-symbol query.",
+  minLength: 1,
+});
 const LineParam = Type.Integer({ description: "1-based line.", minimum: 1 });
 const CharacterParam = Type.Integer({
   description: "1-based UTF-16 column.",

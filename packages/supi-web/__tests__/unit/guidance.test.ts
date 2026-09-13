@@ -1,13 +1,5 @@
 import { Value } from "typebox/value";
-import { describe, expect, it, vi } from "vitest";
-
-const { spawnSync } = vi.hoisted(() => ({
-  spawnSync: vi.fn(() => ({ status: 0 })),
-}));
-
-vi.mock("node:child_process", () => ({
-  spawnSync,
-}));
+import { describe, expect, it } from "vitest";
 
 import { FETCH_TIMEOUT_MAX_MS } from "../../src/fetch.ts";
 import {
@@ -37,12 +29,27 @@ describe("web tool guidance", () => {
     expect(totalChars).toBeLessThanOrEqual(MODEL_SURFACE_CHAR_BUDGET);
   });
 
-  it("keeps prompt guidelines self-identifying", () => {
+  it("keeps prompt guidelines self-identifying and free of repeated call mechanics", () => {
     for (const { spec, surface } of surfaces) {
       for (const guideline of surface.promptGuidelines) {
         expect(guideline).toContain(spec.name);
       }
     }
+
+    const fetch = surfaces.find(({ spec }) => spec.name === WEB_FETCH_MD_TOOL_NAME);
+    expect(fetch?.surface.promptGuidelines).toEqual([]);
+    expect(fetch?.surface.description).toMatch(/Use gh for GitHub URLs when available/i);
+    expect(fetch?.surface.description).not.toMatch(/2,000 lines|50(?:\.0)?KB/i);
+  });
+
+  it("keeps the Context7 order in the fetch description, not its library_id field", () => {
+    const docsFetch = surfaces.find(({ spec }) => spec.name === "web_docs_fetch");
+    expect(docsFetch?.surface.description).toMatch(/Search first if the ID is unknown/i);
+
+    const schema = docsFetch?.spec.parameters as {
+      properties?: { library_id?: { description?: string } };
+    };
+    expect(schema.properties?.library_id?.description).not.toMatch(/search first/i);
   });
 
   it("accepts only supported fetch timeout values", () => {

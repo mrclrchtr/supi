@@ -8,7 +8,8 @@ export function buildModelCatalogueEnum(catalogue: readonly CuratedModel[]): TSc
     throw new Error("Cannot build an Antigravity model enum from an empty catalogue.");
   }
   return StringEnum([...catalogue] as [string, ...string[]], {
-    description: "Curated Antigravity model available to the current account.",
+    description:
+      "Curated Antigravity model available to the current account; new runs have no default.",
   });
 }
 

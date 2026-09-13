@@ -28,9 +28,9 @@ src/
 ├── context7-client.ts # REST API client for Context7 (direct fetch, auth header handling)
 ├── docs.ts            # Extension factory — registers web_docs_search + web_docs_fetch tools
 ├── tool/
-│   ├── tool-specs.ts # single source of truth for tool metadata, schemas, and input types
-│   ├── guidance.ts   # prompt surfaces derived from specs (+ runtime gh guidance)
-│   └── output.ts     # model-visible truncation helpers
+│   ├── tool-specs.ts # Aggregate exports for tool metadata, schemas, and input types
+│   ├── result.ts     # Shared model-visible truncation helper
+│   └── web_*/        # Per-tool specs, guidance, execution, results, and rendering
 ```
 
 ## Content negotiation pipeline (web_fetch_md)

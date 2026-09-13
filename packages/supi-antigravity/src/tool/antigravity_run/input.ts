@@ -41,7 +41,7 @@ export function buildAntigravityRunSchema(catalogue: readonly CuratedModel[]): T
         {
           workspace: Type.Boolean({
             description:
-              "Expose the current PI workspace, or use the empty Consultation Workspace.",
+              "true exposes the current PI workspace; false uses the empty Consultation Workspace. Use true only when repository evidence is needed.",
           }),
           model: buildModelCatalogueEnum(catalogue),
         },
@@ -55,9 +55,16 @@ export function buildAntigravityRunSchema(catalogue: readonly CuratedModel[]): T
       prompt,
       continue: Type.Object(
         {
-          handle: Type.String({ minLength: 1, maxLength: MAX_HANDLE_CHARS }),
+          handle: Type.String({
+            minLength: 1,
+            maxLength: MAX_HANDLE_CHARS,
+            description: "Conversation Handle returned by antigravity_run.",
+          }),
         },
-        { additionalProperties: false },
+        {
+          additionalProperties: false,
+          description: "Continue a prior run and inherit its model and workspace access.",
+        },
       ),
     },
     { additionalProperties: false },

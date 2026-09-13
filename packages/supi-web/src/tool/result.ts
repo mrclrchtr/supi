@@ -7,9 +7,6 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { writeTempFile } from "../temp-file.ts";
 
-/** Human-readable truncation contract shared by all model-visible web outputs. */
-export const MODEL_OUTPUT_LIMIT_DESCRIPTION = `Inline truncates at ${DEFAULT_MAX_LINES.toLocaleString()} lines/${formatSize(DEFAULT_MAX_BYTES)}; full saved to temp.`;
-
 /** Result of preparing content for a tool response visible to the model. */
 export interface ModelVisibleOutput {
   /** Text safe to return in a tool result. */

@@ -1,5 +1,5 @@
 export const toolDescription =
-  "Preview a semantic refactor without changing files or falling back to text edits.";
+  "Create and store a semantic refactor preview without changing files. Unsupported operations do not fall back to text edits.";
 
 export const promptSnippet = "preview a semantic refactor";
 

@@ -1,9 +1,6 @@
-import { MODEL_OUTPUT_LIMIT_DESCRIPTION } from "../result.ts";
+export const toolDescription =
+  "Fetch focused Context7 docs for a known library_id. Search first if the ID is unknown. Markdown is the default; raw=true returns JSON snippets.";
 
-export const toolDescription = `Fetch focused Context7 docs for a known Context7 library_id. Markdown by default; raw=true returns JSON snippets. Search first if unknown. ${MODEL_OUTPUT_LIMIT_DESCRIPTION}`;
+export const promptSnippet = "fetch focused Context7 documentation";
 
-export const promptSnippet = "web_docs_fetch: focused Context7 docs";
-
-export const promptGuidelines = [
-  "Use web_docs_fetch with a known library_id and narrow query; raw only for JSON.",
-];
+export const promptGuidelines: string[] = [];

@@ -12,7 +12,8 @@ export const cacheForensicsSpec = {
   label: CACHE_FORENSICS_TOOL_LABEL,
   parameters: Type.Object({
     pattern: StringEnum(["hotspots", "breakdown", "correlate", "idle"], {
-      description: "Query pattern",
+      description:
+        "Analysis pattern: breakdown=cause totals; hotspots=largest drops; correlate=preceding tool shapes; idle=drops after long gaps.",
     }),
     since: Type.Optional(
       Type.String({

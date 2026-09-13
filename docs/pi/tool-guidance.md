@@ -124,6 +124,7 @@ Mechanics of `description`, `promptSnippet`, and `promptGuidelines`: installed P
 
 - Add it when the tool should appear in the default `Available tools` list.
 - Write one short, noun-led or verb-led capability phrase. Add one short qualifier only when it improves selection.
+- Omit the tool name. Pi adds it as `- <tool name>: <snippet>`.
 - Do not put preconditions, edge cases, ordering rules, parameter syntax, or output details here. Pi converts whitespace to one line and omits an empty value.
 - Omit it for a rarely used or lazily loaded tool when activation must not change the default system prompt. The active provider definition still contains its `description`.
 
@@ -181,7 +182,7 @@ PI does not automatically truncate custom tool output. Truncation helpers and de
 
 SuPi rules:
 
-- Mention truncation limits in `description` when they affect tool choice.
+- Mention a truncation limit in `description` only when it changes tool or input selection. Omit PI's standard 2,000-line and 50 KB limits from descriptions.
 - Prefer spill files over large inline output: `content` carries preview + path only (Tier 2 economy), full data stays on disk.
 - `tool_result` handlers that shrink history should move noise to `details` rather than delete information.
 
@@ -228,7 +229,7 @@ SuPi additions:
 - [ ] Every additional description sentence can change selection, argument validity, or a required safety decision.
 - [ ] Description wording is provider-neutral unless provider identity changes selection, trust, cost, or safe use.
 - [ ] All critical cross-tool routing and ordering rules remain correct without optional prompt metadata.
-- [ ] `promptSnippet` is present only if the tool should appear in the default `Available tools` list. It is one short capability phrase.
+- [ ] `promptSnippet` is present only if the tool should appear in the default `Available tools` list. It is one short capability phrase and does not repeat the tool name.
 - [ ] `promptGuidelines` contains only optional active-tool reminders. Every bullet explicitly names the tool.
 - [ ] Each detailed model-facing fact has one authoritative field. A snippet only summarizes the main capability.
 - [ ] Model-facing guidance is concise, information-dense, and omits low-value hints.

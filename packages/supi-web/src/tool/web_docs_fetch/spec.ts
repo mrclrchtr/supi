@@ -8,7 +8,7 @@ export const WEB_DOCS_FETCH_TOOL_LABEL = "Web Docs Fetch";
 export const webDocsFetchParameters = Type.Object(
   {
     library_id: Type.String({
-      description: "Context7 ID (e.g. /facebook/react); search first if unknown",
+      description: "Context7 ID, for example /facebook/react.",
     }),
     query: Type.String({ description: "Specific docs question" }),
     raw: Type.Optional(

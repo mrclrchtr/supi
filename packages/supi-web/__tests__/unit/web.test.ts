@@ -10,14 +10,6 @@ interface RenderableTool {
   renderResult: (...args: unknown[]) => { render: (width: number) => string[] };
 }
 
-const { spawnSync } = vi.hoisted(() => ({
-  spawnSync: vi.fn(() => ({ status: 0 })),
-}));
-
-vi.mock("node:child_process", () => ({
-  spawnSync,
-}));
-
 import webExtension from "../../src/web.ts";
 
 function createTheme(): ThemeMock {

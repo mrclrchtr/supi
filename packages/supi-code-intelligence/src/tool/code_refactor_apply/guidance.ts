@@ -1,5 +1,5 @@
 export const toolDescription =
-  "Apply a fresh stored refactor plan to change its files. It does not create or regenerate a plan.";
+  "Apply a stored refactor plan by its returned planId after freshness and edit-safety checks. Changed files reject the apply and require a new plan; this tool does not regenerate one.";
 
 export const promptSnippet = "apply a stored refactor plan";
 
