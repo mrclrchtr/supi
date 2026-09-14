@@ -29,6 +29,11 @@ type OverlayComponent = {
   dispose?: () => void;
 };
 
+function typeIntoOverlay(overlay: OverlayComponent, text: string): void {
+  for (const character of text) overlay.handleInput(character);
+  overlay.handleInput("\n");
+}
+
 function runRegistration(
   taskId: string,
   status: AgentRunProgress["status"] = "running",
@@ -82,7 +87,12 @@ function captureOverlay(ctx: ReturnType<typeof makeCtx>): {
 } {
   let overlay: OverlayComponent | undefined;
   const custom = vi.fn(async (factory: (...args: unknown[]) => unknown) => {
-    overlay = factory({ requestRender: vi.fn() }, ctx.ui.theme, {}, vi.fn()) as OverlayComponent;
+    overlay = factory(
+      { requestRender: vi.fn(), terminal: { rows: 1000 } },
+      ctx.ui.theme,
+      {},
+      vi.fn(),
+    ) as OverlayComponent;
   });
   return {
     custom,
@@ -135,7 +145,12 @@ describe("/agents command", () => {
     ) => Promise<void>;
     let rendered = "";
     const custom = vi.fn(async (factory: (...args: unknown[]) => unknown) => {
-      const component = factory({ requestRender: vi.fn() }, makeCtx().ui.theme, {}, vi.fn()) as {
+      const component = factory(
+        { requestRender: vi.fn(), terminal: { rows: 1000 } },
+        makeCtx().ui.theme,
+        {},
+        vi.fn(),
+      ) as {
         render: (width: number) => string[];
         dispose?: () => void;
       };
@@ -164,7 +179,7 @@ describe("/agents command", () => {
     ) => Promise<void>;
     const base = makeCtx({ mode: "tui" });
     const captured = captureOverlay(base);
-    const input = vi.fn(async () => "Focus on tests");
+    const input = vi.fn(async () => "This should not open");
     const ctx = makeCtx({ ui: { ...base.ui, custom: captured.custom, input } });
 
     await handler("", ctx);
@@ -173,6 +188,9 @@ describe("/agents command", () => {
     expect(overlay.render(100).join("\n")).toContain("test/model");
 
     overlay.handleInput("s");
+    expect(overlay.render(100).join("\n")).toContain("Steer inspect");
+    typeIntoOverlay(overlay, "Focus on tests");
+    expect(input).not.toHaveBeenCalled();
     await vi.waitFor(() => expect(active.steer).toHaveBeenCalledWith("Focus on tests"));
     await vi.waitFor(() =>
       expect(overlay.render(100).join("\n")).toContain("steering: Focus on tests"),
@@ -190,13 +208,12 @@ describe("/agents command", () => {
     ) => Promise<void>;
     const base = makeCtx({ mode: "tui" });
     const captured = captureOverlay(base);
-    const ctx = makeCtx({
-      ui: { ...base.ui, custom: captured.custom, input: vi.fn(async () => "Too late") },
-    });
+    const ctx = makeCtx({ ui: { ...base.ui, custom: captured.custom } });
 
     await handler("", ctx);
     const overlay = captured.component();
     overlay.handleInput("s");
+    typeIntoOverlay(overlay, "Too late");
 
     await vi.waitFor(() =>
       expect(overlay.render(100).join("\n")).toContain("Selected run is not running"),

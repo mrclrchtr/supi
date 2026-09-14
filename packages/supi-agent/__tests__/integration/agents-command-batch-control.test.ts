@@ -113,7 +113,12 @@ describe("/agents selected-run control with an active Delegation Batch", () => {
     let overlay: OverlayComponent | undefined;
     const base = makeCtx({ mode: "tui" });
     const custom = vi.fn(async (factory: (...args: unknown[]) => unknown) => {
-      overlay = factory({ requestRender: vi.fn() }, base.ui.theme, {}, vi.fn()) as OverlayComponent;
+      overlay = factory(
+        { requestRender: vi.fn(), terminal: { rows: 1000 } },
+        base.ui.theme,
+        {},
+        vi.fn(),
+      ) as OverlayComponent;
     });
     const command = pi.getCommandHandler("agents") as (
       args: string,

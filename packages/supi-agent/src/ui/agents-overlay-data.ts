@@ -4,8 +4,8 @@ import type { AgentConversationView } from "../tool/agent_run/conversation-view.
 import type { BatchTaskStatus } from "../tool/agent_run/registry.ts";
 import type { AgentProfileFieldSources, ProfileDiagnostic, ProfileSource } from "../types.ts";
 
-/** Number of Conversation View entries shown on one overlay page. */
-export const AGENTS_CONVERSATION_PAGE_SIZE = 10;
+/** Shared height limit for the PI overlay and its rendered viewport. */
+export const AGENTS_OVERLAY_MAX_HEIGHT_PERCENT = 90;
 
 /** One active or last-completed Agent Run shown in the overlay. */
 export interface AgentsOverlayRun {
@@ -63,8 +63,8 @@ export type AgentOverlayControlResult = "accepted" | "not-running" | "canceled";
 export interface AgentsDialogDependencies {
   readonly theme: Theme;
   readonly done: () => void;
-  readonly tui: { requestRender: () => void };
-  readonly onSteer: (taskId: string) => Promise<AgentOverlayControlResult>;
+  readonly tui: { requestRender: () => void; terminal: { rows: number } };
+  readonly onSteer: (taskId: string, message: string) => Promise<AgentOverlayControlResult>;
   readonly onStop: (taskId: string) => Promise<Exclude<AgentOverlayControlResult, "canceled">>;
   readonly subscribe?: (listener: (data: AgentsOverlayData) => void) => () => void;
 }

@@ -1,3 +1,4 @@
+import { CURSOR_MARKER, visibleWidth } from "@earendil-works/pi-tui";
 import { makeCtx } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { AgentsDialog } from "../../src/ui/agents-overlay.ts";
@@ -94,7 +95,7 @@ function dependencies(overrides: Partial<AgentsDialogDependencies> = {}): Agents
   return {
     theme: makeCtx().ui.theme as never,
     done: vi.fn(),
-    tui: { requestRender: vi.fn() },
+    tui: { requestRender: vi.fn(), terminal: { rows: 1000 } },
     onSteer: vi.fn(async () => "accepted" as const),
     onStop: vi.fn(async () => "accepted" as const),
     ...overrides,
@@ -239,7 +240,13 @@ describe("AgentsDialog", () => {
         },
       ],
     });
-    const dialog = new AgentsDialog(initial, dependencies());
+    const dialog = new AgentsDialog(
+      initial,
+      dependencies({
+        tui: { requestRender: vi.fn(), terminal: { rows: 24 } },
+      }),
+    );
+    dialog.render(100);
     dialog.handleInput("\x1b[5~");
     expect(dialog.render(100).join("\n")).not.toContain("message 15");
 
@@ -258,8 +265,36 @@ describe("AgentsDialog", () => {
     const dialog = new AgentsDialog(data(), dependencies({ onSteer }));
 
     dialog.handleInput("s");
+    for (const character of "Focus on tests") dialog.handleInput(character);
+    dialog.handleInput("\n");
 
     await vi.waitFor(() => expect(dialog.render(100).join("\n")).toContain("Control failed"));
+  });
+
+  it("refreshes the embedded cursor when the overlay focus changes", () => {
+    const dialog = new AgentsDialog(data(), dependencies());
+    dialog.handleInput("s");
+
+    dialog.focused = true;
+    expect(dialog.render(100).join("\n")).toContain(CURSOR_MARKER);
+    dialog.focused = false;
+    expect(dialog.render(100).join("\n")).not.toContain(CURSOR_MARKER);
+  });
+
+  it("keeps steering in the overlay and cancels without closing it", () => {
+    const done = vi.fn();
+    const onSteer = vi.fn(async () => "accepted" as const);
+    const dialog = new AgentsDialog(data(), dependencies({ done, onSteer }));
+
+    dialog.handleInput("s");
+    dialog.handleInput("\n");
+    expect(onSteer).not.toHaveBeenCalled();
+    expect(dialog.render(100).join("\n")).toContain("Enter a steering message");
+
+    dialog.handleInput("\x1b");
+    expect(done).not.toHaveBeenCalled();
+    expect(dialog.render(100).join("\n")).toContain("Control canceled");
+    expect(dialog.render(100).join("\n")).toContain("s steer · x stop");
   });
 
   it("steers and stops only the selected active run", async () => {
@@ -268,8 +303,11 @@ describe("AgentsDialog", () => {
     const dialog = new AgentsDialog(data(), dependencies({ onSteer, onStop }));
 
     dialog.handleInput("s");
+    expect(dialog.render(100).join("\n")).toContain("Steer inspect");
+    for (const character of "Focus on tests") dialog.handleInput(character);
+    dialog.handleInput("\n");
     await vi.waitFor(() => expect(dialog.render(100).join("\n")).toContain("Control accepted"));
-    expect(onSteer).toHaveBeenCalledWith("inspect");
+    expect(onSteer).toHaveBeenCalledWith("inspect", "Focus on tests");
     dialog.handleInput("x");
     await vi.waitFor(() => expect(onStop).toHaveBeenCalledWith("inspect"));
   });
@@ -327,6 +365,6 @@ describe("AgentsDialog", () => {
 
   it("keeps every rendered line within the available width", () => {
     const dialog = new AgentsDialog(data(), dependencies());
-    expect(dialog.render(60).every((line) => line.length <= 60)).toBe(true);
+    expect(dialog.render(60).every((line) => visibleWidth(line) <= 60)).toBe(true);
   });
 });

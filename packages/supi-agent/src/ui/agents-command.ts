@@ -8,10 +8,11 @@ import type {
 } from "../tool/agent_run/registry.ts";
 import type { ProfileCatalogue, ProfileDiagnostic, ProfileSourceDirectories } from "../types.ts";
 import { AgentsDialog } from "./agents-overlay.ts";
-import type {
-  AgentsOverlayData,
-  AgentsOverlayProfile,
-  AgentsOverlayRun,
+import {
+  AGENTS_OVERLAY_MAX_HEIGHT_PERCENT,
+  type AgentsOverlayData,
+  type AgentsOverlayProfile,
+  type AgentsOverlayRun,
 } from "./agents-overlay-data.ts";
 
 const MAX_OVERLAY_DIAGNOSTICS = 20;
@@ -33,11 +34,7 @@ export function registerAgentsCommand(pi: ExtensionAPI, registry: AgentRunRegist
             theme,
             tui,
             done: () => done(undefined),
-            onSteer: async (taskId) => {
-              const message = await ctx.ui.input(`Steer ${taskId}`, "Steering message");
-              if (!message?.trim()) return "canceled";
-              return registry.steer(taskId, message.trim());
-            },
+            onSteer: (taskId, message) => registry.steer(taskId, message),
             onStop: (taskId) => registry.stop(taskId),
             subscribe: (listener) =>
               registry.subscribe((snapshot) => listener(buildOverlayData(catalogue, snapshot))),
@@ -48,7 +45,7 @@ export function registerAgentsCommand(pi: ExtensionAPI, registry: AgentRunRegist
             anchor: "center",
             width: "80%",
             minWidth: 60,
-            maxHeight: "90%",
+            maxHeight: `${AGENTS_OVERLAY_MAX_HEIGHT_PERCENT}%`,
             visible: (terminalWidth: number) => terminalWidth >= 60,
           },
         },

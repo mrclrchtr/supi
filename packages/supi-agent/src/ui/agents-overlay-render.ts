@@ -1,6 +1,6 @@
 import type { Usage } from "@earendil-works/pi-ai";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { type Container, Spacer, Text } from "@earendil-works/pi-tui";
+import { Container, Spacer, Text, truncateToWidth } from "@earendil-works/pi-tui";
 import type { AgentConversationView } from "../tool/agent_run/conversation-view.ts";
 import type { BatchTaskStatus } from "../tool/agent_run/registry.ts";
 import { renderConversationEntry } from "../tool/agent_run/render.ts";
@@ -9,7 +9,7 @@ import type {
   AgentsOverlayProfile,
   AgentsOverlayRun,
 } from "./agents-overlay-data.ts";
-import { AGENTS_CONVERSATION_PAGE_SIZE } from "./agents-overlay-data.ts";
+import type { AgentRunBlock } from "./agents-run-viewport.ts";
 
 const LIST_WINDOW_SIZE = 8;
 const MAX_OVERLAY_RESULT_CHARS = 4_000;
@@ -19,30 +19,39 @@ interface RunSectionOptions {
   container: Container;
   data: AgentsOverlayData;
   selectedIndex: number;
-  conversationEnd: number;
+  width: number;
+  listRows: number;
   theme: Theme;
+  conversationBlocks?: readonly AgentRunBlock[];
 }
 
-/** Render the active and last-completed Agent Run section. */
-export function renderRunsSection(options: RunSectionOptions): void {
-  const { container, data, selectedIndex, conversationEnd, theme } = options;
+/** Add fixed run rows and return scrollable details with stable conversation positions. */
+export function renderRunsSection(options: RunSectionOptions): AgentRunBlock[] {
+  const { container, data, selectedIndex, width, listRows, theme } = options;
   if (data.runs.length === 0) {
-    container.addChild(new Text(theme.fg("dim", "No Agent Runs in this session."), 1, 0));
-    return;
+    return [
+      {
+        key: -2,
+        lines: new Text(theme.fg("dim", "No Agent Runs in this session."), 1, 0).render(width),
+      },
+    ];
   }
-  for (const [index, run] of visibleWindow(data.runs, selectedIndex).entries()) {
-    const actualIndex = windowStart(data.runs.length, selectedIndex) + index;
-    addRunRow(container, run, actualIndex === selectedIndex, theme);
+  const start = windowStart(data.runs.length, selectedIndex, listRows);
+  for (const [index, run] of data.runs.slice(start, start + listRows).entries()) {
+    const row = renderRunRow(run, start + index === selectedIndex, theme);
+    container.addChild(new Text(truncateToWidth(row, Math.max(1, width - 2)), 1, 0));
   }
   const run = data.runs[selectedIndex];
-  if (!run) return;
-  container.addChild(new Spacer(1));
-  container.addChild(new Text(theme.fg("accent", theme.bold("Selected task")), 1, 0));
-  renderRunMetadata(container, run, theme);
-  renderRunResult(container, run, theme);
-  container.addChild(new Spacer(1));
-  container.addChild(new Text(theme.fg("accent", theme.bold("Conversation")), 1, 0));
-  renderConversation(container, run.conversationView, conversationEnd, theme);
+  if (!run) return [];
+  const details = new Container();
+  details.addChild(new Text(theme.fg("accent", theme.bold("Selected task")), 1, 0));
+  renderRunMetadata(details, run, theme);
+  renderRunResult(details, run, theme);
+  details.addChild(new Spacer(1));
+  return [
+    { key: -2, lines: details.render(width) },
+    ...(options.conversationBlocks ?? renderConversationBlocks(run.conversationView, width, theme)),
+  ];
 }
 
 /** Render effective Agent Profiles with human-only source provenance. */
@@ -115,16 +124,11 @@ export function renderDiagnosticsSection(
   addDiagnosticOmission(container, data.omittedDiagnosticCount, theme);
 }
 
-function addRunRow(
-  container: Container,
-  run: AgentsOverlayRun,
-  selected: boolean,
-  theme: Theme,
-): void {
+function renderRunRow(run: AgentsOverlayRun, selected: boolean, theme: Theme): string {
   const scope = run.active ? "active" : "last";
   const metrics = `${run.turns} turns · ${run.toolUses} tools`;
   const line = `${selected ? theme.fg("accent", "▶") : " "} ${statusIcon(run.status, theme)} ${run.taskId} (${run.profileId}) · ${run.status} · ${metrics} · ${scope}`;
-  container.addChild(new Text(selected ? theme.fg("accent", line) : theme.fg("dim", line), 1, 0));
+  return selected ? theme.fg("accent", line) : theme.fg("dim", line);
 }
 
 function renderRunMetadata(container: Container, run: AgentsOverlayRun, theme: Theme): void {
@@ -200,10 +204,26 @@ function boundOverlayResult(text: string): { text: string; truncated: boolean } 
   };
 }
 
-function renderConversation(
+function renderConversationBlocks(
+  view: AgentConversationView | undefined,
+  width: number,
+  theme: Theme,
+): AgentRunBlock[] {
+  const conversation = new Container();
+  conversation.addChild(new Text(theme.fg("accent", theme.bold("Conversation")), 1, 0));
+  renderConversationNotice(conversation, view, theme);
+  return [
+    { key: -1, lines: conversation.render(width) },
+    ...(view?.entries.map((entry, index) => ({
+      key: view.omittedEntryCount + index,
+      lines: new Text(renderConversationEntry(entry, theme), 1, 0).render(width),
+    })) ?? []),
+  ];
+}
+
+function renderConversationNotice(
   container: Container,
   view: AgentConversationView | undefined,
-  conversationEnd: number,
   theme: Theme,
 ): void {
   if (!view) {
@@ -221,20 +241,6 @@ function renderConversation(
         0,
       ),
     );
-  }
-  const end = Math.min(view.entries.length, conversationEnd);
-  const start = Math.max(0, end - AGENTS_CONVERSATION_PAGE_SIZE);
-  if (start > 0 || end < view.entries.length) {
-    container.addChild(
-      new Text(
-        theme.fg("dim", `Overlay window: entries ${start + 1}-${end} of ${view.entries.length}.`),
-        1,
-        0,
-      ),
-    );
-  }
-  for (const entry of view.entries.slice(start, end)) {
-    container.addChild(new Text(renderConversationEntry(entry, theme), 1, 0));
   }
   if (view.entries.length === 0) {
     container.addChild(new Text(theme.fg("dim", "No retained conversation entries yet."), 1, 0));
@@ -336,9 +342,6 @@ function visibleWindow<T>(items: readonly T[], selected: number): readonly T[] {
   return items.slice(start, start + LIST_WINDOW_SIZE);
 }
 
-function windowStart(length: number, selected: number): number {
-  return Math.min(
-    Math.max(0, length - LIST_WINDOW_SIZE),
-    Math.max(0, selected - Math.floor(LIST_WINDOW_SIZE / 2)),
-  );
+function windowStart(length: number, selected: number, size = LIST_WINDOW_SIZE): number {
+  return Math.min(Math.max(0, length - size), Math.max(0, selected - Math.floor(size / 2)));
 }
