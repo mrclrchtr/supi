@@ -44,10 +44,13 @@ function mergeRanges(items: readonly ReadNextItem[]): ReadNextItem[] {
         other.startLine <= merged.endLine &&
         merged.startLine <= other.endLine
       ) {
-        if (index < firstIndex) {
-          firstIndex = index;
-          merged.reason = other.reason;
-        }
+        firstIndex = Math.min(firstIndex, index);
+        if (
+          merged.reason !== other.reason ||
+          merged.startLine !== other.startLine ||
+          merged.endLine !== other.endLine
+        )
+          merged.reason = "inspect related source ranges";
         merged.startLine = Math.min(merged.startLine, other.startLine);
         merged.endLine = Math.max(merged.endLine, other.endLine);
         result.splice(index, 1);

@@ -49,6 +49,51 @@ function execute(maxResults?: number) {
 }
 
 describe("code_graph human output", () => {
+  it("asks for a target instead of reporting invalid input for ambiguous names", async () => {
+    writeFileSync(path.join(cwd, "other.ts"), "function work() {}\n");
+    registerMockProvider(cwd, {
+      workspaceSymbols: async () =>
+        completedCodeQuery(
+          ["test.ts", "other.ts"].map((file) => ({
+            name: "work",
+            kind: "Function",
+            file: path.join(cwd, file),
+            declarationAnchor: { line: 1, character: 1 },
+            nameAnchor: { line: 1, character: 10 },
+          })),
+        ),
+    });
+    const result = await executeGraphTool(
+      { target: { symbol: { query: "work" } } },
+      makeTestCtx(cwd),
+    );
+    expect(result.details?.status).toBe("disambiguation");
+    expect(render(result, false)).toContain("Choose a target");
+    expect(render(result, false)).not.toContain("Invalid input");
+    const expanded = render(result, true);
+    expect(expanded).toContain("other.ts");
+    expect(expanded).not.toContain("This agent text");
+  });
+
+  it("keeps the callee failure reason and a next step in both surfaces", async () => {
+    const message = "No enclosing function or method found at the given position";
+    registerMockProvider(cwd, {
+      references: async () => completedCodeQuery([]),
+      calleesAt: async () => ({ kind: "runtime-error", message }),
+    });
+    const result = await execute();
+    expect(result.content).toContain(message);
+    expect(result.content).toContain("code_inspect");
+    expect(render(result, true)).toContain(message);
+    expect(render(result, true)).toContain("code_inspect");
+    await expect(
+      executeGraphTool(
+        { target: { anchor: { file: "test.ts", line: 1, character: 10 } }, relations: ["callees"] },
+        makeTestCtx(cwd),
+      ),
+    ).rejects.toThrow(message);
+  });
+
   it("uses the TUI row cap without claiming that hidden rows are shown", async () => {
     registerMockProvider(cwd, {
       references: async () =>

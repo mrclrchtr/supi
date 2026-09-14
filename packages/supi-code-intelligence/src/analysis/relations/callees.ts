@@ -11,6 +11,8 @@ export interface CalleesResult {
   enclosingScope: CalleeScope | null;
   callees: CalleeEntry[];
   confidence: "structural" | "unavailable";
+  /** Original provider reason when callee evidence is unavailable. */
+  message: string | null;
   depth: "direct" | "deep";
 }
 
@@ -30,7 +32,7 @@ export async function collectCallees(
   control?: CodeRequestControl,
 ): Promise<CalleesResult> {
   if (!deps.provider?.calleesAt) {
-    return unavailableCallees(targetName);
+    return unavailableCallees(targetName, "No structural callee provider", depth);
   }
 
   const depthOrOptions = control ? { depth, control } : depth;
@@ -40,8 +42,8 @@ export async function collectCallees(
     targetCharacter,
     depthOrOptions,
   );
-  if (result.kind !== "success" || !result.data) {
-    return unavailableCallees(targetName);
+  if (result.kind !== "success") {
+    return unavailableCallees(targetName, result.message, depth);
   }
 
   void maxResults;
@@ -53,6 +55,7 @@ export async function collectCallees(
   );
   const callees: CalleeEntry[] = result.data.callees.map((c) => ({
     name: c.name,
+    ...(c.displayName ? { displayName: c.displayName } : {}),
     file: targetFile,
     line: c.startLine,
     character: c.startCharacter,
@@ -64,18 +67,24 @@ export async function collectCallees(
     enclosingScope,
     callees,
     confidence: "structural",
+    message: null,
     depth: result.data.depth ?? depth,
   };
 }
 
-function unavailableCallees(targetName: string | null): CalleesResult {
+function unavailableCallees(
+  targetName: string | null,
+  message: string,
+  depth: "direct" | "deep",
+): CalleesResult {
   return {
     kind: "callees",
     targetName: targetName ?? "symbol",
     enclosingScope: null,
     callees: [],
     confidence: "unavailable",
-    depth: "direct",
+    message,
+    depth,
   };
 }
 

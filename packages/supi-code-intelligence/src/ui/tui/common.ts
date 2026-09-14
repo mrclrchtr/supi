@@ -231,12 +231,15 @@ export function renderDomainResult(
 /** Render the structured output-truncation disclosure. */
 export function renderTruncationDisclosure(result: ToolResult, theme: Theme): Text | null {
   const truncation = result.details?.truncation;
-  if (!truncation?.truncated) return null;
+  if (!truncation?.truncated && !truncation?.displayTruncated) return null;
 
+  const label = truncation.truncated ? "Output truncated" : "Display limited";
   const path = truncation.fullOutputPath
-    ? `; full output: ${truncateDisplayText(truncation.fullOutputPath, 160)}`
-    : "";
-  return new Text(theme.fg("warning", `Output truncated${path}`), 0, 0);
+    ? `; ${truncation.truncated ? "full output" : "full returned evidence"}: ${truncateDisplayText(truncation.fullOutputPath, 160)}`
+    : truncation.displayTruncated
+      ? "; full returned evidence file unavailable"
+      : "";
+  return new Text(theme.fg("warning", `${label}${path}`), 0, 0);
 }
 
 // ── Result options ───────────────────────────────────────────────

@@ -32,6 +32,8 @@ export interface CalleeScope {
 /** One direct structural callee entry from an enclosing-scope lookup. */
 export interface CalleeEntry {
   name: string;
+  /** Syntax-based preview only; the full name remains the grouping key. */
+  displayName?: string;
   file: string;
   line: number;
   character: number;

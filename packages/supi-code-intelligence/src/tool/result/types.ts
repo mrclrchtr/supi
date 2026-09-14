@@ -22,9 +22,13 @@ import type { ResultProvenance } from "./assembly.ts";
 /** Final state for a public tool result. */
 export type ToolResultStatus = "completed" | "invalid-input" | "disambiguation" | "unavailable";
 
-/** Truncation state for model-facing tool content. */
+/** Separate model-content and human-display bounds, with one optional continuation file. */
 export interface ToolOutputTruncationDetails {
+  /** Model content exceeded the PI output limit. */
   truncated: boolean;
+  /** The TUI omits evidence that remains in the model content. */
+  displayTruncated?: boolean;
+  /** Full returned content, not evidence beyond the requested result limit. */
   fullOutputPath?: string;
 }
 

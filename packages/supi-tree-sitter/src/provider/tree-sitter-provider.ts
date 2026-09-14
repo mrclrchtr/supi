@@ -145,6 +145,7 @@ function mapCalleesAtResult(result: CalleesAtResult): CalleesData {
     },
     callees: result.callees.map((c) => ({
       name: c.name,
+      ...(c.displayName === undefined ? {} : { displayName: c.displayName }),
       startLine: c.range.startLine,
       startCharacter: c.range.startCharacter,
     })),

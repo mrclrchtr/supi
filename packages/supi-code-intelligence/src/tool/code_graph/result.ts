@@ -20,8 +20,8 @@ import {
 } from "../result/assembly.ts";
 import { createToolDisplaySection } from "../result/display.ts";
 import type { ToolDisplaySection } from "../result/types.ts";
-import type { GraphDetails, GraphSectionDetails } from "./details.ts";
-import { compactGraphLabel } from "./format.ts";
+import type { GraphDetails, GraphFileGroup, GraphSectionDetails } from "./details.ts";
+import { graphDisplaySection } from "./display.ts";
 import { graphReadNext } from "./read-next.ts";
 
 export type { GraphRelationKind, GraphSection } from "../../session/graph-types.ts";
@@ -87,7 +87,8 @@ export function assembleGraphResult(input: {
     provenance,
   });
 
-  const displaySections = sections.map((section) => graphDisplaySection(section, input.cwd));
+  const displays = sections.map((section) => graphDisplaySection(section, input.cwd));
+  const displaySections = displays.map(({ display }) => display);
 
   return {
     displayName: input.displayName,
@@ -99,50 +100,20 @@ export function assembleGraphResult(input: {
     details: {
       targetName: input.displayName,
       targetFile: input.resolvedDisplayFile,
-      sections: sections.map((section) => graphSectionDetails(section, input.cwd)),
+      sections: sections.map((section, index) =>
+        graphSectionDetails(section, input.cwd, displays[index].fileGroups),
+      ),
       readNext: assembledReadNext(assembled),
       evidenceLists: [...assembled.evidenceLists],
     },
   };
 }
 
-function graphDisplaySection(section: AssembledGraphSection, cwd: string): ToolDisplaySection {
-  if (section.kind === "unavailable") {
-    return createToolDisplaySection({
-      key: `graph.${section.rel}`,
-      title: section.rel,
-      items: [section.message],
-      format: (message) => `Unavailable — ${message}`,
-      totalCount: 1,
-    });
-  }
-
-  return createToolDisplaySection({
-    key: `graph.${section.rel}`,
-    title: section.rel,
-    items: section.evidence.items as readonly unknown[],
-    totalCount: section.evidence.metadata.totalCount,
-    omittedCount: section.evidence.metadata.omittedCount,
-    partialReason: section.evidence.metadata.partialReason,
-    format: (item) => formatGraphDisplayItem(section.rel, item, cwd),
-  });
-}
-
-function formatGraphDisplayItem(
-  relation: "references" | "callees" | "implements",
-  item: unknown,
+function graphSectionDetails(
+  section: AssembledGraphSection,
   cwd: string,
-): string {
-  if (relation === "callees") {
-    const call = item as CallEntry;
-    return `${toDisplayPath(cwd, call.file)}:L${call.line}:${call.character} — ${compactGraphLabel(call.name)}`;
-  }
-
-  const location = item as ReferenceEntry;
-  return `${toDisplayPath(cwd, location.file)}:L${location.line}:${location.character}`;
-}
-
-function graphSectionDetails(section: AssembledGraphSection, cwd: string): GraphSectionDetails {
+  fileGroups: GraphFileGroup[],
+): GraphSectionDetails {
   const calls = section.kind === "ok" && section.rel === "callees" ? section.data : null;
   return {
     rel: section.rel,
@@ -155,6 +126,7 @@ function graphSectionDetails(section: AssembledGraphSection, cwd: string): Graph
       ? { ...calls.enclosingScope, file: toDisplayPath(cwd, calls.enclosingScope.file) }
       : null,
     depth: calls?.depth ?? null,
+    fileGroups,
   };
 }
 
@@ -267,38 +239,7 @@ export function finishGraphResult(outcome: GraphOutcome, cwd: string): CodeIntel
     return searchErrorResult(`**Error:** ${outcome.message}`, { message: outcome.message });
   }
   if (outcome.kind === "disambiguation" || outcome.kind === "kind-mismatch") {
-    const lines = [
-      outcome.kind === "kind-mismatch"
-        ? `**No target matched provider kind \`${outcome.requestedKind}\`. Near matches:**`
-        : "**Target is ambiguous. Choose one candidate handle:**",
-      "",
-    ];
-    for (const candidate of outcome.candidates) {
-      lines.push(
-        `- \`${candidate.targetId}\` — ${candidate.name} (\`${candidate.kind ?? "unknown"}\`) at ${candidate.file}:${candidate.line}:${candidate.character}`,
-      );
-    }
-    if (outcome.kind === "kind-mismatch") {
-      lines.push(
-        "",
-        "Retry without `symbolKind`, use an observed provider kind, or choose a handle.",
-      );
-    }
-    return searchErrorResult(lines.join("\n"), {
-      message:
-        outcome.kind === "kind-mismatch"
-          ? `No target matched provider kind ${outcome.requestedKind}.`
-          : "The target is ambiguous.",
-      displaySections: [
-        createToolDisplaySection({
-          key: "graph.candidates",
-          title: "Candidates",
-          items: outcome.candidates,
-          format: (candidate) =>
-            `${candidate.targetId} — ${candidate.name} (${candidate.kind ?? "unknown"}) at ${candidate.file}:${candidate.line}:${candidate.character}`,
-        }),
-      ],
-    });
+    return finishGraphCandidates(outcome);
   }
 
   const assembly = assembleGraphResult({
@@ -308,6 +249,7 @@ export function finishGraphResult(outcome: GraphOutcome, cwd: string): CodeIntel
     maxResults: outcome.maxResults,
     cwd,
   });
+  const displayTruncated = hasHiddenDisplayEvidence(assembly);
   return {
     content: renderGraphResult(assembly),
     details: {
@@ -315,6 +257,53 @@ export function finishGraphResult(outcome: GraphOutcome, cwd: string): CodeIntel
       data: assembly.details,
       status: "completed",
       displaySections: assembly.displaySections,
+      ...(displayTruncated ? { truncation: { truncated: false, displayTruncated: true } } : {}),
     },
   };
+}
+
+function finishGraphCandidates(
+  outcome: Extract<GraphOutcome, { kind: "disambiguation" | "kind-mismatch" }>,
+): CodeIntelResult {
+  const lines = [
+    outcome.kind === "kind-mismatch"
+      ? `**No target matched provider kind \`${outcome.requestedKind}\`. Near matches:**`
+      : "**Target is ambiguous. Choose one candidate handle:**",
+    "",
+  ];
+  for (const candidate of outcome.candidates) {
+    lines.push(
+      `- \`${candidate.targetId}\` — ${candidate.name} (\`${candidate.kind ?? "unknown"}\`) at ${candidate.file}:${candidate.line}:${candidate.character}`,
+    );
+  }
+  if (outcome.kind === "kind-mismatch") {
+    lines.push(
+      "",
+      "Retry without `symbolKind`, use an observed provider kind, or choose a handle.",
+    );
+  }
+  return searchErrorResult(lines.join("\n"), {
+    status: outcome.kind === "disambiguation" ? "disambiguation" : "invalid-input",
+    message:
+      outcome.kind === "kind-mismatch"
+        ? `No target matched provider kind ${outcome.requestedKind}.`
+        : "The target is ambiguous.",
+    displaySections: [
+      createToolDisplaySection({
+        key: "graph.candidates",
+        title: "Candidates",
+        items: outcome.candidates,
+        format: (candidate) =>
+          `${candidate.targetId} — ${candidate.name} (${candidate.kind ?? "unknown"}) at ${candidate.file}:${candidate.line}:${candidate.character}`,
+      }),
+    ],
+  });
+}
+
+function hasHiddenDisplayEvidence(assembly: GraphResultAssembly): boolean {
+  return assembly.sections.some(
+    (section, index) =>
+      section.kind === "ok" &&
+      assembly.displaySections[index].shownCount < section.evidence.items.length,
+  );
 }

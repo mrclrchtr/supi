@@ -4,6 +4,8 @@ import type { CodeIntelResult, ToolDisplaySection } from "../../types/index.ts";
 export function searchErrorResult(
   content: string,
   opts?: {
+    /** Candidate selection is not invalid usage. Defaults to invalid-input. */
+    status?: "invalid-input" | "disambiguation";
     scope?: string | null;
     nextQueries?: string[];
     message?: string;
@@ -21,7 +23,7 @@ export function searchErrorResult(
         omittedCount: 0,
         nextQueries: opts?.nextQueries ?? [],
       },
-      status: "invalid-input",
+      status: opts?.status ?? "invalid-input",
       ...(opts?.message ? { message: opts.message } : {}),
       ...(opts?.displaySections ? { displaySections: opts.displaySections } : {}),
     },

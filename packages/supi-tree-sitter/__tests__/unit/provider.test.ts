@@ -259,6 +259,7 @@ describe("TreeSitterProvider", () => {
             callees: [
               {
                 name: "helper",
+                displayName: "helper(…)",
                 range: { startLine: 5, startCharacter: 0, endLine: 5, endCharacter: 10 },
               },
             ],
@@ -274,6 +275,7 @@ describe("TreeSitterProvider", () => {
         expect(result.data.enclosingScope.name).toBe("myFunc");
         expect(result.data.enclosingScope.startLine).toBe(1);
         expect(result.data.callees[0].name).toBe("helper");
+        expect(result.data.callees[0].displayName).toBe("helper(…)");
         expect(result.data.callees[0].startLine).toBe(5);
       }
     });

@@ -91,7 +91,11 @@ describe("code_graph agent output", () => {
     const callRows = result.details?.displaySections?.find(
       (section) => section.key === "graph.callees",
     )?.lines;
-    expect(callRows?.[1]).toContain("test.ts:L3:3");
+    expect(callRows?.[1]).toContain("L3:3");
+    if (result.details?.type !== "graph") throw new Error("Expected graph details");
+    expect(
+      result.details.data.sections.find((section) => section.rel === "callees")?.fileGroups,
+    ).toEqual([{ file: "test.ts", count: 2 }]);
   });
 
   it("merges overlapping read suggestions and includes implementation guidance", async () => {

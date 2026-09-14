@@ -1,3 +1,4 @@
+// biome-ignore lint/style/noExcessiveLinesPerFile: one barrier owns the shared read pass, revision tracking, and freshness checks.
 import {
   type CodeRequestControl,
   throwIfCodeRequestInterrupted,
@@ -87,6 +88,10 @@ export class SemanticInputBarrier {
   /** Last verified disk fingerprint for each URI; undefined means observed missing. */
   readonly #observedDiskFingerprints = new Map<string, string | undefined>();
   #revision = 0;
+  /** Latest non-enrollment change, used to classify stale snapshots. */
+  #lastNonEnrollmentChange:
+    | { readonly revision: number; readonly changeKind: SemanticInputChangeKind }
+    | undefined;
   #pending: PendingSynchronization | null = null;
 
   constructor(host: SemanticInputBarrierHost, options: SemanticInputBarrierOptions = {}) {
@@ -149,18 +154,39 @@ export class SemanticInputBarrier {
     if (!this.#host.isOperational()) {
       throw new Error("Semantic input synchronization is unavailable because the client stopped.");
     }
-    if (this.#revision !== snapshot.revision) {
-      throw new Error("Semantic input changed while the request was running.");
-    }
+    const changedBeforeRead = this.getChangeSince(
+      snapshot.revision,
+      "Semantic input changed while the request was running.",
+    );
+    if (changedBeforeRead) throw changedBeforeRead;
     const current = await this.synchronize(control, contentOverrides);
     if (current.revision !== snapshot.revision) {
-      throw new Error("Semantic input changed while the request was running.");
+      const changedAfterRead = this.getChangeSince(
+        snapshot.revision,
+        "Semantic input changed while the request was running.",
+      );
+      throw (
+        changedAfterRead ??
+        new SemanticInputSynchronizationError(
+          "content",
+          "Semantic input changed while the request was running.",
+        )
+      );
     }
+  }
+
+  /** Return the current typed input change after a revision, when present. */
+  getChangeSince(
+    revision: number,
+    message = "Semantic input changed while synchronization was running.",
+  ): SemanticInputSynchronizationError | undefined {
+    if (this.#revision <= revision) return undefined;
+    return new SemanticInputSynchronizationError(this.#changeKindSince(revision), message);
   }
 
   /** Record a lifecycle or input change that invalidates a pending pass. */
   noteInputChange(changeKind: SemanticInputChangeKind = "content"): void {
-    this.#revision++;
+    this.#advanceRevision(changeKind);
     const pending = this.#pending;
     if (!pending || pending.settled) return;
     const reason = pending.controller.signal.reason;
@@ -284,9 +310,11 @@ export class SemanticInputBarrier {
 
   #assertPendingCurrent(pending: PendingSynchronization): void {
     if (pending.controller.signal.aborted) throw pending.controller.signal.reason;
-    if (!this.#host.isOperational() || this.#revision !== pending.generation) {
+    if (!this.#host.isOperational()) {
       throw new Error("Semantic input changed while synchronization was running.");
     }
+    const changed = this.getChangeSince(pending.generation);
+    if (changed) throw changed;
   }
 
   #buildSynchronizationPlan(
@@ -354,9 +382,21 @@ export class SemanticInputBarrier {
   #applySynchronizationPlan(plan: SynchronizationPlan): void {
     if (plan.updates.length > 0) {
       this.#host.applyDocumentUpdates(plan.updates);
-      this.#revision++;
+      this.#advanceRevision("content");
     }
     this.#rememberObservedDiskFingerprints(plan.observedDiskFingerprints);
+  }
+
+  #advanceRevision(changeKind: SemanticInputChangeKind): void {
+    this.#revision++;
+    if (changeKind !== "enrollment") {
+      this.#lastNonEnrollmentChange = { revision: this.#revision, changeKind };
+    }
+  }
+
+  #changeKindSince(revision: number): SemanticInputChangeKind {
+    const change = this.#lastNonEnrollmentChange;
+    return change && change.revision > revision ? change.changeKind : "enrollment";
   }
 
   #rememberObservedDiskFingerprints(fingerprints: ReadonlyMap<string, string | undefined>): void {

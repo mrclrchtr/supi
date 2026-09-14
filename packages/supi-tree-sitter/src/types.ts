@@ -56,6 +56,8 @@ export interface CalleesAtResult {
   };
   callees: Array<{
     name: string;
+    /** Optional syntax-shortened label for presentation; does not replace `name`. */
+    displayName?: string;
     range: SourceRange;
   }>;
   depth: "direct" | "deep";

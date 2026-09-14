@@ -1,12 +1,15 @@
-/** Input change that can supersede a pending synchronization pass. */
+/** Input change that can supersede a synchronization pass or semantic result. */
 export type SemanticInputChangeKind = "enrollment" | "content" | "close" | "failure" | "lifecycle";
 
-/** Typed cause for a synchronization pass invalidated by a newer input generation. */
+/** Typed cause when a synchronization pass or semantic result sees a newer input generation. */
 export class SemanticInputSynchronizationError extends Error {
   changeKind: SemanticInputChangeKind;
 
-  constructor(changeKind: SemanticInputChangeKind) {
-    super("Semantic input changed while synchronization was running.");
+  constructor(
+    changeKind: SemanticInputChangeKind,
+    message = "Semantic input changed while synchronization was running.",
+  ) {
+    super(message);
     this.name = "SemanticInputSynchronizationError";
     this.changeKind = changeKind;
   }

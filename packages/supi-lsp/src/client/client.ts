@@ -57,9 +57,14 @@ import { createPriorityDiagnosticRequestAdapter } from "./client-diagnostic-requ
 import { createTypeScriptDiagnosticRequestAdapter } from "./client-diagnostic-typescript.ts";
 import { ClientDiagnostics } from "./client-diagnostics.ts";
 import type { ClientDiagnosticSnapshot, DiagnosticEntry } from "./client-document-state.ts";
+import { SemanticInputRequestRetryGuard } from "./client-request-enrollment.ts";
 import { JsonRpcClient, JsonRpcRequestError } from "./transport.ts";
 
 const SHUTDOWN_TIMEOUT_MS = 5_000;
+
+interface SemanticRequestAttemptState {
+  inputRevision: number | undefined;
+}
 
 /**
  * Fixed bound after which a running client that never became ready is
@@ -816,11 +821,7 @@ export class LspClient {
       );
     }
     try {
-      await this.getReady(control);
-      const inputSnapshot = await this.diagnostics.synchronizeSemanticInputs(control);
-      const data = (await this.rpc.sendRequest(method, params, control)) as T | null | undefined;
-      await this.diagnostics.assertSemanticInputsCurrent(inputSnapshot, control);
-      return completedCodeQuery(data ?? null);
+      return await this.queryWithEnrollmentRetry(method, params, control);
     } catch (error) {
       // Cancellation and absolute-deadline expiry propagate as interruptions:
       // the caller no longer awaits a result, so no unavailable outcome may
@@ -829,6 +830,61 @@ export class LspClient {
       const detail = error instanceof Error ? error.message : String(error);
       return unavailableCodeQuery(`LSP request ${method} failed: ${detail}`);
     }
+  }
+
+  private async queryWithEnrollmentRetry<T>(
+    method: string,
+    params: unknown,
+    control?: CodeRequestControl,
+  ): Promise<CodeQueryResult<T | null>> {
+    const retryGuard = new SemanticInputRequestRetryGuard((revision) =>
+      this.diagnostics.getSemanticInputChangeSince(revision),
+    );
+    for (;;) {
+      const attempt: SemanticRequestAttemptState = { inputRevision: undefined };
+      try {
+        const data = await this.runSemanticRequestAttempt<T>({
+          method,
+          params,
+          control,
+          retryGuard,
+          attempt,
+        });
+        return completedCodeQuery(data);
+      } catch (error) {
+        throwIfCodeRequestInterrupted(control);
+        const decision = retryGuard.decide(error, attempt.inputRevision);
+        if (decision.kind === "retry") {
+          throwIfCodeRequestInterrupted(control);
+          continue;
+        }
+        throw decision.error;
+      }
+    }
+  }
+
+  private async runSemanticRequestAttempt<T>(options: {
+    method: string;
+    params: unknown;
+    control?: CodeRequestControl;
+    retryGuard: SemanticInputRequestRetryGuard;
+    attempt: SemanticRequestAttemptState;
+  }): Promise<T | null> {
+    const { method, params, control, retryGuard, attempt } = options;
+    throwIfCodeRequestInterrupted(control);
+    retryGuard.assertCurrent();
+    await this.getReady(control);
+    const inputSnapshot = await this.diagnostics.synchronizeSemanticInputs(control);
+    attempt.inputRevision = inputSnapshot.revision;
+    throwIfCodeRequestInterrupted(control);
+    retryGuard.assertCurrent();
+    const rpc = this.rpc;
+    if (!rpc || this._status !== "running") {
+      throw new Error(`LSP request ${method} is unavailable because the client is not running.`);
+    }
+    const data = (await rpc.sendRequest(method, params, control)) as T | null | undefined;
+    await this.diagnostics.assertSemanticInputsCurrent(inputSnapshot, control);
+    return data ?? null;
   }
 
   private async request<T>(

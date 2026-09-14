@@ -20,6 +20,38 @@ afterEach(() => {
 });
 
 describe("code_graph read-next guidance", () => {
+  it("uses neutral guidance when a reference range extends the enclosing scope", async () => {
+    writeFileSync(path.join(tmpDir, "index.ts"), "function foo() {\n  bar();\n}\n\nfoo();\n");
+    registerMockProvider(tmpDir, {
+      references: async () =>
+        completedCodeQuery([
+          {
+            uri: `file://${path.join(tmpDir, "index.ts")}`,
+            range: { start: { line: 4, character: 0 }, end: { line: 4, character: 3 } },
+          },
+        ]),
+      calleesAt: async () => ({
+        kind: "success",
+        data: {
+          enclosingScope: { name: "foo", startLine: 1, endLine: 3 },
+          callees: [],
+          depth: "direct",
+        },
+      }),
+    });
+    const result = await executeGraphTool(
+      {
+        target: { anchor: { file: "index.ts", line: 1, character: 10 } },
+        relations: ["references", "callees"],
+      },
+      { cwd: tmpDir, session: sessionCache.getOrCreate(tmpDir) },
+    );
+    const guidance = result.content.split("## Read Next")[1];
+    expect(guidance).toContain("L1–L45 — inspect related source ranges");
+    expect(guidance).not.toContain("inspect the enclosing scope");
+    expect(guidance?.match(/`index.ts`/g)).toHaveLength(1);
+  });
+
   it("renders source ranges for the resolved target and relation sites", async () => {
     writeFileSync(
       path.join(tmpDir, "index.ts"),

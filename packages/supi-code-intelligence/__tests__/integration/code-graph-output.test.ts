@@ -24,6 +24,37 @@ afterEach(() => {
 });
 
 describe("code_graph with the real structural provider", () => {
+  it("shows short syntax labels without merging distinct source expressions", async () => {
+    writeFileSync(
+      path.join(cwd, "calls.ts"),
+      [
+        "function work() {",
+        `  values.map((v) => \`first \${v}\`).join(",");`,
+        `  values.map((v) => \`second \${v}\`).join(",");`,
+        "}",
+      ].join("\n"),
+    );
+    const session = createTreeSitterSession(cwd);
+    try {
+      registerMockProvider(cwd, { calleesAt: createTreeSitterProvider(session).calleesAt });
+      const result = await executeGraphTool(
+        {
+          target: { anchor: { file: "calls.ts", line: 1, character: 10 } },
+          relations: ["callees"],
+          maxResults: 20,
+        },
+        makeTestCtx(cwd),
+      );
+      expect(result.content).toContain("4 call sites");
+      expect(result.content).toContain("`values.map(…).join` (expression 1/2) — L2:3");
+      expect(result.content).toContain("`values.map(…).join` (expression 2/2) — L3:3");
+      expect(result.content).not.toContain(`first \${v}`);
+      expect(result.content).not.toContain(`second \${v}`);
+    } finally {
+      await session.dispose();
+    }
+  });
+
   it("keeps exact call-site columns through the provider and graph output", async () => {
     const session = createTreeSitterSession(cwd);
     try {
@@ -38,10 +69,9 @@ describe("code_graph with the real structural provider", () => {
       );
       expect(direct.content).toContain("2 call sites");
       expect(direct.content).toContain("`bar` — L2:3, L2:10");
-      expect(direct.details?.displaySections?.[0]?.lines).toEqual([
-        "calls.ts:L2:3 — bar",
-        "calls.ts:L2:10 — bar",
-      ]);
+      expect(direct.details?.displaySections?.[0]?.lines).toEqual(["L2:3 — bar", "L2:10 — bar"]);
+      if (direct.details?.type !== "graph") throw new Error("Expected graph details");
+      expect(direct.details.data.sections[0].fileGroups).toEqual([{ file: "calls.ts", count: 2 }]);
       const deep = await executeGraphTool(
         { ...input, relations: [...input.relations], calleeDepth: "deep" },
         makeTestCtx(cwd),

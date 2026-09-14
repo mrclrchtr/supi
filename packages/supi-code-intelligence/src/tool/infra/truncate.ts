@@ -48,7 +48,7 @@ export function truncateToolContent(
   return { text: `${result.content}${notice}`, truncated: true };
 }
 
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CodeIntelResult } from "../../types/index.ts";
@@ -57,7 +57,9 @@ import type { ToolOutputTruncationDetails } from "../result/types.ts";
 /**
  * Apply the canonical output bound to one assembled code-tool result:
  * truncate at PI limits, spill the full content to a temp file when it
- * overflowed, and record truncation details.
+ * overflowed or the human display omits returned evidence. A display-only
+ * continuation does not add text to model content. File failure is fatal only
+ * when model content would otherwise be lost.
  */
 export function boundCodeToolResult(
   content: string,
@@ -71,19 +73,43 @@ export function boundCodeToolResult(
     maxLines: options.maxLines,
     maxBytes: options.maxBytes,
   });
-  if (truncated && content.length > 0) {
-    const dir = mkdtempSync(join(tmpdir(), "supi-ci-"));
-    const spillPath = join(dir, `${options.toolName}-output.md`);
-    writeFileSync(spillPath, content, "utf-8");
-    return {
-      content: [
-        { type: "text" as const, text: `${text}\n_Full output saved to: \`${spillPath}\`_` },
-      ],
-      details: withTruncation({ truncated: true, fullOutputPath: spillPath }),
-    };
+  const displayTruncated = details?.truncation?.displayTruncated === true;
+  const truncation = { truncated, ...(displayTruncated ? { displayTruncated } : {}) };
+  if ((truncated || displayTruncated) && content.length > 0) {
+    try {
+      const spillPath = saveFullContent(content, options.toolName);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: truncated ? `${text}\n_Full output saved to: \`${spillPath}\`_` : text,
+          },
+        ],
+        details: withTruncation({ ...truncation, fullOutputPath: spillPath }),
+      };
+    } catch (error) {
+      if (truncated) throw error;
+      // Keep valid evidence when only its optional human continuation failed.
+    }
   }
   return {
     content: [{ type: "text" as const, text }],
-    details: withTruncation({ truncated: false }),
+    details: withTruncation(truncation),
   };
+}
+
+function saveFullContent(content: string, toolName: string): string {
+  const dir = mkdtempSync(join(tmpdir(), "supi-ci-"));
+  const spillPath = join(dir, `${toolName}-output.md`);
+  try {
+    writeFileSync(spillPath, content, "utf-8");
+    return spillPath;
+  } catch (error) {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      /* Preserve the write error. */
+    }
+    throw error;
+  }
 }

@@ -1,11 +1,14 @@
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: callee scope filtering and syntax display mapping stay together.
 // Structural callee extraction — enclosing-scope lookup with per-language queries.
 
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { validatePublicPositionBounds } from "../coordinates.ts";
 import { detectGrammar } from "../language.ts";
+import type { SyntaxNodeLike } from "../syntax-node.ts";
 import type { GrammarId, SourceRange, TreeSitterResult } from "../types.ts";
 import { queryParsedFile, type TreeSitterRuntime } from "../worker/runtime.ts";
 import { normalizeCallName } from "./call-name.ts";
+import { createCalleeDisplayName, createSourceLineStarts } from "./callee-display-name.ts";
 import { extractScopeName } from "./scope.ts";
 
 /** Result shape returned by lookupCalleesAt. */
@@ -16,6 +19,7 @@ export interface CalleesAtResult {
   };
   callees: Array<{
     name: string;
+    displayName?: string;
     range: SourceRange;
   }>;
   depth: "direct" | "deep";
@@ -212,6 +216,7 @@ export async function lookupCalleesAt(
       scopes,
       tsPoint,
       depth,
+      source,
     );
 
     const enclosingRange = nodeToSourceRange(enclosingNode);
@@ -318,7 +323,8 @@ function filterCalleeCaptures(
   scopeTypes: ReadonlySet<string>,
   anchor: { row: number; column: number },
   depth: "direct" | "deep" = "direct",
-): Array<{ name: string; range: SourceRange }> {
+  source: string,
+): Array<{ name: string; displayName?: string; range: SourceRange }> {
   const excludeRanges: Array<{
     startRow: number;
     startColumn: number;
@@ -330,7 +336,10 @@ function filterCalleeCaptures(
   }
 
   const seenRanges = new Set<string>();
-  const callees: Array<{ name: string; range: SourceRange }> = [];
+  const callees: Array<{ name: string; displayName?: string; range: SourceRange }> = [];
+  const sourceLineStarts = createSourceLineStarts(source);
+  const syntaxNodes = new Map<string, SyntaxNodeLike>();
+  indexSyntaxNodes(enclosingNode as NamedSyntaxNode, syntaxNodes);
 
   const enclosingStartRow = enclosingNode.startPosition.row;
   const enclosingEndRow = enclosingNode.endPosition.row;
@@ -370,7 +379,21 @@ function filterCalleeCaptures(
     if (name.length === 0 || seenRanges.has(rangeKey)) continue;
     seenRanges.add(rangeKey);
 
-    callees.push({ name, range: capture.range });
+    const syntaxNode = syntaxNodes.get(captureNodeKey(capture));
+    const displayName = syntaxNode
+      ? createCalleeDisplayName({
+          node: syntaxNode,
+          grammarId,
+          nodeType: capture.nodeType,
+          source,
+          sourceLineStarts,
+        })
+      : undefined;
+    callees.push({
+      name,
+      ...(displayName === undefined ? {} : { displayName }),
+      range: capture.range,
+    });
   }
 
   return callees.sort((left, right) => compareSourceRanges(left.range, right.range));
@@ -380,6 +403,27 @@ function filterCalleeCaptures(
 
 function sourceRangeKey(range: SourceRange): string {
   return `${range.startLine}:${range.startCharacter}:${range.endLine}:${range.endCharacter}`;
+}
+
+type NamedSyntaxNode = SyntaxNodeLike & { namedChildren: NamedSyntaxNode[] };
+
+/** Query captures use named nodes. Skip anonymous tokens and avoid recursive indexing. */
+function indexSyntaxNodes(node: NamedSyntaxNode, index: Map<string, SyntaxNodeLike>): void {
+  const pending = [node];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current) break;
+    index.set(syntaxNodeKey(current), current);
+    for (const child of current.namedChildren) pending.push(child);
+  }
+}
+
+function syntaxNodeKey(node: SyntaxNodeLike): string {
+  return `${node.type}:${node.startPosition.row}:${node.startPosition.column}:${node.endPosition.row}:${node.endPosition.column}`;
+}
+
+function captureNodeKey(capture: { nodeType: string; range: SourceRange }): string {
+  return `${capture.nodeType}:${capture.range.startLine - 1}:${capture.range.startCharacter - 1}:${capture.range.endLine - 1}:${capture.range.endCharacter - 1}`;
 }
 
 function compareSourceRanges(left: SourceRange, right: SourceRange): number {

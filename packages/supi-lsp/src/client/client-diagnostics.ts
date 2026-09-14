@@ -46,17 +46,22 @@ import {
 } from "./client-document-state.ts";
 import { clearTrackedDocumentState, synchronizeTrackedDocument } from "./client-document-sync.ts";
 import { getDiagnosticFileState } from "./client-file-state.ts";
+import { SemanticInputRequestRetryGuard } from "./client-request-enrollment.ts";
 import {
   SemanticInputBarrier,
   type SemanticInputDocument,
   type SemanticInputSnapshot,
   type SemanticInputUpdate,
 } from "./client-semantic-input-barrier.ts";
-import type { SemanticInputChangeKind } from "./client-semantic-input-errors.ts";
+import type {
+  SemanticInputChangeKind,
+  SemanticInputSynchronizationError,
+} from "./client-semantic-input-errors.ts";
 import { isSemanticInputEnrollmentError } from "./client-semantic-input-errors.ts";
 
 const DIAGNOSTIC_WAIT_MS = 3_000;
-const MAX_SEMANTIC_INPUT_ENROLLMENT_RETRIES = 1;
+/** Bound rejoin attempts for one synchronization pass, separate from request retries. */
+const MAX_SEMANTIC_INPUT_SYNCHRONIZATION_RETRIES = 1;
 
 /** Bound abandoned adapter work without binding it to one caller's deadline. */
 const DIAGNOSTIC_REQUEST_OWNER_TIMEOUT_MS = 30_000;
@@ -68,6 +73,15 @@ interface ServerDiagnosticRefreshWork {
 type DiagnosticEvidenceCandidate = DiagnosticSynchronization & {
   readonly evidenceRevision: number;
 };
+
+interface DiagnosticQueryAttemptState {
+  inputRevision: number | undefined;
+}
+
+function unavailableAfterEnrollmentRetry(error: unknown): CodeQueryResult<Diagnostic[]> {
+  const detail = error instanceof Error ? error.message : String(error);
+  return unavailableCodeQuery(`Diagnostic collection failed closed: ${detail}`);
+}
 
 /** Own one client's document and diagnostic evidence; revisions prevent stale reuse. */
 export class ClientDiagnostics {
@@ -113,12 +127,12 @@ export class ClientDiagnostics {
     contentOverrides?: ReadonlyMap<string, string>,
   ): Promise<SemanticInputSnapshot> {
     throwIfCodeRequestInterrupted(control);
-    for (let retry = 0; ; retry++) {
+    for (let synchronizationRetry = 0; ; synchronizationRetry++) {
       try {
         return await this.#inputBarrier.synchronize(control, contentOverrides);
       } catch (error) {
         if (
-          retry >= MAX_SEMANTIC_INPUT_ENROLLMENT_RETRIES ||
+          synchronizationRetry >= MAX_SEMANTIC_INPUT_SYNCHRONIZATION_RETRIES ||
           !isSemanticInputEnrollmentError(error) ||
           !this.host.isOperational()
         ) {
@@ -127,6 +141,14 @@ export class ClientDiagnostics {
         throwIfCodeRequestInterrupted(control);
       }
     }
+  }
+
+  /** Return the current typed input change after a request revision, when present. */
+  getSemanticInputChangeSince(revision: number): SemanticInputSynchronizationError | undefined {
+    return this.#inputBarrier.getChangeSince(
+      revision,
+      "Semantic input changed while the request was running.",
+    );
   }
 
   /** Fail closed when a semantic request observes a changed input generation. */
@@ -569,19 +591,88 @@ export class ClientDiagnostics {
     // longer awaits a result.
     throwIfCodeRequestInterrupted(control);
     const uri = fileToUri(filePath);
-    this.#ensureExplicitDocumentContent(
-      filePath,
-      content,
-      options.contentIsAuthoritative !== false,
-    );
+    const contentIsAuthoritative = options.contentIsAuthoritative !== false;
+    this.#ensureExplicitDocumentContent(filePath, content, contentIsAuthoritative);
     const contentOverrides = this.#getDiagnosticContentOverrides(
       uri,
       content,
-      options.contentIsAuthoritative !== false,
+      contentIsAuthoritative,
     );
+    return this.#runDiagnosticQueryWithEnrollmentRetry({
+      filePath,
+      content,
+      uri,
+      control,
+      contentOverrides,
+    });
+  }
+
+  async #runDiagnosticQueryWithEnrollmentRetry(options: {
+    filePath: string;
+    content: string;
+    uri: string;
+    control?: CodeRequestControl;
+    contentOverrides: ReadonlyMap<string, string> | undefined;
+  }): Promise<CodeQueryResult<Diagnostic[]>> {
+    const retryGuard = new SemanticInputRequestRetryGuard((revision) =>
+      this.getSemanticInputChangeSince(revision),
+    );
+    for (;;) {
+      const attempt: DiagnosticQueryAttemptState = { inputRevision: undefined };
+      try {
+        retryGuard.assertCurrent();
+        return await this.#runDiagnosticQueryAttempt({
+          ...options,
+          retryGuard,
+          reuseCachedEvidence: !retryGuard.hasRetried,
+          attempt,
+        });
+      } catch (error) {
+        throwIfCodeRequestInterrupted(options.control);
+        if (isSemanticInputEnrollmentError(error)) {
+          // Enrollment can change cross-file diagnostics. Invalidate only the
+          // evidence generation; the new request key queues behind owned
+          // transport instead of joining an active obsolete request.
+          this.#invalidateDiagnosticEvidenceAfterEnrollment();
+        }
+        const decision = retryGuard.decide(error, attempt.inputRevision);
+        if (decision.kind === "retry") {
+          throwIfCodeRequestInterrupted(options.control);
+          continue;
+        }
+        return unavailableAfterEnrollmentRetry(decision.error);
+      }
+    }
+  }
+
+  /** Run one diagnostic synchronization and evidence attempt. */
+  async #runDiagnosticQueryAttempt(options: {
+    filePath: string;
+    content: string;
+    uri: string;
+    control?: CodeRequestControl;
+    contentOverrides: ReadonlyMap<string, string> | undefined;
+    reuseCachedEvidence: boolean;
+    retryGuard: SemanticInputRequestRetryGuard;
+    attempt: DiagnosticQueryAttemptState;
+  }): Promise<CodeQueryResult<Diagnostic[]>> {
+    const {
+      filePath,
+      content,
+      uri,
+      control,
+      contentOverrides,
+      reuseCachedEvidence,
+      retryGuard,
+      attempt,
+    } = options;
+    retryGuard.assertCurrent();
     const synchronized = await this.#synchronizeDiagnosticInputs(uri, control, contentOverrides);
     if ("kind" in synchronized) return synchronized;
     const inputSnapshot = synchronized;
+    attempt.inputRevision = inputSnapshot.revision;
+    throwIfCodeRequestInterrupted(control);
+    retryGuard.assertCurrent();
     const inputRevision = inputSnapshot.revision;
     const requestAdapter = this.host.diagnosticRequestAdapter.supports(uri)
       ? this.host.diagnosticRequestAdapter
@@ -607,6 +698,7 @@ export class ClientDiagnostics {
       );
     }
     if (
+      reuseCachedEvidence &&
       contentUnchanged &&
       hasConfirmedDiagnosticEvidence(synchronization, cached, this.#evidenceRevision)
     ) {
@@ -694,6 +786,7 @@ export class ClientDiagnostics {
       return options.result;
     } catch (error) {
       if (isCodeRequestInterruption(error, options.control)) throw error;
+      if (isSemanticInputEnrollmentError(error)) throw error;
       if (options.result.kind === "unavailable" && this.#closedVersionedBarrier.has(options.uri)) {
         return options.result;
       }
@@ -926,6 +1019,12 @@ export class ClientDiagnostics {
       document.evidenceRevision = this.#evidenceRevision;
     }
     if (cancelRequests) this.#cancelAllDiagnosticRequests();
+  }
+
+  /** Invalidate enrollment-stale evidence without cancelling owned transport. */
+  #invalidateDiagnosticEvidenceAfterEnrollment(): void {
+    this.#advanceEvidenceRevision(false);
+    this.#waiters.cancelSettle();
   }
 
   #cancelDiagnosticRequest(uri: string): void {

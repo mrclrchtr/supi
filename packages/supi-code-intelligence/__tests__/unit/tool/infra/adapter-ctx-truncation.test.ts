@@ -46,42 +46,51 @@ describe("registerCodeIntelligenceTools adapter", () => {
     expect(captured[0].onUpdate).toBe(onUpdate);
   });
 
-  it("head-truncates oversized content, spills the full result, and preserves details", async () => {
-    const pi = createPiMock();
-    const big = `${Array.from({ length: 3000 }, (_, i) => `line ${i}`).join("\n")}\n`;
-    registerCodeIntelligenceTools(pi as never, sessionCache.getOrCreate, undefined, [
-      fakeSpec(async () => ({
-        content: big,
-        details: {
-          type: "search" as const,
-          data: {
-            confidence: "structural" as const,
-            scope: null,
-            candidateCount: 0,
-            omittedCount: 0,
-            nextQueries: [],
+  it.each([false, true])(
+    "spills full content once when the display is also limited=%s",
+    async (displayTruncated) => {
+      const pi = createPiMock();
+      const big = `${Array.from({ length: 3000 }, (_, i) => `line ${i}`).join("\n")}\n`;
+      registerCodeIntelligenceTools(pi as never, sessionCache.getOrCreate, undefined, [
+        fakeSpec(async () => ({
+          content: big,
+          details: {
+            type: "search" as const,
+            truncation: { truncated: false, displayTruncated },
+            data: {
+              confidence: "structural" as const,
+              scope: null,
+              candidateCount: 0,
+              omittedCount: 0,
+              nextQueries: [],
+            },
           },
-        },
-      })),
-    ]);
+        })),
+      ]);
 
-    const tool = getTool(pi, "code_find") as {
-      execute: (
-        ...args: unknown[]
-      ) => Promise<{ content: Array<{ text: string }>; details?: unknown }>;
-    };
-    const res = await tool.execute("t", {}, undefined, undefined, makeCtx({ cwd: "/tmp" }));
+      const tool = getTool(pi, "code_find") as {
+        execute: (
+          ...args: unknown[]
+        ) => Promise<{ content: Array<{ text: string }>; details?: unknown }>;
+      };
+      const res = await tool.execute("t", {}, undefined, undefined, makeCtx({ cwd: "/tmp" }));
 
-    const text = res.content[0].text;
-    expect(text).toMatch(/\[truncated: kept \d+ of \d+ lines \([^)]+\)\]/);
-    expect(text.startsWith("line 0\n")).toBe(true);
-    const spillPath = text.match(/Full output saved to: `([^`]+)`/)?.[1];
-    expect(spillPath).toBeDefined();
-    expect(readFileSync(spillPath as string, "utf8")).toBe(big);
-    rmSync(dirname(spillPath as string), { recursive: true, force: true });
-    // details passed through untouched (not truncated)
-    expect(res.details).toMatchObject({ type: "search", data: { candidateCount: 0 } });
-  });
+      const text = res.content[0].text;
+      expect(text).toMatch(/\[truncated: kept \d+ of \d+ lines \([^)]+\)\]/);
+      expect(text.startsWith("line 0\n")).toBe(true);
+      const spillPath = text.match(/Full output saved to: `([^`]+)`/)?.[1];
+      expect(spillPath).toBeDefined();
+      expect(readFileSync(spillPath as string, "utf8")).toBe(big);
+      rmSync(dirname(spillPath as string), { recursive: true, force: true });
+      // details passed through untouched (not truncated)
+      expect(res.details).toMatchObject({
+        type: "search",
+        data: { candidateCount: 0 },
+        truncation: { truncated: true, fullOutputPath: spillPath },
+      });
+      expect(text.match(/Full output saved to/g)).toHaveLength(1);
+    },
+  );
 
   it("leaves short content unchanged (no notice)", async () => {
     const pi = createPiMock();

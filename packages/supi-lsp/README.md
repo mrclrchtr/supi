@@ -76,6 +76,8 @@ Refresh and file collection share synchronization, evidence-revision, deadline, 
 
 Caller cancellation or deadline stops only that caller's wait. Explicit diagnostic requests use an owned transport lifetime: supersession drops queued jobs and stops future adapter phases but does not cancel an active protocol request. The route stays occupied until actual settlement or connection disposal. The owner timeout attempts protocol cancellation but does not prove that the backend stopped. The owner bound is at least 30 seconds (or a larger collection budget). A result from an obsolete document generation is discarded. Ordinary semantic requests still pass caller cancellation to the protocol transport.
 
+If another request first opens a document during an active semantic or diagnostic request, the client can synchronize and repeat the request once. The retry retains the caller's original signal and deadline. Content, workspace, close, and lifecycle changes still reject stale results. A diagnostic retry collects new request evidence; it does not promote an old cache. This retry is not route recovery.
+
 Diagnostic collection does not close and reopen a document to obtain confirmation. It does not send a no-op `didChange` for that purpose. Refresh retains unchanged documents and their current server state, and resynchronizes changed or invalidated documents. A client restart may reopen tracked documents to restore client state; that is recovery, not diagnostic confirmation.
 
 Server readiness follows LSP work-done progress: a created progress token is pending and never blocks readiness; an observed `begin` marks active work and makes the client not ready until its `end` or the bounded per-token timeout.

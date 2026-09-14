@@ -133,7 +133,11 @@ async function collectCalleesRelation(options: CollectRelationOptions): Promise<
     options.requestControl,
   );
   if (result.confidence === "unavailable") {
-    return { kind: "unavailable", rel: "callees", message: "Callees unavailable" };
+    return {
+      kind: "unavailable",
+      rel: "callees",
+      message: `${result.message ?? "Callees unavailable"}\nUse code_inspect at the target position to check the scope.`,
+    };
   }
 
   const enclosingScope = result.enclosingScope ?? {
@@ -144,6 +148,7 @@ async function collectCalleesRelation(options: CollectRelationOptions): Promise<
   };
   const calls: CallEntry[] = result.callees.map((callee) => ({
     name: callee.name,
+    ...(callee.displayName ? { displayName: callee.displayName } : {}),
     file: callee.file,
     line: callee.line,
     character: callee.character,

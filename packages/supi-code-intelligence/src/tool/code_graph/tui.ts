@@ -9,7 +9,6 @@ import {
   type ResultOptios,
   readEvidenceEntries,
   renderDomainError,
-  renderDomainResult,
   renderExecutionError,
   renderPartial,
   renderToolDisplaySections,
@@ -17,8 +16,13 @@ import {
   type ToolRendererContext,
   type ToolResult,
 } from "../../ui/tui/common.ts";
-import { readToolDisplaySections, truncateDisplayText } from "../result/display.ts";
+import {
+  MAX_TUI_DISPLAY_ITEMS,
+  readToolDisplaySections,
+  truncateDisplayText,
+} from "../result/display.ts";
 import type { ToolDisplaySection } from "../result/types.ts";
+import type { GraphFileGroup } from "./details.ts";
 import type { CodeGraphToolParams, GraphRelation } from "./execute.ts";
 import { compactGraphLabel, formatGraphEvidence, formatGraphRange } from "./format.ts";
 
@@ -54,7 +58,13 @@ export function renderGraphResult(
   const executionError = renderExecutionError(context, "code_graph failed", theme);
   if (executionError) return executionError;
   const domainError = renderDomainError(result, theme);
-  if (domainError) return renderDomainResult(result, options, theme, domainError);
+  if (domainError) {
+    if (!options.expanded) return domainError;
+    const container = new Container();
+    container.addChild(domainError);
+    renderToolDisplaySections(container, result.details?.displaySections, theme);
+    return container;
+  }
 
   const data = asRecord(result.details?.data);
   const container = new Container();
@@ -81,6 +91,7 @@ interface SectionView {
   message: string | null;
   externalCount: number;
   scope: Record<string, unknown> | null;
+  fileGroups: GraphFileGroup[];
 }
 
 function renderGraphBody(
@@ -130,8 +141,21 @@ function renderRelationBody(
   }
   const scope = scopeLabel(section.scope, targetName);
   if (scope) container.addChild(new Text(theme.fg("dim", scope), 0, 0));
-  for (const row of display?.lines ?? [])
-    container.addChild(new Text(theme.fg("muted", row), 0, 0));
+  const rows = display?.lines ?? [];
+  let index = 0;
+  const groups =
+    section.fileGroups.reduce((sum, group) => sum + group.count, 0) === rows.length
+      ? section.fileGroups
+      : [];
+  for (const group of groups) {
+    if (index >= rows.length) break;
+    container.addChild(new Text(theme.fg("dim", group.file), 0, 0));
+    for (const row of rows.slice(index, index + group.count))
+      container.addChild(new Text(theme.fg("muted", `  ${row}`), 0, 0));
+    index += group.count;
+  }
+  // Older results contain full paths in each row and have no file groups.
+  for (const row of rows.slice(index)) container.addChild(new Text(theme.fg("muted", row), 0, 0));
 }
 
 function sectionSummary(
@@ -173,9 +197,29 @@ function readSections(value: unknown): SectionView[] {
         message: typeof section.message === "string" ? section.message : null,
         externalCount: typeof section.externalCount === "number" ? section.externalCount : 0,
         scope: asRecord(section.enclosingScope),
+        fileGroups: readFileGroups(section.fileGroups),
       },
     ];
   });
+}
+
+function readFileGroups(value: unknown): GraphFileGroup[] {
+  if (!Array.isArray(value)) return [];
+  const groups: GraphFileGroup[] = [];
+  for (const entry of value.slice(0, MAX_TUI_DISPLAY_ITEMS)) {
+    const group = asRecord(entry);
+    if (
+      !group ||
+      typeof group.file !== "string" ||
+      typeof group.count !== "number" ||
+      !Number.isInteger(group.count) ||
+      group.count < 1 ||
+      group.count > MAX_TUI_DISPLAY_ITEMS
+    )
+      return [];
+    groups.push({ file: truncateDisplayText(group.file), count: group.count });
+  }
+  return groups;
 }
 
 function scopeLabel(scope: Record<string, unknown> | null, targetName: unknown): string | null {

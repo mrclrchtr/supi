@@ -73,12 +73,28 @@ function formatCalls(calls: readonly CallEntry[], assembly: GraphResultAssembly)
   for (const call of calls) {
     const file = toDisplayPath(assembly.cwd, call.file);
     const key = JSON.stringify([file, call.name]);
-    const group = groups.get(key) ?? { name: call.name, file, sites: [] };
+    const group = groups.get(key) ?? { name: call.displayName ?? call.name, file, sites: [] };
     group.sites.push(`L${call.line}:${call.character}`);
     groups.set(key, group);
   }
-  return [...groups.values()].map(({ name, file, sites }) => {
+  const previews = [...groups.values()].map((group) => ({
+    ...group,
+    label: compactGraphLabel(group.name),
+  }));
+  const collisions = new Map<string, { count: number; seen: number }>();
+  for (const { file, label } of previews) {
+    const key = JSON.stringify([file, label]);
+    const count = (collisions.get(key)?.count ?? 0) + 1;
+    collisions.set(key, { count, seen: 0 });
+  }
+  return previews.map(({ label, file, sites }) => {
+    const collision = collisions.get(JSON.stringify([file, label]));
+    let qualifier = "";
+    if (collision && collision.count > 1) {
+      collision.seen++;
+      qualifier = ` (expression ${collision.seen}/${collision.count})`;
+    }
     const prefix = file === assembly.resolvedDisplayFile ? "" : `${graphCodeSpan(file)}: `;
-    return `- ${graphCodeSpan(compactGraphLabel(name))} — ${prefix}${sites.join(", ")}`;
+    return `- ${graphCodeSpan(label)}${qualifier} — ${prefix}${sites.join(", ")}`;
   });
 }
