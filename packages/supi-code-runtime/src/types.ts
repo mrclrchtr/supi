@@ -234,7 +234,8 @@ export type CalleeDepth = "direct" | "deep";
  */
 export interface CalleesData {
   enclosingScope: { name: string; startLine: number; endLine: number };
-  callees: Array<{ name: string; startLine: number }>;
+  /** Distinct call sites with 1-based UTF-16 start coordinates. */
+  callees: Array<{ name: string; startLine: number; startCharacter: number }>;
   depth: CalleeDepth;
 }
 

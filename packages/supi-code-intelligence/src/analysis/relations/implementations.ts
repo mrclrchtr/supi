@@ -73,8 +73,7 @@ export async function collectImplementations(
     implementations: project,
     externalCount: normalized.external.length,
     invalidLocationCount: normalized.invalidLocationCount,
-    partialReason:
-      normalized.partialReason ?? (result.kind === "partial" ? "provider-limited" : null),
+    partialReason: result.kind === "partial" ? "provider-limited" : normalized.partialReason,
     confidence: "semantic",
   };
 }

@@ -1,5 +1,6 @@
 import type { AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
 import type { WorkspaceCodeIntelligenceSession } from "../session/session.ts";
+import type { GraphDetails } from "../tool/code_graph/details.ts";
 import type {
   ContextDetails,
   HealthDetails,
@@ -59,6 +60,7 @@ export interface CodeIntelResult {
     | (CodeIntelResultDetails & { type: "context"; data: ContextDetails })
     | (CodeIntelResultDetails & { type: "inspect"; data: InspectDetails })
     | (CodeIntelResultDetails & { type: "search"; data: SearchDetails })
+    | (CodeIntelResultDetails & { type: "graph"; data: GraphDetails })
     | (CodeIntelResultDetails & { type: "resolve"; data: ResolveDetails })
     | (CodeIntelResultDetails & { type: "health"; data: HealthDetails });
 }

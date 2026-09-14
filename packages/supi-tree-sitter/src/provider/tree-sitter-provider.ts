@@ -146,6 +146,7 @@ function mapCalleesAtResult(result: CalleesAtResult): CalleesData {
     callees: result.callees.map((c) => ({
       name: c.name,
       startLine: c.range.startLine,
+      startCharacter: c.range.startCharacter,
     })),
     depth: result.depth,
   };

@@ -49,12 +49,12 @@ describe("code_graph workflow", () => {
       makeTestCtx(tmpDir),
     );
 
-    expect(result.content).toContain("Graph of");
+    expect(result.content).toContain("Target: `foo`");
     expect(result.content).toContain("consumer-a.ts");
     expect(result.content).not.toContain("consumer-b.ts");
-    expect(result.content).toContain("showing 1 of 2; 1 omitted");
-    expect(result.details?.type).toBe("search");
-    if (result.details?.type !== "search") return;
+    expect(result.content).toContain("1 of 2 locations shown; 1 omitted");
+    expect(result.details?.type).toBe("graph");
+    if (result.details?.type !== "graph") return;
     expect(result.details.data.evidenceLists).toContainEqual({
       key: "references.locations",
       totalCount: 2,
@@ -71,7 +71,7 @@ describe("code_graph workflow", () => {
         kind: "success",
         data: {
           enclosingScope: { name: "foo", startLine: 1, endLine: 1 },
-          callees: [{ name: "bar", startLine: 1, endLine: 1 }],
+          callees: [{ name: "bar", startLine: 1, startCharacter: 18 }],
           depth: "direct" as const,
         },
       }),
@@ -85,9 +85,9 @@ describe("code_graph workflow", () => {
       makeTestCtx(tmpDir),
     );
 
-    expect(result.content).toContain("Direct structural calls from `foo`");
-    expect(result.content).toContain("Structural only");
-    expect(result.content).toContain("`bar` (L1)");
+    expect(result.content).toContain("## callees (structural, direct)");
+    expect(result.content).toContain("source expressions, not resolved symbols");
+    expect(result.content).toContain("`bar` — L1:18");
   });
 
   it("reports provider-backed implementations", async () => {
@@ -111,7 +111,7 @@ describe("code_graph workflow", () => {
       makeTestCtx(tmpDir),
     );
 
-    expect(result.content).toContain("Implementations of `Service`");
+    expect(result.content).toContain("## implements (semantic)");
     expect(result.content).toContain("impl.ts");
   });
 

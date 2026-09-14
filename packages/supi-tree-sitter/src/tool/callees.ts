@@ -138,7 +138,7 @@ function findEnclosingScope(
  * 3. Runs a grammar-specific callee query.
  * 4. Filters to captures within that enclosing scope.
  * 5. Excludes nested function/method/callback scopes that do not contain the anchor.
- * 6. Deduplicates by name.
+ * 6. Deduplicates identical capture ranges and returns captures in source order.
  */
 // biome-ignore lint/complexity/useMaxParams: provider function needs runtime + coordinates + depth
 export async function lookupCalleesAt(
@@ -329,7 +329,7 @@ function filterCalleeCaptures(
     collectInnerScopes(enclosingNode, scopeTypes, anchor, excludeRanges);
   }
 
-  const seen = new Set<string>();
+  const seenRanges = new Set<string>();
   const callees: Array<{ name: string; range: SourceRange }> = [];
 
   const enclosingStartRow = enclosingNode.startPosition.row;
@@ -366,16 +366,30 @@ function filterCalleeCaptures(
     }
 
     const name = normalizeCallName(capture.text, grammarId, capture.nodeType);
-    if (name.length === 0 || seen.has(name)) continue;
-    seen.add(name);
+    const rangeKey = sourceRangeKey(capture.range);
+    if (name.length === 0 || seenRanges.has(rangeKey)) continue;
+    seenRanges.add(rangeKey);
 
     callees.push({ name, range: capture.range });
   }
 
-  return callees;
+  return callees.sort((left, right) => compareSourceRanges(left.range, right.range));
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────
+
+function sourceRangeKey(range: SourceRange): string {
+  return `${range.startLine}:${range.startCharacter}:${range.endLine}:${range.endCharacter}`;
+}
+
+function compareSourceRanges(left: SourceRange, right: SourceRange): number {
+  return (
+    left.startLine - right.startLine ||
+    left.startCharacter - right.startCharacter ||
+    left.endLine - right.endLine ||
+    left.endCharacter - right.endCharacter
+  );
+}
 
 /** Convert a tree-sitter node to a SourceRange using the source text for
  * UTF-16 column conversion. */

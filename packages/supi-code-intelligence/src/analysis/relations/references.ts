@@ -77,8 +77,7 @@ export async function collectCallers(
     references: inProject,
     externalCount: normalized.external.length,
     invalidLocationCount: normalized.invalidLocationCount,
-    partialReason:
-      normalized.partialReason ?? (result.kind === "partial" ? "provider-limited" : null),
+    partialReason: result.kind === "partial" ? "provider-limited" : normalized.partialReason,
     evidence: "semantic-references",
     confidence: "semantic",
   };

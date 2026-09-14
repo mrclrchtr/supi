@@ -76,7 +76,7 @@ describe("canonical Tool result assembly", () => {
     expect(assembly.assembled.confidence).toBe("semantic");
     expect(assembly.assembled.sections[0]?.key).toBe("references");
     expect(assembly.assembled.actions.some((action) => action.kind === "read-next")).toBe(true);
-    expect(assembly.details.candidateCount).toBe(0);
+    expect(assembly.details.evidenceLists[0]?.totalCount).toBe(0);
   });
 
   it("bounds every graph relation once for markdown and structured details", () => {
@@ -107,8 +107,8 @@ describe("canonical Tool result assembly", () => {
           data: {
             enclosingScope: { name: "foo", file: "/repo/src/a.ts", startLine: 1, endLine: 5 },
             calls: [
-              { name: "callA", file: "/repo/src/a.ts", line: 2 },
-              { name: "callB", file: "/repo/src/a.ts", line: 3 },
+              { name: "callA", file: "/repo/src/a.ts", line: 2, character: 1 },
+              { name: "callB", file: "/repo/src/a.ts", line: 3, character: 1 },
             ],
             depth: "direct",
           },
@@ -143,7 +143,7 @@ describe("canonical Tool result assembly", () => {
     expect(markdown).not.toContain("callB");
     expect(markdown).toContain("impl-a.ts");
     expect(markdown).not.toContain("impl-b.ts");
-    expect(markdown.match(/showing 1 of 2; 1 omitted/g)).toHaveLength(3);
+    expect(markdown.match(/1 of 2 (?:locations|call sites) shown; 1 omitted/g)).toHaveLength(3);
   });
 
   it("assembles a resolved target with provenance and no unconditional graph advice", () => {

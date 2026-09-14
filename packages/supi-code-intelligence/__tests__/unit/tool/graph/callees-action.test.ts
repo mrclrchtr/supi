@@ -44,8 +44,8 @@ describe("code_graph callees relation", () => {
         data: {
           enclosingScope: { name: "foo", startLine: 1, endLine: 1 },
           callees: [
-            { name: "bar", startLine: 1, endLine: 1 },
-            { name: "baz", startLine: 1, endLine: 1 },
+            { name: "bar", startLine: 1, startCharacter: 18 },
+            { name: "baz", startLine: 1, startCharacter: 25 },
           ],
           depth: "direct" as const,
         },
@@ -61,11 +61,11 @@ describe("code_graph callees relation", () => {
       } as unknown as ActionParams,
       { cwd: tmpDir },
     );
-    expect(result.content).toContain("Graph of");
-    expect(result.content).toContain("Direct structural calls from `foo`");
-    expect(result.content).toContain("direct structural calls");
-    expect(result.content).toContain("Structural only");
-    expect(result.content).toContain("nested function/method/callback scopes");
+    expect(result.content).toContain("Target: `foo`");
+    expect(result.content).toContain("## callees (structural, direct)");
+    expect(result.content).toContain("2 call sites");
+    expect(result.content).toContain("source expressions, not resolved symbols");
+    expect(result.content).toContain("Nested scopes excluded");
   });
 
   it("labels callee results as direct structural calls, not callers", async () => {
@@ -75,7 +75,7 @@ describe("code_graph callees relation", () => {
         kind: "success",
         data: {
           enclosingScope: { name: "foo", startLine: 1, endLine: 1 },
-          callees: [{ name: "bar", startLine: 1, endLine: 1 }],
+          callees: [{ name: "bar", startLine: 1, startCharacter: 18 }],
           depth: "direct" as const,
         },
       }),
@@ -90,7 +90,7 @@ describe("code_graph callees relation", () => {
       } as unknown as ActionParams,
       { cwd: tmpDir },
     );
-    expect(result.content).toContain("direct structural call");
+    expect(result.content).toContain("## callees (structural, direct)");
     expect(result.content).not.toContain("Callers");
   });
 });

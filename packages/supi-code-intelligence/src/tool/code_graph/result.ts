@@ -1,5 +1,9 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
-import { createEvidenceList, type EvidenceList } from "../../analysis/evidence.ts";
+import {
+  createEvidenceList,
+  createPartialEvidenceList,
+  type EvidenceList,
+} from "../../analysis/evidence.ts";
 import type { RelationLocationPartialReason } from "../../analysis/relations/provider-locations.ts";
 import type {
   CallEntry,
@@ -9,13 +13,16 @@ import type {
 import { toDisplayPath } from "../../analysis/search/paths.ts";
 import type { GraphSection } from "../../session/graph-types.ts";
 import {
-  assembledNextQueries,
+  assembledReadNext,
   assembleToolResult,
   type ResultProvenance,
   type ToolResultAssembly,
 } from "../result/assembly.ts";
 import { createToolDisplaySection } from "../result/display.ts";
-import type { SearchDetails, ToolDisplaySection } from "../result/types.ts";
+import type { ToolDisplaySection } from "../result/types.ts";
+import type { GraphDetails, GraphSectionDetails } from "./details.ts";
+import { compactGraphLabel } from "./format.ts";
+import { graphReadNext } from "./read-next.ts";
 
 export type { GraphRelationKind, GraphSection } from "../../session/graph-types.ts";
 
@@ -40,7 +47,7 @@ export interface GraphResultAssembly {
   resolvedDisplayFile: string;
   cwd: string;
   assembled: ToolResultAssembly<{ readonly sections: readonly AssembledGraphSection[] }>;
-  details: SearchDetails;
+  details: GraphDetails;
   displaySections: readonly ToolDisplaySection[];
 }
 
@@ -74,7 +81,7 @@ export function assembleGraphResult(input: {
     })),
     evidenceLists,
     nextQueries: [],
-    readNext: sections.flatMap((section) => (section.kind === "ok" ? section.readNext : [])),
+    readNext: graphReadNext(sections),
     candidateCount,
     confidence,
     provenance,
@@ -90,12 +97,11 @@ export function assembleGraphResult(input: {
     assembled,
     displaySections,
     details: {
-      confidence,
-      scope: null,
-      candidateCount,
-      omittedCount: assembled.totals.omittedCount,
+      targetName: input.displayName,
+      targetFile: input.resolvedDisplayFile,
+      sections: sections.map((section) => graphSectionDetails(section, input.cwd)),
+      readNext: assembledReadNext(assembled),
       evidenceLists: [...assembled.evidenceLists],
-      nextQueries: assembledNextQueries(assembled),
     },
   };
 }
@@ -128,13 +134,28 @@ function formatGraphDisplayItem(
   cwd: string,
 ): string {
   if (relation === "callees") {
-    const call = item as { name: string; file: string; line: number };
-    return `${call.name} — ${toDisplayPath(cwd, call.file)}:L${call.line}`;
+    const call = item as CallEntry;
+    return `${toDisplayPath(cwd, call.file)}:L${call.line}:${call.character} — ${compactGraphLabel(call.name)}`;
   }
 
-  const location = item as { name: string | null; file: string; line: number; character: number };
-  const name = location.name ? `${location.name} — ` : "";
-  return `${name}${toDisplayPath(cwd, location.file)}:L${location.line}:${location.character}`;
+  const location = item as ReferenceEntry;
+  return `${toDisplayPath(cwd, location.file)}:L${location.line}:${location.character}`;
+}
+
+function graphSectionDetails(section: AssembledGraphSection, cwd: string): GraphSectionDetails {
+  const calls = section.kind === "ok" && section.rel === "callees" ? section.data : null;
+  return {
+    rel: section.rel,
+    source: section.rel === "callees" ? "structural" : "semantic",
+    status: section.kind === "ok" ? evidenceStatus(section.evidence) : "unavailable",
+    message: section.kind === "unavailable" ? section.message : null,
+    externalCount:
+      section.kind === "ok" && section.rel !== "callees" ? section.data.externalCount : 0,
+    enclosingScope: calls
+      ? { ...calls.enclosingScope, file: toDisplayPath(cwd, calls.enclosingScope.file) }
+      : null,
+    depth: calls?.depth ?? null,
+  };
 }
 
 function assembleGraphSection(section: GraphSection, maxResults: number): AssembledGraphSection {
@@ -181,11 +202,10 @@ function createRelationEvidenceList<T>(params: {
   invalidLocationCount: number;
   partialReason: RelationLocationPartialReason | null;
 }): EvidenceList<T> {
-  const evidence = createEvidenceList({
-    key: params.key,
-    items: params.items,
-    maxResults: params.maxResults,
-  });
+  const evidence =
+    params.partialReason === "provider-limited"
+      ? createPartialEvidenceList({ ...params, partialReason: params.partialReason })
+      : createEvidenceList(params);
   if (params.partialReason === null) return evidence;
   return {
     ...evidence,
@@ -291,7 +311,7 @@ export function finishGraphResult(outcome: GraphOutcome, cwd: string): CodeIntel
   return {
     content: renderGraphResult(assembly),
     details: {
-      type: "search",
+      type: "graph",
       data: assembly.details,
       status: "completed",
       displaySections: assembly.displaySections,

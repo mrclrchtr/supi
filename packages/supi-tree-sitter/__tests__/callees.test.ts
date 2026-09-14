@@ -106,6 +106,110 @@ describe("calleesAt — structural callee detection", () => {
     }
   });
 
+  it("preserves repeated callee names at distinct source ranges", async () => {
+    writeSource(
+      "repeated.ts",
+      ["function run() {", "  repeat(); repeat();", "  repeat();", "}"].join("\n"),
+    );
+
+    const session = createTreeSitterSession(tmpDir);
+    try {
+      const result = await session.calleesAt("repeated.ts", 1, 10);
+      expect(result).toMatchObject({
+        kind: "success",
+        data: {
+          callees: [
+            {
+              name: "repeat",
+              range: { startLine: 2, startCharacter: 3, endLine: 2, endCharacter: 9 },
+            },
+            {
+              name: "repeat",
+              range: { startLine: 2, startCharacter: 13, endLine: 2, endCharacter: 19 },
+            },
+            {
+              name: "repeat",
+              range: { startLine: 3, startCharacter: 3, endLine: 3, endCharacter: 9 },
+            },
+          ],
+        },
+      });
+    } finally {
+      await session.dispose();
+    }
+  });
+
+  it("preserves repeated names in direct and deep nested calls", async () => {
+    writeSource(
+      "nested-repeated.ts",
+      [
+        "function outer() {",
+        "  repeat();",
+        "  const callback = () => {",
+        "    repeat();",
+        "    repeat();",
+        "  };",
+        "  repeat();",
+        "}",
+      ].join("\n"),
+    );
+
+    const session = createTreeSitterSession(tmpDir);
+    try {
+      const direct = await session.calleesAt("nested-repeated.ts", 1, 10, { depth: "direct" });
+      expect(direct).toMatchObject({
+        kind: "success",
+        data: {
+          callees: [
+            { name: "repeat", range: { startLine: 2 } },
+            { name: "repeat", range: { startLine: 7 } },
+          ],
+        },
+      });
+
+      const deep = await session.calleesAt("nested-repeated.ts", 1, 10, { depth: "deep" });
+      expect(deep).toMatchObject({
+        kind: "success",
+        data: {
+          callees: [
+            { name: "repeat", range: { startLine: 2 } },
+            { name: "repeat", range: { startLine: 4 } },
+            { name: "repeat", range: { startLine: 5 } },
+            { name: "repeat", range: { startLine: 7 } },
+          ],
+        },
+      });
+    } finally {
+      await session.dispose();
+    }
+  });
+
+  it("keeps chained calls with the same start and distinct full ranges", async () => {
+    writeSource("chained.ts", ["function run() {", "  factory()();", "}"].join("\n"));
+
+    const session = createTreeSitterSession(tmpDir);
+    try {
+      const result = await session.calleesAt("chained.ts", 1, 10);
+      expect(result).toMatchObject({
+        kind: "success",
+        data: {
+          callees: [
+            {
+              name: "factory",
+              range: { startLine: 2, startCharacter: 3, endLine: 2, endCharacter: 10 },
+            },
+            {
+              name: "factory()",
+              range: { startLine: 2, startCharacter: 3, endLine: 2, endCharacter: 12 },
+            },
+          ],
+        },
+      });
+    } finally {
+      await session.dispose();
+    }
+  });
+
   it("detects callees in a Python function", async () => {
     writeSource(
       "test.py",

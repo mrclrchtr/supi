@@ -1,4 +1,4 @@
-import type { CodeRequestControl, SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
+import type { SemanticProvider, StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
 
 /**
  * Shared types for the relations analysis modules.
@@ -37,8 +37,8 @@ export interface CalleeEntry {
   character: number;
 }
 
-/** Consumer-facing display entry for structural calls (no character). */
-export type CallEntry = Omit<CalleeEntry, "character">;
+/** One structural call site with a 1-based UTF-16 coordinate. */
+export type CallEntry = CalleeEntry;
 
 /** One implementation entry from a semantic implementation lookup. */
 export interface ImplementationEntry {
@@ -54,32 +54,6 @@ export interface RelationsServiceDeps {
   provider: {
     references?: SemanticProvider["references"];
     implementation?: SemanticProvider["implementation"];
-    calleesAt?: (
-      file: string,
-      line: number,
-      character: number,
-      depthOrOptions?:
-        | "direct"
-        | "deep"
-        | { depth?: "direct" | "deep"; control?: CodeRequestControl },
-    ) => Promise<{
-      kind: string;
-      data?: {
-        enclosingScope?: {
-          name?: string;
-          startLine?: number;
-          endLine?: number;
-        };
-        callees: Array<{
-          name: string;
-          file?: string;
-          location?: string;
-          startLine?: number;
-          startCharacter?: number;
-        }>;
-        depth?: "direct" | "deep";
-      };
-      message?: string;
-    }>;
+    calleesAt?: StructuralProvider["calleesAt"];
   } | null;
 }

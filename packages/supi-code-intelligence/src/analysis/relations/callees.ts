@@ -53,9 +53,9 @@ export async function collectCallees(
   );
   const callees: CalleeEntry[] = result.data.callees.map((c) => ({
     name: c.name,
-    file: c.file ?? c.location ?? targetFile,
-    line: c.startLine ?? targetLine,
-    character: c.startCharacter ?? targetCharacter,
+    file: targetFile,
+    line: c.startLine,
+    character: c.startCharacter,
   }));
 
   return {

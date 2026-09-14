@@ -7,6 +7,7 @@ import {
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeProvider } from "../../analysis/provider.ts";
 import {
+  readNextAround,
   readNextEnclosingScope,
   readNextTarget,
   readNextTopSites,
@@ -145,6 +146,7 @@ async function collectCalleesRelation(options: CollectRelationOptions): Promise<
     name: callee.name,
     file: callee.file,
     line: callee.line,
+    character: callee.character,
   }));
   return {
     kind: "ok",
@@ -192,6 +194,14 @@ async function collectImplementationsRelation(
       invalidLocationCount: result.invalidLocationCount,
       partialReason: result.partialReason,
     },
-    readNext: [],
+    readNext: result.implementations
+      .slice(0, Math.min(options.maxResults, 2))
+      .map((implementation) =>
+        readNextAround(
+          toDisplayPath(options.cwd, implementation.file),
+          implementation.line,
+          "inspect an implementation site",
+        ),
+      ),
   };
 }

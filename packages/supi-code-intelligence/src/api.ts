@@ -61,6 +61,8 @@ export type {
   CodeIntelResultDetails,
   ContextDetails,
   DisambiguationCandidate,
+  GraphDetails,
+  GraphSectionDetails,
   HealthDetails,
   HealthSectionDetails,
   InspectDetails,

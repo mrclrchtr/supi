@@ -207,7 +207,7 @@ Code understanding based on source shape and syntax, such as imports, exports, o
 _Avoid_: semantic analysis, symbol-aware analysis
 
 **Structural callee**:
-A syntax-derived outgoing-call evidence atom from the enclosing executable scope at a target anchor. Structural callees name the call expression as written; they are not symbol-identity evidence. Calls inside nested functions, methods, or callbacks are not attributed to the outer scope.
+A syntax-derived outgoing-call evidence atom from the enclosing executable scope at a target anchor. Each distinct source range is one call site, even when its callee text matches another site. Structural callees name the call expression as written; they are not symbol-identity evidence. Direct depth excludes calls inside nested functions, methods, or callbacks; deep depth includes them without claiming a transitive call graph.
 _Avoid_: semantic callee, caller, reference, treating nested callback calls as direct parent calls
 
 **Refactor plan**:

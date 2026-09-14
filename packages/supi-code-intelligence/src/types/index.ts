@@ -16,6 +16,8 @@ export type {
 
 // ── Detail types ────────────────────────────────────────────────────────
 
+export type { GraphDetails, GraphSectionDetails } from "../tool/code_graph/details.ts";
+
 export type {
   AnchoredResolutionMetadata,
   AnchoredResolutionSource,

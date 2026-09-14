@@ -39,7 +39,7 @@ describe("code_graph read-next guidance", () => {
         kind: "success" as const,
         data: {
           enclosingScope: { name: "foo", startLine: 1, endLine: 1 },
-          callees: [{ name: "bar", startLine: 1, endLine: 1 }],
+          callees: [{ name: "bar", startLine: 1, startCharacter: 25 }],
           depth: "direct" as const,
         },
       }),
@@ -55,7 +55,9 @@ describe("code_graph read-next guidance", () => {
 
     expect(result.content).toContain("## Read Next");
     expect(result.content).toContain("`index.ts` L1");
-    expect(result.content).toContain("inspect the resolved target before editing");
+    expect(result.content).toContain("inspect the enclosing scope");
+    expect(result.content).not.toContain("inspect the resolved target before editing");
+    expect(result.content.match(/`index.ts` L1/g)).toHaveLength(1);
     expect(result.content).toContain("`consumer.ts` L1–L42");
     expect(result.content).toContain("inspect a reference site");
     expect(result.content).toContain("`read` offset 1, limit");
