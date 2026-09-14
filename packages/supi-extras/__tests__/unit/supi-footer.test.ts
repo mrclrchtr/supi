@@ -1,4 +1,4 @@
-import { footerContributions } from "@mrclrchtr/supi-core/footer-registry";
+import { FOOTER_INVALIDATE_EVENT, footerContributions } from "@mrclrchtr/supi-core/footer-registry";
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import supiFooter from "../../src/supi-footer.ts";
@@ -404,6 +404,31 @@ describe("supiFooter extension", () => {
       expect(tui.requestRender).toHaveBeenCalled();
     });
 
+    it("re-renders on footer invalidation", async () => {
+      const pi = createPiMock();
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
+
+      let footerFactory: FooterFactory | undefined;
+      const ctx = makeFooterCtx({
+        ui: uiCapturingFooter((f) => {
+          footerFactory = f;
+        }),
+      });
+
+      const startHandler = pi.handlers.get("session_start")?.[0] as (
+        _e: unknown,
+        c: unknown,
+      ) => Promise<unknown>;
+      await startHandler?.({}, ctx);
+
+      const tui = { requestRender: vi.fn() };
+      const factory = footerFactory as FooterFactory;
+      factory(tui, mockTheme, makeFooterData());
+
+      pi.events.emit(FOOTER_INVALIDATE_EVENT, {});
+      expect(tui.requestRender).toHaveBeenCalled();
+    });
+
     it("cleans up on session_shutdown", async () => {
       const pi = createPiMock();
       supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
@@ -578,6 +603,49 @@ describe("supiFooter extension", () => {
       expect(chIdx).toBeGreaterThan(-1);
       expect(extraIdx).toBeGreaterThan(chIdx);
       expect(costIdx).toBeGreaterThan(extraIdx);
+    });
+
+    it("places stats-end contributions after the context value", async () => {
+      const pi = createPiMock();
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
+      footerContributions.register({
+        key: "lsp-status",
+        placement: "stats-end",
+        priority: 100,
+        render: () => "| λ lsp • 3 ✓",
+      });
+      footerContributions.register({
+        key: "supi-antigravity",
+        placement: "stats-end",
+        priority: 110,
+        render: () => "| ✦",
+      });
+
+      let footerFactory: FooterFactory | undefined;
+      const ctx = makeFooterCtx({
+        model: { provider: "openai", id: "gpt-4", reasoning: false, contextWindow: 128000 },
+        ui: uiCapturingFooter((f) => {
+          footerFactory = f;
+        }),
+      });
+
+      const startHandler = pi.handlers.get("session_start")?.[0] as (
+        _e: unknown,
+        c: unknown,
+      ) => Promise<unknown>;
+      await startHandler?.({}, ctx);
+
+      const factory = footerFactory as FooterFactory;
+      const renderer = factory(
+        mockTui,
+        mockTheme,
+        makeFooterData({
+          getExtensionStatuses: vi.fn(() => new Map([["supi-antigravity", "✦"]])),
+        }),
+      );
+      const lines = renderer.render(200);
+      expect(lines).toHaveLength(2);
+      expect(lines[1]).toContain("| λ lsp • 3 ✓ | ✦");
     });
 
     it("renders TCH from real registry after CH", async () => {

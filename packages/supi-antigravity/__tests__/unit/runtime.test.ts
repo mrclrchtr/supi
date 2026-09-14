@@ -2,8 +2,10 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeSupiConfig } from "@mrclrchtr/supi-core/config";
+import { FOOTER_INVALIDATE_EVENT } from "@mrclrchtr/supi-core/footer-registry";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ANTIGRAVITY_FOOTER_KEY } from "../../src/footer-constants.ts";
 import { getIsolatedAntigravityPaths } from "../../src/isolated-home.ts";
 import { AntigravityRuntime } from "../../src/runtime.ts";
 
@@ -47,7 +49,8 @@ describe("Antigravity runtime activation", () => {
 
     expect(settled).toBe(false);
     expect(pi.tools).toHaveLength(0);
-    expect(context.ui.setStatus).toHaveBeenCalledWith("supi-antigravity", undefined);
+    expect(runtime.isReady).toBe(false);
+    expect(context.ui.setStatus).toHaveBeenCalledWith(ANTIGRAVITY_FOOTER_KEY, undefined);
 
     discovery.resolve({
       status: "available",
@@ -56,9 +59,10 @@ describe("Antigravity runtime activation", () => {
     });
     await refreshing;
     expect(pi.tools).toHaveLength(1);
+    expect(runtime.isReady).toBe(true);
   });
 
-  it("shows the ready status after activation and clears it on shutdown", async () => {
+  it("becomes ready after activation and resets on shutdown", async () => {
     const root = roots[0] as string;
     const cwd = join(root, "repo");
     await mkdir(cwd, { recursive: true });
@@ -76,13 +80,13 @@ describe("Antigravity runtime activation", () => {
     const context = makeCtx({ cwd });
 
     await runtime.startRefresh(cwd, { ui: context.ui });
-    expect(context.ui.setStatus).toHaveBeenLastCalledWith(
-      "supi-antigravity",
-      "✓ antigravity ready",
-    );
+    expect(runtime.isReady).toBe(true);
+    expect(context.ui.setStatus).toHaveBeenCalledWith(ANTIGRAVITY_FOOTER_KEY, "✦");
+    expect(pi.events.emit).toHaveBeenCalledWith(FOOTER_INVALIDATE_EVENT, {});
 
     await runtime.shutdown();
-    expect(context.ui.setStatus).toHaveBeenLastCalledWith("supi-antigravity", undefined);
+    expect(runtime.isReady).toBe(false);
+    expect(context.ui.setStatus).toHaveBeenLastCalledWith(ANTIGRAVITY_FOOTER_KEY, undefined);
   });
 
   it("does not reject when an unavailable warning cannot be shown", async () => {
@@ -107,7 +111,8 @@ describe("Antigravity runtime activation", () => {
 
     await expect(runtime.startRefresh(cwd, { ui: context.ui })).resolves.toBeUndefined();
     expect(notify).toHaveBeenCalledTimes(1);
-    expect(context.ui.setStatus).toHaveBeenLastCalledWith("supi-antigravity", undefined);
+    expect(runtime.isReady).toBe(false);
+    expect(context.ui.setStatus).toHaveBeenLastCalledWith(ANTIGRAVITY_FOOTER_KEY, undefined);
   });
 
   it("reports an unexpected refresh failure", async () => {
@@ -205,7 +210,8 @@ describe("Antigravity runtime activation", () => {
       { homeDir: root },
     );
     await runtime.refresh(cwd, { ui: context.ui });
-    expect(context.ui.setStatus).toHaveBeenLastCalledWith("supi-antigravity", undefined);
+    expect(runtime.isReady).toBe(false);
+    expect(context.ui.setStatus).toHaveBeenLastCalledWith(ANTIGRAVITY_FOOTER_KEY, undefined);
     first.resolve({
       status: "available",
       cliVersion: "1.1.25",
@@ -214,7 +220,8 @@ describe("Antigravity runtime activation", () => {
     await refreshing;
     expect(pi.tools).toHaveLength(0);
     expect(pi.getActiveTools()).not.toContain("antigravity_run");
-    expect(context.ui.setStatus).toHaveBeenLastCalledWith("supi-antigravity", undefined);
+    expect(runtime.isReady).toBe(false);
+    expect(context.ui.setStatus).toHaveBeenLastCalledWith(ANTIGRAVITY_FOOTER_KEY, undefined);
   });
 });
 

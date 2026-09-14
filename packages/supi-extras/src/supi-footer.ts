@@ -8,7 +8,7 @@
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { footerContributions } from "@mrclrchtr/supi-core/footer-registry";
+import { FOOTER_INVALIDATE_EVENT, footerContributions } from "@mrclrchtr/supi-core/footer-registry";
 import {
   buildPwdLine,
   buildStatsLeft,
@@ -31,15 +31,11 @@ import {
 export default function supiFooter(pi: ExtensionAPI) {
   let currentModel: unknown;
   let requestRender: (() => void) | undefined;
-  let unregisterInvalidate: (() => void) | undefined;
+  let unregisterInvalidates: Array<() => void> | undefined;
 
   pi.on("session_start", (_event, ctx) => {
     currentModel = ctx.model;
-    if (!unregisterInvalidate) {
-      unregisterInvalidate = pi.events.on("supi:lsp:invalidate", () => {
-        requestRender?.();
-      });
-    }
+    unregisterInvalidates ??= registerFooterInvalidations(pi, () => requestRender?.());
     installFooter(ctx);
   });
 
@@ -55,8 +51,8 @@ export default function supiFooter(pi: ExtensionAPI) {
   pi.on("session_shutdown", () => {
     currentModel = undefined;
     requestRender = undefined;
-    unregisterInvalidate?.();
-    unregisterInvalidate = undefined;
+    for (const unregister of unregisterInvalidates ?? []) unregister();
+    unregisterInvalidates = undefined;
   });
 
   // biome-ignore lint/suspicious/noExplicitAny: ctx type from pi session_start handler is complex
@@ -167,6 +163,13 @@ export default function supiFooter(pi: ExtensionAPI) {
   }
 }
 
+function registerFooterInvalidations(pi: ExtensionAPI, invalidate: () => void): Array<() => void> {
+  return [
+    pi.events.on("supi:lsp:invalidate", invalidate),
+    pi.events.on(FOOTER_INVALIDATE_EVENT, invalidate),
+  ];
+}
+
 /** Resolve the current thinking level. */
 function resolveThinkingLevel(
   model: ModelInfo | undefined,
@@ -176,6 +179,13 @@ function resolveThinkingLevel(
   if (!model?.reasoning) return "off";
   return getThinkingLevel?.() ?? latestThinkingLevel(entries);
 }
+function isStatsLineContribution(key: string): boolean {
+  return (
+    footerContributions.getByPlacement("stats").some((item) => item.key === key) ||
+    footerContributions.getByPlacement("stats-end").some((item) => item.key === key)
+  );
+}
+
 function buildStatusLine(
   lines: string[],
   footerData: FooterData,
@@ -183,9 +193,11 @@ function buildStatusLine(
   theme: FooterTheme,
 ): void {
   const statuses = footerData.getExtensionStatuses();
+  // A stats-line contribution may use the same key for the built-in footer fallback.
   const legacyEntries =
     statuses.size > 0
       ? (Array.from(statuses.entries()) as Array<[string, string]>)
+          .filter(([key]) => !isStatsLineContribution(key))
           .sort((a, b) => a[0].localeCompare(b[0]))
           .map(([, text]) => sanitizeStatusText(text))
       : [];

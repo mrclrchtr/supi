@@ -1,10 +1,12 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { registerAntigravityFooterContribution } from "./footer.ts";
 import { AntigravityRuntime } from "./runtime.ts";
 import { registerAntigravitySettings } from "./settings.ts";
 
 /** Register the opt-in Antigravity Run extension. */
 export default function antigravityExtension(pi: ExtensionAPI): void {
   const runtime = new AntigravityRuntime({ pi });
+  const footer = registerAntigravityFooterContribution(runtime);
   registerAntigravitySettings(pi, runtime);
 
   pi.on("session_start", (_event, ctx) => {
@@ -18,5 +20,6 @@ export default function antigravityExtension(pi: ExtensionAPI): void {
 
   pi.on("session_shutdown", async () => {
     await runtime.shutdown();
+    footer.dispose();
   });
 }

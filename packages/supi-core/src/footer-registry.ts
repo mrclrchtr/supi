@@ -2,17 +2,24 @@
 //
 // Extensions register pre-styled text chunks with a placement hint
 // ("stats" for the metrics line, "status" for the extension status line).
-// The custom footer in supi-extras (or PI's built-in footer) reads these
-// contributions and renders them alongside the built-in metrics.
+// The custom footer in supi-extras reads these contributions and renders them
+// alongside the built-in metrics. Extensions can use PI's status API as a
+// fallback when the custom footer is not installed.
 
 import { createRegistry } from "./registry-utils.ts";
+
+/** Event emitted when a dynamic footer contribution needs a new render. */
+export const FOOTER_INVALIDATE_EVENT = "supi:footer:invalidate";
 
 /** Where the contribution should appear in the footer. */
 export type FooterPlacement = "stats" | "stats-end" | "status";
 
 /** A single footer contribution registered by an extension. */
 export interface FooterContribution {
-  /** Unique key for this contribution. Re-registering with the same key replaces it. */
+  /**
+   * Unique key for this contribution. Re-registering with the same key replaces it.
+   * A same-key Pi status is treated as this contribution's built-in-footer fallback.
+   */
   key: string;
   /** Which footer line this belongs on. */
   placement: FooterPlacement;

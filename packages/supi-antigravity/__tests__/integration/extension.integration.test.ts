@@ -3,11 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { writeSupiConfig } from "@mrclrchtr/supi-core/config";
+import { footerContributions } from "@mrclrchtr/supi-core/footer-registry";
 import { createPiMock, getHandlerOrThrow, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANTIGRAVITY_CONFIG_SECTION } from "../../src/config.ts";
 import { ANTIGRAVITY_HANDLE_ENTRY_TYPE } from "../../src/conversation/handles.ts";
 import antigravityExtension from "../../src/extension.ts";
+import { unregisterAntigravityFooterContribution } from "../../src/footer.ts";
+import { ANTIGRAVITY_FOOTER_KEY } from "../../src/footer-constants.ts";
 import { toolDescription } from "../../src/tool/antigravity_run/guidance.ts";
 import { fixtureDirectory } from "../helpers/test-paths.ts";
 
@@ -30,6 +33,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  unregisterAntigravityFooterContribution();
   vi.unstubAllEnvs();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
@@ -205,8 +209,14 @@ describe("supi-antigravity extension", () => {
       context,
     );
     expect(pi.tools).toHaveLength(0);
+    const contribution = footerContributions
+      .getByPlacement("stats-end")
+      .find((item) => item.key === ANTIGRAVITY_FOOTER_KEY);
+    expect(contribution).toMatchObject({ placement: "stats-end", priority: 110 });
+    expect(contribution?.render()).toBe("");
+
     const tool = await waitForTool(pi);
-    expect(context.ui.setStatus).toHaveBeenCalledWith("supi-antigravity", "✓ antigravity ready");
+    expect(contribution?.render()).toBe("| ✦");
     expect(tool.name).toBe("antigravity_run");
     expect(tool.description).toBe(toolDescription);
     expect(tool.description).toMatch(/external model.*web research.*design advice/i);
@@ -327,9 +337,11 @@ describe("supi-antigravity extension", () => {
         treeContext,
       ),
     ).rejects.toThrow(/retired/);
-    await getHandlerOrThrow(pi, "session_shutdown")(
-      { type: "session_shutdown", reason: "quit" },
-      treeContext,
-    );
+    for (const handler of pi.getHandlers("session_shutdown")) {
+      await handler({ type: "session_shutdown", reason: "quit" }, treeContext);
+    }
+    expect(pi.getActiveTools()).not.toContain("antigravity_run");
+    expect(context.ui.setStatus).toHaveBeenLastCalledWith(ANTIGRAVITY_FOOTER_KEY, undefined);
+    expect(contribution?.render()).toBe("");
   });
 });

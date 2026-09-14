@@ -1,14 +1,13 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { FOOTER_INVALIDATE_EVENT } from "@mrclrchtr/supi-core/footer-registry";
 import { type AntigravityAvailability, discoverAntigravityAvailability } from "./availability.ts";
 import { loadAntigravityConfig } from "./config.ts";
 import { ConversationHandleStore } from "./conversation/handles.ts";
+import { ANTIGRAVITY_FOOTER_KEY, ANTIGRAVITY_READY_ICON } from "./footer-constants.ts";
 import { getIsolatedAntigravityPaths, type IsolatedAntigravityPaths } from "./isolated-home.ts";
 import { registerAntigravityRunTool } from "./tool/antigravity_run/register.ts";
 import { ANTIGRAVITY_RUN_TOOL_NAME } from "./tool/antigravity_run/spec.ts";
 import type { CuratedModel } from "./types.ts";
-
-const ANTIGRAVITY_STATUS_KEY = "supi-antigravity";
-const ANTIGRAVITY_READY_STATUS = "✓ antigravity ready";
 
 /** Context needed to report availability and update the footer. */
 export type AntigravityRefreshContext = {
@@ -26,6 +25,7 @@ export class AntigravityRuntime {
   #refreshGeneration = 0;
   #refreshAbort: AbortController | undefined;
   #statusUi: Pick<ExtensionContext["ui"], "setStatus"> | undefined;
+  #ready = false;
   #toolRegistered = false;
 
   constructor(options: {
@@ -43,6 +43,11 @@ export class AntigravityRuntime {
   /** The immutable discovery result, if session discovery has completed. */
   get availability(): AntigravityAvailability | undefined {
     return this.#availability;
+  }
+
+  /** Whether the discovered Antigravity tool is ready for use. */
+  get isReady(): boolean {
+    return this.#ready;
   }
 
   /** Rebuild handles from the current PI branch. */
@@ -70,7 +75,7 @@ export class AntigravityRuntime {
     const abortController = new AbortController();
     this.#refreshAbort = abortController;
     if (context) this.#statusUi = context.ui;
-    this.#setStatus(undefined);
+    this.#setReady(false);
     const config = loadAntigravityConfig(cwd, this.#homeDir);
     if (!config.agentToolEnabled) {
       this.#deactivateTool();
@@ -97,7 +102,7 @@ export class AntigravityRuntime {
     this.#availability = availability;
     if (availability.status === "available") {
       this.#activateTool(availability.catalogue, availability.cliVersion);
-      this.#setStatus(ANTIGRAVITY_READY_STATUS);
+      this.#setReady(true);
       return;
     }
     this.#deactivateTool();
@@ -110,7 +115,7 @@ export class AntigravityRuntime {
     this.#refreshAbort?.abort();
     this.#refreshAbort = undefined;
     this.#deactivateTool();
-    this.#setStatus(undefined);
+    this.#setReady(false);
     this.#statusUi = undefined;
     this.handles.clear();
     await Promise.resolve();
@@ -140,11 +145,19 @@ export class AntigravityRuntime {
     }
   }
 
-  #setStatus(status: string | undefined): void {
+  #setReady(ready: boolean): void {
+    const changed = this.#ready !== ready;
+    this.#ready = ready;
     try {
-      this.#statusUi?.setStatus(ANTIGRAVITY_STATUS_KEY, status);
+      this.#statusUi?.setStatus(ANTIGRAVITY_FOOTER_KEY, ready ? ANTIGRAVITY_READY_ICON : undefined);
     } catch {
       // PI may be shutting down while the footer status changes.
+    }
+    if (!changed) return;
+    try {
+      this.#pi.events.emit(FOOTER_INVALIDATE_EVENT, {});
+    } catch {
+      // Footer refresh is optional and must not change runtime state.
     }
   }
 }
