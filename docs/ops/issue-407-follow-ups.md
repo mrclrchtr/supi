@@ -1,10 +1,11 @@
 # Issue 407 follow-ups
 
-**Status:** Work items 1, 2, and 3 implemented; the follow-up 1 regression and final diagnostic return race are corrected; default-parallel focused checks passed; full workspace verification, Kotlin rerun, and parent live Pi verification pending
+**Status:** All four work items implemented and reviewed. Full checks retain one known Kotlin failure; all 21 package checks passed. Parent live Pi verification remains pending.
 **Overall baseline:** `b6bf5209`
 **Work item 2 baseline:** `52315e0c`
 **Work item 3 baseline:** `eeafdcbe`
-**Scope:** Input freshness, server-requested diagnostic refresh, and mixed-language diagnostic filtering for this implementation slice
+**Work item 4 baseline:** `0112cf38`
+**Scope:** Input freshness, server-requested diagnostic refresh, mixed-language diagnostic filtering, and maintenance/result scope labels for this implementation slice
 
 ## Approved policy
 
@@ -31,7 +32,7 @@
 - Do not claim a complete workspace snapshot or detection of all unreported closed-file changes.
 - Use the conservative input scope: open documents on each Required LSP route.
 - Synchronize changed input text only. Never resend unchanged text only to confirm diagnostics.
-- Keep evidence and result scope equal to the caller's scope.
+- Keep diagnostic evidence and result scope equal to the caller's scope; label any broader maintenance operation scope separately.
 - Share pending synchronization between concurrent requests.
 - Known input changes during an operation must not allow stale semantic or diagnostic results to return as completed/current.
 - Failed reads, deletion, changed lifecycle, cancellation, and deadline exhaustion fail closed with existing typed partial/unavailable semantics.
@@ -42,6 +43,7 @@
 - Ordinary diagnostic refresh keeps its own read, classification, and budget path. It does not run a second input-barrier preflight, so unchanged text is not resent.
 - Server-requested refresh uses diagnostic-only invalidation. It keeps the semantic input generation and unchanged open-document synchronization, then collects applicable native pull or TypeScript request evidence. A real disk change uses normal synchronization.
 - Server refresh demand shares one active pass and one newer generation. A newer generation invalidates the active evidence, but the owned diagnostic transport remains active until settlement before queued work can start.
+- Health output labels the maintenance operation scope and maintenance evidence separately from the diagnostic result scope and coverage. Broad workspace-runtime maintenance remains allowed for active routes and tracked documents; it is not a whole-filesystem scan or a whole-workspace proof.
 
 ## Work items
 
@@ -50,7 +52,7 @@
 | 1 | Shared Semantic input barrier for semantic evidence freshness | Implemented and verified in this slice |
 | 2 | Native server-requested diagnostic refresh without pretending source text changed | Implemented and verified in this slice |
 | 3 | Mixed-language diagnostic filtering | Implemented and verified in this slice |
-| 4 | Scope labels that separate maintenance scope from result coverage | Later; pending |
+| 4 | Scope labels that separate maintenance scope from result coverage | Implemented and verified in this slice |
 
 ## Approved test seams
 
@@ -72,7 +74,7 @@ Use real TypeScript/Pyright where useful and controlled server responses for rac
 
 - Retain broad maintenance if required and label its scope separately from result coverage.
 - Do not claim that root-cause or baseline attribution for all live failures is proved.
-- Item 4 remains pending and is outside this slice.
+- Item 4 is implemented in this slice; keep its labels tied to typed operation scope and diagnostic result scope.
 
 ## Verification record
 
@@ -176,7 +178,7 @@ Use real TypeScript/Pyright where useful and controlled server responses for rac
 
   Result: `Test Files 9 passed (9)` and `Tests 76 passed (76)`.
 - Operator evidence: `pnpm exec jiti /tmp/supi-debug-issue407/refresh-consumer-cache-race.mjs` returned `initial.completed[]`, changed dependent diagnostics during refresh, and the same changed diagnostics after refresh. `pnpm exec jiti /tmp/supi-debug-issue407/diagnostic-invalidation-return-race.mjs` returned the partial stale-candidate result above. `pnpm exec jiti /tmp/supi-debug-issue407/input-barrier-occupancy.mjs` reported `{"configuredReadBound":1,"startedBeforeFirstReadSettled":1,"maximumActiveReads":1}`. All three probes exited 0.
-- Full `packages/supi-lsp/__tests__/integration` evidence remains pending. The Kotlin integration test has not been rerun; a prior run timed out, and its test and assertion were not skipped or weakened. Full workspace verification and parent live Pi verification remain pending.
+- Item 2 checkpoint: full LSP integration, workspace, and parent live Pi verification had not yet run. The prior Kotlin timeout remained unresolved; its test and assertion were unchanged. See the final verification result below.
 - Follow-up 3 implementation: `isFileExcludedByTsconfig` now bypasses tsconfig/jsconfig filtering for non-TypeScript/JavaScript-family files. Single-file health omits the Tsconfig coverage label for those files, while automatic path exclusions, explicit-file routing, configured suppression, and JS `allowJs`/`checkJs` handling remain unchanged. Recovery scope telemetry counts only automatic-scope TypeScript/JavaScript-family files.
 - Follow-up 3 public regression: `packages/supi-code-intelligence/__tests__/integration/substrate/lsp/mixed-language-public-tool.integration.test.ts` uses the public `WorkspaceLspRuntime` and `code_health` tool with a controlled native LSP server. A directory refresh under `src/tsconfig.json` (`include: ["*.ts"]`) returns the Python diagnostic with `3 requested, 3 confirmed` tracked-file evidence; an exact Python health request returns the same diagnostic without a `Tsconfig` label.
 - Follow-up 3 focused evidence: the mixed-language/config/output tests and both public code-intelligence LSP integration tests passed with 6 files and 71 tests. Focused Biome passed for 13 TypeScript files and 1 controlled fixture file, `git diff --check` passed, and the focused LSP and code-intelligence source/test typecheck passed with no output.
@@ -186,4 +188,19 @@ Use real TypeScript/Pyright where useful and controlled server responses for rac
   pnpm exec vitest run packages/supi-lsp/__tests__/unit packages/supi-code-intelligence/__tests__/unit --reporter=dot
   ```
 
-- Full verification: not run, as requested. Kotlin rerun: not run. Parent live Pi verification: not run. Reload the extension before live verification.
+- Follow-up 4 implementation: `code_health` now reports typed maintenance operation scope, maintenance evidence, diagnostic result scope, and diagnostic coverage as separate fields. Markdown and expanded TUI output use the same boundaries; passive calls do not claim a maintenance attempt; server-only calls show inventory scope without fabricating diagnostic result scope.
+- Follow-up 4 public regression: `packages/supi-code-intelligence/__tests__/integration/substrate/lsp/mixed-language-public-tool.integration.test.ts` uses the public `code_health` tool and public `WorkspaceLspRuntime`. It verifies one broad workspace-runtime maintenance pass over 3 tracked files, a directory result over 2 files, a passive directory result without maintenance claims, an exact-file result, and server-only inventory output.
+- Follow-up 4 focused evidence: the health/tool/render tests passed with 8 files and 107 tests; both public LSP tool integration files passed with 2 files and 3 tests; the default-parallel LSP and code-intelligence unit command passed with 152 files and 1361 tests. Source and test typechecks passed with no output. Biome passed for 10 changed TypeScript/fixture files and `git diff --check` passed.
+- Barrier test failure attribution: three default-config runs of `workspace-runtime.integration.barrier.test.ts` failed in `keeps a longer-deadline caller on the shared slow read` after 2,000 ms. Before fake timers, the public `getProjectServers()` result was `[{"name":"fixture","status":"running","ready":false}]` after both controller start and `trackFile()`. `trackFile()` opens the file but does not wait for concrete readiness. The first semantic call therefore stayed in the public runtime's readiness path, so `reads.waitForCalls(1)` never completed and fake time never reached the 10 ms caller deadline. The old unawaited `expect(first).rejects` then observed `{ kind: "unavailable" }` during cleanup and raised one unhandled assertion. The public readiness probe measured 35.2 ms for start and 0.6 ms for tracking with the default fixture, so the 2,000 ms budget was not the cause.
+- Controlled readiness red evidence: a temporary copy retained the old ordering and used the fixture's controlled `--readiness-delay=100` event. The default-config command failed with `1` failed and `5` passed tests at the same 2,000 ms timeout. This reproduces the failure without CPU load.
+- Barrier harness fix: the fixture now accepts `--readiness-delay=<ms>`, and the failing test uses a 100 ms delay. It first awaits the public `waitUntilReadyForFile()` operation, using real asynchronous file reads for that operation's documented warm-up, then installs the controlled reader before fake timers. The controlled public readiness probe returned `startMs: 33.5`, `trackMs: 0.6`, `readinessMs: 113.4`, and `readiness.kind: "ready"`; its public server status was `ready: false` after start and tracking. The test keeps the 10 ms and 10,000 ms caller deadlines and the active-read and maximum-overlap assertions. It captures both operation outcomes with rejection handlers and awaits them, so cleanup cannot create an unhandled assertion. The passing path resolves the controlled reads and awaits the owned second operation before controller shutdown; no production code or caller budget changed.
+- Barrier post-fix evidence: three default-config runs with no `--testTimeout` override each passed with `1` file and `6` tests. A repeat with the controlled readiness delay changed from 100 ms to 250 ms also passed with `1` file and `6` tests. The full barrier-file command passed with `1` file and `6` tests. The adjacent public runtime/Pi command passed with `4` files and `14` tests; the relevant unit command passed with `8` files and `126` tests. Source and test typechecks passed with no output. Biome passed for 12 changed TypeScript/fixture files, and `git diff --check` passed.
+- Operator probes after the fix all exited 0: `refresh-consumer-cache-race.mjs` returned completed changed diagnostics during and after refresh; `diagnostic-invalidation-return-race.mjs` returned the expected partial current-generation result during refresh and completed fresh diagnostics after refresh; `input-barrier-occupancy.mjs` reported `{"configuredReadBound":1,"startedBeforeFirstReadSettled":1,"maximumActiveReads":1}`.
+
+## Final workspace verification
+
+- The operator reran `pnpm verify:ai` after the readiness-test correction. WASM, lint, source/test typecheck, and skill checks passed. Vitest reported 401 files passed and 1 failed; 3,397 tests passed, 2 skipped, and 1 failed. There were no unhandled errors.
+- The only remaining failure is the unchanged Kotlin test `pulls diagnostics for a file with a type error` in `client.integration.kotlin.test.ts`. It timed out after 240,000 ms with empty diagnostics for `Main.kt`. The test was not skipped or weakened. Full verification is not green.
+- The failed test phase stopped the combined command before packaging. The operator therefore ran `pnpm pack:verify` separately. All 21 packages passed.
+- Logs: `/tmp/supi-debug-issue407/follow-ups-verify-final.log` and `/tmp/supi-debug-issue407/follow-ups-pack-final.log`.
+- Parent live Pi verification remains pending. Reload the extension before repeating the cross-file, idle-refresh, mixed-language, and scope-label cases.

@@ -18,15 +18,37 @@ function respond(id, result) {
 }
 
 function diagnosticItems(uri) {
-  if (!uri.endsWith("/probe.py")) return [];
-  return [
-    {
-      message: "Python diagnostic under a TypeScript config.",
-      range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
-      severity: 1,
-      source: "mixed-language-fixture",
-    },
-  ];
+  if (uri.endsWith("/probe.py")) {
+    return [
+      {
+        message: "Python diagnostic under a TypeScript config.",
+        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+        severity: 1,
+        source: "mixed-language-fixture",
+      },
+    ];
+  }
+  if (uri.endsWith("/inside.ts")) {
+    return [
+      {
+        message: "Inside directory diagnostic.",
+        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+        severity: 1,
+        source: "mixed-language-fixture",
+      },
+    ];
+  }
+  if (uri.endsWith("/outside.ts")) {
+    return [
+      {
+        message: "Outside directory diagnostic.",
+        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+        severity: 1,
+        source: "mixed-language-fixture",
+      },
+    ];
+  }
+  return [];
 }
 
 function handle(message) {

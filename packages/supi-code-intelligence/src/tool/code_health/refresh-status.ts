@@ -14,6 +14,11 @@ import {
   formatStartupRetry,
   isFileReadinessPending,
 } from "./refresh-outcome.ts";
+import {
+  formatCompactMaintenanceEvidence,
+  formatMaintenanceEvidence,
+  formatMaintenanceScope,
+} from "./scope.ts";
 import { readSemanticHealthState } from "./semantic-state.ts";
 
 /** Render current and retained health refresh status for the TUI. */
@@ -74,8 +79,10 @@ function formatCompletedRefreshStatus(
     noOp,
   });
   const withOutcome = outcomes.length > 0 ? `${base}; ${outcomes.join("; ")}` : base;
-  const evidence = formatDiagnosticEvidence(readRecord(refresh.diagnosticEvidence));
-  const withEvidence = evidence ? `${withOutcome}; ${evidence}` : withOutcome;
+  const maintenanceScope = formatMaintenanceScope(refresh);
+  const withScope = maintenanceScope ? `${withOutcome}; ${maintenanceScope}` : withOutcome;
+  const evidence = formatMaintenanceEvidence(readRecord(refresh.diagnosticEvidence));
+  const withEvidence = evidence ? `${withScope}; ${evidence}` : withScope;
   const stale = readRecord(refresh.staleAssessment);
   return stale?.suspected === true
     ? `${withEvidence}; stale pattern suspected in ${readNumber(stale.matchedFileCount)} files`
@@ -88,11 +95,11 @@ function formatFailedRefreshStatus(refresh: Record<string, unknown>): string {
   );
   const startupRetry = formatStartupRetry(readStartupRetry(refresh.startupRetry));
   const staleRestart = formatStaleDiagnosticRestartsForRecord(refresh);
-  const evidence = formatDiagnosticEvidence(readRecord(refresh.diagnosticEvidence));
+  const maintenanceScope = formatMaintenanceScope(refresh);
+  const evidence = formatMaintenanceEvidence(readRecord(refresh.diagnosticEvidence));
   const reason = typeof refresh.reason === "string" ? `: ${refresh.reason}` : "";
-  return `${refreshAttemptLabel(refresh)} failed${reason}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${startupRetry ? `; ${startupRetry}` : ""}${evidence ? `; ${evidence}` : ""}`;
+  return `${refreshAttemptLabel(refresh)} failed${reason}${maintenanceScope ? `; ${maintenanceScope}` : ""}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${startupRetry ? `; ${startupRetry}` : ""}${evidence ? `; ${evidence}` : ""}`;
 }
-
 function formatRefreshOutcomes(options: {
   refresh: Record<string, unknown>;
   restarted: number;
@@ -119,10 +126,11 @@ export function readCompactRefreshStatus(data: Record<string, unknown> | null): 
     readProcessCrashRecovery(refresh.processCrashRecovery),
   );
   const startupRetry = formatCompactStartupRetry(readStartupRetry(refresh.startupRetry));
+  const maintenanceScope = formatMaintenanceScope(refresh);
   if (refresh.kind === "failed") {
     const staleRestart = formatStaleDiagnosticRestartsForRecord(refresh);
     return (
-      [sourceTracking, staleRestart, processCrashRecovery, startupRetry]
+      [maintenanceScope, sourceTracking, staleRestart, processCrashRecovery, startupRetry]
         .filter((value): value is string => value !== null)
         .join("; ") || null
     );
@@ -140,7 +148,14 @@ export function readCompactRefreshStatus(data: Record<string, unknown> | null): 
 
   const staleRestart = formatStaleDiagnosticRestartsForRecord(refresh);
   const readiness = fileReadinessPending ? "LSP may still be warming; retry shortly" : null;
-  return [sourceTracking, staleRestart, processCrashRecovery, startupRetry, readiness]
+  return [
+    maintenanceScope,
+    sourceTracking,
+    staleRestart,
+    processCrashRecovery,
+    startupRetry,
+    readiness,
+  ]
     .filter((value): value is string => value !== null)
     .join("; ");
 }
@@ -152,7 +167,7 @@ export function readPreviousRefreshStatus(data: Record<string, unknown> | null):
   }
   const attempt = readRecord(refresh.lastAttempt);
   if (!attempt) return null;
-  const evidence = formatCompactDiagnosticEvidence(readRecord(attempt.diagnosticEvidence));
+  const evidence = formatCompactMaintenanceEvidence(readRecord(attempt.diagnosticEvidence));
   const sourceTracking = formatSourceTracking(readRecord(attempt.sourceTracking));
   const processCrashRecovery = formatCompactProcessCrashRecovery(
     readProcessCrashRecovery(attempt.processCrashRecovery),
@@ -165,6 +180,7 @@ export function readPreviousRefreshStatus(data: Record<string, unknown> | null):
   const readiness = fileReadinessPending ? "LSP may still be warming; retry shortly" : null;
   const outcome = [
     readiness,
+    formatMaintenanceScope(attempt),
     sourceTracking,
     staleRestart,
     processCrashRecovery,
@@ -208,7 +224,7 @@ function formatStaleDiagnosticRestartsForRecord(attempt: Record<string, unknown>
 function formatLastRefreshSuffix(refresh: Record<string, unknown>): string {
   const attempt = readRecord(refresh.lastAttempt);
   if (!attempt) return "";
-  const evidence = formatDiagnosticEvidence(readRecord(attempt.diagnosticEvidence));
+  const evidence = formatMaintenanceEvidence(readRecord(attempt.diagnosticEvidence));
   const sourceTracking = formatSourceTracking(readRecord(attempt.sourceTracking));
   const staleRestart = formatStaleDiagnosticRestartsForRecord(attempt);
   const processCrashRecovery = formatProcessCrashRecovery(
@@ -220,6 +236,7 @@ function formatLastRefreshSuffix(refresh: Record<string, unknown>): string {
   const readiness = fileReadinessPending ? "LSP may still be warming; retry shortly" : null;
   const outcome = [
     readiness,
+    formatMaintenanceScope(attempt),
     sourceTracking,
     staleRestart,
     processCrashRecovery,
@@ -246,18 +263,6 @@ function formatSourceTracking(source: Record<string, unknown> | null): string | 
 
 function readArrayLength(value: unknown): number {
   return Array.isArray(value) ? value.length : 0;
-}
-
-function formatCompactDiagnosticEvidence(evidence: Record<string, unknown> | null): string | null {
-  const counts = readEvidenceCounts(evidence);
-  if (!counts) return null;
-  return `req ${counts[0]} · conf ${counts[1]} · unconf ${counts[2]} · failed ${counts[3]} · removed ${counts[4]}`;
-}
-
-function formatDiagnosticEvidence(evidence: Record<string, unknown> | null): string | null {
-  const counts = readEvidenceCounts(evidence);
-  if (!counts) return null;
-  return `${counts[0]} requested, ${counts[1]} confirmed, ${counts[2]} unconfirmed, ${counts[3]} failed, ${counts[4]} removed`;
 }
 
 export function isPendingFileReadiness(data: Record<string, unknown> | null): boolean {
@@ -361,18 +366,6 @@ function isProcessCrashRecoveryOutcome(value: unknown): value is ProcessCrashRec
     value === "recovery-failed" ||
     value === "recovery-exhausted"
   );
-}
-
-function readEvidenceCounts(evidence: Record<string, unknown> | null): number[] | null {
-  if (!evidence) return null;
-  const counts = [
-    evidence.requested,
-    evidence.confirmed,
-    evidence.unconfirmed,
-    evidence.failed,
-    evidence.removed,
-  ];
-  return counts.every(isEvidenceCount) ? counts : null;
 }
 
 function isEvidenceCount(value: unknown): value is number {

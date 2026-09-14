@@ -139,9 +139,9 @@ The mechanism that produced a config coverage state for a TypeScript or JavaScri
 _Avoid_: "the include pattern" as the only mechanism, untyped decision reasons, applying a TypeScript config to another language
 
 **Tracked-file evidence**:
-Diagnostic evidence bounded by the client's tracked documents. A file created after the tracked set was last updated is absent until a refresh pulls it; the evidence line in health output is therefore explicitly bounded (`tracked-file bound`). The workspace refresh path discovers files created since the last snapshot pass and pulls them, so a created file's errors appear on the next settled refresh.
-_Avoid_: "current diagnostics", "the latest evidence"
+Diagnostic evidence bounded by the client's tracked documents. A file created after the tracked set was last updated is absent until a refresh pulls it; the evidence line in health output is therefore explicitly bounded (`tracked-file bound`). The workspace refresh path discovers files created since the last snapshot pass and pulls them, so a created file's errors appear on the next settled refresh. This is diagnostic result evidence, not proof that the whole workspace is clean.
+_Avoid_: "current diagnostics", "the latest evidence", workspace proof
 
 **Refresh-attempt evidence**:
-The diagnostic evidence produced by the just-run recovery pass. It can differ from tracked-file evidence inside one health call; the two must be labeled distinctly in output.
-_Avoid_: conflating the health refresh line with the evidence snapshot
+The diagnostic evidence produced by the just-run maintenance pass. It can differ from tracked-file evidence inside one health call; the two must be labeled distinctly in output. Its maintenance operation scope comes from the typed runtime operation and does not claim every filesystem source.
+_Avoid_: conflating the health refresh line with the evidence snapshot, calling maintenance counts result coverage

@@ -240,9 +240,9 @@ export interface HealthDetails {
   serverInventoryAvailable: boolean;
   /** Server inventory remains workspace-wide even for a scoped diagnostic request. */
   serverInventoryScope: "workspace";
-  /** Exact status and evidence boundary of the diagnostic observation. */
+  /** Diagnostic result scope and exact evidence boundary for this health call. */
   diagnosticObservation: HealthDiagnosticObservation;
-  /** Current or most recent explicit diagnostic refresh attempt. */
+  /** Current or most recent refresh, including typed maintenance scope and evidence. */
   refresh: HealthRefreshState;
   structuralAvailable: boolean;
   /** Structural (tree-sitter) substrate readiness. Undefined when not evaluated. */

@@ -242,7 +242,7 @@ describe("code_health result assembly", () => {
 
     const markdown = renderHealthResult(assembly, "/repo");
     expect(markdown).toContain(
-      "File LSP maintenance attempt**: readiness pending — LSP may still be warming; retry shortly.",
+      "File LSP maintenance attempt**: readiness pending — LSP may still be warming; retry shortly; maintenance scope: file runtime.",
     );
     expect(markdown).toContain("Diagnostics pending — LSP may still be warming; retry shortly.");
     expect(markdown).not.toContain("completed no-op");
@@ -477,11 +477,11 @@ describe("code_health result assembly", () => {
     );
 
     const markdown = renderHealthResult(assembly, "/repo");
-    expect(markdown).toContain("failed — Refresh failed. Started");
+    expect(markdown).toContain("failed — Refresh failed; maintenance scope: file runtime. Started");
     expect(markdown).not.toContain("failed..");
   });
 
-  it("reports the operation scope for a retained file refresh attempt", () => {
+  it("reports the maintenance scope for a retained file refresh attempt", () => {
     const assembly = assembleHealthResult(
       makeHealthData({
         refresh: {
@@ -511,7 +511,7 @@ describe("code_health result assembly", () => {
     expect(markdown).toContain(
       "**File LSP maintenance**: not requested for this call. Previous attempt completed",
     );
-    expect(markdown).toContain("operation scope: file runtime");
+    expect(markdown).toContain("maintenance scope: file runtime");
   });
 
   it("names retained timing as a refresh attempt rather than diagnostic age", () => {

@@ -107,6 +107,7 @@ describe("code_health TUI projection", () => {
     });
 
     expect(render(details, true)).toContain("refresh attempt completed no-op");
+    expect(render(details, true)).toContain("maintenance scope: workspace runtime");
     expect(render(details, true)).not.toContain("stale diagnostic restarts");
   });
 
@@ -205,6 +206,7 @@ describe("code_health TUI projection", () => {
     const expanded = render(details, true).replace(/\s+/g, " ");
     expect(expanded).toContain("file maintenance attempt waiting");
     expect(expanded).toContain("Diagnostics pending — LSP may still be warming; retry shortly");
+    expect(expanded).toContain("evidence scope: live file diagnostic request for /repo/src/a.ts");
     expect(expanded).not.toContain("Diagnostics unavailable");
 
     const retained = render(
@@ -344,7 +346,7 @@ describe("code_health TUI projection", () => {
       },
     });
 
-    const compact = render(details);
+    const compact = render(details).replace(/\s+/g, " ");
     expect(compact).toContain("1 route recovered (1 skipped, 1 failed, 1 exhausted)");
     expect(compact).not.toContain("failed @ a");
 
@@ -363,7 +365,7 @@ describe("code_health TUI projection", () => {
       serverRouteStatusCounts: { recovering: 1, error: 2, unavailable: 1 },
     });
 
-    const compact = render(details);
+    const compact = render(details).replace(/\s+/g, " ");
     expect(compact).toContain("lsp ready workspace routes: 1 recovering");
     expect(compact).toContain("errors, 1 unavailable");
     const expanded = render(details, true);
@@ -407,6 +409,9 @@ describe("code_health TUI projection", () => {
     expect(render(details, true)).toContain(
       "Tracked-file diagnostics partial (3 requested, 1 confirmed, 1 unconfirmed, 1 failed, 0 removed)",
     );
+    expect(render(details, true).replace(/\s+/g, " ")).toContain(
+      "evidence scope: tracked-file diagnostic snapshot",
+    );
   });
 
   it("renders the previous refresh attempt in the compact view", () => {
@@ -428,10 +433,9 @@ describe("code_health TUI projection", () => {
       },
     });
 
-    expect(render(details)).toContain("last refresh attempt failed");
-    expect(render(details)).toMatch(
-      /req 2\s*·\s*conf 0\s*·\s*unconf 1\s*·\s*failed 1\s*·\s*removed 0/,
-    );
+    const compact = render(details).replace(/\s+/g, " ");
+    expect(compact).toContain("last refresh attempt failed");
+    expect(compact).toMatch(/req 2\s*·\s*conf 0\s*·\s*unconf 1\s*·\s*failed 1\s*·\s*removed 0/);
   });
 
   it("renders Capability Warnings from structured health details", () => {
@@ -448,7 +452,7 @@ describe("code_health TUI projection", () => {
       },
     });
 
-    expect(render(details)).toContain("1 capability warning");
+    expect(render(details).replace(/\s+/g, " ")).toContain("1 capability warning");
     const expanded = render(details, true);
     expect(expanded).toContain("Capability Warnings");
     expect(expanded).toContain("pyright-langserver not found on PATH");

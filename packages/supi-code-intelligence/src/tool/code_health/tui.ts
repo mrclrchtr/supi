@@ -31,6 +31,11 @@ import {
   readRefreshStatus,
   readSourceTrackingStatus,
 } from "./refresh-status.ts";
+import {
+  formatCompactDiagnosticEvidence,
+  formatDiagnosticEvidence,
+  withDiagnosticScope,
+} from "./scope.ts";
 import { formatSemanticHealthState, readSemanticHealthState } from "./semantic-state.ts";
 
 /** ── renderCall ────────────────────────────────────────────────── */
@@ -136,7 +141,7 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
     formatSectionSummary(
       section,
       section.key === "diagnostics"
-        ? formatCompactDiagnosticEvidence(readDiagnosticEvidence(data))
+        ? formatCompactDiagnosticEvidence(readDiagnosticEvidence(data), diagnosticScopeKind(data))
         : null,
       theme,
       fileReadinessPending,
@@ -230,36 +235,6 @@ function readDiagnosticEvidence(
   return readRecord(readRecord(data?.diagnosticObservation)?.evidence);
 }
 
-function formatCompactDiagnosticEvidence(evidence: Record<string, unknown> | null): string | null {
-  if (!evidence) return null;
-  const counts = [
-    evidence.requested,
-    evidence.confirmed,
-    evidence.unconfirmed,
-    evidence.failed,
-    evidence.removed,
-  ];
-  if (!counts.every(isEvidenceCount)) return null;
-  return `req ${evidence.requested} · conf ${evidence.confirmed} · unconf ${evidence.unconfirmed} · failed ${evidence.failed} · removed ${evidence.removed}`;
-}
-
-function formatDiagnosticEvidence(evidence: Record<string, unknown> | null): string | null {
-  if (!evidence) return null;
-  const counts = [
-    evidence.requested,
-    evidence.confirmed,
-    evidence.unconfirmed,
-    evidence.failed,
-    evidence.removed,
-  ];
-  if (!counts.every(isEvidenceCount)) return null;
-  return `${evidence.requested} requested, ${evidence.confirmed} confirmed, ${evidence.unconfirmed} unconfirmed, ${evidence.failed} failed, ${evidence.removed} removed`;
-}
-
-function isEvidenceCount(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value >= 0;
-}
-
 function readRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : null;
 }
@@ -324,21 +299,29 @@ function buildDiagnosticSummary(data: Record<string, unknown> | null, theme: The
     const label = isPendingFileReadiness(data)
       ? "Diagnostics pending — LSP may still be warming; retry shortly"
       : "Diagnostics unavailable";
-    return new Text(theme.fg("warning", label), 0, 0);
+    return new Text(theme.fg("warning", withDiagnosticScope(label, data)), 0, 0);
   }
   const trackedFiles = diagnosticScopeKind(data) === "tracked-files";
   if (section.status === "partial") {
     const coverage = formatDiagnosticEvidence(readDiagnosticEvidence(data));
     const label = trackedFiles ? "Tracked-file diagnostics partial" : "Diagnostics partial";
-    return new Text(theme.fg("warning", coverage ? `${label} (${coverage})` : label), 0, 0);
+    const summary = coverage ? `${label} (${coverage})` : label;
+    return new Text(theme.fg("warning", withDiagnosticScope(summary, data)), 0, 0);
   }
   if (section.itemCount === 0) {
-    return new Text(theme.fg("success", diagnosticEmptySummary(data)), 0, 0);
+    return new Text(
+      theme.fg("success", withDiagnosticScope(diagnosticEmptySummary(data), data)),
+      0,
+      0,
+    );
   }
 
   const fileLabel = `${trackedFiles ? "tracked " : ""}${section.itemCount === 1 ? "file" : "files"}`;
   return new Text(
-    theme.fg("warning", theme.bold(`${section.itemCount} ${fileLabel} with issues`)),
+    theme.fg(
+      "warning",
+      theme.bold(withDiagnosticScope(`${section.itemCount} ${fileLabel} with issues`, data)),
+    ),
     0,
     0,
   );

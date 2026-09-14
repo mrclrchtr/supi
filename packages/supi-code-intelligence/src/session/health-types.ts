@@ -94,6 +94,7 @@ export interface HealthStaleAssessment {
   readonly warning: string | null;
 }
 
+/** Runtime scope of maintenance; it is not the diagnostic result scope. */
 export type HealthRefreshOperationScope = "file-runtime" | "workspace-runtime";
 
 /** Readiness result for a file-scoped maintenance attempt. */
@@ -122,7 +123,7 @@ interface CompletedHealthRefreshAttempt {
   readonly sourceTracking?: SourceTrackingReport;
 }
 
-/** A diagnostic refresh attempt against an explicit LSP runtime scope. */
+/** A diagnostic refresh attempt with separate maintenance and result scopes. */
 export type HealthRefreshAttempt =
   | (CompletedHealthRefreshAttempt & {
       readonly operationScope: "workspace-runtime";

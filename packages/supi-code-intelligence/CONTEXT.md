@@ -134,6 +134,14 @@ _Avoid_: live/runtime-backed signal, ambient report evidence, undisclosed cached
 A `code_health` call with `refresh: true` that runs scoped LSP maintenance and permits one startup or process-crash route attempt per selected route. It reports route readiness separately from diagnostic evidence and applies to server-only output as well as diagnostics output.
 _Avoid_: passive server inventory, automatic retry loop, diagnostic confirmation
 
+**Maintenance operation scope**:
+The runtime boundary of one explicit health refresh attempt. `workspace-runtime` names broad maintenance over active routes and tracked documents; it does not mean every filesystem source or proof that the whole workspace is clean. `file-runtime` names maintenance for one exact file.
+_Avoid_: treating maintenance counts as result coverage, calling workspace-runtime evidence workspace proof
+
+**Diagnostic result scope**:
+The boundary of the diagnostic observation returned by `code_health`: one exact file, or a tracked-file snapshot with an optional directory filter. Its entries and coverage counts stay inside this boundary, separate from refresh-attempt evidence.
+_Avoid_: widening a directory result to maintenance coverage, treating tracked-file evidence as a whole-workspace result
+
 **LSP route status summary**:
 Aggregate Server status evidence shown beside Semantic health state as separate recovering and error route counts. It never changes the Semantic health state classification.
 _Avoid_: degraded semantic state, LSP health state, combined readiness

@@ -89,17 +89,8 @@ function renderFailedRefreshStatus(
   lines: string[],
   attempt: Extract<HealthRefreshAttempt, { kind: "failed" }>,
 ): void {
-  const evidence = attempt.diagnosticEvidence
-    ? `; ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}`
-    : "";
-  const processCrashRecovery = attempt.processCrashRecovery
-    ? formatProcessCrashRecovery(attempt.processCrashRecovery)
-    : null;
-  const startupRetry = attempt.startupRetry ? formatStartupRetry(attempt.startupRetry) : null;
-  const staleRestart = formatStaleDiagnosticRestarts(attempt);
-  lines.push(
-    `**${refreshAttemptLabel(attempt)}**: failed — ${attempt.reason}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${startupRetry ? `; ${startupRetry}` : ""}${evidence}`,
-  );
+  const outcome = failedRefreshText(attempt, false);
+  lines.push(`**${refreshAttemptLabel(attempt)}**: ${asSentence(outcome)}`);
   renderSourceTracking(lines, attempt);
   lines.push("");
 }
@@ -131,9 +122,10 @@ function completedRefreshText(
     startupRetry,
   ].filter((value): value is string => value !== null);
   const withOutcome = outcome.length > 0 ? `${base}; ${outcome.join("; ")}` : base;
+  const withScope = `${withOutcome}; maintenance scope: ${refreshOperationScopeText(attempt)}`;
   return attempt.operationScope === "workspace-runtime"
-    ? `${withOutcome}; ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}`
-    : withOutcome;
+    ? `${withScope}; maintenance evidence: ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}`
+    : withScope;
 }
 
 function renderSourceTracking(
@@ -167,7 +159,7 @@ function renderLastAttempt(lines: string[], attempt: HealthRefreshAttempt, cwd: 
   const outcome = refreshAttemptOutcome(attempt);
   const label = refreshAttemptLabel(attempt);
   lines.push(
-    `**Previous ${label.toLowerCase()}**: ${asSentence(outcome)} Started ${formatRefreshElapsed(Date.now() - attempt.attemptedAt)}; requested ${formatDiagnosticScope(attempt.requestedDiagnosticScope, cwd)}; operation scope: ${refreshOperationScopeText(attempt)}.`,
+    `**Previous ${label.toLowerCase()}**: ${asSentence(outcome)} Started ${formatRefreshElapsed(Date.now() - attempt.attemptedAt)}; requested evidence scope: ${formatDiagnosticScope(attempt.requestedDiagnosticScope, cwd)}.`,
   );
 }
 
@@ -175,22 +167,35 @@ function renderRetainedAttempt(lines: string[], attempt: HealthRefreshAttempt, c
   const label =
     attempt.operationScope === "file-runtime" ? "File LSP maintenance" : "Diagnostic refresh";
   lines.push(
-    `**${label}**: not requested for this call. Previous attempt ${asSentence(refreshAttemptOutcome(attempt))} Started ${formatRefreshElapsed(Date.now() - attempt.attemptedAt)}; requested ${formatDiagnosticScope(attempt.requestedDiagnosticScope, cwd)}; operation scope: ${refreshOperationScopeText(attempt)}.`,
+    `**${label}**: not requested for this call. Previous attempt ${asSentence(refreshAttemptOutcome(attempt))} Started ${formatRefreshElapsed(Date.now() - attempt.attemptedAt)}; requested evidence scope: ${formatDiagnosticScope(attempt.requestedDiagnosticScope, cwd)}.`,
   );
 }
 
 function refreshAttemptOutcome(attempt: HealthRefreshAttempt): string {
   if (attempt.kind === "completed") return completedRefreshText(attempt);
+  return failedRefreshText(attempt);
+}
+
+function failedRefreshText(
+  attempt: Extract<HealthRefreshAttempt, { kind: "failed" }>,
+  includeSourceTracking = true,
+): string {
   const processCrashRecovery = attempt.processCrashRecovery
     ? formatProcessCrashRecovery(attempt.processCrashRecovery)
     : null;
   const startupRetry = attempt.startupRetry ? formatStartupRetry(attempt.startupRetry) : null;
   const staleRestart = formatStaleDiagnosticRestarts(attempt);
-  const sourceTracking = formatSourceTracking(attempt.sourceTracking);
+  const sourceTracking = includeSourceTracking
+    ? formatSourceTracking(attempt.sourceTracking)
+    : null;
   const evidence = attempt.diagnosticEvidence
-    ? `; ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}`
+    ? `; maintenance evidence: ${formatDiagnosticEvidence(attempt.diagnosticEvidence)}`
     : "";
-  return `failed — ${attempt.reason}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${startupRetry ? `; ${startupRetry}` : ""}${sourceTracking ? `; ${sourceTracking}` : ""}${evidence}`;
+  return `failed — ${stripTrailingPunctuation(attempt.reason)}; maintenance scope: ${refreshOperationScopeText(attempt)}${staleRestart ? `; ${staleRestart}` : ""}${processCrashRecovery ? `; ${processCrashRecovery}` : ""}${startupRetry ? `; ${startupRetry}` : ""}${sourceTracking ? `; ${sourceTracking}` : ""}${evidence}`;
+}
+
+function stripTrailingPunctuation(text: string): string {
+  return text.replace(/[.!?]+$/, "");
 }
 
 function refreshOperationScopeText(attempt: HealthRefreshAttempt): string {
