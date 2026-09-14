@@ -47,6 +47,7 @@ describe("Antigravity runtime activation", () => {
 
     expect(settled).toBe(false);
     expect(pi.tools).toHaveLength(0);
+    expect(context.ui.setStatus).toHaveBeenCalledWith("supi-antigravity", undefined);
 
     discovery.resolve({
       status: "available",
@@ -55,6 +56,33 @@ describe("Antigravity runtime activation", () => {
     });
     await refreshing;
     expect(pi.tools).toHaveLength(1);
+  });
+
+  it("shows the ready status after activation and clears it on shutdown", async () => {
+    const root = roots[0] as string;
+    const cwd = join(root, "repo");
+    await mkdir(cwd, { recursive: true });
+    const pi = createPiMock();
+    const runtime = new AntigravityRuntime({
+      pi: pi as never,
+      paths: getIsolatedAntigravityPaths(root),
+      homeDir: root,
+      discover: vi.fn(async () => ({
+        status: "available" as const,
+        cliVersion: "1.1.25",
+        catalogue: ["gemini-3.8-flash-low"] as const,
+      })) as never,
+    });
+    const context = makeCtx({ cwd });
+
+    await runtime.startRefresh(cwd, { ui: context.ui });
+    expect(context.ui.setStatus).toHaveBeenLastCalledWith(
+      "supi-antigravity",
+      "✓ antigravity ready",
+    );
+
+    await runtime.shutdown();
+    expect(context.ui.setStatus).toHaveBeenLastCalledWith("supi-antigravity", undefined);
   });
 
   it("does not reject when an unavailable warning cannot be shown", async () => {
@@ -79,6 +107,7 @@ describe("Antigravity runtime activation", () => {
 
     await expect(runtime.startRefresh(cwd, { ui: context.ui })).resolves.toBeUndefined();
     expect(notify).toHaveBeenCalledTimes(1);
+    expect(context.ui.setStatus).toHaveBeenLastCalledWith("supi-antigravity", undefined);
   });
 
   it("reports an unexpected refresh failure", async () => {
@@ -176,6 +205,7 @@ describe("Antigravity runtime activation", () => {
       { homeDir: root },
     );
     await runtime.refresh(cwd, { ui: context.ui });
+    expect(context.ui.setStatus).toHaveBeenLastCalledWith("supi-antigravity", undefined);
     first.resolve({
       status: "available",
       cliVersion: "1.1.25",
@@ -184,6 +214,7 @@ describe("Antigravity runtime activation", () => {
     await refreshing;
     expect(pi.tools).toHaveLength(0);
     expect(pi.getActiveTools()).not.toContain("antigravity_run");
+    expect(context.ui.setStatus).toHaveBeenLastCalledWith("supi-antigravity", undefined);
   });
 });
 

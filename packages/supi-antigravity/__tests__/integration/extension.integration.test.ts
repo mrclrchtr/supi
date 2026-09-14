@@ -206,6 +206,7 @@ describe("supi-antigravity extension", () => {
     );
     expect(pi.tools).toHaveLength(0);
     const tool = await waitForTool(pi);
+    expect(context.ui.setStatus).toHaveBeenCalledWith("supi-antigravity", "✓ antigravity ready");
     expect(tool.name).toBe("antigravity_run");
     expect(tool.description).toBe(toolDescription);
     expect(tool.description).toMatch(/external model.*web research.*design advice/i);

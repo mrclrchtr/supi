@@ -7,8 +7,13 @@ import { registerAntigravityRunTool } from "./tool/antigravity_run/register.ts";
 import { ANTIGRAVITY_RUN_TOOL_NAME } from "./tool/antigravity_run/spec.ts";
 import type { CuratedModel } from "./types.ts";
 
-/** Context needed to show an availability warning. */
-export type AntigravityRefreshContext = { ui: Pick<ExtensionContext["ui"], "notify"> } | undefined;
+const ANTIGRAVITY_STATUS_KEY = "supi-antigravity";
+const ANTIGRAVITY_READY_STATUS = "✓ antigravity ready";
+
+/** Context needed to report availability and update the footer. */
+export type AntigravityRefreshContext = {
+  ui: Pick<ExtensionContext["ui"], "notify" | "setStatus">;
+};
 
 /** Session runtime for immutable availability and Conversation Handle state. */
 export class AntigravityRuntime {
@@ -20,6 +25,7 @@ export class AntigravityRuntime {
   #availability: AntigravityAvailability | undefined;
   #refreshGeneration = 0;
   #refreshAbort: AbortController | undefined;
+  #statusUi: Pick<ExtensionContext["ui"], "setStatus"> | undefined;
   #toolRegistered = false;
 
   constructor(options: {
@@ -63,6 +69,8 @@ export class AntigravityRuntime {
     this.#refreshAbort?.abort();
     const abortController = new AbortController();
     this.#refreshAbort = abortController;
+    if (context) this.#statusUi = context.ui;
+    this.#setStatus(undefined);
     const config = loadAntigravityConfig(cwd, this.#homeDir);
     if (!config.agentToolEnabled) {
       this.#deactivateTool();
@@ -89,6 +97,7 @@ export class AntigravityRuntime {
     this.#availability = availability;
     if (availability.status === "available") {
       this.#activateTool(availability.catalogue, availability.cliVersion);
+      this.#setStatus(ANTIGRAVITY_READY_STATUS);
       return;
     }
     this.#deactivateTool();
@@ -101,6 +110,8 @@ export class AntigravityRuntime {
     this.#refreshAbort?.abort();
     this.#refreshAbort = undefined;
     this.#deactivateTool();
+    this.#setStatus(undefined);
+    this.#statusUi = undefined;
     this.handles.clear();
     await Promise.resolve();
   }
@@ -128,6 +139,14 @@ export class AntigravityRuntime {
       this.#pi.setActiveTools(activeTools.filter((name) => name !== ANTIGRAVITY_RUN_TOOL_NAME));
     }
   }
+
+  #setStatus(status: string | undefined): void {
+    try {
+      this.#statusUi?.setStatus(ANTIGRAVITY_STATUS_KEY, status);
+    } catch {
+      // PI may be shutting down while the footer status changes.
+    }
+  }
 }
 
 function formatRefreshError(error: unknown): string {
@@ -143,7 +162,10 @@ function formatRefreshError(error: unknown): string {
   return message.replace(/\s+/g, " ").trim().slice(0, 200) || "unknown error";
 }
 
-function notifyRefreshWarning(context: AntigravityRefreshContext, message: string): void {
+function notifyRefreshWarning(
+  context: AntigravityRefreshContext | undefined,
+  message: string,
+): void {
   try {
     context?.ui.notify(message, "warning");
   } catch {
