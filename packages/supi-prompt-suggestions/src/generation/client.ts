@@ -6,8 +6,8 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { completeModelRequest } from "@mrclrchtr/supi-core/llm";
 import {
   classifySuggestionFailure,
-  type RuntimeSuggestionFailureKind,
-  suggestionFailureSummary,
+  createSuggestionFailure,
+  type SuggestionFailure,
 } from "./failure.ts";
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -47,10 +47,7 @@ export interface SuggestionClientResult {
 }
 
 /** Classified request failure without provider response text. */
-export interface SuggestionClientFailure {
-  kind: RuntimeSuggestionFailureKind;
-  summary: string;
-}
+export type SuggestionClientFailure = SuggestionFailure;
 
 export interface SuggestionClientError {
   ok: false;
@@ -96,7 +93,7 @@ export async function callSuggestionModel(
     });
 
     if (response.stopReason === "aborted") {
-      return failureResult("timeout");
+      return failureResult(createSuggestionFailure("timeout"));
     }
     if (response.stopReason === "error") {
       return failureResult(classifySuggestionFailure(response.errorMessage));
@@ -117,9 +114,6 @@ export async function callSuggestionModel(
   }
 }
 
-function failureResult(kind: RuntimeSuggestionFailureKind): SuggestionClientError {
-  return {
-    ok: false,
-    failure: { kind, summary: suggestionFailureSummary(kind) },
-  };
+function failureResult(failure: SuggestionFailure): SuggestionClientError {
+  return { ok: false, failure };
 }

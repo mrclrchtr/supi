@@ -77,11 +77,13 @@ If no suggestion appears:
 
 - confirm **Suggestion model** is not `disabled`
 - confirm the selected model is still enabled in PI for the current scope
-- confirm the selected model has authentication configured in PI
+- if a warning reports authentication failed, check the selected model's authentication in PI
 - make sure the editor is empty after the assistant finishes
 - wait for the suggestion spinner to finish; generation times out after about 20 seconds
 
 Request failures show one warning for the active model and session. The warning contains only the
-provider/model identifier and a short failure category. Repeated failures stay quiet until a request
-succeeds, settings change, or a new session starts. Warning state is held in memory, so `/reload`
-also starts a new warning cycle. The separate routing identity remains stable for the same PI session.
+provider/model identifier, a safe failure category, and an optional HTTP status. Categories include
+authentication failed, billing failed, quota exceeded, rate limit exceeded, timeout, and provider
+request failed. Repeated failures stay quiet until a request succeeds, settings change, or a new
+session starts. Warning state is held in memory, so `/reload` also starts a new warning cycle. The
+separate routing identity remains stable for the same PI session.

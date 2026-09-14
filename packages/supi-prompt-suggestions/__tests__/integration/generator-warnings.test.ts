@@ -9,6 +9,9 @@ import { createSuggestionWarning, formatSuggestionWarning } from "../../src/gene
 import { type GenerationStatus, SuggestionGenerator } from "../../src/generation/generator.ts";
 import { SessionLifecycle } from "../../src/session.ts";
 
+// biome-ignore lint/security/noSecrets: This is a provider error type, not a credential.
+const GO_USAGE_LIMIT_ERROR = "GoUsageLimitError";
+
 const MODEL: Model<Api> = {
   id: "suggestion-model",
   name: "Suggestion model",
@@ -127,7 +130,7 @@ describe("SuggestionGenerator warning policy", () => {
       warning: {
         kind: "authentication",
         model: "test-provider/suggestion-model",
-        summary: "authentication is not configured",
+        summary: "authentication failed",
       },
     });
     expect(JSON.stringify(first)).not.toContain(secret);
@@ -139,6 +142,62 @@ describe("SuggestionGenerator warning policy", () => {
     expect(second).toEqual({ kind: "error" });
     expect(complete).toHaveBeenCalledTimes(2);
   });
+
+  it.each([
+    {
+      name: "billing 401",
+      errorMessage: '401 {"error":{"type":"BillingError","message":"account access denied"}}',
+      summary: "billing failed",
+      kind: "billing",
+      httpStatus: 401,
+    },
+    {
+      name: "billing 429",
+      errorMessage: '429 {"error":{"code":"billing_required","message":"account access denied"}}',
+      summary: "billing failed",
+      kind: "billing",
+      httpStatus: 429,
+    },
+    {
+      name: "quota",
+      errorMessage: `429 {"error":{"type":"${GO_USAGE_LIMIT_ERROR}","message":"available balance"}}`,
+      summary: "quota exceeded",
+      kind: "quota",
+      httpStatus: 429,
+    },
+    {
+      name: "generic 429",
+      errorMessage: '429 {"error":{"message":"too many requests"}}',
+      summary: "rate limit exceeded",
+      kind: "rate-limit",
+      httpStatus: 429,
+    },
+    {
+      name: "plain auth",
+      errorMessage: '401 {"error":{"message":"invalid api key"}}',
+      summary: "authentication failed",
+      kind: "authentication",
+      httpStatus: 401,
+    },
+  ])(
+    "carries $name metadata through the generator and UI",
+    async ({ errorMessage, summary, httpStatus }) => {
+      const { ctx } = makeFixture(
+        Promise.resolve(makeResponse({ content: [], stopReason: "error", errorMessage })),
+      );
+      const lifecycle = new SessionLifecycle(new SuggestionGenerator());
+      lifecycle.onStart(ctx);
+      lifecycle.onAgentSettled(ctx);
+
+      await vi.waitFor(() => expect(ctx.ui.notify).toHaveBeenCalledOnce());
+
+      expect(ctx.ui.notify).toHaveBeenCalledWith(
+        `Prompt suggestion unavailable for test-provider/suggestion-model: ${summary} (HTTP ${httpStatus})`,
+        "warning",
+      );
+      lifecycle.onShutdown();
+    },
+  );
 
   it("resets failure suppression after a valid empty response", async () => {
     const { ctx, complete } = makeFixture(

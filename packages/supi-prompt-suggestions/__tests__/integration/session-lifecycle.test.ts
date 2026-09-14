@@ -69,10 +69,28 @@ describe("SessionLifecycle suggestion notifications", () => {
 
     expect(ctx.ui.notify).toHaveBeenCalledOnce();
     expect(ctx.ui.notify).toHaveBeenCalledWith(
-      "Prompt suggestion unavailable for provider/model: authentication is not configured",
+      "Prompt suggestion unavailable for provider/model: authentication failed",
       "warning",
     );
     expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("supi-prompt-suggestions", "");
+  });
+
+  it("formats a safe HTTP status in a warning", () => {
+    const { ctx, callbacks } = makeFixture();
+
+    emit(callbacks, {
+      kind: "error",
+      warning: createSuggestionWarning("provider/model", {
+        kind: "billing",
+        httpStatus: 401,
+        summary: "billing failed",
+      }),
+    });
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      "Prompt suggestion unavailable for provider/model: billing failed (HTTP 401)",
+      "warning",
+    );
   });
 
   it("keeps empty, idle, and cancellation statuses quiet", () => {

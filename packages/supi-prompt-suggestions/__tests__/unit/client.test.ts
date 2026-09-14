@@ -4,6 +4,9 @@ import { makeCtx } from "@mrclrchtr/supi-test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildPrompt, callSuggestionModel } from "../../src/generation/client.ts";
 
+// biome-ignore lint/security/noSecrets: This is a provider error type, not a credential.
+const GO_USAGE_LIMIT_ERROR = "GoUsageLimitError";
+
 const MODEL: Model<Api> = {
   id: "suggestion-model",
   name: "Suggestion model",
@@ -106,16 +109,24 @@ describe("callSuggestionModel", () => {
     ).resolves.toEqual({ ok: true, text: "" });
   });
 
-  it.each(["401 invalid api key", "Provider is not configured: test-provider"])(
-    "classifies runtime authentication failure: %s",
-    async (errorMessage) => {
-      const secret = "sk-live-provider-secret";
+  it.each([
+    {
+      errorMessage: "401 invalid api key sk-live-provider-secret",
+      failure: { kind: "authentication", httpStatus: 401, summary: "authentication failed" },
+    },
+    {
+      errorMessage: "Provider is not configured: test-provider sk-live-provider-secret",
+      failure: { kind: "authentication", summary: "authentication failed" },
+    },
+  ])(
+    "classifies runtime authentication failure: $errorMessage",
+    async ({ errorMessage, failure }) => {
       const { ctx } = makeClientContext(
         Promise.resolve(
           makeResponse({
             content: [],
             stopReason: "error",
-            errorMessage: `${errorMessage} ${secret}`,
+            errorMessage,
           }),
         ),
       );
@@ -127,13 +138,173 @@ describe("callSuggestionModel", () => {
         signal: new AbortController().signal,
       });
 
-      expect(result).toEqual({
-        ok: false,
-        failure: { kind: "authentication", summary: "authentication is not configured" },
-      });
-      expect(JSON.stringify(result)).not.toContain(secret);
+      expect(result).toEqual({ ok: false, failure });
+      expect(JSON.stringify(result)).not.toContain("sk-live-provider-secret");
     },
   );
+
+  it.each([
+    {
+      name: "billing 401",
+      errorMessage: '401 {"error":{"type":"BillingError","message":"account access denied"}}',
+      failure: { kind: "billing", httpStatus: 401, summary: "billing failed" },
+    },
+    {
+      name: "billing 429",
+      errorMessage: '429 {"error":{"code":"billing_required","message":"account access denied"}}',
+      failure: { kind: "billing", httpStatus: 429, summary: "billing failed" },
+    },
+    {
+      name: "quota code",
+      errorMessage: '{"error":{"code":"insufficient_quota","message":"request rejected"}}',
+      failure: { kind: "quota", summary: "quota exceeded" },
+    },
+    {
+      name: "quota code with a billing wrapper",
+      errorMessage: '429 {"error":{"type":"BillingError","code":"insufficient_quota"}}',
+      failure: { kind: "quota", httpStatus: 429, summary: "quota exceeded" },
+    },
+    {
+      name: "quota text with a billing wrapper",
+      errorMessage: '429 {"error":{"message":"BillingError: insufficient_quota"}}',
+      failure: { kind: "quota", httpStatus: 429, summary: "quota exceeded" },
+    },
+    {
+      name: "HTTP status line",
+      errorMessage: "HTTP/1.1 401 Unauthorized",
+      failure: { kind: "authentication", httpStatus: 401, summary: "authentication failed" },
+    },
+    {
+      name: "quota usage limit",
+      errorMessage: `429 {"error":{"type":"${GO_USAGE_LIMIT_ERROR}","message":"available balance"}}`,
+      failure: { kind: "quota", httpStatus: 429, summary: "quota exceeded" },
+    },
+    {
+      name: "generic 429",
+      errorMessage: '429 {"error":{"message":"too many requests"}}',
+      failure: { kind: "rate-limit", httpStatus: 429, summary: "rate limit exceeded" },
+    },
+    {
+      name: "plain 401 auth",
+      errorMessage: '401 {"error":{"message":"invalid api key"}}',
+      failure: { kind: "authentication", httpStatus: 401, summary: "authentication failed" },
+    },
+    {
+      name: "plain 403 auth",
+      errorMessage: '403 {"error":{"message":"forbidden"}}',
+      failure: { kind: "authentication", httpStatus: 403, summary: "authentication failed" },
+    },
+  ])("classifies $name before HTTP fallbacks", async ({ errorMessage, failure }) => {
+    const { ctx } = makeClientContext(
+      Promise.resolve(makeResponse({ content: [], stopReason: "error", errorMessage })),
+    );
+
+    await expect(
+      callSuggestionModel({
+        ctx,
+        model: MODEL,
+        tail: "assistant text",
+        signal: new AbortController().signal,
+      }),
+    ).resolves.toEqual({ ok: false, failure });
+  });
+
+  it.each([
+    {
+      name: "billing code before auth status",
+      error: { status: 401, code: "billing_required", message: "access denied" },
+      failure: { kind: "billing", httpStatus: 401, summary: "billing failed" },
+    },
+    {
+      name: "quota code before rate status",
+      error: { status: 429, code: "insufficient_quota", message: "request rejected" },
+      failure: { kind: "quota", httpStatus: 429, summary: "quota exceeded" },
+    },
+    {
+      name: "direct error_type",
+      error: { status: 401, error_type: "billing_required", message: "access denied" },
+      failure: { kind: "billing", httpStatus: 401, summary: "billing failed" },
+    },
+    {
+      name: "status",
+      error: Object.assign(new Error("gateway rejected"), { status: 418 }),
+      failure: { kind: "request", httpStatus: 418, summary: "provider request failed" },
+    },
+    {
+      name: "statusCode",
+      error: { statusCode: 503, message: "gateway rejected" },
+      failure: { kind: "request", httpStatus: 503, summary: "provider request failed" },
+    },
+    {
+      name: "non-HTTP numeric code",
+      error: { code: "422", message: "gateway rejected" },
+      failure: { kind: "request", summary: "provider request failed" },
+    },
+  ])("keeps a validated status from a rejected request: $name", async ({ error, failure }) => {
+    const { ctx } = makeClientContext(Promise.reject(error));
+
+    await expect(
+      callSuggestionModel({
+        ctx,
+        model: MODEL,
+        tail: "assistant text",
+        signal: new AbortController().signal,
+      }),
+    ).resolves.toEqual({ ok: false, failure });
+  });
+
+  it.each([
+    "provider request failed",
+    "600 provider request failed",
+    "401_foo request id",
+    "request id req-401 at https://provider.example/models/429/status:429",
+    "process exit code 500",
+    '{"code":500,"message":"internal failure"}',
+    "request failed at https://provider.example/HTTP/1.1 401",
+  ])("does not retain an absent or invalid status: %s", async (errorMessage) => {
+    const { ctx } = makeClientContext(
+      Promise.resolve(makeResponse({ content: [], stopReason: "error", errorMessage })),
+    );
+
+    await expect(
+      callSuggestionModel({
+        ctx,
+        model: MODEL,
+        tail: "assistant text",
+        signal: new AbortController().signal,
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      failure: { kind: "request", summary: "provider request failed" },
+    });
+  });
+
+  it("does not retain provider bodies, URLs, or credentials", async () => {
+    const secret = "sk-live-provider-secret";
+    const { ctx } = makeClientContext(
+      Promise.resolve(
+        makeResponse({
+          content: [],
+          stopReason: "error",
+          errorMessage: `401 {"error":{"code":"billing_required","message":"${secret}","url":"https://provider.example/billing"}}`,
+        }),
+      ),
+    );
+
+    const result = await callSuggestionModel({
+      ctx,
+      model: MODEL,
+      tail: "assistant text",
+      signal: new AbortController().signal,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: "billing", httpStatus: 401, summary: "billing failed" },
+    });
+    expect(JSON.stringify(result)).not.toContain(secret);
+    expect(JSON.stringify(result)).not.toContain("provider.example");
+  });
 
   it.each([
     { contextWindow: 128_000, expected: 8192 },

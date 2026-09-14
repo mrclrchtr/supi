@@ -12,11 +12,11 @@ import {
 } from "./client.ts";
 import {
   classifySuggestionFailure,
+  createSuggestionFailure,
   createSuggestionWarning,
-  type SuggestionFailureKind,
+  type SuggestionFailure,
   type SuggestionWarning,
   safeModelLabel,
-  suggestionFailureSummary,
 } from "./failure.ts";
 import { resolveSuggestionModel } from "./model-resolution.ts";
 import { normalizeSuggestionDetailed } from "./normalize.ts";
@@ -137,7 +137,7 @@ export class SuggestionGenerator {
     try {
       const model = opts.model;
       if (!model) {
-        this.#handleFailure("model-unavailable", opts);
+        this.#handleFailure(createSuggestionFailure("model-unavailable"), opts);
         return;
       }
       if (id !== this.generationId || abort.signal.aborted) return;
@@ -198,7 +198,7 @@ export class SuggestionGenerator {
         this.#recordGenerationTimeout(opts);
         return {
           ok: false,
-          failure: { kind: "timeout", summary: suggestionFailureSummary("timeout") },
+          failure: createSuggestionFailure("timeout"),
         };
       }
       return outcome.result;
@@ -244,7 +244,7 @@ export class SuggestionGenerator {
     if (opts.id !== this.generationId) return;
 
     if (!response.ok) {
-      this.#handleFailure(response.failure.kind, opts);
+      this.#handleFailure(response.failure, opts);
       return;
     }
 
@@ -283,9 +283,10 @@ export class SuggestionGenerator {
     opts.callbacks.onStatus({ kind: "ready", suggestion: normalized.text });
   }
 
-  #handleFailure(kind: SuggestionFailureKind, opts: RunOptions): void {
+  #handleFailure(failure: SuggestionFailure, opts: RunOptions): void {
     if (opts.id !== this.generationId) return;
 
+    const safeFailure = createSuggestionFailure(failure.kind, failure.httpStatus);
     const shouldNotify = !this.failureNotified;
     this.failureNotified = true;
 
@@ -297,7 +298,7 @@ export class SuggestionGenerator {
       cwd: opts.ctx.cwd,
       data: {
         modelId: safeModelLabel(opts.modelId),
-        failureKind: kind,
+        failure: safeFailure,
         notification: shouldNotify ? "shown" : "suppressed",
       },
     });
@@ -305,7 +306,7 @@ export class SuggestionGenerator {
     if (shouldNotify) {
       opts.callbacks.onStatus({
         kind: "error",
-        warning: createSuggestionWarning(opts.modelId, kind),
+        warning: createSuggestionWarning(opts.modelId, safeFailure),
       });
       return;
     }

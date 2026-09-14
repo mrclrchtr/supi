@@ -128,6 +128,39 @@ describe("SuggestionGenerator", () => {
     );
   });
 
+  it("carries safe failure metadata to status and debug events", async () => {
+    mockLoadSupiConfig.mockReturnValue({ model: "test-provider/suggestion-model" });
+    mockCallSuggestionModel.mockResolvedValue({
+      ok: false,
+      failure: { kind: "billing", httpStatus: 401, summary: "billing failed" },
+    });
+    const generator = new SuggestionGenerator();
+    const statuses: GenerationStatus[] = [];
+
+    generator.start(makeCtx(), "assistant text", {
+      onStatus: (status) => statuses.push(status),
+    });
+    await waitForStatus(statuses, (status) => status.kind === "error");
+
+    expect(statuses.at(-1)).toEqual({
+      kind: "error",
+      warning: {
+        model: "test-provider/suggestion-model",
+        kind: "billing",
+        httpStatus: 401,
+        summary: "billing failed",
+      },
+    });
+    expect(mockRecordDebugEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: "generation.failure",
+        data: expect.objectContaining({
+          failure: { kind: "billing", httpStatus: 401, summary: "billing failed" },
+        }),
+      }),
+    );
+  });
+
   it("ignores a superseded request result", async () => {
     mockLoadSupiConfig.mockReturnValue({ model: "test-provider/suggestion-model" });
     const first = deferred<SuggestionClientOutput>();

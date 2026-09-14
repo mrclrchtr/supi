@@ -154,3 +154,25 @@ Additional red/green tests fixed warning suppression after configuration-file ch
 - Retained the Agent Run Provider Authority design and documented the effective-endpoint invariant in its package ADR 0010.
 
 Related decision: [Keep model requests under PI provider authority](../adr/0023-pi-owned-model-requests.md).
+
+## Follow-up: safe provider failures and Mimo verification
+
+User-approved scope after live verification:
+
+- Distinguish billing, quota, rate-limit, and authentication failures. Preserve a validated HTTP error status when available.
+- Let explicit provider error evidence take precedence over a generic HTTP classification. A billing failure returned as HTTP 401 must not imply missing credentials.
+- Keep arbitrary response text, URLs, and credentials out of warnings and normal diagnostics. Only fixed categories, fixed summaries, and HTTP statuses from 400 through 599 may be retained.
+- Keep routing, cache identity, model limits, retry policy, warning suppression, and the 20-second suggestion deadline unchanged.
+- Verify with the configured credentials and `opencode/mimo-v2.5-free`, without changing the user's selected suggestion model.
+
+The user confirmed that ghost-text rendering works after reload.
+
+Follow-up results:
+
+- Added safe failure metadata through the client, generator, UI warnings, and debug events. Explicit quota evidence takes precedence over generic billing text; both take precedence over HTTP fallbacks. Bare numeric provider codes are not treated as HTTP statuses.
+- Mimo was found with configured authentication. Two calls reached the normal 20-second deadline. Both had the correct OpenCode session/client headers, stable separate request identity, and no changes to primary-session history.
+- A 60-second diagnostic call received HTTP 200 but did not finish before cancellation. A later diagnostic call completed in 43.8 seconds with HTTP 200 and a 29-character suggestion. It used 171 input tokens and 1,260 output tokens; 442 of 444 content delta events were thinking events.
+- These calls verify configured credentials and request routing. They do not show that Mimo can reliably finish within the unchanged 20-second suggestion deadline. No user configuration or provider credentials were changed. Primary-session cache efficiency was not measured.
+- The final package checks passed: 113 tests, source/test TypeScript checks, and Biome. All 21 packages passed tarball verification.
+- The full `pnpm verify:ai` run passed lint, types, and skill checks, then reported 3,419 passing tests, two skipped tests, and the same four LSP failures already reproduced at the base commit. The package tests were run again after the review fixes.
+- Standards review reported three low-impact findings; Spec review reported two. The current findings were verified and fixed. The added regression cases first failed, then passed. A provider error-type fixture uses a documented Biome suppression for a false secret warning.
