@@ -16,6 +16,7 @@ import {
   type DiagnosticEvidenceSummary,
   type FileScopeDecision,
   getFileScopeDecision,
+  isTsconfigApplicableFile,
   TENTATIVE_PUSH_UNAVAILABLE_REASON,
   type WorkspaceLspRuntime,
 } from "@mrclrchtr/supi-lsp/api";
@@ -26,7 +27,7 @@ import type {
   HealthDiagnosticScope,
 } from "../../session/health-types.ts";
 
-/** Collect a live per-file diagnostic pull with its tsconfig scope decision. */
+/** Collect a live per-file diagnostic pull with an applicable config scope decision. */
 export async function collectScopedFileDiagnostics(options: {
   service: WorkspaceLspRuntime;
   scope: Extract<HealthDiagnosticScope, { kind: "file" }>;
@@ -87,6 +88,8 @@ export async function collectScopedFileDiagnostics(options: {
  * a failure to compute never fails the diagnostic request.
  */
 export function fileScopeStatus(filePath: string, cwd: string): FileScopeDecision | null {
+  if (!isTsconfigApplicableFile(filePath)) return null;
+
   try {
     return getFileScopeDecision(filePath, cwd);
   } catch {

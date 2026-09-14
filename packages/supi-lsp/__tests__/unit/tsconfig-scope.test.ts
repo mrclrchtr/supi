@@ -9,6 +9,7 @@ import {
   invalidateTsconfigCacheForConfig,
   invalidateTsconfigCacheForConfigDir,
   isFileExcludedByTsconfig,
+  isTsconfigApplicableFile,
 } from "../../src/config/tsconfig-scope.ts";
 
 // Use the repo root as cwd — this matches how LspManager passes this.cwd
@@ -158,6 +159,41 @@ describe("isFileExcludedByTsconfig", () => {
       expect(isFileExcludedByTsconfig("src/late.ts", projectRoot)).toBe(false);
     } finally {
       ts.sys.useCaseSensitiveFileNames = originalCaseSensitivity;
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("does not apply a TypeScript config to other language files", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-lsp-language-scope-"));
+    try {
+      fs.writeFileSync(path.join(tempRoot, "tsconfig.json"), '{"include":["*.ts"]}');
+
+      expect(isFileExcludedByTsconfig("probe.py", tempRoot)).toBe(false);
+      expect(isFileExcludedByTsconfig("task.sh", tempRoot)).toBe(false);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it.each([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"])(
+    "recognizes %s as a TypeScript or JavaScript-family file",
+    (extension) => {
+      expect(isTsconfigApplicableFile(`source${extension}`)).toBe(true);
+    },
+  );
+
+  it("keeps JS allowJs and checkJs scope filtering active", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-lsp-js-scope-"));
+    try {
+      fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tempRoot, "tsconfig.json"),
+        '{"include":["src/**/*.js"],"compilerOptions":{"allowJs":true,"checkJs":true}}',
+      );
+      fs.writeFileSync(path.join(tempRoot, "src/app.js"), "export const app = true;\n");
+
+      expect(isFileExcludedByTsconfig("src/app.js", tempRoot)).toBe(false);
+    } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
   });

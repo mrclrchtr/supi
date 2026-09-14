@@ -64,7 +64,7 @@ export type HealthDiagnosticObservation =
       readonly scope: HealthDiagnosticScope;
       readonly entries: readonly HealthDiagnosticEntry[];
       readonly evidence: DiagnosticEvidenceSummary;
-      /** Tsconfig scope decision for the requested file (file scope only). */
+      /** Tsconfig scope decision for an applicable TypeScript or JavaScript file. */
       readonly scopeStatus?: FileScopeDecision;
     }
   | {
@@ -73,7 +73,7 @@ export type HealthDiagnosticObservation =
       readonly entries: readonly HealthDiagnosticEntry[];
       readonly evidence: DiagnosticEvidenceSummary;
       readonly reason: string;
-      /** Tsconfig scope decision for the requested file (file scope only). */
+      /** Tsconfig scope decision for an applicable TypeScript or JavaScript file. */
       readonly scopeStatus?: FileScopeDecision;
     }
   | {
@@ -82,7 +82,7 @@ export type HealthDiagnosticObservation =
       readonly entries: readonly HealthDiagnosticEntry[];
       readonly evidence: DiagnosticEvidenceSummary;
       readonly reason: string;
-      /** Tsconfig scope decision for the requested file (file scope only). */
+      /** Tsconfig scope decision for an applicable TypeScript or JavaScript file. */
       readonly scopeStatus?: FileScopeDecision;
     };
 

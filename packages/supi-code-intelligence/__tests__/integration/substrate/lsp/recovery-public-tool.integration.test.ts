@@ -10,6 +10,7 @@ import { registerWorkspaceRecoveryHandler } from "../../../../src/substrate/lsp/
 import { createLspAdapterState } from "../../../../src/substrate/lsp/state.ts";
 import { codeHealthSpec } from "../../../../src/tool/code_health/spec.ts";
 import { registerCodeIntelligenceTools } from "../../../../src/tool/register.ts";
+import { writeIsolatedFixtureConfig } from "../../../helpers/public-lsp-config.ts";
 
 const FIXTURE = path.resolve(
   import.meta.dirname,
@@ -25,41 +26,6 @@ function readLog(logPath: string): LogEntry[] {
     .split("\n")
     .filter(Boolean)
     .map((line) => JSON.parse(line) as LogEntry);
-}
-
-const BUILT_IN_SERVERS = [
-  "bash",
-  "c",
-  "go",
-  "html",
-  "java",
-  "kotlin",
-  "python",
-  "r",
-  "ruby",
-  "rust",
-  "sql",
-  "typescript",
-] as const;
-
-function writeProjectConfig(cwd: string, logPath: string): void {
-  fs.mkdirSync(path.join(cwd, ".pi", "supi"), { recursive: true });
-  fs.writeFileSync(
-    path.join(cwd, ".pi", "supi", "config.json"),
-    JSON.stringify({
-      lsp: {
-        servers: {
-          fixture: {
-            command: process.execPath,
-            args: [FIXTURE, logPath, "10", "pull"],
-            fileTypes: ["test"],
-            rootMarkers: ["project.marker"],
-          },
-          ...Object.fromEntries(BUILT_IN_SERVERS.map((name) => [name, { enabled: false }])),
-        },
-      },
-    }),
-  );
 }
 
 function createCapability(runtime: WorkspaceLspRuntime): CapabilityAdapter {
@@ -97,7 +63,10 @@ describe("Pi edit recovery through the public code tool", () => {
     fs.writeFileSync(dependency, "dependency-v1");
     fs.writeFileSync(consumer, "consumer-v1");
     fs.writeFileSync(logPath, "");
-    writeProjectConfig(cwd, logPath);
+    writeIsolatedFixtureConfig(cwd, {
+      args: [FIXTURE, logPath, "10", "pull"],
+      fileTypes: ["test"],
+    });
 
     const controller = new LspRuntimeController(cwd);
     const started = await controller.start();

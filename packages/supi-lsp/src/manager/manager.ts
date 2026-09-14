@@ -33,6 +33,7 @@ import {
   invalidateTsconfigCacheForConfig,
   invalidateTsconfigCacheForConfigDir,
   isProjectConfigFileName,
+  isTsconfigApplicableFile,
 } from "../config/tsconfig-scope.ts";
 import type {
   DetectedProjectServer,
@@ -2558,7 +2559,8 @@ export class LspManager {
   }
 
   /**
-   * Aggregate the tsconfig scope decision for every tracked file.
+   * Aggregate the tsconfig scope decision for every tracked TypeScript or
+   * JavaScript-family file.
    *
    * The recovery telemetry surface uses this to report why tracked files are
    * in or out of scope without re-deriving the scope logic. The returned
@@ -2576,7 +2578,7 @@ export class LspManager {
     for (const client of this.clients.values()) {
       for (const document of client.getDiagnosticSnapshot().documents) {
         const file = relativeFilePathFromUri(document.uri, this.cwd);
-        if (!this.isAutomaticScopePath(file)) continue;
+        if (!this.isAutomaticScopePath(file) || !isTsconfigApplicableFile(file)) continue;
         totalFiles++;
         accumulateScopeDecision(accumulator, file, getFileScopeDecision(file, this.cwd));
       }

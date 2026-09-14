@@ -120,6 +120,8 @@ Set `lsp.exclude` in project or global SuPi configuration:
 
 An exact semantic request can still route an excluded file when a compatible server is available. This does not add the file to automatic work. Configured diagnostic suppression still applies to diagnostic output.
 
+Tsconfig and jsconfig filtering applies only to TypeScript and JavaScript-family files (`.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, and `.cjs`). Other-language diagnostics are not filtered by a nearby TypeScript or JavaScript project config. Automatic path exclusions and configured diagnostic suppression still apply. A single-file health result omits the `Tsconfig` coverage line for other languages.
+
 ### Custom server configuration
 
 A custom server needs a command and at least one file type:

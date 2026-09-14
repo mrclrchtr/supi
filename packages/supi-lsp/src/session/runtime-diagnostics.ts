@@ -158,7 +158,10 @@ export interface ScopeDecisionEntry {
   basis: string | null;
 }
 
-/** Aggregate tsconfig scope decisions for all tracked files, for debug telemetry. */
+/**
+ * Aggregate tsconfig scope decisions for automatic-scope TypeScript/JavaScript-family
+ * tracked files, for debug telemetry.
+ */
 export interface ScopeDecisionSummary {
   caseSensitiveFileNames: boolean;
   counts: {
@@ -171,6 +174,6 @@ export interface ScopeDecisionSummary {
   basisCounts: Record<string, number>;
   /** Bounded workspace-relative entries (oldest first), not the full set. */
   entries: ScopeDecisionEntry[];
-  /** Total number of tracked files the summary was computed over. */
+  /** Total number of automatic-scope TypeScript/JavaScript-family tracked files covered. */
   totalFiles: number;
 }

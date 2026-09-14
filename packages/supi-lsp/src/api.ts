@@ -12,6 +12,7 @@ export {
   invalidateTsconfigCacheForConfig,
   invalidateTsconfigCacheForConfigDir,
   isProjectConfigFileName,
+  isTsconfigApplicableFile,
   type ScopeDecisionBasis,
 } from "./config/tsconfig-scope.ts";
 export type {

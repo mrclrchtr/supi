@@ -26,6 +26,7 @@ beforeAll(() => {
   fs.mkdirSync(path.join(tmpDir, "node_modules", "lib"), { recursive: true });
   fs.writeFileSync(path.join(tmpDir, "src", "app.ts"), "export const x = 1;");
   fs.writeFileSync(path.join(tmpDir, "src", "__tests__", "app.test.ts"), "test('x', () => {});");
+  fs.writeFileSync(path.join(tmpDir, "src", "probe.py"), "pass\n");
   fs.writeFileSync(path.join(tmpDir, "node_modules", "lib", "index.ts"), "export const y = 2;");
   policy = createAutomaticLspPathPolicy(tmpDir, []);
 });
@@ -71,6 +72,10 @@ describe("shouldIgnoreLspPath", () => {
 
   it("returns false for files in tsconfig include", () => {
     expect(shouldIgnoreLspPath(path.join(tmpDir, "src", "app.ts"), tmpDir, policy)).toBe(false);
+  });
+
+  it("does not apply tsconfig filtering to non-TypeScript files", () => {
+    expect(shouldIgnoreLspPath(path.join(tmpDir, "src", "probe.py"), tmpDir, policy)).toBe(false);
   });
 
   it("returns true for out-of-tree files (outside project root)", () => {

@@ -114,6 +114,22 @@ describe("code_health file-scope status line", () => {
     );
   });
 
+  it("omits the line for a non-TypeScript file", () => {
+    const assembly = assembleHealthResult(
+      makeHealthData({
+        diagnostics: {
+          kind: "completed",
+          scope: { kind: "file", path: "/repo/src/probe.py" },
+          entries: [],
+          evidence: fileEvidence("confirmed"),
+        },
+      }),
+    );
+    const markdown = renderHealthResult(assembly, "/repo");
+
+    expect(markdown).not.toContain("**Tsconfig**:");
+  });
+
   it("omits the line for workspace-scope observations", () => {
     const assembly = assembleHealthResult(
       makeHealthData({

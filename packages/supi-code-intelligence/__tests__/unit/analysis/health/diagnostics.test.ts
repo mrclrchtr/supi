@@ -202,6 +202,37 @@ describe("code_health diagnostic observations", () => {
     });
   });
 
+  it("does not attach an unrelated tsconfig decision to another language", async () => {
+    writeFileSync(path.join(cwd, "tsconfig.json"), '{"include":["src/**/*.ts"]}');
+    const pythonFile = path.join(cwd, "src", "probe.py");
+    writeFileSync(pythonFile, "pass\n");
+
+    const observation = await collectDiagnostics({
+      service: service({
+        fileDiagnostics: async () => ({
+          kind: "completed",
+          data: [
+            {
+              message: "Python diagnostic",
+              severity: 1,
+              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+            },
+          ],
+        }),
+      }),
+      included: ["diagnostics"],
+      scope: diagnosticScope(pythonFile),
+      cwd,
+      unavailableReason: "not ready",
+    });
+
+    expect(observation).toMatchObject({
+      kind: "completed",
+      entries: [{ file: pythonFile, errors: 1, warnings: 0 }],
+    });
+    expect(observation).not.toHaveProperty("scopeStatus");
+  });
+
   it("attaches the tsconfig scope decision for a post-parse file in a configured project", async () => {
     writeFileSync(path.join(cwd, "tsconfig.json"), '{"include":["src/**/*.ts"]}');
     writeFileSync(path.join(cwd, "src", "existing.ts"), "export {};\n");

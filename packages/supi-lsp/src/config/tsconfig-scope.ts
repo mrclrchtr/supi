@@ -1,9 +1,9 @@
 // tsconfig-aware file scope detection.
 //
-// Determines whether a file is within the compilation scope of its nearest
-// tsconfig.json or jsconfig.json using the TypeScript compiler's own config
-// parsing APIs. Used by the diagnostic filter to suppress LSP errors on files
-// that TypeScript itself would not include in the project.
+// Determines whether a TypeScript or JavaScript-family file is within the
+// compilation scope of its nearest tsconfig.json or jsconfig.json using the
+// TypeScript compiler's own config parsing APIs. Used by the diagnostic filter
+// to suppress LSP errors on files that TypeScript itself would not include.
 
 import * as path from "node:path";
 import ts from "typescript";
@@ -54,6 +54,23 @@ export interface FileScopeDecision {
   caseSensitiveFileNames: boolean;
 }
 
+const TYPESCRIPT_JAVASCRIPT_EXTENSIONS = new Set([
+  ".ts",
+  ".tsx",
+  ".mts",
+  ".cts",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+]);
+
+/** Whether tsconfig/jsconfig filtering applies to a TypeScript or JavaScript-family file. */
+export function isTsconfigApplicableFile(filePath: string): boolean {
+  const normalizedPath = filePath.replaceAll("\\", "/");
+  return TYPESCRIPT_JAVASCRIPT_EXTENSIONS.has(path.extname(normalizedPath).toLowerCase());
+}
+
 const nearestConfigCache = new Map<string, string | null>();
 const parsedConfigCache = new Map<string, ParsedProjectConfigCacheEntry>();
 
@@ -82,6 +99,10 @@ const tsInternal = ts as typeof ts & {
  * @returns `true` if the file is excluded from compilation scope
  */
 export function isFileExcludedByTsconfig(filePath: string, cwd: string): boolean {
+  // TypeScript project scope does not decide whether another language's LSP
+  // diagnostics belong in the automatic workspace summary.
+  if (!isTsconfigApplicableFile(filePath)) return false;
+
   // Legacy filter semantics: only a resolved "excluded" decision filters a
   // file. Out-of-tree and no-config files stay unfiltered; the decision API
   // still reports those statuses honestly for consumers that want them.
@@ -90,6 +111,11 @@ export function isFileExcludedByTsconfig(filePath: string, cwd: string): boolean
 
 /**
  * Compute the explainable tsconfig scope decision for one file.
+ *
+ * This low-level TypeScript compilation-membership query returns an
+ * extension-based decision for other languages. Diagnostic filtering and
+ * display first use {@link isTsconfigApplicableFile}; language-neutral
+ * consumers should use that helper or {@link isFileExcludedByTsconfig} instead.
  *
  * The decision carries the mechanism that produced it (the scope decision
  * basis) so consumers can report why a file is inside or outside the nearest

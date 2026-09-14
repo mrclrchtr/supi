@@ -1,9 +1,10 @@
 # Issue 407 follow-ups
 
-**Status:** Work items 1 and 2 implemented; the follow-up 1 regression and final diagnostic return race are corrected; default-parallel focused checks passed; full workspace verification, Kotlin rerun, and parent live Pi verification pending
+**Status:** Work items 1, 2, and 3 implemented; the follow-up 1 regression and final diagnostic return race are corrected; default-parallel focused checks passed; full workspace verification, Kotlin rerun, and parent live Pi verification pending
 **Overall baseline:** `b6bf5209`
 **Work item 2 baseline:** `52315e0c`
-**Scope:** Input freshness and server-requested diagnostic refresh only for this implementation slice
+**Work item 3 baseline:** `eeafdcbe`
+**Scope:** Input freshness, server-requested diagnostic refresh, and mixed-language diagnostic filtering for this implementation slice
 
 ## Approved policy
 
@@ -48,7 +49,7 @@
 | --- | --- | --- |
 | 1 | Shared Semantic input barrier for semantic evidence freshness | Implemented and verified in this slice |
 | 2 | Native server-requested diagnostic refresh without pretending source text changed | Implemented and verified in this slice |
-| 3 | Mixed-language diagnostic filtering | Later; pending |
+| 3 | Mixed-language diagnostic filtering | Implemented and verified in this slice |
 | 4 | Scope labels that separate maintenance scope from result coverage | Later; pending |
 
 ## Approved test seams
@@ -69,12 +70,9 @@ Use real TypeScript/Pyright where useful and controlled server responses for rac
 
 ## Later-work constraints
 
-- Keep `tsconfig`/`jsconfig` filtering for TypeScript/JavaScript-family files only.
-- Retain automatic path exclusions and other diagnostic suppressions.
-- Omit irrelevant Tsconfig labels for other languages.
 - Retain broad maintenance if required and label its scope separately from result coverage.
 - Do not claim that root-cause or baseline attribution for all live failures is proved.
-- Items 3 and 4 remain pending and are outside this slice.
+- Item 4 remains pending and is outside this slice.
 
 ## Verification record
 
@@ -179,4 +177,13 @@ Use real TypeScript/Pyright where useful and controlled server responses for rac
   Result: `Test Files 9 passed (9)` and `Tests 76 passed (76)`.
 - Operator evidence: `pnpm exec jiti /tmp/supi-debug-issue407/refresh-consumer-cache-race.mjs` returned `initial.completed[]`, changed dependent diagnostics during refresh, and the same changed diagnostics after refresh. `pnpm exec jiti /tmp/supi-debug-issue407/diagnostic-invalidation-return-race.mjs` returned the partial stale-candidate result above. `pnpm exec jiti /tmp/supi-debug-issue407/input-barrier-occupancy.mjs` reported `{"configuredReadBound":1,"startedBeforeFirstReadSettled":1,"maximumActiveReads":1}`. All three probes exited 0.
 - Full `packages/supi-lsp/__tests__/integration` evidence remains pending. The Kotlin integration test has not been rerun; a prior run timed out, and its test and assertion were not skipped or weakened. Full workspace verification and parent live Pi verification remain pending.
+- Follow-up 3 implementation: `isFileExcludedByTsconfig` now bypasses tsconfig/jsconfig filtering for non-TypeScript/JavaScript-family files. Single-file health omits the Tsconfig coverage label for those files, while automatic path exclusions, explicit-file routing, configured suppression, and JS `allowJs`/`checkJs` handling remain unchanged. Recovery scope telemetry counts only automatic-scope TypeScript/JavaScript-family files.
+- Follow-up 3 public regression: `packages/supi-code-intelligence/__tests__/integration/substrate/lsp/mixed-language-public-tool.integration.test.ts` uses the public `WorkspaceLspRuntime` and `code_health` tool with a controlled native LSP server. A directory refresh under `src/tsconfig.json` (`include: ["*.ts"]`) returns the Python diagnostic with `3 requested, 3 confirmed` tracked-file evidence; an exact Python health request returns the same diagnostic without a `Tsconfig` label.
+- Follow-up 3 focused evidence: the mixed-language/config/output tests and both public code-intelligence LSP integration tests passed with 6 files and 71 tests. Focused Biome passed for 13 TypeScript files and 1 controlled fixture file, `git diff --check` passed, and the focused LSP and code-intelligence source/test typecheck passed with no output.
+- Follow-up 3 final default-parallel unit evidence: this command passed with 152 files and 1361 tests; `--no-file-parallelism` was not used:
+
+  ```bash
+  pnpm exec vitest run packages/supi-lsp/__tests__/unit packages/supi-code-intelligence/__tests__/unit --reporter=dot
+  ```
+
 - Full verification: not run, as requested. Kotlin rerun: not run. Parent live Pi verification: not run. Reload the extension before live verification.
