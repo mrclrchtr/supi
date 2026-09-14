@@ -1,10 +1,18 @@
-import { readFile } from "node:fs/promises";
 import {
   type CodeRequestControl,
   throwIfCodeRequestInterrupted,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { raceRequestControl } from "../session/readiness.ts";
 import { fingerprintDocumentContent } from "./client-document-state.ts";
+import {
+  type SemanticInputChangeKind,
+  SemanticInputSynchronizationError,
+} from "./client-semantic-input-errors.ts";
+import {
+  defaultSemanticInputFileReader,
+  isMissingFileReadError,
+  type SemanticInputFileReader,
+} from "./client-semantic-input-file.ts";
 
 const DEFAULT_MAX_CONCURRENT_READS = 16;
 
@@ -30,9 +38,6 @@ export interface SemanticInputBarrierHost {
   closeMissingDocument(filePath: string): void;
   markUnreadableDocument(filePath: string): void;
 }
-
-/** Internal file-read seam. It is not part of the public runtime contract. */
-export type SemanticInputFileReader = (filePath: string, signal: AbortSignal) => Promise<string>;
 
 /** Optional read bound and test seam for one input barrier. */
 export interface SemanticInputBarrierOptions {
@@ -90,7 +95,7 @@ export class SemanticInputBarrier {
       1,
       Math.floor(options.maxConcurrentReads ?? DEFAULT_MAX_CONCURRENT_READS),
     );
-    this.#readFile = options.readFile ?? defaultReadFile;
+    this.#readFile = options.readFile ?? defaultSemanticInputFileReader;
   }
 
   /** Read and apply all open inputs, sharing work for one input generation. */
@@ -154,13 +159,16 @@ export class SemanticInputBarrier {
   }
 
   /** Record a lifecycle or input change that invalidates a pending pass. */
-  noteInputChange(): void {
+  noteInputChange(changeKind: SemanticInputChangeKind = "content"): void {
     this.#revision++;
     const pending = this.#pending;
     if (!pending || pending.settled) return;
-    pending.controller.abort(
-      new Error("Semantic input changed while synchronization was running."),
-    );
+    const reason = pending.controller.signal.reason;
+    if (reason instanceof SemanticInputSynchronizationError) {
+      reason.updateChangeKind(changeKind);
+      return;
+    }
+    pending.controller.abort(new SemanticInputSynchronizationError(changeKind));
   }
 
   /** Seed the initial disk baseline from the content used to open a document. */
@@ -181,7 +189,7 @@ export class SemanticInputBarrier {
   /** Stop pending work and discard observed input fingerprints. */
   clear(): void {
     this.#observedDiskFingerprints.clear();
-    this.noteInputChange();
+    this.noteInputChange("lifecycle");
   }
 
   #canJoin(
@@ -392,14 +400,4 @@ export class SemanticInputBarrier {
     pending.settled = true;
     if (this.#pending === pending) this.#pending = null;
   }
-}
-
-async function defaultReadFile(filePath: string, signal: AbortSignal): Promise<string> {
-  return readFile(filePath, { encoding: "utf8", signal });
-}
-
-function isMissingFileReadError(error: unknown): boolean {
-  if (typeof error !== "object" || error === null || !("code" in error)) return false;
-  const code = error.code;
-  return code === "ENOENT" || code === "ENOTDIR";
 }

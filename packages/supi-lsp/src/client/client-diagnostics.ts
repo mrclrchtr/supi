@@ -52,8 +52,11 @@ import {
   type SemanticInputSnapshot,
   type SemanticInputUpdate,
 } from "./client-semantic-input-barrier.ts";
+import type { SemanticInputChangeKind } from "./client-semantic-input-errors.ts";
+import { isSemanticInputEnrollmentError } from "./client-semantic-input-errors.ts";
 
 const DIAGNOSTIC_WAIT_MS = 3_000;
+const MAX_SEMANTIC_INPUT_ENROLLMENT_RETRIES = 1;
 
 /** Bound abandoned adapter work without binding it to one caller's deadline. */
 const DIAGNOSTIC_REQUEST_OWNER_TIMEOUT_MS = 30_000;
@@ -104,13 +107,26 @@ export class ClientDiagnostics {
     });
   }
 
-  /** Synchronize all open document inputs once for concurrent semantic callers. */
-  synchronizeSemanticInputs(
+  /** Synchronize all open document inputs, rejoining once after a new enrollment. */
+  async synchronizeSemanticInputs(
     control?: CodeRequestControl,
     contentOverrides?: ReadonlyMap<string, string>,
   ): Promise<SemanticInputSnapshot> {
     throwIfCodeRequestInterrupted(control);
-    return this.#inputBarrier.synchronize(control, contentOverrides);
+    for (let retry = 0; ; retry++) {
+      try {
+        return await this.#inputBarrier.synchronize(control, contentOverrides);
+      } catch (error) {
+        if (
+          retry >= MAX_SEMANTIC_INPUT_ENROLLMENT_RETRIES ||
+          !isSemanticInputEnrollmentError(error) ||
+          !this.host.isOperational()
+        ) {
+          throw error;
+        }
+        throwIfCodeRequestInterrupted(control);
+      }
+    }
   }
 
   /** Fail closed when a semantic request observes a changed input generation. */
@@ -254,7 +270,7 @@ export class ClientDiagnostics {
     }
     this.#initializeDocumentContent(uri, content);
     this.#cancelDiagnosticRequest(uri);
-    this.#advanceInputRevision(false, false);
+    this.#advanceInputRevision(false, false, "enrollment");
 
     const languageId = detectLanguageId(filePath);
     this.#waiters.cancelSettle();
@@ -303,7 +319,7 @@ export class ClientDiagnostics {
       this.#diagnosticStore.has(uri) ||
       this.#failedUris.has(uri) ||
       this.#versionHistory.has(uri);
-    if (hadState) this.#advanceInputRevision();
+    if (hadState) this.#advanceInputRevision(true, true, "close");
     this.#failedUris.delete(uri);
     this.#forgetDocumentContent(uri);
     this.#unversionedPushSyncMoments.delete(uri);
@@ -329,7 +345,7 @@ export class ClientDiagnostics {
       if (getDiagnosticFileState(filePath) !== "removed") continue;
 
       const wasOpen = this.#openDocs.has(uri);
-      this.#advanceInputRevision();
+      this.#advanceInputRevision(true, true, "close");
       this.#failedUris.delete(uri);
       this.#forgetDocumentContent(uri);
       this.#unversionedPushSyncMoments.delete(uri);
@@ -345,7 +361,7 @@ export class ClientDiagnostics {
   /** Retain a failed document outcome when a replacement cannot reopen it. */
   markFailedFile(filePath: string): void {
     const uri = fileToUri(filePath);
-    if (!this.#failedUris.has(uri)) this.#advanceInputRevision();
+    if (!this.#failedUris.has(uri)) this.#advanceInputRevision(true, true, "failure");
     this.#failedUris.add(uri);
     this.#unversionedPushSyncMoments.delete(uri);
     this.#closedVersionedBarrier.add(uri);
@@ -491,7 +507,7 @@ export class ClientDiagnostics {
       noteInputContentChange: () => this.#noteInputContentChange(),
       observeDiskContent: (uri, content) => this.#observeDiskContent(uri, content),
       invalidateEvidence: (uri) => {
-        this.#advanceInputRevision(false);
+        this.#advanceInputRevision(false, true, "failure");
         this.#cancelDiagnosticRequest(uri);
         this.#failedUris.add(uri);
         // Keep old diagnostics as partial data, but do not let unchanged
@@ -502,7 +518,7 @@ export class ClientDiagnostics {
         if (document) document.evidenceRevision = -1;
       },
       clearFile: (uri) => {
-        this.#advanceInputRevision(false);
+        this.#advanceInputRevision(false, true, "close");
         this.#cancelDiagnosticRequest(uri);
         this.#forgetDocumentContent(uri);
         this.#failedUris.delete(uri);
@@ -894,8 +910,12 @@ export class ClientDiagnostics {
     this.#waiters.cancelSettle();
   }
 
-  #advanceInputRevision(invalidateEvidence = true, cancelRequests = true): void {
-    this.#inputBarrier.noteInputChange();
+  #advanceInputRevision(
+    invalidateEvidence = true,
+    cancelRequests = true,
+    changeKind: SemanticInputChangeKind = "content",
+  ): void {
+    this.#inputBarrier.noteInputChange(changeKind);
     if (invalidateEvidence) this.#advanceEvidenceRevision(false);
     if (cancelRequests) this.#cancelAllDiagnosticRequests();
   }

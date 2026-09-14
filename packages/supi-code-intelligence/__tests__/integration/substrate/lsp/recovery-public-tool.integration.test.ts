@@ -1,15 +1,15 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { LspRuntimeController, type WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
+import { LspRuntimeController } from "@mrclrchtr/supi-lsp/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, describe, expect, it } from "vitest";
-import type { CapabilityAdapter } from "../../../../src/session/capability-adapter.ts";
 import { WorkspaceCodeIntelligenceSession } from "../../../../src/session/session.ts";
 import { registerWorkspaceRecoveryHandler } from "../../../../src/substrate/lsp/recovery.ts";
 import { createLspAdapterState } from "../../../../src/substrate/lsp/state.ts";
 import { codeHealthSpec } from "../../../../src/tool/code_health/spec.ts";
 import { registerCodeIntelligenceTools } from "../../../../src/tool/register.ts";
+import { createPublicLspCapability } from "../../../helpers/public-lsp-capability.ts";
 import { writeIsolatedFixtureConfig } from "../../../helpers/public-lsp-config.ts";
 
 const FIXTURE = path.resolve(
@@ -26,21 +26,6 @@ function readLog(logPath: string): LogEntry[] {
     .split("\n")
     .filter(Boolean)
     .map((line) => JSON.parse(line) as LogEntry);
-}
-
-function createCapability(runtime: WorkspaceLspRuntime): CapabilityAdapter {
-  return {
-    getProviderState: () => ({ kind: "unavailable", reason: "not used" }),
-    getProvider: () => null,
-    getSemanticProvider: () => null,
-    getStructuralProvider: () => null,
-    getLspRuntimeState: () => ({ kind: "ready", runtime }),
-    getCapabilityStates: () => ({
-      semantic: { kind: "ready" },
-      structural: { kind: "unavailable", reason: "not used" },
-    }),
-    ensureSemanticReadiness: async () => ({ kind: "ready" }),
-  };
 }
 
 describe("Pi edit recovery through the public code tool", () => {
@@ -82,7 +67,7 @@ describe("Pi edit recovery through the public code tool", () => {
     const state = createLspAdapterState();
     state.controller = controller;
     registerWorkspaceRecoveryHandler(pi as never, state);
-    const session = new WorkspaceCodeIntelligenceSession(cwd, createCapability(runtime));
+    const session = new WorkspaceCodeIntelligenceSession(cwd, createPublicLspCapability(runtime));
     registerCodeIntelligenceTools(pi as never, () => session, undefined, [codeHealthSpec]);
 
     fs.writeFileSync(dependency, "dependency-v2");

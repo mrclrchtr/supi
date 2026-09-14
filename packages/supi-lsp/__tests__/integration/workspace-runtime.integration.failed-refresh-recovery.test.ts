@@ -5,6 +5,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { LspRuntimeController, type WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { disabledDefaultServers } from "../helpers/disabled-default-servers.ts";
 
 const fsPromisesMock = vi.hoisted(() => ({ readFile: vi.fn() }));
 
@@ -14,20 +15,6 @@ vi.mock("node:fs/promises", async (importOriginal) => {
 });
 
 const FIXTURE = path.resolve(import.meta.dirname, "../fixtures/lsp-semantic-server.mjs");
-const BUILT_IN_SERVERS = [
-  "bash",
-  "c",
-  "go",
-  "html",
-  "java",
-  "kotlin",
-  "python",
-  "r",
-  "ruby",
-  "rust",
-  "sql",
-  "typescript",
-] as const;
 const DOCUMENT_SYNC_METHODS = new Set([
   "textDocument/didChange",
   "textDocument/didClose",
@@ -57,7 +44,7 @@ function writeProjectConfig(cwd: string, logPath: string): void {
             fileTypes: ["test"],
             rootMarkers: ["project.marker"],
           },
-          ...Object.fromEntries(BUILT_IN_SERVERS.map((name) => [name, { enabled: false }])),
+          ...disabledDefaultServers(cwd),
         },
       },
     }),

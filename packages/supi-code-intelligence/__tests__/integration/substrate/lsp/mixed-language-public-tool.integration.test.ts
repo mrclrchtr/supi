@@ -1,34 +1,19 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { LspRuntimeController, type WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
+import { LspRuntimeController } from "@mrclrchtr/supi-lsp/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, describe, expect, it } from "vitest";
-import type { CapabilityAdapter } from "../../../../src/session/capability-adapter.ts";
 import { WorkspaceCodeIntelligenceSession } from "../../../../src/session/session.ts";
 import { codeHealthSpec } from "../../../../src/tool/code_health/spec.ts";
 import { registerCodeIntelligenceTools } from "../../../../src/tool/register.ts";
+import { createPublicLspCapability } from "../../../helpers/public-lsp-capability.ts";
 import { writeIsolatedFixtureConfig } from "../../../helpers/public-lsp-config.ts";
 
 const FIXTURE = path.resolve(
   import.meta.dirname,
   "../../../../../supi-lsp/__tests__/fixtures/lsp-mixed-diagnostic-server.mjs",
 );
-
-function createCapability(runtime: WorkspaceLspRuntime): CapabilityAdapter {
-  return {
-    getProviderState: () => ({ kind: "unavailable", reason: "not used" }),
-    getProvider: () => null,
-    getSemanticProvider: () => null,
-    getStructuralProvider: () => null,
-    getLspRuntimeState: () => ({ kind: "ready", runtime }),
-    getCapabilityStates: () => ({
-      semantic: { kind: "ready" },
-      structural: { kind: "unavailable", reason: "not used" },
-    }),
-    ensureSemanticReadiness: async () => ({ kind: "ready" }),
-  };
-}
 
 describe("mixed-language diagnostics through public code_health", () => {
   let cwd: string | undefined;
@@ -72,7 +57,7 @@ describe("mixed-language diagnostics through public code_health", () => {
     await expect(runtime.trackFile(python)).resolves.toBe(true);
 
     const pi = createPiMock();
-    const session = new WorkspaceCodeIntelligenceSession(cwd, createCapability(runtime));
+    const session = new WorkspaceCodeIntelligenceSession(cwd, createPublicLspCapability(runtime));
     registerCodeIntelligenceTools(pi as never, () => session, undefined, [codeHealthSpec]);
     const health = getTool(pi, "code_health");
 
@@ -146,7 +131,7 @@ describe("mixed-language diagnostics through public code_health", () => {
     });
 
     const pi = createPiMock();
-    const session = new WorkspaceCodeIntelligenceSession(cwd, createCapability(runtime));
+    const session = new WorkspaceCodeIntelligenceSession(cwd, createPublicLspCapability(runtime));
     registerCodeIntelligenceTools(pi as never, () => session, undefined, [codeHealthSpec]);
     const health = getTool(pi, "code_health");
 

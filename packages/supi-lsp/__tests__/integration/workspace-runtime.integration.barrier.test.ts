@@ -10,6 +10,8 @@ import {
   type WorkspaceLspRuntime,
 } from "@mrclrchtr/supi-lsp/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ControlledReads } from "../helpers/controlled-reads.ts";
+import { disabledDefaultServers } from "../helpers/disabled-default-servers.ts";
 
 const fsPromisesMock = vi.hoisted(() => ({ readFile: vi.fn() }));
 
@@ -19,79 +21,8 @@ vi.mock("node:fs/promises", async (importOriginal) => {
 });
 
 const FIXTURE = path.resolve(import.meta.dirname, "../fixtures/lsp-semantic-server.mjs");
-const BUILT_IN_SERVERS = [
-  "bash",
-  "c",
-  "go",
-  "html",
-  "java",
-  "kotlin",
-  "python",
-  "r",
-  "ruby",
-  "rust",
-  "sql",
-  "typescript",
-] as const;
 
 type LogEntry = { method: string; params?: unknown };
-
-type PendingRead = {
-  filePath: string;
-  resolve: (content: string) => void;
-};
-
-type ReadWaiter = {
-  count: number;
-  resolve: () => void;
-};
-
-class ControlledReads {
-  readonly calls: string[] = [];
-  activeReads = 0;
-  maximumActiveReads = 0;
-  #autoResolve = false;
-  #pending: PendingRead[] = [];
-  #waiters: ReadWaiter[] = [];
-
-  read(filePath: string): Promise<string> {
-    this.calls.push(filePath);
-    this.activeReads++;
-    this.maximumActiveReads = Math.max(this.maximumActiveReads, this.activeReads);
-    const result = new Promise<string>((resolve) => {
-      this.#pending.push({ filePath, resolve });
-      this.#notifyCallWaiters();
-    });
-    if (this.#autoResolve) queueMicrotask(() => this.resolveAll());
-    return result;
-  }
-
-  enableAutoResolve(): void {
-    this.#autoResolve = true;
-    this.resolveAll();
-  }
-
-  waitForCalls(count: number): Promise<void> {
-    if (this.calls.length >= count) return Promise.resolve();
-    return new Promise((resolve) => {
-      this.#waiters.push({ count, resolve });
-    });
-  }
-
-  resolveAll(): void {
-    const pending = this.#pending.splice(0);
-    for (const read of pending) {
-      this.activeReads--;
-      read.resolve(fs.readFileSync(read.filePath, "utf-8"));
-    }
-  }
-
-  #notifyCallWaiters(): void {
-    const ready = this.#waiters.filter((waiter) => this.calls.length >= waiter.count);
-    this.#waiters = this.#waiters.filter((waiter) => this.calls.length < waiter.count);
-    for (const waiter of ready) waiter.resolve();
-  }
-}
 
 interface TestWorkspace {
   cwd: string;
@@ -126,7 +57,7 @@ function writeProjectConfig(
             fileTypes: ["test"],
             rootMarkers: ["project.marker"],
           },
-          ...Object.fromEntries(BUILT_IN_SERVERS.map((name) => [name, { enabled: false }])),
+          ...disabledDefaultServers(cwd),
         },
       },
     }),
