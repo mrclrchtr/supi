@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeSupiConfig } from "@mrclrchtr/supi-core/config";
 import { FOOTER_INVALIDATE_EVENT } from "@mrclrchtr/supi-core/footer-registry";
+import { BRAILLE_SPINNER_FRAMES, SPINNER_INTERVAL_MS } from "@mrclrchtr/supi-core/spinner-frames";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANTIGRAVITY_FOOTER_KEY } from "../../src/footer-constants.ts";
@@ -17,6 +18,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
@@ -50,7 +52,11 @@ describe("Antigravity runtime activation", () => {
     expect(settled).toBe(false);
     expect(pi.tools).toHaveLength(0);
     expect(runtime.isReady).toBe(false);
-    expect(context.ui.setStatus).toHaveBeenCalledWith(ANTIGRAVITY_FOOTER_KEY, undefined);
+    expect(runtime.footerIcon).toBe(BRAILLE_SPINNER_FRAMES[0]);
+    expect(context.ui.setStatus).toHaveBeenLastCalledWith(
+      ANTIGRAVITY_FOOTER_KEY,
+      BRAILLE_SPINNER_FRAMES[0],
+    );
 
     discovery.resolve({
       status: "available",
@@ -60,6 +66,47 @@ describe("Antigravity runtime activation", () => {
     await refreshing;
     expect(pi.tools).toHaveLength(1);
     expect(runtime.isReady).toBe(true);
+    expect(runtime.footerIcon).toBe("✦");
+    expect(context.ui.setStatus).toHaveBeenLastCalledWith(ANTIGRAVITY_FOOTER_KEY, "✦");
+  });
+
+  it("advances the footer spinner until discovery is ready", async () => {
+    vi.useFakeTimers();
+    const root = roots[0] as string;
+    const cwd = join(root, "repo");
+    await mkdir(cwd, { recursive: true });
+    const discovery = deferred<{
+      status: "available";
+      cliVersion: string;
+      catalogue: readonly ["gemini-3.8-flash-low"];
+    }>();
+    const pi = createPiMock();
+    const runtime = new AntigravityRuntime({
+      pi: pi as never,
+      paths: getIsolatedAntigravityPaths(root),
+      homeDir: root,
+      discover: vi.fn(async () => discovery.promise) as never,
+    });
+    const context = makeCtx({ cwd });
+
+    const refreshing = runtime.startRefresh(cwd, { ui: context.ui });
+    expect(runtime.footerIcon).toBe(BRAILLE_SPINNER_FRAMES[0]);
+    vi.advanceTimersByTime(SPINNER_INTERVAL_MS);
+    expect(runtime.footerIcon).toBe(BRAILLE_SPINNER_FRAMES[1]);
+    expect(context.ui.setStatus).toHaveBeenLastCalledWith(
+      ANTIGRAVITY_FOOTER_KEY,
+      BRAILLE_SPINNER_FRAMES[1],
+    );
+
+    discovery.resolve({
+      status: "available",
+      cliVersion: "1.1.25",
+      catalogue: ["gemini-3.8-flash-low"],
+    });
+    await refreshing;
+    expect(runtime.footerIcon).toBe("✦");
+    expect(context.ui.setStatus).toHaveBeenLastCalledWith(ANTIGRAVITY_FOOTER_KEY, "✦");
+    await runtime.shutdown();
   });
 
   it("becomes ready after activation and resets on shutdown", async () => {

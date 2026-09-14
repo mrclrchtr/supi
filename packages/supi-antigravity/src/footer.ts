@@ -1,8 +1,8 @@
 import { footerContributions } from "@mrclrchtr/supi-core/footer-registry";
-import { ANTIGRAVITY_FOOTER_KEY, ANTIGRAVITY_READY_ICON } from "./footer-constants.ts";
+import { ANTIGRAVITY_FOOTER_KEY } from "./footer-constants.ts";
 import type { AntigravityRuntime } from "./runtime.ts";
 
-/** Register the Antigravity ready icon on the footer stats line. */
+/** Register the Antigravity checking spinner and ready icon on the footer stats line. */
 export function registerAntigravityFooterContribution(runtime: AntigravityRuntime): {
   dispose: () => void;
 } {
@@ -10,7 +10,10 @@ export function registerAntigravityFooterContribution(runtime: AntigravityRuntim
     key: ANTIGRAVITY_FOOTER_KEY,
     placement: "stats-end",
     priority: 110,
-    render: () => (runtime.isReady ? `| ${ANTIGRAVITY_READY_ICON}` : ""),
+    render: () => {
+      const icon = runtime.footerIcon;
+      return icon ? `| ${icon}` : "";
+    },
   });
 
   return {

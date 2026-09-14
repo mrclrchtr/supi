@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { FOOTER_INVALIDATE_EVENT } from "@mrclrchtr/supi-core/footer-registry";
+import { BRAILLE_SPINNER_FRAMES, SPINNER_INTERVAL_MS } from "@mrclrchtr/supi-core/spinner-frames";
 import { type AntigravityAvailability, discoverAntigravityAvailability } from "./availability.ts";
 import { loadAntigravityConfig } from "./config.ts";
 import { ConversationHandleStore } from "./conversation/handles.ts";
@@ -8,6 +9,8 @@ import { getIsolatedAntigravityPaths, type IsolatedAntigravityPaths } from "./is
 import { registerAntigravityRunTool } from "./tool/antigravity_run/register.ts";
 import { ANTIGRAVITY_RUN_TOOL_NAME } from "./tool/antigravity_run/spec.ts";
 import type { CuratedModel } from "./types.ts";
+
+type FooterState = "idle" | "checking" | "ready";
 
 /** Context needed to report availability and update the footer. */
 export type AntigravityRefreshContext = {
@@ -25,7 +28,9 @@ export class AntigravityRuntime {
   #refreshGeneration = 0;
   #refreshAbort: AbortController | undefined;
   #statusUi: Pick<ExtensionContext["ui"], "setStatus"> | undefined;
-  #ready = false;
+  #footerState: FooterState = "idle";
+  #spinnerTimer: ReturnType<typeof setInterval> | undefined;
+  #spinnerFrame = 0;
   #toolRegistered = false;
 
   constructor(options: {
@@ -47,7 +52,15 @@ export class AntigravityRuntime {
 
   /** Whether the discovered Antigravity tool is ready for use. */
   get isReady(): boolean {
-    return this.#ready;
+    return this.#footerState === "ready";
+  }
+
+  /** Return the animated checking icon or the settled ready icon for the footer. */
+  get footerIcon(): string | undefined {
+    if (this.#footerState === "checking") {
+      return BRAILLE_SPINNER_FRAMES[this.#spinnerFrame % BRAILLE_SPINNER_FRAMES.length];
+    }
+    return this.#footerState === "ready" ? ANTIGRAVITY_READY_ICON : undefined;
   }
 
   /** Rebuild handles from the current PI branch. */
@@ -75,12 +88,14 @@ export class AntigravityRuntime {
     const abortController = new AbortController();
     this.#refreshAbort = abortController;
     if (context) this.#statusUi = context.ui;
-    this.#setReady(false);
+    this.#stopSpinner();
+    this.#setFooterState("idle");
     const config = loadAntigravityConfig(cwd, this.#homeDir);
     if (!config.agentToolEnabled) {
       this.#deactivateTool();
       return;
     }
+    this.#startSpinner();
 
     let availability = this.#availability;
     if (!availability) {
@@ -101,10 +116,19 @@ export class AntigravityRuntime {
     if (generation !== this.#refreshGeneration || abortController.signal.aborted) return;
     this.#availability = availability;
     if (availability.status === "available") {
-      this.#activateTool(availability.catalogue, availability.cliVersion);
-      this.#setReady(true);
+      try {
+        this.#activateTool(availability.catalogue, availability.cliVersion);
+      } catch (error) {
+        this.#stopSpinner();
+        this.#setFooterState("idle");
+        throw error;
+      }
+      this.#stopSpinner();
+      this.#setFooterState("ready");
       return;
     }
+    this.#stopSpinner();
+    this.#setFooterState("idle");
     this.#deactivateTool();
     notifyRefreshWarning(context, availability.warning);
   }
@@ -114,8 +138,9 @@ export class AntigravityRuntime {
     this.#refreshGeneration += 1;
     this.#refreshAbort?.abort();
     this.#refreshAbort = undefined;
+    this.#stopSpinner();
+    this.#setFooterState("idle");
     this.#deactivateTool();
-    this.#setReady(false);
     this.#statusUi = undefined;
     this.handles.clear();
     await Promise.resolve();
@@ -145,15 +170,42 @@ export class AntigravityRuntime {
     }
   }
 
-  #setReady(ready: boolean): void {
-    const changed = this.#ready !== ready;
-    this.#ready = ready;
+  #startSpinner(): void {
+    this.#stopSpinner();
+    this.#spinnerFrame = 0;
+    this.#setFooterState("checking");
+    this.#spinnerTimer = setInterval(() => {
+      if (this.#footerState !== "checking") return;
+      this.#spinnerFrame = (this.#spinnerFrame + 1) % BRAILLE_SPINNER_FRAMES.length;
+      this.#publishFooter();
+      this.#invalidateFooter();
+    }, SPINNER_INTERVAL_MS);
+    this.#spinnerTimer.unref?.();
+  }
+
+  #stopSpinner(): void {
+    if (this.#spinnerTimer === undefined) return;
+    clearInterval(this.#spinnerTimer);
+    this.#spinnerTimer = undefined;
+  }
+
+  #setFooterState(state: FooterState): void {
+    const changed = this.#footerState !== state;
+    this.#footerState = state;
+    this.#publishFooter();
+    if (!changed) return;
+    this.#invalidateFooter();
+  }
+
+  #publishFooter(): void {
     try {
-      this.#statusUi?.setStatus(ANTIGRAVITY_FOOTER_KEY, ready ? ANTIGRAVITY_READY_ICON : undefined);
+      this.#statusUi?.setStatus(ANTIGRAVITY_FOOTER_KEY, this.footerIcon);
     } catch {
       // PI may be shutting down while the footer status changes.
     }
-    if (!changed) return;
+  }
+
+  #invalidateFooter(): void {
     try {
       this.#pi.events.emit(FOOTER_INVALIDATE_EVENT, {});
     } catch {

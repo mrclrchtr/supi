@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { writeSupiConfig } from "@mrclrchtr/supi-core/config";
 import { footerContributions } from "@mrclrchtr/supi-core/footer-registry";
+import { BRAILLE_SPINNER_FRAMES } from "@mrclrchtr/supi-core/spinner-frames";
 import { createPiMock, getHandlerOrThrow, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANTIGRAVITY_CONFIG_SECTION } from "../../src/config.ts";
@@ -213,7 +214,7 @@ describe("supi-antigravity extension", () => {
       .getByPlacement("stats-end")
       .find((item) => item.key === ANTIGRAVITY_FOOTER_KEY);
     expect(contribution).toMatchObject({ placement: "stats-end", priority: 110 });
-    expect(contribution?.render()).toBe("");
+    expect(BRAILLE_SPINNER_FRAMES.map((frame) => `| ${frame}`)).toContain(contribution?.render());
 
     const tool = await waitForTool(pi);
     expect(contribution?.render()).toBe("| ✦");

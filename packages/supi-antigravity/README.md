@@ -16,7 +16,7 @@ Run `/reload` after installation.
 
 The package never uses the normal Antigravity profile. It creates an Isolated Antigravity Home under the Pi agent directory and a stable empty Consultation Workspace.
 
-After Pi starts, the package checks availability without making startup wait. The tool appears only after the check is complete. When it is ready, the footer shows the terminal-safe `✦` icon. With the SuPi footer, it appears on the stats line as `| ✦`. Before the tool can appear, Pi shows a command like this:
+After Pi starts, the package checks availability without making startup wait. The footer shows a spinning icon while the check runs. The tool appears only after the check is complete. When it is ready, the footer settles on the terminal-safe `✦` icon. With the SuPi footer, it appears on the stats line as `| ✦`. Before the tool can appear, Pi shows a command like this:
 
 ```bash
 cd "<consultation-workspace>" &&
