@@ -16,14 +16,14 @@ Run `/reload` after installation.
 
 The package never uses the normal Antigravity profile. It creates an Isolated Antigravity Home under the Pi agent directory and a stable empty Consultation Workspace.
 
-Before the tool can appear, Pi shows a command like this:
+After Pi starts, the package checks availability without making startup wait. The tool appears only after the check is complete. Before the tool can appear, Pi shows a command like this:
 
 ```bash
 cd "<consultation-workspace>" &&
 HOME="<isolated-home>" AGY_CLI_DISABLE_AUTO_UPDATE=true agy
 ```
 
-On macOS, the package also creates and unlocks a private keychain inside the Isolated Antigravity Home. This avoids the macOS warning about a missing default keychain without prompting for the normal keychain password. Run the command, sign in, exit Antigravity, and reload Pi. The installed `agy` version must be at least `1.1.24`.
+On macOS, the package also creates and unlocks a private keychain inside the Isolated Antigravity Home. This avoids the macOS warning about a missing default keychain without prompting for the normal keychain password. Run the command, sign in, exit Antigravity, and reload Pi. The installed `agy` version must be at least `1.1.24`. The availability check can still be running when Pi becomes ready.
 
 If macOS displays `antigravity.` in the warning, the final `.` is sentence punctuation. It is not part of a keychain name.
 

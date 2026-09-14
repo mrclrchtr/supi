@@ -7,9 +7,9 @@ export default function antigravityExtension(pi: ExtensionAPI): void {
   const runtime = new AntigravityRuntime({ pi });
   registerAntigravitySettings(pi, runtime);
 
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", (_event, ctx) => {
     runtime.rebuildHandles(ctx.sessionManager.getBranch());
-    await runtime.refresh(ctx.cwd, ctx);
+    void runtime.startRefresh(ctx.cwd, ctx);
   });
 
   pi.on("session_tree", (_event, ctx) => {

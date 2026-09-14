@@ -43,6 +43,31 @@ async function setup(): Promise<{ root: string; cwd: string }> {
   return { root, cwd };
 }
 
+async function waitForTool(pi: { tools: unknown[] }): Promise<RegisteredTool> {
+  await vi.waitFor(
+    () =>
+      expect(
+        pi.tools.some(
+          (tool) =>
+            typeof tool === "object" &&
+            tool !== null &&
+            "name" in tool &&
+            tool.name === "antigravity_run",
+        ),
+      ).toBe(true),
+    { timeout: 5_000 },
+  );
+  const tool = pi.tools.find(
+    (candidate) =>
+      typeof candidate === "object" &&
+      candidate !== null &&
+      "name" in candidate &&
+      candidate.name === "antigravity_run",
+  );
+  if (!tool) throw new Error("Antigravity tool was not registered.");
+  return tool as RegisteredTool;
+}
+
 describe("supi-antigravity extension", () => {
   it("omits the tool and warnings when disabled", async () => {
     const { root, cwd } = await setup();
@@ -58,6 +83,7 @@ describe("supi-antigravity extension", () => {
       { type: "session_start", reason: "startup" },
       context,
     );
+    expect(pi.getActiveTools).toHaveBeenCalledTimes(1);
     expect(pi.tools).toHaveLength(0);
     expect(context.ui.notify).not.toHaveBeenCalled();
   });
@@ -72,6 +98,10 @@ describe("supi-antigravity extension", () => {
       { type: "session_start", reason: "startup" },
       context,
     );
+    const notify = context.ui.notify as unknown as { mock: { calls: unknown[][] } };
+    await vi.waitFor(() => expect(notify.mock.calls.length).toBeGreaterThan(0), {
+      timeout: 5_000,
+    });
     expect(pi.tools).toHaveLength(0);
     expect(context.ui.notify).toHaveBeenCalledWith(expect.stringContaining("not found"), "warning");
   });
@@ -86,7 +116,7 @@ describe("supi-antigravity extension", () => {
       { type: "session_start", reason: "startup" },
       context,
     );
-    const tool = pi.tools[0] as RegisteredTool;
+    const tool = await waitForTool(pi);
     await tool.execute(
       "call-hooks",
       {
@@ -109,7 +139,7 @@ describe("supi-antigravity extension", () => {
       { type: "session_start", reason: "startup" },
       context,
     );
-    const tool = pi.tools[0] as RegisteredTool;
+    const tool = await waitForTool(pi);
     const first = await tool.execute(
       "call-first",
       {
@@ -174,8 +204,8 @@ describe("supi-antigravity extension", () => {
       { type: "session_start", reason: "startup" },
       context,
     );
-    expect(pi.tools).toHaveLength(1);
-    const tool = pi.tools[0] as RegisteredTool;
+    expect(pi.tools).toHaveLength(0);
+    const tool = await waitForTool(pi);
     expect(tool.name).toBe("antigravity_run");
     expect(tool.description).toBe(toolDescription);
     expect(tool.description).toMatch(/external model.*web research.*design advice/i);

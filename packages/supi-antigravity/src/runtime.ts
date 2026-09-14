@@ -44,6 +44,19 @@ export class AntigravityRuntime {
     this.handles.rebuild(branch);
   }
 
+  /** Start availability discovery without making Pi session startup wait. */
+  startRefresh(cwd: string, context?: AntigravityRefreshContext): Promise<void> {
+    return this.refresh(cwd, context).catch((error) => {
+      try {
+        // biome-ignore lint/suspicious/noConsole: unexpected failures must stay visible.
+        console.warn(`[supi-antigravity] Availability check failed: ${formatRefreshError(error)}`);
+        context?.ui.notify("Antigravity availability check failed. Reload PI to retry.", "warning");
+      } catch {
+        // PI may be shutting down while the refresh completes.
+      }
+    });
+  }
+
   /** Discover or reuse availability and synchronize the active tool. */
   async refresh(cwd: string, context?: AntigravityRefreshContext): Promise<void> {
     const generation = ++this.#refreshGeneration;
@@ -79,7 +92,7 @@ export class AntigravityRuntime {
       return;
     }
     this.#deactivateTool();
-    context?.ui.notify(availability.warning, "warning");
+    notifyRefreshWarning(context, availability.warning);
   }
 
   /** Stop in-flight discovery and clear session-local state. */
@@ -114,5 +127,26 @@ export class AntigravityRuntime {
     if (activeTools.includes(ANTIGRAVITY_RUN_TOOL_NAME)) {
       this.#pi.setActiveTools(activeTools.filter((name) => name !== ANTIGRAVITY_RUN_TOOL_NAME));
     }
+  }
+}
+
+function formatRefreshError(error: unknown): string {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "object" &&
+          error !== null &&
+          "message" in error &&
+          typeof error.message === "string"
+        ? error.message
+        : String(error);
+  return message.replace(/\s+/g, " ").trim().slice(0, 200) || "unknown error";
+}
+
+function notifyRefreshWarning(context: AntigravityRefreshContext, message: string): void {
+  try {
+    context?.ui.notify(message, "warning");
+  } catch {
+    // PI may be shutting down while the refresh reports its result.
   }
 }

@@ -124,7 +124,7 @@ Tell the user to exit Antigravity and reload PI after sign-in.
 
 ## 3. Add availability discovery
 
-At `session_start`, when the Agent tools setting is enabled:
+At `session_start`, when the Agent tools setting is enabled, start availability discovery without making PI startup wait. Do not await it from the `session_start` handler:
 
 1. Run `agy --version`.
 2. Require version `>=1.1.24`.
@@ -132,6 +132,8 @@ At `session_start`, when the Agent tools setting is enabled:
 4. Parse bounded tab-separated output.
 5. Intersect the result with the four curated models.
 6. Register `antigravity_run` only when at least one curated model is available.
+
+The tool can be absent for a short time after startup while discovery is in progress. Show a bounded warning when discovery is complete without an available tool.
 
 Omit the tool and show a bounded warning when:
 
@@ -163,7 +165,8 @@ When enabled:
 
 - reuse the current immutable catalogue when discovery already completed;
 - otherwise, run the availability check and register or activate the tool;
-- make the settings module `apply()` operation await this refresh before it resolves;
+- make the settings module `apply()` operation await this explicitly requested refresh before it resolves;
+- do not await the startup refresh from `session_start`;
 - use `defineConfigSettings()` for the fixed field and wrap its `apply()` operation for the asynchronous refresh;
 - do not start the probe from the synchronous `afterPersist` callback;
 - prevent an older in-flight refresh from activating the tool after a later disable action.
@@ -403,6 +406,7 @@ Run three real calls with Gemini 3.8 Flash Low:
 
 The Walking Skeleton is complete when:
 
+- PI startup does not wait for Antigravity availability discovery.
 - `antigravity_run` is absent with clear guidance before isolated authentication.
 - The tool appears after authentication and reload.
 - Only available curated models enter its schema and pass runtime validation.
