@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DiagnosticEvidenceSummary } from "../../src/diagnostics/evidence.ts";
 import {
   createDiagnosticTestFile,
+  createPullTestClient,
   createRunningTestClient,
 } from "../helpers/client-test-harness.ts";
 
@@ -108,42 +109,68 @@ describe("LSP server-requested diagnostic refresh", () => {
     expect(JSON.stringify(events)).not.toContain("private diagnostic failure");
   });
 
-  it("force-resynchronizes reusable open documents", async () => {
+  it("refreshes reusable open documents with native pull and no source change", async () => {
+    const file = createDiagnosticTestFile("server-refresh.ts");
+    tempDirs.push(file.tmpDir);
+    const { client, rpc } = createPullTestClient();
+    client.didOpen(file.filePath, "const x = 1;");
+    rpc.sendRequest.mockResolvedValueOnce({ kind: "full", items: [] }).mockResolvedValueOnce({
+      kind: "full",
+      items: [
+        {
+          message: "fresh server diagnostic",
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+        },
+      ],
+    });
+    await client.refreshOpenDiagnostics({ maxWaitMs: 500, quietMs: 1 });
+    rpc.sendNotification.mockClear();
+
+    expect((client as AnyClient).handleServerRequest(REFRESH_METHOD, {})).toBeNull();
+    await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(2));
+    await flushRefresh();
+
+    expect(rpc.sendNotification).not.toHaveBeenCalledWith(
+      expect.stringMatching(/^textDocument\/(?:didChange|didClose|didOpen)$/),
+      expect.anything(),
+    );
+    expect(client.getDiagnostics(file.filePath)).toHaveLength(1);
+    expect(
+      getDebugEvents({ source: "lsp", category: "diagnostics.refresh-request" }).events,
+    ).toEqual([
+      expect.objectContaining({
+        message: "LSP diagnostic refresh request completed",
+        data: expect.objectContaining({ requested: 1, confirmed: 1, unconfirmed: 0 }),
+      }),
+    ]);
+  });
+
+  it("keeps push-only refresh evidence unconfirmed without source synchronization", async () => {
     vi.useFakeTimers();
-    const file = createDiagnosticTestFile("forced-refresh.ts");
+    const file = createDiagnosticTestFile("push-only-refresh.ts");
     tempDirs.push(file.tmpDir);
     const { client, rpc } = createRunningTestClient();
     client.didOpen(file.filePath, "const x = 1;");
-    const version = client.getOpenDocumentVersion(file.filePath);
-    if (version === null) throw new Error("Expected an open document version.");
-    client.handlePublishDiagnostics({ uri: file.uri, version, diagnostics: [] });
-    rpc.sendNotification.mockClear();
-    rpc.sendNotification.mockImplementation((method: string) => {
-      if (method === "textDocument/didChange") {
-        // Publish twice. Push publications stay observations.
-        const currentVersion = client.getOpenDocumentVersion(file.filePath);
-        client.handlePublishDiagnostics({
-          uri: file.uri,
-          version: currentVersion ?? undefined,
-          diagnostics: [],
-        });
-        client.handlePublishDiagnostics({
-          uri: file.uri,
-          version: currentVersion ?? undefined,
-          diagnostics: [],
-        });
-      }
-      return Promise.resolve();
+    client.handlePublishDiagnostics({
+      uri: file.uri,
+      diagnostics: [
+        {
+          message: "ambient diagnostic",
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+        },
+      ],
     });
+    rpc.sendNotification.mockClear();
 
     expect((client as AnyClient).handleServerRequest(REFRESH_METHOD, {})).toBeNull();
     await vi.advanceTimersByTimeAsync(0);
-    await vi.advanceTimersByTimeAsync(250);
+    await vi.advanceTimersByTimeAsync(3_000);
 
-    expect(rpc.sendNotification).toHaveBeenCalledWith(
-      "textDocument/didChange",
-      expect.objectContaining({ textDocument: { uri: file.uri, version: 2 } }),
+    expect(rpc.sendNotification).not.toHaveBeenCalledWith(
+      expect.stringMatching(/^textDocument\/(?:didChange|didClose|didOpen)$/),
+      expect.anything(),
     );
+    expect(client.getDiagnostics(file.filePath)).toHaveLength(1);
     expect(
       getDebugEvents({ source: "lsp", category: "diagnostics.refresh-request" }).events,
     ).toEqual([

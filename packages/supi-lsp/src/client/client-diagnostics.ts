@@ -18,6 +18,8 @@ import {
   type DiagnosticCacheEntry,
   type DiagnosticSynchronization,
   hasCurrentEvidence,
+  hasFreshEvidence,
+  incompleteDiagnosticResult,
   isCurrentSynchronization,
   isValidPublishDiagnosticsParams,
   nextDocumentVersion,
@@ -55,6 +57,15 @@ const DIAGNOSTIC_WAIT_MS = 3_000;
 
 /** Bound abandoned adapter work without binding it to one caller's deadline. */
 const DIAGNOSTIC_REQUEST_OWNER_TIMEOUT_MS = 30_000;
+
+interface ServerDiagnosticRefreshWork {
+  promise: Promise<DiagnosticEvidenceSummary>;
+}
+
+type DiagnosticEvidenceCandidate = DiagnosticSynchronization & {
+  readonly evidenceRevision: number;
+};
+
 /** Own one client's document and diagnostic evidence; revisions prevent stale reuse. */
 export class ClientDiagnostics {
   readonly #openDocs = new Map<string, OpenDocumentState>();
@@ -75,6 +86,9 @@ export class ClientDiagnostics {
   readonly #inputBarrier: SemanticInputBarrier;
   #evidenceRevision = 0;
   #nextSynchronizationId = 0;
+  /** One active server refresh plus one coalesced newer demand generation. */
+  #serverRefreshGeneration = 0;
+  #serverRefreshWork: ServerDiagnosticRefreshWork | undefined;
 
   constructor(private readonly host: ClientDiagnosticsHost) {
     this.#publications = new DiagnosticPublicationTracker({
@@ -157,8 +171,12 @@ export class ClientDiagnostics {
     });
   }
 
-  #rememberDocumentContent(uri: string, content: string): void {
-    this.#inputBarrier.rememberDocumentContent(uri, content);
+  #initializeDocumentContent(uri: string, content: string): void {
+    this.#inputBarrier.initializeDocumentContent(uri, content);
+  }
+
+  #observeDiskContent(uri: string, content: string): void {
+    this.#inputBarrier.observeDiskContent(uri, content);
   }
 
   #forgetDocumentContent(uri: string): void {
@@ -234,7 +252,7 @@ export class ClientDiagnostics {
       this.didChange(filePath, content);
       return;
     }
-    this.#rememberDocumentContent(uri, content);
+    this.#initializeDocumentContent(uri, content);
     this.#cancelDiagnosticRequest(uri);
     this.#advanceInputRevision(false, false);
 
@@ -273,7 +291,6 @@ export class ClientDiagnostics {
     }
     const nextFingerprint = fingerprintDocumentContent(content);
     if (doc.contentFingerprint === nextFingerprint) return;
-    this.#rememberDocumentContent(uri, content);
     this.#advanceInputRevision();
     this.#synchronizeTrackedDocument(uri, filePath, content, doc);
   }
@@ -410,17 +427,52 @@ export class ClientDiagnostics {
     // The refresh helper owns its read, classification, and budget pass. Do
     // not run the query barrier first: one changed file could then invalidate
     // the whole maintenance generation and resend unchanged text.
-    return this.#refreshOpenDiagnostics(options, false);
+    return this.#refreshOpenDiagnostics(options);
   }
 
-  /** Force a full document resynchronization for a server refresh request. */
-  async refreshForServerRequest(): Promise<DiagnosticEvidenceSummary> {
-    return this.#refreshOpenDiagnostics({}, true);
+  /**
+   * Refresh evidence after a server request without pretending input changed.
+   *
+   * A newer request invalidates the active evidence and joins the same owned
+   * work. The next pass starts only after active diagnostic transport settles.
+   */
+  refreshForServerRequest(): Promise<DiagnosticEvidenceSummary> {
+    this.#serverRefreshGeneration++;
+    this.#invalidateDiagnosticEvidenceForServerRequest();
+    const active = this.#serverRefreshWork;
+    if (active) return active.promise;
+
+    const work: ServerDiagnosticRefreshWork = {
+      promise: undefined as unknown as Promise<DiagnosticEvidenceSummary>,
+    };
+    this.#serverRefreshWork = work;
+    work.promise = this.#runServerDiagnosticRefresh(work);
+    void work.promise.catch(() => {});
+    return work.promise;
+  }
+
+  async #runServerDiagnosticRefresh(
+    work: ServerDiagnosticRefreshWork,
+  ): Promise<DiagnosticEvidenceSummary> {
+    for (;;) {
+      const generation = this.#serverRefreshGeneration;
+      try {
+        const evidence = await this.#refreshOpenDiagnostics({});
+        if (generation === this.#serverRefreshGeneration) {
+          if (this.#serverRefreshWork === work) this.#serverRefreshWork = undefined;
+          return evidence;
+        }
+      } catch (error) {
+        if (generation === this.#serverRefreshGeneration) {
+          if (this.#serverRefreshWork === work) this.#serverRefreshWork = undefined;
+          throw error;
+        }
+      }
+    }
   }
 
   async #refreshOpenDiagnostics(
     options: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl,
-    forceResynchronize: boolean,
   ): Promise<DiagnosticEvidenceSummary> {
     const requestedFiles = Array.from(
       new Set([...this.#openDocs.keys(), ...this.#diagnosticStore.keys(), ...this.#failedUris]),
@@ -437,11 +489,15 @@ export class ClientDiagnostics {
       isRelatedUriTracked: (uri) => this.#openDocs.has(uri) || this.#versionHistory.has(uri),
       nextSynchronizationId: () => ++this.#nextSynchronizationId,
       noteInputContentChange: () => this.#noteInputContentChange(),
-      rememberDocumentContent: (uri, content) => this.#rememberDocumentContent(uri, content),
+      observeDiskContent: (uri, content) => this.#observeDiskContent(uri, content),
       invalidateEvidence: (uri) => {
         this.#advanceInputRevision(false);
         this.#cancelDiagnosticRequest(uri);
         this.#failedUris.add(uri);
+        // Keep old diagnostics as partial data, but do not let unchanged
+        // recovery restore their former confirmation generation.
+        const entry = this.#diagnosticStore.get(uri);
+        if (entry) entry.evidenceRevision = -1;
         const document = this.#openDocs.get(uri);
         if (document) document.evidenceRevision = -1;
       },
@@ -471,7 +527,6 @@ export class ClientDiagnostics {
           deadline: requestOptions.deadline,
           operationId: requestOptions.operationId,
         }),
-      forceResynchronize,
       options,
       publications: {
         emitSummary: (summaryOptions) =>
@@ -546,6 +601,11 @@ export class ClientDiagnostics {
         control,
         contentOverrides,
         uri,
+        diagnosticEvidence: this.#captureDiagnosticEvidence({
+          uri,
+          synchronizationId: synchronization.synchronizationId,
+          evidenceRevision: synchronization.evidenceRevision,
+        }),
       });
     }
     const requestEvidenceRevision =
@@ -600,6 +660,7 @@ export class ClientDiagnostics {
     control: CodeRequestControl | undefined;
     contentOverrides: ReadonlyMap<string, string> | undefined;
     uri: string;
+    diagnosticEvidence?: DiagnosticEvidenceCandidate;
   }): Promise<CodeQueryResult<Diagnostic[]>> {
     try {
       await this.assertSemanticInputsCurrent(
@@ -607,6 +668,13 @@ export class ClientDiagnostics {
         options.control,
         options.contentOverrides,
       );
+      if (
+        options.result.kind === "completed" &&
+        (!options.diagnosticEvidence ||
+          !this.#isDiagnosticEvidenceCurrent(options.diagnosticEvidence))
+      ) {
+        return incompleteDiagnosticResult(options.result.data, "timed-out");
+      }
       return options.result;
     } catch (error) {
       if (isCodeRequestInterruption(error, options.control)) throw error;
@@ -672,6 +740,16 @@ export class ClientDiagnostics {
       control,
       contentOverrides: options.contentOverrides,
       uri,
+      // Capture the candidate before the final input barrier can await a read.
+      // The candidate must not follow the mutable document revision.
+      diagnosticEvidence:
+        collected.kind === "completed"
+          ? this.#captureDiagnosticEvidence({
+              uri: request.uri,
+              synchronizationId: request.synchronizationId,
+              evidenceRevision: request.evidenceRevision ?? this.#evidenceRevision,
+            })
+          : undefined,
     });
     this.#publications.emitSummary({
       operation: "sync-file",
@@ -691,6 +769,38 @@ export class ClientDiagnostics {
       operationId: control?.operationId,
     });
     return result;
+  }
+
+  /** Capture immutable identity for one request-confirmed diagnostic result. */
+  #captureDiagnosticEvidence(options: {
+    uri: string;
+    synchronizationId: number;
+    evidenceRevision: number;
+  }): DiagnosticEvidenceCandidate | undefined {
+    const entry = this.#diagnosticStore.get(options.uri);
+    if (
+      !entry ||
+      entry.source === "push" ||
+      entry.synchronizationId !== options.synchronizationId ||
+      entry.evidenceRevision !== options.evidenceRevision ||
+      options.evidenceRevision !== this.#evidenceRevision
+    ) {
+      return undefined;
+    }
+    return {
+      uri: options.uri,
+      synchronizationId: options.synchronizationId,
+      evidenceRevision: options.evidenceRevision,
+    };
+  }
+
+  /** Check a captured diagnostic result against the current live evidence. */
+  #isDiagnosticEvidenceCurrent(candidate: DiagnosticEvidenceCandidate): boolean {
+    return (
+      candidate.evidenceRevision === this.#evidenceRevision &&
+      isCurrentSynchronization(this.#openDocs, candidate) &&
+      hasFreshEvidence(this.#diagnosticStore, candidate, this.#evidenceRevision)
+    );
   }
 
   /** Start one shared request and apply its report through the evidence gate. */
@@ -774,6 +884,14 @@ export class ClientDiagnostics {
   #noteInputContentChange(): number {
     this.#advanceInputRevision();
     return this.#evidenceRevision;
+  }
+
+  /** Invalidate diagnostic evidence without advancing the semantic input generation. */
+  #invalidateDiagnosticEvidenceForServerRequest(): void {
+    // Keep active adapter work owned until it settles. The refresh generation
+    // below discards its evidence and starts the newer pass afterwards.
+    this.#advanceEvidenceRevision(false);
+    this.#waiters.cancelSettle();
   }
 
   #advanceInputRevision(invalidateEvidence = true, cancelRequests = true): void {

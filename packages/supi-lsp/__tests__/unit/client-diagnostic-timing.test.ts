@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -9,16 +9,27 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPullTestClient, createRunningTestClient } from "../helpers/client-test-harness.ts";
 
+const fsPromisesMock = vi.hoisted(() => ({ readFile: vi.fn() }));
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, readFile: fsPromisesMock.readFile };
+});
+
 let cwd = "";
 
 beforeEach(() => {
   cwd = mkdtempSync(join(tmpdir(), "lsp-diagnostic-timing-"));
   configureDebugRegistry({ enabled: true, maxEvents: 20 });
+  fsPromisesMock.readFile.mockImplementation((filePath: string) =>
+    Promise.resolve(readFileSync(filePath, "utf8")),
+  );
 });
 
 afterEach(() => {
   resetDebugRegistry();
   rmSync(cwd, { recursive: true, force: true });
+  fsPromisesMock.readFile.mockReset();
 });
 
 describe("LSP diagnostic timing observations", () => {
@@ -225,25 +236,45 @@ describe("LSP diagnostic timing observations", () => {
   });
 
   it("does not classify waiter release as fresh push evidence", async () => {
-    const file = join(cwd, "released.ts");
-    writeFileSync(file, "const released = true;\n");
-    const { client } = createRunningTestClient({ root: cwd, cwd });
-    setTimeout(() => client.didClose(file), 10);
+    vi.useFakeTimers();
+    try {
+      const file = join(cwd, "released.ts");
+      writeFileSync(file, "const released = true;\n");
+      const { client } = createRunningTestClient({ root: cwd, cwd });
+      let releaseRead!: () => void;
+      const readStarted = new Promise<void>((resolve) => {
+        fsPromisesMock.readFile.mockImplementationOnce(async (filePath: string) => {
+          resolve();
+          await new Promise<void>((resolveRead) => {
+            releaseRead = resolveRead;
+          });
+          return readFileSync(filePath, "utf8");
+        });
+      });
 
-    await client.syncAndWaitForDiagnostics(file, "const released = true;\n");
+      const pending = client.syncAndWaitForDiagnostics(file, "const released = true;\n");
+      await readStarted;
+      releaseRead();
+      await vi.runAllTicks();
+      setTimeout(() => client.didClose(file), 10);
+      await vi.advanceTimersByTimeAsync(10);
+      await pending;
 
-    expect(
-      getDebugEvents({ source: "lsp", category: "diagnostics.timing" }).events[0]?.data,
-    ).toEqual(
-      expect.objectContaining({
-        collection: "push",
-        push: "released",
-        settle: "released",
-        timedOut: false,
-        freshness: "not-observed",
-        outcome: "incomplete",
-      }),
-    );
+      expect(
+        getDebugEvents({ source: "lsp", category: "diagnostics.timing" }).events[0]?.data,
+      ).toEqual(
+        expect.objectContaining({
+          collection: "push",
+          push: "released",
+          settle: "released",
+          timedOut: false,
+          freshness: "not-observed",
+          outcome: "incomplete",
+        }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it("records a failed single-file request without push confirmation", async () => {
     const file = join(cwd, "single.ts");

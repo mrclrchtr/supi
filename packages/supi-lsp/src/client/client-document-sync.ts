@@ -47,13 +47,20 @@ function contentChanges(
   return [{ text: content }];
 }
 
-/** Advance and publish one explicit document synchronization. */
-export function synchronizeDocument(options: SynchronizeDocumentOptions): void {
+/** Retain one document synchronization while advancing its evidence revision. */
+function retainDocumentSynchronization(
+  options: Pick<SynchronizeDocumentOptions, "uri" | "document" | "evidenceRevision" | "waiters">,
+): void {
   options.waiters.releaseFile(options.uri);
   options.waiters.cancelSettle();
+  options.document.evidenceRevision = options.evidenceRevision;
+}
+
+/** Advance and publish one explicit document synchronization. */
+export function synchronizeDocument(options: SynchronizeDocumentOptions): void {
+  retainDocumentSynchronization(options);
   options.document.version = options.version;
   options.document.synchronizationId = options.synchronizationId;
-  options.document.evidenceRevision = options.evidenceRevision;
   const changes = contentChanges(
     options.document.content,
     options.content,
@@ -125,8 +132,8 @@ interface ResynchronizeDocumentsOptions {
   evidenceRevision: number;
   /** Invalidate route evidence before the first changed document is applied. */
   noteInputContentChange(): number;
-  /** Keep the shared semantic barrier's content baseline in step with refresh. */
-  rememberDocumentContent(uri: string, content: string): void;
+  /** Record the verified disk content in the shared semantic barrier. */
+  observeDiskContent(uri: string, content: string): void;
   incrementalSync: boolean;
   sendNotification: NotificationSender;
   uriToFile(uri: string): string;
@@ -154,6 +161,7 @@ export interface ResynchronizeDocumentsResult {
 export function resynchronizeOpenDocuments(
   options: ResynchronizeDocumentsOptions,
 ): ResynchronizeDocumentsResult {
+  const synchronizedUris = new Set<string>();
   const resynchronizedUris = new Set<string>();
   const removedFiles: string[] = [];
   const failedFiles: string[] = [];
@@ -164,27 +172,38 @@ export function resynchronizeOpenDocuments(
     try {
       options.markUnversionedSyncMoment(uri);
       const content = options.preloadedContent?.get(uri) ?? readFileSync(filePath, "utf-8");
-      if (
-        !inputChangeNoted &&
-        fingerprintDocumentContent(content) !== document.contentFingerprint
-      ) {
-        synchronizationRevision = options.noteInputContentChange();
-        inputChangeNoted = true;
+      const contentChanged = fingerprintDocumentContent(content) !== document.contentFingerprint;
+      if (contentChanged) {
+        if (!inputChangeNoted) {
+          synchronizationRevision = options.noteInputContentChange();
+          inputChangeNoted = true;
+        }
+        synchronizeDocument({
+          uri,
+          content,
+          document,
+          version: options.nextVersion(uri),
+          synchronizationId: options.nextSynchronizationId(),
+          evidenceRevision: synchronizationRevision,
+          incrementalSync: options.incrementalSync,
+          waiters: options.waiters,
+          sendNotification: options.sendNotification,
+        });
+      } else {
+        // A failed read can select an unchanged open document for recovery.
+        // Keep its protocol identity stable, but make the current evidence
+        // generation eligible for a fresh request or push observation.
+        retainDocumentSynchronization({
+          uri,
+          document,
+          evidenceRevision: synchronizationRevision,
+          waiters: options.waiters,
+        });
       }
-      synchronizeDocument({
-        uri,
-        content,
-        document,
-        version: options.nextVersion(uri),
-        synchronizationId: options.nextSynchronizationId(),
-        evidenceRevision: synchronizationRevision,
-        incrementalSync: options.incrementalSync,
-        waiters: options.waiters,
-        sendNotification: options.sendNotification,
-      });
-      options.rememberDocumentContent(uri, content);
+      options.observeDiskContent(uri, content);
       options.clearFailedFile(uri);
-      resynchronizedUris.add(uri);
+      synchronizedUris.add(uri);
+      if (contentChanged) resynchronizedUris.add(uri);
     } catch {
       if (getDiagnosticFileState(filePath) === "removed") {
         options.clearFile(uri);
@@ -199,7 +218,7 @@ export function resynchronizeOpenDocuments(
     }
   }
   const synchronizations: DiagnosticSynchronization[] = [];
-  for (const uri of resynchronizedUris) {
+  for (const uri of synchronizedUris) {
     const document = options.openDocuments.get(uri);
     if (!document) continue;
     synchronizations.push({

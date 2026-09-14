@@ -46,7 +46,7 @@ SuPi advertises static and dynamic pull support. It advertises server-requested 
 
 A server gets pull diagnostics when it declares a valid `diagnosticProvider` during initialization. A server also gets pull diagnostics after it registers `textDocument/diagnostic`. The pull support stays active until the server removes the registration. SuPi validates registration parameters. Invalid parameters do not enable pull support. SuPi ignores other registration methods.
 
-When a server sends `workspace/diagnostic/refresh`, SuPi returns `null` immediately. It then refreshes the owning client's tracked documents in the background. The refresh covers open, cached, and failed tracked documents. SuPi does not add workspace-wide `workspace/diagnostic` pulls.
+When a server sends `workspace/diagnostic/refresh`, SuPi returns `null` immediately. It then invalidates diagnostic evidence only and refreshes the owning client's tracked documents in the background. Unchanged open documents keep their input synchronization; SuPi sends no no-op `didChange`, `didClose`, or `didOpen`. It uses native pull or the tested TypeScript request adapter when available. Push-only routes keep partial or unconfirmed evidence. Actual disk changes use the normal document synchronization path. Overlapping refresh requests share one active pass and one newer pending demand; an active diagnostic transport stays owned until it settles. The refresh covers open, cached, and failed tracked documents. SuPi does not add workspace-wide `workspace/diagnostic` pulls.
 
 Protocol support is separate from the configured mode. A server may support pull diagnostics and still use SuPi's push mode because the built-in configuration does not enable pull mode.
 

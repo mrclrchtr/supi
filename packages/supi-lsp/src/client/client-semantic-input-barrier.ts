@@ -54,7 +54,7 @@ interface OpenDocumentRead {
 
 interface SynchronizationPlan {
   readonly updates: SemanticInputUpdate[];
-  readonly fingerprints: Map<string, string | undefined>;
+  readonly observedDiskFingerprints: Map<string, string | undefined>;
 }
 
 interface PendingSynchronization {
@@ -79,7 +79,8 @@ export class SemanticInputBarrier {
   readonly #host: SemanticInputBarrierHost;
   readonly #maxConcurrentReads: number;
   readonly #readFile: SemanticInputFileReader;
-  readonly #inputFingerprints = new Map<string, string>();
+  /** Last verified disk fingerprint for each URI; undefined means observed missing. */
+  readonly #observedDiskFingerprints = new Map<string, string | undefined>();
   #revision = 0;
   #pending: PendingSynchronization | null = null;
 
@@ -162,19 +163,24 @@ export class SemanticInputBarrier {
     );
   }
 
-  /** Remember the content used for a newly opened or explicitly changed file. */
-  rememberDocumentContent(uri: string, content: string): void {
-    this.#inputFingerprints.set(uri, fingerprintDocumentContent(content));
+  /** Seed the initial disk baseline from the content used to open a document. */
+  initializeDocumentContent(uri: string, content: string): void {
+    this.#observedDiskFingerprints.set(uri, fingerprintDocumentContent(content));
   }
 
-  /** Forget a document's last applied content. */
+  /** Record content read from disk after a synchronization or refresh pass. */
+  observeDiskContent(uri: string, content: string): void {
+    this.#observedDiskFingerprints.set(uri, fingerprintDocumentContent(content));
+  }
+
+  /** Forget a document's last observed disk content. */
   forgetDocumentContent(uri: string): void {
-    this.#inputFingerprints.delete(uri);
+    this.#observedDiskFingerprints.delete(uri);
   }
 
   /** Stop pending work and discard observed input fingerprints. */
   clear(): void {
-    this.#inputFingerprints.clear();
+    this.#observedDiskFingerprints.clear();
     this.noteInputChange();
   }
 
@@ -280,35 +286,37 @@ export class SemanticInputBarrier {
     reads: readonly OpenDocumentRead[],
   ): SynchronizationPlan {
     const updates: SemanticInputUpdate[] = [];
-    const fingerprints = new Map<string, string | undefined>();
+    const observedDiskFingerprints = new Map<string, string | undefined>();
     for (const read of reads) {
       const planned = this.#planDocumentRead(pending, read);
-      fingerprints.set(read.document.uri, planned.fingerprint);
+      observedDiskFingerprints.set(read.document.uri, planned.observedDiskFingerprint);
       if (planned.update) updates.push(planned.update);
     }
-    return { updates, fingerprints };
+    return { updates, observedDiskFingerprints };
   }
 
   #planDocumentRead(
     pending: PendingSynchronization,
     read: OpenDocumentRead,
-  ): { fingerprint: string | undefined; update?: SemanticInputUpdate } {
+  ): { observedDiskFingerprint: string | undefined; update?: SemanticInputUpdate } {
     const override = pending.contentOverrides.get(read.document.uri);
     if (read.result.kind === "error") {
       return this.#planReadError(read.document, read.result.error, override);
     }
 
     const diskFingerprint = fingerprintDocumentContent(read.result.content);
-    const previousFingerprint = this.#inputFingerprints.get(read.document.uri);
+    const hasObservedDiskContent = this.#observedDiskFingerprints.has(read.document.uri);
+    const previousDiskFingerprint = this.#observedDiskFingerprints.get(read.document.uri);
+    // An explicit override controls server content; the disk fingerprint remains the next observation.
     const content =
       override ??
-      (previousFingerprint !== undefined && previousFingerprint === diskFingerprint
+      (hasObservedDiskContent && previousDiskFingerprint === diskFingerprint
         ? read.document.content
         : read.result.content);
-    const fingerprint = fingerprintDocumentContent(content);
+    const contentFingerprint = fingerprintDocumentContent(content);
     return {
-      fingerprint,
-      ...(read.document.contentFingerprint !== fingerprint
+      observedDiskFingerprint: diskFingerprint,
+      ...(read.document.contentFingerprint !== contentFingerprint
         ? { update: { document: read.document, content } }
         : {}),
     };
@@ -318,10 +326,10 @@ export class SemanticInputBarrier {
     document: SemanticInputDocument,
     error: unknown,
     override: string | undefined,
-  ): { fingerprint: string | undefined; update?: SemanticInputUpdate } {
+  ): { observedDiskFingerprint: string | undefined; update?: SemanticInputUpdate } {
     if (override !== undefined && isMissingFileReadError(error)) {
       return {
-        fingerprint: undefined,
+        observedDiskFingerprint: undefined,
         ...(document.contentFingerprint !== fingerprintDocumentContent(override)
           ? { update: { document, content: override } }
           : {}),
@@ -338,17 +346,14 @@ export class SemanticInputBarrier {
   #applySynchronizationPlan(plan: SynchronizationPlan): void {
     if (plan.updates.length > 0) {
       this.#host.applyDocumentUpdates(plan.updates);
-      this.#rememberPlanFingerprints(plan.fingerprints);
       this.#revision++;
-      return;
     }
-    this.#rememberPlanFingerprints(plan.fingerprints);
+    this.#rememberObservedDiskFingerprints(plan.observedDiskFingerprints);
   }
 
-  #rememberPlanFingerprints(fingerprints: ReadonlyMap<string, string | undefined>): void {
+  #rememberObservedDiskFingerprints(fingerprints: ReadonlyMap<string, string | undefined>): void {
     for (const [uri, fingerprint] of fingerprints) {
-      if (fingerprint === undefined) this.#inputFingerprints.delete(uri);
-      else this.#inputFingerprints.set(uri, fingerprint);
+      this.#observedDiskFingerprints.set(uri, fingerprint);
     }
   }
 

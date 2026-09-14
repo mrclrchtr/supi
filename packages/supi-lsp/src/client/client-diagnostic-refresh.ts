@@ -228,8 +228,8 @@ async function collectOneRefreshRequest(
  * - without current evidence it is retained: it keeps its server version and
  *   receives fresh request or push evidence without a no-op didChange.
  *
- * A workspace change invalidates diagnostic evidence for every open document,
- * but only changed text is synchronized. This separates evidence generation
+ * An evidence invalidation applies to every open document, but only changed
+ * text is synchronized. This separates evidence generation
  * from document synchronization and avoids restarting a server's full-program
  * check for unchanged files.
  */
@@ -288,8 +288,8 @@ interface ClientDiagnosticRefreshOptions {
   readonly nextSynchronizationId: () => number;
   /** Invalidate route evidence before applying a disk content change. */
   readonly noteInputContentChange: () => number;
-  /** Keep the shared semantic barrier's disk-content baseline current. */
-  readonly rememberDocumentContent: (uri: string, content: string) => void;
+  /** Keep the shared semantic barrier's verified disk observation current. */
+  readonly observeDiskContent: (uri: string, content: string) => void;
   readonly clearFile: (uri: string) => void;
   readonly invalidateEvidence: (uri: string) => void;
   readonly markUnversionedSyncMoment: (uri: string) => void;
@@ -302,8 +302,6 @@ interface ClientDiagnosticRefreshOptions {
     deadline?: number;
     operationId?: string;
   }) => Promise<boolean>;
-  /** Server-requested refreshes bypass normal push-only evidence reuse. */
-  readonly forceResynchronize?: boolean;
   readonly options: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl;
   /** Push-publication telemetry surface for this client. */
   readonly publications: {
@@ -327,17 +325,13 @@ function prepareRefreshDocuments(
   options: ClientDiagnosticRefreshOptions,
   evidenceRevision: number,
 ): PreparedRefreshDocuments {
-  const reuseEnabled = !options.forceResynchronize;
-  const classification = reuseEnabled
-    ? classifyReusableDocuments({
-        openDocuments: options.openDocuments,
-        diagnosticStore: options.diagnosticStore,
-        evidenceRevision,
-        failedFiles: options.failedFiles(),
-      })
-    : undefined;
-  const reusableUris = classification?.reusableUris ?? new Set<string>();
-  const retainedUris = classification?.retainedUris ?? new Set<string>();
+  const classification = classifyReusableDocuments({
+    openDocuments: options.openDocuments,
+    diagnosticStore: options.diagnosticStore,
+    evidenceRevision,
+    failedFiles: options.failedFiles(),
+  });
+  const { reusableUris, retainedUris } = classification;
   const documentsToResynchronize = new Map(
     Array.from(options.openDocuments).filter(
       ([uri]) => !reusableUris.has(uri) && !retainedUris.has(uri),
@@ -350,11 +344,11 @@ function prepareRefreshDocuments(
     nextSynchronizationId: options.nextSynchronizationId,
     evidenceRevision,
     noteInputContentChange: options.noteInputContentChange,
-    rememberDocumentContent: options.rememberDocumentContent,
+    observeDiskContent: options.observeDiskContent,
     incrementalSync: options.host.usesIncrementalDocumentSync(),
     sendNotification: (method, params) => options.host.sendNotification(method, params),
     uriToFile,
-    preloadedContent: classification?.preloadedContent,
+    preloadedContent: classification.preloadedContent,
     clearFile: options.clearFile,
     invalidateEvidence: options.invalidateEvidence,
     markUnversionedSyncMoment: options.markUnversionedSyncMoment,
@@ -388,9 +382,7 @@ function prepareRefreshDocuments(
     ...resynchronization.synchronizations,
   ];
   const fullyReusable =
-    reuseEnabled &&
-    options.openDocuments.size > 0 &&
-    reusableUris.size === options.openDocuments.size;
+    options.openDocuments.size > 0 && reusableUris.size === options.openDocuments.size;
   return { resynchronization, synchronizations, fullyReusable };
 }
 

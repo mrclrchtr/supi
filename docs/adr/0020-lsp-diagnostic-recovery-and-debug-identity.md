@@ -2,7 +2,7 @@
 
 **Status:** Partially superseded by [ADR 0022](0022-request-confirmed-lsp-agnostic-diagnostics.md)
 
-> **Current policy:** ADR 0022 replaces this record's push-diagnostic confirmation rules. Ordinary refresh retains unchanged document text across evidence invalidation; it does not resend unchanged text only to obtain diagnostic confirmation. See [Issue 407 follow-ups](../ops/issue-407-follow-ups.md) for the current input-freshness policy. Native server-requested refresh remains pending under work item 2 in that specification. The retention and protocol-stall-only restart intent remains active. The sync-moment gate is only an admission check for some stale publications; it does not confirm diagnostics. Diagnostic collection does not use a publication count, quiet time, or reopen to confirm a result. The debug identity rules in this record remain active.
+> **Current policy:** ADR 0022 replaces this record's push-diagnostic confirmation rules. Ordinary refresh retains unchanged document text across evidence invalidation; it does not resend unchanged text only to obtain diagnostic confirmation. Server-requested refresh now invalidates diagnostic evidence without changing the semantic input generation, then uses applicable request evidence without no-op document synchronization. See [Issue 407 follow-ups](../ops/issue-407-follow-ups.md) for the current input-freshness and refresh policy. The retention and protocol-stall-only restart intent remains active. The sync-moment gate is only an admission check for some stale publications; it does not confirm diagnostics. Diagnostic collection does not use a publication count, quiet time, or reopen to confirm a result. The debug identity rules in this record remain active.
 
 ## Historical decision record
 
