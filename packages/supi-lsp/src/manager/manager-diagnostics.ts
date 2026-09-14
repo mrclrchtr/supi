@@ -10,17 +10,23 @@ import type { Diagnostic } from "../config/types.ts";
 import { effectiveDiagnosticSeverity } from "../diagnostics/diagnostic-severity.ts";
 import { relativeFilePathFromUri } from "../diagnostics/diagnostic-summary.ts";
 
+/** Options for one manager-owned diagnostic request. */
+interface SyncClientFileOptions {
+  readonly control?: CodeRequestControl;
+  readonly contentIsAuthoritative?: boolean;
+}
+
 /** Sync one file and return diagnostics up to the supplied severity threshold. */
 export async function syncClientFileAndGetDiagnostics(
   client: Pick<LspClient, "syncAndWaitForDiagnostics">,
   filePath: string,
   maxSeverity: number,
-  control?: CodeRequestControl,
+  options: SyncClientFileOptions = {},
 ): Promise<CodeQueryResult<Diagnostic[]>> {
   const content = readFileSync(filePath, "utf-8");
-  const result = control
-    ? await client.syncAndWaitForDiagnostics(filePath, content, control)
-    : await client.syncAndWaitForDiagnostics(filePath, content);
+  const result = await client.syncAndWaitForDiagnostics(filePath, content, options.control, {
+    contentIsAuthoritative: options.contentIsAuthoritative ?? true,
+  });
   return mapCodeQueryResult(result, (diagnostics) =>
     filterDiagnosticsBySeverity(diagnostics, maxSeverity),
   );

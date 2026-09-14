@@ -38,7 +38,9 @@ describe("syncClientFileAndGetDiagnostics", () => {
         kind: "completed",
         data: [diagnostics[0], diagnostics[2]],
       });
-      expect(syncAndWaitForDiagnostics).toHaveBeenCalledWith(file, content);
+      expect(syncAndWaitForDiagnostics).toHaveBeenCalledWith(file, content, undefined, {
+        contentIsAuthoritative: true,
+      });
       expect(clearPullResultIds).not.toHaveBeenCalled();
     } finally {
       rmSync(directory, { recursive: true, force: true });

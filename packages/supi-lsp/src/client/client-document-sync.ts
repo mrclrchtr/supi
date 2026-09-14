@@ -123,6 +123,10 @@ interface ResynchronizeDocumentsOptions {
   nextVersion(uri: string): number;
   nextSynchronizationId(): number;
   evidenceRevision: number;
+  /** Invalidate route evidence before the first changed document is applied. */
+  noteInputContentChange(): number;
+  /** Keep the shared semantic barrier's content baseline in step with refresh. */
+  rememberDocumentContent(uri: string, content: string): void;
   incrementalSync: boolean;
   sendNotification: NotificationSender;
   uriToFile(uri: string): string;
@@ -150,32 +154,37 @@ export interface ResynchronizeDocumentsResult {
 export function resynchronizeOpenDocuments(
   options: ResynchronizeDocumentsOptions,
 ): ResynchronizeDocumentsResult {
-  const synchronizations: DiagnosticSynchronization[] = [];
   const resynchronizedUris = new Set<string>();
   const removedFiles: string[] = [];
   const failedFiles: string[] = [];
+  let synchronizationRevision = options.evidenceRevision;
+  let inputChangeNoted = false;
   for (const [uri, document] of options.openDocuments) {
     const filePath = options.uriToFile(uri);
     try {
       options.markUnversionedSyncMoment(uri);
+      const content = options.preloadedContent?.get(uri) ?? readFileSync(filePath, "utf-8");
+      if (
+        !inputChangeNoted &&
+        fingerprintDocumentContent(content) !== document.contentFingerprint
+      ) {
+        synchronizationRevision = options.noteInputContentChange();
+        inputChangeNoted = true;
+      }
       synchronizeDocument({
         uri,
-        content: options.preloadedContent?.get(uri) ?? readFileSync(filePath, "utf-8"),
+        content,
         document,
         version: options.nextVersion(uri),
         synchronizationId: options.nextSynchronizationId(),
-        evidenceRevision: options.evidenceRevision,
+        evidenceRevision: synchronizationRevision,
         incrementalSync: options.incrementalSync,
         waiters: options.waiters,
         sendNotification: options.sendNotification,
       });
+      options.rememberDocumentContent(uri, content);
       options.clearFailedFile(uri);
       resynchronizedUris.add(uri);
-      synchronizations.push({
-        uri,
-        synchronizationId: document.synchronizationId,
-        evidenceRevision: document.evidenceRevision,
-      });
     } catch {
       if (getDiagnosticFileState(filePath) === "removed") {
         options.clearFile(uri);
@@ -188,6 +197,16 @@ export function resynchronizeOpenDocuments(
       failedFiles.push(filePath);
       // Keep the document open when a transient read fails.
     }
+  }
+  const synchronizations: DiagnosticSynchronization[] = [];
+  for (const uri of resynchronizedUris) {
+    const document = options.openDocuments.get(uri);
+    if (!document) continue;
+    synchronizations.push({
+      uri,
+      synchronizationId: document.synchronizationId,
+      evidenceRevision: document.evidenceRevision,
+    });
   }
   return { synchronizations, resynchronizedUris, removedFiles, failedFiles };
 }

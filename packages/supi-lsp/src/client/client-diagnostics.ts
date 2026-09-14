@@ -4,6 +4,7 @@ import {
   type CodeQueryResult,
   type CodeRequestControl,
   completedCodeQuery,
+  isCodeRequestInterruption,
   throwIfCodeRequestInterrupted,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
@@ -43,8 +44,15 @@ import {
 } from "./client-document-state.ts";
 import { clearTrackedDocumentState, synchronizeTrackedDocument } from "./client-document-sync.ts";
 import { getDiagnosticFileState } from "./client-file-state.ts";
+import {
+  SemanticInputBarrier,
+  type SemanticInputDocument,
+  type SemanticInputSnapshot,
+  type SemanticInputUpdate,
+} from "./client-semantic-input-barrier.ts";
 
 const DIAGNOSTIC_WAIT_MS = 3_000;
+
 /** Bound abandoned adapter work without binding it to one caller's deadline. */
 const DIAGNOSTIC_REQUEST_OWNER_TIMEOUT_MS = 30_000;
 /** Own one client's document and diagnostic evidence; revisions prevent stale reuse. */
@@ -64,6 +72,7 @@ export class ClientDiagnostics {
   readonly #unversionedPushSyncMoments = new Map<string, number>();
   /** URIs closed by a lifecycle operation: versioned pushes stay fail-closed. */
   readonly #closedVersionedBarrier = new Set<string>();
+  readonly #inputBarrier: SemanticInputBarrier;
   #evidenceRevision = 0;
   #nextSynchronizationId = 0;
 
@@ -72,6 +81,121 @@ export class ClientDiagnostics {
       server: host.server,
       cwd: host.cwd,
     });
+    this.#inputBarrier = new SemanticInputBarrier({
+      isOperational: () => this.host.isOperational(),
+      getOpenDocuments: () => this.#getSemanticInputDocuments(),
+      applyDocumentUpdates: (updates) => this.#applySemanticInputUpdates(updates),
+      closeMissingDocument: (filePath) => this.didClose(filePath),
+      markUnreadableDocument: (filePath) => this.markFailedFile(filePath),
+    });
+  }
+
+  /** Synchronize all open document inputs once for concurrent semantic callers. */
+  synchronizeSemanticInputs(
+    control?: CodeRequestControl,
+    contentOverrides?: ReadonlyMap<string, string>,
+  ): Promise<SemanticInputSnapshot> {
+    throwIfCodeRequestInterrupted(control);
+    return this.#inputBarrier.synchronize(control, contentOverrides);
+  }
+
+  /** Fail closed when a semantic request observes a changed input generation. */
+  assertSemanticInputsCurrent(
+    snapshot: SemanticInputSnapshot,
+    control?: CodeRequestControl,
+    contentOverrides?: ReadonlyMap<string, string>,
+  ): Promise<void> {
+    throwIfCodeRequestInterrupted(control);
+    return this.#inputBarrier.assertCurrent(snapshot, control, contentOverrides);
+  }
+
+  #getSemanticInputDocuments(): SemanticInputDocument[] {
+    return Array.from(this.#openDocs, ([uri, document]) => ({
+      uri,
+      filePath: uriToFile(uri),
+      content: document.content,
+      contentFingerprint: document.contentFingerprint,
+    }));
+  }
+
+  #applySemanticInputUpdates(updates: readonly SemanticInputUpdate[]): void {
+    if (updates.length === 0) return;
+    this.#advanceEvidenceRevision();
+    for (const update of updates) {
+      const document = this.#openDocs.get(update.document.uri);
+      if (!document) throw new Error("Semantic input changed while synchronization was running.");
+      this.#synchronizeTrackedDocument(
+        update.document.uri,
+        update.document.filePath,
+        update.content,
+        document,
+      );
+      this.#failedUris.delete(update.document.uri);
+    }
+  }
+
+  /** Apply one tracked-document change with the shared client state. */
+  #synchronizeTrackedDocument(
+    uri: string,
+    filePath: string,
+    content: string,
+    document: OpenDocumentState,
+  ): void {
+    synchronizeTrackedDocument({
+      uri,
+      content,
+      document,
+      nextVersion: () => nextDocumentVersion(this.#versionHistory, uri),
+      nextSynchronizationId: () => ++this.#nextSynchronizationId,
+      evidenceRevision: this.#evidenceRevision,
+      incrementalSync: this.host.usesIncrementalDocumentSync(),
+      waiters: this.#waiters,
+      sendNotification: (method, params) => this.host.sendNotification(method, params),
+      markUnversionedSyncMoment: () => this.#unversionedPushSyncMoments.set(uri, Date.now()),
+      clearFailedFile: () => this.#failedUris.delete(uri),
+      open: () => this.didOpen(filePath, content),
+    });
+  }
+
+  #rememberDocumentContent(uri: string, content: string): void {
+    this.#inputBarrier.rememberDocumentContent(uri, content);
+  }
+
+  #forgetDocumentContent(uri: string): void {
+    this.#inputBarrier.forgetDocumentContent(uri);
+  }
+
+  #ensureExplicitDocumentContent(
+    filePath: string,
+    content: string,
+    contentIsAuthoritative: boolean,
+  ): void {
+    const uri = fileToUri(filePath);
+    const document = this.#openDocs.get(uri);
+    if (!document) {
+      // An untracked file needs an initial protocol document before its barrier
+      // read can verify the manager's content.
+      this.didOpen(filePath, content);
+      return;
+    }
+    // Manager reads are not authoritative: an already tracked document can
+    // change between that read and the barrier's verified read.
+    if (
+      !contentIsAuthoritative ||
+      document.contentFingerprint === fingerprintDocumentContent(content)
+    ) {
+      return;
+    }
+    this.#cancelDiagnosticRequest(uri);
+    this.didChange(filePath, content);
+  }
+
+  #getDiagnosticContentOverrides(
+    uri: string,
+    content: string,
+    contentIsAuthoritative: boolean,
+  ): ReadonlyMap<string, string> | undefined {
+    return contentIsAuthoritative ? new Map([[uri, content]]) : undefined;
   }
 
   get openFiles(): string[] {
@@ -91,6 +215,7 @@ export class ClientDiagnostics {
     this.#openDocs.clear();
     this.#diagnosticStore.clear();
     this.#versionHistory.clear();
+    this.#inputBarrier.clear();
     this.#evidenceRevision++;
     this.#unversionedPushSyncMoments.clear();
     this.#waiters.releaseAll();
@@ -109,7 +234,9 @@ export class ClientDiagnostics {
       this.didChange(filePath, content);
       return;
     }
+    this.#rememberDocumentContent(uri, content);
     this.#cancelDiagnosticRequest(uri);
+    this.#advanceInputRevision(false, false);
 
     const languageId = detectLanguageId(filePath);
     this.#waiters.cancelSettle();
@@ -146,27 +273,22 @@ export class ClientDiagnostics {
     }
     const nextFingerprint = fingerprintDocumentContent(content);
     if (doc.contentFingerprint === nextFingerprint) return;
-    this.#cancelDiagnosticRequest(uri);
-    synchronizeTrackedDocument({
-      uri,
-      content,
-      document: doc,
-      nextVersion: () => nextDocumentVersion(this.#versionHistory, uri),
-      nextSynchronizationId: () => ++this.#nextSynchronizationId,
-      evidenceRevision: this.#evidenceRevision,
-      incrementalSync: this.host.usesIncrementalDocumentSync(),
-      waiters: this.#waiters,
-      sendNotification: (method, params) => this.host.sendNotification(method, params),
-      markUnversionedSyncMoment: () => this.#unversionedPushSyncMoments.set(uri, Date.now()),
-      clearFailedFile: () => this.#failedUris.delete(uri),
-      open: () => this.didOpen(filePath, content),
-    });
+    this.#rememberDocumentContent(uri, content);
+    this.#advanceInputRevision();
+    this.#synchronizeTrackedDocument(uri, filePath, content, doc);
   }
 
   didClose(filePath: string): void {
     const uri = fileToUri(filePath);
     const wasOpen = this.#openDocs.has(uri);
+    const hadState =
+      wasOpen ||
+      this.#diagnosticStore.has(uri) ||
+      this.#failedUris.has(uri) ||
+      this.#versionHistory.has(uri);
+    if (hadState) this.#advanceInputRevision();
     this.#failedUris.delete(uri);
+    this.#forgetDocumentContent(uri);
     this.#unversionedPushSyncMoments.delete(uri);
     this.#closedVersionedBarrier.add(uri);
     clearTrackedDocumentState(this.#openDocs, this.#diagnosticStore, this.#waiters, uri);
@@ -190,7 +312,9 @@ export class ClientDiagnostics {
       if (getDiagnosticFileState(filePath) !== "removed") continue;
 
       const wasOpen = this.#openDocs.has(uri);
+      this.#advanceInputRevision();
       this.#failedUris.delete(uri);
+      this.#forgetDocumentContent(uri);
       this.#unversionedPushSyncMoments.delete(uri);
       this.#closedVersionedBarrier.add(uri);
       this.#cancelDiagnosticRequest(uri);
@@ -204,6 +328,7 @@ export class ClientDiagnostics {
   /** Retain a failed document outcome when a replacement cannot reopen it. */
   markFailedFile(filePath: string): void {
     const uri = fileToUri(filePath);
+    if (!this.#failedUris.has(uri)) this.#advanceInputRevision();
     this.#failedUris.add(uri);
     this.#unversionedPushSyncMoments.delete(uri);
     this.#closedVersionedBarrier.add(uri);
@@ -231,7 +356,7 @@ export class ClientDiagnostics {
   }
   /** Invalidate cache proof while retaining its data as partial fallback. */
   invalidateCachedEvidence(): void {
-    this.#evidenceRevision++;
+    this.#advanceInputRevision();
     this.#requestScheduler.clearPending();
     const knownUris = new Set([
       ...this.#openDocs.keys(),
@@ -282,6 +407,9 @@ export class ClientDiagnostics {
   async refreshOpenDiagnostics(
     options: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl = {},
   ): Promise<DiagnosticEvidenceSummary> {
+    // The refresh helper owns its read, classification, and budget pass. Do
+    // not run the query barrier first: one changed file could then invalidate
+    // the whole maintenance generation and resend unchanged text.
     return this.#refreshOpenDiagnostics(options, false);
   }
 
@@ -308,14 +436,19 @@ export class ClientDiagnostics {
       failedFiles: () => new Set(Array.from(this.#failedUris).map(uriToFile)),
       isRelatedUriTracked: (uri) => this.#openDocs.has(uri) || this.#versionHistory.has(uri),
       nextSynchronizationId: () => ++this.#nextSynchronizationId,
+      noteInputContentChange: () => this.#noteInputContentChange(),
+      rememberDocumentContent: (uri, content) => this.#rememberDocumentContent(uri, content),
       invalidateEvidence: (uri) => {
+        this.#advanceInputRevision(false);
         this.#cancelDiagnosticRequest(uri);
         this.#failedUris.add(uri);
         const document = this.#openDocs.get(uri);
         if (document) document.evidenceRevision = -1;
       },
       clearFile: (uri) => {
+        this.#advanceInputRevision(false);
         this.#cancelDiagnosticRequest(uri);
+        this.#forgetDocumentContent(uri);
         this.#failedUris.delete(uri);
         this.#unversionedPushSyncMoments.delete(uri);
         this.#closedVersionedBarrier.add(uri);
@@ -358,12 +491,27 @@ export class ClientDiagnostics {
     filePath: string,
     content: string,
     control?: CodeRequestControl,
+    options: { contentIsAuthoritative?: boolean } = {},
   ): Promise<CodeQueryResult<Diagnostic[]>> {
     // Reject immediately when the request was already cancelled: no document
     // synchronization or protocol traffic may start for a caller that no
     // longer awaits a result.
     throwIfCodeRequestInterrupted(control);
     const uri = fileToUri(filePath);
+    this.#ensureExplicitDocumentContent(
+      filePath,
+      content,
+      options.contentIsAuthoritative !== false,
+    );
+    const contentOverrides = this.#getDiagnosticContentOverrides(
+      uri,
+      content,
+      options.contentIsAuthoritative !== false,
+    );
+    const synchronized = await this.#synchronizeDiagnosticInputs(uri, control, contentOverrides);
+    if ("kind" in synchronized) return synchronized;
+    const inputSnapshot = synchronized;
+    const inputRevision = inputSnapshot.revision;
     const requestAdapter = this.host.diagnosticRequestAdapter.supports(uri)
       ? this.host.diagnosticRequestAdapter
       : undefined;
@@ -378,45 +526,38 @@ export class ClientDiagnostics {
     const openDocument = this.#openDocs.get(uri);
     const contentUnchanged =
       openDocument?.contentFingerprint === fingerprintDocumentContent(content);
-    const synchronizationCurrent = openDocument?.evidenceRevision === this.#evidenceRevision;
-    // Equivalent content joins the current synchronization. Cached evidence
-    // cannot force a no-op didChange that cancels an in-flight push or pull.
-    if (!contentUnchanged || !synchronizationCurrent) {
-      // A direct sync-file request can supersede an active collection just as
-      // didChange and refresh do. Keep the raw request occupied until it
-      // settles, but stop its obsolete diagnostic phases now.
-      this.#cancelDiagnosticRequest(uri);
-      synchronizeTrackedDocument({
-        uri,
-        content,
-        document: this.#openDocs.get(uri),
-        nextVersion: () => nextDocumentVersion(this.#versionHistory, uri),
-        nextSynchronizationId: () => ++this.#nextSynchronizationId,
-        evidenceRevision: this.#evidenceRevision,
-        incrementalSync: this.host.usesIncrementalDocumentSync(),
-        waiters: this.#waiters,
-        sendNotification: (method, params) => this.host.sendNotification(method, params),
-        markUnversionedSyncMoment: () => this.#unversionedPushSyncMoments.set(uri, Date.now()),
-        clearFailedFile: () => this.#failedUris.delete(uri),
-        open: () => this.didOpen(filePath, content),
-      });
-    }
     const synchronization = this.#openDocs.get(uri);
     observer.synchronized();
     if (!synchronization) {
-      return unavailableCodeQuery("The document could not be synchronized for diagnostics.");
+      return unavailableCodeQuery(
+        this.#closedVersionedBarrier.has(uri)
+          ? "Diagnostic collection ended before the current document synchronization was confirmed."
+          : "The document could not be synchronized for diagnostics.",
+      );
     }
     if (
       contentUnchanged &&
       hasConfirmedDiagnosticEvidence(synchronization, cached, this.#evidenceRevision)
     ) {
       observer.cacheReused(1);
-      return completedCodeQuery(cachedDiagnostics ?? []);
+      return this.#verifyDiagnosticInputs({
+        result: completedCodeQuery(cachedDiagnostics ?? []),
+        snapshot: inputSnapshot,
+        control,
+        contentOverrides,
+        uri,
+      });
     }
+    const requestEvidenceRevision =
+      synchronization.evidenceRevision === this.#evidenceRevision
+        ? synchronization.evidenceRevision
+        : undefined;
     const request = {
       uri,
       synchronizationId: synchronization.synchronizationId,
-      evidenceRevision: synchronization.evidenceRevision,
+      ...(requestEvidenceRevision !== undefined
+        ? { evidenceRevision: requestEvidenceRevision }
+        : {}),
     };
     return this.#collectFileDiagnostics(
       {
@@ -427,9 +568,54 @@ export class ClientDiagnostics {
         request,
         cachedDiagnostics,
         observer,
+        inputRevision,
+        contentOverrides,
       },
       control,
     );
+  }
+
+  async #synchronizeDiagnosticInputs(
+    uri: string,
+    control: CodeRequestControl | undefined,
+    contentOverrides: ReadonlyMap<string, string> | undefined,
+  ): Promise<SemanticInputSnapshot | CodeQueryResult<Diagnostic[]>> {
+    try {
+      return await this.synchronizeSemanticInputs(control, contentOverrides);
+    } catch (error) {
+      if (isCodeRequestInterruption(error, control)) throw error;
+      if (this.#closedVersionedBarrier.has(uri)) {
+        return unavailableCodeQuery(
+          "Diagnostic collection ended before the current document synchronization was confirmed.",
+        );
+      }
+      const detail = error instanceof Error ? error.message : String(error);
+      return unavailableCodeQuery(`Semantic input synchronization failed: ${detail}`);
+    }
+  }
+
+  async #verifyDiagnosticInputs(options: {
+    result: CodeQueryResult<Diagnostic[]>;
+    snapshot: SemanticInputSnapshot;
+    control: CodeRequestControl | undefined;
+    contentOverrides: ReadonlyMap<string, string> | undefined;
+    uri: string;
+  }): Promise<CodeQueryResult<Diagnostic[]>> {
+    try {
+      await this.assertSemanticInputsCurrent(
+        options.snapshot,
+        options.control,
+        options.contentOverrides,
+      );
+      return options.result;
+    } catch (error) {
+      if (isCodeRequestInterruption(error, options.control)) throw error;
+      if (options.result.kind === "unavailable" && this.#closedVersionedBarrier.has(options.uri)) {
+        return options.result;
+      }
+      const detail = error instanceof Error ? error.message : String(error);
+      return unavailableCodeQuery(`Diagnostic collection failed closed: ${detail}`);
+    }
   }
 
   /** Collect diagnostics for one synchronized document. */
@@ -442,12 +628,14 @@ export class ClientDiagnostics {
       request: DiagnosticSynchronization;
       cachedDiagnostics: Diagnostic[] | null;
       observer: DiagnosticObserver;
+      inputRevision: number;
+      contentOverrides: ReadonlyMap<string, string> | undefined;
     },
     control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Diagnostic[]>> {
     const { filePath, uri, requestAdapter, syncStart, request, cachedDiagnostics, observer } =
       options;
-    const result = await collectSynchronizedFileDiagnostics(
+    const collected = await collectSynchronizedFileDiagnostics(
       {
         requestDiagnostics: requestAdapter
           ? (timeoutMs, deadline, requestControl) =>
@@ -478,6 +666,13 @@ export class ClientDiagnostics {
       },
       control,
     );
+    const result = await this.#verifyDiagnosticInputs({
+      result: collected,
+      snapshot: { revision: options.inputRevision },
+      control,
+      contentOverrides: options.contentOverrides,
+      uri,
+    });
     this.#publications.emitSummary({
       operation: "sync-file",
       identity: {
@@ -550,6 +745,17 @@ export class ClientDiagnostics {
           evidenceRevision: options.request.evidenceRevision ?? this.#evidenceRevision,
           currentRevision: () => this.#evidenceRevision,
           isCurrentSynchronization: () => isCurrentSynchronization(this.#openDocs, options.request),
+          markEvidenceCurrent: (_uri, synchronizationId) => {
+            const document = this.#openDocs.get(options.request.uri);
+            if (
+              document &&
+              synchronizationId !== undefined &&
+              document.synchronizationId === synchronizationId
+            ) {
+              document.evidenceRevision =
+                options.request.evidenceRevision ?? this.#evidenceRevision;
+            }
+          },
           isRelatedUriTracked: (uri) => this.#openDocs.has(uri) || this.#versionHistory.has(uri),
         });
         void execution.settled
@@ -563,6 +769,25 @@ export class ClientDiagnostics {
       },
       consumerControl,
     );
+  }
+
+  #noteInputContentChange(): number {
+    this.#advanceInputRevision();
+    return this.#evidenceRevision;
+  }
+
+  #advanceInputRevision(invalidateEvidence = true, cancelRequests = true): void {
+    this.#inputBarrier.noteInputChange();
+    if (invalidateEvidence) this.#advanceEvidenceRevision(false);
+    if (cancelRequests) this.#cancelAllDiagnosticRequests();
+  }
+
+  #advanceEvidenceRevision(cancelRequests = true): void {
+    this.#evidenceRevision++;
+    for (const document of this.#openDocs.values()) {
+      document.evidenceRevision = this.#evidenceRevision;
+    }
+    if (cancelRequests) this.#cancelAllDiagnosticRequests();
   }
 
   #cancelDiagnosticRequest(uri: string): void {

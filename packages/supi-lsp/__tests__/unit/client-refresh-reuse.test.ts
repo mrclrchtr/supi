@@ -140,7 +140,7 @@ describe("push-only diagnostic refresh reuse", () => {
     expect(notificationMethods(rpc)).toEqual(["textDocument/didChange"]);
   });
 
-  it("does not reuse evidence after a workspace evidence revision change", async () => {
+  it("keeps unchanged text synchronized after a workspace evidence revision change", async () => {
     const file = trackFile(createDiagnosticTestFile("revision-change.ts"));
     const { client, rpc } = createRunningTestClient();
     openFile(client, file);
@@ -155,6 +155,6 @@ describe("push-only diagnostic refresh reuse", () => {
     const evidence = await client.refreshOpenDiagnostics({ maxWaitMs: 100, quietMs: 1 });
 
     expect(evidence).toMatchObject({ requested: 1, confirmed: 0, unconfirmed: 1 });
-    expect(notificationMethods(rpc)).toEqual(["textDocument/didChange"]);
+    expect(notificationMethods(rpc)).toEqual([]);
   });
 });

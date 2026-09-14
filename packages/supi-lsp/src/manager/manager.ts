@@ -1956,7 +1956,10 @@ export class LspManager {
       return unavailableCodeQuery(`No LSP client can collect diagnostics for ${resolvedPath}.`);
     }
     try {
-      return await syncClientFileAndGetDiagnostics(client, resolvedPath, maxSeverity, control);
+      return await syncClientFileAndGetDiagnostics(client, resolvedPath, maxSeverity, {
+        control,
+        contentIsAuthoritative: false,
+      });
     } catch (error) {
       // Cancellation must propagate; a cancelled caller no longer awaits a
       // diagnostic result or the file cleanup side effects.

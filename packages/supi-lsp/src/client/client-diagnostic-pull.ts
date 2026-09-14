@@ -14,6 +14,7 @@ export function startDiagnosticEvidenceFromAdapter(options: {
   readonly evidenceRevision: number;
   readonly currentRevision: () => number;
   readonly isCurrentSynchronization: () => boolean;
+  readonly markEvidenceCurrent?: (uri: string, synchronizationId: number | undefined) => void;
   readonly isRelatedUriTracked: (uri: string) => boolean;
 }): DiagnosticRequestExecution<boolean> {
   const previous = options.store.get(options.request.uri);
@@ -40,6 +41,7 @@ export function startDiagnosticEvidenceFromAdapter(options: {
       source: requestResult.source,
     });
     if (!applied) throw new Error("Invalid diagnostic request report.");
+    options.markEvidenceCurrent?.(options.request.uri, options.synchronizationId);
     return true;
   });
   result.catch(() => {});

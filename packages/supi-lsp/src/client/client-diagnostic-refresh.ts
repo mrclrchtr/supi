@@ -225,16 +225,13 @@ async function collectOneRefreshRequest(
  * A document whose disk content still matches its open fingerprint stays in
  * the server's current state:
  * - with current evidence it is reusable without document synchronization;
- * - without current evidence it is retained: it keeps its synchronization and
- *   collection waits for the server's existing pipeline instead of forcing a
- *   no-op didChange. Large push-only servers (typescript-language-server)
- *   skip empty-to-empty publishes, so a no-op didChange of a clean file can
- *   never confirm — it only invalidates in-progress evidence and restarts
- *   full-program checks (#344).
+ * - without current evidence it is retained: it keeps its server version and
+ *   receives fresh request or push evidence without a no-op didChange.
  *
- * Documents outside the current evidence revision were invalidated by a
- * workspace change and must resynchronize: their stale revision cannot
- * produce fresh evidence without an explicit sync (ADR 0020).
+ * A workspace change invalidates diagnostic evidence for every open document,
+ * but only changed text is synchronized. This separates evidence generation
+ * from document synchronization and avoids restarting a server's full-program
+ * check for unchanged files.
  */
 function classifyReusableDocuments(options: {
   openDocuments: ReadonlyMap<string, OpenDocumentState>;
@@ -257,11 +254,6 @@ function classifyReusableDocuments(options: {
       content = readFileSync(filePath, "utf-8");
     } catch {
       // The resynchronization path classifies removed and unreadable files.
-      continue;
-    }
-    if (document.evidenceRevision !== options.evidenceRevision) {
-      // Invalidated generation: the resync didChange re-establishes proof.
-      preloadedContent.set(uri, content);
       continue;
     }
     if (fingerprintDocumentContent(content) !== document.contentFingerprint) {
@@ -294,6 +286,10 @@ interface ClientDiagnosticRefreshOptions {
   readonly failedFiles: () => ReadonlySet<string>;
   readonly isRelatedUriTracked: (uri: string) => boolean;
   readonly nextSynchronizationId: () => number;
+  /** Invalidate route evidence before applying a disk content change. */
+  readonly noteInputContentChange: () => number;
+  /** Keep the shared semantic barrier's disk-content baseline current. */
+  readonly rememberDocumentContent: (uri: string, content: string) => void;
   readonly clearFile: (uri: string) => void;
   readonly invalidateEvidence: (uri: string) => void;
   readonly markUnversionedSyncMoment: (uri: string) => void;
@@ -353,6 +349,8 @@ function prepareRefreshDocuments(
     nextVersion: (uri) => nextDocumentVersion(options.versionHistory, uri),
     nextSynchronizationId: options.nextSynchronizationId,
     evidenceRevision,
+    noteInputContentChange: options.noteInputContentChange,
+    rememberDocumentContent: options.rememberDocumentContent,
     incrementalSync: options.host.usesIncrementalDocumentSync(),
     sendNotification: (method, params) => options.host.sendNotification(method, params),
     uriToFile,
@@ -381,7 +379,7 @@ function prepareRefreshDocuments(
     retainedSynchronizations.push({
       uri,
       synchronizationId: document.synchronizationId,
-      evidenceRevision: document.evidenceRevision,
+      ...(document.evidenceRevision === evidenceRevision ? { evidenceRevision } : {}),
     });
   }
   const synchronizations = [

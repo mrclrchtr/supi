@@ -684,13 +684,18 @@ export class LspClient {
     return this.diagnostics.refreshOpenDiagnostics(options);
   }
 
-  /** Sync one file and return diagnostics with explicit evidence availability. */
+  /**
+   * Sync one file and return diagnostics with explicit evidence availability.
+   * The manager disables content authority so this barrier can detect a disk
+   * deletion between the manager read and the client request.
+   */
   async syncAndWaitForDiagnostics(
     filePath: string,
     content: string,
     control?: CodeRequestControl,
+    options: { contentIsAuthoritative?: boolean } = {},
   ): Promise<CodeQueryResult<Diagnostic[]>> {
-    return this.diagnostics.syncAndWaitForDiagnostics(filePath, content, control);
+    return this.diagnostics.syncAndWaitForDiagnostics(filePath, content, control, options);
   }
 
   // ── LSP Requests ───────────────────────────────────────────────────
@@ -812,7 +817,9 @@ export class LspClient {
     }
     try {
       await this.getReady(control);
+      const inputSnapshot = await this.diagnostics.synchronizeSemanticInputs(control);
       const data = (await this.rpc.sendRequest(method, params, control)) as T | null | undefined;
+      await this.diagnostics.assertSemanticInputsCurrent(inputSnapshot, control);
       return completedCodeQuery(data ?? null);
     } catch (error) {
       // Cancellation and absolute-deadline expiry propagate as interruptions:

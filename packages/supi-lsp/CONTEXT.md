@@ -78,9 +78,13 @@ _Avoid_: nullable runtime, implicit startup, manager availability, inferring sem
 Evidence that a live LSP client is ready: workspace readiness requires at least one active ready client, while file readiness requires the routed client for that file to exist and finish startup. An empty client set and a routed `null` result are unavailable, never vacuously ready. Failed workspace warm-up leaves the runtime owner published and semantic registration pending so a lazy file route may still start later.
 _Avoid_: owner readiness, `Promise.all([])` readiness, treating a configured route as a live client
 
+**Semantic input barrier**:
+A freshness condition that requires known changes to the inputs of each Required LSP route to be synchronized before semantic evidence can be trusted. It covers reported workspace changes and detected disk changes to open documents, but is not a complete workspace snapshot.
+_Avoid_: readiness probe, diagnostic refresh, workspace-wide freshness
+
 **Diagnostic evidence barrier**:
 A freshness boundary that invalidates earlier diagnostic evidence after a document or workspace change. Only evidence confirmed for the current document scope can cross it; an old cache or ambient publication cannot.
-_Avoid_: cache clear, quiet period, clean result, workspace-wide freshness
+_Avoid_: cache clear, quiet period, clean result, Semantic input barrier
 
 **TypeScript program membership**:
 The live configured or inferred TypeScript programs that contain a file, in the model behind the running server's diagnostics. Distinct from config coverage state, which only checks the nearest tsconfig.
@@ -91,7 +95,7 @@ The evidence set that a TypeScript file change must make suspect: the containing
 _Avoid_: workspace-wide suspect set, changed-file-only scope
 
 **Confirmed diagnostic evidence**:
-Diagnostic evidence from a validated request that matches the current document synchronization and evidence revision. It can support a completed or clean result for that file.
+Diagnostic evidence from a validated request that satisfies the Semantic input barrier and matches the current document synchronization and evidence revision. It can support a completed or clean result for that file.
 _Avoid_: fresh evidence, current snapshot, semantic completion
 
 **Tentative diagnostic evidence**:

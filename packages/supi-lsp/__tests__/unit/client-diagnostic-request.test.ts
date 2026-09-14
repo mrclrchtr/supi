@@ -1,11 +1,18 @@
-import { rmSync } from "node:fs";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync, rmSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createDiagnosticTestFile,
   createRunningTestClient,
   createTypeScriptTestClient,
   type TestRpc,
 } from "../helpers/client-test-harness.ts";
+
+const fsPromisesMock = vi.hoisted(() => ({ readFile: vi.fn() }));
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, readFile: fsPromisesMock.readFile };
+});
 
 function deferred<T>(): {
   promise: Promise<T>;
@@ -24,7 +31,9 @@ function deferred<T>(): {
 type OwnedPhase = {
   params: { arguments: [string] };
   result: ReturnType<typeof deferred<unknown>>;
+  resultObserved: ReturnType<typeof deferred<void>>;
   settled: ReturnType<typeof deferred<void>>;
+  settledObserved: ReturnType<typeof deferred<void>>;
 };
 
 type OwnedPhaseState = {
@@ -38,11 +47,21 @@ function installOwnedTypeScriptPhases(rpc: Pick<TestRpc, "sendRequestOwned">): O
     const phase = {
       params,
       result: deferred<unknown>(),
+      resultObserved: deferred<void>(),
       settled: deferred<void>(),
+      settledObserved: deferred<void>(),
     } satisfies OwnedPhase;
     state.phases.push(phase);
     state.starts.push(params.arguments[0]);
-    return { result: phase.result.promise, settled: phase.settled.promise };
+    return {
+      result: phase.result.promise.then((value) => {
+        phase.resultObserved.resolve();
+        return value;
+      }),
+      settled: phase.settled.promise.then(() => {
+        phase.settledObserved.resolve();
+      }),
+    };
   });
   return state;
 }
@@ -52,7 +71,23 @@ function resolvePhase(phase: OwnedPhase, body: unknown[] = []): void {
   phase.settled.resolve();
 }
 
+function getPhase(state: OwnedPhaseState, index: number): OwnedPhase {
+  const phase = state.phases[index];
+  if (!phase) throw new Error(`Missing diagnostic phase ${index}.`);
+  return phase;
+}
+
+async function settleInputRead(): Promise<void> {
+  await vi.runAllTicks();
+}
+
 const tempDirs: string[] = [];
+
+beforeEach(() => {
+  fsPromisesMock.readFile.mockImplementation((filePath: string) =>
+    Promise.resolve(readFileSync(filePath, "utf-8")),
+  );
+});
 
 afterEach(() => {
   vi.useRealTimers();
@@ -161,6 +196,10 @@ describe("LspClient diagnostic request ownership", () => {
     const first = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;", {
       deadline: 10,
     });
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
     const firstRejected = expect(first).rejects.toThrow("Code request deadline exceeded");
     await vi.waitFor(() => expect(state.phases).toHaveLength(1));
     const second = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;", {
@@ -199,10 +238,11 @@ describe("LspClient diagnostic request ownership", () => {
     await expect(first).rejects.toThrow("first caller left");
 
     const second = client.syncAndWaitForDiagnostics(secondFile.filePath, "const x = 1;");
-    state.phases[0]?.result.resolve({ type: "response", success: true, body: [] });
-    await Promise.resolve();
+    const firstPhase = getPhase(state, 0);
+    firstPhase.result.resolve({ type: "response", success: true, body: [] });
+    await firstPhase.resultObserved.promise;
     expect(state.phases).toHaveLength(1);
-    state.phases[0]?.settled.resolve();
+    firstPhase.settled.resolve();
     await vi.waitFor(() => expect(state.phases).toHaveLength(2));
 
     resolvePhase(state.phases[1]);
@@ -252,8 +292,9 @@ describe("LspClient diagnostic request ownership", () => {
     await vi.waitFor(() => expect(state.phases).toHaveLength(2));
     resolvePhase(state.phases[1]);
     await vi.waitFor(() => expect(state.phases).toHaveLength(3));
-    resolvePhase(state.phases[2]);
-    await Promise.resolve();
+    const finalPhase = getPhase(state, 2);
+    resolvePhase(finalPhase);
+    await finalPhase.settledObserved.promise;
 
     expect(state.phases).toHaveLength(3);
     expect(state.starts).toHaveLength(3);
@@ -313,8 +354,9 @@ describe("LspClient diagnostic request ownership", () => {
 
     await client.shutdown();
     await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
-    resolvePhase(state.phases[0]);
-    await Promise.resolve();
+    const phase = getPhase(state, 0);
+    resolvePhase(phase);
+    await phase.settledObserved.promise;
     expect(client.getDiagnostics(file.filePath)).toEqual([]);
   });
 });

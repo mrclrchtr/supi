@@ -204,6 +204,7 @@ describe("push-only refresh content retention (issue #344)", () => {
     const file = createFile("invalidated.ts", "const invalidated = 1;");
     const { client, rpc } = createRunningTestClient();
     client.didOpen(file.filePath, "const invalidated = 1;");
+    const versionBeforeRefresh = client.getOpenDocumentVersion(file.filePath);
     client.notifyWorkspaceFileChanges([{ uri: file.uri, type: 2 }]);
     rpc.sendNotification.mockClear();
     rpc.sendNotification.mockImplementation((method: string) => {
@@ -215,9 +216,11 @@ describe("push-only refresh content retention (issue #344)", () => {
 
     const evidence = await client.refreshOpenDiagnostics({ maxWaitMs: 200, quietMs: 10 });
 
-    // An invalidated generation must re-establish proof through a real
-    // didChange even when the disk content is unchanged.
+    // An invalidated generation stays unconfirmed without a no-op text
+    // notification. The retained document keeps its protocol state.
     expect(evidence).toMatchObject({ requested: 1, confirmed: 0, unconfirmed: 1 });
-    expect(notificationMethods(rpc)).toEqual(["textDocument/didChange"]);
+    expect(notificationMethods(rpc)).toEqual([]);
+    expect(client.getOpenDocumentVersion(file.filePath)).toBe(versionBeforeRefresh);
+    expect(client.openFiles).toContain(file.filePath);
   });
 });

@@ -1,11 +1,18 @@
-import { rmSync } from "node:fs";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync, rmSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Diagnostic } from "../../src/config/types.ts";
 import {
   createDiagnosticTestFile,
   createPullTestClient,
   createRunningTestClient,
 } from "../helpers/client-test-harness.ts";
+
+const fsPromisesMock = vi.hoisted(() => ({ readFile: vi.fn() }));
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, readFile: fsPromisesMock.readFile };
+});
 
 function deferred<T>(): {
   promise: Promise<T>;
@@ -29,7 +36,17 @@ function diagnostic(message: string): Diagnostic {
   };
 }
 
+async function settleInputRead(): Promise<void> {
+  await vi.runAllTicks();
+}
+
 const tempDirs: string[] = [];
+
+beforeEach(() => {
+  fsPromisesMock.readFile.mockImplementation((filePath: string) =>
+    Promise.resolve(readFileSync(filePath, "utf-8")),
+  );
+});
 
 afterEach(() => {
   vi.useRealTimers();
@@ -51,6 +68,8 @@ describe("push diagnostic regression cases", () => {
     client.didOpen(file.filePath, "const value = 1;\n");
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const value = 1;\n");
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
     setTimeout(() => client.handlePublishDiagnostics({ uri: file.uri, diagnostics: [] }), 10);
     setTimeout(
       () =>
@@ -61,6 +80,8 @@ describe("push diagnostic regression cases", () => {
       2_800,
     );
     await vi.advanceTimersByTimeAsync(3_100);
+    await settleInputRead();
+    await vi.runAllTimersAsync();
 
     await expect(pending).resolves.toMatchObject({
       kind: "partial",
@@ -82,8 +103,12 @@ describe("push diagnostic regression cases", () => {
       capabilities: { executeCommandProvider: { commands: ["other.command"] } },
     });
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const value = 1;\n");
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
     client.handlePublishDiagnostics({ uri: file.uri, diagnostics: [diagnostic("push error")] });
     await vi.advanceTimersByTimeAsync(3_100);
+    await settleInputRead();
+    await vi.runAllTimersAsync();
 
     await expect(pending).resolves.toMatchObject({
       kind: "partial",
@@ -99,8 +124,12 @@ describe("push diagnostic regression cases", () => {
     tempDirs.push(file.tmpDir);
     const { client } = createRunningTestClient();
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const value = 1;\n");
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
     client.handlePublishDiagnostics({ uri: file.uri, diagnostics: [diagnostic("type error")] });
     await vi.advanceTimersByTimeAsync(3_100);
+    await settleInputRead();
+    await vi.runAllTimersAsync();
 
     await expect(pending).resolves.toMatchObject({
       kind: "partial",

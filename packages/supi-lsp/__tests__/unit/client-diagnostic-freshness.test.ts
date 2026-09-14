@@ -1,5 +1,5 @@
 import * as fs from "node:fs";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LspClient } from "../../src/client/client.ts";
 import type { Diagnostic } from "../../src/config/types.ts";
 import {
@@ -7,6 +7,13 @@ import {
   createRunningTestClient,
   createDiagnosticTestFile as createTempTsFile,
 } from "../helpers/client-test-harness.ts";
+
+const fsPromisesMock = vi.hoisted(() => ({ readFile: vi.fn() }));
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, readFile: fsPromisesMock.readFile };
+});
 
 function makeDiagnostic(message: string): Diagnostic {
   return {
@@ -19,8 +26,18 @@ function publish(client: LspClient, uri: string, diagnostics: Diagnostic[]): voi
   client.handlePublishDiagnostics({ uri, diagnostics });
 }
 
+async function settleInputRead(): Promise<void> {
+  await vi.runAllTicks();
+}
+
 describe("LSP single-file diagnostic freshness", () => {
   let tmpDir = "";
+
+  beforeEach(() => {
+    fsPromisesMock.readFile.mockImplementation((filePath: string) =>
+      Promise.resolve(fs.readFileSync(filePath, "utf-8")),
+    );
+  });
 
   afterEach(() => {
     vi.useRealTimers();
@@ -35,6 +52,8 @@ describe("LSP single-file diagnostic freshness", () => {
     const { client } = createRunningTestClient();
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
     // The first wait exhausts the settle budget; a second synchronization fallback
     // waits once more with a bounded budget before giving up.
     await vi.advanceTimersByTimeAsync(4_000);
@@ -70,6 +89,10 @@ describe("LSP single-file diagnostic freshness", () => {
     rpc.sendNotification.mockClear();
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.runAllTimersAsync();
+    await settleInputRead();
     await vi.runAllTimersAsync();
 
     await expect(pending).resolves.toMatchObject({
@@ -90,8 +113,12 @@ describe("LSP single-file diagnostic freshness", () => {
     client.notifyWorkspaceFileChanges([{ uri: file.uri, type: 2 }]);
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
     // The bounded synchronization wait adds a bounded second wait to the budget.
     await vi.advanceTimersByTimeAsync(4_000);
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
 
     await expect(pending).resolves.toMatchObject({
       kind: "partial",
@@ -310,8 +337,12 @@ describe("LSP single-file diagnostic freshness", () => {
     publish(client, file.uri, [makeDiagnostic("cached")]);
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 2;");
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
     // The bounded synchronization wait adds a bounded second wait to the budget.
     await vi.advanceTimersByTimeAsync(4_000);
+    await settleInputRead();
+    await vi.runAllTimersAsync();
 
     await expect(pending).resolves.toMatchObject({
       kind: "partial",
@@ -329,8 +360,12 @@ describe("LSP single-file diagnostic freshness", () => {
     publish(client, file.uri, []);
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 2;");
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
     // The bounded synchronization wait adds a bounded second wait to the budget.
     await vi.advanceTimersByTimeAsync(4_000);
+    await settleInputRead();
+    await vi.runAllTimersAsync();
 
     await expect(pending).resolves.toMatchObject({ kind: "partial", data: [] });
   });
@@ -361,8 +396,11 @@ describe("LSP single-file diagnostic freshness", () => {
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;", {
       signal: controller.signal,
     });
+    const rejected = expect(pending).rejects.toThrow("cancelled mid-pull");
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
 
-    await expect(pending).rejects.toThrow("cancelled mid-pull");
+    await rejected;
   });
 
   it("does not apply pull evidence when the caller aborts mid-pull", async () => {
@@ -382,6 +420,9 @@ describe("LSP single-file diagnostic freshness", () => {
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;", {
       signal: controller.signal,
     });
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
+    await settleInputRead();
     await vi.advanceTimersByTimeAsync(0);
     expect(pullStarted).toBe(true);
 
@@ -401,6 +442,7 @@ describe("LSP single-file diagnostic freshness", () => {
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;", {
       signal: controller.signal,
     });
+    await settleInputRead();
     await vi.advanceTimersByTimeAsync(0);
     controller.abort(new Error("cancelled during push wait"));
 
@@ -415,6 +457,7 @@ describe("LSP single-file diagnostic freshness", () => {
     rpc.sendRequest.mockRejectedValue(new Error("pull failed"));
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
+    await settleInputRead();
     await vi.advanceTimersByTimeAsync(0);
 
     await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
@@ -456,7 +499,11 @@ describe("LSP single-file diagnostic freshness", () => {
     const { client, rpc } = createRunningTestClient();
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(3_100);
+    await settleInputRead();
+    await vi.runAllTimersAsync();
 
     await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
     expect(rpc.sendNotification).not.toHaveBeenCalledWith(
@@ -475,7 +522,11 @@ describe("LSP single-file diagnostic freshness", () => {
     const versionBefore = client.getOpenDocumentVersion(file.filePath);
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 2;");
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(4_000);
+    await settleInputRead();
+    await vi.runAllTimersAsync();
 
     await expect(pending).resolves.toMatchObject({
       kind: "partial",
@@ -820,7 +871,10 @@ describe("LSP single-file diagnostic freshness", () => {
     setTimeout(() => publish(client, file.uri, [makeDiagnostic("fresh-push")]), 40);
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(50);
+    await settleInputRead();
 
     await expect(pending).resolves.toMatchObject({
       kind: "partial",
@@ -838,7 +892,15 @@ describe("LSP single-file diagnostic freshness", () => {
     setTimeout(() => publish(client, file.uri, [makeDiagnostic("single-sync-push")]), 20);
 
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const x = 1;");
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
+    await settleInputRead();
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(100);
+    await settleInputRead();
+    await vi.runAllTimersAsync();
 
     await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
     expect(client.getDiagnostics(file.filePath)).toEqual([makeDiagnostic("single-sync-push")]);
