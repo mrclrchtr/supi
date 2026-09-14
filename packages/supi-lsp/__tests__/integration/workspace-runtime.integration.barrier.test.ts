@@ -102,7 +102,12 @@ interface TestWorkspace {
   runtime: WorkspaceLspRuntime;
 }
 
-function writeProjectConfig(cwd: string, logPath: string, supportsDiagnostics = false): void {
+function writeProjectConfig(
+  cwd: string,
+  logPath: string,
+  supportsDiagnostics = false,
+  readinessDelayMs = 1,
+): void {
   fs.mkdirSync(path.join(cwd, ".pi", "supi"), { recursive: true });
   fs.writeFileSync(
     path.join(cwd, ".pi", "supi", "config.json"),
@@ -111,7 +116,13 @@ function writeProjectConfig(cwd: string, logPath: string, supportsDiagnostics = 
         servers: {
           fixture: {
             command: process.execPath,
-            args: [FIXTURE, logPath, "10", ...(supportsDiagnostics ? ["pull"] : [])],
+            args: [
+              FIXTURE,
+              logPath,
+              "10",
+              ...(supportsDiagnostics ? ["pull"] : []),
+              `--readiness-delay=${readinessDelayMs}`,
+            ],
             fileTypes: ["test"],
             rootMarkers: ["project.marker"],
           },
@@ -122,7 +133,10 @@ function writeProjectConfig(cwd: string, logPath: string, supportsDiagnostics = 
   );
 }
 
-async function createWorkspace(supportsDiagnostics = false): Promise<TestWorkspace> {
+async function createWorkspace(
+  supportsDiagnostics = false,
+  readinessDelayMs = 1,
+): Promise<TestWorkspace> {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "workspace-runtime-barrier-"));
   const dependency = path.join(cwd, "dependency.test");
   const consumer = path.join(cwd, "consumer.test");
@@ -131,7 +145,7 @@ async function createWorkspace(supportsDiagnostics = false): Promise<TestWorkspa
   fs.writeFileSync(dependency, "dependency-v1");
   fs.writeFileSync(consumer, "consumer-v1");
   fs.writeFileSync(logPath, "");
-  writeProjectConfig(cwd, logPath, supportsDiagnostics);
+  writeProjectConfig(cwd, logPath, supportsDiagnostics, readinessDelayMs);
 
   const controller = new LspRuntimeController(cwd);
   try {
@@ -200,8 +214,22 @@ describe("public WorkspaceLspRuntime input barrier", () => {
   });
 
   it("keeps a longer-deadline caller on the shared slow read", async () => {
-    workspace = await createWorkspace();
+    workspace = await createWorkspace(false, 100);
     await workspace.runtime.trackFile(workspace.consumer);
+
+    // The public readiness operation also performs its documented semantic
+    // warm-up. Use real reads for that protocol work before installing the
+    // controlled reader used by the deadline race.
+    fsPromisesMock.readFile.mockImplementation((filePath: string) =>
+      fs.promises.readFile(filePath, "utf-8"),
+    );
+    await expect(
+      workspace.runtime.waitUntilReadyForFile(workspace.consumer),
+    ).resolves.toMatchObject({
+      kind: "ready",
+    });
+    fsPromisesMock.readFile.mockImplementation((filePath: string) => reads.read(filePath));
+
     const baseTime = Date.now();
     vi.useFakeTimers();
     vi.setSystemTime(baseTime);
@@ -211,16 +239,26 @@ describe("public WorkspaceLspRuntime input barrier", () => {
       { line: 0, character: 0 },
       { deadline: baseTime + 10 },
     );
-    const firstRejected = expect(first).rejects.toThrow("Code request deadline exceeded");
+    const firstOutcome = first.then(
+      (value) => ({ status: "fulfilled" as const, value }),
+      (reason: unknown) => ({ status: "rejected" as const, reason }),
+    );
     await reads.waitForCalls(1);
     const second = workspace.runtime.definition(
       workspace.consumer,
       { line: 0, character: 0 },
       { deadline: baseTime + 10_000 },
     );
+    const secondOutcome = second.then(
+      (value) => ({ status: "fulfilled" as const, value }),
+      (reason: unknown) => ({ status: "rejected" as const, reason }),
+    );
 
     await vi.advanceTimersByTimeAsync(10);
-    await firstRejected;
+    await expect(firstOutcome).resolves.toMatchObject({
+      status: "rejected",
+      reason: { message: "Code request deadline exceeded" },
+    });
     expect(reads.calls).toHaveLength(1);
     expect(reads.activeReads).toBe(1);
 
@@ -230,7 +268,10 @@ describe("public WorkspaceLspRuntime input barrier", () => {
     await reads.waitForCalls(2);
     reads.resolveAll();
 
-    await expect(second).resolves.toMatchObject({ kind: "completed", data: [] });
+    await expect(secondOutcome).resolves.toMatchObject({
+      status: "fulfilled",
+      value: { kind: "completed", data: [] },
+    });
     expect(reads.maximumActiveReads).toBe(1);
   });
 

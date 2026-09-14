@@ -4,6 +4,10 @@ let input = Buffer.alloc(0);
 const logPath = process.argv[2];
 const responseDelayMs = Number(process.argv[3] ?? 25);
 const supportsDiagnostics = process.argv[4] === "pull";
+const readinessDelayArg = process.argv.find((arg) => arg.startsWith("--readiness-delay="));
+const readinessDelayMs = readinessDelayArg
+  ? Number(readinessDelayArg.slice("--readiness-delay=".length))
+  : 1;
 const documents = new Map();
 
 function log(method, params) {
@@ -84,7 +88,7 @@ function handle(message) {
           method: "$/progress",
           params: { token: "ready", value: { kind: "end" } },
         }),
-      1,
+      readinessDelayMs,
     );
     return;
   }
