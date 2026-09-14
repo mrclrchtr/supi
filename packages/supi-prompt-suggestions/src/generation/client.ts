@@ -1,16 +1,16 @@
-/**
- * Low-level suggestion model client.
- *
- * Pure functions for calling the suggestion model — no module-level state,
- * no orchestration, no debug logging.
- *
- * @module
- */
+/** Low-level suggestion model client. */
 
-import type { ProviderHeaders } from "@earendil-works/pi-ai";
-import { completeSimple } from "@earendil-works/pi-ai/compat";
+import type { Api, Context, Model } from "@earendil-works/pi-ai";
+import { clampMaxTokensToContext } from "@earendil-works/pi-ai/api/simple-options";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { completeModelRequest } from "@mrclrchtr/supi-core/llm";
+import {
+  classifySuggestionFailure,
+  type RuntimeSuggestionFailureKind,
+  suggestionFailureSummary,
+} from "./failure.ts";
 
-// ── Constants ──────────────────────────────────────────────────────────
+// ── Constants ──────────────────────────────────────────────────────────────
 
 export const GENERATION_TIMEOUT_MS = 20_000;
 
@@ -32,95 +32,94 @@ const SYSTEM_PROMPT =
   "If there is no useful follow-up, respond with exactly the word NO_SUGGESTION and nothing else. " +
   "Keep suggestions under 240 characters.";
 
-// ── Prompt building ────────────────────────────────────────────────────
+// ── Prompt building ────────────────────────────────────────────────────────
 
-/**
- * Format the tail text as a completion prompt.
- *
- * Instructions live in {@link SYSTEM_PROMPT} — the user message
- * only provides the assistant message content to suggest from.
- */
+/** Format the tail text as a completion prompt. */
 export function buildPrompt(tail: string): string {
   return `<assistant_message>\n${tail}\n</assistant_message>\n\nSuggestion:`;
 }
 
-// ── Types ──────────────────────────────────────────────────────────────
+// ── Types ───────────────────────────────────────────────────────────────────
 
 export interface SuggestionClientResult {
   ok: true;
   text: string;
 }
 
+/** Classified request failure without provider response text. */
+export interface SuggestionClientFailure {
+  kind: RuntimeSuggestionFailureKind;
+  summary: string;
+}
+
 export interface SuggestionClientError {
   ok: false;
-  message: string;
+  failure: SuggestionClientFailure;
 }
 
 export type SuggestionClientOutput = SuggestionClientResult | SuggestionClientError;
 
 export interface SuggestionClientOptions {
-  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
-  model: any;
-  auth: { apiKey: string; headers?: ProviderHeaders; env?: Record<string, string> };
+  ctx: ExtensionContext;
+  model: Model<Api>;
   tail: string;
   signal: AbortSignal;
 }
 
-// ── API call ───────────────────────────────────────────────────────────
+// ── API call ────────────────────────────────────────────────────────────────
 
 /**
- * Call the suggestion model with a simple completion prompt.
+ * Call the suggestion model through PI's model registry.
  *
- * Pure function — all side effects (HTTP, abort) are scoped to the call.
- * Returns a structured result; does not log or interact with the extension
- * context.
+ * The request keeps the fixed prompt and bounded assistant tail. PI resolves
+ * authentication, endpoint, headers, and provider environment.
  */
 export async function callSuggestionModel(
   opts: SuggestionClientOptions,
 ): Promise<SuggestionClientOutput> {
-  const { model, auth, tail, signal } = opts;
+  const context: Context = {
+    systemPrompt: SYSTEM_PROMPT,
+    messages: [
+      {
+        role: "user",
+        content: [{ type: "text", text: buildPrompt(opts.tail) }],
+        timestamp: Date.now(),
+      },
+    ],
+  };
 
-  const response = await completeSimple(
-    model,
-    {
-      systemPrompt: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: "user",
-          content: [{ type: "text", text: buildPrompt(tail) }],
-          timestamp: Date.now(),
-        },
-      ],
-    },
-    {
-      apiKey: auth.apiKey,
-      headers: auth.headers,
-      env: auth.env,
-      signal,
-    },
-  );
+  try {
+    const response = await completeModelRequest(opts.ctx, opts.model, context, {
+      affinityScope: "prompt-suggestions",
+      signal: opts.signal,
+      maxTokens: clampMaxTokensToContext(opts.model, context, opts.model.maxTokens),
+    });
 
-  if (response?.stopReason === "error") {
-    const message = `Suggestion model failed: ${response.errorMessage ?? response.stopReason}`;
-    return { ok: false, message };
+    if (response.stopReason === "aborted") {
+      return failureResult("timeout");
+    }
+    if (response.stopReason === "error") {
+      return failureResult(classifySuggestionFailure(response.errorMessage));
+    }
+
+    // An empty successful response is a valid no-suggestion result. Thinking or
+    // other non-text blocks are also harmless when no user-visible text exists.
+    const textContent = Array.isArray(response.content)
+      ? response.content
+          .filter((content): content is { type: "text"; text: string } => content.type === "text")
+          .map((content) => content.text)
+          .join("")
+      : "";
+
+    return { ok: true, text: textContent };
+  } catch (error) {
+    return failureResult(classifySuggestionFailure(error));
   }
+}
 
-  if (!response?.content) {
-    const message = `Suggestion model returned no content (stopReason: ${response?.stopReason ?? "undefined"})`;
-    return { ok: false, message };
-  }
-
-  // Prompt suggestions are taken from normal user-visible text only.
-  const textContent = response.content
-    .filter((c: { type: string }) => c.type === "text")
-    .map((c: { type: string; text?: string }) => c.text)
-    .join("");
-
-  if (!textContent) {
-    const contentTypes = response.content.map((c: { type: string }) => c.type);
-    const message = `Suggestion model returned no text (stopReason: ${response.stopReason ?? "undefined"}, content types: [${contentTypes.join(", ") || "none"}])`;
-    return { ok: false, message };
-  }
-
-  return { ok: true, text: textContent };
+function failureResult(kind: RuntimeSuggestionFailureKind): SuggestionClientError {
+  return {
+    ok: false,
+    failure: { kind, summary: suggestionFailureSummary(kind) },
+  };
 }

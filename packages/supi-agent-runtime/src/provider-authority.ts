@@ -203,11 +203,17 @@ function resolveParentModel(
   childModel: Model<Api>,
   fallback: Model<Api>,
 ): Model<Api> {
+  let parentModel = fallback;
   try {
-    return provider.getModels().find((candidate) => candidate.id === childModel.id) ?? fallback;
+    parentModel =
+      provider.getModels().find((candidate) => candidate.id === childModel.id) ?? fallback;
   } catch {
-    return fallback;
+    // Keep the authorized fallback when the parent catalog is unavailable.
   }
+  // ModelRuntime may resolve a credential-specific endpoint onto childModel.
+  return parentModel.baseUrl === childModel.baseUrl
+    ? parentModel
+    : { ...parentModel, baseUrl: childModel.baseUrl };
 }
 
 function mergeRequestAuth(

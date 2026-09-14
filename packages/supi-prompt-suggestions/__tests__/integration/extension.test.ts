@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockRegisterSettings = vi.hoisted(() => vi.fn());
 const mockGeneratorStart = vi.hoisted(() => vi.fn());
 const mockGeneratorDismiss = vi.hoisted(() => vi.fn());
+const mockGeneratorReset = vi.hoisted(() => vi.fn());
 const mockEditorSetSuggestion = vi.hoisted(() => vi.fn());
 const mockEditorClearGhost = vi.hoisted(() => vi.fn());
 const mockEditorAddToHistory = vi.hoisted(() => vi.fn());
@@ -46,6 +47,7 @@ const mockSuggestionGenerator = vi.hoisted(
     class {
       start = mockGeneratorStart;
       dismiss = mockGeneratorDismiss;
+      reset = mockGeneratorReset;
     },
 );
 
@@ -149,7 +151,16 @@ describe("supi-prompt-suggestions extension lifecycle", () => {
 
   it("registers settings on load", () => {
     setup();
-    expect(mockRegisterSettings).toHaveBeenCalled();
+    expect(mockRegisterSettings).toHaveBeenCalledWith(expect.anything(), expect.any(Function));
+  });
+
+  it("resets generation after settings persistence", () => {
+    setup();
+    const afterPersist = mockRegisterSettings.mock.calls[0]?.[1] as () => void;
+
+    afterPersist();
+
+    expect(mockGeneratorReset).toHaveBeenCalledOnce();
   });
 
   it("registers session_start handler", () => {
@@ -332,7 +343,7 @@ describe("supi-prompt-suggestions extension lifecycle", () => {
     const shutdownHandler = getHandler(handlers, "session_shutdown");
     shutdownHandler();
 
-    expect(mockGeneratorDismiss).toHaveBeenCalled();
+    expect(mockGeneratorReset).toHaveBeenCalled();
     expect(mockEditorClearGhost).toHaveBeenCalled();
     expect(mockSpinnerStop).toHaveBeenCalled();
   });

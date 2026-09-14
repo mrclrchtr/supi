@@ -8,11 +8,18 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { defineConfigSettings, registerSettings } from "@mrclrchtr/supi-core/settings";
+import {
+  defineConfigSettings,
+  registerSettings,
+  type SettingsPersistedChange,
+} from "@mrclrchtr/supi-core/settings";
 import { CONFIG_SECTION, DEFAULTS } from "./config.ts";
 
 /** Register the prompt-suggestions settings section. */
-export function registerPromptSuggestionsSettings(pi: ExtensionAPI): void {
+export function registerPromptSuggestionsSettings(
+  pi: ExtensionAPI,
+  afterPersist?: (change: SettingsPersistedChange) => void,
+): void {
   registerSettings(
     pi,
     defineConfigSettings({
@@ -28,6 +35,7 @@ export function registerPromptSuggestionsSettings(pi: ExtensionAPI): void {
           description: "Model used for ghost-text suggestions. Select 'disabled' to turn off.",
         },
       ],
+      afterPersist,
     }),
   );
 }

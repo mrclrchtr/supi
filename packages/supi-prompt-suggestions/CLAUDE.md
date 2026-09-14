@@ -17,17 +17,22 @@ editor's in-memory history. History is re-seeded from the active `sessionManager
 class manages concurrency with an internal abort controller and generation ID. Calling `start` or
 `dismiss` cancels any in-flight generation. Generation is TUI-only; print, JSON, and RPC modes do
 not install the ghost editor or make background suggestion model calls. `extension.ts` owns the
-`SuggestionGenerator` instance directly rather than going through module-level wrappers. Generation
-failures stop the spinner and are recorded through SuPi debug events; they do not leave persistent
-footer error status.
+`SuggestionGenerator` instance directly rather than going through module-level wrappers. The
+generator emits one bounded warning for the first failure of each model/session stream, then
+suppresses repeated failures until success, a settings change, or a new session. It emits no warning
+for cancellation, stale results, disabled suggestions, or empty successful output. `SessionLifecycle`
+renders warnings and clears the spinner; no persistent footer error status is used.
 
-### Suggestion model via completeSimple
+### Suggestion model via PI registry
 
-Suggestions use `completeSimple` (not `createAgentSession`). Only the last 8,000 characters of the
-final assistant message are sent. The system prompt instructs the model to write a single follow-up
-line (question, answer, or directive) or return the `NO_SUGGESTION` sentinel. The user message wraps
-the assistant text in `<assistant_message>...</assistant_message>` tags and appends `Suggestion:` —
-no PI, SuPi, project, or conversation context is included.
+Suggestions use `completeModelRequest` from `@mrclrchtr/supi-core/llm` (not `createAgentSession` or
+the pi-ai compatibility API). PI resolves authentication, headers, provider environment, and the
+effective endpoint. The request uses the stable `prompt-suggestions` affinity scope and the model's
+output limit clamped with PI's public context helper. Only the last 8,000 characters of the final
+assistant message are sent. The system prompt instructs the model to write a single follow-up line
+(question, answer, or directive) or return the `NO_SUGGESTION` sentinel. The user message wraps the
+assistant text in `<assistant_message>...</assistant_message>` tags and appends `Suggestion:` — no
+PI, SuPi, project, or conversation context is included.
 
 ### Settings use the fixed config adapter
 
@@ -67,8 +72,9 @@ later Escape without ghost text reaches PI's normal interrupt/double-escape hand
 suppresses the suggestion without destroying it. Any editor operation that makes the text exactly
 empty restores the suggestion.
 
-### Abort signal combination
+### Timeout and cancellation
 
-The `combineAbortSignals()` helper in `supi-core/abort-utils` combines the caller's abort signal
-with a generation timeout signal. It returns a cleanup function that callers must invoke in a
-`finally` block to avoid listener leaks.
+`SuggestionGenerator` passes an internal abort signal to the PI registry request. An explicit timer
+races the request so a provider that ignores abort still reaches a terminal timeout state. Timeout
+aborts the provider request, stops the spinner, and follows the warning policy. Normal cancellation
+and stale results stay quiet.

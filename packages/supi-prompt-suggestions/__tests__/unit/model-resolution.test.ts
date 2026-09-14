@@ -1,130 +1,73 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { Api, Model } from "@earendil-works/pi-ai";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { makeCtx } from "@mrclrchtr/supi-test-utils";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { resolveSuggestionModel } from "../../src/generation/model-resolution.ts";
 
-// ── Hoisted mocks ──────────────────────────────────────────────────────────
-
-const mockGetSelectableModels = vi.hoisted(() => vi.fn());
-
-vi.mock("@mrclrchtr/supi-core/model-selection", () => ({
-  getSelectableModels: mockGetSelectableModels,
-}));
-
-import { resolveSuggestionAuth } from "../../src/generation/model-resolution.ts";
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-const mockModelSelection = {
-  canonicalId: "anthropic/claude-sonnet-4-5",
-  provider: "anthropic",
-  id: "claude-sonnet-4-5",
-  model: { provider: "anthropic", id: "claude-sonnet-4-5" },
-  label: "Claude Sonnet 4.5",
-  description: "anthropic/claude-sonnet-4-5",
-  isCurrent: false,
+const MODEL: Model<Api> = {
+  id: "suggestion-model",
+  name: "Suggestion model",
+  api: "openai-completions",
+  provider: "test-provider",
+  baseUrl: "https://provider.example/v1",
+  reasoning: false,
+  input: ["text"],
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  contextWindow: 128_000,
+  maxTokens: 256,
 };
 
-function makeCtx(
-  overrides: {
-    cwd?: string;
-    getApiKeyAndHeaders?: ReturnType<typeof vi.fn>;
-    hasConfiguredAuth?: ReturnType<typeof vi.fn>;
-  } = {},
-) {
-  return {
-    cwd: overrides.cwd ?? "/fake/project",
+const tempDirectories: string[] = [];
+
+function makeSelectionContext(enabledModels: string[]) {
+  const cwd = mkdtempSync(join(tmpdir(), "supi-prompt-selection-"));
+  tempDirectories.push(cwd);
+  mkdirSync(join(cwd, ".pi"), { recursive: true });
+  writeFileSync(
+    join(cwd, ".pi", "settings.json"),
+    `${JSON.stringify({ enabledModels }, null, 2)}\n`,
+  );
+
+  const getApiKeyAndHeaders = vi.fn();
+  const ctx = makeCtx({
+    cwd,
+    model: MODEL,
     modelRegistry: {
-      getApiKeyAndHeaders:
-        overrides.getApiKeyAndHeaders ??
-        vi.fn().mockResolvedValue({ ok: true, apiKey: "test-key", headers: undefined }),
-      hasConfiguredAuth: overrides.hasConfiguredAuth ?? vi.fn(() => true),
+      getAvailable: () => [MODEL],
+      getApiKeyAndHeaders,
     },
-    model: null,
-  };
+    sessionManager: { getSessionId: () => "pi-session" },
+  }) as unknown as ExtensionContext;
+  return { ctx, getApiKeyAndHeaders };
 }
 
-// ── Tests ──────────────────────────────────────────────────────────────────
+afterEach(() => {
+  for (const directory of tempDirectories.splice(0)) {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
-describe("resolveSuggestionAuth", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+describe("resolveSuggestionModel", () => {
+  it("returns the configured model from the scoped model set", () => {
+    const { ctx } = makeSelectionContext(["test-provider/suggestion-model"]);
+
+    expect(resolveSuggestionModel(ctx, "test-provider/suggestion-model")).toBe(MODEL);
   });
 
-  it("resolves auth when model is found and API key is available", async () => {
-    mockGetSelectableModels.mockReturnValue([mockModelSelection]);
+  it("does not perform an authentication preflight", () => {
+    const { ctx, getApiKeyAndHeaders } = makeSelectionContext(["test-provider/suggestion-model"]);
 
-    const ctx = makeCtx();
-    const result = await resolveSuggestionAuth(ctx as never, "anthropic/claude-sonnet-4-5");
+    resolveSuggestionModel(ctx, "test-provider/suggestion-model");
 
-    expect(result).toEqual({
-      kind: "ok",
-      auth: {
-        model: { provider: "anthropic", id: "claude-sonnet-4-5" },
-        apiKey: "test-key",
-      },
-    });
+    expect(getApiKeyAndHeaders).not.toHaveBeenCalled();
   });
 
-  it("preserves resolved headers and provider-scoped environment", async () => {
-    mockGetSelectableModels.mockReturnValue([mockModelSelection]);
+  it("returns undefined when the model is outside the scoped set", () => {
+    const { ctx } = makeSelectionContext(["other-provider/other-model"]);
 
-    const ctx = makeCtx({
-      getApiKeyAndHeaders: vi.fn().mockResolvedValue({
-        ok: true,
-        apiKey: "test-key",
-        headers: { "x-test": "true" },
-        env: { TEST_ENV: "1" },
-      }),
-    });
-    const result = await resolveSuggestionAuth(ctx as never, "anthropic/claude-sonnet-4-5");
-
-    expect(result).toEqual({
-      kind: "ok",
-      auth: {
-        model: { provider: "anthropic", id: "claude-sonnet-4-5" },
-        apiKey: "test-key",
-        headers: { "x-test": "true" },
-        env: { TEST_ENV: "1" },
-      },
-    });
-  });
-
-  it("reports error when model is not in scoped set", async () => {
-    mockGetSelectableModels.mockReturnValue([]);
-
-    const ctx = makeCtx();
-    const result = await resolveSuggestionAuth(ctx as never, "anthropic/nonexistent");
-
-    expect(result).toEqual({
-      kind: "error",
-      message: 'Suggestion model "anthropic/nonexistent" not in scoped set',
-    });
-  });
-
-  it("reports error when resolved auth has no configured API key", async () => {
-    mockGetSelectableModels.mockReturnValue([mockModelSelection]);
-
-    const ctx = makeCtx({
-      getApiKeyAndHeaders: vi.fn().mockResolvedValue({ ok: true, apiKey: undefined }),
-      hasConfiguredAuth: vi.fn(() => false),
-    });
-    const result = await resolveSuggestionAuth(ctx as never, "anthropic/claude-sonnet-4-5");
-
-    expect(result).toEqual({
-      kind: "error",
-      message: "No API key configured for anthropic/claude-sonnet-4-5",
-    });
-  });
-
-  it("reports error when API key auth fails", async () => {
-    mockGetSelectableModels.mockReturnValue([mockModelSelection]);
-
-    const ctx = makeCtx({
-      getApiKeyAndHeaders: vi.fn().mockResolvedValue({ ok: false }),
-    });
-    const result = await resolveSuggestionAuth(ctx as never, "anthropic/claude-sonnet-4-5");
-
-    expect(result).toEqual({
-      kind: "error",
-      message: "No API key configured for anthropic/claude-sonnet-4-5",
-    });
+    expect(resolveSuggestionModel(ctx, "test-provider/suggestion-model")).toBeUndefined();
   });
 });

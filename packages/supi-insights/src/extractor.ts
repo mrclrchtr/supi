@@ -1,8 +1,7 @@
 // LLM facet extraction — analyze session transcripts and extract structured facets.
 
-import { complete } from "@earendil-works/pi-ai/compat";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { callWithJsonResponse } from "@mrclrchtr/supi-core/llm";
+import { callWithJsonResponse, completeModelRequest } from "@mrclrchtr/supi-core/llm";
 import { Type } from "typebox";
 import type { SessionFacets } from "./types.ts";
 
@@ -91,6 +90,7 @@ export async function extractFacets(
     ctx,
     {
       prompt: `${FACET_EXTRACTION_PROMPT}${processedTranscript}`,
+      affinityScope: "insights:extraction",
       maxTokens: 4096,
       retries: 2,
     },
@@ -108,9 +108,6 @@ async function summarizeTranscript(transcript: string, ctx: ExtensionContext): P
   const model = ctx.model ?? ctx.modelRegistry.getAvailable()[0];
   if (!model) return transcript.slice(0, 30000);
 
-  const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-  if (!auth.ok || !auth.apiKey) return transcript.slice(0, 30000);
-
   const CHUNK_SIZE = 25000;
   const chunks: string[] = [];
   for (let i = 0; i < transcript.length; i += CHUNK_SIZE) {
@@ -120,7 +117,8 @@ async function summarizeTranscript(transcript: string, ctx: ExtensionContext): P
   const summaries = await Promise.all(
     chunks.map(async (chunk) => {
       try {
-        const response = await complete(
+        const response = await completeModelRequest(
+          ctx,
           model,
           {
             systemPrompt: "",
@@ -133,12 +131,14 @@ async function summarizeTranscript(transcript: string, ctx: ExtensionContext): P
             ],
           },
           {
-            apiKey: auth.apiKey,
-            headers: auth.headers,
+            affinityScope: "insights:chunk-summary",
             signal: ctx.signal,
             maxTokens: 500,
           },
         );
+        if (response.stopReason === "error" || response.stopReason === "aborted") {
+          return chunk.slice(0, 2000);
+        }
         return response.content
           .filter((c): c is { type: "text"; text: string } => c.type === "text")
           .map((c) => c.text)

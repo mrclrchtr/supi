@@ -14,10 +14,10 @@ import { SuggestionGenerator } from "./generation/generator.ts";
 import { SessionLifecycle } from "./session.ts";
 
 export default function (pi: ExtensionAPI): void {
-  registerPromptSuggestionsSettings(pi);
-
   const generator = new SuggestionGenerator();
   const session = new SessionLifecycle(generator);
+
+  registerPromptSuggestionsSettings(pi, () => session.onSettingsChanged());
 
   pi.on("session_start", (_event, ctx) => session.onStart(ctx));
   pi.on("agent_settled", (_event, ctx) => session.onAgentSettled(ctx));

@@ -14,7 +14,8 @@ import { registerPromptSuggestionsSettings } from "../../src/config/settings.ts"
 
 describe("registerPromptSuggestionsSettings", () => {
   it("uses declarative modelPicker so disabled is an explicit value, not a signal to unset", () => {
-    registerPromptSuggestionsSettings({} as never);
+    const afterPersist = vi.fn();
+    registerPromptSuggestionsSettings({} as never, afterPersist);
 
     expect(settingsMocks.define).toHaveBeenCalledOnce();
     expect(settingsMocks.register).toHaveBeenCalledOnce();
@@ -25,6 +26,7 @@ describe("registerPromptSuggestionsSettings", () => {
       kind: "modelPicker",
       key: "model",
     });
+    expect(options.afterPersist).toBe(afterPersist);
 
     // With the declarative schema, all values (including "disabled") are explicit;
     // only the Inherit action deletes the key.

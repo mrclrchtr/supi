@@ -1,10 +1,11 @@
+import type { Api, Model } from "@earendil-works/pi-ai";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { makeCtx as makePiContext } from "@mrclrchtr/supi-test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-// ── Hoisted mocks ──────────────────────────────────────────────────────────
 
 const mockLoadSupiConfig = vi.hoisted(() => vi.fn());
 const mockRecordDebugEvent = vi.hoisted(() => vi.fn());
-const mockResolveSuggestionAuth = vi.hoisted(() => vi.fn());
+const mockResolveSuggestionModel = vi.hoisted(() => vi.fn());
 const mockCallSuggestionModel = vi.hoisted(() => vi.fn());
 
 vi.mock("@mrclrchtr/supi-core/config", () => ({
@@ -16,7 +17,7 @@ vi.mock("@mrclrchtr/supi-core/debug", () => ({
 }));
 
 vi.mock("../../src/generation/model-resolution.ts", () => ({
-  resolveSuggestionAuth: mockResolveSuggestionAuth,
+  resolveSuggestionModel: mockResolveSuggestionModel,
 }));
 
 vi.mock("../../src/generation/client.ts", () => ({
@@ -24,301 +25,145 @@ vi.mock("../../src/generation/client.ts", () => ({
   GENERATION_TIMEOUT_MS: 20_000,
 }));
 
-import { SuggestionGenerator } from "../../src/generation/generator.ts";
+import type { SuggestionClientOutput } from "../../src/generation/client.ts";
+import { type GenerationStatus, SuggestionGenerator } from "../../src/generation/generator.ts";
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+const MODEL: Model<Api> = {
+  id: "suggestion-model",
+  name: "Suggestion model",
+  api: "openai-completions",
+  provider: "test-provider",
+  baseUrl: "https://provider.example/v1",
+  reasoning: false,
+  input: ["text"],
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  contextWindow: 128_000,
+  maxTokens: 256,
+};
 
 function deferred<T>(): {
   promise: Promise<T>;
   resolve: (value: T) => void;
-  reject: (reason?: unknown) => void;
 } {
   let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
+  const promise = new Promise<T>((res) => {
     resolve = res;
-    reject = rej;
   });
-  return { promise, resolve, reject };
+  return { promise, resolve };
 }
 
-const mockAuthOk = {
-  kind: "ok" as const,
-  auth: {
-    model: { provider: "anthropic", id: "claude-sonnet-4-5" },
-    apiKey: "test-key",
-    headers: undefined,
-  },
-};
-
-function makeCtx(overrides: { cwd?: string } = {}) {
-  return {
-    cwd: overrides.cwd ?? "/fake/project",
-    modelRegistry: {
-      getApiKeyAndHeaders: vi.fn(),
-    },
-    model: null,
-  };
+function makeCtx(): ExtensionContext {
+  return makePiContext({
+    cwd: "/fake/project",
+    modelRegistry: {},
+    model: MODEL,
+    sessionManager: { getSessionId: () => "pi-session" },
+  }) as unknown as ExtensionContext;
 }
 
-// ── Tests ──────────────────────────────────────────────────────────────────
+function waitForStatus(
+  statuses: GenerationStatus[],
+  predicate: (status: GenerationStatus) => boolean,
+): Promise<void> {
+  return vi.waitFor(() => {
+    expect(statuses.some(predicate)).toBe(true);
+  });
+}
 
 describe("SuggestionGenerator", () => {
-  let generator: SuggestionGenerator;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    generator = new SuggestionGenerator();
     mockLoadSupiConfig.mockReturnValue({ model: "disabled" });
+    mockResolveSuggestionModel.mockReturnValue(MODEL);
   });
 
-  // ── Skip paths (synchronous) ─────────────────────────────────
+  it("reports idle when suggestions are disabled or the assistant text is empty", () => {
+    const generator = new SuggestionGenerator();
+    const statuses: GenerationStatus[] = [];
+    const callbacks = { onStatus: (status: GenerationStatus) => statuses.push(status) };
+    const ctx = makeCtx();
 
-  it("reports idle when model is disabled", () => {
-    const onStatus = vi.fn();
-    mockLoadSupiConfig.mockReturnValue({ model: "disabled" });
+    generator.start(ctx, "assistant text", callbacks);
+    mockLoadSupiConfig.mockReturnValue({ model: "test-provider/suggestion-model" });
+    generator.start(ctx, "   ", callbacks);
 
-    generator.start(makeCtx() as never, "some assistant text", { onStatus });
-
-    expect(onStatus).toHaveBeenCalledWith({ kind: "idle" });
-    expect(mockRecordDebugEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ category: "generation.skipped" }),
-    );
+    expect(statuses).toEqual([{ kind: "idle" }, { kind: "idle" }]);
+    expect(mockCallSuggestionModel).not.toHaveBeenCalled();
   });
 
-  it("reports idle when lastAssistantText is empty", () => {
-    const onStatus = vi.fn();
-    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/some-model" });
+  it("reports an unavailable configured model without an auth preflight", async () => {
+    mockLoadSupiConfig.mockReturnValue({ model: "test-provider/missing-model" });
+    mockResolveSuggestionModel.mockReturnValue(undefined);
+    const generator = new SuggestionGenerator();
+    const statuses: GenerationStatus[] = [];
 
-    generator.start(makeCtx() as never, "   ", { onStatus });
+    generator.start(makeCtx(), "assistant text", {
+      onStatus: (status) => statuses.push(status),
+    });
+    await waitForStatus(statuses, (status) => status.kind === "error");
 
-    expect(onStatus).toHaveBeenCalledWith({ kind: "idle" });
-    expect(mockRecordDebugEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ category: "generation.skipped" }),
-    );
-  });
-
-  it("reports idle when lastAssistantText is empty string", () => {
-    const onStatus = vi.fn();
-    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/some-model" });
-
-    generator.start(makeCtx() as never, "", { onStatus });
-
-    expect(onStatus).toHaveBeenCalledWith({ kind: "idle" });
-  });
-
-  // ── Auth error ──────────────────────────────────────────────
-
-  it("reports idle when auth resolution fails", async () => {
-    const onStatus = vi.fn();
-    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
-    mockResolveSuggestionAuth.mockResolvedValue({
+    expect(statuses.at(-1)).toMatchObject({
       kind: "error",
-      message: 'Suggestion model "anthropic/nonexistent" not in scoped set',
-    });
-
-    generator.start(makeCtx() as never, "some text", { onStatus });
-
-    expect(onStatus).toHaveBeenCalledWith({ kind: "generating" });
-
-    await vi.waitFor(() => {
-      expect(onStatus).toHaveBeenCalledWith({ kind: "idle" });
-    });
-    expect(mockRecordDebugEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ category: "generation.auth-failure", level: "warning" }),
-    );
-  });
-
-  // ── Successful generation ────────────────────────────────────
-
-  it("reports ready when suggestion is successfully generated", async () => {
-    const onStatus = vi.fn();
-    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
-    mockResolveSuggestionAuth.mockResolvedValue(mockAuthOk);
-    mockCallSuggestionModel.mockResolvedValue({ ok: true, text: "fix the bug" });
-
-    generator.start(makeCtx() as never, "some text", { onStatus });
-
-    expect(onStatus).toHaveBeenCalledWith({ kind: "generating" });
-
-    await vi.waitFor(() => {
-      expect(onStatus).toHaveBeenCalledWith({
-        kind: "ready",
-        suggestion: "fix the bug",
-      });
-    });
-
-    expect(mockRecordDebugEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        category: "generation.done",
-        message: "Prompt suggestion ready",
-        data: expect.not.objectContaining({ suggestion: expect.any(String) }),
-      }),
-    );
-  });
-
-  it("passes provider-scoped auth environment to the model call", async () => {
-    const onStatus = vi.fn();
-    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
-    mockResolveSuggestionAuth.mockResolvedValue({
-      kind: "ok",
-      auth: {
-        model: { provider: "anthropic", id: "claude-sonnet-4-5" },
-        apiKey: "test-key",
-        headers: { "x-test": "true" },
-        env: { ANTHROPIC_BASE_URL: "https://example.invalid" },
+      warning: {
+        kind: "model-unavailable",
+        model: "test-provider/missing-model",
       },
     });
+  });
+
+  it("reports a ready normalized suggestion", async () => {
+    mockLoadSupiConfig.mockReturnValue({ model: "test-provider/suggestion-model" });
     mockCallSuggestionModel.mockResolvedValue({ ok: true, text: "fix the bug" });
+    const generator = new SuggestionGenerator();
+    const statuses: GenerationStatus[] = [];
 
-    generator.start(makeCtx() as never, "some text", { onStatus });
-
-    await vi.waitFor(() => {
-      expect(mockCallSuggestionModel).toHaveBeenCalledWith(
-        expect.objectContaining({
-          auth: {
-            apiKey: "test-key",
-            headers: { "x-test": "true" },
-            env: { ANTHROPIC_BASE_URL: "https://example.invalid" },
-          },
-        }),
-      );
+    generator.start(makeCtx(), "assistant text", {
+      onStatus: (status) => statuses.push(status),
     });
+    await waitForStatus(statuses, (status) => status.kind === "ready");
+
+    expect(statuses.at(-1)).toEqual({ kind: "ready", suggestion: "fix the bug" });
+    expect(mockCallSuggestionModel).toHaveBeenCalledWith(
+      expect.objectContaining({ model: MODEL, tail: "assistant text" }),
+    );
   });
 
-  // ── Model call error ─────────────────────────────────────────
+  it("ignores a superseded request result", async () => {
+    mockLoadSupiConfig.mockReturnValue({ model: "test-provider/suggestion-model" });
+    const first = deferred<SuggestionClientOutput>();
+    mockCallSuggestionModel.mockReturnValueOnce(first.promise);
+    mockCallSuggestionModel.mockResolvedValueOnce({ ok: true, text: "second suggestion" });
+    const generator = new SuggestionGenerator();
+    const statuses: GenerationStatus[] = [];
+    const callbacks = { onStatus: (status: GenerationStatus) => statuses.push(status) };
 
-  it("reports error when model call fails", async () => {
-    const onStatus = vi.fn();
-    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
-    mockResolveSuggestionAuth.mockResolvedValue(mockAuthOk);
-    mockCallSuggestionModel.mockResolvedValue({
-      ok: false,
-      message: "Model overloaded",
-    });
+    generator.start(makeCtx(), "first text", callbacks);
+    generator.start(makeCtx(), "second text", callbacks);
+    first.resolve({ ok: true, text: "stale suggestion" });
 
-    generator.start(makeCtx() as never, "some text", { onStatus });
-
-    expect(onStatus).toHaveBeenCalledWith({ kind: "generating" });
-
-    await vi.waitFor(() => {
-      expect(onStatus).toHaveBeenCalledWith({
-        kind: "error",
-        message: "Model overloaded",
-      });
-    });
+    await waitForStatus(
+      statuses,
+      (status) => status.kind === "ready" && status.suggestion === "second suggestion",
+    );
+    expect(statuses).not.toContainEqual({ kind: "ready", suggestion: "stale suggestion" });
   });
 
-  // ── Empty normalized suggestion ──────────────────────────────
+  it("dismisses a pending request without sending a status update", async () => {
+    mockLoadSupiConfig.mockReturnValue({ model: "test-provider/suggestion-model" });
+    const pending = deferred<SuggestionClientOutput>();
+    mockCallSuggestionModel.mockReturnValue(pending.promise);
+    const generator = new SuggestionGenerator();
+    const statuses: GenerationStatus[] = [];
 
-  it("reports idle when normalized suggestion is empty", async () => {
-    const onStatus = vi.fn();
-    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
-    mockResolveSuggestionAuth.mockResolvedValue(mockAuthOk);
-    mockCallSuggestionModel.mockResolvedValue({ ok: true, text: "" });
-
-    generator.start(makeCtx() as never, "some text", { onStatus });
-
-    expect(onStatus).toHaveBeenCalledWith({ kind: "generating" });
-
-    await vi.waitFor(() => {
-      expect(onStatus).toHaveBeenCalledWith({ kind: "idle" });
+    generator.start(makeCtx(), "assistant text", {
+      onStatus: (status) => statuses.push(status),
     });
-  });
-
-  // ── Concurrency ──────────────────────────────────────────────
-
-  it("cancels previous generation when start is called again", async () => {
-    const onStatus = vi.fn();
-    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
-
-    // First generation: auth hangs
-    const auth1 = deferred<typeof mockAuthOk>();
-    mockResolveSuggestionAuth.mockReturnValueOnce(auth1.promise);
-    mockCallSuggestionModel.mockResolvedValue({ ok: true, text: "second suggestion" });
-
-    // Start first generation
-    generator.start(makeCtx() as never, "text one", { onStatus });
-    expect(onStatus).toHaveBeenCalledWith({ kind: "generating" });
-    onStatus.mockClear();
-
-    // Start second generation (cancels first)
-    mockResolveSuggestionAuth.mockResolvedValueOnce(mockAuthOk);
-    generator.start(makeCtx() as never, "text two", { onStatus });
-    expect(onStatus).toHaveBeenCalledWith({ kind: "generating" });
-    onStatus.mockClear();
-
-    // Resolve first auth — should be ignored (ID mismatch)
-    auth1.resolve(mockAuthOk);
-
-    // Second generation should complete normally
-    await vi.waitFor(() => {
-      expect(onStatus).toHaveBeenCalledWith({
-        kind: "ready",
-        suggestion: "second suggestion",
-      });
-    });
-  });
-
-  // ── Dismiss ──────────────────────────────────────────────────
-
-  it("dismiss cancels in-flight generation and invalidates generation ID", async () => {
-    const onStatus = vi.fn();
-    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
-
-    const auth = deferred<typeof mockAuthOk>();
-    mockResolveSuggestionAuth.mockReturnValue(auth.promise);
-
-    generator.start(makeCtx() as never, "some text", { onStatus });
-    expect(onStatus).toHaveBeenCalledWith({ kind: "generating" });
-    onStatus.mockClear();
-
-    // Dismiss while auth is still pending
+    await waitForStatus(statuses, (status) => status.kind === "generating");
+    statuses.length = 0;
     generator.dismiss();
-
-    // Resolve auth — should be ignored (ID mismatch)
-    auth.resolve(mockAuthOk);
-
-    // Give time for async to settle — onStatus should not be called again
+    pending.resolve({ ok: true, text: "stale suggestion" });
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(onStatus).not.toHaveBeenCalled();
-  });
 
-  // ── When abort signal is set before model call ───────────────
-
-  it("skips model call when abort signal is already set", async () => {
-    const onStatus = vi.fn();
-    mockLoadSupiConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
-
-    // First generation with a blocking auth
-    const auth1 = deferred<typeof mockAuthOk>();
-    mockResolveSuggestionAuth.mockReturnValueOnce(auth1.promise);
-    mockCallSuggestionModel.mockResolvedValue({ ok: true, text: "should not see this" });
-
-    generator.start(makeCtx() as never, "text one", { onStatus });
-    expect(onStatus).toHaveBeenCalledWith({ kind: "generating" });
-
-    // Start second generation which cancels first
-    const auth2 = deferred<typeof mockAuthOk>();
-    mockResolveSuggestionAuth.mockReturnValueOnce(auth2.promise);
-    generator.start(makeCtx() as never, "text two", { onStatus });
-
-    // Resolve first auth — the first generation's abort signal is set
-    auth1.resolve(mockAuthOk);
-
-    // model should never be called for the first generation
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(mockCallSuggestionModel).not.toHaveBeenCalled();
-
-    // Now complete second generation
-    auth2.resolve(mockAuthOk);
-    mockCallSuggestionModel.mockResolvedValue({ ok: true, text: "second" });
-
-    await vi.waitFor(() => {
-      expect(onStatus).toHaveBeenCalledWith({
-        kind: "ready",
-        suggestion: "second",
-      });
-    });
+    expect(statuses).toEqual([]);
   });
 });

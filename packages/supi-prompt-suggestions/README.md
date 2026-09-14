@@ -53,6 +53,9 @@ The default is `disabled`. Pick a cheap, fast model if you want lightweight sugg
 
 Settings follow SuPi's normal scoped config behavior: set a global default, then override it per project when needed.
 
+Suggestion requests use PI's model registry. PI owns authentication and provider routing; the
+extension does not resolve or copy credentials.
+
 ## Privacy
 
 When suggestions are enabled, the suggestion model receives only the last assistant message, trimmed to the final 8,000 characters.
@@ -63,7 +66,10 @@ The extension does **not** send:
 - tool outputs
 - file contents
 - project metadata
-- session metadata
+- session metadata in the prompt
+
+The request can include a separate opaque provider-routing identity. It is not part of the prompt and
+is derived from the PI session, provider, model, and prompt-suggestion stream.
 
 ## Troubleshooting
 
@@ -71,6 +77,11 @@ If no suggestion appears:
 
 - confirm **Suggestion model** is not `disabled`
 - confirm the selected model is still enabled in PI for the current scope
-- confirm the selected model has an API key configured
+- confirm the selected model has authentication configured in PI
 - make sure the editor is empty after the assistant finishes
 - wait for the suggestion spinner to finish; generation times out after about 20 seconds
+
+Request failures show one warning for the active model and session. The warning contains only the
+provider/model identifier and a short failure category. Repeated failures stay quiet until a request
+succeeds, settings change, or a new session starts. Warning state is held in memory, so `/reload`
+also starts a new warning cycle. The separate routing identity remains stable for the same PI session.

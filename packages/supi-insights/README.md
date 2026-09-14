@@ -44,6 +44,8 @@ The command pipeline is:
 4. aggregate the results across sessions
 5. generate an HTML report and post a short in-chat summary with the saved file path
 
+All direct model requests use `@mrclrchtr/supi-core/llm`. Requests use separate stable scopes for facet extraction, chunk summaries, report sections, and the overview. PI resolves request auth and endpoints.
+
 ## What the report covers
 
 The generated report can include:

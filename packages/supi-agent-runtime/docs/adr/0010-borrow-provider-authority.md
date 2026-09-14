@@ -12,6 +12,8 @@ PI 0.83 does not expose the containing `ModelRuntime` through `ExtensionContext`
 - preserves provider-owned OAuth refresh, runtime credentials, base URLs, and custom streams;
 - keeps child provider registration local to the Agent Run.
 
+For each delegated request, the adapter keeps the matching parent catalog model when available, so provider-specific model metadata and custom stream behavior remain active. It then applies the effective `baseUrl` from the prepared child model to the delegated model for both `stream` and `streamSimple`. If catalog lookup fails, it applies the same endpoint to the authorized fallback.
+
 The child runtime uses in-memory credential and model stores, so it cannot discover ambient parent credentials or model configuration. The caller passes authority at execution time. Prepared plans store model identity, never authority or credential state. Resources, extensions, tools, and settings remain caller-owned policy and are not inherited from the containing session.
 
 This is an exact behavioral borrow, not a shared `ModelRuntime` identity. Agent Runs remain context-isolated but permission-shared.

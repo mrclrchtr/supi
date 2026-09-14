@@ -1,12 +1,131 @@
-import { complete } from "@earendil-works/pi-ai/compat";
+import { createHash } from "node:crypto";
+import type {
+  Api,
+  AssistantMessage,
+  Context,
+  Model,
+  ModelsApiStreamOptions,
+  ProviderHeaders,
+} from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { TSchema } from "typebox";
 import { Value } from "typebox/value";
 
 // Shared LLM utilities for SuPi extensions.
 //
-// Provides retry logic, structured LLM call helpers, and other
-// common patterns for extensions that interact with AI models.
+// Provides PI-owned model requests, retry logic, structured LLM call helpers,
+// and other common patterns for extensions that interact with AI models.
+
+const MODEL_REQUEST_NAMESPACE = "supi-direct-model-request-v1";
+
+/**
+ * Options for {@link completeModelRequest}.
+ *
+ * Authentication, provider environment, and session identity stay under PI
+ * control. The feature supplies a stable scope for its prompt stream.
+ */
+export type CompleteModelRequestOptions<TApi extends Api = Api> = Omit<
+  ModelsApiStreamOptions<TApi>,
+  "apiKey" | "env" | "sessionId"
+> & {
+  /** Stable feature scope. Do not include prompt, turn, or retry data. */
+  affinityScope: string;
+  /** PI owns these fields, including for APIs with open-ended option types. */
+  apiKey?: never;
+  env?: never;
+  sessionId?: never;
+};
+
+function createModelRequestAffinityId(
+  sessionId: string,
+  affinityScope: string,
+  model: Model<Api>,
+): string {
+  const material = JSON.stringify([
+    MODEL_REQUEST_NAMESPACE,
+    sessionId,
+    affinityScope,
+    model.provider,
+    model.id,
+  ]);
+  const digest = createHash("sha256").update(material, "utf8").digest("hex");
+  return `supi-${digest.slice(0, 56)}`;
+}
+
+function isOpenCodeModel(model: Model<Api>): boolean {
+  if (model.provider === "opencode" || model.provider === "opencode-go") return true;
+
+  try {
+    return new URL(model.baseUrl).hostname === "opencode.ai";
+  } catch {
+    return false;
+  }
+}
+
+function hasHeader(headers: ProviderHeaders, name: string): boolean {
+  const lowerName = name.toLowerCase();
+  return Object.keys(headers).some((headerName) => headerName.toLowerCase() === lowerName);
+}
+
+function addOpenCodeDefaultHeaders(
+  model: Model<Api>,
+  affinityId: string,
+  headers: ProviderHeaders,
+): ProviderHeaders {
+  if (!isOpenCodeModel(model)) return headers;
+
+  const result = { ...headers };
+  if (!hasHeader(result, "x-opencode-session")) {
+    result["x-opencode-session"] = affinityId;
+  }
+  if (!hasHeader(result, "x-opencode-client")) {
+    result["x-opencode-client"] = "pi";
+  }
+  return result;
+}
+
+/**
+ * Complete a direct request through PI's model registry.
+ *
+ * PI resolves authentication, provider headers, environment, and the
+ * effective endpoint. This helper adds one stable opaque session identity for
+ * the feature prompt stream and applies the OpenCode compatibility defaults.
+ * It does not retry, validate output, or present errors.
+ *
+ * When `maxTokens` is omitted, the underlying registry receives no explicit
+ * output cap. A caller that needs the selected model's declared cap can pass
+ * `maxTokens: model.maxTokens` without importing PI internals.
+ */
+export async function completeModelRequest<TApi extends Api>(
+  ctx: ExtensionContext,
+  model: Model<TApi>,
+  context: Context,
+  options: CompleteModelRequestOptions<TApi>,
+): Promise<AssistantMessage> {
+  const { affinityScope, transformHeaders: callerTransformHeaders, ...requestOptions } = options;
+  const safeRequestOptions = { ...requestOptions };
+  delete safeRequestOptions.apiKey;
+  delete safeRequestOptions.env;
+  delete safeRequestOptions.sessionId;
+
+  const affinityId = createModelRequestAffinityId(
+    ctx.sessionManager.getSessionId(),
+    affinityScope,
+    model,
+  );
+  const transformHeaders = async (headers: ProviderHeaders): Promise<ProviderHeaders> => {
+    const transformed = callerTransformHeaders ? await callerTransformHeaders(headers) : headers;
+    return addOpenCodeDefaultHeaders(model, affinityId, transformed);
+  };
+
+  // Restore PI's conditional provider-option type after removing owned fields.
+  return ctx.modelRegistry.complete(model, context, {
+    ...safeRequestOptions,
+    signal: safeRequestOptions.signal ?? ctx.signal,
+    sessionId: affinityId,
+    transformHeaders,
+  } as unknown as ModelsApiStreamOptions<TApi>);
+}
 
 /**
  * Options for {@link withRetry}.
@@ -122,6 +241,8 @@ export function extractJsonFromResponse<T extends TSchema>(
 export interface CallWithJsonResponseOptions {
   /** The prompt to send to the LLM. */
   prompt: string;
+  /** Stable feature scope for request affinity. Do not include prompt or retry data. */
+  affinityScope: string;
   /** Optional data context appended to the prompt. */
   dataContext?: string;
   /** Maximum tokens for the response. Default: 4096 */
@@ -135,8 +256,9 @@ export interface CallWithJsonResponseOptions {
 /**
  * Call the LLM with a prompt and validate the JSON response against a TypeBox schema.
  *
- * Handles model resolution, auth, retry via `withRetry`, text extraction,
- * JSON regex matching, and TypeBox validation.
+ * Handles model resolution, retry via `withRetry`, text extraction, JSON
+ * matching, and TypeBox validation. The request itself stays under PI
+ * registry authority through {@link completeModelRequest}.
  *
  * Returns `null` when:
  * - No model is available
@@ -145,7 +267,7 @@ export interface CallWithJsonResponseOptions {
  * - JSON doesn't match the schema
  * - The request is aborted
  *
- * @param ctx - The extension context for model resolution and auth.
+ * @param ctx - The extension context for model selection and PI registry access.
  * @param options - Call options including prompt, schema, and retry config.
  * @param schema - TypeBox schema to validate the JSON response against.
  * @returns The parsed and validated result, or `null`.
@@ -155,13 +277,17 @@ export async function callWithJsonResponse<T extends TSchema>(
   options: CallWithJsonResponseOptions,
   schema: T,
 ): Promise<{ parsed: import("typebox").Static<T> } | null> {
-  const { prompt, dataContext, maxTokens = 4096, systemPrompt = "", retries = 2 } = options;
+  const {
+    prompt,
+    affinityScope,
+    dataContext,
+    maxTokens = 4096,
+    systemPrompt = "",
+    retries = 2,
+  } = options;
 
   const model = ctx.model ?? ctx.modelRegistry.getAvailable()[0] ?? null;
   if (!model) return null;
-
-  const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-  if (!auth.ok || !auth.apiKey) return null;
 
   const fullPrompt = dataContext
     ? `${prompt}
@@ -171,8 +297,9 @@ ${dataContext}`
     : prompt;
 
   const response = await withRetry(
-    async () => {
-      return complete(
+    async () =>
+      completeModelRequest(
+        ctx,
         model,
         {
           systemPrompt,
@@ -185,13 +312,11 @@ ${dataContext}`
           ],
         },
         {
-          apiKey: auth.apiKey,
-          headers: auth.headers,
+          affinityScope,
           signal: ctx.signal,
           maxTokens,
         },
-      );
-    },
+      ),
     { retries, baseDelayMs: 1000, signal: ctx.signal },
   );
 

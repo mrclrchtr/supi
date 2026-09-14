@@ -14,7 +14,7 @@ src/
   index.ts            — public export surface (identical to api.ts)
   debug-registry.ts   — public debug surface, event state, retention, redaction, and queries
   debug-timing.ts     — monotonic one-shot debug timers
-  llm.ts              — shared LLM utilities (withRetry, callWithJsonResponse)
+  llm.ts              — PI-owned direct requests, retry, and JSON response helpers
   path-utils.ts       — shared tool-path and file-URI normalization helpers
   report.ts           — shared text/report rendering helpers
   project-roots.ts    — directory walking, root discovery (flat utility)
@@ -42,7 +42,7 @@ src/
 - `registry-utils.ts` — preferred shared location for global registries and normalized-cwd session-state registries used by peer substrate packages
 - `debug-registry.ts` — stable `@mrclrchtr/supi-core/debug` domain surface plus Debug Registry state, retention, redaction, listeners, and queries; producers own event meaning while `supi-debug` owns retention and display policy
 - `debug-timing.ts` — `startDebugTimer()` for one-shot total and sequential phase timings; the timer is a no-op when Debug is disabled, and a `finish()` factory prevents event-data construction on disabled hot paths
-- `llm.ts` — shared LLM utilities: `withRetry()` (exponential-backoff retry with AbortSignal), `extractJsonFromResponse()`, `callWithJsonResponse()` (model resolution → completion → JSON extraction → TypeBox validation)
+- `llm.ts` — shared LLM utilities: `completeModelRequest()` (PI registry completion with stable affinity and OpenCode headers), `withRetry()` (exponential-backoff retry with AbortSignal), `extractJsonFromResponse()`, and `callWithJsonResponse()` (model selection → registry completion → JSON extraction → TypeBox validation)
 - `prompt-surface.ts` — configurable tool prompt-surface resolution and its public types
 
 ## Config gotchas

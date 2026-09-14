@@ -10,6 +10,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { StatusSpinner } from "@mrclrchtr/supi-core/api";
 import { type GhostTextCallbacks, GhostTextEditor } from "./editor/editor.ts";
+import { formatSuggestionWarning, type SuggestionWarning } from "./generation/failure.ts";
 import type { GenerationStatus, SuggestionGenerator } from "./generation/generator.ts";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ export class SessionLifecycle {
   private ghostEditor: GhostTextEditor | null = null;
   private statusSpinner: StatusSpinner | null = null;
   private generationInFlight = false;
+  private lifecycleId = 0;
 
   constructor(private generator: SuggestionGenerator) {}
 
@@ -51,6 +53,8 @@ export class SessionLifecycle {
 
   /** Install the ghost editor wrapper, seed UP-arrow history, and recreate the spinner. */
   onStart(ctx: ExtensionContext): void {
+    this.lifecycleId++;
+    this.generator.reset();
     this.statusSpinner?.stop();
     this.statusSpinner = null;
     this.ghostEditor = null;
@@ -64,6 +68,7 @@ export class SessionLifecycle {
   onAgentSettled(ctx: ExtensionContext): void {
     if (ctx.mode !== "tui") return;
 
+    const lifecycleId = this.lifecycleId;
     const lastAssistant = extractLastAssistantText(ctx.sessionManager.getBranch());
     if (!lastAssistant) {
       this.statusSpinner?.stop();
@@ -77,12 +82,16 @@ export class SessionLifecycle {
     }
 
     this.generator.start(ctx, lastAssistant, {
-      onStatus: (status: GenerationStatus) => this.handleStatus(status, ctx),
+      onStatus: (status: GenerationStatus) => {
+        if (lifecycleId !== this.lifecycleId) return;
+        this.handleStatus(status, ctx);
+      },
     });
   }
 
   /** Dismiss in-flight generation, stop spinner, clear ghost text. */
   onAgentStart(): void {
+    this.lifecycleId++;
     this.statusSpinner?.stop();
     this.generationInFlight = false;
     this.generator.dismiss();
@@ -91,9 +100,19 @@ export class SessionLifecycle {
 
   /** Full cleanup on session shutdown. */
   onShutdown(): void {
+    this.lifecycleId++;
     this.statusSpinner?.stop();
     this.generationInFlight = false;
-    this.generator.dismiss();
+    this.generator.reset();
+    this.ghostEditor?.clearGhost();
+  }
+
+  /** Invalidate generation and warning state after settings persistence. */
+  onSettingsChanged(): void {
+    this.lifecycleId++;
+    this.statusSpinner?.stop();
+    this.generationInFlight = false;
+    this.generator.reset();
     this.ghostEditor?.clearGhost();
   }
 
@@ -115,12 +134,17 @@ export class SessionLifecycle {
       case "error":
         this.generationInFlight = false;
         this.statusSpinner?.stop();
+        if (status.warning) this.notifyWarning(status.warning, ctx);
         break;
       case "idle":
         this.generationInFlight = false;
         this.statusSpinner?.stop();
         break;
     }
+  }
+
+  private notifyWarning(warning: SuggestionWarning, ctx: ExtensionContext): void {
+    if (ctx.hasUI) ctx.ui.notify(formatSuggestionWarning(warning), "warning");
   }
 
   private buildCallbacks(): GhostTextCallbacks {

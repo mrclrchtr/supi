@@ -15,7 +15,7 @@ Reference material for agents that develop PI extensions in this repo. Docs here
 | --- | --- | --- |
 | `pi/tool-guidance.md` | How to design and register PI tools with minimal context cost: placement rules (prefix vs. result vs. free channels), naming, metadata budgets, output limits, checklist | You add or change any model-callable tool |
 | `pi/context-architecture.md` | What PI sends to the model and what it costs: billing tiers (prefix / additions / cache breaks), cache breakpoints, free channels, index into official Pi docs, extension hooks for context control | You touch system prompts, tool metadata, injected messages, history, or compaction |
-| `pi/model-call.md` | How an extension calls models directly via `@earendil-works/pi-ai` | You need a model call outside the agent loop |
+| `pi/model-call.md` | PI-owned requests, the shared SuPi completion module, and separate routing identities | You need a model call outside the agent loop |
 
 ## conventions/ — SuPi conventions
 
@@ -29,6 +29,7 @@ Reference material for agents that develop PI extensions in this repo. Docs here
 ## adr/ and agents/
 
 - `adr/` — architecture decision records. Read only the ADRs for the subsystem you change.
+- [ADR 0023: PI-owned model requests](adr/0023-pi-owned-model-requests.md) — shared direct request handling, separate routing identities, and Agent Run endpoint preservation.
 - [ADR 0022: Request-confirmed, LSP-agnostic diagnostics](adr/0022-request-confirmed-lsp-agnostic-diagnostics.md) — current diagnostic source, confirmation, scheduling, and coverage policy; supersedes the diagnostic-confirmation parts of ADR 0020.
 - `agents/` — issue tracker and triage workflow for agent work in this repo.
 
@@ -36,6 +37,7 @@ Reference material for agents that develop PI extensions in this repo. Docs here
 
 `ops/` holds operational notes and investigation reports.
 
+- [Issue 402 model requests](ops/issue-402-model-requests.md) — approved design and verification record for OpenCode routing, effective endpoints, cache separation, and suggestion warnings.
 - [Issue 407 follow-ups](ops/issue-407-follow-ups.md) — approved follow-up specification and verification record.
 - [Issue 407: TypeScript diagnostics and request-based confirmation](ops/issue-407-push-diagnostics.md) — historical measurements and current implementation status for request-confirmed diagnostics.
 

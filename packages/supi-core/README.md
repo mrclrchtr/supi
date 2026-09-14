@@ -21,6 +21,7 @@ pnpm add @mrclrchtr/supi-core
 ## Package surfaces
 
 - `@mrclrchtr/supi-core/api` — reusable helpers for other packages and extensions
+- `@mrclrchtr/supi-core/llm` — PI-owned direct model requests and JSON helpers
 - `@mrclrchtr/supi-core/report` — shared text/report rendering helpers for TUI and plain-text summaries
 
 ## What you get from the API
@@ -47,6 +48,13 @@ Config file locations:
 ### Context helpers
 
 - `wrapExtensionContext()` — wrap injected text in SuPi's `<extension-context>` tag
+
+### Model requests
+
+- `completeModelRequest(ctx, model, context, options)` — complete through PI's model registry with stable feature affinity. PI owns auth and endpoint resolution.
+- `callWithJsonResponse()` — retry a registry request, extract JSON, and validate it with TypeBox.
+
+`completeModelRequest()` requires a stable `affinityScope`. It keeps cache retention defaults, does not include prompt content in the affinity ID, and adds OpenCode headers only when the provider or exact model endpoint matches OpenCode. Pass `maxTokens: model.maxTokens` when a caller needs the model's declared output cap without using PI private modules.
 
 ### Shared registries
 

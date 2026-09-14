@@ -176,6 +176,7 @@ async function generateSectionInsight<Name extends ParallelInsightSectionName>(
     ctx,
     {
       prompt: section.prompt,
+      affinityScope: `insights:report-section:${section.name}`,
       dataContext,
       maxTokens: section.maxTokens,
       retries: 2,
@@ -259,6 +260,7 @@ ${horizonText}`;
     ctx,
     {
       prompt,
+      affinityScope: "insights:overview",
       maxTokens: 4096,
       retries: 2,
     },
