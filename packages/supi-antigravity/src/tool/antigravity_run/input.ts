@@ -34,42 +34,46 @@ export function buildAntigravityRunSchema(catalogue: readonly CuratedModel[]): T
     maxLength: MAX_PROMPT_CHARS,
     description: "The bounded request to send to Antigravity.",
   });
-  const newInput = Type.Object(
+  // Keep the root schema an object. Some providers reject a top-level anyOf
+  // because function parameters must have `type: "object"`.
+  return Type.Object(
     {
       prompt,
-      new: Type.Object(
-        {
-          workspace: Type.Boolean({
-            description:
-              "true exposes the current PI workspace; false uses the empty Consultation Workspace. Use true only when repository evidence is needed.",
-          }),
-          model: buildModelCatalogueEnum(catalogue),
-        },
-        { additionalProperties: false },
+      new: Type.Optional(
+        Type.Object(
+          {
+            workspace: Type.Boolean({
+              description:
+                "true exposes the current PI workspace; false uses the empty Consultation Workspace. Use true only when repository evidence is needed.",
+            }),
+            model: buildModelCatalogueEnum(catalogue),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+      continue: Type.Optional(
+        Type.Object(
+          {
+            handle: Type.String({
+              minLength: 1,
+              maxLength: MAX_HANDLE_CHARS,
+              description: "Conversation Handle returned by antigravity_run.",
+            }),
+          },
+          {
+            additionalProperties: false,
+            description: "Continue a prior run and inherit its model and workspace access.",
+          },
+        ),
       ),
     },
-    { additionalProperties: false },
-  );
-  const continueInput = Type.Object(
     {
-      prompt,
-      continue: Type.Object(
-        {
-          handle: Type.String({
-            minLength: 1,
-            maxLength: MAX_HANDLE_CHARS,
-            description: "Conversation Handle returned by antigravity_run.",
-          }),
-        },
-        {
-          additionalProperties: false,
-          description: "Continue a prior run and inherit its model and workspace access.",
-        },
-      ),
+      // `prompt` is required, so these bounds require exactly one branch.
+      minProperties: 2,
+      maxProperties: 2,
+      additionalProperties: false,
     },
-    { additionalProperties: false },
   );
-  return Type.Union([newInput, continueInput]);
 }
 
 /** Validate exact-one input and the model against the same catalogue. */

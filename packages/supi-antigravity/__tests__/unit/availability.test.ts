@@ -133,6 +133,11 @@ describe("Antigravity availability", () => {
       ),
     ).toThrow();
     const schema = buildAntigravityRunSchema(catalogue);
+    expect(schema).toMatchObject({
+      type: "object",
+      minProperties: 2,
+      maxProperties: 2,
+    });
     expect(
       Value.Check(schema, {
         prompt: "x",
