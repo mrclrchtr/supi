@@ -21,7 +21,9 @@ not install the ghost editor or make background suggestion model calls. `extensi
 generator emits one bounded warning for the first failure of each model/session stream, then
 suppresses repeated failures until success, a settings change, or a new session. It emits no warning
 for cancellation, stale results, disabled suggestions, or empty successful output. `SessionLifecycle`
-renders warnings and clears the spinner; no persistent footer error status is used.
+renders warnings and clears the spinner; no persistent footer error status is used. Quiet no-ghost
+outcomes (no assistant text, editor not empty at settle, editor not empty at delivery) emit debug
+`generation.skipped` events with a `reason` and lengths only — never suggestion or editor text.
 
 ### Suggestion model via PI registry
 

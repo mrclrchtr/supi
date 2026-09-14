@@ -9,6 +9,7 @@
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { StatusSpinner } from "@mrclrchtr/supi-core/api";
+import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import { type GhostTextCallbacks, GhostTextEditor } from "./editor/editor.ts";
 import { formatSuggestionWarning, type SuggestionWarning } from "./generation/failure.ts";
 import type { GenerationStatus, SuggestionGenerator } from "./generation/generator.ts";
@@ -71,12 +72,31 @@ export class SessionLifecycle {
     const lifecycleId = this.lifecycleId;
     const lastAssistant = extractLastAssistantText(ctx.sessionManager.getBranch());
     if (!lastAssistant) {
+      recordDebugEvent({
+        source: "prompt-suggestions",
+        level: "debug",
+        category: "generation.skipped",
+        message: "Prompt suggestion generation skipped: no assistant message to suggest from",
+        cwd: ctx.cwd,
+        data: { reason: "no-assistant-text" },
+      });
       this.statusSpinner?.stop();
       this.generationInFlight = false;
       return;
     }
 
     if (ctx.ui.getEditorText() !== "") {
+      recordDebugEvent({
+        source: "prompt-suggestions",
+        level: "debug",
+        category: "generation.skipped",
+        message: "Prompt suggestion generation skipped: editor not empty at settle",
+        cwd: ctx.cwd,
+        data: {
+          reason: "editor-not-empty-at-settle",
+          editorTextLen: ctx.ui.getEditorText().length,
+        },
+      });
       this.statusSpinner?.stop();
       return;
     }
@@ -129,6 +149,19 @@ export class SessionLifecycle {
         this.statusSpinner?.stop();
         if (ctx.ui.getEditorText() === "") {
           this.ghostEditor?.setSuggestion(status.suggestion);
+        } else {
+          recordDebugEvent({
+            source: "prompt-suggestions",
+            level: "debug",
+            category: "generation.skipped",
+            message: "Prompt suggestion dropped: editor not empty at delivery",
+            cwd: ctx.cwd,
+            data: {
+              reason: "editor-not-empty-at-delivery",
+              suggestionLen: status.suggestion.length,
+              editorTextLen: ctx.ui.getEditorText().length,
+            },
+          });
         }
         break;
       case "error":
