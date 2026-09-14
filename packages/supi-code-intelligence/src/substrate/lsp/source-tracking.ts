@@ -26,7 +26,12 @@ export interface SourceTrackingReport {
   readonly observedFileCount: number;
   readonly discovered: readonly string[];
   readonly tracked: readonly string[];
-  readonly unsupported: readonly string[];
+  /**
+   * Candidates skipped by automatic policy or tracking preconditions. This can
+   * include policy exclusions, unsupported automatic routes, and paths that
+   * are no longer regular; it is not a server capability result.
+   */
+  readonly skipped: readonly string[];
   readonly unavailable: readonly string[];
   readonly deferred: number;
 }
@@ -68,7 +73,7 @@ export async function trackCreatedSources(options: {
         inventory,
         discovered: [],
         tracked: [],
-        unsupported: [],
+        skipped: [],
         unavailable: [],
         deferred: options.state.createdSourceQueue,
         control: options.control,
@@ -103,7 +108,7 @@ export async function trackCreatedSources(options: {
   };
 
   const tracked = pathsForOutcome(batch.outcomes, "tracked");
-  const unsupported = pathsForOutcome(batch.outcomes, "unsupported");
+  const skipped = pathsForOutcome(batch.outcomes, "skipped");
   const unavailable = pathsForOutcome(batch.outcomes, "unavailable");
   return {
     state: nextState,
@@ -112,7 +117,7 @@ export async function trackCreatedSources(options: {
       inventory,
       discovered,
       tracked,
-      unsupported,
+      skipped,
       unavailable,
       deferred: nextQueue,
       control: options.control,
@@ -188,7 +193,7 @@ function createReport(options: {
   inventory: WorkspaceSourceInventory;
   discovered: readonly string[];
   tracked: readonly string[];
-  unsupported: readonly string[];
+  skipped: readonly string[];
   unavailable: readonly string[];
   deferred: readonly string[];
   control?: CodeRequestControl;
@@ -199,7 +204,7 @@ function createReport(options: {
     observedFileCount: options.inventory.observedFileCount,
     discovered: displayPaths(options.cwd, options.discovered, options.control),
     tracked: displayPaths(options.cwd, options.tracked, options.control),
-    unsupported: displayPaths(options.cwd, options.unsupported, options.control),
+    skipped: displayPaths(options.cwd, options.skipped, options.control),
     unavailable: displayPaths(options.cwd, options.unavailable, options.control),
     deferred: options.deferred.length,
   };

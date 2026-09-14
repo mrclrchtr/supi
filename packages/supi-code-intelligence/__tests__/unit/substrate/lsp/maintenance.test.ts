@@ -73,7 +73,7 @@ function makeRuntime(overrides: Record<string, unknown> = {}) {
       outcomes: await Promise.all(
         filePaths.map(async (file) => {
           if (!runtime.isSupportedSourceFile(file)) {
-            return { file, kind: "unsupported" as const, reason: "not-automatic-source" as const };
+            return { file, kind: "skipped" as const, reason: "not-automatic-source" as const };
           }
           return (await runtime.trackFile(file))
             ? { file, kind: "tracked" as const }

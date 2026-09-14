@@ -28,7 +28,7 @@ export function readSourceTrackingStatus(source: Record<string, unknown> | null)
   if (!source || (source.status !== "complete" && source.status !== "limited")) return null;
   const reason =
     source.status === "limited" && typeof source.reason === "string" ? ` (${source.reason})` : "";
-  return `${source.status}${reason}: ${readNumber(source.observedFileCount)} observed, ${readArrayLength(source.discovered)} discovered, ${readArrayLength(source.tracked)} tracked, ${readArrayLength(source.unsupported)} unsupported, ${readArrayLength(source.unavailable)} unavailable, ${readNumber(source.deferred)} deferred`;
+  return `${source.status}${reason}: ${readNumber(source.observedFileCount)} observed, ${readArrayLength(source.discovered)} discovered, ${readArrayLength(source.tracked)} tracked, ${readArrayLength(source.skipped)} skipped, ${readArrayLength(source.unavailable)} unavailable, ${readNumber(source.deferred)} deferred`;
 }
 
 export function readRefreshStatus(data: Record<string, unknown> | null): string | null {

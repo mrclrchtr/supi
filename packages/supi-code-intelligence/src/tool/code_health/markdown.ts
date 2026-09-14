@@ -10,6 +10,7 @@ import {
   formatProcessCrashRecovery,
   formatRefreshElapsed,
   formatSourceTracking,
+  formatSourceTrackingDetails,
   formatStaleDiagnosticRestarts as formatStaleDiagnosticRestartsText,
   formatStartupRetry,
   isFileReadinessPending,
@@ -132,7 +133,7 @@ function renderSourceTracking(
   lines: string[],
   attempt: Pick<HealthRefreshAttempt, "sourceTracking">,
 ): void {
-  const sourceTracking = formatSourceTracking(attempt.sourceTracking);
+  const sourceTracking = formatSourceTrackingDetails(attempt.sourceTracking);
   if (sourceTracking) lines.push(`**Source discovery**: ${asSentence(sourceTracking)}`);
 }
 

@@ -67,9 +67,15 @@ export interface RoutedMutationResponse<T> {
 export type BulkTrackFileOutcome =
   | { readonly file: string; readonly kind: "tracked" }
   | { readonly file: string; readonly kind: "already-tracked" }
+  /**
+   * Automatic tracking skipped this candidate. This includes policy-excluded
+   * paths, unsupported automatic routes, missing paths, and paths that are no
+   * longer regular. The coarse reason does not prove one cause or that an
+   * explicit request cannot be served.
+   */
   | {
       readonly file: string;
-      readonly kind: "unsupported";
+      readonly kind: "skipped";
       readonly reason: "missing" | "not-automatic-source";
     }
   | { readonly file: string; readonly kind: "unavailable"; readonly reason: string };

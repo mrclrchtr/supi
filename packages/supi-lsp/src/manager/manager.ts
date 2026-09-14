@@ -2021,15 +2021,15 @@ export class LspManager {
   ): Promise<BulkTrackFileOutcome> {
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
     if (!this.isConfiguredAutomaticSourceFile(resolvedPath)) {
-      return { file: resolvedPath, kind: "unsupported", reason: "not-automatic-source" };
+      return { file: resolvedPath, kind: "skipped", reason: "not-automatic-source" };
     }
     const fileStatus = this.inspectSourceFile(resolvedPath);
     if (fileStatus !== "regular") {
       if (fileStatus === "missing") {
-        return { file: resolvedPath, kind: "unsupported", reason: "missing" };
+        return { file: resolvedPath, kind: "skipped", reason: "missing" };
       }
       if (fileStatus === "not-automatic-source") {
-        return { file: resolvedPath, kind: "unsupported", reason: "not-automatic-source" };
+        return { file: resolvedPath, kind: "skipped", reason: "not-automatic-source" };
       }
       return {
         file: resolvedPath,

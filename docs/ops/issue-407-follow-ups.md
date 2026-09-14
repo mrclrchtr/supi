@@ -1,11 +1,56 @@
 # Issue 407 follow-ups
 
-**Status:** All four work items implemented and reviewed. Full checks retain one known Kotlin failure; all 21 package checks passed. Parent live Pi verification remains pending.
+**Status:** The current first-access and source-label corrections are implemented. Full workspace checks retain only the known Kotlin failure; all 21 package checks passed. Parent live verification of these corrections remains pending after reload.
 **Overall baseline:** `b6bf5209`
 **Work item 2 baseline:** `52315e0c`
 **Work item 3 baseline:** `eeafdcbe`
 **Work item 4 baseline:** `0112cf38`
 **Scope:** Input freshness, server-requested diagnostic refresh, mixed-language diagnostic filtering, and maintenance/result scope labels for this implementation slice
+
+## Current fix 1: concurrent first access
+
+**Baseline:** `e57f0808`
+**Status:** Implemented. Automated verification is recorded below. Parent live verification remains pending after reload.
+
+- The private semantic-input barrier now reports a typed cause for a superseded pass and records document enrollment separately from content changes, close, read failure, and lifecycle changes. Retry eligibility is monotonic: after any non-enrollment cause, a later enrollment cannot make the pass retryable.
+- `ClientDiagnostics` can rejoin one superseded pass after a new document enrollment. It uses the original request control and deadline. It does not retry other failures, a closed or unreadable document, a stopped client, or an exhausted retry bound.
+- The shared owner still drains its readers before replacement. Evidence is checked again before a result is completed. No manager or client state is exposed through the public runtime.
+- The public-runtime first-access regressions have 7 tests across two files. They cover concurrent first access, continued enrollment, close, content-then-enrollment, enrollment-then-content, cancellation during enrollment rejoin, and deadline during enrollment rejoin.
+- The registered public `code_health` regression has 2 parameterized tests. They cover explicit `refresh: true` and passive exact-file requests. Both concurrent calls return completed diagnostic observations with `1 requested, 1 confirmed, 0 unconfirmed, 0 failed, 0 removed`.
+- No dependency or GitHub changes are part of this correction.
+
+### Fix 1 retained evidence
+
+- Baseline red evidence at `e57f0808`: the public-runtime first-access test and the registered `code_health` test both failed because one concurrent exact-file result was unavailable with the synchronization-change reason. The exact earlier logs are `/tmp/supi-debug-issue407/first-access-regression-red-1.log`, `/tmp/supi-debug-issue407/first-access-regression-red-2.log`, and `/tmp/supi-debug-issue407/first-access-operator-red.log`.
+- Earlier fix1 focused logs are retained at `/tmp/supi-debug-issue407/fix1-focused-regressions.log`, `/tmp/supi-debug-issue407/fix1-adjacent-public-runtime.log`, `/tmp/supi-debug-issue407/fix1-lsp-code-intelligence-units.log`, `/tmp/supi-debug-issue407/fix1-source-test-typecheck.log`, and `/tmp/supi-debug-issue407/fix1-biome-diff-check.log`. Their counts predate this cleanup and are not current evidence.
+- The red safety regression is retained at `/tmp/supi-debug-issue407/fix1-supersession-red.log`. With monotonic cause handling temporarily removed, `does not rejoin after content invalidation followed by enrollment` returned `completed` instead of `unavailable`; the production fix restores the expected fail-closed result.
+- Earlier probe logs are retained at `/tmp/supi-debug-issue407/fix1-operator-input-barrier-occupancy.log`, `/tmp/supi-debug-issue407/fix1-operator-refresh-consumer-cache-race.log`, and `/tmp/supi-debug-issue407/fix1-operator-diagnostic-invalidation-return-race.log`. The current probe result is recorded below.
+- The final operator run below supersedes the focused verification counts. The parent live first-access and `code_health` checks require an extension reload.
+- Deferred: the push-only maintenance optimization for unchanged inputs with no expected publication remains out of scope. Keep the current budget and the no-false-confirmation rule.
+
+## Current fix 3: truthful automatic source-tracking counts
+
+**Baseline:** `e57f0808`
+**Status:** Implemented. The earlier live Pi pass at `e57f0808` did not load this correction. Automated verification is recorded below; parent live verification remains pending after reload.
+
+- Renamed the automatic bulk-tracking result and report bucket from `unsupported` to `skipped`. This is a breaking result-field rename with no legacy alias. The existing `missing` and `not-automatic-source` reasons, route checks, filters, and queue behavior remain unchanged.
+- `skipped` covers policy-excluded, unsupported automatic-route, missing, and no-longer-regular candidates. It does not claim that an explicit request cannot serve the file. Unavailable paths remain queued; skipped paths are removed.
+- Markdown and TUI source-tracking counts now use `skipped`. Markdown current and failed attempts use one standalone `Source discovery` label; previous/retained and compact/expanded views keep one label in their own projection.
+- The registered public `code_health` regression uses a real `WorkspaceLspRuntime` and a controlled server. It confirms an exact diagnostic for a JavaScript file excluded by tsconfig, then reports `1` skipped, no `unsupported` field, and no JavaScript diagnostic entry in the automatic directory snapshot.
+
+### Fix 3 retained evidence
+
+- Earlier fix3 focused logs are retained at `/tmp/supi-debug-issue407/fix3-focused-regressions.log`, `/tmp/supi-debug-issue407/fix3-lsp-code-intelligence-units.log`, `/tmp/supi-debug-issue407/fix3-lsp-code-intelligence-units-first-run.log`, `/tmp/supi-debug-issue407/fix3-client-diagnostic-scale-retry.log`, `/tmp/supi-debug-issue407/fix3-source-test-typecheck.log`, and `/tmp/supi-debug-issue407/fix3-biome.log`. Their counts predate this cleanup and are not current evidence.
+- The final operator run below supersedes the focused verification counts. Reload before the new source-label live check.
+
+## Current operator verification
+
+- `pnpm verify:ai` passed WASM, lint, source/test typecheck, and skill checks. Vitest reported 405 files passed and 1 failed; 3,407 tests passed, 2 skipped, and 1 failed. There were no unhandled errors.
+- The only failure was the unchanged Kotlin diagnostic test: 240,000 ms elapsed with empty diagnostics for `Main.kt`. Neither its assertion nor its timeout was changed. Full verification is not green.
+- `pnpm pack:verify` ran separately because the failed test stage stops the combined command. All 21 packages passed.
+- Logs: `/tmp/supi-debug-issue407/fixes-1-3-operator-verify.log` and `/tmp/supi-debug-issue407/fixes-1-3-operator-pack.log`.
+- The old live pass at `e57f0808` is recorded in `/tmp/supi-debug-issue407/live-follow-ups-verification.md`. Current corrections still require reload and a new parent live check.
+- The push-only maintenance wait remains unchanged, as requested.
 
 ## Approved policy
 
@@ -49,10 +94,10 @@
 
 | ID | Work item | Status |
 | --- | --- | --- |
-| 1 | Shared Semantic input barrier for semantic evidence freshness | Implemented and verified in this slice |
-| 2 | Native server-requested diagnostic refresh without pretending source text changed | Implemented and verified in this slice |
-| 3 | Mixed-language diagnostic filtering | Implemented and verified in this slice |
-| 4 | Scope labels that separate maintenance scope from result coverage | Implemented and verified in this slice |
+| 1 | Shared Semantic input barrier for semantic evidence freshness | Implemented; current operator verification pending |
+| 2 | Native server-requested diagnostic refresh without pretending source text changed | Implemented; current operator verification pending |
+| 3 | Mixed-language diagnostic filtering | Implemented; current operator verification pending |
+| 4 | Scope labels that separate maintenance scope from result coverage | Implemented; current operator verification pending |
 
 ## Approved test seams
 
@@ -78,6 +123,9 @@ Use real TypeScript/Pyright where useful and controlled server responses for rac
 
 ## Verification record
 
+The records below are retained historical evidence from earlier working-tree states. Their test counts are not current evidence. The current focused results are in [Current focused checks](#current-focused-checks).
+
+- Original e57f0808 live verification happened and is recorded in `/tmp/supi-debug-issue407/live-follow-ups-verification.md`. It predates the current working-tree fixes and cleanup.
 - Implementation evidence: `ClientDiagnostics` uses one bounded asynchronous full-content read barrier for semantic and exact diagnostic requests. `LspClient` checks the barrier before and after semantic requests. The barrier keeps verified disk observations separate from explicitly supplied document content; a selected override does not replace the disk baseline. Ordinary refresh reports detected content changes through the same input and evidence revision, updates the verified disk observation, and does not resend unchanged text.
 - Follow-up correction evidence: `SemanticInputBarrier` stores and shares one mutable pending owner, waits for incompatible owners to settle before replacement, stops dispatch after abandonment, and drains all in-flight readers before settlement. Public-runtime regressions cover cancellation, deadlines, input generations, concurrent callers, and same-size edits with preserved mtimes. Unit tests use a controlled `node:fs/promises` seam and `vi.runAllTicks()` instead of extra reads or fixed Promise-microtask loops.
 - Baseline red evidence: in an isolated worktree at `b6bf5209`, with the new recovery test and its controlled LSP fixture copied into the worktree, this command failed:
@@ -94,7 +142,7 @@ Use real TypeScript/Pyright where useful and controlled server responses for rac
   ./node_modules/.bin/vitest run packages/supi-lsp/__tests__/unit/diagnostic-sync.test.ts packages/supi-lsp/__tests__/unit/client-diagnostic-freshness.test.ts packages/supi-lsp/__tests__/unit/client-diagnostic-request.test.ts packages/supi-lsp/__tests__/unit/client-diagnostic-push-regression.test.ts packages/supi-lsp/__tests__/unit/client-refresh-reuse.test.ts packages/supi-lsp/__tests__/unit/client-refresh.test.ts packages/supi-lsp/__tests__/unit/client-refresh-request.test.ts packages/supi-lsp/__tests__/integration/workspace-runtime.integration.barrier.test.ts packages/supi-lsp/__tests__/integration/workspace-runtime.integration.semantic.test.ts packages/supi-lsp/__tests__/integration/workspace-runtime.integration.typescript.test.ts packages/supi-code-intelligence/__tests__/integration/substrate/lsp/recovery-public-tool.integration.test.ts --testTimeout=30000
   ```
 
-  Result: `Test Files 11 passed (11)` and `Tests 105 passed (105)`. The operator repeated this focused run after the final cleanup and confirmed the count. This includes 5 public-runtime barrier regressions and 54 diagnostic freshness/request tests after deterministic I/O coordination changes.
+  Result: `Test Files 11 passed (11)` and `Tests 105 passed (105)`. This is historical evidence from the retained log and is not a current count.
 - Focused Biome evidence: `pnpm exec biome check` passed for all 16 changed TypeScript files with no remaining diagnostics.
 - TypeScript evidence: this command passed with exit code 0 and no output:
 
@@ -197,10 +245,19 @@ Use real TypeScript/Pyright where useful and controlled server responses for rac
 - Barrier post-fix evidence: three default-config runs with no `--testTimeout` override each passed with `1` file and `6` tests. A repeat with the controlled readiness delay changed from 100 ms to 250 ms also passed with `1` file and `6` tests. The full barrier-file command passed with `1` file and `6` tests. The adjacent public runtime/Pi command passed with `4` files and `14` tests; the relevant unit command passed with `8` files and `126` tests. Source and test typechecks passed with no output. Biome passed for 12 changed TypeScript/fixture files, and `git diff --check` passed.
 - Operator probes after the fix all exited 0: `refresh-consumer-cache-race.mjs` returned completed changed diagnostics during and after refresh; `diagnostic-invalidation-return-race.mjs` returned the expected partial current-generation result during refresh and completed fresh diagnostics after refresh; `input-barrier-occupancy.mjs` reported `{"configuredReadBound":1,"startedBeforeFirstReadSettled":1,"maximumActiveReads":1}`.
 
-## Final workspace verification
+## Current focused checks
 
-- The operator reran `pnpm verify:ai` after the readiness-test correction. WASM, lint, source/test typecheck, and skill checks passed. Vitest reported 401 files passed and 1 failed; 3,397 tests passed, 2 skipped, and 1 failed. There were no unhandled errors.
-- The only remaining failure is the unchanged Kotlin test `pulls diagnostics for a file with a type error` in `client.integration.kotlin.test.ts`. It timed out after 240,000 ms with empty diagnostics for `Main.kt`. The test was not skipped or weakened. Full verification is not green.
-- The failed test phase stopped the combined command before packaging. The operator therefore ran `pnpm pack:verify` separately. All 21 packages passed.
-- Logs: `/tmp/supi-debug-issue407/follow-ups-verify-final.log` and `/tmp/supi-debug-issue407/follow-ups-pack-final.log`.
-- Parent live Pi verification remains pending. Reload the extension before repeating the cross-file, idle-refresh, mixed-language, and scope-label cases.
+- Changed and adjacent public-runtime and Pi integration tests passed: `Test Files 13 passed (13)` and `Tests 39 passed (39)`. The run used the default config with no `testTimeout` override. Log: `/tmp/supi-debug-issue407/advisory-cleanup-public-integrations.log`.
+- The registered public `code_health` first-access test has 2 cases: explicit `refresh: true` and passive exact-file access. Both cases preserve cold documents, controlled enrollment timing, and confirmed evidence. Log: `/tmp/supi-debug-issue407/advisory-cleanup-first-access-public.log`.
+- LSP and code-intelligence unit tests passed: `Test Files 152 passed (152)` and `Tests 1361 passed (1361)`. The run used default parallelism and did not use `--no-file-parallelism`. Log: `/tmp/supi-debug-issue407/advisory-cleanup-lsp-code-intelligence-units.log`.
+- Source and test typechecks passed with exit code 0. Log: `/tmp/supi-debug-issue407/advisory-cleanup-source-test-typecheck.log`.
+- Biome checked 28 changed or new TypeScript and fixture files with no diagnostics. Log: `/tmp/supi-debug-issue407/advisory-cleanup-biome.log`.
+- `git diff --check` passed. Log: `/tmp/supi-debug-issue407/advisory-cleanup-diff-check.log`.
+- All three existing race and ownership probes passed. Log: `/tmp/supi-debug-issue407/advisory-cleanup-operator-probes.log`.
+- The operator subsequently ran full verification and packaging. See the current operator verification section; only the parent live check remains pending.
+
+## Earlier workspace verification (historical)
+
+- `/tmp/supi-debug-issue407/follow-ups-verify-final.log` retains an earlier full verification with the unchanged Kotlin timeout. It predates the current working-tree fixes and cleanup.
+- `/tmp/supi-debug-issue407/follow-ups-pack-final.log` retains the earlier package verification at `e57f0808`.
+- Parent live Pi verification of the current fixes remains pending. Reload the extension before repeating the cross-file, idle-refresh, mixed-language, and scope-label cases.

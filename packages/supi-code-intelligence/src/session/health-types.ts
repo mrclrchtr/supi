@@ -119,7 +119,10 @@ interface CompletedHealthRefreshAttempt {
   /** Separate outcome for initial-start retries. */
   readonly startupRetry?: StartupRetryReport;
   readonly staleAssessment: HealthStaleAssessment;
-  /** Source discovery and bounded tracking facts for broad refreshes. */
+  /**
+   * Source discovery and bounded tracking facts for broad refreshes. The
+   * report's skipped list describes automatic tracking policy, not capability.
+   */
   readonly sourceTracking?: SourceTrackingReport;
 }
 
@@ -153,7 +156,10 @@ export type HealthRefreshAttempt =
       readonly processCrashRecovery?: ProcessCrashRecoveryReport;
       /** Initial-start retry outcome, when the recovery pass returned one. */
       readonly startupRetry?: StartupRetryReport;
-      /** Source discovery and bounded tracking facts for broad refreshes. */
+      /**
+       * Source discovery and bounded tracking facts for broad refreshes. The
+       * report's skipped list describes automatic tracking policy, not capability.
+       */
       readonly sourceTracking?: SourceTrackingReport;
       /** File readiness outcome, when a file-scoped attempt failed. */
       readonly fileReadiness?: HealthFileReadiness;

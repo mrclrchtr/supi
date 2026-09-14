@@ -152,7 +152,7 @@ describe("LspManager concurrency guard", () => {
     }
   });
 
-  it("does not start a route for unsupported bulk paths", async () => {
+  it("does not start a route for skipped bulk paths", async () => {
     const sessionCwd = makeTempRoot();
     const manager = new LspManager(
       {
@@ -167,8 +167,8 @@ describe("LspManager concurrency guard", () => {
       },
       sessionCwd,
     );
-    const unsupported = join(sessionCwd, "source.js");
-    writeFileSync(unsupported, "export {};\n");
+    const skipped = join(sessionCwd, "source.js");
+    writeFileSync(skipped, "export {};\n");
     const performStartSpy = vi
       .spyOn(
         LspManager.prototype as unknown as { performStart: () => Promise<null> },
@@ -177,8 +177,8 @@ describe("LspManager concurrency guard", () => {
       .mockImplementation(() => Promise.resolve(null));
 
     try {
-      await expect(manager.bulkTrackFiles([unsupported])).resolves.toEqual({
-        outcomes: [{ file: unsupported, kind: "unsupported", reason: "not-automatic-source" }],
+      await expect(manager.bulkTrackFiles([skipped])).resolves.toEqual({
+        outcomes: [{ file: skipped, kind: "skipped", reason: "not-automatic-source" }],
       });
       expect(performStartSpy).not.toHaveBeenCalled();
     } finally {

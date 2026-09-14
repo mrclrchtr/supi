@@ -27,7 +27,7 @@ The latest complete set of automatic-policy-eligible files with a configured LSP
 _Avoid_: sentinel snapshot, current file list, source mtime snapshot
 
 **Created-source queue**:
-A deduplicated queue of source paths found after the Source baseline. A broad diagnostic refresh processes up to 256 paths, retains out-of-scope and unavailable paths, and removes paths after tracked, already-tracked, or unsupported outcomes.
+A deduplicated queue of source paths found after the Source baseline. A broad diagnostic refresh processes up to 256 paths, retains out-of-scope and unavailable paths, and removes paths after tracked, already-tracked, or skipped outcomes.
 _Avoid_: source change list, unbounded tracking queue, diagnostic evidence
 
 **Limited source discovery**:

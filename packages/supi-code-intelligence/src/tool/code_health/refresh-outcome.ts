@@ -101,10 +101,18 @@ function formatStartupRetryEntry(entry: StartupRetryEntry): string {
 export function formatSourceTracking(
   report: SourceTrackingReport | null | undefined,
 ): string | null {
+  const details = formatSourceTrackingDetails(report);
+  return details ? `source discovery: ${details}` : null;
+}
+
+/** Format source tracking counts without a label for a standalone heading. */
+export function formatSourceTrackingDetails(
+  report: SourceTrackingReport | null | undefined,
+): string | null {
   if (!report) return null;
   const inventory =
     report.status === "complete" ? "complete" : `limited (${report.reason ?? "unknown reason"})`;
-  return `source discovery: ${inventory}; ${report.observedFileCount} source files observed, ${report.discovered.length} discovered, ${report.tracked.length} tracked, ${report.unsupported.length} unsupported, ${report.unavailable.length} unavailable, ${report.deferred} deferred`;
+  return `${inventory}; ${report.observedFileCount} source files observed, ${report.discovered.length} discovered, ${report.tracked.length} tracked, ${report.skipped.length} skipped, ${report.unavailable.length} unavailable, ${report.deferred} deferred`;
 }
 
 /** Format the age of a retained refresh attempt for a status line. */

@@ -295,7 +295,7 @@ describe("code_health result assembly", () => {
             observedFileCount: 50_001,
             discovered: [],
             tracked: [],
-            unsupported: [],
+            skipped: [],
             unavailable: [],
             deferred: 4,
           },
@@ -315,8 +315,9 @@ describe("code_health result assembly", () => {
       sourceTracking: { status: "limited", reason: "file-limit", deferred: 4 },
     });
     expect(markdown).toContain(
-      "**Source discovery**: source discovery: limited (file-limit); 50001 source files observed, 0 discovered, 0 tracked, 0 unsupported, 0 unavailable, 4 deferred.",
+      "**Source discovery**: limited (file-limit); 50001 source files observed, 0 discovered, 0 tracked, 0 skipped, 0 unavailable, 4 deferred.",
     );
+    expect(markdown.match(/source discovery/gi)).toHaveLength(1);
     expect(markdown).toContain("Evidence coverage**: 0 requested, 0 confirmed");
   });
 

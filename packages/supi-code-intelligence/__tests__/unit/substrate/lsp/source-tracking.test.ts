@@ -54,18 +54,18 @@ describe("created-source tracking state", () => {
     tmpDir = mkdtempSync(path.join(os.tmpdir(), "source-tracking-"));
     const existing = path.join(tmpDir, "existing.ts");
     const tracked = path.join(tmpDir, "tracked.ts");
-    const unsupported = path.join(tmpDir, "unsupported.ts");
+    const skipped = path.join(tmpDir, "skipped.ts");
     const unavailable = path.join(tmpDir, "unavailable.ts");
-    for (const file of [existing, tracked, unsupported, unavailable]) writeFileSync(file, "\n");
+    for (const file of [existing, tracked, skipped, unavailable]) writeFileSync(file, "\n");
 
     const scanWorkspaceSources = vi
       .fn()
       .mockResolvedValueOnce(inventory([existing]))
-      .mockResolvedValueOnce(inventory([existing, tracked, unsupported, unavailable]));
+      .mockResolvedValueOnce(inventory([existing, tracked, skipped, unavailable]));
     const bulkTrackFiles = vi.fn().mockResolvedValue({
       outcomes: [
         { file: tracked, kind: "tracked" },
-        { file: unsupported, kind: "unsupported", reason: "not-automatic-source" },
+        { file: skipped, kind: "skipped", reason: "not-automatic-source" },
         { file: unavailable, kind: "unavailable", reason: "route unavailable" },
       ],
     });
@@ -82,16 +82,15 @@ describe("created-source tracking state", () => {
     });
 
     expect(second.report).toMatchObject({
-      discovered: ["tracked.ts", "unsupported.ts", "unavailable.ts"],
+      discovered: ["tracked.ts", "skipped.ts", "unavailable.ts"],
       tracked: ["tracked.ts"],
-      unsupported: ["unsupported.ts"],
+      skipped: ["skipped.ts"],
       unavailable: ["unavailable.ts"],
       deferred: 1,
     });
     expect(second.state.createdSourceQueue).toEqual([unavailable]);
-    expect(second.state.sourceBaseline).toEqual(
-      new Set([existing, tracked, unsupported, unavailable]),
-    );
+    expect(second.state.createdSourceQueue).not.toContain(skipped);
+    expect(second.state.sourceBaseline).toEqual(new Set([existing, tracked, skipped, unavailable]));
   });
 
   it("passes no more than 256 created paths to one bulk batch", async () => {

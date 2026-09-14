@@ -132,9 +132,9 @@ describe("code_health TUI projection", () => {
           status: "limited",
           reason: "filesystem-error",
           observedFileCount: 10,
-          discovered: [],
+          discovered: ["excluded.js"],
           tracked: [],
-          unsupported: [],
+          skipped: ["excluded.js"],
           unavailable: [],
           deferred: 2,
         },
@@ -148,9 +148,15 @@ describe("code_health TUI projection", () => {
     });
 
     expect(render(details, true)).toContain("Source discovery: limited");
+    expect(render(details, true)).toContain("1 skipped");
     expect(render(details, true)).toContain("filesystem-error");
+    expect(render(details, true)).not.toContain("unsupported");
+    expect(render(details, true).match(/source discovery/gi)).toHaveLength(1);
     expect(render(details)).toContain("source discovery limited");
+    expect(render(details)).toContain("1 skipped");
     expect(render(details)).toContain("filesystem-error");
+    expect(render(details)).not.toContain("unsupported");
+    expect(render(details).match(/source discovery/gi)).toHaveLength(1);
   });
 
   it("labels pending file readiness as warming in compact and expanded views", () => {

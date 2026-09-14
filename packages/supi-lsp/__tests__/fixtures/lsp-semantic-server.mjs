@@ -24,6 +24,17 @@ function respond(id, result) {
 }
 
 function diagnosticItems(uri) {
+  if (uri.endsWith("/excluded.js")) {
+    return [
+      {
+        message: "JavaScript syntax error.",
+        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+        severity: 1,
+        source: "source-tracking-fixture",
+      },
+    ];
+  }
+
   const dependency = [...documents.entries()].find(([documentUri]) =>
     documentUri.endsWith("/dependency.test"),
   )?.[1];
