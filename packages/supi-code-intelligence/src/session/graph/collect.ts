@@ -76,7 +76,7 @@ async function collectReferences(options: CollectRelationOptions): Promise<Graph
     },
   });
   if (result.confidence === "unavailable") {
-    return { kind: "unavailable", rel: "references", message: "References unavailable" };
+    return { kind: "unavailable", rel: "references", message: result.message };
   }
 
   const targetLine = options.position.line + 1;

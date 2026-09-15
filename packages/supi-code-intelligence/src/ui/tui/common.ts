@@ -1,9 +1,6 @@
 /**
- * Shared TUI rendering utilities for code-intelligence tool results.
- *
- * Extracted from the per-tool renderers to eliminate duplication:
- * evidence section rendering, markdown detail, count badges,
- * partial/error guards, and the shared simple-result pattern.
+ * Shared transcript helpers for structured Code Intelligence results.
+ * Tool renderers own presentation; these helpers read assembled details.
  */
 
 import {
@@ -11,12 +8,14 @@ import {
   type Theme,
   type ToolRenderResultOptions,
 } from "@earendil-works/pi-coding-agent";
-import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
+import { type Component, Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { formatEvidenceBadge } from "@mrclrchtr/supi-core/evidence-badge";
 import { truncateDisplayText } from "../../tool/result/display.ts";
 import { renderToolDisplaySections } from "./display.ts";
+import { renderExecutionError } from "./execution-error.ts";
 
 export { formatCallPath, formatCallValue, renderToolDisplaySections } from "./display.ts";
+export { renderExecutionError } from "./execution-error.ts";
 
 import type {
   ToolDisplaySection,
@@ -58,6 +57,8 @@ export const EVIDENCE_KEY_LABELS: Record<string, string> = {
   "imports.modules": "imports",
   "inspect.definitions": "definitions",
   "inspect.diagnostics": "nearby diagnostics",
+  "graph.candidates": "candidates",
+  "orientation.candidates": "candidates",
   "references.locations": "references",
   "refactor.edits": "edits",
   "resolve.candidates": "candidates",
@@ -135,12 +136,14 @@ function isOptionalCount(value: unknown): value is number | undefined {
 
 /** Format one assembled evidence list without recomputing its bounds. */
 export function formatEvidenceEntry(entry: EvidenceEntry): string {
+  const label = evidenceLabel(entry.key);
+  const singleCandidate = label === "candidates" && (entry.totalCount ?? entry.shownCount) === 1;
   const badge = formatEvidenceBadge({
     shownCount: entry.shownCount,
     totalCount: entry.totalCount,
     omittedCount: entry.omittedCount,
     partialReason: entry.partialReason,
-    label: evidenceLabel(entry.key),
+    label: singleCandidate ? "candidate" : label,
   });
   if (!entry.invalidLocationCount) return badge;
   const noun = entry.invalidLocationCount === 1 ? "location" : "locations";
@@ -181,19 +184,6 @@ export function renderPartial(label: string, theme: Theme): Text {
   return new Text(theme.fg("warning", label), 0, 0);
 }
 
-export function renderError(label: string, theme: Theme): Text {
-  return new Text(theme.fg("error", label), 0, 0);
-}
-
-/** Render an execution failure from PI's renderer context. */
-export function renderExecutionError(
-  context: ToolRendererContext | undefined,
-  label: string,
-  theme: Theme,
-): Text | null {
-  return context?.isError ? renderError(label, theme) : null;
-}
-
 /** Render a domain error encoded in structured result details. */
 export function renderDomainError(result: ToolResult, theme: Theme): Text | null {
   const status = result.details?.status;
@@ -210,7 +200,7 @@ export function renderDomainError(result: ToolResult, theme: Theme): Text | null
   const message = result.details?.message
     ? `: ${truncateDisplayText(result.details.message, 160)}`
     : "";
-  return renderError(`${label}${message}`, theme);
+  return new Text(theme.fg("error", `${label}${message}`), 0, 0);
 }
 
 /** Render an invalid-input or unavailable result with its structured body. */
@@ -242,8 +232,6 @@ export function renderTruncationDisclosure(result: ToolResult, theme: Theme): Te
   return new Text(theme.fg("warning", `${label}${path}`), 0, 0);
 }
 
-// ── Result options ───────────────────────────────────────────────
-
 // ── Shared simple-result renderer ─────────────────────────────────
 
 /**
@@ -257,12 +245,16 @@ export function renderSimpleResult(
   result: ToolResult,
   options: ResultOptios,
   theme: Theme,
-  partialLabel: string,
+  labels: { progress: string; failure: string },
   context?: ToolRendererContext,
-): Container | Text {
-  if (options.isPartial) return renderPartial(partialLabel, theme);
+): Component {
+  if (options.isPartial) return renderPartial(labels.progress, theme);
 
-  const executionError = renderExecutionError(context, "Tool failed", theme);
+  const executionError = renderExecutionError(
+    result,
+    { isError: context?.isError, expanded: options.expanded, label: labels.failure },
+    theme,
+  );
   if (executionError) return executionError;
 
   const domainError = renderDomainError(result, theme);

@@ -1,4 +1,5 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import {
   createEvidenceList,
   createPartialEvidenceList,
@@ -18,10 +19,12 @@ import {
   type ResultProvenance,
   type ToolResultAssembly,
 } from "../result/assembly.ts";
+import { formatCandidateRow } from "../result/candidate-row.ts";
 import { createToolDisplaySection } from "../result/display.ts";
 import type { ToolDisplaySection } from "../result/types.ts";
 import type { GraphDetails, GraphFileGroup, GraphSectionDetails } from "./details.ts";
 import { graphDisplaySection } from "./display.ts";
+import { formatGraphEvidence } from "./format.ts";
 import { graphReadNext } from "./read-next.ts";
 
 export type { GraphRelationKind, GraphSection } from "../../session/graph-types.ts";
@@ -276,28 +279,51 @@ function finishGraphCandidates(
       `- \`${candidate.targetId}\` — ${candidate.name} (\`${candidate.kind ?? "unknown"}\`) at ${candidate.file}:${candidate.line}:${candidate.character}`,
     );
   }
+  const evidence = graphCandidateEvidence(outcome);
+  lines.push("", formatGraphEvidence(evidence, "candidates"));
   if (outcome.kind === "kind-mismatch") {
     lines.push(
       "",
       "Retry without `symbolKind`, use an observed provider kind, or choose a handle.",
     );
   }
+  const displaySections = [
+    createToolDisplaySection({
+      key: "graph.candidates",
+      title: "Candidates",
+      items: outcome.candidates,
+      totalCount: evidence.totalCount,
+      omittedCount: evidence.omittedCount,
+      partialReason: evidence.partialReason,
+      format: (candidate) => formatCandidateRow(candidate, "handle-first"),
+    }),
+  ];
   return searchErrorResult(lines.join("\n"), {
+    confidence: "semantic",
+    evidenceLists: [evidence],
+    nextQueries:
+      outcome.kind === "kind-mismatch"
+        ? ["Retry without symbolKind, use an observed provider kind, or choose a near-match handle"]
+        : ["Choose one candidate handle, or narrow the symbol selector with scope or symbolKind"],
     status: outcome.kind === "disambiguation" ? "disambiguation" : "invalid-input",
     message:
       outcome.kind === "kind-mismatch"
         ? `No target matched provider kind ${outcome.requestedKind}.`
         : "The target is ambiguous.",
-    displaySections: [
-      createToolDisplaySection({
-        key: "graph.candidates",
-        title: "Candidates",
-        items: outcome.candidates,
-        format: (candidate) =>
-          `${candidate.targetId} — ${candidate.name} (${candidate.kind ?? "unknown"}) at ${candidate.file}:${candidate.line}:${candidate.character}`,
-      }),
-    ],
+    displaySections,
   });
+}
+
+function graphCandidateEvidence(
+  outcome: Extract<GraphOutcome, { kind: "disambiguation" | "kind-mismatch" }>,
+): EvidenceListMetadata {
+  return {
+    key: "graph.candidates",
+    totalCount: outcome.totalCount,
+    shownCount: outcome.candidates.length,
+    omittedCount: outcome.omittedCount,
+    partialReason: outcome.partialReason,
+  };
 }
 
 function hasHiddenDisplayEvidence(assembly: GraphResultAssembly): boolean {

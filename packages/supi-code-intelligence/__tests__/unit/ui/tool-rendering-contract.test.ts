@@ -25,7 +25,7 @@ describe("Code Intelligence tool rendering contract", () => {
       { isError: true },
     );
 
-    expect(rendered.render(120).join("\n")).toContain("Tool failed");
+    expect(rendered.render(120).join("\n")).toContain("code_find failed");
   });
 
   it("renders domain errors and structured expanded rows", () => {

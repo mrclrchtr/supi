@@ -131,10 +131,18 @@ async function orientTarget(options: {
       ? {
           kind: "kind-mismatch",
           requestedKind: target.requestedKind,
-          omittedCount: target.omittedCount,
           candidates,
+          totalCount: target.totalCount,
+          omittedCount: target.omittedCount,
+          partialReason: target.partialReason,
         }
-      : { kind: "disambiguation", omittedCount: target.omittedCount, candidates };
+      : {
+          kind: "disambiguation",
+          candidates,
+          totalCount: target.totalCount,
+          omittedCount: target.omittedCount,
+          partialReason: target.partialReason,
+        };
   }
   if (target.kind !== "resolved") return target;
   throwIfAborted(control);

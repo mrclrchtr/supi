@@ -1,5 +1,8 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
-import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
+import {
+  type EvidenceListMetadata,
+  renderEvidenceListMetadataDisclosure,
+} from "../../analysis/evidence.ts";
 import type { ReadNextItem } from "../../analysis/read-next.ts";
 import type {
   OrientationCandidate,
@@ -15,6 +18,7 @@ import {
   type ResultSection,
   type ToolResultAssembly,
 } from "../result/assembly.ts";
+import { formatCandidateRow } from "../result/candidate-row.ts";
 import { createToolDisplaySection } from "../result/display.ts";
 import type {
   ContextDetails,
@@ -47,17 +51,17 @@ export interface OrientationResultAssembly {
 /** Build structured candidate rows for an unresolved Orientation target. */
 export function orientationCandidateDisplaySections(
   candidates: readonly OrientationCandidate[],
-  omittedCount = 0,
+  evidence: EvidenceListMetadata,
 ): readonly ToolDisplaySection[] {
   return [
     createToolDisplaySection({
       key: "orientation.candidates",
       title: "Candidates",
       items: candidates,
-      totalCount: candidates.length + omittedCount,
-      omittedCount,
-      format: (candidate) =>
-        `${candidate.rank}. ${candidate.name} (${candidate.kind ?? "unknown"}) — ${candidate.file}:${candidate.line}:${candidate.character} [${candidate.targetId}]`,
+      totalCount: evidence.totalCount,
+      omittedCount: evidence.omittedCount,
+      partialReason: evidence.partialReason,
+      format: (candidate) => formatCandidateRow(candidate, "rank-first"),
     }),
   ];
 }
@@ -215,13 +219,23 @@ export function finishOrientationResult(outcome: OrientationOutcome): CodeIntelR
         `${candidate.rank}. **${candidate.name}** (\`${candidate.kind ?? "unknown"}\`) — \`${candidate.file}\`:${candidate.line}:${candidate.character} — \`${candidate.targetId}\``,
       );
     }
+    const evidence: EvidenceListMetadata = {
+      key: "orientation.candidates",
+      totalCount: outcome.totalCount,
+      shownCount: candidates.length,
+      omittedCount: outcome.omittedCount,
+      partialReason: outcome.partialReason,
+    };
+    const disclosure = renderEvidenceListMetadataDisclosure(evidence);
+    if (disclosure) lines.push("", disclosure);
     const nextQueries =
       outcome.kind === "kind-mismatch"
         ? ["Retry without symbolKind, use an observed provider kind, or focus one handle"]
         : ["Use one candidate handle as focus.target.handle"];
     const details = assembleOrientationDetails({
       confidence: "semantic",
-      omittedCount: outcome.omittedCount,
+      omittedCount: evidence.omittedCount ?? 0,
+      evidenceLists: [evidence],
       candidates,
       nextQueries,
     });
@@ -231,7 +245,8 @@ export function finishOrientationResult(outcome: OrientationOutcome): CodeIntelR
         type: "context",
         data: details,
         status: "completed",
-        displaySections: orientationCandidateDisplaySections(candidates, outcome.omittedCount),
+        message: orientationSelectionMessage(outcome),
+        displaySections: orientationCandidateDisplaySections(candidates, evidence),
       },
     };
   }
@@ -245,4 +260,12 @@ export function finishOrientationResult(outcome: OrientationOutcome): CodeIntelR
       displaySections: assembly.displaySections,
     },
   };
+}
+
+function orientationSelectionMessage(
+  outcome: Extract<OrientationOutcome, { kind: "disambiguation" | "kind-mismatch" }>,
+): string {
+  return outcome.kind === "kind-mismatch"
+    ? `No Orientation target matched provider kind ${outcome.requestedKind}.`
+    : "Multiple Orientation targets require one candidate.";
 }

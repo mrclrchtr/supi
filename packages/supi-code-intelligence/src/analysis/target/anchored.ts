@@ -191,7 +191,9 @@ async function candidatesFromSymbols(
 ): Promise<{
   kind: "disambiguation";
   candidates: DisambiguationCandidateData[];
+  totalCount: number;
   omittedCount: number;
+  partialReason: null;
 }> {
   const candidates = await Promise.all(
     matched.map(async (s, idx) => {
@@ -215,7 +217,13 @@ async function candidatesFromSymbols(
       } satisfies DisambiguationCandidateData;
     }),
   );
-  return { kind: "disambiguation", candidates, omittedCount: 0 };
+  return {
+    kind: "disambiguation",
+    candidates,
+    totalCount: candidates.length,
+    omittedCount: 0,
+    partialReason: null,
+  };
 }
 
 /** Layer 1: match the coordinate against LSP document symbols. Returns null to fall through. */

@@ -18,7 +18,11 @@ import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import type { TargetSymbolKind } from "../../session/target-input.ts";
 import type { AnchorKind } from "../../session/target-store.ts";
 import { normalizePath } from "../search/paths.ts";
-import type { DisambiguationCandidateData, TargetOutcome } from "./types.ts";
+import type {
+  DisambiguationCandidateData,
+  TargetCandidateCompleteness,
+  TargetOutcome,
+} from "./types.ts";
 
 const MAX_CANDIDATES = 8; // default fallback when maxResults is not provided
 const NON_EXPORTED_KINDS = new Set(["Variable", "Field", "Property"]);
@@ -146,6 +150,7 @@ export async function resolveSymbolTarget(
       return buildCandidateOutcome({
         kind: "kind-mismatch",
         candidates: eligible,
+        ...candidateCompleteness(result, eligible.length),
         semantic,
         cwd,
         maxResults: options.maxResults,
@@ -155,6 +160,7 @@ export async function resolveSymbolTarget(
     }
     return resolveCandidates({
       candidates: exactKind,
+      ...candidateCompleteness(result, exactKind.length),
       semantic,
       cwd,
       maxResults: options.maxResults,
@@ -164,6 +170,7 @@ export async function resolveSymbolTarget(
 
   return resolveCandidates({
     candidates: eligible,
+    ...candidateCompleteness(result, eligible.length),
     semantic,
     cwd,
     maxResults: options?.maxResults,
@@ -179,19 +186,15 @@ function normalizeProviderKind(kind: string): string {
   return kind.replace(/[\s_-]/g, "").toLowerCase();
 }
 
-async function resolveCandidates(options: {
-  candidates: readonly CodeSymbol[];
-  semantic: SemanticSubstrate;
-  cwd: string;
-  maxResults?: number;
-  control?: CodeRequestControl;
-}): Promise<TargetOutcome> {
-  const { candidates, semantic, cwd, maxResults, control } = options;
+async function resolveCandidates(
+  options: CandidateOutcomeBase & Pick<TargetCandidateCompleteness, "totalCount" | "partialReason">,
+): Promise<TargetOutcome> {
+  const { candidates, semantic, cwd, maxResults, control, totalCount, partialReason } = options;
   const ranged = candidates.filter(
     (candidate) =>
       candidate.declarationAnchor.line > 0 || candidate.declarationAnchor.character > 0,
   );
-  if (ranged.length === 1) {
+  if (ranged.length === 1 && totalCount !== null) {
     return resolvedTarget(await refineResolvedSymbolAnchor(ranged[0], semantic, control));
   }
   return buildCandidateOutcome({
@@ -200,6 +203,8 @@ async function resolveCandidates(options: {
     semantic,
     cwd,
     maxResults,
+    totalCount,
+    partialReason,
     control,
   });
 }
@@ -230,13 +235,24 @@ interface CandidateOutcomeBase {
   semantic: SemanticSubstrate;
   cwd: string;
   maxResults?: number;
+  control?: CodeRequestControl;
+}
+
+function candidateCompleteness(
+  result: Exclude<CodeQueryResult<CodeSymbol[]>, { kind: "unavailable" }>,
+  totalCount: number,
+): Pick<TargetCandidateCompleteness, "totalCount" | "partialReason"> {
+  return result.kind === "partial"
+    ? { totalCount: null, partialReason: "provider-limited" }
+    : { totalCount, partialReason: null };
 }
 
 type CandidateOutcomeOptions = CandidateOutcomeBase &
+  Pick<TargetCandidateCompleteness, "totalCount" | "partialReason"> &
   (
     | { kind: "disambiguation"; requestedKind?: never }
     | { kind: "kind-mismatch"; requestedKind: TargetSymbolKind }
-  ) & { control?: CodeRequestControl };
+  );
 
 /**
  * Refine only bounded visible candidates to name anchors while retaining the
@@ -271,7 +287,9 @@ async function buildCandidateOutcome(
   );
   const common = {
     candidates: toDisambiguationCandidates(refined, options.cwd),
+    totalCount: options.totalCount,
     omittedCount: Math.max(0, options.candidates.length - cap),
+    partialReason: options.partialReason,
   };
   return options.kind === "kind-mismatch"
     ? {

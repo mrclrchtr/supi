@@ -1,7 +1,11 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { completedCodeQuery, partialCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  completedCodeQuery,
+  partialCodeQuery,
+  unavailableCodeQuery,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeGraphTool } from "../../../src/tool/code_graph/execute.ts";
 import { renderGraphResult } from "../../../src/tool/code_graph/tui.ts";
@@ -73,6 +77,135 @@ describe("code_graph human output", () => {
     const expanded = render(result, true);
     expect(expanded).toContain("other.ts");
     expect(expanded).not.toContain("This agent text");
+  });
+
+  it.each([
+    {
+      name: "ambiguity",
+      target: { symbol: { query: "work" } },
+      status: "disambiguation" as const,
+      message: "The target is ambiguous.",
+      nextQuery:
+        "Choose one candidate handle, or narrow the symbol selector with scope or symbolKind",
+      contentMarker: "**Target is ambiguous. Choose one candidate handle:**",
+    },
+    {
+      name: "kind mismatch",
+      target: { symbol: { query: "work", symbolKind: "class" as const } },
+      status: "invalid-input" as const,
+      message: "No target matched provider kind class.",
+      nextQuery:
+        "Retry without symbolKind, use an observed provider kind, or choose a near-match handle",
+      contentMarker: "**No target matched provider kind `class`. Near matches:**",
+    },
+  ])("keeps graph $name content and status while exposing selection guidance", async (case_) => {
+    writeFileSync(path.join(cwd, "other.ts"), "function work() {}\n");
+    registerMockProvider(cwd, {
+      workspaceSymbols: async () =>
+        completedCodeQuery(
+          ["test.ts", "other.ts"].map((file) => ({
+            name: "work",
+            kind: "Function",
+            file: path.join(cwd, file),
+            declarationAnchor: { line: 1, character: 1 },
+            nameAnchor: { line: 1, character: 10 },
+          })),
+        ),
+    });
+    const result = await executeGraphTool({ target: case_.target }, makeTestCtx(cwd));
+
+    expect(result.content).toContain(case_.contentMarker);
+    expect(result.content).not.toContain(case_.nextQuery);
+    expect(result.details?.status).toBe(case_.status);
+    expect(result.details?.message).toBe(case_.message);
+    if (result.details?.type !== "search") throw new Error("Expected search details");
+    expect(result.details.data).toMatchObject({
+      candidateCount: 2,
+      omittedCount: 0,
+      nextQueries: [case_.nextQuery],
+    });
+  });
+
+  it.each([undefined, "class"] as const)(
+    "discloses candidate omissions once with maxResults 1 (kind=%s)",
+    async (symbolKind) => {
+      writeFileSync(path.join(cwd, "other.ts"), "function work() {}\n");
+      registerMockProvider(cwd, {
+        workspaceSymbols: async () =>
+          completedCodeQuery(
+            ["test.ts", "other.ts"].map((file) => ({
+              name: "work",
+              kind: "Function",
+              file: path.join(cwd, file),
+              declarationAnchor: { line: 1, character: 1 },
+              nameAnchor: { line: 1, character: 10 },
+            })),
+          ),
+      });
+      const result = await executeGraphTool(
+        { target: { symbol: { query: "work", symbolKind } }, maxResults: 1 },
+        makeTestCtx(cwd),
+      );
+      expect(result.details?.displaySections?.[0]).toMatchObject({
+        shownCount: 1,
+        totalCount: 2,
+        omittedCount: 1,
+      });
+      for (const text of [result.content, render(result, false), render(result, true)]) {
+        expect(text).toContain("1 of 2");
+        expect(text.match(/1 omitted/g)).toHaveLength(1);
+        expect(text).not.toContain("other.ts");
+      }
+    },
+  );
+
+  it("discloses provider-limited candidate omissions in all surfaces", async () => {
+    writeFileSync(path.join(cwd, "other.ts"), "function work() {}\n");
+    registerMockProvider(cwd, {
+      workspaceSymbols: async () =>
+        partialCodeQuery(
+          ["test.ts", "other.ts"].map((file) => ({
+            name: "work",
+            kind: "Function",
+            file: path.join(cwd, file),
+            declarationAnchor: { line: 1, character: 1 },
+            nameAnchor: { line: 1, character: 10 },
+          })),
+          "one workspace-symbol route failed",
+        ),
+    });
+    const result = await executeGraphTool(
+      { target: { symbol: { query: "work" } }, maxResults: 1 },
+      makeTestCtx(cwd),
+    );
+    expect(result.details?.displaySections?.[0]).toMatchObject({
+      shownCount: 1,
+      totalCount: null,
+      omittedCount: 1,
+      partialReason: "provider-limited",
+    });
+    for (const text of [result.content, render(result, false), render(result, true)]) {
+      expect(text).toContain("1 collected omitted; more may exist — provider-limited");
+      expect(text.match(/collected omitted/g)).toHaveLength(1);
+      expect(text).not.toContain("other.ts");
+    }
+  });
+
+  it("keeps the reference provider failure reason in a mixed graph result", async () => {
+    const reason = "LSP references failed. Enrollment retry exhausted after 1 retry.";
+    registerMockProvider(cwd, {
+      references: async () => unavailableCodeQuery(reason),
+      implementation: async () => completedCodeQuery([]),
+    });
+    const result = await execute();
+    expect(result.content).toContain(reason);
+    expect(render(result, true)).toContain(reason);
+    if (result.details?.type !== "graph") throw new Error("Expected graph details");
+    expect(result.details.data.sections[0]).toMatchObject({
+      rel: "references",
+      status: "unavailable",
+      message: reason,
+    });
   });
 
   it("keeps the callee failure reason and a next step in both surfaces", async () => {

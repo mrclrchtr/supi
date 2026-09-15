@@ -19,6 +19,7 @@ import { resolveSymbolTarget } from "../analysis/target/symbol.ts";
 import type {
   ResolvedTargetData,
   ResolvedTargetGroupData,
+  TargetCandidateCompleteness,
   TargetOutcome,
 } from "../analysis/target/types.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
@@ -59,17 +60,15 @@ export type TargetWorkflowOutcome =
       omittedCount: number;
       unknownNestingCount: number;
     }
-  | {
+  | ({
       kind: "disambiguation";
       candidates: ReadonlyArray<TargetWorkflowCandidate>;
-      omittedCount: number;
-    }
-  | {
+    } & TargetCandidateCompleteness)
+  | ({
       kind: "kind-mismatch";
       requestedKind: TargetSymbolKind;
       candidates: ReadonlyArray<TargetWorkflowCandidate>;
-      omittedCount: number;
-    }
+    } & TargetCandidateCompleteness)
   | { kind: "invalid-input"; message: string }
   | { kind: "unavailable"; reason: string };
 
@@ -318,12 +317,16 @@ function toWorkflowOutcome(
         kind: "kind-mismatch",
         requestedKind: outcome.requestedKind,
         candidates,
+        totalCount: outcome.totalCount,
         omittedCount: outcome.omittedCount,
+        partialReason: outcome.partialReason,
       }
     : {
         kind: "disambiguation",
         candidates,
+        totalCount: outcome.totalCount,
         omittedCount: outcome.omittedCount,
+        partialReason: outcome.partialReason,
       };
 }
 

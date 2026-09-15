@@ -1,6 +1,7 @@
 /** Human transcript renderer for code_graph. */
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { Container, Spacer, Text } from "@earendil-works/pi-tui";
+import { type Component, Container, Spacer, Text } from "@earendil-works/pi-tui";
+import { renderCandidateSelection } from "../../ui/tui/candidate-selection.ts";
 import {
   buildSimpleCompact,
   type EvidenceEntry,
@@ -10,6 +11,7 @@ import {
   readEvidenceEntries,
   renderDomainError,
   renderExecutionError,
+  renderMarkdownDetail,
   renderPartial,
   renderToolDisplaySections,
   renderTruncationDisclosure,
@@ -53,18 +55,18 @@ export function renderGraphResult(
   options: ResultOptios,
   theme: Theme,
   context: ToolRendererContext | undefined,
-): Container | Text {
+): Component {
   if (options.isPartial) return renderPartial("Collecting relations…", theme);
-  const executionError = renderExecutionError(context, "code_graph failed", theme);
+  const executionError = renderExecutionError(
+    result,
+    { isError: context?.isError, expanded: options.expanded, label: "code_graph failed" },
+    theme,
+  );
   if (executionError) return executionError;
+  const candidateSelection = renderCandidateSelection(result, options, theme, "graph.candidates");
+  if (candidateSelection) return candidateSelection;
   const domainError = renderDomainError(result, theme);
-  if (domainError) {
-    if (!options.expanded) return domainError;
-    const container = new Container();
-    container.addChild(domainError);
-    renderToolDisplaySections(container, result.details?.displaySections, theme);
-    return container;
-  }
+  if (domainError) return renderGraphDomainError(result, options.expanded, domainError, theme);
 
   const data = asRecord(result.details?.data);
   const container = new Container();
@@ -156,6 +158,21 @@ function renderRelationBody(
   }
   // Older results contain full paths in each row and have no file groups.
   for (const row of rows.slice(index)) container.addChild(new Text(theme.fg("muted", row), 0, 0));
+}
+
+function renderGraphDomainError(
+  result: ToolResult,
+  expanded: boolean,
+  domainError: Text,
+  theme: Theme,
+): Container | Text {
+  if (!expanded) return domainError;
+  const container = new Container();
+  container.addChild(domainError);
+  const displays = readToolDisplaySections(result.details?.displaySections);
+  renderToolDisplaySections(container, displays, theme);
+  if (displays.length === 0) renderMarkdownDetail(container, result, theme);
+  return container;
 }
 
 function sectionSummary(

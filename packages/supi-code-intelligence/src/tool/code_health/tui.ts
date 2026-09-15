@@ -3,7 +3,7 @@
  */
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { Container, Spacer, Text } from "@earendil-works/pi-tui";
+import { type Component, Container, Spacer, Text } from "@earendil-works/pi-tui";
 import {
   formatProjectServerRouteStatusCounts,
   type ProjectServerRouteStatusCounts,
@@ -69,12 +69,16 @@ export function renderHealthResult(
   options: ResultOptios,
   theme: Theme,
   context: ToolRendererContext | undefined,
-): Container | Text {
+): Component {
   if (options.isPartial) return renderPartial("Gathering workspace health…", theme);
 
   const data =
     result.details?.type === "health" ? (result.details.data as Record<string, unknown>) : null;
-  const executionError = renderExecutionError(context, "code_health failed", theme);
+  const executionError = renderExecutionError(
+    result,
+    { isError: context?.isError, expanded: options.expanded, label: "code_health failed" },
+    theme,
+  );
   if (executionError) return executionError;
   const domainError = renderDomainError(result, theme);
   if (domainError) return renderDomainResult(result, options, theme, domainError);

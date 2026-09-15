@@ -1,6 +1,6 @@
 /** TUI renderer for code_refactor_apply. */
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { Container, Spacer, Text } from "@earendil-works/pi-tui";
+import { type Component, Container, Spacer, Text } from "@earendil-works/pi-tui";
 import {
   formatCallValue,
   type ResultOptios,
@@ -33,10 +33,14 @@ export function renderRefactorApplyResult(
   options: ResultOptios,
   theme: Theme,
   context: ToolRendererContext | undefined,
-): Container | Text {
+): Component {
   if (options.isPartial) return renderPartial("Applying…", theme);
 
-  const executionError = renderExecutionError(context, "code_refactor_apply failed", theme);
+  const executionError = renderExecutionError(
+    result,
+    { isError: context?.isError, expanded: options.expanded, label: "code_refactor_apply failed" },
+    theme,
+  );
   if (executionError) return executionError;
   const domainError = renderDomainError(result, theme);
   if (domainError) return renderDomainResult(result, options, theme, domainError);

@@ -247,7 +247,9 @@ describe("canonical Tool result assembly", () => {
             anchorKind: "name",
           },
         ],
+        totalCount: 1,
         omittedCount: 0,
+        partialReason: null,
       },
       "/repo",
     );

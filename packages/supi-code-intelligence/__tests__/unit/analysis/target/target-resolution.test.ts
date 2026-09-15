@@ -133,6 +133,7 @@ describe("resolveSymbolTarget", () => {
     if (result.kind === "disambiguation") {
       expect(result.candidates).toHaveLength(2);
       expect(result.candidates[0]?.file).toContain("src/");
+      expect(result).toMatchObject({ totalCount: 2, omittedCount: 0, partialReason: null });
     }
   });
 
@@ -321,11 +322,52 @@ describe("resolveSymbolTarget", () => {
       kind: "kind-mismatch",
       requestedKind: "class",
       candidates: [{ name: "Widget", kind: "Variable", rank: 1 }],
+      totalCount: 2,
       omittedCount: 1,
+      partialReason: null,
     });
     if (result.kind === "kind-mismatch") {
       expect(result.candidates[0]).not.toHaveProperty("reason");
     }
+  });
+
+  it("preserves provider-limited candidate completeness", async () => {
+    const result = await resolveSymbolTarget(
+      "Widget",
+      "/project",
+      {
+        workspaceSymbols: vi.fn().mockResolvedValue(
+          partialCodeQuery(
+            [
+              {
+                name: "Widget",
+                kind: "Class",
+                file: "/project/src/a.ts",
+                declarationAnchor: { line: 1, character: 1 },
+                container: null,
+              },
+              {
+                name: "Widget",
+                kind: "Class",
+                file: "/project/src/b.ts",
+                declarationAnchor: { line: 2, character: 1 },
+                container: null,
+              },
+            ],
+            "one workspace-symbol route failed",
+          ),
+        ),
+      } as unknown as SemanticSubstrate,
+      { maxResults: 1 },
+    );
+
+    expect(result).toMatchObject({
+      kind: "disambiguation",
+      totalCount: null,
+      omittedCount: 1,
+      partialReason: "provider-limited",
+      candidates: [{ name: "Widget", rank: 1 }],
+    });
   });
 
   // Tracer bullet for ADR 0003 — see docs/adr/0003-code-symbol-name-declaration-anchors.md

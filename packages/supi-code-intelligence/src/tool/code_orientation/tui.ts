@@ -1,6 +1,7 @@
 /** TUI renderer for code_orientation. */
 import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
-import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
+import { type Component, Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
+import { renderCandidateSelection } from "../../ui/tui/candidate-selection.ts";
 import {
   type EvidenceEntry,
   formatCallPath,
@@ -50,15 +51,35 @@ export function renderOrientationResult(
   options: ResultOptios,
   theme: Theme,
   context: ToolRendererContext | undefined,
-): Container | Text {
+): Component {
   if (options.isPartial) return renderPartial("Orienting…", theme);
 
+  const executionError = renderExecutionError(
+    result,
+    { isError: context?.isError, expanded: options.expanded, label: "code_orientation failed" },
+    theme,
+  );
+  if (executionError) return executionError;
+
+  const candidateSelection = renderCandidateSelection(
+    result,
+    options,
+    theme,
+    "orientation.candidates",
+  );
+  if (candidateSelection) return candidateSelection;
+
+  return renderOrientationDetails(result, options, theme);
+}
+
+function renderOrientationDetails(
+  result: ToolResult,
+  options: ResultOptios,
+  theme: Theme,
+): Component {
   const data =
     result.details?.type === "context" ? (result.details.data as Record<string, unknown>) : null;
   const markdownText = result.content.find((c) => c.type === "text")?.text ?? "";
-
-  const executionError = renderExecutionError(context, "code_orientation failed", theme);
-  if (executionError) return executionError;
   const domainError = renderDomainError(result, theme);
   if (domainError) return renderDomainResult(result, options, theme, domainError);
 

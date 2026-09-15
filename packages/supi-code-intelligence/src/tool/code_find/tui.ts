@@ -37,5 +37,11 @@ export function renderFindResult(
   theme: Theme,
   context: ToolRendererContext | undefined,
 ): ReturnType<typeof renderSimpleResult> {
-  return renderSimpleResult(result, options, theme, "Searching…", context);
+  return renderSimpleResult(
+    result,
+    options,
+    theme,
+    { progress: "Searching…", failure: "code_find failed" },
+    context,
+  );
 }

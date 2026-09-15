@@ -40,5 +40,11 @@ export function renderInspectResult(
   theme: Theme,
   context: ToolRendererContext | undefined,
 ): ReturnType<typeof renderSimpleResult> {
-  return renderSimpleResult(result, options, theme, "Inspecting…", context);
+  return renderSimpleResult(
+    result,
+    options,
+    theme,
+    { progress: "Inspecting…", failure: "code_inspect failed" },
+    context,
+  );
 }

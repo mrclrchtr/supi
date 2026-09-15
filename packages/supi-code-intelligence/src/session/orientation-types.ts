@@ -5,6 +5,7 @@ import type { EvidenceListMetadata } from "../analysis/evidence.ts";
 import type { InstructionFilesMetadata } from "../analysis/instruction-files.ts";
 import type { CodeProvider } from "../analysis/provider.ts";
 import type { ReadNextItem } from "../analysis/read-next.ts";
+import type { TargetCandidateCompleteness } from "../analysis/target/types.ts";
 import type { OrientationTargetInput, TargetSymbolKind } from "./target-input.ts";
 import type { AnchorKind, TargetStoreEntry } from "./target-store.ts";
 
@@ -118,16 +119,14 @@ export interface OrientationResultData {
 
 export type OrientationWorkflowOutcome =
   | { readonly kind: "completed"; readonly data: OrientationResultData }
-  | {
+  | ({
       readonly kind: "disambiguation";
       readonly candidates: readonly OrientationCandidate[];
-      readonly omittedCount: number;
-    }
-  | {
+    } & TargetCandidateCompleteness)
+  | ({
       readonly kind: "kind-mismatch";
       readonly requestedKind: TargetSymbolKind;
       readonly candidates: readonly OrientationCandidate[];
-      readonly omittedCount: number;
-    }
+    } & TargetCandidateCompleteness)
   | { readonly kind: "invalid-input"; readonly message: string }
   | { readonly kind: "unavailable"; readonly reason: string };

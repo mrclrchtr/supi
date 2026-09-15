@@ -10,6 +10,7 @@ import {
   type ResultProvenance,
   type ToolResultAssembly,
 } from "../result/assembly.ts";
+import { formatCandidateRow } from "../result/candidate-row.ts";
 import { createToolDisplaySection } from "../result/display.ts";
 import type { ResolveDetails, ToolDisplaySection } from "../result/types.ts";
 
@@ -25,7 +26,7 @@ export interface ResolveResultAssembly {
 interface ResolveProjection {
   readonly key: string;
   readonly title: string;
-  readonly status: "complete" | "unavailable";
+  readonly status: "complete" | "partial" | "unavailable";
   readonly items: readonly unknown[];
   readonly confidence: ConfidenceMode;
   readonly evidence: EvidenceListMetadata | null;
@@ -153,19 +154,19 @@ function projectTargetGroup(
 function projectCandidateOutcome(
   outcome: Extract<TargetWorkflowOutcome, { kind: "disambiguation" | "kind-mismatch" }>,
 ): ResolveProjection {
-  const totalCount = outcome.candidates.length + outcome.omittedCount;
   const evidence: EvidenceListMetadata = {
     key: "resolve.candidates",
-    totalCount,
+    totalCount: outcome.totalCount,
     shownCount: outcome.candidates.length,
     omittedCount: outcome.omittedCount,
-    partialReason: null,
+    partialReason: outcome.partialReason,
   };
+  const collectedCount = evidence.shownCount + (evidence.omittedCount ?? 0);
   const mismatch = outcome.kind === "kind-mismatch";
   return {
     key: "resolve.candidates",
     title: mismatch ? "Near matches" : "Candidates",
-    status: "complete",
+    status: outcome.partialReason ? "partial" : "complete",
     items: outcome.candidates,
     confidence: "semantic",
     evidence,
@@ -173,7 +174,7 @@ function projectCandidateOutcome(
       resultKind: outcome.kind,
       ...(mismatch ? { requestedKind: outcome.requestedKind } : {}),
       confidence: "semantic",
-      targetCount: totalCount,
+      targetCount: evidence.totalCount ?? collectedCount,
       omittedCount: outcome.omittedCount,
       evidenceLists: [evidence],
       targets: [],
@@ -254,15 +255,17 @@ function resolveDisplaySections(details: ResolveDetails): ToolDisplaySection[] {
   }
 
   if (details.candidates && details.candidates.length > 0) {
+    const evidence = details.evidenceLists?.find((entry) => entry.key === "resolve.candidates");
+    if (!evidence) return [];
     return [
       createToolDisplaySection({
         key: "resolve.candidates",
         title: "Candidates",
         items: details.candidates,
-        totalCount: details.targetCount,
-        omittedCount: details.omittedCount,
-        format: (candidate) =>
-          `${candidate.rank}. ${candidate.name} (${candidate.kind ?? "unknown"}) — ${candidate.file}:${candidate.line}:${candidate.character} [${candidate.targetId}]`,
+        totalCount: evidence.totalCount,
+        omittedCount: evidence.omittedCount,
+        partialReason: evidence.partialReason,
+        format: (candidate) => formatCandidateRow(candidate, "rank-first"),
       }),
     ];
   }

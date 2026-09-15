@@ -28,6 +28,11 @@ export class SemanticInputRequestRetryGuard {
 
   constructor(private readonly currentChangeSince: SemanticInputChangeLookup) {}
 
+  /** Number of request-level retries permitted for this request so far. */
+  get retryCount(): number {
+    return this.#requestRetries;
+  }
+
   /** Whether this request already used its one request-level retry. */
   get hasRetried(): boolean {
     return this.#requestRetries > 0;

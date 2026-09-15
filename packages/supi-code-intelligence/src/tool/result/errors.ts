@@ -1,6 +1,9 @@
+import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import type { CodeIntelResult, ToolDisplaySection } from "../../types/index.ts";
+import { assembledNextQueries, assembleToolResult } from "./assembly.ts";
 
-/** Full error result for search-family tools. */
+/** Full failure or candidate-selection result for search-family tools. */
 export function searchErrorResult(
   content: string,
   opts?: {
@@ -10,18 +13,28 @@ export function searchErrorResult(
     nextQueries?: string[];
     message?: string;
     displaySections?: readonly ToolDisplaySection[];
+    /** Evidence retained when a target still needs selection. */
+    evidenceLists?: readonly EvidenceListMetadata[];
+    confidence?: ConfidenceMode;
   },
 ): CodeIntelResult {
+  const assembled = assembleToolResult({
+    data: null,
+    confidence: opts?.confidence ?? "unavailable",
+    evidenceLists: opts?.evidenceLists,
+    nextQueries: opts?.nextQueries,
+  });
   return {
     content,
     details: {
       type: "search" as const,
       data: {
-        confidence: "unavailable" as const,
+        confidence: assembled.confidence,
         scope: opts?.scope ?? null,
-        candidateCount: 0,
-        omittedCount: 0,
-        nextQueries: opts?.nextQueries ?? [],
+        candidateCount: assembled.totals.candidateCount,
+        omittedCount: assembled.totals.omittedCount,
+        ...(opts?.evidenceLists ? { evidenceLists: [...assembled.evidenceLists] } : {}),
+        nextQueries: assembledNextQueries(assembled),
       },
       status: opts?.status ?? "invalid-input",
       ...(opts?.message ? { message: opts.message } : {}),

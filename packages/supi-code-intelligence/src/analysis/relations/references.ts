@@ -13,7 +13,7 @@ import {
 } from "./provider-locations.ts";
 import type { CallerEvidence, CallerReference, RelationsServiceDeps } from "./types.ts";
 
-export interface CallersResult {
+interface CallerEvidenceData {
   kind: "callers";
   targetName: string;
   references: CallerReference[];
@@ -22,8 +22,11 @@ export interface CallersResult {
   invalidLocationCount: number;
   partialReason: RelationLocationPartialReason | null;
   evidence: CallerEvidence;
-  confidence: "semantic" | "unavailable";
 }
+
+/** Reference evidence, or the provider reason that prevented collection. */
+export type CallersResult = CallerEvidenceData &
+  ({ confidence: "semantic" } | { confidence: "unavailable"; message: string });
 
 /**
  * Collect callers (references) for a target file/position using semantic provider.
@@ -46,6 +49,7 @@ export async function collectCallers(
       partialReason: null,
       evidence: "semantic-references",
       confidence: "unavailable",
+      message: "No semantic references provider",
     };
   }
 
@@ -60,6 +64,7 @@ export async function collectCallers(
       partialReason: null,
       evidence: "semantic-references",
       confidence: "unavailable",
+      message: result.reason,
     };
   }
 

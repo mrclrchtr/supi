@@ -136,6 +136,16 @@ export interface DisambiguationCandidateData {
   anchorKind: AnchorKind;
 }
 
+/** Completeness metadata for a bounded candidate collection. */
+export interface TargetCandidateCompleteness {
+  /** Exact candidate total, or null when the provider returned partial data. */
+  totalCount: number | null;
+  /** Candidates returned by the provider but hidden by the target cap. */
+  omittedCount: number;
+  /** Why the provider cannot establish an exact candidate total. */
+  partialReason: "provider-limited" | null;
+}
+
 /**
  * Typed outcome of a resolution attempt.
  *
@@ -145,16 +155,14 @@ export interface DisambiguationCandidateData {
 export type TargetOutcome =
   | { kind: "resolved"; target: ResolvedTargetData }
   | { kind: "group"; group: ResolvedTargetGroupData }
-  | {
+  | ({
       kind: "disambiguation";
       candidates: DisambiguationCandidateData[];
-      omittedCount: number;
-    }
-  | {
+    } & TargetCandidateCompleteness)
+  | ({
       kind: "kind-mismatch";
       requestedKind: TargetSymbolKind;
       candidates: DisambiguationCandidateData[];
-      omittedCount: number;
-    }
+    } & TargetCandidateCompleteness)
   | { kind: "unavailable"; reason: string }
   | { kind: "error"; message: string };

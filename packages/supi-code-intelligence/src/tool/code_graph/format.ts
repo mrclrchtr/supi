@@ -1,14 +1,14 @@
 import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 
-/** Format relation counts and all known limits in one place. */
+/** Format graph counts and all known limits in one place. */
 export function formatGraphEvidence(
   metadata: Omit<EvidenceListMetadata, "partialReason"> & { partialReason: string | null },
-  noun: "locations" | "call sites",
+  noun: "locations" | "call sites" | "candidates",
   externalCount = 0,
 ): string {
   const { shownCount, totalCount, omittedCount, partialReason, invalidLocationCount } = metadata;
   const count = totalCount ?? shownCount;
-  const label = count === 1 ? (noun === "locations" ? "location" : "call site") : noun;
+  const label = count === 1 ? singularGraphNoun(noun) : noun;
   let text =
     totalCount === null
       ? `${shownCount} ${label} shown${omittedCount ? `; ${omittedCount} collected omitted` : ""}; more may exist — ${partialReason}`
@@ -22,6 +22,17 @@ export function formatGraphEvidence(
     text += `; ${invalidLocationCount} invalid provider ${invalidNoun} omitted (invalid-provider-location)`;
   }
   return text;
+}
+
+function singularGraphNoun(noun: "locations" | "call sites" | "candidates"): string {
+  switch (noun) {
+    case "locations":
+      return "location";
+    case "call sites":
+      return "call site";
+    case "candidates":
+      return "candidate";
+  }
 }
 
 /** Format a 1-based source-line range for either graph presentation. */

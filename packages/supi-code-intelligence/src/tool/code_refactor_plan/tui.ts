@@ -50,5 +50,11 @@ export function renderRefactorPlanResult(
   theme: Theme,
   context: ToolRendererContext | undefined,
 ): ReturnType<typeof renderSimpleResult> {
-  return renderSimpleResult(result, options, theme, "Planning…", context);
+  return renderSimpleResult(
+    result,
+    options,
+    theme,
+    { progress: "Planning…", failure: "code_refactor_plan failed" },
+    context,
+  );
 }

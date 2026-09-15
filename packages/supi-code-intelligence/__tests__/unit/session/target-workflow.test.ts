@@ -331,15 +331,21 @@ describe("target-workflow (deep session seam)", () => {
 
       const outcome = await resolveTargetWorkflow(
         { symbol: { query: "bar" } },
-        DEFAULT_POLICY,
+        { ...DEFAULT_POLICY, maxResults: 1 },
         deps,
       );
 
       expect(outcome.kind).toBe("disambiguation");
       if (outcome.kind === "disambiguation") {
-        expect(outcome.candidates).toHaveLength(2);
+        expect(outcome.candidates).toHaveLength(1);
         expect(outcome.candidates[0]?.targetId).toMatch(/^tg-/);
+        expect(outcome).toMatchObject({
+          totalCount: 2,
+          omittedCount: 1,
+          partialReason: null,
+        });
       }
+      expect(store).toHaveLength(1);
     });
 
     it("returns unavailable when no semantic provider", async () => {

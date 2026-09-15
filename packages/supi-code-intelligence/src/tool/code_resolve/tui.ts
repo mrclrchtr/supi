@@ -1,6 +1,7 @@
 /** TUI renderer for code_resolve. */
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
+import { renderCandidateSelection } from "../../ui/tui/candidate-selection.ts";
 import {
   formatCallPath,
   formatCallValue,
@@ -56,5 +57,21 @@ export function renderResolveResult(
   theme: Theme,
   context: ToolRendererContext | undefined,
 ): ReturnType<typeof renderSimpleResult> {
-  return renderSimpleResult(result, options, theme, "Resolving…", context);
+  if (!options.isPartial && !context?.isError) {
+    const candidateSelection = renderCandidateSelection(
+      result,
+      options,
+      theme,
+      "resolve.candidates",
+    );
+    if (candidateSelection) return candidateSelection;
+  }
+
+  return renderSimpleResult(
+    result,
+    options,
+    theme,
+    { progress: "Resolving…", failure: "code_resolve failed" },
+    context,
+  );
 }

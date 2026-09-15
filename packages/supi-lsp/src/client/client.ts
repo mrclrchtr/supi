@@ -58,6 +58,10 @@ import { createTypeScriptDiagnosticRequestAdapter } from "./client-diagnostic-ty
 import { ClientDiagnostics } from "./client-diagnostics.ts";
 import type { ClientDiagnosticSnapshot, DiagnosticEntry } from "./client-document-state.ts";
 import { SemanticInputRequestRetryGuard } from "./client-request-enrollment.ts";
+import {
+  isSemanticInputEnrollmentError,
+  SemanticInputSynchronizationError,
+} from "./client-semantic-input-errors.ts";
 import { JsonRpcClient, JsonRpcRequestError } from "./transport.ts";
 
 const SHUTDOWN_TIMEOUT_MS = 5_000;
@@ -850,17 +854,81 @@ export class LspClient {
           retryGuard,
           attempt,
         });
+        if (retryGuard.hasRetried) {
+          this.recordSemanticRetry({ method, control, retryGuard, outcome: "completed" });
+        }
         return completedCodeQuery(data);
       } catch (error) {
-        throwIfCodeRequestInterrupted(control);
-        const decision = retryGuard.decide(error, attempt.inputRevision);
-        if (decision.kind === "retry") {
-          throwIfCodeRequestInterrupted(control);
-          continue;
-        }
-        throw decision.error;
+        this.prepareSemanticRetry({ method, control, retryGuard, attempt, error });
       }
     }
+  }
+
+  /** Return only when another attempt is permitted; retain the cause when retry stops. */
+  private prepareSemanticRetry(options: {
+    method: string;
+    control?: CodeRequestControl;
+    retryGuard: SemanticInputRequestRetryGuard;
+    attempt: SemanticRequestAttemptState;
+    error: unknown;
+  }): void {
+    const { method, control, retryGuard, attempt, error } = options;
+    if (isCodeRequestInterruption(error, control)) {
+      if (retryGuard.hasRetried) {
+        this.recordSemanticRetry({ method, control, retryGuard, outcome: "interrupted" });
+      }
+      throwIfCodeRequestInterrupted(control);
+      throw error;
+    }
+    throwIfCodeRequestInterrupted(control);
+    const decision = retryGuard.decide(error, attempt.inputRevision);
+    if (decision.kind === "retry") {
+      throwIfCodeRequestInterrupted(control);
+      this.recordSemanticRetry({ method, control, retryGuard, outcome: "retry", error });
+      return;
+    }
+    if (retryGuard.hasRetried) {
+      const outcome = isSemanticInputEnrollmentError(decision.error) ? "exhausted" : "failed";
+      this.recordSemanticRetry({ method, control, retryGuard, outcome, error: decision.error });
+      const detail =
+        decision.error instanceof Error ? decision.error.message : String(decision.error);
+      const count = retryGuard.retryCount;
+      throw new Error(
+        `${detail} Enrollment retry ${outcome} after ${count} ${count === 1 ? "retry" : "retries"}.`,
+        {
+          cause: decision.error,
+        },
+      );
+    }
+    throw decision.error;
+  }
+
+  /** Record request acceptance separately from transport completion, without request content. */
+  private recordSemanticRetry(options: {
+    method: string;
+    control?: CodeRequestControl;
+    retryGuard: SemanticInputRequestRetryGuard;
+    outcome: "retry" | "completed" | "exhausted" | "failed" | "interrupted";
+    error?: unknown;
+  }): void {
+    recordDebugEvent({
+      source: "lsp",
+      level: "debug",
+      category: "semantic-request.enrollment-retry",
+      message: "LSP semantic request enrollment retry",
+      cwd: boundCwd(this.cwd),
+      ...(options.control?.operationId ? { operationId: options.control.operationId } : {}),
+      data: {
+        server: truncateIdentity(this.name),
+        method: truncateIdentity(options.method),
+        outcome: options.outcome,
+        retryCount: options.retryGuard.retryCount,
+        changeKind:
+          options.error instanceof SemanticInputSynchronizationError
+            ? options.error.changeKind
+            : null,
+      },
+    });
   }
 
   private async runSemanticRequestAttempt<T>(options: {
