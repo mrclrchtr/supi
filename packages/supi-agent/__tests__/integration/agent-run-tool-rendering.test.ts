@@ -97,6 +97,7 @@ describe("registered agent_run rendering boundary", () => {
     expect(text).toContain("tool:start:read src/app.ts");
     expect(text).toContain("tool:end:read");
     expect(text).not.toContain("tool:end:read src/app.ts");
+    expect(text).toContain("model: test/model");
   });
 
   it("redacts credentials and keeps benign git upstream flags in expanded activity", async () => {
@@ -141,6 +142,7 @@ describe("registered agent_run rendering boundary", () => {
     expect(text).toContain("[REDACTED]");
     expect(text).not.toContain("s3cr3t");
     expect(text).toContain("git push -u origin main");
+    expect(text).toContain("model: test/model · thinking: off");
   });
 
   it("renders failure, canceled, timeout, and truncated terminal states", async () => {

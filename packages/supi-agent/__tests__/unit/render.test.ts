@@ -23,6 +23,35 @@ describe("renderResult", () => {
     expect(result).toBeDefined();
   });
 
+  it("renders the effective model and thinking level for a live task", () => {
+    const result = renderResult(
+      {
+        details: {
+          tasks: [
+            {
+              taskId: "t1",
+              profileId: "explore",
+              status: "running",
+              turns: 2,
+              toolUses: 2,
+              modelId: "anthropic/claude-sonnet-4-5",
+              thinkingLevel: "high",
+            },
+          ],
+          completedCount: 0,
+          totalCount: 1,
+        },
+      },
+      { expanded: false, isPartial: true },
+      mockTheme as never,
+    );
+    const text = result.render(240).join("\n");
+
+    expect(text).toContain(
+      "model: anthropic/claude-sonnet-4-5 · thinking: high · 2 turns · 2 tools",
+    );
+  });
+
   it("renders collapsed final with task status, progress, and an output preview", () => {
     const result = renderResult(
       {
@@ -38,6 +67,8 @@ describe("renderResult", () => {
               humanTruncated: false,
               modelTruncated: false,
               usage: { totalTokens: 1000 },
+              modelId: "anthropic/claude-sonnet-4-5",
+              thinkingLevel: "high",
             },
           ],
           aggregateUsage: { totalTokens: 1000 },
@@ -52,6 +83,96 @@ describe("renderResult", () => {
     expect(text).toContain("1 completed");
     expect(text).toContain("1,000 tokens");
     expect(text).toContain("Found the caller.");
+    expect(text).toContain(
+      "model: anthropic/claude-sonnet-4-5 · thinking: high · 5 turns · 3 tools",
+    );
+  });
+
+  it("renders the model alone when the thinking level is unavailable", () => {
+    const result = renderResult(
+      {
+        details: {
+          tasks: [
+            {
+              taskId: "t1",
+              profileId: "explore",
+              status: "completed",
+              turns: 5,
+              toolUses: 3,
+              finalTextFull: "Found the caller.",
+              humanTruncated: false,
+              modelTruncated: false,
+              modelId: "anthropic/claude-sonnet-4-5",
+            },
+          ],
+        },
+      },
+      { expanded: false, isPartial: false },
+      mockTheme as never,
+    );
+    const text = result.render(240).join("\n");
+
+    expect(text).toContain("model: anthropic/claude-sonnet-4-5 · 5 turns · 3 tools");
+    expect(text).not.toContain("thinking:");
+  });
+
+  it("omits the thinking segment when the model is unavailable", () => {
+    const result = renderResult(
+      {
+        details: {
+          tasks: [
+            {
+              taskId: "t1",
+              profileId: "explore",
+              status: "completed",
+              turns: 5,
+              toolUses: 3,
+              finalTextFull: "Found the caller.",
+              humanTruncated: false,
+              modelTruncated: false,
+              thinkingLevel: "high",
+            },
+          ],
+        },
+      },
+      { expanded: false, isPartial: false },
+      mockTheme as never,
+    );
+    const text = result.render(240).join("\n");
+
+    expect(text).not.toContain("model:");
+    expect(text).not.toContain("thinking:");
+    expect(text).not.toContain("· ·");
+    expect(text).toContain("5 turns · 3 tools");
+  });
+
+  it("omits the model and thinking segments when they are unavailable", () => {
+    const result = renderResult(
+      {
+        details: {
+          tasks: [
+            {
+              taskId: "t1",
+              profileId: "explore",
+              status: "completed",
+              turns: 5,
+              toolUses: 3,
+              finalTextFull: "Found the caller.",
+              humanTruncated: false,
+              modelTruncated: false,
+            },
+          ],
+        },
+      },
+      { expanded: false, isPartial: false },
+      mockTheme as never,
+    );
+    const text = result.render(240).join("\n");
+
+    expect(text).not.toContain("model:");
+    expect(text).not.toContain("thinking:");
+    expect(text).not.toContain("· ·");
+    expect(text).toContain("5 turns · 3 tools");
   });
 
   it("renders expanded final with task details and the result body", () => {
@@ -69,6 +190,8 @@ describe("renderResult", () => {
               humanTruncated: false,
               modelTruncated: false,
               usage: { totalTokens: 1000 },
+              modelId: "anthropic/claude-sonnet-4-5",
+              thinkingLevel: "off",
             },
           ],
           aggregateUsage: { totalTokens: 1000 },
@@ -83,6 +206,9 @@ describe("renderResult", () => {
     expect(text).toContain("Findings");
     expect(text).toContain("src/index.ts");
     expect(text).toContain("1,000 tokens");
+    expect(text).toContain(
+      "model: anthropic/claude-sonnet-4-5 · thinking: off · 5 turns · 3 tools",
+    );
   });
 
   it("renders error state from PI's renderer context", () => {

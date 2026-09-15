@@ -21,6 +21,10 @@ Profile sources overlay fields by ID with project → global → package precede
 
 Changes to **Agent Run tool** and each profile's **Model** and **Thinking** settings apply immediately. `/agents` stays available when `agent_run` is off.
 
+## Agent Run row
+
+The `agent_run` transcript row shows the effective model of a Delegation Task as `model: provider/model-id`. It adds `thinking: <level>` when the run reports a thinking level. The live progress row, the collapsed result, and the expanded result show these facts first, followed by turns, tool uses, and Usage. A run without model data shows no model segment.
+
 ## `/agents`
 
 Use `/agents` in TUI mode to inspect active Agent Runs, the last completed Delegation Batch, effective Agent Profiles, and bounded Profile Diagnostics. The Runs view keeps task metadata separate from the bounded Conversation View. It shows lifecycle status, model, thinking level, turns, tool uses, Usage, safe tool activity, steering, assistant text, and retention notices.

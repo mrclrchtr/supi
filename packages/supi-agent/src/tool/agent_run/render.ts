@@ -4,7 +4,7 @@
  * Dual-surface: chrome built from details, markdown body excluded.
  */
 
-import type { Usage } from "@earendil-works/pi-ai";
+import type { ModelThinkingLevel, Usage } from "@earendil-works/pi-ai";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import type { AgentConversationView, ConversationEntry } from "./conversation-view.ts";
@@ -110,11 +110,29 @@ function taskHeading(
   return `${statusColor(task.status, theme)} ${theme.fg("accent", task.taskId)} (${task.profileId}) — ${statusLabel(task.status, task.failureCode)}`;
 }
 
-function formatTaskMetrics(task: Pick<BatchTaskProgress, "turns" | "toolUses" | "usage">): string {
-  const parts = [`${task.turns} turns`, `${task.toolUses} tools`];
+function formatTaskMetrics(
+  task: Pick<BatchTaskProgress, "turns" | "toolUses" | "usage" | "modelId" | "thinkingLevel">,
+): string {
+  const parts: string[] = [];
+  const model = formatModelSegment(task.modelId, task.thinkingLevel);
+  if (model) parts.push(model);
+  parts.push(`${task.turns} turns`, `${task.toolUses} tools`);
   const usage = formatUsage(task.usage);
   if (usage) parts.push(usage);
   return parts.join(" · ");
+}
+
+/**
+ * Human-facing label for the effective model and thinking level. Absent data
+ * stays absent so the metric list never gains an empty segment. Do not add
+ * color codes here: the expanded and live rows color the complete metric text.
+ */
+function formatModelSegment(
+  modelId: string | undefined,
+  thinkingLevel: ModelThinkingLevel | undefined,
+): string | undefined {
+  if (!modelId) return undefined;
+  return thinkingLevel ? `model: ${modelId} · thinking: ${thinkingLevel}` : `model: ${modelId}`;
 }
 
 function errorMessage(text: string | undefined, expanded: boolean): string | undefined {
@@ -182,7 +200,8 @@ function formatLiveTask(task: BatchTaskProgress, theme: Theme, expanded: boolean
   const parts = [statusLabel(task.status), formatTaskMetrics(task)];
   const activity = expanded ? task.recentActivity?.join(" · ") : task.recentActivity?.at(-1);
   if (activity) parts.push(`activity: ${activity}`);
-  return `${statusColor(task.status, theme)} ${task.taskId} (${task.profileId}) · ${parts.join(" · ")}`;
+  const detail = `${task.taskId} (${task.profileId}) · ${parts.join(" · ")}`;
+  return `${statusColor(task.status, theme)} ${theme.fg("dim", detail)}`;
 }
 
 function renderPartial(
@@ -197,17 +216,14 @@ function renderPartial(
   const header = theme.fg("warning", `● ${label}`);
 
   if (!expanded) {
-    const lines = [
-      header,
-      ...tasks.map((task) => theme.fg("dim", formatLiveTask(task, theme, false))),
-    ];
+    const lines = [header, ...tasks.map((task) => formatLiveTask(task, theme, false))];
     return new Text(lines.join("\n"), 0, 0);
   }
 
   const container = new Container();
   container.addChild(new Text(header, 0, 0));
   for (const task of tasks) {
-    container.addChild(new Text(theme.fg("dim", formatLiveTask(task, theme, true)), 1, 0));
+    container.addChild(new Text(formatLiveTask(task, theme, true), 1, 0));
   }
   return container;
 }

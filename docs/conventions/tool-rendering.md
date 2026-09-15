@@ -185,6 +185,6 @@ These files show package-specific patterns. Check the complete tool registration
 
 - **Simple text helpers**: `packages/supi-web/src/tool/render.ts` — `renderToolCall` and `renderCollapsibleTextResult`
 - **Structured code tools**: `packages/supi-code-intelligence/src/tool/<tool>/tui.ts` — per-tool renderers sharing `packages/supi-code-intelligence/src/ui/tui/common.ts`
-- **Stateful multi-task tool**: `packages/supi-agent/src/tool/render.ts` — bounded progress and conversation views
+- **Stateful multi-task tool**: `packages/supi-agent/src/tool/agent_run/render.ts` — bounded progress and conversation views
 - **Review results**: `packages/supi-review/src/tui/run.ts` — task verdicts and structured findings
 - **Blocking interactive form**: `packages/supi-ask-user/src/ui/form.ts` opens the form; `packages/supi-ask-user/src/render/transcript.ts` renders the transcript result
