@@ -67,7 +67,7 @@
   "devDependencies": {
     "@mrclrchtr/supi-test-utils": "workspace:*",
     "@types/node": "25.9.6",
-    "vitest": "4.1.11"
+    "vitest": "5.0.0"
   },
   "pi": {
     "extensions": [
