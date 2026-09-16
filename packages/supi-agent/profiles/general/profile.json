@@ -1,5 +1,5 @@
 {
-  "description": "Handle a focused coding task with repository guidance and explicit file tools.",
+  "description": "General-purpose agent for complex investigations and multi-step repository tasks. Use when the work requires several steps of investigation, execution, or verification.",
   "tools": [
     "read",
     "bash",
