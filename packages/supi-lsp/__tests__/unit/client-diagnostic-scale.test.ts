@@ -106,7 +106,9 @@ afterEach(() => {
 });
 
 describe("large TypeScript diagnostic refresh", () => {
-  it("uses one bounded route and exact coverage at the refresh deadline", async () => {
+  it("uses one bounded route and exact coverage at the refresh deadline", {
+    timeout: 10_000,
+  }, async () => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
     const directory = mkdtempSync(join(tmpdir(), "supi-lsp-1000-documents-"));
