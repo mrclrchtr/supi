@@ -22,7 +22,13 @@ export interface AgentRunProviderAuthority {
 
 /** Model-specific request auth returned by PI's compatibility registry facade. */
 export type AgentRunRequestAuth =
-  | { ok: true; apiKey?: string; headers?: ProviderHeaders; env?: Record<string, string> }
+  | {
+      ok: true;
+      apiKey?: string;
+      headers?: ProviderHeaders;
+      baseUrl?: string;
+      env?: Record<string, string>;
+    }
   | { ok: false; error: string };
 
 /** Adapt PI's public model registry to the narrow Agent Run authority interface. */
@@ -222,6 +228,7 @@ function mergeRequestAuth(
 ): AuthResult {
   const auth = providerAuth?.auth;
   const resolved = requestAuth?.ok ? requestAuth : undefined;
+  const baseUrl = resolved?.baseUrl ?? auth?.baseUrl;
   return {
     ...(providerAuth?.source ? { source: providerAuth.source } : {}),
     ...(providerAuth?.env || resolved?.env
@@ -229,6 +236,7 @@ function mergeRequestAuth(
       : {}),
     auth: {
       ...(auth ?? {}),
+      ...(baseUrl ? { baseUrl } : {}),
       ...(resolved?.apiKey ? { apiKey: resolved.apiKey } : {}),
       ...(auth?.headers || resolved?.headers
         ? { headers: { ...(auth?.headers ?? {}), ...(resolved?.headers ?? {}) } }

@@ -199,6 +199,65 @@ describe("Agent Run Provider Authority contract", () => {
     });
   });
 
+  it("preserves a model-specific auth endpoint for both borrowed stream methods", async () => {
+    const delegatedModel = (requestModel: Model<"openai-completions">) => {
+      const stream = createAssistantMessageEventStream();
+      const message = {
+        role: "assistant" as const,
+        content: [{ type: "text" as const, text: "delegated response" }],
+        api: requestModel.api,
+        provider: requestModel.provider,
+        model: requestModel.id,
+        usage,
+        stopReason: "stop" as const,
+        timestamp: Date.now(),
+      };
+      queueMicrotask(() => stream.push({ type: "done", reason: "stop", message }));
+      return stream;
+    };
+    const stream = vi.fn(delegatedModel);
+    const streamSimple = vi.fn(delegatedModel);
+    const provider: Provider<"openai-completions"> = {
+      id: model.provider,
+      name: "Borrowed Provider",
+      auth: {
+        apiKey: {
+          name: "Parent runtime key",
+          resolve: async () => ({ auth: { apiKey: "parent-runtime-key" } }),
+        },
+      },
+      getModels: () => [parentCatalogModel],
+      stream,
+      streamSimple,
+    };
+    const created = await createAgentRunModelRuntime(
+      {
+        getProvider: () => provider,
+        getProviderAuth: async () => ({ auth: { apiKey: "parent-runtime-key" } }),
+        getApiKeyAndHeaders: async () => ({
+          ok: true as const,
+          apiKey: "parent-runtime-key",
+          baseUrl: resolvedBaseUrl,
+        }),
+      },
+      [model],
+    );
+    const childModel = created.runtime.getModel(model.provider, model.id);
+    if (!childModel) throw new Error("The controlled child model was not registered");
+
+    await created.runtime.stream(childModel, { messages: [] }).result();
+    await created.runtime.streamSimple(childModel, { messages: [] }).result();
+
+    expect(stream.mock.calls[0]?.[0]).toMatchObject({
+      name: parentCatalogModel.name,
+      baseUrl: resolvedBaseUrl,
+    });
+    expect(streamSimple.mock.calls[0]?.[0]).toMatchObject({
+      name: parentCatalogModel.name,
+      baseUrl: resolvedBaseUrl,
+    });
+  });
+
   it("keeps PI child session IDs stable within a run and separate across sibling runs", async () => {
     const root = await mkdtemp(join(tmpdir(), "supi-agent-session-id-"));
     temporaryDirectories.push(root);
