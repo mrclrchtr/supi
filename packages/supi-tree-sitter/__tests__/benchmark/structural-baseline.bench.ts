@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { configureDebugRegistry, resetDebugRegistry } from "@mrclrchtr/supi-core/debug";
-import { afterAll, beforeAll, bench, describe } from "vitest";
+import { afterAll, beforeAll, describe, test } from "vitest";
 import { createTreeSitterSession, type TreeSitterSession } from "../../src/api.ts";
 
 const FIXTURE_DIR = resolve(import.meta.dirname, "../fixtures");
@@ -28,63 +28,49 @@ afterAll(async () => {
 });
 
 describe("representative structural operation baselines", () => {
-  bench(
-    "cold parser and outline",
-    async () => {
-      const session = createTreeSitterSession(FIXTURE_DIR);
-      try {
-        const result = await session.outline(FIXTURE_FILE);
-        if (result.kind !== "success") throw new Error(`Cold outline failed: ${result.message}`);
-      } finally {
-        await session.dispose();
-      }
-    },
-    BENCHMARK_OPTIONS,
-  );
+  const defineBaseline = (name: string, fn: () => Promise<void>) => {
+    test(name, async ({ bench }) => {
+      await bench(name, fn).run(BENCHMARK_OPTIONS);
+    });
+  };
 
-  bench(
-    "repeated parsed tree and outline",
-    async () => {
-      const result = await repeatedSession.outline(FIXTURE_FILE);
-      if (result.kind !== "success") throw new Error(`Repeated outline failed: ${result.message}`);
-    },
-    BENCHMARK_OPTIONS,
-  );
+  defineBaseline("cold parser and outline", async () => {
+    const session = createTreeSitterSession(FIXTURE_DIR);
+    try {
+      const result = await session.outline(FIXTURE_FILE);
+      if (result.kind !== "success") throw new Error(`Cold outline failed: ${result.message}`);
+    } finally {
+      await session.dispose();
+    }
+  });
 
-  bench(
-    "cold parser, query compilation, and call sites",
-    async () => {
-      const session = createTreeSitterSession(FIXTURE_DIR);
-      try {
-        const result = await session.callSites(FIXTURE_FILE);
-        if (result.kind !== "success") throw new Error(`Cold call sites failed: ${result.message}`);
-      } finally {
-        await session.dispose();
-      }
-    },
-    BENCHMARK_OPTIONS,
-  );
+  defineBaseline("repeated parsed tree and outline", async () => {
+    const result = await repeatedSession.outline(FIXTURE_FILE);
+    if (result.kind !== "success") throw new Error(`Repeated outline failed: ${result.message}`);
+  });
 
-  bench(
-    "repeated parsed tree, compiled query, and call sites",
-    async () => {
-      const result = await repeatedSession.callSites(FIXTURE_FILE);
-      if (result.kind !== "success") {
-        throw new Error(`Repeated call sites failed: ${result.message}`);
-      }
-    },
-    BENCHMARK_OPTIONS,
-  );
+  defineBaseline("cold parser, query compilation, and call sites", async () => {
+    const session = createTreeSitterSession(FIXTURE_DIR);
+    try {
+      const result = await session.callSites(FIXTURE_FILE);
+      if (result.kind !== "success") throw new Error(`Cold call sites failed: ${result.message}`);
+    } finally {
+      await session.dispose();
+    }
+  });
 
-  bench(
-    "post-restart cold parser and outline",
-    async () => {
-      await repeatedSession.dispose();
-      repeatedSession = createTreeSitterSession(FIXTURE_DIR);
-      const result = await repeatedSession.outline(FIXTURE_FILE);
-      if (result.kind !== "success")
-        throw new Error(`Post-restart outline failed: ${result.message}`);
-    },
-    BENCHMARK_OPTIONS,
-  );
+  defineBaseline("repeated parsed tree, compiled query, and call sites", async () => {
+    const result = await repeatedSession.callSites(FIXTURE_FILE);
+    if (result.kind !== "success") {
+      throw new Error(`Repeated call sites failed: ${result.message}`);
+    }
+  });
+
+  defineBaseline("post-restart cold parser and outline", async () => {
+    await repeatedSession.dispose();
+    repeatedSession = createTreeSitterSession(FIXTURE_DIR);
+    const result = await repeatedSession.outline(FIXTURE_FILE);
+    if (result.kind !== "success")
+      throw new Error(`Post-restart outline failed: ${result.message}`);
+  });
 });
