@@ -40,7 +40,7 @@ beforeAll(() => {
   fs.writeFileSync(path.join(tmpDir, "settings.gradle.kts"), 'rootProject.name = "kotlinprobe"\n');
   fs.writeFileSync(
     path.join(tmpDir, "build.gradle.kts"),
-    'plugins {\n    kotlin("jvm") version "2.2.0"\n}\n',
+    'plugins {\n    kotlin("jvm") version "2.2.0"\n}\n\nrepositories {\n    mavenCentral()\n}\n',
   );
   const srcDir = path.join(tmpDir, "src", "main", "kotlin");
   fs.mkdirSync(srcDir, { recursive: true });
