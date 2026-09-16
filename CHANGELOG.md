@@ -1,5 +1,14 @@
 # Changelog
 
+## [7.1.0](https://github.com/mrclrchtr/supi/compare/v7.0.1...v7.1.0) (2026-09-16)
+
+
+### Features
+
+* **supi-agent:** enhance descriptions for clarity and specificity ([ae5eabe](https://github.com/mrclrchtr/supi/commit/ae5eabe5715db38721079ecebbf606f2782304d4))
+* **supi-agent:** update toolDescription for clarity ([0236db2](https://github.com/mrclrchtr/supi/commit/0236db246d5291cfe606665bfde47f7ff83353a7))
+* **supi-review:** update toolDescription for clarity ([509bec8](https://github.com/mrclrchtr/supi/commit/509bec829897ed33ea1c453ef6d2efa7da422e5c))
+
 ## [7.0.1](https://github.com/mrclrchtr/supi/compare/v7.0.0...v7.0.1) (2026-09-16)
 
 
