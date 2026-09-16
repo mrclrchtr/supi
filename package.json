@@ -13,6 +13,7 @@
   "bugs": {
     "url": "https://github.com/mrclrchtr/supi/issues"
   },
+  "type": "module",
   "keywords": [
     "pi-package",
     "pi",
