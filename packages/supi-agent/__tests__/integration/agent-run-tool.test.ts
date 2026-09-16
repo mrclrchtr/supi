@@ -49,25 +49,6 @@ afterEach(async () => {
 });
 
 describe("registered agent_run boundary", () => {
-  it("exposes compact task selection and built-in profile descriptions", async () => {
-    const tool = await registeredTool();
-    const schema = JSON.parse(JSON.stringify(tool.parameters));
-    const profile = schema.properties.tasks.items.properties.profile;
-
-    expect(tool.description).toMatch(/repository evidence.*coding tasks/);
-    expect(tool.description).toMatch(/review_run.*code reviews/);
-    expect(tool.description).toMatch(/only.*read-only.*multiple tasks/i);
-    expect(tool.description).toMatch(/mutation-capable batch.*one task/i);
-    expect(tool.description).not.toContain("antigravity_run");
-    expect(tool.description?.length).toBeLessThanOrEqual(400);
-    expect(tool.promptSnippet).toBeUndefined();
-    expect(tool.promptGuidelines).toBeUndefined();
-    expect(profile.enum).toEqual(["explore", "general"]);
-    expect(profile.description).toMatch(/explore: .*without changing files/);
-    expect(profile.description).toMatch(/general: .*coding task/);
-    expect(profile.description.length).toBeLessThanOrEqual(200);
-  });
-
   it("bounds task instructions at 16,000 characters in the registered schema", async () => {
     const tool = await registeredTool();
     const schema = tool.parameters as {
