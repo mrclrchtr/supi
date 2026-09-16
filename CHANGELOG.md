@@ -1,5 +1,17 @@
 # Changelog
 
+## [7.0.1](https://github.com/mrclrchtr/supi/compare/v7.0.0...v7.0.1) (2026-09-16)
+
+
+### Bug Fixes
+
+* **deps:** update dependency hk to v2 ([d8a896a](https://github.com/mrclrchtr/supi/commit/d8a896a78475c829280844ff515d1e7bba975869))
+* **deps:** update dependency vitest to v5 ([9561e2b](https://github.com/mrclrchtr/supi/commit/9561e2b639547077e2fa1153ae9df3c57fa7e567))
+* **hk:** complete v2 configuration upgrade ([6af8e09](https://github.com/mrclrchtr/supi/commit/6af8e09ce530a0d78e4c4d7e8b94c949fc5bd316))
+* **models:** preserve auth-resolved request endpoints ([ad02d71](https://github.com/mrclrchtr/supi/commit/ad02d71bc4e958a448ca83e7ca3dbd3a4c34ed22)), closes [#410](https://github.com/mrclrchtr/supi/issues/410)
+* **test:** remove Vitest config warnings ([820e593](https://github.com/mrclrchtr/supi/commit/820e593e1ebf2d21f851ca599f888520c69ec22e))
+* **tree-sitter:** migrate benchmarks to Vitest 5 ([c35a36e](https://github.com/mrclrchtr/supi/commit/c35a36ed6c5caf2ae275bf7cdab89b0bc43bf90e))
+
 ## [7.0.0](https://github.com/mrclrchtr/supi/compare/v6.4.0...v7.0.0) (2026-09-16)
 
 
