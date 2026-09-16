@@ -17,6 +17,20 @@
       "depNameTemplate": "mattpocock/skills",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Keep hk Pkl schema imports aligned with the mise tool",
+      "managerFilePatterns": ["/^hk\\.pkl$/"],
+      "matchStrings": [
+        "amends\\s+\\\"package://github\\.com/jdx/hk/releases/download/v(?<currentValue>[^/\\\"]+)/hk@[^#\\\"]+#/Config\\.pkl\\\"\\s+import\\s+\\\"package://github\\.com/jdx/hk/releases/download/v[^/\\\"]+/hk@[^#\\\"]+#/Builtins\\.pkl\\\""
+      ],
+      "autoReplaceStringTemplate": "amends \"package://github.com/jdx/hk/releases/download/v{{{newValue}}}/hk@{{{newValue}}}#/Config.pkl\"\nimport \"package://github.com/jdx/hk/releases/download/v{{{newValue}}}/hk@{{{newValue}}}#/Builtins.pkl\"",
+      "depNameTemplate": "hk",
+      "packageNameTemplate": "jdx/hk",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver",
+      "extractVersionTemplate": "^v(?<version>\\S+)"
     }
   ],
   "packageRules": [
