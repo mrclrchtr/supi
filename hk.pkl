@@ -1,5 +1,5 @@
-amends "package://github.com/jdx/hk/releases/download/v1.42.0/hk@1.42.0#/Config.pkl"
-import "package://github.com/jdx/hk/releases/download/v1.42.0/hk@1.42.0#/Builtins.pkl"
+amends "package://github.com/jdx/hk/releases/download/v2.0.1/hk@2.0.1#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.0.1/hk@2.0.1#/Builtins.pkl"
 
 env {
   ["NODE_ENV"] = "development"
@@ -25,12 +25,12 @@ exclude =
 local precommit = new Mapping<String, Step> {
   ["check-merge-conflict"] = Builtins.check_merge_conflict
   ["gitleaks"] = (Builtins.gitleaks) {
-    prefix = "pnpm -s exec"
+    prefix = List("pnpm", "-s", "exec")
   }
   ["check-added-large-files"] = Builtins.check_added_large_files
 
   ["biome"] = (Builtins.biome) {
-    prefix = "pnpm -s exec"
+    prefix = List("pnpm", "-s", "exec")
   }
 
   ["trailing-whitespace"] = Builtins.trailing_whitespace
