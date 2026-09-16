@@ -1,5 +1,55 @@
 # Changelog
 
+## [7.0.0](https://github.com/mrclrchtr/supi/compare/v6.4.0...v7.0.0) (2026-09-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* **code-intelligence:** Automatic bulk tracking uses skipped instead of unsupported in outcome kinds and source-tracking report fields.
+
+### Features
+
+* **prompt-suggestions:** record quiet suggestion skip paths ([08caa65](https://github.com/mrclrchtr/supi/commit/08caa652e837841f4e1d37d26da04175a8b8919b))
+* **supi-agent:** embed steering input in agents overlay ([4361425](https://github.com/mrclrchtr/supi/commit/4361425e1dc962c989218b5cda1a6e19b0281511))
+* **supi-agent:** show the effective model in the agent run row ([957dab2](https://github.com/mrclrchtr/supi/commit/957dab298f7c523eb7982455fd4351a6ea0fabf6))
+* **supi-antigravity:** animate readiness indicator ([56dad9a](https://github.com/mrclrchtr/supi/commit/56dad9a9b9a5d63bec04714c9616fbf73c5c8657))
+* **supi-antigravity:** place ready icon beside lsp status ([ae1eba0](https://github.com/mrclrchtr/supi/commit/ae1eba0c20e075a0de5d55740f92ed0b2a7736ff))
+* **supi-antigravity:** show ready status in footer ([030ec7d](https://github.com/mrclrchtr/supi/commit/030ec7d8154807cdde507df79f2899e5f6c51114))
+* **tools:** clarify delegation tool selection ([20cfe75](https://github.com/mrclrchtr/supi/commit/20cfe75a595ce49d6797c288b527ddb5f6d9e5d4))
+* **tools:** clarify tool guidance ([a2e407e](https://github.com/mrclrchtr/supi/commit/a2e407ec7402db571ffaced788345a0d43c6bbd6))
+
+
+### Bug Fixes
+
+* **code-intelligence:** complete graph and transcript follow-ups ([6b16c49](https://github.com/mrclrchtr/supi/commit/6b16c499cc19cb44041323e9d9d7afb7898d20dc))
+* **code-intelligence:** complete graph output follow-ups ([87247e9](https://github.com/mrclrchtr/supi/commit/87247e9711f2b4cb754562de58238544f4eb806c))
+* **code-intelligence:** distinguish maintenance and result scope ([a39a854](https://github.com/mrclrchtr/supi/commit/a39a8545b37cc50a651bfe6cdd68e2577ed08a07))
+* **code-intelligence:** preserve call sites and remove duplicate output ([ae50123](https://github.com/mrclrchtr/supi/commit/ae50123d0a1b2fb2da4eebece1a368f3e3740d30))
+* **code-intelligence:** report skipped source tracking ([28f4f7f](https://github.com/mrclrchtr/supi/commit/28f4f7fb62b55ed24f85de6445a43d04e067340d))
+* **deps:** lock file maintenance ([280531f](https://github.com/mrclrchtr/supi/commit/280531f3fca7696d150ea3fd504807f58bcbd757))
+* **deps:** update dependency @biomejs/biome to v2.5.13 ([ea613eb](https://github.com/mrclrchtr/supi/commit/ea613eb83859ad71fb0343c5530a2add6abe2232))
+* **deps:** update dependency @types/node to v25.9.6 ([d21caac](https://github.com/mrclrchtr/supi/commit/d21caacee4ea183fd8cf891fe0635f8437a69ea9))
+* **deps:** update dependency ignore to v7.0.9 ([1afd124](https://github.com/mrclrchtr/supi/commit/1afd124ff93400aa71d6f98994cd4f194d9d8835))
+* **deps:** update dependency typebox to v1.3.28 ([41536b2](https://github.com/mrclrchtr/supi/commit/41536b2211db13c40ab1558fecd1b669124ee0d1))
+* **deps:** update dependency typebox to v1.3.29 ([6724ac3](https://github.com/mrclrchtr/supi/commit/6724ac39f12afd2d22d57a660d3c2f5d099a44ff))
+* **deps:** update dependency typebox to v1.3.30 ([33e4e9b](https://github.com/mrclrchtr/supi/commit/33e4e9bb536a5f2976ea0591aa87e39a26b3264a))
+* **deps:** update pnpm to v12.4.0 ([a6f373d](https://github.com/mrclrchtr/supi/commit/a6f373df8e2dac42f1e8e9c85b0227eae4726d1b))
+* **deps:** update pnpm to v12.4.1 ([84caf0f](https://github.com/mrclrchtr/supi/commit/84caf0fecd62e95a64f58346918c58e848871ddf))
+* **lsp:** confirm diagnostics through request adapters ([35ec9a6](https://github.com/mrclrchtr/supi/commit/35ec9a67d69bcc413bec3b566f346e5d37cca3bd)), closes [#407](https://github.com/mrclrchtr/supi/issues/407)
+* **lsp:** make diagnostic config filtering language-aware ([c4e4aae](https://github.com/mrclrchtr/supi/commit/c4e4aaeba136648c565de66420615bfee54cfe95))
+* **lsp:** refresh diagnostics without source changes ([a1bad1f](https://github.com/mrclrchtr/supi/commit/a1bad1fe2172f40b26af8f731a5a73d234fd9e1e))
+* **lsp:** retry failed routes during explicit health refresh ([96eb746](https://github.com/mrclrchtr/supi/commit/96eb746098f8c1c56f222d2b8fd77a95f644ef52))
+* **lsp:** retry input synchronization after document enrollment ([7ecb94f](https://github.com/mrclrchtr/supi/commit/7ecb94f2453d3886666f8ae6eea50c997dc5e312))
+* **lsp:** synchronize route inputs before semantic requests ([5311cff](https://github.com/mrclrchtr/supi/commit/5311cffb8af6ef7a3eb2dc89043b4c85d4972bf9))
+* **models:** preserve provider authority and cache routing ([e0e14bb](https://github.com/mrclrchtr/supi/commit/e0e14bb8f58c8bb2541763c568aa759372900f41)), closes [#402](https://github.com/mrclrchtr/supi/issues/402)
+* **prompt-suggestions:** classify safe provider failures ([2dc0c6a](https://github.com/mrclrchtr/supi/commit/2dc0c6abbe582c81eb4ed2b50c1f8beae93a4733)), closes [#402](https://github.com/mrclrchtr/supi/issues/402)
+* **supi-antigravity:** root the tool schema in an object ([7f1ebc1](https://github.com/mrclrchtr/supi/commit/7f1ebc1e457126a363961161668be790f6d9723e))
+
+
+### Performance Improvements
+
+* **supi-antigravity:** avoid blocking startup discovery ([d605d93](https://github.com/mrclrchtr/supi/commit/d605d93a8e40f792cc26e26d09c101fec3510ccc))
+
 ## [6.4.0](https://github.com/mrclrchtr/supi/compare/v6.3.1...v6.4.0) (2026-09-08)
 
 
