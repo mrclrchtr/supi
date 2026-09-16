@@ -1,5 +1,5 @@
 export const toolDescription =
-  "Run one to four independent inspection-only review tasks against one frozen Review Target. Use for code reviews or criteria-based inspections; use agent_run for exploration or coding and direct tools for simple checks. Each task selects change or state evidence.";
+  "Run independent inspection-only code reviews or repository-state audits against defined criteria in one frozen snapshot. Return structured findings, criteria coverage, and per-task verdicts. Not for general repository exploration or implementation.";
 
 export const promptSnippet = "Run independent inspection-only reviews";
 
