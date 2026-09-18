@@ -51,7 +51,7 @@
   ],
   "devDependencies": {
     "@mrclrchtr/supi-test-utils": "workspace:*",
-    "vitest": "5.0.0"
+    "vitest": "5.0.1"
   },
   "main": "src/api.ts",
   "exports": {
