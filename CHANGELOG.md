@@ -1,5 +1,16 @@
 # Changelog
 
+## [7.1.1](https://github.com/mrclrchtr/supi/compare/v7.1.0...v7.1.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @types/node to v25.9.7 ([caafd22](https://github.com/mrclrchtr/supi/commit/caafd2230e23c83b64e236c0ec18affba2468aac))
+* **deps:** update dependency typebox to v1.3.31 ([14dbe35](https://github.com/mrclrchtr/supi/commit/14dbe356d4fa3207338d22a6db89ad608cea9ffa))
+* **deps:** update dependency typebox to v1.3.32 ([bea546d](https://github.com/mrclrchtr/supi/commit/bea546dc5a5b42490173abf4fa7c42e74ad84245))
+* **deps:** update dependency vitest to v5.0.1 ([f138dee](https://github.com/mrclrchtr/supi/commit/f138deeda278e269b7e3adc8699d43e0552969ac))
+* **deps:** update pnpm to v12.4.2 ([89921bd](https://github.com/mrclrchtr/supi/commit/89921bdfe5f3bf0111a83d66695e4696493c8371))
+
 ## [7.1.0](https://github.com/mrclrchtr/supi/compare/v7.0.1...v7.1.0) (2026-09-16)
 
 
