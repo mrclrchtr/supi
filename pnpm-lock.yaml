@@ -217,7 +217,7 @@ importers:
         version: 6.0.0
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
       web-tree-sitter:
         specifier: 0.27.0
         version: 0.27.0
@@ -254,7 +254,7 @@ importers:
         version: 25.9.7
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-agent-runtime:
     dependencies:
@@ -273,7 +273,7 @@ importers:
         version: 25.9.7
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-antigravity:
     dependencies:
@@ -301,7 +301,7 @@ importers:
         version: 25.9.7
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-ask-user:
     dependencies:
@@ -323,7 +323,7 @@ importers:
         version: link:../supi-test-utils
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-bash-timeout:
     dependencies:
@@ -345,7 +345,7 @@ importers:
         version: 25.9.7
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-cache:
     dependencies:
@@ -370,7 +370,7 @@ importers:
         version: link:../supi-test-utils
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-claude-md:
     dependencies:
@@ -386,7 +386,7 @@ importers:
         version: 25.9.7
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-code-intelligence:
     dependencies:
@@ -426,7 +426,7 @@ importers:
         version: 25.9.7
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-code-runtime:
     devDependencies:
@@ -435,7 +435,7 @@ importers:
         version: 25.9.7
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-context:
     dependencies:
@@ -460,7 +460,7 @@ importers:
         version: link:../supi-test-utils
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-core:
     dependencies:
@@ -482,7 +482,7 @@ importers:
         version: 25.9.7
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-debug:
     dependencies:
@@ -507,7 +507,7 @@ importers:
         version: link:../supi-test-utils
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-extras:
     dependencies:
@@ -529,7 +529,7 @@ importers:
         version: link:../supi-test-utils
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-insights:
     dependencies:
@@ -551,7 +551,7 @@ importers:
         version: 25.9.7
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-lsp:
     dependencies:
@@ -582,7 +582,7 @@ importers:
         version: link:../supi-test-utils
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-prompt-suggestions:
     dependencies:
@@ -604,7 +604,7 @@ importers:
         version: 25.9.7
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-review:
     dependencies:
@@ -635,7 +635,7 @@ importers:
         version: link:../supi-test-utils
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-settings:
     dependencies:
@@ -657,7 +657,7 @@ importers:
         version: 25.9.7
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-skill-patches:
     devDependencies:
@@ -669,7 +669,7 @@ importers:
         version: https://codeload.github.com/mattpocock/skills/tar.gz/6acc160e4e0cd062dbbbd7a1b26ae92855edf07e(patch_hash=8863f248574562f23d570936c32add355b29811a07abcedcad5c8a9d1a37e3c1)
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-skills:
     dependencies:
@@ -688,7 +688,7 @@ importers:
         version: link:../supi-test-utils
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-test-utils:
     dependencies:
@@ -697,7 +697,7 @@ importers:
         version: 0.85.1(ws@8.21.3)
       vitest:
         specifier: ^4.1.5 || ^5.0.0
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
     devDependencies:
       '@types/node':
         specifier: 25.9.7
@@ -774,7 +774,7 @@ importers:
         version: 0.23.2(tree-sitter@0.25.1)
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/supi-web:
     dependencies:
@@ -792,7 +792,7 @@ importers:
         version: 0.6.0
       jsdom:
         specifier: ^30.0.0
-        version: 30.0.1
+        version: 30.1.0
       turndown:
         specifier: ^7.2.0
         version: 7.2.4
@@ -814,7 +814,7 @@ importers:
         version: 5.0.6
       vitest:
         specifier: 5.0.1
-        version: 5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
 
 packages:
 
@@ -827,13 +827,13 @@ packages:
       zod:
         optional: true
 
-  '@asamuzakjp/css-color@6.0.7':
-    resolution: {integrity: sha512-vC/bk1Lz7Tn/EfU9/apOTBk80/8dyGyWMowPoV1tJ52muDGsDqt2HPT2klrFUiY60MQmQv9q8yIht15JnBgDGw==}
-    engines: {node: ^22.13.0 || >=24.0.0}
+  '@asamuzakjp/css-color@7.0.0':
+    resolution: {integrity: sha512-IxddtGnnoidVSO6O/aiTueptbTThHvi2qGHu9/AWuD1J7i86Ox+jl+Y5SXcDH1RixzQlP2cjH/PjnlImZiAurQ==}
+    engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
 
-  '@asamuzakjp/dom-selector@8.3.2':
-    resolution: {integrity: sha512-93Z1N+BQNXysodoicpOIyNh2drHfz/CTf9nnT0FEx72GJcIiwgydD7tGAr78j41LsYn3hlRn+LdGPuBLn1Bl8Q==}
-    engines: {node: ^22.13.0 || >=24.0.0}
+  '@asamuzakjp/dom-selector@9.2.0':
+    resolution: {integrity: sha512-qKvLetaSd/OTWif9JT0eu1SHBg3H7Nvp9SoMwMxqT5tmYyrxea/P1A5pIfGbnIJlOtm3yVeqw+ORxDOkjN1aEw==}
+    engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
 
   '@aws-crypto/sha256-browser@5.2.0':
     resolution: {integrity: sha512-AXfN/lGotSQwu6HNcEsIASo7kWXZ5HYWvfOmSNKDsEqC4OashTp8alTmaz+F7TC2L083SFv5RdB+qU3Vs1kZqw==}
@@ -2130,8 +2130,8 @@ packages:
     resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
     hasBin: true
 
-  jsdom@30.0.1:
-    resolution: {integrity: sha512-52v7mUVUfNQVYYqE1lcdaymWL0njO7lTLUog6ZvW2U5KsbiLk/GnZlVJ+qx0xfNJZ6Gn+KSpPNE52vurbxZwrA==}
+  jsdom@30.1.0:
+    resolution: {integrity: sha512-h/Q+H+KmlGf49ITw3TrykSVbg04S75S2O7ZtJc9gMGOWBrQRZmx5AJIKLtJ01e6Kszl+/tpFthCVqxNifxhoqg==}
     engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
     peerDependencies:
       canvas: ^3.2.3
@@ -2511,9 +2511,6 @@ packages:
   subsume@4.0.0:
     resolution: {integrity: sha512-BWnYJElmHbYZ/zKevy+TG+SsyoFCmRPDHJbR1MzLxkPOv1Jp/4hGhVUtP98s+wZBsBsHwCXvPTP0x287/WMjGg==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
-
-  symbol-tree@3.2.4:
-    resolution: {integrity: sha512-9QNk5KwDF+Bvz+PyObkmSYjI5ksVUYtjW7AU22r2NKcfLJcXp96hkDWU3+XndOsUb+AQ9QhfzfCT2O+CNWT5Tw==}
 
   system-architecture@0.1.0:
     resolution: {integrity: sha512-ulAk51I9UVUyJgxlv9M6lFot2WP3e7t8Kz9+IS6D4rVba1tR9kON+Ey69f+1R4Q8cd45Lod6a4IcJIxnzGc/zA==}
@@ -2929,7 +2926,7 @@ snapshots:
       json-schema-to-ts: 3.1.1
       standardwebhooks: 1.1.1
 
-  '@asamuzakjp/css-color@6.0.7':
+  '@asamuzakjp/css-color@7.0.0':
     dependencies:
       '@csstools/css-calc': 3.3.0(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)
       '@csstools/css-color-parser': 4.2.2(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)
@@ -2937,7 +2934,7 @@ snapshots:
       '@csstools/css-tokenizer': 4.0.0
       lru-cache: 11.5.2
 
-  '@asamuzakjp/dom-selector@8.3.2':
+  '@asamuzakjp/dom-selector@9.2.0':
     dependencies:
       bidi-js: 1.1.0
       css-tree: 3.2.1
@@ -4237,10 +4234,10 @@ snapshots:
     dependencies:
       argparse: 2.0.1
 
-  jsdom@30.0.1:
+  jsdom@30.1.0:
     dependencies:
-      '@asamuzakjp/css-color': 6.0.7
-      '@asamuzakjp/dom-selector': 8.3.2
+      '@asamuzakjp/css-color': 7.0.0
+      '@asamuzakjp/dom-selector': 9.2.0
       '@bramus/specificity': 2.4.2
       '@csstools/css-syntax-patches-for-csstree': 1.1.13(css-tree@3.2.1)
       '@exodus/bytes': 1.15.1
@@ -4252,7 +4249,6 @@ snapshots:
       lru-cache: 11.5.2
       parse5: 8.0.1
       saxes: 6.0.0
-      symbol-tree: 3.2.4
       tough-cookie: 6.0.2
       undici: 8.10.2
       w3c-xmlserializer: 5.0.0
@@ -4577,8 +4573,6 @@ snapshots:
       escape-string-regexp: 5.0.0
       unique-string: 3.0.0
 
-  symbol-tree@3.2.4: {}
-
   system-architecture@0.1.0: {}
 
   tinybench@6.1.4: {}
@@ -4765,7 +4759,7 @@ snapshots:
       jiti: 2.7.0
       yaml: 2.9.1
 
-  vitest@5.0.1(@types/node@25.9.7)(jsdom@30.0.1)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1)):
+  vitest@5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1)):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/mocker': 5.0.1(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
@@ -4783,7 +4777,7 @@ snapshots:
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 25.9.7
-      jsdom: 30.0.1
+      jsdom: 30.1.0
     transitivePeerDependencies:
       - msw
 
