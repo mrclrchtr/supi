@@ -18,6 +18,8 @@ Advisory ghost-text prompt suggestions for the [pi coding agent](https://github.
 
 ## Install
 
+Requires Pi 0.86.0 or later.
+
 ```bash
 pi install npm:@mrclrchtr/supi-prompt-suggestions
 ```
@@ -53,8 +55,8 @@ The default is `disabled`. Pick a cheap, fast model if you want lightweight sugg
 
 Settings follow SuPi's normal scoped config behavior: set a global default, then override it per project when needed.
 
-Suggestion requests use PI's model registry. PI owns authentication and provider routing; the
-extension does not resolve or copy credentials.
+Suggestion requests use PI's registry simple-completion path. PI owns authentication, provider
+routing, and context-aware output limits; the extension does not resolve or copy credentials.
 
 ## Privacy
 

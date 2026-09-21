@@ -27,11 +27,12 @@ outcomes (no assistant text, editor not empty at settle, editor not empty at del
 
 ### Suggestion model via PI registry
 
-Suggestions use `completeModelRequest` from `@mrclrchtr/supi-core/llm` (not `createAgentSession` or
-the pi-ai compatibility API). PI resolves authentication, headers, provider environment, and the
-effective endpoint. The request uses the stable `prompt-suggestions` affinity scope and the model's
-output limit clamped with PI's public context helper. Only the last 8,000 characters of the final
-assistant message are sent. The system prompt instructs the model to write a single follow-up line
+Suggestions use `completeSimpleModelRequest` from `@mrclrchtr/supi-core/llm`, backed by
+`ctx.modelRegistry.streamSimple().result()` on PI 0.86.0 or later. PI resolves authentication,
+headers, provider environment, and the effective endpoint. The request uses the stable
+`prompt-suggestions` affinity scope. PI's simple path supplies model output limits and context
+guards; the extension does not import Pi AI implementation subpaths. Only the last 8,000
+characters of the final assistant message are sent. The system prompt instructs the model to write a single follow-up line
 (question, answer, or directive) or return the `NO_SUGGESTION` sentinel. The user message wraps the
 assistant text in `<assistant_message>...</assistant_message>` tags and appends `Suggestion:` — no
 PI, SuPi, project, or conversation context is included.

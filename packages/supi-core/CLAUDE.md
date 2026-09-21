@@ -42,7 +42,7 @@ src/
 - `registry-utils.ts` — preferred shared location for global registries and normalized-cwd session-state registries used by peer substrate packages
 - `debug-registry.ts` — stable `@mrclrchtr/supi-core/debug` domain surface plus Debug Registry state, retention, redaction, listeners, and queries; producers own event meaning while `supi-debug` owns retention and display policy
 - `debug-timing.ts` — `startDebugTimer()` for one-shot total and sequential phase timings; the timer is a no-op when Debug is disabled, and a `finish()` factory prevents event-data construction on disabled hot paths
-- `llm.ts` — shared LLM utilities: `completeModelRequest()` (PI registry completion with stable affinity and OpenCode headers), `withRetry()` (exponential-backoff retry with AbortSignal), `extractJsonFromResponse()`, and `callWithJsonResponse()` (model selection → registry completion → JSON extraction → TypeBox validation)
+- `llm.ts` — shared LLM utilities: `completeModelRequest()` (API-specific registry completion), `completeSimpleModelRequest()` (provider-neutral completion on PI 0.86.0 or later), `withRetry()`, `extractJsonFromResponse()`, and `callWithJsonResponse()`. Both completion paths share stable affinity and OpenCode header policy; the simple path delegates output limits to PI.
 - `prompt-surface.ts` — configurable tool prompt-surface resolution and its public types
 
 ## Config gotchas

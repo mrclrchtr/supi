@@ -1,9 +1,8 @@
 /** Low-level suggestion model client. */
 
 import type { Api, Context, Model } from "@earendil-works/pi-ai";
-import { clampMaxTokensToContext } from "@earendil-works/pi-ai/api/simple-options";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { completeModelRequest } from "@mrclrchtr/supi-core/llm";
+import { completeSimpleModelRequest } from "@mrclrchtr/supi-core/llm";
 import {
   classifySuggestionFailure,
   createSuggestionFailure,
@@ -69,7 +68,7 @@ export interface SuggestionClientOptions {
  * Call the suggestion model through PI's model registry.
  *
  * The request keeps the fixed prompt and bounded assistant tail. PI resolves
- * authentication, endpoint, headers, and provider environment.
+ * authentication, endpoint, headers, provider environment, and simple output limits.
  */
 export async function callSuggestionModel(
   opts: SuggestionClientOptions,
@@ -86,10 +85,9 @@ export async function callSuggestionModel(
   };
 
   try {
-    const response = await completeModelRequest(opts.ctx, opts.model, context, {
+    const response = await completeSimpleModelRequest(opts.ctx, opts.model, context, {
       affinityScope: "prompt-suggestions",
       signal: opts.signal,
-      maxTokens: clampMaxTokensToContext(opts.model, context, opts.model.maxTokens),
     });
 
     if (response.stopReason === "aborted") {

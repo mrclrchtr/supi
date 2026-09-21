@@ -21,6 +21,7 @@ import {
   type CompleteModelRequestOptions,
   callWithJsonResponse,
   completeModelRequest,
+  completeSimpleModelRequest,
 } from "../../src/llm.ts";
 
 const makeModel = (overrides: Partial<Model<Api>> = {}): Model<Api> => ({
@@ -294,7 +295,10 @@ describe("completeModelRequest", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("uses the real ModelRuntime request path for endpoint, environment, and headers", async () => {
+  it.each([
+    { name: "API-specific", request: completeModelRequest },
+    { name: "simple", request: completeSimpleModelRequest },
+  ])("uses real $name requests for endpoint, environment, and headers", async ({ request }) => {
     const runtime = await ModelRuntime.create({
       credentials: new InMemoryCredentialStore(),
       modelsPath: null,
@@ -353,7 +357,7 @@ describe("completeModelRequest", () => {
       }),
     );
 
-    await completeModelRequest(
+    await request(
       makeExtensionContext(new ModelRegistry(runtime), "runtime-session"),
       controlledModel,
       makeContext(),

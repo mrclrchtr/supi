@@ -42,12 +42,12 @@ function makeResponse(overrides: Partial<AssistantMessage> = {}): AssistantMessa
 }
 
 function makeClientContext(response: AssistantMessage | Promise<AssistantMessage>) {
-  const complete = vi.fn().mockReturnValue(response);
+  const streamSimple = vi.fn().mockReturnValue({ result: () => response });
   const ctx = makeCtx({
-    modelRegistry: { complete },
+    modelRegistry: { streamSimple },
     sessionManager: { getSessionId: () => "pi-session" },
   }) as unknown as ExtensionContext;
-  return { ctx, complete };
+  return { ctx, streamSimple };
 }
 
 describe("buildPrompt", () => {
@@ -72,15 +72,15 @@ describe("callSuggestionModel", () => {
     vi.restoreAllMocks();
   });
 
-  it("uses the PI registry request path with the fixed prompt and context clamp", async () => {
+  it("uses the PI registry simple path with the fixed prompt and model defaults", async () => {
     const signal = new AbortController().signal;
-    const { ctx, complete } = makeClientContext(Promise.resolve(makeResponse()));
+    const { ctx, streamSimple } = makeClientContext(Promise.resolve(makeResponse()));
 
     const result = await callSuggestionModel({ ctx, model: MODEL, tail: "assistant text", signal });
 
     expect(result).toEqual({ ok: true, text: "next" });
-    expect(complete).toHaveBeenCalledOnce();
-    const [model, context, options] = complete.mock.calls[0] as [
+    expect(streamSimple).toHaveBeenCalledOnce();
+    const [model, context, options] = streamSimple.mock.calls[0] as [
       Model<Api>,
       Context,
       Record<string, unknown>,
@@ -91,7 +91,7 @@ describe("callSuggestionModel", () => {
     });
     expect(options).toMatchObject({ signal });
     expect(options.sessionId).toMatch(/^supi-/u);
-    expect(options.maxTokens).toBe(256);
+    expect(options).not.toHaveProperty("maxTokens");
     expect(options).not.toHaveProperty("apiKey");
     expect(options).not.toHaveProperty("env");
   });
@@ -305,23 +305,6 @@ describe("callSuggestionModel", () => {
     expect(JSON.stringify(result)).not.toContain(secret);
     expect(JSON.stringify(result)).not.toContain("provider.example");
   });
-
-  it.each([
-    { contextWindow: 128_000, expected: 8192 },
-    { contextWindow: 4096, expected: 1 },
-  ])(
-    "keeps model limits within context window $contextWindow",
-    async ({ contextWindow, expected }) => {
-      const { ctx, complete } = makeClientContext(makeResponse());
-      await callSuggestionModel({
-        ctx,
-        model: { ...MODEL, maxTokens: 8192, contextWindow },
-        tail: "assistant text",
-        signal: new AbortController().signal,
-      });
-      expect(complete.mock.calls[0]?.[2]).toMatchObject({ maxTokens: expected });
-    },
-  );
 
   it("classifies an aborted provider response as a timeout", async () => {
     const { ctx } = makeClientContext(

@@ -70,7 +70,7 @@ function makeFixture(response: AssistantMessage | Promise<AssistantMessage>) {
     model: MODEL,
     modelRegistry: {
       getAvailable: () => [MODEL],
-      complete,
+      streamSimple: (...args: unknown[]) => ({ result: () => complete(...args) }),
     },
     sessionManager: {
       getSessionId: () => "pi-session",

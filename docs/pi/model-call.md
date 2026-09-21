@@ -2,7 +2,7 @@
 
 ## PI request authority
 
-Use `ctx.modelRegistry.complete(model, context, options)` for a completion outside the agent loop. PI resolves the current provider, authentication, OAuth refresh, headers, environment, and credential-specific endpoint for that request.
+Use `ctx.modelRegistry.complete(model, context, options)` for API-specific options outside the agent loop. On PI 0.86.0 or later, use `ctx.modelRegistry.streamSimple(model, context, options).result()` for provider-neutral options and PI's simple output-limit handling. Both paths resolve the current provider, authentication, OAuth refresh, headers, environment, and credential-specific endpoint.
 
 The installed PI example `examples/extensions/summarize.ts` uses this public registry method. `ExtensionAPI` (`pi`) does not expose `callModel()`.
 
@@ -28,12 +28,22 @@ const response = await ctx.modelRegistry.complete(
 - Select the model under the feature's model policy.
 - Let the registry resolve auth at dispatch. Copying selected fields from `getApiKeyAndHeaders()` can lose the resolved endpoint and bypass the registered provider implementation.
 - Handle both a rejected promise and an assistant response with `stopReason: "error"` or `"aborted"`.
-- `complete()` uses the full provider options. It is not identical to compat `completeSimple()`, which supplies model-derived output limits and other simple-option mappings.
+- `complete()` uses the full provider options. The registry simple path supplies model-derived output limits and other simple-option mappings. Use the registry rather than compat `completeSimple()` so extension-registered providers remain available.
+- A public Pi AI package subpath is not necessarily available through Pi's extension loader. Use the registry for model calls rather than importing helpers such as `@earendil-works/pi-ai/api/simple-options`. See the [Pi maintainer's loader guidance](https://github.com/earendil-works/pi/issues/4595#issuecomment-4468203851).
 - A standalone registry call does not inherit the active AgentSession's session identity or SDK attribution transform.
 
 ## SuPi direct completions
 
-Use the shared `completeModelRequest()` module for SuPi direct completions:
+Use `completeSimpleModelRequest()` for provider-neutral SuPi requests, including prompt suggestions. Use `completeModelRequest()` when a caller needs API-specific options. Both are exported from `@mrclrchtr/supi-core/llm` and share request identity and header policy:
+
+```typescript
+const response = await completeSimpleModelRequest(ctx, model, context, {
+  affinityScope: "prompt-suggestions",
+  signal: ctx.signal,
+});
+```
+
+The simple helper requires PI 0.86.0 or later. It delegates output limits to PI without importing Pi AI subpaths. API-specific callers retain their current interface:
 
 ```typescript
 import { completeModelRequest } from "@mrclrchtr/supi-core/llm";
@@ -48,8 +58,9 @@ const response = await completeModelRequest(ctx, model, context, {
 | Owner | Responsibility |
 | --- | --- |
 | PI model registry | Provider dispatch, request auth, OAuth refresh, effective endpoint, auth headers, environment |
-| `completeModelRequest` | Stable separate request identity and PI 0.85.1 OpenCode header defaults |
-| Calling feature | Model selection, prompt, output limits, cancellation, retries, validation, error presentation |
+| Both SuPi completion helpers | Stable separate request identity and OpenCode header defaults |
+| PI simple path | Model-derived output limits and context guards for provider-neutral requests |
+| Calling feature | Model selection, prompt, explicit limit overrides, cancellation, retries, validation, error presentation |
 
 Choose a stable scope for each distinct feature prompt stream. Do not put prompt text, turn numbers, retry counts, credentials, or project paths into that scope. The helper derives an opaque identity from the scope, PI session, provider, and model. Repeated calls in the same stream retain that identity without using the primary agent's identity.
 
@@ -76,7 +87,7 @@ When a borrowed provider delegates to the current parent provider, it must prese
 
 ## Evidence and decisions
 
-Verified against installed PI and pi-ai 0.85.1:
+Request handling was verified against PI and pi-ai 0.85.1. Registry simple completion was added in PI 0.86.0 and verified with 0.86.1:
 
 - PI `docs/extensions.md`: model registry and provider auth.
 - PI `examples/extensions/summarize.ts`: public registry completion.

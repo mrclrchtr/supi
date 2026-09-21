@@ -5,6 +5,7 @@ import type {
   Context,
   Model,
   ModelsApiStreamOptions,
+  ModelsSimpleStreamOptions,
   ProviderHeaders,
 } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -18,16 +19,7 @@ import { Value } from "typebox/value";
 
 const MODEL_REQUEST_NAMESPACE = "supi-direct-model-request-v1";
 
-/**
- * Options for {@link completeModelRequest}.
- *
- * Authentication, provider environment, and session identity stay under PI
- * control. The feature supplies a stable scope for its prompt stream.
- */
-export type CompleteModelRequestOptions<TApi extends Api = Api> = Omit<
-  ModelsApiStreamOptions<TApi>,
-  "apiKey" | "env" | "sessionId"
-> & {
+type ModelRequestOptions<T> = Omit<T, "apiKey" | "env" | "sessionId"> & {
   /** Stable feature scope. Do not include prompt, turn, or retry data. */
   affinityScope: string;
   /** PI owns these fields, including for APIs with open-ended option types. */
@@ -35,6 +27,14 @@ export type CompleteModelRequestOptions<TApi extends Api = Api> = Omit<
   env?: never;
   sessionId?: never;
 };
+
+/** API-specific completion options. PI owns auth, environment, and identity. */
+export type CompleteModelRequestOptions<TApi extends Api = Api> = ModelRequestOptions<
+  ModelsApiStreamOptions<TApi>
+>;
+
+/** Provider-neutral completion options. PI owns auth, environment, and identity. */
+export type CompleteSimpleModelRequestOptions = ModelRequestOptions<ModelsSimpleStreamOptions>;
 
 function createModelRequestAffinityId(
   sessionId: string,
@@ -84,24 +84,10 @@ function addOpenCodeDefaultHeaders(
   return result;
 }
 
-/**
- * Complete a direct request through PI's model registry.
- *
- * PI resolves authentication, provider headers, environment, and the
- * effective endpoint. This helper adds one stable opaque session identity for
- * the feature prompt stream and applies the OpenCode compatibility defaults.
- * It does not retry, validate output, or present errors.
- *
- * When `maxTokens` is omitted, the underlying registry receives no explicit
- * output cap. A caller that needs the selected model's declared cap can pass
- * `maxTokens: model.maxTokens` without importing PI internals.
- */
-export async function completeModelRequest<TApi extends Api>(
-  ctx: ExtensionContext,
-  model: Model<TApi>,
-  context: Context,
-  options: CompleteModelRequestOptions<TApi>,
-): Promise<AssistantMessage> {
+/** Keep request identity and header policy identical for both completion paths. */
+function prepareModelRequestOptions<
+  T extends Pick<ModelsSimpleStreamOptions, "signal" | "transformHeaders">,
+>(ctx: ExtensionContext, model: Model<Api>, options: ModelRequestOptions<T>): T {
   const { affinityScope, transformHeaders: callerTransformHeaders, ...requestOptions } = options;
   const safeRequestOptions = { ...requestOptions };
   delete safeRequestOptions.apiKey;
@@ -118,13 +104,57 @@ export async function completeModelRequest<TApi extends Api>(
     return addOpenCodeDefaultHeaders(model, affinityId, transformed);
   };
 
-  // Restore PI's conditional provider-option type after removing owned fields.
-  return ctx.modelRegistry.complete(model, context, {
+  // Restore PI's option type after removing owned fields.
+  return {
     ...safeRequestOptions,
     signal: safeRequestOptions.signal ?? ctx.signal,
     sessionId: affinityId,
     transformHeaders,
-  } as unknown as ModelsApiStreamOptions<TApi>);
+  } as unknown as T;
+}
+
+/**
+ * Complete an API-specific request through PI's model registry.
+ *
+ * PI resolves auth, headers, environment, and the effective endpoint. SuPi adds
+ * a stable opaque feature identity and OpenCode header defaults. This helper
+ * does not retry, validate output, or present errors. It supplies no output cap
+ * when `maxTokens` is omitted; use {@link completeSimpleModelRequest} for PI's
+ * model-derived defaults and context-aware limits.
+ */
+export async function completeModelRequest<TApi extends Api>(
+  ctx: ExtensionContext,
+  model: Model<TApi>,
+  context: Context,
+  options: CompleteModelRequestOptions<TApi>,
+): Promise<AssistantMessage> {
+  return ctx.modelRegistry.complete(
+    model,
+    context,
+    prepareModelRequestOptions<ModelsApiStreamOptions<TApi>>(ctx, model, options),
+  );
+}
+
+/**
+ * Complete a provider-neutral request through PI's registry simple path.
+ *
+ * Requires PI 0.86.0 or later. PI's provider handles simple options, including
+ * model-derived output limits and context estimates. Request identity, header
+ * policy, and error behavior match {@link completeModelRequest}.
+ */
+export async function completeSimpleModelRequest(
+  ctx: ExtensionContext,
+  model: Model<Api>,
+  context: Context,
+  options: CompleteSimpleModelRequestOptions,
+): Promise<AssistantMessage> {
+  return ctx.modelRegistry
+    .streamSimple(
+      model,
+      context,
+      prepareModelRequestOptions<ModelsSimpleStreamOptions>(ctx, model, options),
+    )
+    .result();
 }
 
 /**

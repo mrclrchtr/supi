@@ -51,10 +51,11 @@ Config file locations:
 
 ### Model requests
 
-- `completeModelRequest(ctx, model, context, options)` — complete through PI's model registry with stable feature affinity. PI owns auth and endpoint resolution.
+- `completeModelRequest(ctx, model, context, options)` — send API-specific options through PI's model registry.
+- `completeSimpleModelRequest(ctx, model, context, options)` — send provider-neutral options through `streamSimple().result()` on PI 0.86.0 or later. PI supplies model-derived output limits and context guards.
 - `callWithJsonResponse()` — retry a registry request, extract JSON, and validate it with TypeBox.
 
-`completeModelRequest()` requires a stable `affinityScope`. It keeps cache retention defaults, does not include prompt content in the affinity ID, and adds OpenCode headers only when the provider or exact model endpoint matches OpenCode. Pass `maxTokens: model.maxTokens` when a caller needs the model's declared output cap without using PI private modules.
+Both completion helpers require a stable `affinityScope`. PI owns auth and endpoint resolution. The helpers keep cache retention defaults, exclude prompt content from the affinity ID, and add OpenCode headers only when the provider or exact model endpoint matches OpenCode. Use the simple helper when PI should manage output limits; the API-specific helper forwards the caller's limit unchanged.
 
 ### Shared registries
 
