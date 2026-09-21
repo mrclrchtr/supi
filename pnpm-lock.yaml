@@ -163,7 +163,7 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  mattpocock-skills@*: 8863f248574562f23d570936c32add355b29811a07abcedcad5c8a9d1a37e3c1
+  mattpocock-skills@*: 130deea6c1b81ea46199f61cebf1c4a531d896b7fb53a0bd072cd7b594210501
 
 importers:
 
@@ -666,7 +666,7 @@ importers:
         version: 2.7.0
       mattpocock-skills:
         specifier: github:mattpocock/skills#v1.2.3
-        version: https://codeload.github.com/mattpocock/skills/tar.gz/6acc160e4e0cd062dbbbd7a1b26ae92855edf07e(patch_hash=8863f248574562f23d570936c32add355b29811a07abcedcad5c8a9d1a37e3c1)
+        version: https://codeload.github.com/mattpocock/skills/tar.gz/6acc160e4e0cd062dbbbd7a1b26ae92855edf07e(patch_hash=130deea6c1b81ea46199f61cebf1c4a531d896b7fb53a0bd072cd7b594210501)
       vitest:
         specifier: 5.0.1
         version: 5.0.1(@types/node@25.9.7)(jsdom@30.1.0)(vite@8.3.0(@types/node@25.9.7)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.1))
@@ -4443,7 +4443,7 @@ snapshots:
 
   marked@18.0.11: {}
 
-  mattpocock-skills@https://codeload.github.com/mattpocock/skills/tar.gz/6acc160e4e0cd062dbbbd7a1b26ae92855edf07e(patch_hash=8863f248574562f23d570936c32add355b29811a07abcedcad5c8a9d1a37e3c1): {}
+  mattpocock-skills@https://codeload.github.com/mattpocock/skills/tar.gz/6acc160e4e0cd062dbbbd7a1b26ae92855edf07e(patch_hash=130deea6c1b81ea46199f61cebf1c4a531d896b7fb53a0bd072cd7b594210501): {}
 
   mdn-data@2.27.1: {}
 
