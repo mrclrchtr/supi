@@ -198,6 +198,43 @@ describe("/agents command", () => {
     overlay.dispose?.();
   });
 
+  it("closes the agents overlay before an active ask_user form handles Escape", async () => {
+    const pi = await startExtension();
+    const handler = pi.getCommandHandler("agents") as (
+      args: string,
+      ctx: ReturnType<typeof makeCtx>,
+    ) => Promise<void>;
+    type InputListener = (data: string) => { consume?: boolean } | undefined;
+    const listeners = new Set<InputListener>();
+    const onTerminalInput = vi.fn((listener: InputListener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    });
+    let resolveCustom: (() => void) | undefined;
+    const done = vi.fn((_result?: unknown) => resolveCustom?.());
+    const custom = vi.fn((factory: (...args: unknown[]) => unknown) => {
+      factory({ requestRender: vi.fn(), terminal: { rows: 1000 } }, makeCtx().ui.theme, {}, done);
+      return new Promise<void>((resolve) => {
+        resolveCustom = resolve;
+      });
+    });
+    const base = makeCtx({ mode: "tui" });
+    const ctx = makeCtx({ ui: { ...base.ui, custom, onTerminalInput } });
+
+    const commandPromise = handler("", ctx);
+    await vi.waitFor(() => expect(custom).toHaveBeenCalledOnce());
+    pi.events.emit("supi:ask-user:start", { source: "supi-ask-user" });
+
+    expect(onTerminalInput).toHaveBeenCalledOnce();
+    const listener = [...listeners][0];
+    if (!listener) throw new Error("Agents input listener was not registered");
+    expect(listener("\u001b")).toEqual({ consume: true });
+    expect(done).toHaveBeenCalledOnce();
+
+    await commandPromise;
+    expect(listeners).toHaveLength(0);
+  });
+
   it("represents a rejected steering request as not-running", async () => {
     const pi = await startExtension();
     const active = runRegistration("settling", "running", "not-running");

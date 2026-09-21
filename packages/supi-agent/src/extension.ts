@@ -8,10 +8,11 @@ import { registerAgentsCommand } from "./ui/agents-command.ts";
 /** Register session-scoped Agent Profile discovery and foreground delegation tool. */
 export default function agentExtension(pi: ExtensionAPI): void {
   let disposeProfileSettings: (() => void) | undefined;
-  registerAgentsCommand(pi, registry);
+  const agentsCommandLifecycle = registerAgentsCommand(pi, registry);
 
   // Catalogue, settings sections, and tool schema refresh on every session start/reload.
   pi.on("session_start", async (_event, ctx) => {
+    agentsCommandLifecycle.activate();
     disposeProfileSettings?.();
     const catalogue = await agentProfileCatalogueStore.reload({
       cwd: ctx.cwd,
@@ -33,6 +34,7 @@ export default function agentExtension(pi: ExtensionAPI): void {
   });
 
   pi.on("session_shutdown", async () => {
+    agentsCommandLifecycle.deactivate();
     disposeProfileSettings?.();
     disposeProfileSettings = undefined;
     await registry.cancelAll();

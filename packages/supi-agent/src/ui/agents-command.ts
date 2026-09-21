@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Key, matchesKey } from "@earendil-works/pi-tui";
 import { resolveProfileDefinition } from "../profile-catalogue.ts";
 import { agentProfileCatalogueStore } from "../session.ts";
 import type {
@@ -18,7 +19,32 @@ import {
 const MAX_OVERLAY_DIAGNOSTICS = 20;
 
 /** Register the TUI-only /agents Agent Run inspector. */
-export function registerAgentsCommand(pi: ExtensionAPI, registry: AgentRunRegistry): void {
+export function registerAgentsCommand(
+  pi: ExtensionAPI,
+  registry: AgentRunRegistry,
+): AgentsCommandLifecycle {
+  let askUserActive = false;
+  let removeAskUserEvents: (() => void) | undefined;
+  const activate = (): void => {
+    askUserActive = false;
+    removeAskUserEvents?.();
+    removeAskUserEvents = subscribeAskUserEvents(
+      pi,
+      () => {
+        askUserActive = true;
+      },
+      () => {
+        askUserActive = false;
+      },
+    );
+  };
+  const deactivate = (): void => {
+    askUserActive = false;
+    removeAskUserEvents?.();
+    removeAskUserEvents = undefined;
+  };
+  activate();
+
   pi.registerCommand("agents", {
     description: "Inspect Agent Runs and Agent Profiles",
     handler: async (_args, ctx) => {
@@ -28,30 +54,65 @@ export function registerAgentsCommand(pi: ExtensionAPI, registry: AgentRunRegist
       }
 
       const catalogue = agentProfileCatalogueStore.get();
-      await ctx.ui.custom<void>(
-        (tui, theme, _keybindings, done) =>
-          new AgentsDialog(buildOverlayData(catalogue, registry.snapshot()), {
-            theme,
-            tui,
-            done: () => done(undefined),
-            onSteer: (taskId, message) => registry.steer(taskId, message),
-            onStop: (taskId) => registry.stop(taskId),
-            subscribe: (listener) =>
-              registry.subscribe((snapshot) => listener(buildOverlayData(catalogue, snapshot))),
-          }),
-        {
-          overlay: true,
-          overlayOptions: {
-            anchor: "center",
-            width: "80%",
-            minWidth: 60,
-            maxHeight: `${AGENTS_OVERLAY_MAX_HEIGHT_PERCENT}%`,
-            visible: (terminalWidth: number) => terminalWidth >= 60,
+      let closeOverlay: (() => void) | undefined;
+      // Pi gives temporary non-overlay prompts keyboard focus while this overlay stays visible.
+      // Close /agents first so Esc does not cancel an active ask_user form.
+      const removeInputListener = ctx.ui.onTerminalInput?.((data) => {
+        if (!askUserActive || !closeOverlay || !matchesKey(data, Key.escape)) return;
+        closeOverlay();
+        return { consume: true };
+      });
+
+      try {
+        await ctx.ui.custom<void>(
+          (tui, theme, _keybindings, done) => {
+            closeOverlay = () => done(undefined);
+            return new AgentsDialog(buildOverlayData(catalogue, registry.snapshot()), {
+              theme,
+              tui,
+              done: () => done(undefined),
+              onSteer: (taskId, message) => registry.steer(taskId, message),
+              onStop: (taskId) => registry.stop(taskId),
+              subscribe: (listener) =>
+                registry.subscribe((snapshot) => listener(buildOverlayData(catalogue, snapshot))),
+            });
           },
-        },
-      );
+          {
+            overlay: true,
+            overlayOptions: {
+              anchor: "center",
+              width: "80%",
+              minWidth: 60,
+              maxHeight: `${AGENTS_OVERLAY_MAX_HEIGHT_PERCENT}%`,
+              visible: (terminalWidth: number) => terminalWidth >= 60,
+            },
+          },
+        );
+      } finally {
+        removeInputListener?.();
+      }
     },
   });
+
+  return { activate, deactivate };
+}
+
+interface AgentsCommandLifecycle {
+  activate(): void;
+  deactivate(): void;
+}
+
+function subscribeAskUserEvents(
+  pi: ExtensionAPI,
+  onStart: () => void,
+  onEnd: () => void,
+): () => void {
+  const removeStart = pi.events.on("supi:ask-user:start", onStart);
+  const removeEnd = pi.events.on("supi:ask-user:end", onEnd);
+  return () => {
+    removeStart();
+    removeEnd();
+  };
 }
 
 function buildOverlayData(
