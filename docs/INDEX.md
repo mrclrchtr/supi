@@ -14,7 +14,7 @@ Reference material for agents that develop PI extensions in this repo. Docs here
 | Doc | Answers | Read when |
 | --- | --- | --- |
 | `pi/tool-guidance.md` | How to design and register PI tools with minimal context cost: placement rules (prefix vs. result vs. free channels), naming, metadata budgets, output limits, checklist | You add or change any model-callable tool |
-| `pi/context-architecture.md` | What PI sends to the model and what it costs: billing tiers (prefix / additions / cache breaks), cache breakpoints, free channels, index into official Pi docs, extension hooks for context control | You touch system prompts, tool metadata, injected messages, history, or compaction |
+| `pi/context-architecture.md` | What PI sends to the model and what it costs: billing tiers, cache breakpoints, free channels, raw history vs. projected context, persistent edits, request hooks, and lifecycle boundaries | You touch system prompts, tool metadata, injected messages, history, or compaction |
 | `pi/model-call.md` | PI-owned requests, the shared SuPi completion module, and separate routing identities | You need a model call outside the agent loop |
 
 ## conventions/ — SuPi conventions
