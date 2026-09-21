@@ -32,6 +32,16 @@ import {
   WEB_FETCH_MD_TOOL_NAME,
   webFetchMdParameters,
 } from "./web_fetch_md/spec.ts";
+import {
+  toolDescription as webSearchDescription,
+  promptGuidelines as webSearchGuidelines,
+  promptSnippet as webSearchSnippet,
+} from "./web_search/guidance.ts";
+import {
+  WEB_SEARCH_TOOL_LABEL,
+  WEB_SEARCH_TOOL_NAME,
+  webSearchParameters,
+} from "./web_search/spec.ts";
 
 export type { WebDocsFetchInput } from "./web_docs_fetch/spec.ts";
 export { WEB_DOCS_FETCH_TOOL_NAME } from "./web_docs_fetch/spec.ts";
@@ -39,11 +49,14 @@ export type { WebDocsSearchInput } from "./web_docs_search/spec.ts";
 export { WEB_DOCS_SEARCH_TOOL_NAME } from "./web_docs_search/spec.ts";
 export type { WebFetchMdInput, WebFetchOutputMode } from "./web_fetch_md/spec.ts";
 export { WEB_FETCH_INLINE_MAX_CHARS, WEB_FETCH_MD_TOOL_NAME } from "./web_fetch_md/spec.ts";
+export type { WebSearchInput } from "./web_search/spec.ts";
+export { WEB_SEARCH_TOOL_NAME } from "./web_search/spec.ts";
 
 export const WEB_TOOL_NAMES = [
   WEB_FETCH_MD_TOOL_NAME,
   WEB_DOCS_SEARCH_TOOL_NAME,
   WEB_DOCS_FETCH_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
 ] as const;
 export type WebToolName = (typeof WEB_TOOL_NAMES)[number];
 
@@ -87,6 +100,14 @@ export const WEB_TOOL_SPECS = [
     promptSnippet: docsFetchSnippet,
     promptGuidelines: docsFetchGuidelines,
     parameters: webDocsFetchParameters,
+  },
+  {
+    name: WEB_SEARCH_TOOL_NAME,
+    label: WEB_SEARCH_TOOL_LABEL,
+    description: webSearchDescription,
+    promptSnippet: webSearchSnippet,
+    promptGuidelines: webSearchGuidelines,
+    parameters: webSearchParameters,
   },
 ] as const satisfies readonly WebToolSpec[];
 

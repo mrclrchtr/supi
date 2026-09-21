@@ -1,17 +1,19 @@
 # @mrclrchtr/supi-web
 
-SuPi Web extension — fetch web pages as clean Markdown via `web_fetch_md`, and
-query library documentation via Context7 using `web_docs_search` + `web_docs_fetch`.
+SuPi Web extension — fetch web pages as clean Markdown via `web_fetch_md`,
+search public sources via `web_search`, and query library documentation via
+Context7 using `web_docs_search` + `web_docs_fetch`.
 
 ## Scope
 
-`@mrclrchtr/supi-web` now has two explicit surfaces:
-- `@mrclrchtr/supi-web/extension` → `src/extension.ts` registers all three tools
+`@mrclrchtr/supi-web` has two explicit surfaces:
+- `@mrclrchtr/supi-web/extension` → `src/extension.ts` registers the web tools; `web_search` is conditional on settings and bx availability
 - `@mrclrchtr/supi-web/api` → `src/api.ts` exposes the programmatic helpers
 
-The package registers three agent-callable tools:
+The package registers four agent-callable tools:
 
 - `web_fetch_md` — fetches an `http(s)` URL and returns clean Markdown
+- `web_search` — searches the public web through the installed `bx` executable and returns source excerpts
 - `web_docs_search` — searches Context7 for libraries by name, returns metadata table
 - `web_docs_fetch` — retrieves up-to-date documentation context for a specific library via Context7
 
@@ -26,6 +28,8 @@ src/
 ├── convert.ts         # HTML → Markdown: JSDOM + Readability + Turndown + link absolutization
 ├── temp-file.ts       # Temporary file helper for large content
 ├── context7-client.ts # REST API client for Context7 (direct fetch, auth header handling)
+├── config.ts          # Web Search setting and defaults
+├── settings-registration.ts # Web Search settings contribution
 ├── docs.ts            # Extension factory — registers web_docs_search + web_docs_fetch tools
 ├── tool/
 │   ├── tool-specs.ts # Aggregate exports for tool metadata, schemas, and input types
@@ -39,6 +43,15 @@ src/
 2. **Sniff** — range GET first 8KB; detect Markdown / plain text / HTML by content + headers
 3. **Siblings** — try `.md` / `.markdown` / `index.md` / `README.md` variants
 4. **Full GET HTML** — JSDOM parse, strip script/style/noscript, Readability extract, Turndown convert
+
+## Web Search pipeline (web_search)
+
+1. Validate `query` and optional freshness.
+2. Run one direct `bx context` process with the query after `--`.
+3. Parse required `grounding.generic` source data and format all sources and excerpts.
+4. Apply the shared model-visible output limit.
+
+The tool registers only when Web Search is enabled and `bx` is available on `PATH`. Settings apply after `/reload`; the setting does not change active tools during apply. Missing `bx` produces a human warning and does not stop the extension.
 
 ## Context7 pipeline (web_docs_search + web_docs_fetch)
 
@@ -58,6 +71,13 @@ src/
 - Any model-visible inline output is truncated to PI's default 2,000-line / 50KB limit; truncated full output is saved to a temp file
 - `abs_links: true` (default) resolves all relative `href` and `src` to absolute URLs
 - Plain text responses are wrapped in fenced code blocks with a language hint from the URL extension
+
+### web_search
+- `query` (required) — public web search terms or a question
+- `freshness` (optional) — `pd`, `pw`, `pm`, `py`, or an ordered `YYYY-MM-DDtoYYYY-MM-DD` range
+- Returns source titles, URLs, and provider excerpts; it does not generate an answer
+- Requires `bx` on `PATH`; missing `bx` leaves this tool unregistered
+- Search output uses provider defaults and preserves all returned sources and excerpts
 
 ### web_docs_search
 - `library_name` (required) — library name to search for (e.g. `react`, `next.js`)
@@ -83,6 +103,6 @@ src/
 
 ## Test layout
 
-Tests live in `__tests__/unit/` following the package layout convention.
+Pure logic and settings tests live in `__tests__/unit/`. Tests that start the `bx` subprocess live in `__tests__/integration/`.
 
 

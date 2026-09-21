@@ -34,6 +34,8 @@ async function collectTools() {
   add("supi-web", "web_docs_search", m.webDocsSearchSpec);
   m = await import(`${PACKAGES}/supi-web/src/tool/web_docs_fetch/spec.ts`);
   add("supi-web", "web_docs_fetch", m.webDocsFetchSpec);
+  m = await import(`${PACKAGES}/supi-web/src/tool/web_search/spec.ts`);
+  add("supi-web", "web_search", m.webSearchSpec);
   m = await import(`${PACKAGES}/supi-review/src/tool/review_run/spec.ts`);
   add("supi-review", "review_run", m.reviewRunSpec);
   m = await import(`${PACKAGES}/supi-review/src/tool/review_output/spec.ts`);

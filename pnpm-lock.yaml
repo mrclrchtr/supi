@@ -790,6 +790,9 @@ importers:
       '@mozilla/readability':
         specifier: ^0.6.0
         version: 0.6.0
+      '@mrclrchtr/supi-core':
+        specifier: workspace:*
+        version: link:../supi-core
       jsdom:
         specifier: ^30.0.0
         version: 30.1.0

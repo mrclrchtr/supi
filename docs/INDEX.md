@@ -37,6 +37,7 @@ Reference material for agents that develop PI extensions in this repo. Docs here
 
 `ops/` holds operational notes and investigation reports.
 
+- [Web Search design investigation](ops/web-search-design.md) — approved bx search design, automated verification, and live tool checks.
 - [Issue 402 model requests](ops/issue-402-model-requests.md) — approved design and verification record for OpenCode routing, effective endpoints, cache separation, and suggestion warnings.
 - [Issue 407 follow-ups](ops/issue-407-follow-ups.md) — approved follow-up specification and verification record.
 - [Issue 407: TypeScript diagnostics and request-based confirmation](ops/issue-407-push-diagnostics.md) — historical measurements and current implementation status for request-confirmed diagnostics.

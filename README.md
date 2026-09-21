@@ -94,7 +94,7 @@ pi install npm:@mrclrchtr/supi-web
 | Package | What it adds | Install |
 |---|---|---|
 | [`supi-code-intelligence`](packages/supi-code-intelligence/README.md) | Direct LSP- and AST-backed code understanding, navigation, search, health, and refactoring tools | `pi install npm:@mrclrchtr/supi-code-intelligence` |
-| [`supi-web`](packages/supi-web/README.md) | Direct public-page-to-Markdown fetching, context-safe large output, and focused Context7 documentation | `pi install npm:@mrclrchtr/supi-web` |
+| [`supi-web`](packages/supi-web/README.md) | Public-page-to-Markdown fetching, public web source search, context-safe large output, and focused Context7 documentation | `pi install npm:@mrclrchtr/supi-web` |
 | [`supi-ask-user`](packages/supi-ask-user/README.md) | Structured choice and text forms for focused agent-user decisions | `pi install npm:@mrclrchtr/supi-ask-user` |
 | [`supi-context`](packages/supi-context/README.md) | Context-pressure snapshots and detailed TUI usage reports | `pi install npm:@mrclrchtr/supi-context` |
 | [`supi-settings`](packages/supi-settings/README.md) | One project/global settings UI for SuPi packages | `pi install npm:@mrclrchtr/supi-settings` |

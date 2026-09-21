@@ -35,7 +35,7 @@ async function collectPromptSurfaces() {
     module = await import(`${PACKAGES}/supi-review/src/tool/${name}/guidance.ts`);
     add(name, module);
   }
-  for (const name of ["web_fetch_md", "web_docs_search", "web_docs_fetch"]) {
+  for (const name of ["web_fetch_md", "web_docs_search", "web_docs_fetch", "web_search"]) {
     module = await import(`${PACKAGES}/supi-web/src/tool/${name}/guidance.ts`);
     add(name, module);
   }

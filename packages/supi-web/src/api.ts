@@ -18,5 +18,6 @@ export {
   type WebDocsFetchInput,
   type WebDocsSearchInput,
   type WebFetchMdInput,
+  type WebSearchInput,
   type WebToolName,
 } from "./tool/tool-specs.ts";

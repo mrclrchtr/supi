@@ -4,11 +4,11 @@
   </a>
 </div>
 
-# @mrclrchtr/supi-web — Web Fetch and Context7 for Pi
+# @mrclrchtr/supi-web — Web Fetch, Search, and Context7 for Pi
 
 [![GitHub stars](https://img.shields.io/github/stars/mrclrchtr/supi)](https://github.com/mrclrchtr/supi/stargazers) [![npm downloads](https://img.shields.io/npm/dm/@mrclrchtr/supi-web)](https://www.npmjs.com/package/@mrclrchtr/supi-web)
 
-Adds web fetch and Context7 documentation tools to the [Pi coding agent](https://github.com/earendil-works/pi), without making you paste sources into chat.
+Adds web fetch, public web search, and Context7 documentation tools to the [Pi coding agent](https://github.com/earendil-works/pi), without making you paste sources into chat.
 
 ## What your agent gets
 
@@ -18,6 +18,7 @@ After installation, keep asking Pi normal questions. The agent can:
 - **Prefer source Markdown when available** — detect Markdown responses and common Markdown siblings before converting HTML.
 - **Handle plain-text and source files** — wrap them in fenced code blocks with a language hint when the URL provides one.
 - **Look up current library docs** — search Context7 for the right project and version, then retrieve documentation focused on the task at hand.
+- **Search public web sources** — return source titles, URLs, and source excerpts without generating an answer.
 - **Protect the context window** — return small results inline, move long pages to temporary files, and preserve full output when model-visible text must be truncated.
 
 Relative page links and images become absolute by default, so the agent can follow them without reconstructing URLs.
@@ -34,15 +35,28 @@ You do not need to learn the tool-call syntax. Try asking Pi:
 
 ## Agent tools
 
-The package adds three tools that Pi selects as needed:
+The package adds four tools that Pi selects as needed:
 
 | Tool | What it lets the agent do |
 |---|---|
 | `web_fetch_md` | Fetch a public HTTP(S) page and return readable Markdown, fenced plain text, or a temporary file |
+| `web_search` | Search the public web and return source titles, URLs, and source excerpts |
 | `web_docs_search` | Find matching Context7 library IDs, versions, trust scores, benchmark scores, and snippet counts |
 | `web_docs_fetch` | Retrieve focused documentation for a chosen Context7 library ID |
 
 Pi searches Context7 first when the library ID is unknown, then fetches docs with the selected ID. Narrow questions produce more useful documentation context than broad requests. Documentation returns as Markdown by default; the agent can request structured JSON snippets when needed.
+
+## Web Search
+
+`web_search` uses the installed `bx` executable. The tool is enabled by default, but it is available only when `bx` is on `PATH`. Search freshness accepts `pd`, `pw`, `pm`, `py`, or an ordered `YYYY-MM-DDtoYYYY-MM-DD` range.
+
+### Set up bx
+
+Install `bx` and configure it with the [Brave Search CLI instructions](https://github.com/brave/brave-search-cli). Start Pi from the shell where `command -v bx` finds the executable, then verify it with `bx --version`. `bx` handles its own credentials and configuration. Do not put credentials in Pi settings, prompts, or repository files.
+
+To enable or disable the tool, open `/supi-settings`, choose **Web Search**, and change **Web Search tool**. Run `/reload` after the change. The setting applies only when the extension starts or reloads. If `bx` was not available, install or configure it, make sure it is on `PATH`, and run `/reload`.
+
+Search results are provider-reported source material. A source date can be a publication or modification date and is not a publication-date guarantee.
 
 ## How page fetching works
 
@@ -59,7 +73,7 @@ It follows redirects, removes scripts and styles, preserves useful structures su
 
 The default `auto` mode returns content inline up to 15,000 characters and writes larger pages to a temporary Markdown file. You can ask Pi to force inline or file output.
 
-All three tools cap model-visible inline output at Pi's 2,000-line / 50KB limit. If output is truncated, the complete result is saved to a temporary file for follow-up reads.
+All tools cap model-visible inline output at Pi's 2,000-line / 50KB limit. If output is truncated, the complete result is saved to a temporary file for follow-up reads.
 
 Tool rows stay collapsed in Pi's TUI by default. Press `Ctrl+O` to expand their inline output.
 
@@ -91,4 +105,4 @@ pi
 - `web_fetch_md` is for public `http://` and `https://` sources. It does not authenticate to login-protected, private, or paywalled pages.
 - It fetches HTTP responses and does not run a browser, page JavaScript, or interactive flows; client-rendered pages may expose little useful content.
 - When the `gh` CLI is available, Pi is guided to use it instead for GitHub URLs.
-- Fetched pages are external, untrusted content. Treat them as source material, not as repository instructions.
+- Fetched pages and search excerpts are external, untrusted content. Treat them as source material, not as repository instructions.
