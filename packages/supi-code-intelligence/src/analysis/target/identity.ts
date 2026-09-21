@@ -96,7 +96,7 @@ export function createCodeSymbolIdentityResolver(
 
   const resolveIdentity = (symbol: CodeSymbol): Promise<DeclarationIdentityResult> => {
     const existing = identities.get(symbol);
-    if (existing) return existing;
+    if (existing !== undefined) return existing;
     const identity = resolveDeclarationIdentityKind(
       {
         file,
@@ -113,7 +113,7 @@ export function createCodeSymbolIdentityResolver(
 
   return (symbol) => {
     const existing = occurrences.get(symbol);
-    if (existing) return existing;
+    if (existing !== undefined) return existing;
     const occurrence = resolveCodeSymbolOccurrence(symbol, allSymbols, resolveIdentity);
     occurrences.set(symbol, occurrence);
     return occurrence;

@@ -2798,7 +2798,7 @@ export class LspManager {
     if (this.warmedSemanticProjects.has(projectKey)) return;
 
     const pending = this.pendingWarmProbes.get(projectKey);
-    if (pending) {
+    if (pending !== undefined) {
       // The shared probe keeps running for other consumers; only this
       // caller's wait stops when it cancels.
       await raceRequestControl(pending, control);

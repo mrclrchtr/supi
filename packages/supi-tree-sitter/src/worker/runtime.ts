@@ -105,7 +105,7 @@ export class TreeSitterRuntime {
     if (existing) return existing;
 
     const pending = this.parserPromises.get(grammarId);
-    if (pending) return pending;
+    if (pending !== undefined) return pending;
 
     const promise = this.createGrammarParser(grammarId);
     this.parserPromises.set(grammarId, promise);
