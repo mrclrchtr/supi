@@ -93,7 +93,7 @@ export async function initializeConsultationWorkspace(
   paths: IsolatedAntigravityPaths,
 ): Promise<void> {
   const existing = consultationInitializations.get(paths.consultationWorkspace);
-  if (existing) {
+  if (existing !== undefined) {
     await existing;
     return;
   }
@@ -173,7 +173,7 @@ async function prepareIsolatedMacOSKeychain(
 ): Promise<void> {
   if ((options.platform ?? process.platform) !== "darwin") return;
   const existing = keychainInitializations.get(paths.keychainPath);
-  if (existing) {
+  if (existing !== undefined) {
     await existing;
     return;
   }
