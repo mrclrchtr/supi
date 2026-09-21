@@ -1,5 +1,23 @@
 # Changelog
 
+## [7.1.1](https://github.com/mrclrchtr/supi/compare/v7.1.0...v7.1.1) (2026-09-21)
+
+
+### Bug Fixes
+
+* **deps:** lock file maintenance ([0869e4c](https://github.com/mrclrchtr/supi/commit/0869e4cddb5934d4370257303b4f5ddab1dba6dc))
+* **deps:** satisfy Biome 2.5.14 promise checks ([74ac295](https://github.com/mrclrchtr/supi/commit/74ac295543fb3cf97aacd9e6b0c8a21bfa332c5b))
+* **deps:** update dependency @biomejs/biome to v2.5.14 ([8b3f0fb](https://github.com/mrclrchtr/supi/commit/8b3f0fbbde724f000fb139172c13a0c7e0c7bab7))
+* **deps:** update dependency @types/node to v25.9.7 ([caafd22](https://github.com/mrclrchtr/supi/commit/caafd2230e23c83b64e236c0ec18affba2468aac))
+* **deps:** update dependency jsdom to v30.1.0 ([6030d4e](https://github.com/mrclrchtr/supi/commit/6030d4ebdaf90d714fa4ffea995364c6fc81f7b7))
+* **deps:** update dependency typebox to v1.3.31 ([14dbe35](https://github.com/mrclrchtr/supi/commit/14dbe356d4fa3207338d22a6db89ad608cea9ffa))
+* **deps:** update dependency typebox to v1.3.32 ([bea546d](https://github.com/mrclrchtr/supi/commit/bea546dc5a5b42490173abf4fa7c42e74ad84245))
+* **deps:** update dependency typebox to v1.3.33 ([de6edbb](https://github.com/mrclrchtr/supi/commit/de6edbb5ff619e0829a5e76c81e5f6c158bd1c24))
+* **deps:** update dependency vitest to v5.0.1 ([f138dee](https://github.com/mrclrchtr/supi/commit/f138deeda278e269b7e3adc8699d43e0552969ac))
+* **deps:** update pnpm to v12.4.2 ([89921bd](https://github.com/mrclrchtr/supi/commit/89921bdfe5f3bf0111a83d66695e4696493c8371))
+* **prompt-suggestions:** use Pi registry simple completions ([45a4f92](https://github.com/mrclrchtr/supi/commit/45a4f929c388110593e2f32ce86e0887c26d2644)), closes [#415](https://github.com/mrclrchtr/supi/issues/415)
+* **skills:** relax research output requirements ([3d863ac](https://github.com/mrclrchtr/supi/commit/3d863accd2bddf19ae825dc6e06a10ce0c58dee0))
+
 ## [7.1.0](https://github.com/mrclrchtr/supi/compare/v7.0.1...v7.1.0) (2026-09-16)
 
 
