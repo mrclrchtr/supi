@@ -1,5 +1,20 @@
 # Changelog
 
+## [7.2.0](https://github.com/mrclrchtr/supi/compare/v7.1.1...v7.2.0) (2026-09-21)
+
+
+### Features
+
+* **web:** add bx-backed web search ([88cc0d5](https://github.com/mrclrchtr/supi/commit/88cc0d53664287aeb10d67cc104de94abff7e969))
+
+
+### Bug Fixes
+
+* **agent:** close /agents before ask_user on Escape ([2a348fd](https://github.com/mrclrchtr/supi/commit/2a348fdbe25992cee848ab3955939408377dee1b))
+* **deps:** update pnpm to v12.5.0 ([c01f78b](https://github.com/mrclrchtr/supi/commit/c01f78b198ef6a0ea7c1ca1f9f7bdaf194ea2eef))
+* **extras:** remove [@path](https://github.com/path) guidance ([e217d7e](https://github.com/mrclrchtr/supi/commit/e217d7e8efff7e56ef5f494890618e9feebd20b7))
+* **extras:** use structured path guidance ([cd02f4a](https://github.com/mrclrchtr/supi/commit/cd02f4a2d82dfb74908b0f5e5891d4f62c1ee961))
+
 ## [7.1.1](https://github.com/mrclrchtr/supi/compare/v7.1.0...v7.1.1) (2026-09-21)
 
 
