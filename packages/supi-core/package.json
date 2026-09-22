@@ -49,7 +49,7 @@
     }
   },
   "devDependencies": {
-    "@types/node": "25.9.7",
+    "@types/node": "25.9.8",
     "vitest": "5.0.1"
   },
   "main": "src/api.ts",
