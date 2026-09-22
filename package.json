@@ -62,8 +62,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
-    "@commitlint/cli": "21.2.2",
-    "@commitlint/config-conventional": "21.2.2",
+    "@commitlint/cli": "21.2.3",
+    "@commitlint/config-conventional": "21.2.3",
     "@earendil-works/pi-ai": "^0.87.0",
     "@earendil-works/pi-coding-agent": "^0.87.0",
     "@earendil-works/pi-tui": "^0.87.0",
