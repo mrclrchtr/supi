@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-cache",
-  "version": "7.2.0",
+  "version": "7.2.1",
   "description": "Inspect prompt-cache history and investigate regressions",
   "license": "MIT",
   "repository": {
