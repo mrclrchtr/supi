@@ -1,5 +1,15 @@
 # Changelog
 
+## [7.2.1](https://github.com/mrclrchtr/supi/compare/v7.2.0...v7.2.1) (2026-09-22)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @types/node to v25.9.8 ([cdab411](https://github.com/mrclrchtr/supi/commit/cdab411dbe3d2b6fe130768abe9cb7d8559987d6))
+* **deps:** update pi to v0.87.0 ([66d0927](https://github.com/mrclrchtr/supi/commit/66d0927f3c8f833c7fec8a1c90bbe6df003fc33d))
+* **deps:** update pnpm to v12.5.1 ([7d5eb76](https://github.com/mrclrchtr/supi/commit/7d5eb76d923cf8ba0daabf33e353596d047065ce))
+* **skills:** apply model invocation overrides to PI prompts ([463f2e7](https://github.com/mrclrchtr/supi/commit/463f2e7180e6449a4b33b86074d6665da981bcb9))
+
 ## [7.2.0](https://github.com/mrclrchtr/supi/compare/v7.1.1...v7.2.0) (2026-09-21)
 
 
