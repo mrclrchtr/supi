@@ -39,7 +39,7 @@ Tree-sitter support is bundled. Full LSP features require the matching language-
 - **Operational awareness** — inspect context pressure, cache history and forensics, and SuPi debug events with `supi-context`, `supi-cache`, and `supi-debug`. PI owns live cache statistics and cache-miss notices.
 - **Repository guidance** — maintain `CLAUDE.md` and `AGENTS.md` files with the skills in [`supi-claude-md`](packages/supi-claude-md/README.md).
 - **Skills on your terms** — use [`supi-skills`](packages/supi-skills/README.md) to choose, globally or per project, whether Pi can select each skill automatically, whether only you can start it, or whether it is disabled. Type `$` to search and start installed skills without remembering their full command names.
-- **Session polish** — prompt stashing, shortcuts, activity indicators, advisory prompt suggestions, and default shell timeouts.
+- **Session polish** — use [`supi-extras`](packages/supi-extras/README.md) to choose session-only tool visibility and, with `supi-skills`, skill visibility. It also adds prompt stashing, activity indicators, and shortcuts.
 
 ## Install
 
@@ -99,7 +99,7 @@ pi install npm:@mrclrchtr/supi-web
 | [`supi-context`](packages/supi-context/README.md) | Context-pressure snapshots and detailed TUI usage reports | `pi install npm:@mrclrchtr/supi-context` |
 | [`supi-settings`](packages/supi-settings/README.md) | One project/global settings UI for SuPi packages | `pi install npm:@mrclrchtr/supi-settings` |
 | [`supi-skills`](packages/supi-skills/README.md) | Scoped skill controls and `$skill-name` input shortcuts | `pi install npm:@mrclrchtr/supi-skills` |
-| [`supi-extras`](packages/supi-extras/README.md) | Prompt stash, shortcuts, activity indicators, and other session conveniences | `pi install npm:@mrclrchtr/supi-extras` |
+| [`supi-extras`](packages/supi-extras/README.md) | Session capability controls, prompt stash, shortcuts, and activity indicators | `pi install npm:@mrclrchtr/supi-extras` |
 | [`supi-prompt-suggestions`](packages/supi-prompt-suggestions/README.md) | Advisory ghost-text suggestions from a model you choose | `pi install npm:@mrclrchtr/supi-prompt-suggestions` |
 
 ### Adapted skills
@@ -169,7 +169,7 @@ At the prompt, type `$` and part of a skill name. Select a result to insert `$sk
 $code-review Review the current changes.
 ```
 
-Project choices inherit your global choices. Run `/reload` after you change whether a skill loads, or after you add or remove skills.
+Project choices inherit your global choices. Run `/reload` after you change whether a skill loads, or after you add or remove skills. Install `supi-extras` to hide model-visible skills for one session. This does not change explicit skill commands or `$skill-name` shortcuts.
 
 The release installers include both `supi-skills` and `supi-settings`. For a standalone installation with skill controls, install both packages:
 
@@ -177,6 +177,8 @@ The release installers include both `supi-skills` and `supi-settings`. For a sta
 pi install npm:@mrclrchtr/supi-settings
 pi install npm:@mrclrchtr/supi-skills
 ```
+
+Install `@mrclrchtr/supi-extras` to manage session-only skill visibility with `/supi-capabilities`.
 
 ## Update and remove
 

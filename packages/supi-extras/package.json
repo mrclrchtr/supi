@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-extras",
   "version": "7.2.1",
-  "description": "Shortcuts, prompt stash, activity indicators, and small session helpers",
+  "description": "Session capability controls, prompt stash, shortcuts, and activity indicators",
   "license": "MIT",
   "repository": {
     "type": "git",

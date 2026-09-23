@@ -38,12 +38,14 @@ export function applyPromptOverrides({
   cwd,
   projectTrusted,
   homeDir,
+  hiddenSkillNames = new Set(),
 }: {
   options: BuildSystemPromptOptions;
   systemPrompt: string;
   cwd: string;
   projectTrusted: boolean;
   homeDir?: string;
+  hiddenSkillNames?: ReadonlySet<string>;
 }): string | undefined {
   const selectedTools = options.selectedTools;
   const skillFileReadTool =
@@ -52,17 +54,20 @@ export function applyPromptOverrides({
       : (["read", "bash"] as const).find((tool) => selectedTools.includes(tool));
   if (!skillFileReadTool) return undefined;
   const skills = options.skills ?? [];
-  const effective = skills.map((skill) => ({
-    ...skill,
-    disableModelInvocation: resolveInvocation({
-      name: skill.name,
-      sourceDefault: skill.disableModelInvocation,
-      scope: "project",
-      cwd,
-      projectTrusted,
-      homeDir,
-    }).disabled,
-  }));
+  const effective = skills
+    .filter((skill) => !hiddenSkillNames.has(skill.name))
+    .map((skill) => ({
+      ...skill,
+      disableModelInvocation: resolveInvocation({
+        name: skill.name,
+        sourceDefault: skill.disableModelInvocation,
+        scope: "project",
+        cwd,
+        projectTrusted,
+        homeDir,
+      }).disabled,
+    }));
+  const effectiveByName = new Map(effective.map((skill) => [skill.name, skill]));
   const original = formatSkillsForPrompt(skills, skillFileReadTool);
   const replacement = formatSkillsForPrompt(effective, skillFileReadTool);
   if (original === replacement) return undefined;
@@ -97,10 +102,12 @@ export function applyPromptOverrides({
     data: {
       skillCount: skills.length,
       changedSkills: skills
-        .filter(
-          (skill, index) =>
-            skill.disableModelInvocation !== effective[index]?.disableModelInvocation,
-        )
+        .filter((skill) => {
+          const activeSkill = effectiveByName.get(skill.name);
+          return (
+            !activeSkill || skill.disableModelInvocation !== activeSkill.disableModelInvocation
+          );
+        })
         .map((skill) => skill.name),
       forceSystemPrompt: true,
       hasSkillsSection: systemPrompt.includes("<skills>"),

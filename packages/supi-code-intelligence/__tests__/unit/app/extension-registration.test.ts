@@ -142,7 +142,7 @@ describe("focused code intelligence tool registration", () => {
     }
   });
 
-  it("keeps a short snippet for every always-active tool", () => {
+  it("keeps a short snippet for every registered tool", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
@@ -164,6 +164,10 @@ describe("focused code intelligence tool registration", () => {
     expect(findGuidelines).toMatch(/broad code-aware discovery/i);
     expect(findGuidelines).toMatch(/target identity/i);
     expect(findGuidelines).toMatch(/relationships/i);
+    expect(findGuidelines).toMatch(/when each tool is available/i);
+    expect((getTool(pi, "code_inspect").promptGuidelines ?? []).join(" ")).toMatch(
+      /when code_health is available/i,
+    );
     expect(getTool(pi, "code_resolve").promptGuidelines).toEqual([]);
     expect(getTool(pi, "code_health").promptGuidelines).toEqual([]);
     expect(getTool(pi, "code_refactor_plan").promptGuidelines).toEqual([]);

@@ -31,7 +31,7 @@ Whole-workflow capability unavailable → throw from `execute()` so PI marks a r
 - PI schema validation is not enough: workflow validation must protect direct callers.
 - Exact-one schemas use closed one-key objects rather than TypeBox unions/literals for model-provider compatibility.
 - Prompt-surface ownership (see `docs/pi/tool-guidance.md`): `description` owns selection rules, preconditions, and no-fallback contracts; `promptSnippet` owns one capability phrase; `promptGuidelines` owns cross-tool routing; schema field descriptions own parameter mechanics. Every model-facing fact lives in exactly one home; duplicates are deleted.
-- All eight tools stay always-active. Deferred/lazy activation via `pi.setActiveTools()` is a rejected design: the static `tools` parameter keeps the prompt-cache prefix stable.
+- `/supi-capabilities` can turn eligible `code_*` tools off for one session. The PI startup allowlist still sets the boundary. Keep cross-tool guidance conditional on the named tool being available. Do not assume all `code_*` tools are active together.
 
 ## Target resolution
 

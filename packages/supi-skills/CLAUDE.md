@@ -10,3 +10,4 @@ Scoped skill controls and `$skill-name` input shortcuts.
 - Project writes require PI project trust.
 - Installed skill names for `$skill-name` are captured at `session_start`. Outside `$...` tokens, autocomplete delegates to the current provider.
 - The package registers an asynchronous `SettingsModule` for `/supi-settings`; it does not bundle `supi-settings`, because two copies register numbered duplicate commands. Standalone users must install `@mrclrchtr/supi-settings` separately.
+- Session skill visibility reads `supi-core` state in `before_agent_start`. It filters only the model prompt. Do not change PI settings, explicit skill commands, or `$skill-name` shortcuts for a session override.

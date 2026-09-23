@@ -4,5 +4,5 @@ export const toolDescription =
 export const promptSnippet = "inspect a source location";
 
 export const promptGuidelines = [
-  "Use code_inspect for diagnostics near a source location; use code_health for broader diagnostics or language-server status.",
+  "Use code_inspect for diagnostics near a source location. Use code_health for broader diagnostics or server status when code_health is available.",
 ];

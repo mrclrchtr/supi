@@ -97,3 +97,11 @@ _Avoid_: treating project prompt text as trusted by location alone, runtime beha
 **Load Status Marker**:
 A versioned SuPi diagnostic marker emitted for external harnesses as an observed inventory of loaded SuPi tools and commands. It is not a Debug Event, is not governed by Debug Registry settings, and does not decide whether a particular harness's expected resources are present.
 _Avoid_: debug event, registry event, telemetry, policy checker
+
+**Session Capability Override**:
+A session-specific restriction that makes selected extension tools inactive or hides selected skills from the model catalog without changing persistent configuration.
+_Avoid_: session settings, temporary settings
+
+**Package Tool Group**:
+The current model-callable tools from one Extension Package, grouped for bulk selection. Selecting the group does not unload the package.
+_Avoid_: package disable, extension unload

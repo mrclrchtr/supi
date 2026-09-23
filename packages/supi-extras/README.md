@@ -26,7 +26,7 @@ pi install ./packages/supi-extras
 
 ## What you get
 
-This package mixes a few commands and shortcuts with a few always-on UI tweaks. Skill controls and `$skill-name` shortcuts live in [`@mrclrchtr/supi-skills`](https://github.com/mrclrchtr/supi/tree/main/packages/supi-skills).
+This package adds commands, shortcuts, and UI changes. Persistent skill controls and `$skill-name` shortcuts live in [`@mrclrchtr/supi-skills`](https://github.com/mrclrchtr/supi/tree/main/packages/supi-skills). That package supplies the skill list for session visibility controls.
 
 ## Commands
 
@@ -35,6 +35,23 @@ This package mixes a few commands and shortcuts with a few always-on UI tweaks. 
 - `/clear` — start a new session (alias for `/new`)
 - `/clone-session <session-id>` — clone a session into the current worktree and switch to it; autocomplete searches IDs and session names
 - `/supi-stash` — browse, restore, copy, delete, or clear saved prompt drafts
+- `/supi-capabilities` — choose extension tools and model-visible skills for this session
+
+## Session capabilities
+
+`/supi-capabilities` opens a searchable selector. Use it to change extension tool and skill visibility for the current session.
+
+- The selector lists extension tools that PI allowed at startup. It does not list PI built-in or SDK tools.
+- The selector never enables a tool that was inactive at startup.
+- Tool and skill overrides are stored in the session. Resume restores them. Fork and `/clone-session` copy them. `/new` starts without overrides.
+- Tree navigation keeps explicit capability tool choices and does not change other tool choices.
+- Tool changes affect later requests. They do not stop a tool call that is already running.
+- PI has no event that marks the end of dynamic tool registration. SuPi cannot know when to remove a missing tool name. If a saved tool restriction names a tool that is not registered yet, SuPi keeps the restriction and applies it if the tool appears later. Use **Reset Tools** to clear it.
+- Skill changes affect the model skill catalog only. Explicit `/skill:name` commands and `$name` shortcuts stay available.
+- Use **Reset Tools**, **Reset Skills**, or **Reset All** to remove overrides.
+- The footer shows a themed count while overrides are active.
+
+Install `@mrclrchtr/supi-skills` to manage skills. Tool controls work without that package.
 
 ## Shortcuts
 
@@ -81,6 +98,7 @@ That prevents git subprocesses from hanging while waiting for an interactive edi
 - `src/prompt-stash.ts` — prompt stash shortcuts, persistence, and overlay
 - `src/tab-spinner.ts` — terminal tab-title spinner
 - `src/copy-prompt.ts` and `src/clipboard.ts` — copy-to-clipboard shortcut and helper
+- `src/session-capabilities.ts`, `src/session-capabilities-state.ts`, `src/session-capabilities-tools.ts`, and `src/session-capabilities-ui.ts` — session tool and skill controls
 - `src/supi-footer.ts` — footer replacement
 - `src/supi-footer-helpers.ts` — pure helpers
 - `src/git-editor.ts` — git editor environment guard

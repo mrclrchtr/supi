@@ -56,6 +56,12 @@ Use `enabled` or `disabled` as the stored value. An absent record or field inher
 
 Older versions stored boolean values in `skills.modelInvocation`. SuPi reads that format and migrates valid entries on the next settings write. Invalid values remain preserved, marked as invalid, and produce a warning until they are repaired. A conflicting legacy fallback is kept under `$legacyModelInvocation` until the invalid record is repaired.
 
+## Session visibility
+
+Install `@mrclrchtr/supi-extras` to use `/supi-capabilities`. Its Skills tab lists skills that PI has loaded and that persistent settings allow in the model catalog. It does not list unloaded skills or skills that persistent settings block.
+
+A session visibility override hides a skill from the model prompt for the current session. It does not change PI settings or SuPi skill settings. The user can still run `/skill:name` or use `$name`. Resume restores the override. A fork copies it. Use **Reset Skills** to show all eligible skills again.
+
 ## Input shortcut
 
 `$skill-name` expands to `/skill:skill-name`. Skill-only autocomplete is active while the cursor is in a `$...` token.

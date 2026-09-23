@@ -30,11 +30,11 @@ function writeSkill(path: string, name: string): void {
   writeFileSync(path, `---\nname: ${name}\ndescription: Test ${name}\n---\n`, "utf-8");
 }
 
-function loadedStaticSkill(agentDir: string): Skill {
-  const filePath = join(agentDir, "skills", "supi-test-review", "SKILL.md");
+function loadedStaticSkill(agentDir: string, name = "supi-test-review"): Skill {
+  const filePath = join(agentDir, "skills", name, "SKILL.md");
   return {
-    name: "supi-test-review",
-    description: "Loaded review skill",
+    name,
+    description: `Loaded ${name} skill`,
     filePath,
     baseDir: dirname(filePath),
     sourceInfo: {
@@ -47,7 +47,7 @@ function loadedStaticSkill(agentDir: string): Skill {
   };
 }
 
-function commandContext(cwd: string, skills: Skill[] = []) {
+function commandContext(cwd: string, skills: BuildSystemPromptOptions["skills"] = []) {
   const notify = vi.fn();
   return {
     ...makeCtx({ cwd, isProjectTrusted: () => true }),

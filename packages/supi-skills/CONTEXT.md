@@ -28,3 +28,7 @@ _Avoid_: Hidden skill, manual-only skill
 
 **Disabled Skill**:
 An unloaded skill that is unavailable to both the model and the user.
+
+**Session Skill Visibility Override**:
+A temporary current-session choice that omits a loaded skill from the model skill catalog while leaving explicit skill commands available.
+_Avoid_: session Skill Load, Disabled Skill

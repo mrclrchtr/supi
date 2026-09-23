@@ -4,5 +4,5 @@ export const toolDescription =
 export const promptSnippet = "search code structure or workspace symbols";
 
 export const promptGuidelines = [
-  "Use code_find for broad code-aware discovery, code_resolve for target identity, and code_graph for relationships.",
+  "Use code_find for broad code-aware discovery. Use code_resolve for target identity and code_graph for relationships when each tool is available.",
 ];

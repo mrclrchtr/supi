@@ -150,6 +150,31 @@ describe("skill model invocation", () => {
     expect(formatSkillsForPrompt(options.skills)).toContain("<name>implement</name>");
   });
 
+  it("hides session-disabled skills from normal and forced prompts", () => {
+    const homeDir = tempHome();
+    const cwd = join(homeDir, "project");
+    const visibleSkill = skill(false, "visible");
+    const hiddenSkill = skill(false, "hidden");
+    const skills = [visibleSkill, hiddenSkill];
+    const originalSkills = formatSkillsForPrompt(skills).trim();
+    const systemPrompt = `<skills>\n${originalSkills}\n</skills>`;
+    const options = { cwd, skills, forceSystemPrompt: systemPrompt };
+
+    expect(
+      applyPromptOverrides({
+        options,
+        systemPrompt,
+        cwd,
+        projectTrusted: true,
+        homeDir,
+        hiddenSkillNames: new Set(["hidden"]),
+      }),
+    ).toBeUndefined();
+    expect(options.forceSystemPrompt).toContain("<name>visible</name>");
+    expect(options.forceSystemPrompt).not.toContain("<name>hidden</name>");
+    expect(options.skills?.map((item) => item.name)).toEqual(["visible"]);
+  });
+
   it("updates a forced prompt that contains PI's structured skills section", () => {
     const homeDir = tempHome();
     const cwd = join(homeDir, "project");
