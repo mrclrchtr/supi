@@ -25,6 +25,12 @@ The selected package is the only package whose documentation is in scope. The al
 
 A direct claim is a sentence, list item, table row, install example, or link that names the package and describes its purpose, status, installation, or public behavior. Search repository-owned Markdown files for the directory name, npm package name, and package README link.
 
+## Audience and relevance
+
+Extension READMEs serve end users. Public library READMEs serve API consumers. For internal packages and test utilities, identify the intended maintainer or developer audience.
+
+Keep a detail only if it helps that audience install, use, configure, or troubleshoot the package, or understand its limits and risks. For libraries, this includes public API contracts and examples. Keep maintainer setup and source file lists in contributor documentation rather than extension user READMEs.
+
 ## Phase 1 — Read the installed Pi docs
 
 Use the installed `@earendil-works/pi-coding-agent` path supplied by the harness. Otherwise, check `node_modules/@earendil-works/pi-coding-agent`. Ask for the docs location when the package is not installed.
@@ -64,7 +70,7 @@ Orient on the selected package, then inspect:
 - root manifests, install scripts, and current catalogs when they define package status or stack membership
 - current user-facing Markdown files that make direct claims about the package
 
-Keep a short evidence map in the current working notes. Do not create a repository file for it. Give each entry three fields: verified fact, source path, and README action. Include:
+Keep a short evidence map in the current working notes. Do not create a repository file for it. Give each entry three fields: verified fact, source path, and README action. Inspection does not require inclusion: use implementation details to verify behavior, then apply the audience and relevance test. Mark facts that users do not need as evidence only. Include:
 
 - package role: Pi extension, resource-only extension, public library, internal package, test utility, or mixed package
 - supported installation methods
@@ -95,14 +101,15 @@ Apply these rules:
 
 - Write only verified claims.
 - Use ASD-STE100 Simplified Technical English and the repository's established voice.
-- Explain the practical outcome before implementation details.
+- Describe the practical outcome. Include implementation details only when they pass the audience and relevance test.
+- Explain what users can do in a UI. Include comparisons with other commands or Pi rendering details only when they help users complete a task.
 - Use `pi install npm:<package>` for an installable Pi package.
 - Use the applicable package-manager command for a public library.
 - Identify an internal or private package clearly instead of giving an end-user install command.
 - Name only resources, commands, tools, shortcuts, settings, and exports that exist.
 - Document runtime discovery as its user-visible result.
 - State important defaults, requirements, limits, privacy rules, and security boundaries directly.
-- Preserve accurate banners, screenshots, links, examples, and local development notes.
+- Preserve accurate banners, screenshots, links, and examples that serve the intended audience. Keep local development instructions in contributor documentation.
 - Remove stale lists, generic boilerplate, duplicate explanations, and unsupported marketing claims.
 
 Use only the sections that fit the package:
@@ -114,18 +121,19 @@ Use only the sections that fit the package:
 - configuration or settings
 - requirements, limits, privacy, or security
 - public API and examples for a library
-- source entrypoints or developer notes when useful
+- developer usage for internal packages and test utilities
 
 After the package README is accurate, update each current user-facing Markdown file whose direct claim conflicts with the evidence map. Change only the claim about the selected package. Keep unrelated prose unchanged.
 
-**Phase 3 is complete when:** the package README contains only verified current claims and all current direct Markdown references agree with it.
+**Phase 3 is complete when:** the package README contains only verified current claims that pass the audience and relevance test, and all current direct Markdown references agree with it.
 
 ## Validate
 
 1. Re-read every changed document against the evidence map.
-2. Check headings, code fences, relative links, image links, and named source paths.
-3. When Git is available, run `git diff --check`.
-4. Inspect the complete diff and final status. Confirm that all new edits are documentation edits about the selected package and that pre-existing changes remain intact.
+2. Check every paragraph and list item in the selected README for audience relevance. Remove details that pass the factual check but fail the relevance test. Apply the same test to changed claims in other documents.
+3. Check headings, code fences, relative links, image links, and named source paths.
+4. When Git is available, run `git diff --check`.
+5. Inspect the complete diff and final status. Confirm that all new edits are documentation edits about the selected package and that pre-existing changes remain intact.
 
 For documentation-only changes, skip the full code verification suite unless project instructions require it.
 
