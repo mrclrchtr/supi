@@ -15,7 +15,11 @@ import type {
   AgentsOverlayRun,
 } from "./agents-overlay-data.ts";
 import { AGENTS_OVERLAY_MAX_HEIGHT_PERCENT } from "./agents-overlay-data.ts";
-import { renderDiagnosticsSection, renderProfilesSection } from "./agents-overlay-render.ts";
+import {
+  centerLegend,
+  renderDiagnosticsSection,
+  renderProfilesSection,
+} from "./agents-overlay-render.ts";
 import { AgentsRunViewer, type AgentsRunViewerAction } from "./agents-run-viewer.ts";
 import { AgentsSteeringInput } from "./agents-steering-input.ts";
 
@@ -139,7 +143,7 @@ export class AgentsDialog implements Focusable {
             this.#line(this.#tabs(), width),
             ...new DynamicBorder((text: string) => theme.fg("accent", text)).render(width),
           ];
-    const footer = this.#hints().map((hint) => this.#line(theme.fg("dim", hint), width));
+    const footer = this.#hints().map((hint) => centerLegend(theme.fg("dim", hint), width));
     const bodyHeight = Math.max(0, height - header.length - footer.length);
     const body = new Container();
     if (this.#tab() === "profiles") {

@@ -1,6 +1,6 @@
 import type { Usage } from "@earendil-works/pi-ai";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { Container, Spacer, Text, truncateToWidth } from "@earendil-works/pi-tui";
+import { Container, Spacer, Text, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { AgentConversationView } from "../tool/agent_run/conversation-view.ts";
 import type { BatchTaskStatus } from "../tool/agent_run/registry.ts";
 import { renderConversationEntry } from "../tool/agent_run/render.ts";
@@ -10,6 +10,13 @@ import type {
   AgentsOverlayRun,
 } from "./agents-overlay-data.ts";
 import type { AgentRunBlock } from "./agents-run-viewport.ts";
+
+/** Center a legend row using visible terminal columns, with clipping on narrow screens. */
+export function centerLegend(text: string, width: number): string {
+  const clipped = truncateToWidth(text, Math.max(0, width - 2));
+  const padding = Math.max(0, Math.floor((width - visibleWidth(clipped)) / 2));
+  return `${" ".repeat(padding)}${clipped}`;
+}
 
 const LIST_WINDOW_SIZE = 8;
 const MAX_OVERLAY_RESULT_CHARS = 4_000;

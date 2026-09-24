@@ -9,6 +9,7 @@ import {
   visibleWidth,
 } from "@earendil-works/pi-tui";
 import type { AgentsOverlayData, AgentsOverlayRun } from "./agents-overlay-data.ts";
+import { centerLegend } from "./agents-overlay-render.ts";
 import { AgentsTranscriptPane } from "./agents-transcript-pane.ts";
 
 export type AgentsRunViewerAction = "handled" | "steer" | "stop";
@@ -83,7 +84,7 @@ export class AgentsRunViewer {
       ? [...steeringLines, ...(notice ? [this.#line(this.theme.fg("warning", notice), width)] : [])]
       : [
           ...this.hints(stopConfirmation).map((hint) =>
-            this.#line(this.theme.fg("dim", hint), width),
+            centerLegend(this.theme.fg("dim", hint), width),
           ),
           ...(notice ? [this.#line(this.theme.fg("warning", notice), width)] : []),
           status,
@@ -103,11 +104,11 @@ export class AgentsRunViewer {
   handleInput(data: string, controlsEnabled: boolean): AgentsRunViewerAction | undefined {
     if (this.#handleNarrowInput(data) || this.#handleSelectionInput(data)) return "handled";
     if (this.#navigate(data)) return "handled";
-    if (data === "e") {
+    if (matchesKey(data, "o") || matchesKey(data, Key.ctrl("o"))) {
       this.#transcript.toggleToolDetails();
       return "handled";
     }
-    if (data === "i") {
+    if (matchesKey(data, "t") || matchesKey(data, Key.ctrl("t"))) {
       this.#transcript.toggleThinking();
       return "handled";
     }
@@ -195,21 +196,20 @@ export class AgentsRunViewer {
     const run = this.selectedRun;
     const controls = run?.active
       ? run.status === "running"
-        ? "s steer · x stop (confirm)"
+        ? "s steer · x stop"
         : run.status === "starting"
-          ? "x stop (confirm)"
+          ? "x stop"
           : "controls unavailable"
       : "controls unavailable";
     if (this.#isNarrow()) {
       return [
         "← list · ↑↓ scroll · pgup/pgdn · home · end/f live",
-        `e tool details · i thinking · ${controls}`,
-        "tab sections · esc close",
+        `o tools · t thinking · ${controls} · tab · esc close`,
       ];
     }
     return [
       "↑↓ select · pgup/pgdn scroll · home start · end live · f pause/resume",
-      `e tool details · i thinking · ${controls} · tab sections · esc close`,
+      `o tools · t thinking · ${controls} · tab sections · esc close`,
     ];
   }
 

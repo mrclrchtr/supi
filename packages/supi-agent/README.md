@@ -36,7 +36,7 @@ Use `/agents` in TUI mode to inspect active Agent Runs, every completed Delegati
 - The viewer follows new transcript output by default (`LIVE`). Use Page Up/Page Down to scroll through wrapped lines. Page Up pauses auto-scroll (`PAUSED`); live updates keep the reading position. The status shows how many lines are below the view, not an unread count.
 - Press Home to read task metadata and earlier output. Press End to resume auto-scroll. Page Down also resumes auto-scroll when it reaches the end.
 - Press `f` to pause or resume auto-scroll. Selecting a different run resumes auto-scroll.
-- Press `i` to hide or show thinking. Press `e` or click a raw tool block to show or hide its input and output.
+- Press `t` or Ctrl+T to hide or show thinking. Press `o` or Ctrl+O to show or hide tool input and output. The Ctrl shortcuts match PI defaults. You can also click a raw tool block to show or hide its input and output. These shortcuts do not apply while you enter a steering message.
 - The bounded Conversation View can omit old entries. The human-only transcript keeps all captured messages for every batch in the current parent session.
 - Press `s` to steer the selected running Agent Run. A text field opens inside the overlay; press Enter to send or Esc to cancel.
 - Press `x` to request a stop for the selected starting or running Agent Run, then press Enter or `y` to confirm. A startup stop can wait for PI setup to finish.

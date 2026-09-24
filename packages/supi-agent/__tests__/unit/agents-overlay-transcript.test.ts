@@ -297,6 +297,18 @@ describe("AgentsDialog transcript viewer", () => {
     expect(lines.join("\n")).toContain("Visible answer.");
     expect(lines.join("\n")).toContain("Private reasoning.");
     expect(lines.join("\n")).toContain("File output.");
+    for (const key of ["t", "\u0014", "\u001b[116;5u"]) {
+      dialog.handleInput(key);
+      expect(dialog.render(120).join("\n")).not.toContain("Private reasoning.");
+      dialog.handleInput(key);
+      expect(dialog.render(120).join("\n")).toContain("Private reasoning.");
+    }
+    for (const key of ["o", "\u000f", "\u001b[111;5u"]) {
+      dialog.handleInput(key);
+      expect(dialog.render(120).join("\n")).toContain("src/index.ts");
+      dialog.handleInput(key);
+      expect(dialog.render(120).join("\n")).toContain("Raw tool input/result hidden");
+    }
     const hiddenRow = lines.findIndex((line) => line.includes("Raw tool input/result hidden"));
     expect(hiddenRow).toBeGreaterThanOrEqual(0);
     expect(click(dialog, 38, hiddenRow)).toBeUndefined();
