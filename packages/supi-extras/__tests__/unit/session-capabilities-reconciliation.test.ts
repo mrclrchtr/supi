@@ -133,6 +133,7 @@ describe("session capability reconciliation", () => {
     const selector = session.getSelector();
     for (const character of "Reset Tools") selector?.handleInput(character);
     selector?.handleInput("\r");
+    selector?.handleInput("\r");
 
     expect(session.getActive()).toEqual(["read", "bash"]);
     expect(sessionCapabilityState.get("capability-reset-gate")?.toolDenylist).toEqual([]);
@@ -183,7 +184,8 @@ describe("session capability reconciliation", () => {
     await command(session.pi)("", session.ctx);
     let selector = session.getSelector();
     for (const character of "tool-active") selector?.handleInput(character);
-    selector?.handleInput("\r");
+    selector?.handleInput("\u001b[B");
+    selector?.handleInput(" ");
     expect(sessionCapabilityState.get("capability-tree-state")?.toolDenylist).toEqual([
       "tool-active",
     ]);
@@ -191,7 +193,8 @@ describe("session capability reconciliation", () => {
     await command(session.pi)("", session.ctx);
     selector = session.getSelector();
     for (const character of "tool-active") selector?.handleInput(character);
-    selector?.handleInput("\r");
+    selector?.handleInput("\u001b[B");
+    selector?.handleInput(" ");
     expect(sessionCapabilityState.get("capability-tree-state")?.toolEnabledNames).toEqual([
       "tool-active",
     ]);

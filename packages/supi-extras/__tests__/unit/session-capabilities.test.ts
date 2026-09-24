@@ -105,7 +105,8 @@ describe("session capability controls", () => {
     expect(selector?.render(120).join("\n")).not.toContain("read description");
 
     selector?.handleInput?.("tool-active");
-    selector?.handleInput?.("\r");
+    selector?.handleInput?.("\u001b[B");
+    selector?.handleInput?.(" ");
 
     expect(getActive()).toEqual(["read", "bash"]);
     expect(done).not.toHaveBeenCalled();
@@ -147,6 +148,7 @@ describe("session capability controls", () => {
     selector = session.getSelector();
     for (const character of "Reset Tools") selector?.handleInput?.(character);
     selector?.handleInput?.("\r");
+    selector?.handleInput?.("\r");
 
     expect(session.getActive()).toEqual(["read", "bash", "tool-active", "tool-second"]);
     expect(session.entries.at(-1)?.data).toMatchObject({
@@ -171,7 +173,7 @@ describe("session capability controls", () => {
     let selector = session.getSelector();
     selector?.handleInput?.("\t");
     for (const character of "visible-skill") selector?.handleInput?.(character);
-    selector?.handleInput?.("\r");
+    selector?.handleInput?.(" ");
 
     expect(sessionCapabilityState.get("capability-skill-test")?.hiddenSkillNames).toEqual([
       "visible-skill",
@@ -181,6 +183,7 @@ describe("session capability controls", () => {
     selector = session.getSelector();
     selector?.handleInput?.("\t");
     for (const character of "Reset Skills") selector?.handleInput?.(character);
+    selector?.handleInput?.("\r");
     selector?.handleInput?.("\r");
 
     expect(sessionCapabilityState.get("capability-skill-test")?.hiddenSkillNames).toEqual([]);
@@ -200,7 +203,8 @@ describe("session capability controls", () => {
     await command("", session.ctx);
     const selector = session.getSelector();
     for (const character of "tool-active") selector?.handleInput?.(character);
-    selector?.handleInput?.("\r");
+    selector?.handleInput?.("\u001b[B");
+    selector?.handleInput?.(" ");
     expect(session.getActive()).toEqual(["read", "bash"]);
 
     await shutdown({ reason: "reload" }, session.ctx);
@@ -301,10 +305,11 @@ describe("session capability controls", () => {
     await command("", session.ctx);
     let selector = session.getSelector();
     for (const character of "tool-active") selector?.handleInput?.(character);
-    selector?.handleInput?.("\r");
+    selector?.handleInput?.("\u001b[B");
+    selector?.handleInput?.(" ");
     selector?.handleInput?.("\t");
     for (const character of "visible-skill") selector?.handleInput?.(character);
-    selector?.handleInput?.("\r");
+    selector?.handleInput?.(" ");
     expect(sessionCapabilityState.get("capability-reset-test")).toMatchObject({
       toolDenylist: ["tool-active"],
       hiddenSkillNames: ["visible-skill"],
@@ -313,6 +318,7 @@ describe("session capability controls", () => {
     await command("", session.ctx);
     selector = session.getSelector();
     for (const character of "Reset All") selector?.handleInput?.(character);
+    selector?.handleInput?.("\r");
     selector?.handleInput?.("\r");
 
     expect(session.getActive()).toEqual(["read", "bash", "tool-active"]);
@@ -336,7 +342,8 @@ describe("session capability controls", () => {
     await command("", session.ctx);
     const selector = session.getSelector();
     for (const character of "tool-active") selector?.handleInput?.(character);
-    selector?.handleInput?.("\r");
+    selector?.handleInput?.("\u001b[B");
+    selector?.handleInput?.(" ");
 
     expect(footerContributions.getByPlacement("stats-end")[0]?.render()).toContain("◈1");
     expect(session.ctx.ui.theme.fg).toHaveBeenCalledWith("accent", "◈1");
@@ -347,6 +354,7 @@ describe("session capability controls", () => {
     await command("", session.ctx);
     const resetSelector = session.getSelector();
     for (const character of "Reset Tools") resetSelector?.handleInput?.(character);
+    resetSelector?.handleInput?.("\r");
     resetSelector?.handleInput?.("\r");
 
     expect(footerContributions.getByPlacement("stats-end")).toEqual([]);
