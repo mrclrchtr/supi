@@ -61,6 +61,7 @@ const CORE_EXPORTS = {
   "./spinner-frames": "./src/spinner-frames.ts",
   "./status-spinner": "./src/status-spinner.ts",
   "./terminal": "./src/terminal.ts",
+  "./tui": "./src/tui.ts",
 };
 
 const MINIMAL_EXPORTS = {
@@ -192,6 +193,7 @@ describe("packStaged clean manifest", () => {
     expect(pkg.exports).toEqual(CORE_EXPORTS);
     expect(pkg.pi).toBeUndefined();
     expect(entries).toContain("package/src/api.ts");
+    expect(entries).toContain("package/src/tui.ts");
     expect(entries).not.toContain("package/src/extension.ts");
   });
 

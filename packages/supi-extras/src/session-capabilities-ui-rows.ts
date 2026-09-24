@@ -1,8 +1,5 @@
 import type { SelectItem } from "@earendil-works/pi-tui";
-import { truncateToWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { SessionCapabilitySkill, SessionCapabilityState } from "@mrclrchtr/supi-core/session";
-
-const DESCRIPTION_VIEWPORT_HEIGHT = 4;
 
 /** A section shown by the session capability selector. */
 export type CapabilitySection = "tools" | "skills";
@@ -192,20 +189,4 @@ export function buildCapabilityRows(
   state: SessionCapabilityState,
 ): CapabilityRow[] {
   return section === "tools" ? toolRows(tools, state) : skillRows(skills, state);
-}
-
-/** Render a fixed-height preview for the selected row. */
-export function renderDescriptionViewport(
-  description: string | undefined,
-  width: number,
-): string[] {
-  const contentWidth = Math.max(1, width - 4);
-  const wrapped = description ? wrapTextWithAnsi(description, contentWidth) : [];
-  const visible = wrapped.slice(0, DESCRIPTION_VIEWPORT_HEIGHT);
-  if (wrapped.length > DESCRIPTION_VIEWPORT_HEIGHT) {
-    const lastIndex = DESCRIPTION_VIEWPORT_HEIGHT - 1;
-    visible[lastIndex] = truncateToWidth(`${visible[lastIndex] ?? ""}…`, contentWidth, "…");
-  }
-  while (visible.length < DESCRIPTION_VIEWPORT_HEIGHT) visible.push("");
-  return visible.map((line) => (line ? `  ${line}` : ""));
 }

@@ -13,6 +13,7 @@ import {
   type SettingsScope,
   SUPI_SETTINGS_COLLECT_EVENT,
 } from "@mrclrchtr/supi-core/settings";
+import { formatTuiTitleLine } from "@mrclrchtr/supi-core/tui";
 import { ScopedSettingsList } from "./scoped-settings-list.ts";
 import { readSettingsModules } from "./settings-module-reader.ts";
 
@@ -95,8 +96,12 @@ export async function openSettingsOverlay(pi: ExtensionAPI, ctx: ExtensionContex
       container.addChild(new DynamicBorder((text: string) => theme.fg("borderMuted", text)));
       container.addChild(
         new Text(
-          `${theme.fg("accent", theme.bold("SuPi Settings"))}  ${theme.fg("dim", "Scope")}  ${scope("Project", "project")}  ${scope("Global", "global")}`,
-          1,
+          formatTuiTitleLine(
+            "SuPi Settings",
+            theme,
+            `${theme.fg("dim", "Scope")}  ${scope("Project", "project")}  ${scope("Global", "global")}`,
+          ),
+          0,
           0,
         ),
       );

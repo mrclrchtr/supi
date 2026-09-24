@@ -186,7 +186,11 @@ describe("openSettingsOverlay", () => {
       } as never,
     );
 
-    const rendered = component?.render(80).join("\n") ?? "";
+    const lines = component?.render(80) ?? [];
+    const rendered = lines.join("\n");
+    const titleLine = lines.find((line) => line.includes("SuPi Settings"));
+    expect(titleLine?.startsWith(" SuPi Settings")).toBe(true);
+    expect(titleLine?.startsWith("  SuPi Settings")).toBe(false);
     expect(rendered.indexOf("Other")).toBeLessThan(rendered.indexOf("Skills"));
   });
 

@@ -38,3 +38,5 @@ export * from "./spinner-frames.ts";
 export * from "./status-spinner.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./terminal.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./tui.ts";

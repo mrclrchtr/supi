@@ -23,6 +23,7 @@ pnpm add @mrclrchtr/supi-core
 - `@mrclrchtr/supi-core/api` — reusable helpers for other packages and extensions
 - `@mrclrchtr/supi-core/llm` — PI-owned direct model requests and JSON helpers
 - `@mrclrchtr/supi-core/report` — shared text/report rendering helpers for TUI and plain-text summaries
+- `@mrclrchtr/supi-core/tui` — shared terminal UI helpers for list titles, rows, menus, and descriptions
 
 ## What you get from the API
 
@@ -69,6 +70,14 @@ Both completion helpers require a stable `affinityScope`. PI owns auth and endpo
 - project-root detection and directory walking helpers such as `findProjectRoot()` and `walkProject()`
 - active-branch session helper: `getActiveBranchEntries()`
 - terminal helpers such as `formatTitle()`, `signalWaiting()`, and `signalDone()`
+
+### TUI helpers
+
+- `formatTuiTitleLine()` — use the shared title style in terminal lists
+- `renderSelectableRow()` — render a selected row with an aligned value
+- `renderDescriptionViewport()` — show a fixed-height description preview
+- `renderTuiHintLine()` — render short key hints in one line
+- `createSelectListMenu()` — build an action menu with shared key hints
 
 ### Report helpers
 
@@ -125,3 +134,4 @@ export default function myExtension(pi: ExtensionAPI) {
 - `src/debug-timing.ts` — monotonic total and phase timers for Debug Event Producers
 - `src/settings/` — settings registry, schema, scope resolution, and persistence
 - `src/report.ts` — shared text/report rendering helpers
+- `src/tui.ts` — shared terminal UI list and action-menu helpers

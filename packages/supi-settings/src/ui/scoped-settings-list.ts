@@ -1,13 +1,17 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Input, Key, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { SettingsAction, SettingsModule, SettingsScope } from "@mrclrchtr/supi-core/settings";
+import {
+  renderDescriptionViewport,
+  renderSelectableRow,
+  renderTuiHintLine,
+} from "@mrclrchtr/supi-core/tui";
 import type { ThemeAccessor } from "./settings-action-menu.ts";
 import {
   buildActionMenu,
   createActionMenuComponent,
   getConcreteChoices,
 } from "./settings-action-menu.ts";
-import { renderDescriptionViewport } from "./settings-list-layout.ts";
 import { type LoadedSettingsModule, readSettingsModules } from "./settings-module-reader.ts";
 import {
   filterSettingsRows,
@@ -62,7 +66,7 @@ export class ScopedSettingsList {
     this.tui = tui;
     this.onCancel = onCancel;
     this.onError = onError;
-    this.rebuildRows(initial);
+    this.rows = rowsFromModules(initial);
   }
   async reload(scope: SettingsScope, cwd: string, ctx?: ExtensionContext): Promise<void> {
     this.scope = scope;
@@ -130,6 +134,7 @@ export class ScopedSettingsList {
       30,
       Math.max(...displayRows.map((row) => visibleWidth(row.field.field.label))),
     );
+    const maxIndent = Math.max(...displayRows.map((row) => (row.subsectionLabel ? 6 : 4)));
     let previousSection: string | undefined;
     let previousSubsection: string | undefined;
     let visibleHeaderCount = 0;
@@ -151,19 +156,19 @@ export class ScopedSettingsList {
           visibleHeaderCount++;
         }
       }
-      const isSelected = i === this.selectedIndex;
       const indent = row.subsectionLabel ? 6 : 4;
-      const prefix = isSelected
-        ? `${" ".repeat(indent - 2)}${this.theme.fg("accent", "→ ")}`
-        : " ".repeat(indent);
-      const label = row.field.field.label.padEnd(
-        row.field.field.label.length + maxLabelWidth - visibleWidth(row.field.field.label),
+      lines.push(
+        renderSelectableRow({
+          label: row.field.field.label,
+          value: row.field.displayValue,
+          indent,
+          maxIndent,
+          maxLabelWidth,
+          width,
+          selected: i === this.selectedIndex,
+          theme: this.theme,
+        }),
       );
-      const labelText = this.theme.fg(isSelected ? "accent" : "text", label);
-      const valueWidth = Math.max(0, width - indent - maxLabelWidth - 2);
-      const value = truncateToWidth(row.field.displayValue, valueWidth, "");
-      const valueText = this.theme.fg(isSelected ? "accent" : "muted", value);
-      lines.push(truncateToWidth(`${prefix}${labelText}  ${valueText}`, width));
     }
     const reservedHeaderCount = maxVisibleHeaderCount(displayRows, maxVisible);
     for (let i = visibleHeaderCount; i < reservedHeaderCount; i++) lines.push("");
@@ -174,7 +179,7 @@ export class ScopedSettingsList {
     if (displayRows.some((row) => row.field.field.description)) {
       lines.push("");
       for (const line of renderDescriptionViewport(description, width)) {
-        lines.push(line ? this.theme.fg("dim", `  ${line}`) : "");
+        lines.push(line ? this.theme.fg("dim", line) : "");
       }
     }
     lines.push("");
@@ -183,10 +188,9 @@ export class ScopedSettingsList {
   }
 
   private renderHint(width: number): string {
-    const hints = [];
-    if (this.searchInput) hints.push("Type to search");
+    const hints = this.searchInput ? ["Type to search"] : [];
     hints.push("Enter for actions", "Space to cycle", "Tab for scope", "Esc to close");
-    return truncateToWidth(this.theme.fg("dim", hints.join(" · ")), width);
+    return renderTuiHintLine(hints, this.theme, width);
   }
 
   handleInput(data: string): void {
@@ -248,17 +252,13 @@ export class ScopedSettingsList {
     if (!this.searchInput) this.searchInput = new Input();
   }
 
-  private rebuildRows(loaded: LoadedSettingsModule[]): void {
-    this.rows = rowsFromModules(loaded);
-  }
-
   private async refreshRows(): Promise<void> {
     const result = await readSettingsModules(this.modules, {
       scope: this.scope,
       cwd: this.cwd,
       ctx: this.ctx,
     });
-    this.rebuildRows(result.loaded);
+    this.rows = rowsFromModules(result.loaded);
     for (const error of result.errors) this.onError?.(error);
   }
 

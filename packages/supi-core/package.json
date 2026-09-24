@@ -71,6 +71,7 @@
     "./settings": "./src/settings.ts",
     "./spinner-frames": "./src/spinner-frames.ts",
     "./status-spinner": "./src/status-spinner.ts",
-    "./terminal": "./src/terminal.ts"
+    "./terminal": "./src/terminal.ts",
+    "./tui": "./src/tui.ts"
   }
 }

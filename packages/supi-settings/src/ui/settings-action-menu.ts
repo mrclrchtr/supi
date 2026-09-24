@@ -4,8 +4,8 @@
 // value choices, Inherit from global, Use default, and Reset to default.
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Container, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
 import type { ScopedFieldValue, SettingsField, SettingsScope } from "@mrclrchtr/supi-core/settings";
+import { createSelectListMenu } from "@mrclrchtr/supi-core/tui";
 
 /** Theme accessor type matching the TUI custom() theme parameter. */
 export type ThemeAccessor = Parameters<Parameters<ExtensionContext["ui"]["custom"]>[0]>[1];
@@ -76,26 +76,11 @@ export function createActionMenuComponent(
   done: (action?: string) => void,
   theme: ThemeAccessor,
 ) {
-  const items: SelectItem[] = menu.map((m) => ({ value: m.value, label: m.label }));
-  const container = new Container();
-  container.addChild(new Text(theme.fg("accent", "  Actions"), 1, 0));
-  const selectList = new SelectList(items, Math.min(items.length + 2, 15), {
-    selectedPrefix: (t) => theme.fg("accent", t),
-    selectedText: (t) => theme.fg("accent", t),
-    description: (t) => theme.fg("muted", t),
-    scrollInfo: (t) => theme.fg("dim", t),
-    noMatch: (t) => theme.fg("warning", t),
+  return createSelectListMenu({
+    title: "Actions",
+    items: menu.map((item) => ({ value: item.value, label: item.label })),
+    theme,
+    onSelect: (item) => done(item.value),
+    onCancel: () => done(),
   });
-  selectList.onSelect = (item) => done(item.value);
-  selectList.onCancel = () => done();
-  container.addChild(selectList);
-  container.addChild(new Text(theme.fg("dim", "  ↑↓ navigate • enter select • esc cancel"), 1, 0));
-  return {
-    render: (width: number) => container.render(width),
-    invalidate: () => container.invalidate(),
-    handleInput: (data: string) => {
-      selectList.handleInput(data);
-      return true;
-    },
-  };
 }

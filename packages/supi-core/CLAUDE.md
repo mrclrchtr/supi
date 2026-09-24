@@ -17,6 +17,7 @@ src/
   llm.ts              — PI-owned direct requests, retry, and JSON response helpers
   path-utils.ts       — shared tool-path and file-URI normalization helpers
   report.ts           — shared text/report rendering helpers
+  tui.ts              — shared title, row, hint, and action-menu rendering for terminal lists
   project-roots.ts    — directory walking, root discovery (flat utility)
   prompt-surface.ts   — configurable tool prompt-surface package boundary
   registry-utils.ts   — globalThis-backed shared registries, including session-state helpers (flat utility)
@@ -39,6 +40,7 @@ src/
 - `settings/` — data and persistence seam used by the TUI in `@mrclrchtr/supi-settings`
 - `path-utils.ts` — preferred shared location for leading `@` stripping, cwd resolution, and file URI conversion used across SuPi tool packages
 - `report.ts` — preferred shared location for reusable themed report/text helpers such as section headers, preview overflow hints, key/value rows, and wrapped report blocks
+- `tui.ts` — shared themed rendering helpers for terminal list titles, selectable rows, hints, action menus, and description previews
 - `registry-utils.ts` — preferred shared location for global registries and normalized-cwd session-state registries used by peer substrate packages
 - `debug-registry.ts` — stable `@mrclrchtr/supi-core/debug` domain surface plus Debug Registry state, retention, redaction, listeners, and queries; producers own event meaning while `supi-debug` owns retention and display policy
 - `debug-timing.ts` — `startDebugTimer()` for one-shot total and sequential phase timings; the timer is a no-op when Debug is disabled, and a `finish()` factory prevents event-data construction on disabled hot paths

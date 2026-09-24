@@ -1,14 +1,9 @@
-import {
-  DynamicBorder,
-  type ExtensionUIContext,
-  getSelectListTheme,
-} from "@earendil-works/pi-coding-agent";
+import { DynamicBorder, type ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import {
   fuzzyFilter,
   Input,
   Key,
   matchesKey,
-  SelectList,
   type TuiMouseEvent,
   type TuiMouseEventResult,
   truncateToWidth,
@@ -16,11 +11,17 @@ import {
 } from "@earendil-works/pi-tui";
 import type { SessionCapabilitySkill, SessionCapabilityState } from "@mrclrchtr/supi-core/session";
 import {
+  createSelectListMenu,
+  formatTuiTitleLine,
+  renderDescriptionViewport,
+  renderSelectableRow,
+  renderTuiHintLine,
+} from "@mrclrchtr/supi-core/tui";
+import {
   buildCapabilityRows,
   type CapabilityRow,
   type CapabilitySection,
   type CapabilityToolItem,
-  renderDescriptionViewport,
 } from "./session-capabilities-ui-rows.ts";
 
 export type { CapabilityToolItem } from "./session-capabilities-ui-rows.ts";
@@ -191,27 +192,22 @@ class CapabilityList implements SelectorComponent {
   }
 
   private renderRow(row: CapabilityRow, index: number, layout: RowLayout): string {
-    const selected = index === this.selectedIndex;
-    const prefix = selected
-      ? `${" ".repeat(row.indent - 2)}${this.options.theme.fg("accent", "→ ")}`
-      : " ".repeat(row.indent);
-    const label = truncateToWidth(row.label, layout.maxLabelWidth, "");
-    const padding = " ".repeat(
-      Math.max(0, layout.maxIndent - row.indent + layout.maxLabelWidth - visibleWidth(label)),
-    );
-    const labelText = this.options.theme.fg(selected ? "accent" : "text", label + padding);
-    const valueWidth = Math.max(0, layout.width - layout.maxIndent - layout.maxLabelWidth - 4);
-    const value = truncateToWidth(row.currentValue, valueWidth, "");
-    const valueText = this.options.theme.fg(selected ? "accent" : "muted", value);
-    return truncateToWidth(`${prefix}${labelText}  ${valueText}`, layout.width);
+    return renderSelectableRow({
+      label: row.label,
+      value: row.currentValue,
+      indent: row.indent,
+      maxIndent: layout.maxIndent,
+      maxLabelWidth: layout.maxLabelWidth,
+      width: layout.width,
+      selected: index === this.selectedIndex,
+      theme: this.options.theme,
+    });
   }
 
   private renderHint(width: number): string {
-    return truncateToWidth(
-      this.options.theme.fg(
-        "dim",
-        "Type to search · Enter for actions · Space to toggle · Tab to switch · Esc to close",
-      ),
+    return renderTuiHintLine(
+      ["Type to search", "Enter for actions", "Space to toggle", "Tab to switch", "Esc to close"],
+      this.options.theme,
       width,
     );
   }
@@ -279,36 +275,21 @@ class CapabilityList implements SelectorComponent {
   private activateSelected(): void {
     const row = this.filteredRows()[this.selectedIndex];
     if (!row?.actions?.length) return;
-    const selectList = new SelectList(
-      row.actions,
-      Math.min(row.actions.length + 2, 15),
-      getSelectListTheme(),
-    );
-    selectList.onSelect = (item) => {
-      this.menu = null;
-      this.options.onChange(row.id, item.value);
-      this.refreshRows(row.id);
-    };
-    selectList.onCancel = () => {
-      this.menu = null;
-      this.invalidate();
-      this.options.tui.requestRender();
-    };
-    this.menu = {
-      render: (width) => [
-        truncateToWidth(this.options.theme.fg("accent", "  Actions"), width),
-        ...selectList.render(width),
-        "",
-        truncateToWidth(
-          this.options.theme.fg("dim", "  ↑↓ navigate · Enter select · Esc cancel"),
-          width,
-        ),
-      ],
-      invalidate: () => selectList.invalidate(),
-      handleInput: (data) => selectList.handleInput(data),
-      handleMouse: (event) =>
-        event.y < 1 ? undefined : selectList.handleMouse({ ...event, y: event.y - 1 }),
-    };
+    this.menu = createSelectListMenu({
+      title: "Actions",
+      items: row.actions,
+      theme: this.options.theme,
+      onSelect: (item) => {
+        this.menu = null;
+        this.options.onChange(row.id, item.value);
+        this.refreshRows(row.id);
+      },
+      onCancel: () => {
+        this.menu = null;
+        this.invalidate();
+        this.options.tui.requestRender();
+      },
+    });
     this.invalidate();
     this.options.tui.requestRender();
   }
@@ -337,10 +318,7 @@ export function createCapabilitySelector(options: CapabilitySelectorOptions): Se
       section === "tools"
         ? `${theme.fg("accent", theme.bold("[Tools]"))}  ${theme.fg("dim", "Skills")}`
         : `${theme.fg("dim", "Tools")}  ${theme.fg("accent", theme.bold("[Skills]"))}`;
-    return truncateToWidth(
-      ` ${theme.fg("accent", theme.bold("Session Capabilities"))}  ${tabs}`,
-      width,
-    );
+    return truncateToWidth(formatTuiTitleLine("Session Capabilities", theme, tabs), width);
   };
 
   return {
