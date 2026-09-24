@@ -98,6 +98,7 @@ describe("session capability controls", () => {
     ) => Promise<void>;
     await command("", ctx);
 
+    expect(ctx.ui.custom).toHaveBeenCalledWith(expect.any(Function));
     const selector = getSelector();
     expect(selector).toBeDefined();
     expect(selector?.render(120).join("\n")).toContain("tool-active");

@@ -259,28 +259,26 @@ export default function sessionCapabilities(pi: ExtensionAPI): void {
         }
       }
 
-      await ctx.ui.custom(
-        (tui, theme, _keybindings, done) =>
-          createCapabilitySelector({
-            state,
-            tools: toolInventory.tools,
-            skills,
-            theme,
-            tui,
-            done,
-            onChange: (id, value) =>
-              handleSelectorChange({
-                pi,
-                ctx,
-                state,
-                tools: toolInventory.tools,
-                skills,
-                id,
-                value,
-                restorableNames: restorableToolNames,
-              }),
-          }),
-        { overlay: true },
+      await ctx.ui.custom((tui, theme, _keybindings, done) =>
+        createCapabilitySelector({
+          state,
+          tools: toolInventory.tools,
+          skills,
+          theme,
+          tui,
+          done,
+          onChange: (id, value) =>
+            handleSelectorChange({
+              pi,
+              ctx,
+              state,
+              tools: toolInventory.tools,
+              skills,
+              id,
+              value,
+              restorableNames: restorableToolNames,
+            }),
+        }),
       );
     },
   });
