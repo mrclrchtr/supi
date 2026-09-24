@@ -24,6 +24,10 @@ export function createAgentRunSessionView(session: AgentSession, cwd: string): A
     get cwd() {
       return cwd;
     },
+    get systemPrompt() {
+      const current = activeSession;
+      return active && current ? current.systemPrompt : "";
+    },
     get model() {
       const current = activeSession;
       return active && current ? snapshot(current.model) : undefined;
@@ -49,6 +53,28 @@ export function createAgentRunSessionView(session: AgentSession, cwd: string): A
         return Object.freeze([...current.getActiveToolNames()]);
       } catch {
         return Object.freeze([] as string[]);
+      }
+    },
+    getToolRenderers: () => {
+      const current = activeSession;
+      if (!active || !current) return Object.freeze([]);
+      try {
+        return Object.freeze(
+          current.getAllTools().flatMap(({ name }) => {
+            const tool = current.getToolDefinition(name);
+            if (!tool) return [];
+            return [
+              Object.freeze({
+                name: tool.name,
+                ...(tool.renderCall ? { renderCall: tool.renderCall } : {}),
+                ...(tool.renderResult ? { renderResult: tool.renderResult } : {}),
+                ...(tool.renderShell ? { renderShell: tool.renderShell } : {}),
+              }),
+            ];
+          }),
+        );
+      } catch {
+        return Object.freeze([]);
       }
     },
     getSessionStats: () => {

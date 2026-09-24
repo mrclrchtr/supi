@@ -1,6 +1,11 @@
+import { randomUUID } from "node:crypto";
+import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { AgentRunHandle, StartAgentRunOptions } from "@mrclrchtr/supi-agent-runtime/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import agentExtension from "../../src/extension.ts";
+import { registry } from "../../src/tool/agent_run/register.ts";
 import {
   context,
   type RegisteredAgentRunTool,
@@ -90,12 +95,41 @@ describe("registered agent_run boundary", () => {
       undefined,
       undefined,
       context(),
-    )) as { details: { tasks: Array<{ finalText: string; finalTextFull: string }> } };
+    )) as {
+      details: {
+        tasks: Array<{ finalText: string; finalTextFull: string }>;
+        transcriptSources?: unknown;
+        runKeys?: unknown;
+      };
+    };
 
     expect(result.details.tasks[0]?.finalText.length).toBeLessThanOrEqual(16_000);
     expect(result.details.tasks[0]?.finalText).toContain("[truncated:");
     expect(result.details.tasks[0]?.finalTextFull.length).toBeLessThanOrEqual(51_200);
     expect(result.details.tasks[0]?.finalTextFull).toContain("[truncated:");
+    expect(result.details).not.toHaveProperty("transcriptSources");
+    expect(result.details).not.toHaveProperty("runKeys");
+  });
+
+  it("continues a run when temporary transcript storage fails", async () => {
+    const missingParent = join(tmpdir(), `supi-agent-missing-${randomUUID()}`);
+    vi.stubEnv("TMPDIR", join(missingParent, "nested"));
+    const tool = await registeredTool();
+    const result = (await tool.execute(
+      "call-storage-failure",
+      { tasks: [{ id: "task-1", profile: "explore", instructions: "inspect" }] },
+      undefined,
+      undefined,
+      context(),
+    )) as { content: Array<{ text: string }>; details: { tasks: Array<{ status: string }> } };
+
+    expect(result.details.tasks[0]?.status).toBe("completed");
+    expect(result.content[0]?.text).toContain("x".repeat(10));
+    expect(result.details).not.toHaveProperty("transcriptSources");
+    const source = Object.values(registry.snapshot().batches[0]?.transcriptSources ?? {})[0];
+    expect(source?.getStatus().status).toBe("incomplete");
+    await expect(source?.load()).resolves.toMatchObject({ status: "incomplete" });
+    await rm(missingParent, { recursive: true, force: true });
   });
 
   it("renders live lifecycle states, progress metrics, and safe recent activity", async () => {

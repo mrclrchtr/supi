@@ -58,7 +58,7 @@ describe("AgentsDialog live output", () => {
     (rows) => {
       const dialog = new AgentsDialog(data(), dependencies(rows));
       const lines = dialog.render(60);
-      expect(lines.length).toBeLessThanOrEqual(Math.floor(rows * 0.9));
+      expect(lines).toHaveLength(rows);
       expect(lines.every((line) => visibleWidth(line) <= 60)).toBe(true);
       expect(lines.join("\n")).toContain("message 40");
       expect(lines.join("\n")).toContain("s steer · x stop");
@@ -76,16 +76,18 @@ describe("AgentsDialog live output", () => {
     }));
     const dialog = new AgentsDialog({ ...input, runs }, dependencies(rows));
     dialog.render(60);
+    dialog.handleInput("\x1b[D");
     dialog.handleInput("\x1b[B");
-    dialog.render(60);
     dialog.handleInput("\x1b[B");
+    const list = dialog.render(60);
+    expect(list.some((line) => line.includes("▶") && line.includes("last"))).toBe(true);
+    dialog.handleInput("\x1b[C");
     const lines = dialog.render(60);
-    expect(lines.some((line) => line.includes("▶") && line.includes("last"))).toBe(true);
     expect(lines.join("\n")).toContain("Agents");
     expect(lines.join("\n")).toContain("Runs 3");
     expect(lines.join("\n")).toContain("s steer · x stop");
-    expect(lines.join("\n")).toContain("f pause/resume");
-    expect(lines.length).toBeLessThanOrEqual(Math.floor(rows * 0.9));
+    expect(lines.join("\n")).toContain("end/f live");
+    expect(lines).toHaveLength(rows);
   });
 
   it("follows subscription updates, pauses for reading, and resumes with End", () => {
@@ -137,7 +139,7 @@ describe("AgentsDialog live output", () => {
     expect(dialog.render(80).join("\n")).toContain("message 40");
     dialog.handleInput("f");
     dialog.render(80);
-    dialog.handleInput("\x1b[A");
+    dialog.handleInput("\x1b[5~");
     expect(dialog.render(80).join("\n")).toContain("PAUSED");
     dialog.updateData(data(41));
     expect(dialog.render(80).join("\n")).not.toContain("message 41");
@@ -168,13 +170,13 @@ describe("AgentsDialog live output", () => {
     dialog.render(80);
     dialog.handleInput("\x1b[Z");
     expect(dialog.render(80).join("\n")).toContain("PAUSED");
-    dialog.handleInput("\x1b[A");
+    dialog.handleInput("\x1b[F");
     expect(dialog.render(80).join("\n")).toContain("LIVE");
   });
 
   it.each([1, 2, 3, 4, 5, 6, 7, 8])("does not overflow a terminal with only %i rows", (rows) => {
     const dialog = new AgentsDialog(data(), dependencies(rows));
-    expect(dialog.render(60).length).toBeLessThanOrEqual(Math.max(1, Math.floor(rows * 0.9)));
+    expect(dialog.render(60)).toHaveLength(Math.max(1, rows));
   });
 
   it.each([1, 2, 3, 4, 5, 6])("keeps the steering input visible in %i terminal rows", (rows) => {
@@ -182,7 +184,7 @@ describe("AgentsDialog live output", () => {
     dialog.handleInput("s");
 
     const lines = dialog.render(60);
-    expect(lines.length).toBeLessThanOrEqual(Math.max(1, Math.floor(rows * 0.9)));
+    expect(lines).toHaveLength(Math.max(1, rows));
     expect(stripTerminalSequences(lines.join("\n"))).toContain("Steering message");
   });
 
@@ -203,7 +205,7 @@ describe("AgentsDialog live output", () => {
     deps.tui.terminal.rows = 24;
     const after = dialog.render(80);
     expect(after.length).toBeLessThan(before.length);
-    expect(after.length).toBeLessThanOrEqual(21);
+    expect(after).toHaveLength(24);
     expect(after.join("\n")).toContain("message 40");
   });
 

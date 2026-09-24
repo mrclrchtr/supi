@@ -33,6 +33,7 @@ export type {
   AgentRunSessionView,
   AgentRunStatus,
   AgentRunSteerResult,
+  AgentRunToolRenderer,
   AgentSessionInputs,
   CompletionResolver,
   SafeAssistantStopReason,

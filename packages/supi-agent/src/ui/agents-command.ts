@@ -71,8 +71,8 @@ export function registerAgentsCommand(
               theme,
               tui,
               done: () => done(undefined),
-              onSteer: (taskId, message) => registry.steer(taskId, message),
-              onStop: (taskId) => registry.stop(taskId),
+              onSteer: (runKey, message) => registry.steer(runKey, message),
+              onStop: (runKey) => registry.stop(runKey),
               subscribe: (listener) =>
                 registry.subscribe((snapshot) => listener(buildOverlayData(catalogue, snapshot))),
             });
@@ -80,11 +80,10 @@ export function registerAgentsCommand(
           {
             overlay: true,
             overlayOptions: {
-              anchor: "center",
-              width: "80%",
-              minWidth: 60,
+              anchor: "top-left",
+              width: "100%",
               maxHeight: `${AGENTS_OVERLAY_MAX_HEIGHT_PERCENT}%`,
-              visible: (terminalWidth: number) => terminalWidth >= 60,
+              margin: 0,
             },
           },
         );
@@ -120,7 +119,8 @@ function buildOverlayData(
   snapshot: AgentRunRegistrySnapshot,
 ): AgentsOverlayData {
   const activeRuns: AgentsOverlayRun[] = snapshot.activeRuns.map((run) => ({
-    key: `active:${run.taskId}`,
+    key: `run:${run.runKey}`,
+    runKey: run.runKey,
     active: true,
     taskId: run.taskId,
     profileId: run.profileId,
@@ -138,20 +138,24 @@ function buildOverlayData(
       ? {}
       : { sharedContext: snapshot.activeSharedContext }),
     conversationView: run.conversationView,
+    ...(run.transcriptSource ? { transcriptSource: run.transcriptSource } : {}),
   }));
-  const lastRuns =
-    snapshot.lastBatch?.tasks.map((task, index) =>
-      completedRun(
+  const completedRuns = snapshot.batches.flatMap((batch) =>
+    batch.tasks.map((task) => {
+      const runKey = batch.runKeys[task.taskId] ?? `${batch.batchId}:${task.taskId}`;
+      return completedRun({
         task,
-        index,
-        snapshot.lastBatch?.conversationViews[task.taskId],
-        snapshot.lastBatch?.sharedContext,
-      ),
-    ) ?? [];
+        runKey,
+        conversationView: batch.conversationViews[task.taskId],
+        transcriptSource: batch.transcriptSources[runKey],
+        sharedContext: batch.sharedContext,
+      });
+    }),
+  );
   const diagnostics = boundedDiagnostics(catalogue?.diagnostics ?? []);
 
   return {
-    runs: [...activeRuns, ...lastRuns],
+    runs: [...activeRuns, ...completedRuns],
     profiles:
       catalogue?.profiles
         .filter(
@@ -166,14 +170,17 @@ function buildOverlayData(
   };
 }
 
-function completedRun(
-  task: BatchTaskResult,
-  index: number,
-  conversationView: AgentsOverlayRun["conversationView"],
-  sharedContext?: string,
-): AgentsOverlayRun {
+function completedRun(options: {
+  readonly task: BatchTaskResult;
+  readonly runKey: string;
+  readonly conversationView: AgentsOverlayRun["conversationView"];
+  readonly transcriptSource: AgentsOverlayRun["transcriptSource"];
+  readonly sharedContext?: string;
+}): AgentsOverlayRun {
+  const { task, runKey, conversationView, transcriptSource, sharedContext } = options;
   return {
-    key: `last:${index}:${task.taskId}`,
+    key: `run:${runKey}`,
+    runKey,
     active: false,
     taskId: task.taskId,
     profileId: task.profileId,
@@ -190,6 +197,7 @@ function completedRun(
     taskMetadata: task.taskMetadata ?? conversationView?.taskMetadata,
     ...(sharedContext === undefined ? {} : { sharedContext }),
     conversationView,
+    ...(transcriptSource ? { transcriptSource } : {}),
   };
 }
 

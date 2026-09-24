@@ -12,6 +12,7 @@ export default function agentExtension(pi: ExtensionAPI): void {
 
   // Catalogue, settings sections, and tool schema refresh on every session start/reload.
   pi.on("session_start", async (_event, ctx) => {
+    registry.openSession();
     agentsCommandLifecycle.activate();
     disposeProfileSettings?.();
     const catalogue = await agentProfileCatalogueStore.reload({
@@ -39,7 +40,7 @@ export default function agentExtension(pi: ExtensionAPI): void {
     disposeProfileSettings = undefined;
     await registry.cancelAll();
     agentProfileCatalogueStore.clear();
-    registry.clear();
+    await registry.clear();
   });
 
   registerAgentSettings(pi);

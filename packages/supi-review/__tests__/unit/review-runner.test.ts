@@ -40,6 +40,7 @@ function createView(
 ): AgentRunSessionView {
   return {
     cwd: "/repo",
+    systemPrompt: "Reviewer protocol",
     model: undefined,
     thinkingLevel: "off",
     isStreaming: false,
@@ -53,6 +54,7 @@ function createView(
       },
     ],
     getActiveToolNames: () => [...activeTools],
+    getToolRenderers: () => [],
     getSessionStats: () => ({ tokens: { input: 1, output: 2, total: 3 } }) as never,
     getLastAssistantText: () => "visible",
     subscribe: vi.fn(() => vi.fn()),

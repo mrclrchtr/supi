@@ -4,19 +4,19 @@ import {
   type Focusable,
   Key,
   matchesKey,
-  Spacer,
-  Text,
+  type TuiMouseEvent,
+  type TuiMouseEventResult,
   truncateToWidth,
 } from "@earendil-works/pi-tui";
-import { type CachedRunSection, renderCachedRunsSection } from "./agents-overlay-cache.ts";
 import type {
   AgentOverlayControlResult,
   AgentsDialogDependencies,
   AgentsOverlayData,
+  AgentsOverlayRun,
 } from "./agents-overlay-data.ts";
 import { AGENTS_OVERLAY_MAX_HEIGHT_PERCENT } from "./agents-overlay-data.ts";
 import { renderDiagnosticsSection, renderProfilesSection } from "./agents-overlay-render.ts";
-import { type AgentRunBlock, AgentRunViewport } from "./agents-run-viewport.ts";
+import { AgentsRunViewer, type AgentsRunViewerAction } from "./agents-run-viewer.ts";
 import { AgentsSteeringInput } from "./agents-steering-input.ts";
 
 const TABS = ["runs", "profiles", "diagnostics"] as const;
@@ -28,26 +28,26 @@ export class AgentsDialog implements Focusable {
   #cachedLines: string[] | undefined;
   #cachedWidth: number | undefined;
   #cachedHeight: number | undefined;
-  #cachedRunSection: CachedRunSection | undefined;
-  #viewport = new AgentRunViewport();
+  #profileIndex = 0;
   #diagnosticIndex = 0;
   #notice: string | undefined;
-  #profileIndex = 0;
-  #runIndex = 0;
+  #stopConfirmKey: string | undefined;
   #tabIndex = 0;
   #busy = false;
   #steeringInput: AgentsSteeringInput | undefined;
   #focused = false;
   #unsubscribe: (() => void) | undefined;
+  readonly #runViewer: AgentsRunViewer;
 
   constructor(
     private data: AgentsOverlayData,
     private readonly dependencies: AgentsDialogDependencies,
   ) {
+    this.#runViewer = new AgentsRunViewer(data, dependencies.theme, () => this.#changed());
     this.#unsubscribe = dependencies.subscribe?.((next) => this.updateData(next));
   }
 
-  /** Implement PI's Focusable contract for the embedded steering input. */
+  /** Implement Pi's Focusable contract for the embedded steering input. */
   get focused(): boolean {
     return this.#focused;
   }
@@ -56,11 +56,9 @@ export class AgentsDialog implements Focusable {
     if (this.#focused === value) return;
     this.#focused = value;
     if (this.#steeringInput) this.#steeringInput.focused = value;
-    this.#invalidateRender();
-    this.dependencies.tui.requestRender();
+    this.#changed();
   }
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one render pass owns responsive overlay layout.
   render(width: number): string[] {
     const height = Math.max(
       1,
@@ -69,137 +67,46 @@ export class AgentsDialog implements Focusable {
     if (this.#cachedLines && this.#cachedWidth === width && this.#cachedHeight === height) {
       return this.#cachedLines;
     }
-    const theme = this.dependencies.theme;
-    const border = new DynamicBorder((text: string) => theme.fg("accent", text));
-    const header = new Container();
-    header.addChild(border);
-    header.addChild(new Text(this.#header(), 1, 0));
-    header.addChild(new Text(this.#tabs(), 1, 0));
-    const body = new Container();
-    let blocks: AgentRunBlock[] = [];
-    const runs = this.#tab() === "runs";
-    const steeringLines = this.#steeringLines(width);
-    const footerContent =
-      this.#steeringInput && height === 1
-        ? steeringLines.slice(-1)
-        : [
-            ...this.#hints().map((hint) => this.#line(theme.fg("dim", hint), width)),
-            ...steeringLines,
-            ...(this.#notice ? [this.#line(theme.fg("warning", this.#notice), width)] : []),
-            ...(this.#steeringInput && height <= 2 ? [] : border.render(width)),
-          ];
-    const footerLimit = this.#steeringInput ? height : Math.max(0, height - 1);
-    const footer = footerContent.slice(Math.max(0, footerContent.length - footerLimit));
-    const statusRows = runs && this.data.runs.length > 0 && height > footer.length + 1 ? 1 : 0;
-    const headerCapacity = Math.max(0, height - footer.length - statusRows - 1);
-    let runLines: readonly string[] = [];
-    switch (this.#tab()) {
-      case "runs": {
-        const listRows = Math.max(1, Math.min(8, Math.floor(height / 4), headerCapacity - 4));
-        const section = renderCachedRunsSection(this.#cachedRunSection, {
-          data: this.data,
-          selectedIndex: this.#runIndex,
-          width,
-          listRows,
-          theme,
-        });
-        this.#cachedRunSection = section;
-        blocks = [...section.blocks];
-        runLines = section.lines.slice(0, headerCapacity);
-        break;
-      }
-      case "profiles":
-        renderProfilesSection(body, this.data, this.#profileIndex, theme);
-        break;
-      case "diagnostics":
-        renderDiagnosticsSection(body, this.data, this.#diagnosticIndex, theme);
-        break;
-    }
-    header.addChild(new Spacer(1));
-    const headerLines =
-      headerCapacity > 0 && headerCapacity <= 3
-        ? [
-            this.#line(`${this.#header()}  ${this.#tabs()}`, width),
-            ...runLines.slice(0, Math.max(0, headerCapacity - 1)),
-          ]
-        : [
-            ...header.render(width).slice(0, Math.max(0, headerCapacity - runLines.length)),
-            ...runLines,
-          ];
-    const bodyHeight = Math.max(
-      this.#steeringInput ? 0 : 1,
-      height - headerLines.length - footer.length - statusRows,
-    );
-    const bodyLines =
-      bodyHeight === 0
-        ? []
-        : runs
-          ? this.#viewport.render(blocks, bodyHeight)
-          : body.render(width).slice(0, bodyHeight);
-    const status = statusRows ? [this.#line(this.#viewStatus(), width)] : [];
-    this.#cachedLines = [...headerLines, ...bodyLines, ...status, ...footer].map((line) =>
-      truncateToWidth(line, width),
-    );
+    this.#cachedLines =
+      this.#tab() === "runs"
+        ? this.#runViewer.render({
+            width,
+            height,
+            header: this.#header(),
+            tabs: this.#tabs(),
+            notice: this.#notice,
+            steeringLines: this.#steeringLines(width),
+            steeringActive: this.#steeringInput !== undefined,
+            stopConfirmation: this.#stopConfirmKey !== undefined,
+          })
+        : this.#renderCataloguePage(width, height);
     this.#cachedWidth = width;
     this.#cachedHeight = height;
     return this.#cachedLines;
   }
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: one keyboard dispatcher owns the dialog controls.
   handleInput(data: string): void {
-    if (this.#steeringInput) {
-      if (matchesKey(data, Key.ctrl("c"))) {
-        this.#cancelSteering();
-        return;
-      }
-      this.#steeringInput.handleInput(data);
-      this.#changed();
+    if (this.#handleSteeringInput(data)) return;
+    if (this.#stopConfirmKey) {
+      this.#handleStopConfirmation(data);
       return;
     }
-    if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c"))) {
-      this.dependencies.done();
+    if (this.#handleCloseInput(data) || this.#handleRunInput(data) || this.#handleTabInput(data)) {
       return;
     }
-    if (matchesKey(data, Key.tab) || matchesKey(data, Key.right)) {
-      this.#tabIndex = (this.#tabIndex + 1) % TABS.length;
-      this.#changed();
-      return;
-    }
-    if (matchesKey(data, Key.left) || matchesKey(data, Key.shift("tab"))) {
-      this.#tabIndex = (this.#tabIndex + TABS.length - 1) % TABS.length;
-      this.#changed();
-      return;
-    }
-    if (matchesKey(data, Key.up) || data === "k") {
-      this.#moveSelection(-1);
-      return;
-    }
-    if (matchesKey(data, Key.down) || data === "j") {
-      this.#moveSelection(1);
-      return;
-    }
-    if (this.#tab() !== "runs") return;
-    if (this.#navigate(data)) return;
-    const run = this.data.runs[this.#runIndex];
-    if (!run?.active || this.#busy) return;
-    if (data === "s" && run.status === "running") {
-      this.#beginSteering(run.taskId);
-    } else if (data === "x" && (run.status === "starting" || run.status === "running")) {
-      this.#runControl("Stopping selected run…", () => this.dependencies.onStop(run.taskId));
-    }
+    this.#handleCatalogueInput(data);
+  }
+
+  /** Route fullscreen mouse input to the run and transcript panes. */
+  handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
+    if (this.#tab() !== "runs" || this.#steeringInput || this.#stopConfirmKey) return undefined;
+    return this.#runViewer.handleMouse(event);
   }
 
   /** Replace live registry data while preserving the selected run when possible. */
   updateData(data: AgentsOverlayData): void {
-    const selectedKey = this.data.runs[this.#runIndex]?.key;
     this.data = data;
-    const nextIndex = selectedKey ? data.runs.findIndex((run) => run.key === selectedKey) : -1;
-    this.#runIndex =
-      nextIndex >= 0 ? nextIndex : Math.min(this.#runIndex, Math.max(0, data.runs.length - 1));
-    if (data.runs[this.#runIndex]?.key !== selectedKey) {
-      this.#viewport.reset();
-    }
-    this.#cachedRunSection = undefined;
+    this.#runViewer.updateData(data);
     this.#profileIndex = Math.min(this.#profileIndex, Math.max(0, data.profiles.length - 1));
     this.#diagnosticIndex = Math.min(
       this.#diagnosticIndex,
@@ -208,62 +115,110 @@ export class AgentsDialog implements Focusable {
     this.#changed();
   }
 
-  /** Release the live registry subscription when PI removes the overlay. */
+  /** Release the live registry subscription when Pi removes the overlay. */
   dispose(): void {
     this.#unsubscribe?.();
     this.#unsubscribe = undefined;
+    this.#runViewer.dispose();
     this.#clearSteering();
   }
 
   invalidate(): void {
-    this.#invalidateRender();
-    this.#cachedRunSection = undefined;
+    this.#cachedLines = undefined;
+    this.#steeringInput?.invalidate();
+    this.#runViewer.invalidate();
   }
 
-  #viewStatus(): string {
+  #renderCataloguePage(width: number, height: number): string[] {
     const theme = this.dependencies.theme;
-    const omitted = this.data.runs[this.#runIndex]?.conversationView?.omittedEntryCount ?? 0;
-    const retention = omitted > 0 ? theme.fg("warning", ` · ${omitted} entries omitted`) : "";
-    return theme.fg("accent", this.#viewport.status) + retention;
+    const header =
+      height <= 3
+        ? [this.#line(`${this.#header()}  ${this.#tabs()}`, width)]
+        : [
+            this.#line(this.#header(), width),
+            this.#line(this.#tabs(), width),
+            ...new DynamicBorder((text: string) => theme.fg("accent", text)).render(width),
+          ];
+    const footer = this.#hints().map((hint) => this.#line(theme.fg("dim", hint), width));
+    const bodyHeight = Math.max(0, height - header.length - footer.length);
+    const body = new Container();
+    if (this.#tab() === "profiles") {
+      renderProfilesSection(body, this.data, this.#profileIndex, theme);
+    } else {
+      renderDiagnosticsSection(body, this.data, this.#diagnosticIndex, theme);
+    }
+    const lines = [...header, ...body.render(width).slice(0, bodyHeight), ...footer].slice(
+      0,
+      height,
+    );
+    while (lines.length < height) lines.push("");
+    return lines.map((line) => truncateToWidth(line, width));
   }
 
-  #line(text: string, width: number): string {
-    return ` ${truncateToWidth(text, Math.max(0, width - 2))}`;
+  #handleRunViewerAction(action: AgentsRunViewerAction | undefined): boolean {
+    if (action === "handled") {
+      this.#changed();
+      return true;
+    }
+    const run = this.#runViewer.selectedRun;
+    if (action === "steer" && run) {
+      this.#beginSteering(run);
+      return true;
+    }
+    if (action === "stop" && run) {
+      this.#stopConfirmKey = run.runKey ?? run.taskId;
+      this.#notice = `Stop ${run.taskId}? Press Enter or y to confirm; Esc to cancel.`;
+      this.#changed();
+      return true;
+    }
+    return false;
   }
 
-  #header(): string {
-    const theme = this.dependencies.theme;
-    const active = this.data.runs.filter((run) => run.active).length;
-    return `${theme.fg("accent", theme.bold("◆ Agents"))}${theme.fg("dim", `  ${active} active`)}`;
+  #handleSteeringInput(data: string): boolean {
+    if (!this.#steeringInput) return false;
+    if (matchesKey(data, Key.ctrl("c"))) this.#cancelSteering();
+    else {
+      this.#steeringInput.handleInput(data);
+      this.#changed();
+    }
+    return true;
   }
 
-  #tabs(): string {
-    const theme = this.dependencies.theme;
-    const counts = {
-      runs: this.data.runs.length,
-      profiles: this.data.profiles.length,
-      diagnostics: this.data.diagnostics.length,
-    };
-    return TABS.map((tab, index) => {
-      const label = `${title(tab)} ${counts[tab]}`;
-      return index === this.#tabIndex ? theme.fg("accent", `[${label}]`) : theme.fg("dim", label);
-    }).join(theme.fg("dim", "  "));
+  #handleCloseInput(data: string): boolean {
+    if (!matchesKey(data, Key.escape) && !matchesKey(data, Key.ctrl("c"))) return false;
+    this.dependencies.done();
+    return true;
   }
 
-  #moveSelection(delta: number): void {
-    const limits = {
-      runs: this.data.runs.length,
-      profiles: this.data.profiles.length,
-      diagnostics: this.data.diagnostics.length,
-    };
-    const length = limits[this.#tab()];
+  #handleRunInput(data: string): boolean {
+    if (this.#tab() !== "runs") return false;
+    const action = this.#runViewer.handleInput(data, !this.#busy);
+    return this.#handleRunViewerAction(action);
+  }
+
+  #handleTabInput(data: string): boolean {
+    if (matchesKey(data, Key.tab) || matchesKey(data, Key.right)) {
+      this.#tabIndex = (this.#tabIndex + 1) % TABS.length;
+    } else if (matchesKey(data, Key.left) || matchesKey(data, Key.shift("tab"))) {
+      this.#tabIndex = (this.#tabIndex + TABS.length - 1) % TABS.length;
+    } else {
+      return false;
+    }
+    this.#changed();
+    return true;
+  }
+
+  #handleCatalogueInput(data: string): void {
+    if (this.#tab() === "runs") return;
+    if (matchesKey(data, Key.up) || data === "k") this.#moveCatalogueSelection(-1);
+    else if (matchesKey(data, Key.down) || data === "j") this.#moveCatalogueSelection(1);
+  }
+
+  #moveCatalogueSelection(delta: number): void {
+    const length =
+      this.#tab() === "profiles" ? this.data.profiles.length : this.data.diagnostics.length;
     if (length === 0) return;
-    if (this.#tab() === "runs") {
-      const nextIndex = clamp(this.#runIndex + delta, 0, length - 1);
-      if (nextIndex === this.#runIndex) return;
-      this.#runIndex = nextIndex;
-      this.#viewport.reset();
-    } else if (this.#tab() === "profiles") {
+    if (this.#tab() === "profiles") {
       this.#profileIndex = clamp(this.#profileIndex + delta, 0, length - 1);
     } else {
       this.#diagnosticIndex = clamp(this.#diagnosticIndex + delta, 0, length - 1);
@@ -271,26 +226,13 @@ export class AgentsDialog implements Focusable {
     this.#changed();
   }
 
-  #navigate(data: string): boolean {
-    const actions = [
-      [Key.pageUp, "page-up"],
-      [Key.pageDown, "page-down"],
-      [Key.home, "start"],
-      [Key.end, "end"],
-      ["f", "toggle"],
-    ] as const;
-    const action = actions.find(([key]) => matchesKey(data, key));
-    if (!action) return false;
-    this.#viewport.navigate(action[1]);
-    this.#changed();
-    return true;
-  }
-
-  #beginSteering(taskId: string): void {
-    const input = new AgentsSteeringInput(taskId, this.dependencies.theme, {
+  #beginSteering(run: AgentsOverlayRun): void {
+    const input = new AgentsSteeringInput(run.taskId, this.dependencies.theme, {
       onSubmit: (message) => {
         this.#clearSteering();
-        this.#runControl("Sending steering…", () => this.dependencies.onSteer(taskId, message));
+        this.#runControl("Sending steering…", () =>
+          this.dependencies.onSteer(run.runKey ?? run.taskId, message),
+        );
       },
       onEmpty: () => {
         this.#notice = "Enter a steering message or press Esc to cancel.";
@@ -302,6 +244,19 @@ export class AgentsDialog implements Focusable {
     this.#steeringInput = input;
     this.#notice = undefined;
     this.#changed();
+  }
+
+  #handleStopConfirmation(data: string): void {
+    if (matchesKey(data, Key.escape)) {
+      this.#stopConfirmKey = undefined;
+      this.#notice = "Stop canceled.";
+      this.#changed();
+      return;
+    }
+    if (!matchesKey(data, Key.enter) && data.toLowerCase() !== "y") return;
+    const runKey = this.#stopConfirmKey;
+    this.#stopConfirmKey = undefined;
+    if (runKey) this.#runControl("Stopping selected run…", () => this.dependencies.onStop(runKey));
   }
 
   #cancelSteering(): void {
@@ -345,38 +300,38 @@ export class AgentsDialog implements Focusable {
   }
 
   #hints(): string[] {
-    if (this.#steeringInput) return ["enter send · esc cancel"];
-    const run = this.data.runs[this.#runIndex];
-    const controls =
-      this.#tab() !== "runs" || !run?.active
-        ? "controls unavailable"
-        : run.status === "running"
-          ? "s steer · x stop"
-          : run.status === "starting"
-            ? "x stop · steering unavailable"
-            : "controls unavailable";
-    return this.#tab() === "runs"
-      ? [
-          "pgup/pgdn scroll · home start · end live · f pause/resume",
-          `↑↓ select · ${controls}`,
-          "tab/←→ sections · esc close",
-        ]
-      : ["tab/←→ sections · ↑↓ select · esc close"];
+    return ["tab/←→ sections · ↑↓ select · esc close"];
+  }
+
+  #header(): string {
+    return `Agents  ${this.data.runs.filter((run) => run.active).length} active`;
+  }
+
+  #tabs(): string {
+    return TABS.map((tab, index) => {
+      const selected = index === this.#tabIndex;
+      const count =
+        tab === "runs"
+          ? this.data.runs.length
+          : tab === "profiles"
+            ? this.data.profiles.length
+            : this.data.diagnostics.length;
+      const value = `${title(tab)} ${count}`;
+      return selected ? `[${value}]` : value;
+    }).join(this.dependencies.theme.fg("dim", "  "));
   }
 
   #tab(): AgentsTab {
     return TABS[this.#tabIndex] ?? "runs";
   }
 
-  #invalidateRender(): void {
-    this.#cachedLines = undefined;
-    this.#cachedWidth = undefined;
-    this.#cachedHeight = undefined;
-    this.#steeringInput?.invalidate();
+  #line(text: string, width: number): string {
+    return truncateToWidth(` ${text}`, width);
   }
 
   #changed(): void {
-    this.#invalidateRender();
+    this.#cachedLines = undefined;
+    this.#steeringInput?.invalidate();
     this.dependencies.tui.requestRender();
   }
 }

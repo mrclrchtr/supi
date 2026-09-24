@@ -48,11 +48,13 @@ const invocation = {
 function view(messages: unknown[]): AgentRunSessionView {
   return {
     cwd: "/repo",
+    systemPrompt: "Reviewer protocol",
     model: originalModel.model as never,
     thinkingLevel: "max",
     isStreaming: false,
     messages: messages as never,
     getActiveToolNames: () => ["read", "submit_review"],
+    getToolRenderers: () => [],
     getSessionStats: () => ({ tokens: { input: 0, output: 0, total: 0 } }) as never,
     getLastAssistantText: () => undefined,
     subscribe: vi.fn(() => vi.fn()),

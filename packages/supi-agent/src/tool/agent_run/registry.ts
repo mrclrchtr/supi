@@ -1,101 +1,41 @@
-import type { ModelThinkingLevel, Usage } from "@earendil-works/pi-ai";
+import { randomUUID } from "node:crypto";
+import type { Usage } from "@earendil-works/pi-ai";
 import type {
-  AgentRunHandle,
   AgentRunProgress,
   AgentRunSteerResult,
+  AgentRunToolRenderer,
 } from "@mrclrchtr/supi-agent-runtime/api";
-import type { AgentConversationView, ConversationTaskMetadata } from "./conversation-view.ts";
+import type { AgentConversationView } from "./conversation-view.ts";
+import type {
+  ActiveRunRegistration,
+  ActiveRunSnapshot,
+  AgentRunRegistrySnapshot,
+  AgentRunStopResult,
+  BatchTaskResult,
+  CompletedBatch,
+} from "./registry-types.ts";
 
-/** Per-task status tracked during live execution. */
-export type BatchTaskStatus = AgentRunProgress["status"];
+export type {
+  ActiveRunRegistration,
+  ActiveRunSnapshot,
+  AgentRunRegistrySnapshot,
+  AgentRunStopResult,
+  BatchProgressState,
+  BatchTaskProgress,
+  BatchTaskResult,
+  BatchTaskStatus,
+  CompletedBatch,
+} from "./registry-types.ts";
 
-/** Live progress for one Delegation Task. */
-export interface BatchTaskProgress {
-  taskId: string;
-  profileId: string;
-  status: BatchTaskStatus;
-  turns: number;
-  toolUses: number;
-  usage?: Usage;
-  recentActivity?: readonly string[];
-  modelId?: string;
-  thinkingLevel?: ModelThinkingLevel;
-}
-
-/** Live progress for one Delegation Batch. */
-export interface BatchProgressState {
-  tasks: readonly BatchTaskProgress[];
-  completedCount: number;
-  totalCount: number;
-}
-
-/** Public view of one task's execution outcome. */
-export interface BatchTaskResult {
-  taskId: string;
-  profileId: string;
-  status: BatchTaskStatus;
-  /** Model-facing final assistant text, capped. */
-  finalText?: string;
-  /** Human-facing full final text, capped. */
-  finalTextFull?: string;
-  humanTruncated: boolean;
-  modelTruncated: boolean;
-  usage?: Usage;
-  /** Failure stage for non-success outcomes. */
-  failureCode?: string;
-  /** Turns executed. */
-  turns: number;
-  /** Tool uses executed. */
-  toolUses: number;
-  /** Effective provider/model ID used by the child session. */
-  modelId?: string;
-  /** Effective thinking level used by the child session. */
-  thinkingLevel?: ModelThinkingLevel;
-  /** Initial task metadata kept separate from the Conversation View. */
-  taskMetadata?: ConversationTaskMetadata;
-}
-
-/** Public view of one completed batch. */
-export interface CompletedBatch {
-  tasks: readonly BatchTaskResult[];
-  sharedContext?: string;
-  /** Aggregate usage across all started runs. */
-  aggregateUsage?: Usage;
-  /** Per-task bounded conversation views retained for inspection. */
-  conversationViews: Record<string, AgentConversationView>;
-}
-
-/** Metadata needed to inspect and control one active Agent Run. */
-export interface ActiveRunRegistration {
-  taskId: string;
-  profileId: string;
-  modelId: string;
-  thinkingLevel: ModelThinkingLevel;
-  taskMetadata: ConversationTaskMetadata;
-  handle: AgentRunHandle<string>;
-  getConversationView: (acceptedSteering: readonly string[]) => AgentConversationView;
-  getRecentActivity?: () => readonly string[];
-}
-
-/** Immutable inspection view of one active Agent Run. */
-export interface ActiveRunSnapshot extends BatchTaskProgress {
-  modelId: string;
-  thinkingLevel: ModelThinkingLevel;
-  taskMetadata: ConversationTaskMetadata;
-  conversationView: AgentConversationView;
-}
-
-/** Current session-local state exposed to the /agents overlay. */
-export interface AgentRunRegistrySnapshot {
-  activeRuns: readonly ActiveRunSnapshot[];
-  activeSharedContext?: string;
-  lastBatch?: CompletedBatch;
-}
-
-/** Result of one selected-run stop request. */
-export type AgentRunStopResult = "accepted" | "not-running";
+import {
+  AgentRunTranscriptCapture,
+  type AgentRunTranscriptMetadata,
+  AgentRunTranscriptStore,
+} from "./transcript-store.ts";
 
 interface ActiveRun extends ActiveRunRegistration {
+  runKey: string;
+  batchId: string;
   progress: AgentRunProgress;
   acceptedSteering: string[];
   unsubscribe?: () => void;
@@ -108,24 +48,70 @@ export class AgentRunRegistry {
   #active = new Map<string, ActiveRun>();
   #conversationViews = new Map<string, AgentConversationView>();
   #listeners = new Set<RegistryListener>();
+  #batches: CompletedBatch[] = [];
   #lastBatch: CompletedBatch | undefined;
-  #activeSharedContext: string | undefined;
+  #batchSharedContexts = new Map<string, string | undefined>();
+  #activeBatchId: string | undefined;
+  #sessionGeneration = 0;
+  #sessionOpen = true;
+  #batchGenerations = new Map<string, number>();
+  #transcriptStore = new AgentRunTranscriptStore();
 
   /** Start one batch-level metadata scope before its Agent Runs register. */
-  beginBatch(sharedContext?: string): void {
-    this.#activeSharedContext = sharedContext;
-    this.#publish();
+  beginBatch(sharedContext?: string): string {
+    const batchId = randomUUID();
+    this.#batchGenerations.set(batchId, this.#sessionOpen ? this.#sessionGeneration : -1);
+    if (this.#sessionOpen) {
+      this.#batchSharedContexts.set(batchId, sharedContext);
+      this.#activeBatchId = batchId;
+      this.#publish();
+    }
+    return batchId;
+  }
+
+  /** Open registry writes for a new parent session. */
+  openSession(): void {
+    this.#sessionOpen = true;
+  }
+
+  /** Start one temporary transcript without affecting Agent Run execution. */
+  createTranscriptCapture(
+    metadata: AgentRunTranscriptMetadata,
+    systemPrompt = "",
+    toolRenderers: readonly AgentRunToolRenderer[] = [],
+  ): AgentRunTranscriptCapture {
+    if (this.#isBatchClosed(metadata.batchId)) {
+      return new AgentRunTranscriptCapture({
+        metadata,
+        systemPrompt,
+        toolRenderers,
+        getDirectory: async () => {
+          throw new Error("The parent session is closed.");
+        },
+      });
+    }
+    return this.#transcriptStore.createCapture(metadata, systemPrompt, toolRenderers, () =>
+      this.#publish(),
+    );
   }
 
   /** Register one active run with the human-facing metadata needed by the overlay. */
   register(registration: ActiveRunRegistration): void {
-    this.#removeActive(registration.taskId);
+    const runKey = registration.runKey ?? registration.taskId;
+    const batchId = registration.batchId ?? this.#activeBatchId ?? "default";
+    if (this.#isBatchClosed(batchId)) {
+      void registration.handle.stop().catch(() => undefined);
+      return;
+    }
+    this.#removeActive(runKey);
     const run: ActiveRun = {
       ...registration,
+      runKey,
+      batchId,
       progress: { status: "starting", turns: 0, toolUses: 0, toolErrors: 0 },
       acceptedSteering: [],
     };
-    this.#active.set(registration.taskId, run);
+    this.#active.set(runKey, run);
     run.unsubscribe = registration.handle.subscribe((progress) => {
       run.progress = progress;
       this.#publish();
@@ -134,8 +120,9 @@ export class AgentRunRegistry {
   }
 
   /** Record the final Conversation View for one task. */
-  setConversationView(taskId: string, view: AgentConversationView): void {
-    this.#conversationViews.set(taskId, view);
+  setConversationView(runKey: string, view: AgentConversationView): void {
+    if (!this.#active.has(runKey)) return;
+    this.#conversationViews.set(runKey, view);
     this.#publish();
   }
 
@@ -145,8 +132,8 @@ export class AgentRunRegistry {
   }
 
   /** Settle one run's result and remove it from active runs. */
-  settle(taskId: string): void {
-    this.#removeActive(taskId);
+  settle(runKey: string): void {
+    this.#removeActive(runKey);
     this.#publish();
   }
 
@@ -155,28 +142,62 @@ export class AgentRunRegistry {
     results: readonly BatchTaskResult[],
     sharedContext?: string,
     aggregateUsage?: Usage,
+    batchId = this.#activeBatchId ?? "default",
   ): CompletedBatch {
+    if (this.#isBatchClosed(batchId)) {
+      this.#batchGenerations.delete(batchId);
+      return {
+        batchId,
+        tasks: results,
+        sharedContext,
+        aggregateUsage,
+        conversationViews: {},
+        runKeys: Object.fromEntries(results.map((result) => [result.taskId, result.taskId])),
+        transcriptSources: {},
+      };
+    }
+    const runs = [...this.#active.values()].filter((run) => run.batchId === batchId);
+    const runKeyByTask = new Map(runs.map((run) => [run.taskId, run.runKey]));
+    const runKeys = Object.fromEntries(
+      results.map((result) => [result.taskId, runKeyByTask.get(result.taskId) ?? result.taskId]),
+    );
     const batch: CompletedBatch = {
+      batchId,
       tasks: results,
-      sharedContext,
+      sharedContext: this.#batchSharedContexts.get(batchId) ?? sharedContext,
       aggregateUsage,
-      conversationViews: Object.fromEntries(this.#conversationViews),
+      conversationViews: Object.fromEntries(
+        results.flatMap((result) => {
+          const runKey = runKeys[result.taskId];
+          const view = runKey ? this.#conversationViews.get(runKey) : undefined;
+          return view ? [[result.taskId, view]] : [];
+        }),
+      ),
+      runKeys,
+      transcriptSources: Object.fromEntries(
+        runs.flatMap((run) => (run.transcript ? [[run.runKey, run.transcript]] : [])),
+      ),
     };
+    this.#batches.push(batch);
     this.#lastBatch = batch;
-    this.#clearActive();
-    this.#activeSharedContext = undefined;
-    this.#conversationViews.clear();
+    for (const run of runs) this.#removeActive(run.runKey);
+    this.#batchSharedContexts.delete(batchId);
+    this.#batchGenerations.delete(batchId);
+    this.#activeBatchId = [...this.#batchSharedContexts.keys()].at(-1);
+    for (const run of runs) this.#conversationViews.delete(run.runKey);
     this.#publish();
     return batch;
   }
 
   /** Return a bounded inspection snapshot for the overlay. */
   snapshot(): AgentRunRegistrySnapshot {
+    const activeBatchId = this.#active.values().next().value?.batchId ?? this.#activeBatchId;
     return {
       activeRuns: [...this.#active.values()].map((run) => this.#snapshotRun(run)),
-      ...(this.#activeSharedContext === undefined
-        ? {}
-        : { activeSharedContext: this.#activeSharedContext }),
+      ...(activeBatchId && this.#batchSharedContexts.get(activeBatchId) !== undefined
+        ? { activeSharedContext: this.#batchSharedContexts.get(activeBatchId) }
+        : {}),
+      batches: [...this.#batches],
       lastBatch: this.#lastBatch,
     };
   }
@@ -193,8 +214,8 @@ export class AgentRunRegistry {
   }
 
   /** Queue steering for one selected running Agent Run. */
-  async steer(taskId: string, message: string): Promise<AgentRunSteerResult> {
-    const run = this.#active.get(taskId);
+  async steer(runKey: string, message: string): Promise<AgentRunSteerResult> {
+    const run = this.#active.get(runKey);
     if (run?.progress.status !== "running") return "not-running";
     const result = await run.handle.steer(message);
     if (result === "accepted") {
@@ -205,13 +226,13 @@ export class AgentRunRegistry {
   }
 
   /** Return steering accepted through the overlay for final Conversation View retention. */
-  acceptedSteering(taskId: string): readonly string[] {
-    return [...(this.#active.get(taskId)?.acceptedSteering ?? [])];
+  acceptedSteering(runKey: string): readonly string[] {
+    return [...(this.#active.get(runKey)?.acceptedSteering ?? [])];
   }
 
   /** Stop only the selected starting or running Agent Run. */
-  async stop(taskId: string): Promise<AgentRunStopResult> {
-    const run = this.#active.get(taskId);
+  async stop(runKey: string): Promise<AgentRunStopResult> {
+    const run = this.#active.get(runKey);
     if (!run || (run.progress.status !== "starting" && run.progress.status !== "running")) {
       return "not-running";
     }
@@ -235,17 +256,32 @@ export class AgentRunRegistry {
   async cancelAll(): Promise<void> {
     await Promise.allSettled([...this.#active.values()].map((run) => run.handle.stop()));
     this.#clearActive();
-    this.#activeSharedContext = undefined;
+    this.#batchSharedContexts.clear();
+    this.#activeBatchId = undefined;
     this.#publish();
   }
 
-  /** Clear active and last-batch state on session shutdown. */
-  clear(): void {
+  /** Clear session state and remove temporary transcript files. */
+  async clear(): Promise<void> {
+    this.#sessionOpen = false;
+    this.#sessionGeneration++;
     this.#clearActive();
     this.#conversationViews.clear();
+    this.#batches = [];
     this.#lastBatch = undefined;
-    this.#activeSharedContext = undefined;
+    this.#batchSharedContexts.clear();
+    this.#activeBatchId = undefined;
+    const transcriptStore = this.#transcriptStore;
+    this.#transcriptStore = new AgentRunTranscriptStore();
+    await transcriptStore.dispose();
     this.#publish();
+  }
+
+  #isBatchClosed(batchId: string): boolean {
+    const generation = this.#batchGenerations.get(batchId);
+    return (
+      !this.#sessionOpen || (generation !== undefined && generation !== this.#sessionGeneration)
+    );
   }
 
   #snapshotRun(run: ActiveRun): ActiveRunSnapshot {
@@ -264,6 +300,9 @@ export class AgentRunRegistry {
       };
     }
     return {
+      runKey: run.runKey,
+      batchId: run.batchId,
+      ...(run.transcript ? { transcriptSource: run.transcript } : {}),
       taskId: run.taskId,
       profileId: run.profileId,
       status: run.progress.status,
@@ -290,10 +329,10 @@ export class AgentRunRegistry {
     }
   }
 
-  #removeActive(taskId: string): void {
-    const run = this.#active.get(taskId);
+  #removeActive(runKey: string): void {
+    const run = this.#active.get(runKey);
     run?.unsubscribe?.();
-    this.#active.delete(taskId);
+    this.#active.delete(runKey);
   }
 
   #clearActive(): void {

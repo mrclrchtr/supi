@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Usage } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AgentRunHandle, AgentRunSessionView } from "@mrclrchtr/supi-agent-runtime/api";
@@ -23,6 +24,7 @@ import {
 import type { AgentRunToolParams } from "./schema.ts";
 import { capHumanText, capModelText, humanTextOverflow, modelTextOverflow } from "./text-caps.ts";
 import { summarizeToolActivity } from "./tool-summary.ts";
+import type { AgentRunTranscriptCapture } from "./transcript-store.ts";
 
 // ── Progress ─────────────────────────────────────────────────────
 
@@ -56,6 +58,8 @@ export async function runDelegationBatch(
   results: BatchTaskResult[];
   aggregateUsage?: Usage;
   conversationViews: Map<string, AgentConversationView>;
+  batchId: string;
+  runKeys: ReadonlyMap<string, string>;
 }> {
   const preflightResult = preflightDelegationBatch(params, catalogue, ctx);
   if ("errors" in preflightResult) {
@@ -66,7 +70,8 @@ export async function runDelegationBatch(
   }
 
   const resolved = preflightResult.tasks;
-  registry?.beginBatch(params.sharedContext);
+  const batchId = registry?.beginBatch(params.sharedContext) ?? randomUUID();
+  const runKeys = new Map<string, string>();
   const totalCount = resolved.length;
   const progressMap = new Map<string, BatchTaskProgress>();
   const conversationViews = new Map<string, AgentConversationView>();
@@ -112,12 +117,29 @@ export async function runDelegationBatch(
     thinkingLevel: ResolvedTask["inputs"]["thinkingLevel"];
     handle: AgentRunHandle<string>;
     telemetry: AgentRunTelemetry;
+    runKey: string;
+    transcript?: AgentRunTranscriptCapture;
   }> = [];
   for (const task of resolved) {
     const taskMetadata: ConversationTaskMetadata = {
       instructions: task.instructions,
     };
     const modelId = `${task.model.provider}/${task.model.id}`;
+    const runKey = randomUUID();
+    runKeys.set(task.taskId, runKey);
+    const transcript = registry?.createTranscriptCapture({
+      runKey,
+      batchId,
+      taskId: task.taskId,
+      profileId: task.profileId,
+      cwd: task.inputs.cwd,
+      modelId,
+      thinkingLevel: task.inputs.thinkingLevel,
+      tools: task.inputs.tools,
+      instructions: task.instructions,
+      ...(params.sharedContext === undefined ? {} : { sharedContext: params.sharedContext }),
+      startedAt: Date.now(),
+    });
     setProgress({
       taskId: task.taskId,
       profileId: task.profileId,
@@ -164,9 +186,11 @@ export async function runDelegationBatch(
       completionResolver: (session) => session.getLastAssistantText(),
       observer: (session) => {
         liveSession = session;
+        transcript?.updateSession(session.systemPrompt, session.getToolRenderers());
         registry?.refresh();
         const unsubscribe = session.subscribe((event) => {
           telemetry.observe(event);
+          transcript?.observe(event, session.systemPrompt, session.getToolRenderers());
           const activity = summarizeToolActivity(event);
           if (activity) {
             recentActivity.push(activity);
@@ -186,9 +210,9 @@ export async function runDelegationBatch(
         return () => {
           unsubscribe();
           try {
-            const view = currentConversationView(registry?.acceptedSteering(task.taskId));
+            const view = currentConversationView(registry?.acceptedSteering(runKey));
             conversationViews.set(task.taskId, view);
-            registry?.setConversationView(task.taskId, view);
+            registry?.setConversationView(runKey, view);
           } catch {
             // Conversation View is presentation-only.
           } finally {
@@ -200,6 +224,8 @@ export async function runDelegationBatch(
 
     handles.push({
       taskId: task.taskId,
+      runKey,
+      transcript,
       profileId: task.profileId,
       modelId,
       thinkingLevel: task.inputs.thinkingLevel,
@@ -207,6 +233,9 @@ export async function runDelegationBatch(
       telemetry,
     });
     registry?.register({
+      runKey,
+      batchId,
+      ...(transcript ? { transcript } : {}),
       taskId: task.taskId,
       profileId: task.profileId,
       modelId,
@@ -235,6 +264,7 @@ export async function runDelegationBatch(
 
   // Await all; output order matches input.
   const settled = await Promise.allSettled(handles.map((entry) => entry.handle.result));
+  await Promise.all(handles.map((entry) => entry.transcript?.finish()));
 
   const results: BatchTaskResult[] = [];
   const usageList: Usage[] = [];
@@ -335,5 +365,7 @@ export async function runDelegationBatch(
     results,
     aggregateUsage,
     conversationViews,
+    batchId,
+    runKeys,
   };
 }

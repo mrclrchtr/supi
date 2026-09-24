@@ -40,14 +40,12 @@ export function makeAgentRunExecute(
 
     const outcome = await runDelegationBatch(toolParams, catalogue, ctx, onBatchUpdate, registry);
 
-    // Settle active runs + finalize batch in the registry.
-    for (const result of outcome.results) {
-      registry.settle(result.taskId);
-    }
+    // Finalize the batch after its transcript files have closed.
     const batch = registry.completeBatch(
       outcome.results,
       toolParams.sharedContext,
       outcome.aggregateUsage,
+      outcome.batchId,
     );
 
     return buildAgentRunResult(outcome, batch, toolParams.sharedContext);

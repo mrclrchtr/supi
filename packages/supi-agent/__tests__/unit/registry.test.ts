@@ -4,7 +4,9 @@ import {
   type ActiveRunRegistration,
   AgentRunRegistry,
   type BatchTaskResult,
+  type CompletedBatch,
 } from "../../src/tool/agent_run/registry.ts";
+import type { AgentRunTranscriptCapture } from "../../src/tool/agent_run/transcript-store.ts";
 
 function makeHandle(status: AgentRunProgress["status"] = "running") {
   return {
@@ -122,6 +124,66 @@ describe("AgentRunRegistry", () => {
     expect(registry.snapshot()).toMatchObject({ activeRuns: [], lastBatch: batch });
   });
 
+  it("retains every batch with distinct run keys and transcripts until shutdown", async () => {
+    const registry = new AgentRunRegistry();
+    const captures: AgentRunTranscriptCapture[] = [];
+    const batches: CompletedBatch[] = [];
+    for (const index of [1, 2]) {
+      const batchId = registry.beginBatch();
+      const runKey = `run-${index}`;
+      const transcript = registry.createTranscriptCapture(
+        {
+          runKey,
+          batchId,
+          taskId: "same-task",
+          profileId: "explore",
+          cwd: "/work/project",
+          modelId: "test/model",
+          thinkingLevel: "low",
+          tools: ["read"],
+          instructions: "Inspect this file.",
+          startedAt: index,
+        },
+        "Child system prompt",
+      );
+      captures.push(transcript);
+      registry.register({
+        ...makeRegistration("same-task"),
+        runKey,
+        batchId,
+        transcript,
+      });
+      await transcript.finish();
+      batches.push(
+        registry.completeBatch(
+          [makeResult({ taskId: "same-task" })],
+          undefined,
+          undefined,
+          batchId,
+        ),
+      );
+    }
+
+    expect(registry.snapshot().batches).toHaveLength(2);
+    expect(batches[0]?.runKeys["same-task"]).toBe("run-1");
+    expect(batches[1]?.runKeys["same-task"]).toBe("run-2");
+    expect(batches[0]?.transcriptSources["run-1"]).toBe(captures[0]);
+    expect(batches[1]?.transcriptSources["run-2"]).toBe(captures[1]);
+    await registry.clear();
+  });
+
+  it("does not restore a batch that completes after session cleanup", async () => {
+    const registry = new AgentRunRegistry();
+    const batchId = registry.beginBatch();
+    registry.register({ ...makeRegistration("t1"), runKey: "run-1", batchId });
+
+    await registry.cancelAll();
+    await registry.clear();
+    registry.completeBatch([makeResult()], undefined, undefined, batchId);
+
+    expect(registry.snapshot()).toEqual({ activeRuns: [], batches: [], lastBatch: undefined });
+  });
+
   it("isolates Conversation View and listener failures from Agent Run state", () => {
     const registry = new AgentRunRegistry();
     const registration = makeRegistration("t1");
@@ -138,15 +200,19 @@ describe("AgentRunRegistry", () => {
     expect(registry.snapshot().activeRuns[0]?.conversationView.entries).toEqual([]);
   });
 
-  it("clears state and notifies subscribers on shutdown", () => {
+  it("clears state and notifies subscribers on shutdown", async () => {
     const registry = new AgentRunRegistry();
     const listener = vi.fn();
     registry.subscribe(listener);
     registry.register(makeRegistration("t1"));
-    registry.clear();
+    await registry.clear();
 
     expect(registry.hasActive()).toBe(false);
     expect(registry.lastBatch()).toBeUndefined();
-    expect(listener).toHaveBeenLastCalledWith({ activeRuns: [], lastBatch: undefined });
+    expect(listener).toHaveBeenLastCalledWith({
+      activeRuns: [],
+      batches: [],
+      lastBatch: undefined,
+    });
   });
 });

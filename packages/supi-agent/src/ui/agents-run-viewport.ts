@@ -28,6 +28,11 @@ export class AgentRunViewport {
     return `PAUSED · ${below} lines below`;
   }
 
+  /** Current first visible line, used to map mouse events to transcript components. */
+  get scrollOffset(): number {
+    return this.#start;
+  }
+
   /** Fit wrapped rows to the available height without moving a paused reading position. */
   render(blocks: readonly AgentRunBlock[], height: number): string[] {
     this.#height = Math.max(1, height);
@@ -38,6 +43,14 @@ export class AgentRunViewport {
     this.#start = this.#following ? maximum : Math.min(maximum, this.#anchorStart());
     this.#rememberAnchor();
     return this.#rows.slice(this.#start, this.#start + this.#height).map((row) => row.text);
+  }
+
+  /** Scroll by logical lines. Scrolling up pauses following; reaching the end resumes it. */
+  scrollBy(lines: number): void {
+    const maximum = this.#maximumStart();
+    this.#start = Math.max(0, Math.min(maximum, this.#start + Math.trunc(lines)));
+    this.#following = lines > 0 && this.#start === maximum;
+    this.#rememberAnchor();
   }
 
   /** Page through wrapped lines. Reaching the end with Page Down restores live following. */

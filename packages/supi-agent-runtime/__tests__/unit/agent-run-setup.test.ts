@@ -55,22 +55,33 @@ it("rejects an unready session without prompting and tears down the observer", a
   expect(viewKeys).not.toContain("dispose");
 });
 
-it("snapshots callback events instead of forwarding session-owned objects", async () => {
-  const _harness = createHarness(mocks);
-  let observedEvent: object | undefined;
+it("exposes the effective prompt and render-only tool definitions to its observer", async () => {
+  const harness = createHarness(mocks);
+  const execute = vi.fn();
+  const renderCall = vi.fn();
+  Object.assign(harness.session, {
+    systemPrompt: "Child system prompt",
+    getAllTools: () => [{ name: "read" }],
+    getToolDefinition: () => ({ name: "read", execute, renderCall }),
+  });
+  let systemPrompt: string | undefined;
+  let toolRenderers: readonly { name: string; renderCall?: unknown }[] = [];
   const run = startAgentRun({
     inputs: inputs(),
     prompt: "event snapshot",
     observer: (view) => {
-      view.subscribe((event) => {
-        observedEvent = event;
-      });
+      systemPrompt = view.systemPrompt;
+      toolRenderers = view.getToolRenderers();
     },
     completionResolver: () => "done",
   });
 
   await expect(run.result).resolves.toMatchObject({ kind: "success", value: "done" });
-  expect(Object.isFrozen(observedEvent)).toBe(true);
+  expect(systemPrompt).toBe("Child system prompt");
+  expect(toolRenderers).toEqual([{ name: "read", renderCall }]);
+  expect(toolRenderers[0]).not.toHaveProperty("execute");
+  expect(Object.isFrozen(toolRenderers)).toBe(true);
+  expect(Object.isFrozen(toolRenderers[0])).toBe(true);
 });
 
 it("classifies observer setup errors as an unready session", async () => {

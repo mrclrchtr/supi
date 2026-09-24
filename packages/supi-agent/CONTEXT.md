@@ -49,8 +49,20 @@ An ordered set of independent Delegation Tasks accepted only when every selected
 _Avoid_: Workflow, chain, DAG
 
 **Delegation Batch Result**:
-The ordered, attributed parent-facing result of a Delegation Batch. It has one aggregate model-output bound; each task remains represented, and complete bounded task text stays available through human details and a temporary Markdown spill when needed.
-_Avoid_: unbounded joined output, Agent transcript, continuation artifact
+The ordered parent-facing result of a Delegation Batch. It has one aggregate model-output bound; each task remains represented, and its bounded final text and Conversation View stay in human details. A temporary Markdown spill holds bounded task text when needed. The full Agent Run Transcript is separate and never enters the tool result.
+_Avoid_: unbounded joined output, transcript payload, continuation artifact
+
+**Conversation View**:
+The bounded human and model-facing summary of one Agent Run. It retains recent assistant text, steering, and safe tool summaries; it omits full tool output and private reasoning.
+_Avoid_: full transcript, replay log
+
+**Agent Run Transcript**:
+The complete human-only sequence of finalized Agent Run messages, effective system prompts, and allowlisted lifecycle events. It is separate from Agent Run Progress and parent tool results; raw tool input and output stay hidden until the user opens them.
+_Avoid_: model result, diagnostics, conversation summary
+
+**Agent Run Transcript Store**:
+The parent-session owner of temporary JSONL files for all Agent Run batches. It has no application cap or restart recovery. It marks a failed capture incomplete, does not stop the run, and removes its files at session shutdown.
+_Avoid_: persistent session history, replay store
 
 **Mutation-Capable Profile**:
 An Agent Profile whose allowed tools can change workspace state. It is eligible only for a single-task Delegation Batch.

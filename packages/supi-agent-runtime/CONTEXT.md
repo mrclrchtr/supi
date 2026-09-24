@@ -57,7 +57,7 @@ The current immutable status, turn count, tool-use count, and usage snapshot of 
 _Avoid_: Event history, transcript, activity log
 
 **Agent Run Observer**:
-An optional caller-owned adapter that receives a read-only session view for domain-specific evidence such as review audit or a conversation viewer. The runtime does not retain or add this evidence to Agent Run Progress or normal diagnostics.
+An optional caller-owned adapter that receives a read-only session view, effective system prompt, and render-only tool definitions for domain evidence such as review audit or a conversation viewer. Tool definitions omit execution functions. The runtime does not retain or add observer evidence to Agent Run Progress or normal diagnostics.
 _Avoid_: Progress listener, session owner, transcript recorder
 
 **Agent Run Handle**:

@@ -27,17 +27,21 @@ The `agent_run` transcript row shows the effective model of a Delegation Task as
 
 ## `/agents`
 
-Use `/agents` in TUI mode to inspect active Agent Runs, the last completed Delegation Batch, effective Agent Profiles, and bounded Profile Diagnostics. The Runs view keeps task metadata separate from the bounded Conversation View. It shows lifecycle status, model, thinking level, turns, tool uses, Usage, safe tool activity, steering, assistant text, and retention notices.
+Use `/agents` in TUI mode to inspect active Agent Runs, every completed Delegation Batch in the current parent session, effective Agent Profiles, and bounded Profile Diagnostics. The Runs view keeps the bounded Conversation View separate from a full human-only transcript. It shows status, model, thinking level, turns, tool uses, Usage, safe tool activity, steering, assistant text, and retention notices. Transcript messages stay outside parent tool results.
 
 - Use Tab, Shift+Tab, or Left/Right to change sections.
 - Use Up/Down to select a run, profile, or diagnostic.
-- The Runs view follows the latest retained output by default (`LIVE`). The run list and controls stay visible as the details scroll.
-- Use Page Up/Page Down to scroll through wrapped output lines. Page Up pauses auto-scroll (`PAUSED`); live updates keep the retained entry in view. The status shows how many lines are below the view, not an unread count.
+- At terminal widths of 100 columns or more, the Runs view shows a run list and transcript side by side. On narrower terminals, use Left to open the run list, Up/Down to select a run, and Enter or Right to open its transcript.
+- The viewer uses the full terminal. The run list and controls stay visible while the transcript scrolls. Mouse-wheel input scrolls the transcript or selects a run.
+- The viewer follows new transcript output by default (`LIVE`). Use Page Up/Page Down to scroll through wrapped lines. Page Up pauses auto-scroll (`PAUSED`); live updates keep the reading position. The status shows how many lines are below the view, not an unread count.
 - Press Home to read task metadata and earlier output. Press End to resume auto-scroll. Page Down also resumes auto-scroll when it reaches the end.
 - Press `f` to pause or resume auto-scroll. Selecting a different run resumes auto-scroll.
-- The view fits the terminal height. If retention removes the entry you are reading, the view moves to the oldest available entry.
+- Press `i` to hide or show thinking. Press `e` or click a raw tool block to show or hide its input and output.
+- The bounded Conversation View can omit old entries. The human-only transcript keeps all captured messages for every batch in the current parent session.
 - Press `s` to steer the selected running Agent Run. A text field opens inside the overlay; press Enter to send or Esc to cancel.
-- Press `x` to stop only the selected starting or running Agent Run. A startup stop can wait for PI setup to finish.
-- Press Esc to close the overlay. PI's normal outer-tool cancellation still stops the full Delegation Batch.
+- Press `x` to request a stop for the selected starting or running Agent Run, then press Enter or `y` to confirm. A startup stop can wait for PI setup to finish.
+- Press Esc to close the viewer. This does not stop Agent Runs. PI's normal outer-tool cancellation still stops the full Delegation Batch.
 
-Other PI modes show only an unavailable notice. The overlay does not add a text control protocol, persistent child history, child JSONL, or replay files. Session shutdown clears its active and last-batch state.
+Transcript files are temporary JSONL files in a private directory for the parent session. They have no application cap or restart recovery. A storage failure marks capture incomplete but does not stop a run. The viewer shows the available transcript and the incomplete status. Session shutdown removes the directory.
+
+Other PI modes show only an unavailable notice. The overlay does not change global `tuiMode` or add a text control protocol, persistent child history, or replay files. Closing the viewer does not stop runs.

@@ -95,7 +95,7 @@ function dependencies(overrides: Partial<AgentsDialogDependencies> = {}): Agents
   return {
     theme: makeCtx().ui.theme as never,
     done: vi.fn(),
-    tui: { requestRender: vi.fn(), terminal: { rows: 1000 } },
+    tui: { requestRender: vi.fn(), terminal: { rows: 24 } },
     onSteer: vi.fn(async () => "accepted" as const),
     onStop: vi.fn(async () => "accepted" as const),
     ...overrides,
@@ -118,7 +118,7 @@ describe("AgentsDialog", () => {
     expect(text).toContain("steering: Check the tests too.");
     expect(text).toContain("tool read (completed) — read src/index.ts");
     expect(text).toContain("2 conversation entries");
-    expect(text).toContain("human output truncated");
+    expect(text.toLowerCase()).toContain("human output truncated");
   });
 
   it("renders the final result separately from the retained conversation", () => {
@@ -258,6 +258,17 @@ describe("AgentsDialog", () => {
     expect(dialog.render(100).join("\n")).toContain("message 15");
   });
 
+  it("closes the viewer without stopping the selected run", () => {
+    const done = vi.fn();
+    const onStop = vi.fn(async () => "accepted" as const);
+    const dialog = new AgentsDialog(data(), dependencies({ done, onStop }));
+
+    dialog.handleInput("\x1b");
+
+    expect(done).toHaveBeenCalledOnce();
+    expect(onStop).not.toHaveBeenCalled();
+  });
+
   it("reports control failures without an unhandled rejection", async () => {
     const onSteer = vi.fn(async () => {
       throw new Error("TUI closed");
@@ -309,6 +320,8 @@ describe("AgentsDialog", () => {
     await vi.waitFor(() => expect(dialog.render(100).join("\n")).toContain("Control accepted"));
     expect(onSteer).toHaveBeenCalledWith("inspect", "Focus on tests");
     dialog.handleInput("x");
+    expect(onStop).not.toHaveBeenCalled();
+    dialog.handleInput("y");
     await vi.waitFor(() => expect(onStop).toHaveBeenCalledWith("inspect"));
   });
 
@@ -320,6 +333,8 @@ describe("AgentsDialog", () => {
     const dialog = new AgentsDialog(starting, dependencies({ onStop }));
 
     dialog.handleInput("x");
+    expect(dialog.render(100).join("\n")).toContain("Press Enter or y to confirm");
+    dialog.handleInput("\n");
 
     expect(dialog.render(100).join("\n")).toContain("Stopping selected run");
     await vi.waitFor(() => expect(onStop).toHaveBeenCalledWith("inspect"));

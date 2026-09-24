@@ -49,11 +49,13 @@ function sessionDouble(
   const listeners = new Set<(event: AgentSessionEvent) => void>();
   const session: AgentRunSessionView = {
     cwd: options.inputs.cwd,
+    systemPrompt: "Child system prompt",
     model: options.inputs.model,
     thinkingLevel: options.inputs.thinkingLevel,
     isStreaming: false,
     messages: config.messages ?? [],
     getActiveToolNames: () => options.inputs.tools,
+    getToolRenderers: () => [],
     getSessionStats: () => ({
       sessionFile: undefined,
       sessionId: "test-session",

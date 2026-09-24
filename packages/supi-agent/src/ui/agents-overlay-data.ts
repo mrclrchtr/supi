@@ -2,14 +2,17 @@ import type { ModelThinkingLevel, Usage } from "@earendil-works/pi-ai";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { AgentConversationView } from "../tool/agent_run/conversation-view.ts";
 import type { BatchTaskStatus } from "../tool/agent_run/registry.ts";
+import type { AgentRunTranscriptSource } from "../tool/agent_run/transcript-store.ts";
 import type { AgentProfileFieldSources, ProfileDiagnostic, ProfileSource } from "../types.ts";
 
 /** Shared height limit for the PI overlay and its rendered viewport. */
-export const AGENTS_OVERLAY_MAX_HEIGHT_PERCENT = 90;
+export const AGENTS_OVERLAY_MAX_HEIGHT_PERCENT = 100;
 
 /** One active or last-completed Agent Run shown in the overlay. */
 export interface AgentsOverlayRun {
   readonly key: string;
+  readonly runKey?: string;
+  readonly transcriptSource?: AgentRunTranscriptSource;
   readonly active: boolean;
   readonly taskId: string;
   readonly profileId: string;

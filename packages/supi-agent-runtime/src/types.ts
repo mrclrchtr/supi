@@ -65,9 +65,17 @@ export interface AgentRunMessage {
   readonly [key: string]: unknown;
 }
 
+/** Render-only tool details from an owned AgentSession. */
+export type AgentRunToolRenderer = Pick<
+  ToolDefinition,
+  "name" | "renderCall" | "renderResult" | "renderShell"
+>;
+
 /** Read-only view of the owned session exposed to caller-owned callbacks. */
 export interface AgentRunSessionView {
   readonly cwd: string;
+  /** Effective child system prompt. */
+  readonly systemPrompt: string;
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
   readonly model: Readonly<Model<any>> | undefined;
   readonly thinkingLevel: ModelThinkingLevel;
@@ -75,6 +83,8 @@ export interface AgentRunSessionView {
   readonly messages: readonly AgentRunMessage[];
   /** Return a defensive copy of the current active tool names. */
   getActiveToolNames(): readonly string[];
+  /** Return tool renderers without exposing tool execution functions. */
+  getToolRenderers(): readonly AgentRunToolRenderer[];
   /** Return PI's current aggregate session statistics. */
   getSessionStats(): SessionStats;
   /** Return the last visible assistant text, when PI has one. */

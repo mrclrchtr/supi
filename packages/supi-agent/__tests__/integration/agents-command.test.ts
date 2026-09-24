@@ -13,7 +13,7 @@ import type { ActiveRunRegistration } from "../../src/tool/agent_run/registry.ts
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
-  registry.clear();
+  await registry.clear();
   agentProfileCatalogueStore.clear();
   vi.unstubAllEnvs();
   await Promise.all(
@@ -88,7 +88,7 @@ function captureOverlay(ctx: ReturnType<typeof makeCtx>): {
   let overlay: OverlayComponent | undefined;
   const custom = vi.fn(async (factory: (...args: unknown[]) => unknown) => {
     overlay = factory(
-      { requestRender: vi.fn(), terminal: { rows: 1000 } },
+      { requestRender: vi.fn(), terminal: { rows: 24 } },
       ctx.ui.theme,
       {},
       vi.fn(),
@@ -146,7 +146,7 @@ describe("/agents command", () => {
     let rendered = "";
     const custom = vi.fn(async (factory: (...args: unknown[]) => unknown) => {
       const component = factory(
-        { requestRender: vi.fn(), terminal: { rows: 1000 } },
+        { requestRender: vi.fn(), terminal: { rows: 24 } },
         makeCtx().ui.theme,
         {},
         vi.fn(),
@@ -166,7 +166,7 @@ describe("/agents command", () => {
       expect.objectContaining({ overlay: true }),
     );
     expect(rendered).toContain("Agents");
-    expect(rendered).toContain("No Agent Runs in this session");
+    expect(rendered).toContain("No Agent Runs.");
   });
 
   it("shows active run details and retains accepted steering inline", async () => {
@@ -213,7 +213,7 @@ describe("/agents command", () => {
     let resolveCustom: (() => void) | undefined;
     const done = vi.fn((_result?: unknown) => resolveCustom?.());
     const custom = vi.fn((factory: (...args: unknown[]) => unknown) => {
-      factory({ requestRender: vi.fn(), terminal: { rows: 1000 } }, makeCtx().ui.theme, {}, done);
+      factory({ requestRender: vi.fn(), terminal: { rows: 24 } }, makeCtx().ui.theme, {}, done);
       return new Promise<void>((resolve) => {
         resolveCustom = resolve;
       });
@@ -274,7 +274,10 @@ describe("/agents command", () => {
     const ctx = makeCtx({ ui: { ...base.ui, custom: captured.custom } });
 
     await handler("", ctx);
-    captured.component().handleInput("x");
+    const overlay = captured.component();
+    overlay.handleInput("x");
+    expect(selected.stop).not.toHaveBeenCalled();
+    overlay.handleInput("y");
 
     await vi.waitFor(() => expect(selected.stop).toHaveBeenCalledOnce());
     expect(sibling.stop).not.toHaveBeenCalled();
@@ -284,7 +287,9 @@ describe("/agents command", () => {
 
   it("shows the last completed batch after active runs settle", async () => {
     const pi = await startExtension();
-    const view = runRegistration("finished").registration.getConversationView([]);
+    const registration = runRegistration("finished").registration;
+    registry.register(registration);
+    const view = registration.getConversationView([]);
     registry.setConversationView("finished", view);
     registry.completeBatch([
       {
@@ -314,7 +319,6 @@ describe("/agents command", () => {
     const text = captured.component().render(100).join("\n");
     expect(text).toContain("finished");
     expect(text).toContain("completed");
-    expect(text).toContain("last");
     expect(text).toContain("The inspection is complete.");
     captured.component().dispose?.();
   });
@@ -349,7 +353,7 @@ describe("/agents command", () => {
     await shutdown({ type: "session_shutdown", reason: "quit" }, makeCtx());
 
     expect(active.stop).toHaveBeenCalledOnce();
-    expect(registry.snapshot()).toEqual({ activeRuns: [], lastBatch: undefined });
+    expect(registry.snapshot()).toEqual({ activeRuns: [], batches: [], lastBatch: undefined });
     expect(agentProfileCatalogueStore.get()).toBeUndefined();
   });
 });

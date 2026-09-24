@@ -75,7 +75,7 @@ function controlledHandle(): ControlledHandle {
 
 afterEach(async () => {
   await registry.cancelAll();
-  registry.clear();
+  await registry.clear();
   agentProfileCatalogueStore.clear();
   mocks.handles.length = 0;
   vi.clearAllMocks();
@@ -114,7 +114,7 @@ describe("/agents selected-run control with an active Delegation Batch", () => {
     const base = makeCtx({ mode: "tui" });
     const custom = vi.fn(async (factory: (...args: unknown[]) => unknown) => {
       overlay = factory(
-        { requestRender: vi.fn(), terminal: { rows: 1000 } },
+        { requestRender: vi.fn(), terminal: { rows: 24 } },
         base.ui.theme,
         {},
         vi.fn(),
@@ -127,6 +127,8 @@ describe("/agents selected-run control with an active Delegation Batch", () => {
     await command("", makeCtx({ ui: { ...base.ui, custom } }));
 
     overlay?.handleInput("x");
+    await vi.waitFor(() => expect(overlay).toBeDefined());
+    overlay?.handleInput("y");
     await vi.waitFor(() => expect(mocks.handles[0]?.stop).toHaveBeenCalledOnce());
 
     expect(mocks.handles[1]?.stop).not.toHaveBeenCalled();

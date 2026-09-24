@@ -30,6 +30,7 @@ export function createHarness(mocks: AgentRunMocks, entries: unknown[] = []) {
     agent: { waitForIdle: vi.fn(async () => undefined) },
     extensionRunner,
     model: {},
+    systemPrompt: "",
     thinkingLevel: "low",
     isStreaming: false,
     isIdle: true,
@@ -69,6 +70,8 @@ export function createHarness(mocks: AgentRunMocks, entries: unknown[] = []) {
     abort: vi.fn(async () => undefined),
     dispose: vi.fn(() => extensionRunner.invalidate()),
     getActiveToolNames: vi.fn(() => ["read"]),
+    getAllTools: vi.fn(() => []),
+    getToolDefinition: vi.fn(() => undefined),
     getSessionStats: vi.fn(() => ({ tokens: { input: 0, output: 0, total: 0 } })),
     getLastAssistantText: vi.fn(() => "done"),
   };

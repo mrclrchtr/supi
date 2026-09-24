@@ -1,3 +1,18 @@
 # Retain a bounded Agent Conversation View
 
-The expanded result and `/agents` viewer retain the newest 100 visible assistant, user-steering, and tool-activity entries and at most 50 KB of visible text, disclosing omissions. Initial task/shared-context metadata is displayed separately rather than duplicated in every conversation stream. Tool records use package-owned allowlisted argument summaries and omit thinking, signatures, tool-result bodies, and arbitrary unknown-tool arguments. Bash retains only a control-stripped, secret-redacted, whitespace-collapsed first-line preview capped at 120 characters. The in-memory registry keeps active runs and only the last completed Delegation Batch, clearing on session shutdown; older final tool rows remain normal conversation history.
+## Status
+
+Accepted
+
+## Decision
+
+Keep the parent-facing Conversation View bounded to the newest 100 visible entries and 50 KB of text. Keep one row for every task. The view contains assistant text, steering, and safe tool summaries. It omits private reasoning, signatures, full tool results, and arbitrary tool arguments.
+
+Keep the complete human-only Agent Run Transcript separate from the Conversation View. `/agents` reads it from temporary session storage. It never enters the parent tool result. See [ADR 0009](0009-store-human-agent-run-transcripts-temporarily.md).
+
+## Consequences
+
+- The model-facing result stays within its existing bounds.
+- Human details can show the full captured message sequence, including tool results and system prompt history.
+- The bounded Conversation View remains available when transcript storage is incomplete or unavailable.
+- Bash activity keeps a control-stripped, secret-redacted, whitespace-collapsed first-line preview capped at 120 characters.
