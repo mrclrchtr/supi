@@ -1,5 +1,23 @@
 # Changelog
 
+## [7.3.0](https://github.com/mrclrchtr/supi/compare/v7.2.1...v7.3.0) (2026-09-24)
+
+
+### Features
+
+* **agent:** add fullscreen run transcript viewer ([90851b0](https://github.com/mrclrchtr/supi/commit/90851b0d9090b97c5b3e535a6646a4d32337fe80))
+* **core:** add shared TUI list helpers ([b8840f2](https://github.com/mrclrchtr/supi/commit/b8840f29be8330b640f57b5e4aa34e2a33809f49))
+* **extras:** add session capability controls ([7e9aa76](https://github.com/mrclrchtr/supi/commit/7e9aa76553447134639d1d5abf3218767076f08c))
+* **extras:** improve session capabilities UI ([618df08](https://github.com/mrclrchtr/supi/commit/618df086ecc9fd48ea84f286ed3ba0977f95afa6))
+
+
+### Bug Fixes
+
+* **agent:** align viewer shortcuts with PI defaults ([eb80339](https://github.com/mrclrchtr/supi/commit/eb8033974099c31ee13efedca3fbd8b048568524))
+* **deps:** update commitlint monorepo to v21.2.3 ([472e1fb](https://github.com/mrclrchtr/supi/commit/472e1fb56cda7ba00d63c3088fd8dd485c0e962d))
+* **deps:** update dependency hk to v2.1.0 ([7a2ed35](https://github.com/mrclrchtr/supi/commit/7a2ed3507f01cfd6470d67b5d93222859bf84370))
+* **extras:** show session capabilities in the input area ([58ae3bf](https://github.com/mrclrchtr/supi/commit/58ae3bfceef4b9a282cfea0091f995186d54c252))
+
 ## [7.2.1](https://github.com/mrclrchtr/supi/compare/v7.2.0...v7.2.1) (2026-09-22)
 
 

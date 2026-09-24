@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-tree-sitter",
-  "version": "7.2.1",
+  "version": "7.3.0",
   "description": "Structural AST analysis for SuPi code intelligence",
   "license": "MIT",
   "repository": {
