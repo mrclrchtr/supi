@@ -21,6 +21,15 @@ export interface AgentRunDisplayConversation {
   readonly textTruncated: boolean;
 }
 
+/** Caller-owned display fields that do not change Agent Run execution or outcome. */
+export interface AgentRunDisplayDetails {
+  readonly target?: string;
+  readonly batchLabel?: string;
+  readonly verdict?: string;
+  readonly findingCount?: number;
+  readonly blockingFindingCount?: number;
+}
+
 /** Neutral metadata for one Agent Run in the containing-session viewer. */
 export interface AgentRunDisplayMetadata {
   readonly runKey?: string;
@@ -36,12 +45,14 @@ export interface AgentRunDisplayMetadata {
   readonly tools: readonly string[];
   readonly taskDescription?: string;
   readonly sharedContext?: string;
+  readonly display?: AgentRunDisplayDetails;
   readonly startedAt: number;
 }
 
 /** Parent-owned details that the runtime viewer can show without changing tool output. */
 export interface AgentRunDisplayResult {
   readonly finalText?: string;
+  readonly display?: AgentRunDisplayDetails;
   readonly failureCode?: string;
   readonly humanTruncated?: boolean;
   readonly modelTruncated?: boolean;
@@ -64,6 +75,7 @@ export interface AgentRunRegistryRun extends AgentRunDisplayMetadata {
   readonly batchId: string;
   readonly active: boolean;
   readonly status: AgentRunProgress["status"];
+  readonly finishedAt?: number;
   readonly steeringAvailable: boolean;
   readonly turns: number;
   readonly toolUses: number;

@@ -16,6 +16,7 @@ export { startAgentRun, startRegisteredAgentRun } from "./run.ts";
 export { AgentRunRegistry } from "./session/agent-run-registry.ts";
 export type {
   AgentRunDisplayConversation,
+  AgentRunDisplayDetails,
   AgentRunDisplayEntry,
   AgentRunDisplayMetadata,
   AgentRunDisplayResult,

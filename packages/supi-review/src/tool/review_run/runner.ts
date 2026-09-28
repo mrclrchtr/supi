@@ -18,6 +18,7 @@ import type {
 import { runIsolatedChild } from "./child-session.ts";
 import { createReviewRecoveryDeclineTool, createReviewSubmissionTool } from "./child-tools.ts";
 import { ReviewRecoveryPolicy } from "./recovery.ts";
+import { normalizeReviewSubmission } from "./submission.ts";
 import { buildReviewerSystemPrompt } from "./system-prompt.ts";
 
 function reviewerRunDisplay(
@@ -36,6 +37,7 @@ function reviewerRunDisplay(
     thinkingLevel,
     tools,
     taskDescription: `Inspection-only Review Task in ${invocation.task.mode} mode.`,
+    display: { target: invocation.snapshot.title },
     startedAt: Date.now(),
   };
 }
@@ -115,12 +117,20 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     headlessInspection: true,
     projectTrusted: invocation.projectTrusted ?? false,
     runDisplay: reviewerRunDisplay(invocation, effectiveThinkingLevel, originalTools),
-    displayResult: (result) =>
-      result.kind === "success"
-        ? { finalText: result.value.summary }
-        : result.kind === "failed"
-          ? { failureCode: result.failureCode }
-          : {},
+    displayResult: (result) => {
+      if (result.kind === "failed") return { failureCode: result.failureCode };
+      if (result.kind !== "success") return {};
+      const submission = normalizeReviewSubmission(result.value);
+      return {
+        finalText: submission.summary,
+        display: {
+          target: invocation.snapshot.title,
+          verdict: submission.verdict,
+          findingCount: submission.findingCounts.total,
+          blockingFindingCount: submission.findingCounts.blocking,
+        },
+      };
+    },
     onSessionCreated: (created) => {
       session = created;
       if (invocation.audit) {

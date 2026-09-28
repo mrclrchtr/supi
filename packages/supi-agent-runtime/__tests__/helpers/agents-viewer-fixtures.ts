@@ -13,7 +13,7 @@ export function makeAgentsRun(overrides: Partial<AgentsOverlayRun> = {}): Agents
     modelId: "test/model",
     thinkingLevel: "low",
     tools: ["read"],
-    startedAt: 1,
+    startedAt: Date.now() - 2_000,
     active: true,
     status: "running",
     steeringAvailable: true,

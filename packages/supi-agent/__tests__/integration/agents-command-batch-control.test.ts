@@ -146,8 +146,9 @@ describe("/agents selected-run control with an active Delegation Batch", () => {
     ) => Promise<void>;
     await command("", makeCtx({ ui: { ...base.ui, custom } }));
 
-    overlay?.handleInput("x");
     await vi.waitFor(() => expect(overlay).toBeDefined());
+    overlay?.handleInput("\n");
+    overlay?.handleInput("x");
     overlay?.handleInput("y");
     await vi.waitFor(() => expect(mocks.handles[0]?.stop).toHaveBeenCalledOnce());
 

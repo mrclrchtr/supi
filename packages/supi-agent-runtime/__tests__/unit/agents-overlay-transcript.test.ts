@@ -33,6 +33,10 @@ function dependencies(rows: number): AgentsDialogDependencies {
   };
 }
 
+function openConversation(dialog: AgentsDialog): void {
+  dialog.handleInput("\n");
+}
+
 function click(dialog: AgentsDialog, x: number, y: number) {
   return dialog.handleMouse({
     type: "click",
@@ -111,6 +115,7 @@ describe("AgentsDialog transcript viewer", () => {
       }),
       dependencies(24),
     );
+    openConversation(dialog);
     expect(dialog.render(120).join("\n")).toContain("message 50");
 
     const wheel = (wheelDelta: number) =>
@@ -148,13 +153,15 @@ describe("AgentsDialog transcript viewer", () => {
       },
     };
     const dialog = new AgentsDialog(fallbackData(source), dependencies(40));
+    openConversation(dialog);
 
     await vi.waitFor(() => {
       const rendered = dialog.render(120).join("\n");
-      expect(rendered).toContain("Available final result");
       expect(rendered).toContain("Retained conversation entry");
     });
     expect(dialog.render(120).join("\n")).toContain("Transcript storage is unavailable");
+    dialog.handleInput("\t");
+    expect(dialog.render(120).join("\n")).toContain("Available final result");
     dialog.dispose();
   });
 
@@ -187,12 +194,17 @@ describe("AgentsDialog transcript viewer", () => {
       load: async () => document,
     };
     const dialog = new AgentsDialog(fallbackData(source), dependencies(40));
+    openConversation(dialog);
 
     await vi.waitFor(() => {
       const rendered = dialog.render(120).join("\n");
-      expect(rendered).toContain("Available final result");
       expect(rendered).toContain("Retained conversation entry");
+      expect(rendered).toContain("transcript incomplete");
     });
+    dialog.handleInput("\t");
+    const details = dialog.render(120).join("\n");
+    expect(details).toContain("Available final result");
+    expect(details).toContain("Transcript incomplete");
     dialog.dispose();
   });
 
@@ -255,6 +267,7 @@ describe("AgentsDialog transcript viewer", () => {
       "Child system prompt",
       toolRenderers,
     );
+    capture.observe({ type: "turn_start" } as never, "Child system prompt", toolRenderers);
     await capture.load();
 
     const run = data().runs[0];
@@ -274,33 +287,45 @@ describe("AgentsDialog transcript viewer", () => {
       }),
       dependencies(80),
     );
-    await vi.waitFor(() =>
-      expect(dialog.render(120).join("\n")).toContain("Raw tool input/result hidden"),
-    );
+    openConversation(dialog);
+    await vi.waitFor(() => expect(dialog.render(120).join("\n")).toContain("Visible answer."));
     let lines = dialog.render(120);
-    expect(lines.join("\n")).toContain("Child system prompt");
-    expect(lines.join("\n")).toContain("Steering: focus on the edge cases.");
-    expect(lines.join("\n")).toContain("Visible answer.");
-    expect(lines.join("\n")).toContain("Private reasoning.");
-    expect(lines.join("\n")).toContain("File output.");
-    for (const key of ["t", "\u0014", "\u001b[116;5u"]) {
+    const conversationText = lines.join("\n");
+    expect(conversationText).toContain("Steering: focus on the edge cases.");
+    expect(conversationText).toContain("Visible answer.");
+    expect(conversationText).toContain("Private reasoning.");
+    expect(conversationText).toContain("File output.");
+    expect(conversationText).not.toContain("Child system prompt");
+    expect(conversationText).not.toContain("Raw tool input/result hidden");
+    expect(conversationText).not.toContain("Run events");
+    expect(conversationText).not.toContain("assistant ·");
+    expect(conversationText).not.toContain("user ·");
+    expect(conversationText).not.toContain("toolResult ·");
+    expect(conversationText.match(/File output\./g)).toHaveLength(1);
+    for (const key of ["\u0014", "\u001b[116;5u"]) {
       dialog.handleInput(key);
       expect(dialog.render(120).join("\n")).not.toContain("Private reasoning.");
       dialog.handleInput(key);
       expect(dialog.render(120).join("\n")).toContain("Private reasoning.");
     }
-    for (const key of ["o", "\u000f", "\u001b[111;5u"]) {
-      dialog.handleInput(key);
-      expect(dialog.render(120).join("\n")).toContain("src/index.ts");
-      dialog.handleInput(key);
-      expect(dialog.render(120).join("\n")).toContain("Raw tool input/result hidden");
-    }
+    dialog.handleInput("\t");
+    lines = dialog.render(120);
+    expect(lines.join("\n")).toContain("Child system prompt");
+    expect(lines.join("\n")).toContain("Raw tool input/result hidden");
+    expect(lines.join("\n")).toContain("Run events");
+    expect(lines.join("\n")).toContain(`user · ${new Date(10).toLocaleTimeString()}`);
+    expect(lines.join("\n")).toContain(`assistant · ${new Date(11).toLocaleTimeString()}`);
+    expect(lines.join("\n")).toContain(`toolResult · ${new Date(12).toLocaleTimeString()}`);
     const hiddenRow = lines.findIndex((line) => line.includes("Raw tool input/result hidden"));
     expect(hiddenRow).toBeGreaterThanOrEqual(0);
-    expect(click(dialog, 38, hiddenRow)).toBeUndefined();
-    expect(dialog.render(120).join("\n")).toContain("Raw tool input/result hidden");
     expect(click(dialog, 50, hiddenRow)).toEqual({ handled: true });
     expect(dialog.render(120).join("\n")).toContain("src/index.ts");
+    dialog.handleInput("\t");
+    expect(dialog.render(120).join("\n")).not.toContain("src/index.ts");
+    dialog.handleInput("\t");
+    expect(dialog.render(120).join("\n")).toContain("src/index.ts");
+    dialog.handleInput("\u000f");
+    expect(dialog.render(120).join("\n")).toContain("Raw tool input/result hidden");
 
     lines = dialog.render(120);
     const thinkingRow = lines.findIndex((line) => line.includes("Private reasoning."));
@@ -338,7 +363,8 @@ describe("AgentsDialog transcript viewer", () => {
       expect(dialog.render(120).join("\n")).toContain("Later transcript message."),
     );
     lines = dialog.render(100);
-    expect(lines.join("\n")).toContain("src/index.ts");
+    expect(lines.join("\n")).toContain("Raw tool input/result hidden");
+    expect(lines.join("\n")).not.toContain("src/index.ts");
     expect(lines.join("\n")).toContain("Thinking is hidden");
     dialog.dispose();
   });
@@ -405,6 +431,7 @@ describe("AgentsDialog transcript viewer", () => {
       }),
       deps,
     );
+    openConversation(dialog);
     await vi.waitFor(() => expect(dialog.render(120).join("\n")).toContain(label));
     if (!invalidateTool) throw new Error("Tool renderer did not load.");
 
@@ -476,6 +503,8 @@ describe("AgentsDialog transcript viewer", () => {
       }),
       dependencies(80),
     );
+    openConversation(dialog);
+    dialog.handleInput("\t");
 
     await vi.waitFor(() => {
       const rendered = dialog.render(120).join("\n");

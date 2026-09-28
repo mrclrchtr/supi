@@ -71,6 +71,7 @@ describe("Agent Profile pages in /agents", () => {
     await handler("", makeCtx({ mode: "tui", ui: { ...base.ui, custom } }));
     if (!overlay) throw new Error("The /agents viewer did not open.");
     overlay.handleInput("\t");
+    overlay.handleInput("\t");
     const profiles = overlay.render(100).join("\n");
     expect(profiles).toContain("explore — package");
     expect(profiles).toContain("general — package");

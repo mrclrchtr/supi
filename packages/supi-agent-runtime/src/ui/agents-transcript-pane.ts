@@ -18,9 +18,13 @@ import {
   renderAgentRunTranscript,
 } from "./agents-transcript.ts";
 
+type TranscriptView = "conversation" | "details";
+
 /** The transcript viewport and loader for one selected Agent Run. */
 export class AgentsTranscriptPane {
-  #viewport = new AgentRunViewport();
+  #conversationViewport = new AgentRunViewport();
+  #detailsViewport = new AgentRunViewport();
+  #detailsStarted = false;
   #source: AgentRunTranscriptSource | undefined;
   #document: AgentRunTranscriptDocument | undefined;
   #revision = -1;
@@ -30,11 +34,17 @@ export class AgentsTranscriptPane {
   #loadToken = 0;
   #rendered: AgentTranscriptRenderResult | undefined;
   #renderedDocument: AgentRunTranscriptDocument | undefined;
+  #renderedView: TranscriptView | undefined;
   #targets: readonly AgentTranscriptInteractiveTarget[] = [];
   #bounds = { top: 0, height: 0, left: 0, width: 0 };
   #toolDetailsExpanded = false;
   #thinkingHidden = false;
+  #view: "conversation" | "details" = "conversation";
   #selectedKey: string | undefined;
+
+  get #viewport(): AgentRunViewport {
+    return this.#view === "details" ? this.#detailsViewport : this.#conversationViewport;
+  }
 
   constructor(
     private readonly theme: Theme,
@@ -60,8 +70,14 @@ export class AgentsTranscriptPane {
   select(run: AgentsOverlayRun | undefined): void {
     if (run?.key !== this.#selectedKey) {
       this.#selectedKey = run?.key;
-      this.#viewport.reset();
-      this.#rendered = undefined;
+      this.#conversationViewport.reset();
+      this.#detailsViewport.reset();
+      this.#detailsStarted = false;
+      if (this.#view === "details") {
+        this.#detailsViewport.navigate("start");
+        this.#detailsStarted = true;
+      }
+      this.#clearRendered();
       this.#targets = [];
     }
     this.#request(run);
@@ -81,37 +97,57 @@ export class AgentsTranscriptPane {
       return height > 0 ? [this.#line("Select an Agent Run.", width)] : [];
     }
     if (this.#document && run.transcriptSource === this.#source) {
-      if (!this.#rendered || this.#renderedDocument !== this.#document) {
-        this.#rendered = renderAgentRunTranscript({
-          document: this.#document,
-          toolRenderers: this.#source?.toolRenderers ?? [],
-          theme: this.theme,
-          tui: { requestRender: () => this.onChange() },
-          expanded: this.#toolDetailsExpanded,
-          thinkingHidden: this.#thinkingHidden,
-          previous: this.#rendered,
-        });
-        this.#renderedDocument = this.#document;
-      }
-      const layout = layoutAgentRunTranscript(this.#rendered, width);
-      this.#targets = layout.targets;
-      const fallback =
-        this.#document.status === "incomplete"
-          ? this.#fallbackBlocks(
-              run,
-              width,
-              this.#rendered.items.length,
-              "Transcript capture is incomplete. Showing the retained Agent Run view.",
-            )
-          : [];
-      return this.#viewport.render([...layout.blocks, ...fallback], height);
+      return this.#renderDocument(run, this.#document, width, height);
     }
     this.#targets = [];
     if (this.#loading) {
       return height > 0 ? [this.#line("Loading the full Agent Run transcript…", width)] : [];
     }
-    if (this.#failed) return this.#renderFallback(run, width, height);
     return this.#renderFallback(run, width, height);
+  }
+
+  #renderDocument(
+    run: AgentsOverlayRun,
+    document: AgentRunTranscriptDocument,
+    width: number,
+    height: number,
+  ): string[] {
+    if (
+      !this.#rendered ||
+      this.#renderedDocument !== document ||
+      this.#renderedView !== this.#view
+    ) {
+      this.#rendered = renderAgentRunTranscript({
+        document,
+        toolRenderers: this.#source?.toolRenderers ?? [],
+        theme: this.theme,
+        tui: { requestRender: () => this.onChange() },
+        expanded: this.#toolDetailsExpanded,
+        thinkingHidden: this.#thinkingHidden,
+        view: this.#view,
+        previous: this.#rendered,
+      });
+      this.#renderedDocument = document;
+      this.#renderedView = this.#view;
+    }
+    const rendered = this.#rendered;
+    if (!rendered) throw new Error("Transcript render was not created.");
+    const layout = layoutAgentRunTranscript(rendered, width);
+    const registryMetadata =
+      this.#view === "details" ? this.#registryMetadataBlocks(run, width) : [];
+    const registryRows = registryMetadata.reduce((count, block) => count + block.lines.length, 0);
+    this.#targets = layout.targets.map((target) => ({
+      ...target,
+      start: target.start + registryRows,
+    }));
+    const fallback =
+      document.status === "incomplete"
+        ? this.#fallbackBlocks(run, width, rendered.items.length, {
+            warning: "Transcript capture is incomplete. Showing the retained Agent Run view.",
+            showTechnicalDetails: this.#view === "details",
+          })
+        : [];
+    return this.#viewport.render([...registryMetadata, ...layout.blocks, ...fallback], height);
   }
 
   handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
@@ -152,8 +188,22 @@ export class AgentsTranscriptPane {
     this.#viewport.navigate(action);
   }
 
+  setDetails(details: boolean): void {
+    const view = details ? "details" : "conversation";
+    if (this.#view === view) return;
+    this.#view = view;
+    if (details && !this.#detailsStarted) {
+      this.#detailsViewport.navigate("start");
+      this.#detailsStarted = true;
+    }
+    this.onChange();
+  }
+
   toggleToolDetails(): void {
-    this.#toolDetailsExpanded = !this.#toolDetailsExpanded;
+    const anyExpanded =
+      this.#rendered?.rawPayloads.some((payload) => payload.isExpanded) ??
+      this.#toolDetailsExpanded;
+    this.#toolDetailsExpanded = !anyExpanded;
     this.#applyToolExpansion();
   }
 
@@ -182,8 +232,7 @@ export class AgentsTranscriptPane {
       this.#status = undefined;
       this.#loading = false;
       this.#failed = false;
-      this.#rendered = undefined;
-      this.#renderedDocument = undefined;
+      this.#clearRendered();
       return;
     }
     const status = source.getStatus();
@@ -202,8 +251,7 @@ export class AgentsTranscriptPane {
     this.#failed = false;
     if (!sameSource) {
       this.#document = undefined;
-      this.#rendered = undefined;
-      this.#renderedDocument = undefined;
+      this.#clearRendered();
     }
     const token = ++this.#loadToken;
     const selectedKey = run?.key;
@@ -234,37 +282,59 @@ export class AgentsTranscriptPane {
     }
   }
 
+  #clearRendered(): void {
+    this.#rendered = undefined;
+    this.#renderedDocument = undefined;
+    this.#renderedView = undefined;
+  }
+
   #renderFallback(run: AgentsOverlayRun, width: number, height: number): string[] {
     return this.#viewport.render(
-      this.#fallbackBlocks(
-        run,
-        width,
-        0,
-        this.#failed
-          ? "Transcript storage is unavailable. Showing the retained Agent Run view."
-          : undefined,
-      ),
+      this.#fallbackBlocks(run, width, 0, {
+        ...(this.#failed
+          ? { warning: "Transcript storage is unavailable. Showing the retained Agent Run view." }
+          : {}),
+        showTechnicalDetails: this.#view === "details",
+      }),
       height,
     );
+  }
+
+  #registryMetadataBlocks(run: AgentsOverlayRun, width: number): AgentRunBlock[] {
+    if (this.#view !== "details") return [];
+    const status = run.result?.failureCode
+      ? `${run.status} (${run.result.failureCode})`
+      : run.status;
+    const details = [
+      `Registry status: ${status}`,
+      `Runtime totals: ${run.turns} turns · ${run.toolUses} tool uses${
+        run.usage ? ` · ${run.usage.totalTokens.toLocaleString("en-US")} tokens` : ""
+      }`,
+    ];
+    return details.map((text, index) => ({
+      key: index - details.length,
+      lines: new Text(text, 0, 0).render(width),
+    }));
   }
 
   #fallbackBlocks(
     run: AgentsOverlayRun,
     width: number,
     keyOffset: number,
-    warning?: string,
+    options: { warning?: string; showTechnicalDetails?: boolean } = {},
   ): AgentRunBlock[] {
-    const blocks = fallbackMetadata(run, warning).map((line, index) => ({
-      key: keyOffset + index,
-      lines: new Text(line, 0, 0).render(width),
-    }));
+    const metadata = options.showTechnicalDetails ? fallbackMetadata(run) : [];
+    const blocks = [...(options.warning ? [options.warning] : []), ...metadata].map(
+      (line, index) => ({
+        key: keyOffset + index,
+        lines: new Text(line, 0, 0).render(width),
+      }),
+    );
     for (const entry of run.conversation?.entries ?? []) {
       const line =
-        entry.kind === "assistant"
-          ? `assistant: ${entry.text}`
-          : entry.kind === "steering"
-            ? `steering: ${entry.text}`
-            : `${entry.toolName}: ${entry.summary ?? entry.status}`;
+        entry.kind === "assistant" || entry.kind === "steering"
+          ? entry.text
+          : `${entry.toolName}: ${entry.summary ?? entry.status}`;
       blocks.push({
         key: keyOffset + blocks.length,
         lines: new Text(line, 1, 0).render(width),
@@ -284,9 +354,8 @@ export class AgentsTranscriptPane {
   }
 }
 
-function fallbackMetadata(run: AgentsOverlayRun, warning?: string): string[] {
+function fallbackMetadata(run: AgentsOverlayRun): string[] {
   const metadata = [
-    ...(warning ? [warning] : []),
     `${run.taskId} · ${run.kind}: ${run.label} · ${run.result?.failureCode ? `${run.status} (${run.result.failureCode})` : run.status}`,
     `Model: ${run.modelId} · thinking ${run.thinkingLevel}`,
     `${run.turns} turns · ${run.toolUses} tool uses${run.usage ? ` · ${run.usage.totalTokens.toLocaleString("en-US")} tokens` : ""}`,

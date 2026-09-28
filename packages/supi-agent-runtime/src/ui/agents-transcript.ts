@@ -47,6 +47,7 @@ export interface RenderAgentRunTranscriptOptions {
   readonly tui: { requestRender: () => void };
   readonly expanded: boolean;
   readonly thinkingHidden: boolean;
+  readonly view: "conversation" | "details";
   readonly previous?: AgentTranscriptRenderResult;
 }
 
@@ -70,15 +71,17 @@ export function renderAgentRunTranscript(
   options: RenderAgentRunTranscriptOptions,
 ): AgentTranscriptRenderResult {
   const context = createRenderContext(options);
-  addItem(context, renderTranscriptMetadata(options.document, options.theme));
-  for (const prompt of options.document.systemPromptHistory) {
-    addItem(context, renderSystemPrompt(prompt, options.theme));
-  }
-  if (options.document.operations.length > 0) {
-    addItem(context, renderTranscriptOperations(options.document.operations, options.theme));
+  if (options.view === "details") {
+    addItem(context, renderTranscriptMetadata(options.document, options.theme));
+    for (const prompt of options.document.systemPromptHistory) {
+      addItem(context, renderSystemPrompt(prompt, options.theme));
+    }
+    if (options.document.operations.length > 0) {
+      addItem(context, renderTranscriptOperations(options.document.operations, options.theme));
+    }
   }
   for (const message of options.document.messages) {
-    appendMessage(context, message, context.messageIndex++);
+    appendMessage(context, message, context.messageIndex++, options.view === "details");
   }
   return {
     items: context.items,
@@ -137,32 +140,37 @@ function appendMessage(
   context: TranscriptRenderContext,
   message: AgentRunMessage,
   messageIndex: number,
+  showTechnicalDetails: boolean,
 ): void {
-  const timestamp =
-    typeof message.timestamp === "number" ? new Date(message.timestamp).toLocaleTimeString() : "";
-  addItem(
-    context,
-    new Text(
-      context.theme.fg("accent", `${message.role}${timestamp ? ` · ${timestamp}` : ""}`),
-      0,
-      0,
-    ),
-  );
+  const pairedToolResult =
+    message.role === "toolResult" &&
+    typeof message.toolCallId === "string" &&
+    context.renderedResults.has(message.toolCallId);
+  if (showTechnicalDetails && !pairedToolResult) addMessageHeader(context, message);
   if (message.role === "assistant") {
-    appendAssistantMessage(context, message, messageIndex);
+    appendAssistantMessage(context, message, messageIndex, showTechnicalDetails);
   } else if (message.role === "user") {
     appendUserMessage(context, message);
   } else if (message.role === "toolResult") {
-    appendToolResult(context, message);
+    appendToolResult(context, message, showTechnicalDetails);
   } else {
     addItem(context, new Text(formatMessage(message), 1, 0));
   }
+}
+
+function addMessageHeader(context: TranscriptRenderContext, message: AgentRunMessage): void {
+  const timestamp =
+    typeof message.timestamp === "number" && Number.isFinite(message.timestamp)
+      ? ` · ${new Date(message.timestamp).toLocaleTimeString()}`
+      : "";
+  addItem(context, new Text(context.theme.fg("dim", `${message.role}${timestamp}`), 0, 0));
 }
 
 function appendAssistantMessage(
   context: TranscriptRenderContext,
   message: AgentRunMessage,
   messageIndex: number,
+  showTechnicalDetails: boolean,
 ): void {
   if (!Array.isArray(message.content)) {
     addItem(context, new Text(formatMessage(message), 1, 0));
@@ -183,16 +191,18 @@ function appendAssistantMessage(
   context.assistantMessages.push(assistant);
   addItem(context, assistant, true);
   for (const part of message.content) {
-    if (isToolCall(part)) appendToolCall(context, part);
+    if (isToolCall(part)) appendToolCall(context, part, showTechnicalDetails);
   }
 }
 
 function appendToolCall(
   context: TranscriptRenderContext,
   part: { type: "toolCall"; id: string; name: string; arguments: unknown },
+  showTechnicalDetails: boolean,
 ): void {
   const result = context.results.get(part.id);
   if (result) context.renderedResults.add(part.id);
+  if (showTechnicalDetails && result) addMessageHeader(context, result);
   const existing = context.previous?.toolCallsById.get(part.id);
   const tool =
     existing ??
@@ -223,7 +233,7 @@ function appendToolCall(
   const activeRaw = context.rawPayloadsById.get(rawKey);
   if (!activeRaw) throw new Error("Raw tool payload was not created.");
   context.rawPayloads.push(activeRaw);
-  addItem(context, activeRaw, true);
+  if (showTechnicalDetails) addItem(context, activeRaw, true);
 }
 
 function appendUserMessage(context: TranscriptRenderContext, message: AgentRunMessage): void {
@@ -241,7 +251,11 @@ function appendUserMessage(context: TranscriptRenderContext, message: AgentRunMe
   }
 }
 
-function appendToolResult(context: TranscriptRenderContext, message: AgentRunMessage): void {
+function appendToolResult(
+  context: TranscriptRenderContext,
+  message: AgentRunMessage,
+  showTechnicalDetails: boolean,
+): void {
   if (typeof message.toolCallId !== "string" || context.renderedResults.has(message.toolCallId)) {
     return;
   }
@@ -275,7 +289,7 @@ function appendToolResult(context: TranscriptRenderContext, message: AgentRunMes
   const activeRaw = context.rawPayloadsById.get(rawKey);
   if (!activeRaw) throw new Error("Raw tool payload was not created.");
   context.rawPayloads.push(activeRaw);
-  addItem(context, activeRaw, true);
+  if (showTechnicalDetails) addItem(context, activeRaw, true);
 }
 
 function addItem(

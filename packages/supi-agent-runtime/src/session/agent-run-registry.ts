@@ -32,6 +32,7 @@ interface RegisteredRun {
   readonly acceptedSteering: string[];
   live?: LiveRun;
   status: AgentRunRegistryRun["status"];
+  finishedAt?: number;
   turns: number;
   toolUses: number;
   usage?: AgentRunRegistryRun["usage"];
@@ -273,6 +274,7 @@ export class AgentRunRegistry {
       batchId: run.batchId,
       active: isActive(run.status),
       status: run.status,
+      ...(run.finishedAt === undefined ? {} : { finishedAt: run.finishedAt }),
       steeringAvailable: run.status === "running" && (live?.handle.steeringAvailable ?? false),
       turns: run.turns,
       toolUses: run.toolUses,
@@ -311,6 +313,7 @@ export class AgentRunRegistry {
     failureCode?: string,
   ): void {
     run.status = status;
+    run.finishedAt = Date.now();
     run.usage = usage ?? run.usage;
     if (failureCode) run.result = { ...run.result, failureCode };
     if (run.live) {

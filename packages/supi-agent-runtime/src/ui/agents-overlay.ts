@@ -3,6 +3,7 @@ import {
   Container,
   type Focusable,
   Key,
+  type KeyId,
   matchesKey,
   type TuiMouseEvent,
   type TuiMouseEventResult,
@@ -23,7 +24,10 @@ import {
 import { AgentsRunViewer, type AgentsRunViewerAction } from "./agents-run-viewer.ts";
 import { AgentsSteeringInput } from "./agents-steering-input.ts";
 
-type AgentsTab = "runs" | "profiles" | "diagnostics";
+type AgentsTab = "agents" | "reviews" | "profiles" | "diagnostics";
+
+const AGENTS_TITLE = "Agents";
+const CATALOGUE_HINT = "tab/←→ sections · ↑↓ select · esc close";
 
 /** TUI-only Agent Run inspector and selected-run controller. */
 export class AgentsDialog implements Focusable {
@@ -39,14 +43,22 @@ export class AgentsDialog implements Focusable {
   #steeringInput: AgentsSteeringInput | undefined;
   #focused = false;
   #unsubscribe: (() => void) | undefined;
+  #elapsedInterval: ReturnType<typeof setInterval> | undefined;
   readonly #runViewer: AgentsRunViewer;
 
   constructor(
     private data: AgentsOverlayData,
     private readonly dependencies: AgentsDialogDependencies,
   ) {
-    this.#runViewer = new AgentsRunViewer(data, dependencies.theme, () => this.#changed());
+    this.#runViewer = new AgentsRunViewer(
+      data,
+      dependencies.theme,
+      () => this.#changed(),
+      dependencies.keybindings,
+    );
+    this.#runViewer.setSection("agents");
     this.#unsubscribe = dependencies.subscribe?.((next) => this.updateData(next));
+    this.#updateElapsedTimer();
   }
 
   /** Implement Pi's Focusable contract for the embedded steering input. */
@@ -58,6 +70,7 @@ export class AgentsDialog implements Focusable {
     if (this.#focused === value) return;
     this.#focused = value;
     if (this.#steeringInput) this.#steeringInput.focused = value;
+    this.#runViewer.focused = value;
     this.#changed();
   }
 
@@ -70,11 +83,11 @@ export class AgentsDialog implements Focusable {
       return this.#cachedLines;
     }
     this.#cachedLines =
-      this.#tab() === "runs"
+      this.#tab() === "agents" || this.#tab() === "reviews"
         ? this.#runViewer.render({
             width,
             height,
-            header: this.#header(),
+            header: AGENTS_TITLE,
             tabs: this.#tabs(),
             notice: this.#notice,
             steeringLines: this.#steeringLines(width),
@@ -93,15 +106,23 @@ export class AgentsDialog implements Focusable {
       this.#handleStopConfirmation(data);
       return;
     }
-    if (this.#handleCloseInput(data) || this.#handleRunInput(data) || this.#handleTabInput(data)) {
+    if (this.#runViewer.isList && this.#handleTabInput(data, false)) return;
+    if (this.#tab() === "agents" || this.#tab() === "reviews") {
+      this.#handleRunInput(data);
       return;
     }
+    if (this.#handleCloseInput(data) || this.#handleTabInput(data)) return;
     this.#handleCatalogueInput(data);
   }
 
   /** Route fullscreen mouse input to the run and transcript panes. */
   handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
-    if (this.#tab() !== "runs" || this.#steeringInput || this.#stopConfirmKey) return undefined;
+    if (
+      (this.#tab() !== "agents" && this.#tab() !== "reviews") ||
+      this.#steeringInput ||
+      this.#stopConfirmKey
+    )
+      return undefined;
     return this.#runViewer.handleMouse(event);
   }
 
@@ -109,6 +130,7 @@ export class AgentsDialog implements Focusable {
   updateData(data: AgentsOverlayData): void {
     this.data = data;
     this.#runViewer.updateData(data);
+    this.#updateElapsedTimer();
     this.#diagnosticIndex = Math.min(
       this.#diagnosticIndex,
       Math.max(0, (data.profilePages?.diagnostics.length ?? 0) - 1),
@@ -125,6 +147,8 @@ export class AgentsDialog implements Focusable {
   dispose(): void {
     this.#unsubscribe?.();
     this.#unsubscribe = undefined;
+    if (this.#elapsedInterval) clearInterval(this.#elapsedInterval);
+    this.#elapsedInterval = undefined;
     this.#runViewer.dispose();
     this.#clearSteering();
   }
@@ -139,13 +163,13 @@ export class AgentsDialog implements Focusable {
     const theme = this.dependencies.theme;
     const header =
       height <= 3
-        ? [this.#line(`${this.#header()}  ${this.#tabs()}`, width)]
+        ? [this.#line(`${AGENTS_TITLE}  ${this.#tabs()}`, width)]
         : [
-            this.#line(this.#header(), width),
+            this.#line(AGENTS_TITLE, width),
             this.#line(this.#tabs(), width),
             ...new DynamicBorder((text: string) => theme.fg("accent", text)).render(width),
           ];
-    const footer = this.#hints().map((hint) => centerLegend(theme.fg("dim", hint), width));
+    const footer = [CATALOGUE_HINT].map((hint) => centerLegend(theme.fg("dim", hint), width));
     const bodyHeight = Math.max(0, height - header.length - footer.length);
     const body = new Container();
     if (this.#tab() === "profiles") {
@@ -164,6 +188,10 @@ export class AgentsDialog implements Focusable {
   #handleRunViewerAction(action: AgentsRunViewerAction | undefined): boolean {
     if (action === "handled") {
       this.#changed();
+      return true;
+    }
+    if (action === "close") {
+      this.dependencies.done();
       return true;
     }
     const run = this.#runViewer.selectedRun;
@@ -191,33 +219,40 @@ export class AgentsDialog implements Focusable {
   }
 
   #handleCloseInput(data: string): boolean {
-    if (!matchesKey(data, Key.escape) && !matchesKey(data, Key.ctrl("c"))) return false;
+    const interrupted = this.#matches(data, "app.interrupt", Key.escape);
+    const canceled = this.#matches(data, "tui.select.cancel", Key.ctrl("c"));
+    if (!interrupted && !canceled) return false;
     this.dependencies.done();
     return true;
   }
 
   #handleRunInput(data: string): boolean {
-    if (this.#tab() !== "runs") return false;
+    if (this.#tab() !== "agents" && this.#tab() !== "reviews") return false;
     const action = this.#runViewer.handleInput(data, !this.#busy);
     return this.#handleRunViewerAction(action);
   }
 
-  #handleTabInput(data: string): boolean {
-    if (matchesKey(data, Key.tab) || matchesKey(data, Key.right)) {
+  #handleTabInput(data: string, allowArrows = true): boolean {
+    if (matchesKey(data, Key.tab) || (allowArrows && matchesKey(data, Key.right))) {
       this.#tabIndex = (this.#tabIndex + 1) % this.#tabsList().length;
-    } else if (matchesKey(data, Key.left) || matchesKey(data, Key.shift("tab"))) {
+    } else if (matchesKey(data, Key.shift("tab")) || (allowArrows && matchesKey(data, Key.left))) {
       this.#tabIndex = (this.#tabIndex + this.#tabsList().length - 1) % this.#tabsList().length;
     } else {
       return false;
+    }
+    if (this.#runViewer.isList) {
+      this.#runViewer.setSection(this.#tab() === "reviews" ? "reviews" : "agents");
     }
     this.#changed();
     return true;
   }
 
   #handleCatalogueInput(data: string): void {
-    if (this.#tab() === "runs") return;
-    if (matchesKey(data, Key.up) || data === "k") this.#moveCatalogueSelection(-1);
-    else if (matchesKey(data, Key.down) || data === "j") this.#moveCatalogueSelection(1);
+    if (this.#matches(data, "tui.select.up", Key.up)) {
+      this.#moveCatalogueSelection(-1);
+    } else if (this.#matches(data, "tui.select.down", Key.down)) {
+      this.#moveCatalogueSelection(1);
+    }
   }
 
   #moveCatalogueSelection(delta: number): void {
@@ -254,13 +289,13 @@ export class AgentsDialog implements Focusable {
   }
 
   #handleStopConfirmation(data: string): void {
-    if (matchesKey(data, Key.escape)) {
+    if (this.#matches(data, "app.interrupt", Key.escape)) {
       this.#stopConfirmKey = undefined;
       this.#notice = "Stop canceled.";
       this.#changed();
       return;
     }
-    if (!matchesKey(data, Key.enter) && data.toLowerCase() !== "y") return;
+    if (!this.#matches(data, "tui.select.confirm", Key.enter) && data.toLowerCase() !== "y") return;
     const runKey = this.#stopConfirmKey;
     this.#stopConfirmKey = undefined;
     if (runKey) this.#runControl("Stopping selected run…", () => this.dependencies.onStop(runKey));
@@ -306,40 +341,47 @@ export class AgentsDialog implements Focusable {
       });
   }
 
-  #hints(): string[] {
-    return ["tab/←→ sections · ↑↓ select · esc close"];
-  }
-
-  #header(): string {
-    return `Agents  ${this.data.runs.filter((run) => run.active).length} active`;
-  }
-
   #tabs(): string {
     return this.#tabsList()
       .map((tab, index) => {
-        const selected = index === this.#tabIndex;
-        const count =
-          tab === "runs"
-            ? this.data.runs.length
-            : tab === "profiles"
-              ? (this.data.profilePages?.profiles.length ?? 0)
-              : (this.data.profilePages?.diagnostics.length ?? 0);
-        const value = `${title(tab)} ${count}`;
-        return selected ? `[${value}]` : value;
+        const value = title(tab);
+        return index === this.#tabIndex ? `[${value}]` : value;
       })
       .join(this.dependencies.theme.fg("dim", "  "));
   }
 
   #tabsList(): AgentsTab[] {
-    return this.data.profilePages ? ["runs", "profiles", "diagnostics"] : ["runs"];
+    return this.data.profilePages
+      ? ["agents", "reviews", "profiles", "diagnostics"]
+      : ["agents", "reviews"];
   }
 
   #tab(): AgentsTab {
-    return this.#tabsList()[this.#tabIndex] ?? "runs";
+    return this.#tabsList()[this.#tabIndex] ?? "agents";
+  }
+
+  #matches(
+    data: string,
+    action: Parameters<NonNullable<AgentsDialogDependencies["keybindings"]>["matches"]>[1],
+    fallback: KeyId,
+  ): boolean {
+    return typeof this.dependencies.keybindings?.matches === "function"
+      ? this.dependencies.keybindings.matches(data, action)
+      : matchesKey(data, fallback);
   }
 
   #line(text: string, width: number): string {
     return truncateToWidth(` ${text}`, width);
+  }
+
+  #updateElapsedTimer(): void {
+    if (!this.data.runs.some((run) => run.active)) {
+      clearInterval(this.#elapsedInterval);
+      this.#elapsedInterval = undefined;
+    } else if (!this.#elapsedInterval) {
+      this.#elapsedInterval = setInterval(() => this.#runViewer.refreshElapsed(), 1_000);
+      this.#elapsedInterval.unref?.();
+    }
   }
 
   #changed(): void {

@@ -8,7 +8,7 @@ vi.mock("../../src/tool/review_run/child-session.ts", () => ({
   runIsolatedChild: mocks.runIsolatedChild,
 }));
 
-import type { AgentRunSessionView } from "@mrclrchtr/supi-agent-runtime/api";
+import type { AgentRunRegistry, AgentRunSessionView } from "@mrclrchtr/supi-agent-runtime/api";
 import { runReviewer } from "../../src/tool/review_run/runner.ts";
 import type { ReviewModelSelection, ReviewSnapshot } from "../../src/types.ts";
 
@@ -78,6 +78,66 @@ describe("runReviewer", () => {
     packetHash: "c".repeat(64),
     model,
   };
+
+  it("sends caller-owned target and finding data to the shared registry", async () => {
+    const setDisplayResult = vi.fn();
+    const registry = { setDisplayResult } as unknown as AgentRunRegistry;
+    const submission = {
+      summary: "Found one issue.",
+      findings: [
+        {
+          title: "Unsafe path handling",
+          description: "The path is not validated.",
+          blocksAcceptance: true,
+          impact: "high" as const,
+          effort: "small" as const,
+          confidence: 0.99,
+        },
+      ],
+      criteriaCoverage: { status: "complete" as const },
+    };
+    mocks.runIsolatedChild.mockImplementationOnce(async (config) => {
+      const outcome = { kind: "success" as const, value: submission };
+      const displayResult = config.displayResult?.(outcome);
+      if (displayResult)
+        config.registry?.setDisplayResult(config.runDisplay?.runKey ?? "", displayResult);
+      return outcome;
+    });
+
+    await runReviewer({ ...invocation, registry });
+
+    const runDisplay = mocks.runIsolatedChild.mock.calls[0]?.[0].runDisplay;
+    expect(runDisplay).toMatchObject({ display: { target: "Filesystem changes" } });
+    expect(setDisplayResult).toHaveBeenCalledWith(runDisplay?.runKey, {
+      finalText: "Found one issue.",
+      display: {
+        target: "Filesystem changes",
+        verdict: "issues",
+        findingCount: 1,
+        blockingFindingCount: 1,
+      },
+    });
+  });
+
+  it("sends reviewer failure codes to the shared registry", async () => {
+    const setDisplayResult = vi.fn();
+    const registry = { setDisplayResult } as unknown as AgentRunRegistry;
+    mocks.runIsolatedChild.mockImplementationOnce(async (config) => {
+      const outcome = { kind: "failed" as const, failureCode: "prompt-rejected" };
+      const displayResult = config.displayResult?.(outcome);
+      if (displayResult) {
+        config.registry?.setDisplayResult(config.runDisplay?.runKey ?? "", displayResult);
+      }
+      return outcome;
+    });
+
+    await runReviewer({ ...invocation, registry });
+
+    const runDisplay = mocks.runIsolatedChild.mock.calls[0]?.[0].runDisplay;
+    expect(setDisplayResult).toHaveBeenCalledWith(runDisplay?.runKey, {
+      failureCode: "prompt-rejected",
+    });
+  });
 
   it("forwards runtime progress to the review adapter", async () => {
     const onProgress = vi.fn();

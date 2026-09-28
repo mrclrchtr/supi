@@ -34,6 +34,10 @@ export class RawToolPayload implements Component {
     this.#lines = formatTranscriptValue(payload);
   }
 
+  get isExpanded(): boolean {
+    return this.#expanded;
+  }
+
   setExpanded(expanded: boolean): void {
     this.#expanded = expanded;
   }
@@ -44,7 +48,9 @@ export class RawToolPayload implements Component {
 
   render(width: number): string[] {
     if (!this.#expanded) {
-      return [this.theme.fg("dim", "  Raw tool input/result hidden · click or press e to expand")];
+      return [
+        this.theme.fg("dim", "  Raw tool input/result hidden · use the tool details control"),
+      ];
     }
     const container = new Container();
     container.addChild(new Text(this.theme.fg("muted", "  Raw tool input/result"), 0, 0));

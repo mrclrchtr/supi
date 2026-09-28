@@ -133,13 +133,14 @@ async function showAgentsViewer(
   });
   try {
     await ctx.ui.custom<void>(
-      (tui, theme, _keybindings, done) => {
+      (tui, theme, keybindings, done) => {
         closeOverlay = () => done(undefined);
         return new AgentsDialog(
           buildOverlayData(state.registry.snapshot(), profilePagesFor(state)),
           {
             theme,
             tui,
+            keybindings,
             done: () => done(undefined),
             onSteer: (runKey, message) => state.registry.steer(runKey, message),
             onStop: (runKey) => state.registry.stop(runKey),

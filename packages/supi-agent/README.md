@@ -27,20 +27,19 @@ The `agent_run` transcript row shows the effective model of a Delegation Task as
 
 ## `/agents`
 
-Use `/agents` in TUI mode to inspect Agent and Reviewer runs in the current session. When this package is loaded, the viewer also shows effective Agent Profiles and bounded Profile Diagnostics. The Runs view keeps the bounded Conversation View separate from the full human-only transcript. It shows status, model, thinking level, turns, tool uses, Usage, safe tool activity, steering, assistant text, and retention notices. Transcript messages stay outside parent tool results.
+Use `/agents` in TUI mode to inspect Agent and Reviewer runs in the current session. When this package is loaded, the viewer also shows effective Agent Profiles and bounded Profile Diagnostics. The viewer keeps the bounded Conversation View separate from the full human-only transcript. It shows status, model, thinking level, turns, tool uses, Usage, safe tool activity, steering, assistant text, and retention notices. Transcript messages stay outside parent tool results.
 
-- Use Tab, Shift+Tab, or Left/Right to change sections.
-- Use Up/Down to select a run, profile, or diagnostic.
-- At terminal widths of 100 columns or more, the Runs view shows a run list and transcript side by side. On narrower terminals, use Left to open the run list, Up/Down to select a run, and Enter or Right to open its transcript.
-- The viewer uses the full terminal. The run list and controls stay visible while the transcript scrolls. Mouse-wheel input scrolls the transcript or selects a run.
-- The viewer follows new transcript output by default (`LIVE`). Use Page Up/Page Down to scroll through wrapped lines. Page Up pauses auto-scroll (`PAUSED`); live updates keep the reading position. The status shows how many lines are below the view, not an unread count.
-- Press Home to read task metadata and earlier output. Press End to resume auto-scroll. Page Down also resumes auto-scroll when it reaches the end.
-- Press `f` to pause or resume auto-scroll. Selecting a different run resumes auto-scroll.
-- Press `t` or Ctrl+T to hide or show thinking. Press `o` or Ctrl+O to show or hide tool input and output. The Ctrl shortcuts match PI defaults. You can also click a raw tool block to show or hide its input and output. These shortcuts do not apply while you enter a steering message.
+- Type in the run list to search. Use Up and Down to select a run, Profile, or diagnostic.
+- In the run list, use Tab or Shift+Tab to switch between Agent and Reviewer runs. Use Enter to open a run.
+- The selected run fills the viewer. The viewer does not use a split pane. Use Esc to return to the run list. Press Esc again to close the viewer.
+- In an open run, use Tab to switch between Conversation and Details. Details shows run metadata, role and time headers, system prompts, run events, and technical tool data.
+- The viewer follows new transcript output by default (`LIVE`). Use Page Up and Page Down to scroll through wrapped lines. Page Up pauses auto-scroll (`PAUSED`); live updates keep the reading position. The status shows how many lines are below the view, not an unread count.
+- Use Home to read earlier output. Open Details for task metadata. Use End to resume auto-scroll. Page Down also resumes auto-scroll when it reaches the end.
+- Use the configured Pi thinking and tool-detail shortcuts (Ctrl+T and Ctrl+O by default). In Details, click a raw tool block to show or hide its input and output. These keys do not apply while you enter a steering message.
 - The bounded Conversation View can omit old entries. The runtime-owned human-only transcript keeps captured messages for Agent and Reviewer runs until the containing session ends. Its retention does not depend on Review audit settings.
-- Press `s` to steer the selected running Agent Run. A text field opens inside the overlay; press Enter to send or Esc to cancel.
-- Press `x` to request a stop for the selected starting or running Agent or Reviewer Run, then press Enter or `y` to confirm. A startup stop can wait for PI setup to finish. Stopping one Reviewer Run does not stop its sibling tasks.
-- Press Esc to close the viewer. This does not stop Agent Runs. PI's normal outer-tool cancellation still stops the full Delegation Batch.
+- Use `s` to steer the selected run when steering is available. A text field opens inside the viewer. Press Enter to send or Esc to cancel.
+- Use `x` to request a stop for a starting or running Agent or Reviewer Run. Press Enter or `y` to confirm. A startup stop can wait for PI setup to finish. Stopping one Reviewer Run does not stop its sibling tasks.
+- Mouse-wheel input scrolls the transcript or selects a run. Closing the viewer does not stop Agent Runs. PI's normal outer-tool cancellation still stops the full Delegation Batch.
 
 Transcript files are temporary JSONL files in a private directory for the parent session. They have no application cap or restart recovery. A storage failure marks capture incomplete but does not stop a run. The viewer shows the available transcript and the incomplete status. Session shutdown removes the directory.
 

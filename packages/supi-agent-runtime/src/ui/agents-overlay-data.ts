@@ -1,5 +1,5 @@
 import type { ModelThinkingLevel, Usage } from "@earendil-works/pi-ai";
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import type { KeybindingsManager, Theme } from "@earendil-works/pi-coding-agent";
 import type {
   AgentRunDisplayConversation,
   AgentRunRegistryRun,
@@ -71,6 +71,7 @@ export interface AgentsDialogDependencies {
   readonly theme: Theme;
   readonly done: () => void;
   readonly tui: { requestRender: () => void; terminal: { rows: number } };
+  readonly keybindings?: Pick<KeybindingsManager, "getKeys" | "matches">;
   readonly onSteer: (runKey: string, message: string) => Promise<AgentOverlayControlResult>;
   readonly onStop: (runKey: string) => Promise<Exclude<AgentOverlayControlResult, "canceled">>;
   readonly subscribe?: (listener: (data: AgentsOverlayData) => void) => () => void;

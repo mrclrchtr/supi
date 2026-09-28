@@ -121,7 +121,12 @@ describe("shared /agents registration", () => {
       await handler("", makeCtx({ mode: "tui", ui: { ...base.ui, custom } }));
 
       if (!overlay) throw new Error("The /agents viewer did not open.");
-      expect(overlay.render(100).join("\n")).toContain("Profiles 1");
+      const text = overlay.render(100).join("\n");
+      expect(text).toContain("No Agent Runs are registered.");
+      expect(text).toContain("[Agents]");
+      expect(text).toContain("Profiles");
+      expect(text).toContain("Diagnostics");
+      expect(text).not.toContain("Profiles 1");
       overlay.dispose?.();
     },
   );

@@ -1,60 +1,107 @@
-import type { Theme } from "@earendil-works/pi-coding-agent";
-import { DynamicBorder } from "@earendil-works/pi-coding-agent";
+import type { KeybindingsManager, Theme } from "@earendil-works/pi-coding-agent";
 import {
+  Input,
   Key,
+  type KeyId,
   matchesKey,
+  type SelectItem,
+  SelectList,
   type TuiMouseEvent,
   type TuiMouseEventResult,
   truncateToWidth,
-  visibleWidth,
 } from "@earendil-works/pi-tui";
 import type { AgentsOverlayData, AgentsOverlayRun } from "./agents-overlay-data.ts";
-import { centerLegend } from "./agents-overlay-render.ts";
+import { orderedRuns, type RunSection, runListItem } from "./agents-run-list.ts";
+import { handleTranscriptNavigation } from "./agents-run-viewer-input.ts";
+import {
+  formatRunConversationHeading,
+  formatRunViewerStatus,
+  renderAgentsRunFooter,
+  renderAgentsRunHeader,
+  renderAgentsRunHints,
+  renderAgentsRunList,
+} from "./agents-run-viewer-render.ts";
 import { AgentsTranscriptPane } from "./agents-transcript-pane.ts";
 
-export type AgentsRunViewerAction = "handled" | "steer" | "stop";
+type AgentsKeybindings = Pick<KeybindingsManager, "getKeys" | "matches">;
+type KeybindingAction = Parameters<KeybindingsManager["matches"]>[1];
+export type AgentsRunViewerAction = "handled" | "steer" | "stop" | "close";
 
-/** Own the adaptive run list, transcript pane, and their navigation. */
+type ViewerPage = "list" | "conversation" | "details";
+
+/** Show a searchable run list and one full-width selected-run view. */
 export class AgentsRunViewer {
   #data: AgentsOverlayData;
-  #runIndex = 0;
-  #narrowPane: "list" | "transcript";
-  #lastWidth = 0;
+  #page: ViewerPage = "list";
+  #section: RunSection = "agents";
+  #selectedKey: string | undefined;
+  #selectedIndex = 0;
+  #visibleRuns: AgentsOverlayRun[] = [];
+  #search = new Input({ prompt: "Search: ", placeholder: "task, label, target, result" });
+  #listMaxVisible = 8;
+  #listPageSize = 1;
+  #selectList: SelectList;
+  #listTop = 0;
+  #listHeight = 0;
   #bodyTop = 0;
   #bodyHeight = 0;
+  #focused = false;
   readonly #transcript: AgentsTranscriptPane;
 
   constructor(
     data: AgentsOverlayData,
     private readonly theme: Theme,
     private readonly onChange: () => void,
+    private readonly keybindings?: AgentsKeybindings,
   ) {
     this.#data = data;
-    this.#narrowPane = data.runs.length > 0 ? "transcript" : "list";
     this.#transcript = new AgentsTranscriptPane(theme, onChange);
-    this.#transcript.select(this.selectedRun);
+    this.#selectList = this.#createSelectList([]);
+    this.#refreshList();
+  }
+
+  get isList(): boolean {
+    return this.#page === "list";
   }
 
   get selectedRun(): AgentsOverlayRun | undefined {
-    return this.#data.runs[this.#runIndex];
+    return this.#selectedKey
+      ? this.#data.runs.find((run) => run.key === this.#selectedKey)
+      : this.#visibleRuns[this.#selectedIndex];
   }
 
-  /** Replace run data while keeping the selected run when it is still present. */
+  /** Show only the selected caller-facing section. */
+  setSection(section: RunSection): void {
+    if (this.#section === section) return;
+    this.#section = section;
+    this.#refreshList();
+    this.onChange();
+  }
+
+  set focused(value: boolean) {
+    this.#focused = value;
+    this.#search.focused = value && this.#page === "list";
+  }
+
+  /** Rebuild elapsed descriptions without changing the current selection. */
+  refreshElapsed(): void {
+    const pinnedKey = this.#page === "list" ? undefined : this.selectedRun?.key;
+    this.#refreshList(pinnedKey);
+    this.onChange();
+  }
+
+  /** Replace live data and keep an opened run selected until list return or removal. */
   updateData(data: AgentsOverlayData): void {
     const selectedKey = this.selectedRun?.key;
     this.#data = data;
-    const nextIndex = selectedKey ? data.runs.findIndex((run) => run.key === selectedKey) : -1;
-    this.#runIndex =
-      nextIndex >= 0 ? nextIndex : Math.min(this.#runIndex, Math.max(0, data.runs.length - 1));
-    const selectedRun = this.selectedRun;
-    if (!selectedRun) {
-      this.#narrowPane = "list";
-      this.#transcript.select(undefined);
-    } else if (selectedRun.key !== selectedKey) {
-      this.#narrowPane = "transcript";
-      this.#transcript.select(selectedRun);
-    } else {
-      this.#transcript.update(selectedRun);
+    const pinnedKey =
+      this.#page !== "list" && selectedKey && data.runs.some((run) => run.key === selectedKey)
+        ? selectedKey
+        : undefined;
+    this.#refreshList(pinnedKey);
+    if (this.#page !== "list") {
+      if (this.selectedRun?.key !== selectedKey) this.#transcript.select(this.selectedRun);
+      else this.#transcript.update(this.selectedRun);
     }
   }
 
@@ -70,92 +117,101 @@ export class AgentsRunViewer {
   }): string[] {
     const { width, height, header, tabs, notice, steeringLines, steeringActive, stopConfirmation } =
       options;
-    this.#lastWidth = width;
-    if (height === 1 && steeringActive) {
-      return [steeringLines.at(-1) ?? this.#line(header, width)];
+    if (steeringActive && height <= 4) {
+      const content = [
+        ...steeringLines,
+        ...(notice ? [this.#line(this.theme.fg("warning", notice), width)] : []),
+      ].slice(-height);
+      while (content.length < height) content.unshift("");
+      return content.map((line) => truncateToWidth(line, width));
     }
-    const border = new DynamicBorder((text: string) => this.theme.fg("accent", text)).render(width);
-    const compactHeader = height <= 5 || steeringActive;
-    const headerLines = compactHeader
-      ? [this.#line(`${header}  ${tabs}`, width)]
-      : [this.#line(header, width), this.#line(tabs, width), ...border];
-    const status = this.#line(this.#viewStatus(), width);
-    const footerContent = steeringActive
-      ? [...steeringLines, ...(notice ? [this.#line(this.theme.fg("warning", notice), width)] : [])]
-      : [
-          ...this.hints(stopConfirmation).map((hint) =>
-            centerLegend(this.theme.fg("dim", hint), width),
-          ),
-          ...(notice ? [this.#line(this.theme.fg("warning", notice), width)] : []),
-          status,
-        ];
-    const footerRows = Math.min(footerContent.length, Math.max(0, height - headerLines.length));
+
+    const headerLines = renderAgentsRunHeader({
+      theme: this.theme,
+      header,
+      tabs,
+      width,
+      height,
+      steeringActive,
+    });
+    const pageHeading =
+      this.#page === "list"
+        ? []
+        : [
+            this.#line(
+              formatRunConversationHeading(this.selectedRun, this.#transcript.isIncomplete),
+              width,
+            ),
+          ];
+    const footerContent = renderAgentsRunFooter({
+      theme: this.theme,
+      hints: renderAgentsRunHints({
+        stopConfirmation,
+        page: this.#page,
+        height,
+        run: this.selectedRun,
+        theme: this.theme,
+        keybindings: this.keybindings,
+      }),
+      notice,
+      status:
+        this.#page === "list"
+          ? undefined
+          : formatRunViewerStatus({
+              run: this.selectedRun,
+              transcriptStatus: this.#transcript.status,
+              transcriptIncomplete: this.#transcript.isIncomplete,
+            }),
+      steeringLines,
+      steeringActive,
+      width,
+    });
+    this.#bodyTop = headerLines.length + pageHeading.length;
+    const footerRows = Math.min(footerContent.length, Math.max(0, height - this.#bodyTop));
+    // The tail keeps status and notice rows before optional hints when height is low.
     const footer = footerContent.slice(footerContent.length - footerRows);
-    this.#bodyTop = headerLines.length;
-    this.#bodyHeight = Math.max(0, height - headerLines.length - footer.length);
-    const body = this.#isWide(width)
-      ? this.#renderSplitPane(width, this.#bodyHeight)
-      : this.#renderNarrowPane(width, this.#bodyHeight);
-    const lines = [...headerLines, ...body.slice(0, this.#bodyHeight), ...footer].slice(0, height);
+    this.#bodyHeight = Math.max(0, height - this.#bodyTop - footer.length);
+
+    if (this.#page !== "list") {
+      this.#transcript.setBounds({ top: this.#bodyTop, height: this.#bodyHeight, left: 0, width });
+    }
+    const body =
+      this.#page === "list"
+        ? this.#renderList(width, this.#bodyHeight)
+        : this.#transcript.render(this.selectedRun, width, this.#bodyHeight);
+    const lines = [
+      ...headerLines,
+      ...pageHeading,
+      ...body.slice(0, this.#bodyHeight),
+      ...footer,
+    ].slice(0, height);
     while (lines.length < height) lines.push("");
     return lines.map((line) => truncateToWidth(line, width));
   }
 
   handleInput(data: string, controlsEnabled: boolean): AgentsRunViewerAction | undefined {
-    if (this.#handleNarrowInput(data) || this.#handleSelectionInput(data)) return "handled";
-    if (this.#navigate(data)) return "handled";
-    if (matchesKey(data, "o") || matchesKey(data, Key.ctrl("o"))) {
+    if (this.#page === "list") return this.#handleListInput(data);
+    if (this.#isCancel(data)) {
+      this.#page = "list";
+      this.#transcript.setDetails(false);
+      this.#search.focused = this.#focused;
+      this.#refreshList();
+      return "handled";
+    }
+    if (matchesKey(data, Key.tab)) {
+      this.#page = this.#page === "conversation" ? "details" : "conversation";
+      this.#transcript.setDetails(this.#page === "details");
+      return "handled";
+    }
+    if (this.#handleTranscriptNavigation(data)) return "handled";
+    if (this.#matches(data, "app.tools.expand", Key.ctrl("o"))) {
       this.#transcript.toggleToolDetails();
       return "handled";
     }
-    if (matchesKey(data, "t") || matchesKey(data, Key.ctrl("t"))) {
+    if (this.#matches(data, "app.thinking.toggle", Key.ctrl("t"))) {
       this.#transcript.toggleThinking();
       return "handled";
     }
-    return this.#controlAction(data, controlsEnabled);
-  }
-
-  handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
-    if (event.type === "wheel") return this.#handleWheel(event);
-    if (event.type === "click" && event.button === "left") return this.#handleClick(event);
-    return undefined;
-  }
-
-  #handleNarrowInput(data: string): boolean {
-    if (!this.#isNarrow()) return false;
-    if (this.#narrowPane === "list") {
-      if (!matchesKey(data, Key.enter) && !matchesKey(data, Key.right)) return false;
-      this.#narrowPane = "transcript";
-      return true;
-    }
-    if (matchesKey(data, Key.left)) {
-      this.#narrowPane = "list";
-      return true;
-    }
-    if (matchesKey(data, Key.up) || data === "k") {
-      this.#transcript.scrollBy(-1);
-      return true;
-    }
-    if (matchesKey(data, Key.down) || data === "j") {
-      this.#transcript.scrollBy(1);
-      return true;
-    }
-    return false;
-  }
-
-  #handleSelectionInput(data: string): boolean {
-    if (matchesKey(data, Key.up) || data === "k") {
-      if (!this.#isNarrow() || this.#narrowPane === "list") this.#moveSelection(-1);
-      return true;
-    }
-    if (matchesKey(data, Key.down) || data === "j") {
-      if (!this.#isNarrow() || this.#narrowPane === "list") this.#moveSelection(1);
-      return true;
-    }
-    return false;
-  }
-
-  #controlAction(data: string, controlsEnabled: boolean): AgentsRunViewerAction | undefined {
     const run = this.selectedRun;
     if (!controlsEnabled || !run?.active) return undefined;
     if (data === "s" && run.steeringAvailable) return "steer";
@@ -163,59 +219,34 @@ export class AgentsRunViewer {
     return undefined;
   }
 
-  #handleWheel(event: TuiMouseEvent): TuiMouseEventResult | undefined {
-    if (!this.#insideBody(event)) return undefined;
-    const delta = event.wheelDelta ?? 0;
-    if (this.#isListArea(event.x)) {
-      this.#moveSelection(delta < 0 ? -1 : 1);
-    } else {
-      this.#transcript.scrollBy(delta);
+  handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
+    if (this.#page !== "list") {
+      if (
+        event.type === "wheel" &&
+        event.y >= this.#bodyTop &&
+        event.y < this.#bodyTop + this.#bodyHeight
+      ) {
+        this.#transcript.scrollBy(event.wheelDelta ?? 0);
+        this.onChange();
+        return { handled: true };
+      }
+      return this.#transcript.handleMouse(event);
     }
-    this.onChange();
-    return { handled: true };
-  }
-
-  #handleClick(event: TuiMouseEvent): TuiMouseEventResult | undefined {
-    if (this.#clickRun(event)) {
+    if (event.y < this.#listTop || event.y >= this.#listTop + this.#listHeight) {
+      return undefined;
+    }
+    const result = this.#selectList.handleMouse({ ...event, y: event.y - this.#listTop });
+    if (result?.handled) {
+      const selected = this.#selectList.getSelectedItem();
+      if (selected) this.#selectRun(selected.value);
       this.onChange();
-      return { handled: true };
     }
-    return this.#transcript.handleMouse(event);
-  }
-
-  #isListArea(x: number): boolean {
-    if (this.#isWide()) return x < this.#listWidth(this.#lastWidth);
-    return this.#narrowPane === "list";
-  }
-
-  hints(stopConfirmation: boolean): string[] {
-    if (stopConfirmation) return ["Enter/y confirm stop · Esc cancel"];
-    if (this.#isNarrow() && this.#narrowPane === "list") {
-      return ["↑↓ select · enter view · tab sections · esc close"];
-    }
-    const run = this.selectedRun;
-    const controls = run?.active
-      ? run.status === "running"
-        ? run.steeringAvailable
-          ? "s steer · x stop"
-          : "steering unavailable · x stop"
-        : run.status === "starting"
-          ? "x stop"
-          : "controls unavailable"
-      : "controls unavailable";
-    if (this.#isNarrow()) {
-      return [
-        "← list · ↑↓ scroll · pgup/pgdn · home · end/f live",
-        `o tools · t thinking · ${controls} · tab · esc close`,
-      ];
-    }
-    return [
-      "↑↓ select · pgup/pgdn scroll · home start · end live · f pause/resume",
-      `o tools · t thinking · ${controls} · tab sections · esc close`,
-    ];
+    return result;
   }
 
   invalidate(): void {
+    this.#search.invalidate();
+    this.#selectList.invalidate();
     this.#transcript.invalidate();
   }
 
@@ -223,148 +254,145 @@ export class AgentsRunViewer {
     this.#transcript.dispose();
   }
 
-  #renderSplitPane(width: number, height: number): string[] {
-    const listWidth = this.#listWidth(width);
-    const detailWidth = Math.max(1, width - listWidth - 3);
-    const list = this.#renderRunList(listWidth, height);
-    this.#transcript.setBounds({
-      top: this.#bodyTop,
+  #handleListInput(data: string): AgentsRunViewerAction {
+    if (this.#isCancel(data)) return "close";
+    if (this.#matches(data, "tui.select.confirm", Key.enter)) {
+      this.#openSelectedRun();
+      return "handled";
+    }
+    if (this.#matches(data, "tui.select.up", Key.up)) {
+      this.#moveSelection(-1);
+      return "handled";
+    }
+    if (this.#matches(data, "tui.select.down", Key.down)) {
+      this.#moveSelection(1);
+      return "handled";
+    }
+    if (this.#matches(data, "tui.select.pageUp", Key.pageUp)) {
+      this.#moveSelection(-Math.max(1, this.#listPageSize), false);
+      return "handled";
+    }
+    if (this.#matches(data, "tui.select.pageDown", Key.pageDown)) {
+      this.#moveSelection(Math.max(1, this.#listPageSize), false);
+      return "handled";
+    }
+    this.#search.handleInput(data);
+    this.#refreshList();
+    this.onChange();
+    return "handled";
+  }
+
+  #renderList(width: number, height: number): string[] {
+    const rendered = renderAgentsRunList({
+      theme: this.theme,
+      search: this.#search,
+      getSelectList: (maxVisible) => {
+        if (maxVisible !== this.#listMaxVisible) {
+          this.#listMaxVisible = maxVisible;
+          this.#selectList = this.#createSelectList(
+            this.#visibleRuns.map((run) => runListItem(run)),
+            maxVisible,
+          );
+          if (this.#visibleRuns.length > 0) this.#selectList.setSelectedIndex(this.#selectedIndex);
+        }
+        return this.#selectList;
+      },
+      selectedRun: this.selectedRun,
+      itemCount: this.#visibleRuns.length,
+      emptyMessage:
+        this.#section === "agents" ? "No Agent Runs are registered." : "No Reviews are registered.",
+      width,
       height,
-      left: listWidth + 3,
-      width: detailWidth,
+      bodyTop: this.#bodyTop,
     });
-    const transcript = this.#transcript.render(this.selectedRun, detailWidth, height);
-    const divider = this.theme.fg("dim", "│");
-    return Array.from({ length: height }, (_, index) => {
-      const left = padToWidth(list[index] ?? "", listWidth);
-      return truncateToWidth(`${left} ${divider} ${transcript[index] ?? ""}`, width);
-    });
+    this.#listPageSize = rendered.visibleItemCount;
+    this.#listTop = rendered.listTop;
+    this.#listHeight = rendered.listHeight;
+    return rendered.lines;
   }
 
-  #renderNarrowPane(width: number, height: number): string[] {
-    if (this.#narrowPane === "list") {
-      this.#transcript.setBounds({ top: 0, height: 0, left: 0, width: 0 });
-      return this.#renderRunList(width, height);
-    }
-    this.#transcript.setBounds({ top: this.#bodyTop, height, left: 0, width });
-    return this.#transcript.render(this.selectedRun, width, height);
-  }
-
-  #renderRunList(width: number, height: number): string[] {
-    if (height <= 0) return [];
-    if (this.#data.runs.length === 0) {
-      return [this.#line(this.theme.fg("dim", "No Agent Runs."), width)];
-    }
-    const start = runWindowStart(this.#data.runs.length, this.#runIndex, height);
-    return this.#data.runs.slice(start, start + height).map((run, index) => {
-      const selected = start + index === this.#runIndex;
-      const metrics = `${run.turns} turns · ${run.toolUses} tools`;
-      const scope = run.active ? "active" : "completed";
-      const label = `${selected ? "▶" : " "} ${run.status} · ${run.taskId} (${run.kind}: ${run.label}) · ${metrics} · ${scope}`;
-      return truncateToWidth(
-        selected ? this.theme.fg("accent", label) : this.theme.fg("dim", label),
-        width,
-      );
+  #createSelectList(items: SelectItem[], maxVisible = this.#listMaxVisible): SelectList {
+    const list = new SelectList(items, maxVisible, {
+      selectedPrefix: (text) => this.theme.fg("accent", text),
+      selectedText: (text) => this.theme.fg("accent", text),
+      description: (text) => this.theme.fg("dim", text),
+      scrollInfo: (text) => this.theme.fg("dim", text),
+      noMatch: (text) => this.theme.fg("warning", text),
     });
+    list.onSelectionChange = (item) => this.#selectRun(item.value);
+    list.onSelect = (item) => {
+      this.#selectRun(item.value);
+      this.#openSelectedRun();
+    };
+    return list;
   }
 
-  #viewStatus(): string {
-    const run = this.selectedRun;
-    const omitted = run?.conversation?.omittedEntryCount ?? 0;
-    const retention = omitted > 0 ? this.theme.fg("warning", ` · ${omitted} entries omitted`) : "";
-    const capture = this.#transcript.isIncomplete
-      ? this.theme.fg("warning", " · transcript incomplete")
-      : "";
-    const loading = this.#transcript.isLoading ? this.theme.fg("dim", " · loading transcript") : "";
-    const runStatus = run
-      ? `${run.status}${run.result?.failureCode ? ` (${run.result.failureCode})` : ""} · ${run.turns} turns · ${run.toolUses} tools${run.usage ? ` · ${run.usage.totalTokens.toLocaleString("en-US")} tokens` : ""}`
-      : "No run selected";
-    return (
-      this.theme.fg("accent", this.#transcript.status) +
-      retention +
-      this.theme.fg("accent", ` · ${runStatus}`) +
-      capture +
-      loading
+  #refreshList(pinnedKey?: string): void {
+    const current = pinnedKey ?? this.selectedRun?.key ?? this.#selectedKey;
+    this.#visibleRuns = orderedRuns(this.#data.runs, this.#section, this.#search.getValue());
+    const currentIndex = current ? this.#visibleRuns.findIndex((run) => run.key === current) : -1;
+    this.#selectedIndex = currentIndex >= 0 ? currentIndex : 0;
+    this.#selectedKey = pinnedKey ?? this.#visibleRuns[this.#selectedIndex]?.key;
+    this.#selectList = this.#createSelectList(this.#visibleRuns.map((run) => runListItem(run)));
+    if (this.#visibleRuns.length > 0) this.#selectList.setSelectedIndex(this.#selectedIndex);
+  }
+
+  #moveSelection(delta: number, wrap = true): void {
+    if (this.#visibleRuns.length === 0) return;
+    const next = wrap
+      ? (((this.#selectedIndex + delta) % this.#visibleRuns.length) + this.#visibleRuns.length) %
+        this.#visibleRuns.length
+      : Math.max(0, Math.min(this.#visibleRuns.length - 1, this.#selectedIndex + delta));
+    this.#selectedIndex = next;
+    const run = this.#visibleRuns[next];
+    if (!run) return;
+    this.#selectedKey = run.key;
+    this.#selectList.setSelectedIndex(next);
+    if (this.#page !== "list") this.#transcript.select(run);
+    this.onChange();
+  }
+
+  #selectRun(runKey: string): void {
+    const index = this.#visibleRuns.findIndex((run) => run.key === runKey);
+    if (index < 0) return;
+    this.#selectedIndex = index;
+    this.#selectedKey = runKey;
+    if (this.#page !== "list") this.#transcript.select(this.selectedRun);
+  }
+
+  #handleTranscriptNavigation(data: string): boolean {
+    return handleTranscriptNavigation(
+      data,
+      (input, action, fallback) => this.#matches(input, action, fallback),
+      (lines) => this.#transcript.scrollBy(lines),
+      (action) => this.#transcript.navigate(action),
     );
   }
 
-  #insideBody(event: TuiMouseEvent): boolean {
-    return event.y >= this.#bodyTop && event.y < this.#bodyTop + this.#bodyHeight;
+  #openSelectedRun(): void {
+    const run = this.selectedRun;
+    if (!run) return;
+    this.#page = "conversation";
+    this.#search.focused = false;
+    this.#transcript.setDetails(false);
+    this.#transcript.select(run);
+    this.onChange();
   }
 
-  #clickRun(event: TuiMouseEvent): boolean {
-    if (this.#isNarrow() && this.#narrowPane !== "list") return false;
-    const listWidth = this.#isWide() ? this.#listWidth(this.#lastWidth) : this.#lastWidth;
-    if (event.x >= listWidth || !this.#insideBody(event)) return false;
-    const row = event.y - this.#bodyTop;
-    const start = runWindowStart(this.#data.runs.length, this.#runIndex, this.#bodyHeight);
-    const selected = start + row;
-    if (selected < 0 || selected >= this.#data.runs.length) return true;
-    this.#selectRun(selected);
-    if (this.#isNarrow()) this.#narrowPane = "transcript";
-    return true;
+  #isCancel(data: string): boolean {
+    return (
+      this.#matches(data, "app.interrupt", Key.escape) ||
+      this.#matches(data, "tui.select.cancel", Key.ctrl("c"))
+    );
   }
 
-  #selectRun(index: number): void {
-    if (index === this.#runIndex) return;
-    this.#runIndex = index;
-    this.#transcript.select(this.selectedRun);
-  }
-
-  #moveSelection(delta: number): void {
-    this.#selectRun(clamp(this.#runIndex + delta, 0, Math.max(0, this.#data.runs.length - 1)));
-  }
-
-  #navigate(data: string): boolean {
-    if (matchesKey(data, Key.pageUp)) {
-      this.#transcript.navigate("page-up");
-      return true;
-    }
-    if (matchesKey(data, Key.pageDown)) {
-      this.#transcript.navigate("page-down");
-      return true;
-    }
-    if (matchesKey(data, Key.home)) {
-      this.#transcript.navigate("start");
-      return true;
-    }
-    if (matchesKey(data, Key.end)) {
-      this.#transcript.navigate("end");
-      return true;
-    }
-    if (data === "f") {
-      this.#transcript.navigate("toggle");
-      return true;
-    }
-    return false;
-  }
-
-  #isWide(width = this.#lastWidth): boolean {
-    return width >= 100;
-  }
-
-  #isNarrow(): boolean {
-    return !this.#isWide();
-  }
-
-  #listWidth(width: number): number {
-    return Math.min(36, Math.max(24, Math.floor(width * 0.3)));
+  #matches(data: string, action: KeybindingAction, fallback: KeyId): boolean {
+    return typeof this.keybindings?.matches === "function"
+      ? this.keybindings.matches(data, action)
+      : matchesKey(data, fallback);
   }
 
   #line(text: string, width: number): string {
     return truncateToWidth(` ${text}`, width);
   }
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value));
-}
-
-function runWindowStart(length: number, selected: number, size: number): number {
-  return Math.min(Math.max(0, length - size), Math.max(0, selected - Math.floor(size / 2)));
-}
-
-function padToWidth(text: string, width: number): string {
-  const clipped = truncateToWidth(text, width);
-  return `${clipped}${" ".repeat(Math.max(0, width - visibleWidth(clipped)))}`;
 }

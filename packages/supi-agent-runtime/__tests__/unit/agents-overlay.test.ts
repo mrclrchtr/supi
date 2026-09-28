@@ -85,6 +85,14 @@ function data(overrides: Partial<AgentsOverlayData> = {}): AgentsOverlayData {
   };
 }
 
+function openConversation(dialog: AgentsDialog): void {
+  dialog.handleInput("\n");
+}
+
+function showDetails(dialog: AgentsDialog): void {
+  dialog.handleInput("\t");
+}
+
 function dependencies(overrides: Partial<AgentsDialogDependencies> = {}): AgentsDialogDependencies {
   return {
     theme: makeCtx().ui.theme as never,
@@ -97,20 +105,208 @@ function dependencies(overrides: Partial<AgentsDialogDependencies> = {}): Agents
 }
 
 describe("AgentsDialog", () => {
-  it("renders selected run metadata, usage, conversation, and disclosure notices", () => {
-    const text = new AgentsDialog(data(), dependencies()).render(100).join("\n");
-    expect(text).toContain("inspect");
+  it("shows a searchable Agent list before it opens a conversation", () => {
+    const run = makeAgentsRun({
+      taskId: "inspect-router",
+      label: "explore",
+      turns: 8,
+      toolUses: 12,
+      recentActivity: ["read src/router.ts"],
+      startedAt: Date.now() - 5_000,
+      conversation,
+    });
+    const dialog = new AgentsDialog(data({ runs: [run] }), dependencies());
+    const text = dialog.render(100).join("\n");
+
+    expect(text).toContain("inspect-router");
     expect(text).toContain("running");
-    expect(text).toContain("anthropic/claude-sonnet");
-    expect(text).toContain("thinking high");
-    expect(text).toContain("175 tokens");
-    expect(text).toContain("Task: Inspect the execution path");
-    expect(text).toContain("Shared context: Repository context");
-    expect(text).toContain("assistant: I found the caller.");
-    expect(text).toContain("steering: Check the tests too.");
-    expect(text).toContain("read: read src/index.ts");
-    expect(text).toContain("2 entries");
-    expect(text.toLowerCase()).toContain("human output truncated");
+    expect(text).toContain("read src/router.ts");
+    expect(text).toContain("Search");
+    expect(text).not.toContain("I found the caller.");
+    expect(text).not.toContain("8 turns");
+    expect(text).not.toContain("12 tools");
+    expect(text).not.toContain("controls unavailable");
+  });
+
+  it("filters tasks by searchable text", () => {
+    const dialog = new AgentsDialog(
+      data({
+        runs: [
+          makeAgentsRun({ taskId: "find-router", label: "inspect" }),
+          makeAgentsRun({ key: "run:other", taskId: "check-tests", label: "test" }),
+        ],
+      }),
+      dependencies(),
+    );
+    for (const character of "router") dialog.handleInput(character);
+    const filtered = dialog.render(100).join("\n");
+    expect(filtered).toContain("find-router");
+    expect(filtered).not.toContain("check-tests");
+    dialog.handleInput("x");
+    expect(dialog.render(100).join("\n")).toContain("No tasks match “routerx”.");
+  });
+
+  it("keeps runs from one batch together in the searchable list", () => {
+    const runs = [
+      makeAgentsRun({
+        taskId: "old-first",
+        batchId: "batch-old",
+        startedAt: Date.now() - 10_000,
+      }),
+      makeAgentsRun({
+        key: "run:new",
+        taskId: "new-batch",
+        batchId: "batch-new",
+        startedAt: Date.now() - 5_000,
+      }),
+      makeAgentsRun({
+        key: "run:old-second",
+        taskId: "old-second",
+        batchId: "batch-old",
+        startedAt: Date.now() - 9_000,
+      }),
+    ];
+    const text = new AgentsDialog(data({ runs }), dependencies()).render(120).join("\n");
+    const newest = text.indexOf("new-batch");
+    const firstOld = text.indexOf("old-first");
+    const secondOld = text.indexOf("old-second");
+    expect(newest).toBeLessThan(firstOld);
+    expect(firstOld).toBeLessThan(secondOld);
+    expect(text).toContain("batch batch-ol");
+  });
+
+  it("uses configured Pi keys to open, return, and close the conversation", () => {
+    const done = vi.fn();
+    const keybindings = {
+      matches: (data: string, action: string) =>
+        (data === "go" && action === "tui.select.confirm") ||
+        (data === "back" && action === "app.interrupt"),
+      getKeys: (action: string) => (action === "app.tools.expand" ? ["ctrl+shift+o"] : []),
+    } as never;
+    const dialog = new AgentsDialog(data(), dependencies({ done, keybindings }));
+
+    dialog.handleInput("go");
+    expect(dialog.render(100).join("\n")).toContain("I found the caller.");
+    expect(dialog.render(100).join("\n")).toContain("ctrl+shift+o");
+    dialog.handleInput("back");
+    expect(dialog.render(100).join("\n")).not.toContain("I found the caller.");
+    dialog.handleInput("back");
+    expect(done).toHaveBeenCalledOnce();
+  });
+
+  it("shows review target, verdict, and findings without replacing execution status", () => {
+    const review = makeAgentsRun({
+      key: "review:task",
+      runKey: "review-task",
+      taskId: "audit-paths",
+      kind: "Reviewer",
+      label: "change review",
+      active: false,
+      status: "completed",
+      display: { target: "Filesystem changes" },
+      result: {
+        finalText: "The path check misses a traversal case.",
+        display: {
+          target: "Filesystem changes",
+          verdict: "issues",
+          findingCount: 2,
+          blockingFindingCount: 1,
+        },
+      },
+    });
+    const dialog = new AgentsDialog(data({ runs: [review] }), dependencies());
+    dialog.handleInput("\t");
+    const text = dialog.render(140).join("\n");
+    expect(text).toContain("completed");
+    expect(text).toContain("Filesystem changes");
+    expect(text).toContain("verdict issues");
+    expect(text).toContain("2 findings");
+    expect(text).toContain("Result: The path check misses a traversal case.");
+  });
+
+  it("opens a full-width conversation and returns to the list before it closes", () => {
+    const done = vi.fn();
+    const dialog = new AgentsDialog(data(), dependencies({ done }));
+    dialog.handleInput("\n");
+    const conversationText = dialog.render(100).join("\n");
+
+    expect(conversationText).toContain("I found the caller.");
+    expect(conversationText).not.toContain("No Agent Runs.");
+    dialog.handleInput("\u001b");
+    expect(dialog.render(100).join("\n")).not.toContain("I found the caller.");
+    expect(done).not.toHaveBeenCalled();
+    dialog.handleInput("\u001b");
+    expect(done).toHaveBeenCalledOnce();
+  });
+
+  it("filters between Agent and Reviewer lists", () => {
+    const dialog = new AgentsDialog(
+      data({
+        runs: [
+          makeAgentsRun({ taskId: "agent-task", kind: "Agent Run" }),
+          makeAgentsRun({
+            key: "review:task",
+            runKey: "review-task",
+            taskId: "review-task",
+            kind: "Reviewer",
+            label: "change review",
+          }),
+        ],
+      }),
+      dependencies(),
+    );
+    expect(dialog.render(100).join("\n")).toContain("agent-task");
+    expect(dialog.render(100).join("\n")).not.toContain("review-task");
+
+    dialog.handleInput("\t");
+    const reviews = dialog.render(100).join("\n");
+    expect(reviews).toContain("review-task");
+    expect(reviews).not.toContain("agent-task");
+  });
+
+  it("keeps the run list in sync after an arrow changes a catalogue tab", () => {
+    const dialog = new AgentsDialog(
+      data({
+        runs: [
+          makeAgentsRun({ taskId: "agent-task", kind: "Agent Run" }),
+          makeAgentsRun({
+            key: "review:task",
+            runKey: "review-task",
+            taskId: "review-task",
+            kind: "Reviewer",
+            label: "change review",
+          }),
+        ],
+      }),
+      dependencies(),
+    );
+    dialog.handleInput("\t");
+    dialog.handleInput("\t");
+    expect(dialog.render(100).join("\n")).toContain("[Profiles]");
+
+    dialog.handleInput("\u001b[D");
+    const reviews = dialog.render(100).join("\n");
+    expect(reviews).toContain("[Reviews]");
+    expect(reviews).toContain("review-task");
+    expect(reviews).not.toContain("agent-task");
+  });
+
+  it("keeps the default conversation clean and shows run metadata in Details", () => {
+    const dialog = new AgentsDialog(data(), dependencies());
+    openConversation(dialog);
+    const conversationText = dialog.render(100).join("\n");
+    expect(conversationText).toContain("I found the caller.");
+    expect(conversationText).not.toContain("assistant:");
+    expect(conversationText).not.toContain("Task: Inspect the execution path");
+    showDetails(dialog);
+    const details = dialog.render(100).join("\n");
+    expect(details).toContain("anthropic/claude-sonnet");
+    expect(details).toContain("thinking high");
+    expect(details).toContain("175 tokens");
+    expect(details).toContain("Task: Inspect the execution path");
+    expect(details).toContain("Shared context: Repository context");
+    expect(details).toContain("2 entries");
+    expect(details.toLowerCase()).toContain("human output truncated");
   });
 
   it("renders the final result separately from the retained conversation", () => {
@@ -120,7 +316,12 @@ describe("AgentsDialog", () => {
       result: { finalText: "The caller is in `src/index.ts`." },
       conversation,
     });
-    const text = new AgentsDialog(data({ runs: [run] }), dependencies()).render(100).join("\n");
+    const dialog = new AgentsDialog(data({ runs: [run] }), dependencies());
+    expect(dialog.render(100).join("\n")).toContain("Result: The caller is in `src/index.ts`.");
+    openConversation(dialog);
+    expect(dialog.render(100).join("\n")).not.toContain("The caller is in `src/index.ts`.");
+    showDetails(dialog);
+    const text = dialog.render(100).join("\n");
     expect(text).toContain("Result");
     expect(text).toContain("The caller is in `src/index.ts`.");
   });
@@ -135,12 +336,15 @@ describe("AgentsDialog", () => {
       result: { finalText },
       conversation,
     });
-    const text = new AgentsDialog(data({ runs: [run] }), dependencies()).render(100).join("\n");
+    const dialog = new AgentsDialog(data({ runs: [run] }), dependencies());
+    openConversation(dialog);
+    showDetails(dialog);
+    const text = dialog.render(100).join("\n");
     expect(text).toContain("Result shortened for overlay");
     expect(text).toContain("result line 8");
     expect(text).not.toContain("result line 30");
     expect(text).toContain("Conversation");
-    expect(text).toContain("assistant: I found the caller.");
+    expect(text).toContain("I found the caller.");
   });
 
   it("does not report a trailing newline as truncated output", () => {
@@ -152,9 +356,10 @@ describe("AgentsDialog", () => {
       status: "completed",
       result: { finalText: `${finalText}\n` },
     });
-    expect(
-      new AgentsDialog(data({ runs: [run] }), dependencies()).render(100).join("\n"),
-    ).not.toContain("Result shortened for overlay");
+    const dialog = new AgentsDialog(data({ runs: [run] }), dependencies());
+    openConversation(dialog);
+    showDetails(dialog);
+    expect(dialog.render(100).join("\n")).not.toContain("Result shortened for overlay");
   });
 
   it("does not render a result section for a failed run", () => {
@@ -163,7 +368,10 @@ describe("AgentsDialog", () => {
       status: "failed",
       result: { failureCode: "prompt-rejected", finalText: "" },
     });
-    const text = new AgentsDialog(data({ runs: [run] }), dependencies()).render(100).join("\n");
+    const dialog = new AgentsDialog(data({ runs: [run] }), dependencies());
+    openConversation(dialog);
+    showDetails(dialog);
+    const text = dialog.render(100).join("\n");
     expect(text).toContain("failed (prompt-rejected)");
     expect(text).not.toContain("Result");
   });
@@ -171,10 +379,10 @@ describe("AgentsDialog", () => {
   it("shows optional Agent Profile pages and bounded diagnostics", () => {
     const dialog = new AgentsDialog(data(), dependencies());
     dialog.handleInput("\t");
+    dialog.handleInput("\t");
     const profiles = dialog.render(100).join("\n");
-    expect(profiles).toContain("Runs 1");
-    expect(profiles).toContain("Profiles 1");
-    expect(profiles).toContain("Diagnostics 1");
+    expect(profiles).toContain("Profiles");
+    expect(profiles).toContain("Diagnostics");
     expect(profiles).toContain("Read-only code exploration");
     expect(profiles).toContain("Strongest source: package — /profiles/explore");
     expect(profiles).toContain("Model (global): openai/gpt-5");
@@ -189,21 +397,22 @@ describe("AgentsDialog", () => {
   });
 
   it("resets conversation paging when live data replaces the selected run", () => {
-    const entries = Array.from({ length: 15 }, (_, index) => ({
+    const entries = Array.from({ length: 40 }, (_, index) => ({
       kind: "assistant" as const,
       text: `message ${index + 1}`,
     }));
     const initialRun = makeAgentsRun({ conversation: { ...conversation, entries } });
     const initial = data({ runs: [initialRun] });
     const dialog = new AgentsDialog(initial, dependencies());
+    openConversation(dialog);
     dialog.render(100);
     dialog.handleInput("\x1b[5~");
-    expect(dialog.render(100).join("\n")).not.toContain("message 15");
+    expect(dialog.render(100).join("\n")).not.toContain("message 40");
     dialog.updateData({
       ...initial,
       runs: [makeAgentsRun({ ...initialRun, key: "run:done", active: false })],
     });
-    expect(dialog.render(100).join("\n")).toContain("message 15");
+    expect(dialog.render(100).join("\n")).toContain("message 40");
   });
 
   it("closes the viewer without stopping the selected run", () => {
@@ -220,6 +429,7 @@ describe("AgentsDialog", () => {
       throw new Error("TUI closed");
     });
     const dialog = new AgentsDialog(data(), dependencies({ onSteer }));
+    openConversation(dialog);
     dialog.handleInput("s");
     for (const character of "Focus on tests") dialog.handleInput(character);
     dialog.handleInput("\n");
@@ -228,6 +438,7 @@ describe("AgentsDialog", () => {
 
   it("refreshes the embedded cursor when overlay focus changes", () => {
     const dialog = new AgentsDialog(data(), dependencies());
+    openConversation(dialog);
     dialog.handleInput("s");
     dialog.focused = true;
     expect(dialog.render(100).join("\n")).toContain(CURSOR_MARKER);
@@ -239,6 +450,7 @@ describe("AgentsDialog", () => {
     const done = vi.fn();
     const onSteer = vi.fn(async () => "accepted" as const);
     const dialog = new AgentsDialog(data(), dependencies({ done, onSteer }));
+    openConversation(dialog);
     dialog.handleInput("s");
     dialog.handleInput("\n");
     expect(onSteer).not.toHaveBeenCalled();
@@ -253,6 +465,7 @@ describe("AgentsDialog", () => {
     const onSteer = vi.fn(async () => "accepted" as const);
     const onStop = vi.fn(async () => "accepted" as const);
     const dialog = new AgentsDialog(data(), dependencies({ onSteer, onStop }));
+    openConversation(dialog);
     dialog.handleInput("s");
     expect(dialog.render(100).join("\n")).toContain("Steer inspect");
     for (const character of "Focus on tests") dialog.handleInput(character);
@@ -269,6 +482,7 @@ describe("AgentsDialog", () => {
     const onStop = vi.fn(async () => "accepted" as const);
     const starting = makeAgentsRun({ status: "starting", steeringAvailable: false });
     const dialog = new AgentsDialog(data({ runs: [starting] }), dependencies({ onStop }));
+    openConversation(dialog);
     dialog.handleInput("x");
     expect(dialog.render(100).join("\n")).toContain("Press Enter or y to confirm");
     dialog.handleInput("\n");
@@ -309,22 +523,27 @@ describe("AgentsDialog", () => {
       steeringAvailable: false,
     });
     const dialog = new AgentsDialog(data({ runs: [completed] }), dependencies({ onSteer, onStop }));
+    openConversation(dialog);
     dialog.handleInput("s");
     dialog.handleInput("x");
     expect(onSteer).not.toHaveBeenCalled();
     expect(onStop).not.toHaveBeenCalled();
-    expect(dialog.render(100).join("\n")).toContain("controls unavailable");
+    expect(dialog.render(100).join("\n")).not.toContain("controls unavailable");
   });
 
   it("shows when steering is unavailable but keeps Stop available", () => {
     const run = makeAgentsRun({ steeringAvailable: false });
-    const text = new AgentsDialog(data({ runs: [run] }), dependencies()).render(100).join("\n");
-    expect(text).toContain("steering unavailable · x stop");
+    const dialog = new AgentsDialog(data({ runs: [run] }), dependencies());
+    openConversation(dialog);
+    const text = dialog.render(100).join("\n");
+    expect(text).toContain("x stop");
+    expect(text).not.toContain("steering unavailable");
   });
 
   it("keeps every rendered line within the available width", () => {
-    expect(
-      new AgentsDialog(data(), dependencies()).render(60).every((line) => visibleWidth(line) <= 60),
-    ).toBe(true);
+    const dialog = new AgentsDialog(data(), dependencies());
+    expect(dialog.render(60).every((line) => visibleWidth(line) <= 60)).toBe(true);
+    openConversation(dialog);
+    expect(dialog.render(60).every((line) => visibleWidth(line) <= 60)).toBe(true);
   });
 });
