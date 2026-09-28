@@ -7,13 +7,13 @@
 import type { ModelThinkingLevel, Usage } from "@earendil-works/pi-ai";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
-import type { AgentConversationView, ConversationEntry } from "./conversation-view.ts";
 import type {
   BatchProgressState,
   BatchTaskProgress,
   BatchTaskResult,
   BatchTaskStatus,
-} from "./registry.ts";
+} from "./batch-types.ts";
+import type { AgentConversationView, ConversationEntry } from "./conversation-view.ts";
 import type { AgentRunResultDetails } from "./result.ts";
 
 // ── Helpers ──────────────────────────────────────────────────────

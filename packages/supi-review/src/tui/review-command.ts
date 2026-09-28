@@ -4,7 +4,10 @@ import {
   buildSessionContext,
   type ExtensionAPI,
 } from "@earendil-works/pi-coding-agent";
-import { createAgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/api";
+import {
+  type AgentRunRegistry,
+  createAgentRunProviderAuthority,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import type { LocalReviewAuditStore } from "../audit/local-review-audit-store.ts";
 import { loadReviewConfig } from "../config.ts";
 import { collectPlannerContext } from "../history/collect.ts";
@@ -267,6 +270,7 @@ async function executeInteractiveReview(
     planning?: PlanningRecord;
     provenance: "caller-supplied" | "planner-assisted";
     auditStore?: LocalReviewAuditStore;
+    registry?: AgentRunRegistry;
   },
 ) {
   const config = loadReviewConfig(ctx.cwd);
@@ -297,6 +301,7 @@ async function executeInteractiveReview(
         bootstrapCommand: config.bootstrapCommand,
         projectTrusted: ctx.isProjectTrusted(),
         ...(auditStore ? { auditStore } : {}),
+        ...(input.registry ? { registry: input.registry } : {}),
         signal,
       }),
   );
@@ -306,6 +311,7 @@ interface ReviewCommandServices {
   pi: ExtensionAPI;
   artifactStore: ReviewArtifactStore;
   auditStore: LocalReviewAuditStore;
+  registry?: AgentRunRegistry;
 }
 
 /** Select the target after Review Modes are edited. State batches never pass a before endpoint. */
@@ -322,7 +328,7 @@ export async function runReviewCommand(
   ctx: CommandContext,
   services: ReviewCommandServices,
 ): Promise<void> {
-  const { pi, artifactStore, auditStore } = services;
+  const { pi, artifactStore, auditStore, registry } = services;
   if (!ctx.hasUI) return;
   let selectedTarget: InteractiveTarget | undefined;
   try {
@@ -413,6 +419,7 @@ export async function runReviewCommand(
     ...(usePlannerDraft && plannerDraft ? { planning: plannerDraft.planning } : {}),
     provenance: usePlannerDraft ? "planner-assisted" : "caller-supplied",
     auditStore,
+    ...(registry ? { registry } : {}),
   });
   if (!outcome) return;
   if (outcome.kind !== "completed") {

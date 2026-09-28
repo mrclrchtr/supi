@@ -158,7 +158,7 @@ export class AgentsRunViewer {
   #controlAction(data: string, controlsEnabled: boolean): AgentsRunViewerAction | undefined {
     const run = this.selectedRun;
     if (!controlsEnabled || !run?.active) return undefined;
-    if (data === "s" && run.status === "running") return "steer";
+    if (data === "s" && run.steeringAvailable) return "steer";
     if (data === "x" && (run.status === "starting" || run.status === "running")) return "stop";
     return undefined;
   }
@@ -196,7 +196,9 @@ export class AgentsRunViewer {
     const run = this.selectedRun;
     const controls = run?.active
       ? run.status === "running"
-        ? "s steer · x stop"
+        ? run.steeringAvailable
+          ? "s steer · x stop"
+          : "steering unavailable · x stop"
         : run.status === "starting"
           ? "x stop"
           : "controls unavailable"
@@ -258,7 +260,7 @@ export class AgentsRunViewer {
       const selected = start + index === this.#runIndex;
       const metrics = `${run.turns} turns · ${run.toolUses} tools`;
       const scope = run.active ? "active" : "completed";
-      const label = `${selected ? "▶" : " "} ${run.status} · ${run.taskId} (${run.profileId}) · ${metrics} · ${scope}`;
+      const label = `${selected ? "▶" : " "} ${run.status} · ${run.taskId} (${run.kind}: ${run.label}) · ${metrics} · ${scope}`;
       return truncateToWidth(
         selected ? this.theme.fg("accent", label) : this.theme.fg("dim", label),
         width,
@@ -268,14 +270,14 @@ export class AgentsRunViewer {
 
   #viewStatus(): string {
     const run = this.selectedRun;
-    const omitted = run?.conversationView?.omittedEntryCount ?? 0;
+    const omitted = run?.conversation?.omittedEntryCount ?? 0;
     const retention = omitted > 0 ? this.theme.fg("warning", ` · ${omitted} entries omitted`) : "";
     const capture = this.#transcript.isIncomplete
       ? this.theme.fg("warning", " · transcript incomplete")
       : "";
     const loading = this.#transcript.isLoading ? this.theme.fg("dim", " · loading transcript") : "";
     const runStatus = run
-      ? `${run.status}${run.failureCode ? ` (${run.failureCode})` : ""} · ${run.turns} turns · ${run.toolUses} tools${run.usage ? ` · ${run.usage.totalTokens.toLocaleString("en-US")} tokens` : ""}`
+      ? `${run.status}${run.result?.failureCode ? ` (${run.result.failureCode})` : ""} · ${run.turns} turns · ${run.toolUses} tools${run.usage ? ` · ${run.usage.totalTokens.toLocaleString("en-US")} tokens` : ""}`
       : "No run selected";
     return (
       this.theme.fg("accent", this.#transcript.status) +

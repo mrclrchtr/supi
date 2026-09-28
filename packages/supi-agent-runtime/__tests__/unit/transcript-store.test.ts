@@ -2,7 +2,7 @@ import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AgentRunTranscriptStore } from "../../src/tool/agent_run/transcript-store.js";
+import { AgentRunTranscriptStore } from "../../src/session/transcript-store.ts";
 
 const stores: AgentRunTranscriptStore[] = [];
 
@@ -17,12 +17,13 @@ function metadata() {
     runKey: "run-1",
     batchId: "batch-1",
     taskId: "task-1",
-    profileId: "coder",
+    kind: "Agent Run",
+    label: "coder",
     cwd: "/work/project",
     modelId: "provider/model",
     thinkingLevel: "high",
     tools: ["read"],
-    instructions: "Inspect the source.",
+    taskDescription: "Inspect the source.",
     sharedContext: "Use the existing package API.",
     startedAt: 1,
   };

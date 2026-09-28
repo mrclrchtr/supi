@@ -22,7 +22,8 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock("@mrclrchtr/supi-agent-runtime/api", () => ({
+vi.mock("@mrclrchtr/supi-agent-runtime/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@mrclrchtr/supi-agent-runtime/api")>()),
   startAgentRun: mocks.startAgentRun,
   combineAgentRunUsage: mocks.combineAgentRunUsage,
   createAgentRunProviderAuthority: mocks.createAgentRunProviderAuthority,

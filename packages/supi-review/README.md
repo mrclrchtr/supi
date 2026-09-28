@@ -28,6 +28,10 @@ This package is beta software. Its interfaces can change.
 
 Changes to **Agent tools** apply immediately. Turning this setting off removes the agent start and audit tools from the active tool set. The output tool and the commands stay available.
 
+## Shared `/agents` viewer
+
+When this package is loaded, each Reviewer Session appears in the runtime-owned `/agents` viewer with its status and human-only transcript. The runtime keeps that transcript until the containing PI session ends. It does so even when Review audit is off. A Local Reviewer Replay remains a separate Review-owned artifact with its own seven-day retention. Stopping one Reviewer Run does not stop its sibling tasks.
+
 ## Review input
 
 `review_run` has one flat input. It has `target`, optional top-level `paths`, optional `sharedContext`, and one to four `tasks`.

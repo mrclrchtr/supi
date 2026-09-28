@@ -9,10 +9,12 @@ describe("Agents legend alignment", () => {
     const dialog = new AgentsDialog(
       {
         runs: [],
-        profiles: [],
-        diagnostics: [],
-        omittedDiagnosticCount: 0,
-        omittedProfileCount: 0,
+        profilePages: {
+          profiles: [],
+          diagnostics: [],
+          omittedDiagnosticCount: 0,
+          omittedProfileCount: 0,
+        },
       },
       {
         theme: makeCtx().ui.theme as never,

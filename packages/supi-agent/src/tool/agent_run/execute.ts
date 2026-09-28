@@ -1,9 +1,10 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { AgentRunRegistry } from "@mrclrchtr/supi-agent-runtime/api";
 import type { TSchema } from "typebox";
 import { Value } from "typebox/value";
 import { agentProfileCatalogueStore } from "../../session.ts";
 import { runDelegationBatch } from "./batch-runner.ts";
-import type { AgentRunRegistry, BatchProgressState } from "./registry.ts";
+import type { BatchProgressState } from "./batch-types.ts";
 import { buildAgentRunResult } from "./result.ts";
 import type { AgentRunToolParams } from "./schema.ts";
 
@@ -41,13 +42,6 @@ export function makeAgentRunExecute(
     const outcome = await runDelegationBatch(toolParams, catalogue, ctx, onBatchUpdate, registry);
 
     // Finalize the batch after its transcript files have closed.
-    const batch = registry.completeBatch(
-      outcome.results,
-      toolParams.sharedContext,
-      outcome.aggregateUsage,
-      outcome.batchId,
-    );
-
-    return buildAgentRunResult(outcome, batch, toolParams.sharedContext);
+    return buildAgentRunResult(outcome, toolParams.sharedContext);
   };
 }

@@ -1,5 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createAgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/api";
+import {
+  type AgentRunRegistry,
+  createAgentRunProviderAuthority,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import { StatusSpinner } from "@mrclrchtr/supi-core/status-spinner";
 import type { LocalReviewAuditStore } from "../../audit/local-review-audit-store.ts";
 import { loadReviewConfig } from "../../config.ts";
@@ -78,6 +81,7 @@ function initialReviewProgress(input: ReturnType<typeof parseRunReviewToolInput>
 export function makeRunReviewExecute(
   artifactStore: ReviewArtifactStore,
   localAuditStore?: LocalReviewAuditStore,
+  registry?: AgentRunRegistry,
 ): NonNullable<Parameters<ExtensionAPI["registerTool"]>[0]["execute"]> {
   // biome-ignore lint/complexity/useMaxParams: Pi ToolDefinition execute signature
   return async (_id, params, signal, onUpdate, ctx) => {
@@ -115,6 +119,7 @@ export function makeRunReviewExecute(
         bootstrapCommand: config.bootstrapCommand,
         projectTrusted: ctx.isProjectTrusted(),
         ...(auditStore ? { auditStore } : {}),
+        ...(registry ? { registry } : {}),
         signal,
         onUpdate: wrappedUpdate,
       });

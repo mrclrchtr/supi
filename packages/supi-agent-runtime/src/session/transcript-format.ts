@@ -1,5 +1,5 @@
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
-import type { AgentRunMessage } from "@mrclrchtr/supi-agent-runtime/api";
+import type { AgentRunMessage } from "../types.ts";
 import type {
   AgentRunTranscriptDocument,
   AgentRunTranscriptMetadata,

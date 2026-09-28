@@ -1,24 +1,23 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { clearAgentsProfilePages, registerAgentsCommand } from "@mrclrchtr/supi-agent-runtime/api";
 import { registerAgentSettings, syncAgentRunTool } from "./config.ts";
+import { agentProfilePages } from "./profile-pages.ts";
 import { registerProfileSettings } from "./profile-settings.ts";
 import { agentProfileCatalogueStore } from "./session.ts";
-import { registerAgentRunTool, registry } from "./tool/agent_run/register.ts";
-import { registerAgentsCommand } from "./ui/agents-command.ts";
+import { registerAgentRunTool } from "./tool/agent_run/register.ts";
 
 /** Register session-scoped Agent Profile discovery and foreground delegation tool. */
 export default function agentExtension(pi: ExtensionAPI): void {
   let disposeProfileSettings: (() => void) | undefined;
-  const agentsCommandLifecycle = registerAgentsCommand(pi, registry);
 
   // Catalogue, settings sections, and tool schema refresh on every session start/reload.
   pi.on("session_start", async (_event, ctx) => {
-    registry.openSession();
-    agentsCommandLifecycle.activate();
     disposeProfileSettings?.();
     const catalogue = await agentProfileCatalogueStore.reload({
       cwd: ctx.cwd,
       projectTrusted: ctx.isProjectTrusted(),
     });
+    const registry = registerAgentsCommand(pi, { profilePages: agentProfilePages });
     disposeProfileSettings = registerProfileSettings(pi, catalogue);
     for (const diagnostic of catalogue.diagnostics) {
       if (!diagnostic.directory || diagnostic.code === "catalogue-overflow") continue;
@@ -30,18 +29,17 @@ export default function agentExtension(pi: ExtensionAPI): void {
         "warning",
       );
     }
-    registerAgentRunTool(pi);
+    registerAgentRunTool(pi, registry);
     syncAgentRunTool(pi, ctx.cwd);
   });
 
   pi.on("session_shutdown", async () => {
-    agentsCommandLifecycle.deactivate();
     disposeProfileSettings?.();
     disposeProfileSettings = undefined;
-    await registry.cancelAll();
+    clearAgentsProfilePages(pi);
     agentProfileCatalogueStore.clear();
-    await registry.clear();
   });
 
   registerAgentSettings(pi);
+  registerAgentsCommand(pi, { profilePages: agentProfilePages });
 }

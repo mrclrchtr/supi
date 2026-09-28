@@ -1,20 +1,23 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   createResources: vi.fn(),
   startAgentRun: vi.fn(),
 }));
 
-vi.mock("@mrclrchtr/supi-agent-runtime/api", () => ({
+vi.mock("@mrclrchtr/supi-agent-runtime/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@mrclrchtr/supi-agent-runtime/api")>()),
   startAgentRun: mocks.startAgentRun,
 }));
 vi.mock("../../src/tool/review_run/child-resources.ts", () => ({
   createIsolatedChildResources: mocks.createResources,
 }));
 
+import { AgentRunRegistry, type AgentRunSessionView } from "@mrclrchtr/supi-agent-runtime/api";
 import { runIsolatedChild } from "../../src/tool/review_run/child-session.ts";
 
 const diagnostics = { lifecycleTrace: { entries: [], droppedCount: 0 }, turns: 1, toolUses: 1 };
+let registry: AgentRunRegistry;
 const config = {
   cwd: "/repo",
   providerAuthority: {
@@ -32,18 +35,26 @@ const config = {
 
 function handle(outcome: unknown, progress: unknown[] = []) {
   return {
+    steeringAvailable: false,
     result: Promise.resolve(outcome),
     subscribe: vi.fn((listener: (progress: unknown) => void) => {
       for (const snapshot of progress) listener(snapshot);
       return vi.fn();
     }),
+    steer: vi.fn(async () => "not-running" as const),
+    stop: vi.fn(async () => undefined),
   };
 }
 
 describe("runIsolatedChild", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    registry = new AgentRunRegistry();
     mocks.createResources.mockReturnValue({ loader: {}, settingsManager: {} });
+  });
+
+  afterEach(async () => {
+    await registry.clear();
   });
 
   it("returns before resource allocation when provider authority is unavailable", async () => {
@@ -135,6 +146,63 @@ describe("runIsolatedChild", () => {
     const resourceAgentDir = mocks.createResources.mock.calls[0]?.[2];
     const runtimeAgentDir = mocks.startAgentRun.mock.calls[0]?.[0].inputs.agentDir;
     expect(runtimeAgentDir).toBe(resourceAgentDir);
+  });
+
+  it("captures Reviewer Session messages and keeps the Review observer cleanup", async () => {
+    const unsubscribeAudit = vi.fn();
+    const session = {
+      systemPrompt: "Reviewer Protocol",
+      getToolRenderers: () => [],
+      subscribe: (listener: (event: never) => void) => {
+        listener({
+          type: "message_end",
+          message: { role: "assistant", content: [{ type: "text", text: "Review finished." }] },
+        } as never);
+        return vi.fn();
+      },
+    } as unknown as AgentRunSessionView;
+    mocks.startAgentRun.mockImplementation(
+      (options: { observer?: (view: AgentRunSessionView) => unknown }) => ({
+        ...handle({ kind: "success", value: "submitted" }),
+        result: Promise.resolve().then(async () => {
+          const cleanup = await options.observer?.(session);
+          if (typeof cleanup === "function") cleanup();
+          return { kind: "success", value: "submitted" };
+        }),
+      }),
+    );
+    const runDisplay = {
+      runKey: "review-run",
+      batchId: "review-batch",
+      taskId: "task-1",
+      kind: "Reviewer",
+      label: "change review",
+      cwd: "/repo",
+      modelId: "test/model",
+      thinkingLevel: "low",
+      tools: ["read", "submit_review"],
+      startedAt: 1,
+    } as const;
+
+    await expect(
+      runIsolatedChild({
+        ...config,
+        registry,
+        runDisplay,
+        displayResult: () => ({ finalText: "Review finished." }),
+        onSessionCreated: () => unsubscribeAudit,
+      }),
+    ).resolves.toMatchObject({ kind: "success", value: "submitted" });
+
+    expect(unsubscribeAudit).toHaveBeenCalledOnce();
+    const run = registry.snapshot().runs[0];
+    expect(run).toMatchObject({ kind: "Reviewer", taskId: "task-1", active: false });
+    const transcript = await run?.transcriptSource?.load();
+    expect(transcript).toMatchObject({
+      metadata: { kind: "Reviewer", label: "change review" },
+      systemPrompt: "Reviewer Protocol",
+      messages: [{ role: "assistant" }],
+    });
   });
 
   it("omits reasoning when the provider does not report it", async () => {

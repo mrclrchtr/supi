@@ -18,6 +18,10 @@ _Avoid_: system prompt, caller instructions
 A managed child agent that executes exactly one Review Task in the batch's shared Review Workspace. It shares the containing Pi process's trust boundary and follows the Reviewer Protocol without per-session write isolation.
 _Avoid_: reviewer sub-agent, review sandbox
 
+**Reviewer Run Entry**:
+The neutral runtime record for one Reviewer Session in `/agents`. It uses the runtime transcript store, not the Review audit store.
+_Avoid_: review task result, Local Reviewer Replay
+
 **Review Workspace**:
 A disposable registered Git worktree that freezes one verified Review Target's reviewed state for a concurrent review batch. It is visible in Git while active and removed best-effort afterward; later caller edits and reviewer-generated dependency state are not Target Evidence.
 _Avoid_: live worktree, per-reviewer checkout, child sandbox
@@ -155,5 +159,5 @@ The typed result of running one isolated child session (planner or reviewer): a 
 _Avoid_: reviewer output, run result, result-builder callbacks
 
 **Local Reviewer Replay**:
-A private local artifact for tuning a Reviewer Session. It retains provider-visible messages and tool output, packet/protocol text, timing, usage, and the Review Workspace Receipt for seven days; thinking blocks and thought signatures are omitted. It is disabled by default; enabling `review.auditEnabled` records every task and activates `review_audit` immediately while Agent tools are on.
+A private local artifact for tuning a Reviewer Session. It retains provider-visible messages and tool output, packet/protocol text, timing, usage, and the Review Workspace Receipt for seven days; thinking blocks and thought signatures are omitted. It is disabled by default; enabling `review.auditEnabled` records every task and activates `review_audit` immediately while Agent tools are on. The shared runtime transcript has separate containing-session retention and does not use this setting.
 _Avoid_: normal review output, child diagnostics, permanent transcript

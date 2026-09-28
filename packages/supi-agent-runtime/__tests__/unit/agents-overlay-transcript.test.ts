@@ -7,12 +7,13 @@ import {
   type AgentRunTranscriptDocument,
   type AgentRunTranscriptSource,
   AgentRunTranscriptStore,
-} from "../../src/tool/agent_run/transcript-store.ts";
+} from "../../src/session/transcript-store.ts";
 import { AgentsDialog } from "../../src/ui/agents-overlay.ts";
 import type {
   AgentsDialogDependencies,
   AgentsOverlayData,
 } from "../../src/ui/agents-overlay-data.ts";
+import { makeAgentsRun } from "../helpers/agents-viewer-fixtures.ts";
 
 const stores: AgentRunTranscriptStore[] = [];
 
@@ -59,15 +60,12 @@ function fallbackData(transcriptSource: AgentRunTranscriptSource): AgentsOverlay
         runKey: "run-1",
         active: false,
         status: "completed",
-        finalText: "Available final result",
-        conversationView: {
-          taskId: run.taskId,
-          profileId: run.profileId,
+        result: { finalText: "Available final result" },
+        conversation: {
           entries: [{ kind: "assistant", text: "Retained conversation entry" }],
           omittedEntryCount: 0,
           omittedCharacterCount: 0,
           textTruncated: false,
-          taskMetadata: { instructions: "Inspect this file." },
         },
         transcriptSource,
       },
@@ -78,25 +76,14 @@ function fallbackData(transcriptSource: AgentRunTranscriptSource): AgentsOverlay
 function data(overrides: Partial<AgentsOverlayData> = {}): AgentsOverlayData {
   return {
     runs: [
-      {
-        key: "active:inspect",
-        active: true,
-        taskId: "inspect",
-        profileId: "explore",
-        status: "running",
+      makeAgentsRun({
         modelId: "test/model",
         thinkingLevel: "high",
         turns: 1,
         toolUses: 1,
-        humanTruncated: false,
-        modelTruncated: false,
         ...overrides.runs?.[0],
-      },
+      }),
     ],
-    profiles: [],
-    diagnostics: [],
-    omittedDiagnosticCount: 0,
-    omittedProfileCount: 0,
     ...overrides,
   };
 }
@@ -110,9 +97,7 @@ describe("AgentsDialog transcript viewer", () => {
         runs: [
           {
             ...run,
-            conversationView: {
-              taskId: "inspect",
-              profileId: "explore",
+            conversation: {
               entries: Array.from({ length: 50 }, (_, index) => ({
                 kind: "assistant" as const,
                 text: `message ${index + 1}`,
@@ -120,7 +105,6 @@ describe("AgentsDialog transcript viewer", () => {
               omittedEntryCount: 0,
               omittedCharacterCount: 0,
               textTruncated: false,
-              taskMetadata: { instructions: "Inspect this file." },
             },
           },
         ],
@@ -180,12 +164,13 @@ describe("AgentsDialog transcript viewer", () => {
         runKey: "run-1",
         batchId: "batch-1",
         taskId: "inspect",
-        profileId: "explore",
+        kind: "Agent Run",
+        label: "explore",
         cwd: "/work/project",
         modelId: "test/model",
         thinkingLevel: "high",
         tools: [],
-        instructions: "Inspect this file.",
+        taskDescription: "Inspect this file.",
         startedAt: 1,
       },
       systemPrompt: "",
@@ -220,12 +205,13 @@ describe("AgentsDialog transcript viewer", () => {
         runKey: "run-1",
         batchId: "batch-1",
         taskId: "inspect",
-        profileId: "explore",
+        kind: "Agent Run",
+        label: "explore",
         cwd: "/work/project",
         modelId: "test/model",
         thinkingLevel: "high",
         tools: ["read"],
-        instructions: "Inspect this file.",
+        taskDescription: "Inspect this file.",
         startedAt: 10,
       },
       "Child system prompt",
@@ -374,12 +360,13 @@ describe("AgentsDialog transcript viewer", () => {
         runKey: "run-1",
         batchId: "batch-1",
         taskId: "inspect",
-        profileId: "explore",
+        kind: "Agent Run",
+        label: "explore",
         cwd: "/work/project",
         modelId: "test/model",
         thinkingLevel: "high",
         tools: ["read"],
-        instructions: "Inspect this file.",
+        taskDescription: "Inspect this file.",
         startedAt: 1,
       },
       "Child system prompt",
@@ -440,12 +427,13 @@ describe("AgentsDialog transcript viewer", () => {
         runKey: "run-1",
         batchId: "batch-1",
         taskId: "inspect",
-        profileId: "explore",
+        kind: "Agent Run",
+        label: "explore",
         cwd: "/work/project",
         modelId: "test/model",
         thinkingLevel: "high",
         tools: [],
-        instructions: "Inspect this file.",
+        taskDescription: "Inspect this file.",
         startedAt: 1,
       },
       "Child system prompt",

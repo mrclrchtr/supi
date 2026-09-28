@@ -58,6 +58,38 @@ it("starts timeout measurement only immediately before prompting", async () => {
   expect(harness.session.abort).toHaveBeenCalledTimes(1);
 });
 
+it("does not start streaming when a subscriber cancels during prompt preflight", async () => {
+  const harness = createHarness(mocks);
+  let streamingStarted = false;
+  harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
+    options?.preflightResult?.(true);
+    streamingStarted = true;
+    harness.session.isStreaming = true;
+    await new Promise<void>(() => {});
+  });
+  const run = startAgentRun({
+    inputs: inputs(),
+    prompt: "cancel before streaming",
+    completionResolver: () => "done",
+  });
+  let runningPublications = 0;
+  let stopped: Promise<void> | undefined;
+  run.subscribe((progress) => {
+    if (progress.status !== "running") return;
+    runningPublications++;
+    if (runningPublications === 2) stopped = run.stop();
+  });
+
+  await vi.waitFor(() => expect(harness.session.prompt).toHaveBeenCalledOnce());
+  await vi.waitFor(() => expect(stopped).toBeDefined());
+  if (!stopped) throw new Error("The preflight subscriber did not stop the run.");
+  await stopped;
+
+  expect(streamingStarted).toBe(false);
+  expect(harness.session.isStreaming).toBe(false);
+  await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
+});
+
 it("clears queued messages and rejects extension sends at the cancellation fence", async () => {
   const harness = createHarness(mocks);
   harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
@@ -98,14 +130,20 @@ it("allows active steering, makes stop idempotent, and settles after disposal", 
     prompt: "long",
     completionResolver: () => "done",
   });
+  const steeringSnapshots: boolean[] = [];
+  run.subscribe(() => steeringSnapshots.push(run.steeringAvailable));
   await vi.waitFor(() => expect(harness.session.prompt).toHaveBeenCalled());
+  expect(run.steeringAvailable).toBe(true);
   await expect(run.steer("redirect")).resolves.toBe("accepted");
   const firstStop = run.stop();
+  expect(run.steeringAvailable).toBe(false);
   const secondStop = run.stop();
   finishPrompt();
   await Promise.all([firstStop, secondStop]);
   await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
   await expect(run.steer("late")).resolves.toBe("not-running");
+  expect(steeringSnapshots).toContain(true);
+  expect(steeringSnapshots.at(-1)).toBe(false);
   expect(harness.session.abort).toHaveBeenCalledTimes(1);
   expect(harness.runtime.dispose).toHaveBeenCalledTimes(1);
 });

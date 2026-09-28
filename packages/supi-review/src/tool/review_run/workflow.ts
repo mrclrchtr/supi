@@ -1,5 +1,8 @@
 // biome-ignore lint/style/noExcessiveLinesPerFile: Review Target and Workspace lifecycle remain in one workflow module.
-import type { AgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/api";
+import type {
+  AgentRunProviderAuthority,
+  AgentRunRegistry,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import {
   combineAgentRunUsage,
   createEarlyCancellationDiagnostics,
@@ -75,6 +78,8 @@ export interface RunReviewInput {
   projectTrusted?: boolean;
   /** Present when local reviewer replay is enabled. */
   auditStore?: LocalReviewAuditStore;
+  /** Registry for the Pi runtime that owns the Review request. */
+  registry?: AgentRunRegistry;
   signal?: AbortSignal;
   onUpdate?: OnUpdate;
 }
@@ -395,6 +400,7 @@ export async function runReview(input: RunReviewInput) {
       input.providerAuthority,
       input.recoveryModel,
       input.recoveryModelId,
+      input.registry,
     );
   } finally {
     cleanupWarning = await workspace.cleanup();

@@ -3,9 +3,12 @@ import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import {
   type AgentRunContinuation,
+  type AgentRunDisplayMetadata,
+  type AgentRunDisplayResult,
   type AgentRunOutcome,
   type AgentRunProgress,
   type AgentRunProviderAuthority,
+  type AgentRunRegistry,
   type AgentRunSessionView,
   startAgentRun,
 } from "@mrclrchtr/supi-agent-runtime/api";
@@ -38,6 +41,9 @@ export interface IsolatedRunConfig<T> {
   headlessInspection?: boolean;
   projectTrusted?: boolean;
   onSessionCreated?: (session: AgentRunSessionView) => undefined | (() => void);
+  runDisplay?: AgentRunDisplayMetadata & { readonly runKey: string; readonly batchId: string };
+  registry?: AgentRunRegistry;
+  displayResult?: (outcome: ChildRunOutcome<T>) => AgentRunDisplayResult;
   onProgress?: (progress: ReviewProgress) => void;
 }
 
@@ -114,6 +120,10 @@ export async function runIsolatedChild<T>(
       projectTrusted: config.projectTrusted,
     },
   );
+  let runKey: string | undefined;
+  const transcript = config.runDisplay
+    ? config.registry?.createTranscriptCapture(config.runDisplay, config.protocolPrompt)
+    : undefined;
   const run = startAgentRun<T>({
     inputs: {
       cwd: config.cwd,
@@ -139,10 +149,24 @@ export async function runIsolatedChild<T>(
         : config.holder.value,
     ...(config.continuation ? { continuation: config.continuation } : {}),
     observer: (session) => {
+      const unsubscribeTranscript = runKey
+        ? config.registry?.attachSession(runKey, session)
+        : undefined;
       const cleanup = config.onSessionCreated?.(session);
-      return typeof cleanup === "function" ? cleanup : undefined;
+      if (!unsubscribeTranscript && typeof cleanup !== "function") return undefined;
+      return () => {
+        unsubscribeTranscript?.();
+        if (typeof cleanup === "function") cleanup();
+      };
     },
   });
+  if (config.runDisplay) {
+    runKey = config.registry?.register({
+      metadata: config.runDisplay,
+      ...(transcript ? { transcript } : {}),
+      handle: run,
+    });
+  }
   const unsubscribe = config.onProgress
     ? run.subscribe((progress) => {
         if (
@@ -155,7 +179,16 @@ export async function runIsolatedChild<T>(
       })
     : undefined;
   try {
-    return mapOutcome(await run.result);
+    const outcome = mapOutcome(await run.result);
+    if (runKey) {
+      await transcript?.finish();
+      config.registry?.setDisplayResult(
+        runKey,
+        config.displayResult?.(outcome) ??
+          (outcome.kind === "failed" ? { failureCode: outcome.failureCode } : {}),
+      );
+    }
+    return outcome;
   } finally {
     unsubscribe?.();
   }

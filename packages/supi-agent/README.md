@@ -27,7 +27,7 @@ The `agent_run` transcript row shows the effective model of a Delegation Task as
 
 ## `/agents`
 
-Use `/agents` in TUI mode to inspect active Agent Runs, every completed Delegation Batch in the current parent session, effective Agent Profiles, and bounded Profile Diagnostics. The Runs view keeps the bounded Conversation View separate from a full human-only transcript. It shows status, model, thinking level, turns, tool uses, Usage, safe tool activity, steering, assistant text, and retention notices. Transcript messages stay outside parent tool results.
+Use `/agents` in TUI mode to inspect Agent and Reviewer runs in the current session. When this package is loaded, the viewer also shows effective Agent Profiles and bounded Profile Diagnostics. The Runs view keeps the bounded Conversation View separate from the full human-only transcript. It shows status, model, thinking level, turns, tool uses, Usage, safe tool activity, steering, assistant text, and retention notices. Transcript messages stay outside parent tool results.
 
 - Use Tab, Shift+Tab, or Left/Right to change sections.
 - Use Up/Down to select a run, profile, or diagnostic.
@@ -37,9 +37,9 @@ Use `/agents` in TUI mode to inspect active Agent Runs, every completed Delegati
 - Press Home to read task metadata and earlier output. Press End to resume auto-scroll. Page Down also resumes auto-scroll when it reaches the end.
 - Press `f` to pause or resume auto-scroll. Selecting a different run resumes auto-scroll.
 - Press `t` or Ctrl+T to hide or show thinking. Press `o` or Ctrl+O to show or hide tool input and output. The Ctrl shortcuts match PI defaults. You can also click a raw tool block to show or hide its input and output. These shortcuts do not apply while you enter a steering message.
-- The bounded Conversation View can omit old entries. The human-only transcript keeps all captured messages for every batch in the current parent session.
+- The bounded Conversation View can omit old entries. The runtime-owned human-only transcript keeps captured messages for Agent and Reviewer runs until the containing session ends. Its retention does not depend on Review audit settings.
 - Press `s` to steer the selected running Agent Run. A text field opens inside the overlay; press Enter to send or Esc to cancel.
-- Press `x` to request a stop for the selected starting or running Agent Run, then press Enter or `y` to confirm. A startup stop can wait for PI setup to finish.
+- Press `x` to request a stop for the selected starting or running Agent or Reviewer Run, then press Enter or `y` to confirm. A startup stop can wait for PI setup to finish. Stopping one Reviewer Run does not stop its sibling tasks.
 - Press Esc to close the viewer. This does not stop Agent Runs. PI's normal outer-tool cancellation still stops the full Delegation Batch.
 
 Transcript files are temporary JSONL files in a private directory for the parent session. They have no application cap or restart recovery. A storage failure marks capture incomplete but does not stop a run. The viewer shows the available transcript and the incomplete status. Session shutdown removes the directory.

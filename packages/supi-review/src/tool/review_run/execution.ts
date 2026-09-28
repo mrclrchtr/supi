@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import {
   type AgentRunProviderAuthority,
+  type AgentRunRegistry,
   createUnobservedAgentRunDiagnostics,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import { normalizeReviewInput } from "../../review-input.ts";
@@ -126,11 +128,13 @@ export async function executeReviewTasks(
   providerAuthority?: AgentRunProviderAuthority,
   recoveryModel?: ReviewModelSelection,
   recoveryModelId?: string,
+  registry?: AgentRunRegistry,
 ): Promise<ReviewTaskResult[]> {
   const review = normalizeReviewInput(reviewInput);
   let completedCount = 0;
   const totalCount = review.tasks.length;
   const effectiveThinkingLevel = clampReviewThinkingLevel(model.model, reviewerThinkingLevel);
+  const runGroupId = randomUUID();
   // Partial tool output is replaced repeatedly; retain the review context and task state for expanded views.
   const presentation = {
     targetTitle: snapshot.title,
@@ -191,11 +195,13 @@ export async function executeReviewTasks(
           requestedThinkingLevel: reviewerThinkingLevel,
           ...(recoveryModel ? { recoveryModel } : {}),
           ...(recoveryModelId ? { recoveryModelId } : {}),
+          ...(registry ? { registry } : {}),
           providerAuthority,
           projectTrusted,
           ...(audit ? { audit } : {}),
           ...(dependencyBootstrapConfigured ? { dependencyBootstrapConfigured } : {}),
           signal,
+          runGroupId,
           onProgress: (progress) => {
             taskStates[task.id] = { status: "running", progress };
             emitUpdate(onUpdate, {

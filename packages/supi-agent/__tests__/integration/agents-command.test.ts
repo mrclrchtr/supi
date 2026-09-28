@@ -2,18 +2,22 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { AgentRunProgress } from "@mrclrchtr/supi-agent-runtime/api";
 import { createPiMock, getHandlerOrThrow, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import agentExtension from "../../src/extension.ts";
 import { agentProfileCatalogueStore } from "../../src/session.ts";
-import { registry } from "../../src/tool/agent_run/register.ts";
-import type { ActiveRunRegistration } from "../../src/tool/agent_run/registry.ts";
 
 const temporaryDirectories: string[] = [];
+const startedPis: ReturnType<typeof createPiMock>[] = [];
 
 afterEach(async () => {
-  await registry.clear();
+  await Promise.all(
+    startedPis
+      .splice(0)
+      .map((pi) =>
+        pi.emit("session_shutdown", { type: "session_shutdown", reason: "test" }, makeCtx()),
+      ),
+  );
   agentProfileCatalogueStore.clear();
   vi.unstubAllEnvs();
   await Promise.all(
@@ -29,331 +33,51 @@ type OverlayComponent = {
   dispose?: () => void;
 };
 
-function typeIntoOverlay(overlay: OverlayComponent, text: string): void {
-  for (const character of text) overlay.handleInput(character);
-  overlay.handleInput("\n");
-}
-
-function runRegistration(
-  taskId: string,
-  status: AgentRunProgress["status"] = "running",
-  steerResult: "accepted" | "not-running" = "accepted",
-): {
-  registration: ActiveRunRegistration;
-  steer: ReturnType<typeof vi.fn>;
-  stop: ReturnType<typeof vi.fn>;
-} {
-  const steer = vi.fn(async () => steerResult);
-  const stop = vi.fn(async () => undefined);
-  const handle = {
-    result: new Promise<never>(() => undefined),
-    subscribe: (listener: (progress: AgentRunProgress) => void) => {
-      listener({ status, turns: 2, toolUses: 3, toolErrors: 0 });
-      return () => undefined;
-    },
-    steer,
-    stop,
-  };
-  return {
-    registration: {
-      taskId,
-      profileId: "explore",
-      modelId: "test/model",
-      thinkingLevel: "medium",
-      taskMetadata: { instructions: `Inspect ${taskId}` },
-      handle,
-      getConversationView: (acceptedSteering) => ({
-        taskId,
-        profileId: "explore",
-        entries: [
-          { kind: "assistant", text: `Working on ${taskId}` },
-          ...acceptedSteering.map((text) => ({ kind: "steering" as const, text })),
-        ],
-        omittedEntryCount: 0,
-        omittedCharacterCount: 0,
-        textTruncated: false,
-        taskMetadata: { instructions: `Inspect ${taskId}` },
-      }),
-      getRecentActivity: () => ["read src/index.ts"],
-    },
-    steer,
-    stop,
-  };
-}
-
-function captureOverlay(ctx: ReturnType<typeof makeCtx>): {
-  custom: ReturnType<typeof vi.fn>;
-  component: () => OverlayComponent;
-} {
-  let overlay: OverlayComponent | undefined;
-  const custom = vi.fn(async (factory: (...args: unknown[]) => unknown) => {
-    overlay = factory(
-      { requestRender: vi.fn(), terminal: { rows: 24 } },
-      ctx.ui.theme,
-      {},
-      vi.fn(),
-    ) as OverlayComponent;
-  });
-  return {
-    custom,
-    component: () => {
-      if (!overlay) throw new Error("Overlay was not created");
-      return overlay;
-    },
-  };
-}
-
-async function startExtension(options: { invalidProfile?: boolean } = {}) {
+async function startExtension(): Promise<ReturnType<typeof createPiMock>> {
   const agentDir = await mkdtemp(join(tmpdir(), "supi-agent-command-"));
   temporaryDirectories.push(agentDir);
   vi.stubEnv("PI_CODING_AGENT_DIR", agentDir);
-  if (options.invalidProfile) {
-    const directory = join(agentDir, "supi", "agents", "broken");
-    await mkdir(directory, { recursive: true });
-    await writeFile(join(directory, "profile.json"), "{", "utf8");
-  }
+  const directory = join(agentDir, "supi", "agents", "broken");
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, "profile.json"), "{", "utf8");
   const pi = createPiMock();
+  startedPis.push(pi);
   agentExtension(pi as unknown as ExtensionAPI);
-  const start = getHandlerOrThrow(pi, "session_start");
-  await start(
+  await getHandlerOrThrow(pi, "session_start")(
     { type: "session_start", reason: "startup" },
     makeCtx({ cwd: process.cwd(), isProjectTrusted: () => false }),
   );
   return pi;
 }
 
-describe("/agents command", () => {
-  it("returns a concise unavailable notice outside TUI mode", async () => {
+describe("Agent Profile pages in /agents", () => {
+  it("keeps effective Profiles and bounded Profile Diagnostics in the shared viewer", async () => {
     const pi = await startExtension();
     const handler = pi.getCommandHandler("agents") as (
       args: string,
       ctx: ReturnType<typeof makeCtx>,
     ) => Promise<void>;
-    const ctx = makeCtx({ mode: "print" });
-
-    await handler("", ctx);
-
-    expect(ctx.ui.notify).toHaveBeenCalledWith("/agents is available only in TUI mode.", "warning");
-    expect(ctx.ui.custom).not.toHaveBeenCalled();
-  });
-
-  it("opens a no-run overlay in TUI mode", async () => {
-    const pi = await startExtension();
-    const handler = pi.getCommandHandler("agents") as (
-      args: string,
-      ctx: ReturnType<typeof makeCtx>,
-    ) => Promise<void>;
-    let rendered = "";
+    let overlay: OverlayComponent | undefined;
+    const base = makeCtx({ mode: "tui" });
     const custom = vi.fn(async (factory: (...args: unknown[]) => unknown) => {
-      const component = factory(
+      overlay = factory(
         { requestRender: vi.fn(), terminal: { rows: 24 } },
-        makeCtx().ui.theme,
+        base.ui.theme,
         {},
         vi.fn(),
-      ) as {
-        render: (width: number) => string[];
-        dispose?: () => void;
-      };
-      rendered = component.render(100).join("\n");
-      component.dispose?.();
+      ) as OverlayComponent;
     });
-    const ctx = makeCtx({ mode: "tui", ui: { ...makeCtx().ui, custom } });
 
-    await handler("", ctx);
-
-    expect(custom).toHaveBeenCalledWith(
-      expect.any(Function),
-      expect.objectContaining({ overlay: true }),
-    );
-    expect(rendered).toContain("Agents");
-    expect(rendered).toContain("No Agent Runs.");
-  });
-
-  it("shows active run details and retains accepted steering inline", async () => {
-    const pi = await startExtension();
-    const active = runRegistration("inspect");
-    registry.register(active.registration);
-    const handler = pi.getCommandHandler("agents") as (
-      args: string,
-      ctx: ReturnType<typeof makeCtx>,
-    ) => Promise<void>;
-    const base = makeCtx({ mode: "tui" });
-    const captured = captureOverlay(base);
-    const input = vi.fn(async () => "This should not open");
-    const ctx = makeCtx({ ui: { ...base.ui, custom: captured.custom, input } });
-
-    await handler("", ctx);
-    const overlay = captured.component();
-    expect(overlay.render(100).join("\n")).toContain("Working on inspect");
-    expect(overlay.render(100).join("\n")).toContain("test/model");
-
-    overlay.handleInput("s");
-    expect(overlay.render(100).join("\n")).toContain("Steer inspect");
-    typeIntoOverlay(overlay, "Focus on tests");
-    expect(input).not.toHaveBeenCalled();
-    await vi.waitFor(() => expect(active.steer).toHaveBeenCalledWith("Focus on tests"));
-    await vi.waitFor(() =>
-      expect(overlay.render(100).join("\n")).toContain("steering: Focus on tests"),
-    );
-    overlay.dispose?.();
-  });
-
-  it("closes the agents overlay before an active ask_user form handles Escape", async () => {
-    const pi = await startExtension();
-    const handler = pi.getCommandHandler("agents") as (
-      args: string,
-      ctx: ReturnType<typeof makeCtx>,
-    ) => Promise<void>;
-    type InputListener = (data: string) => { consume?: boolean } | undefined;
-    const listeners = new Set<InputListener>();
-    const onTerminalInput = vi.fn((listener: InputListener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    });
-    let resolveCustom: (() => void) | undefined;
-    const done = vi.fn((_result?: unknown) => resolveCustom?.());
-    const custom = vi.fn((factory: (...args: unknown[]) => unknown) => {
-      factory({ requestRender: vi.fn(), terminal: { rows: 24 } }, makeCtx().ui.theme, {}, done);
-      return new Promise<void>((resolve) => {
-        resolveCustom = resolve;
-      });
-    });
-    const base = makeCtx({ mode: "tui" });
-    const ctx = makeCtx({ ui: { ...base.ui, custom, onTerminalInput } });
-
-    const commandPromise = handler("", ctx);
-    await vi.waitFor(() => expect(custom).toHaveBeenCalledOnce());
-    pi.events.emit("supi:ask-user:start", { source: "supi-ask-user" });
-
-    expect(onTerminalInput).toHaveBeenCalledOnce();
-    const listener = [...listeners][0];
-    if (!listener) throw new Error("Agents input listener was not registered");
-    expect(listener("\u001b")).toEqual({ consume: true });
-    expect(done).toHaveBeenCalledOnce();
-
-    await commandPromise;
-    expect(listeners).toHaveLength(0);
-  });
-
-  it("represents a rejected steering request as not-running", async () => {
-    const pi = await startExtension();
-    const active = runRegistration("settling", "running", "not-running");
-    registry.register(active.registration);
-    const handler = pi.getCommandHandler("agents") as (
-      args: string,
-      ctx: ReturnType<typeof makeCtx>,
-    ) => Promise<void>;
-    const base = makeCtx({ mode: "tui" });
-    const captured = captureOverlay(base);
-    const ctx = makeCtx({ ui: { ...base.ui, custom: captured.custom } });
-
-    await handler("", ctx);
-    const overlay = captured.component();
-    overlay.handleInput("s");
-    typeIntoOverlay(overlay, "Too late");
-
-    await vi.waitFor(() =>
-      expect(overlay.render(100).join("\n")).toContain("Selected run is not running"),
-    );
-    expect(registry.acceptedSteering("settling")).toEqual([]);
-    overlay.dispose?.();
-  });
-
-  it("stops only the selected run and leaves its sibling active", async () => {
-    const pi = await startExtension();
-    const selected = runRegistration("selected");
-    const sibling = runRegistration("sibling");
-    registry.register(selected.registration);
-    registry.register(sibling.registration);
-    const handler = pi.getCommandHandler("agents") as (
-      args: string,
-      ctx: ReturnType<typeof makeCtx>,
-    ) => Promise<void>;
-    const base = makeCtx({ mode: "tui" });
-    const captured = captureOverlay(base);
-    const ctx = makeCtx({ ui: { ...base.ui, custom: captured.custom } });
-
-    await handler("", ctx);
-    const overlay = captured.component();
-    overlay.handleInput("x");
-    expect(selected.stop).not.toHaveBeenCalled();
-    overlay.handleInput("y");
-
-    await vi.waitFor(() => expect(selected.stop).toHaveBeenCalledOnce());
-    expect(sibling.stop).not.toHaveBeenCalled();
-    expect(registry.snapshot().activeRuns).toHaveLength(2);
-    captured.component().dispose?.();
-  });
-
-  it("shows the last completed batch after active runs settle", async () => {
-    const pi = await startExtension();
-    const registration = runRegistration("finished").registration;
-    registry.register(registration);
-    const view = registration.getConversationView([]);
-    registry.setConversationView("finished", view);
-    registry.completeBatch([
-      {
-        taskId: "finished",
-        profileId: "explore",
-        status: "completed",
-        turns: 1,
-        toolUses: 1,
-        finalTextFull: "The inspection is complete.",
-        modelId: "test/model",
-        thinkingLevel: "low",
-        humanTruncated: false,
-        modelTruncated: false,
-        taskMetadata: view.taskMetadata,
-      },
-    ]);
-    const handler = pi.getCommandHandler("agents") as (
-      args: string,
-      ctx: ReturnType<typeof makeCtx>,
-    ) => Promise<void>;
-    const base = makeCtx({ mode: "tui" });
-    const captured = captureOverlay(base);
-    const ctx = makeCtx({ ui: { ...base.ui, custom: captured.custom } });
-
-    await handler("", ctx);
-
-    const text = captured.component().render(100).join("\n");
-    expect(text).toContain("finished");
-    expect(text).toContain("completed");
-    expect(text).toContain("The inspection is complete.");
-    captured.component().dispose?.();
-  });
-
-  it("shows effective profile provenance and bounded Profile Diagnostics", async () => {
-    const pi = await startExtension({ invalidProfile: true });
-    const handler = pi.getCommandHandler("agents") as (
-      args: string,
-      ctx: ReturnType<typeof makeCtx>,
-    ) => Promise<void>;
-    const base = makeCtx({ mode: "tui" });
-    const captured = captureOverlay(base);
-    const ctx = makeCtx({ ui: { ...base.ui, custom: captured.custom } });
-
-    await handler("", ctx);
-    const overlay = captured.component();
+    await handler("", makeCtx({ mode: "tui", ui: { ...base.ui, custom } }));
+    if (!overlay) throw new Error("The /agents viewer did not open.");
     overlay.handleInput("\t");
-    expect(overlay.render(100).join("\n")).toContain("explore — package");
+    const profiles = overlay.render(100).join("\n");
+    expect(profiles).toContain("explore — package");
+    expect(profiles).toContain("general — package");
     overlay.handleInput("\t");
     const diagnostics = overlay.render(100).join("\n");
     expect(diagnostics).toContain("broken");
     expect(diagnostics).toContain("invalid-manifest");
     overlay.dispose?.();
-  });
-
-  it("clears overlay-accessible state on session shutdown", async () => {
-    const pi = await startExtension();
-    const active = runRegistration("active");
-    registry.register(active.registration);
-    const shutdown = getHandlerOrThrow(pi, "session_shutdown");
-
-    await shutdown({ type: "session_shutdown", reason: "quit" }, makeCtx());
-
-    expect(active.stop).toHaveBeenCalledOnce();
-    expect(registry.snapshot()).toEqual({ activeRuns: [], batches: [], lastBatch: undefined });
-    expect(agentProfileCatalogueStore.get()).toBeUndefined();
   });
 });

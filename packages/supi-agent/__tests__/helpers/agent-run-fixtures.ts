@@ -6,16 +6,12 @@ import type {
 import type {
   AgentRunHandle,
   AgentRunMessage,
+  AgentRunRegistry,
   AgentRunSessionView,
   StartAgentRunOptions,
 } from "@mrclrchtr/supi-agent-runtime/api";
-import {
-  createPiMock,
-  getHandlerOrThrow,
-  getTool,
-  makeCtx,
-  type ToolDef,
-} from "@mrclrchtr/supi-test-utils";
+import { getAgentRunRegistry } from "@mrclrchtr/supi-agent-runtime/api";
+import { createPiMock, getTool, makeCtx, type ToolDef } from "@mrclrchtr/supi-test-utils";
 import { vi } from "vitest";
 
 export type Renderable = { render: (width: number) => string[] };
@@ -23,6 +19,7 @@ export type Renderable = { render: (width: number) => string[] };
 export type RegisteredAgentRunTool = ToolDef & {
   renderCall: (...args: unknown[]) => Renderable;
   renderResult: (...args: unknown[]) => Renderable;
+  registry: AgentRunRegistry;
 };
 
 export const theme = {
@@ -88,14 +85,16 @@ export function runDouble(
   config: RunDoubleConfig = {},
 ): AgentRunHandle<string> {
   const controlled = sessionDouble(options, config);
-  const observerCleanup = options.observer?.(controlled.session);
-  for (const event of config.events ?? []) controlled.emit(event);
 
   return {
-    result: Promise.resolve(observerCleanup).then((cleanup) => {
-      cleanup?.();
-      return { kind: "success" as const, value: config.value ?? "controlled result" };
-    }),
+    steeringAvailable: false,
+    result: Promise.resolve()
+      .then(() => options.observer?.(controlled.session))
+      .then((cleanup) => {
+        for (const event of config.events ?? []) controlled.emit(event);
+        cleanup?.();
+        return { kind: "success" as const, value: config.value ?? "controlled result" };
+      }),
     subscribe: vi.fn((listener) => {
       listener({ status: "starting", turns: 0, toolUses: 0, toolErrors: 0 });
       return () => undefined;
@@ -139,13 +138,14 @@ export async function registerAgentRunToolForTest(
   vi.stubEnv("HOME", "/tmp/supi-agent-boundary-test-home");
   const pi = createPiMock();
   extension(pi as unknown as ExtensionAPI);
-  const sessionStart = getHandlerOrThrow(pi, "session_start");
-  await sessionStart({ type: "session_start", reason: "startup" }, context());
-  const sessionShutdown = getHandlerOrThrow(pi, "session_shutdown");
+  await pi.emit("session_start", { type: "session_start", reason: "startup" }, context());
   shutdowns.push(async () => {
-    await sessionShutdown({ type: "session_shutdown", reason: "test" }, context());
+    await pi.emit("session_shutdown", { type: "session_shutdown", reason: "test" }, context());
   });
-  return getTool(pi, "agent_run") as unknown as RegisteredAgentRunTool;
+  return {
+    ...(getTool(pi, "agent_run") as unknown as Omit<RegisteredAgentRunTool, "registry">),
+    registry: getAgentRunRegistry(pi as unknown as ExtensionAPI),
+  };
 }
 
 export async function shutdownRegisteredTools(shutdowns: Shutdown[]): Promise<void> {

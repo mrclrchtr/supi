@@ -3,7 +3,7 @@ import { appendFile, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
-import type { AgentRunMessage, AgentRunToolRenderer } from "@mrclrchtr/supi-agent-runtime/api";
+import type { AgentRunMessage, AgentRunToolRenderer } from "../types.ts";
 import type { TranscriptRecord } from "./transcript-format.ts";
 import { parseTranscript, projectOperation, sanitizeMessage } from "./transcript-format.ts";
 
@@ -13,12 +13,13 @@ export interface AgentRunTranscriptMetadata {
   readonly runKey: string;
   readonly batchId: string;
   readonly taskId: string;
-  readonly profileId: string;
+  readonly kind: string;
+  readonly label: string;
   readonly cwd: string;
   readonly modelId: string;
   readonly thinkingLevel: string;
   readonly tools: readonly string[];
-  readonly instructions: string;
+  readonly taskDescription?: string;
   readonly sharedContext?: string;
   readonly startedAt: number;
 }

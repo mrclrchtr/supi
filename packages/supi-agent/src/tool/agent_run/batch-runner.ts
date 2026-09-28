@@ -1,20 +1,21 @@
 import { randomUUID } from "node:crypto";
 import type { Usage } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { AgentRunHandle, AgentRunSessionView } from "@mrclrchtr/supi-agent-runtime/api";
+import type {
+  AgentRunDisplayConversation,
+  AgentRunHandle,
+  AgentRunRegistry,
+  AgentRunSessionView,
+  AgentRunTranscriptCapture,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import { combineAgentRunUsage, startAgentRun } from "@mrclrchtr/supi-agent-runtime/api";
 import { toAgentToolNames } from "../../capabilities.ts";
 import type { AgentProfile, ProfileCatalogue } from "../../types.ts";
 import type { ResolvedTask } from "./batch-preflight.ts";
 import { preflightDelegationBatch } from "./batch-preflight.ts";
+import type { BatchProgressState, BatchTaskProgress, BatchTaskResult } from "./batch-types.ts";
 import type { AgentConversationView, ConversationTaskMetadata } from "./conversation-view.ts";
 import { buildConversationView } from "./conversation-view.ts";
-import type {
-  AgentRunRegistry,
-  BatchProgressState,
-  BatchTaskProgress,
-  BatchTaskResult,
-} from "./registry.ts";
 import {
   AgentRunTelemetry,
   failureCodeFromOutcome,
@@ -24,7 +25,6 @@ import {
 import type { AgentRunToolParams } from "./schema.ts";
 import { capHumanText, capModelText, humanTextOverflow, modelTextOverflow } from "./text-caps.ts";
 import { summarizeToolActivity } from "./tool-summary.ts";
-import type { AgentRunTranscriptCapture } from "./transcript-store.ts";
 
 // ── Progress ─────────────────────────────────────────────────────
 
@@ -70,7 +70,7 @@ export async function runDelegationBatch(
   }
 
   const resolved = preflightResult.tasks;
-  const batchId = registry?.beginBatch(params.sharedContext) ?? randomUUID();
+  const batchId = randomUUID();
   const runKeys = new Map<string, string>();
   const totalCount = resolved.length;
   const progressMap = new Map<string, BatchTaskProgress>();
@@ -127,19 +127,21 @@ export async function runDelegationBatch(
     const modelId = `${task.model.provider}/${task.model.id}`;
     const runKey = randomUUID();
     runKeys.set(task.taskId, runKey);
-    const transcript = registry?.createTranscriptCapture({
+    const metadata = {
       runKey,
       batchId,
       taskId: task.taskId,
-      profileId: task.profileId,
+      kind: "Agent Run",
+      label: task.profileId,
       cwd: task.inputs.cwd,
       modelId,
       thinkingLevel: task.inputs.thinkingLevel,
       tools: task.inputs.tools,
-      instructions: task.instructions,
+      taskDescription: task.instructions,
       ...(params.sharedContext === undefined ? {} : { sharedContext: params.sharedContext }),
       startedAt: Date.now(),
-    });
+    };
+    const transcript = registry?.createTranscriptCapture(metadata);
     setProgress({
       taskId: task.taskId,
       profileId: task.profileId,
@@ -176,6 +178,17 @@ export async function runDelegationBatch(
             textTruncated: false,
             taskMetadata,
           });
+    const displayConversation = (
+      acceptedSteering: readonly string[],
+    ): AgentRunDisplayConversation => {
+      const view = currentConversationView(acceptedSteering);
+      return {
+        entries: view.entries,
+        omittedEntryCount: view.omittedEntryCount,
+        omittedCharacterCount: view.omittedCharacterCount,
+        textTruncated: view.textTruncated,
+      };
+    };
 
     const handle = startAgentRun<string>({
       inputs: task.inputs,
@@ -186,11 +199,10 @@ export async function runDelegationBatch(
       completionResolver: (session) => session.getLastAssistantText(),
       observer: (session) => {
         liveSession = session;
-        transcript?.updateSession(session.systemPrompt, session.getToolRenderers());
+        const unsubscribeRegistry = registry?.attachSession(runKey, session);
         registry?.refresh();
         const unsubscribe = session.subscribe((event) => {
           telemetry.observe(event);
-          transcript?.observe(event, session.systemPrompt, session.getToolRenderers());
           const activity = summarizeToolActivity(event);
           if (activity) {
             recentActivity.push(activity);
@@ -209,10 +221,10 @@ export async function runDelegationBatch(
         // The cleanup runs during finish, before result resolves.
         return () => {
           unsubscribe();
+          unsubscribeRegistry?.();
           try {
             const view = currentConversationView(registry?.acceptedSteering(runKey));
             conversationViews.set(task.taskId, view);
-            registry?.setConversationView(runKey, view);
           } catch {
             // Conversation View is presentation-only.
           } finally {
@@ -232,19 +244,15 @@ export async function runDelegationBatch(
       handle,
       telemetry,
     });
-    registry?.register({
-      runKey,
-      batchId,
-      ...(transcript ? { transcript } : {}),
-      taskId: task.taskId,
-      profileId: task.profileId,
-      modelId,
-      thinkingLevel: task.inputs.thinkingLevel,
-      taskMetadata,
-      handle,
-      getConversationView: currentConversationView,
-      getRecentActivity: () => recentActivity,
-    });
+    if (registry) {
+      registry.register({
+        metadata,
+        ...(transcript ? { transcript } : {}),
+        handle,
+        getConversation: displayConversation,
+        getRecentActivity: () => recentActivity,
+      });
+    }
 
     handle.subscribe((progress) => {
       if (progress.status === "running") telemetry.markRunning();
@@ -270,7 +278,7 @@ export async function runDelegationBatch(
   const usageList: Usage[] = [];
 
   for (let index = 0; index < handles.length; index++) {
-    const { taskId, profileId, modelId, thinkingLevel, telemetry } = handles[index];
+    const { taskId, profileId, modelId, thinkingLevel, telemetry, runKey } = handles[index];
     const outcome = settled[index];
 
     if (outcome.status === "rejected") {
@@ -300,6 +308,7 @@ export async function runDelegationBatch(
         modelId,
         thinkingLevel,
       });
+      registry?.setDisplayResult(runKey, { failureCode: "unexpected-runner-failure" });
       continue;
     }
 
@@ -325,6 +334,8 @@ export async function runDelegationBatch(
     const rawText = agentOutcome.kind === "success" ? agentOutcome.value : "";
     const modelText = capModelText(rawText);
     const humanText = capHumanText(rawText);
+    const humanTruncated = humanTextOverflow(rawText) > 0;
+    const modelTruncated = modelTextOverflow(rawText) > 0;
 
     results.push({
       taskId,
@@ -332,8 +343,8 @@ export async function runDelegationBatch(
       status,
       finalText: modelText,
       finalTextFull: humanText,
-      humanTruncated: humanTextOverflow(rawText) > 0,
-      modelTruncated: modelTextOverflow(rawText) > 0,
+      humanTruncated,
+      modelTruncated,
       usage,
       failureCode: failureCodeFromOutcome(agentOutcome),
       turns: progressMap.get(taskId)?.turns ?? 0,
@@ -345,6 +356,12 @@ export async function runDelegationBatch(
             instructions: resolved[index].instructions,
           }
         : undefined,
+    });
+    registry?.setDisplayResult(runKey, {
+      finalText: humanText,
+      failureCode: failureCodeFromOutcome(agentOutcome),
+      humanTruncated,
+      modelTruncated,
     });
 
     setProgress({

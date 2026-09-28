@@ -288,6 +288,8 @@ export interface StartAgentRunOptions<T> {
 
 /** Sole public control interface for one Agent Run. */
 export interface AgentRunHandle<T> {
+  /** True only while the initial user prompt accepts steering. */
+  readonly steeringAvailable: boolean;
   /** Terminal outcome, including all usage attributable to the owned Agent Run session. */
   readonly result: Promise<AgentRunOutcome<T>>;
   /** Subscribe to immutable progress snapshots; the current snapshot is immediate. */

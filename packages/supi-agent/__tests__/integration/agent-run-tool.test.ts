@@ -5,7 +5,6 @@ import { join } from "node:path";
 import type { AgentRunHandle, StartAgentRunOptions } from "@mrclrchtr/supi-agent-runtime/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import agentExtension from "../../src/extension.ts";
-import { registry } from "../../src/tool/agent_run/register.ts";
 import {
   context,
   type RegisteredAgentRunTool,
@@ -26,7 +25,8 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock("@mrclrchtr/supi-agent-runtime/api", () => ({
+vi.mock("@mrclrchtr/supi-agent-runtime/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@mrclrchtr/supi-agent-runtime/api")>()),
   startAgentRun: mocks.startAgentRun,
   combineAgentRunUsage: mocks.combineAgentRunUsage,
   createAgentRunProviderAuthority: mocks.createAgentRunProviderAuthority,
@@ -126,7 +126,7 @@ describe("registered agent_run boundary", () => {
     expect(result.details.tasks[0]?.status).toBe("completed");
     expect(result.content[0]?.text).toContain("x".repeat(10));
     expect(result.details).not.toHaveProperty("transcriptSources");
-    const source = Object.values(registry.snapshot().batches[0]?.transcriptSources ?? {})[0];
+    const source = tool.registry.snapshot().runs[0]?.transcriptSource;
     expect(source?.getStatus().status).toBe("incomplete");
     await expect(source?.load()).resolves.toMatchObject({ status: "incomplete" });
     await rm(missingParent, { recursive: true, force: true });

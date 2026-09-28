@@ -61,7 +61,7 @@ The complete human-only sequence of finalized Agent Run messages, effective syst
 _Avoid_: model result, diagnostics, conversation summary
 
 **Agent Run Transcript Store**:
-The parent-session owner of temporary JSONL files for all Agent Run batches. It has no application cap or restart recovery. It marks a failed capture incomplete, does not stop the run, and removes its files at session shutdown.
+The runtime-owned temporary JSONL store for Agent and Reviewer runs registered in the containing session. It has no application cap or restart recovery. It marks a failed capture incomplete, does not stop a run, and removes files at session shutdown.
 _Avoid_: persistent session history, replay store
 
 **Mutation-Capable Profile**:

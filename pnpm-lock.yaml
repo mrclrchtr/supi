@@ -264,6 +264,9 @@ importers:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
         version: 0.87.1(ws@8.22.0)
+      '@earendil-works/pi-tui':
+        specifier: '*'
+        version: 0.87.1
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core

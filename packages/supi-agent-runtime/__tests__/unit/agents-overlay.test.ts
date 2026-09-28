@@ -6,10 +6,9 @@ import type {
   AgentsDialogDependencies,
   AgentsOverlayData,
 } from "../../src/ui/agents-overlay-data.ts";
+import { makeAgentsRun } from "../helpers/agents-viewer-fixtures.ts";
 
-const conversationView = {
-  taskId: "inspect",
-  profileId: "explore",
+const conversation = {
   entries: [
     { kind: "assistant" as const, text: "I found the caller." },
     { kind: "steering" as const, text: "Check the tests too." },
@@ -23,18 +22,12 @@ const conversationView = {
   omittedEntryCount: 2,
   omittedCharacterCount: 80,
   textTruncated: true,
-  taskMetadata: { instructions: "Inspect the execution path" },
 };
 
 function data(overrides: Partial<AgentsOverlayData> = {}): AgentsOverlayData {
   return {
     runs: [
-      {
-        key: "active:inspect",
-        active: true,
-        taskId: "inspect",
-        profileId: "explore",
-        status: "running",
+      makeAgentsRun({
         modelId: "anthropic/claude-sonnet",
         thinkingLevel: "high",
         turns: 2,
@@ -48,45 +41,46 @@ function data(overrides: Partial<AgentsOverlayData> = {}): AgentsOverlayData {
           cost: { input: 0.1, output: 0.2, cacheRead: 0, cacheWrite: 0, total: 0.3 },
         },
         recentActivity: ["read src/index.ts"],
-        humanTruncated: true,
-        modelTruncated: false,
-        taskMetadata: conversationView.taskMetadata,
+        result: { humanTruncated: true },
+        taskDescription: "Inspect the execution path",
         sharedContext: "Repository context",
-        conversationView,
-      },
+        conversation,
+      }),
     ],
-    profiles: [
-      {
-        id: "explore",
-        description: "Read-only code exploration",
-        source: "package",
-        directory: "/profiles/explore",
-        model: "openai/gpt-5",
-        thinking: "high",
-        tools: ["read", "code_find"],
-        systemPrompt: "supi:explore",
-        instructionScopes: [],
-        fieldSources: {
-          description: "package",
-          tools: "package",
-          systemPrompt: "package",
-          instructionScopes: "package",
-          model: "global",
-          thinking: "project",
+    profilePages: {
+      profiles: [
+        {
+          id: "explore",
+          description: "Read-only code exploration",
+          source: "package",
+          directory: "/profiles/explore",
+          model: "openai/gpt-5",
+          thinking: "high",
+          tools: ["read", "code_find"],
+          systemPrompt: "supi:explore",
+          instructionScopes: [],
+          fieldSources: {
+            description: "package",
+            tools: "package",
+            systemPrompt: "package",
+            instructionScopes: "package",
+            model: "global",
+            thinking: "project",
+          },
         },
-      },
-    ],
-    diagnostics: [
-      {
-        profileId: "broken",
-        source: "global",
-        code: "invalid-manifest",
-        message: "profile.json is invalid.",
-        directory: "/profiles/broken",
-      },
-    ],
-    omittedDiagnosticCount: 3,
-    omittedProfileCount: 1,
+      ],
+      diagnostics: [
+        {
+          profileId: "broken",
+          source: "global",
+          code: "invalid-manifest",
+          message: "profile.json is invalid.",
+          directory: "/profiles/broken",
+        },
+      ],
+      omittedDiagnosticCount: 3,
+      omittedProfileCount: 1,
+    },
     ...overrides,
   };
 }
@@ -104,60 +98,44 @@ function dependencies(overrides: Partial<AgentsDialogDependencies> = {}): Agents
 
 describe("AgentsDialog", () => {
   it("renders selected run metadata, usage, conversation, and disclosure notices", () => {
-    const dialog = new AgentsDialog(data(), dependencies());
-    const text = dialog.render(100).join("\n");
-
+    const text = new AgentsDialog(data(), dependencies()).render(100).join("\n");
     expect(text).toContain("inspect");
     expect(text).toContain("running");
     expect(text).toContain("anthropic/claude-sonnet");
     expect(text).toContain("thinking high");
     expect(text).toContain("175 tokens");
-    expect(text).toContain("Instructions: Inspect the execution path");
+    expect(text).toContain("Task: Inspect the execution path");
     expect(text).toContain("Shared context: Repository context");
     expect(text).toContain("assistant: I found the caller.");
     expect(text).toContain("steering: Check the tests too.");
-    expect(text).toContain("tool read (completed) — read src/index.ts");
-    expect(text).toContain("2 conversation entries");
+    expect(text).toContain("read: read src/index.ts");
+    expect(text).toContain("2 entries");
     expect(text.toLowerCase()).toContain("human output truncated");
   });
 
   it("renders the final result separately from the retained conversation", () => {
-    const completed = data({
-      runs: [
-        {
-          ...data().runs[0],
-          key: "last:inspect",
-          active: false,
-          status: "completed",
-          finalText: "The caller is in `src/index.ts`.",
-        },
-      ],
+    const run = makeAgentsRun({
+      active: false,
+      status: "completed",
+      result: { finalText: "The caller is in `src/index.ts`." },
+      conversation,
     });
-    const dialog = new AgentsDialog(completed, dependencies());
-    const text = dialog.render(100).join("\n");
-
+    const text = new AgentsDialog(data({ runs: [run] }), dependencies()).render(100).join("\n");
     expect(text).toContain("Result");
     expect(text).toContain("The caller is in `src/index.ts`.");
   });
 
-  it("shortens a long final result so the conversation remains visible", () => {
+  it("shortens a long result so the conversation remains visible", () => {
     const finalText = Array.from({ length: 30 }, (_, index) => `result line ${index + 1}`).join(
       "\n",
     );
-    const completed = data({
-      runs: [
-        {
-          ...data().runs[0],
-          key: "last:inspect",
-          active: false,
-          status: "completed",
-          finalText,
-        },
-      ],
+    const run = makeAgentsRun({
+      active: false,
+      status: "completed",
+      result: { finalText },
+      conversation,
     });
-    const dialog = new AgentsDialog(completed, dependencies());
-    const text = dialog.render(100).join("\n");
-
+    const text = new AgentsDialog(data({ runs: [run] }), dependencies()).render(100).join("\n");
     expect(text).toContain("Result shortened for overlay");
     expect(text).toContain("result line 8");
     expect(text).not.toContain("result line 30");
@@ -169,45 +147,29 @@ describe("AgentsDialog", () => {
     const finalText = Array.from({ length: 8 }, (_, index) => `result line ${index + 1}`).join(
       "\n",
     );
-    const completed = data({
-      runs: [
-        {
-          ...data().runs[0],
-          key: "last:inspect",
-          active: false,
-          status: "completed",
-          finalText: `${finalText}\n`,
-        },
-      ],
+    const run = makeAgentsRun({
+      active: false,
+      status: "completed",
+      result: { finalText: `${finalText}\n` },
     });
-    const dialog = new AgentsDialog(completed, dependencies());
-
-    expect(dialog.render(100).join("\n")).not.toContain("Result shortened for overlay");
+    expect(
+      new AgentsDialog(data({ runs: [run] }), dependencies()).render(100).join("\n"),
+    ).not.toContain("Result shortened for overlay");
   });
 
-  it("does not render a result section for a failed task", () => {
-    const failed = data({
-      runs: [
-        {
-          ...data().runs[0],
-          key: "last:inspect",
-          active: false,
-          status: "failed",
-          failureCode: "prompt-rejected",
-          finalText: "",
-        },
-      ],
+  it("does not render a result section for a failed run", () => {
+    const run = makeAgentsRun({
+      active: false,
+      status: "failed",
+      result: { failureCode: "prompt-rejected", finalText: "" },
     });
-    const dialog = new AgentsDialog(failed, dependencies());
-    const text = dialog.render(100).join("\n");
-
+    const text = new AgentsDialog(data({ runs: [run] }), dependencies()).render(100).join("\n");
     expect(text).toContain("failed (prompt-rejected)");
     expect(text).not.toContain("Result");
   });
 
-  it("shows effective profile provenance and bounded diagnostics on their tabs", () => {
+  it("shows optional Agent Profile pages and bounded diagnostics", () => {
     const dialog = new AgentsDialog(data(), dependencies());
-
     dialog.handleInput("\t");
     const profiles = dialog.render(100).join("\n");
     expect(profiles).toContain("Runs 1");
@@ -219,7 +181,6 @@ describe("AgentsDialog", () => {
     expect(profiles).toContain("Thinking (project): high");
     expect(profiles).toContain("Tools (package): read, code_find");
     expect(profiles).toContain("1 additional profile omitted");
-
     dialog.handleInput("\t");
     const diagnostics = dialog.render(100).join("\n");
     expect(diagnostics).toContain("invalid-manifest");
@@ -227,34 +188,21 @@ describe("AgentsDialog", () => {
     expect(diagnostics).toContain("3 additional diagnostics omitted");
   });
 
-  it("resets conversation paging when a live update replaces the selected run", () => {
+  it("resets conversation paging when live data replaces the selected run", () => {
     const entries = Array.from({ length: 15 }, (_, index) => ({
       kind: "assistant" as const,
       text: `message ${index + 1}`,
     }));
-    const initial = data({
-      runs: [
-        {
-          ...data().runs[0],
-          conversationView: { ...conversationView, entries },
-        },
-      ],
-    });
-    const dialog = new AgentsDialog(
-      initial,
-      dependencies({
-        tui: { requestRender: vi.fn(), terminal: { rows: 24 } },
-      }),
-    );
+    const initialRun = makeAgentsRun({ conversation: { ...conversation, entries } });
+    const initial = data({ runs: [initialRun] });
+    const dialog = new AgentsDialog(initial, dependencies());
     dialog.render(100);
     dialog.handleInput("\x1b[5~");
     expect(dialog.render(100).join("\n")).not.toContain("message 15");
-
     dialog.updateData({
       ...initial,
-      runs: [{ ...initial.runs[0], key: "last:inspect", active: false }],
+      runs: [makeAgentsRun({ ...initialRun, key: "run:done", active: false })],
     });
-
     expect(dialog.render(100).join("\n")).toContain("message 15");
   });
 
@@ -262,9 +210,7 @@ describe("AgentsDialog", () => {
     const done = vi.fn();
     const onStop = vi.fn(async () => "accepted" as const);
     const dialog = new AgentsDialog(data(), dependencies({ done, onStop }));
-
     dialog.handleInput("\x1b");
-
     expect(done).toHaveBeenCalledOnce();
     expect(onStop).not.toHaveBeenCalled();
   });
@@ -274,18 +220,15 @@ describe("AgentsDialog", () => {
       throw new Error("TUI closed");
     });
     const dialog = new AgentsDialog(data(), dependencies({ onSteer }));
-
     dialog.handleInput("s");
     for (const character of "Focus on tests") dialog.handleInput(character);
     dialog.handleInput("\n");
-
     await vi.waitFor(() => expect(dialog.render(100).join("\n")).toContain("Control failed"));
   });
 
-  it("refreshes the embedded cursor when the overlay focus changes", () => {
+  it("refreshes the embedded cursor when overlay focus changes", () => {
     const dialog = new AgentsDialog(data(), dependencies());
     dialog.handleInput("s");
-
     dialog.focused = true;
     expect(dialog.render(100).join("\n")).toContain(CURSOR_MARKER);
     dialog.focused = false;
@@ -296,12 +239,10 @@ describe("AgentsDialog", () => {
     const done = vi.fn();
     const onSteer = vi.fn(async () => "accepted" as const);
     const dialog = new AgentsDialog(data(), dependencies({ done, onSteer }));
-
     dialog.handleInput("s");
     dialog.handleInput("\n");
     expect(onSteer).not.toHaveBeenCalled();
     expect(dialog.render(100).join("\n")).toContain("Enter a steering message");
-
     dialog.handleInput("\x1b");
     expect(done).not.toHaveBeenCalled();
     expect(dialog.render(100).join("\n")).toContain("Control canceled");
@@ -312,7 +253,6 @@ describe("AgentsDialog", () => {
     const onSteer = vi.fn(async () => "accepted" as const);
     const onStop = vi.fn(async () => "accepted" as const);
     const dialog = new AgentsDialog(data(), dependencies({ onSteer, onStop }));
-
     dialog.handleInput("s");
     expect(dialog.render(100).join("\n")).toContain("Steer inspect");
     for (const character of "Focus on tests") dialog.handleInput(character);
@@ -327,20 +267,16 @@ describe("AgentsDialog", () => {
 
   it("permits selected stop during startup and shows the stopping wait", async () => {
     const onStop = vi.fn(async () => "accepted" as const);
-    const starting = data({
-      runs: [{ ...data().runs[0], status: "starting" }],
-    });
-    const dialog = new AgentsDialog(starting, dependencies({ onStop }));
-
+    const starting = makeAgentsRun({ status: "starting", steeringAvailable: false });
+    const dialog = new AgentsDialog(data({ runs: [starting] }), dependencies({ onStop }));
     dialog.handleInput("x");
     expect(dialog.render(100).join("\n")).toContain("Press Enter or y to confirm");
     dialog.handleInput("\n");
-
     expect(dialog.render(100).join("\n")).toContain("Stopping selected run");
     await vi.waitFor(() => expect(onStop).toHaveBeenCalledWith("inspect"));
   });
 
-  it("renders every lifecycle status distinctly", () => {
+  it("renders each lifecycle status distinctly", () => {
     const statuses = [
       "starting",
       "running",
@@ -350,36 +286,45 @@ describe("AgentsDialog", () => {
       "canceled",
       "timeout",
     ] as const;
-    const runs = statuses.map((status) => ({
-      ...data().runs[0],
-      key: status,
-      taskId: status,
-      active: status === "starting" || status === "running" || status === "stopping",
-      status,
-    }));
+    const runs = statuses.map((status) =>
+      makeAgentsRun({
+        key: `run:${status}`,
+        runKey: status,
+        taskId: status,
+        active: ["starting", "running", "stopping"].includes(status),
+        status,
+        steeringAvailable: false,
+      }),
+    );
     const text = new AgentsDialog(data({ runs }), dependencies()).render(120).join("\n");
-
     for (const status of statuses) expect(text).toContain(status);
   });
 
   it("disables controls for a completed run", () => {
     const onSteer = vi.fn(async () => "accepted" as const);
     const onStop = vi.fn(async () => "accepted" as const);
-    const completed = data({
-      runs: [{ ...data().runs[0], key: "last:inspect", active: false, status: "completed" }],
+    const completed = makeAgentsRun({
+      active: false,
+      status: "completed",
+      steeringAvailable: false,
     });
-    const dialog = new AgentsDialog(completed, dependencies({ onSteer, onStop }));
-
+    const dialog = new AgentsDialog(data({ runs: [completed] }), dependencies({ onSteer, onStop }));
     dialog.handleInput("s");
     dialog.handleInput("x");
-
     expect(onSteer).not.toHaveBeenCalled();
     expect(onStop).not.toHaveBeenCalled();
     expect(dialog.render(100).join("\n")).toContain("controls unavailable");
   });
 
+  it("shows when steering is unavailable but keeps Stop available", () => {
+    const run = makeAgentsRun({ steeringAvailable: false });
+    const text = new AgentsDialog(data({ runs: [run] }), dependencies()).render(100).join("\n");
+    expect(text).toContain("steering unavailable · x stop");
+  });
+
   it("keeps every rendered line within the available width", () => {
-    const dialog = new AgentsDialog(data(), dependencies());
-    expect(dialog.render(60).every((line) => visibleWidth(line) <= 60)).toBe(true);
+    expect(
+      new AgentsDialog(data(), dependencies()).render(60).every((line) => visibleWidth(line) <= 60),
+    ).toBe(true);
   });
 });

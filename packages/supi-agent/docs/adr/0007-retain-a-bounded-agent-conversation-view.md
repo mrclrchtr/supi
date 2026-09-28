@@ -8,7 +8,7 @@ Accepted
 
 Keep the parent-facing Conversation View bounded to the newest 100 visible entries and 50 KB of text. Keep one row for every task. The view contains assistant text, steering, and safe tool summaries. It omits private reasoning, signatures, full tool results, and arbitrary tool arguments.
 
-Keep the complete human-only Agent Run Transcript separate from the Conversation View. `/agents` reads it from temporary session storage. It never enters the parent tool result. See [ADR 0009](0009-store-human-agent-run-transcripts-temporarily.md).
+Keep the complete human-only Agent Run Transcript separate from the Conversation View. The runtime-owned `/agents` viewer reads it from temporary session storage. It never enters the parent tool result. See [ADR 0009](0009-store-human-agent-run-transcripts-temporarily.md) and [the shared runtime decision](../../../supi-agent-runtime/docs/adr/0013-share-the-session-run-viewer-and-transcripts.md).
 
 ## Consequences
 

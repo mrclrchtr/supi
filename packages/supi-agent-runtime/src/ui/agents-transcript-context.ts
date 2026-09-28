@@ -3,7 +3,7 @@ import { Container, Text } from "@earendil-works/pi-tui";
 import type {
   AgentRunTranscriptDocument,
   AgentRunTranscriptOperation,
-} from "../tool/agent_run/transcript-store.ts";
+} from "../session/transcript-store.ts";
 import { formatTranscriptValue } from "./agents-transcript-payload.ts";
 
 /** Render Agent Run metadata for the transcript. */
@@ -16,7 +16,7 @@ export function renderTranscriptMetadata(
   const statusColor = document.status === "complete" ? "success" : "warning";
   container.addChild(
     new Text(
-      theme.fg("accent", theme.bold(`${metadata.taskId} · ${metadata.profileId}`)) +
+      theme.fg("accent", theme.bold(`${metadata.taskId} · ${metadata.kind}: ${metadata.label}`)) +
         theme.fg(statusColor, ` · capture ${document.status} · ${document.messageCount} messages`),
       0,
       0,
@@ -28,7 +28,7 @@ export function renderTranscriptMetadata(
     `Working directory: ${metadata.cwd}`,
     `Tools: ${metadata.tools.join(", ") || "none"}`,
     `Started: ${new Date(metadata.startedAt).toLocaleString()}`,
-    `Instructions: ${metadata.instructions}`,
+    ...(metadata.taskDescription ? [`Task: ${metadata.taskDescription}`] : []),
     ...(metadata.sharedContext ? [`Shared context: ${metadata.sharedContext}`] : []),
   ];
   for (const field of fields) container.addChild(new Text(field, 0, 0));

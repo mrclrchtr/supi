@@ -8,7 +8,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { type Component, Image, Text } from "@earendil-works/pi-tui";
 import type { AgentRunMessage, AgentRunToolRenderer } from "@mrclrchtr/supi-agent-runtime/api";
-import type { AgentRunTranscriptDocument } from "../tool/agent_run/transcript-store.ts";
+import type { AgentRunTranscriptDocument } from "../session/transcript-store.ts";
 import type { AgentRunBlock } from "./agents-run-viewport.ts";
 import {
   renderSystemPrompt,

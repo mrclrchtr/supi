@@ -50,7 +50,7 @@ vi.mock("node:fs/promises", () => ({
   rm: fileSystem.rm,
 }));
 
-import { AgentRunTranscriptStore } from "../../src/tool/agent_run/transcript-store.js";
+import { AgentRunTranscriptStore } from "../../src/session/transcript-store.ts";
 
 const stores: AgentRunTranscriptStore[] = [];
 
@@ -67,12 +67,13 @@ describe("AgentRunTranscriptCapture concurrent reads", () => {
         runKey: "run-1",
         batchId: "batch-1",
         taskId: "task-1",
-        profileId: "coder",
+        kind: "Agent Run",
+        label: "coder",
         cwd: "/work/project",
         modelId: "provider/model",
         thinkingLevel: "high",
         tools: [],
-        instructions: "Inspect the source.",
+        taskDescription: "Inspect the source.",
         startedAt: 1,
       },
       "Child system prompt",

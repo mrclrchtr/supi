@@ -1,7 +1,8 @@
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
 import { type AggregateSection, boundAggregateOutput } from "./aggregate.ts";
 import type { runDelegationBatch } from "./batch-runner.ts";
-import type { BatchTaskResult, CompletedBatch } from "./registry.ts";
+import type { BatchTaskResult } from "./batch-types.ts";
+import type { AgentConversationView } from "./conversation-view.ts";
 
 /** Batch outcome returned by the delegation runner. */
 export type DelegationBatchOutcome = Awaited<ReturnType<typeof runDelegationBatch>>;
@@ -10,7 +11,7 @@ export interface AgentRunResultDetails {
   tasks: BatchTaskResult[];
   sharedContext?: string;
   aggregateUsage: DelegationBatchOutcome["aggregateUsage"];
-  conversationViews: CompletedBatch["conversationViews"];
+  conversationViews: Record<string, AgentConversationView>;
   fullOutputPath?: string;
 }
 
@@ -36,7 +37,6 @@ export function formatModelResult(results: readonly BatchTaskResult[]): {
 /** Assemble the model-facing agent_run result for one completed batch. */
 export function buildAgentRunResult(
   outcome: DelegationBatchOutcome,
-  batch: CompletedBatch,
   sharedContext?: string,
 ): AgentToolResult<AgentRunResultDetails> {
   const { results, aggregateUsage } = outcome;
@@ -47,7 +47,7 @@ export function buildAgentRunResult(
       tasks: results,
       sharedContext,
       aggregateUsage,
-      conversationViews: batch.conversationViews,
+      conversationViews: Object.fromEntries(outcome.conversationViews),
       ...(formatted.fullOutputPath ? { fullOutputPath: formatted.fullOutputPath } : {}),
     },
     usage: aggregateUsage,

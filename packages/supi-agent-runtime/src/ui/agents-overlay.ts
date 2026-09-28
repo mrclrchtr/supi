@@ -23,9 +23,7 @@ import {
 import { AgentsRunViewer, type AgentsRunViewerAction } from "./agents-run-viewer.ts";
 import { AgentsSteeringInput } from "./agents-steering-input.ts";
 
-const TABS = ["runs", "profiles", "diagnostics"] as const;
-
-type AgentsTab = (typeof TABS)[number];
+type AgentsTab = "runs" | "profiles" | "diagnostics";
 
 /** TUI-only Agent Run inspector and selected-run controller. */
 export class AgentsDialog implements Focusable {
@@ -111,11 +109,15 @@ export class AgentsDialog implements Focusable {
   updateData(data: AgentsOverlayData): void {
     this.data = data;
     this.#runViewer.updateData(data);
-    this.#profileIndex = Math.min(this.#profileIndex, Math.max(0, data.profiles.length - 1));
     this.#diagnosticIndex = Math.min(
       this.#diagnosticIndex,
-      Math.max(0, data.diagnostics.length - 1),
+      Math.max(0, (data.profilePages?.diagnostics.length ?? 0) - 1),
     );
+    this.#profileIndex = Math.min(
+      this.#profileIndex,
+      Math.max(0, (data.profilePages?.profiles.length ?? 0) - 1),
+    );
+    this.#tabIndex = Math.min(this.#tabIndex, this.#tabsList().length - 1);
     this.#changed();
   }
 
@@ -202,9 +204,9 @@ export class AgentsDialog implements Focusable {
 
   #handleTabInput(data: string): boolean {
     if (matchesKey(data, Key.tab) || matchesKey(data, Key.right)) {
-      this.#tabIndex = (this.#tabIndex + 1) % TABS.length;
+      this.#tabIndex = (this.#tabIndex + 1) % this.#tabsList().length;
     } else if (matchesKey(data, Key.left) || matchesKey(data, Key.shift("tab"))) {
-      this.#tabIndex = (this.#tabIndex + TABS.length - 1) % TABS.length;
+      this.#tabIndex = (this.#tabIndex + this.#tabsList().length - 1) % this.#tabsList().length;
     } else {
       return false;
     }
@@ -219,8 +221,9 @@ export class AgentsDialog implements Focusable {
   }
 
   #moveCatalogueSelection(delta: number): void {
+    const pages = this.data.profilePages;
     const length =
-      this.#tab() === "profiles" ? this.data.profiles.length : this.data.diagnostics.length;
+      this.#tab() === "profiles" ? (pages?.profiles.length ?? 0) : (pages?.diagnostics.length ?? 0);
     if (length === 0) return;
     if (this.#tab() === "profiles") {
       this.#profileIndex = clamp(this.#profileIndex + delta, 0, length - 1);
@@ -312,21 +315,27 @@ export class AgentsDialog implements Focusable {
   }
 
   #tabs(): string {
-    return TABS.map((tab, index) => {
-      const selected = index === this.#tabIndex;
-      const count =
-        tab === "runs"
-          ? this.data.runs.length
-          : tab === "profiles"
-            ? this.data.profiles.length
-            : this.data.diagnostics.length;
-      const value = `${title(tab)} ${count}`;
-      return selected ? `[${value}]` : value;
-    }).join(this.dependencies.theme.fg("dim", "  "));
+    return this.#tabsList()
+      .map((tab, index) => {
+        const selected = index === this.#tabIndex;
+        const count =
+          tab === "runs"
+            ? this.data.runs.length
+            : tab === "profiles"
+              ? (this.data.profilePages?.profiles.length ?? 0)
+              : (this.data.profilePages?.diagnostics.length ?? 0);
+        const value = `${title(tab)} ${count}`;
+        return selected ? `[${value}]` : value;
+      })
+      .join(this.dependencies.theme.fg("dim", "  "));
+  }
+
+  #tabsList(): AgentsTab[] {
+    return this.data.profilePages ? ["runs", "profiles", "diagnostics"] : ["runs"];
   }
 
   #tab(): AgentsTab {
-    return TABS[this.#tabIndex] ?? "runs";
+    return this.#tabsList()[this.#tabIndex] ?? "runs";
   }
 
   #line(text: string, width: number): string {

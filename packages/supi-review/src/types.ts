@@ -2,6 +2,7 @@ import type { Model, ModelThinkingLevel, Usage } from "@earendil-works/pi-ai";
 import type {
   AgentRunDiagnostics,
   AgentRunProviderAuthority,
+  AgentRunRegistry,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import type { LocalReviewAuditStore } from "./audit/local-review-audit-store.ts";
 import type { ReviewThinkingLevel } from "./thinking.ts";
@@ -278,6 +279,10 @@ export interface ReviewerInvocation {
   signal?: AbortSignal;
   projectTrusted?: boolean;
   onProgress?: (progress: ReviewProgress) => void;
+  /** Shared viewer group for the independent Reviewer Sessions in one Review. */
+  runGroupId?: string;
+  /** Registry for the Pi runtime that owns this Reviewer. */
+  registry?: AgentRunRegistry;
 }
 
 export type ReviewerExtensionSetStatus = "active" | "degraded" | "unobserved";

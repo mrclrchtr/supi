@@ -17,7 +17,8 @@ const mockHandles: Array<{
   stop: ReturnType<typeof vi.fn>;
 }> = [];
 
-vi.mock("@mrclrchtr/supi-agent-runtime/api", () => ({
+vi.mock("@mrclrchtr/supi-agent-runtime/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@mrclrchtr/supi-agent-runtime/api")>()),
   createAgentRunProviderAuthority: vi.fn(() => ({
     getProvider: () => undefined,
     getProviderAuth: async () => undefined,
@@ -25,6 +26,7 @@ vi.mock("@mrclrchtr/supi-agent-runtime/api", () => ({
   startAgentRun: vi.fn(
     (options: { prompt: string; readinessCheck?: (session: unknown) => boolean }) => {
       const handle = {
+        steeringAvailable: false,
         result: new Promise<{ kind: string; value?: string }>((resolve) => {
           // Resolve immediately with success.
           resolve({ kind: "success", value: `completed: ${options.prompt}` });

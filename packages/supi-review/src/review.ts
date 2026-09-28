@@ -1,5 +1,6 @@
 import { type ExtensionAPI, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { Box } from "@earendil-works/pi-tui";
+import { registerAgentsCommand } from "@mrclrchtr/supi-agent-runtime/api";
 import { LocalReviewAuditStore } from "./audit/local-review-audit-store.ts";
 import { registerReviewSettings, syncReviewAgentTools } from "./config.ts";
 import { ReviewArtifactStore } from "./session/review-artifact-store.ts";
@@ -16,9 +17,10 @@ export default function reviewExtension(pi: ExtensionAPI): void {
   const auditStore = new LocalReviewAuditStore({
     agentDir: process.env.PI_CODING_AGENT_DIR || getAgentDir(),
   });
+  const registry = registerAgentsCommand(pi);
   registerReviewSettings(pi);
   registerReviewOutputTool(pi, artifactStore);
-  registerReviewRunTool(pi, artifactStore, auditStore);
+  registerReviewRunTool(pi, artifactStore, auditStore, registry);
   registerReviewAuditTool(pi, auditStore);
   pi.on("session_start", (_event, ctx) => syncReviewAgentTools(pi, ctx.cwd));
   registerReviewWorkspaceCleanupCommand(pi);
@@ -39,6 +41,7 @@ export default function reviewExtension(pi: ExtensionAPI): void {
 
   pi.registerCommand("supi-review", {
     description: "Run one or more caller-defined Inspection-only review tasks",
-    handler: async (_args, ctx) => runReviewCommand(ctx, { pi, artifactStore, auditStore }),
+    handler: async (_args, ctx) =>
+      runReviewCommand(ctx, { pi, artifactStore, auditStore, registry }),
   });
 }

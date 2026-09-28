@@ -27,7 +27,7 @@ Multi-context monorepo. Each package is an independent context with its own `CON
 - **supi-web** → `packages/supi-web/CONTEXT.md`
 
 Relationships:
-- **supi-agent → supi-agent-runtime**: Agent Profiles compile Delegation Tasks into Agent Runs.
-- **supi-review → supi-agent-runtime**: Reviewer and Planner adapters resolve structured completions through Agent Runs.
+- **supi-agent → supi-agent-runtime**: Agent Profiles compile Delegation Tasks into Agent Runs; the runtime owns the shared session registry, temporary transcripts, and `/agents` viewer.
+- **supi-review → supi-agent-runtime**: Reviewer and Planner adapters resolve structured completions through Agent Runs. Reviewer Runs appear in the same registry; Review audit stays separate.
 
 System-wide context lives in root `CONTEXT.md` and `docs/adr/`.

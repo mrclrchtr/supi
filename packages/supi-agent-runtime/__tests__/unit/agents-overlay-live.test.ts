@@ -1,44 +1,39 @@
 import { stripTerminalSequences, visibleWidth } from "@earendil-works/pi-tui";
 import { makeCtx } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it, vi } from "vitest";
+import type {
+  AgentRunDisplayConversation,
+  AgentRunDisplayEntry,
+} from "../../src/session/agent-run-registry-types.ts";
 import { AgentsDialog } from "../../src/ui/agents-overlay.ts";
 import type {
   AgentsDialogDependencies,
   AgentsOverlayData,
 } from "../../src/ui/agents-overlay-data.ts";
+import { makeAgentsRun } from "../helpers/agents-viewer-fixtures.ts";
 
-function data(count = 40): AgentsOverlayData {
+function data(
+  count = 40,
+  options: { omittedEntryCount?: number; entries?: readonly AgentRunDisplayEntry[] } = {},
+): AgentsOverlayData {
+  const conversation: AgentRunDisplayConversation = {
+    entries:
+      options.entries ??
+      Array.from({ length: count }, (_, index) => ({
+        kind: "assistant" as const,
+        text: `message ${index + 1}`,
+      })),
+    omittedEntryCount: options.omittedEntryCount ?? 0,
+    omittedCharacterCount: 0,
+    textTruncated: false,
+  };
   return {
     runs: [
-      {
-        key: "active:inspect",
-        active: true,
-        taskId: "inspect",
-        profileId: "explore",
-        status: "running",
-        turns: 1,
-        toolUses: 0,
-        humanTruncated: false,
-        modelTruncated: false,
-        taskMetadata: { instructions: "Inspect the callers." },
-        conversationView: {
-          taskId: "inspect",
-          profileId: "explore",
-          taskMetadata: { instructions: "Inspect the callers." },
-          entries: Array.from({ length: count }, (_, index) => ({
-            kind: "assistant" as const,
-            text: `message ${index + 1}`,
-          })),
-          omittedEntryCount: 0,
-          omittedCharacterCount: 0,
-          textTruncated: false,
-        },
-      },
+      makeAgentsRun({
+        taskDescription: "Inspect the callers.",
+        conversation,
+      }),
     ],
-    profiles: [],
-    diagnostics: [],
-    omittedDiagnosticCount: 0,
-    omittedProfileCount: 0,
   };
 }
 
@@ -54,7 +49,7 @@ function dependencies(rows = 24): AgentsDialogDependencies {
 
 describe("AgentsDialog live output", () => {
   it.each([10, 24, 40])(
-    "fits %i terminal rows and keeps the latest output and controls visible",
+    "fits %i terminal rows and keeps latest output and controls visible",
     (rows) => {
       const dialog = new AgentsDialog(data(), dependencies(rows));
       const lines = dialog.render(60);
@@ -68,19 +63,17 @@ describe("AgentsDialog live output", () => {
   );
 
   it.each([9, 10, 12, 14])("keeps the selected run visible with %i terminal rows", (rows) => {
-    const input = data();
-    const runs = ["first", "middle", "last"].map((taskId) => ({
-      ...input.runs[0],
-      key: `active:${taskId}`,
-      taskId,
-    }));
-    const dialog = new AgentsDialog({ ...input, runs }, dependencies(rows));
+    const runs = ["first", "middle", "last"].map((taskId) =>
+      makeAgentsRun({ taskId, key: `run:${taskId}` }),
+    );
+    const dialog = new AgentsDialog({ runs }, dependencies(rows));
     dialog.render(60);
     dialog.handleInput("\x1b[D");
     dialog.handleInput("\x1b[B");
     dialog.handleInput("\x1b[B");
-    const list = dialog.render(60);
-    expect(list.some((line) => line.includes("▶") && line.includes("last"))).toBe(true);
+    expect(dialog.render(60).some((line) => line.includes("▶") && line.includes("last"))).toBe(
+      true,
+    );
     dialog.handleInput("\x1b[C");
     const lines = dialog.render(60);
     expect(lines.join("\n")).toContain("Agents");
@@ -129,11 +122,11 @@ describe("AgentsDialog live output", () => {
     expect(dialog.render(80).join("\n")).toContain("message 41");
   });
 
-  it("uses Home for metadata and f to pause or resume without changing the selected run", () => {
+  it("uses Home for task metadata and f to pause or resume", () => {
     const dialog = new AgentsDialog(data(), dependencies());
     dialog.render(80);
     dialog.handleInput("\x1b[H");
-    expect(dialog.render(80).join("\n")).toContain("Instructions: Inspect the callers.");
+    expect(dialog.render(80).join("\n")).toContain("Task: Inspect the callers.");
     expect(dialog.render(80).join("\n")).toContain("PAUSED");
     dialog.handleInput("f");
     expect(dialog.render(80).join("\n")).toContain("message 40");
@@ -146,24 +139,20 @@ describe("AgentsDialog live output", () => {
   });
 
   it("keeps retention notices visible while following a long conversation", () => {
-    const input = data();
-    const view = input.runs[0]?.conversationView;
-    if (!view) throw new Error("Missing test conversation");
-    view.omittedEntryCount = 100;
-    const dialog = new AgentsDialog(input, dependencies());
+    const dialog = new AgentsDialog(data(40, { omittedEntryCount: 100 }), dependencies());
     expect(dialog.render(60).join("\n")).toContain("100 entries omitted");
     dialog.handleInput("\x1b[5~");
     expect(dialog.render(60).join("\n")).toContain("100 entries omitted");
   });
 
   it("preserves the selected run and reading position when rows change order", () => {
-    const input = data();
-    const second = { ...input.runs[0], key: "active:other", taskId: "other" };
-    const dialog = new AgentsDialog({ ...input, runs: [...input.runs, second] }, dependencies());
+    const first = makeAgentsRun();
+    const second = makeAgentsRun({ key: "run:other", runKey: "other", taskId: "other" });
+    const dialog = new AgentsDialog({ runs: [first, second] }, dependencies());
     dialog.render(80);
     dialog.handleInput("\x1b[5~");
     const paused = dialog.render(80).filter((line) => line.includes("assistant:"));
-    dialog.updateData({ ...input, runs: [second, ...input.runs] });
+    dialog.updateData({ runs: [second, first] });
     expect(dialog.render(80).filter((line) => line.includes("assistant:"))).toEqual(paused);
     expect(dialog.render(80).join("\n")).toContain("PAUSED");
     dialog.handleInput("\t");
@@ -182,7 +171,6 @@ describe("AgentsDialog live output", () => {
   it.each([1, 2, 3, 4, 5, 6])("keeps the steering input visible in %i terminal rows", (rows) => {
     const dialog = new AgentsDialog(data(), dependencies(rows));
     dialog.handleInput("s");
-
     const lines = dialog.render(60);
     expect(lines).toHaveLength(Math.max(1, rows));
     expect(stripTerminalSequences(lines.join("\n"))).toContain("Steering message");
@@ -192,7 +180,6 @@ describe("AgentsDialog live output", () => {
     const dialog = new AgentsDialog(data(), dependencies(4));
     dialog.handleInput("s");
     dialog.handleInput("\n");
-
     const text = stripTerminalSequences(dialog.render(60).join("\n"));
     expect(text).toContain("Enter a steering message");
     expect(text).toContain("Steering message");
@@ -210,11 +197,10 @@ describe("AgentsDialog live output", () => {
   });
 
   it("pages within one long wrapped message without hiding its end", () => {
-    const input = data(1);
-    const view = input.runs[0]?.conversationView;
-    if (!view) throw new Error("Missing test conversation");
-    view.entries = [{ kind: "assistant", text: `${"wrapped output ".repeat(600)}LATEST` }];
-    const dialog = new AgentsDialog(input, dependencies());
+    const entries: readonly AgentRunDisplayEntry[] = [
+      { kind: "assistant", text: `${"wrapped output ".repeat(600)}LATEST` },
+    ];
+    const dialog = new AgentsDialog(data(1, { entries }), dependencies());
     expect(dialog.render(60).join("\n")).toContain("LATEST");
     dialog.handleInput("\x1b[5~");
     expect(dialog.render(60).join("\n")).not.toContain("LATEST");

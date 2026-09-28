@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { AgentRunRegistry } from "@mrclrchtr/supi-agent-runtime/api";
 import type { LocalReviewAuditStore } from "../../audit/local-review-audit-store.ts";
 import type { ReviewArtifactStore } from "../../session/review-artifact-store.ts";
 import { makeRunReviewExecute } from "./execute.ts";
@@ -11,6 +12,7 @@ export function registerReviewRunTool(
   pi: ExtensionAPI,
   artifactStore: ReviewArtifactStore,
   localAuditStore?: LocalReviewAuditStore,
+  registry?: AgentRunRegistry,
 ): void {
   pi.registerTool({
     ...reviewRunSpec,
@@ -19,6 +21,6 @@ export function registerReviewRunTool(
     promptGuidelines: [...promptGuidelines],
     renderCall: renderRunCall,
     renderResult: renderRunResult,
-    execute: makeRunReviewExecute(artifactStore, localAuditStore),
+    execute: makeRunReviewExecute(artifactStore, localAuditStore, registry),
   });
 }

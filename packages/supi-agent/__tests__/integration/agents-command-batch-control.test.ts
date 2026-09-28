@@ -4,6 +4,7 @@ import type {
   AgentRunOutcome,
   AgentRunProgress,
 } from "@mrclrchtr/supi-agent-runtime/api";
+import { getAgentRunRegistry } from "@mrclrchtr/supi-agent-runtime/api";
 import {
   createPiMock,
   getHandlerOrThrow,
@@ -14,14 +15,15 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import agentExtension from "../../src/extension.ts";
 import { agentProfileCatalogueStore } from "../../src/session.ts";
-import { registry } from "../../src/tool/agent_run/register.ts";
 import { context } from "../helpers/agent-run-fixtures.ts";
 
 const mocks = vi.hoisted(() => ({
   handles: [] as ControlledHandle[],
 }));
+let activePi: ReturnType<typeof createPiMock> | undefined;
 
-vi.mock("@mrclrchtr/supi-agent-runtime/api", () => ({
+vi.mock("@mrclrchtr/supi-agent-runtime/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@mrclrchtr/supi-agent-runtime/api")>()),
   createAgentRunProviderAuthority: vi.fn(() => ({
     getProvider: () => undefined,
     getProviderAuth: async () => undefined,
@@ -51,6 +53,7 @@ function controlledHandle(): ControlledHandle {
   });
   const listeners = new Set<(progress: AgentRunProgress) => void>();
   const handle = {
+    steeringAvailable: false,
     result,
     resolve,
     subscribe: (listener: (progress: AgentRunProgress) => void) => {
@@ -74,8 +77,16 @@ function controlledHandle(): ControlledHandle {
 }
 
 afterEach(async () => {
-  await registry.cancelAll();
-  await registry.clear();
+  if (activePi) {
+    const registry = getAgentRunRegistry(activePi as unknown as ExtensionAPI);
+    await registry.cancelAll();
+    await activePi.emit(
+      "session_shutdown",
+      { type: "session_shutdown", reason: "test" },
+      makeCtx(),
+    );
+    activePi = undefined;
+  }
   agentProfileCatalogueStore.clear();
   mocks.handles.length = 0;
   vi.clearAllMocks();
@@ -86,6 +97,7 @@ describe("/agents selected-run control with an active Delegation Batch", () => {
   it("stops only the selected run while the outer tool waits for its sibling", async () => {
     vi.stubEnv("HOME", "/tmp/supi-agent-batch-control-test-home");
     const pi = createPiMock();
+    activePi = pi;
     agentExtension(pi as unknown as ExtensionAPI);
     const start = getHandlerOrThrow(pi, "session_start");
     await start({ type: "session_start", reason: "startup" }, context());

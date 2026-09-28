@@ -419,6 +419,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     if (event.type !== "agent_settled" || aborting || terminal || finalizing) return;
     settledEventObserved = true;
     promptActive = false;
+    publish();
   };
 
   const pendingMessageCount = (activeSession: AgentSession): number | undefined => {
@@ -736,6 +737,12 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       timeoutId = setTimeout(requestTimeout, options.timeoutMs);
       timeoutId.unref?.();
     }
+    const publishPromptAcceptance = (): void => {
+      publish();
+      if (cancelRequested || aborting || terminal || finalizing) {
+        throw new Error("Agent Run prompt canceled before acceptance");
+      }
+    };
     const onPreflight = (accepted: boolean): void => {
       settlePromptPreflight();
       if (!accepted) {
@@ -750,6 +757,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       }
       promptAccepted = true;
       promptActive = true;
+      publishPromptAcceptance();
     };
     try {
       const promptPromise = session.prompt(options.prompt, { preflightResult: onPreflight });
@@ -758,6 +766,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
           settlePromptPreflight();
           promptPromiseSettled = true;
           promptActive = false;
+          publish();
           if (promptFailureCode) startPromptFailureSettlement(promptFailureCode);
           else startPromptSettlement();
         },
@@ -765,6 +774,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
           settlePromptPreflight();
           promptPromiseSettled = true;
           promptActive = false;
+          publish();
           promptFailureCode ??= "unexpected-runner-failure";
           startPromptFailureSettlement(promptFailureCode);
         },
@@ -773,6 +783,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       settlePromptPreflight();
       promptPromiseSettled = true;
       promptActive = false;
+      publish();
       promptFailureCode ??= "unexpected-runner-failure";
       startPromptFailureSettlement(promptFailureCode);
     }
@@ -904,6 +915,18 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
   };
 
   const handle: AgentRunHandle<T> = {
+    get steeringAvailable() {
+      return (
+        progressState.status === "running" &&
+        Boolean(session) &&
+        promptActive &&
+        Boolean(session?.isStreaming) &&
+        !settledEventObserved &&
+        !terminal &&
+        !finalizing &&
+        !aborting
+      );
+    },
     result,
     subscribe(listener) {
       listeners.add(listener);
@@ -915,17 +938,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       return () => listeners.delete(listener);
     },
     steer: async (message): Promise<AgentRunSteerResult> => {
-      if (
-        progressState.status !== "running" ||
-        !session ||
-        !promptActive ||
-        !session.isStreaming ||
-        settledEventObserved ||
-        terminal ||
-        finalizing ||
-        aborting
-      )
-        return "not-running";
+      if (!handle.steeringAvailable || !session) return "not-running";
       const activeSession = session;
       const admissionAtStart = admissionGeneration;
       try {

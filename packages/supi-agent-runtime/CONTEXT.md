@@ -1,6 +1,6 @@
 # supi-agent-runtime
 
-Runs exactly one in-process PI agent session behind a neutral lifecycle interface for extension-owned adapters.
+Runs in-process PI sessions and owns the shared session-local run registry, transcript store, and `/agents` viewer for its adapters.
 
 ## Language
 
@@ -23,6 +23,18 @@ _Avoid_: API key, model configuration, runtime policy
 **Agent Run Outcome**:
 The terminal success, failure, cancellation, or timeout result of one Agent Run, including all model usage billed within its owned session and bounded diagnostics.
 _Avoid_: Batch result, tool result, agent response
+
+**Agent Run Registry**:
+The containing-session list of managed Agent and Reviewer runs. The runtime owns neutral display data, transcript access, and selected-run controls. Agent and Review packages keep their own policy.
+_Avoid_: profile catalogue, review audit, process-wide history
+
+**Agent Run Transcript**:
+The human-only record of finalized child-session messages, effective system prompts, and allowlisted lifecycle fields. It stays outside tool results and normal diagnostics.
+_Avoid_: conversation summary, audit replay, model output
+
+**Agent Run Transcript Store**:
+The runtime-owned temporary store for transcripts from all registered runs in the containing session. It removes files at shutdown. Its retention does not depend on Review audit settings.
+_Avoid_: Review audit store, persistent session history
 
 **Session Readiness Check**:
 A caller-owned post-bind, pre-prompt decision over the read-only session view. It lets each adapter require or deliberately degrade unavailable capabilities without moving session mechanics out of the runtime.

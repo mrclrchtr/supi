@@ -5,11 +5,10 @@ import {
   type TuiMouseEventResult,
   truncateToWidth,
 } from "@earendil-works/pi-tui";
-import { renderConversationEntry } from "../tool/agent_run/render.ts";
 import type {
   AgentRunTranscriptDocument,
   AgentRunTranscriptSource,
-} from "../tool/agent_run/transcript-store.ts";
+} from "../session/transcript-store.ts";
 import type { AgentsOverlayRun } from "./agents-overlay-data.ts";
 import { type AgentRunBlock, AgentRunViewport } from "./agents-run-viewport.ts";
 import {
@@ -259,10 +258,16 @@ export class AgentsTranscriptPane {
       key: keyOffset + index,
       lines: new Text(line, 0, 0).render(width),
     }));
-    for (const entry of run.conversationView?.entries ?? []) {
+    for (const entry of run.conversation?.entries ?? []) {
+      const line =
+        entry.kind === "assistant"
+          ? `assistant: ${entry.text}`
+          : entry.kind === "steering"
+            ? `steering: ${entry.text}`
+            : `${entry.toolName}: ${entry.summary ?? entry.status}`;
       blocks.push({
         key: keyOffset + blocks.length,
-        lines: new Text(renderConversationEntry(entry, this.theme), 1, 0).render(width),
+        lines: new Text(line, 1, 0).render(width),
       });
     }
     if (blocks.length === 0) {
@@ -282,18 +287,18 @@ export class AgentsTranscriptPane {
 function fallbackMetadata(run: AgentsOverlayRun, warning?: string): string[] {
   const metadata = [
     ...(warning ? [warning] : []),
-    `${run.taskId} · ${run.profileId} · ${run.failureCode ? `${run.status} (${run.failureCode})` : run.status}`,
-    `Model: ${run.modelId ?? "unavailable"} · thinking ${run.thinkingLevel ?? "unavailable"}`,
+    `${run.taskId} · ${run.kind}: ${run.label} · ${run.result?.failureCode ? `${run.status} (${run.result.failureCode})` : run.status}`,
+    `Model: ${run.modelId} · thinking ${run.thinkingLevel}`,
     `${run.turns} turns · ${run.toolUses} tool uses${run.usage ? ` · ${run.usage.totalTokens.toLocaleString("en-US")} tokens` : ""}`,
-    ...(run.humanTruncated ? ["Human output truncated."] : []),
-    ...(run.conversationView?.omittedEntryCount
-      ? [`Retention: ${run.conversationView.omittedEntryCount} conversation entries omitted.`]
+    ...(run.result?.humanTruncated ? ["Human output truncated."] : []),
+    ...(run.conversation?.omittedEntryCount
+      ? [`Retention: ${run.conversation.omittedEntryCount} conversation entries omitted.`]
       : []),
-    ...(run.taskMetadata ? [`Instructions: ${run.taskMetadata.instructions}`] : []),
+    ...(run.taskDescription ? [`Task: ${run.taskDescription}`] : []),
     ...(run.sharedContext ? [`Shared context: ${run.sharedContext}`] : []),
   ];
-  if (run.finalText?.trim()) {
-    const bounded = boundFallbackResult(run.finalText);
+  if (run.result?.finalText?.trim()) {
+    const bounded = boundFallbackResult(run.result.finalText);
     metadata.push("Result", bounded.text);
     if (bounded.truncated) metadata.push("Result shortened for overlay.");
   }

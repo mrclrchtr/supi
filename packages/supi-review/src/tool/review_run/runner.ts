@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import {
+  type AgentRunDisplayMetadata,
   type AgentRunSessionView,
   createEarlyCancellationDiagnostics,
 } from "@mrclrchtr/supi-agent-runtime/api";
@@ -17,6 +19,26 @@ import { runIsolatedChild } from "./child-session.ts";
 import { createReviewRecoveryDeclineTool, createReviewSubmissionTool } from "./child-tools.ts";
 import { ReviewRecoveryPolicy } from "./recovery.ts";
 import { buildReviewerSystemPrompt } from "./system-prompt.ts";
+
+function reviewerRunDisplay(
+  invocation: ReviewerInvocation,
+  thinkingLevel: AgentRunDisplayMetadata["thinkingLevel"],
+  tools: readonly string[],
+): AgentRunDisplayMetadata & { readonly runKey: string; readonly batchId: string } {
+  return {
+    runKey: randomUUID(),
+    batchId: invocation.runGroupId ?? randomUUID(),
+    taskId: invocation.task.id,
+    kind: "Reviewer",
+    label: `${invocation.task.mode} review`,
+    cwd: invocation.cwd,
+    modelId: invocation.model.canonicalId,
+    thinkingLevel,
+    tools,
+    taskDescription: `Inspection-only Review Task in ${invocation.task.mode} mode.`,
+    startedAt: Date.now(),
+  };
+}
 
 function auditOutcome(result: ReviewerRunResult): {
   kind: string;
@@ -89,8 +111,16 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     ...(invocation.recoveryModel
       ? { authorizedContinuationModels: [invocation.recoveryModel.model] }
       : {}),
+    ...(invocation.registry ? { registry: invocation.registry } : {}),
     headlessInspection: true,
     projectTrusted: invocation.projectTrusted ?? false,
+    runDisplay: reviewerRunDisplay(invocation, effectiveThinkingLevel, originalTools),
+    displayResult: (result) =>
+      result.kind === "success"
+        ? { finalText: result.value.summary }
+        : result.kind === "failed"
+          ? { failureCode: result.failureCode }
+          : {},
     onSessionCreated: (created) => {
       session = created;
       if (invocation.audit) {
