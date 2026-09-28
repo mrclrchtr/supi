@@ -1,10 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
-import type {
-  AgentRunTranscriptDocument,
-  AgentRunTranscriptOperation,
-} from "../session/transcript-store.ts";
-import { formatTranscriptValue } from "./agents-transcript-payload.ts";
+import type { AgentRunTranscriptDocument } from "../session/transcript-store.ts";
 
 /** Render Agent Run metadata for the transcript. */
 export function renderTranscriptMetadata(
@@ -57,40 +53,4 @@ export function renderSystemPrompt(
   container.addChild(new Text(theme.fg("accent", `Effective system prompt · ${date}`), 0, 0));
   container.addChild(new Text(prompt.text || "(empty system prompt)", 1, 0));
   return container;
-}
-
-/** Render safe Agent Run events, including compaction summaries and usage. */
-export function renderTranscriptOperations(
-  operations: readonly AgentRunTranscriptOperation[],
-  theme: Theme,
-): Container {
-  const container = new Container();
-  container.addChild(new Text(theme.fg("accent", theme.bold("Run events")), 0, 0));
-  for (const operation of operations) appendOperation(container, operation, theme);
-  return container;
-}
-
-function appendOperation(
-  container: Container,
-  operation: AgentRunTranscriptOperation,
-  theme: Theme,
-): void {
-  const { type, occurredAt, ...details } = operation;
-  const simpleDetails = Object.entries(details).filter(([key, value]) => {
-    const isStructured = key === "summary" || key === "usage" || key === "details";
-    return !isStructured && value !== undefined && (value === null || typeof value !== "object");
-  });
-  const suffix = simpleDetails.map(([key, value]) => `${key}: ${String(value)}`).join(" · ");
-  const time = new Date(occurredAt).toLocaleTimeString();
-  container.addChild(new Text(`${time} · ${type}${suffix ? ` · ${suffix}` : ""}`, 1, 0));
-  if (typeof details.summary === "string") {
-    container.addChild(new Text(theme.fg("accent", "Summary"), 1, 0));
-    container.addChild(new Text(details.summary, 2, 0));
-  }
-  for (const key of ["usage", "details"] as const) {
-    const value = details[key];
-    if (value === undefined) continue;
-    container.addChild(new Text(theme.fg("dim", `${key}:`), 1, 0));
-    container.addChild(new Text(formatTranscriptValue(value), 2, 0));
-  }
 }

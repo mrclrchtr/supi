@@ -32,7 +32,7 @@ Use `/agents` in TUI mode to inspect Agent and Reviewer runs in the current sess
 - Type in the run list to search. Use Up and Down to select a run, Profile, or diagnostic.
 - In the run list, use Tab or Shift+Tab to switch between Agent and Reviewer runs. Use Enter to open a run.
 - The selected run fills the viewer. The viewer does not use a split pane. Use Esc to return to the run list. Press Esc again to close the viewer.
-- In an open run, use Tab to switch between Conversation and Details. Details shows run metadata, role and time headers, system prompts, run events, and technical tool data.
+- In an open run, use Tab to switch between Conversation and Details. Details shows run metadata, role and time headers, system prompts, and technical tool data.
 - The viewer follows new transcript output by default (`LIVE`). Use Page Up and Page Down to scroll through wrapped lines. Page Up pauses auto-scroll (`PAUSED`); live updates keep the reading position. The status shows how many lines are below the view, not an unread count.
 - Use Home to read earlier output. Open Details for task metadata. Use End to resume auto-scroll. Page Down also resumes auto-scroll when it reaches the end.
 - Use the configured Pi thinking and tool-detail shortcuts (Ctrl+T and Ctrl+O by default). In Details, click a raw tool block to show or hide its input and output. These keys do not apply while you enter a steering message.

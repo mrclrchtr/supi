@@ -10,11 +10,7 @@ import { type Component, Image, Text } from "@earendil-works/pi-tui";
 import type { AgentRunMessage, AgentRunToolRenderer } from "@mrclrchtr/supi-agent-runtime/api";
 import type { AgentRunTranscriptDocument } from "../session/transcript-store.ts";
 import type { AgentRunBlock } from "./agents-run-viewport.ts";
-import {
-  renderSystemPrompt,
-  renderTranscriptMetadata,
-  renderTranscriptOperations,
-} from "./agents-transcript-context.ts";
+import { renderSystemPrompt, renderTranscriptMetadata } from "./agents-transcript-context.ts";
 import { formatTranscriptValue, RawToolPayload } from "./agents-transcript-payload.ts";
 
 export interface AgentTranscriptInteractiveTarget {
@@ -75,9 +71,6 @@ export function renderAgentRunTranscript(
     addItem(context, renderTranscriptMetadata(options.document, options.theme));
     for (const prompt of options.document.systemPromptHistory) {
       addItem(context, renderSystemPrompt(prompt, options.theme));
-    }
-    if (options.document.operations.length > 0) {
-      addItem(context, renderTranscriptOperations(options.document.operations, options.theme));
     }
   }
   for (const message of options.document.messages) {

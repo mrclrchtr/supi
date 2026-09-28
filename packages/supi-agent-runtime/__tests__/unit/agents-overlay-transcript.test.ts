@@ -267,8 +267,15 @@ describe("AgentsDialog transcript viewer", () => {
       "Child system prompt",
       toolRenderers,
     );
+    capture.observe({ type: "agent_start" } as never, "Child system prompt", toolRenderers);
     capture.observe({ type: "turn_start" } as never, "Child system prompt", toolRenderers);
-    await capture.load();
+    capture.observe({ type: "agent_settled" } as never, "Child system prompt", toolRenderers);
+    const capturedDocument = await capture.load();
+    expect(capturedDocument.operations.map(({ type }) => type)).toEqual([
+      "agent_start",
+      "turn_start",
+      "agent_settled",
+    ]);
 
     const run = data().runs[0];
     if (!run) throw new Error("Missing test run");
@@ -298,6 +305,9 @@ describe("AgentsDialog transcript viewer", () => {
     expect(conversationText).not.toContain("Child system prompt");
     expect(conversationText).not.toContain("Raw tool input/result hidden");
     expect(conversationText).not.toContain("Run events");
+    expect(conversationText).not.toContain("agent_start");
+    expect(conversationText).not.toContain("turn_start");
+    expect(conversationText).not.toContain("agent_settled");
     expect(conversationText).not.toContain("assistant ·");
     expect(conversationText).not.toContain("user ·");
     expect(conversationText).not.toContain("toolResult ·");
@@ -312,7 +322,10 @@ describe("AgentsDialog transcript viewer", () => {
     lines = dialog.render(120);
     expect(lines.join("\n")).toContain("Child system prompt");
     expect(lines.join("\n")).toContain("Raw tool input/result hidden");
-    expect(lines.join("\n")).toContain("Run events");
+    expect(lines.join("\n")).not.toContain("Run events");
+    expect(lines.join("\n")).not.toContain("agent_start");
+    expect(lines.join("\n")).not.toContain("turn_start");
+    expect(lines.join("\n")).not.toContain("agent_settled");
     expect(lines.join("\n")).toContain(`user · ${new Date(10).toLocaleTimeString()}`);
     expect(lines.join("\n")).toContain(`assistant · ${new Date(11).toLocaleTimeString()}`);
     expect(lines.join("\n")).toContain(`toolResult · ${new Date(12).toLocaleTimeString()}`);
@@ -446,7 +459,7 @@ describe("AgentsDialog transcript viewer", () => {
     dialog.dispose();
   });
 
-  it("shows compaction summaries, usage, and details in the transcript", async () => {
+  it("keeps lifecycle events in storage but hides them from both transcript views", async () => {
     const store = new AgentRunTranscriptStore();
     stores.push(store);
     const capture = store.createCapture(
@@ -466,6 +479,8 @@ describe("AgentsDialog transcript viewer", () => {
       "Child system prompt",
       [],
     );
+    capture.observe({ type: "agent_start" } as never, "Child system prompt", []);
+    capture.observe({ type: "turn_start" } as never, "Child system prompt", []);
     capture.observe(
       {
         type: "compaction_end",
@@ -485,6 +500,19 @@ describe("AgentsDialog transcript viewer", () => {
       [],
     );
     await capture.finish();
+    const capturedDocument = await capture.load();
+    expect(capturedDocument.operations.map(({ type }) => type)).toEqual([
+      "agent_start",
+      "turn_start",
+      "compaction_end",
+    ]);
+    expect(capturedDocument.operations.at(-1)).toMatchObject({
+      type: "compaction_end",
+      summary: "The compacted transcript kept the parser changes.",
+      tokensBefore: 12_000,
+      usage: { cacheRead: 20 },
+      details: { readFiles: ["src/worker.ts"], modifiedFiles: ["src/parser.ts"] },
+    });
 
     const run = data().runs[0];
     if (!run) throw new Error("Missing test run");
@@ -504,16 +532,30 @@ describe("AgentsDialog transcript viewer", () => {
       dependencies(80),
     );
     openConversation(dialog);
-    dialog.handleInput("\t");
-
     await vi.waitFor(() => {
-      const rendered = dialog.render(120).join("\n");
-      expect(rendered).toContain("The compacted transcript kept the parser changes.");
-      expect(rendered).toContain("tokensBefore: 12000");
-      expect(rendered).toContain('"cacheRead": 20');
-      expect(rendered).toContain("src/worker.ts");
-      expect(rendered).toContain("src/parser.ts");
+      expect(dialog.render(120).join("\n")).not.toContain("Loading the full Agent Run transcript");
     });
+    const conversation = dialog.render(120).join("\n");
+    expect(conversation).not.toContain("Run events");
+    expect(conversation).not.toContain("agent_start");
+    expect(conversation).not.toContain("turn_start");
+    expect(conversation).not.toContain("compaction_end");
+    expect(conversation).not.toContain("The compacted transcript kept the parser changes.");
+    expect(conversation).not.toContain("tokensBefore");
+
+    dialog.handleInput("\t");
+    const details = dialog.render(120).join("\n");
+    expect(details).toContain("inspect · Agent Run: explore");
+    expect(details).toContain("Child system prompt");
+    expect(details).not.toContain("Run events");
+    expect(details).not.toContain("agent_start");
+    expect(details).not.toContain("turn_start");
+    expect(details).not.toContain("compaction_end");
+    expect(details).not.toContain("The compacted transcript kept the parser changes.");
+    expect(details).not.toContain("tokensBefore");
+    expect(details).not.toContain('"cacheRead": 20');
+    expect(details).not.toContain("src/worker.ts");
+    expect(details).not.toContain("src/parser.ts");
     dialog.dispose();
   });
 });
