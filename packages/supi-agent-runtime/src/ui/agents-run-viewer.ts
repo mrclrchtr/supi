@@ -12,7 +12,8 @@ import {
 } from "@earendil-works/pi-tui";
 import type { AgentsOverlayData, AgentsOverlayRun } from "./agents-overlay-data.ts";
 import { orderedRuns, type RunSection, runListItem } from "./agents-run-list.ts";
-import { handleTranscriptNavigation } from "./agents-run-viewer-input.ts";
+import { nextRunSelection } from "./agents-run-switcher.ts";
+import { handleRunViewerPageInput, handleTranscriptNavigation } from "./agents-run-viewer-input.ts";
 import {
   formatRunConversationHeading,
   formatRunViewerStatus,
@@ -134,24 +135,24 @@ export class AgentsRunViewer {
       height,
       steeringActive,
     });
-    const pageHeading =
-      this.#page === "list"
-        ? []
-        : [
-            this.#line(
-              formatRunConversationHeading(this.selectedRun, this.#transcript.isIncomplete),
-              width,
-            ),
-          ];
+    const selectedRun = this.selectedRun;
+    const runHeading = formatRunConversationHeading(
+      selectedRun,
+      this.#visibleRuns,
+      this.#section,
+      this.#transcript.isIncomplete,
+    );
+    const pageHeading = this.#page === "list" ? [] : [this.#line(runHeading.text, width)];
     const footerContent = renderAgentsRunFooter({
       theme: this.theme,
       hints: renderAgentsRunHints({
         stopConfirmation,
         page: this.#page,
         height,
-        run: this.selectedRun,
+        run: selectedRun,
         theme: this.theme,
         keybindings: this.keybindings,
+        canSwitchRuns: runHeading.canSwitchRuns,
       }),
       notice,
       status:
@@ -191,16 +192,22 @@ export class AgentsRunViewer {
 
   handleInput(data: string, controlsEnabled: boolean): AgentsRunViewerAction | undefined {
     if (this.#page === "list") return this.#handleListInput(data);
-    if (this.#isCancel(data)) {
-      this.#page = "list";
-      this.#transcript.setDetails(false);
-      this.#search.focused = this.#focused;
-      this.#refreshList();
-      return "handled";
-    }
-    if (matchesKey(data, Key.tab)) {
-      this.#page = this.#page === "conversation" ? "details" : "conversation";
-      this.#transcript.setDetails(this.#page === "details");
+    if (
+      handleRunViewerPageInput(data, {
+        isCancel: (input) => this.#isCancel(input),
+        returnToList: () => {
+          this.#page = "list";
+          this.#transcript.setDetails(false);
+          this.#search.focused = this.#focused;
+          this.#refreshList();
+        },
+        toggleView: () => {
+          this.#page = this.#page === "conversation" ? "details" : "conversation";
+          this.#transcript.setDetails(this.#page === "details");
+        },
+        switchRun: (direction) => this.#moveSelection(direction),
+      })
+    ) {
       return "handled";
     }
     if (this.#handleTranscriptNavigation(data)) return "handled";
@@ -331,24 +338,19 @@ export class AgentsRunViewer {
     const current = pinnedKey ?? this.selectedRun?.key ?? this.#selectedKey;
     this.#visibleRuns = orderedRuns(this.#data.runs, this.#section, this.#search.getValue());
     const currentIndex = current ? this.#visibleRuns.findIndex((run) => run.key === current) : -1;
-    this.#selectedIndex = currentIndex >= 0 ? currentIndex : 0;
+    this.#selectedIndex = currentIndex >= 0 ? currentIndex : pinnedKey ? -1 : 0;
     this.#selectedKey = pinnedKey ?? this.#visibleRuns[this.#selectedIndex]?.key;
     this.#selectList = this.#createSelectList(this.#visibleRuns.map((run) => runListItem(run)));
     if (this.#visibleRuns.length > 0) this.#selectList.setSelectedIndex(this.#selectedIndex);
   }
 
   #moveSelection(delta: number, wrap = true): void {
-    if (this.#visibleRuns.length === 0) return;
-    const next = wrap
-      ? (((this.#selectedIndex + delta) % this.#visibleRuns.length) + this.#visibleRuns.length) %
-        this.#visibleRuns.length
-      : Math.max(0, Math.min(this.#visibleRuns.length - 1, this.#selectedIndex + delta));
-    this.#selectedIndex = next;
-    const run = this.#visibleRuns[next];
-    if (!run) return;
-    this.#selectedKey = run.key;
-    this.#selectList.setSelectedIndex(next);
-    if (this.#page !== "list") this.#transcript.select(run);
+    const next = nextRunSelection(this.#visibleRuns, this.#selectedIndex, delta, wrap);
+    if (!next) return;
+    this.#selectedIndex = next.index;
+    this.#selectedKey = next.run.key;
+    this.#selectList.setSelectedIndex(next.index);
+    if (this.#page !== "list") this.#transcript.select(next.run);
     this.onChange();
   }
 

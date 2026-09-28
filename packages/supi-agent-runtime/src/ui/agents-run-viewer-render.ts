@@ -6,14 +6,21 @@ import {
 import { type Input, type SelectList, truncateToWidth } from "@earendil-works/pi-tui";
 import type { AgentsOverlayRun } from "./agents-overlay-data.ts";
 import { centerLegend } from "./agents-overlay-render.ts";
-import { formatElapsed, runListPreview } from "./agents-run-list.ts";
+import { formatElapsed, type RunSection, runListPreview } from "./agents-run-list.ts";
+import { runSwitcherPosition } from "./agents-run-switcher.ts";
 
-/** Render the selected-run heading with stable status and review information. */
+/** Render the selected run, its filtered position, and its stable status. */
 export function formatRunConversationHeading(
   run: AgentsOverlayRun | undefined,
+  runs: readonly AgentsOverlayRun[],
+  section: RunSection,
   transcriptIncomplete: boolean,
-): string {
-  if (!run) return "No Agent Run selected";
+): { readonly text: string; readonly canSwitchRuns: boolean } {
+  const position = runSwitcherPosition(runs, run?.key);
+  if (!run) return { text: "No Agent Run selected", canSwitchRuns: position.canSwitch };
+  const sectionLabel = section === "agents" ? "Agents" : "Reviews";
+  const runPosition =
+    position.position === undefined ? "pinned" : `${position.position}/${runs.length}`;
   const state = `${run.status} · ${formatElapsed(run)}`;
   const target = run.result?.display?.target ?? run.display?.target;
   const verdict = run.result?.display?.verdict;
@@ -23,7 +30,10 @@ export function formatRunConversationHeading(
   ]
     .filter(Boolean)
     .join(" · ");
-  return `${run.taskId} — ${run.label} · ${state}${review ? ` · ${review}` : ""}${transcriptIncomplete ? " · transcript incomplete" : ""}`;
+  return {
+    text: `${sectionLabel} · ${runPosition} · ${run.taskId} — ${run.label} · ${state}${review ? ` · ${review}` : ""}${transcriptIncomplete ? " · transcript incomplete" : ""}`,
+    canSwitchRuns: position.canSwitch,
+  };
 }
 
 /** Keep incomplete-transcript warnings at the start of the viewer status line. */
@@ -62,23 +72,13 @@ export function renderAgentsRunHints(options: {
   readonly run?: AgentsOverlayRun;
   readonly theme: Theme;
   readonly keybindings?: Pick<KeybindingsManager, "getKeys">;
+  readonly canSwitchRuns: boolean;
 }): string[] {
-  const { stopConfirmation, page, height, run, theme, keybindings } = options;
+  const { stopConfirmation, page, height, run, theme, keybindings, canSwitchRuns } = options;
   if (stopConfirmation) return ["Enter/y confirm stop · Esc cancel"];
-  if (page === "list") {
-    return height <= 8
-      ? ["↑↓ move · type search · enter open · esc close"]
-      : ["↑↓ move · type to search · enter open", "tab sections · esc close"];
-  }
-  if (height <= 8) {
-    return [`↑↓ scroll · tab ${page === "details" ? "conversation" : "details"} · esc list`];
-  }
-  const controls = run?.active
-    ? [
-        run.steeringAvailable ? "s steer" : undefined,
-        run.status === "starting" || run.status === "running" ? "x stop" : undefined,
-      ].filter((hint): hint is string => hint !== undefined)
-    : [];
+  if (page === "list") return renderAgentsRunListHints(height);
+  if (height <= 8) return renderCompactRunHints(page, canSwitchRuns);
+  const controls = renderRunControlHints(run);
   const toolsHint = formatAgentsRunKeyHint({
     theme,
     keybindings,
@@ -95,9 +95,29 @@ export function renderAgentsRunHints(options: {
   });
   return [
     "↑↓ scroll · PgUp/PgDn · Home/End",
+    ...(canSwitchRuns ? ["Alt+← previous · Alt+→ next"] : []),
     [page === "details" ? "tab conversation" : "tab details", toolsHint, thinkingHint].join(" · "),
     [...controls, "esc list"].join(" · "),
   ];
+}
+
+function renderAgentsRunListHints(height: number): string[] {
+  return height <= 8
+    ? ["↑↓ move · type search · enter open · esc close"]
+    : ["↑↓ move · type to search · enter open", "tab sections · esc close"];
+}
+
+function renderCompactRunHints(page: "conversation" | "details", canSwitchRuns: boolean): string[] {
+  const navigationHint = canSwitchRuns ? "Alt+← previous · Alt+→ next" : "↑↓ scroll";
+  return [`${navigationHint} · tab ${page === "details" ? "conversation" : "details"} · esc list`];
+}
+
+function renderRunControlHints(run?: AgentsOverlayRun): string[] {
+  if (!run?.active) return [];
+  const controls: string[] = [];
+  if (run.steeringAvailable) controls.push("s steer");
+  if (run.status === "starting" || run.status === "running") controls.push("x stop");
+  return controls;
 }
 
 /** Render the full-width header for the selected section. */

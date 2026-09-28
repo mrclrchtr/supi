@@ -1,9 +1,38 @@
 import type { KeybindingsManager } from "@earendil-works/pi-coding-agent";
-import { Key, type KeyId } from "@earendil-works/pi-tui";
+import { Key, type KeyId, matchesKey } from "@earendil-works/pi-tui";
 
 type KeybindingAction = Parameters<KeybindingsManager["matches"]>[1];
 type MatchKey = (data: string, action: KeybindingAction, fallback: KeyId) => boolean;
 type TranscriptNavigation = "page-up" | "page-down" | "start" | "end";
+
+/** Handle keys that change the selected run view or run. */
+export function handleRunViewerPageInput(
+  data: string,
+  actions: {
+    readonly isCancel: (data: string) => boolean;
+    readonly returnToList: () => void;
+    readonly toggleView: () => void;
+    readonly switchRun: (direction: -1 | 1) => void;
+  },
+): boolean {
+  if (actions.isCancel(data)) {
+    actions.returnToList();
+    return true;
+  }
+  if (matchesKey(data, Key.tab)) {
+    actions.toggleView();
+    return true;
+  }
+  if (matchesKey(data, Key.alt("left"))) {
+    actions.switchRun(-1);
+    return true;
+  }
+  if (matchesKey(data, Key.alt("right"))) {
+    actions.switchRun(1);
+    return true;
+  }
+  return false;
+}
 
 /** Route transcript navigation keys to the active run view. */
 export function handleTranscriptNavigation(
