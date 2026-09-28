@@ -1,5 +1,20 @@
 # Changelog
 
+## [7.4.0](https://github.com/mrclrchtr/supi/compare/v7.3.1...v7.4.0) (2026-09-28)
+
+
+### Features
+
+* **agent-runtime:** add fast run switching ([11c74e1](https://github.com/mrclrchtr/supi/commit/11c74e1f80bd96ffac7def122a493f57f89085ce))
+* **agent-runtime:** add searchable /agents task viewer ([5fe0a74](https://github.com/mrclrchtr/supi/commit/5fe0a743109e84926afd400dfee16334eb9b58e4))
+
+
+### Bug Fixes
+
+* **agent-runtime:** keep review controls accessible and fence steering ([91bf316](https://github.com/mrclrchtr/supi/commit/91bf316c48004b877e1c3a4ea79586d74aebacf0))
+* **agent-runtime:** remove run events from agents UI ([8955eee](https://github.com/mrclrchtr/supi/commit/8955eee4ed98f3f2e138265421be30b6d405770d))
+* **deps:** update dependency vitest to v5.0.2 ([35da919](https://github.com/mrclrchtr/supi/commit/35da919952fd9e03a14633e2542612982d268dd1))
+
 ## [7.3.1](https://github.com/mrclrchtr/supi/compare/v7.3.0...v7.3.1) (2026-09-28)
 
 
