@@ -87,7 +87,12 @@ function commandContext(selects: Array<string | undefined>) {
           ) => unknown,
         ) =>
           new Promise((resolve) => {
-            factory({ requestRender: vi.fn() }, {}, {}, resolve);
+            factory(
+              { requestRender: vi.fn() },
+              { fg: (_color: string, text: string) => text },
+              {},
+              resolve,
+            );
           }),
       ),
     },

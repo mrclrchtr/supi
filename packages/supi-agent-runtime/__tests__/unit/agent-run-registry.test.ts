@@ -104,74 +104,78 @@ describe("Agent Run Registry", () => {
 
   it("releases live run state at settlement and retains the display and transcript snapshot", async () => {
     const registry = new AgentRunRegistry();
-    const run = makeHandle();
-    const runMetadata = metadata("completed");
-    const transcript = registry.createTranscriptCapture(runMetadata, "Agent Protocol");
-    const conversation = {
-      entries: [{ kind: "assistant" as const, text: "Finished." }],
-      omittedEntryCount: 0,
-      omittedCharacterCount: 0,
-      textTruncated: false,
-    };
-    const getConversation = vi.fn(() => conversation);
-    const getRecentActivity = vi.fn(() => ["tool:read"]);
-    registry.register({
-      metadata: runMetadata,
-      transcript,
-      handle: run.handle,
-      getConversation,
-      getRecentActivity,
-    });
-    let sessionListener: ((event: never) => void) | undefined;
-    const unsubscribeSession = vi.fn(() => {
-      sessionListener = undefined;
-    });
-    const session = {
-      systemPrompt: "Agent Protocol",
-      getToolRenderers: () => [],
-      subscribe: (listener: (event: never) => void) => {
-        sessionListener = listener;
-        return unsubscribeSession;
-      },
-    } as unknown as AgentRunSessionView;
-    registry.attachSession("completed", session);
-    sessionListener?.({
-      type: "message_end",
-      message: { role: "assistant", content: [{ type: "text", text: "Finished." }] },
-    } as never);
-    const callsBeforeSettlement = getConversation.mock.calls.length;
+    try {
+      const run = makeHandle();
+      const runMetadata = metadata("completed");
+      const transcript = registry.createTranscriptCapture(runMetadata, "Agent Protocol");
+      const conversation = {
+        entries: [{ kind: "assistant" as const, text: "Finished." }],
+        omittedEntryCount: 0,
+        omittedCharacterCount: 0,
+        textTruncated: false,
+      };
+      const getConversation = vi.fn(() => conversation);
+      const getRecentActivity = vi.fn(() => ["tool:read"]);
+      registry.register({
+        metadata: runMetadata,
+        transcript,
+        handle: run.handle,
+        getConversation,
+        getRecentActivity,
+      });
+      let sessionListener: ((event: never) => void) | undefined;
+      const unsubscribeSession = vi.fn(() => {
+        sessionListener = undefined;
+      });
+      const session = {
+        systemPrompt: "Agent Protocol",
+        getToolRenderers: () => [],
+        subscribe: (listener: (event: never) => void) => {
+          sessionListener = listener;
+          return unsubscribeSession;
+        },
+      } as unknown as AgentRunSessionView;
+      registry.attachSession("completed", session);
+      sessionListener?.({
+        type: "message_end",
+        message: { role: "assistant", content: [{ type: "text", text: "Finished." }] },
+      } as never);
+      const callsBeforeSettlement = getConversation.mock.calls.length;
 
-    run.resolve({ kind: "success", value: "Finished." });
-    await run.handle.result;
+      run.resolve({ kind: "success", value: "Finished." });
+      await run.handle.result;
 
-    expect(run.unsubscribeProgress).toHaveBeenCalledOnce();
-    expect(unsubscribeSession).toHaveBeenCalledOnce();
-    expect(getConversation).toHaveBeenCalledTimes(callsBeforeSettlement + 1);
-    expect(getRecentActivity).toHaveBeenCalledOnce();
-    expect(registry.hasActive()).toBe(false);
-    await expect(registry.stop("completed")).resolves.toBe("not-running");
-    await expect(registry.steer("completed", "late steering")).resolves.toBe("not-running");
-    expect(run.stop).not.toHaveBeenCalled();
-    expect(run.steer).not.toHaveBeenCalled();
+      expect(run.unsubscribeProgress).toHaveBeenCalledOnce();
+      expect(unsubscribeSession).toHaveBeenCalledOnce();
+      expect(getConversation).toHaveBeenCalledTimes(callsBeforeSettlement + 1);
+      expect(getRecentActivity).toHaveBeenCalledOnce();
+      expect(registry.hasActive()).toBe(false);
+      await expect(registry.stop("completed")).resolves.toBe("not-running");
+      await expect(registry.steer("completed", "late steering")).resolves.toBe("not-running");
+      expect(run.stop).not.toHaveBeenCalled();
+      expect(run.steer).not.toHaveBeenCalled();
 
-    registry.setDisplayResult("completed", { finalText: "Finished." });
-    const saved = registry.snapshot().runs[0];
-    expect(saved).toMatchObject({
-      active: false,
-      status: "completed",
-      recentActivity: ["tool:read"],
-      conversation,
-      result: { finalText: "Finished." },
-      transcriptSource: transcript,
-    });
-    expect(getConversation).toHaveBeenCalledTimes(callsBeforeSettlement + 1);
-    expect(getRecentActivity).toHaveBeenCalledOnce();
+      registry.setDisplayResult("completed", { finalText: "Finished." });
+      const saved = registry.snapshot().runs[0];
+      expect(saved).toMatchObject({
+        active: false,
+        status: "completed",
+        recentActivity: ["tool:read"],
+        conversation,
+        result: { finalText: "Finished." },
+        transcriptSource: transcript,
+      });
+      expect(getConversation).toHaveBeenCalledTimes(callsBeforeSettlement + 1);
+      expect(getRecentActivity).toHaveBeenCalledOnce();
 
-    await transcript.finish();
-    await expect(transcript.load()).resolves.toMatchObject({
-      status: "complete",
-      messages: [{ role: "assistant" }],
-    });
+      await transcript.finish();
+      await expect(transcript.load()).resolves.toMatchObject({
+        status: "complete",
+        messages: [{ role: "assistant" }],
+      });
+    } finally {
+      await registry.clear();
+    }
   });
 
   it("releases steering records after the final snapshot and ignores late steering", async () => {

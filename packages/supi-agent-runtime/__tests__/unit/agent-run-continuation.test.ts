@@ -82,6 +82,89 @@ describe("Agent Run finite continuation", () => {
     expect(harness.runtime.dispose).toHaveBeenCalledTimes(1);
   });
 
+  it("finishes initial steering before it starts recovery", async () => {
+    const harness = createHarness(mocks);
+    let run: ReturnType<typeof startAgentRun> | undefined;
+    let steeringRequest: Promise<"accepted" | "not-running"> | undefined;
+    let releaseSteering!: () => void;
+    const steeringWork = new Promise<undefined>((resolve) => {
+      releaseSteering = () => resolve(undefined);
+    });
+    harness.session.steer.mockImplementationOnce(() => steeringWork);
+    let completion: string | undefined;
+    const resolveNext = vi.fn(() => {
+      completion = "recovered";
+      return {
+        prompt: "Submit from retained history.",
+        activeTools: ["submit_review"],
+        thinkingLevel: "low" as const,
+      };
+    });
+    harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
+      harness.session.isStreaming = true;
+      options?.preflightResult?.(true);
+      steeringRequest = run?.steer("Initial-only direction");
+      harness.session.emit({ type: "agent_settled" });
+      harness.session.isStreaming = false;
+    });
+    let clearCallsAtRecoveryStart = 0;
+    harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
+      clearCallsAtRecoveryStart = harness.session.clearQueue.mock.calls.length;
+      harness.session.isStreaming = true;
+      options?.preflightResult?.(true);
+      harness.session.emit({ type: "agent_settled" });
+      harness.session.isStreaming = false;
+    });
+    run = startAgentRun({
+      inputs: inputs(),
+      prompt: "review",
+      completionResolver: () => completion,
+      continuation: { maxTurns: 1, resolveNext },
+    });
+
+    await vi.waitFor(() => expect(steeringRequest).toBeDefined());
+    expect(resolveNext).not.toHaveBeenCalled();
+    expect(harness.session.prompt).toHaveBeenCalledOnce();
+
+    releaseSteering();
+    await expect(run.result).resolves.toMatchObject({ kind: "success", value: "recovered" });
+    await expect(steeringRequest).resolves.toBe("not-running");
+    expect(clearCallsAtRecoveryStart).toBe(1);
+    expect(harness.session.clearQueue).toHaveBeenCalledTimes(2);
+    expect(harness.session.prompt).toHaveBeenCalledTimes(2);
+  });
+
+  it("skips recovery when an initial steering handler stalls", async () => {
+    vi.useFakeTimers();
+    const harness = createHarness(mocks);
+    let run: ReturnType<typeof startAgentRun> | undefined;
+    harness.session.steer.mockImplementationOnce(() => new Promise<undefined>(() => {}));
+    const resolveNext = vi.fn();
+    harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
+      harness.session.isStreaming = true;
+      options?.preflightResult?.(true);
+      void run?.steer("Initial-only direction");
+      harness.session.emit({ type: "agent_settled" });
+      harness.session.isStreaming = false;
+    });
+    run = startAgentRun({
+      inputs: inputs(),
+      prompt: "review",
+      completionResolver: () => undefined,
+      continuation: { maxTurns: 1, resolveNext },
+    });
+
+    await vi.waitFor(() => expect(harness.session.steer).toHaveBeenCalledOnce());
+    expect(resolveNext).not.toHaveBeenCalled();
+    await vi.advanceTimersToNextTimerAsync();
+
+    await expect(run.result).resolves.toMatchObject({
+      kind: "failed",
+      failureCode: "missing-completion",
+    });
+    expect(resolveNext).not.toHaveBeenCalled();
+  });
+
   it("continues an accepted provider error that resolves through PI", async () => {
     const harness = createHarness(mocks);
     harness.session.messages = [

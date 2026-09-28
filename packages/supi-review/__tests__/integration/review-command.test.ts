@@ -95,7 +95,12 @@ function scriptedContext(cwd: string, script: Script) {
       ) => unknown,
     ) =>
       new Promise((resolve) => {
-        factory({ requestRender: vi.fn() }, {}, {}, resolve);
+        factory(
+          { requestRender: vi.fn() },
+          { fg: (_color: string, text: string) => text },
+          {},
+          resolve,
+        );
       }),
   );
   const model = { provider: "test", id: "reviewer", name: "Test reviewer" };

@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   queuePostReviewTurn: vi.fn(),
   listLocalBranches: vi.fn(),
   listRecentCommits: vi.fn(),
+  openAgentsViewer: vi.fn(async () => undefined),
   loaders: [] as Array<{
     message?: string;
     onAbort?: () => void;
@@ -21,18 +22,30 @@ const mocks = vi.hoisted(() => ({
   runGit: vi.fn(),
 }));
 
+vi.mock("@mrclrchtr/supi-agent-runtime/api", async (original) => ({
+  ...(await original()),
+  openAgentsViewer: mocks.openAgentsViewer,
+}));
 vi.mock("@earendil-works/pi-coding-agent", () => ({
   BorderedLoader: class {
     readonly signal = new AbortController().signal;
     onAbort?: () => void;
+    readonly message: string;
 
-    constructor(
-      _tui: unknown,
-      _theme: unknown,
-      readonly message: string,
-    ) {
+    constructor(_tui: unknown, _theme: unknown, message: string) {
+      this.message = message;
       mocks.loaders.push(this);
     }
+
+    render(): string[] {
+      return [];
+    }
+
+    invalidate(): void {}
+
+    handleInput(): void {}
+
+    dispose(): void {}
   },
   buildSessionContext: () => ({ messages: [] }),
   getAgentDir: () => "/agent",
@@ -96,6 +109,7 @@ const planning = {
 function commandContext(selects: Array<string | undefined>, editors: Array<string | undefined>) {
   const select = vi.fn(async () => selects.shift());
   const editor = vi.fn(async () => editors.shift());
+  const components: unknown[] = [];
   const custom = vi.fn(
     async (
       factory: (
@@ -106,7 +120,14 @@ function commandContext(selects: Array<string | undefined>, editors: Array<strin
       ) => unknown,
     ) =>
       new Promise((resolve) => {
-        factory({ requestRender: vi.fn() }, {}, {}, resolve);
+        components.push(
+          factory(
+            { requestRender: vi.fn() },
+            { fg: (_color: string, text: string) => text },
+            {},
+            resolve,
+          ),
+        );
       }),
   );
   const ctx = makeCtx({
@@ -114,11 +135,10 @@ function commandContext(selects: Array<string | undefined>, editors: Array<strin
     ui: { ...makeCtx().ui, select, editor, confirm: vi.fn(async () => true), custom },
     sessionManager: { getEntries: vi.fn(() => []), getLeafId: vi.fn(() => null) },
   });
-  return { ctx, custom, editor, select };
+  return { ctx, components, custom, editor, select };
 }
 
-async function runCommand(command: ReturnType<typeof commandContext>) {
-  const pi = createPiMock();
+async function runCommand(command: ReturnType<typeof commandContext>, pi = createPiMock()) {
   reviewExtension(pi as unknown as ExtensionAPI);
   const handler = pi.getCommandHandler("supi-review") as (
     args: string,
@@ -255,6 +275,33 @@ describe("/supi-review task editing", () => {
     await runCommand(command);
 
     expect(mocks.loaders.at(-1)).toMatchObject({ message: "Reviewing… (path focus: src/a.ts)" });
+  });
+
+  it("opens the shared run viewer during Review without canceling the batch", async () => {
+    let finishReview!: (outcome: { kind: "invalid"; reason: string }) => void;
+    mocks.runReview.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishReview = resolve;
+      }),
+    );
+    const command = commandContext(selectCurrentManual("state"), ["State task.", ""]);
+    const pi = createPiMock();
+    const commandPromise = runCommand(command, pi);
+
+    await vi.waitFor(() => expect(mocks.runReview).toHaveBeenCalledOnce());
+    const loader = command.components.at(-1) as {
+      handleInput?: (data: string) => void;
+      render: (width: number) => string[];
+    };
+    expect(loader.render(80).join("\n")).toContain("Ctrl+O opens /agents");
+    loader.handleInput?.("\x0f");
+
+    await vi.waitFor(() => expect(mocks.openAgentsViewer).toHaveBeenCalledWith(pi, command.ctx));
+    expect(mocks.runReview).toHaveBeenCalledOnce();
+    expect(mocks.loaders.at(-1)?.signal.aborted).toBe(false);
+
+    finishReview({ kind: "invalid", reason: "target changed" });
+    await commandPromise;
   });
 
   it("keeps Planner modes as visible choices and retains Planner-assisted provenance after edits", async () => {

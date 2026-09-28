@@ -3,10 +3,13 @@ import {
   BorderedLoader,
   buildSessionContext,
   type ExtensionAPI,
+  type Theme,
 } from "@earendil-works/pi-coding-agent";
+import { Container, Key, matchesKey, Spacer, Text } from "@earendil-works/pi-tui";
 import {
   type AgentRunRegistry,
   createAgentRunProviderAuthority,
+  openAgentsViewer,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import type { LocalReviewAuditStore } from "../audit/local-review-audit-store.ts";
 import { loadReviewConfig } from "../config.ts";
@@ -156,6 +159,56 @@ async function editReviewInteractive(
 interface CancellableLoaderOptions {
   /** Finish at once on Escape only when the operation has no cleanup work. */
   finishOnAbort?: boolean;
+  /** Open the shared run viewer without stopping the current operation. */
+  openAgents?: () => Promise<void>;
+}
+
+class ReviewRunLoader extends Container {
+  readonly #loader: BorderedLoader;
+  readonly #openAgents: () => Promise<void>;
+  readonly #onOpenError: (error: unknown) => void;
+  #openingAgents = false;
+
+  constructor(
+    loader: BorderedLoader,
+    theme: Theme,
+    openAgents: () => Promise<void>,
+    onOpenError: (error: unknown) => void,
+  ) {
+    super();
+    this.#loader = loader;
+    this.#openAgents = openAgents;
+    this.#onOpenError = onOpenError;
+    this.addChild(loader);
+    this.addChild(new Spacer(1));
+    this.addChild(new Text(theme.fg("dim", "Ctrl+O opens /agents"), 1, 0));
+  }
+
+  get signal(): AbortSignal {
+    return this.#loader.signal;
+  }
+
+  set onAbort(handler: (() => void) | undefined) {
+    this.#loader.onAbort = handler;
+  }
+
+  handleInput(data: string): void {
+    if (matchesKey(data, Key.ctrl("o"))) {
+      if (this.#openingAgents) return;
+      this.#openingAgents = true;
+      void this.#openAgents()
+        .catch(this.#onOpenError)
+        .finally(() => {
+          this.#openingAgents = false;
+        });
+      return;
+    }
+    this.#loader.handleInput(data);
+  }
+
+  dispose(): void {
+    this.#loader.dispose();
+  }
 }
 
 /** Run command-owned child work behind an Escape-cancellable Pi loader. */
@@ -167,6 +220,14 @@ async function withCancellableLoader<T>(
 ): Promise<T | undefined> {
   return ctx.ui.custom<T | undefined>((tui, theme, _keybindings, done) => {
     const loader = new BorderedLoader(tui, theme, message);
+    const component = options.openAgents
+      ? new ReviewRunLoader(loader, theme, options.openAgents, (error) =>
+          ctx.ui.notify(
+            error instanceof Error ? error.message : "Could not open /agents.",
+            "error",
+          ),
+        )
+      : loader;
     let settled = false;
     const finish = (value: T | undefined) => {
       if (settled) return;
@@ -186,7 +247,7 @@ async function withCancellableLoader<T>(
         finish(undefined);
       },
     );
-    return loader;
+    return component;
   });
 }
 
@@ -260,6 +321,7 @@ async function draftInteractiveReview(
 async function executeInteractiveReview(
   ctx: CommandContext,
   input: {
+    pi: ExtensionAPI;
     target: ReviewTargetSpec;
     review: ReviewInput;
     scope: ReviewScope;
@@ -304,6 +366,7 @@ async function executeInteractiveReview(
         ...(input.registry ? { registry: input.registry } : {}),
         signal,
       }),
+    { openAgents: () => openAgentsViewer(input.pi, ctx) },
   );
 }
 
@@ -409,6 +472,7 @@ export async function runReviewCommand(
   );
   if (!approved) return;
   const outcome = await executeInteractiveReview(ctx, {
+    pi,
     target,
     review: edited,
     scope,

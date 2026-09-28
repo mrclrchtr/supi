@@ -14,6 +14,7 @@ Review owns Reviewer Session policy and optional Local Reviewer Replay retention
 - Use the runtime transcript store for the full human-only session transcript. Keep its containing-session lifetime separate from the seven-day Review audit lifetime.
 - Keep the Review observer for audit capture. Compose its cleanup with the runtime transcript observer; neither observer replaces the other.
 - Show Reviewer Runs with Agent Runs in one `/agents` command. Do not move Review policy, Review audit, or Review result formatting into the runtime.
+- While interactive `/supi-review` runs, show `Ctrl+O` to open this viewer without stopping the Review.
 - Share one Review group ID across Reviewer Sessions from the same Review request.
 
 ## Consequences

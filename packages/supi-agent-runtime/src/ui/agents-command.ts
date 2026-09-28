@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { AgentRunRegistry } from "../session/agent-run-registry.ts";
 import type { AgentRunRegistrySnapshot } from "../session/agent-run-registry-types.ts";
 import type {
@@ -94,66 +94,77 @@ export function registerAgentsCommand(
 
   pi.registerCommand("agents", {
     description: "Inspect managed runs and, when available, Agent Profiles",
-    handler: async (_args, ctx) => {
-      if (ctx.mode !== "tui") {
-        ctx.ui.notify("/agents is available only in TUI mode.", "warning");
-        return;
-      }
-      const [{ Key, matchesKey }, { AgentsDialog }] = await Promise.all([
-        import("@earendil-works/pi-tui"),
-        import("./agents-overlay.ts"),
-      ]);
-      let closeOverlay: (() => void) | undefined;
-      let askUserActive = false;
-      const removeAskUserStart = pi.events.on("supi:ask-user:start", () => {
-        askUserActive = true;
-      });
-      const removeAskUserEnd = pi.events.on("supi:ask-user:end", () => {
-        askUserActive = false;
-      });
-      const removeAskUserInput = ctx.ui.onTerminalInput?.((data) => {
-        if (!askUserActive || !closeOverlay || !matchesKey(data, Key.escape)) return;
-        closeOverlay();
-        return { consume: true };
-      });
-      try {
-        await ctx.ui.custom<void>(
-          (tui, theme, _keybindings, done) => {
-            closeOverlay = () => done(undefined);
-            return new AgentsDialog(
-              buildOverlayData(state.registry.snapshot(), profilePagesFor(state)),
-              {
-                theme,
-                tui,
-                done: () => done(undefined),
-                onSteer: (runKey, message) => state.registry.steer(runKey, message),
-                onStop: (runKey) => state.registry.stop(runKey),
-                subscribe: (listener) =>
-                  state.registry.subscribe((snapshot) =>
-                    listener(buildOverlayData(snapshot, profilePagesFor(state))),
-                  ),
-              },
-            );
-          },
-          {
-            overlay: true,
-            overlayOptions: {
-              anchor: "top-left",
-              width: "100%",
-              maxHeight: "100%",
-              margin: 0,
-            },
-          },
-        );
-      } finally {
-        removeAskUserInput?.();
-        removeAskUserStart();
-        removeAskUserEnd();
-      }
-    },
+    handler: async (_args, ctx) => showAgentsViewer(pi, state, ctx),
   });
   state.commandRegistered = true;
   return state.registry;
+}
+
+/** Open the shared `/agents` viewer from another interactive extension flow. */
+export function openAgentsViewer(pi: ExtensionAPI, ctx: ExtensionCommandContext): Promise<void> {
+  return showAgentsViewer(pi, runtimeState(pi), ctx);
+}
+
+async function showAgentsViewer(
+  pi: ExtensionAPI,
+  state: SharedRuntimeState,
+  ctx: ExtensionCommandContext,
+): Promise<void> {
+  if (ctx.mode !== "tui") {
+    ctx.ui.notify("/agents is available only in TUI mode.", "warning");
+    return;
+  }
+  const [{ Key, matchesKey }, { AgentsDialog }] = await Promise.all([
+    import("@earendil-works/pi-tui"),
+    import("./agents-overlay.ts"),
+  ]);
+  let closeOverlay: (() => void) | undefined;
+  let askUserActive = false;
+  const removeAskUserStart = pi.events.on("supi:ask-user:start", () => {
+    askUserActive = true;
+  });
+  const removeAskUserEnd = pi.events.on("supi:ask-user:end", () => {
+    askUserActive = false;
+  });
+  const removeAskUserInput = ctx.ui.onTerminalInput?.((data) => {
+    if (!askUserActive || !closeOverlay || !matchesKey(data, Key.escape)) return;
+    closeOverlay();
+    return { consume: true };
+  });
+  try {
+    await ctx.ui.custom<void>(
+      (tui, theme, _keybindings, done) => {
+        closeOverlay = () => done(undefined);
+        return new AgentsDialog(
+          buildOverlayData(state.registry.snapshot(), profilePagesFor(state)),
+          {
+            theme,
+            tui,
+            done: () => done(undefined),
+            onSteer: (runKey, message) => state.registry.steer(runKey, message),
+            onStop: (runKey) => state.registry.stop(runKey),
+            subscribe: (listener) =>
+              state.registry.subscribe((snapshot) =>
+                listener(buildOverlayData(snapshot, profilePagesFor(state))),
+              ),
+          },
+        );
+      },
+      {
+        overlay: true,
+        overlayOptions: {
+          anchor: "top-left",
+          width: "100%",
+          maxHeight: "100%",
+          margin: 0,
+        },
+      },
+    );
+  } finally {
+    removeAskUserInput?.();
+    removeAskUserStart();
+    removeAskUserEnd();
+  }
 }
 
 /** Remove the Agent-owned Profile pages when their provider extension shuts down. */

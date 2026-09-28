@@ -35,6 +35,8 @@ import { collectAgentRunUsage } from "./usage.ts";
 
 /** Grace period for a provider abort before disposal continues. */
 export const AGENT_RUN_ABORT_GRACE_MS = 2_000;
+/** Maximum wait for initial steering to settle before recovery is skipped. */
+const INITIAL_STEERING_DRAIN_GRACE_MS = 2_000;
 /** Grace period for AgentSessionRuntime disposal. */
 export const AGENT_RUN_SHUTDOWN_GRACE_MS = 2_000;
 /** Maximum turns accepted from one finite continuation policy. */
@@ -95,6 +97,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
   let admissionGeneration = 0;
   let fencedSession: AgentSession | undefined;
   const extensionWork = new Set<Promise<unknown>>();
+  const inFlightSteering = new Set<Promise<AgentRunSteerResult>>();
   let resolveSessionSetupFinished!: () => void;
   const sessionSetupDone = new Promise<void>((resolve) => {
     resolveSessionSetupFinished = resolve;
@@ -452,6 +455,21 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     }
   };
 
+  /** Wait briefly for initial steering before starting recovery. */
+  const awaitInitialSteeringDrain = async (): Promise<boolean> => {
+    if (inFlightSteering.size === 0) return true;
+    const pending = [...inFlightSteering];
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const drained = await Promise.race([
+      Promise.allSettled(pending).then(() => true),
+      new Promise<boolean>((resolve) => {
+        timeoutId = setTimeout(() => resolve(false), INITIAL_STEERING_DRAIN_GRACE_MS);
+      }),
+    ]);
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+    return drained;
+  };
+
   const authorizedContinuationModel = (model: Model<Api>): boolean =>
     [options.inputs.model, ...(options.inputs.authorizedContinuationModels ?? [])].some(
       (candidate) => candidate.provider === model.provider && candidate.id === model.id,
@@ -587,6 +605,12 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       return;
     }
     continuationInitialFailure ??= initialFailureCode;
+    const steeringDrained = await awaitInitialSteeringDrain();
+    if (aborting || terminal || finalizing) return;
+    if (!steeringDrained) {
+      await finishFailed(continuationInitialFailure);
+      return;
+    }
     const maximumTurns = policy.maxTurns;
     while (continuationTurn < maximumTurns && !aborting && !terminal && !finalizing) {
       const nextTurn = continuationTurn + 1;
@@ -941,19 +965,31 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       if (!handle.steeringAvailable || !session) return "not-running";
       const activeSession = session;
       const admissionAtStart = admissionGeneration;
-      try {
-        await activeSession.steer(message);
-        if (!extensionAdmissionOpen || admissionGeneration !== admissionAtStart) {
-          try {
-            activeSession.clearQueue();
-          } catch {
-            // A late queue write is inert once the session is closing.
+      const steering = (async (): Promise<AgentRunSteerResult> => {
+        try {
+          await activeSession.steer(message);
+          if (
+            !extensionAdmissionOpen ||
+            admissionGeneration !== admissionAtStart ||
+            !handle.steeringAvailable
+          ) {
+            try {
+              activeSession.clearQueue();
+            } catch {
+              // Recovery waits for this write to finish before it starts.
+            }
+            return "not-running";
           }
+          return "accepted";
+        } catch {
           return "not-running";
         }
-        return "accepted";
-      } catch {
-        return "not-running";
+      })();
+      inFlightSteering.add(steering);
+      try {
+        return await steering;
+      } finally {
+        inFlightSteering.delete(steering);
       }
     },
     stop: requestCancellation,

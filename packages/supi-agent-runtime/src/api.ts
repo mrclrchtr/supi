@@ -64,6 +64,7 @@ export type { RegisterAgentsCommandOptions } from "./ui/agents-command.ts";
 export {
   clearAgentsProfilePages,
   getAgentRunRegistry,
+  openAgentsViewer,
   registerAgentsCommand,
 } from "./ui/agents-command.ts";
 export type {
