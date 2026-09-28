@@ -1,5 +1,22 @@
 # Changelog
 
+## [7.3.1](https://github.com/mrclrchtr/supi/compare/v7.3.0...v7.3.1) (2026-09-28)
+
+
+### Bug Fixes
+
+* **deps:** lock file maintenance ([b61e3fb](https://github.com/mrclrchtr/supi/commit/b61e3fb6683f0ebb3a067c1db5c21fd1ade5a921))
+* **deps:** update dependency hk to v2.2.0 ([1fbc7dd](https://github.com/mrclrchtr/supi/commit/1fbc7dd4d867e8e18b77b6c45fc0e518d29d41dc))
+* **deps:** update dependency hk to v2.3.0 ([3422c80](https://github.com/mrclrchtr/supi/commit/3422c80a0ce4fb402b50729898b89fa5566669bd))
+* **deps:** update dependency hk to v2.3.1 ([e8acb07](https://github.com/mrclrchtr/supi/commit/e8acb07b76a97c2b8ce8cb9a4f371b3b349eb32d))
+* **deps:** update dependency hk to v2.4.0 ([848f34c](https://github.com/mrclrchtr/supi/commit/848f34c27b0e64343f8896133f1c294684e84239))
+* **deps:** update dependency ignore to v7.0.10 ([d67b698](https://github.com/mrclrchtr/supi/commit/d67b698454a672097dce8d1e470ee7680d509c00))
+* **deps:** update dependency jsdom to v30.1.1 ([c6b6df2](https://github.com/mrclrchtr/supi/commit/c6b6df2f1e9033b94791f489a851c724928488d0))
+* **deps:** update dependency pnpm to latest ([18ac634](https://github.com/mrclrchtr/supi/commit/18ac634c20280db2751901243da4d5d0e9df15f5))
+* **deps:** update dependency typescript-language-server to v6.0.1 ([feeede5](https://github.com/mrclrchtr/supi/commit/feeede5a9fe1244766bf48a14c7a1748605f6458))
+* **deps:** update pi to v0.87.1 ([0a93e06](https://github.com/mrclrchtr/supi/commit/0a93e06745248067620a118548055ffebabbdbff))
+* **deps:** update pnpm to v12.6.0 ([45ca526](https://github.com/mrclrchtr/supi/commit/45ca526b6187de141873f220027635ee0c0ca4a6))
+
 ## [7.3.0](https://github.com/mrclrchtr/supi/compare/v7.2.1...v7.3.0) (2026-09-24)
 
 
