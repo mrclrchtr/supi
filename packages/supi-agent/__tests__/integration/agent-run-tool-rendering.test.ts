@@ -1,4 +1,7 @@
-import type { AgentRunHandle, StartAgentRunOptions } from "@mrclrchtr/supi-agent-runtime/api";
+import type {
+  RegisteredAgentRunHandle,
+  StartRegisteredAgentRunOptions,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import agentExtension from "../../src/extension.ts";
 import {
@@ -14,7 +17,7 @@ import {
 } from "../helpers/agent-run-fixtures.ts";
 
 const mocks = vi.hoisted(() => ({
-  startAgentRun: vi.fn(),
+  startRegisteredAgentRun: vi.fn(),
   combineAgentRunUsage: vi.fn(() => undefined),
   createAgentRunProviderAuthority: vi.fn(() => ({
     getProvider: () => undefined,
@@ -24,19 +27,27 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@mrclrchtr/supi-agent-runtime/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@mrclrchtr/supi-agent-runtime/api")>()),
-  startAgentRun: mocks.startAgentRun,
+  startRegisteredAgentRun: mocks.startRegisteredAgentRun,
   combineAgentRunUsage: mocks.combineAgentRunUsage,
   createAgentRunProviderAuthority: mocks.createAgentRunProviderAuthority,
 }));
 
 function installRunDouble(config: RunDoubleConfig): void {
-  mocks.startAgentRun.mockImplementationOnce((options: StartAgentRunOptions<string>) =>
-    runDouble(options, config),
+  mocks.startRegisteredAgentRun.mockImplementationOnce(
+    (options: StartRegisteredAgentRunOptions<string>) => ({
+      ...runDouble(options, config),
+      runKey: options.registration.metadata.runKey ?? "test-run",
+    }),
   );
 }
 
-function defaultRun(options: StartAgentRunOptions<string>): AgentRunHandle<string> {
-  return runDouble(options, { value: "controlled result" });
+function defaultRun(
+  options: StartRegisteredAgentRunOptions<string>,
+): RegisteredAgentRunHandle<string> {
+  return {
+    ...runDouble(options, { value: "controlled result" }),
+    runKey: options.registration.metadata.runKey ?? "test-run",
+  };
 }
 
 const shutdowns: Shutdown[] = [];
@@ -46,8 +57,8 @@ function registeredTool(): Promise<RegisteredAgentRunTool> {
 }
 
 beforeEach(() => {
-  mocks.startAgentRun.mockReset();
-  mocks.startAgentRun.mockImplementation(defaultRun);
+  mocks.startRegisteredAgentRun.mockReset();
+  mocks.startRegisteredAgentRun.mockImplementation(defaultRun);
 });
 
 afterEach(async () => {

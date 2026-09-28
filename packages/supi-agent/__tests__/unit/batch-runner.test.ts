@@ -9,7 +9,7 @@ import { runDelegationBatch } from "../../src/tool/agent_run/batch-runner.ts";
 import { formatModelResult } from "../../src/tool/agent_run/result.ts";
 import type { ProfileCatalogue } from "../../src/types.ts";
 
-// Mock startAgentRun from supi-agent-runtime
+// Mock startRegisteredAgentRun from supi-agent-runtime
 const mockHandles: Array<{
   result: Promise<{ kind: string; value?: string; usage?: object }>;
   subscribe: ReturnType<typeof vi.fn>;
@@ -23,7 +23,7 @@ vi.mock("@mrclrchtr/supi-agent-runtime/api", async (importOriginal) => ({
     getProvider: () => undefined,
     getProviderAuth: async () => undefined,
   })),
-  startAgentRun: vi.fn(
+  startRegisteredAgentRun: vi.fn(
     (options: { prompt: string; readinessCheck?: (session: unknown) => boolean }) => {
       const handle = {
         steeringAvailable: false,
@@ -256,9 +256,9 @@ describe("runDelegationBatch", () => {
   });
 
   it("returns a normal result even when every task fails", async () => {
-    // Mock startAgentRun to return failure for this test only.
-    const { startAgentRun } = await import("@mrclrchtr/supi-agent-runtime/api");
-    (startAgentRun as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+    // Mock startRegisteredAgentRun to return failure for this test only.
+    const { startRegisteredAgentRun } = await import("@mrclrchtr/supi-agent-runtime/api");
+    (startRegisteredAgentRun as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
       result: Promise.resolve({
         kind: "failed",
         failureCode: "session-not-ready",
@@ -283,8 +283,8 @@ describe("runDelegationBatch", () => {
 
   it("records bounded Agent Run diagnostics for a failed task", async () => {
     configureDebugRegistry({ enabled: true });
-    const { startAgentRun } = await import("@mrclrchtr/supi-agent-runtime/api");
-    (startAgentRun as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+    const { startRegisteredAgentRun } = await import("@mrclrchtr/supi-agent-runtime/api");
+    (startRegisteredAgentRun as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
       result: Promise.resolve({
         kind: "failed",
         failureCode: "missing-completion",
@@ -339,10 +339,10 @@ describe("runDelegationBatch", () => {
   });
 
   it("bounds four 16,000-character answers to one aggregate result with a complete spill", async () => {
-    const { startAgentRun } = await import("@mrclrchtr/supi-agent-runtime/api");
+    const { startRegisteredAgentRun } = await import("@mrclrchtr/supi-agent-runtime/api");
     const bigAnswer = "x".repeat(16_000);
     for (let i = 0; i < 4; i++) {
-      (startAgentRun as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+      (startRegisteredAgentRun as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
         result: Promise.resolve({ kind: "success" as const, value: bigAnswer }),
         subscribe: vi.fn(() => () => undefined),
         steer: vi.fn(async () => "not-running" as const),
@@ -386,8 +386,8 @@ describe("runDelegationBatch", () => {
   });
 
   it("preserves missing assistant text as missing completion", async () => {
-    const { startAgentRun } = await import("@mrclrchtr/supi-agent-runtime/api");
-    (startAgentRun as ReturnType<typeof vi.fn>).mockImplementationOnce(
+    const { startRegisteredAgentRun } = await import("@mrclrchtr/supi-agent-runtime/api");
+    (startRegisteredAgentRun as ReturnType<typeof vi.fn>).mockImplementationOnce(
       (options: { completionResolver: (session: unknown) => string | undefined }) => ({
         result: Promise.resolve(
           options.completionResolver({ getLastAssistantText: () => undefined }),

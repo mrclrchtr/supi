@@ -3,11 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createResources: vi.fn(),
   startAgentRun: vi.fn(),
+  startRegisteredAgentRun: vi.fn(),
 }));
 
 vi.mock("@mrclrchtr/supi-agent-runtime/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@mrclrchtr/supi-agent-runtime/api")>()),
   startAgentRun: mocks.startAgentRun,
+  startRegisteredAgentRun: mocks.startRegisteredAgentRun,
 }));
 vi.mock("../../src/tool/review_run/child-resources.ts", () => ({
   createIsolatedChildResources: mocks.createResources,
@@ -148,7 +150,7 @@ describe("runIsolatedChild", () => {
     expect(runtimeAgentDir).toBe(resourceAgentDir);
   });
 
-  it("captures Reviewer Session messages and keeps the Review observer cleanup", async () => {
+  it("keeps Review observer cleanup in a registered child", async () => {
     const unsubscribeAudit = vi.fn();
     const session = {
       systemPrompt: "Reviewer Protocol",
@@ -161,9 +163,13 @@ describe("runIsolatedChild", () => {
         return vi.fn();
       },
     } as unknown as AgentRunSessionView;
-    mocks.startAgentRun.mockImplementation(
-      (options: { observer?: (view: AgentRunSessionView) => unknown }) => ({
+    mocks.startRegisteredAgentRun.mockImplementation(
+      (options: {
+        observer?: (view: AgentRunSessionView) => unknown;
+        registration: { metadata: { runKey: string } };
+      }) => ({
         ...handle({ kind: "success", value: "submitted" }),
+        runKey: options.registration.metadata.runKey,
         result: Promise.resolve().then(async () => {
           const cleanup = await options.observer?.(session);
           if (typeof cleanup === "function") cleanup();
@@ -195,14 +201,14 @@ describe("runIsolatedChild", () => {
     ).resolves.toMatchObject({ kind: "success", value: "submitted" });
 
     expect(unsubscribeAudit).toHaveBeenCalledOnce();
-    const run = registry.snapshot().runs[0];
-    expect(run).toMatchObject({ kind: "Reviewer", taskId: "task-1", active: false });
-    const transcript = await run?.transcriptSource?.load();
-    expect(transcript).toMatchObject({
-      metadata: { kind: "Reviewer", label: "change review" },
-      systemPrompt: "Reviewer Protocol",
-      messages: [{ role: "assistant" }],
-    });
+    expect(mocks.startRegisteredAgentRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        registration: {
+          metadata: runDisplay,
+        },
+        transcriptSystemPrompt: "protocol",
+      }),
+    );
   });
 
   it("omits reasoning when the provider does not report it", async () => {

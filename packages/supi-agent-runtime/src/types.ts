@@ -7,6 +7,8 @@ import type {
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import type { AgentRunProviderAuthority } from "./provider-authority.ts";
+import type { AgentRunRegistry } from "./session/agent-run-registry.ts";
+import type { AgentRunRegistration } from "./session/agent-run-registry-types.ts";
 
 /** The host-owned failure stages of one Agent Run. */
 export type AgentRunFailureCode =
@@ -298,4 +300,22 @@ export interface AgentRunHandle<T> {
   steer(message: string): Promise<AgentRunSteerResult>;
   /** Stop the run; repeated calls share the same terminal cleanup. */
   stop(): Promise<void>;
+}
+
+/** Options for `startRegisteredAgentRun()`. */
+export interface StartRegisteredAgentRunOptions<T> extends StartAgentRunOptions<T> {
+  /** Optional containing-session registry. */
+  readonly registry?: AgentRunRegistry;
+  /** Viewer metadata and caller-owned conversation/activity views. */
+  readonly registration: Pick<
+    AgentRunRegistration,
+    "metadata" | "getConversation" | "getRecentActivity"
+  >;
+  /** System prompt to store before the child session starts. */
+  readonly transcriptSystemPrompt?: string;
+}
+
+/** Handle returned by `startRegisteredAgentRun()`, with its stable run key. */
+export interface RegisteredAgentRunHandle<T> extends AgentRunHandle<T> {
+  readonly runKey: string;
 }

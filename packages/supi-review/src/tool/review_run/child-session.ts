@@ -10,7 +10,9 @@ import {
   type AgentRunProviderAuthority,
   type AgentRunRegistry,
   type AgentRunSessionView,
+  type StartAgentRunOptions,
   startAgentRun,
+  startRegisteredAgentRun,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import type { ChildRunOutcome, ReviewProgress } from "../../types.ts";
 import { createIsolatedChildResources } from "./child-resources.ts";
@@ -120,11 +122,7 @@ export async function runIsolatedChild<T>(
       projectTrusted: config.projectTrusted,
     },
   );
-  let runKey: string | undefined;
-  const transcript = config.runDisplay
-    ? config.registry?.createTranscriptCapture(config.runDisplay, config.protocolPrompt)
-    : undefined;
-  const run = startAgentRun<T>({
+  const runOptions: StartAgentRunOptions<T> = {
     inputs: {
       cwd: config.cwd,
       model: config.model,
@@ -148,25 +146,17 @@ export async function runIsolatedChild<T>(
         ? undefined
         : config.holder.value,
     ...(config.continuation ? { continuation: config.continuation } : {}),
-    observer: (session) => {
-      const unsubscribeTranscript = runKey
-        ? config.registry?.attachSession(runKey, session)
-        : undefined;
-      const cleanup = config.onSessionCreated?.(session);
-      if (!unsubscribeTranscript && typeof cleanup !== "function") return undefined;
-      return () => {
-        unsubscribeTranscript?.();
-        if (typeof cleanup === "function") cleanup();
-      };
-    },
-  });
-  if (config.runDisplay) {
-    runKey = config.registry?.register({
-      metadata: config.runDisplay,
-      ...(transcript ? { transcript } : {}),
-      handle: run,
-    });
-  }
+    observer: config.onSessionCreated,
+  };
+  const registeredRun = config.runDisplay
+    ? startRegisteredAgentRun<T>({
+        ...runOptions,
+        registry: config.registry,
+        registration: { metadata: config.runDisplay },
+        transcriptSystemPrompt: config.protocolPrompt,
+      })
+    : undefined;
+  const run = registeredRun ?? startAgentRun<T>(runOptions);
   const unsubscribe = config.onProgress
     ? run.subscribe((progress) => {
         if (
@@ -180,10 +170,9 @@ export async function runIsolatedChild<T>(
     : undefined;
   try {
     const outcome = mapOutcome(await run.result);
-    if (runKey) {
-      await transcript?.finish();
+    if (registeredRun) {
       config.registry?.setDisplayResult(
-        runKey,
+        registeredRun.runKey,
         config.displayResult?.(outcome) ??
           (outcome.kind === "failed" ? { failureCode: outcome.failureCode } : {}),
       );

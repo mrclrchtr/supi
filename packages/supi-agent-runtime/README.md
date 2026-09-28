@@ -44,3 +44,5 @@ Continuation can start only after Pi accepts the initial prompt. It can handle `
 Agent and Review call `registerAgentsCommand(pi)` from the public API. The helper finds one shared registry for the containing Pi runtime through `pi.events`. Bundled runtime copies use the same registry and register one `/agents` command for that runtime. The runtime package does not register itself as a Pi extension.
 
 The runtime owns temporary human-only transcripts for registered runs until the containing session ends. This retention is separate from Review audit settings. Agent can supply optional Profile and Profile Diagnostics pages; the runtime does not own Agent Profile policy. Steering is available only while the initial prompt is active. Stop affects only the selected run.
+
+`startRegisteredAgentRun()` returns one handle. `stop()` waits for bounded Agent Run disposal, not transcript writes. `result` resolves after final transcript writes finish. A storage failure marks the transcript incomplete and does not change the Agent Run outcome. Without a registry, the runtime does not create a transcript. A closed registry stops the run.

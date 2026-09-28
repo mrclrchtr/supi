@@ -105,6 +105,7 @@ export class AgentRunTranscriptCapture implements AgentRunTranscriptSource {
   #toolRenderers: AgentRunToolRenderer[];
   #filePath: string | undefined;
   #writeQueue: Promise<void>;
+  #finishPromise: Promise<void> | undefined;
   readonly metadata: AgentRunTranscriptMetadata;
   private readonly onChange?: () => void;
 
@@ -167,16 +168,20 @@ export class AgentRunTranscriptCapture implements AgentRunTranscriptSource {
     if (operation) void this.#enqueue({ kind: "operation", operation });
   }
 
-  /** Mark the capture complete after the run settles. */
-  async finish(): Promise<void> {
-    if (this.#status !== "capturing") return;
-    await this.#enqueue({ kind: "status", status: "complete" });
-    await this.#writeQueue;
-    if (this.#status === "capturing") {
-      this.#status = "complete";
-      this.#revision++;
-      this.onChange?.();
-    }
+  /** Mark the capture complete after the run settles and wait for queued writes. */
+  finish(): Promise<void> {
+    if (this.#finishPromise !== undefined) return this.#finishPromise;
+    if (this.#status !== "capturing") return Promise.resolve();
+    this.#finishPromise = (async () => {
+      await this.#enqueue({ kind: "status", status: "complete" });
+      await this.#writeQueue;
+      if (this.#status === "capturing") {
+        this.#status = "complete";
+        this.#revision++;
+        this.onChange?.();
+      }
+    })();
+    return this.#finishPromise;
   }
 
   /** Read the full transcript from temporary storage. */

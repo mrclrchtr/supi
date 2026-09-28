@@ -3,6 +3,7 @@ import type {
   AgentRunHandle,
   AgentRunOutcome,
   AgentRunProgress,
+  StartRegisteredAgentRunOptions,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import { getAgentRunRegistry } from "@mrclrchtr/supi-agent-runtime/api";
 import {
@@ -29,10 +30,17 @@ vi.mock("@mrclrchtr/supi-agent-runtime/api", async (importOriginal) => ({
     getProviderAuth: async () => undefined,
   })),
   combineAgentRunUsage: vi.fn(() => undefined),
-  startAgentRun: vi.fn(() => {
+  startRegisteredAgentRun: vi.fn((options: StartRegisteredAgentRunOptions<string>) => {
     const handle = controlledHandle();
+    const runKey = options.registration.metadata.runKey ?? `run-${mocks.handles.length + 1}`;
+    const registeredHandle = { ...handle, runKey };
+    options.registry?.register({
+      ...options.registration,
+      metadata: { ...options.registration.metadata, runKey },
+      handle: registeredHandle,
+    });
     mocks.handles.push(handle);
-    return handle;
+    return registeredHandle;
   }),
 }));
 

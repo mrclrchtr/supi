@@ -1,4 +1,5 @@
 // biome-ignore lint/style/noExcessiveLinesPerFile: the Agent Run state machine keeps lifecycle ownership auditable in one closure.
+import { randomUUID } from "node:crypto";
 import type { Api, Model, Usage } from "@earendil-works/pi-ai";
 import type {
   AgentSession,
@@ -29,7 +30,9 @@ import type {
   AgentRunSessionView,
   AgentRunStatus,
   AgentRunSteerResult,
+  RegisteredAgentRunHandle,
   StartAgentRunOptions,
+  StartRegisteredAgentRunOptions,
 } from "./types.ts";
 import { collectAgentRunUsage } from "./usage.ts";
 
@@ -1008,6 +1011,84 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
   }
   void setup();
   return handle;
+}
+
+/**
+ * Start an Agent Run with registry tracking and awaited transcript capture.
+ *
+ * `stop()` waits for bounded Agent Run disposal. It does not wait for transcript writes. `result`
+ * resolves after the final transcript writes finish. A storage failure marks the transcript
+ * incomplete and does not change the Agent Run outcome. Without a registry, no transcript is
+ * created. A closed registry stops the Agent Run.
+ */
+export function startRegisteredAgentRun<T>(
+  options: StartRegisteredAgentRunOptions<T>,
+): RegisteredAgentRunHandle<T> {
+  const { registry, registration, transcriptSystemPrompt, ...runOptions } = options;
+  const runKey = registration.metadata.runKey ?? randomUUID();
+  const metadata = {
+    ...registration.metadata,
+    runKey,
+    batchId: registration.metadata.batchId ?? "default",
+  };
+  const transcript = registry?.createTranscriptCapture(metadata, transcriptSystemPrompt ?? "");
+  const observer = async (session: AgentRunSessionView): Promise<(() => void) | undefined> => {
+    const detachTranscript = registry?.attachSession(runKey, session);
+    try {
+      const detachCallerObserver = await options.observer?.(session);
+      if (!detachTranscript && typeof detachCallerObserver !== "function") return undefined;
+      return () => {
+        try {
+          detachCallerObserver?.();
+        } finally {
+          detachTranscript?.();
+        }
+      };
+    } catch (error) {
+      try {
+        detachTranscript?.();
+      } catch {
+        // Transcript observer cleanup cannot replace the caller observer error.
+      }
+      throw error;
+    }
+  };
+  const handle = startAgentRun({ ...runOptions, observer });
+  const result = handle.result.then(async (outcome) => {
+    try {
+      await transcript?.finish();
+    } catch {
+      // Transcript storage cannot change the Agent Run outcome.
+    }
+    return outcome;
+  });
+  const registeredHandle: RegisteredAgentRunHandle<T> = {
+    runKey,
+    get steeringAvailable() {
+      return handle.steeringAvailable;
+    },
+    result,
+    subscribe(listener) {
+      return handle.subscribe(listener);
+    },
+    steer(message) {
+      return handle.steer(message);
+    },
+    stop() {
+      // Stop waits for bounded Agent Run disposal, not for transcript writes.
+      return handle.stop();
+    },
+  };
+  registry?.register({
+    metadata,
+    ...(transcript ? { transcript } : {}),
+    handle: registeredHandle,
+    ...(registration.getConversation ? { getConversation: registration.getConversation } : {}),
+    ...(registration.getRecentActivity
+      ? { getRecentActivity: registration.getRecentActivity }
+      : {}),
+  });
+  return registeredHandle;
 }
 
 function usageFields(usage: Usage | undefined): { usage?: Usage } {

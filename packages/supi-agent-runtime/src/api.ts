@@ -12,7 +12,7 @@ export type {
   AgentRunRequestAuth,
 } from "./provider-authority.ts";
 export { createAgentRunProviderAuthority } from "./provider-authority.ts";
-export { startAgentRun } from "./run.ts";
+export { startAgentRun, startRegisteredAgentRun } from "./run.ts";
 export { AgentRunRegistry } from "./session/agent-run-registry.ts";
 export type {
   AgentRunDisplayConversation,
@@ -56,9 +56,11 @@ export type {
   AgentRunToolRenderer,
   AgentSessionInputs,
   CompletionResolver,
+  RegisteredAgentRunHandle,
   SafeAssistantStopReason,
   SessionReadinessCheck,
   StartAgentRunOptions,
+  StartRegisteredAgentRunOptions,
 } from "./types.ts";
 export type { RegisterAgentsCommandOptions } from "./ui/agents-command.ts";
 export {

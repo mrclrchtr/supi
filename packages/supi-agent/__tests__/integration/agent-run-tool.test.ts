@@ -1,8 +1,7 @@
-import { randomUUID } from "node:crypto";
-import { rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import type { AgentRunHandle, StartAgentRunOptions } from "@mrclrchtr/supi-agent-runtime/api";
+import type {
+  RegisteredAgentRunHandle,
+  StartRegisteredAgentRunOptions,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import agentExtension from "../../src/extension.ts";
 import {
@@ -17,7 +16,7 @@ import {
 } from "../helpers/agent-run-fixtures.ts";
 
 const mocks = vi.hoisted(() => ({
-  startAgentRun: vi.fn(),
+  startRegisteredAgentRun: vi.fn(),
   combineAgentRunUsage: vi.fn(() => undefined),
   createAgentRunProviderAuthority: vi.fn(() => ({
     getProvider: () => undefined,
@@ -27,13 +26,18 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@mrclrchtr/supi-agent-runtime/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@mrclrchtr/supi-agent-runtime/api")>()),
-  startAgentRun: mocks.startAgentRun,
+  startRegisteredAgentRun: mocks.startRegisteredAgentRun,
   combineAgentRunUsage: mocks.combineAgentRunUsage,
   createAgentRunProviderAuthority: mocks.createAgentRunProviderAuthority,
 }));
 
-function defaultRun(options: StartAgentRunOptions<string>): AgentRunHandle<string> {
-  return runDouble(options, { value: "x".repeat(60_000) });
+function defaultRun(
+  options: StartRegisteredAgentRunOptions<string>,
+): RegisteredAgentRunHandle<string> {
+  return {
+    ...runDouble(options, { value: "x".repeat(60_000) }),
+    runKey: options.registration.metadata.runKey ?? "test-run",
+  };
 }
 
 const shutdowns: Shutdown[] = [];
@@ -43,8 +47,8 @@ function registeredTool(): Promise<RegisteredAgentRunTool> {
 }
 
 beforeEach(() => {
-  mocks.startAgentRun.mockReset();
-  mocks.startAgentRun.mockImplementation(defaultRun);
+  mocks.startRegisteredAgentRun.mockReset();
+  mocks.startRegisteredAgentRun.mockImplementation(defaultRun);
 });
 
 afterEach(async () => {
@@ -84,7 +88,7 @@ describe("registered agent_run boundary", () => {
         context(),
       ),
     ).rejects.toThrow("Invalid agent_run input");
-    expect(mocks.startAgentRun).not.toHaveBeenCalled();
+    expect(mocks.startRegisteredAgentRun).not.toHaveBeenCalled();
   });
 
   it("keeps both output lanes within their bounds through the registered tool", async () => {
@@ -109,27 +113,6 @@ describe("registered agent_run boundary", () => {
     expect(result.details.tasks[0]?.finalTextFull).toContain("[truncated:");
     expect(result.details).not.toHaveProperty("transcriptSources");
     expect(result.details).not.toHaveProperty("runKeys");
-  });
-
-  it("continues a run when temporary transcript storage fails", async () => {
-    const missingParent = join(tmpdir(), `supi-agent-missing-${randomUUID()}`);
-    vi.stubEnv("TMPDIR", join(missingParent, "nested"));
-    const tool = await registeredTool();
-    const result = (await tool.execute(
-      "call-storage-failure",
-      { tasks: [{ id: "task-1", profile: "explore", instructions: "inspect" }] },
-      undefined,
-      undefined,
-      context(),
-    )) as { content: Array<{ text: string }>; details: { tasks: Array<{ status: string }> } };
-
-    expect(result.details.tasks[0]?.status).toBe("completed");
-    expect(result.content[0]?.text).toContain("x".repeat(10));
-    expect(result.details).not.toHaveProperty("transcriptSources");
-    const source = tool.registry.snapshot().runs[0]?.transcriptSource;
-    expect(source?.getStatus().status).toBe("incomplete");
-    await expect(source?.load()).resolves.toMatchObject({ status: "incomplete" });
-    await rm(missingParent, { recursive: true, force: true });
   });
 
   it("renders live lifecycle states, progress metrics, and safe recent activity", async () => {

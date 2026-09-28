@@ -105,4 +105,34 @@ describe("AgentRunTranscriptCapture concurrent reads", () => {
     expect(finalDocument.status).toBe("complete");
     expect(finalDocument.messages).toHaveLength(1);
   });
+
+  it("writes one final status when run completion overlaps session shutdown", async () => {
+    const store = new AgentRunTranscriptStore();
+    stores.push(store);
+    const capture = store.createCapture(
+      {
+        runKey: "run-2",
+        batchId: "batch-1",
+        taskId: "task-2",
+        kind: "Reviewer",
+        label: "change review",
+        cwd: "/work/project",
+        modelId: "provider/model",
+        thinkingLevel: "low",
+        tools: ["read"],
+        startedAt: 2,
+      },
+      "Reviewer Protocol",
+      [],
+    );
+    await capture.load();
+    fileSystem.appendFile.mockClear();
+
+    await Promise.all([capture.finish(), store.dispose()]);
+
+    const finalStatusWrites = fileSystem.appendFile.mock.calls.filter(([, data]) =>
+      String(data).includes('"kind":"status"'),
+    );
+    expect(finalStatusWrites).toHaveLength(1);
+  });
 });
