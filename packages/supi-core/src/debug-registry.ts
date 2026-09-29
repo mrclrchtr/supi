@@ -6,6 +6,9 @@
 
 export type DebugLevel = "debug" | "info" | "warning" | "error";
 export type DebugAgentAccess = "off" | "sanitized" | "raw";
+
+/** Custom session-entry type used to persist sanitized debug events. */
+export const DEBUG_EVENT_ENTRY_TYPE = "supi-debug-event";
 export interface DebugRegistryConfig {
   /** Whether producers should retain debug events. */
   enabled: boolean;
@@ -212,7 +215,7 @@ function toSanitizedView(event: DebugEvent): DebugEventView {
     category: event.category,
     message: event.message,
     cwd: event.cwd,
-    data: event.data,
+    data: event.data === undefined ? undefined : redactDebugData(event.data),
   };
 }
 
@@ -241,15 +244,17 @@ export function recordDebugEvent(input: DebugEventInput): DebugEvent | null {
   };
   state.events.push(event);
   trimToMaxEvents(state);
-  const view = toSanitizedView(event);
   for (const listener of state.listeners) {
     try {
-      listener(view);
+      listener(toSanitizedView(event));
     } catch {
       // Debug-event consumers must not alter producer behavior.
     }
   }
-  return { ...event };
+  return {
+    ...event,
+    data: event.data === undefined ? undefined : redactDebugData(event.data),
+  };
 }
 
 /** Query retained debug events newest-first. Results are sanitized unless raw access is requested and allowed. */

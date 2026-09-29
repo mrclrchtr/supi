@@ -1,3 +1,5 @@
+export type { AskUserFormUi, OpenAskUserFormOptions } from "./form-api.ts";
+export { openAskUserForm } from "./form-api.ts";
 export { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
 export { AskUserParamsSchema } from "./schema.ts";
 export { AskUserController } from "./session/controller.ts";

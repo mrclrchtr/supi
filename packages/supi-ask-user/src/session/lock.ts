@@ -1,4 +1,4 @@
-// Session-scoped single-active interaction guard for ask_user.
+// Shared single-form guard for Ask User callers.
 
 export class ActiveQuestionnaireLock {
   private active: boolean = false;

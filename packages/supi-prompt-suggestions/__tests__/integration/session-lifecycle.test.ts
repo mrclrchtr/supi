@@ -1,6 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { GhostTextEditor } from "../../src/editor/editor.ts";
 import { createSuggestionWarning } from "../../src/generation/failure.ts";
 import type {
   GenerationStatus,
@@ -8,6 +9,8 @@ import type {
   SuggestionGenerator,
 } from "../../src/generation/generator.ts";
 import { SessionLifecycle } from "../../src/session.ts";
+
+type EditorFactory = NonNullable<ReturnType<ExtensionContext["ui"]["getEditorComponent"]>>;
 
 class ControlledGenerator {
   readonly start = vi.fn(
@@ -60,6 +63,85 @@ afterEach(() => {
 });
 
 describe("SessionLifecycle suggestion notifications", () => {
+  it("keeps ghost ownership and history on the main editor when a form creates an editor", () => {
+    const generator = new ControlledGenerator();
+    const base = makeCtx();
+    const branch = [
+      {
+        type: "message",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "seeded editor history" }],
+        },
+      },
+      {
+        type: "message",
+        message: {
+          role: "assistant",
+          stopReason: "stop",
+          content: [{ type: "text", text: "assistant answer" }],
+        },
+      },
+    ];
+    let editorFactory: EditorFactory | undefined;
+    const ctx = makeCtx({
+      hasUI: true,
+      mode: "tui",
+      ui: {
+        ...base.ui,
+        setEditorComponent: (factory: EditorFactory | undefined) => {
+          editorFactory = factory;
+        },
+      },
+      sessionManager: {
+        getBranch: () => branch,
+        getSessionId: () => "pi-session",
+      },
+    }) as unknown as ExtensionContext;
+    const lifecycle = new SessionLifecycle(generator as unknown as SuggestionGenerator);
+    lifecycle.onStart(ctx);
+    if (!editorFactory) throw new Error("Missing custom editor factory");
+
+    const tui = { terminal: { rows: 40 }, requestRender: vi.fn() };
+    const editorTheme = {
+      borderColor: (text: string) => text,
+      selectList: {
+        selectedPrefix: (text: string) => text,
+        selectedText: (text: string) => text,
+        description: (text: string) => text,
+        scrollInfo: (text: string) => text,
+        noMatch: (text: string) => text,
+        selectedDescription: (text: string) => text,
+        selectedScrollInfo: (text: string) => text,
+        cursor: ">",
+        paddingLeft: 2,
+      },
+    };
+    const keybindings = { matches: () => false, getKeys: () => [] };
+    const mainEditor = editorFactory(
+      tui as never,
+      editorTheme as never,
+      keybindings as never,
+    ) as GhostTextEditor;
+    const embeddedEditor = editorFactory(
+      tui as never,
+      editorTheme as never,
+      keybindings as never,
+    ) as GhostTextEditor;
+    lifecycle.onAgentSettled(ctx);
+    generator.callbacks?.onStatus({ kind: "ready", suggestion: "main editor suggestion" });
+
+    mainEditor.focused = true;
+    embeddedEditor.focused = true;
+    expect(mainEditor.render(80).join("\n")).toContain("main editor suggestion");
+    expect(embeddedEditor.render(80).join("\n")).not.toContain("main editor suggestion");
+
+    embeddedEditor.handleInput("\u001b[A");
+    mainEditor.handleInput("\u001b[A");
+    expect(embeddedEditor.getText()).toBe("");
+    expect(mainEditor.getText()).toBe("seeded editor history");
+  });
+
   it("renders one bounded warning and clears the spinner", () => {
     const { ctx, callbacks } = makeFixture();
     const warning = createSuggestionWarning("provider/model", "authentication");

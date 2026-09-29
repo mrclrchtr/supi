@@ -1,6 +1,7 @@
 import { createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
 import {
+  DEBUG_EVENT_ENTRY_TYPE,
   type DebugEventQuery,
   type DebugEventView,
   isDebugLevel,
@@ -9,8 +10,8 @@ import {
   redactDebugData,
 } from "@mrclrchtr/supi-core/debug";
 
-/** Custom session-entry type used for sanitized debug-event persistence. */
-export const DEBUG_EVENT_ENTRY_TYPE = "supi-debug-event";
+/** Shared custom entry type for sanitized session-local debug events. */
+export { DEBUG_EVENT_ENTRY_TYPE };
 
 type PersistedDebugEventQuery = Pick<
   DebugEventQuery,

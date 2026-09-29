@@ -109,6 +109,35 @@ describe("debug registry", () => {
     });
   });
 
+  it("keeps retained event data unchanged when listeners or query callers mutate their copies", () => {
+    configureDebugRegistry({ enabled: true });
+    let listenerEvent: { data?: { draft?: string } } | undefined;
+    let laterListenerDraft: string | undefined;
+    subscribeDebugEvents((event) => {
+      listenerEvent = event as typeof listenerEvent;
+      if (event.data && typeof event.data === "object") {
+        (event.data as { draft: string }).draft = "listener mutation";
+      }
+    });
+    subscribeDebugEvents((event) => {
+      laterListenerDraft = (event.data as { draft: string }).draft;
+    });
+
+    recordDebugEvent({
+      source: "prompt-improver",
+      level: "info",
+      category: "draft.confirmed",
+      message: "Draft confirmed",
+      data: { draft: "confirmed draft" },
+    });
+    const query = getDebugEvents();
+    (query.events[0]?.data as { draft: string }).draft = "query mutation";
+
+    expect(listenerEvent?.data?.draft).toBe("listener mutation");
+    expect(laterListenerDraft).toBe("confirmed draft");
+    expect(getDebugEvents().events[0]?.data).toEqual({ draft: "confirmed draft" });
+  });
+
   it("trims oldest events when maxEvents is exceeded", () => {
     configureDebugRegistry({ enabled: true, maxEvents: 2 });
 

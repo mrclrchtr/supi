@@ -60,7 +60,15 @@ function makeUnsupportedCtx(): UnsupportedCtx {
 function makeFormCtx(result: unknown): FormCtx {
   const ctx = makeCtx({ hasUI: true, mode: "tui", abort: vi.fn() }) as unknown as FormCtx;
   ctx.ui.setWorkingVisible = vi.fn();
-  ctx.ui.custom = (async () => result) as unknown as FormCtx["ui"]["custom"];
+  ctx.ui.custom = (async (factory: Parameters<FormCtx["ui"]["custom"]>[0]) => {
+    factory(
+      { terminal: { rows: 40 }, requestRender() {} },
+      { fg: (_color: string, text: string) => text },
+      { matches: () => false },
+      () => undefined,
+    );
+    return result;
+  }) as unknown as FormCtx["ui"]["custom"];
   return ctx;
 }
 
@@ -251,19 +259,39 @@ describe("ask_user tool", () => {
     const tool = getTool(pi, "ask_user");
 
     let resolveFirst: ((value: unknown) => void) | undefined;
-    const firstCtx = makeCtx({ hasUI: true, mode: "tui", abort: vi.fn() }) as unknown as FormCtx;
-    firstCtx.ui.setWorkingVisible = vi.fn();
-    firstCtx.ui.custom = (async () =>
-      await new Promise<unknown>((resolve) => {
-        resolveFirst = resolve;
-      })) as unknown as FormCtx["ui"]["custom"];
-
-    const secondCtx = makeUnsupportedCtx();
+    const sharedTui = { terminal: { rows: 40 }, requestRender() {} };
+    const makePendingCtx = () => {
+      const ctx = makeCtx({ hasUI: true, mode: "tui", abort: vi.fn() }) as unknown as FormCtx;
+      ctx.ui.setWorkingVisible = vi.fn();
+      ctx.ui.setTitle = vi.fn();
+      ctx.ui.custom = (async (factory: Parameters<FormCtx["ui"]["custom"]>[0]) =>
+        await new Promise<unknown>((resolve, reject) => {
+          try {
+            factory(sharedTui, {}, {}, resolve);
+            resolveFirst ??= resolve;
+          } catch (error) {
+            reject(error);
+          }
+        })) as unknown as FormCtx["ui"]["custom"];
+      return ctx;
+    };
+    const firstCtx = makePendingCtx();
+    const secondCtx = makePendingCtx();
 
     const pending = tool.execute("tc-5", request, undefined, undefined, firstCtx);
     await expect(tool.execute("tc-6", request, undefined, undefined, secondCtx)).rejects.toThrow(
       "already in flight",
     );
+
+    expect(firstCtx.ui.setWorkingVisible).toHaveBeenCalledTimes(1);
+    expect(firstCtx.ui.setWorkingVisible).toHaveBeenCalledWith(false);
+    expect(firstCtx.ui.setTitle).toHaveBeenCalledTimes(1);
+    expect(secondCtx.ui.setWorkingVisible).not.toHaveBeenCalled();
+    expect(secondCtx.ui.setTitle).not.toHaveBeenCalled();
+    expect(pi.events.emit).toHaveBeenCalledTimes(1);
+    expect(pi.events.emit).toHaveBeenCalledWith("supi:ask-user:start", {
+      source: "supi-ask-user",
+    });
 
     resolveFirst?.({
       outcome: "submitted",
@@ -280,6 +308,15 @@ describe("ask_user tool", () => {
       ],
     });
     await pending;
+
+    expect(firstCtx.ui.setWorkingVisible).toHaveBeenNthCalledWith(2, true);
+    expect(firstCtx.ui.setTitle).toHaveBeenCalledTimes(2);
+    expect(secondCtx.ui.setWorkingVisible).not.toHaveBeenCalled();
+    expect(secondCtx.ui.setTitle).not.toHaveBeenCalled();
+    expect(pi.events.emit).toHaveBeenCalledTimes(2);
+    expect(pi.events.emit).toHaveBeenLastCalledWith("supi:ask-user:end", {
+      source: "supi-ask-user",
+    });
   });
 
   it("emits start and end events around successful form interaction", async () => {

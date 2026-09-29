@@ -14,6 +14,11 @@ import { type GhostTextCallbacks, GhostTextEditor } from "./editor/editor.ts";
 import { formatSuggestionWarning, type SuggestionWarning } from "./generation/failure.ts";
 import type { GenerationStatus, SuggestionGenerator } from "./generation/generator.ts";
 
+const EMBEDDED_EDITOR_CALLBACKS: GhostTextCallbacks = {
+  onAccept: () => {},
+  onDismiss: () => {},
+};
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 type SessionTextContent = string | { type: string; text?: string }[] | undefined;
@@ -230,12 +235,19 @@ export class SessionLifecycle {
   }
 
   private installEditor(ctx: ExtensionContext): void {
+    let mainEditorPending = true;
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
+      // PI creates the installed editor when setEditorComponent is called. Later
+      // factory calls can create embedded editors for forms, so they do not own suggestions.
+      const isMainEditor = mainEditorPending;
+      mainEditorPending = false;
       const editor = new GhostTextEditor(tui, theme, keybindings, {
-        callbacks: this.buildCallbacks(),
+        callbacks: isMainEditor ? this.buildCallbacks() : EMBEDDED_EDITOR_CALLBACKS,
       });
-      this.ghostEditor = editor;
-      this.seedHistoryFromSession(editor, ctx);
+      if (isMainEditor) {
+        this.ghostEditor = editor;
+        this.seedHistoryFromSession(editor, ctx);
+      }
       return editor;
     });
   }

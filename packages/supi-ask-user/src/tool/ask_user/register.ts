@@ -1,6 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { AskUserParamsSchema } from "../../schema.ts";
-import type { ActiveQuestionnaireLock } from "../../session/lock.ts";
 import type { AskUserToolDetails } from "../../types.ts";
 import { executeAskUser } from "./execute.ts";
 import type { ASK_USER_PROMPT_SURFACE_DEFAULTS } from "./guidance.ts";
@@ -13,7 +12,6 @@ export type AskUserPromptSurface = typeof ASK_USER_PROMPT_SURFACE_DEFAULTS;
 /** Register ask_user with one resolved prompt surface. */
 export function registerAskUserTool(
   pi: ExtensionAPI,
-  lock: ActiveQuestionnaireLock,
   surface: AskUserPromptSurface,
   getSessionName: () => string | undefined,
 ): void {
@@ -24,7 +22,7 @@ export function registerAskUserTool(
     promptGuidelines: surface.promptGuidelines,
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      return executeAskUser(params, signal, ctx, lock, pi, getSessionName());
+      return executeAskUser(params, signal, ctx, pi, getSessionName());
     },
     renderCall: (args, theme) => renderAskUserCall(args, theme),
     renderResult: (result, options, theme, context) =>

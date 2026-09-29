@@ -166,6 +166,7 @@ Import the explicit API subpath:
 import {
   AskUserController,
   normalizeQuestionnaire,
+  openAskUserForm,
   type AskUserOutcome,
 } from "@mrclrchtr/supi-ask-user/api";
 
@@ -182,9 +183,17 @@ const questionnaire = normalizeQuestionnaire({
 
 const controller = new AskUserController(questionnaire);
 const outcome: AskUserOutcome = controller.outcome();
+
+// Open the full form from an extension context.
+const result = await openAskUserForm(questionnaire, {
+  ui: ctx.ui,
+  signal: ctx.signal,
+});
 ```
 
-The API exports `AskUserParamsSchema`, `normalizeQuestionnaire`, `AskUserValidationError`, and `AskUserController`. It also exports types for normalized questions, responses, outcomes, tool details, and cancel or abort interaction results. The package root is not an import surface. Use `/api` for the library or `/extension` for the Pi extension entrypoint.
+`openAskUserForm()` uses the shared form UI in Pi's editor area and one lock for all callers. Pass `overlay: true` to use a focused overlay instead. It returns structured answers or a cancel/abort result. It does not write to the session transcript or call `ctx.abort()`; the caller owns those actions. A caller can pass its own `AbortSignal`.
+
+The API exports `AskUserParamsSchema`, `normalizeQuestionnaire`, `AskUserValidationError`, `AskUserController`, and `openAskUserForm()`. It also exports types for the form UI, normalized questions, responses, outcomes, tool details, and cancel or abort interaction results. The package root is not an import surface. Use `/api` for the library or `/extension` for the Pi extension entrypoint.
 
 The package ships TypeScript source. A standalone consumer must use a runtime or build tool that can load TypeScript.
 

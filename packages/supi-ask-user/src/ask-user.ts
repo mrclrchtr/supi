@@ -4,13 +4,11 @@ import {
   resolveToolPromptSurface,
 } from "@mrclrchtr/supi-core/prompt-surface";
 import { createSessionNameTracker } from "@mrclrchtr/supi-core/session";
-import { ActiveQuestionnaireLock } from "./session/lock.ts";
 import { ASK_USER_PROMPT_SURFACE_DEFAULTS } from "./tool/ask_user/guidance.ts";
 import { registerAskUserTool } from "./tool/ask_user/register.ts";
 import { ASK_USER_TOOL_NAME } from "./tool/ask_user/spec.ts";
 
 export default function askUserExtension(pi: ExtensionAPI): void {
-  const lock = new ActiveQuestionnaireLock();
   const getSessionName = createSessionNameTracker(pi);
 
   // Label ask_user tool results so they're visible and filterable in /tree.
@@ -53,7 +51,7 @@ export default function askUserExtension(pi: ExtensionAPI): void {
 
     if (ctx.mode !== "tui") return;
 
-    registerAskUserTool(pi, lock, surface, getSessionName);
+    registerAskUserTool(pi, surface, getSessionName);
   });
 }
 

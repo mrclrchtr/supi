@@ -17,6 +17,7 @@ Multi-context monorepo. Each package is an independent context with its own `CON
 - **supi-extras** → `packages/supi-extras/CONTEXT.md`
 - **supi-insights** → `packages/supi-insights/CONTEXT.md`
 - **supi-lsp** → `packages/supi-lsp/CONTEXT.md`
+- **supi-prompt-improver** → `packages/supi-prompt-improver/CONTEXT.md`
 - **supi-prompt-suggestions** → `packages/supi-prompt-suggestions/CONTEXT.md`
 - **supi-review** → `packages/supi-review/CONTEXT.md`
 - **supi-settings** → `packages/supi-settings/CONTEXT.md`

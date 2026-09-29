@@ -34,16 +34,22 @@ Entrypoint: `src/ask-user.ts`
 ## Package surfaces
 
 - `@mrclrchtr/supi-ask-user/extension` — pi extension entrypoint
-- `@mrclrchtr/supi-ask-user/api` — reusable types and utilities
+- `@mrclrchtr/supi-ask-user/api` — reusable types, utilities, and `openAskUserForm()`
 
 ```ts
-import { normalizeQuestionnaire, AskUserController } from "@mrclrchtr/supi-ask-user/api";
+import {
+  normalizeQuestionnaire,
+  AskUserController,
+  openAskUserForm,
+} from "@mrclrchtr/supi-ask-user/api";
 ```
 
 ## Non-obvious behavior
 
 - Requires pi interactive (TUI) mode — no degraded fallback.
-- Only one `ask_user` form may be active at a time; a session-scoped lock enforces this.
+- Only one Ask User form may be active at a time; the shared API lock covers the tool and reusable callers.
+- `openAskUserForm()` owns the shared renderer, editor integration, and form cleanup. It uses Pi's editor area by default; callers can request `overlay: true`. It returns answers or cancellation. It does not persist results or abort the main agent.
+- The registered tool adapter owns transcript persistence, labels, and main-agent cancellation.
 - Tool execution is registered as sequential so sibling tool calls do not run concurrently with a live form.
 - Cancellation/abort stops the current agent turn (UI returns `AskUserInteractionResult`, then `ctx.abort()`, then tool execution throws to mark the result failed).
 - Final question always moves to **review**, never submits directly. Submit row is focused by default so a single `Enter` submits.

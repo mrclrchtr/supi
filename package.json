@@ -95,7 +95,8 @@
       "./packages/supi-web/src/extension.ts",
       "./packages/supi-extras/src/extension.ts",
       "./packages/supi-insights/src/extension.ts",
-      "./packages/supi-prompt-suggestions/src/extension.ts"
+      "./packages/supi-prompt-suggestions/src/extension.ts",
+      "./packages/supi-prompt-improver/src/extension.ts"
     ],
     "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/assets/social-preview.png"
   }

@@ -25,6 +25,7 @@ export interface AskUserUiContext {
       keybindings: KeybindingsManager,
       done: (result: T) => void,
     ) => Component & { dispose?(): void },
+    options?: { overlay?: boolean },
   ): Promise<T>;
 }
 
