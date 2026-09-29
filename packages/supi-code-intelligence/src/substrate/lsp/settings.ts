@@ -4,69 +4,113 @@
 // supported opt-out.
 //
 // Registered fields:
-// - exclude: stringList
-// - disabled_servers: custom submenu whose module action writes per-language disable config
+// - disabled_servers: custom submenu whose module action writes per-language enablement config
 
 import { type ExtensionAPI, getSettingsListTheme } from "@earendil-works/pi-coding-agent";
 import type { Component, SettingItem } from "@earendil-works/pi-tui";
 import { Container, Key, matchesKey, SettingsList, Text } from "@earendil-works/pi-tui";
 
-import { loadSupiConfigSectionForScope, writeSupiConfig } from "@mrclrchtr/supi-core/config";
+import {
+  loadSupiConfigSectionForScope,
+  replaceSupiConfigSection,
+} from "@mrclrchtr/supi-core/config";
 import {
   defineConfigSettings,
   registerSettings,
   type SettingsScope,
-  type ValueSource,
 } from "@mrclrchtr/supi-core/settings";
-import { type LspSettings, loadConfig } from "@mrclrchtr/supi-lsp/api";
+import { loadConfig } from "@mrclrchtr/supi-lsp/api";
 
-const LSP_DEFAULTS = {
-  exclude: [] as string[],
-} satisfies LspSettings;
+const LSP_DEFAULTS = {};
 
-/** Discover configured servers from the defaults + effective LSP config. */
-function getConfiguredServers(cwd: string): string[] {
-  try {
-    const config = loadConfig(cwd);
-    return Object.keys(config.servers);
-  } catch {
-    return ["typescript"];
-  }
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/**
- * Load the raw LSP section for a single scope to inspect the currently
- * configured disabled servers from the persisted config.
- */
-function getDisabledServersFromConfig(scope: SettingsScope, cwd: string): Set<string> {
-  const section = loadSupiConfigSectionForScope("lsp", cwd, {
-    scope,
-  });
-  if (!section) return new Set();
-  const servers = section.servers as Record<string, { enabled?: boolean }> | undefined;
-  const disabled = new Set<string>();
-  if (servers) {
-    for (const [name, srv] of Object.entries(servers)) {
-      if (srv.enabled === false) disabled.add(name);
-    }
-  }
-  return disabled;
-}
-
-function createDisabledServersSubmenu(
+/** Discover servers that may shape the selected settings scope. */
+function getConfiguredServers(
   scope: SettingsScope,
   cwd: string,
-  done: (selectedValue?: string) => void,
-): Component {
-  const allServers = getConfiguredServers(cwd);
-  const disabledServers = getDisabledServersFromConfig(scope, cwd);
+  homeDir?: string,
+  projectTrusted = true,
+): string[] {
+  const names = new Set<string>();
+  const includeProject = scope === "project" && projectTrusted;
+  try {
+    for (const name of Object.keys(
+      loadConfig(cwd, { homeDir, projectTrusted: includeProject }).servers,
+    )) {
+      names.add(name);
+    }
+  } catch {
+    // Raw scope reads below still expose names that need a settings action.
+  }
+  const scopes = includeProject ? (["global", "project"] as const) : (["global"] as const);
+  for (const configScope of scopes) {
+    const section = loadSupiConfigSectionForScope("lsp", cwd, {
+      scope: configScope,
+      homeDir,
+    });
+    const servers = section?.servers;
+    if (!servers || typeof servers !== "object" || Array.isArray(servers)) continue;
+    for (const name of Object.keys(servers)) names.add(name);
+  }
+  return names.size > 0 ? [...names] : ["typescript"];
+}
 
-  const items: SettingItem[] = allServers.map((name) => ({
-    id: name,
-    label: name,
-    currentValue: disabledServers.has(name) ? "disabled" : "enabled",
-    values: ["enabled", "disabled"],
-  }));
+/** Load explicit per-server enabled values from one persisted scope. */
+function getServerEnablement(
+  scope: SettingsScope,
+  cwd: string,
+  homeDir?: string,
+  projectTrusted = true,
+): Map<string, boolean> {
+  if (scope === "project" && !projectTrusted) return new Map();
+  const section = loadSupiConfigSectionForScope("lsp", cwd, { scope, homeDir });
+  const servers = section?.servers as Record<string, { enabled?: unknown }> | undefined;
+  const enabled = new Map<string, boolean>();
+  if (!servers || typeof servers !== "object" || Array.isArray(servers)) return enabled;
+  for (const [name, server] of Object.entries(servers)) {
+    if (
+      server &&
+      typeof server === "object" &&
+      !Array.isArray(server) &&
+      typeof server.enabled === "boolean"
+    ) {
+      enabled.set(name, server.enabled);
+    }
+  }
+  return enabled;
+}
+
+interface DisabledServersSubmenuOptions {
+  scope: SettingsScope;
+  cwd: string;
+  done: (selectedValue?: string) => void;
+  homeDir?: string;
+  projectTrusted: boolean;
+}
+
+function createDisabledServersSubmenu(options: DisabledServersSubmenuOptions): Component {
+  const { scope, cwd, done, homeDir, projectTrusted } = options;
+  const allServers = getConfiguredServers(scope, cwd, homeDir, projectTrusted);
+  const scopedEnablement = getServerEnablement(scope, cwd, homeDir, projectTrusted);
+  const inheritedEnablement =
+    scope === "project"
+      ? getServerEnablement("global", cwd, homeDir, projectTrusted)
+      : new Map<string, boolean>();
+
+  const items: SettingItem[] = allServers.map((name) => {
+    const direct = scopedEnablement.get(name);
+    const effective = direct ?? inheritedEnablement.get(name) ?? true;
+    return {
+      id: name,
+      label:
+        direct === undefined ? `${name} (inherit: ${effective ? "enabled" : "disabled"})` : name,
+      currentValue: direct === undefined ? "inherit" : direct ? "enabled" : "disabled",
+      values: ["inherit", "enabled", "disabled"],
+    };
+  });
 
   let dirty = false;
   const container = new Container();
@@ -98,10 +142,8 @@ function createDisabledServersSubmenu(
           done();
           return;
         }
-        const disabled = items
-          .filter((item) => item.currentValue === "disabled")
-          .map((item) => item.id);
-        done(JSON.stringify(disabled));
+        const values = Object.fromEntries(items.map((item) => [item.id, item.currentValue]));
+        done(JSON.stringify(values));
         return;
       }
       settingsList.handleInput?.(data);
@@ -109,35 +151,69 @@ function createDisabledServersSubmenu(
   };
 }
 
-/** Persist the complete disabled-server choice through the settings module action path. */
-function persistDisabledServers(
-  scope: SettingsScope,
-  cwd: string,
-  value: string | undefined,
-): void {
-  const selected = value ? JSON.parse(value) : [];
-  if (!Array.isArray(selected) || !selected.every((item) => typeof item === "string")) {
-    throw new Error("Invalid disabled-server selection");
+/** Persist complete per-language enablement choices through the settings module action path. */
+type ServerEnablementChoice = "inherit" | "enabled" | "disabled";
+
+function parseServerEnablement(value: string | undefined): Record<string, ServerEnablementChoice> {
+  const selected: unknown = value ? JSON.parse(value) : {};
+  if (
+    !isRecord(selected) ||
+    !Object.values(selected).every(
+      (choice) => choice === "inherit" || choice === "enabled" || choice === "disabled",
+    )
+  ) {
+    throw new Error("Invalid language-server enablement selection");
   }
-  const disabled = new Set<string>(selected);
-  const currentSection = loadSupiConfigSectionForScope("lsp", cwd, { scope });
-  const servers =
-    (currentSection?.servers as Record<string, Record<string, unknown>> | undefined) ?? {};
-  const names = new Set([...Object.keys(servers), ...getConfiguredServers(cwd)]);
-  for (const name of names) {
-    if (disabled.has(name)) {
-      servers[name] = { ...(servers[name] ?? {}), enabled: false };
-      continue;
-    }
-    const server = servers[name];
-    if (!server) continue;
-    delete server.enabled;
-    if (Object.keys(server).length === 0) delete servers[name];
-  }
-  writeSupiConfig({ section: "lsp", scope, cwd }, { servers });
+  return selected as Record<string, ServerEnablementChoice>;
 }
 
-export function registerLspSettings(pi: ExtensionAPI): void {
+function applyServerEnablementChoice(
+  servers: Record<string, unknown>,
+  name: string,
+  choice: ServerEnablementChoice,
+): void {
+  const rawServer = servers[name];
+  const server = isRecord(rawServer) ? { ...rawServer } : undefined;
+  if (choice === "inherit") {
+    if (!server) return;
+    delete server.enabled;
+    if (Object.keys(server).length === 0) delete servers[name];
+    else servers[name] = server;
+    return;
+  }
+  servers[name] = { ...(server ?? {}), enabled: choice === "enabled" };
+}
+
+interface PersistServerEnablementOptions {
+  scope: SettingsScope;
+  cwd: string;
+  value?: string;
+  homeDir?: string;
+  projectTrusted: boolean;
+}
+
+/** Persist complete per-language enablement choices through the settings module action path. */
+function persistServerEnablement(options: PersistServerEnablementOptions): void {
+  const { scope, cwd, value, homeDir, projectTrusted } = options;
+  const choices = parseServerEnablement(value);
+  const currentSection = loadSupiConfigSectionForScope("lsp", cwd, { scope, homeDir });
+  const rawServers = currentSection?.servers;
+  const servers: Record<string, unknown> = isRecord(rawServers) ? { ...rawServers } : {};
+  const visibleNames = new Set(getConfiguredServers(scope, cwd, homeDir, projectTrusted));
+  const names = new Set([
+    ...Object.keys(choices),
+    ...Object.keys(servers).filter((name) => visibleNames.has(name)),
+  ]);
+  for (const name of names) applyServerEnablementChoice(servers, name, choices[name] ?? "inherit");
+
+  const nextSection = { ...(currentSection ?? {}) };
+  if (Object.keys(servers).length > 0) nextSection.servers = servers;
+  else delete nextSection.servers;
+  replaceSupiConfigSection({ section: "lsp", scope, cwd }, nextSection, { homeDir });
+}
+
+/** Register per-language LSP enablement controls with the shared settings registry. */
+export function registerLspSettings(pi: ExtensionAPI, homeDir?: string): void {
   registerSettings(
     pi,
     defineConfigSettings({
@@ -147,52 +223,59 @@ export function registerLspSettings(pi: ExtensionAPI): void {
       defaults: LSP_DEFAULTS,
       fields: [
         {
-          kind: "stringList" as const,
-          key: "exclude",
-          label: "Exclude Patterns",
-          description:
-            "Comma-separated gitignore patterns for automatic LSP workspace work. Exact file requests stay available.",
-        },
-        {
           kind: "custom" as const,
           key: "disabled_servers",
           label: "Disabled Servers",
           description: "Press Enter to choose which language servers to disable",
-          resolve: (scope, cwd) => {
-            const scopedDisabled = getDisabledServersFromConfig(scope, cwd);
-            const otherScope = scope === "project" ? "global" : "project";
-            const otherDisabled =
-              scope === "project" ? getDisabledServersFromConfig("global", cwd) : new Set<string>();
-
-            // Effective disabled servers = union of both scopes (since either disables)
-            const effectiveDisabled = new Set([...scopedDisabled, ...otherDisabled]);
+          resolve: (scope, cwd, ctx) => {
+            const projectTrusted = ctx?.isProjectTrusted() ?? true;
+            const scopedEnablement = getServerEnablement(scope, cwd, homeDir, projectTrusted);
+            const globalEnablement = getServerEnablement("global", cwd, homeDir, projectTrusted);
+            const names = new Set([
+              ...getConfiguredServers(scope, cwd, homeDir, projectTrusted),
+              ...scopedEnablement.keys(),
+              ...globalEnablement.keys(),
+            ]);
+            const effectiveDisabled = [...names]
+              .filter(
+                (name) =>
+                  (scopedEnablement.get(name) ?? globalEnablement.get(name) ?? true) === false,
+              )
+              .sort((a, b) => a.localeCompare(b));
             const label =
-              effectiveDisabled.size > 0
-                ? [...effectiveDisabled].sort().join(", ")
-                : "none disabled";
-
-            // Source: where the override comes from
-            let source: ValueSource;
-            if (scopedDisabled.size > 0) {
-              source = scope;
-            } else if (otherDisabled.size > 0) {
-              source = otherScope as ValueSource;
-            } else {
-              source = "default";
-            }
-
-            let inheritanceSource: "global" | "default" | undefined;
-            if (scope === "project" && source === "project") {
-              inheritanceSource =
-                getDisabledServersFromConfig("global", cwd).size > 0 ? "global" : "default";
-            }
-
+              effectiveDisabled.length > 0 ? effectiveDisabled.join(", ") : "none disabled";
+            const source =
+              scopedEnablement.size > 0
+                ? scope
+                : scope === "project" && globalEnablement.size > 0
+                  ? "global"
+                  : "default";
+            const inheritanceSource =
+              scope === "project" && scopedEnablement.size > 0
+                ? globalEnablement.size > 0
+                  ? "global"
+                  : "default"
+                : undefined;
             return { displayValue: label, source, inheritanceSource };
           },
-          submenu: (_currentValue, done, scope, cwd) =>
-            createDisabledServersSubmenu(scope, cwd, done),
-          persist: (scope, cwd, action) =>
-            persistDisabledServers(scope, cwd, action.kind === "set" ? action.value : undefined),
+          // biome-ignore lint/complexity/useMaxParams: custom settings callbacks receive the shared scope and ExtensionContext arguments.
+          submenu: (_currentValue, done, scope, cwd, ctx) =>
+            createDisabledServersSubmenu({
+              scope,
+              cwd,
+              done,
+              homeDir,
+              projectTrusted: ctx?.isProjectTrusted() ?? true,
+            }),
+          // biome-ignore lint/complexity/useMaxParams: custom settings callbacks receive the shared scope and ExtensionContext arguments.
+          persist: (scope, cwd, action, _helpers, ctx) =>
+            persistServerEnablement({
+              scope,
+              cwd,
+              value: action.kind === "set" ? action.value : undefined,
+              homeDir,
+              projectTrusted: ctx?.isProjectTrusted() ?? true,
+            }),
         },
       ],
     }),

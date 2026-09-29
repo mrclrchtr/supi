@@ -7,12 +7,17 @@
  */
 
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import { loadSupiConfigForScope } from "@mrclrchtr/supi-core/config";
-import { loadConfig, scanMissingServers } from "@mrclrchtr/supi-lsp/api";
+import {
+  type AutomaticLspPathPolicy,
+  createDefaultAutomaticLspPathPolicy,
+  getExplicitlyDisabledLanguages,
+  loadConfig,
+  scanMissingServers,
+} from "@mrclrchtr/supi-lsp/api";
 
 /** One actionable warning about reduced Code intelligence capability. */
 export interface CapabilityWarning {
-  type: "language-disabled" | "missing-server" | "structural-unavailable";
+  type: "language-disabled" | "missing-server" | "structural-unavailable" | "configuration-error";
   message: string;
   language?: string;
   detail?: string;
@@ -27,6 +32,10 @@ export interface CapabilityWarningReport {
 /** Minimal LSP-controller surface needed to discover missing servers. */
 export interface CapabilityWarningMissingServerSource {
   getMissingServers(): Array<{ name: string; command: string; foundExtensions?: string[] }>;
+  /** Explicit disablement captured with the active LSP configuration snapshot. */
+  getExplicitlyDisabledLanguages?(): readonly string[];
+  /** Configuration validation failure that prevented automatic startup. */
+  getConfigurationError?(): string | null;
 }
 
 /** Current runtime/config facts needed to evaluate Capability Warnings. */
@@ -34,11 +43,20 @@ export interface CapabilityWarningInput {
   explicitlyDisabledLanguages: string[];
   missingServers: Array<{ name: string; command: string; foundExtensions: string[] }>;
   structuralState: { kind: string; reason?: string };
+  /** Configuration could not be validated for automatic capability work. */
+  configurationError?: string;
 }
 
 /** Evaluate current capability/configuration facts into a structured warning report. */
 export function evaluateCapabilityWarnings(input: CapabilityWarningInput): CapabilityWarningReport {
   const warnings: CapabilityWarning[] = [];
+
+  if (input.configurationError) {
+    warnings.push({
+      type: "configuration-error",
+      message: `Code intelligence configuration failed: ${input.configurationError}`,
+    });
+  }
 
   for (const language of input.explicitlyDisabledLanguages) {
     warnings.push({
@@ -122,21 +140,60 @@ export class CapabilityWarningState {
   }
 }
 
+/** Options for trust-aware capability configuration reads. */
+export interface CapabilityWarningConfigOptions {
+  readonly projectTrusted?: boolean;
+  readonly homeDir?: string;
+  /** Reuse the active automatic policy instead of reading a new snapshot. */
+  readonly automaticPathPolicy?: AutomaticLspPathPolicy;
+}
+
 /** Gather current runtime/config facts for Capability Warning evaluation. */
 export function gatherCapabilityWarningInput(
   cwd: string,
   lspController: CapabilityWarningMissingServerSource | null,
+  options: CapabilityWarningConfigOptions = {},
 ): CapabilityWarningInput {
+  const projectTrusted = options.projectTrusted !== false;
   const structuralState = getDefaultWorkspaceRuntime().getWorkspace(cwd).structural.state;
-  const explicitlyDisabledLanguages = detectExplicitlyDisabledLanguages(cwd);
-  const missingServers = lspController
-    ? normalizeMissingServers(lspController.getMissingServers())
-    : scanMissingServers(loadConfig(cwd), cwd);
+  let explicitlyDisabledLanguages: string[] = [];
+  let missingServers: Array<{
+    name: string;
+    command: string;
+    foundExtensions: string[];
+  }> = [];
+  let configurationError: string | undefined;
+
+  try {
+    if (lspController) {
+      explicitlyDisabledLanguages = [...(lspController.getExplicitlyDisabledLanguages?.() ?? [])];
+      missingServers = normalizeMissingServers(lspController.getMissingServers());
+      configurationError = lspController.getConfigurationError?.() ?? undefined;
+    } else {
+      // Build and validate the policy before scanning. A failed policy must
+      // not fall through to an unprotected workspace scan.
+      const automaticPathPolicy =
+        options.automaticPathPolicy ??
+        createDefaultAutomaticLspPathPolicy(cwd, {
+          projectTrusted,
+          homeDir: options.homeDir,
+        });
+      const config = loadConfig(cwd, { projectTrusted, homeDir: options.homeDir });
+      explicitlyDisabledLanguages = getExplicitlyDisabledLanguages(cwd, {
+        projectTrusted,
+        homeDir: options.homeDir,
+      });
+      missingServers = scanMissingServers(config, cwd, undefined, automaticPathPolicy);
+    }
+  } catch (error: unknown) {
+    configurationError = error instanceof Error ? error.message : String(error);
+  }
 
   return {
     explicitlyDisabledLanguages,
     missingServers,
     structuralState,
+    ...(configurationError ? { configurationError } : {}),
   };
 }
 
@@ -148,22 +205,4 @@ function normalizeMissingServers(
     command: entry.command,
     foundExtensions: entry.foundExtensions ?? [],
   }));
-}
-
-function detectExplicitlyDisabledLanguages(cwd: string): string[] {
-  const disabled = new Set<string>();
-  for (const scope of ["project", "global"] as const) {
-    const raw = loadSupiConfigForScope(
-      "lsp",
-      cwd,
-      { servers: {} as Record<string, { enabled?: boolean }> },
-      { scope },
-    );
-    const servers = (raw as { servers?: Record<string, { enabled?: boolean }> }).servers;
-    if (!servers) continue;
-    for (const [name, server] of Object.entries(servers)) {
-      if (server.enabled === false) disabled.add(name);
-    }
-  }
-  return [...disabled].sort();
 }

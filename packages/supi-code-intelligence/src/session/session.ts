@@ -19,7 +19,11 @@
 import { realpathSync } from "node:fs";
 import * as path from "node:path";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
-import type { LspRuntimeController } from "@mrclrchtr/supi-lsp/api";
+import {
+  type AutomaticLspPathPolicy,
+  createDefaultAutomaticLspPathPolicy,
+  type LspRuntimeController,
+} from "@mrclrchtr/supi-lsp/api";
 import {
   createLspMaintenanceState,
   type LspMaintenanceState,
@@ -175,6 +179,9 @@ export class WorkspaceCodeIntelligenceSession {
   /** Global config home for hermetic config reads; undefined uses os.homedir(). */
   #homeDir: string | undefined;
 
+  /** One automatic exclusion snapshot shared by this session's broad searches. */
+  #automaticPathPolicy: AutomaticLspPathPolicy | null = null;
+
   constructor(cwd: string, capability?: CapabilityAdapter) {
     this.cwd = cwd;
     this.#capability = capability ?? new WorkspaceCapabilityAdapter();
@@ -188,6 +195,11 @@ export class WorkspaceCodeIntelligenceSession {
   /** Record the global-config home used for session config reads. */
   setHomeDir(homeDir?: string): void {
     this.#homeDir = homeDir;
+  }
+
+  /** Attach the lifecycle-owned automatic exclusion snapshot to this session. */
+  setAutomaticPathPolicy(policy: AutomaticLspPathPolicy | null): void {
+    this.#automaticPathPolicy = policy;
   }
 
   /** Attach lifecycle-owned LSP state without exposing it to Tool adapters. */
@@ -283,6 +295,9 @@ export class WorkspaceCodeIntelligenceSession {
         cwd: this.cwd,
         capability: this.#capability,
         lspController: this.#lspController,
+        projectTrusted: this.#projectTrusted,
+        homeDir: this.#homeDir,
+        automaticPathPolicy: this.#automaticPathPolicy ?? undefined,
         lastRefreshAttempt: this.#lastHealthRefreshAttempt,
         trackRefreshAttempt: (attempt) => {
           this.#lastHealthRefreshAttempt = attempt;
@@ -298,7 +313,23 @@ export class WorkspaceCodeIntelligenceSession {
 
   /** Search one explicit structural or semantic substrate. */
   async find(input: FindWorkflowInput, control?: WorkflowControl): Promise<FindWorkflowOutcome> {
-    return runFindWorkflow(input, { cwd: this.cwd, capability: this.#capability }, control);
+    let automaticPathPolicy: AutomaticLspPathPolicy;
+    try {
+      automaticPathPolicy = this.#automaticPathPolicy ??= createDefaultAutomaticLspPathPolicy(
+        this.cwd,
+        { projectTrusted: this.#projectTrusted, homeDir: this.#homeDir },
+      );
+    } catch (error) {
+      return {
+        kind: "unavailable",
+        reason: error instanceof Error ? error.message : String(error),
+      };
+    }
+    return runFindWorkflow(
+      input,
+      { cwd: this.cwd, capability: this.#capability, automaticPathPolicy },
+      control,
+    );
   }
 
   /** Orient around the workspace or one exact focus. */
@@ -438,6 +469,7 @@ export class WorkspaceCodeIntelligenceSession {
     this.#nativeInstructionPaths.clear();
     this.#maintenanceState = createLspMaintenanceState();
     this.#lspController = null;
+    this.#automaticPathPolicy = null;
     this.#projectTrusted = false;
   }
 }

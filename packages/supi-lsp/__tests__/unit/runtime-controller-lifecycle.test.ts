@@ -5,7 +5,7 @@ import type { ManagerLifecycleTransition } from "../../src/manager/manager.ts";
 
 const mocks = vi.hoisted(() => ({
   clearRuntime: vi.fn(),
-  loadLspSettings: vi.fn().mockReturnValue({ exclude: [] }),
+  loadAutomaticExclusionPatterns: vi.fn().mockReturnValue([]),
   scanProjectCapabilities: vi.fn().mockReturnValue([]),
   managers: [] as Array<{
     emit(transition: unknown): void;
@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../src/config/config.ts", () => ({
+  getExplicitlyDisabledLanguages: vi.fn().mockReturnValue([]),
   loadConfig: vi.fn().mockReturnValue({
     servers: {
       typescript: {
@@ -34,8 +35,8 @@ vi.mock("../../src/config/config.ts", () => ({
     },
   }),
 }));
-vi.mock("../../src/config/lsp-settings.ts", () => ({
-  loadLspSettings: mocks.loadLspSettings,
+vi.mock("@mrclrchtr/supi-core/config", () => ({
+  loadAutomaticExclusionPatterns: mocks.loadAutomaticExclusionPatterns,
 }));
 vi.mock("../../src/config/tsconfig-scope.ts", () => ({ clearTsconfigCache: vi.fn() }));
 vi.mock("../../src/diagnostics/workspace-sentinels.ts", () => ({}));
@@ -106,7 +107,7 @@ function managerTransition(
 afterEach(() => {
   mocks.managers.length = 0;
   mocks.owners.length = 0;
-  mocks.loadLspSettings.mockReset().mockReturnValue({ exclude: [] });
+  mocks.loadAutomaticExclusionPatterns.mockReset().mockReturnValue([]);
   mocks.scanProjectCapabilities.mockReset().mockReturnValue([]);
   vi.clearAllMocks();
 });
@@ -154,7 +155,7 @@ describe("LspRuntimeController lifecycle projection", () => {
     expect(firstPolicy.isEligible("/project/generated/file.ts")).toBe(true);
     expect(firstPolicy.isEligible("/project/.pi/private.ts")).toBe(false);
 
-    mocks.loadLspSettings.mockReturnValue({ exclude: ["generated/"] });
+    mocks.loadAutomaticExclusionPatterns.mockReturnValue(["generated/"]);
     await controller.start();
 
     const secondPolicy = mocks.scanProjectCapabilities.mock.calls[1]?.[3] as {

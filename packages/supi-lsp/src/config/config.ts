@@ -3,9 +3,9 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadSupiConfigForScope } from "@mrclrchtr/supi-core/config";
+import { loadSupiConfigForScope, loadSupiConfigSectionForScope } from "@mrclrchtr/supi-core/config";
 import { truncateDebugIdentity } from "@mrclrchtr/supi-core/debug";
-import type { LspConfig, ServerConfig } from "./types.ts";
+import type { JsonObject, JsonValue, LspConfig, ServerConfig } from "./types.ts";
 
 const CONFIG_DIR = path.dirname(fileURLToPath(import.meta.url));
 
@@ -18,6 +18,8 @@ const DEFAULTS: LspConfig = JSON.parse(
 
 export interface LoadConfigOptions {
   homeDir?: string;
+  /** Whether project-scoped server configuration is trusted. Defaults to true. */
+  projectTrusted?: boolean;
 }
 
 /** Map from language alias → canonical config key. */
@@ -52,16 +54,56 @@ export function loadConfig(cwd: string, options?: LoadConfigOptions): LspConfig 
     { servers: {} as Record<string, ServerConfig> },
     { scope: "global", homeDir: options?.homeDir },
   );
-  const projectLsp = loadSupiConfigForScope(
-    "lsp",
-    cwd,
-    { servers: {} as Record<string, ServerConfig> },
-    { scope: "project" },
-  );
+  const projectLsp =
+    options?.projectTrusted === false
+      ? { servers: {} as Record<string, ServerConfig> }
+      : loadSupiConfigForScope(
+          "lsp",
+          cwd,
+          { servers: {} as Record<string, ServerConfig> },
+          { scope: "project" },
+        );
 
   const merged = mergeServerConfigs(defaults.servers, globalLsp.servers, projectLsp.servers);
 
   return { servers: merged };
+}
+
+/**
+ * Read effective explicit language disablement for the active LSP snapshot.
+ * Project values override global values, including an explicit re-enable.
+ */
+export function getExplicitlyDisabledLanguages(cwd: string, options?: LoadConfigOptions): string[] {
+  const effective = new Map<string, boolean>();
+  applyEnabledOverrides(
+    effective,
+    loadSupiConfigSectionForScope("lsp", cwd, {
+      scope: "global",
+      homeDir: options?.homeDir,
+    }),
+  );
+  if (options?.projectTrusted !== false) {
+    applyEnabledOverrides(
+      effective,
+      loadSupiConfigSectionForScope("lsp", cwd, { scope: "project" }),
+    );
+  }
+  return [...effective]
+    .filter(([, enabled]) => enabled === false)
+    .map(([name]) => name)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function applyEnabledOverrides(
+  effective: Map<string, boolean>,
+  section: Record<string, unknown> | null,
+): void {
+  const servers = section?.servers;
+  if (!isRecord(servers)) return;
+  for (const [name, value] of Object.entries(servers)) {
+    if (!isRecord(value) || typeof value.enabled !== "boolean") continue;
+    effective.set(LANGUAGE_ALIASES[name] ?? name, value.enabled);
+  }
 }
 
 /**
@@ -217,6 +259,11 @@ const SERVER_OVERRIDE_SETTERS: Record<string, ServerOverrideSetter> = {
     override.env = candidate;
     return true;
   },
+  settings(override, candidate) {
+    if (!isJsonObject(candidate)) return false;
+    override.settings = candidate;
+    return true;
+  },
   initializationOptions(override, candidate) {
     override.initializationOptions = candidate;
     return true;
@@ -260,6 +307,17 @@ function isNonEmptyStringArray(value: unknown): value is string[] {
 
 function isStringRecord(value: unknown): value is Record<string, string> {
   return isRecord(value) && Object.values(value).every((entry) => typeof entry === "string");
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return isJsonValue(value) && isRecord(value);
+}
+
+function isJsonValue(value: unknown): value is JsonValue {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every((entry) => isJsonValue(entry));
+  return isRecord(value) && Object.values(value).every((entry) => isJsonValue(entry));
 }
 
 function warnInvalidServerConfig(name: string, fields: readonly string[], skipped: boolean): void {

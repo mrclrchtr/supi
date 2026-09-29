@@ -1,4 +1,5 @@
 import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-code-runtime/api";
+import type { AutomaticLspPathPolicy } from "@mrclrchtr/supi-lsp/api";
 import type { StructuralSearchOperation } from "@mrclrchtr/supi-tree-sitter/api";
 import type { CodeFindAstKind } from "../../tool/code_find/ast-kinds.ts";
 import type { EvidencePartialReason } from "../evidence.ts";
@@ -74,6 +75,8 @@ export interface StructuredPatternSearchOptions {
   readonly roots: string | readonly string[];
   readonly cwd: string;
   readonly structural: StructuralSubstrate;
+  /** Snapshot used for configured exclusions below broad AST roots. */
+  readonly automaticPathPolicy?: AutomaticLspPathPolicy;
   readonly control?: StructuredPatternControl;
 }
 
@@ -107,6 +110,7 @@ export async function getStructuredPatternMatches(
     now,
     schedule: options.control?.schedule,
     operations: options.control?.operations,
+    automaticPathPolicy: options.automaticPathPolicy,
   });
   if (enumeration.kind === "invalid-root") {
     return {

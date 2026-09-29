@@ -100,7 +100,10 @@ describe("push diagnostic regression cases", () => {
     const { client, rpc } = createRunningTestClient({
       name: "typescript-language-server",
       command: "typescript-language-server",
-      capabilities: { executeCommandProvider: { commands: ["other.command"] } },
+      capabilities: {
+        textDocumentSync: { change: 1, openClose: true },
+        executeCommandProvider: { commands: ["other.command"] },
+      },
     });
     const pending = client.syncAndWaitForDiagnostics(file.filePath, "const value = 1;\n");
     await settleInputRead();

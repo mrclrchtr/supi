@@ -55,6 +55,10 @@ export interface WorkspaceSymbolCollection {
   hasSupport: boolean;
   completedClientCount: number;
   failures: string[];
+  /** Results removed by the automatic path policy. */
+  excludedCount?: number;
+  /** Bounded paths removed by the automatic path policy. */
+  excludedExamples?: string[];
 }
 
 export async function collectWorkspaceSymbols(
@@ -84,6 +88,16 @@ export async function collectWorkspaceSymbols(
   return { results, hasSupport, completedClientCount, failures };
 }
 
+function workspaceSymbolExclusionReason(collection: WorkspaceSymbolCollection): string | null {
+  const excludedCount = collection.excludedCount ?? 0;
+  if (excludedCount === 0) return null;
+  const noun = `workspace-symbol result${excludedCount === 1 ? "" : "s"}`;
+  const examples = collection.excludedExamples?.length
+    ? ` Examples: ${collection.excludedExamples.join(", ")}.`
+    : "";
+  return `Automatic path policy excluded ${excludedCount} ${noun}.${examples}`;
+}
+
 /** Project one multi-client collection into the shared typed query contract. */
 export function workspaceSymbolCollectionResult(
   collection: WorkspaceSymbolCollection,
@@ -96,8 +110,23 @@ export function workspaceSymbolCollectionResult(
       collection.failures.join("; ") || "No workspace-symbol request completed.",
     );
   }
-  if (collection.failures.length > 0) {
-    return partialCodeQuery(collection.results, collection.failures.join("; "));
+  const exclusion = workspaceSymbolExclusionReason(collection);
+  if (collection.failures.length > 0 || exclusion) {
+    const excludedCount = collection.excludedCount ?? 0;
+    const metadata =
+      excludedCount > 0
+        ? {
+            automaticPathExclusion: {
+              excludedCount,
+              examples: [...(collection.excludedExamples ?? [])],
+            },
+          }
+        : undefined;
+    return partialCodeQuery(
+      collection.results,
+      [collection.failures.join("; "), exclusion].filter(Boolean).join("; "),
+      metadata,
+    );
   }
   return completedCodeQuery(collection.results);
 }

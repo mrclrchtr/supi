@@ -73,6 +73,9 @@ export function assembleFindWorkflowResult(
       evidenceLists: [...assembled.evidenceLists],
       nextQueries: assembledNextQueries(assembled),
       ...(outcome.data.kind === "ast" ? { scan: outcome.data.result.scan } : {}),
+      ...(outcome.data.kind === "semantic" && outcome.data.partialMetadata?.automaticPathExclusion
+        ? { automaticPathExclusion: outcome.data.partialMetadata.automaticPathExclusion }
+        : {}),
     },
   };
 }

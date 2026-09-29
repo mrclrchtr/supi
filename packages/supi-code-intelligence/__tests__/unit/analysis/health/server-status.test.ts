@@ -2,6 +2,7 @@ import type { ProjectServerInfo } from "@mrclrchtr/supi-lsp/api";
 import { describe, expect, it } from "vitest";
 import {
   countProjectServerRouteStatuses,
+  formatProjectServerOperationSupport,
   formatProjectServerRoot,
   formatProjectServerRouteSummary,
 } from "../../../../src/analysis/health/server-status.ts";
@@ -45,5 +46,20 @@ describe("LSP route status presentation", () => {
     expect(formatProjectServerRoot("/workspace", "/workspace")).toBe(".");
     expect(formatProjectServerRoot("/workspace", "/workspace/packages/app")).toBe("packages/app");
     expect(formatProjectServerRoot("/workspace", "/external/app")).toBe("../external/app");
+  });
+
+  it("distinguishes server limits from SuPi planning limits", () => {
+    expect(
+      formatProjectServerOperationSupport({
+        update_imports: { server: "not-advertised", supi: "supported" },
+        extract_function: {
+          server: "advertised",
+          supi: "limited",
+          reason: "Standard LSP has no exact extraction-name contract.",
+        },
+      }),
+    ).toBe(
+      "operation support: update_imports: server unsupported, extract_function: SuPi limitation: Standard LSP has no exact extraction-name contract.",
+    );
   });
 });

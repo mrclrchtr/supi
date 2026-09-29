@@ -121,7 +121,7 @@ Operation support is narrower than grammar support. AST import and export search
 ### Search and output limits
 
 - An AST search has a 5,000 eligible-file limit and a 10-second deadline shared by file enumeration and analysis. These are not tool-call settings.
-- Below directory roots, AST search excludes hidden entries, dependency/build/cache directories, symlinks, non-regular files, and files unsupported by the requested operation. It does **not** read `.gitignore`. Explicit roots are resolved and honored, including symlink roots. See the [scan policy](src/analysis/search/ast-scan.ts) for the exact directory list.
+- Below directory roots, AST search excludes hidden entries, dependency/build/cache directories, symlinks, non-regular files, configured `code-intelligence.exclude` paths, and files unsupported by the requested operation. It does **not** read `.gitignore`. Explicit roots are resolved and honored, including excluded paths and symlink roots. See the [scan policy](src/analysis/search/ast-scan.ts) for the exact directory list.
 - An exact file that does not support the requested AST operation is invalid. Results disclose policy exclusions, interrupted scans, provider limits, and omitted matches. No matches do not mean that unsupported files were searched.
 - Tool text is truncated at Pi's default 2,000 lines or 50 KB. When this occurs, the full text is written to a temporary file and its path is returned. Result-list limits still apply to that full text.
 
@@ -148,7 +148,7 @@ Project values override global values, which override defaults. Project configur
 |---|---|---|
 | `code-intelligence.overviewEnabled` | `true` | Add the hidden overview; the choice is fixed for the session |
 | `code-intelligence.instructionFileNames` | `["CLAUDE.md", "AGENTS.md"]` | Ordered plain filenames for directory instruction discovery |
-| `lsp.exclude` | `[]` | Gitignore-style patterns for automatic LSP work, not exact-file requests |
+| `code-intelligence.exclude` | `[]` | Gitignore-style patterns for automatic LSP and broad AST work, not exact requests |
 | `lsp.servers.<language>.enabled` | Enabled unless `false` | Disable a language server |
 
 Example `.pi/supi/config.json`:
@@ -157,10 +157,10 @@ Example `.pi/supi/config.json`:
 {
   "code-intelligence": {
     "overviewEnabled": false,
-    "instructionFileNames": ["AGENTS.md", "CLAUDE.md"]
+    "instructionFileNames": ["AGENTS.md", "CLAUDE.md"],
+    "exclude": ["generated/**"]
   },
   "lsp": {
-    "exclude": ["generated/**"],
     "servers": {
       "python": { "enabled": false }
     }
@@ -168,13 +168,13 @@ Example `.pi/supi/config.json`:
 }
 ```
 
-Use `typescript`, `python`, `rust`, `go`, `c`, `ruby`, `java`, `kotlin`, `bash`, `html`, `sql`, or `r` for built-in server keys (`cpp` aliases `c`). Server command and routing overrides are defined in the [LSP configuration reference](../supi-lsp/README.md#custom-server-configuration). `.pi-lsp.json` is not read. Restart Pi after server configuration changes. Only the boolean `true` enables the overview; non-boolean values do not enable it.
+Use `typescript`, `python`, `rust`, `go`, `c`, `ruby`, `java`, `kotlin`, `bash`, `html`, `sql`, or `r` for built-in server keys (`cpp` aliases `c`). Server command and routing overrides are defined in the [LSP configuration reference](../supi-lsp/README.md#custom-server-configuration). `.pi-lsp.json` is not read. Only the boolean `true` enables the overview; non-boolean values do not enable it. The shared exclusion list uses gitignore syntax and project-over-global replacement. An explicit project `[]` clears configured patterns. `/supi-settings` shows the config path and says to reload or restart Pi after saving. Saved exclusions apply after reload or restart; exact file and explicitly selected directory requests remain available. An old `lsp.exclude` value reports a migration error and is not used.
 
 Directory orientation checks the path from the workspace root to the focused directory. It selects the first valid configured instruction file per directory, skips files already loaded by Pi or shown on the active branch, and shows at most 200 lines per file. Resolved instruction paths must stay inside the workspace. These snippets are tool output, not additions to Pi's system prompt.
 
 ## Privacy and security
 
-Pi extensions run with your system permissions; this package is not a sandbox. Language servers run as local processes and receive source files. Review server commands and project configuration before trusting a project. `lsp.exclude` and AST scan exclusions are not access controls.
+Pi extensions run with your system permissions; this package is not a sandbox. Language servers run as local processes and receive source files. Review server commands and project configuration before trusting a project. `code-intelligence.exclude` and AST scan exclusions are not access controls.
 
 Tool results and the hidden overview enter Pi's model context and can be saved in session history. They can contain source text, paths, manifest data, diagnostics, and instruction-file contents. Truncated tool results and graph display overflow also leave full returned text in local temporary files. These files are not durable session storage and can be removed by system cleanup. “Hidden” means not displayed in the transcript, not hidden from the model.
 

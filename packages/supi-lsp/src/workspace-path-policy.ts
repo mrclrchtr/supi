@@ -1,7 +1,7 @@
 import { type Dirent, lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import * as path from "node:path";
+import { loadAutomaticExclusionPatterns } from "@mrclrchtr/supi-core/config";
 import ignore from "ignore";
-import { loadLspSettings } from "./config/lsp-settings.ts";
 
 /** Directory names that automatic LSP work never enters or selects. */
 export const AUTOMATIC_LSP_EXCLUDED_DIRECTORIES: readonly string[] = Object.freeze([
@@ -22,15 +22,27 @@ export const AUTOMATIC_LSP_EXCLUDED_DIRECTORIES: readonly string[] = Object.free
 
 const BUILT_IN_EXCLUSIONS = new Set(AUTOMATIC_LSP_EXCLUDED_DIRECTORIES);
 
+/** Options for loading one workspace's automatic path policy. */
+export interface AutomaticLspPathPolicyOptions {
+  /** Whether project-scoped SuPi configuration is trusted. */
+  projectTrusted?: boolean;
+  /** Global config home, used by tests and managed sessions. */
+  homeDir?: string;
+}
+
 /** Automatic path rules for one Workspace LSP runtime. The rules do not change. */
 export interface AutomaticLspPathPolicy {
   /** Canonical absolute workspace root used for all matching. */
   readonly workspaceRoot: string;
+  /** The configured patterns captured by this immutable policy. */
+  readonly configuredPatterns?: readonly string[];
   /**
    * True when automatic LSP work can use the path.
    * The policy reads the path kind when the caller does not supply it.
    */
   isEligible(candidate: string, kind?: "file" | "directory"): boolean;
+  /** True when the shared configured list excludes the path. */
+  isConfiguredExcluded?(candidate: string, kind?: "file" | "directory"): boolean;
 }
 
 /** Create the automatic path rules for one Workspace LSP runtime. */
@@ -39,10 +51,20 @@ export function createAutomaticLspPathPolicy(
   excludePatterns: readonly string[],
 ): AutomaticLspPathPolicy {
   const canonicalRoot = canonicalPath(workspaceRoot);
-  const configuredExclusions = createIgnoreMatcher([...excludePatterns]);
+  const configuredPatterns = Object.freeze([...excludePatterns]);
+  const configuredExclusions = createIgnoreMatcher(configuredPatterns);
   const repositoryRules = compileRepositoryRules(canonicalRoot, configuredExclusions);
   return Object.freeze({
     workspaceRoot: canonicalRoot,
+    configuredPatterns,
+    isConfiguredExcluded(candidate: string, kind?: "file" | "directory"): boolean {
+      const relativePath = normalizeCandidate(canonicalRoot, workspaceRoot, candidate);
+      if (relativePath === null || relativePath === "") return false;
+      const candidateKind = kind ?? readCandidateKind(canonicalRoot, relativePath);
+      return configuredExclusions.ignores(
+        candidateKind === "directory" ? `${relativePath}/` : relativePath,
+      );
+    },
     isEligible(candidate: string, kind?: "file" | "directory"): boolean {
       const relativePath = normalizeCandidate(canonicalRoot, workspaceRoot, candidate);
       if (relativePath === null) return false;
@@ -62,8 +84,12 @@ export function createAutomaticLspPathPolicy(
  * Create path rules for an automatic LSP helper used outside a runtime.
  * Runtime-owned operations should pass the rules created at startup instead.
  */
-export function createDefaultAutomaticLspPathPolicy(workspaceRoot: string): AutomaticLspPathPolicy {
-  return createAutomaticLspPathPolicy(workspaceRoot, loadLspSettings(workspaceRoot).exclude);
+export function createDefaultAutomaticLspPathPolicy(
+  workspaceRoot: string,
+  options: AutomaticLspPathPolicyOptions = {},
+): AutomaticLspPathPolicy {
+  const excludePatterns = loadAutomaticExclusionPatterns(workspaceRoot, options);
+  return createAutomaticLspPathPolicy(workspaceRoot, excludePatterns);
 }
 
 /**

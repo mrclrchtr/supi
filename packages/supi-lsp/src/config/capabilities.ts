@@ -38,14 +38,22 @@ export const CLIENT_CAPABILITIES: ClientCapabilities = {
             "quickfix",
             "refactor",
             "refactor.extract",
+            "refactor.extract.function",
+            "refactor.extract.constant",
+            "refactor.extract.variable",
             "refactor.inline",
             "refactor.rewrite",
             "source",
             "source.organizeImports",
             "source.fixAll",
+            "source.removeUnused",
           ],
         },
       },
+      dataSupport: true,
+      // SuPi resolves only the edit property. Commands and other fields
+      // must remain server-owned and are never advertised as resolvable.
+      resolveSupport: { properties: ["edit"] },
     },
     publishDiagnostics: {
       relatedInformation: true,
@@ -64,6 +72,7 @@ export const CLIENT_CAPABILITIES: ClientCapabilities = {
     workDoneProgress: true,
   },
   workspace: {
+    configuration: true,
     workspaceFolders: true,
     workspaceEdit: {
       documentChanges: true,

@@ -4,13 +4,10 @@ import type {
   RefactorResult,
   SemanticProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
-import type { CodeAction } from "../config/types.ts";
 import type { WorkspaceLspRuntime } from "../session/runtime-registry.ts";
 import {
   collectCodeActionResults,
   isDeleteDeadCodeCodeAction,
-  isExtractFunctionCodeAction,
-  isExtractVariableCodeAction,
   isUpdateImportsCodeAction,
   runFilteredCodeActionRefactor,
   runRenameRefactor,
@@ -28,7 +25,11 @@ export function createLspRefactorProvider(
       const response = control
         ? await lsp.codeActions(file, position, control)
         : await lsp.codeActions(file, position);
-      if (!response?.value) return [];
+      if (!response) return [];
+      if (response.reason && !response.value) {
+        return [{ kind: "unavailable", reason: response.reason }];
+      }
+      if (!response.value) return [];
       return collectCodeActionResults(response.value, {
         getOpenDocumentVersion: (candidate) => lsp.getOpenDocumentVersion(candidate),
         authorizedMutationRoots: response.authorizedMutationRoots,
@@ -58,21 +59,11 @@ async function planRefactor(
         control,
       });
     case "extract_function":
-      return runExtractRefactor({
-        lsp,
-        request,
-        operation: "extract_function",
-        matches: isExtractFunctionCodeAction,
-        control,
-      });
     case "extract_variable":
-      return runExtractRefactor({
-        lsp,
-        request,
-        operation: "extract_variable",
-        matches: isExtractVariableCodeAction,
-        control,
-      });
+      return {
+        kind: "unavailable",
+        reason: `Refactor operation "${request.operation}" is unavailable: standard LSP code actions do not provide a safe exact extraction-name contract.`,
+      };
     case "update_imports":
       return runFilteredCodeActionRefactor({
         lsp,
@@ -102,29 +93,4 @@ async function planRefactor(
     kind: "unavailable",
     reason: `Refactor operation "${request.operation}" is not supported by the active semantic provider.`,
   };
-}
-
-function runExtractRefactor(options: {
-  lsp: WorkspaceLspRuntime;
-  request: RefactorRequest;
-  operation: "extract_function" | "extract_variable";
-  matches: (action: CodeAction) => boolean;
-  control?: CodeRequestControl;
-}): Promise<RefactorResult> | RefactorResult {
-  const { lsp, request, operation, matches, control } = options;
-  if (!request.range) {
-    return {
-      kind: "unavailable",
-      reason: `Refactor operation "${operation}" requires \`range\`.`,
-    };
-  }
-  return runFilteredCodeActionRefactor({
-    lsp,
-    file: request.file,
-    position: request.position,
-    range: request.range,
-    operation,
-    matches,
-    control,
-  });
 }

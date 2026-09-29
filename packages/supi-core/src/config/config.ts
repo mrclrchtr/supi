@@ -70,6 +70,116 @@ export interface SupiConfigOptions {
   homeDir?: string;
 }
 
+/** Options for loading automatic code-intelligence exclusions. */
+export interface AutomaticExclusionOptions extends SupiConfigOptions {
+  /** Whether the project config is trusted and can apply. Defaults to true. */
+  projectTrusted?: boolean;
+}
+
+/**
+ * Load the one configured exclusion list shared by automatic LSP work and
+ * broad AST searches.
+ *
+ * Project values replace global values. An explicit empty project list clears
+ * the global list. The old `lsp.exclude` key is rejected in every applicable
+ * scope so automatic work cannot start without its former protection.
+ */
+export function loadAutomaticExclusionPatterns(
+  cwd: string,
+  options: AutomaticExclusionOptions = {},
+): readonly string[] {
+  const projectTrusted = options.projectTrusted !== false;
+  const globalCodeIntelligence = loadSupiConfigSectionForScope("code-intelligence", cwd, {
+    scope: "global",
+    homeDir: options.homeDir,
+  });
+  const projectCodeIntelligence = projectTrusted
+    ? loadSupiConfigSectionForScope("code-intelligence", cwd, { scope: "project" })
+    : null;
+  const globalLsp = loadSupiConfigSectionForScope("lsp", cwd, {
+    scope: "global",
+    homeDir: options.homeDir,
+  });
+  const projectLsp = projectTrusted
+    ? loadSupiConfigSectionForScope("lsp", cwd, { scope: "project" })
+    : null;
+
+  const legacyPath = findLegacyExclusionPath(cwd, options, globalLsp, projectLsp);
+  if (legacyPath) {
+    throw new Error(
+      `Unsupported ${legacyPath.scope} configuration at ${legacyPath.path}: "lsp.exclude" was removed. Move its value to "code-intelligence.exclude". Automatic LSP and broad AST work did not start; reload after migration.`,
+    );
+  }
+
+  const source = findExclusionSource(cwd, options, {
+    projectTrusted,
+    globalCodeIntelligence,
+    projectCodeIntelligence,
+  });
+  return validateExclusionSource(source);
+}
+
+interface ExclusionSource {
+  value: unknown;
+  path: string;
+}
+
+interface LegacyExclusionPath {
+  scope: "global" | "project";
+  path: string;
+}
+
+function findLegacyExclusionPath(
+  cwd: string,
+  options: AutomaticExclusionOptions,
+  globalLsp: Record<string, unknown> | null,
+  projectLsp: Record<string, unknown> | null,
+): LegacyExclusionPath | null {
+  if (globalLsp && Object.hasOwn(globalLsp, "exclude")) {
+    return { scope: "global", path: getSupiConfigPath("global", cwd, options) };
+  }
+  if (projectLsp && Object.hasOwn(projectLsp, "exclude")) {
+    return { scope: "project", path: getSupiConfigPath("project", cwd) };
+  }
+  return null;
+}
+
+function findExclusionSource(
+  cwd: string,
+  options: AutomaticExclusionOptions,
+  sections: {
+    projectTrusted: boolean;
+    globalCodeIntelligence: Record<string, unknown> | null;
+    projectCodeIntelligence: Record<string, unknown> | null;
+  },
+): ExclusionSource | null {
+  const { projectTrusted, globalCodeIntelligence, projectCodeIntelligence } = sections;
+  if (
+    projectTrusted &&
+    projectCodeIntelligence &&
+    Object.hasOwn(projectCodeIntelligence, "exclude")
+  ) {
+    return { value: projectCodeIntelligence.exclude, path: getSupiConfigPath("project", cwd) };
+  }
+  if (globalCodeIntelligence && Object.hasOwn(globalCodeIntelligence, "exclude")) {
+    return {
+      value: globalCodeIntelligence.exclude,
+      path: getSupiConfigPath("global", cwd, options),
+    };
+  }
+  return null;
+}
+
+function validateExclusionSource(source: ExclusionSource | null): readonly string[] {
+  if (!source) return Object.freeze([]);
+  if (!Array.isArray(source.value) || !source.value.every((entry) => typeof entry === "string")) {
+    throw new Error(
+      `Invalid "code-intelligence.exclude" in ${source.path}: expected an array of gitignore-style strings. Automatic LSP and broad AST work did not start.`,
+    );
+  }
+  return Object.freeze([...source.value]);
+}
+
 /**
  * Load and merge config for a given extension section.
  *

@@ -1,5 +1,7 @@
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: enumeration policy and traversal stay one cohesive internal module.
 import { type Dirent, promises as fs, type Stats } from "node:fs";
 import * as path from "node:path";
+import type { AutomaticLspPathPolicy } from "@mrclrchtr/supi-lsp/api";
 import {
   getStructuralSearchSupportedExtensions,
   getSupportedExtensions,
@@ -34,6 +36,7 @@ export const DEFAULT_AST_SCAN_TIMEOUT_MS = 10_000;
 export type AstScanExclusionReason =
   | "hidden-entry"
   | "excluded-directory"
+  | "configured-exclusion"
   | "unsupported-extension"
   | "unsupported-operation"
   | "symlink"
@@ -60,6 +63,8 @@ export interface AstScanPolicy {
   readonly operation: StructuralSearchOperation;
   readonly supportedExtensions: readonly string[];
   readonly excludedDirectories: readonly string[];
+  /** Patterns captured from code-intelligence.exclude for this scan. */
+  readonly configuredExclusions: readonly string[];
   readonly hiddenEntries: "excluded";
   readonly ignoreFiles: false;
   readonly symlinks: "explicit-roots-only";
@@ -86,6 +91,8 @@ export interface EnumerateAstFilesOptions {
   /** Timer seam for deterministic deadline tests; defaults to wall-clock timers. */
   readonly schedule?: ScheduleDeadline;
   readonly operations?: AstScanOperations;
+  /** Session-owned automatic path policy for configured exclusions. */
+  readonly automaticPathPolicy?: AutomaticLspPathPolicy;
 }
 
 export type AstFileEnumeration =
@@ -107,6 +114,7 @@ export function astScanPolicy(
   operation: StructuralSearchOperation,
   maxFiles: number,
   timeoutMs: number,
+  automaticPathPolicy?: AutomaticLspPathPolicy,
 ): AstScanPolicy {
   return {
     operation,
@@ -114,6 +122,7 @@ export function astScanPolicy(
       a.localeCompare(b),
     ),
     excludedDirectories: [...AST_SCAN_EXCLUDED_DIRECTORIES],
+    configuredExclusions: [...(automaticPathPolicy?.configuredPatterns ?? [])],
     hiddenEntries: "excluded",
     ignoreFiles: false,
     symlinks: "explicit-roots-only",
@@ -215,7 +224,10 @@ class AstFileEnumerator {
 
     if (rootStat.isFile()) return this.#processFileRoot(canonicalRoot);
     if (rootStat.isDirectory()) {
-      await this.#walk(canonicalRoot);
+      const bypassConfiguredExclusions =
+        this.options.automaticPathPolicy?.isConfiguredExcluded?.(canonicalRoot, "directory") ??
+        false;
+      await this.#walk(canonicalRoot, bypassConfiguredExclusions);
       return null;
     }
     return {
@@ -243,7 +255,7 @@ class AstFileEnumerator {
     };
   }
 
-  async #walk(directory: string): Promise<void> {
+  async #walk(directory: string, bypassConfiguredExclusions = false): Promise<void> {
     if (!this.#checkControl() || this.#visitedDirectories.has(directory)) return;
     this.#visitedDirectories.add(directory);
     const entries = await this.#readDirectory(directory);
@@ -251,7 +263,7 @@ class AstFileEnumerator {
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
       if (!this.#checkControl()) return;
-      await this.#processEntry(directory, entry);
+      await this.#processEntry(directory, entry, bypassConfiguredExclusions);
     }
   }
 
@@ -267,27 +279,48 @@ class AstFileEnumerator {
     }
   }
 
-  async #processEntry(directory: string, entry: Dirent): Promise<void> {
+  async #processEntry(
+    directory: string,
+    entry: Dirent,
+    bypassConfiguredExclusions: boolean,
+  ): Promise<void> {
     const entryPath = path.join(directory, entry.name);
-    const exclusion = this.#entryExclusion(entry);
+    const exclusion = this.#entryExclusion(entryPath, entry, bypassConfiguredExclusions);
     if (exclusion) {
       this.#record(this.#exclusions, exclusion, entryPath);
       return;
     }
     if (entry.isDirectory()) {
-      await this.#walk(entryPath);
+      await this.#walk(entryPath, bypassConfiguredExclusions);
       return;
     }
     if (entry.isFile()) this.#addFile(entryPath);
   }
 
-  #entryExclusion(entry: Dirent): AstScanExclusionReason | null {
+  #entryExclusion(
+    entryPath: string,
+    entry: Dirent,
+    bypassConfiguredExclusions: boolean,
+  ): AstScanExclusionReason | null {
     if (entry.name.startsWith(".")) return "hidden-entry";
     if (entry.isSymbolicLink()) return "symlink";
     if (entry.isDirectory()) {
-      return EXCLUDED_DIRECTORY_SET.has(entry.name) ? "excluded-directory" : null;
+      if (EXCLUDED_DIRECTORY_SET.has(entry.name)) return "excluded-directory";
+      if (
+        !bypassConfiguredExclusions &&
+        this.options.automaticPathPolicy?.isConfiguredExcluded?.(entryPath, "directory")
+      ) {
+        return "configured-exclusion";
+      }
+      return null;
     }
     if (!entry.isFile()) return "non-regular";
+    if (
+      !bypassConfiguredExclusions &&
+      this.options.automaticPathPolicy?.isConfiguredExcluded?.(entryPath, "file")
+    ) {
+      return "configured-exclusion";
+    }
     return this.#fileExclusion(entry.name);
   }
 
@@ -367,6 +400,7 @@ class AstFileEnumerator {
         this.options.operation,
         this.options.maxFiles,
         this.options.timeoutMs ?? DEFAULT_AST_SCAN_TIMEOUT_MS,
+        this.options.automaticPathPolicy,
       ),
       exclusions: [...this.#exclusions.values()],
       limitations: [...this.#limitations.values()].map((entry) => ({

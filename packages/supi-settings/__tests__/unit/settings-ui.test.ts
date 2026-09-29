@@ -317,4 +317,27 @@ describe("openSettingsOverlay", () => {
 
     expect(custom).toHaveBeenCalledOnce();
   });
+
+  it("renders the config path and reload notice", async () => {
+    const pi = makePi([makeModule()]);
+    let component: { render(width: number): string[] } | undefined;
+    const custom = vi.fn((factory: (...args: unknown[]) => unknown) => {
+      component = factory({ requestRender: vi.fn() }, makeTheme(), undefined, vi.fn()) as {
+        render(width: number): string[];
+      };
+      return Promise.resolve();
+    });
+
+    await openSettingsOverlay(
+      pi as never,
+      {
+        cwd: "/tmp",
+        ui: { custom, notify: vi.fn() },
+      } as never,
+    );
+
+    const rendered = component?.render(80).join("\n") ?? "";
+    expect(rendered).toContain("Config: /tmp/.pi/supi/config.json");
+    expect(rendered).toContain("Reload or restart Pi after saving");
+  });
 });

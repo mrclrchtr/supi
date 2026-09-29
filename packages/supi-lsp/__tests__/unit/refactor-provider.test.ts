@@ -237,6 +237,25 @@ describe("LspRefactorProvider", () => {
       expect(results).toHaveLength(0);
     });
 
+    it("preserves routed code-action failure reasons", async () => {
+      const lsp = createMockLsp({
+        codeActions: vi.fn().mockResolvedValue({
+          value: null,
+          reason: "The server does not advertise textDocument/codeAction.",
+          authorizedMutationRoots: ["/src"],
+        }),
+      });
+      const provider = createLspSemanticProvider(lsp);
+      const results = (await provider.codeActions?.("/src/index.ts", {
+        line: 0,
+        character: 0,
+      })) as RefactorResult[];
+
+      expect(results).toEqual([
+        { kind: "unavailable", reason: "The server does not advertise textDocument/codeAction." },
+      ]);
+    });
+
     it("returns unavailable for code actions without edits", async () => {
       const lsp = createMockLsp({
         codeActions: vi.fn().mockResolvedValue(routed([{ title: "Organize imports" }])),
@@ -249,6 +268,25 @@ describe("LspRefactorProvider", () => {
 
       expect(results).toHaveLength(1);
       expect(results[0].kind).toBe("unavailable");
+    });
+
+    it("keeps a valid standard Command response unsupported", async () => {
+      const lsp = createMockLsp({
+        codeActions: vi
+          .fn()
+          .mockResolvedValue(routed([{ title: "Run fix", command: "server.runFix" }] as unknown)),
+      });
+      const provider = createLspSemanticProvider(lsp);
+      const results = (await provider.codeActions?.("/src/index.ts", {
+        line: 0,
+        character: 0,
+      })) as RefactorResult[];
+
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({
+        kind: "unavailable",
+        reason: expect.stringContaining("command"),
+      });
     });
   });
 
@@ -298,6 +336,134 @@ describe("LspRefactorProvider", () => {
       expect(renameSpy).toHaveBeenCalledWith("/src/index.ts", { line: 0, character: 0 }, "newName");
       expect(codeActionsSpy).not.toHaveBeenCalled();
       expect(result?.kind).toBe("precise");
+    });
+
+    it("requests the operation kind as an invoked code-action request", async () => {
+      const codeActionsSpy = vi.fn().mockResolvedValue(routed([]));
+      const provider = createLspSemanticProvider(
+        createMockLsp({ codeActions: codeActionsSpy }),
+      ) as OperationAwareSemanticProvider;
+
+      await provider.refactor?.({
+        operation: "update_imports",
+        file: "/src/index.ts",
+        position: { line: 0, character: 0 },
+      });
+
+      expect(codeActionsSpy).toHaveBeenCalledWith(
+        "/src/index.ts",
+        { line: 0, character: 0 },
+        undefined,
+        { only: ["source.organizeImports"], triggerKind: 1 },
+      );
+    });
+
+    it.each([
+      ["null entry", null],
+      ["numeric kind", { title: "Bad action", kind: 1 }],
+    ])("does not throw for malformed returned actions: %s", async (_label, entry) => {
+      const provider = createLspSemanticProvider(
+        createMockLsp({
+          codeActions: vi.fn().mockResolvedValue(routed([entry] as unknown)),
+        }),
+      ) as OperationAwareSemanticProvider;
+
+      const result = await provider.refactor?.({
+        operation: "update_imports",
+        file: "/src/index.ts",
+        position: { line: 0, character: 0 },
+      });
+
+      expect(result?.kind).toBe("unavailable");
+    });
+
+    it("refuses extraction before requesting code actions", async () => {
+      const codeActionsSpy = vi.fn();
+      const provider = createLspSemanticProvider(
+        createMockLsp({ codeActions: codeActionsSpy }),
+      ) as OperationAwareSemanticProvider;
+
+      const result = await provider.refactor?.({
+        operation: "extract_function",
+        file: "/src/index.ts",
+        position: { line: 0, character: 0 },
+        range: {
+          start: { line: 0, character: 0 },
+          end: { line: 0, character: 5 },
+        },
+      });
+
+      expect(codeActionsSpy).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        kind: "unavailable",
+        reason:
+          'Refactor operation "extract_function" is unavailable: standard LSP code actions do not provide a safe exact extraction-name contract.',
+      });
+    });
+
+    it("returns equivalent matching plans only once", async () => {
+      const action = {
+        title: "Organize imports",
+        kind: "source.organizeImports",
+        edit: {
+          changes: {
+            "file:///src/index.ts": [
+              {
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+                newText: "",
+              },
+            ],
+          },
+        },
+      };
+      const provider = createLspSemanticProvider(
+        createMockLsp({ codeActions: vi.fn().mockResolvedValue(routed([action, { ...action }])) }),
+      ) as OperationAwareSemanticProvider;
+
+      const result = await provider.refactor?.({
+        operation: "update_imports",
+        file: "/src/index.ts",
+        position: { line: 0, character: 0 },
+      });
+
+      expect(result?.kind).toBe("precise");
+    });
+
+    it("returns ambiguity for distinct matching plans", async () => {
+      const makeAction = (newText: string) => ({
+        title: "Organize imports",
+        kind: "source.organizeImports",
+        edit: {
+          changes: {
+            "file:///src/index.ts": [
+              {
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+                newText,
+              },
+            ],
+          },
+        },
+      });
+      const provider = createLspSemanticProvider(
+        createMockLsp({
+          codeActions: vi
+            .fn()
+            .mockResolvedValue(routed([makeAction("first"), makeAction("second")])),
+        }),
+      ) as OperationAwareSemanticProvider;
+
+      const result = await provider.refactor?.({
+        operation: "update_imports",
+        file: "/src/index.ts",
+        position: { line: 0, character: 0 },
+      });
+
+      expect(result?.kind).toBe("ambiguous");
+      if (result?.kind === "ambiguous") {
+        expect(result.candidates).toHaveLength(2);
+        expect(result.candidates[0]?.description).toContain("Organize imports");
+        expect(result.candidates[0]?.file).toBe("/src/index.ts");
+      }
     });
 
     it("routes update_imports through code actions instead of rename", async () => {

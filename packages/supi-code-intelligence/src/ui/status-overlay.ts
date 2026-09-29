@@ -20,6 +20,7 @@ import type {
 import type { CapabilityWarningReport } from "../analysis/capability/capability-warnings.ts";
 import {
   countProjectServerRouteStatuses,
+  formatProjectServerOperationSupport,
   formatProjectServerRoot,
   formatProjectServerStatusReason,
 } from "../analysis/health/server-status.ts";
@@ -381,6 +382,10 @@ export class CiStatusDialog {
     const statusReason = formatProjectServerStatusReason(server.statusReason);
     if (statusReason) {
       container.addChild(new Text(t.fg("warning", `    ${statusReason}`), 0, 0));
+    }
+    const operationSupport = formatProjectServerOperationSupport(server.operationSupport);
+    if (operationSupport) {
+      container.addChild(new Text(t.fg("dim", `    ${operationSupport}`), 0, 0));
     }
 
     if (server.openFiles.length > 0) {

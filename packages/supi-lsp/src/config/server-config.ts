@@ -1,5 +1,15 @@
 // SuPi-specific server configuration types — not part of the LSP specification.
+
+import type { ServerOperationSupportMap } from "./operation-support.ts";
 // These are our own types for server discovery, configuration, and status tracking.
+
+/** JSON values accepted by a server's advanced settings object. */
+export type JsonValue = string | number | boolean | null | JsonValue[] | JsonObject;
+
+/** A JSON object passed to a language server as advanced settings. */
+export interface JsonObject {
+  readonly [key: string]: JsonValue;
+}
 
 export interface ServerConfig {
   command: string;
@@ -10,6 +20,9 @@ export interface ServerConfig {
   enabled?: boolean;
   /** Environment values added when the server process starts. */
   env?: Record<string, string>;
+  /** Server-owned configuration settings. This object replaces inherited settings as a whole. */
+  settings?: JsonObject;
+  /** Options sent during initialize; kept separate from `settings`. */
   initializationOptions?: unknown;
   /** Maximum time to wait for a single $/progress cycle, in ms. Default: 10_000. */
   readinessTimeoutMs?: number;
@@ -39,6 +52,8 @@ export interface ProjectServerInfo extends DetectedProjectServer {
   openFiles: string[];
   /** Whether the LSP server is currently not indexing and ready to serve queries. */
   ready: boolean;
+  /** Negotiated operation support, when the route has a capability snapshot. */
+  operationSupport?: ServerOperationSupportMap;
 }
 
 /** A language whose source files are present but the server binary is missing. */

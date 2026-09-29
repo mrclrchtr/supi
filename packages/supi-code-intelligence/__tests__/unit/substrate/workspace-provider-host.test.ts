@@ -5,6 +5,10 @@ const mocks = vi.hoisted(() => ({
   tree: [] as Array<{ start: ReturnType<typeof vi.fn>; shutdown: ReturnType<typeof vi.fn> }>,
 }));
 vi.mock("@mrclrchtr/supi-lsp/api", () => ({
+  createDefaultAutomaticLspPathPolicy: vi.fn(() => ({
+    workspaceRoot: "/workspace",
+    isEligible: () => true,
+  })),
   LspRuntimeController: class {
     start = vi.fn(async () => ({ kind: "ready" as const }));
     shutdown = vi.fn(async () => {});

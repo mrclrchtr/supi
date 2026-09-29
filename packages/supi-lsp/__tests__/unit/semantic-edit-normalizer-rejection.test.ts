@@ -182,6 +182,25 @@ describe("normalizeSemanticEdit rejection", () => {
     expectUnavailable(result, testCase.reason);
   });
 
+  it("does not fall back to changes when documentChanges is malformed", () => {
+    const result = normalizeSemanticEdit(
+      {
+        kind: "workspace-edit",
+        edit: {
+          changes: fallbackChanges,
+          documentChanges: [
+            {
+              textDocument: { uri: "file:///src/a.ts", version: null },
+            },
+          ],
+        },
+      },
+      versions,
+    );
+
+    expectUnavailable(result, "malformed document change");
+  });
+
   it("rejects precise edits when semantic routing provides no mutation root", () => {
     const result = normalizeSemanticEdit(
       { kind: "workspace-edit", edit: { changes: fallbackChanges } },

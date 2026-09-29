@@ -1,4 +1,4 @@
-import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import type { CodeQueryPartialMetadata, ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { CapabilityWarningReport } from "../../analysis/capability/capability-warnings.ts";
 import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import type { InstructionFilesMetadata } from "../../analysis/instruction-files.ts";
@@ -90,6 +90,8 @@ export interface SearchDetails {
   changedFiles?: readonly string[];
   /** Present for AST mode; declares the operation-specific source-file universe and completeness. */
   scan?: StructuredScanSummary;
+  /** Structured disclosure for semantic results removed by the automatic path policy. */
+  automaticPathExclusion?: CodeQueryPartialMetadata["automaticPathExclusion"];
 }
 
 // Canonical disambiguation candidate — re-exported from resolution/types.ts

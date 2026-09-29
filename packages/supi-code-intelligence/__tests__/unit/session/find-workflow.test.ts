@@ -268,6 +268,7 @@ describe("runFindWorkflow", () => {
               operation: "outline",
               supportedExtensions: [".ts"],
               excludedDirectories: ["node_modules"],
+              configuredExclusions: [],
               hiddenEntries: "excluded",
               ignoreFiles: false,
               symlinks: "explicit-roots-only",

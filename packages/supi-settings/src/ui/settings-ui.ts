@@ -6,6 +6,7 @@ import {
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { Container, Key, matchesKey, Text } from "@earendil-works/pi-tui";
+import { getSupiConfigPath } from "@mrclrchtr/supi-core/config";
 import {
   createSettingsContributionCollector,
   type SettingsCollectionDiagnostic,
@@ -102,6 +103,16 @@ export async function openSettingsOverlay(pi: ExtensionAPI, ctx: ExtensionContex
             `${theme.fg("dim", "Scope")}  ${scope("Project", "project")}  ${scope("Global", "global")}`,
           ),
           0,
+          0,
+        ),
+      );
+      container.addChild(
+        new Text(
+          theme.fg(
+            "dim",
+            `Config: ${getSupiConfigPath(state.scope, state.cwd)} · Reload or restart Pi after saving`,
+          ),
+          1,
           0,
         ),
       );

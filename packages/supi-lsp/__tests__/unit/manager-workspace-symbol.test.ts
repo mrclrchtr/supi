@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { completedCodeQuery, unavailableCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
+import { fileToUri } from "@mrclrchtr/supi-core/path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LspManager } from "../../src/manager/manager.ts";
 import { findWorkspaceSymbolWarmTargets } from "../../src/manager/manager-workspace-symbol.ts";
@@ -84,6 +85,63 @@ describe("findWorkspaceSymbolWarmTargets", () => {
     expect(findWorkspaceSymbolWarmTargets(root, ["package.json"], ["ts"], { policy })).toEqual([
       { projectRoot: root, file: join(root, "generated", "keep.ts") },
     ]);
+  });
+});
+
+describe("LspManager.workspaceSymbol filtering", () => {
+  it("filters automatic results and discloses configured exclusions", async () => {
+    const root = makeTempRoot();
+    const excluded = join(root, "configured", "drop.ts");
+    mkdirSync(dirname(excluded), { recursive: true });
+    writeFileSync(excluded, "export const Drop = 1;\n");
+    const visible = join(root, "src", "index.ts");
+    const symbols = [
+      {
+        name: "Drop",
+        kind: 12,
+        location: { uri: fileToUri(excluded), range: { start: {}, end: {} } },
+      },
+      {
+        name: "Widget",
+        kind: 12,
+        location: { uri: fileToUri(visible), range: { start: {}, end: {} } },
+      },
+    ];
+    const policy = createAutomaticLspPathPolicy(root, ["configured/"]);
+    const manager = new LspManager(
+      {
+        servers: {
+          typescript: {
+            command: "node",
+            args: [],
+            fileTypes: ["ts"],
+            rootMarkers: ["package.json"],
+          },
+        },
+      },
+      root,
+      undefined,
+      policy,
+    );
+    const client = {
+      name: "typescript",
+      root,
+      status: "running",
+      serverCapabilities: { workspaceSymbolProvider: true },
+      workspaceSymbol: vi.fn().mockResolvedValue(completedCodeQuery(symbols)),
+    };
+    getClients(manager).set(`typescript:${root}`, client);
+
+    const filtered = await manager.workspaceSymbol("Widget");
+
+    expect(filtered).toMatchObject({
+      kind: "partial",
+      data: [symbols[1]],
+      reason: expect.stringContaining("excluded 1 workspace-symbol result"),
+    });
+
+    const explicit = await manager.workspaceSymbol("Drop", undefined, [excluded]);
+    expect(explicit).toEqual({ kind: "completed", data: symbols });
   });
 });
 

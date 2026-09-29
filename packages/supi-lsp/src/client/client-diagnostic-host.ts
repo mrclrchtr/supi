@@ -1,4 +1,5 @@
 import type { DiagnosticRequestAdapter } from "./client-diagnostic-request.ts";
+import type { NormalizedDocumentSync } from "./client-document-sync.ts";
 
 /** Transport and capability operations required by diagnostic state. */
 export interface ClientDiagnosticsHost {
@@ -9,6 +10,6 @@ export interface ClientDiagnosticsHost {
   isOperational(): boolean;
   /** Native pull and server-specific request evidence share this priority adapter. */
   diagnosticRequestAdapter: DiagnosticRequestAdapter;
-  usesIncrementalDocumentSync(): boolean;
+  documentSync(): NormalizedDocumentSync;
   sendNotification(method: string, params: unknown): void;
 }

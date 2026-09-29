@@ -1,3 +1,12 @@
+/** Structured metadata for a partial query result. */
+export interface CodeQueryPartialMetadata {
+  /** Automatic path-policy evidence removed from a collected result. */
+  readonly automaticPathExclusion?: {
+    readonly excludedCount: number;
+    readonly examples: readonly string[];
+  };
+}
+
 /**
  * Result of a read-only code-provider query.
  *
@@ -8,7 +17,12 @@
  */
 export type CodeQueryResult<T> =
   | { readonly kind: "completed"; readonly data: T }
-  | { readonly kind: "partial"; readonly data: T; readonly reason: string }
+  | {
+      readonly kind: "partial";
+      readonly data: T;
+      readonly reason: string;
+      readonly metadata?: CodeQueryPartialMetadata;
+    }
   | { readonly kind: "unavailable"; readonly reason: string };
 
 /** Construct a successfully completed code-query result, including empty data. */
@@ -17,8 +31,12 @@ export function completedCodeQuery<T>(data: T): CodeQueryResult<T> {
 }
 
 /** Construct a usable but incomplete code-query result. */
-export function partialCodeQuery<T>(data: T, reason: string): CodeQueryResult<T> {
-  return { kind: "partial", data, reason };
+export function partialCodeQuery<T>(
+  data: T,
+  reason: string,
+  metadata?: CodeQueryPartialMetadata,
+): CodeQueryResult<T> {
+  return { kind: "partial", data, reason, ...(metadata ? { metadata } : {}) };
 }
 
 /** Construct a code-query result that could not be established. */
@@ -35,7 +53,7 @@ export function mapCodeQueryResult<T, U>(
     case "completed":
       return completedCodeQuery(map(result.data));
     case "partial":
-      return partialCodeQuery(map(result.data), result.reason);
+      return partialCodeQuery(map(result.data), result.reason, result.metadata);
     case "unavailable":
       return unavailableCodeQuery(result.reason);
   }

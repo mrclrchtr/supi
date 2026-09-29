@@ -3,11 +3,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { vi } from "vitest";
 import { LspClient } from "../../src/client/client.ts";
-import type { ServerCapabilities } from "../../src/config/types.ts";
+import {
+  type NormalizedDocumentSync,
+  normalizeDocumentSync,
+} from "../../src/client/client-document-sync.ts";
+import type { JsonObject, ServerCapabilities } from "../../src/config/types.ts";
 
 type ClientInternals = {
   _status: "running";
   capabilities: ServerCapabilities;
+  normalizedDocumentSync: NormalizedDocumentSync;
   rpc: TestRpc;
 };
 
@@ -26,6 +31,7 @@ export function createRunningTestClient(
     command?: string;
     fileTypes?: string[];
     initializationOptions?: unknown;
+    settings?: JsonObject;
   } = {},
 ): { client: LspClient; rpc: TestRpc } {
   const client = new LspClient(
@@ -36,6 +42,7 @@ export function createRunningTestClient(
       fileTypes: options.fileTypes ?? ["ts"],
       rootMarkers: ["tsconfig.json"],
       initializationOptions: options.initializationOptions,
+      settings: options.settings,
     },
     options.root ?? "/project",
     undefined,
@@ -58,7 +65,15 @@ export function createRunningTestClient(
   };
   Object.assign(client as unknown as ClientInternals, {
     _status: "running" as const,
-    capabilities: options.capabilities ?? {},
+    capabilities:
+      options.capabilities ??
+      ({ textDocumentSync: { change: 1, openClose: true } } as ServerCapabilities),
+    normalizedDocumentSync: normalizeDocumentSync(
+      (
+        options.capabilities ??
+        ({ textDocumentSync: { change: 1, openClose: true } } as ServerCapabilities)
+      ).textDocumentSync,
+    ),
     rpc,
   });
   return { client, rpc };
@@ -81,6 +96,7 @@ export function createPullTestClient(options: { root?: string; cwd?: string } = 
   return createRunningTestClient({
     ...options,
     capabilities: {
+      textDocumentSync: { change: 1, openClose: true },
       diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false },
     },
   });
@@ -95,6 +111,7 @@ export function createTypeScriptTestClient(
     command: "typescript-language-server",
     fileTypes: ["ts", "tsx", "js", "jsx"],
     capabilities: {
+      textDocumentSync: { change: 1, openClose: true },
       executeCommandProvider: { commands: ["typescript.tsserverRequest"] },
     },
   });

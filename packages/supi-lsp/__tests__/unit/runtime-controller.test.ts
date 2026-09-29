@@ -1,8 +1,8 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { loadAutomaticExclusionPatterns } from "@mrclrchtr/supi-core/config";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadLspSettings } from "../../src/config/lsp-settings.ts";
 import { LspRuntimeController } from "../../src/session/runtime-controller.ts";
 import { getWorkspaceLspRuntime } from "../../src/session/runtime-registry.ts";
 
@@ -25,23 +25,23 @@ afterEach(() => {
   TMP_DIRS.length = 0;
 });
 
-// ── lsp-settings (config helpers) ─────────────────────────────
+// ── automatic exclusions ──────────────────────────────────────
 
-describe("loadLspSettings", () => {
+describe("automatic exclusion loader", () => {
   it("returns defaults when no config exists", () => {
     const tmpDir = makeProjectDir();
-    expect(loadLspSettings(tmpDir, tmpDir)).toEqual({ exclude: [] });
+    expect(loadAutomaticExclusionPatterns(tmpDir, { homeDir: tmpDir })).toEqual([]);
   });
 
-  it("reads project exclusion patterns", () => {
+  it("reads project exclusion patterns from code-intelligence", () => {
     const tmpDir = makeProjectDir();
     fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, ".pi", "supi", "config.json"),
-      JSON.stringify({ lsp: { exclude: ["**/*.test.ts"] } }),
+      JSON.stringify({ "code-intelligence": { exclude: ["**/*.test.ts"] } }),
     );
 
-    expect(loadLspSettings(tmpDir).exclude).toEqual(["**/*.test.ts"]);
+    expect(loadAutomaticExclusionPatterns(tmpDir)).toEqual(["**/*.test.ts"]);
   });
 });
 
@@ -56,6 +56,26 @@ describe("LspRuntimeController", () => {
     expect(controller.kind).toBe("initial");
 
     // Shutdown without start should be safe
+    await controller.shutdown();
+  });
+
+  it("publishes a migration error before automatic LSP work starts", async () => {
+    const tmpDir = makeProjectDir();
+    fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "supi", "config.json"),
+      JSON.stringify({ lsp: { exclude: ["fixtures/"] } }),
+    );
+
+    const controller = new LspRuntimeController(tmpDir, undefined, { homeDir: makeProjectDir() });
+    const result = await controller.start();
+
+    expect(result).toMatchObject({
+      kind: "unavailable",
+      reason: expect.stringContaining("lsp.exclude"),
+    });
+    expect(controller.getConfigurationError()).toContain('"lsp.exclude" was removed');
+    expect(controller.workspaceRuntime).toBeNull();
     await controller.shutdown();
   });
 

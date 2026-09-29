@@ -17,5 +17,6 @@ export function collectServers(
     status: server.status,
     ...(server.statusReason ? { statusReason: server.statusReason } : {}),
     ready: server.ready,
+    ...(server.operationSupport ? { operationSupport: server.operationSupport } : {}),
   }));
 }

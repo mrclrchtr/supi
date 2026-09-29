@@ -188,6 +188,27 @@ describe("loadConfig", () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
+  it("ignores project server overrides when the project is untrusted", () => {
+    const tmpDir = makeTmpDir();
+    const homeDir = makeTmpDir();
+    fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi/supi/config.json"),
+      JSON.stringify({ lsp: { servers: { typescript: { command: "project-server" } } } }),
+    );
+    fs.mkdirSync(path.join(homeDir, ".pi/agent/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(homeDir, ".pi/agent/supi/config.json"),
+      JSON.stringify({ lsp: { servers: { typescript: { command: "global-server" } } } }),
+    );
+
+    expect(loadConfig(tmpDir, { homeDir, projectTrusted: false }).servers.typescript?.command).toBe(
+      "global-server",
+    );
+    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(homeDir, { recursive: true });
+  });
+
   it("merges global config per language key", () => {
     const tmpDir = makeTmpDir();
 
@@ -303,6 +324,88 @@ describe("loadConfig", () => {
     expect(config.servers.typescript).toBeUndefined();
     expect(config.servers.python).toBeDefined();
 
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it("replaces inherited server settings as one JSON object", () => {
+    const tmpDir = makeTmpDir();
+    const homeDir = makeTmpDir();
+    withHomeDir(homeDir, () => {
+      fs.mkdirSync(path.join(homeDir, ".pi/agent/supi"), { recursive: true });
+      fs.writeFileSync(
+        path.join(homeDir, ".pi/agent/supi/config.json"),
+        JSON.stringify({
+          lsp: {
+            servers: {
+              typescript: {
+                settings: { typescript: { strict: true }, inherited: true },
+                initializationOptions: { from: "global" },
+              },
+            },
+          },
+        }),
+      );
+      fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".pi/supi/config.json"),
+        JSON.stringify({
+          lsp: {
+            servers: {
+              typescript: {
+                settings: { typescript: { analysis: { typeCheckingMode: "strict" } } },
+                initializationOptions: { from: "project" },
+              },
+            },
+          },
+        }),
+      );
+
+      const config = loadConfig(tmpDir, { homeDir });
+      expect(config.servers.typescript?.settings).toEqual({
+        typescript: { analysis: { typeCheckingMode: "strict" } },
+      });
+      expect(config.servers.typescript?.initializationOptions).toEqual({ from: "project" });
+    });
+    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(homeDir, { recursive: true });
+  });
+
+  it("accepts an explicit empty settings object to clear inheritance", () => {
+    const tmpDir = makeTmpDir();
+    const homeDir = makeTmpDir();
+    withHomeDir(homeDir, () => {
+      fs.mkdirSync(path.join(homeDir, ".pi/agent/supi"), { recursive: true });
+      fs.writeFileSync(
+        path.join(homeDir, ".pi/agent/supi/config.json"),
+        JSON.stringify({
+          lsp: { servers: { typescript: { settings: { python: { analysis: {} } } } } },
+        }),
+      );
+      fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".pi/supi/config.json"),
+        JSON.stringify({ lsp: { servers: { typescript: { settings: {} } } } }),
+      );
+
+      expect(loadConfig(tmpDir, { homeDir }).servers.typescript?.settings).toEqual({});
+    });
+    fs.rmSync(tmpDir, { recursive: true });
+    fs.rmSync(homeDir, { recursive: true });
+  });
+
+  it("ignores a non-object server settings value", () => {
+    const tmpDir = makeTmpDir();
+    fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi/supi/config.json"),
+      JSON.stringify({ lsp: { servers: { typescript: { settings: [] } } } }),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const config = loadConfig(tmpDir);
+
+    expect(config.servers.typescript?.settings).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("settings"));
     fs.rmSync(tmpDir, { recursive: true });
   });
 

@@ -1,4 +1,4 @@
-import type { CodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
+import type { CodeQueryPartialMetadata, CodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
 import type { StructuredPatternResult } from "../analysis/search/pattern.ts";
 import type { CodeFindAstKind } from "../tool/code_find/ast-kinds.ts";
 import type { CodeFindMode } from "../tool/code_find/modes.ts";
@@ -23,6 +23,7 @@ export type FindWorkflowData =
       readonly kind: "semantic";
       readonly symbols: readonly CodeSymbol[];
       readonly partialReason: string | null;
+      readonly partialMetadata?: CodeQueryPartialMetadata;
     };
 
 export type FindWorkflowOutcome =

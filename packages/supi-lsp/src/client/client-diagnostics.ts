@@ -1,4 +1,5 @@
 // biome-ignore-all lint/style/noExcessiveLinesPerFile: one client's document sync, diagnostics, refresh, and sync-file flow stay in one cohesive class.
+import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import {
   type CodeQueryResult,
@@ -116,6 +117,8 @@ export class ClientDiagnostics {
       isOperational: () => this.host.isOperational(),
       getOpenDocuments: () => this.#getSemanticInputDocuments(),
       applyDocumentUpdates: (updates) => this.#applySemanticInputUpdates(updates),
+      noteExternalDiskChange: (filePath, content) =>
+        this.#noteExternalDiskChange(filePath, content),
       closeMissingDocument: (filePath) => this.didClose(filePath),
       markUnreadableDocument: (filePath) => this.markFailedFile(filePath),
     });
@@ -200,7 +203,7 @@ export class ClientDiagnostics {
       nextVersion: () => nextDocumentVersion(this.#versionHistory, uri),
       nextSynchronizationId: () => ++this.#nextSynchronizationId,
       evidenceRevision: this.#evidenceRevision,
-      incrementalSync: this.host.usesIncrementalDocumentSync(),
+      documentSync: this.host.documentSync(),
       waiters: this.#waiters,
       sendNotification: (method, params) => this.host.sendNotification(method, params),
       markUnversionedSyncMoment: () => this.#unversionedPushSyncMoments.set(uri, Date.now()),
@@ -211,10 +214,6 @@ export class ClientDiagnostics {
 
   #initializeDocumentContent(uri: string, content: string): void {
     this.#inputBarrier.initializeDocumentContent(uri, content);
-  }
-
-  #observeDiskContent(uri: string, content: string): void {
-    this.#inputBarrier.observeDiskContent(uri, content);
   }
 
   #forgetDocumentContent(uri: string): void {
@@ -331,6 +330,38 @@ export class ClientDiagnostics {
     if (doc.contentFingerprint === nextFingerprint) return;
     this.#advanceInputRevision();
     this.#synchronizeTrackedDocument(uri, filePath, content, doc);
+  }
+
+  /** Send a save after a disk change that the input barrier observed. */
+  #noteExternalDiskChange(filePath: string, content: string): void {
+    if (!this.host.isOperational()) return;
+    const documentSync = this.host.documentSync();
+    if (!documentSync.save) return;
+    this.host.sendNotification("textDocument/didSave", {
+      textDocument: { uri: fileToUri(filePath) },
+      ...(documentSync.includeText ? { text: content } : {}),
+    });
+  }
+
+  /** Synchronize and notify one tracked document after an observed disk write. */
+  noteWorkspaceWrite(filePath: string): void {
+    if (!this.host.isOperational()) return;
+
+    const uri = fileToUri(filePath);
+    const document = this.#openDocs.get(uri);
+    if (!document) return;
+
+    let content: string;
+    try {
+      content = readFileSync(filePath, "utf-8");
+    } catch {
+      return;
+    }
+    const diskChanged = this.#inputBarrier.observeDiskContent(uri, content);
+    if (document.contentFingerprint !== fingerprintDocumentContent(content)) {
+      this.didChange(filePath, content);
+    }
+    if (diskChanged) this.#noteExternalDiskChange(filePath, content);
   }
 
   didClose(filePath: string): void {
@@ -527,7 +558,9 @@ export class ClientDiagnostics {
       isRelatedUriTracked: (uri) => this.#openDocs.has(uri) || this.#versionHistory.has(uri),
       nextSynchronizationId: () => ++this.#nextSynchronizationId,
       noteInputContentChange: () => this.#noteInputContentChange(),
-      observeDiskContent: (uri, content) => this.#observeDiskContent(uri, content),
+      observeDiskContent: (uri, content) => this.#inputBarrier.observeDiskContent(uri, content),
+      noteExternalDiskChange: (uri, content) =>
+        this.#noteExternalDiskChange(uriToFile(uri), content),
       invalidateEvidence: (uri) => {
         this.#advanceInputRevision(false, true, "failure");
         this.#cancelDiagnosticRequest(uri);

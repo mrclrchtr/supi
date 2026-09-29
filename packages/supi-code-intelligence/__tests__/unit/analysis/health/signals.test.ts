@@ -1,4 +1,8 @@
-import type { ProjectServerStatusReason, WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
+import type {
+  ProjectServerStatusReason,
+  ServerOperationSupportMap,
+  WorkspaceLspRuntime,
+} from "@mrclrchtr/supi-lsp/api";
 import { describe, expect, it } from "vitest";
 import { collectServers } from "../../../../src/analysis/health/signals.ts";
 
@@ -9,6 +13,32 @@ const reasons: ProjectServerStatusReason[] = [
 ];
 
 describe("collectServers", () => {
+  it("preserves negotiated operation support", () => {
+    const operationSupport: ServerOperationSupportMap = {
+      update_imports: { server: "advertised", supi: "supported" },
+      extract_function: {
+        server: "advertised",
+        supi: "limited",
+        reason: "Standard LSP does not preserve the requested extraction name.",
+      },
+    };
+    const runtime = {
+      getProjectServers: () => [
+        {
+          name: "typescript",
+          root: "/project",
+          fileTypes: ["ts"],
+          status: "running" as const,
+          openFiles: [],
+          ready: true,
+          operationSupport,
+        },
+      ],
+    } as unknown as WorkspaceLspRuntime;
+
+    expect(collectServers(runtime, ["servers"])[0]?.operationSupport).toEqual(operationSupport);
+  });
+
   it("preserves structured process-crash status reasons", () => {
     const runtime = {
       getProjectServers: () =>

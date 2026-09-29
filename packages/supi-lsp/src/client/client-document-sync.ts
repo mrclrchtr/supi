@@ -1,11 +1,67 @@
 import { readFileSync } from "node:fs";
-import type { VersionedTextDocumentIdentifier } from "../config/types.ts";
+import {
+  TextDocumentSyncKind,
+  type VersionedTextDocumentIdentifier,
+} from "vscode-languageserver-protocol";
 import type { DiagnosticSynchronization } from "./client-diagnostic-evidence.ts";
 import type { DiagnosticWaitRegistry } from "./client-diagnostic-waiters.ts";
 import { fingerprintDocumentContent, type OpenDocumentState } from "./client-document-state.ts";
 import { getDiagnosticFileState } from "./client-file-state.ts";
 
 type NotificationSender = (method: string, params: unknown) => void;
+
+/** Normalized document lifecycle options negotiated with one LSP server. */
+export interface NormalizedDocumentSync {
+  readonly openClose: boolean;
+  readonly change: TextDocumentSyncKind;
+  readonly save: boolean;
+  readonly includeText: boolean;
+}
+
+const NO_DOCUMENT_SYNC: NormalizedDocumentSync = Object.freeze({
+  openClose: false,
+  change: TextDocumentSyncKind.None,
+  save: false,
+  includeText: false,
+});
+
+/**
+ * Normalize structured and legacy numeric server synchronization options.
+ * Legacy non-none values use the historical full lifecycle defaults.
+ */
+export function normalizeDocumentSync(value: unknown): NormalizedDocumentSync {
+  if (value === TextDocumentSyncKind.None) return NO_DOCUMENT_SYNC;
+  if (value === TextDocumentSyncKind.Full || value === TextDocumentSyncKind.Incremental) {
+    return Object.freeze({
+      openClose: true,
+      change: value,
+      save: true,
+      includeText: false,
+    });
+  }
+  if (!isRecord(value)) return NO_DOCUMENT_SYNC;
+
+  const change = isTextDocumentSyncKind(value.change) ? value.change : TextDocumentSyncKind.None;
+  const save = value.save === true || isRecord(value.save);
+  return Object.freeze({
+    openClose: value.openClose === true,
+    change,
+    save,
+    includeText: isRecord(value.save) && value.save.includeText === true,
+  });
+}
+
+function isTextDocumentSyncKind(value: unknown): value is TextDocumentSyncKind {
+  return (
+    value === TextDocumentSyncKind.None ||
+    value === TextDocumentSyncKind.Full ||
+    value === TextDocumentSyncKind.Incremental
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 interface SynchronizeDocumentOptions {
   uri: string;
@@ -14,7 +70,7 @@ interface SynchronizeDocumentOptions {
   version: number;
   synchronizationId: number;
   evidenceRevision: number;
-  incrementalSync: boolean;
+  documentSync: NormalizedDocumentSync;
   waiters: DiagnosticWaitRegistry;
   sendNotification: NotificationSender;
 }
@@ -31,9 +87,9 @@ function endPosition(content: string): { line: number; character: number } {
 function contentChanges(
   previousContent: string,
   content: string,
-  incrementalSync: boolean,
+  change: TextDocumentSyncKind,
 ): unknown[] {
-  if (incrementalSync) {
+  if (change === TextDocumentSyncKind.Incremental) {
     return [
       {
         range: {
@@ -64,10 +120,11 @@ export function synchronizeDocument(options: SynchronizeDocumentOptions): void {
   const changes = contentChanges(
     options.document.content,
     options.content,
-    options.incrementalSync,
+    options.documentSync.change,
   );
   options.document.content = options.content;
   options.document.contentFingerprint = fingerprintDocumentContent(options.content);
+  if (options.documentSync.change === TextDocumentSyncKind.None) return;
   options.sendNotification("textDocument/didChange", {
     textDocument: {
       uri: options.uri,
@@ -98,7 +155,7 @@ export function synchronizeTrackedDocument(options: {
   nextVersion(): number;
   nextSynchronizationId(): number;
   evidenceRevision: number;
-  incrementalSync: boolean;
+  documentSync: NormalizedDocumentSync;
   waiters: DiagnosticWaitRegistry;
   sendNotification: NotificationSender;
   markUnversionedSyncMoment?(): void;
@@ -117,7 +174,7 @@ export function synchronizeTrackedDocument(options: {
     version: options.nextVersion(),
     synchronizationId: options.nextSynchronizationId(),
     evidenceRevision: options.evidenceRevision,
-    incrementalSync: options.incrementalSync,
+    documentSync: options.documentSync,
     waiters: options.waiters,
     sendNotification: options.sendNotification,
   });
@@ -130,11 +187,13 @@ interface ResynchronizeDocumentsOptions {
   nextVersion(uri: string): number;
   nextSynchronizationId(): number;
   evidenceRevision: number;
+  documentSync: NormalizedDocumentSync;
   /** Invalidate route evidence before the first changed document is applied. */
   noteInputContentChange(): number;
-  /** Record the verified disk content in the shared semantic barrier. */
-  observeDiskContent(uri: string, content: string): void;
-  incrementalSync: boolean;
+  /** Record the verified disk content and report whether its baseline changed. */
+  observeDiskContent(uri: string, content: string): boolean;
+  /** Send one save for an externally observed disk change. */
+  noteExternalDiskChange(uri: string, content: string): void;
   sendNotification: NotificationSender;
   uriToFile(uri: string): string;
   /** Disk content already read by classification; avoids a second read. */
@@ -155,6 +214,17 @@ export interface ResynchronizeDocumentsResult {
   removedFiles: string[];
   /** Existing tracked documents that could not be read or synchronized. */
   failedFiles: string[];
+}
+
+/** Send one save when a refresh observes a new disk fingerprint. */
+function noteObservedDiskChange(
+  options: ResynchronizeDocumentsOptions,
+  uri: string,
+  content: string,
+): void {
+  if (options.observeDiskContent(uri, content)) {
+    options.noteExternalDiskChange(uri, content);
+  }
 }
 
 /** Re-read and synchronize every existing open document. */
@@ -185,7 +255,7 @@ export function resynchronizeOpenDocuments(
           version: options.nextVersion(uri),
           synchronizationId: options.nextSynchronizationId(),
           evidenceRevision: synchronizationRevision,
-          incrementalSync: options.incrementalSync,
+          documentSync: options.documentSync,
           waiters: options.waiters,
           sendNotification: options.sendNotification,
         });
@@ -200,7 +270,7 @@ export function resynchronizeOpenDocuments(
           waiters: options.waiters,
         });
       }
-      options.observeDiskContent(uri, content);
+      noteObservedDiskChange(options, uri, content);
       options.clearFailedFile(uri);
       synchronizedUris.add(uri);
       if (contentChanged) resynchronizedUris.add(uri);

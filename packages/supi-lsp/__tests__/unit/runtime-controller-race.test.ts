@@ -1,5 +1,6 @@
 import { WorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createAutomaticLspPathPolicy } from "../../src/workspace-path-policy.ts";
 
 const mocks = vi.hoisted(() => ({
   clearRuntime: vi.fn(),
@@ -14,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../src/config/config.ts", () => ({
+  getExplicitlyDisabledLanguages: vi.fn().mockReturnValue([]),
   loadConfig: vi.fn().mockReturnValue({
     servers: {
       typescript: {
@@ -23,9 +25,6 @@ vi.mock("../../src/config/config.ts", () => ({
       },
     },
   }),
-}));
-vi.mock("../../src/config/lsp-settings.ts", () => ({
-  loadLspSettings: vi.fn().mockReturnValue({ exclude: [] }),
 }));
 vi.mock("../../src/config/tsconfig-scope.ts", () => ({ clearTsconfigCache: vi.fn() }));
 vi.mock("../../src/diagnostics/workspace-sentinels.ts", () => ({
@@ -77,7 +76,9 @@ describe("LspRuntimeController warm-up ownership", () => {
     };
     mocks.createOwner.mockReturnValueOnce(owner);
 
-    const controller = new LspRuntimeController("/project", new WorkspaceRuntime());
+    const controller = new LspRuntimeController("/project", new WorkspaceRuntime(), {
+      automaticPathPolicy: createAutomaticLspPathPolicy("/project", []),
+    });
     const result = await controller.start();
 
     expect(result.kind).toBe("ready");
@@ -103,7 +104,9 @@ describe("LspRuntimeController warm-up ownership", () => {
     };
     mocks.createOwner.mockReturnValueOnce(firstOwner).mockReturnValueOnce(secondOwner);
 
-    const controller = new LspRuntimeController("/project", new WorkspaceRuntime());
+    const controller = new LspRuntimeController("/project", new WorkspaceRuntime(), {
+      automaticPathPolicy: createAutomaticLspPathPolicy("/project", []),
+    });
     await controller.start();
     await controller.start();
 

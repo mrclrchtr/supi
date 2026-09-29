@@ -9,6 +9,7 @@ export function registerLspSessionLifecycle(
   pi: ExtensionAPI,
   state: LspAdapterState,
   onStarted?: (ctx: ExtensionContext) => void | Promise<void>,
+  homeDir?: string,
 ): void {
   let disposeLifecycle: (() => void) | null = null;
   let subscriptionGeneration = 0;
@@ -49,6 +50,7 @@ export function registerLspSessionLifecycle(
 
     const lease = await acquireWorkspaceProviderHost(ctx.cwd, {
       projectTrusted: ctx.isProjectTrusted(),
+      homeDir,
     });
     state.providerLease = lease;
     state.controller = lease.lspController;

@@ -36,8 +36,20 @@ function normalizeCodeAction(
   const action = asRecord(value);
   if (
     !action ||
+    !Object.hasOwn(action, "title") ||
     typeof action.title !== "string" ||
+    action.title.trim().length === 0 ||
     !hasOnlyKeys(action, [
+      "title",
+      "kind",
+      "diagnostics",
+      "isPreferred",
+      "disabled",
+      "edit",
+      "command",
+      "data",
+    ]) ||
+    !hasNoInheritedAllowedKeys(action, [
       "title",
       "kind",
       "diagnostics",
@@ -51,6 +63,18 @@ function normalizeCodeAction(
     return { kind: "unavailable", reason: "LSP server returned a malformed code action." };
   }
   const title = action.title;
+  if (
+    Object.hasOwn(action, "kind") &&
+    (typeof action.kind !== "string" || action.kind.trim().length === 0)
+  ) {
+    return { kind: "unavailable", reason: `Code action "${title}" has a malformed kind.` };
+  }
+  if (Object.hasOwn(action, "diagnostics") && !Array.isArray(action.diagnostics)) {
+    return { kind: "unavailable", reason: `Code action "${title}" has malformed diagnostics.` };
+  }
+  if (Object.hasOwn(action, "isPreferred") && typeof action.isPreferred !== "boolean") {
+    return { kind: "unavailable", reason: `Code action "${title}" has a malformed preference.` };
+  }
   if (Object.hasOwn(action, "disabled")) {
     return { kind: "unavailable", reason: `Code action "${title}" is disabled.` };
   }
@@ -82,7 +106,8 @@ function normalizeWorkspaceEdit(
   const workspaceEdit = asRecord(value);
   if (
     !workspaceEdit ||
-    !hasOnlyKeys(workspaceEdit, ["changes", "documentChanges", "changeAnnotations"])
+    !hasOnlyKeys(workspaceEdit, ["changes", "documentChanges", "changeAnnotations"]) ||
+    !hasNoInheritedAllowedKeys(workspaceEdit, ["changes", "documentChanges", "changeAnnotations"])
   ) {
     return { kind: "unavailable", reason: "LSP server returned a malformed workspace edit." };
   }
@@ -92,7 +117,8 @@ function normalizeWorkspaceEdit(
       reason: "Workspace edit contains unsupported change annotations.",
     };
   }
-  return Object.hasOwn(workspaceEdit, "documentChanges")
+  const hasDocumentChanges = Object.hasOwn(workspaceEdit, "documentChanges");
+  return hasDocumentChanges
     ? normalizeDocumentChanges(workspaceEdit.documentChanges, context)
     : normalizeChanges(workspaceEdit.changes, context);
 }
@@ -165,7 +191,7 @@ function normalizeDocumentChange(
   if (!file) {
     return { kind: "unavailable", reason: "Document change does not contain a valid file URI." };
   }
-  if (!("version" in textDocument)) {
+  if (!Object.hasOwn(textDocument, "version")) {
     return { kind: "unavailable", reason: "Document change does not contain a version." };
   }
   const precondition = establishPrecondition(file, textDocument.version, context);
@@ -185,9 +211,14 @@ function parseTextDocumentEdit(edit: Record<string, unknown> | null): {
   const textDocument = asRecord(edit?.textDocument);
   if (
     !edit ||
+    !Object.hasOwn(edit, "textDocument") ||
+    !Object.hasOwn(edit, "edits") ||
     !hasOnlyKeys(edit, ["textDocument", "edits"]) ||
+    !hasNoInheritedAllowedKeys(edit, ["textDocument", "edits"]) ||
     !textDocument ||
+    !Object.hasOwn(textDocument, "uri") ||
     !hasOnlyKeys(textDocument, ["uri", "version"]) ||
+    !hasNoInheritedAllowedKeys(textDocument, ["uri", "version"]) ||
     !Array.isArray(edit.edits)
   ) {
     return null;
@@ -245,9 +276,15 @@ function normalizeTextEdits(
     const end = asPosition(range?.end);
     if (
       !textEdit ||
+      !Object.hasOwn(textEdit, "range") ||
+      !Object.hasOwn(textEdit, "newText") ||
       !hasOnlyKeys(textEdit, ["range", "newText"]) ||
+      !hasNoInheritedAllowedKeys(textEdit, ["range", "newText", "snippet", "annotationId"]) ||
       !range ||
+      !Object.hasOwn(range, "start") ||
+      !Object.hasOwn(range, "end") ||
       !hasOnlyKeys(range, ["start", "end"]) ||
+      !hasNoInheritedAllowedKeys(range, ["start", "end"]) ||
       !start ||
       !end ||
       isBefore(end, start) ||
@@ -285,6 +322,13 @@ function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[])
   return Object.keys(value).every((key) => allowedKeys.has(key));
 }
 
+function hasNoInheritedAllowedKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+): boolean {
+  return allowed.every((key) => !(key in value) || Object.hasOwn(value, key));
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -294,6 +338,8 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 function asPosition(value: unknown): { line: number; character: number } | null {
   const position = asRecord(value);
   return position &&
+    Object.hasOwn(position, "line") &&
+    Object.hasOwn(position, "character") &&
     hasOnlyKeys(position, ["line", "character"]) &&
     Number.isInteger(position.line) &&
     (position.line as number) >= 0 &&

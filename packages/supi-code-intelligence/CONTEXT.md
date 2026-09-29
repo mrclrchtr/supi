@@ -14,6 +14,10 @@ _Avoid_: code intel, IDE features
 An optional, bounded first-turn snapshot of manifest-declared package topology, one-line descriptions, entrypoints, and detected languages. It contains manifest facts as untrusted evidence and points to the Orientation surface when facts are omitted.
 _Avoid_: architecture overview, complete project context, trusted instructions
 
+**Automatic code-intelligence exclusion**:
+A configured path rule that omits a path from automatic LSP work and broad AST searches. Explicit fixture inspection remains available; the rule is not an access restriction.
+_Avoid_: access denial, hidden source, LSP-only exclusion
+
 **Orientation surface**:
 The code-intelligence surface that helps an agent establish directly observed workspace, package, directory, file, or target facts before choosing more surgical tools.
 _Avoid_: context bundle, relation graph, treating orientation as target analysis

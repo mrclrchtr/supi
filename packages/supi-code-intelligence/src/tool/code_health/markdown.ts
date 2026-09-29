@@ -1,6 +1,7 @@
 /** Markdown renderer for code_health results. */
 import type { CapabilityWarningReport } from "../../analysis/capability/capability-warnings.ts";
 import {
+  formatProjectServerOperationSupport,
   formatProjectServerRoot,
   formatProjectServerRouteSummary,
   formatProjectServerStatusReason,
@@ -381,6 +382,8 @@ function renderServersSection(
       lines.push(
         `- ${statusIcon} **${server.name}** @ \`${formatProjectServerRoot(cwd, server.root)}\` (${server.fileTypes.join(", ")}) — ${server.status}${reason}`,
       );
+      const operationSupport = formatProjectServerOperationSupport(server.operationSupport);
+      if (operationSupport) lines.push(`  - ${operationSupport}`);
     }
   }
   lines.push("");

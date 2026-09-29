@@ -1,5 +1,9 @@
 import * as path from "node:path";
-import type { ProjectServerInfo, ProjectServerStatusReason } from "@mrclrchtr/supi-lsp/api";
+import type {
+  ProjectServerInfo,
+  ProjectServerStatusReason,
+  ServerOperationSupportMap,
+} from "@mrclrchtr/supi-lsp/api";
 
 /** Workspace-wide counts for non-running LSP routes. */
 export interface ProjectServerRouteStatusCounts {
@@ -61,4 +65,22 @@ export function formatProjectServerStatusReason(
     default:
       return null;
   }
+}
+
+/** Render operation support without hiding server limits or SuPi limits. */
+export function formatProjectServerOperationSupport(
+  support: ServerOperationSupportMap | undefined,
+): string | null {
+  if (!support) return null;
+  const entries = Object.entries(support).flatMap(([operation, value]) => {
+    const details: string[] = [];
+    if (value.server === "not-advertised") details.push("server unsupported");
+    if (value.server === "unknown") details.push("not negotiated");
+    if (value.supi === "limited") {
+      details.push(`SuPi limitation${value.reason ? `: ${value.reason}` : ""}`);
+    }
+    if (value.supi === "unsupported") details.push("SuPi unsupported");
+    return details.length > 0 ? [`${operation}: ${details.join("; ")}`] : [];
+  });
+  return entries.length > 0 ? `operation support: ${entries.join(", ")}` : null;
 }

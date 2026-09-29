@@ -8,8 +8,9 @@ import * as path from "node:path";
 import type { CodeQueryResult } from "@mrclrchtr/supi-code-runtime/api";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LspClient } from "../../src/client/client.ts";
-import type { Diagnostic, ServerConfig } from "../../src/config/types.ts";
+import type { CodeAction, Diagnostic, ServerConfig } from "../../src/config/types.ts";
 import { createLspSemanticProvider } from "../../src/provider/lsp-semantic-provider.ts";
+import { normalizeSemanticEdit } from "../../src/provider/semantic-edit-normalizer.ts";
 import type { WorkspaceLspRuntime } from "../../src/session/runtime-registry.ts";
 import { hasCommand, waitFor } from "../helpers/integration-utils.ts";
 
@@ -57,7 +58,13 @@ beforeAll(() => {
   fs.writeFileSync(
     path.join(tmpDir, "tsconfig.json"),
     JSON.stringify({
-      compilerOptions: { strict: true, noEmit: true, target: "ES2022", module: "ESNext" },
+      compilerOptions: {
+        strict: true,
+        noEmit: true,
+        noUnusedLocals: true,
+        target: "ES2022",
+        module: "ESNext",
+      },
       include: ["*.ts"],
     }),
   );
@@ -216,6 +223,49 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
     // May or may not have actions — just verify no crash
     expect(actions === null || Array.isArray(actions)).toBe(true);
   }, 10_000);
+
+  it("normalizes the real TypeScript organize-imports action", async () => {
+    const file = path.join(tmpDir, "organize.ts");
+    fs.writeFileSync(path.join(tmpDir, "unused.ts"), "export const unused = 1;\n");
+    const content =
+      'import { add } from "./good";\nimport { unused } from "./unused";\nexport const value = 1;\n';
+    fs.writeFileSync(file, content);
+    client.didOpen(file, content);
+
+    const result = await waitFor(
+      () =>
+        client.codeActionsDetailed(
+          file,
+          { start: { line: 0, character: 0 }, end: { line: 2, character: 0 } },
+          { diagnostics: [], only: ["source.organizeImports"] },
+        ),
+      (candidate) =>
+        candidate.kind === "completed" &&
+        candidate.data !== null &&
+        candidate.data.some(
+          (action) => action.kind?.startsWith("source.organizeImports") && action.edit,
+        ),
+      { timeoutMs: 10_000, retryDelayMs: 100, label: "TypeScript organize-imports action" },
+    );
+
+    expect(result.kind).toBe("completed");
+    if (result.kind !== "completed" || result.data === null) return;
+    const action = result.data.find(
+      (candidate): candidate is CodeAction =>
+        candidate.kind?.startsWith("source.organizeImports") === true &&
+        candidate.edit !== undefined,
+    );
+    expect(action).toBeDefined();
+    const plan = normalizeSemanticEdit(
+      { kind: "code-action", action },
+      {
+        getOpenDocumentVersion: (candidate) => client.getOpenDocumentVersion(candidate),
+        authorizedMutationRoots: [tmpDir],
+      },
+    );
+    expect(plan.kind).toBe("precise");
+    if (plan.kind === "precise") expect(plan.edits.edits.length).toBeGreaterThan(0);
+  }, 20_000);
 
   it("returns workspace symbols for exact match", async () => {
     const symbols = await client.workspaceSymbol("add");

@@ -151,6 +151,7 @@ export interface CustomField extends BaseField {
     cwd: string,
     action: SettingsAction,
     helpers: ConfigHelpers,
+    ctx?: ExtensionContext,
   ) => void | Promise<void>;
 }
 
@@ -404,7 +405,7 @@ async function applyConfigAction(
   const helpers = createConfigHelpers(options.section, scope, cwd, options.homeDir);
   let storedValue: unknown;
   if (field.kind === "custom") {
-    await field.persist(scope, cwd, action, helpers);
+    await field.persist(scope, cwd, action, helpers, ctx);
     storedValue = action.kind === "set" ? action.value : undefined;
   } else if (action.kind === "set") {
     storedValue = parseTypedValue(action.value, field);

@@ -29,6 +29,7 @@ export default function headlessInspectionProfile(pi: ExtensionAPI): void {
     session.attachLspController(lspState.controller);
     session.seedSentinelSnapshot(lspState.sentinelSnapshot);
     session.setProjectTrusted(ctx.isProjectTrusted());
+    session.setAutomaticPathPolicy(lspState.providerLease?.automaticPathPolicy ?? null);
   });
   pi.on("session_shutdown", () => sessions.clear());
 

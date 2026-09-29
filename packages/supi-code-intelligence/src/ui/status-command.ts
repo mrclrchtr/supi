@@ -4,8 +4,13 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import { getWorkspaceLspRuntime, type WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import {
+  type AutomaticLspPathPolicy,
+  getWorkspaceLspRuntime,
+  type WorkspaceLspRuntimeState,
+} from "@mrclrchtr/supi-lsp/api";
+import {
+  type CapabilityWarningMissingServerSource,
   evaluateCapabilityWarnings,
   gatherCapabilityWarningInput,
 } from "../analysis/capability/capability-warnings.ts";
@@ -20,8 +25,20 @@ interface InspectorState {
   close: (() => void) | null;
 }
 
+/** Owned LSP facts used by the status warning collector. */
+export interface CiStatusWarningSource {
+  get(cwd: string): {
+    lspController: CapabilityWarningMissingServerSource | null;
+    automaticPathPolicy: AutomaticLspPathPolicy | null;
+  };
+}
+
 /** Register the interactive /supi-ci-status overlay command. */
-export function registerCiStatusCommand(pi: ExtensionAPI): void {
+export function registerCiStatusCommand(
+  pi: ExtensionAPI,
+  homeDir?: string,
+  warningSource?: CiStatusWarningSource,
+): void {
   const inspector: InspectorState = { handle: null, close: null };
   pi.registerCommand("supi-ci-status", {
     description: "Toggle code intelligence status — LSP and structural analysis state",
@@ -31,7 +48,15 @@ export function registerCiStatusCommand(pi: ExtensionAPI): void {
         return;
       }
 
-      const dataRef = { current: await gatherCiStatusData(ctx.cwd, pi) };
+      const dataRef = {
+        current: await gatherCiStatusData({
+          cwd: ctx.cwd,
+          pi,
+          projectTrusted: ctx.isProjectTrusted(),
+          homeDir,
+          warningSource,
+        }),
+      };
       updateStatusAndWidget(ctx, dataRef.current);
 
       // Custom footer while overlay is open — reads latest data via ref
@@ -56,7 +81,13 @@ export function registerCiStatusCommand(pi: ExtensionAPI): void {
                 return lspState.runtime.getOutstandingDiagnostics(maxSeverity).entries;
               },
               onRefresh: async () => {
-                const fresh = await gatherCiStatusData(ctx.cwd, pi);
+                const fresh = await gatherCiStatusData({
+                  cwd: ctx.cwd,
+                  pi,
+                  projectTrusted: ctx.isProjectTrusted(),
+                  homeDir,
+                  warningSource,
+                });
                 dataRef.current = fresh;
                 updateStatusAndWidget(ctx, fresh);
                 return fresh;
@@ -87,8 +118,18 @@ export function registerCiStatusCommand(pi: ExtensionAPI): void {
   });
 }
 
+/** Inputs for one status dialog snapshot. */
+interface GatherCiStatusOptions {
+  cwd: string;
+  pi: ExtensionAPI;
+  projectTrusted: boolean;
+  homeDir?: string;
+  warningSource?: CiStatusWarningSource;
+}
+
 /** Gather a snapshot of LSP and structural state for the dialog. */
-async function gatherCiStatusData(cwd: string, pi: ExtensionAPI): Promise<CiStatusData> {
+async function gatherCiStatusData(options: GatherCiStatusOptions): Promise<CiStatusData> {
+  const { cwd, pi, projectTrusted, homeDir, warningSource } = options;
   const workspace = getDefaultWorkspaceRuntime().getWorkspace(cwd);
   const lspState = getWorkspaceLspRuntime(cwd);
   const serverInventoryAvailable = lspState.kind === "ready" || lspState.kind === "disabled";
@@ -118,7 +159,14 @@ async function gatherCiStatusData(cwd: string, pi: ExtensionAPI): Promise<CiStat
   const activeTools = pi.getActiveTools().filter((t) => t.startsWith("code_"));
 
   // Evaluate current Capability Warnings from available data.
-  const capabilityWarnings = evaluateCapabilityWarnings(gatherCapabilityWarningInput(cwd, null));
+  const warningFacts = warningSource?.get(cwd);
+  const capabilityWarnings = evaluateCapabilityWarnings(
+    gatherCapabilityWarningInput(cwd, warningFacts?.lspController ?? null, {
+      projectTrusted,
+      homeDir,
+      automaticPathPolicy: warningFacts?.automaticPathPolicy ?? undefined,
+    }),
+  );
 
   return {
     workspaceRoot: cwd,

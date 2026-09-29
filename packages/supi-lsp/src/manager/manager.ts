@@ -1938,6 +1938,10 @@ export class LspManager {
         { policy: this.automaticPathPolicy },
       )[0];
       if (target) await this.warmSemanticProject(firstReady, target.file, false, control);
+      // The warm-up request can start server indexing after the initial
+      // readiness wait resolves. Observe the resulting progress before
+      // reporting the workspace as ready.
+      await firstReady.getReady(control);
     }
 
     throwIfCodeRequestInterrupted(control);
@@ -2124,6 +2128,23 @@ export class LspManager {
     if (changes.length > 0) this.invalidationEpoch++;
     invalidateProjectConfigCaches(changes);
     this.notifyWorkspaceFileChanges(changes);
+  }
+
+  /** Synchronize tracked files after successful writes and send requested saves. */
+  noteWorkspaceWrites(changes: FileEvent[]): void {
+    if (changes.length === 0) return;
+    this.noteWorkspaceChanges(changes);
+
+    const writtenFiles = [
+      ...new Set(
+        changes
+          .filter((change) => change.type === FileChangeType.Changed)
+          .map((change) => uriToFile(change.uri)),
+      ),
+    ];
+    for (const client of this.clients.values()) {
+      for (const filePath of writtenFiles) client.noteWorkspaceWrite(filePath);
+    }
   }
 
   /** Return per-route diagnostic evidence capability for recovery targeting. */
@@ -2630,8 +2651,8 @@ export class LspManager {
           : null,
       control,
     );
-    const collect = async (clients: Iterable<LspClient>, value: string) =>
-      this.addWorkspaceSymbolDemandEvidence(
+    const collect = async (clients: Iterable<LspClient>, value: string) => {
+      const collection = this.addWorkspaceSymbolDemandEvidence(
         await collectWorkspaceSymbols(
           Array.from(clients).filter((client) => routeMatches(client)),
           value,
@@ -2639,6 +2660,8 @@ export class LspManager {
         ),
         demand,
       );
+      return this.filterWorkspaceSymbolCollection(collection, resolvedScopes);
+    };
     const initial = await collect(this.clients.values(), query);
     if (!initial.hasSupport || initial.results.length > 0) {
       return workspaceSymbolCollectionResult(initial);
@@ -2667,6 +2690,53 @@ export class LspManager {
       hasSupport: collection.hasSupport || demand.hasSupport,
       failures: [...collection.failures, ...demand.failures],
     };
+  }
+
+  private filterWorkspaceSymbolCollection(
+    collection: WorkspaceSymbolCollection,
+    scopes: readonly string[] | undefined,
+  ): WorkspaceSymbolCollection {
+    const excludedExamples: string[] = [];
+    let excludedCount = 0;
+    const results = collection.results.filter((result) => {
+      const file = uriToFile(result.location.uri);
+      if (this.isWorkspaceSymbolResultAllowed(file, scopes)) return true;
+      excludedCount++;
+      if (excludedExamples.length < 5) {
+        excludedExamples.push(displayRelativeFilePath(file, this.cwd));
+      }
+      return false;
+    });
+    return {
+      ...collection,
+      results,
+      excludedCount: (collection.excludedCount ?? 0) + excludedCount,
+      excludedExamples: [...(collection.excludedExamples ?? []), ...excludedExamples].slice(0, 5),
+    };
+  }
+
+  /** Keep explicitly selected excluded scopes inspectable while filtering broad results. */
+  private isWorkspaceSymbolResultAllowed(
+    filePath: string,
+    scopes: readonly string[] | undefined,
+  ): boolean {
+    if (this.automaticPathPolicy.isEligible(filePath, "file")) return true;
+    if (!scopes || scopes.length === 0) return false;
+
+    const resolvedFile = path.resolve(filePath);
+    return scopes.some((scope) => {
+      const resolvedScope = path.resolve(scope);
+      if (resolvedScope === resolvedFile) return true;
+      try {
+        if (!fs.statSync(resolvedScope).isDirectory()) return false;
+      } catch {
+        return false;
+      }
+      return (
+        !this.automaticPathPolicy.isEligible(resolvedScope, "directory") &&
+        projectRoots.isWithinOrEqual(resolvedScope, resolvedFile)
+      );
+    });
   }
 
   private hasWorkspaceSymbolRouteForScopes(scopes: readonly string[]): boolean {

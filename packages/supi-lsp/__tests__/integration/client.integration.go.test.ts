@@ -42,7 +42,7 @@ let tmpDir: string;
 let badFile: string;
 
 beforeAll(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-go-integration-"));
+  tmpDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "lsp-go-integration-")));
 
   fs.writeFileSync(path.join(tmpDir, "go.mod"), "module goplsintegration\n\ngo 1.22\n");
 
@@ -82,20 +82,31 @@ describe.skipIf(!HAS_GOPLS)("LspClient integration (gopls push default)", () => 
   it("handles one or more valid push publications without pull requests", async () => {
     const content = fs.readFileSync(badFile, "utf-8");
     // The system gopls version can publish once or publish later for one
-    // synchronization. Ambient publications stay observational, so this
-    // push-only result cannot be completed.
-    const result = await client.syncAndWaitForDiagnostics(badFile, content);
+    // synchronization; ambient publications stay observational, so this
+    // push-only result cannot be completed. Wait for the expected publication
+    // instead of assuming it arrives during the first 3s collection budget.
+    const result = await waitFor(
+      () => client.syncAndWaitForDiagnostics(badFile, content),
+      (diagnostics) =>
+        diagnostics.kind !== "unavailable" &&
+        diagnostics.data.some((diagnostic: Diagnostic) => diagnostic.severity === 1),
+      {
+        timeoutMs: 15_000,
+        retryDelayMs: 200,
+        label: "non-empty gopls push diagnostics for main.go",
+      },
+    );
     if (result.kind === "completed") {
       expect.fail("Push-only diagnostics must not be completed.");
-    } else if (result.kind === "partial") {
-      const typeErrors = result.data.filter((diagnostic: Diagnostic) => diagnostic.severity === 1);
-      expect(typeErrors.length).toBeGreaterThan(0);
-    } else {
-      expect(result.reason).toContain("ambient evidence");
-      const retained = client.getDiagnostics(badFile);
-      expect(retained.length).toBeGreaterThan(0);
-      expect(retained.some((diagnostic: Diagnostic) => diagnostic.severity === 1)).toBe(true);
     }
+    if (result.kind !== "partial") {
+      throw new Error(
+        `Expected observed ambient push diagnostics, got ${result.kind}: ${result.reason}`,
+      );
+    }
+    expect(result.reason).toContain("ambient evidence");
+    const typeErrors = result.data.filter((diagnostic: Diagnostic) => diagnostic.severity === 1);
+    expect(typeErrors.length).toBeGreaterThan(0);
   }, 30_000);
 });
 

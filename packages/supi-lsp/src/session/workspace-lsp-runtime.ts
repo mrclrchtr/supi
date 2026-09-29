@@ -1,6 +1,7 @@
 import type { CodeQueryResult, CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import type {
   CodeAction,
+  CodeActionContext,
   DocumentSymbol,
   FileEvent,
   Hover,
@@ -61,6 +62,16 @@ export interface RoutedMutationResponse<T> {
   readonly value: T;
   /** Roots that the routed client owns for this mutation response. */
   readonly authorizedMutationRoots: readonly string[];
+  /** Honest reason when the routed server could not provide the operation. */
+  readonly reason?: string;
+}
+
+/** Extra protocol context for one explicit code-action request. */
+export interface WorkspaceCodeActionRequestOptions {
+  /** Operation-specific CodeActionKind filters. */
+  readonly only?: readonly string[];
+  /** Explicit requests use Invoked; automatic callers may select another kind. */
+  readonly triggerKind?: CodeActionContext["triggerKind"];
 }
 
 /** Outcome for one path selected by a bounded automatic tracking batch. */
@@ -134,6 +145,7 @@ export interface WorkspaceLspRuntime extends WorkspaceLspDiagnosticSurface {
     filePath: string,
     positionOrRange: Position | Range,
     control?: CodeRequestControl,
+    options?: WorkspaceCodeActionRequestOptions,
   ): Promise<RoutedMutationResponse<CodeAction[] | null> | null>;
   getOpenDocumentVersion(filePath: string): number | null;
   /**
@@ -173,4 +185,6 @@ export interface WorkspaceLspRuntime extends WorkspaceLspDiagnosticSurface {
   closeFile(filePath: string): void;
   pruneMissingFiles(): readonly string[];
   noteWorkspaceChanges(changes: FileEvent[]): void;
+  /** Synchronize tracked files after successful writes and send requested saves. */
+  noteWorkspaceWrites(changes: FileEvent[]): void;
 }

@@ -15,6 +15,7 @@ import {
 } from "@mrclrchtr/supi-core/debug";
 import { resolveToolPath as resolveSessionPath } from "@mrclrchtr/supi-core/path";
 import { createSessionStateRegistry } from "@mrclrchtr/supi-core/session";
+import { CodeActionTriggerKind } from "vscode-languageserver-types";
 import type {
   CodeAction,
   Diagnostic,
@@ -47,6 +48,7 @@ import type {
   BulkTrackFilesResult,
   RoutedMutationResponse,
   SemanticReadinessResult,
+  WorkspaceCodeActionRequestOptions,
   WorkspaceLspRuntime,
   WorkspaceLspRuntimeState,
 } from "./workspace-lsp-runtime.ts";
@@ -81,12 +83,18 @@ export type {
   BulkTrackFilesResult,
   RoutedMutationResponse,
   SemanticReadinessResult,
+  WorkspaceCodeActionRequestOptions,
   WorkspaceLspRuntime,
   WorkspaceLspRuntimeState,
 } from "./workspace-lsp-runtime.ts";
 
 function isRange(value: Position | Range): value is Range {
-  return "start" in value && "end" in value;
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Object.hasOwn(value, "start") &&
+    Object.hasOwn(value, "end")
+  );
 }
 
 function unavailableFileQuery<T>(operation: string, file: string): CodeQueryResult<T> {
@@ -234,6 +242,18 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       control,
     });
     if (!client) return null;
+    if (typeof client.renameDetailed === "function") {
+      const result = await client.renameDetailed(resolvedPath, position, newName, control);
+      return {
+        value: result.kind === "completed" ? result.data : null,
+        authorizedMutationRoots: [client.root],
+        ...(result.kind === "unavailable"
+          ? { reason: result.reason }
+          : result.data === null
+            ? { reason: "LSP server returned no workspace edit." }
+            : {}),
+      };
+    }
     return {
       value: await client.rename(resolvedPath, position, newName, control),
       authorizedMutationRoots: [client.root],
@@ -248,6 +268,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     filePath: string,
     positionOrRange: Position | Range,
     control?: CodeRequestControl,
+    options?: WorkspaceCodeActionRequestOptions,
   ): Promise<RoutedMutationResponse<CodeAction[] | null> | null> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath, {
@@ -264,8 +285,25 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       .filter((diagnostic) => diagnostic.range.end.line >= range.start.line)
       .filter((diagnostic) => diagnostic.range.start.line <= range.end.line);
 
+    const context = {
+      diagnostics,
+      triggerKind: options?.triggerKind ?? CodeActionTriggerKind.Invoked,
+      ...(options?.only ? { only: [...options.only] } : {}),
+    };
+    if (typeof client.codeActionsDetailed === "function") {
+      const result = await client.codeActionsDetailed(resolvedPath, range, context, control);
+      return {
+        value: result.kind === "completed" ? result.data : null,
+        authorizedMutationRoots: [client.root],
+        ...(result.kind === "unavailable"
+          ? { reason: result.reason }
+          : result.data === null
+            ? { reason: "LSP server returned no code actions." }
+            : {}),
+      };
+    }
     return {
-      value: await client.codeActions(resolvedPath, range, { diagnostics }, control),
+      value: await client.codeActions(resolvedPath, range, context, control),
       authorizedMutationRoots: [client.root],
     };
   }
@@ -408,6 +446,12 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   noteWorkspaceChanges(changes: FileEvent[]): void {
     this.manager.clearAllPullResultIds();
     this.manager.noteWorkspaceChanges(changes);
+  }
+
+  /** Synchronize tracked files after successful writes and send requested saves. */
+  noteWorkspaceWrites(changes: FileEvent[]): void {
+    this.manager.clearAllPullResultIds();
+    this.manager.noteWorkspaceWrites(changes);
   }
 
   async #shutdown(): Promise<void> {

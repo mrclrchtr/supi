@@ -57,24 +57,43 @@ export default function codeIntelligenceExtension(
   const lspState = createLspAdapterState();
 
   registerCodeIntelligenceSettings(pi, homeDir);
-  registerLspSettings(pi);
-  registerLspSessionLifecycle(pi, lspState, (ctx) => {
-    const session = app.getSession(ctx.cwd);
-    if (!session) return;
-    session.attachLspController(lspState.controller);
-    session.seedSentinelSnapshot(lspState.sentinelSnapshot);
-    session.setProjectTrusted(ctx.isProjectTrusted());
-    session.setHomeDir(homeDir);
-  });
+  registerLspSettings(pi, homeDir);
+  registerLspSessionLifecycle(
+    pi,
+    lspState,
+    (ctx) => {
+      const session = app.getSession(ctx.cwd);
+      if (!session) return;
+      session.attachLspController(lspState.controller);
+      session.seedSentinelSnapshot(lspState.sentinelSnapshot);
+      session.setProjectTrusted(ctx.isProjectTrusted());
+      session.setHomeDir(homeDir);
+      session.setAutomaticPathPolicy(lspState.providerLease?.automaticPathPolicy ?? null);
+    },
+    homeDir,
+  );
   registerWorkspaceRecoveryHandler(pi, lspState);
 
   registerCodeIntelligenceTools(pi, (cwd) => {
     const session = getOrCreateSession?.(cwd) ?? app.getSession(cwd) ?? app.createSession(cwd);
+    const lease = lspState.providerLease;
+    if (lease?.cwd === cwd) {
+      session.attachLspController(lspState.controller);
+      session.setAutomaticPathPolicy(lease.automaticPathPolicy);
+    }
     session.setHomeDir(homeDir);
     return session;
   });
 
-  registerCiStatusCommand(pi);
+  registerCiStatusCommand(pi, homeDir, {
+    get: (cwd) =>
+      lspState.providerLease?.cwd === cwd
+        ? {
+            lspController: lspState.controller,
+            automaticPathPolicy: lspState.providerLease.automaticPathPolicy,
+          }
+        : { lspController: null, automaticPathPolicy: null },
+  });
   const lspFooter = registerLspFooterContribution(pi, lspState);
 
   pi.on("session_shutdown", () => {

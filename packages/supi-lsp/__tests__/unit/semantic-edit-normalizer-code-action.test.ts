@@ -67,6 +67,21 @@ describe("semantic code action normalization", () => {
       reason: "malformed",
     },
     {
+      name: "malformed action kind",
+      action: { title: "Extract function", kind: 1, edit },
+      reason: "malformed kind",
+    },
+    {
+      name: "malformed action preference",
+      action: { title: "Extract function", isPreferred: "yes", edit },
+      reason: "malformed preference",
+    },
+    {
+      name: "empty action title",
+      action: { title: "  ", edit },
+      reason: "malformed",
+    },
+    {
       name: "unsupported protocol member",
       action: { title: "Extract function", edit, tags: [1] },
       reason: "malformed",

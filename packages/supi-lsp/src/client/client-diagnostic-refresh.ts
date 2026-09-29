@@ -289,7 +289,9 @@ interface ClientDiagnosticRefreshOptions {
   /** Invalidate route evidence before applying a disk content change. */
   readonly noteInputContentChange: () => number;
   /** Keep the shared semantic barrier's verified disk observation current. */
-  readonly observeDiskContent: (uri: string, content: string) => void;
+  readonly observeDiskContent: (uri: string, content: string) => boolean;
+  /** Send one save for an externally observed disk change. */
+  readonly noteExternalDiskChange: (uri: string, content: string) => void;
   readonly clearFile: (uri: string) => void;
   readonly invalidateEvidence: (uri: string) => void;
   readonly markUnversionedSyncMoment: (uri: string) => void;
@@ -343,9 +345,10 @@ function prepareRefreshDocuments(
     nextVersion: (uri) => nextDocumentVersion(options.versionHistory, uri),
     nextSynchronizationId: options.nextSynchronizationId,
     evidenceRevision,
+    documentSync: options.host.documentSync(),
     noteInputContentChange: options.noteInputContentChange,
     observeDiskContent: options.observeDiskContent,
-    incrementalSync: options.host.usesIncrementalDocumentSync(),
+    noteExternalDiskChange: options.noteExternalDiskChange,
     sendNotification: (method, params) => options.host.sendNotification(method, params),
     uriToFile,
     preloadedContent: classification.preloadedContent,

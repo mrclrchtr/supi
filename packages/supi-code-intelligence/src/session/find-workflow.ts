@@ -2,6 +2,7 @@
 
 import type { CodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
+import type { AutomaticLspPathPolicy } from "@mrclrchtr/supi-lsp/api";
 import { SEMANTIC_READINESS_TIMEOUT_REASON } from "../analysis/readiness.ts";
 import { resolveScopeSet } from "../analysis/search/paths.ts";
 import { getStructuredPatternMatches } from "../analysis/search/pattern.ts";
@@ -15,6 +16,8 @@ import { reportProgress, throwIfAborted, type WorkflowControl } from "./workflow
 export interface FindWorkflowDeps {
   readonly cwd: string;
   readonly capability: CapabilityAdapter;
+  /** Session-owned automatic path snapshot for broad AST work. */
+  readonly automaticPathPolicy?: AutomaticLspPathPolicy;
 }
 
 /** Search one explicit substrate without silently falling back to another mode. */
@@ -99,6 +102,7 @@ async function runSemanticSearch(options: {
       kind: "semantic",
       symbols: scopedSymbols,
       partialReason: result.kind === "partial" ? result.reason : null,
+      ...(result.kind === "partial" && result.metadata ? { partialMetadata: result.metadata } : {}),
     },
   };
 }
@@ -126,6 +130,7 @@ async function runAstSearch(options: {
     roots: scopePaths,
     cwd: deps.cwd,
     structural: provider,
+    automaticPathPolicy: deps.automaticPathPolicy,
     control: {
       operationId: control?.operationId,
       signal: control?.signal,

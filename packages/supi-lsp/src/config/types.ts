@@ -24,6 +24,7 @@ export {
   AnnotatedTextEdit,
   CodeAction,
   type CodeActionContext,
+  CodeActionTriggerKind,
   Command,
   Diagnostic,
   DiagnosticRelatedInformation,
@@ -48,10 +49,17 @@ export {
   WorkspaceEdit,
   WorkspaceSymbol,
 } from "vscode-languageserver-types";
-
+export type {
+  ServerAdvertisement,
+  ServerOperationName,
+  ServerOperationSupport,
+  ServerOperationSupportMap,
+} from "./operation-support.ts";
 // ── SuPi-specific server config ──────────────────────────────────────
 export type {
   DetectedProjectServer,
+  JsonObject,
+  JsonValue,
   LspConfig,
   MissingServer,
   ProjectServerInfo,

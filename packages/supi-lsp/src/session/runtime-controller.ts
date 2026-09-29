@@ -13,14 +13,13 @@ import {
   recordDebugEvent,
   truncateDebugIdentity as truncateIdentity,
 } from "@mrclrchtr/supi-core/debug";
-import { loadConfig } from "../config/config.ts";
-import { type LspSettings, loadLspSettings } from "../config/lsp-settings.ts";
+import { getExplicitlyDisabledLanguages, loadConfig } from "../config/config.ts";
 import { clearTsconfigCache } from "../config/tsconfig-scope.ts";
 import type { DetectedProjectServer, LspConfig, ProjectServerInfo } from "../config/types.ts";
 import { LspManager, type ManagerLifecycleTransition } from "../manager/manager.ts";
 import {
   type AutomaticLspPathPolicy,
-  createAutomaticLspPathPolicy,
+  createDefaultAutomaticLspPathPolicy,
 } from "../workspace-path-policy.ts";
 import {
   markLspCapabilitiesReady,
@@ -62,7 +61,7 @@ interface LspControllerReady {
   workspaceRuntime: WorkspaceLspRuntime;
   projectServers: ProjectServerInfo[];
   detectedServers: DetectedProjectServer[];
-  settings: LspSettings;
+  config: LspConfig;
   automaticPathPolicy: AutomaticLspPathPolicy;
 }
 
@@ -74,6 +73,16 @@ interface LspControllerDisabled {
 interface LspControllerUnavailable {
   kind: "unavailable";
   reason: string;
+}
+
+/** Options for one LSP runtime controller. */
+export interface LspRuntimeControllerOptions {
+  /** Whether project-scoped configuration is trusted. Defaults to true. */
+  readonly projectTrusted?: boolean;
+  /** Global config home, used by managed sessions and tests. */
+  readonly homeDir?: string;
+  /** A policy captured by the owning workspace host. */
+  readonly automaticPathPolicy?: AutomaticLspPathPolicy;
 }
 
 /** Result type from {@link LspRuntimeController.start}. */
@@ -129,6 +138,7 @@ function supersededStartResult(): LspStartResult {
  */
 export class LspRuntimeController {
   readonly #cwd: string;
+  readonly #options: LspRuntimeControllerOptions;
   #state: LspControllerState;
   #capabilityRuntime: WorkspaceRuntime | null;
   #activeManager: LspManager | null = null;
@@ -139,9 +149,14 @@ export class LspRuntimeController {
   readonly #lifecycleListeners = new Set<LspRuntimeTransitionListener>();
   /** Monotonic ownership token for starts, shutdowns, and manager callbacks. */
   #readinessGeneration = 0;
+  /** Explicit disablement captured with the active server configuration. */
+  #activeExplicitlyDisabledLanguages: readonly string[] = [];
+  /** Validation failure from the configuration snapshot used by automatic work. */
+  #configurationError: string | null = null;
 
-  constructor(cwd: string, runtime?: WorkspaceRuntime) {
+  constructor(cwd: string, runtime?: WorkspaceRuntime, options: LspRuntimeControllerOptions = {}) {
     this.#cwd = cwd;
+    this.#options = options;
     this.#state = { kind: "initial" };
     this.#capabilityRuntime = runtime ?? null;
   }
@@ -173,9 +188,9 @@ export class LspRuntimeController {
     return [];
   }
 
-  /** LSP settings used for this session. */
-  get settings(): LspSettings | null {
-    if (this.#state.kind === "ready") return this.#state.settings;
+  /** Automatic path policy captured for the active runtime. */
+  get automaticPathPolicy(): AutomaticLspPathPolicy | null {
+    if (this.#state.kind === "ready") return this.#state.automaticPathPolicy;
     return null;
   }
 
@@ -208,7 +223,8 @@ export class LspRuntimeController {
   /**
    * Start the LSP session for this controller's cwd.
    *
-   * Loads settings, creates the manager, starts detected servers,
+   * Loads the server configuration and one automatic path snapshot, creates
+   * the manager, starts detected servers,
    * publishes the session service, and registers capabilities.
    *
    * Always attempts detected servers unless they were explicitly disabled
@@ -224,11 +240,37 @@ export class LspRuntimeController {
     await this.cleanupExistingSession();
     if (generation !== this.#readinessGeneration) return supersededStartResult();
 
-    const lspSettings = loadLspSettings(this.#cwd);
-    const config = loadConfig(this.#cwd);
-
+    let automaticPathPolicy: AutomaticLspPathPolicy;
+    let config: LspConfig;
+    let explicitlyDisabledLanguages: string[];
     try {
-      return await this.initializeLspSession(config, lspSettings, generation);
+      automaticPathPolicy =
+        this.#options.automaticPathPolicy ??
+        createDefaultAutomaticLspPathPolicy(this.#cwd, {
+          projectTrusted: this.#options.projectTrusted,
+          homeDir: this.#options.homeDir,
+        });
+      config = loadConfig(this.#cwd, {
+        projectTrusted: this.#options.projectTrusted,
+        homeDir: this.#options.homeDir,
+      });
+      explicitlyDisabledLanguages = getExplicitlyDisabledLanguages(this.#cwd, {
+        projectTrusted: this.#options.projectTrusted,
+        homeDir: this.#options.homeDir,
+      });
+    } catch (error: unknown) {
+      this.#configurationError =
+        error instanceof Error && error.message ? error.message : String(error);
+      return this.setUnavailable(error, generation);
+    }
+    this.#configurationError = null;
+    try {
+      return await this.initializeLspSession(
+        config,
+        automaticPathPolicy,
+        explicitlyDisabledLanguages,
+        generation,
+      );
     } catch (error: unknown) {
       return this.setUnavailable(error, generation);
     }
@@ -266,6 +308,7 @@ export class LspRuntimeController {
     const reason = error instanceof Error ? error.message : String(error);
     this.#activeManager = null;
     this.#latestManagerTransition = null;
+    this.#activeExplicitlyDisabledLanguages = [];
     if (this.#capabilityRuntime) unregisterLspCapabilities(this.#capabilityRuntime, this.#cwd);
     this.#projectedSemanticReady = null;
     this.#state = { kind: "unavailable", reason };
@@ -279,15 +322,16 @@ export class LspRuntimeController {
    */
   private async initializeLspSession(
     config: LspConfig,
-    settings: LspSettings,
+    automaticPathPolicy: AutomaticLspPathPolicy,
+    explicitlyDisabledLanguages: readonly string[],
     generation: number,
   ): Promise<LspStartResult> {
     if (generation !== this.#readinessGeneration) return supersededStartResult();
     clearWorkspaceLspRuntime(this.#cwd);
+    this.#activeExplicitlyDisabledLanguages = [...explicitlyDisabledLanguages];
     if (Object.keys(config.servers).length === 0) return this.setDisabled(generation);
     this.#state = { kind: "pending" };
 
-    const automaticPathPolicy = createAutomaticLspPathPolicy(this.#cwd, settings.exclude);
     let manager: LspManager;
     manager = new LspManager(
       config,
@@ -340,7 +384,7 @@ export class LspRuntimeController {
       workspaceRuntime,
       projectServers,
       detectedServers,
-      settings,
+      config,
       automaticPathPolicy,
     };
 
@@ -438,6 +482,8 @@ export class LspRuntimeController {
     clearTsconfigCache();
     this.#activeManager = null;
     this.#latestManagerTransition = null;
+    this.#activeExplicitlyDisabledLanguages = [];
+    this.#configurationError = null;
 
     if (this.#capabilityRuntime) {
       unregisterLspCapabilities(this.#capabilityRuntime, this.#cwd);
@@ -456,10 +502,24 @@ export class LspRuntimeController {
     this.publishLifecycle("shutdown", false, []);
   }
 
+  /** Explicit language disablement captured by the active LSP session. */
+  getExplicitlyDisabledLanguages(): readonly string[] {
+    return [...this.#activeExplicitlyDisabledLanguages];
+  }
+
+  /** Configuration validation error that prevented automatic LSP startup, if any. */
+  getConfigurationError(): string | null {
+    return this.#configurationError;
+  }
+
   /** Get the missing servers warning (servers whose binary is not on PATH). */
   getMissingServers(): Array<{ name: string; command: string }> {
     if (this.#state.kind !== "ready") return [];
-    const config = loadConfig(this.#cwd);
-    return scanMissingServers(config, this.#cwd, undefined, this.#state.automaticPathPolicy);
+    return scanMissingServers(
+      this.#state.config,
+      this.#cwd,
+      undefined,
+      this.#state.automaticPathPolicy,
+    );
   }
 }

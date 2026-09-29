@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { CapabilityState } from "@mrclrchtr/supi-code-runtime/api";
@@ -71,6 +71,41 @@ async function run(lspState: WorkspaceLspRuntimeState, semantic: CapabilityState
 }
 
 describe("semantic health state", () => {
+  it("reports configuration failure without scanning when the automatic policy cannot load", async () => {
+    const homeDir = mkdtempSync(path.join(os.tmpdir(), "health-config-home-"));
+    mkdirSync(path.join(cwd, ".pi/supi"), { recursive: true });
+    writeFileSync(
+      path.join(cwd, ".pi/supi/config.json"),
+      JSON.stringify({ lsp: { exclude: ["legacy-generated"] } }),
+    );
+
+    const outcome = await runHealthWorkflow(
+      { include: ["servers"] },
+      {
+        cwd,
+        capability: capability({ kind: "disabled" }, { kind: "disabled" }),
+        lspController: null,
+        projectTrusted: true,
+        homeDir,
+        lastRefreshAttempt: null,
+        trackRefreshAttempt: () => undefined,
+        maintenanceState: emptyMaintenanceState(),
+        updateMaintenanceState: () => undefined,
+      },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      data: { capabilityWarnings: { hasWarnings: true } },
+    });
+    if (outcome.kind === "completed") {
+      expect(outcome.data.capabilityWarnings?.warnings).toContainEqual(
+        expect.objectContaining({ type: "configuration-error" }),
+      );
+    }
+    rmSync(homeDir, { recursive: true, force: true });
+  });
+
   it("keeps file-scoped server inventory passive", async () => {
     const file = path.join(cwd, "probe.ts");
     writeFileSync(file, "export const probe = true;\n");

@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { createAutomaticLspPathPolicy } from "@mrclrchtr/supi-lsp/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { enumerateAstFiles } from "../../../../src/analysis/search/ast-scan.ts";
 
@@ -67,6 +68,41 @@ describe("enumerateAstFiles", () => {
         expect.objectContaining({ reason: "unsupported-extension" }),
       ]),
     );
+  });
+
+  it("applies the shared configured exclusions only to broad roots", async () => {
+    const excluded = write("fixtures/projects/example/source.ts");
+    const visible = write("src/source.ts");
+    const policy = createAutomaticLspPathPolicy(tmpDir, ["fixtures/projects/**"]);
+
+    const broad = await enumerateAstFiles({
+      cwd: tmpDir,
+      roots: [tmpDir],
+      operation: "outline",
+      deadline: Number.POSITIVE_INFINITY,
+      maxFiles: 5_000,
+      automaticPathPolicy: policy,
+    });
+    expect(broad).toMatchObject({ kind: "completed", files: [realpathSync(visible)] });
+    if (broad.kind === "completed") {
+      expect(broad.exclusions).toContainEqual(
+        expect.objectContaining({
+          reason: "configured-exclusion",
+          examples: ["fixtures/projects/example"],
+        }),
+      );
+      expect(broad.policy.configuredExclusions).toEqual(["fixtures/projects/**"]);
+    }
+
+    const explicit = await enumerateAstFiles({
+      cwd: tmpDir,
+      roots: [path.dirname(excluded)],
+      operation: "outline",
+      deadline: Number.POSITIVE_INFINITY,
+      maxFiles: 5_000,
+      automaticPathPolicy: policy,
+    });
+    expect(explicit).toMatchObject({ kind: "completed", files: [realpathSync(excluded)] });
   });
 
   it("honors explicit roots and deduplicates overlapping scopes", async () => {

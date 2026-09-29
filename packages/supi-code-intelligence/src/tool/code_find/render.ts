@@ -51,11 +51,27 @@ function renderSemantic(assembly: FindResultAssembly, evidence: EvidenceListMeta
   }
   const disclosure = renderEvidenceListMetadataDisclosure(evidence);
   if (disclosure) lines.push(disclosure);
+  const exclusionDisclosure = renderAutomaticPathExclusionDisclosure(
+    outcome.data.partialMetadata?.automaticPathExclusion,
+  );
+  if (exclusionDisclosure) lines.push(exclusionDisclosure);
   return lines.join("\n");
+}
+
+function renderAutomaticPathExclusionDisclosure(
+  exclusion: { readonly excludedCount: number; readonly examples: readonly string[] } | undefined,
+): string | null {
+  if (!exclusion || exclusion.excludedCount <= 0) return null;
+  const noun = `workspace-symbol result${exclusion.excludedCount === 1 ? "" : "s"}`;
+  const examples = exclusion.examples.length
+    ? ` Examples: ${exclusion.examples.map((file) => `\`${file}\``).join(", ")}.`
+    : "";
+  return `_Automatic path policy excluded ${exclusion.excludedCount} ${noun}.${examples}_`;
 }
 
 function renderEmptySemantic(assembly: FindResultAssembly, evidence: EvidenceListMetadata): string {
   const { outcome } = assembly;
+  if (outcome.data.kind !== "semantic") return "";
   const lines = [
     `**Semantic search** — \`${outcome.query}\``,
     "",
@@ -65,6 +81,10 @@ function renderEmptySemantic(assembly: FindResultAssembly, evidence: EvidenceLis
   ];
   const disclosure = renderEvidenceListMetadataDisclosure(evidence);
   if (disclosure) lines.push("", disclosure);
+  const exclusionDisclosure = renderAutomaticPathExclusionDisclosure(
+    outcome.data.partialMetadata?.automaticPathExclusion,
+  );
+  if (exclusionDisclosure) lines.push("", exclusionDisclosure);
   lines.push("", "Document-level semantic symbols can differ from the workspace index.");
   const fileQuery = assembly.assembled.actions.find(
     (action) => action.kind === "query" && action.instruction.startsWith("If you know the file"),

@@ -6,11 +6,11 @@ import { createLspAdapterState } from "../../../../src/substrate/lsp/state.ts";
 describe("workspace LSP recovery", () => {
   it("notifies the runtime about every successfully applied refactor file", async () => {
     const pi = createPiMock();
-    const noteWorkspaceChanges = vi.fn();
+    const noteWorkspaceWrites = vi.fn();
     const state = createLspAdapterState();
     state.controller = {
       cwd: "/workspace",
-      workspaceRuntime: { noteWorkspaceChanges },
+      workspaceRuntime: { noteWorkspaceWrites },
     } as never;
     registerWorkspaceRecoveryHandler(pi as never, state);
 
@@ -30,11 +30,11 @@ describe("workspace LSP recovery", () => {
       makeCtx({ cwd: "/workspace" }),
     );
 
-    expect(noteWorkspaceChanges).toHaveBeenCalledTimes(2);
-    expect(noteWorkspaceChanges).toHaveBeenNthCalledWith(1, [
+    expect(noteWorkspaceWrites).toHaveBeenCalledTimes(2);
+    expect(noteWorkspaceWrites).toHaveBeenNthCalledWith(1, [
       { uri: "file:///workspace/src/a.ts", type: 2 },
     ]);
-    expect(noteWorkspaceChanges).toHaveBeenNthCalledWith(2, [
+    expect(noteWorkspaceWrites).toHaveBeenNthCalledWith(2, [
       { uri: "file:///workspace/src/b.ts", type: 2 },
     ]);
   });

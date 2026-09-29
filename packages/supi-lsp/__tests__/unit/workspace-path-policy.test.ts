@@ -9,8 +9,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
+import { loadAutomaticExclusionPatterns } from "@mrclrchtr/supi-core/config";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadLspSettings } from "../../src/config/lsp-settings.ts";
 import {
   AUTOMATIC_LSP_EXCLUDED_DIRECTORIES,
   createAutomaticLspPathPolicy,
@@ -66,24 +66,32 @@ describe("automatic LSP path policy", () => {
     expect(policy.isEligible(write(root, ".storybook/source.ts"))).toBe(true);
   });
 
-  it("loads project and global SuPi config before applying .pi exclusion", () => {
+  it("loads project and global code-intelligence exclusions before applying .pi exclusion", () => {
     const root = makeWorkspace();
     const home = makeWorkspace();
-    write(root, ".pi/supi/config.json", JSON.stringify({ lsp: { exclude: ["project/"] } }));
-    write(home, ".pi/agent/supi/config.json", JSON.stringify({ lsp: { exclude: ["global/"] } }));
+    write(
+      root,
+      ".pi/supi/config.json",
+      JSON.stringify({ "code-intelligence": { exclude: ["project/"] } }),
+    );
+    write(
+      home,
+      ".pi/agent/supi/config.json",
+      JSON.stringify({ "code-intelligence": { exclude: ["global/"] } }),
+    );
 
-    const projectSettings = loadLspSettings(root, home);
-    const projectPolicy = createAutomaticLspPathPolicy(root, projectSettings.exclude);
+    const projectPatterns = loadAutomaticExclusionPatterns(root, { homeDir: home });
+    const projectPolicy = createAutomaticLspPathPolicy(root, projectPatterns);
 
-    expect(projectSettings.exclude).toEqual(["project/"]);
+    expect(projectPatterns).toEqual(["project/"]);
     expect(projectPolicy.isEligible(join(root, ".pi/supi/config.json"))).toBe(false);
     expect(projectPolicy.isEligible(write(root, "project/output.ts"))).toBe(false);
 
     rmSync(join(root, ".pi", "supi", "config.json"));
-    const globalSettings = loadLspSettings(root, home);
-    const globalPolicy = createAutomaticLspPathPolicy(root, globalSettings.exclude);
+    const globalPatterns = loadAutomaticExclusionPatterns(root, { homeDir: home });
+    const globalPolicy = createAutomaticLspPathPolicy(root, globalPatterns);
 
-    expect(globalSettings.exclude).toEqual(["global/"]);
+    expect(globalPatterns).toEqual(["global/"]);
     expect(globalPolicy.isEligible(write(root, "global/output.ts"))).toBe(false);
   });
 
@@ -100,6 +108,63 @@ describe("automatic LSP path policy", () => {
     expect(policy.workspaceRoot).toBe(realpathSync(root));
     expect(policy.isEligible(join(alias, "visible.ts"))).toBe(true);
     expect(policy.isEligible(join(alias, "ignored/source.ts"))).toBe(false);
+  });
+
+  it("rejects the removed lsp.exclude setting", () => {
+    const root = makeWorkspace();
+    write(root, ".pi/supi/config.json", JSON.stringify({ lsp: { exclude: ["fixtures/"] } }));
+
+    expect(() => loadAutomaticExclusionPatterns(root)).toThrow('"lsp.exclude" was removed');
+  });
+
+  it("rejects an invalid code-intelligence exclusion list", () => {
+    const root = makeWorkspace();
+    write(
+      root,
+      ".pi/supi/config.json",
+      JSON.stringify({ "code-intelligence": { exclude: ["valid/", 42] } }),
+    );
+
+    expect(() => loadAutomaticExclusionPatterns(root)).toThrow(
+      "expected an array of gitignore-style strings",
+    );
+  });
+
+  it("ignores a removed project exclusion when the project is untrusted", () => {
+    const root = makeWorkspace();
+    const home = makeWorkspace();
+    write(root, ".pi/supi/config.json", JSON.stringify({ lsp: { exclude: ["fixtures/"] } }));
+
+    expect(loadAutomaticExclusionPatterns(root, { homeDir: home, projectTrusted: false })).toEqual(
+      [],
+    );
+  });
+
+  it("replaces global patterns with a trusted project list and honors an empty clear", () => {
+    const root = makeWorkspace();
+    const home = makeWorkspace();
+    write(root, ".pi/supi/config.json", JSON.stringify({ "code-intelligence": { exclude: [] } }));
+    write(
+      home,
+      ".pi/agent/supi/config.json",
+      JSON.stringify({ "code-intelligence": { exclude: ["global/"] } }),
+    );
+
+    expect(loadAutomaticExclusionPatterns(root, { homeDir: home })).toEqual([]);
+    expect(loadAutomaticExclusionPatterns(root, { homeDir: home, projectTrusted: false })).toEqual([
+      "global/",
+    ]);
+  });
+
+  it("captures configured patterns in an immutable policy snapshot", () => {
+    const root = makeWorkspace();
+    const patterns = ["generated/"];
+    const policy = createAutomaticLspPathPolicy(root, patterns);
+    patterns[0] = "visible/";
+
+    expect(policy.configuredPatterns).toEqual(["generated/"]);
+    expect(Object.isFrozen(policy.configuredPatterns)).toBe(true);
+    expect(policy.isConfiguredExcluded?.(join(root, "generated"), "directory")).toBe(true);
   });
 
   it("applies configured patterns in order with negation", () => {

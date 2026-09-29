@@ -11,6 +11,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectServerInfo } from "../../src/config/types.ts";
 import type { ManagerLifecycleTransition } from "../../src/manager/manager.ts";
+import { createAutomaticLspPathPolicy } from "../../src/workspace-path-policy.ts";
 
 const mocks = vi.hoisted(() => ({
   managers: [] as Array<{ emit(transition: unknown): void }>,
@@ -19,6 +20,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../src/config/config.ts", () => ({
+  getExplicitlyDisabledLanguages: vi.fn().mockReturnValue([]),
   loadConfig: vi.fn().mockReturnValue({
     servers: {
       typescript: {
@@ -28,9 +30,6 @@ vi.mock("../../src/config/config.ts", () => ({
       },
     },
   }),
-}));
-vi.mock("../../src/config/lsp-settings.ts", () => ({
-  loadLspSettings: vi.fn().mockReturnValue({ exclude: [] }),
 }));
 vi.mock("../../src/config/tsconfig-scope.ts", () => ({ clearTsconfigCache: vi.fn() }));
 vi.mock("../../src/diagnostics/workspace-sentinels.ts", () => ({
@@ -115,7 +114,9 @@ describe("LSP capability transition telemetry", () => {
   });
 
   it("emits one event per ready↔pending transition with workspace identity", async () => {
-    const controller = new LspRuntimeController("/project", new WorkspaceRuntime());
+    const controller = new LspRuntimeController("/project", new WorkspaceRuntime(), {
+      automaticPathPolicy: createAutomaticLspPathPolicy("/project", []),
+    });
     await controller.start();
 
     // Initial pending registration and startup publish no capability event.
@@ -137,7 +138,9 @@ describe("LSP capability transition telemetry", () => {
   });
 
   it("publishes no capability event for shutdown clearing or late replay", async () => {
-    const controller = new LspRuntimeController("/project", new WorkspaceRuntime());
+    const controller = new LspRuntimeController("/project", new WorkspaceRuntime(), {
+      automaticPathPolicy: createAutomaticLspPathPolicy("/project", []),
+    });
     await controller.start();
     mocks.managers[0]?.emit(managerTransition("readiness", true));
     await controller.shutdown();

@@ -56,7 +56,21 @@ describe("CodeIntelligenceConfig", () => {
     expect(CODE_INTELLIGENCE_DEFAULTS).toEqual({
       instructionFileNames: ["CLAUDE.md", "AGENTS.md"],
       overviewEnabled: true,
+      exclude: [],
     });
+  });
+
+  it("does not validate the removed exclusion while loading general config", () => {
+    const tmpDir = makeTempDir();
+    tempDirs.push(tmpDir);
+    fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi/supi/config.json"),
+      JSON.stringify({ lsp: { exclude: ["fixtures/"] } }),
+    );
+
+    expect(loadCodeIntelligenceConfig(tmpDir, tmpDir).overviewEnabled).toBe(true);
+    expect(resolveOverviewEnabled(tmpDir, true, tmpDir)).toBe(true);
   });
 
   it("loads code-intelligence.instructionFileNames from project config", () => {
@@ -208,7 +222,7 @@ describe("registerCodeIntelligenceSettings", () => {
     const module = collectModule(pi);
     const { rows: values } = await module.read({ scope: "project", cwd: tmpDir });
 
-    expect(values).toHaveLength(2);
+    expect(values).toHaveLength(3);
     expect(values[0]).toMatchObject({
       field: { kind: "stringList", key: "instructionFileNames" },
       source: "default",
@@ -217,6 +231,66 @@ describe("registerCodeIntelligenceSettings", () => {
       field: { kind: "boolean", key: "overviewEnabled" },
       source: "default",
     });
+    expect(values[2]).toMatchObject({
+      field: { kind: "stringList", key: "exclude" },
+      source: "default",
+    });
+  });
+
+  it("reports the removed exclusion setting while reading settings", async () => {
+    const tmpDir = makeTempDir();
+    tempDirs.push(tmpDir);
+    fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi/supi/config.json"),
+      JSON.stringify({ lsp: { exclude: ["fixtures/"] } }),
+    );
+    const pi = makePi();
+    registerCodeIntelligenceSettings(pi as never, tmpDir);
+    const module = collectModule(pi);
+
+    await expect(module.read({ scope: "project", cwd: tmpDir })).rejects.toThrow(
+      '"lsp.exclude" was removed',
+    );
+  });
+
+  it("shows inherited and explicit exclusion sources", async () => {
+    const tmpDir = makeTempDir();
+    const homeDir = makeTempDir();
+    tempDirs.push(tmpDir, homeDir);
+    fs.mkdirSync(path.join(homeDir, ".pi/agent/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(homeDir, ".pi/agent/supi/config.json"),
+      JSON.stringify({ "code-intelligence": { exclude: ["generated/"] } }),
+    );
+    const pi = makePi();
+    registerCodeIntelligenceSettings(pi as never, homeDir);
+    const module = collectModule(pi);
+
+    const inherited = await module.read({ scope: "project", cwd: tmpDir });
+    expect(inherited.rows[2]).toMatchObject({
+      field: { key: "exclude" },
+      editValue: "generated/",
+      source: "global",
+    });
+
+    await module.apply({
+      scope: "project",
+      cwd: tmpDir,
+      fieldKey: "exclude",
+      action: { kind: "set", value: "" },
+    });
+    const cleared = await module.read({ scope: "project", cwd: tmpDir });
+    expect(cleared.rows[2]).toMatchObject({ field: { key: "exclude" }, source: "project" });
+
+    await module.apply({
+      scope: "project",
+      cwd: tmpDir,
+      fieldKey: "exclude",
+      action: { kind: "unset" },
+    });
+    const reset = await module.read({ scope: "project", cwd: tmpDir });
+    expect(reset.rows[2]).toMatchObject({ field: { key: "exclude" }, source: "global" });
   });
 
   it("shows the global overview setting source for project scope", async () => {

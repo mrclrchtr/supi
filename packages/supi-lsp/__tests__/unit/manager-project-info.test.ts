@@ -9,6 +9,7 @@ function makeClient(
     status?: "running" | "error" | "shutdown" | "initializing";
     openFiles?: string[];
     ready?: boolean;
+    capabilities?: LspClient["serverCapabilities"];
   } = {},
 ): LspClient {
   // buildProjectServerInfo only accesses status, serverCapabilities, openFiles,
@@ -17,7 +18,7 @@ function makeClient(
     name: "mock",
     root: "/project",
     status: overrides.status ?? "running",
-    serverCapabilities: null,
+    serverCapabilities: overrides.capabilities ?? null,
     openFiles: overrides.openFiles ?? [],
     ready: overrides.ready ?? false,
   } as unknown as LspClient;
@@ -43,6 +44,34 @@ describe("buildProjectServerInfo", () => {
     );
 
     expect(result.ready).toBe(expected);
+  });
+
+  it("projects negotiated operation support without guessing titles", () => {
+    const result = buildProjectServerInfo(
+      {
+        serverName: "typescript",
+        root: "/project",
+        fileTypes: ["ts"],
+        client: makeClient({
+          capabilities: {
+            renameProvider: { prepareProvider: true },
+            codeActionProvider: {
+              codeActionKinds: ["source.organizeImports"],
+              resolveProvider: true,
+            },
+          },
+        }),
+      },
+      cwd,
+    );
+
+    expect(result.operationSupport).toMatchObject({
+      rename_symbol: { server: "advertised", supi: "supported" },
+      prepare_rename: { server: "advertised" },
+      update_imports: { server: "advertised" },
+      code_action_resolve: { server: "advertised" },
+      extract_function: { server: "not-advertised", supi: "limited" },
+    });
   });
 
   it("reports every process-crash reason as an error status", () => {

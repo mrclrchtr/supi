@@ -47,13 +47,13 @@ The provider maps semantic requests to `WorkspaceLspRuntime`. Read-only semantic
 
 Public code-intelligence refactors currently use:
 
-- `rename_symbol` → `textDocument/rename`
-- `extract_function` → matching precise code action
-- `extract_variable` → matching precise code action
-- `update_imports` → matching precise organize-imports code action
-- `delete_dead_code` → matching precise unused-code code action
+- `rename_symbol` → `textDocument/prepareRename` when advertised, then `textDocument/rename`
+- `extract_function` → unavailable: standard LSP has no safe exact extraction-name contract
+- `extract_variable` → unavailable: standard LSP has no safe exact extraction-name contract
+- `update_imports` → `source.organizeImports` code actions
+- `delete_dead_code` → `source.removeUnused` code actions
 
-Only precise text edits cross into refactor plans. Resource/file operations remain unavailable.
+Operation-specific code actions use `context.only` and `Invoked`, resolve lazy edit-only actions when advertised, match `CodeAction.kind`, and return ambiguity for distinct normalized edits. Only precise text edits cross into refactor plans. Resource/file operations remain unavailable.
 
 Diagnostic severity: Error (`1`), Warning (`2`), Information (`3`), Hint (`4`). The default threshold is `1`.
 
@@ -88,7 +88,7 @@ Always-on policy:
 - `lsp.servers.<language>.enabled: false` is the language opt-out.
 - If every server definition is disabled, startup is a successful disabled state, not a ready runtime with zero servers.
 
-`lsp.exclude` contains gitignore-style patterns for automatic LSP workspace work: discovery, startup, warm-up, tracking, file lists, guidance, and diagnostic summaries not tied to one request. The policy also reads root and nested `.gitignore` files. Built-in private, generated, and dependency directories stay excluded and cannot be enabled again. Explicit semantic requests for one exact file can still route an excluded file; this does not add the file to later automatic work. Diagnostic output keeps its configured suppression.
+`code-intelligence.exclude` contains gitignore-style patterns for automatic LSP workspace work and broad AST searches. The LSP policy also reads root and nested `.gitignore` files. Built-in private, generated, and dependency directories stay excluded and cannot be enabled again. Explicit semantic requests for one exact file can still route an excluded file; this does not add the file to later automatic work. Runtime and AST consumers use one immutable configured-pattern snapshot per active session. Diagnostic output keeps its configured suppression. An old `lsp.exclude` value is a migration error.
 
 `didOpen` language IDs must follow the server's document contract rather than blindly reuse the extension: ERB uses `erb`, Go module manifests use `go.mod`, and shell dialect extensions use `shellscript`.
 

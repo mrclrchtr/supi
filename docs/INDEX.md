@@ -30,6 +30,7 @@ Reference material for agents that develop PI extensions in this repo. Docs here
 
 - `adr/` — architecture decision records. Read only the ADRs for the subsystem you change.
 - [ADR 0023: PI-owned model requests](adr/0023-pi-owned-model-requests.md) — shared direct request handling, separate routing identities, and Agent Run endpoint preservation.
+- [ADR 0024: Shared code-intelligence exclusions](adr/0024-shared-code-intelligence-exclusions.md) — one configured list for automatic LSP work and broad AST searches.
 - [ADR 0022: Request-confirmed, LSP-agnostic diagnostics](adr/0022-request-confirmed-lsp-agnostic-diagnostics.md) — current diagnostic source, confirmation, scheduling, and coverage policy; supersedes the diagnostic-confirmation parts of ADR 0020.
 - `agents/` — issue tracker and triage workflow for agent work in this repo.
 

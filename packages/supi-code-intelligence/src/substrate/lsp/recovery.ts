@@ -1,8 +1,8 @@
 // Workspace recovery handler — tool_result event that recovers LSP state after
 // file-mutating tool calls.
 //
-// Notifies the workspace LSP runtime about file changes so diagnostics stay fresh
-// for explicit code_health and semantic tool queries.
+// Notifies the workspace LSP runtime about file writes so document state and
+// diagnostics stay fresh for explicit code_health and semantic tool queries.
 
 import * as nodePath from "node:path";
 import type {
@@ -49,7 +49,7 @@ export function registerWorkspaceRecoveryHandler(pi: ExtensionAPI, state: LspAda
         invalidateTsconfigCacheForConfigDir(nodePath.dirname(resolved));
       }
 
-      runtime.noteWorkspaceChanges([{ uri: fileToUri(resolved), type: 2 }]);
+      runtime.noteWorkspaceWrites([{ uri: fileToUri(resolved), type: 2 }]);
     }
   });
 }

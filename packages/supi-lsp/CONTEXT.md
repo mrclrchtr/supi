@@ -11,7 +11,7 @@ The workspace-scoped interface that owns file routing, semantic readiness and op
 _Avoid_: LspManager, LSP singleton, provider bag, client registry
 
 **Automatic LSP path policy**:
-The fixed, runtime-owned path rules for automatic workspace work. It matches paths against the built-in private/generated/dependency directories, `lsp.exclude`, root and nested `.gitignore` rules, and the resolved workspace root. It stops before excluded directories, does not visit symbolic-link directories, and is used for discovery, startup, warm-up, file lists, created-file tracking, guidance, and diagnostic summaries not tied to one request. Regular symbolic-link files remain allowed when their target is a file. The runtime creates one policy at startup and creates a new one on reload.
+The fixed, runtime-owned path rules for automatic workspace work. It matches paths against the built-in private/generated/dependency directories, `code-intelligence.exclude`, root and nested `.gitignore` rules, and the resolved workspace root. It stops before excluded directories, does not visit symbolic-link directories, and is used for discovery, startup, warm-up, file lists, created-file tracking, guidance, and diagnostic summaries not tied to one request. Broad AST searches use the same configured pattern matcher but retain their existing implicit rules. Regular symbolic-link files remain allowed when their target is a file. The runtime creates one immutable policy snapshot at startup and creates a new one on reload.
 _Avoid_: local LSP skip set, one-off exclude check, explicit-file policy
 
 **Automatic LSP intent**:
@@ -33,6 +33,10 @@ _Avoid_: source change list, unbounded tracking queue, diagnostic evidence
 **Limited source discovery**:
 A source inventory that stops at the safety limit or a material filesystem error. It reports its reason and observed count, does not infer additions or removals, and does not replace the Source baseline.
 _Avoid_: complete source scan, exact omitted count, source failure
+
+**Operation support projection**:
+The negotiated server advertisement and SuPi planning status for a refactor operation. It distinguishes an advertised operation, a server that does not advertise it, an unknown capability before negotiation, and a SuPi limitation such as standard LSP extraction names. Actual request failures remain operation results, not capability claims.
+_Avoid_: installed means supported, unavailable means server unsupported, command extraction is precise
 
 **LSP route**:
 The stable identity of one configured language server for one workspace root. A route can continue across a failed server process and its replacement. Lifecycle, status, and recovery state belong to the route, not to one process generation.
@@ -65,6 +69,10 @@ _Avoid_: process-crash replacement, unlimited startup loop, diagnostic confirmat
 **Process-crash refresh outcome**:
 The bounded route-level report that an explicit health refresh gives for each process-crash route it attempts or skips. It has exact recovered, skipped, failed, and exhausted counts, up to 16 entries, and an exact omitted-entry count. Each entry has the configured server name, workspace-relative root, stable outcome, and a typed next action for non-recovered routes. A skipped route uses `use-exact-file`; a failed or exhausted route uses `refresh`.
 _Avoid_: current server status, aggregate client count, passive inventory
+
+**LSP settings snapshot**:
+The effective server configuration fixed for one active Workspace LSP runtime. Saved changes become active only after reload or restart establishes a new snapshot.
+_Avoid_: live settings, config file contents, proof that a server accepted settings
 
 **LSP runtime controller**:
 The lifecycle/status module for one workspace. It starts and shuts down language-server infrastructure, publishes runtime state, and reports detected project servers. It does not own semantic workflow policy.

@@ -1,4 +1,5 @@
 import type { LspClient } from "../client/client.ts";
+import { getServerOperationSupport } from "../config/operation-support.ts";
 import type { ProjectServerInfo, ProjectServerStatusReason } from "../config/server-config.ts";
 import { displayRelativeFilePath } from "../summary.ts";
 
@@ -38,5 +39,6 @@ export function buildProjectServerInfo(
         .filter((file) => input.includeOpenFile?.(file) ?? true)
         .map((file) => displayRelativeFilePath(file, cwd)) ?? [],
     ready: input.client?.ready ?? false,
+    operationSupport: getServerOperationSupport(input.client?.serverCapabilities ?? null),
   };
 }

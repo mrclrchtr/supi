@@ -1,7 +1,11 @@
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import { LspRuntimeController } from "@mrclrchtr/supi-lsp/api";
+import {
+  type AutomaticLspPathPolicy,
+  createDefaultAutomaticLspPathPolicy,
+  LspRuntimeController,
+} from "@mrclrchtr/supi-lsp/api";
 import { TreeSitterRuntimeController } from "@mrclrchtr/supi-tree-sitter/api";
 
 const HOSTS = Symbol.for("supi-code-intelligence/workspace-provider-hosts");
@@ -15,6 +19,8 @@ type ClosingHostRegistry = Map<string, Promise<void>>;
 export interface WorkspaceProviderHostLease {
   cwd: string;
   lspController: LspRuntimeController | null;
+  /** Immutable automatic exclusion policy captured for this lease. */
+  automaticPathPolicy: AutomaticLspPathPolicy;
   sentinelSnapshot: Map<string, number>;
   release(): Promise<void>;
 }
@@ -58,23 +64,29 @@ class WorkspaceProviderHost {
   #lspStarted = false;
   #settledStart = Promise.resolve();
   #closed = false;
+  #automaticPathPolicies = new Map<boolean, AutomaticLspPathPolicy>();
 
   constructor(cwd: string) {
     this.cwd = cwd;
   }
 
-  async acquire(projectTrusted: boolean): Promise<WorkspaceProviderHostLease> {
+  async acquire(projectTrusted: boolean, homeDir?: string): Promise<WorkspaceProviderHostLease> {
     if (this.#closed) throw new Error("Workspace provider host is closed.");
+    const automaticPathPolicy =
+      this.#automaticPathPolicies.get(projectTrusted) ??
+      createDefaultAutomaticLspPathPolicy(this.cwd, { projectTrusted, homeDir });
+    this.#automaticPathPolicies.set(projectTrusted, automaticPathPolicy);
     // Count this pending acquirer before awaiting startup so the final active lease cannot shut it down.
     this.#leases++;
     this.#settledStart = this.#settledStart
-      .then(() => this.#startMissing(projectTrusted))
+      .then(() => this.#startMissing(projectTrusted, automaticPathPolicy, homeDir))
       .catch(() => undefined);
     await this.#settledStart;
     let released = false;
     return {
       cwd: this.cwd,
       lspController: projectTrusted ? this.#lsp : null,
+      automaticPathPolicy,
       sentinelSnapshot:
         projectTrusted && this.#lsp?.kind === "ready"
           ? (this.#lsp.workspaceRuntime?.scanWorkspaceSentinels() ?? new Map())
@@ -99,7 +111,11 @@ class WorkspaceProviderHost {
     };
   }
 
-  async #startMissing(projectTrusted: boolean): Promise<void> {
+  async #startMissing(
+    projectTrusted: boolean,
+    automaticPathPolicy: AutomaticLspPathPolicy,
+    homeDir?: string,
+  ): Promise<void> {
     const runtime = getDefaultWorkspaceRuntime();
     if (!this.#treeStarted) {
       this.#treeStarted = true;
@@ -108,7 +124,11 @@ class WorkspaceProviderHost {
     }
     if (!projectTrusted || this.#lspStarted) return;
     this.#lspStarted = true;
-    this.#lsp = new LspRuntimeController(this.cwd, runtime);
+    this.#lsp = new LspRuntimeController(this.cwd, runtime, {
+      automaticPathPolicy,
+      projectTrusted,
+      homeDir,
+    });
     await this.#lsp.start().catch(() => undefined);
   }
 
@@ -121,13 +141,14 @@ class WorkspaceProviderHost {
     ]);
     this.#lsp = null;
     this.#tree = null;
+    this.#automaticPathPolicies.clear();
   }
 }
 
 /** Acquire shared semantic and structural providers for one canonical workspace. */
 export async function acquireWorkspaceProviderHost(
   cwd: string,
-  options: { projectTrusted: boolean },
+  options: { projectTrusted: boolean; homeDir?: string },
 ): Promise<WorkspaceProviderHostLease> {
   const workspace = canonicalWorkspace(cwd);
   for (;;) {
@@ -141,7 +162,7 @@ export async function acquireWorkspaceProviderHost(
     host = new WorkspaceProviderHost(workspace);
     hosts.set(workspace, host);
   }
-  return host.acquire(options.projectTrusted);
+  return host.acquire(options.projectTrusted, options.homeDir);
 }
 
 /** Clear process-shared hosts between isolated tests. */

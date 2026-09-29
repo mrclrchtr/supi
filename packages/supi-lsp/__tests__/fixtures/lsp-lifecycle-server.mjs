@@ -126,7 +126,12 @@ function handle(message) {
     send({
       jsonrpc: "2.0",
       id: message.id,
-      result: { capabilities: { workspaceSymbolProvider: true } },
+      result: {
+        capabilities: {
+          workspaceSymbolProvider: true,
+          textDocumentSync: { change: 1, openClose: true },
+        },
+      },
     });
     return;
   }

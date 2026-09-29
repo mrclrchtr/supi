@@ -46,7 +46,7 @@ SuPi advertises static and dynamic pull support. It advertises server-requested 
 
 A server gets pull diagnostics when it declares a valid `diagnosticProvider` during initialization. A server also gets pull diagnostics after it registers `textDocument/diagnostic`. The pull support stays active until the server removes the registration. SuPi validates registration parameters. Invalid parameters do not enable pull support. SuPi ignores other registration methods.
 
-When a server sends `workspace/diagnostic/refresh`, SuPi returns `null` immediately. It then invalidates diagnostic evidence only and refreshes the owning client's tracked documents in the background. Unchanged open documents keep their input synchronization; SuPi sends no no-op `didChange`, `didClose`, or `didOpen`. It uses native pull or the tested TypeScript request adapter when available. Push-only routes keep partial or unconfirmed evidence. Actual disk changes use the normal document synchronization path. Overlapping refresh requests share one active pass and one newer pending demand; an active diagnostic transport stays owned until it settles. The refresh covers open, cached, and failed tracked documents. SuPi does not add workspace-wide `workspace/diagnostic` pulls.
+When a server sends `workspace/diagnostic/refresh`, SuPi returns `null` immediately. It then invalidates diagnostic evidence only and refreshes the owning client's tracked documents in the background. Unchanged open documents keep their input synchronization; SuPi sends no no-op `didChange`, `didClose`, or `didOpen`. It uses native pull or the tested TypeScript request adapter when available. Push-only routes keep partial or unconfirmed evidence. Actual disk changes use the normal document synchronization path, followed by one `didSave` when the server requested saves; repeated observations of the same content send no duplicate save. Overlapping refresh requests share one active pass and one newer pending demand; an active diagnostic transport stays owned until it settles. The refresh covers open, cached, and failed tracked documents. SuPi does not add workspace-wide `workspace/diagnostic` pulls.
 
 Protocol support is separate from the configured mode. A server may support pull diagnostics and still use SuPi's push mode because the built-in configuration does not enable pull mode.
 
@@ -108,17 +108,19 @@ Gopls pull diagnostics stay opt-in while golang/go#70199 is open; without the op
 
 Automatic LSP work uses one path policy that does not change for each workspace runtime. It covers project discovery, route startup, warm-up, sentinel and source-file lists, created-file tracking, runtime guidance, and diagnostic summaries not tied to one request.
 
-The policy excludes these directories by default: `.git`, `.cache`, `.pi`, `.pnpm`, `node_modules`, `dist`, `build`, `out`, `coverage`, `.next`, `.nuxt`, `.turbo`, and `__pycache__`. It also applies `lsp.exclude` patterns and root or nested `.gitignore` rules. Patterns use gitignore syntax, including rules relative to each directory and `!` rules. Built-in exclusions cannot be enabled again. Symbolic-link directories are not visited. Other dot-directories, such as `.github` and `.storybook`, remain allowed.
+The policy excludes these directories by default: `.git`, `.cache`, `.pi`, `.pnpm`, `node_modules`, `dist`, `build`, `out`, `coverage`, `.next`, `.nuxt`, `.turbo`, and `__pycache__`. It also applies `code-intelligence.exclude` patterns and root or nested `.gitignore` rules. Patterns use gitignore syntax, including rules relative to each directory and `!` rules. Built-in exclusions cannot be enabled again. Symbolic-link directories are not visited. Other dot-directories, such as `.github` and `.storybook`, remain allowed.
 
-Set `lsp.exclude` in project or global SuPi configuration:
+Set `code-intelligence.exclude` in project or global SuPi configuration. A project list replaces the global list; `[]` clears configured patterns. Use `/supi-settings` to edit this shared list when the settings extension is installed. Reload or restart Pi after saving:
 
 ```json
 {
-  "lsp": {
+  "code-intelligence": {
     "exclude": ["generated/**", "!generated/keep.ts"]
   }
 }
 ```
+
+An old `lsp.exclude` value is a migration error. Move it to `code-intelligence.exclude`; SuPi does not edit personal configuration for you.
 
 An exact semantic request can still route an excluded file when a compatible server is available. This does not add the file to automatic work. Configured diagnostic suppression still applies to diagnostic output.
 
@@ -126,7 +128,7 @@ Tsconfig and jsconfig filtering applies only to TypeScript and JavaScript-family
 
 ### Custom server configuration
 
-A custom server needs a command and at least one file type:
+A custom server needs a command and at least one file type. Advanced server settings are JSON objects. They replace inherited settings as a whole; `initializationOptions` remains a separate initialize value:
 
 ```json
 {
@@ -137,12 +139,21 @@ A custom server needs a command and at least one file type:
         "args": ["--stdio"],
         "fileTypes": ["custom"],
         "env": { "CUSTOM_LSP_LOG": "debug" },
+        "settings": { "custom": { "mode": "project" } },
         "initializationOptions": { "mode": "project" }
       }
     }
   }
 }
 ```
+
+Server settings use one snapshot for the active workspace runtime:
+
+- An omitted `settings` field inherits the earlier object. `settings: {}` clears inherited settings.
+- `workspace/configuration` reads that snapshot. A request without a section receives the complete object; an unknown section receives `null`.
+- A configured snapshot is also sent through `workspace/didChangeConfiguration` after initialization.
+- SuPi validates the JSON object shape, not server-specific setting names or values.
+- Saved changes apply after reload or restart. A saved value does not prove that the server accepted it.
 
 File types do not include a leading dot. If `rootMarkers` is omitted, the server uses the session root.
 
@@ -155,6 +166,18 @@ Disable one language with `lsp.servers.<language>.enabled: false`. Use `/supi-ci
 - explicit ready, pending, inactive, disabled, and unavailable registry states
 - a `SemanticProvider` adapter for `supi-code-runtime`
 - precise rename and code-action edit conversion
+- operation-specific code-action kind filters and standard lazy edit resolution
+- negotiated operation support in project-server status
+
+Operation-specific planners request `source.organizeImports` for import updates and
+`source.removeUnused` for dead-code removal. They match the returned `CodeAction.kind`,
+not its title. Edit-only actions are validated before planning. Command actions,
+resource operations, snippets, annotations, malformed actions, and stale responses
+stay unavailable. Distinct matching plans return an ambiguous result instead of
+selecting the first action. Rename uses `prepareRename` when the server advertises
+it and otherwise uses direct standard rename. Standard LSP does not provide
+a safe exact extraction-name contract, so `extract_function` and `extract_variable`
+plans report a SuPi planning limitation instead of selecting a generated name.
 
 Clients, `LspManager`, and the default runtime implementation remain internal.
 
@@ -164,7 +187,7 @@ Clients, `LspManager`, and the default runtime implementation remain internal.
 
 - language-server detection and startup
 - shutdown
-- settings and missing-server inventory
+- server configuration and missing-server inventory
 - publishing workspace runtime state and aggregate lifecycle transitions
 - projecting concrete client readiness into semantic capability state
 

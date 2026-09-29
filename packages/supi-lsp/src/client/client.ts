@@ -16,9 +16,18 @@ import {
   recordDebugEvent,
   truncateDebugIdentity as truncateIdentity,
 } from "@mrclrchtr/supi-core/debug";
-import { fileToUri } from "@mrclrchtr/supi-core/path";
+import { fileToUri, uriToFile } from "@mrclrchtr/supi-core/path";
 import { type ProgressToken, TextDocumentSyncKind } from "vscode-languageserver-protocol";
+import { CodeActionTriggerKind } from "vscode-languageserver-types";
 import { CLIENT_CAPABILITIES } from "../config/capabilities.ts";
+import {
+  getServerOperationSupport,
+  supportsCodeActionResolve,
+  supportsCodeActions,
+  supportsPrepareRename,
+  supportsRename,
+  supportsRequestedCodeActionKinds,
+} from "../config/operation-support.ts";
 import type {
   CodeAction,
   CodeActionContext,
@@ -29,6 +38,8 @@ import type {
   FileEvent,
   Hover,
   InitializeResult,
+  JsonObject,
+  JsonValue,
   Location,
   LocationLink,
   Position,
@@ -57,6 +68,7 @@ import { createPriorityDiagnosticRequestAdapter } from "./client-diagnostic-requ
 import { createTypeScriptDiagnosticRequestAdapter } from "./client-diagnostic-typescript.ts";
 import { ClientDiagnostics } from "./client-diagnostics.ts";
 import type { ClientDiagnosticSnapshot, DiagnosticEntry } from "./client-document-state.ts";
+import { type NormalizedDocumentSync, normalizeDocumentSync } from "./client-document-sync.ts";
 import { SemanticInputRequestRetryGuard } from "./client-request-enrollment.ts";
 import {
   isSemanticInputEnrollmentError,
@@ -68,6 +80,11 @@ const SHUTDOWN_TIMEOUT_MS = 5_000;
 
 interface SemanticRequestAttemptState {
   inputRevision: number | undefined;
+}
+
+interface RefactorTransaction {
+  rpc: JsonRpcClient;
+  assertCurrent: () => Promise<void>;
 }
 
 /**
@@ -103,6 +120,291 @@ export async function withTimeout<T>(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isPosition(value: unknown): value is Position {
+  return (
+    isRecord(value) &&
+    Object.hasOwn(value, "line") &&
+    Object.hasOwn(value, "character") &&
+    Object.keys(value).every((key) => key === "line" || key === "character") &&
+    Number.isInteger(value.line) &&
+    (value.line as number) >= 0 &&
+    Number.isInteger(value.character) &&
+    (value.character as number) >= 0
+  );
+}
+
+function isRange(value: unknown): value is Range {
+  return (
+    isRecord(value) &&
+    Object.hasOwn(value, "start") &&
+    Object.hasOwn(value, "end") &&
+    Object.keys(value).every((key) => key === "start" || key === "end") &&
+    isPosition(value.start) &&
+    isPosition(value.end) &&
+    !isBefore(value.end, value.start)
+  );
+}
+
+function isBefore(left: Position, right: Position): boolean {
+  return left.line < right.line || (left.line === right.line && left.character < right.character);
+}
+
+function isPositionInRange(position: Position, range: Range): boolean {
+  return !isBefore(position, range.start) && !isBefore(range.end, position);
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+  const allowedKeys = new Set(allowed);
+  return Object.keys(value).every((key) => allowedKeys.has(key));
+}
+
+function validatePrepareRenameResult(value: unknown, position: Position): string | null {
+  if (value === null || value === undefined) {
+    return "Rename is unavailable at the requested position.";
+  }
+  if (!isRecord(value)) return "LSP server returned a malformed prepareRename result.";
+  if (isRange(value)) {
+    return isPositionInRange(position, value)
+      ? null
+      : "LSP server returned a prepareRename range that excludes the requested position.";
+  }
+  if (
+    hasOnlyKeys(value, ["range", "placeholder"]) &&
+    Object.hasOwn(value, "range") &&
+    Object.hasOwn(value, "placeholder") &&
+    typeof value.placeholder === "string" &&
+    isRange(value.range)
+  ) {
+    return isPositionInRange(position, value.range)
+      ? null
+      : "LSP server returned a prepareRename range that excludes the requested position.";
+  }
+  if (
+    hasOnlyKeys(value, ["defaultBehavior"]) &&
+    Object.hasOwn(value, "defaultBehavior") &&
+    typeof value.defaultBehavior === "boolean"
+  ) {
+    return null;
+  }
+  return "LSP server returned a malformed prepareRename result.";
+}
+
+function isLazyCodeAction(value: unknown): value is CodeAction {
+  return (
+    isRecord(value) &&
+    Object.hasOwn(value, "title") &&
+    typeof value.title === "string" &&
+    value.title.trim().length > 0 &&
+    !Object.hasOwn(value, "edit") &&
+    !Object.hasOwn(value, "command") &&
+    !Object.hasOwn(value, "disabled") &&
+    hasNoInheritedAllowedKeys(value, [
+      "title",
+      "kind",
+      "diagnostics",
+      "isPreferred",
+      "disabled",
+      "edit",
+      "command",
+      "data",
+    ])
+  );
+}
+
+function codeActionKindMatchesFilter(kind: unknown, filter: string): boolean {
+  return (
+    filter === "" ||
+    (typeof kind === "string" && (kind === filter || kind.startsWith(`${filter}.`)))
+  );
+}
+
+function isValidCommand(value: unknown): value is NonNullable<CodeAction["command"]> {
+  const command = isRecord(value) ? value : null;
+  return (
+    command !== null &&
+    Object.hasOwn(command, "title") &&
+    typeof command.title === "string" &&
+    command.title.trim().length > 0 &&
+    Object.hasOwn(command, "command") &&
+    typeof command.command === "string" &&
+    hasOnlyKeys(command, ["title", "tooltip", "command", "arguments"]) &&
+    hasNoInheritedAllowedKeys(command, ["title", "tooltip", "command", "arguments"]) &&
+    (!Object.hasOwn(command, "tooltip") || typeof command.tooltip === "string") &&
+    (!Object.hasOwn(command, "arguments") || Array.isArray(command.arguments))
+  );
+}
+
+/** Validate one code-action response before matching or lazy resolution. */
+function normalizeCodeActionResponseEntry(value: unknown): CodeAction | null {
+  const entry = isRecord(value) ? value : null;
+  if (!hasValidCodeActionTitle(entry)) return null;
+
+  // A protocol response may be a Command, not only a CodeAction. Keep it as
+  // an edit-less CodeAction so later planning reports it as unsupported.
+  if (typeof entry.command === "string") return normalizeCommandCodeAction(entry);
+  return isValidCodeActionEntry(entry) ? (entry as CodeAction) : null;
+}
+
+function hasValidCodeActionTitle(
+  entry: Record<string, unknown> | null,
+): entry is Record<string, unknown> {
+  return (
+    entry !== null &&
+    Object.hasOwn(entry, "title") &&
+    typeof entry.title === "string" &&
+    entry.title.trim().length > 0
+  );
+}
+
+function normalizeCommandCodeAction(entry: Record<string, unknown>): CodeAction | null {
+  return hasOnlyKeys(entry, ["title", "tooltip", "command", "arguments"]) && isValidCommand(entry)
+    ? { title: entry.title as string, command: entry as NonNullable<CodeAction["command"]> }
+    : null;
+}
+
+function isValidCodeActionEntry(entry: Record<string, unknown>): boolean {
+  return (
+    hasOnlyKeys(entry, [
+      "title",
+      "kind",
+      "diagnostics",
+      "isPreferred",
+      "disabled",
+      "edit",
+      "command",
+      "data",
+      "tags",
+    ]) &&
+    hasNoInheritedAllowedKeys(entry, [
+      "title",
+      "kind",
+      "diagnostics",
+      "isPreferred",
+      "disabled",
+      "edit",
+      "command",
+      "data",
+      "tags",
+    ]) &&
+    isValidOptionalCodeActionFields(entry)
+  );
+}
+
+function isValidOptionalCodeActionFields(entry: Record<string, unknown>): boolean {
+  return (
+    (!Object.hasOwn(entry, "kind") || typeof entry.kind === "string") &&
+    (!Object.hasOwn(entry, "diagnostics") || Array.isArray(entry.diagnostics)) &&
+    (!Object.hasOwn(entry, "isPreferred") || typeof entry.isPreferred === "boolean") &&
+    (!Object.hasOwn(entry, "disabled") || isValidDisabledCodeAction(entry.disabled)) &&
+    (!Object.hasOwn(entry, "command") || isValidCommand(entry.command)) &&
+    (!Object.hasOwn(entry, "tags") || Array.isArray(entry.tags))
+  );
+}
+
+function isValidDisabledCodeAction(value: unknown): boolean {
+  const disabled = isRecord(value) ? value : null;
+  return (
+    disabled !== null &&
+    Object.hasOwn(disabled, "reason") &&
+    typeof disabled.reason === "string" &&
+    hasOnlyKeys(disabled, ["reason"]) &&
+    hasNoInheritedAllowedKeys(disabled, ["reason"])
+  );
+}
+
+function hasNoInheritedAllowedKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+): boolean {
+  return allowed.every((key) => !(key in value) || Object.hasOwn(value, key));
+}
+
+function isCodeActionContext(value: unknown): value is CodeActionContext {
+  if (
+    !isRecord(value) ||
+    !Object.hasOwn(value, "diagnostics") ||
+    !Array.isArray(value.diagnostics)
+  ) {
+    return false;
+  }
+  if (
+    !hasOnlyKeys(value, ["diagnostics", "only", "triggerKind"]) ||
+    !hasNoInheritedAllowedKeys(value, ["diagnostics", "only", "triggerKind"])
+  ) {
+    return false;
+  }
+  if (
+    Object.hasOwn(value, "only") &&
+    value.only !== undefined &&
+    (!Array.isArray(value.only) ||
+      value.only.some(
+        (kind) => typeof kind !== "string" || (kind.length > 0 && kind.trim().length === 0),
+      ))
+  ) {
+    return false;
+  }
+  return (
+    !Object.hasOwn(value, "triggerKind") ||
+    value.triggerKind === undefined ||
+    value.triggerKind === CodeActionTriggerKind.Invoked ||
+    value.triggerKind === CodeActionTriggerKind.Automatic
+  );
+}
+
+const EMPTY_SETTINGS: JsonObject = Object.freeze({});
+
+/** Clone and freeze a JSON settings value so one client owns one stable snapshot. */
+function cloneJsonValue(value: JsonValue): JsonValue {
+  if (Array.isArray(value)) {
+    return Object.freeze(value.map((entry) => cloneJsonValue(entry))) as JsonValue;
+  }
+  if (isRecord(value)) {
+    const clone: Record<string, JsonValue> = Object.create(null);
+    for (const [key, entry] of Object.entries(value)) {
+      clone[key] = cloneJsonValue(entry as JsonValue);
+    }
+    return Object.freeze(clone) as JsonValue;
+  }
+  return value;
+}
+
+function cloneSettings(settings: JsonObject | undefined): JsonObject | undefined {
+  return settings === undefined ? undefined : (cloneJsonValue(settings) as JsonObject);
+}
+
+/** Resolve a dotted section against an own-property-only JSON settings tree. */
+function lookupSettings(settings: JsonObject, section: unknown): JsonValue | undefined {
+  if (section === undefined || section === "") return settings;
+  if (typeof section !== "string") return undefined;
+  const parts = section.split(".");
+  if (parts.some((part) => part.length === 0)) return undefined;
+
+  let current: JsonValue = settings;
+  for (const part of parts) {
+    if (!isRecord(current) || !Object.hasOwn(current, part)) return undefined;
+    current = current[part] as JsonValue;
+  }
+  return current;
+}
+
+/** Test whether a configuration scope URI belongs to this server workspace. */
+function isApplicableConfigurationScope(scopeUri: unknown, root: string): boolean {
+  if (scopeUri === undefined) return true;
+  if (typeof scopeUri !== "string" || !scopeUri.startsWith("file://")) return false;
+  let scopePath: string;
+  try {
+    scopePath = uriToFile(scopeUri);
+  } catch {
+    return false;
+  }
+  if (scopePath === scopeUri) return false;
+  const relative = path.relative(path.resolve(root), path.resolve(scopePath));
+  return (
+    relative === "" ||
+    (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative))
+  );
 }
 
 /**
@@ -193,6 +495,10 @@ export class LspClient {
   private rpc: JsonRpcClient | null = null;
   private _status: ClientStatus = "initializing";
   private capabilities: ServerCapabilities | null = null;
+  /** Negotiated once after initialize for this client generation. */
+  private normalizedDocumentSync: NormalizedDocumentSync = normalizeDocumentSync(undefined);
+  /** Stable server-owned settings for this client generation. */
+  private readonly settingsSnapshot: JsonObject | undefined;
   private readonly diagnosticRequestAdapter: DiagnosticRequestAdapter;
   private readonly diagnostics: ClientDiagnostics;
   /** Dynamic capability registrations for this client instance only. */
@@ -223,6 +529,7 @@ export class LspClient {
   ) {
     this.name = name;
     this.root = root;
+    this.settingsSnapshot = cloneSettings(config.settings);
     const nativeDiagnosticAdapter: DiagnosticRequestAdapter = {
       supports: (uri) => this.hasApplicableDiagnosticProvider(uri),
       sourceFor: (uri) => (this.hasApplicableDiagnosticProvider(uri) ? "pull" : undefined),
@@ -254,8 +561,9 @@ export class LspClient {
       cwd: cwd,
       isOperational: () => this.rpc !== null && this._status === "running",
       diagnosticRequestAdapter: this.diagnosticRequestAdapter,
-      usesIncrementalDocumentSync: () => this.usesIncrementalDocumentSync,
+      documentSync: () => this.getDocumentSyncOptions(),
       sendNotification: (method, params) => {
+        if (!this.shouldSendDocumentNotification(method)) return;
         if (this.rpc) void this.rpc.sendNotification(method, params);
       },
     });
@@ -273,11 +581,54 @@ export class LspClient {
     return this.capabilities;
   }
 
+  /** Whether this route advertises the standard rename request. */
+  get supportsRename(): boolean {
+    return supportsRename(this.capabilities);
+  }
+
+  /** Whether this route advertises `textDocument/prepareRename`. */
+  get supportsPrepareRename(): boolean {
+    return supportsPrepareRename(this.capabilities);
+  }
+
+  /** Whether this route advertises `textDocument/codeAction`. */
+  get supportsCodeActions(): boolean {
+    return supportsCodeActions(this.capabilities);
+  }
+
+  /** Whether this route advertises standard code-action resolution. */
+  get supportsCodeActionResolve(): boolean {
+    return supportsCodeActionResolve(this.capabilities);
+  }
+
+  /** Capability facts used by the project-server health surface. */
+  get operationSupport() {
+    return getServerOperationSupport(this.capabilities);
+  }
+
+  /** Whether the server can answer a request for each supplied code-action kind. */
+  supportsCodeActionKinds(requested: readonly string[]): boolean {
+    return supportsRequestedCodeActionKinds(this.capabilities, requested);
+  }
+
   /** Whether the server requires range-based document changes. */
   get usesIncrementalDocumentSync(): boolean {
-    const sync = this.capabilities?.textDocumentSync;
-    const change = typeof sync === "number" ? sync : sync?.change;
-    return change === TextDocumentSyncKind.Incremental;
+    return this.getDocumentSyncOptions().change === TextDocumentSyncKind.Incremental;
+  }
+
+  private getDocumentSyncOptions(): NormalizedDocumentSync {
+    return this.normalizedDocumentSync;
+  }
+
+  /** Filter document lifecycle traffic against the negotiated server options. */
+  private shouldSendDocumentNotification(method: string): boolean {
+    const sync = this.getDocumentSyncOptions();
+    if (method === "textDocument/didOpen" || method === "textDocument/didClose") {
+      return sync.openClose;
+    }
+    if (method === "textDocument/didChange") return sync.change !== TextDocumentSyncKind.None;
+    if (method === "textDocument/didSave") return sync.save;
+    return true;
   }
 
   /** Whether the server is currently not indexing and ready to serve queries. */
@@ -374,12 +725,14 @@ export class LspClient {
         throw new Error(`${this.name}: client shutdown during initialize`);
       }
       this.capabilities = result.capabilities;
+      this.normalizedDocumentSync = normalizeDocumentSync(result.capabilities.textDocumentSync);
       await this.rpc.sendNotification("initialized", {});
       if (this._status !== "initializing") {
         throw new Error(`${this.name}: client shutdown during initialize`);
       }
       this._status = "running";
       this.publishLifecycle("startup");
+      this.sendInitialConfigurationChange();
 
       this.armNoProgressTimer();
     } catch (err) {
@@ -686,6 +1039,11 @@ export class LspClient {
     } satisfies DidChangeWatchedFilesParams);
   }
 
+  /** Synchronize a tracked file and notify the server after a real disk write. */
+  noteWorkspaceWrite(filePath: string): void {
+    this.diagnostics.noteWorkspaceWrite(filePath);
+  }
+
   /** Re-read open documents, then collect pull diagnostics or wait for push diagnostics. */
   async refreshOpenDiagnostics(
     options: { maxWaitMs?: number; quietMs?: number } & CodeRequestControl = {},
@@ -775,11 +1133,53 @@ export class LspClient {
     newName: string,
     control?: CodeRequestControl,
   ): Promise<WorkspaceEdit | null> {
-    return this.request(
-      "textDocument/rename",
-      { textDocument: { uri: fileToUri(filePath) }, position, newName },
-      control,
-    );
+    const result = await this.renameDetailed(filePath, position, newName, control);
+    return result.kind === "completed" ? result.data : null;
+  }
+
+  /** Run rename with capability gating, optional preparation, and freshness checks. */
+  async renameDetailed(
+    filePath: string,
+    position: Position,
+    newName: string,
+    control?: CodeRequestControl,
+  ): Promise<CodeQueryResult<WorkspaceEdit | null>> {
+    if (!this.supportsRename) {
+      return unavailableCodeQuery("The server does not advertise textDocument/rename.");
+    }
+    if (
+      typeof filePath !== "string" ||
+      filePath.length === 0 ||
+      !isPosition(position) ||
+      typeof newName !== "string" ||
+      newName.trim().length === 0
+    ) {
+      return unavailableCodeQuery(
+        "Rename requires a valid file, position, and non-empty new name.",
+      );
+    }
+
+    const params = {
+      textDocument: { uri: fileToUri(filePath) },
+      position,
+      newName,
+    };
+    return this.runRefactorTransaction("textDocument/rename", control, async (transaction) => {
+      if (this.supportsPrepareRename) {
+        const prepared = await transaction.rpc.sendRequest(
+          "textDocument/prepareRename",
+          { textDocument: { uri: fileToUri(filePath) }, position },
+          control,
+        );
+        const preparationError = validatePrepareRenameResult(prepared, position);
+        if (preparationError) throw new Error(preparationError);
+        await transaction.assertCurrent();
+      }
+      return (await transaction.rpc.sendRequest("textDocument/rename", params, control)) as
+        | WorkspaceEdit
+        | null
+        | undefined;
+    });
   }
 
   async codeActions(
@@ -788,11 +1188,46 @@ export class LspClient {
     context: CodeActionContext,
     control?: CodeRequestControl,
   ): Promise<CodeAction[] | null> {
-    return this.request(
-      "textDocument/codeAction",
-      { textDocument: { uri: fileToUri(filePath) }, range, context },
-      control,
-    );
+    const result = await this.codeActionsDetailed(filePath, range, context, control);
+    return result.kind === "completed" ? result.data : null;
+  }
+
+  /** Run code actions with explicit context, standard resolution, and freshness checks. */
+  async codeActionsDetailed(
+    filePath: string,
+    range: Range,
+    context: CodeActionContext,
+    control?: CodeRequestControl,
+  ): Promise<CodeQueryResult<CodeAction[] | null>> {
+    if (!this.supportsCodeActions) {
+      return unavailableCodeQuery("The server does not advertise textDocument/codeAction.");
+    }
+    if (typeof filePath !== "string" || filePath.length === 0 || !isRange(range)) {
+      return unavailableCodeQuery("Code actions require a valid file and range.");
+    }
+    if (!isCodeActionContext(context)) {
+      return unavailableCodeQuery("Code actions require a valid context.");
+    }
+    if (context.only && !this.supportsCodeActionKinds(context.only)) {
+      return unavailableCodeQuery("The server does not advertise the requested code-action kind.");
+    }
+
+    const requestContext: CodeActionContext = {
+      ...context,
+      triggerKind: context.triggerKind ?? CodeActionTriggerKind.Invoked,
+      ...(context.only ? { only: [...context.only] } : {}),
+    };
+    return this.runRefactorTransaction("textDocument/codeAction", control, async (transaction) => {
+      const raw = await transaction.rpc.sendRequest(
+        "textDocument/codeAction",
+        { textDocument: { uri: fileToUri(filePath) }, range, context: requestContext },
+        control,
+      );
+      if (raw === null || raw === undefined) return null;
+      if (!Array.isArray(raw)) throw new Error("LSP server returned malformed code actions.");
+
+      return this.resolveCodeActions(raw, transaction, control, requestContext.only);
+    });
   }
 
   async implementation(
@@ -811,6 +1246,137 @@ export class LspClient {
   }
 
   // ── Private ─────────────────────────────────────────────────────────
+  private async resolveCodeActions(
+    raw: unknown[],
+    transaction: RefactorTransaction,
+    control: CodeRequestControl | undefined,
+    only: readonly string[] | undefined,
+  ): Promise<CodeAction[]> {
+    const candidates = raw.map((value) => {
+      const candidate = normalizeCodeActionResponseEntry(value);
+      if (!candidate)
+        throw new Error("LSP server returned a malformed code action response entry.");
+      return candidate;
+    });
+    const actions: CodeAction[] = [];
+    for (const action of candidates) {
+      const lazyAction = isLazyCodeAction(action) ? action : undefined;
+      if (
+        !this.supportsCodeActionResolve ||
+        !lazyAction ||
+        (only !== undefined &&
+          !only.some((filter) => codeActionKindMatchesFilter(lazyAction.kind, filter)))
+      ) {
+        actions.push(action);
+        continue;
+      }
+      await transaction.assertCurrent();
+      const resolved = await transaction.rpc.sendRequest("codeAction/resolve", lazyAction, control);
+      await transaction.assertCurrent();
+      if (!isRecord(resolved)) {
+        throw new Error("LSP server returned a malformed resolved code action.");
+      }
+      const resolvedAction = normalizeCodeActionResponseEntry({ ...lazyAction, ...resolved });
+      if (!resolvedAction) {
+        throw new Error("LSP server returned a malformed resolved code action.");
+      }
+      actions.push(resolvedAction);
+    }
+    return actions;
+  }
+
+  private async runRefactorTransaction<T>(
+    method: string,
+    control: CodeRequestControl | undefined,
+    operation: (transaction: RefactorTransaction) => Promise<T | null | undefined>,
+  ): Promise<CodeQueryResult<T | null>> {
+    throwIfCodeRequestInterrupted(control);
+    if (!this.rpc || this._status !== "running") {
+      return unavailableCodeQuery(
+        `LSP request ${method} is unavailable because the client is not running.`,
+      );
+    }
+
+    const retryGuard = new SemanticInputRequestRetryGuard((revision) =>
+      this.diagnostics.getSemanticInputChangeSince(revision),
+    );
+    for (;;) {
+      const attempt: SemanticRequestAttemptState = { inputRevision: undefined };
+      try {
+        retryGuard.assertCurrent();
+        const data = await this.runRefactorTransactionAttempt({
+          method,
+          control,
+          operation,
+          retryGuard,
+          attempt,
+        });
+        if (retryGuard.hasRetried) {
+          this.recordSemanticRetry({ method, control, retryGuard, outcome: "completed" });
+        }
+        return completedCodeQuery(data);
+      } catch (error) {
+        const failure = this.handleRefactorTransactionFailure<T>({
+          method,
+          control,
+          retryGuard,
+          attempt,
+          error,
+        });
+        if (failure) return failure;
+      }
+    }
+  }
+
+  private handleRefactorTransactionFailure<T>(options: {
+    method: string;
+    control?: CodeRequestControl;
+    retryGuard: SemanticInputRequestRetryGuard;
+    attempt: SemanticRequestAttemptState;
+    error: unknown;
+  }): CodeQueryResult<T | null> | null {
+    const { method, control, retryGuard, attempt, error } = options;
+    try {
+      this.prepareSemanticRetry({ method, control, retryGuard, attempt, error });
+      return null;
+    } catch (retryError) {
+      if (isCodeRequestInterruption(retryError, control)) throw retryError;
+      const detail = retryError instanceof Error ? retryError.message : String(retryError);
+      return unavailableCodeQuery(`LSP request ${method} failed: ${detail}`);
+    }
+  }
+
+  /** Run the complete prepare/request/resolve transaction for one input snapshot. */
+  private async runRefactorTransactionAttempt<T>(options: {
+    method: string;
+    control?: CodeRequestControl;
+    operation: (transaction: RefactorTransaction) => Promise<T | null | undefined>;
+    retryGuard: SemanticInputRequestRetryGuard;
+    attempt: SemanticRequestAttemptState;
+  }): Promise<T | null> {
+    const { method, control, operation, retryGuard, attempt } = options;
+    throwIfCodeRequestInterrupted(control);
+    retryGuard.assertCurrent();
+    await this.getReady(control);
+    const inputSnapshot = await this.diagnostics.synchronizeSemanticInputs(control);
+    attempt.inputRevision = inputSnapshot.revision;
+    throwIfCodeRequestInterrupted(control);
+    retryGuard.assertCurrent();
+    const rpc = this.rpc;
+    if (!rpc || this._status !== "running") {
+      throw new Error(`LSP request ${method} is unavailable because the client is not running.`);
+    }
+    const data = await operation({
+      rpc,
+      assertCurrent: async () => {
+        retryGuard.assertCurrent();
+        await this.diagnostics.assertSemanticInputsCurrent(inputSnapshot, control);
+      },
+    });
+    await this.diagnostics.assertSemanticInputsCurrent(inputSnapshot, control);
+    return data ?? null;
+  }
+
   private async query<T>(
     method: string,
     params: unknown,
@@ -955,15 +1521,6 @@ export class LspClient {
     return data ?? null;
   }
 
-  private async request<T>(
-    method: string,
-    params: unknown,
-    control?: CodeRequestControl,
-  ): Promise<T | null> {
-    const result = await this.query<T>(method, params, control);
-    return result.kind === "unavailable" ? null : result.data;
-  }
-
   private handleServerRequest(method: string, params: unknown): unknown {
     switch (method) {
       case "workspace/configuration":
@@ -1038,11 +1595,30 @@ export class LspClient {
     });
   }
 
+  /** Send the initial settings snapshot after the initialize handshake. */
+  private sendInitialConfigurationChange(): void {
+    if (this.settingsSnapshot === undefined || !this.rpc || this._status !== "running") return;
+    void this.rpc.sendNotification("workspace/didChangeConfiguration", {
+      settings: this.settingsSnapshot,
+    });
+  }
+
   private buildWorkspaceConfigurationResult(params: unknown): unknown[] {
-    if (!params || typeof params !== "object") return [];
-    const items = (params as { items?: unknown }).items;
-    if (!Array.isArray(items)) return [];
-    return items.map(() => null);
+    if (!isRecord(params) || !Object.hasOwn(params, "items") || !Array.isArray(params.items)) {
+      return [];
+    }
+    return params.items.map((item) => this.buildWorkspaceConfigurationItem(item));
+  }
+
+  private buildWorkspaceConfigurationItem(item: unknown): JsonValue | null {
+    if (!isRecord(item)) return null;
+    const scopeUri = Object.hasOwn(item, "scopeUri") ? item.scopeUri : undefined;
+    if (!isApplicableConfigurationScope(scopeUri, this.root)) return null;
+    const section = Object.hasOwn(item, "section") ? item.section : undefined;
+    if (this.settingsSnapshot === undefined) {
+      return section === undefined || section === "" ? EMPTY_SETTINGS : null;
+    }
+    return lookupSettings(this.settingsSnapshot, section) ?? null;
   }
 
   /**
@@ -1130,12 +1706,12 @@ export class LspClient {
   private pendingReady(): Promise<void> {
     if (this._isReady) return Promise.resolve();
     if (this._readyPromise !== null) return this._readyPromise;
-    // If no progress timer was ever armed and no tokens are tracked,
+    // If no progress timer was ever armed and no active tokens are tracked,
     // the server was either never started with a real process (test scenario)
     // or completed before any progress tracking began. Resolve immediately
     // only when the client is still running — a crash or shutdown clears
     // both fields but must not report the client as ready.
-    if (this.noProgressTimer === null && this.trackedTokens.size === 0) {
+    if (this.noProgressTimer === null && !this.hasActiveTokens()) {
       if (this._status === "running") {
         this._isReady = true;
         this.everReady = true;

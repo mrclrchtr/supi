@@ -4,6 +4,7 @@ import type {
   ProcessCrashRecoveryReport,
   ProjectServerInfo,
   ProjectServerStatusReason,
+  ServerOperationSupportMap,
   StartupRetryReport,
 } from "@mrclrchtr/supi-lsp/api";
 import type { CapabilityWarningReport } from "../analysis/capability/capability-warnings.ts";
@@ -33,6 +34,8 @@ export interface HealthServerInfo {
   readonly status: ProjectServerInfo["status"];
   readonly statusReason?: ProjectServerStatusReason;
   readonly ready: boolean;
+  /** Negotiated operation support and SuPi planning limitations. */
+  readonly operationSupport?: ServerOperationSupportMap;
 }
 
 /** A single diagnostic message extracted for detailed health output. */

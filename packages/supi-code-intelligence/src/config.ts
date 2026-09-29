@@ -1,8 +1,16 @@
 // Code Intelligence configuration and settings registration.
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { loadSupiConfig, loadSupiConfigForScope } from "@mrclrchtr/supi-core/config";
-import { defineConfigSettings, registerSettings } from "@mrclrchtr/supi-core/settings";
+import {
+  loadAutomaticExclusionPatterns,
+  loadSupiConfig,
+  loadSupiConfigForScope,
+} from "@mrclrchtr/supi-core/config";
+import {
+  defineConfigSettings,
+  registerSettings,
+  type SettingsModule,
+} from "@mrclrchtr/supi-core/settings";
 
 const CODE_INTELLIGENCE_SECTION = "code-intelligence";
 
@@ -12,17 +20,30 @@ export interface CodeIntelligenceConfig extends Record<string, unknown> {
   instructionFileNames: string[];
   /** Inject the hidden first-turn workspace architecture overview when enabled. */
   overviewEnabled: boolean;
+  /** Gitignore-style paths excluded from automatic LSP and broad AST work. */
+  exclude: string[];
 }
 
 /** Default code-intelligence configuration. */
 export const CODE_INTELLIGENCE_DEFAULTS: CodeIntelligenceConfig = {
   instructionFileNames: ["CLAUDE.md", "AGENTS.md"],
   overviewEnabled: true,
+  exclude: [],
 };
 
 /** Load merged code-intelligence configuration for a workspace. */
-export function loadCodeIntelligenceConfig(cwd: string, homeDir?: string): CodeIntelligenceConfig {
-  return loadSupiConfig(CODE_INTELLIGENCE_SECTION, cwd, CODE_INTELLIGENCE_DEFAULTS, { homeDir });
+export function loadCodeIntelligenceConfig(
+  cwd: string,
+  homeDir?: string,
+  projectTrusted = true,
+): CodeIntelligenceConfig {
+  const loaded = projectTrusted
+    ? loadSupiConfig(CODE_INTELLIGENCE_SECTION, cwd, CODE_INTELLIGENCE_DEFAULTS, { homeDir })
+    : loadSupiConfigForScope(CODE_INTELLIGENCE_SECTION, cwd, CODE_INTELLIGENCE_DEFAULTS, {
+        scope: "global",
+        homeDir,
+      });
+  return loaded;
 }
 
 /**
@@ -41,39 +62,48 @@ export function resolveOverviewEnabled(
   projectTrusted: boolean,
   homeDir?: string,
 ): boolean {
-  const config = projectTrusted
-    ? loadCodeIntelligenceConfig(cwd, homeDir)
-    : loadSupiConfigForScope(CODE_INTELLIGENCE_SECTION, cwd, CODE_INTELLIGENCE_DEFAULTS, {
-        scope: "global",
-        homeDir,
-      });
+  const config = loadCodeIntelligenceConfig(cwd, homeDir, projectTrusted);
   return config.overviewEnabled === true;
 }
 
 /** Register code-intelligence settings with the shared SuPi settings registry. */
 export function registerCodeIntelligenceSettings(pi: ExtensionAPI, homeDir?: string): void {
-  registerSettings(
-    pi,
-    defineConfigSettings({
-      id: CODE_INTELLIGENCE_SECTION,
-      label: "Code Intelligence",
-      section: CODE_INTELLIGENCE_SECTION,
-      defaults: CODE_INTELLIGENCE_DEFAULTS,
-      fields: [
-        {
-          kind: "stringList" as const,
-          key: "instructionFileNames",
-          label: "Instruction File Names",
-          description: "Directory-local instruction file names shown by directory orientation",
-        },
-        {
-          kind: "boolean" as const,
-          key: "overviewEnabled",
-          label: "Overview Enabled",
-          description: "Inject the hidden first-turn workspace architecture overview",
-        },
-      ],
-      ...(homeDir ? { homeDir } : {}),
-    }),
-  );
+  const module = defineConfigSettings({
+    id: CODE_INTELLIGENCE_SECTION,
+    label: "Code Intelligence",
+    section: CODE_INTELLIGENCE_SECTION,
+    defaults: CODE_INTELLIGENCE_DEFAULTS,
+    fields: [
+      {
+        kind: "stringList" as const,
+        key: "instructionFileNames",
+        label: "Instruction File Names",
+        description: "Directory-local instruction file names shown by directory orientation",
+      },
+      {
+        kind: "boolean" as const,
+        key: "overviewEnabled",
+        label: "Overview Enabled",
+        description: "Inject the hidden first-turn workspace architecture overview",
+      },
+      {
+        kind: "stringList" as const,
+        key: "exclude",
+        label: "Automatic Exclusions",
+        description:
+          "Gitignore-style patterns for automatic LSP and broad AST work. Edit the project or global config, then reload or restart Pi; exact requests stay available.",
+      },
+    ],
+    ...(homeDir ? { homeDir } : {}),
+  });
+  registerSettings(pi, {
+    ...module,
+    async read(context: Parameters<SettingsModule["read"]>[0]) {
+      loadAutomaticExclusionPatterns(context.cwd, {
+        homeDir,
+        projectTrusted: context.ctx?.isProjectTrusted() ?? true,
+      });
+      return module.read(context);
+    },
+  });
 }

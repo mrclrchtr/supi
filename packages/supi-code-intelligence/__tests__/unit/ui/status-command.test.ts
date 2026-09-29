@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { completedCodeQuery, getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { getWorkspaceLspRuntime, type WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
@@ -45,9 +48,14 @@ function readyProjectServer() {
 }
 
 describe("/supi-ci-status command", () => {
+  const tempDirs: string[] = [];
+
   afterEach(() => {
     getDefaultWorkspaceRuntime().clearAll();
     vi.clearAllMocks();
+    for (const directory of tempDirs.splice(0)) {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it("does NOT call ctx.ui.notify (replaced by overlay)", async () => {
@@ -102,6 +110,41 @@ describe("/supi-ci-status command", () => {
       width: "66%",
       minWidth: 60,
     });
+  });
+
+  it("shows configuration failure in the status dialog", async () => {
+    const cwd = mkdtempSync(path.join(os.tmpdir(), "status-config-"));
+    const homeDir = mkdtempSync(path.join(os.tmpdir(), "status-config-home-"));
+    tempDirs.push(cwd, homeDir);
+    mkdirSync(path.join(cwd, ".pi/supi"), { recursive: true });
+    writeFileSync(
+      path.join(cwd, ".pi/supi/config.json"),
+      JSON.stringify({ lsp: { exclude: ["legacy-generated"] } }),
+    );
+
+    const pi = createPiMock();
+    registerCiStatusCommand(pi as never, homeDir);
+    const ctx = makeCtx({ cwd, isProjectTrusted: () => true });
+    Object.assign(ctx.ui, { setFooter: vi.fn() });
+    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
+      kind: "unavailable",
+      reason: "no LSP session",
+    });
+
+    const cmd = pi.getCommandHandler("supi-ci-status") as (
+      args: string,
+      ctx: ReturnType<typeof makeCtx>,
+    ) => Promise<void>;
+    await cmd("", ctx);
+
+    const customMock = ctx.ui.custom as unknown as {
+      mock: { calls: Array<[(...args: unknown[]) => unknown]> };
+    };
+    const factory = customMock.mock.calls[0]?.[0];
+    const dialog = factory?.({ requestRender: vi.fn() }, ctx.ui.theme, undefined, vi.fn()) as
+      | { render(width: number): string[] }
+      | undefined;
+    expect(dialog?.render(100).join("\\n")).toContain("Code intelligence configuration failed");
   });
 
   it("sets status bar with readiness and typed route errors", async () => {

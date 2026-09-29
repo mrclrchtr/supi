@@ -3,6 +3,7 @@
 import type { CapabilityState } from "@mrclrchtr/supi-code-runtime/api";
 import { isCodeRequestInterruption } from "@mrclrchtr/supi-code-runtime/api";
 import type {
+  AutomaticLspPathPolicy,
   LspRuntimeController,
   SemanticReadinessResult,
   WorkspaceDiagnosticReport,
@@ -45,6 +46,10 @@ export interface HealthWorkflowDeps {
   readonly cwd: string;
   readonly capability: CapabilityAdapter;
   readonly lspController: LspRuntimeController | null;
+  /** Project trust and global config home for fallback warning reads. */
+  readonly projectTrusted?: boolean;
+  readonly homeDir?: string;
+  readonly automaticPathPolicy?: AutomaticLspPathPolicy;
   readonly lastRefreshAttempt: HealthRefreshAttempt | null;
   readonly trackRefreshAttempt: (attempt: HealthRefreshAttempt) => void;
   /** Typed sentinel, source-baseline, and created-source queue state. */
@@ -227,7 +232,11 @@ function collectCapabilityWarnings(
 ): HealthData["capabilityWarnings"] {
   if (!semanticRequested) return undefined;
   const report = evaluateCapabilityWarnings(
-    gatherCapabilityWarningInput(deps.cwd, deps.lspController),
+    gatherCapabilityWarningInput(deps.cwd, deps.lspController, {
+      projectTrusted: deps.projectTrusted,
+      homeDir: deps.homeDir,
+      automaticPathPolicy: deps.automaticPathPolicy,
+    }),
   );
   return report.hasWarnings ? report : undefined;
 }

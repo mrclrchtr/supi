@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   collectCodeActionResults,
   isDeleteDeadCodeCodeAction,
-  isExtractFunctionCodeAction,
-  isExtractVariableCodeAction,
   isUpdateImportsCodeAction,
 } from "../../src/provider/refactor-planning.ts";
 
@@ -21,16 +19,9 @@ function makeUpdateImportsAction(
   return { title, kind } as Parameters<typeof isUpdateImportsCodeAction>[0];
 }
 
-function makeExtractAction(
-  title: string,
-  kind?: string,
-): Parameters<typeof isExtractFunctionCodeAction>[0] {
-  return { title, kind } as Parameters<typeof isExtractFunctionCodeAction>[0];
-}
-
 describe("isUpdateImportsCodeAction", () => {
-  it("allows exact title fallback only when kind is absent", () => {
-    expect(isUpdateImportsCodeAction(makeUpdateImportsAction("Organize Imports"))).toBe(true);
+  it("requires the documented kind and never guesses from a title", () => {
+    expect(isUpdateImportsCodeAction(makeUpdateImportsAction("Organize Imports"))).toBe(false);
     expect(isUpdateImportsCodeAction(makeUpdateImportsAction("Organize Imports", "quickfix"))).toBe(
       false,
     );
@@ -77,45 +68,25 @@ describe("collectCodeActionResults", () => {
   });
 });
 
-describe("extract code action matching", () => {
-  it("matches extract function actions by kind or title", () => {
-    expect(isExtractFunctionCodeAction(makeExtractAction("Extract to function"))).toBe(true);
-    expect(
-      isExtractFunctionCodeAction(makeExtractAction("Extract helper", "refactor.extract.function")),
-    ).toBe(true);
-    expect(isExtractFunctionCodeAction(makeExtractAction("Extract constant"))).toBe(false);
-  });
-
-  it("matches extract variable actions by kind or title", () => {
-    expect(isExtractVariableCodeAction(makeExtractAction("Extract constant"))).toBe(true);
-    expect(
-      isExtractVariableCodeAction(makeExtractAction("Extract value", "refactor.extract.variable")),
-    ).toBe(true);
-    expect(isExtractVariableCodeAction(makeExtractAction("Extract method"))).toBe(false);
-  });
-});
-
 describe("isDeleteDeadCodeCodeAction", () => {
-  it("matches canonical dead-code removal titles for supported kinds", () => {
+  it("requires the documented source.removeUnused kind", () => {
+    expect(
+      isDeleteDeadCodeCodeAction(
+        makeDeleteDeadCodeAction("Remove unused declaration", "source.removeUnused"),
+      ),
+    ).toBe(true);
     expect(
       isDeleteDeadCodeCodeAction(makeDeleteDeadCodeAction("Remove unused declaration", "quickfix")),
-    ).toBe(true);
-    expect(
-      isDeleteDeadCodeCodeAction(
-        makeDeleteDeadCodeAction("Remove unreachable code", "refactor.rewrite"),
-      ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it("rejects declaration-related titles that are not dead-code removals", () => {
+  it("rejects title-only and unrelated kinds", () => {
     expect(
-      isDeleteDeadCodeCodeAction(
-        makeDeleteDeadCodeAction("Move declaration to new file", "quickfix"),
-      ),
+      isDeleteDeadCodeCodeAction(makeDeleteDeadCodeAction("Move declaration to new file")),
     ).toBe(false);
     expect(
       isDeleteDeadCodeCodeAction(
-        makeDeleteDeadCodeAction("Extract declaration into helper", "refactor.rewrite"),
+        makeDeleteDeadCodeAction("Remove unused declaration", "refactor.rewrite"),
       ),
     ).toBe(false);
   });

@@ -36,6 +36,8 @@ export interface SemanticInputBarrierHost {
   isOperational(): boolean;
   getOpenDocuments(): readonly SemanticInputDocument[];
   applyDocumentUpdates(updates: readonly SemanticInputUpdate[]): void;
+  /** Report disk changes that were observed during synchronization. */
+  noteExternalDiskChange?(filePath: string, content: string): void;
   closeMissingDocument(filePath: string): void;
   markUnreadableDocument(filePath: string): void;
 }
@@ -60,6 +62,7 @@ interface OpenDocumentRead {
 
 interface SynchronizationPlan {
   readonly updates: SemanticInputUpdate[];
+  readonly externalDiskChanges: Array<{ readonly filePath: string; readonly content: string }>;
   readonly observedDiskFingerprints: Map<string, string | undefined>;
 }
 
@@ -202,9 +205,13 @@ export class SemanticInputBarrier {
     this.#observedDiskFingerprints.set(uri, fingerprintDocumentContent(content));
   }
 
-  /** Record content read from disk after a synchronization or refresh pass. */
-  observeDiskContent(uri: string, content: string): void {
-    this.#observedDiskFingerprints.set(uri, fingerprintDocumentContent(content));
+  /** Record content read from disk and report a changed known baseline. */
+  observeDiskContent(uri: string, content: string): boolean {
+    const fingerprint = fingerprintDocumentContent(content);
+    const previous = this.#observedDiskFingerprints.get(uri);
+    const changed = this.#observedDiskFingerprints.has(uri) && previous !== fingerprint;
+    this.#observedDiskFingerprints.set(uri, fingerprint);
+    return changed;
   }
 
   /** Forget a document's last observed disk content. */
@@ -322,19 +329,25 @@ export class SemanticInputBarrier {
     reads: readonly OpenDocumentRead[],
   ): SynchronizationPlan {
     const updates: SemanticInputUpdate[] = [];
+    const externalDiskChanges: Array<{ readonly filePath: string; readonly content: string }> = [];
     const observedDiskFingerprints = new Map<string, string | undefined>();
     for (const read of reads) {
       const planned = this.#planDocumentRead(pending, read);
       observedDiskFingerprints.set(read.document.uri, planned.observedDiskFingerprint);
       if (planned.update) updates.push(planned.update);
+      if (planned.externalDiskChange) externalDiskChanges.push(planned.externalDiskChange);
     }
-    return { updates, observedDiskFingerprints };
+    return { updates, externalDiskChanges, observedDiskFingerprints };
   }
 
   #planDocumentRead(
     pending: PendingSynchronization,
     read: OpenDocumentRead,
-  ): { observedDiskFingerprint: string | undefined; update?: SemanticInputUpdate } {
+  ): {
+    observedDiskFingerprint: string | undefined;
+    update?: SemanticInputUpdate;
+    externalDiskChange?: { readonly filePath: string; readonly content: string };
+  } {
     const override = pending.contentOverrides.get(read.document.uri);
     if (read.result.kind === "error") {
       return this.#planReadError(read.document, read.result.error, override);
@@ -343,6 +356,12 @@ export class SemanticInputBarrier {
     const diskFingerprint = fingerprintDocumentContent(read.result.content);
     const hasObservedDiskContent = this.#observedDiskFingerprints.has(read.document.uri);
     const previousDiskFingerprint = this.#observedDiskFingerprints.get(read.document.uri);
+    const externalDiskChange =
+      override === undefined &&
+      hasObservedDiskContent &&
+      previousDiskFingerprint !== diskFingerprint
+        ? { filePath: read.document.filePath, content: read.result.content }
+        : undefined;
     // An explicit override controls server content; the disk fingerprint remains the next observation.
     const content =
       override ??
@@ -352,6 +371,7 @@ export class SemanticInputBarrier {
     const contentFingerprint = fingerprintDocumentContent(content);
     return {
       observedDiskFingerprint: diskFingerprint,
+      ...(externalDiskChange ? { externalDiskChange } : {}),
       ...(read.document.contentFingerprint !== contentFingerprint
         ? { update: { document: read.document, content } }
         : {}),
@@ -385,6 +405,9 @@ export class SemanticInputBarrier {
       this.#advanceRevision("content");
     }
     this.#rememberObservedDiskFingerprints(plan.observedDiskFingerprints);
+    for (const change of plan.externalDiskChanges) {
+      this.#host.noteExternalDiskChange?.(change.filePath, change.content);
+    }
   }
 
   #advanceRevision(changeKind: SemanticInputChangeKind): void {

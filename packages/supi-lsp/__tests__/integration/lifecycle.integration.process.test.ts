@@ -346,15 +346,14 @@ describe("LSP manager lifecycle integration", () => {
     const original = await manager.startServerForRoot("test", root);
     if (!original) throw new Error("Expected the original client to start.");
     const originalPid = (original as unknown as { process: { pid?: number } }).process?.pid;
-    original.didOpen(sourceFile, fs.readFileSync(sourceFile, "utf8"));
-    // Establish the stall before the bounded recovery pass. On a loaded CI
-    // runner, the fixture's progress notification can arrive after the
-    // recovery budget even though the client is already becoming stalled.
+    // Establish the stall before opening the file and starting recovery.
+    // A loaded runner can receive progress after the recovery budget ends.
     await waitFor(
       async () => original.getRecoveryStallSignal(),
       (signal) => signal === "readiness-stall",
       { timeoutMs: 2_000, retryDelayMs: 20, label: "push-only readiness stall" },
     );
+    original.didOpen(sourceFile, fs.readFileSync(sourceFile, "utf8"));
     const changes: FileEvent[] = [{ uri: fileToUri(sourceFile), type: FileChangeType.Changed }];
 
     const recovery = await manager.recoverWorkspaceDiagnostics({
