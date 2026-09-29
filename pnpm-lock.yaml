@@ -271,6 +271,9 @@ importers:
         specifier: workspace:*
         version: link:../supi-core
     devDependencies:
+      '@mrclrchtr/supi-ask-user':
+        specifier: workspace:*
+        version: link:../supi-ask-user
       '@types/node':
         specifier: 25.9.8
         version: 25.9.8

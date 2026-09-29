@@ -47,4 +47,6 @@ The runtime owns temporary human-only transcripts for registered runs until the 
 
 In Conversation or Details, Alt+Left and Alt+Right cycle through the filtered runs in the current Agents or Reviews section. The viewer keeps the current view. Esc returns to the run list.
 
+If the Ask User tool opens a form while `/agents` is open, the viewer closes so the form is visible. This does not cancel the agent turn. Run `/agents` again to reopen the viewer.
+
 `startRegisteredAgentRun()` returns one handle. `stop()` waits for bounded Agent Run disposal, not transcript writes. `result` resolves after final transcript writes finish. A storage failure marks the transcript incomplete and does not change the Agent Run outcome. Without a registry, the runtime does not create a transcript. A closed registry stops the run.

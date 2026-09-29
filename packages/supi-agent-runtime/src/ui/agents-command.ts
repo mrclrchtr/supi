@@ -94,7 +94,7 @@ export function registerAgentsCommand(
 
   pi.registerCommand("agents", {
     description: "Inspect managed runs and, when available, Agent Profiles",
-    handler: async (_args, ctx) => showAgentsViewer(state, ctx),
+    handler: async (_args, ctx) => showAgentsViewer(pi, state, ctx),
   });
   state.commandRegistered = true;
   return state.registry;
@@ -102,10 +102,11 @@ export function registerAgentsCommand(
 
 /** Open the shared `/agents` viewer from another interactive extension flow. */
 export function openAgentsViewer(pi: ExtensionAPI, ctx: ExtensionCommandContext): Promise<void> {
-  return showAgentsViewer(runtimeState(pi), ctx);
+  return showAgentsViewer(pi, runtimeState(pi), ctx);
 }
 
 async function showAgentsViewer(
+  pi: ExtensionAPI,
   state: SharedRuntimeState,
   ctx: ExtensionCommandContext,
 ): Promise<void> {
@@ -113,31 +114,54 @@ async function showAgentsViewer(
     ctx.ui.notify("/agents is available only in TUI mode.", "warning");
     return;
   }
-  const { AgentsDialog } = await import("./agents-overlay.ts");
-  await ctx.ui.custom<void>(
-    (tui, theme, keybindings, done) =>
-      new AgentsDialog(buildOverlayData(state.registry.snapshot(), profilePagesFor(state)), {
-        theme,
-        tui,
-        keybindings,
-        done: () => done(undefined),
-        onSteer: (runKey, message) => state.registry.steer(runKey, message),
-        onStop: (runKey) => state.registry.stop(runKey),
-        subscribe: (listener) =>
-          state.registry.subscribe((snapshot) =>
-            listener(buildOverlayData(snapshot, profilePagesFor(state))),
-          ),
-      }),
-    {
-      overlay: true,
-      overlayOptions: {
-        anchor: "top-left",
-        width: "100%",
-        maxHeight: "100%",
-        margin: 0,
+  let formStarted = false;
+  let mounted = false;
+  let closeViewer: (() => void) | undefined;
+  const removeAskUserStart = pi.events.on("supi:ask-user:start", () => {
+    formStarted = true;
+    if (mounted) closeViewer?.();
+  });
+  try {
+    const { AgentsDialog } = await import("./agents-overlay.ts");
+    if (formStarted) return;
+    await ctx.ui.custom<void>(
+      (tui, theme, keybindings, done) => {
+        closeViewer = () => done(undefined);
+        return new AgentsDialog(
+          buildOverlayData(state.registry.snapshot(), profilePagesFor(state)),
+          {
+            theme,
+            tui,
+            keybindings,
+            done: () => done(undefined),
+            onSteer: (runKey, message) => state.registry.steer(runKey, message),
+            onStop: (runKey) => state.registry.stop(runKey),
+            subscribe: (listener) =>
+              state.registry.subscribe((snapshot) =>
+                listener(buildOverlayData(snapshot, profilePagesFor(state))),
+              ),
+          },
+        );
       },
-    },
-  );
+      {
+        overlay: true,
+        overlayOptions: {
+          anchor: "top-left",
+          width: "100%",
+          maxHeight: "100%",
+          margin: 0,
+        },
+        /** Wait for mounting so Pi's close callback removes this overlay, not an earlier one. */
+        onHandle: () => {
+          mounted = true;
+          if (formStarted) closeViewer?.();
+        },
+      },
+    );
+  } finally {
+    closeViewer = undefined;
+    removeAskUserStart();
+  }
 }
 
 /** Remove the Agent-owned Profile pages when their provider extension shuts down. */
