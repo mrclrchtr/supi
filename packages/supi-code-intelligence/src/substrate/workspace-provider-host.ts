@@ -1,4 +1,5 @@
 import { realpathSync } from "node:fs";
+import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import {
@@ -37,11 +38,11 @@ function closingRegistry(): ClosingHostRegistry {
   return global[CLOSING_HOSTS];
 }
 
-function canonicalWorkspace(cwd: string): string {
+function canonicalPath(candidate: string): string {
   try {
-    return realpathSync(cwd);
+    return realpathSync(candidate);
   } catch {
-    return resolve(cwd);
+    return resolve(candidate);
   }
 }
 
@@ -65,6 +66,8 @@ class WorkspaceProviderHost {
   #settledStart = Promise.resolve();
   #closed = false;
   #automaticPathPolicies = new Map<boolean, AutomaticLspPathPolicy>();
+  /** One configuration home owns all providers and policies until shutdown. */
+  #homeDir: string | null = null;
 
   constructor(cwd: string) {
     this.cwd = cwd;
@@ -72,14 +75,24 @@ class WorkspaceProviderHost {
 
   async acquire(projectTrusted: boolean, homeDir?: string): Promise<WorkspaceProviderHostLease> {
     if (this.#closed) throw new Error("Workspace provider host is closed.");
+    const normalizedHome = canonicalPath(homeDir ?? homedir());
+    if (this.#homeDir !== null && this.#homeDir !== normalizedHome) {
+      throw new Error(
+        `Workspace ${this.cwd} already uses configuration home ${this.#homeDir}. Cannot use ${normalizedHome} until all existing provider leases are released.`,
+      );
+    }
     const automaticPathPolicy =
       this.#automaticPathPolicies.get(projectTrusted) ??
-      createDefaultAutomaticLspPathPolicy(this.cwd, { projectTrusted, homeDir });
+      createDefaultAutomaticLspPathPolicy(this.cwd, {
+        projectTrusted,
+        homeDir: normalizedHome,
+      });
+    this.#homeDir = normalizedHome;
     this.#automaticPathPolicies.set(projectTrusted, automaticPathPolicy);
     // Count this pending acquirer before awaiting startup so the final active lease cannot shut it down.
     this.#leases++;
     this.#settledStart = this.#settledStart
-      .then(() => this.#startMissing(projectTrusted, automaticPathPolicy, homeDir))
+      .then(() => this.#startMissing(projectTrusted, automaticPathPolicy, normalizedHome))
       .catch(() => undefined);
     await this.#settledStart;
     let released = false;
@@ -145,12 +158,16 @@ class WorkspaceProviderHost {
   }
 }
 
-/** Acquire shared semantic and structural providers for one canonical workspace. */
+/**
+ * Acquire shared providers for one canonical workspace and configuration home.
+ * A different home is rejected until all existing leases are released.
+ * An omitted home uses the operating system's default home directory.
+ */
 export async function acquireWorkspaceProviderHost(
   cwd: string,
   options: { projectTrusted: boolean; homeDir?: string },
 ): Promise<WorkspaceProviderHostLease> {
-  const workspace = canonicalWorkspace(cwd);
+  const workspace = canonicalPath(cwd);
   for (;;) {
     const closing = closingRegistry().get(workspace);
     if (!closing) break;

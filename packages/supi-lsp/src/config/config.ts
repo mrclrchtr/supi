@@ -27,6 +27,7 @@ export const LANGUAGE_ALIASES: Record<string, string> = {
   cpp: "c",
 };
 
+/** Alias fields override canonical fields, independent of property order. */
 function resolveAliasesInOverrides(servers: Record<string, unknown>): void {
   for (const [alias, target] of Object.entries(LANGUAGE_ALIASES)) {
     if (!Object.hasOwn(servers, alias)) continue;
@@ -100,9 +101,11 @@ function applyEnabledOverrides(
 ): void {
   const servers = section?.servers;
   if (!isRecord(servers)) return;
-  for (const [name, value] of Object.entries(servers)) {
+  const normalized = { ...servers };
+  resolveAliasesInOverrides(normalized);
+  for (const [name, value] of Object.entries(normalized)) {
     if (!isRecord(value) || typeof value.enabled !== "boolean") continue;
-    effective.set(LANGUAGE_ALIASES[name] ?? name, value.enabled);
+    effective.set(name, value.enabled);
   }
 }
 
