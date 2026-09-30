@@ -36,7 +36,8 @@ describe("skill patch maintenance", () => {
     expect(research).toContain("current foreground task");
     expect(research).toMatch(/use Context7/i);
     expect(research).toMatch(/use `web_fetch_md`/i);
-    expect(research).toMatch(/use `antigravity_run` only for synthesis/i);
+    expect(research).toMatch(/use `consulting_run` only for synthesis/i);
+    expect(research).not.toContain("antigravity_run");
     expect(research).not.toContain("background agent");
   });
 

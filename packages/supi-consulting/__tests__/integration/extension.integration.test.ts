@@ -1,0 +1,357 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { writeSupiConfig } from "@mrclrchtr/supi-core/config";
+import { footerContributions } from "@mrclrchtr/supi-core/footer-registry";
+import { BRAILLE_SPINNER_FRAMES } from "@mrclrchtr/supi-core/spinner-frames";
+import { createPiMock, getHandlerOrThrow, makeCtx } from "@mrclrchtr/supi-test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CONSULTING_CONFIG_SECTION } from "../../src/config.ts";
+import { CONSULTING_HANDLE_ENTRY_TYPE } from "../../src/conversation/handles.ts";
+import consultingExtension from "../../src/extension.ts";
+import { unregisterConsultingFooterContribution } from "../../src/footer.ts";
+import { CONSULTING_FOOTER_KEY } from "../../src/footer-constants.ts";
+import { toolDescription } from "../../src/tool/consulting_run/guidance.ts";
+import { fixtureDirectory } from "../helpers/test-paths.ts";
+
+type RegisteredTool = {
+  name: string;
+  description: string;
+  parameters: unknown;
+  promptSnippet?: string;
+  promptGuidelines?: readonly string[];
+  execute: (
+    ...args: unknown[]
+  ) => Promise<{ content: Array<{ type: string; text?: string }>; details?: unknown }>;
+};
+
+const fakeDirectory = fixtureDirectory(import.meta.dirname);
+const roots: string[] = [];
+
+beforeEach(() => {
+  vi.stubEnv("PATH", `${fakeDirectory}:${process.env.PATH ?? ""}`);
+});
+
+afterEach(async () => {
+  unregisterConsultingFooterContribution();
+  vi.unstubAllEnvs();
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+});
+
+async function setup(): Promise<{ root: string; cwd: string }> {
+  const root = await mkdtemp(join(tmpdir(), "supi-consulting-extension-"));
+  const cwd = join(root, "repo");
+  await mkdir(cwd, { recursive: true });
+  roots.push(root);
+  vi.stubEnv("PI_CODING_AGENT_DIR", root);
+  return { root, cwd };
+}
+
+async function waitForTool(pi: { tools: unknown[] }): Promise<RegisteredTool> {
+  await vi.waitFor(
+    () =>
+      expect(
+        pi.tools.some(
+          (tool) =>
+            typeof tool === "object" &&
+            tool !== null &&
+            "name" in tool &&
+            tool.name === "consulting_run",
+        ),
+      ).toBe(true),
+    { timeout: 5_000 },
+  );
+  const tool = pi.tools.find(
+    (candidate) =>
+      typeof candidate === "object" &&
+      candidate !== null &&
+      "name" in candidate &&
+      candidate.name === "consulting_run",
+  );
+  if (!tool) throw new Error("Consultation tool was not registered.");
+  return tool as RegisteredTool;
+}
+
+describe("supi-consulting extension", () => {
+  it("omits the tool and warnings when disabled", async () => {
+    const { root, cwd } = await setup();
+    writeSupiConfig(
+      { section: CONSULTING_CONFIG_SECTION, scope: "project", cwd },
+      { agentToolEnabled: false },
+      { homeDir: root },
+    );
+    const pi = createPiMock();
+    consultingExtension(pi as unknown as ExtensionAPI);
+    const context = makeCtx({ cwd, sessionManager: { getBranch: () => [] } });
+    await getHandlerOrThrow(pi, "session_start")(
+      { type: "session_start", reason: "startup" },
+      context,
+    );
+    expect(pi.getActiveTools).toHaveBeenCalledTimes(1);
+    expect(pi.tools).toHaveLength(0);
+    expect(context.ui.notify).not.toHaveBeenCalled();
+  });
+
+  it("omits the tool and warns when agy is missing", async () => {
+    const { cwd } = await setup();
+    vi.stubEnv("PATH", "/usr/bin:/bin");
+    const pi = createPiMock();
+    consultingExtension(pi as unknown as ExtensionAPI);
+    const context = makeCtx({ cwd, sessionManager: { getBranch: () => [] } });
+    await getHandlerOrThrow(pi, "session_start")(
+      { type: "session_start", reason: "startup" },
+      context,
+    );
+    const notify = context.ui.notify as unknown as { mock: { calls: unknown[][] } };
+    await vi.waitFor(() => expect(notify.mock.calls.length).toBeGreaterThan(0), {
+      timeout: 5_000,
+    });
+    expect(pi.tools).toHaveLength(0);
+    expect(context.ui.notify).toHaveBeenCalledWith(expect.stringContaining("not found"), "warning");
+  });
+
+  it("warns before a workspace run when project hooks are active", async () => {
+    const { cwd } = await setup();
+    await writeFile(join(cwd, ".agy-hooks-active"), "active\\n");
+    const pi = createPiMock();
+    consultingExtension(pi as unknown as ExtensionAPI);
+    const context = makeCtx({ cwd, sessionManager: { getBranch: () => [] } });
+    await getHandlerOrThrow(pi, "session_start")(
+      { type: "session_start", reason: "startup" },
+      context,
+    );
+    const tool = await waitForTool(pi);
+    await tool.execute(
+      "call-hooks",
+      {
+        prompt: "require-add-dir workspace",
+        new: { agent: "antigravity", workspace: true, model: "gemini-3.8-flash-low" },
+      },
+      undefined,
+      undefined,
+      context,
+    );
+    expect(context.ui.notify).toHaveBeenCalledWith(expect.stringContaining("hooks"), "warning");
+  });
+
+  it("rejects overlap on one handle while allowing independent runs", async () => {
+    const { cwd } = await setup();
+    const pi = createPiMock();
+    consultingExtension(pi as unknown as ExtensionAPI);
+    const context = makeCtx({ cwd, sessionManager: { getBranch: () => [] } });
+    await getHandlerOrThrow(pi, "session_start")(
+      { type: "session_start", reason: "startup" },
+      context,
+    );
+    const tool = await waitForTool(pi);
+    const first = await tool.execute(
+      "call-first",
+      {
+        prompt: "first",
+        new: { agent: "antigravity", workspace: false, model: "gemini-3.8-flash-low" },
+      },
+      undefined,
+      undefined,
+      context,
+    );
+    const handle = (first.details as { handle: string }).handle;
+    let started!: () => void;
+    const startedPromise = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const running = tool.execute(
+      "call-running",
+      { prompt: "delay follow", continue: { handle } },
+      undefined,
+      (update: { details?: unknown }) => {
+        if (update.details && typeof update.details === "object") started();
+      },
+      context,
+    );
+    await startedPromise;
+    await expect(
+      tool.execute(
+        "call-overlap",
+        { prompt: "overlap", continue: { handle } },
+        undefined,
+        undefined,
+        context,
+      ),
+    ).rejects.toThrow(/already in use/);
+    await running;
+
+    const independent = await Promise.all([
+      tool.execute(
+        "call-independent-1",
+        {
+          prompt: "parallel one",
+          new: { agent: "antigravity", workspace: false, model: "gemini-3.8-flash-low" },
+        },
+        undefined,
+        undefined,
+        context,
+      ),
+      tool.execute(
+        "call-independent-2",
+        {
+          prompt: "parallel two",
+          new: { agent: "antigravity", workspace: false, model: "gemini-3.8-flash-low" },
+        },
+        undefined,
+        undefined,
+        context,
+      ),
+    ]);
+    expect(independent).toHaveLength(2);
+  });
+
+  it("registers, runs, and continues consulting_run after discovery", async () => {
+    const { cwd } = await setup();
+    const pi = createPiMock();
+    consultingExtension(pi as unknown as ExtensionAPI);
+    const context = makeCtx({ cwd, sessionManager: { getBranch: () => [] } });
+    await getHandlerOrThrow(pi, "session_start")(
+      { type: "session_start", reason: "startup" },
+      context,
+    );
+    expect(pi.tools).toHaveLength(0);
+    const contribution = footerContributions
+      .getByPlacement("stats-end")
+      .find((item) => item.key === CONSULTING_FOOTER_KEY);
+    expect(contribution).toMatchObject({ placement: "stats-end", priority: 110 });
+    expect(BRAILLE_SPINNER_FRAMES.map((frame) => `| ${frame}`)).toContain(contribution?.render());
+
+    const tool = await waitForTool(pi);
+    expect(contribution?.render()).toBe("| ✦");
+    expect(tool.name).toBe("consulting_run");
+    expect(tool.description).toBe(toolDescription);
+    expect(tool.description).toMatch(/external agent.*web research.*design advice/i);
+    expect(tool.description).toMatch(/workspace analysis.*independent second opinion/i);
+    expect(tool.description).toMatch(/direct tools.*repository facts/i);
+    expect(tool.description).toMatch(
+      /current workspace only when the Consultation needs repository evidence/i,
+    );
+    expect(tool.description.length).toBeLessThanOrEqual(320);
+
+    const schemaText = JSON.stringify(tool.parameters);
+    expect(schemaText).toMatch(/true exposes the current PI workspace/i);
+    expect(schemaText).toMatch(/false uses the empty Consultation Workspace/i);
+    expect(schemaText).toMatch(/original selection/i);
+    expect(schemaText).toMatch(/Consulting Agent that will perform this Consultation/i);
+    expect(tool.promptSnippet).toBeUndefined();
+    expect(tool.promptGuidelines).toBeUndefined();
+
+    const first = await tool.execute(
+      "call-1",
+      {
+        prompt: "require-no-add-dir first",
+        new: { agent: "antigravity", workspace: false, model: "gemini-3.8-flash-low" },
+      },
+      undefined,
+      undefined,
+      context,
+    );
+    const details = first.details as { handle: string; continuation: string };
+    expect(details.handle).toMatch(/^consult_/);
+    expect(details.handle).not.toBe(details.continuation);
+    expect(details.continuation).not.toBe("fake-conversation");
+    expect(pi.entries).toContainEqual({
+      type: CONSULTING_HANDLE_ENTRY_TYPE,
+      data: expect.objectContaining({ action: "created" }),
+    });
+
+    const followUp = await tool.execute(
+      "call-2",
+      {
+        prompt: "require-no-add-dir follow this",
+        continue: { handle: details.handle },
+      },
+      undefined,
+      undefined,
+      context,
+    );
+    expect(followUp.details).toEqual(expect.objectContaining({ handle: details.handle }));
+    expect((followUp.details as { continuation: string }).continuation).toBe(details.continuation);
+
+    const workspaceFirst = await tool.execute(
+      "call-workspace-1",
+      {
+        prompt: "require-add-dir workspace",
+        new: { agent: "antigravity", workspace: true, model: "gemini-3.8-flash-low" },
+      },
+      undefined,
+      undefined,
+      context,
+    );
+    const workspaceHandle = (workspaceFirst.details as { handle: string }).handle;
+    const workspaceFollowUp = await tool.execute(
+      "call-workspace-2",
+      {
+        prompt: "require-add-dir workspace follow",
+        continue: { handle: workspaceHandle },
+      },
+      undefined,
+      undefined,
+      context,
+    );
+    expect(workspaceFollowUp.details).toEqual(
+      expect.objectContaining({
+        handle: workspaceHandle,
+        workspaceUsed: true,
+        observedActivities: ["workspace"],
+        activityCounts: { web: 0, workspace: 1, other: 0 },
+        observedWorkspaceEvidence: [expect.any(Object)],
+      }),
+    );
+
+    await expect(
+      tool.execute(
+        "call-3",
+        { prompt: "fail this follow-up", continue: { handle: details.handle } },
+        undefined,
+        undefined,
+        context,
+      ),
+    ).rejects.toThrow();
+    expect(pi.entries).toContainEqual({
+      type: CONSULTING_HANDLE_ENTRY_TYPE,
+      data: expect.objectContaining({ action: "retired", handle: details.handle }),
+    });
+    await expect(
+      tool.execute(
+        "call-4",
+        { prompt: "again", continue: { handle: details.handle } },
+        undefined,
+        undefined,
+        context,
+      ),
+    ).rejects.toThrow(/retired/);
+
+    const branch = pi.entries.map((entry) => ({
+      type: "custom",
+      customType: entry.type,
+      data: entry.data,
+    }));
+    const treeContext = makeCtx({ cwd, sessionManager: { getBranch: () => branch } });
+    await getHandlerOrThrow(pi, "session_tree")(
+      { type: "session_tree", newLeafId: "new", oldLeafId: "old" },
+      treeContext,
+    );
+    await expect(
+      tool.execute(
+        "call-after-resume",
+        { prompt: "again after resume", continue: { handle: details.handle } },
+        undefined,
+        undefined,
+        treeContext,
+      ),
+    ).rejects.toThrow(/retired/);
+    for (const handler of pi.getHandlers("session_shutdown")) {
+      await handler({ type: "session_shutdown", reason: "quit" }, treeContext);
+    }
+    expect(pi.getActiveTools()).not.toContain("consulting_run");
+    expect(context.ui.setStatus).toHaveBeenLastCalledWith(CONSULTING_FOOTER_KEY, undefined);
+    expect(contribution?.render()).toBe("");
+  });
+});

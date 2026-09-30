@@ -23,8 +23,8 @@ async function collectPromptSurfaces() {
   add("debug", module);
   module = await import(`${PACKAGES}/supi-agent/src/tool/agent_run/guidance.ts`);
   add("agent_run", module);
-  module = await import(`${PACKAGES}/supi-antigravity/src/tool/antigravity_run/guidance.ts`);
-  add("antigravity_run", module);
+  module = await import(`${PACKAGES}/supi-consulting/src/tool/consulting_run/guidance.ts`);
+  add("consulting_run", module);
 
   module = await import(`${PACKAGES}/supi-code-intelligence/src/tool/guidance.ts`);
   for (const [name, surface] of Object.entries(module.CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES)) {

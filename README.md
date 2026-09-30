@@ -122,13 +122,13 @@ Not part of the recommended release stack. Included in the full-stack installer 
 
 ### Beta additions
 
-Most packages in this section are installed by `install-all.sh` on top of the release stack. `supi-antigravity` is an opt-in **Agent** package and is not included in either installer:
+Most packages in this section are installed by `install-all.sh` on top of the release stack. `supi-consulting` is an opt-in **Agent** package and is not included in either installer:
 
 | Package | What it adds | Install |
 |---|---|---|
 | [`supi-review`](packages/supi-review/README.md) | Caller-defined, inspection-only reviews in managed child sessions | `pi install npm:@mrclrchtr/supi-review` |
 | [`supi-agent`](packages/supi-agent/README.md) | Explicit Agent Profile catalogue and child resource policy | `pi install npm:@mrclrchtr/supi-agent` |
-| [`supi-antigravity`](packages/supi-antigravity/README.md) | **Agent** — bounded Antigravity consultations with isolated workspace access and evidence | `pi install npm:@mrclrchtr/supi-antigravity` |
+| [`supi-consulting`](packages/supi-consulting/README.md) | **Agent** — bounded consultations with explicit agent and workspace selection and observed evidence; currently supports Antigravity | `pi install npm:@mrclrchtr/supi-consulting` |
 | [`supi-cache`](packages/supi-cache/README.md) | Prompt-cache history and cross-session regression forensics | `pi install npm:@mrclrchtr/supi-cache` |
 | [`supi-insights`](packages/supi-insights/README.md) | Historical session analytics and shareable HTML reports | `pi install npm:@mrclrchtr/supi-insights` |
 | [`supi-claude-md`](packages/supi-claude-md/README.md) | Skills for auditing and revising repository instruction files | `pi install npm:@mrclrchtr/supi-claude-md` |

@@ -1,0 +1,138 @@
+#!/usr/bin/env node
+import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { existsSync, realpathSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+const args = process.argv.slice(2);
+if (args.includes("--version")) {
+  process.stdout.write("1.1.25\n");
+  process.exit(0);
+}
+if (args[0] === "models") {
+  process.stdout.write(
+    "model\tdescription\ngemini-3.8-flash-low\tFlash\ngemini-3.1-pro-high\tPro\n",
+  );
+  process.exit(0);
+}
+if (args.includes("/hooks")) {
+  process.stdout.write(
+    JSON.stringify(
+      existsSync(join(process.cwd(), ".agy-hooks-active"))
+        ? { hooks: [{ scope: "project", status: "active" }] }
+        : { hooks: [] },
+    ),
+  );
+  process.exit(0);
+}
+
+let input = "";
+process.stdin.on("data", (chunk) => {
+  input += chunk.toString();
+});
+process.stdin.on("end", () => {
+  const userEvent = JSON.parse(input.trim());
+  if (userEvent.event !== "user") {
+    process.stderr.write("fixture expected an event-based user message\n");
+    process.exitCode = 1;
+    return;
+  }
+  if (input.includes("require-add-dir")) {
+    const addDirIndex = args.indexOf("--add-dir");
+    const selectedWorkspace = addDirIndex >= 0 ? args[addDirIndex + 1] : undefined;
+    if (!selectedWorkspace || realpathSync(selectedWorkspace) !== realpathSync(process.cwd())) {
+      process.stderr.write("fixture expected the selected workspace directory\n");
+      process.exitCode = 1;
+      return;
+    }
+  }
+  if (input.includes("require-no-add-dir") && args.includes("--add-dir")) {
+    process.stderr.write("fixture did not expect a workspace directory\n");
+    process.exitCode = 1;
+    return;
+  }
+  const conversationIndex = args.indexOf("--conversation");
+  const conversationId =
+    conversationIndex < 0 || input.includes("different-conversation")
+      ? `fixture-conversation-${randomUUID()}`
+      : args[conversationIndex + 1];
+  if (input.includes("malformed")) {
+    process.stdout.write("not-json\n");
+    return;
+  }
+  if (input.includes("oversized")) {
+    process.stdout.write(`${"x".repeat(128 * 1024 + 1)}\n`);
+    return;
+  }
+  if (input.includes("exit-nonzero")) {
+    process.stderr.write("fixture process failure\n");
+    process.exitCode = 7;
+    return;
+  }
+  if (input.includes("spawn-child")) {
+    const match = input.match(/child-pid-file=([^\s]+)/);
+    const child = spawn("sleep", ["30"], { stdio: "ignore" });
+    if (match && child.pid) writeFileSync(match[1], String(child.pid));
+  }
+  const emitEvent = (event) => process.stdout.write(`${JSON.stringify(event)}\n`);
+  let nextStepIndex = 1;
+  const emitToolStep = (stepIndex, state, name, parameters, error) => {
+    emitEvent({
+      event: "step_update",
+      step_update: {
+        conversation_id: conversationId,
+        step_index: stepIndex,
+        state,
+        step_type: "tool",
+        tool_name: name,
+        tool_info: {
+          name,
+          ...(parameters ? { parameters } : {}),
+          ...(error ? { error } : {}),
+        },
+      },
+    });
+  };
+  const emitToolPair = (name, parameters, terminalState, error) => {
+    const stepIndex = nextStepIndex++;
+    emitToolStep(stepIndex, "ACTIVE", name, parameters);
+    emitToolStep(stepIndex, terminalState, name, parameters, error);
+  };
+  const emitResult = () => {
+    emitEvent({ event: "init", conversation_id: conversationId, init: {} });
+    if (input.includes("fail")) {
+      emitEvent({
+        event: "result",
+        result: { conversation_id: conversationId, status: "ERROR" },
+      });
+      return;
+    }
+    if (input.includes("permission")) {
+      emitToolPair("write_file", { path: "README.md" }, "ERROR", { message: "Permission denied" });
+    } else if (input.includes("workspace")) {
+      emitToolPair("read_file", { path: "README.md" }, "DONE");
+    } else {
+      emitToolPair("search_web", { Url: "https://nodejs.org/api/child_process.html" }, "DONE");
+    }
+    const workspaceEvidence = input.includes("workspace")
+      ? [{ path: "README.md", summary: "fixture file" }]
+      : [];
+    emitEvent({
+      event: "result",
+      result: {
+        conversation_id: conversationId,
+        status: "SUCCESS",
+        usage: { input_tokens: 4, output_tokens: 6 },
+        structured_output: {
+          answer: conversationIndex >= 0
+            ? "The prior consultation is retained."
+            : "Node documentation explains child process cancellation.",
+          sources: [{ title: "Node.js child_process", url: "https://nodejs.org/api/child_process.html" }],
+          workspaceEvidence,
+        },
+      },
+    });
+  };
+  if (input.includes("delay")) setTimeout(emitResult, 250);
+  else emitResult();
+});

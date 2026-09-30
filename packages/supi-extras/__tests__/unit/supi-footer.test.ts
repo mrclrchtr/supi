@@ -615,7 +615,7 @@ describe("supiFooter extension", () => {
         render: () => "| λ lsp • 3 ✓",
       });
       footerContributions.register({
-        key: "supi-antigravity",
+        key: "supi-consulting",
         placement: "stats-end",
         priority: 110,
         render: () => "| ✦",
@@ -640,7 +640,7 @@ describe("supiFooter extension", () => {
         mockTui,
         mockTheme,
         makeFooterData({
-          getExtensionStatuses: vi.fn(() => new Map([["supi-antigravity", "✦"]])),
+          getExtensionStatuses: vi.fn(() => new Map([["supi-consulting", "✦"]])),
         }),
       );
       const lines = renderer.render(200);

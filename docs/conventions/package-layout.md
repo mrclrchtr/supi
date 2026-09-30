@@ -119,6 +119,7 @@ When multiple SuPi packages need the same path, URI, config, or session helper s
 | `supi-code-runtime` | library-only: flat source with `capability/` + `workspace/`; no pi extension |
 | `supi-agent` | per-tool `tool/agent_run/`; catalogue/resource-policy slice stays at root |
 | `supi-agent-runtime` | library-only: flat lifecycle/diagnostics source; no pi extension |
+| `supi-consulting` | per-tool `tool/consulting_run/`; private agent adapters in `agents/`; branch-aware handles in `conversation/` |
 | `supi-context` | root domains stay; per-tool `tool/<tool>/` layout |
 | `supi-core` | domain-first if reorganized: `config/`, `context/`, `settings/` |
 | `supi-debug` | root domains stay; per-tool `tool/debug/` layout |

@@ -4,13 +4,13 @@ Multi-context monorepo. Each package is an independent context with its own `CON
 
 - **supi-agent** → `packages/supi-agent/CONTEXT.md`
 - **supi-agent-runtime** → `packages/supi-agent-runtime/CONTEXT.md`
-- **supi-antigravity** → `packages/supi-antigravity/CONTEXT.md`
 - **supi-ask-user** → `packages/supi-ask-user/CONTEXT.md`
 - **supi-bash-timeout** → `packages/supi-bash-timeout/CONTEXT.md`
 - **supi-cache** → `packages/supi-cache/CONTEXT.md`
 - **supi-claude-md** → `packages/supi-claude-md/CONTEXT.md`
 - **supi-code-intelligence** → `packages/supi-code-intelligence/CONTEXT.md`
 - **supi-code-runtime** → `packages/supi-code-runtime/CONTEXT.md`
+- **supi-consulting** → `packages/supi-consulting/CONTEXT.md`
 - **supi-context** → `packages/supi-context/CONTEXT.md`
 - **supi-core** → `packages/supi-core/CONTEXT.md`
 - **supi-debug** → `packages/supi-debug/CONTEXT.md`

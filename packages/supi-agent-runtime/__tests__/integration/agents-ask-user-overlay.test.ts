@@ -116,7 +116,7 @@ describe("/agents with a stacked Ask User overlay", () => {
           listener({ status: "running", turns: 0, toolUses: 0, toolErrors: 0 });
           return () => undefined;
         },
-        steer: vi.fn(async () => "accepted" as const),
+        steer: vi.fn(async () => "queued" as const),
         stop: vi.fn(async () => undefined),
       },
     });
