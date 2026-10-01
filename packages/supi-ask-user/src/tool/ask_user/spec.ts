@@ -8,5 +8,7 @@ export const askUserSpec = {
   name: ASK_USER_TOOL_NAME,
   label: ASK_USER_TOOL_LABEL,
   parameters: AskUserParamsSchema,
+  // Keep user forms out of nested tool calls.
+  exposure: "model-only",
   executionMode: "sequential",
 } as const;

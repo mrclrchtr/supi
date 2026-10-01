@@ -23,5 +23,7 @@ export function buildAgentRunParameters(): TSchema {
 export const agentRunSpec = {
   name: AGENT_RUN_TOOL_NAME,
   label: AGENT_RUN_TOOL_LABEL,
+  // Start Agent Runs only through direct model calls.
+  exposure: "model-only",
   executionMode: "sequential",
 } as const;

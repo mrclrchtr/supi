@@ -65,6 +65,10 @@ describe("Antigravity runtime activation", () => {
     });
     await refreshing;
     expect(pi.tools).toHaveLength(1);
+    expect(pi.tools[0]).toMatchObject({
+      name: "antigravity_run",
+      exposure: "model-only",
+    });
     expect(runtime.isReady).toBe(true);
     expect(runtime.footerIcon).toBe("✦");
     expect(context.ui.setStatus).toHaveBeenLastCalledWith(ANTIGRAVITY_FOOTER_KEY, "✦");

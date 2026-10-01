@@ -8,4 +8,6 @@ export const reviewRunSpec = {
   name: REVIEW_RUN_TOOL_NAME,
   label: REVIEW_RUN_TOOL_LABEL,
   parameters: runReviewSchema,
+  // Start Reviews only through direct model calls.
+  exposure: "model-only",
 } as const;

@@ -92,6 +92,7 @@ describe("ask_user tool", () => {
     const tool = getTool(pi, "ask_user");
 
     expect(tool.label).toBe("Ask User");
+    expect(tool).toMatchObject({ exposure: "model-only" });
     expect((tool as { executionMode?: string }).executionMode).toBe("sequential");
     expect(tool.description).toContain("focused user decision blocks progress");
     expect(tool.description).toContain("Not for status updates or broad surveys");

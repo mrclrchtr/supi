@@ -16,5 +16,7 @@ export function buildAntigravityRunParameters(catalogue: readonly CuratedModel[]
 export const antigravityRunSpec = {
   name: ANTIGRAVITY_RUN_TOOL_NAME,
   label: ANTIGRAVITY_RUN_TOOL_LABEL,
+  // Start or continue Antigravity runs only through direct model calls.
+  exposure: "model-only",
   executionMode: "parallel",
 } as const;

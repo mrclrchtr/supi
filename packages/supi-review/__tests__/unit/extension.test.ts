@@ -25,7 +25,10 @@ describe("supi-review extension", () => {
       "review_audit",
     ]);
     expect(getTools(pi).some((tool) => tool.name === "review_prepare")).toBe(false);
-    expect(getTool(pi, "review_output")).toBeDefined();
+    expect(getTool(pi, "review_run")).toMatchObject({ exposure: "model-only" });
+    for (const name of ["review_output", "review_audit"]) {
+      expect({ exposure: "direct", ...getTool(pi, name) }).toMatchObject({ exposure: "direct" });
+    }
     expect(mocks.syncReviewAgentTools).not.toHaveBeenCalled();
     expect(pi.commands.has("supi-review")).toBe(true);
     expect(pi.commands.has("supi-review-cleanup")).toBe(true);
