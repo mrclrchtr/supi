@@ -1,6 +1,6 @@
 [tools]
 node = "lts"
-pnpm = "latest"
+pnpm = "12.8.0"
 hk = "2.4.0"
 pkl = "0.32.1"
 
