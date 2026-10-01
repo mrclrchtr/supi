@@ -212,6 +212,7 @@ describe("AgentsDialog transcript viewer", () => {
     const store = new AgentRunTranscriptStore();
     stores.push(store);
     const toolRenderers = [{ name: "read" }];
+    const rawToolPath = '"path": "src/index.ts"';
     const capture = store.createCapture(
       {
         runKey: "run-1",
@@ -302,6 +303,8 @@ describe("AgentsDialog transcript viewer", () => {
     expect(conversationText).toContain("Visible answer.");
     expect(conversationText).toContain("Private reasoning.");
     expect(conversationText).toContain("File output.");
+    expect(conversationText).toContain('path="src/index.ts"');
+    expect(conversationText).not.toContain(rawToolPath);
     expect(conversationText).not.toContain("Child system prompt");
     expect(conversationText).not.toContain("Raw tool input/result hidden");
     expect(conversationText).not.toContain("Run events");
@@ -322,6 +325,7 @@ describe("AgentsDialog transcript viewer", () => {
     lines = dialog.render(120);
     expect(lines.join("\n")).toContain("Child system prompt");
     expect(lines.join("\n")).toContain("Raw tool input/result hidden");
+    expect(lines.join("\n")).not.toContain(rawToolPath);
     expect(lines.join("\n")).not.toContain("Run events");
     expect(lines.join("\n")).not.toContain("agent_start");
     expect(lines.join("\n")).not.toContain("turn_start");
@@ -332,13 +336,16 @@ describe("AgentsDialog transcript viewer", () => {
     const hiddenRow = lines.findIndex((line) => line.includes("Raw tool input/result hidden"));
     expect(hiddenRow).toBeGreaterThanOrEqual(0);
     expect(click(dialog, 50, hiddenRow)).toEqual({ handled: true });
-    expect(dialog.render(120).join("\n")).toContain("src/index.ts");
+    expect(dialog.render(120).join("\n")).toContain("Raw tool input/result");
+    expect(dialog.render(120).join("\n")).toContain(rawToolPath);
     dialog.handleInput("\t");
-    expect(dialog.render(120).join("\n")).not.toContain("src/index.ts");
+    expect(dialog.render(120).join("\n")).toContain('path="src/index.ts"');
+    expect(dialog.render(120).join("\n")).not.toContain(rawToolPath);
     dialog.handleInput("\t");
-    expect(dialog.render(120).join("\n")).toContain("src/index.ts");
+    expect(dialog.render(120).join("\n")).toContain(rawToolPath);
     dialog.handleInput("\u000f");
     expect(dialog.render(120).join("\n")).toContain("Raw tool input/result hidden");
+    expect(dialog.render(120).join("\n")).not.toContain(rawToolPath);
 
     lines = dialog.render(120);
     const thinkingRow = lines.findIndex((line) => line.includes("Private reasoning."));
@@ -377,7 +384,7 @@ describe("AgentsDialog transcript viewer", () => {
     );
     lines = dialog.render(100);
     expect(lines.join("\n")).toContain("Raw tool input/result hidden");
-    expect(lines.join("\n")).not.toContain("src/index.ts");
+    expect(lines.join("\n")).not.toContain(rawToolPath);
     expect(lines.join("\n")).toContain("Thinking is hidden");
     dialog.dispose();
   });
