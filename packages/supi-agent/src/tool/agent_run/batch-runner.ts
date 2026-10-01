@@ -156,14 +156,14 @@ export async function runDelegationBatch(
     let liveSession: AgentRunSessionView | undefined;
     const telemetry = new AgentRunTelemetry();
     const currentConversationView = (
-      acceptedSteering: readonly string[] = [],
+      queuedSteering: readonly string[] = [],
     ): AgentConversationView =>
       liveSession
         ? buildConversationView({
             taskId: task.taskId,
             profileId: task.profileId,
             messages: liveSession.messages,
-            acceptedSteering,
+            queuedSteering,
             taskMetadata,
           })
         : (conversationViews.get(task.taskId) ?? {
@@ -176,9 +176,9 @@ export async function runDelegationBatch(
             taskMetadata,
           });
     const displayConversation = (
-      acceptedSteering: readonly string[],
+      queuedSteering: readonly string[],
     ): AgentRunDisplayConversation => {
-      const view = currentConversationView(acceptedSteering);
+      const view = currentConversationView(queuedSteering);
       return {
         entries: view.entries,
         omittedEntryCount: view.omittedEntryCount,
@@ -218,7 +218,7 @@ export async function runDelegationBatch(
         return () => {
           unsubscribe();
           try {
-            const view = currentConversationView(registry?.acceptedSteering(runKey));
+            const view = currentConversationView(registry?.queuedSteering(runKey));
             conversationViews.set(task.taskId, view);
           } catch {
             // Conversation View is presentation-only.

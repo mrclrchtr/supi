@@ -1,3 +1,4 @@
+import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -29,11 +30,12 @@ function createSession() {
       listener = callback;
       return vi.fn();
     }),
-    prompt: vi.fn(async () => {
+    prompt: vi.fn<AgentSession["prompt"]>(async (_prompt, options) => {
+      options?.preflightResult?.("started");
       listener?.({ type: "agent_settled" });
     }),
     abort: vi.fn(async () => undefined),
-    steer: vi.fn(async () => undefined),
+    steer: vi.fn<AgentSession["steer"]>(async () => "queued"),
     sendUserMessage: vi.fn(async () => undefined),
     sendCustomMessage: vi.fn(async () => undefined),
     clearQueue: vi.fn(() => ({ steering: [], followUp: [] })),

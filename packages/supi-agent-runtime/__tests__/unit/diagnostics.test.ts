@@ -187,7 +187,7 @@ describe("Agent Run diagnostics", () => {
     const diagnostics = await failureDiagnostics((harness) => {
       harness.session.getActiveToolNames.mockReturnValue(["read", longName]);
       harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
-        options?.preflightResult?.(true);
+        options?.preflightResult?.("started");
         for (let index = 0; index < 100; index++) {
           harness.session.emit({ type: "agent_start" });
         }

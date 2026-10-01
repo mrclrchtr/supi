@@ -76,7 +76,7 @@ it("exposes progress, active steering, stop, and the terminal result", async () 
   const { session } = createHarness(mocks);
   session.prompt.mockImplementationOnce(async (_prompt, options) => {
     session.isStreaming = true;
-    options?.preflightResult?.(true);
+    options?.preflightResult?.("started");
     await new Promise<void>(() => undefined);
   });
   const run = startRegisteredAgentRun({
@@ -103,7 +103,7 @@ it("exposes progress, active steering, stop, and the terminal result", async () 
   await vi.waitFor(() => expect(session.prompt).toHaveBeenCalledOnce());
 
   expect(run.steeringAvailable).toBe(true);
-  await expect(run.steer("check the tests")).resolves.toBe("accepted");
+  await expect(run.steer("check the tests")).resolves.toBe("queued");
   await run.stop();
 
   await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
@@ -119,7 +119,7 @@ it("waits for the finalized transcript before resolving the registered result", 
   const { session } = createHarness(mocks);
   session.systemPrompt = "Child system prompt";
   session.prompt.mockImplementationOnce(async (_prompt, options) => {
-    options?.preflightResult?.(true);
+    options?.preflightResult?.("started");
     session.emit({
       type: "message_end",
       message: {

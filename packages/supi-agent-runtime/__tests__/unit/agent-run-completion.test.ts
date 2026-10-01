@@ -79,7 +79,7 @@ it("does not start a prompt accepted after cancellation", async () => {
       new Promise<void>(() => {
         acceptPreflight = () => {
           try {
-            options?.preflightResult?.(true);
+            options?.preflightResult?.("started");
           } catch {
             // The runtime rejects a late preflight acceptance to stop PI prompting.
           }
@@ -99,13 +99,13 @@ it("does not start a prompt accepted after cancellation", async () => {
   await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
 });
 
-it("lets cancellation own a later prompt rejection", async () => {
+it("lets cancellation own a later prompt rejection without a disposition", async () => {
   const harness = createHarness(mocks);
-  let rejectPreflight!: () => void;
+  let rejectPrompt!: (error: Error) => void;
   harness.session.prompt.mockImplementationOnce(
-    async (_prompt, options) =>
-      new Promise<void>(() => {
-        rejectPreflight = () => options?.preflightResult?.(false);
+    async () =>
+      new Promise<void>((_resolve, reject) => {
+        rejectPrompt = reject;
       }),
   );
   const run = startAgentRun({
@@ -115,7 +115,7 @@ it("lets cancellation own a later prompt rejection", async () => {
   });
   await vi.waitFor(() => expect(harness.session.prompt).toHaveBeenCalled());
   const stopped = run.stop();
-  rejectPreflight();
+  rejectPrompt(new Error("prompt rejected before start"));
 
   await stopped;
   await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
@@ -128,7 +128,7 @@ it("lets cancellation own a later accepted-prompt rejection", async () => {
   harness.session.prompt.mockImplementationOnce(
     async (_prompt, options) =>
       new Promise<void>((_resolve, reject) => {
-        options?.preflightResult?.(true);
+        options?.preflightResult?.("started");
         rejectPrompt = reject;
       }),
   );
@@ -159,7 +159,7 @@ it("maps an accepted prompt rejection after settlement to unexpected runner fail
   harness.session.prompt.mockImplementationOnce(
     async (_prompt, options) =>
       new Promise<void>((_resolve, reject) => {
-        options?.preflightResult?.(true);
+        options?.preflightResult?.("started");
         rejectPrompt = reject;
       }),
   );

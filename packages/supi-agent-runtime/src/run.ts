@@ -6,6 +6,7 @@ import type {
   AgentSessionEvent,
   AgentSessionRuntime,
   ExtensionRuntime,
+  PromptOptions,
 } from "@earendil-works/pi-coding-agent";
 import {
   createAgentSession,
@@ -40,6 +41,28 @@ import { collectAgentRunUsage } from "./usage.ts";
 export const AGENT_RUN_ABORT_GRACE_MS = 2_000;
 /** Maximum wait for initial steering to settle before recovery is skipped. */
 const INITIAL_STEERING_DRAIN_GRACE_MS = 2_000;
+type PromptDisposition = Parameters<NonNullable<PromptOptions["preflightResult"]>>[0];
+type PromptRejectionReason =
+  | "handled"
+  | "queued"
+  | "threw-before-start"
+  | "resolved-without-disposition";
+// Pi can defer a prompt after its first call resolves. Reject a late start.
+const shouldRejectLatePromptStart = (state: {
+  disposition: PromptDisposition;
+  preflightClosed: boolean;
+  promptPromiseSettled: boolean;
+  promptFailureRecorded: boolean;
+  promptClosed: boolean;
+  dispositionObserved: boolean;
+  promptAccepted: boolean;
+}): boolean =>
+  state.disposition === "started" &&
+  (state.preflightClosed ||
+    state.promptPromiseSettled ||
+    state.promptFailureRecorded ||
+    state.promptClosed ||
+    (state.dispositionObserved && !state.promptAccepted));
 /** Grace period for AgentSessionRuntime disposal. */
 export const AGENT_RUN_SHUTDOWN_GRACE_MS = 2_000;
 /** Maximum turns accepted from one finite continuation policy. */
@@ -557,18 +580,31 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     activeSession.setThinkingLevel(step.thinkingLevel);
     const previousAssistant = latestAssistant(activeSession);
     let accepted = false;
+    let dispositionSeen = false;
+    let promptCallSettled = false;
     let promptFailed = false;
     try {
       await activeSession.prompt(step.prompt, {
-        preflightResult: (success) => {
-          accepted = success;
-          if (success && (aborting || terminal || finalizing)) {
-            throw new Error("Agent Run continuation canceled before acceptance");
+        preflightResult: (disposition) => {
+          if (
+            disposition === "started" &&
+            (promptCallSettled ||
+              aborting ||
+              terminal ||
+              finalizing ||
+              (dispositionSeen && !accepted))
+          ) {
+            throw new Error("Agent Run continuation prompt started after its preflight closed");
           }
+          if (dispositionSeen) return;
+          dispositionSeen = true;
+          accepted = disposition === "started";
         },
       });
     } catch {
       promptFailed = true;
+    } finally {
+      promptCallSettled = true;
     }
     try {
       await awaitSessionQuiescence(activeSession);
@@ -764,32 +800,68 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       timeoutId = setTimeout(requestTimeout, options.timeoutMs);
       timeoutId.unref?.();
     }
+    const promptIsClosed = (): boolean =>
+      cancelRequested || timeoutRequested || aborting || terminal || finalizing;
     const publishPromptAcceptance = (): void => {
       publish();
-      if (cancelRequested || aborting || terminal || finalizing) {
+      if (promptIsClosed()) {
         throw new Error("Agent Run prompt canceled before acceptance");
       }
     };
-    const onPreflight = (accepted: boolean): void => {
+    const rejectBeforePromptStarted = (reason: PromptRejectionReason): void => {
+      promptFailureCode ??= "prompt-rejected";
+      if (promptIsClosed()) return;
+      lifecycle.recordHostMarker({ type: "prompt_rejected", reason });
+    };
+    let promptDispositionObserved = false;
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Check the late-start fence before changing preflight state.
+    const onPreflight = (disposition: PromptDisposition): void => {
+      const preflightClosed = promptPreflightSettled && !promptDispositionObserved;
+      if (
+        shouldRejectLatePromptStart({
+          disposition,
+          preflightClosed,
+          promptPromiseSettled,
+          promptFailureRecorded: promptFailureCode !== undefined,
+          promptClosed: promptIsClosed(),
+          dispositionObserved: promptDispositionObserved,
+          promptAccepted,
+        })
+      ) {
+        settlePromptPreflight();
+        throw new Error("Agent Run prompt started after its preflight closed");
+      }
+      if (promptDispositionObserved || preflightClosed) return;
+      promptDispositionObserved = true;
       settlePromptPreflight();
-      if (!accepted) {
+      if (disposition !== "started") {
         promptActive = false;
-        if (cancelRequested || timeoutRequested || aborting || terminal || finalizing) return;
-        lifecycle.recordHostMarker({ type: "prompt_rejected" });
-        promptFailureCode = "prompt-rejected";
+        if (promptIsClosed()) return;
+        rejectBeforePromptStarted(disposition);
         return;
       }
-      if (cancelRequested || timeoutRequested || aborting || terminal || finalizing) {
+      if (promptIsClosed()) {
         throw new Error("Agent Run prompt canceled before acceptance");
       }
       promptAccepted = true;
       promptActive = true;
       publishPromptAcceptance();
     };
+    const handlePromptRejection = (): void => {
+      if (promptFailureCode) return;
+      if (promptAccepted) {
+        promptFailureCode = "unexpected-runner-failure";
+      } else {
+        rejectBeforePromptStarted("threw-before-start");
+      }
+    };
     try {
       const promptPromise = session.prompt(options.prompt, { preflightResult: onPreflight });
       void Promise.resolve(promptPromise).then(
         () => {
+          if (!promptPreflightSettled && !promptAccepted) {
+            rejectBeforePromptStarted("resolved-without-disposition");
+          }
           settlePromptPreflight();
           promptPromiseSettled = true;
           promptActive = false;
@@ -802,8 +874,8 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
           promptPromiseSettled = true;
           promptActive = false;
           publish();
-          promptFailureCode ??= "unexpected-runner-failure";
-          startPromptFailureSettlement(promptFailureCode);
+          handlePromptRejection();
+          startPromptFailureSettlement(promptFailureCode ?? "unexpected-runner-failure");
         },
       );
     } catch {
@@ -811,8 +883,8 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       promptPromiseSettled = true;
       promptActive = false;
       publish();
-      promptFailureCode ??= "unexpected-runner-failure";
-      startPromptFailureSettlement(promptFailureCode);
+      handlePromptRejection();
+      startPromptFailureSettlement(promptFailureCode ?? "unexpected-runner-failure");
     }
   };
 
@@ -970,7 +1042,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       const admissionAtStart = admissionGeneration;
       const steering = (async (): Promise<AgentRunSteerResult> => {
         try {
-          await activeSession.steer(message);
+          const disposition = await activeSession.steer(message);
           if (
             !extensionAdmissionOpen ||
             admissionGeneration !== admissionAtStart ||
@@ -983,7 +1055,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
             }
             return "not-running";
           }
-          return "accepted";
+          return disposition;
         } catch {
           return "not-running";
         }

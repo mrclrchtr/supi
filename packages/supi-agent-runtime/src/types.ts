@@ -1,5 +1,6 @@
 import type { Model, ModelThinkingLevel, Usage } from "@earendil-works/pi-ai";
 import type {
+  AgentSession,
   AgentSessionEvent,
   ResourceLoader,
   SessionStats,
@@ -10,7 +11,7 @@ import type { AgentRunProviderAuthority } from "./provider-authority.ts";
 import type { AgentRunRegistry } from "./session/agent-run-registry.ts";
 import type { AgentRunRegistration } from "./session/agent-run-registry-types.ts";
 
-/** The host-owned failure stages of one Agent Run. */
+/** The host-owned failure stages of one Agent Run; `prompt-rejected` means no initial prompt started. */
 export type AgentRunFailureCode =
   | "session-creation-failed"
   | "session-not-ready"
@@ -260,10 +261,13 @@ export type AgentRunLifecycleTraceEntry =
   | { type: "queue_update"; steeringCount: number; followUpCount: number }
   | { type: "timeout_expired" }
   | { type: "abort_requested"; reason: "canceled" | "timeout" }
-  | { type: "prompt_rejected" };
+  | {
+      type: "prompt_rejected";
+      reason: "handled" | "queued" | "threw-before-start" | "resolved-without-disposition";
+    };
 
-/** Result returned by an active-only steering request. */
-export type AgentRunSteerResult = "accepted" | "not-running";
+/** Pi's input disposition for an active steering request, or a closed/unavailable run. */
+export type AgentRunSteerResult = Awaited<ReturnType<AgentSession["steer"]>> | "not-running";
 
 /** Listener used by the Agent Run Handle progress subscription. */
 export type AgentRunProgressListener = (progress: AgentRunProgress) => void;

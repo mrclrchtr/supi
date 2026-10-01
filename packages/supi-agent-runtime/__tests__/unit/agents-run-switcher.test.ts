@@ -45,7 +45,7 @@ function dependencies(overrides: Partial<AgentsDialogDependencies> = {}): Agents
     theme: makeCtx().ui.theme as never,
     done: vi.fn(),
     tui: { requestRender: vi.fn(), terminal: { rows: 24 } },
-    onSteer: vi.fn(async () => "accepted" as const),
+    onSteer: vi.fn(async () => "queued" as const),
     onStop: vi.fn(async () => "accepted" as const),
     ...overrides,
   };

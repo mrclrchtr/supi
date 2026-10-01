@@ -98,7 +98,7 @@ function dependencies(overrides: Partial<AgentsDialogDependencies> = {}): Agents
     theme: makeCtx().ui.theme as never,
     done: vi.fn(),
     tui: { requestRender: vi.fn(), terminal: { rows: 24 } },
-    onSteer: vi.fn(async () => "accepted" as const),
+    onSteer: vi.fn(async () => "queued" as const),
     onStop: vi.fn(async () => "accepted" as const),
     ...overrides,
   };
@@ -448,7 +448,7 @@ describe("AgentsDialog", () => {
 
   it("keeps steering in the overlay and cancels without closing it", () => {
     const done = vi.fn();
-    const onSteer = vi.fn(async () => "accepted" as const);
+    const onSteer = vi.fn(async () => "queued" as const);
     const dialog = new AgentsDialog(data(), dependencies({ done, onSteer }));
     openConversation(dialog);
     dialog.handleInput("s");
@@ -461,8 +461,8 @@ describe("AgentsDialog", () => {
     expect(dialog.render(100).join("\n")).toContain("s steer · x stop");
   });
 
-  it("steers and stops only the selected active run", async () => {
-    const onSteer = vi.fn(async () => "accepted" as const);
+  it("shows queued steering and controls only the selected active run", async () => {
+    const onSteer = vi.fn(async () => "queued" as const);
     const onStop = vi.fn(async () => "accepted" as const);
     const dialog = new AgentsDialog(data(), dependencies({ onSteer, onStop }));
     openConversation(dialog);
@@ -470,12 +470,29 @@ describe("AgentsDialog", () => {
     expect(dialog.render(100).join("\n")).toContain("Steer inspect");
     for (const character of "Focus on tests") dialog.handleInput(character);
     dialog.handleInput("\n");
-    await vi.waitFor(() => expect(dialog.render(100).join("\n")).toContain("Control accepted"));
+    await vi.waitFor(() => expect(dialog.render(100).join("\n")).toContain("Steering queued."));
     expect(onSteer).toHaveBeenCalledWith("inspect", "Focus on tests");
     dialog.handleInput("x");
     expect(onStop).not.toHaveBeenCalled();
     dialog.handleInput("y");
     await vi.waitFor(() => expect(onStop).toHaveBeenCalledWith("inspect"));
+  });
+
+  it("reports handled input without calling it queued steering", async () => {
+    const onSteer = vi.fn(async () => "handled" as const);
+    const dialog = new AgentsDialog(data(), dependencies({ onSteer }));
+    openConversation(dialog);
+    dialog.handleInput("s");
+    for (const character of "Open the help command") dialog.handleInput(character);
+    dialog.handleInput("\n");
+
+    await vi.waitFor(() =>
+      expect(dialog.render(100).join("\n")).toContain(
+        "Pi handled the input; it was not queued as steering.",
+      ),
+    );
+    expect(dialog.render(100).join("\n")).not.toContain("Steering queued.");
+    expect(onSteer).toHaveBeenCalledWith("inspect", "Open the help command");
   });
 
   it("permits selected stop during startup and shows the stopping wait", async () => {
@@ -515,7 +532,7 @@ describe("AgentsDialog", () => {
   });
 
   it("disables controls for a completed run", () => {
-    const onSteer = vi.fn(async () => "accepted" as const);
+    const onSteer = vi.fn(async () => "queued" as const);
     const onStop = vi.fn(async () => "accepted" as const);
     const completed = makeAgentsRun({
       active: false,

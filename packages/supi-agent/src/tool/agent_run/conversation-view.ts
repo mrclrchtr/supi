@@ -32,8 +32,8 @@ export interface ConversationViewOptions {
   taskId: string;
   profileId: string;
   messages: readonly AgentRunMessage[];
-  /** Steering accepted by the overlay, including messages not yet present in the child session. */
-  acceptedSteering?: readonly string[];
+  /** Steering queued by Pi but not yet present in the child session. */
+  queuedSteering?: readonly string[];
   taskMetadata: ConversationTaskMetadata;
 }
 
@@ -122,7 +122,7 @@ export function buildConversationView(options: ConversationViewOptions): AgentCo
       observedSteering.set(entry.text, (observedSteering.get(entry.text) ?? 0) + 1);
     }
   }
-  for (const text of options.acceptedSteering ?? []) {
+  for (const text of options.queuedSteering ?? []) {
     const observedCount = observedSteering.get(text) ?? 0;
     if (observedCount > 0) {
       observedSteering.set(text, observedCount - 1);

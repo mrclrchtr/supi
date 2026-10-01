@@ -1,3 +1,4 @@
+import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { type Mock, vi } from "vitest";
 import type { AgentRunProviderAuthority, AgentSessionInputs } from "../../src/api.ts";
 
@@ -44,18 +45,16 @@ export function createHarness(mocks: AgentRunMocks, entries: unknown[] = []) {
     emit(event: { type: string; [key: string]: unknown }) {
       for (const listener of listeners) listener(event);
     },
-    prompt: vi.fn(
-      async (_prompt: string, options?: { preflightResult?: (accepted: boolean) => void }) => {
-        session.isStreaming = true;
-        options?.preflightResult?.(true);
-        session.emit({ type: "agent_settled" });
-        session.isStreaming = false;
-      },
-    ),
+    prompt: vi.fn<AgentSession["prompt"]>(async (_prompt, options) => {
+      session.isStreaming = true;
+      options?.preflightResult?.("started");
+      session.emit({ type: "agent_settled" });
+      session.isStreaming = false;
+    }),
     setActiveToolsByName: vi.fn(),
     setModel: vi.fn(async () => undefined),
     setThinkingLevel: vi.fn(),
-    steer: vi.fn(async () => undefined),
+    steer: vi.fn<AgentSession["steer"]>(async () => "queued"),
     sendUserMessage: vi.fn(
       async (_content?: unknown, _options?: unknown): Promise<void> => undefined,
     ),

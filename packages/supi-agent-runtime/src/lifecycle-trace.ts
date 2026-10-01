@@ -72,8 +72,10 @@ export class AgentRunLifecycleTraceCollector {
   recordHostMarker(marker: AgentRunLifecycleTraceEntry): void {
     switch (marker.type) {
       case "timeout_expired":
-      case "prompt_rejected":
         this.#push({ type: marker.type });
+        break;
+      case "prompt_rejected":
+        this.#push({ type: marker.type, reason: marker.reason });
         break;
       case "abort_requested":
         this.#push({ type: "abort_requested", reason: marker.reason });
@@ -135,8 +137,9 @@ function formatEntry(entry: AgentRunLifecycleTraceEntry): string {
     case "agent_settled":
     case "summarization_retry_finished":
     case "timeout_expired":
-    case "prompt_rejected":
       return entry.type;
+    case "prompt_rejected":
+      return `prompt_rejected(reason=${entry.reason})`;
     case "agent_end":
       return `agent_end(willRetry=${entry.willRetry})`;
     case "compaction_start":

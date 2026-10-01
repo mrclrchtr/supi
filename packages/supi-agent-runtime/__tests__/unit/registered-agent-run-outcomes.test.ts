@@ -126,7 +126,7 @@ it("completes stop after bounded disposal when the prompt does not settle", asyn
   const { session, runtime } = createHarness(mocks);
   session.prompt.mockImplementationOnce(async (_prompt, options) => {
     session.isStreaming = true;
-    options?.preflightResult?.(true);
+    options?.preflightResult?.("started");
     await new Promise<void>(() => undefined);
   });
   const run = startRegisteredAgentRun({
@@ -160,7 +160,7 @@ it("stops after bounded disposal while a transcript message write is pending", a
   const capturedMessage = "The run was canceled while this message was written.";
   session.prompt.mockImplementationOnce(async (_prompt, options) => {
     session.isStreaming = true;
-    options?.preflightResult?.(true);
+    options?.preflightResult?.("started");
     session.emit({
       type: "message_end",
       message: {
@@ -248,7 +248,7 @@ it("finishes transcript capture after a timeout", async () => {
   fakeTimersEnabled = true;
   const { session } = createHarness(mocks);
   session.prompt.mockImplementationOnce(async (_prompt, options) => {
-    options?.preflightResult?.(true);
+    options?.preflightResult?.("started");
     await new Promise<void>(() => undefined);
   });
   const run = startRegisteredAgentRun({

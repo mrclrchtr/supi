@@ -64,7 +64,7 @@ export interface AgentRunRegistration {
   readonly transcript?: AgentRunTranscriptCapture;
   readonly handle: AgentRunHandle<unknown>;
   readonly getConversation?: (
-    acceptedSteering: readonly string[],
+    queuedSteering: readonly string[],
   ) => AgentRunDisplayConversation | undefined;
   readonly getRecentActivity?: () => readonly string[];
 }

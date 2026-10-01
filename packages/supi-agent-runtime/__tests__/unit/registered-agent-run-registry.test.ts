@@ -92,7 +92,7 @@ it("removes transcript files when the containing session shuts down", async () =
   const { session } = createHarness(mocks);
   session.prompt.mockImplementationOnce(async (_prompt, options) => {
     session.isStreaming = true;
-    options?.preflightResult?.(true);
+    options?.preflightResult?.("started");
     await new Promise<void>(() => undefined);
   });
   const run = startRegisteredAgentRun({

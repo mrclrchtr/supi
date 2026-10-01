@@ -69,7 +69,7 @@ function controlledHandle(): ControlledHandle {
       listener({ status: "running", turns: 0, toolUses: 0, toolErrors: 0 });
       return () => listeners.delete(listener);
     },
-    steer: vi.fn(async () => "accepted" as const),
+    steer: vi.fn(async () => "queued" as const),
     stop: vi.fn(async () => {
       resolve({
         kind: "canceled",

@@ -8,7 +8,13 @@ import type {
   AgentRunSessionView,
 } from "../../src/types.ts";
 
-function makeHandle(options: { status?: AgentRunProgress["status"]; steering?: boolean } = {}) {
+function makeHandle(
+  options: {
+    status?: AgentRunProgress["status"];
+    steering?: boolean;
+    steerResult?: "queued" | "handled";
+  } = {},
+) {
   let resolve!: (outcome: AgentRunOutcome<string>) => void;
   const result = new Promise<AgentRunOutcome<string>>((done) => {
     resolve = done;
@@ -20,7 +26,7 @@ function makeHandle(options: { status?: AgentRunProgress["status"]; steering?: b
     toolErrors: 0,
   };
   const stop = vi.fn(async () => undefined);
-  const steer = vi.fn(async () => "accepted" as const);
+  const steer = vi.fn(async () => options.steerResult ?? "queued");
   const unsubscribeProgress = vi.fn();
   const handle: AgentRunHandle<string> = {
     steeringAvailable: options.steering ?? true,
@@ -77,7 +83,7 @@ describe("Agent Run Registry", () => {
     registry.register({ metadata: metadata("prompting"), handle: prompting.handle });
     registry.register({ metadata: metadata("recovering"), handle: recovering.handle });
 
-    await expect(registry.steer("prompting", "Check the test path")).resolves.toBe("accepted");
+    await expect(registry.steer("prompting", "Check the test path")).resolves.toBe("queued");
     await expect(registry.steer("recovering", "Change the review criteria")).resolves.toBe(
       "not-running",
     );
@@ -86,6 +92,30 @@ describe("Agent Run Registry", () => {
     expect(
       registry.snapshot().runs.find((run) => run.runKey === "recovering")?.steeringAvailable,
     ).toBe(false);
+  });
+
+  it("returns handled input without recording it as queued steering", async () => {
+    const registry = new AgentRunRegistry();
+    const handled = makeHandle({ steerResult: "handled" });
+    const getConversation = vi.fn((queuedSteering: readonly string[]) => ({
+      entries: queuedSteering.map((text) => ({ kind: "steering" as const, text })),
+      omittedEntryCount: 0,
+      omittedCharacterCount: 0,
+      textTruncated: false,
+    }));
+    registry.register({
+      metadata: metadata("handled-steering"),
+      handle: handled.handle,
+      getConversation,
+    });
+
+    await expect(registry.steer("handled-steering", "Open the help command")).resolves.toBe(
+      "handled",
+    );
+
+    expect(registry.queuedSteering("handled-steering")).toEqual([]);
+    registry.snapshot();
+    expect(getConversation).toHaveBeenLastCalledWith([]);
   });
 
   it("stops only the selected run and leaves sibling reviewers active", async () => {
@@ -181,8 +211,8 @@ describe("Agent Run Registry", () => {
   it("releases steering records after the final snapshot and ignores late steering", async () => {
     const registry = new AgentRunRegistry();
     const run = makeHandle();
-    const getConversation = vi.fn((acceptedSteering: readonly string[]) => ({
-      entries: acceptedSteering.map((text) => ({ kind: "steering" as const, text })),
+    const getConversation = vi.fn((queuedSteering: readonly string[]) => ({
+      entries: queuedSteering.map((text) => ({ kind: "steering" as const, text })),
       omittedEntryCount: 0,
       omittedCharacterCount: 0,
       textTruncated: false,
@@ -197,8 +227,8 @@ describe("Agent Run Registry", () => {
     let acceptLateSteering!: () => void;
     run.steer.mockImplementationOnce(
       () =>
-        new Promise<"accepted">((resolve) => {
-          acceptLateSteering = () => resolve("accepted");
+        new Promise<"queued">((resolve) => {
+          acceptLateSteering = () => resolve("queued");
         }),
     );
     const lateSteering = registry.steer("steering-race", "Late steering");
@@ -206,11 +236,11 @@ describe("Agent Run Registry", () => {
     run.resolve({ kind: "success", value: "Done" });
     await run.handle.result;
     expect(getConversation).toHaveBeenLastCalledWith(["First steering"]);
-    expect(registry.acceptedSteering("steering-race")).toEqual([]);
+    expect(registry.queuedSteering("steering-race")).toEqual([]);
 
     acceptLateSteering();
-    await expect(lateSteering).resolves.toBe("accepted");
-    expect(registry.acceptedSteering("steering-race")).toEqual([]);
+    await expect(lateSteering).resolves.toBe("queued");
+    expect(registry.queuedSteering("steering-race")).toEqual([]);
     expect(registry.snapshot().runs[0]?.conversation?.entries).toEqual([
       { kind: "steering", text: "First steering" },
     ]);

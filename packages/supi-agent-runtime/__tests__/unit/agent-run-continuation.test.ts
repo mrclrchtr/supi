@@ -17,7 +17,7 @@ vi.mock("@earendil-works/pi-coding-agent", async (original) => ({
   createAgentSessionRuntime: mocks.createAgentSessionRuntime,
 }));
 
-import { startAgentRun } from "../../src/api.ts";
+import { type AgentRunSteerResult, startAgentRun } from "../../src/api.ts";
 import { createHarness, inputs } from "../helpers/agent-run-harness.ts";
 
 const recoveryModel = {
@@ -82,13 +82,58 @@ describe("Agent Run finite continuation", () => {
     expect(harness.runtime.dispose).toHaveBeenCalledTimes(1);
   });
 
+  it.each(["handled", "queued", "throws", "missing"] as const)(
+    "does not treat a %s continuation prompt as a settled turn",
+    async (disposition) => {
+      const harness = createHarness(mocks);
+      let promptNumber = 0;
+      harness.session.prompt.mockImplementation(async (_prompt, options) => {
+        promptNumber++;
+        if (promptNumber === 1) {
+          options?.preflightResult?.("started");
+          harness.session.emit({ type: "agent_settled" });
+          return;
+        }
+        if (disposition === "throws") throw new Error("pre-start continuation rejection");
+        if (disposition === "missing") return;
+        options?.preflightResult?.(disposition);
+      });
+      const completionResolver = vi.fn(() => undefined);
+      const onTurn = vi.fn();
+      const run = startAgentRun({
+        inputs: inputs(),
+        prompt: "initial prompt",
+        completionResolver,
+        continuation: {
+          maxTurns: 1,
+          resolveNext: () => ({
+            prompt: "continuation prompt",
+            activeTools: ["read"],
+            thinkingLevel: "low",
+          }),
+          onTurn,
+        },
+      });
+
+      await expect(run.result).resolves.toMatchObject({
+        kind: "failed",
+        failureCode: "missing-completion",
+      });
+      expect(harness.session.prompt).toHaveBeenCalledTimes(2);
+      expect(completionResolver).toHaveBeenCalledTimes(1);
+      expect(onTurn).toHaveBeenCalledWith(
+        expect.objectContaining({ outcome: "provider-failed", promptAccepted: false }),
+      );
+    },
+  );
+
   it("finishes initial steering before it starts recovery", async () => {
     const harness = createHarness(mocks);
     let run: ReturnType<typeof startAgentRun> | undefined;
-    let steeringRequest: Promise<"accepted" | "not-running"> | undefined;
+    let steeringRequest: Promise<AgentRunSteerResult> | undefined;
     let releaseSteering!: () => void;
-    const steeringWork = new Promise<undefined>((resolve) => {
-      releaseSteering = () => resolve(undefined);
+    const steeringWork = new Promise<"queued">((resolve) => {
+      releaseSteering = () => resolve("queued");
     });
     harness.session.steer.mockImplementationOnce(() => steeringWork);
     let completion: string | undefined;
@@ -102,7 +147,7 @@ describe("Agent Run finite continuation", () => {
     });
     harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
       harness.session.isStreaming = true;
-      options?.preflightResult?.(true);
+      options?.preflightResult?.("started");
       steeringRequest = run?.steer("Initial-only direction");
       harness.session.emit({ type: "agent_settled" });
       harness.session.isStreaming = false;
@@ -111,7 +156,7 @@ describe("Agent Run finite continuation", () => {
     harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
       clearCallsAtRecoveryStart = harness.session.clearQueue.mock.calls.length;
       harness.session.isStreaming = true;
-      options?.preflightResult?.(true);
+      options?.preflightResult?.("started");
       harness.session.emit({ type: "agent_settled" });
       harness.session.isStreaming = false;
     });
@@ -138,11 +183,11 @@ describe("Agent Run finite continuation", () => {
     vi.useFakeTimers();
     const harness = createHarness(mocks);
     let run: ReturnType<typeof startAgentRun> | undefined;
-    harness.session.steer.mockImplementationOnce(() => new Promise<undefined>(() => {}));
+    harness.session.steer.mockImplementationOnce(() => new Promise<"queued">(() => {}));
     const resolveNext = vi.fn();
     harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
       harness.session.isStreaming = true;
-      options?.preflightResult?.(true);
+      options?.preflightResult?.("started");
       void run?.steer("Initial-only direction");
       harness.session.emit({ type: "agent_settled" });
       harness.session.isStreaming = false;
@@ -195,7 +240,7 @@ describe("Agent Run finite continuation", () => {
   it("lets continuation retain the original accepted provider failure", async () => {
     const harness = createHarness(mocks);
     harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
-      options?.preflightResult?.(true);
+      options?.preflightResult?.("started");
       throw new Error("private provider failure");
     });
     const resolveNext = vi.fn(async () => undefined);
@@ -229,15 +274,15 @@ describe("Agent Run finite continuation", () => {
       const harness = createHarness(mocks);
       const resolveNext = vi.fn();
       if (kind === "rejected") {
-        harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
-          options?.preflightResult?.(false);
+        harness.session.prompt.mockImplementationOnce(async () => {
+          throw new Error("pre-start prompt rejection");
         });
       }
       if (kind === "canceled") {
         harness.session.prompt.mockImplementationOnce(
           async (_prompt, options) =>
             new Promise<void>(() => {
-              options?.preflightResult?.(true);
+              options?.preflightResult?.("started");
             }),
         );
       }
@@ -246,7 +291,7 @@ describe("Agent Run finite continuation", () => {
         harness.session.prompt.mockImplementationOnce(
           async (_prompt, options) =>
             new Promise<void>(() => {
-              options?.preflightResult?.(true);
+              options?.preflightResult?.("started");
             }),
         );
       }
@@ -427,10 +472,10 @@ describe("Agent Run finite continuation", () => {
     const entries = [{ type: "message", message: { role: "assistant", usage: usage(2) } }];
     const harness = createHarness(mocks, entries);
     harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
-      options?.preflightResult?.(true);
+      options?.preflightResult?.("started");
     });
     harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
-      options?.preflightResult?.(true);
+      options?.preflightResult?.("started");
       entries.push({ type: "message", message: { role: "assistant", usage: usage(3) } });
     });
     let completion: string | undefined;

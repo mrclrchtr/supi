@@ -5,6 +5,7 @@ import type {
   AgentRunRegistryRun,
 } from "../session/agent-run-registry-types.ts";
 import type { AgentRunTranscriptSource } from "../session/transcript-store.ts";
+import type { AgentRunSteerResult } from "../types.ts";
 
 /** Shared height limit for the PI overlay and its rendered viewport. */
 export const AGENTS_OVERLAY_MAX_HEIGHT_PERCENT = 100;
@@ -64,7 +65,28 @@ export interface AgentsOverlayData {
 }
 
 /** Result of one interactive selected-run control. */
-export type AgentOverlayControlResult = "accepted" | "not-running" | "canceled";
+export type AgentOverlayControlResult =
+  | "accepted"
+  | "queued"
+  | "handled"
+  | "not-running"
+  | "canceled";
+
+/** Return clear feedback for one Pi or overlay control result. */
+export function agentOverlayControlNotice(result: AgentOverlayControlResult): string {
+  switch (result) {
+    case "queued":
+      return "Steering queued.";
+    case "handled":
+      return "Pi handled the input; it was not queued as steering.";
+    case "accepted":
+      return "Control accepted.";
+    case "canceled":
+      return "Control canceled.";
+    case "not-running":
+      return "Selected run is not running.";
+  }
+}
 
 /** Runtime dependencies for the interactive overlay. */
 export interface AgentsDialogDependencies {
@@ -72,7 +94,7 @@ export interface AgentsDialogDependencies {
   readonly done: () => void;
   readonly tui: { requestRender: () => void; terminal: { rows: number } };
   readonly keybindings?: Pick<KeybindingsManager, "getKeys" | "matches">;
-  readonly onSteer: (runKey: string, message: string) => Promise<AgentOverlayControlResult>;
-  readonly onStop: (runKey: string) => Promise<Exclude<AgentOverlayControlResult, "canceled">>;
+  readonly onSteer: (runKey: string, message: string) => Promise<AgentRunSteerResult>;
+  readonly onStop: (runKey: string) => Promise<"accepted" | "not-running">;
   readonly subscribe?: (listener: (data: AgentsOverlayData) => void) => () => void;
 }

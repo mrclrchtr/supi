@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AgentRunHandle, AgentRunSessionView } from "../types.ts";
+import type { AgentRunHandle, AgentRunSessionView, AgentRunSteerResult } from "../types.ts";
 import type {
   AgentRunDisplayConversation,
   AgentRunDisplayMetadata,
@@ -29,7 +29,7 @@ interface RegisteredRun {
   readonly generation: number;
   readonly metadata: AgentRunDisplayMetadata;
   readonly transcript?: AgentRunTranscriptCapture;
-  readonly acceptedSteering: string[];
+  readonly queuedSteering: string[];
   live?: LiveRun;
   status: AgentRunRegistryRun["status"];
   finishedAt?: number;
@@ -104,7 +104,7 @@ export class AgentRunRegistry {
         tools: [...registration.metadata.tools],
       },
       ...(registration.transcript ? { transcript: registration.transcript } : {}),
-      acceptedSteering: [],
+      queuedSteering: [],
       live,
       status: "starting",
       turns: 0,
@@ -191,7 +191,7 @@ export class AgentRunRegistry {
   }
 
   /** Queue steering only for the selected run during its initial active prompt. */
-  async steer(runKey: string, message: string): Promise<"accepted" | "not-running"> {
+  async steer(runKey: string, message: string): Promise<AgentRunSteerResult> {
     const run = this.#runs.get(runKey);
     const handle = run?.live?.handle;
     if (run?.status !== "running" || !handle?.steeringAvailable) {
@@ -199,20 +199,20 @@ export class AgentRunRegistry {
     }
     const result = await handle.steer(message);
     if (
-      result === "accepted" &&
+      result === "queued" &&
       this.#isCurrent(run) &&
       run.status === "running" &&
       run.live?.handle === handle
     ) {
-      run.acceptedSteering.push(message);
+      run.queuedSteering.push(message);
       this.#publish();
     }
     return result;
   }
 
-  /** Return the steering messages accepted through the viewer. */
-  acceptedSteering(runKey: string): readonly string[] {
-    return [...(this.#runs.get(runKey)?.acceptedSteering ?? [])];
+  /** Return steering messages that Pi queued through the viewer. */
+  queuedSteering(runKey: string): readonly string[] {
+    return [...(this.#runs.get(runKey)?.queuedSteering ?? [])];
   }
 
   /** Stop only the selected active run. */
@@ -326,7 +326,7 @@ export class AgentRunRegistry {
 
   #readConversation(run: RegisteredRun): AgentRunDisplayConversation | undefined {
     try {
-      const conversation = run.live?.getConversation?.([...run.acceptedSteering]);
+      const conversation = run.live?.getConversation?.([...run.queuedSteering]);
       return conversation ? copyConversation(conversation) : undefined;
     } catch {
       return undefined;
@@ -343,7 +343,7 @@ export class AgentRunRegistry {
   }
 
   #releaseLive(run: RegisteredRun): void {
-    run.acceptedSteering.length = 0;
+    run.queuedSteering.length = 0;
     const live = run.live;
     if (!live) return;
     live.unsubscribeProgress?.();

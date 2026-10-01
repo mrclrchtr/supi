@@ -21,7 +21,7 @@ describe("buildConversationView", () => {
     expect(view.entries[1].kind).toBe("steering");
   });
 
-  it("retains accepted steering that has not entered the child message list", () => {
+  it("retains queued steering that has not entered the child message list", () => {
     const messages: AgentRunMessage[] = [
       { role: "user", content: "Initial prompt", timestamp: 0 },
       { role: "user", content: "Already queued", timestamp: 0 },
@@ -30,7 +30,7 @@ describe("buildConversationView", () => {
       taskId: "t1",
       profileId: "explore",
       messages,
-      acceptedSteering: ["Already queued", "Stop checking docs"],
+      queuedSteering: ["Already queued", "Stop checking docs"],
       taskMetadata: { instructions: "do work" },
     });
 

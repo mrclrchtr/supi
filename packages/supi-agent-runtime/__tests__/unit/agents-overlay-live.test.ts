@@ -42,7 +42,7 @@ function dependencies(rows = 24): AgentsDialogDependencies {
     theme: makeCtx().ui.theme as never,
     tui: { requestRender: vi.fn(), terminal: { rows } },
     done: vi.fn(),
-    onSteer: vi.fn(async () => "accepted" as const),
+    onSteer: vi.fn(async () => "queued" as const),
     onStop: vi.fn(async () => "accepted" as const),
   };
 }

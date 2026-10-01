@@ -30,7 +30,7 @@ it("starts timeout measurement only immediately before prompting", async () => {
   harness.session.prompt.mockImplementationOnce(
     async (_prompt, options) =>
       new Promise<void>(() => {
-        options?.preflightResult?.(true);
+        options?.preflightResult?.("started");
       }),
   );
   const run = startAgentRun({
@@ -62,7 +62,7 @@ it("does not start streaming when a subscriber cancels during prompt preflight",
   const harness = createHarness(mocks);
   let streamingStarted = false;
   harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
-    options?.preflightResult?.(true);
+    options?.preflightResult?.("started");
     streamingStarted = true;
     harness.session.isStreaming = true;
     await new Promise<void>(() => {});
@@ -94,7 +94,7 @@ it("clears queued messages and rejects extension sends at the cancellation fence
   const harness = createHarness(mocks);
   harness.session.prompt.mockImplementationOnce(async (_prompt, options) => {
     harness.session.isStreaming = true;
-    options?.preflightResult?.(true);
+    options?.preflightResult?.("started");
     harness.session.emit({ type: "queue_update", steering: ["queued"], followUp: ["later"] });
     await new Promise<undefined>(() => {});
   });
@@ -121,7 +121,7 @@ it("allows active steering, makes stop idempotent, and settles after disposal", 
     async (_prompt, options) =>
       new Promise<void>((resolve) => {
         harness.session.isStreaming = true;
-        options?.preflightResult?.(true);
+        options?.preflightResult?.("started");
         finishPrompt = resolve;
       }),
   );
@@ -134,7 +134,7 @@ it("allows active steering, makes stop idempotent, and settles after disposal", 
   run.subscribe(() => steeringSnapshots.push(run.steeringAvailable));
   await vi.waitFor(() => expect(harness.session.prompt).toHaveBeenCalled());
   expect(run.steeringAvailable).toBe(true);
-  await expect(run.steer("redirect")).resolves.toBe("accepted");
+  await expect(run.steer("redirect")).resolves.toBe("queued");
   const firstStop = run.stop();
   expect(run.steeringAvailable).toBe(false);
   const secondStop = run.stop();
@@ -148,12 +148,39 @@ it("allows active steering, makes stop idempotent, and settles after disposal", 
   expect(harness.runtime.dispose).toHaveBeenCalledTimes(1);
 });
 
+it("returns Pi's handled steering disposition through the handle", async () => {
+  const harness = createHarness(mocks);
+  let finishPrompt!: () => void;
+  harness.session.prompt.mockImplementationOnce(
+    async (_prompt, options) =>
+      new Promise<void>((resolve) => {
+        harness.session.isStreaming = true;
+        options?.preflightResult?.("started");
+        finishPrompt = () => {
+          harness.session.isStreaming = false;
+          resolve();
+        };
+      }),
+  );
+  harness.session.steer.mockResolvedValueOnce("handled");
+  const run = startAgentRun({
+    inputs: inputs(),
+    prompt: "active handled steering",
+    completionResolver: () => "done",
+  });
+  await vi.waitFor(() => expect(harness.session.prompt).toHaveBeenCalled());
+
+  await expect(run.steer("Open help")).resolves.toBe("handled");
+  finishPrompt();
+  await expect(run.result).resolves.toMatchObject({ kind: "success", value: "done" });
+});
+
 it("memoizes reentrant stop calls before publishing stopping", async () => {
   const harness = createHarness(mocks);
   harness.session.prompt.mockImplementationOnce(
     async (_prompt, options) =>
       new Promise<void>(() => {
-        options?.preflightResult?.(true);
+        options?.preflightResult?.("started");
       }),
   );
   const run = startAgentRun({
@@ -176,11 +203,11 @@ it("memoizes reentrant stop calls before publishing stopping", async () => {
 
 it("waits for prompt preflight to settle before disposing after stop", async () => {
   const harness = createHarness(mocks);
-  let finishPreflight!: (accepted: boolean) => void;
+  let finishPreflight!: () => void;
   harness.session.prompt.mockImplementationOnce(
     async (_prompt, options) =>
       new Promise<void>(() => {
-        finishPreflight = (accepted) => options?.preflightResult?.(accepted);
+        finishPreflight = () => options?.preflightResult?.("handled");
       }),
   );
   const run = startAgentRun({
@@ -196,7 +223,7 @@ it("waits for prompt preflight to settle before disposing after stop", async () 
   });
   await Promise.resolve();
   expect(stoppedEarly).toBe(false);
-  finishPreflight(false);
+  finishPreflight();
 
   await stopped;
   await expect(run.result).resolves.toMatchObject({ kind: "canceled" });
@@ -209,7 +236,7 @@ it("lets cancellation win a timeout race and records one abort request", async (
   harness.session.prompt.mockImplementationOnce(
     async (_prompt, options) =>
       new Promise<undefined>(() => {
-        options?.preflightResult?.(true);
+        options?.preflightResult?.("started");
       }),
   );
   harness.session.abort.mockImplementationOnce(() => new Promise<undefined>(() => {}));
@@ -287,7 +314,7 @@ it("settles cancellation after abort grace when the provider never resolves", as
   harness.session.prompt.mockImplementationOnce(
     async (_prompt, options) =>
       new Promise<undefined>(() => {
-        options?.preflightResult?.(true);
+        options?.preflightResult?.("started");
       }),
   );
   const run = startAgentRun({

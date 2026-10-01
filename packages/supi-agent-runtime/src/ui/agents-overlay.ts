@@ -15,7 +15,10 @@ import type {
   AgentsOverlayData,
   AgentsOverlayRun,
 } from "./agents-overlay-data.ts";
-import { AGENTS_OVERLAY_MAX_HEIGHT_PERCENT } from "./agents-overlay-data.ts";
+import {
+  AGENTS_OVERLAY_MAX_HEIGHT_PERCENT,
+  agentOverlayControlNotice,
+} from "./agents-overlay-data.ts";
 import {
   centerLegend,
   renderDiagnosticsSection,
@@ -325,12 +328,7 @@ export class AgentsDialog implements Focusable {
     this.#changed();
     void action()
       .then((result) => {
-        this.#notice =
-          result === "accepted"
-            ? "Control accepted."
-            : result === "canceled"
-              ? "Control canceled."
-              : "Selected run is not running.";
+        this.#notice = agentOverlayControlNotice(result);
       })
       .catch(() => {
         this.#notice = "Control failed.";
