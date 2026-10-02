@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.0.1](https://github.com/mrclrchtr/supi/compare/v8.0.0...v8.0.1) (2026-10-02)
+
+
+### Bug Fixes
+
+* **context:** declare typebox as a host-provided peer ([7847619](https://github.com/mrclrchtr/supi/commit/78476190b3523fb216e0dfd91b5e1ff1ec057af5))
+
 ## [8.0.0](https://github.com/mrclrchtr/supi/compare/v7.4.0...v8.0.0) (2026-10-02)
 
 
