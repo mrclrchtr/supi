@@ -4,6 +4,7 @@ import type { OutlineItem } from "../types.ts";
 import { extractCFamilyOutlineItems } from "./outline-c-family.ts";
 import { extractHtmlSqlOutlineItems } from "./outline-html-sql.ts";
 import { extractJvmOutlineItems } from "./outline-jvm.ts";
+import { extractLatexOutlineItems } from "./outline-latex.ts";
 import { extractScriptingOutlineItems } from "./outline-scripting.ts";
 
 /** Extract declarations whose Tree-sitter node shapes are specific to non-JS/TS grammars. */
@@ -11,6 +12,9 @@ export function extractPolyglotOutlineItems(
   node: SyntaxNodeLike,
   source: string,
 ): OutlineItem[] | undefined {
+  const latexItems = extractLatexOutlineItems(node, source);
+  if (latexItems) return latexItems;
+
   const scriptingItems = extractScriptingOutlineItems(node, source);
   if (scriptingItems) return scriptingItems;
 
@@ -35,7 +39,9 @@ export function extractPolyglotOutlineItems(
     case "union_item":
       return one(container(node, "union", source, rustFields));
     case "enum_item":
-      return one(container(node, "enum", source, rustEnumVariants));
+      return node.childForFieldName("name")
+        ? one(container(node, "enum", source, rustEnumVariants))
+        : undefined;
     case "trait_item":
       return one(container(node, "interface", source, rustMethods));
     case "impl_item":

@@ -77,6 +77,12 @@
       "args": ["--slave", "-e", "languageserver::run()"],
       "fileTypes": ["r"],
       "rootMarkers": ["DESCRIPTION", "renv.lock", ".Rprofile"]
+    },
+    "latex": {
+      "command": "texlab",
+      "args": [],
+      "fileTypes": ["tex", "bib"],
+      "rootMarkers": []
     }
   }
 }

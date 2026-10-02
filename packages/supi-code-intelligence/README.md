@@ -115,8 +115,9 @@ Tree-sitter grammars are bundled and parse locally. Grammar selection uses the f
 | Java | `jdtls` | `.java` |
 | Kotlin | `kotlin-lsp` | `.kt`, `.kts` |
 | R | `R` with the `languageserver` package | `.r` |
+| LaTeX / BibTeX | `texlab` | `.tex`, `.sty`, `.cls` |
 
-Operation support is narrower than grammar support. AST import and export search supports only JavaScript, TypeScript, and TSX. Other AST operations depend on the grammar's extractors. A missing LSP server does not prevent available workspace or structural queries, but it prevents new semantic targets and related operations.
+Texlab routes `.tex` and `.bib` files. The bundled Tree-sitter grammar parses `.tex`, `.sty`, and `.cls`, but it does not parse `.bib`. LaTeX AST search supports outlines and imports for packages, classes, source files, and bibliographies. It does not support export searches, callee queries, or call-site analysis. AST import searches also support JavaScript, TypeScript, and TSX. Export searches support only those languages. Other AST operations depend on each grammar's extractors. Structural queries work without an LSP server. Semantic targets and related operations need a running server.
 
 ### Search and output limits
 
@@ -168,7 +169,7 @@ Example `.pi/supi/config.json`:
 }
 ```
 
-Use `typescript`, `python`, `rust`, `go`, `c`, `ruby`, `java`, `kotlin`, `bash`, `html`, `sql`, or `r` for built-in server keys (`cpp` aliases `c`). Server command and routing overrides are defined in the [LSP configuration reference](../supi-lsp/README.md#custom-server-configuration). `.pi-lsp.json` is not read. Only the boolean `true` enables the overview; non-boolean values do not enable it. The shared exclusion list uses gitignore syntax and project-over-global replacement. An explicit project `[]` clears configured patterns. `/supi-settings` shows the config path and says to reload or restart Pi after saving. Saved exclusions apply after reload or restart; exact file and explicitly selected directory requests remain available. An old `lsp.exclude` value reports a migration error and is not used.
+Use `typescript`, `python`, `rust`, `go`, `c`, `ruby`, `java`, `kotlin`, `bash`, `html`, `sql`, `r`, or `latex` for built-in server keys (`cpp` aliases `c`). Server command and routing overrides are defined in the [LSP configuration reference](../supi-lsp/README.md#custom-server-configuration). `.pi-lsp.json` is not read. Only the boolean `true` enables the overview; non-boolean values do not enable it. The shared exclusion list uses gitignore syntax and project-over-global replacement. An explicit project `[]` clears configured patterns. `/supi-settings` shows the config path and says to reload or restart Pi after saving. Saved exclusions apply after reload or restart; exact file and explicitly selected directory requests remain available. An old `lsp.exclude` value reports a migration error and is not used.
 
 Directory orientation checks the path from the workspace root to the focused directory. It selects the first valid configured instruction file per directory, skips files already loaded by Pi or shown on the active branch, and shows at most 200 lines per file. Resolved instruction paths must stay inside the workspace. These snippets are tool output, not additions to Pi's system prompt.
 

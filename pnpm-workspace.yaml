@@ -15,6 +15,7 @@ allowBuilds:
   tree-sitter-kotlin: false
   '@davisvaughan/tree-sitter-r': false
   '@derekstride/tree-sitter-sql': false
+  '@pfoerster/tree-sitter-latex': false
   '@google/genai': true
   koffi: true
   protobufjs: true

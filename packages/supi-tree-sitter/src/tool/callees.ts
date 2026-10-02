@@ -76,6 +76,7 @@ const ENCLOSING_SCOPE_TYPES: Record<GrammarId, ReadonlySet<string>> = {
   r: new Set(["function_definition"]),
   html: new Set(),
   sql: new Set(),
+  latex: new Set(),
 };
 
 // ── Main entrypoint ──────────────────────────────────────────────────

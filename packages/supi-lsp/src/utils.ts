@@ -53,6 +53,8 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
   kts: "kotlin",
   swift: "swift",
   lua: "lua",
+  tex: "latex",
+  bib: "bibtex",
   zig: "zig",
 };
 

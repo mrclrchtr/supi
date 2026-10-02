@@ -20,7 +20,12 @@ import {
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { AnchorKind } from "../../session/target-store.ts";
 import { normalizePath } from "../search/paths.ts";
-import { canonicalDeclarationKind, refineTypeAliasIdentity } from "./identity.ts";
+import {
+  canonicalDeclarationKind,
+  canonicalFileDeclarationKind,
+  canonicalFileDeclarationName,
+  refineTypeAliasIdentity,
+} from "./identity.ts";
 import type { ResolvedTargetData, ResolvedTargetGroupData } from "./types.ts";
 
 const BINARY_EXTENSIONS = new Set([
@@ -175,6 +180,7 @@ async function discoverSemantic(
 
 function targetFromSymbol(file: string, symbol: DocumentCodeSymbol): DiscoveredTargetData {
   const anchor = symbol.nameAnchor ?? symbol.declarationAnchor;
+  const identityKind = canonicalFileDeclarationKind(file, symbol.kind, symbol.name);
   return {
     file,
     position: { line: anchor.line - 1, character: anchor.character - 1 },
@@ -184,6 +190,7 @@ function targetFromSymbol(file: string, symbol: DocumentCodeSymbol): DiscoveredT
     declarationOccurrence: 0,
     name: symbol.name,
     kind: symbol.kind,
+    ...(identityKind === undefined ? {} : { identityKind }),
     confidence: "semantic",
     provenance: ["semantic"],
     anchorKind: (symbol.nameAnchor ? "name" : "declaration") as AnchorKind,
@@ -230,7 +237,9 @@ function flattenOutline(
       declarationOccurrence: 0,
       name: item.name,
       kind: item.kind,
-      identityKind: canonicalDeclarationKind(item.kind),
+      identityKind:
+        canonicalFileDeclarationKind(file, item.kind, item.name) ??
+        canonicalDeclarationKind(item.kind),
       confidence: "structural",
       provenance: ["structural"],
       anchorKind: "declaration",
@@ -321,7 +330,8 @@ function findSemanticMatch(
 
 function sameDeclaration(left: DiscoveredTargetData, right: DiscoveredTargetData): boolean {
   return (
-    left.name === right.name &&
+    canonicalFileDeclarationName(left.file, left.kind, left.name) ===
+      canonicalFileDeclarationName(right.file, right.kind, right.name) &&
     compatibleContainerEvidence(left, right) &&
     left.declarationAnchor.line === right.declarationAnchor.line &&
     declarationIdentityKind(left) === declarationIdentityKind(right)
@@ -357,7 +367,11 @@ function assignDeclarationOccurrences(
 }
 
 function declarationIdentityKind(target: ResolvedTargetData): string {
-  return target.identityKind ?? canonicalDeclarationKind(target.kind);
+  return (
+    target.identityKind ??
+    canonicalFileDeclarationKind(target.file, target.kind, target.name) ??
+    canonicalDeclarationKind(target.kind)
+  );
 }
 
 function compareFileOrientationDeclarations(

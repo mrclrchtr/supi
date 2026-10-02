@@ -108,6 +108,10 @@ describe("first-turn overview", () => {
   });
 
   it("keeps module names, dependencies, entrypoints, and detected languages", () => {
+    fs.writeFileSync(
+      path.join(workspaceRoot, "packages/module-0/src/paper.tex"),
+      String.raw`\section{Intro}`,
+    );
     const data = buildOverviewData(architectureModel());
     if (!data) throw new Error("Expected overview data");
 
@@ -117,7 +121,7 @@ describe("first-turn overview", () => {
     expect(output).toContain("**workspace** — Test workspace");
     expect(output).toContain("- **module-0** → module-1, module-2");
     expect(output).toContain("[main: src/index.ts]");
-    expect(output).toContain("**Detected:** ts");
+    expect(output).toContain("**Detected:** tex, ts");
     expect(output).toContain("code_orientation");
   });
 

@@ -38,6 +38,12 @@ describe("loadConfig", () => {
     expect(config.servers.ruby).toBeDefined();
     expect(config.servers.java).toBeDefined();
     expect(config.servers.kotlin).toBeDefined();
+    expect(config.servers.latex).toEqual({
+      command: "texlab",
+      args: [],
+      fileTypes: ["tex", "bib"],
+      rootMarkers: [],
+    });
   });
 
   it("merges project config overrides per language key", () => {
@@ -575,6 +581,8 @@ describe("getServerForFile", () => {
     ["app.rb", "ruby"],
     ["App.java", "java"],
     ["App.kt", "kotlin"],
+    ["paper.tex", "latex"],
+    ["references.bib", "latex"],
   ])("maps %s to %s", (file, serverName) => {
     const result = getServerForFile(config, file);
     expect(result).not.toBeNull();

@@ -48,6 +48,9 @@ const EXTENSION_GRAMMAR = {
   ".xhtml": "html",
   ".r": "r",
   ".sql": "sql",
+  ".tex": "latex",
+  ".sty": "latex",
+  ".cls": "latex",
 } satisfies Record<SupportedExtension, GrammarId>;
 
 const SUPPORTED_EXTENSIONS = Object.keys(EXTENSION_GRAMMAR) as SupportedExtension[];
@@ -87,6 +90,7 @@ const GRAMMAR_WASM: Record<GrammarId, string> = {
   html: "tree-sitter-html.wasm",
   r: "tree-sitter-r.wasm",
   sql: "tree-sitter-sql.wasm",
+  latex: "tree-sitter-latex.wasm",
 };
 
 const resourcesDir = path.resolve(sourceDir, "../resources/grammars");
@@ -103,7 +107,7 @@ export function resolveGrammarWasmPath(grammarId: GrammarId): string {
   if (!fs.existsSync(vendoredPath)) {
     throw new Error(
       `Vendored WASM grammar not found for "${grammarId}": expected at ${vendoredPath}. ` +
-        "Run `node scripts/vendor-wasm.mjs` or reinstall the package.",
+        "Run `pnpm --filter @mrclrchtr/supi-tree-sitter generate:all-wasm` or reinstall the package.",
     );
   }
 

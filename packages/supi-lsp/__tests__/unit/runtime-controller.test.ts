@@ -110,6 +110,7 @@ describe("LspRuntimeController", () => {
       "html",
       "java",
       "kotlin",
+      "latex",
       "python",
       "r",
       "ruby",

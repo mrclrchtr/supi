@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { extname, resolve } from "node:path";
 import {
   type CodeRequestControl,
   type CodeSymbol,
@@ -21,6 +21,46 @@ export function canonicalDeclarationKind(kind: string | null): string {
   }
   if (["method", "constructor"].includes(normalized)) return "member";
   return normalized;
+}
+
+const LATEX_EXTENSIONS = new Set([".tex", ".sty", ".cls"]);
+const LATEX_SECTION_KINDS = new Set([
+  "module",
+  "part",
+  "chapter",
+  "section",
+  "subsection",
+  "subsubsection",
+  "paragraph",
+  "subparagraph",
+]);
+const TEXLAB_COMMAND_NAME = /^define\s+(\\\S+)$/;
+
+/** Map LaTeX outline and Texlab kinds to file-local identities. */
+export function canonicalFileDeclarationKind(
+  file: string,
+  kind: string | null,
+  name: string | null,
+): string | undefined {
+  if (!LATEX_EXTENSIONS.has(extname(file).toLowerCase())) return undefined;
+
+  const normalized = (kind ?? "").toLowerCase();
+  if (LATEX_SECTION_KINDS.has(normalized)) return "latex-section";
+  if (normalized === "command") return "latex-command";
+  if (normalized === "key" && TEXLAB_COMMAND_NAME.test(name ?? "")) return "latex-command";
+  return undefined;
+}
+
+/** Match Texlab's `define \\command` name to the grammar's command name. */
+export function canonicalFileDeclarationName(
+  file: string,
+  kind: string | null,
+  name: string | null,
+): string | null {
+  if (LATEX_EXTENSIONS.has(extname(file).toLowerCase()) && kind?.toLowerCase() === "key") {
+    return TEXLAB_COMMAND_NAME.exec(name ?? "")?.[1] ?? name;
+  }
+  return name;
 }
 
 /** Exact declaration-name observation used to derive provider-independent identity. */

@@ -14,9 +14,10 @@ This package has **no pi extension surface** — no `pi.extensions`, no `src/ext
 
 All grammar WASM files are **vendored** in `resources/grammars/<id>/` and shipped with the package. The native `tree-sitter-*` npm packages are `devDependencies` only — they are never resolved at runtime.
 
-- **13 grammars from 12 npm packages** (javascript, typescript, tsx, python, rust, go, c, cpp, java, ruby, bash, html, r) ship `.wasm` — `tree-sitter-typescript` provides both `typescript` and `tsx`. Copied by `scripts/vendor-wasm.mjs`.
-- **Kotlin** (`tree-sitter-kotlin`) does not ship `.wasm` — built from source by `scripts/generate-kotlin-wasm.mjs` using `tree-sitter-cli`
-- **SQL** (`@derekstride/tree-sitter-sql`) does not ship `.wasm` — built from source by `scripts/generate-sql-wasm.mjs` using `tree-sitter-cli`
+- **13 prebuilt grammars from 12 npm packages** (javascript, typescript, tsx, python, rust, go, c, cpp, java, ruby, bash, html, r) ship `.wasm` — `tree-sitter-typescript` provides both `typescript` and `tsx`. Copied by `scripts/vendor-wasm.mjs`.
+- **Kotlin** (`tree-sitter-kotlin`) does not ship `.wasm` — built from source by `scripts/generate-kotlin-wasm.mjs` using `tree-sitter-cli`.
+- **SQL** (`@derekstride/tree-sitter-sql`) does not ship `.wasm` — built from source by `scripts/generate-sql-wasm.mjs` using `tree-sitter-cli`.
+- **LaTeX** (`@pfoerster/tree-sitter-latex`) does not ship `.wasm` — built from source by `scripts/generate-latex-wasm.mjs` using `tree-sitter-cli`. The script also copies and checks the upstream MIT `LICENSE` in `resources/grammars/latex/`.
 
 ### When to regenerate
 
@@ -61,7 +62,7 @@ Vendored WASM metadata (`.wasm.json`) tracks the source npm package version and 
 - `declare module "foo"` parses as a string-named `module` node; keep outline shallow and preserve the module name.
 - CRLF input needs normalized line splitting in coordinate helpers and `node_at` bounds to stay LSP-compatible.
 - Outline should stay shallow: top-level declarations plus supported class/interface/enum members, not local function bodies.
-- `outline` supports every parser grammar. HTML outline evidence is limited to elements with non-empty `id` attributes; SQL outline evidence is limited to supported `CREATE` declarations plus shallow table/type members. Ruby gemspecs and KornShell files reuse the Ruby and Bash grammars. ERB and Go module manifests stay semantic-only because their syntax is not Ruby or Go source. `imports` and `exports` remain JavaScript/TypeScript-only. `call-sites` supports only grammars with a registered, contract-tested query (currently every parser grammar except HTML and SQL). `getStructuralSearchSupportedExtensions()` is the authoritative public declaration used by AST Scan eligibility. The runtime also exposes a `query()` method on `TreeSitterSession` that works across all parser grammars.
+- `outline` supports every parser grammar. HTML outline evidence is limited to elements with non-empty `id` attributes; SQL outline evidence is limited to supported `CREATE` declarations plus shallow table/type members. Ruby gemspecs and KornShell files reuse the Ruby and Bash grammars. ERB and Go module manifests stay semantic-only because their syntax is not Ruby or Go source. `imports` supports JavaScript, TypeScript, TSX, and LaTeX; `exports` supports JavaScript, TypeScript, and TSX. LaTeX imports include package, class, source, and bibliography directives. `call-sites` supports every parser grammar except HTML, SQL, and LaTeX. `getStructuralSearchSupportedExtensions()` is the authoritative public declaration used by AST Scan eligibility. The runtime also exposes a `query()` method on `TreeSitterSession` that works across all parser grammars.
 - `pnpm peers check` currently reports missing `tree-sitter` peers for `@derekstride/tree-sitter-sql` and `tree-sitter-kotlin`; these grammar packages are dev-only WASM generators, so treat that warning as known workspace noise unless the vendoring strategy changes.
 
 ## Packaging

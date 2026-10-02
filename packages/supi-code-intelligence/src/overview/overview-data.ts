@@ -27,6 +27,7 @@ const GRAMMAR_LANGUAGE_TAGS: Record<string, string> = {
   html: "html",
   r: "r",
   sql: "sql",
+  latex: "tex",
 };
 
 /**

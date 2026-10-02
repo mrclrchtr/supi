@@ -730,6 +730,9 @@ importers:
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
         version: link:../supi-test-utils
+      '@pfoerster/tree-sitter-latex':
+        specifier: 0.6.0
+        version: 0.6.0(tree-sitter@0.25.1)
       '@types/node':
         specifier: 25.9.8
         version: 25.9.8
@@ -1363,6 +1366,15 @@ packages:
 
   '@oxc-project/types@0.151.0':
     resolution: {integrity: sha512-J1yXrIlNDZVzE3ada310xeAw7nH8yCAyLPuUIsjKatFPmfn5bS1oW+cM+QsGOtVWd5nhSpbwZWx/rue+r5Z+PA==}
+
+  '@pfoerster/tree-sitter-latex@0.6.0':
+    resolution: {integrity: sha512-j9V0Zh5bFoEu6ZLqbLAB+2+NWm/gsPkoKgtOf2Gbn6mikuJ5MyxMmKgwQvPIxPYC57tHcIj9oKaT4jBdN86R1Q==}
+    peerDependencies:
+      tree-sitter: ^0.21.0 || ^0.25.0
+      tree_sitter: '*'
+    peerDependenciesMeta:
+      tree_sitter:
+        optional: true
 
   '@pnpm/catalogs.protocol-parser@1001.0.0':
     resolution: {integrity: sha512-9rHKCMRvhfv7TSAVSCVLI+8OZhi1OcT8lanAGqOPbGgQTkFrPH3PfEWJNxz43xqrXRa4HCFRAMu+g19su5eRLA==}
@@ -3489,6 +3501,12 @@ snapshots:
   '@mozilla/readability@0.6.0': {}
 
   '@oxc-project/types@0.151.0': {}
+
+  '@pfoerster/tree-sitter-latex@0.6.0(tree-sitter@0.25.1)':
+    dependencies:
+      node-addon-api: 8.9.2
+      node-gyp-build: 4.8.4
+      tree-sitter: 0.25.1
 
   '@pnpm/catalogs.protocol-parser@1001.0.0': {}
 

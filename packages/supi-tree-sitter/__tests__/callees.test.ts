@@ -44,15 +44,19 @@ describe("TreeSitterSession.calleesAt", () => {
     }
   });
 
-  it("returns unsupported-language for HTML and SQL files", async () => {
+  it("returns unsupported-language for HTML, SQL, and LaTeX files", async () => {
     writeSource("test.html", "<html><body><p>hello</p></body></html>");
     writeSource("test.sql", "SELECT * FROM users WHERE id = 1;");
+    writeSource("test.tex", String.raw`\section{Intro}`);
     const session = createTreeSitterSession(tmpDir);
     try {
       await expect(session.calleesAt("test.html", 1, 5)).resolves.toMatchObject({
         kind: "unsupported-language",
       });
       await expect(session.calleesAt("test.sql", 1, 5)).resolves.toMatchObject({
+        kind: "unsupported-language",
+      });
+      await expect(session.calleesAt("test.tex", 1, 5)).resolves.toMatchObject({
         kind: "unsupported-language",
       });
     } finally {

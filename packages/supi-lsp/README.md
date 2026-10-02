@@ -35,6 +35,7 @@ The table is a historical initialize-handshake audit performed on 2026-08-21 aga
 | Java | `jdtls` | Unverified | Push | Probe limitation: the wrapper needs a workspace launch configuration; the version probe did not respond. |
 | Kotlin | `kotlin-lsp` LS-262.9593.0 | Static pull (confirmed) | Pull | Statically advertises `diagnosticProvider` in the initialize result, but only when started with `--stdio`; the built-in configuration provides the argument. |
 | Bash | `bash-language-server` 5.6.0 | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
+| LaTeX / BibTeX | `texlab` | Unverified (not probed) | Push | Built-in route for `.tex` and `.bib`. Language IDs: `.tex` uses `latex`; `.bib` uses `bibtex`. No root marker is required. |
 | HTML | `vscode-html-language-server` | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
 | SQL | `sql-language-server` 1.7.1 | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |
 | R | `R` 4.6.1 (languageserver) | No (confirmed) | Push | No `diagnosticProvider` in the initialize result. |

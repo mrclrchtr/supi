@@ -40,6 +40,9 @@ const LANGUAGE_CASES = [
   { file: "file.xhtml", grammar: "html" },
   { file: "file.r", grammar: "r" },
   { file: "file.sql", grammar: "sql" },
+  { file: "file.tex", grammar: "latex" },
+  { file: "file.sty", grammar: "latex" },
+  { file: "file.cls", grammar: "latex" },
 ] satisfies ReadonlyArray<{ file: string; grammar: GrammarId }>;
 
 const GRAMMAR_RESOURCES = [
@@ -58,6 +61,7 @@ const GRAMMAR_RESOURCES = [
   { grammar: "html", file: "tree-sitter-html.wasm" },
   { grammar: "r", file: "tree-sitter-r.wasm" },
   { grammar: "sql", file: "tree-sitter-sql.wasm" },
+  { grammar: "latex", file: "tree-sitter-latex.wasm" },
 ] satisfies ReadonlyArray<{ grammar: GrammarId; file: string }>;
 
 describe("language registry", () => {
@@ -65,9 +69,12 @@ describe("language registry", () => {
     expect(detectGrammar(file)).toBe(grammar);
   });
 
-  it.each(["go.mod", "Makefile", "file.txt"])("%s is not a parser source file", (file) => {
-    expect(detectGrammar(file)).toBeUndefined();
-  });
+  it.each(["go.mod", "Makefile", "file.txt", "references.bib"])(
+    "%s is not a parser source file",
+    (file) => {
+      expect(detectGrammar(file)).toBeUndefined();
+    },
+  );
 
   it("matches extensions without regard to case", () => {
     expect(detectGrammar("file.TS")).toBe("typescript");

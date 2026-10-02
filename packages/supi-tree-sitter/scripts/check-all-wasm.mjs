@@ -7,6 +7,7 @@
  */
 
 import { checkKotlinWasm } from "./generate-kotlin-wasm.mjs";
+import { checkLatexWasm } from "./generate-latex-wasm.mjs";
 import { checkSqlWasm } from "./generate-sql-wasm.mjs";
 import { checkWasm } from "./vendor-wasm.mjs";
 import { formatError, isMain, runScript } from "./wasm-utils.mjs";
@@ -19,12 +20,13 @@ Options:
   --check  Check files (checking is the default)
   --help   Show this help`;
 
-/** Check pre-built, Kotlin, and SQL Tree-sitter WASM artifacts. */
+/** Check all vendored Tree-sitter WASM files. */
 export function checkAllWasm() {
   const checks = [
     ["pre-built grammars", checkWasm],
     ["Kotlin", checkKotlinWasm],
     ["SQL", checkSqlWasm],
+    ["LaTeX", checkLatexWasm],
   ];
   const errors = [];
 

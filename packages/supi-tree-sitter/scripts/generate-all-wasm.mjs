@@ -7,6 +7,7 @@
 
 import { checkAllWasm } from "./check-all-wasm.mjs";
 import { generateKotlinWasm } from "./generate-kotlin-wasm.mjs";
+import { generateLatexWasm } from "./generate-latex-wasm.mjs";
 import { generateSqlWasm } from "./generate-sql-wasm.mjs";
 import { vendorWasm } from "./vendor-wasm.mjs";
 import { isMain, runScript } from "./wasm-utils.mjs";
@@ -19,11 +20,12 @@ Options:
   --check  Check files without rebuilding them
   --help   Show this help`;
 
-/** Generate pre-built, Kotlin, and SQL Tree-sitter WASM artifacts. */
+/** Generate all vendored Tree-sitter WASM files. */
 export function generateAllWasm() {
   vendorWasm();
   generateKotlinWasm();
   generateSqlWasm();
+  generateLatexWasm();
   process.stdout.write("All Tree-sitter WASM artifacts generated.\n");
 }
 

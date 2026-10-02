@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { checkGeneratedWasm, checkVendoredWasm } from "../../scripts/wasm-checks.mjs";
+import {
+  checkCopiedFile,
+  checkGeneratedWasm,
+  checkVendoredWasm,
+} from "../../scripts/wasm-checks.mjs";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const scriptsDir = join(packageRoot, "scripts");
@@ -12,6 +16,7 @@ const commands = [
   "vendor-wasm.mjs",
   "generate-kotlin-wasm.mjs",
   "generate-sql-wasm.mjs",
+  "generate-latex-wasm.mjs",
   "check-all-wasm.mjs",
   "generate-all-wasm.mjs",
 ];
@@ -58,6 +63,27 @@ describe("WASM maintenance scripts", () => {
     },
     15_000,
   );
+
+  it("reports a stale copied artifact with the all-artifacts command", () => {
+    const directory = mkdtempSync(join(tmpdir(), "supi-copied-artifact-check-"));
+    const sourcePath = join(directory, "LICENSE.source");
+    const vendoredPath = join(directory, "LICENSE");
+    writeFileSync(sourcePath, "upstream license\n");
+    writeFileSync(vendoredPath, "stale license\n");
+
+    try {
+      expect(() =>
+        checkCopiedFile({
+          displayName: "LaTeX Tree-sitter grammar license",
+          sourcePath,
+          vendoredPath,
+          staleCommand: "pnpm --filter @mrclrchtr/supi-tree-sitter generate:all-wasm",
+        }),
+      ).toThrow("generate:all-wasm");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
 
   it("reports a stale generated artifact with the all-artifacts command", () => {
     const fixture = copyArtifact(

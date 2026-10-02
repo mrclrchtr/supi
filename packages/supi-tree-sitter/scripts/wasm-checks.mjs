@@ -1,6 +1,24 @@
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { formatError, readInstalledPackage, readJson, sha256 } from "./wasm-utils.mjs";
+
+/** Check that one vendored copy matches its upstream source file. */
+export function checkCopiedFile({ displayName, sourcePath, vendoredPath, staleCommand }) {
+  const errors = [];
+  try {
+    if (!readFileSync(sourcePath).equals(readFileSync(vendoredPath))) {
+      errors.push(`${displayName}: vendored file does not match the installed source.`);
+    }
+  } catch (error) {
+    errors.push(`${displayName}: ${formatError(error)}`);
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`${displayName} is stale:\n- ${errors.join("\n- ")}\nRun: ${staleCommand}`);
+  }
+  process.stdout.write(`${displayName} is current.\n`);
+}
 
 function metadataValue(metadata, keyPath) {
   return keyPath.split(".").reduce((value, key) => {

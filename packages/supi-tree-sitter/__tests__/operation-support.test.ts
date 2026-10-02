@@ -3,7 +3,16 @@ import { getStructuralSearchSupportedExtensions, getSupportedExtensions } from "
 import { detectGrammar } from "../src/language.ts";
 
 const JS_TS_GRAMMARS = new Set(["javascript", "typescript", "tsx"]);
-const CALL_UNSUPPORTED_EXTENSIONS = new Set([".html", ".htm", ".xhtml", ".sql"]);
+const JS_TS_LATEX_GRAMMARS = new Set([...JS_TS_GRAMMARS, "latex"]);
+const CALL_UNSUPPORTED_EXTENSIONS = new Set([
+  ".html",
+  ".htm",
+  ".xhtml",
+  ".sql",
+  ".tex",
+  ".sty",
+  ".cls",
+]);
 
 function extensionsForGrammars(grammars: ReadonlySet<string>): string[] {
   return getSupportedExtensions().filter((extension) =>
@@ -17,13 +26,22 @@ describe("structural search operation support", () => {
   });
 
   it.each(["imports", "exports"] as const)(
-    "declares only JavaScript and TypeScript extensions for %s",
+    "declares grammar-backed extensions for %s",
     (operation) => {
+      const grammars = operation === "imports" ? JS_TS_LATEX_GRAMMARS : JS_TS_GRAMMARS;
       expect(getStructuralSearchSupportedExtensions(operation)).toEqual(
-        extensionsForGrammars(JS_TS_GRAMMARS),
+        extensionsForGrammars(grammars),
       );
     },
   );
+
+  it("supports imports for LaTeX but not exports or call sites", () => {
+    expect(getStructuralSearchSupportedExtensions("imports")).toEqual(
+      expect.arrayContaining([".tex", ".sty", ".cls"]),
+    );
+    expect(getStructuralSearchSupportedExtensions("exports")).not.toContain(".tex");
+    expect(getStructuralSearchSupportedExtensions("call-sites")).not.toContain(".tex");
+  });
 
   it("derives call-site extensions from the extractor query registry", () => {
     expect(getStructuralSearchSupportedExtensions("call-sites")).toEqual(

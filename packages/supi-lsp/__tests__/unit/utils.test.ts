@@ -23,6 +23,8 @@ describe("detectLanguageId", () => {
     ["project.gemspec", "ruby"],
     ["script.sh", "shellscript"],
     ["script.ksh", "shellscript"],
+    ["paper.tex", "latex"],
+    ["references.bib", "bibtex"],
   ])("detects %s as %s", (file, expected) => {
     expect(detectLanguageId(file)).toBe(expected);
   });

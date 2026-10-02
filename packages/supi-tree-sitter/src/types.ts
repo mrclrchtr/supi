@@ -99,7 +99,7 @@ export interface TreeSitterService {
    * HTML ids, and SQL schema members.
    */
   outline(file: string, control?: CodeRequestControl): Promise<TreeSitterResult<OutlineItem[]>>;
-  /** Extract static ES import declarations. */
+  /** Extract import records from JavaScript, TypeScript, TSX, and LaTeX files. */
   imports(file: string, control?: CodeRequestControl): Promise<TreeSitterResult<ImportRecord[]>>;
   /** Extract exported declarations, named exports, re-exports, and TS export assignments. */
   exports(file: string, control?: CodeRequestControl): Promise<TreeSitterResult<ExportRecord[]>>;
@@ -146,7 +146,8 @@ export type GrammarId =
   | "bash"
   | "html"
   | "r"
-  | "sql";
+  | "sql"
+  | "latex";
 
 /** Supported file extension. */
 export type SupportedExtension =
@@ -184,4 +185,7 @@ export type SupportedExtension =
   | ".htm"
   | ".xhtml"
   | ".r"
-  | ".sql";
+  | ".sql"
+  | ".tex"
+  | ".sty"
+  | ".cls";

@@ -33,6 +33,12 @@ export function supportsGrammarOperation(
     case "outline":
       return true;
     case "imports":
+      return (
+        grammar === "javascript" ||
+        grammar === "typescript" ||
+        grammar === "tsx" ||
+        grammar === "latex"
+      );
     case "exports":
       return grammar === "javascript" || grammar === "typescript" || grammar === "tsx";
     default:

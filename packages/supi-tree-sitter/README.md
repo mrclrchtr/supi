@@ -50,8 +50,13 @@ Coordinates in the library APIs use **1-based** line and character columns. Char
 - HTML (`.html`, `.htm`, `.xhtml`)
 - R (`.r`)
 - SQL (`.sql`)
+- LaTeX (`.tex`, `.sty`, `.cls`)
 
-Outline collection supports every listed family. HTML outlines contain elements with non-empty `id` attributes; SQL outlines contain `CREATE` declarations and shallow table/type members. Import and export collection remains JavaScript/TypeScript-only, and call-site collection supports every listed family except HTML and SQL. Go module manifests and ERB templates are intentionally excluded because the Go and Ruby grammars do not parse those mixed or separate syntaxes; `supi-lsp` still handles them semantically. Consumers performing a bulk structural scan should use `getStructuralSearchSupportedExtensions(operation)` rather than treating parser support as operation support.
+Outline collection supports every listed family. HTML outlines list elements with a non-empty `id` attribute. SQL outlines list `CREATE` declarations and their first-level table and type members. LaTeX outlines list section headings and command, environment, label, acronym, glossary-entry, and color definitions.
+
+Import collection supports JavaScript, TypeScript, TSX, and LaTeX. LaTeX imports include package, class, source, and bibliography directives. Export collection supports JavaScript, TypeScript, and TSX only. Call-site collection supports every listed family except HTML, SQL, and LaTeX. LaTeX does not support export collection, callee queries, or call-site collection. The LaTeX grammar does not parse `.bib` files.
+
+The Go and Ruby grammars do not parse Go module manifests or ERB templates. `supi-lsp` still handles them semantically. For a bulk scan, use `getStructuralSearchSupportedExtensions(operation)`. Parser support does not mean that each operation is supported.
 
 ## Architecture
 
