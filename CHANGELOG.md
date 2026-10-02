@@ -1,5 +1,29 @@
 # Changelog
 
+## [8.0.0](https://github.com/mrclrchtr/supi/compare/v7.4.0...v8.0.0) (2026-10-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* **agent-runtime:** migrate Pi prompt and steering dispositions
+* **lsp:** Replace lsp.exclude with code-intelligence.exclude. Move existing exclusion lists to the new key and reload or restart.
+
+### Features
+
+* **lsp:** extract runtime reliability improvements ([046520a](https://github.com/mrclrchtr/supi/commit/046520a3a3470fbcdaeac2ab81770bd81047d3cd))
+
+
+### Bug Fixes
+
+* **agent-runtime:** migrate Pi prompt and steering dispositions ([c287f8a](https://github.com/mrclrchtr/supi/commit/c287f8add9c5795774cecb5c53ff9229b830c085)), closes [#453](https://github.com/mrclrchtr/supi/issues/453)
+* **deps:** update dependency pnpm to latest ([1b1a0a4](https://github.com/mrclrchtr/supi/commit/1b1a0a456e4472a474549313b3386596fbce7372))
+* **deps:** update pnpm to v12.7.0 ([8c80556](https://github.com/mrclrchtr/supi/commit/8c805566372ec48357dc270266b196f36d019ce6))
+* **deps:** update pnpm to v12.8.0 ([144ce5b](https://github.com/mrclrchtr/supi/commit/144ce5b96bca0bfd703c961f14264e09b0585c37))
+* **deps:** update pnpm to v12.8.0 ([8cc5fab](https://github.com/mrclrchtr/supi/commit/8cc5faba3cb8349899f4d2354d63ce5c5921abc1))
+* **deps:** update pnpm to v12.8.1 ([922ac50](https://github.com/mrclrchtr/supi/commit/922ac5053388811fc4148f372b269f98faf3fc26))
+* **lsp:** reject conflicting homes and align alias reporting ([69feb1f](https://github.com/mrclrchtr/supi/commit/69feb1f75e39ccf716de60a2528b4e3a0fad9ad3))
+* **tools:** keep user forms and agent runs model-only ([72c4fbb](https://github.com/mrclrchtr/supi/commit/72c4fbbc7a67a6d5d55adde95300d73d23831bbd)), closes [#455](https://github.com/mrclrchtr/supi/issues/455)
+
 ## [7.4.0](https://github.com/mrclrchtr/supi/compare/v7.3.1...v7.4.0) (2026-09-28)
 
 
