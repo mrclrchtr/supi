@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-extras",
-  "version": "8.0.1",
+  "version": "8.0.2",
   "description": "Session capability controls, prompt stash, shortcuts, and activity indicators",
   "license": "MIT",
   "repository": {

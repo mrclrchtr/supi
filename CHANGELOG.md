@@ -1,5 +1,13 @@
 # Changelog
 
+## [8.0.2](https://github.com/mrclrchtr/supi/compare/v8.0.1...v8.0.2) (2026-10-03)
+
+
+### Bug Fixes
+
+* **deps:** update dependency ignore to v7.0.11 ([458d93f](https://github.com/mrclrchtr/supi/commit/458d93f4699c179d7253db76f1f48809d93b75b8))
+* **deps:** update dependency vitest to v5.0.3 ([fce020b](https://github.com/mrclrchtr/supi/commit/fce020b21b97efb8a97ba81140c96070d8aff715))
+
 ## [8.0.1](https://github.com/mrclrchtr/supi/compare/v8.0.0...v8.0.1) (2026-10-02)
 
 
