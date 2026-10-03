@@ -139,6 +139,54 @@ describe("code_health diagnostic observations", () => {
     });
   });
 
+  it("keeps an observed push error visible as unconfirmed detailed evidence", async () => {
+    const file = path.join(cwd, "src", "a.ts");
+    const observation = await collectDiagnostics({
+      service: service({
+        fileDiagnostics: async () => ({
+          kind: "partial",
+          data: [
+            {
+              severity: 1,
+              message: "Observed error",
+              source: "example-server",
+              range: {
+                start: { line: 0, character: 2 },
+                end: { line: 0, character: 5 },
+              },
+            },
+          ],
+          reason: TENTATIVE_PUSH_UNAVAILABLE_REASON,
+        }),
+      }),
+      included: ["diagnostics"],
+      scope: diagnosticScope(file),
+      cwd,
+      unavailableReason: "not ready",
+      detailed: true,
+    });
+
+    expect(observation).toMatchObject({
+      kind: "partial",
+      entries: [
+        {
+          file,
+          errors: 1,
+          warnings: 0,
+          messages: [{ line: 1, severity: "error", message: "Observed error" }],
+        },
+      ],
+      evidence: {
+        requested: 1,
+        confirmed: 0,
+        unconfirmed: 1,
+        failed: 0,
+        removed: 0,
+      },
+      reason: expect.stringContaining("ambient evidence only"),
+    });
+  });
+
   it("maps tentative push unavailability to unconfirmed file evidence", async () => {
     const file = path.join(cwd, "src", "a.ts");
     const observation = await collectDiagnostics({

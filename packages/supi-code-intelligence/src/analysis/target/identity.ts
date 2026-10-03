@@ -82,6 +82,71 @@ export interface DeclarationOccurrenceIdentity extends DeclarationIdentityResult
   readonly declarationOccurrence: number;
 }
 
+/** Identity fields used to order otherwise-equal declarations on one line. */
+export interface DeclarationOccurrenceCandidate {
+  readonly name: string | null;
+  readonly identityKind: string;
+  readonly declarationAnchor: { readonly line: number; readonly character: number };
+  readonly nameAnchor?: { readonly line: number; readonly character: number } | null;
+  readonly container: string | null;
+}
+
+/** Assign source-order occurrences after one sort for each identity group. */
+export function declarationOccurrencesFor(
+  candidates: readonly DeclarationOccurrenceCandidate[],
+): number[] {
+  const groups = new Map<
+    string,
+    Array<{ candidate: DeclarationOccurrenceCandidate; index: number }>
+  >();
+  candidates.forEach((candidate, index) => {
+    const key = JSON.stringify([
+      candidate.name,
+      candidate.identityKind,
+      candidate.container,
+      candidate.declarationAnchor.line,
+    ]);
+    const group = groups.get(key);
+    if (group) group.push({ candidate, index });
+    else groups.set(key, [{ candidate, index }]);
+  });
+
+  const occurrences = new Array<number>(candidates.length);
+  for (const group of groups.values()) {
+    group.sort(
+      (left, right) =>
+        compareDeclarationOccurrenceCandidates(left.candidate, right.candidate) ||
+        left.index - right.index,
+    );
+    group.forEach(({ index }, occurrence) => {
+      occurrences[index] = occurrence;
+    });
+  }
+  return occurrences;
+}
+
+/** Return the shared source-order occurrence for one selected declaration. */
+export function declarationOccurrenceFor(
+  selected: DeclarationOccurrenceCandidate,
+  candidates: readonly DeclarationOccurrenceCandidate[],
+): number {
+  const index = candidates.indexOf(selected);
+  if (index < 0) throw new Error("The selected declaration is not in the occurrence set.");
+  const occurrence = declarationOccurrencesFor(candidates)[index];
+  if (occurrence === undefined) throw new Error("The declaration occurrence was not assigned.");
+  return occurrence;
+}
+
+function compareDeclarationOccurrenceCandidates(
+  left: DeclarationOccurrenceCandidate,
+  right: DeclarationOccurrenceCandidate,
+): number {
+  return (
+    left.declarationAnchor.character - right.declarationAnchor.character ||
+    (left.nameAnchor?.character ?? 0) - (right.nameAnchor?.character ?? 0)
+  );
+}
+
 /**
  * Resolve an identity kind without rewriting the provider-reported display kind.
  * An LSP `Variable` becomes `type` only when Tree-sitter reports the exact name
@@ -133,6 +198,10 @@ export function createCodeSymbolIdentityResolver(
 ): (symbol: CodeSymbol) => Promise<DeclarationOccurrenceIdentity> {
   const identities = new Map<CodeSymbol, Promise<DeclarationIdentityResult>>();
   const occurrences = new Map<CodeSymbol, Promise<DeclarationOccurrenceIdentity>>();
+  const occurrenceSets = new Map<
+    CodeSymbol,
+    Promise<Map<CodeSymbol, DeclarationOccurrenceIdentity>>
+  >();
 
   const resolveIdentity = (symbol: CodeSymbol): Promise<DeclarationIdentityResult> => {
     const existing = identities.get(symbol);
@@ -154,42 +223,51 @@ export function createCodeSymbolIdentityResolver(
   return (symbol) => {
     const existing = occurrences.get(symbol);
     if (existing !== undefined) return existing;
-    const occurrence = resolveCodeSymbolOccurrence(symbol, allSymbols, resolveIdentity);
+    let occurrenceSet = occurrenceSets.get(symbol);
+    if (!occurrenceSet) {
+      const peers = allSymbols.filter(
+        (candidate) =>
+          candidate.name === symbol.name &&
+          (candidate.container ?? null) === (symbol.container ?? null) &&
+          candidate.declarationAnchor.line === symbol.declarationAnchor.line,
+      );
+      occurrenceSet = resolveCodeSymbolOccurrences(peers, resolveIdentity);
+      for (const peer of peers) occurrenceSets.set(peer, occurrenceSet);
+    }
+    const occurrence = occurrenceSet.then((resolved) => {
+      const identity = resolved.get(symbol);
+      if (!identity) throw new Error("The symbol is not in its declaration set.");
+      return identity;
+    });
     occurrences.set(symbol, occurrence);
     return occurrence;
   };
 }
 
-async function resolveCodeSymbolOccurrence(
-  symbol: CodeSymbol,
-  allSymbols: readonly CodeSymbol[],
+async function resolveCodeSymbolOccurrences(
+  symbols: readonly CodeSymbol[],
   resolveIdentity: (symbol: CodeSymbol) => Promise<DeclarationIdentityResult>,
-): Promise<DeclarationOccurrenceIdentity> {
-  const peers = allSymbols.filter(
-    (candidate) =>
-      candidate.name === symbol.name &&
-      (candidate.container ?? null) === (symbol.container ?? null) &&
-      candidate.declarationAnchor.line === symbol.declarationAnchor.line,
-  );
+): Promise<Map<CodeSymbol, DeclarationOccurrenceIdentity>> {
   const observed = await Promise.all(
-    peers.map(async (candidate) => ({ candidate, identity: await resolveIdentity(candidate) })),
+    symbols.map(async (symbol) => ({ symbol, identity: await resolveIdentity(symbol) })),
   );
-  const selectedIdentity = await resolveIdentity(symbol);
-  const matching = observed
-    .filter(({ identity }) => identity.identityKind === selectedIdentity.identityKind)
-    .map(({ candidate }) => candidate)
-    .sort(compareCodeSymbolDeclarations);
-  return {
-    ...selectedIdentity,
-    declarationOccurrence: Math.max(0, matching.indexOf(symbol)),
-  };
-}
-
-function compareCodeSymbolDeclarations(left: CodeSymbol, right: CodeSymbol): number {
-  return (
-    left.declarationAnchor.character - right.declarationAnchor.character ||
-    (left.nameAnchor?.character ?? 0) - (right.nameAnchor?.character ?? 0)
-  );
+  const candidates = observed.map(({ symbol, identity }) => ({
+    name: symbol.name,
+    identityKind: identity.identityKind,
+    declarationAnchor: symbol.declarationAnchor,
+    nameAnchor: symbol.nameAnchor ?? null,
+    container: symbol.container ?? null,
+  }));
+  const occurrences = declarationOccurrencesFor(candidates);
+  const resolved = new Map<CodeSymbol, DeclarationOccurrenceIdentity>();
+  observed.forEach(({ symbol, identity }, index) => {
+    const declarationOccurrence = occurrences[index];
+    if (declarationOccurrence === undefined) {
+      throw new Error("The declaration occurrence was not assigned.");
+    }
+    resolved.set(symbol, { ...identity, declarationOccurrence });
+  });
+  return resolved;
 }
 
 /** Refine one semantic target with exact structural type-alias evidence. */

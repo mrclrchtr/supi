@@ -11,8 +11,9 @@ import { extractScriptingOutlineItems } from "./outline-scripting.ts";
 export function extractPolyglotOutlineItems(
   node: SyntaxNodeLike,
   source: string,
+  lineStarts: readonly number[],
 ): OutlineItem[] | undefined {
-  const latexItems = extractLatexOutlineItems(node, source);
+  const latexItems = extractLatexOutlineItems(node, source, lineStarts);
   if (latexItems) return latexItems;
 
   const scriptingItems = extractScriptingOutlineItems(node, source);

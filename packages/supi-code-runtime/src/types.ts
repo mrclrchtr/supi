@@ -94,6 +94,8 @@ export type ConfidenceMode = "semantic" | "structural" | "heuristic" | "unavaila
 export interface OutlineData {
   name: string;
   kind: string;
+  /** Exact 1-based start of the declaration name token, when known. */
+  nameAnchor?: SymbolAnchor;
   startLine: number;
   startCharacter: number;
   endLine: number;

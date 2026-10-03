@@ -8,6 +8,7 @@ import {
   type StructuralProvider,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
+import { TENTATIVE_PUSH_UNAVAILABLE_REASON } from "@mrclrchtr/supi-lsp/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codeIntelligenceExtension from "../../../../src/extension.ts";
@@ -228,6 +229,34 @@ describe("code_inspect tool", () => {
     };
     expect(result.content[0]?.text).toContain("`second` (variable) L1:18–L1:35");
     expect(result.content[0]?.text).not.toContain("`first` (variable)");
+  });
+
+  it("shows ambient errors as partial evidence and keeps their limitation", async () => {
+    const limitation = TENTATIVE_PUSH_UNAVAILABLE_REASON;
+    registerSemantic();
+    registerStructural();
+    mockReadyLsp({
+      fileDiagnostics: vi.fn().mockResolvedValue({
+        kind: "partial",
+        data: [
+          {
+            severity: 1,
+            message: "Observed missing label.",
+            range: {
+              start: { line: 2, character: 10 },
+              end: { line: 2, character: 20 },
+            },
+          },
+        ],
+        reason: limitation,
+      }),
+    });
+
+    const result = (await executeInspect()) as { content: Array<{ text: string }> };
+    const text = result.content[0]?.text ?? "";
+    expect(text).toContain("Observed missing label.");
+    expect(text).toContain("Partial — A diagnostic publication is ambient evidence only");
+    expect(text).toContain("empty publication cannot confirm that the document is clean");
   });
 
   it("never substitutes a diagnostic outside the nearby window", async () => {

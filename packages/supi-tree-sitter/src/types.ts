@@ -23,6 +23,8 @@ export interface OutlineItem {
   name: string;
   kind: string;
   range: SourceRange;
+  /** Exact 1-based start of the declaration name, when available. */
+  nameAnchor?: { line: number; character: number };
   children?: OutlineItem[];
 }
 

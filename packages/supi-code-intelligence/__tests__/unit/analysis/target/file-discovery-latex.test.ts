@@ -15,6 +15,45 @@ afterEach(() => {
 });
 
 describe("LaTeX file target discovery", () => {
+  it("keeps comment text out of structural label names and preserves token anchors", async () => {
+    cwd = mkdtempSync(path.join(os.tmpdir(), "latex-target-comments-"));
+    const file = path.join(cwd, "paper.tex");
+    writeFileSync(
+      file,
+      String.raw`\label{sec:intro_label% trailing comment
+}
+\label{%
+sec:next}`,
+    );
+    const treeSitter = createTreeSitterSession(cwd);
+    const structural = createTreeSitterProvider(treeSitter);
+
+    try {
+      const outcome = await resolveFileTargetGroup(file, cwd, { structural });
+
+      expect(outcome.kind).toBe("resolved");
+      if (outcome.kind !== "resolved") return;
+      expect(outcome.group.targets.filter(({ kind }) => kind === "label")).toMatchObject([
+        {
+          name: "sec:intro_label",
+          position: { line: 0, character: 7 },
+          displayLine: 1,
+          displayCharacter: 8,
+          anchorKind: "name",
+        },
+        {
+          name: "sec:next",
+          position: { line: 3, character: 0 },
+          displayLine: 4,
+          displayCharacter: 1,
+          anchorKind: "name",
+        },
+      ]);
+    } finally {
+      await treeSitter.dispose();
+    }
+  });
+
   it("merges actual Texlab symbol kinds with structural LaTeX declarations", async () => {
     cwd = mkdtempSync(path.join(os.tmpdir(), "latex-target-discovery-"));
     const file = path.join(cwd, "paper.tex");
@@ -78,6 +117,11 @@ describe("LaTeX file target discovery", () => {
       });
       expect(outcome.group.targets.find(({ name }) => name === "sec:intro")).toMatchObject({
         kind: "label",
+        position: { line: 3, character: 7 },
+        displayLine: 4,
+        displayCharacter: 8,
+        declarationAnchor: { line: 4, character: 1 },
+        anchorKind: "name",
         provenance: ["structural"],
       });
     } finally {

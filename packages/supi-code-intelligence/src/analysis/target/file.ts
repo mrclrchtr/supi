@@ -24,6 +24,7 @@ import {
   canonicalDeclarationKind,
   canonicalFileDeclarationKind,
   canonicalFileDeclarationName,
+  declarationOccurrencesFor,
   refineTypeAliasIdentity,
 } from "./identity.ts";
 import type { ResolvedTargetData, ResolvedTargetGroupData } from "./types.ts";
@@ -228,11 +229,15 @@ function flattenOutline(
   nesting: DeclarationNesting = "top-level",
 ): DiscoveredTargetData[] {
   return items.flatMap((item) => {
+    const nameAnchor = item.nameAnchor ?? {
+      line: item.startLine,
+      character: item.startCharacter,
+    };
     const target: DiscoveredTargetData = {
       file,
-      position: { line: item.startLine - 1, character: item.startCharacter - 1 },
-      displayLine: item.startLine,
-      displayCharacter: item.startCharacter,
+      position: { line: nameAnchor.line - 1, character: nameAnchor.character - 1 },
+      displayLine: nameAnchor.line,
+      displayCharacter: nameAnchor.character,
       declarationAnchor: { line: item.startLine, character: item.startCharacter },
       declarationOccurrence: 0,
       name: item.name,
@@ -242,7 +247,7 @@ function flattenOutline(
         canonicalDeclarationKind(item.kind),
       confidence: "structural",
       provenance: ["structural"],
-      anchorKind: "declaration",
+      anchorKind: item.nameAnchor ? "name" : "declaration",
       container,
       nesting,
     };
@@ -352,17 +357,20 @@ function compatibleContainerEvidence(
 function assignDeclarationOccurrences(
   targets: readonly DiscoveredTargetData[],
 ): DiscoveredTargetData[] {
-  const occurrences = new Map<string, number>();
-  return targets.map((target) => {
-    const key = [
-      target.declarationAnchor.line,
-      target.name ?? "",
-      declarationIdentityKind(target),
-      target.container ?? "",
-    ].join("\0");
-    const occurrence = occurrences.get(key) ?? 0;
-    occurrences.set(key, occurrence + 1);
-    return { ...target, declarationOccurrence: occurrence };
+  const candidates = targets.map((target) => ({
+    name: target.name,
+    identityKind: declarationIdentityKind(target),
+    declarationAnchor: target.declarationAnchor,
+    nameAnchor: { line: target.displayLine, character: target.displayCharacter },
+    container: target.container,
+  }));
+  const occurrences = declarationOccurrencesFor(candidates);
+  return targets.map((target, index) => {
+    const declarationOccurrence = occurrences[index];
+    if (declarationOccurrence === undefined) {
+      throw new Error("The declaration occurrence was not assigned.");
+    }
+    return { ...target, declarationOccurrence };
   });
 }
 

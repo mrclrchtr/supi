@@ -103,6 +103,7 @@ function mapOutlineItems(items: OutlineItem[]): OutlineData[] {
   return items.map((item) => ({
     name: item.name,
     kind: item.kind,
+    ...(item.nameAnchor ? { nameAnchor: { ...item.nameAnchor } } : {}),
     ...takeRange(item.range),
     children: item.children ? mapOutlineItems(item.children) : undefined,
   }));

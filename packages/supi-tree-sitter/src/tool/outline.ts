@@ -26,16 +26,30 @@ const OUTLINE_DECLARATION_NODE_TYPES = new Set([
   "function_signature",
 ]);
 
-/** Extract a structural outline from a parsed tree. */
-export function collectOutline(rootNode: SyntaxNodeLike, source: string): OutlineItem[] {
-  return collectItems(rootNode, source);
+function sourceLineStarts(source: string): number[] {
+  const starts = [0];
+  for (let index = 0; index < source.length; index += 1) {
+    if (source[index] === "\r" && source[index + 1] === "\n") index += 1;
+    else if (source[index] !== "\r" && source[index] !== "\n") continue;
+    starts.push(index + 1);
+  }
+  return starts;
 }
 
-function collectItems(node: SyntaxNodeLike, source: string): OutlineItem[] {
+/** Extract a structural outline from a parsed tree. */
+export function collectOutline(rootNode: SyntaxNodeLike, source: string): OutlineItem[] {
+  return collectItems(rootNode, source, sourceLineStarts(source));
+}
+
+function collectItems(
+  node: SyntaxNodeLike,
+  source: string,
+  lineStarts: readonly number[],
+): OutlineItem[] {
   const items: OutlineItem[] = [];
 
   for (const child of node.children) {
-    const polyglotItems = extractPolyglotOutlineItems(child, source);
+    const polyglotItems = extractPolyglotOutlineItems(child, source, lineStarts);
     if (polyglotItems) {
       items.push(...polyglotItems);
       continue;
@@ -43,7 +57,7 @@ function collectItems(node: SyntaxNodeLike, source: string): OutlineItem[] {
 
     const extractedItems = extractItems(child, source);
     if (extractedItems) items.push(...extractedItems);
-    else items.push(...collectItems(child, source));
+    else items.push(...collectItems(child, source, lineStarts));
   }
 
   return items;

@@ -38,7 +38,7 @@ function renderNode(
   lines.push(
     `- Type: \`${node.type}\` at ${input.relPath}:${node.startLine}:${node.startCharacter}–${node.endLine}:${node.endCharacter}`,
   );
-  if (node.text) lines.push("```ts", node.text, "```");
+  if (node.text) lines.push("```text", node.text, "```");
   if (node.ancestry.length > 0) {
     lines.push("", "### Ancestry");
     for (const ancestor of node.ancestry) {

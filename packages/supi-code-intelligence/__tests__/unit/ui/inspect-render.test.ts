@@ -58,6 +58,40 @@ describe("renderInspectResult", () => {
     expect(result).toContain("No diagnostics intersect the nearby window");
   });
 
+  it("uses a neutral fence for source text with a non-TypeScript extension", () => {
+    const assembly = assembleInspectResult(
+      {
+        relPath: "paper.tex",
+        line: 4,
+        character: 10,
+        maxResults: 5,
+        confidence: "structural",
+        diagnosticWindow: { startLine: 2, endLine: 6 },
+        sections: {
+          node: completedCodeQuery({
+            type: "label",
+            text: "sec:intro",
+            startLine: 4,
+            startCharacter: 8,
+            endLine: 4,
+            endCharacter: 17,
+            ancestry: [],
+          }),
+          enclosingSymbol: completedCodeQuery(null),
+          hover: unavailableCodeQuery("no semantic provider"),
+          definition: unavailableCodeQuery("no semantic provider"),
+          diagnostics: unavailableCodeQuery("no diagnostic provider"),
+        },
+      },
+      [],
+    );
+
+    const result = renderInspectResult(assembly);
+    expect(result).toContain("```text\nsec:intro\n```");
+    expect(result).not.toContain("```ts");
+    expect(result).not.toContain("```bibtex");
+  });
+
   it("renders unavailable and partial section reasons plus list truncation", () => {
     const assembly = assembleInspectResult(
       {

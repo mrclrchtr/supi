@@ -1,0 +1,12 @@
+\documentclass{article}
+\usepackage{import}
+\newcommand{\vect}[1]{\mathbf{#1}}
+\begin{document}
+\section{Introduction}
+\label{sec:intro}
+See Section~\ref{sec:intro} and \cite{knuthBook}.
+\input{chapters/body}
+\import{chapters}{appendix}
+\bibliographystyle{plain}
+\bibliography{references}
+\end{document}

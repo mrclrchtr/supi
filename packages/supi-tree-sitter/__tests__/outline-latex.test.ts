@@ -62,6 +62,44 @@ Result text.`,
       ["proofsketch", "environment"],
       ["sec:intro", "label"],
     ]);
+    expect(items.find(({ name }) => name === "sec:intro")).toMatchObject({
+      nameAnchor: { line: 3, character: 8 },
+    });
+  });
+
+  it("uses the label token for names and anchors when comments occur in its group", async () => {
+    const items = flatten(
+      await outline(String.raw`\label{sec:intro% trailing comment
+}
+\label{%
+sec:next}`),
+    );
+
+    expect(items.filter(({ kind }) => kind === "label")).toMatchObject([
+      { name: "sec:intro", nameAnchor: { line: 1, character: 8 } },
+      { name: "sec:next", nameAnchor: { line: 4, character: 1 } },
+    ]);
+  });
+
+  it("keeps complete underscore keys and rejects split key spans", async () => {
+    const items = flatten(
+      await outline(String.raw`\label{sec:my_label}
+\label{sec:intro% trailing comment
+}
+\label{%
+sec:next_label}
+\label{sec:part%
+suffix}
+\label{sec:
+split}`),
+    );
+    const labels = items.filter(({ kind }) => kind === "label");
+
+    expect(labels.map(({ name, nameAnchor }) => [name, nameAnchor])).toEqual([
+      ["sec:my_label", { line: 1, character: 8 }],
+      ["sec:intro", { line: 2, character: 8 }],
+      ["sec:next_label", { line: 5, character: 1 }],
+    ]);
   });
 
   it("keeps labels in sectionless list items", async () => {

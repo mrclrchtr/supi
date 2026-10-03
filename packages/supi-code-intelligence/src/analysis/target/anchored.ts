@@ -24,6 +24,10 @@ import {
   createCodeSymbolIdentityResolver,
   type DeclarationOccurrenceIdentity,
 } from "./identity.ts";
+import {
+  resolveLatexLabelTargetAtAnchor,
+  resolveTexlabSectionLabelCollision,
+} from "./latex-label-container.ts";
 import type { DisambiguationCandidateData, ResolvedTargetData, TargetOutcome } from "./types.ts";
 
 /** 1-based symbol anchor position (mirrors the runtime `SymbolAnchor`). */
@@ -62,14 +66,11 @@ function isBinaryFile(filePath: string): boolean {
 
 // ── Provider-backed anchored symbol resolution ────────────────────────
 
-/**
- * Minimal provider surface used by anchored symbol resolution — only the
- * methods the resolver actually consults. The composite `CodeProvider` from
- * `request-context.ts` satisfies this shape, as do focused test doubles.
- */
+/** Provider methods used by anchored resolution. */
 export interface AnchoredResolverProvider {
   documentSymbols?: SemanticProvider["documentSymbols"];
   nodeAt?: StructuralProvider["nodeAt"];
+  outline?: StructuralProvider["outline"];
 }
 
 /** Tree-sitter node types that introduce a named declaration. */
@@ -283,6 +284,14 @@ async function resolveFromStructural(
   provider: AnchoredResolverProvider,
   control?: CodeRequestControl,
 ): Promise<TargetOutcome | null> {
+  const latexLabel = await resolveLatexLabelTargetAtAnchor({
+    file,
+    line: requested.line,
+    character: requested.character,
+    outline: provider.outline,
+    control,
+  });
+  if (latexLabel) return { kind: "resolved", target: latexLabel };
   if (!provider.nodeAt) return null;
   let nodeResult: CodeResult<NodeAtData> | null = null;
   try {
@@ -294,10 +303,16 @@ async function resolveFromStructural(
   if (nodeResult?.kind !== "success") return null;
 
   const node = nodeResult.data;
-  if (NON_SYMBOL_NODE_TYPES.has(node.type)) {
+  const isLabelKey = node.ancestry.some((ancestor) => ancestor.type === "label_definition");
+  if (isLabelKey || NON_SYMBOL_NODE_TYPES.has(node.type)) {
     return {
       kind: "error",
-      message: coordinateNotOnSymbolMessage(file, requested.line, requested.character, node.type),
+      message: coordinateNotOnSymbolMessage(
+        file,
+        requested.line,
+        requested.character,
+        isLabelKey ? "unverified LaTeX label key" : node.type,
+      ),
     };
   }
   if (node.type !== "identifier") {
@@ -322,6 +337,10 @@ async function resolveFromStructural(
     };
   }
   const nameAnchor: Anchor = { line: node.startLine, character: node.startCharacter };
+  const declarationAnchor = {
+    line: declAncestor.startLine,
+    character: declAncestor.startCharacter,
+  };
   const snapped =
     nameAnchor.line !== requested.line || nameAnchor.character !== requested.character;
   return {
@@ -331,10 +350,7 @@ async function resolveFromStructural(
       position: { line: nameAnchor.line - 1, character: nameAnchor.character - 1 },
       displayLine: nameAnchor.line,
       displayCharacter: nameAnchor.character,
-      declarationAnchor: {
-        line: declAncestor.startLine,
-        character: declAncestor.startCharacter,
-      },
+      declarationAnchor,
       declarationOccurrence: 0,
       name: node.text,
       kind: kindFromDeclarationType(declAncestor.type),
@@ -387,7 +403,13 @@ export async function resolveAnchoredSymbolTarget(
   const requested: Anchor = { line, character };
   if (provider) {
     const semantic = await resolveFromSemantic(file, requested, provider, control);
-    if (semantic) return semantic;
+    if (semantic) {
+      return (
+        (await resolveTexlabSectionLabelCollision(file, semantic, () =>
+          resolveFromStructural(file, requested, provider, control),
+        )) ?? semantic
+      );
+    }
     const structural = await resolveFromStructural(file, requested, provider, control);
     if (structural) return structural;
   }
