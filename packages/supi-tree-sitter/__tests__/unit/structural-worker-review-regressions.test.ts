@@ -6,12 +6,11 @@ import { STRUCTURAL_WORKER_PROTOCOL_VERSION } from "../../src/session/structural
 class StartingWorker {
   readonly events = new EventEmitter();
   readonly posts: unknown[] = [];
-  readonly terminate = vi.fn(async () => {
-    this.events.emit("exit", 0);
-    return 0;
-  });
+  disconnected = false;
+  readonly terminate = vi.fn(async () => 0);
 
   postMessage(message: unknown): void {
+    if (this.disconnected) throw new Error("Structural Worker process is disconnected");
     this.posts.push(message);
   }
   on(event: "message", listener: (message: unknown) => void): this;
@@ -128,4 +127,101 @@ describe("Structural Worker review regressions", () => {
       await client.dispose();
     }
   });
+
+  it("routes a disconnected cancel send through the Worker failure transition", async () => {
+    const { client, workers } = createClientWithWorkers();
+    const abortController = new AbortController();
+    const unhandledErrors: unknown[] = [];
+    const onUncaught = (error: unknown) => unhandledErrors.push(error);
+    process.on("uncaughtException", onUncaught);
+    const operation = client.execute(
+      { operation: "outline", file: "test.ts" },
+      {
+        signal: abortController.signal,
+      },
+    );
+
+    try {
+      await vi.waitFor(() => expect(workers).toHaveLength(1));
+      const first = workers[0];
+      await vi.waitFor(() => expect(first?.posts).toHaveLength(1));
+      if (!first) throw new Error("Expected the first Worker");
+      first.disconnected = true;
+      abortController.abort(new Error("caller stopped"));
+      await vi.waitFor(() => expect(workers).toHaveLength(2));
+
+      await expect(operation).resolves.toEqual({
+        kind: "runtime-error",
+        message: "Structural Worker process is disconnected",
+      });
+      first.events.emit("exit", 1);
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(workers).toHaveLength(2);
+      expect(unhandledErrors).toEqual([]);
+    } finally {
+      process.removeListener("uncaughtException", onUncaught);
+      await client.dispose();
+    }
+  });
+
+  it("routes a disconnected chunk acknowledgement through the Worker failure transition", async () => {
+    const { client, workers } = createClientWithWorkers();
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (error: unknown) => unhandledRejections.push(error);
+    process.on("unhandledRejection", onUnhandledRejection);
+    const operation = client.execute({ operation: "outline", file: "test.ts" });
+
+    try {
+      await vi.waitFor(() => expect(workers).toHaveLength(1));
+      const first = workers[0];
+      await vi.waitFor(() => expect(first?.posts).toHaveLength(1));
+      if (!first) throw new Error("Expected the first Worker");
+      const request = first.posts[0] as { requestId: string };
+      const payload = Buffer.from(JSON.stringify({ kind: "success", data: [] }), "utf8");
+      first.disconnected = true;
+      first.events.emit("message", {
+        kind: "chunk",
+        version: STRUCTURAL_WORKER_PROTOCOL_VERSION,
+        generation: 1,
+        requestId: request.requestId,
+        sequence: 0,
+        final: true,
+        encodedBytes: payload.byteLength,
+        payload,
+      });
+      await vi.waitFor(() => expect(workers).toHaveLength(2));
+
+      await expect(operation).resolves.toEqual({
+        kind: "runtime-error",
+        message: "Structural Worker process is disconnected",
+      });
+      first.events.emit("exit", 1);
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(workers).toHaveLength(2);
+      expect(unhandledRejections).toEqual([]);
+    } finally {
+      process.removeListener("unhandledRejection", onUnhandledRejection);
+      await client.dispose();
+    }
+  });
 });
+
+function createClientWithWorkers(): {
+  client: StructuralWorkerClient;
+  workers: StartingWorker[];
+} {
+  const workers: StartingWorker[] = [];
+  const client = new StructuralWorkerClient("/workspace", ({ generation }) => {
+    const worker = new StartingWorker();
+    workers.push(worker);
+    queueMicrotask(() =>
+      worker.events.emit("message", {
+        kind: "ready",
+        version: STRUCTURAL_WORKER_PROTOCOL_VERSION,
+        generation,
+      }),
+    );
+    return worker;
+  });
+  return { client, workers };
+}

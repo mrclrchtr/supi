@@ -27,7 +27,7 @@ This package provides the parser-backed structural substrate consumed by `@mrclr
 
 - an owned parsing session API for direct library consumers
 - a `StructuralProvider` adapter published through `./provider/tree-sitter-provider`
-- a long-lived owned Structural Worker that keeps Pi responsive during parser-backed work
+- one long-lived Structural Worker in a dedicated Node process; the Worker keeps Pi responsive during parser-backed work
 - `CodeRequestControl` cancellation, absolute deadlines, shared atomic interruption, and hard-stop termination
 - structural outline/import/export/node/callee/call-site operations through the asynchronous service surface
 - operation-specific extension discovery through `getStructuralSearchSupportedExtensions()`
@@ -107,15 +107,19 @@ The benchmark reports cold and repeated outline results. It also reports cold an
 
 The Structural Worker reads files asynchronously. It identifies fresh parsed files by canonical path, grammar, and SHA-256 content hash. Cached trees use true least-recently-used eviction with limits of 128 files and 32 MiB of retained UTF-8 source bytes. Compiled queries use the same policy with limits of 128 queries and 512 KiB of retained UTF-8 query text. Source and query byte counts are memory-related proxies because `web-tree-sitter` does not report WASM resource sizes. Cached canonical trees stay private in the Worker.
 
-All structural service operations accept optional `CodeRequestControl`. The parent converts cancellation to one shared atomic flag and forwards absolute deadlines. When present, it forwards only the opaque Debug Operation ID through the Worker protocol so parse and query timing events keep direct request ownership. Direct library calls have no ID. Worker read phases observe a local abort signal. Parser and query progress callbacks observe the flag and deadline. If cooperative interruption does not settle in the fixed 250 ms grace period, the parent terminates the Worker. Valid queued work keeps FIFO order on one fresh Worker with cold caches. There is no main-thread parser fallback.
+The Structural Worker runs in a dedicated Node child process. The process uses `--liftoff-only` so V8 avoids the optimizing WebAssembly compiler that uses unsafe amounts of memory for large grammars. This applies to every grammar in the Worker. Pi's main process does not receive this flag, and a V8 failure in the Worker process cannot crash Pi.
+
+All structural service operations accept optional `CodeRequestControl`. The parent converts cancellation to one shared atomic flag and forwards absolute deadlines. When present, it forwards only the opaque Debug Operation ID through the Worker protocol so parse and query timing events keep direct request ownership. Direct library calls have no ID. The process host creates a shared atomic flag for its Worker thread because Node IPC cannot share the parent flag. Worker read phases observe a local abort signal. Parser and query progress callbacks observe the flag and deadline. If cooperative interruption does not settle in the fixed 250 ms grace period, the parent terminates the Worker process. Valid queued work keeps FIFO order on one fresh Worker with cold caches. There is no main-thread parser fallback.
 
 ## Source
 
 - `src/api.ts` — public library entrypoint
+- `src/worker/process-host.mjs` — process bridge and Worker-local cancellation flags
 - `src/worker/bootstrap.mjs` — package-owned Worker bootstrap and direct `jiti` loader
 - `src/worker/runtime.ts` — Worker-only parser and query runtime
 - `src/worker/parsed-file-store.ts` — Worker-only parsed-file and compiled-query reuse
 - `src/session/structural-worker-client.ts` — bounded FIFO mailbox, protocol, cancellation, and restart ownership
+- `src/session/structural-worker-process.ts` — isolated Node process and IPC bridge
 - `src/session/runtime-controller.ts` — generation-fenced shared Worker lifecycle
 - `src/session/session.ts` — asynchronous Worker-proxy service and owned session API
 - `src/operation-support.ts` — authoritative operation-specific extension support

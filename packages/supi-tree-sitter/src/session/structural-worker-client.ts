@@ -1,6 +1,5 @@
 // biome-ignore-all lint/style/noExcessiveLinesPerFile: one mailbox state machine owns all Worker lifecycle transitions
 import { setImmediate as yieldImmediate } from "node:timers/promises";
-import { Worker } from "node:worker_threads";
 import {
   type CodeRequestControl,
   CodeRequestDeadlineError,
@@ -12,6 +11,10 @@ import { publishStructuralTimingEvent } from "./structural-timing.ts";
 import { StructuralWorkerLifecycle } from "./structural-worker-client-lifecycle.ts";
 import { assertStructuralProtocolMessageSize } from "./structural-worker-message-size.ts";
 import {
+  createStructuralWorkerProcess,
+  type StructuralWorkerLike,
+} from "./structural-worker-process.ts";
+import {
   decodeStructuralResult,
   type ParentToStructuralWorkerMessage,
   STRUCTURAL_WORKER_LIMITS,
@@ -21,14 +24,6 @@ import {
   validateStructuralWorkerOperation,
   validateWorkerToParentMessage,
 } from "./structural-worker-protocol.ts";
-
-interface StructuralWorkerLike {
-  postMessage(message: ParentToStructuralWorkerMessage): void;
-  on(event: "message", listener: (message: unknown) => void): this;
-  on(event: "error", listener: (error: Error) => void): this;
-  on(event: "exit", listener: (code: number) => void): this;
-  terminate(): Promise<number>;
-}
 
 export type StructuralWorkerFactory = (options: {
   readonly cwd: string;
@@ -71,6 +66,7 @@ interface ActiveWorker {
   readonly worker: StructuralWorkerLike;
   ready: boolean;
   startupSettled: boolean;
+  failureStarted: boolean;
   readonly settleStartupFailure: (message: string) => void;
 }
 
@@ -198,6 +194,7 @@ export class StructuralWorkerClient {
       worker,
       ready: false,
       startupSettled: false,
+      failureStarted: false,
       settleStartupFailure: (message) => rejectStartup(message),
     };
     this.#worker = active;
@@ -241,23 +238,18 @@ export class StructuralWorkerClient {
       });
       worker.on("error", (error) => {
         settleFailure(error.message);
-        if (this.#worker === active && active.ready) {
-          void this.#lifecycle.run(() => this.#workerFailure(error.message));
-        }
+        if (active.ready) this.#failWorker(active, error.message);
       });
       worker.on("exit", (code) => {
         settleFailure(`Structural Worker exited with code ${code}`);
-        if (!this.#closed && this.#worker === active && active.ready) {
-          void this.#lifecycle.run(() =>
-            this.#workerFailure(`Structural Worker exited with code ${code}`),
-          );
-        }
+        if (active.ready) this.#failWorker(active, `Structural Worker exited with code ${code}`);
       });
     });
   }
 
   #dispatch(): void {
-    if (this.#closed || this.#active || !this.#worker?.ready) return;
+    const worker = this.#worker;
+    if (this.#closed || this.#active || !worker?.ready) return;
     while (this.#queue.length > 0) {
       const request = this.#queue.shift();
       if (!request) return;
@@ -271,7 +263,7 @@ export class StructuralWorkerClient {
       const message = {
         kind: "request",
         version: STRUCTURAL_WORKER_PROTOCOL_VERSION,
-        generation: this.#worker.generation,
+        generation: worker.generation,
         requestId: request.id,
         input: request.input,
         ...(request.control?.operationId ? { operationId: request.control.operationId } : {}),
@@ -280,7 +272,7 @@ export class StructuralWorkerClient {
       } as const;
       try {
         assertStructuralProtocolMessageSize(message);
-        this.#worker.worker.postMessage(message);
+        if (!this.#send(worker, message)) return;
       } catch (error) {
         this.#active = null;
         this.#settle(request, runtimeError(errorMessage(error)));
@@ -334,12 +326,13 @@ export class StructuralWorkerClient {
     active.awaitingAck = message.sequence;
     if (message.final) active.finalSequence = message.sequence;
     await yieldImmediate();
-    if (this.#active !== active || !this.#worker) return;
+    const worker = this.#worker;
+    if (this.#active !== active || !worker) return;
     active.awaitingAck = null;
-    this.#worker.worker.postMessage({
+    this.#send(worker, {
       kind: "chunk-ack",
       version: STRUCTURAL_WORKER_PROTOCOL_VERSION,
-      generation: this.#worker.generation,
+      generation: worker.generation,
       requestId: active.id,
       sequence: message.sequence,
     });
@@ -401,6 +394,22 @@ export class StructuralWorkerClient {
     };
   }
 
+  #send(worker: ActiveWorker, message: ParentToStructuralWorkerMessage): boolean {
+    try {
+      worker.worker.postMessage(message);
+      return true;
+    } catch (error) {
+      this.#failWorker(worker, errorMessage(error));
+      return false;
+    }
+  }
+
+  #failWorker(worker: ActiveWorker, reason: string): void {
+    if (this.#closed || this.#worker !== worker || worker.failureStarted) return;
+    worker.failureStarted = true;
+    void this.#lifecycle.run(() => this.#workerFailure(reason)).catch(() => undefined);
+  }
+
   #interrupt(request: PendingRequest<unknown>, error: unknown): void {
     if (request.settled) return;
     const queuedIndex = this.#queue.indexOf(request);
@@ -409,14 +418,19 @@ export class StructuralWorkerClient {
       this.#reject(request, error);
       return;
     }
-    if (this.#active !== request || !this.#worker) return;
+    const worker = this.#worker;
+    if (this.#active !== request || !worker) return;
     Atomics.store(request.cancellationFlag, 0, 1);
-    this.#worker.worker.postMessage({
-      kind: "cancel",
-      version: STRUCTURAL_WORKER_PROTOCOL_VERSION,
-      generation: this.#worker.generation,
-      requestId: request.id,
-    });
+    if (
+      !this.#send(worker, {
+        kind: "cancel",
+        version: STRUCTURAL_WORKER_PROTOCOL_VERSION,
+        generation: worker.generation,
+        requestId: request.id,
+      })
+    ) {
+      return;
+    }
     request.hardStopTimer = setTimeout(
       () => void this.#hardStop(request, error),
       STRUCTURAL_WORKER_LIMITS.hardStopGraceMs,
@@ -550,10 +564,7 @@ function createProductionWorker(options: {
   cwd: string;
   generation: number;
 }): StructuralWorkerLike {
-  return new Worker(new URL("../worker/bootstrap.mjs", import.meta.url), {
-    execArgv: [],
-    workerData: options,
-  });
+  return createStructuralWorkerProcess(options);
 }
 
 function runtimeError<T = never>(message: string): TreeSitterResult<T> {

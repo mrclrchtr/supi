@@ -55,6 +55,7 @@ Vendored WASM metadata (`.wasm.json`) tracks the source npm package version and 
 
 - `web-tree-sitter` query construction errors are validation errors; avoid broad runtime-error string heuristics.
 - Structural services apply optional shared `CodeRequestControl` in the Worker. The parent maps it to an absolute deadline, a local Worker abort, one shared atomic cancellation slot, and the optional opaque Debug Operation ID. Never send Pi's raw Tool-call identity. A 250 ms hard stop terminates uncooperative work. Never add a main-thread parser fallback.
+- The Structural Worker runs in a child Node process with `--liftoff-only`. Node rejects V8 compile flags in `worker_threads.execArgv`; do not move this flag to the Worker or to Pi's process. The process host creates the shared cancellation slot before it forwards each request to the Worker.
 - `TreeSitterSession.canParse()` is a parseability check only. The Worker keeps canonical trees private. The installed `web-tree-sitter` `Language` type has no release method; Worker disposal deletes trees, queries, and parsers, then drops language references.
 - `TreeSitterRuntimeController` generation-fences startup. Shutdown and a newer start await pending session disposal, and stale startup continuations must not publish capability state.
 - `TreeSitterSession.dispose()` is asynchronous. All owners must await it.
