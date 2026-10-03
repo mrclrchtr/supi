@@ -10,6 +10,8 @@ import { createTreeSitterProvider } from "@mrclrchtr/supi-tree-sitter/provider/t
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { WorkspaceCodeIntelligenceSession } from "../../../../src/session/session.ts";
 import { codeGraphSpec } from "../../../../src/tool/code_graph/spec.ts";
+import { codeInspectSpec } from "../../../../src/tool/code_inspect/spec.ts";
+import { codeRefactorApplySpec } from "../../../../src/tool/code_refactor_apply/spec.ts";
 import { codeRefactorPlanSpec } from "../../../../src/tool/code_refactor_plan/spec.ts";
 import { codeResolveSpec } from "../../../../src/tool/code_resolve/spec.ts";
 import { registerCodeIntelligenceTools } from "../../../../src/tool/register.ts";
@@ -32,16 +34,20 @@ type CodeResult = {
 let cwd: string;
 let homeDir: string;
 let mainFile: string;
+let headingFile: string;
 let bodyFile: string;
 let appendixFile: string;
 let underscoreFile: string;
 let controller: LspRuntimeController | undefined;
 let treeSitter: ReturnType<typeof createTreeSitterSession> | undefined;
 let resolveTool: Tool;
+let inspectTool: Tool;
 let graphTool: Tool;
 let planTool: Tool;
+let applyTool: Tool;
 let context: ReturnType<typeof makeCtx>;
 let labelTargetId: string;
+let headingTargetId: string;
 let underscoreLabelTargetId: string;
 
 async function prepareWorkspace(): Promise<void> {
@@ -49,6 +55,16 @@ async function prepareWorkspace(): Promise<void> {
   homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "latex-public-home-"));
   fs.cpSync(LATEX_FIXTURE, cwd, { recursive: true });
   mainFile = path.join(cwd, "main.tex");
+  headingFile = path.join(cwd, "heading.tex");
+  fs.writeFileSync(
+    headingFile,
+    String.raw`\documentclass{article}
+\begin{document}
+\section{Intro}
+\label{sec:Intro}
+\end{document}
+`,
+  );
   bodyFile = path.join(cwd, "chapters", "body.tex");
   appendixFile = path.join(cwd, "chapters", "appendix.tex");
   const source = fs.readFileSync(mainFile, "utf8");
@@ -81,13 +97,17 @@ async function startTexlab() {
   const started = await controller.start();
   if (started.kind !== "ready") throw new Error(`Texlab did not start: ${started.kind}`);
   const runtime = started.runtime;
-  for (const file of [mainFile, bodyFile, appendixFile, underscoreFile]) {
+  for (const file of [mainFile, headingFile, bodyFile, appendixFile, underscoreFile]) {
     if (!(await runtime.trackFile(file)))
       throw new Error(`Could not track ${path.basename(file)}.`);
     const ready = await runtime.waitUntilReadyForFile(file);
     if (ready.kind !== "ready") throw new Error(`Texlab is not ready for ${path.basename(file)}.`);
   }
   return runtime;
+}
+
+function latexCommand(command: string): string {
+  return `${String.fromCharCode(92)}${command}`;
 }
 
 function registerTools(runtime: Awaited<ReturnType<typeof startTexlab>>) {
@@ -103,10 +123,14 @@ function registerTools(runtime: Awaited<ReturnType<typeof startTexlab>>) {
     codeResolveSpec,
     codeGraphSpec,
     codeRefactorPlanSpec,
+    codeRefactorApplySpec,
+    codeInspectSpec,
   ]);
   resolveTool = getTool(pi, "code_resolve");
+  inspectTool = getTool(pi, "code_inspect");
   graphTool = getTool(pi, "code_graph");
   planTool = getTool(pi, "code_refactor_plan");
+  applyTool = getTool(pi, "code_refactor_apply");
   context = makeCtx({ cwd });
   return session;
 }
@@ -122,6 +146,13 @@ describe.skipIf(!HAS_TEXLAB)("LaTeX targets through real Texlab and Tree-sitter"
     const label = group.targets.find((target) => target.name === "sec:Intro");
     if (!label) throw new Error("Texlab and Tree-sitter did not report sec:Intro.");
     labelTargetId = label.targetId;
+    const headingGroup = await session.resolve({ target: { file: headingFile } });
+    if (headingGroup.kind !== "target-group") {
+      throw new Error("The heading TeX file did not return a Target group.");
+    }
+    const heading = headingGroup.targets.find((target) => target.name === "Intro");
+    if (!heading) throw new Error("Texlab and Tree-sitter did not report the Intro section.");
+    headingTargetId = heading.targetId;
     const underscoreGroup = await session.resolve({ target: { file: underscoreFile } });
     if (underscoreGroup.kind !== "target-group") {
       throw new Error("The underscore TeX file did not return a Target group.");
@@ -202,6 +233,84 @@ describe.skipIf(!HAS_TEXLAB)("LaTeX targets through real Texlab and Tree-sitter"
       expect(JSON.stringify(rejected.details)).toContain("No symbol target resolved");
     }
   });
+
+  it("anchors a section rename to its title instead of its label", async () => {
+    const fileResult = (await resolveTool.execute(
+      "latex-heading-file-target",
+      { target: { file: headingFile } },
+      undefined,
+      undefined,
+      context,
+    )) as CodeResult;
+    const fileDetails = fileResult.details as {
+      data: { targets: Array<Record<string, unknown>> };
+    };
+    const heading = fileDetails.data.targets.find((target) => target.name === "Intro");
+    const planResult = (await planTool.execute(
+      "latex-heading-rename",
+      {
+        target: { handle: headingTargetId },
+        operation: { rename_symbol: { newName: "NewHeading" } },
+      },
+      undefined,
+      undefined,
+      context,
+    )) as CodeResult;
+    const planDetails = planResult.details as {
+      data: { confidence: string; nextQueries: string[] };
+      displaySections?: Array<{ lines: readonly string[] }>;
+    };
+    const edits = planDetails.displaySections?.flatMap((section) => section.lines) ?? [];
+
+    expect(edits).toEqual([`${headingFile} L3:10 → L3:15: NewHeading`]);
+    expect(planDetails.data.confidence).toBe("structural");
+    expect(heading).toMatchObject({
+      name: "Intro",
+      displayLine: 3,
+      displayCharacter: 10,
+      anchorKind: "name",
+    });
+
+    const anchorResult = (await resolveTool.execute(
+      "latex-heading-name-anchor",
+      { target: { anchor: { file: headingFile, line: 3, character: 10 } } },
+      undefined,
+      undefined,
+      context,
+    )) as CodeResult;
+    const anchorDetails = anchorResult.details as {
+      data: { targets: Array<{ targetId: string; name: string | null }> };
+    };
+    expect(anchorDetails.data.targets[0]).toMatchObject({ name: "Intro" });
+    expect(anchorDetails.data.targets[0]?.targetId).toBe(heading?.targetId);
+
+    const nextQuery = planDetails.data.nextQueries.find((query) => query.includes("planId:")) ?? "";
+    const planId = /planId: "([^"]+)"/u.exec(nextQuery)?.[1];
+    expect(planId).toMatch(/^plan-[0-9a-f]{12}$/u);
+    await applyTool.execute("latex-heading-apply", { planId }, undefined, undefined, context);
+    const appliedSource = fs.readFileSync(headingFile, "utf8");
+    const newHeading = ["New", "Heading"].join("");
+    expect(appliedSource).toContain(latexCommand(`section{${newHeading}}`));
+    expect(appliedSource).toContain(latexCommand("label{sec:Intro}"));
+    expect(appliedSource).not.toContain(latexCommand(`label{sec:${newHeading}}`));
+  });
+
+  it("shows an underscore label as one syntax token in point inspection", async () => {
+    const result = (await inspectTool.execute(
+      "latex-underscore-inspect",
+      { point: { file: underscoreFile, line: 4, character: 14 } },
+      undefined,
+      undefined,
+      context,
+    )) as { content: Array<{ text: string }> };
+    const text = result.content[0]?.text ?? "";
+
+    expect(text).toContain("Type: `label` at underscore.tex:4:8–4:20");
+    expect(text).toContain("sec:my_label");
+    expect(text).toContain("`curly_group_label");
+    expect(text).toContain("`label_definition");
+    expect(text).not.toContain("`subscript");
+  }, 10_000);
 
   it("keeps the full underscore label name and target identity", async () => {
     const fileResult = (await resolveTool.execute(

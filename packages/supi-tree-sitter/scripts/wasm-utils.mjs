@@ -163,6 +163,23 @@ function resolveTreeSitterCli(cliPackage) {
   return cliPath;
 }
 
+export function runTreeSitterGenerate(cliPath, grammarDir) {
+  const result = spawnSync(process.execPath, [cliPath, "generate"], {
+    cwd: grammarDir,
+    stdio: "inherit",
+  });
+
+  if (result.error) {
+    throw new Error("Could not start tree-sitter generate.", { cause: result.error });
+  }
+  if (result.signal) {
+    throw new Error(`tree-sitter generate was terminated by ${result.signal}.`);
+  }
+  if (result.status !== 0) {
+    throw new Error("tree-sitter generate failed for the prepared grammar.");
+  }
+}
+
 function runTreeSitterBuild(cliPath, grammarDir) {
   const result = spawnSync(process.execPath, [cliPath, "build", "--wasm"], {
     cwd: grammarDir,
@@ -227,6 +244,8 @@ export function writeWasmArtifacts({ sourceWasmPath, artifacts, metadata }) {
  * @param {{ wasmPath: string, metadataPath: string }} options.artifacts Destination paths.
  * @param {string} options.tempPrefix Temporary directory prefix.
  * @param {(grammarDir: string) => void} [options.prepare] Optional source edit.
+ * @param {(cliPath: string, grammarDir: string) => void} [options.generate]
+ *   Optional parser generation after the source edit.
  * @param {(details: { sourcePackage: object, cliPackage: object, sha256: string }) => object}
  *   options.createMetadata Metadata factory.
  * @returns {{ checksum: string, sourcePackage: object, cliPackage: object }} Build details.
@@ -238,6 +257,7 @@ export function generateWasmArtifact({
   artifacts,
   tempPrefix,
   prepare,
+  generate,
   createMetadata,
 }) {
   const sourcePackage = readInstalledPackage(sourcePackageName);
@@ -249,6 +269,7 @@ export function generateWasmArtifact({
   try {
     cpSync(sourcePackage.dir, grammarDir, { recursive: true });
     prepare?.(grammarDir);
+    generate?.(cliPath, grammarDir);
     runTreeSitterBuild(cliPath, grammarDir);
 
     const generatedWasmPath = join(grammarDir, wasmFile);

@@ -11,23 +11,20 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import {
   type CodeRequestControl,
-  type CodeResult,
   type CodeSymbol,
   isCodeRequestInterruption,
-  type NodeAtData,
   type SemanticProvider,
   type StructuralProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { AnchorKind } from "../../session/target-store.ts";
 import type { AnchoredResolutionMetadata, AnchoredResolutionSource } from "../../types/index.ts";
+import { resolveFromStructural } from "./anchored-structural.ts";
 import {
+  canonicalFileDeclarationKind,
   createCodeSymbolIdentityResolver,
   type DeclarationOccurrenceIdentity,
 } from "./identity.ts";
-import {
-  resolveLatexLabelTargetAtAnchor,
-  resolveTexlabSectionLabelCollision,
-} from "./latex-label-container.ts";
+import { resolveTexlabSectionLabelCollision } from "./latex-label-container.ts";
 import type { DisambiguationCandidateData, ResolvedTargetData, TargetOutcome } from "./types.ts";
 
 /** 1-based symbol anchor position (mirrors the runtime `SymbolAnchor`). */
@@ -71,49 +68,6 @@ export interface AnchoredResolverProvider {
   documentSymbols?: SemanticProvider["documentSymbols"];
   nodeAt?: StructuralProvider["nodeAt"];
   outline?: StructuralProvider["outline"];
-}
-
-/** Tree-sitter node types that introduce a named declaration. */
-const DECLARATION_NODE_TYPES = new Set([
-  "function_declaration",
-  "generator_function_declaration",
-  "function_signature",
-  "method_definition",
-  "method_declaration",
-  "method_signature",
-  "class_declaration",
-  "interface_declaration",
-  "enum_declaration",
-  "type_alias_declaration",
-  "lexical_declaration",
-  "variable_declaration",
-  "export_statement",
-]);
-
-/** Tree-sitter node types that represent non-symbol tokens. */
-const NON_SYMBOL_NODE_TYPES = new Set([
-  "comment",
-  "line_comment",
-  "block_comment",
-  "string",
-  "string_fragment",
-  "template_string",
-  "template_literal_type",
-  "regex",
-  "regex_pattern",
-  "number",
-  "escape_sequence",
-]);
-
-function kindFromDeclarationType(nodeType: string): string | null {
-  if (nodeType.includes("function")) return "Function";
-  if (nodeType.includes("method")) return "Method";
-  if (nodeType.includes("class")) return "Class";
-  if (nodeType.includes("interface")) return "Interface";
-  if (nodeType.includes("enum")) return "Enum";
-  if (nodeType.includes("type_alias")) return "Type";
-  if (nodeType.includes("lexical") || nodeType.includes("variable")) return "Variable";
-  return null;
 }
 
 /**
@@ -175,7 +129,8 @@ function resolvedFromSymbol(
       declarationOccurrence: opts.identity.declarationOccurrence,
       name: s.name,
       kind: s.kind,
-      identityKind: opts.identity.identityKind,
+      identityKind:
+        canonicalFileDeclarationKind(file, s.kind, s.name) ?? opts.identity.identityKind,
       confidence: "semantic",
       provenance: opts.identity.structuralEvidence ? ["semantic", "structural"] : ["semantic"],
       anchorKind: (s.nameAnchor ? "name" : "declaration") as AnchorKind,
@@ -203,7 +158,7 @@ async function candidatesFromSymbols(
       return {
         name: s.name,
         kind: s.kind,
-        identityKind: identity.identityKind,
+        identityKind: canonicalFileDeclarationKind(file, s.kind, s.name) ?? identity.identityKind,
         provenance: identity.structuralEvidence
           ? (["semantic", "structural"] as const)
           : (["semantic"] as const),
@@ -275,92 +230,6 @@ async function resolveFromSemantic(
   }
   if (snap.length > 1) return candidatesFromSymbols(file, snap, resolveIdentity);
   return null;
-}
-
-/** Layer 2: classify the coordinate via tree-sitter `nodeAt`. Returns null to fall through. */
-async function resolveFromStructural(
-  file: string,
-  requested: Anchor,
-  provider: AnchoredResolverProvider,
-  control?: CodeRequestControl,
-): Promise<TargetOutcome | null> {
-  const latexLabel = await resolveLatexLabelTargetAtAnchor({
-    file,
-    line: requested.line,
-    character: requested.character,
-    outline: provider.outline,
-    control,
-  });
-  if (latexLabel) return { kind: "resolved", target: latexLabel };
-  if (!provider.nodeAt) return null;
-  let nodeResult: CodeResult<NodeAtData> | null = null;
-  try {
-    nodeResult = await provider.nodeAt(file, requested.line, requested.character);
-  } catch (error) {
-    if (isCodeRequestInterruption(error, control)) throw error;
-    nodeResult = null;
-  }
-  if (nodeResult?.kind !== "success") return null;
-
-  const node = nodeResult.data;
-  const isLabelKey = node.ancestry.some((ancestor) => ancestor.type === "label_definition");
-  if (isLabelKey || NON_SYMBOL_NODE_TYPES.has(node.type)) {
-    return {
-      kind: "error",
-      message: coordinateNotOnSymbolMessage(
-        file,
-        requested.line,
-        requested.character,
-        isLabelKey ? "unverified LaTeX label key" : node.type,
-      ),
-    };
-  }
-  if (node.type !== "identifier") {
-    // Keyword/modifier/operator etc. — no LSP header snap available.
-    return {
-      kind: "error",
-      message: coordinateNotOnSymbolMessage(file, requested.line, requested.character, node.type),
-    };
-  }
-
-  const declAncestor = node.ancestry.find((a) => DECLARATION_NODE_TYPES.has(a.type));
-  if (!declAncestor) {
-    // Identifier is a usage, not a declaration name.
-    return {
-      kind: "error",
-      message: coordinateNotOnSymbolMessage(
-        file,
-        requested.line,
-        requested.character,
-        "identifier usage",
-      ),
-    };
-  }
-  const nameAnchor: Anchor = { line: node.startLine, character: node.startCharacter };
-  const declarationAnchor = {
-    line: declAncestor.startLine,
-    character: declAncestor.startCharacter,
-  };
-  const snapped =
-    nameAnchor.line !== requested.line || nameAnchor.character !== requested.character;
-  return {
-    kind: "resolved",
-    target: {
-      file,
-      position: { line: nameAnchor.line - 1, character: nameAnchor.character - 1 },
-      displayLine: nameAnchor.line,
-      displayCharacter: nameAnchor.character,
-      declarationAnchor,
-      declarationOccurrence: 0,
-      name: node.text,
-      kind: kindFromDeclarationType(declAncestor.type),
-      confidence: "structural",
-      provenance: ["structural"],
-      anchorKind: "name",
-      container: null,
-      resolution: buildResolution(requested, nameAnchor, snapped, "structural-identifier"),
-    },
-  };
 }
 
 /**

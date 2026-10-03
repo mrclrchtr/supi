@@ -96,6 +96,8 @@ export interface OutlineData {
   kind: string;
   /** Exact 1-based start of the declaration name token, when known. */
   nameAnchor?: SymbolAnchor;
+  /** Exclusive 1-based end of a verified literal name span, when known. */
+  nameEndAnchor?: SymbolAnchor;
   startLine: number;
   startCharacter: number;
   endLine: number;
@@ -218,7 +220,12 @@ export type RefactorResult =
       authorizedMutationRoots: string[];
     }
   | { kind: "ambiguous"; candidates: DisambiguationCandidate[] }
-  | { kind: "unavailable"; reason: string };
+  | {
+      kind: "unavailable";
+      reason: string;
+      /** Roots authorized by the routed LSP client, when a route returned no edit. */
+      authorizedMutationRoots?: string[];
+    };
 
 // ── Structural data shapes (value types, range-flattened) ──────────────
 

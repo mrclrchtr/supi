@@ -21,6 +21,11 @@ import {
 import type { AnchorKind } from "../../session/target-store.ts";
 import { normalizePath } from "../search/paths.ts";
 import {
+  reconcileContainer,
+  reconcileNesting,
+  refineLatexSectionNameAnchor,
+} from "./file-refinement.ts";
+import {
   canonicalDeclarationKind,
   canonicalFileDeclarationKind,
   canonicalFileDeclarationName,
@@ -56,7 +61,7 @@ const BINARY_EXTENSIONS = new Set([
   ".node",
 ]);
 
-interface DiscoveredTargetData extends ResolvedTargetData {
+export interface DiscoveredTargetData extends ResolvedTargetData {
   /** Provider-backed hierarchy used only for file-result presentation ranking. */
   readonly nesting: DeclarationNesting;
 }
@@ -269,9 +274,10 @@ function mergeDiscoveries(
     if (semanticIndex === null) return [structuralTarget];
     unmatchedSemantic.delete(semanticIndex);
     const semanticTarget = semantic[semanticIndex];
+    const refinedSemantic = refineLatexSectionNameAnchor(semanticTarget, structuralTarget);
     return [
       {
-        ...semanticTarget,
+        ...refinedSemantic,
         provenance: ["semantic", "structural"] as const,
         container: reconcileContainer(semanticTarget, structuralTarget),
         nesting: reconcileNesting(semanticTarget.nesting, structuralTarget.nesting),
@@ -282,32 +288,6 @@ function mergeDiscoveries(
   const sourceOrdered = [...mergedStructural, ...semanticOnly].sort(compareDeclarations);
   const identified = assignDeclarationOccurrences(sourceOrdered);
   return identified.sort(compareFileOrientationDeclarations);
-}
-
-/** Let provider-backed known hierarchy refine unknown without guessing through a conflict. */
-function reconcileNesting(
-  semantic: DeclarationNesting,
-  structural: DeclarationNesting,
-): DeclarationNesting {
-  if (semantic === structural) return semantic;
-  if (semantic === "unknown") return structural;
-  if (structural === "unknown") return semantic;
-  return "unknown";
-}
-
-/** Preserve known container evidence while clearing explicit provider conflicts. */
-function reconcileContainer(
-  semantic: DiscoveredTargetData,
-  structural: DiscoveredTargetData,
-): string | null {
-  if (semantic.container === structural.container) return semantic.container;
-  if (semantic.nesting === "unknown" && semantic.container === null) {
-    return structural.container;
-  }
-  if (structural.nesting === "unknown" && structural.container === null) {
-    return semantic.container;
-  }
-  return null;
 }
 
 function findSemanticMatch(

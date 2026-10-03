@@ -104,6 +104,7 @@ function mapOutlineItems(items: OutlineItem[]): OutlineData[] {
     name: item.name,
     kind: item.kind,
     ...(item.nameAnchor ? { nameAnchor: { ...item.nameAnchor } } : {}),
+    ...(item.nameEndAnchor ? { nameEndAnchor: { ...item.nameEndAnchor } } : {}),
     ...takeRange(item.range),
     children: item.children ? mapOutlineItems(item.children) : undefined,
   }));

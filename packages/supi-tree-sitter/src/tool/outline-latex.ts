@@ -2,6 +2,8 @@ import { nodeToRange } from "../coordinates.ts";
 import type { SyntaxNodeLike } from "../syntax-node.ts";
 import type { OutlineItem } from "../types.ts";
 
+const UNSUPPORTED_TITLE_CHARACTERS = /[\\{}%$#&^~_[\]()=]/u;
+
 const LATEX_SECTION_KINDS: Readonly<Record<string, string>> = {
   part: "part",
   chapter: "chapter",
@@ -31,19 +33,7 @@ export function extractLatexOutlineItems(
   lineStarts: readonly number[],
 ): OutlineItem[] | undefined {
   const sectionKind = LATEX_SECTION_KINDS[node.type];
-  if (sectionKind) {
-    const title = node.childForFieldName("text");
-    const name = title ? groupContent(title.text) : "";
-    if (!name) return [];
-    return [
-      {
-        name,
-        kind: sectionKind,
-        range: nodeToRange(node, source),
-        children: collectLatexMembers(node, source, lineStarts),
-      },
-    ];
-  }
+  if (sectionKind) return extractLatexSectionItem(node, source, lineStarts, sectionKind);
 
   const definition = LATEX_DEFINITION_FIELDS[node.type];
   if (!definition) return undefined;
@@ -62,6 +52,27 @@ export function extractLatexOutlineItems(
       kind: definition.kind,
       range: nodeToRange(node, source),
       ...(label ? { nameAnchor: label.nameAnchor } : {}),
+    },
+  ];
+}
+
+function extractLatexSectionItem(
+  node: SyntaxNodeLike,
+  source: string,
+  lineStarts: readonly number[],
+  sectionKind: string,
+): OutlineItem[] {
+  const title = node.childForFieldName("text");
+  const name = title ? groupContent(title.text) : "";
+  if (!name) return [];
+  const titleSpan = title ? findPlainTitleSpan(title, source, lineStarts, name) : null;
+  return [
+    {
+      name,
+      kind: sectionKind,
+      range: nodeToRange(node, source),
+      ...(titleSpan ? { nameAnchor: titleSpan.start, nameEndAnchor: titleSpan.end } : {}),
+      children: collectLatexMembers(node, source, lineStarts),
     },
   ];
 }
@@ -218,6 +229,55 @@ function collectLatexMembers(
     items.push(...collectLatexMembers(child, source, lineStarts));
   }
   return items;
+}
+
+function findPlainTitleSpan(
+  node: SyntaxNodeLike,
+  source: string,
+  lineStarts: readonly number[],
+  name: string,
+): { start: { line: number; character: number }; end: { line: number; character: number } } | null {
+  const groupStart = sourceOffsetAt(
+    source,
+    node.startPosition.row,
+    node.startPosition.column,
+    lineStarts,
+  );
+  const groupEnd = sourceOffsetAt(
+    source,
+    node.endPosition.row,
+    node.endPosition.column,
+    lineStarts,
+  );
+  if (source[groupStart] !== "{" || source[groupEnd - 1] !== "}") return null;
+
+  const rawText = source.slice(groupStart + 1, groupEnd - 1);
+  const text = rawText.trim();
+  if (!text || normalizeTitleWhitespace(text) !== name || UNSUPPORTED_TITLE_CHARACTERS.test(text)) {
+    return null;
+  }
+  const startOffset = groupStart + 1 + (rawText.length - rawText.trimStart().length);
+  const endOffset = startOffset + text.length;
+  if (source.slice(startOffset, endOffset) !== text) return null;
+  return {
+    start: sourcePointAtOffset(startOffset, lineStarts),
+    end: sourcePointAtOffset(endOffset, lineStarts),
+  };
+}
+
+function sourcePointAtOffset(
+  offset: number,
+  lineStarts: readonly number[],
+): { line: number; character: number } {
+  let lineIndex = 0;
+  while (lineIndex + 1 < lineStarts.length && (lineStarts[lineIndex + 1] ?? Infinity) <= offset) {
+    lineIndex += 1;
+  }
+  return { line: lineIndex + 1, character: offset - (lineStarts[lineIndex] ?? 0) + 1 };
+}
+
+function normalizeTitleWhitespace(value: string): string {
+  return value.replace(/\s+/gu, " ").trim();
 }
 
 function groupContent(value: string): string {

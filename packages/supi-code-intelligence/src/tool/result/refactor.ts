@@ -46,7 +46,13 @@ export function assembleRefactorPlanDetails(
     items: [...plan.edits.edits],
     maxResults,
   });
-  const provenance = [{ source: "semantic" as const, capability: "LSP refactor" }];
+  const evidenceSource = plan.evidenceSource ?? "semantic";
+  const provenance = [
+    {
+      source: evidenceSource,
+      capability: evidenceSource === "semantic" ? "LSP refactor" : "Tree-sitter exact LaTeX title",
+    },
+  ];
   const assembled = assembleToolResult({
     data: { plan, cwd, edits },
     sections: [
@@ -55,14 +61,14 @@ export function assembleRefactorPlanDetails(
         title: "Proposed edits",
         status: "complete",
         items: edits.items,
-        confidence: "semantic",
+        confidence: evidenceSource,
         provenance,
       },
     ],
     evidenceLists: [edits.metadata],
     nextQueries: [`Use code_refactor_apply with planId: "${plan.id}" to apply this refactor`],
     candidateCount: edits.metadata.totalCount ?? edits.metadata.shownCount,
-    confidence: "semantic",
+    confidence: evidenceSource,
     provenance,
   });
 
@@ -96,7 +102,19 @@ export function assembleRefactorApplyDetails(
   plan: Readonly<RefactorPlan>,
 ): RefactorApplyResultAssembly {
   const candidateCount = applyResult.kind === "applied" ? applyResult.totalEdits : 0;
-  const provenance = [{ source: "runtime" as const, capability: "file-mutation-queue" }];
+  const evidenceSource = plan.evidenceSource ?? "semantic";
+  const provenance =
+    applyResult.kind === "applied"
+      ? [
+          {
+            source: evidenceSource,
+            capability:
+              evidenceSource === "semantic" ? "LSP refactor" : "Tree-sitter exact LaTeX title",
+          },
+          { source: "runtime" as const, capability: "file-mutation-queue" },
+        ]
+      : [{ source: "runtime" as const, capability: "file-mutation-queue" }];
+  const confidence = applyResult.kind === "applied" ? evidenceSource : "unavailable";
   const assembled = assembleToolResult({
     data: { plan, result: applyResult },
     sections: [
@@ -105,13 +123,13 @@ export function assembleRefactorApplyDetails(
         title: "Applied edits",
         status: applyResult.kind === "applied" ? "complete" : "unavailable",
         items: applyResult.kind === "applied" ? [applyResult] : [],
-        confidence: applyResult.kind === "applied" ? "semantic" : "unavailable",
+        confidence,
         provenance,
       },
     ],
     nextQueries: [],
     candidateCount,
-    confidence: applyResult.kind === "applied" ? "semantic" : "unavailable",
+    confidence,
     provenance,
   });
 

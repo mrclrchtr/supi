@@ -169,6 +169,28 @@ describe("LspRefactorProvider", () => {
       }
     });
 
+    it("keeps routed mutation authority when rename is unsupported", async () => {
+      const lsp = createMockLsp({
+        rename: vi.fn().mockResolvedValue({
+          value: null,
+          reason: "Rename is unavailable at the requested position.",
+          authorizedMutationRoots: ["/routed/nested"],
+        }),
+      });
+      const provider = createLspSemanticProvider(lsp);
+      const result = (await provider.rename?.(
+        "/routed/nested/paper.tex",
+        { line: 2, character: 9 },
+        "Overview",
+      )) as RefactorResult;
+
+      expect(result).toEqual({
+        kind: "unavailable",
+        reason: "Rename is unavailable at the requested position.",
+        authorizedMutationRoots: ["/routed/nested"],
+      });
+    });
+
     it("returns unavailable when LSP returns empty edit (no changes, no documentChanges)", async () => {
       const lsp = createMockLsp({
         rename: vi.fn().mockResolvedValue(routed({} as unknown)),

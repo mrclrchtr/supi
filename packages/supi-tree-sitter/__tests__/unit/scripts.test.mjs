@@ -4,11 +4,13 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { patchLatexGrammar } from "../../scripts/generate-latex-wasm.mjs";
 import {
   checkCopiedFile,
   checkGeneratedWasm,
   checkVendoredWasm,
 } from "../../scripts/wasm-checks.mjs";
+import { readInstalledPackage } from "../../scripts/wasm-utils.mjs";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const scriptsDir = join(packageRoot, "scripts");
@@ -63,6 +65,22 @@ describe("WASM maintenance scripts", () => {
     },
     15_000,
   );
+
+  it("applies the checked LaTeX label patch to the pinned source grammar", () => {
+    const directory = mkdtempSync(join(tmpdir(), "supi-latex-patch-"));
+    const sourcePackage = readInstalledPackage("@pfoerster/tree-sitter-latex");
+    copyFileSync(join(sourcePackage.dir, "grammar.js"), join(directory, "grammar.js"));
+    try {
+      patchLatexGrammar(directory);
+      const grammar = readFileSync(join(directory, "grammar.js"), "utf8");
+
+      expect(grammar).toContain(String.raw`label: $ => /[^\\\[\]\{\}\$\(\)=&%\s\^\#\~,]+/`);
+      expect(grammar).not.toContain(String.raw`label: $ => /[^\\\[\]\{\}\$\(\)=&%\s_\^\#\~,]+/`);
+      expect(() => patchLatexGrammar(directory)).toThrow("found 0");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
 
   it("reports a stale copied artifact with the all-artifacts command", () => {
     const directory = mkdtempSync(join(tmpdir(), "supi-copied-artifact-check-"));

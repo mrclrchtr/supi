@@ -10,6 +10,10 @@ import { toLspPosition } from "@mrclrchtr/supi-lsp/api";
 import { SEMANTIC_READINESS_TIMEOUT_REASON } from "../analysis/readiness.ts";
 import { applyWorkspaceEdit } from "../analysis/refactor/apply.ts";
 import {
+  isLatexSectionTarget,
+  refineLatexSectionRenameResult,
+} from "../analysis/refactor/latex-section-rename.ts";
+import {
   establishMutationAuthority,
   revalidateMutationAuthority,
 } from "../analysis/refactor/mutation-authority.ts";
@@ -35,6 +39,7 @@ import {
   type RefactorPlanWorkflowInput,
   type RefactorPlanWorkflowOutcome,
 } from "./refactor-types.ts";
+import type { TargetStoreEntry } from "./target-store.ts";
 import { resolveTargetWorkflow, type TargetWorkflowDeps } from "./target-workflow.ts";
 import { reportProgress, throwIfAborted, type WorkflowControl } from "./workflow-control.ts";
 
@@ -99,54 +104,7 @@ export async function runRefactorPlanWorkflow(
   }
   if (readiness.kind === "unavailable") return readiness;
   throwIfAborted(control);
-
-  const file = normalizePath(target.entry.file, deps.cwd);
-  const result = await planWithProvider(
-    deps.capability.getSemanticProvider(deps.cwd),
-    {
-      operation: parsed.operation,
-      file,
-      position: toLspPosition(target.entry.displayLine, target.entry.displayCharacter),
-      range: parsed.range ? toLspRange(parsed.range) : undefined,
-      newName: parsed.newName,
-    },
-    control,
-  );
-  if (result.kind === "unavailable") return result;
-  if (result.kind === "ambiguous") {
-    return { kind: "ambiguous", candidates: result.candidates };
-  }
-
-  const validation = validateEdit(result.edits);
-  if (!validation.safe) {
-    return { kind: "invalid-input", message: `Refactor safety check failed: ${validation.reason}` };
-  }
-  const authority = establishMutationAuthority(
-    result.edits.edits.map((edit) => edit.file),
-    result.authorizedMutationRoots,
-  );
-  if (authority.kind === "unavailable") return authority;
-
-  const plan: RefactorPlan = {
-    id: generatePlanId(
-      parsed.operation,
-      file,
-      target.entry.displayLine,
-      target.entry.displayCharacter,
-      parsed.newName,
-    ),
-    operation: parsed.operation,
-    newName: parsed.newName,
-    targetFile: file,
-    targetLine: target.entry.displayLine,
-    targetCharacter: target.entry.displayCharacter,
-    edits: result.edits,
-    authorizedMutationRoots: authority.canonicalRoots,
-    fileFingerprints: collectFileFingerprints(result.edits.edits),
-    createdAt: Date.now(),
-  };
-  deps.storePlan(plan);
-  return { kind: "completed", plan: immutablePlan(plan) };
+  return planResolvedRefactor(parsed, target.entry, deps, control);
 }
 
 /** Revalidate and apply one stored plan through the per-file mutation queue. */
@@ -194,6 +152,121 @@ export async function runRefactorApplyWorkflow(
   if (result.kind === "error") return { kind: "unavailable", reason: result.reason };
   deps.removePlan(plan.id);
   return { kind: "completed", plan: immutablePlan(plan), result };
+}
+
+type ParsedRefactorOperation = Extract<ReturnType<typeof parseOperation>, { kind: "ok" }>;
+type RefinedRefactorResult = Awaited<ReturnType<typeof refineLatexSectionRenameResult>>;
+
+async function planResolvedRefactor(
+  parsed: ParsedRefactorOperation,
+  target: Readonly<TargetStoreEntry>,
+  deps: RefactorWorkflowDeps,
+  control?: WorkflowControl,
+): Promise<RefactorPlanWorkflowOutcome> {
+  const file = normalizePath(target.file, deps.cwd);
+  const sectionRename = await planWithLatexSafety({ parsed, target, file, deps, control });
+  const result = sectionRename.result;
+  if (result.kind === "unavailable") return result;
+  if (result.kind === "ambiguous") {
+    return { kind: "ambiguous", candidates: result.candidates };
+  }
+  if (
+    sectionRename.sourceFingerprint &&
+    computeFileFingerprint(file) !== sectionRename.sourceFingerprint
+  ) {
+    return {
+      kind: "unavailable",
+      reason: "The LaTeX source changed before the title rename plan was stored.",
+    };
+  }
+
+  const validation = validateEdit(result.edits);
+  if (!validation.safe) {
+    return { kind: "invalid-input", message: `Refactor safety check failed: ${validation.reason}` };
+  }
+  const authority = establishMutationAuthority(
+    result.edits.edits.map((edit) => edit.file),
+    result.authorizedMutationRoots,
+  );
+  if (authority.kind === "unavailable") return authority;
+
+  const plan: RefactorPlan = {
+    id: generatePlanId(
+      parsed.operation,
+      file,
+      target.displayLine,
+      target.displayCharacter,
+      parsed.newName,
+    ),
+    operation: parsed.operation,
+    newName: parsed.newName,
+    targetFile: file,
+    targetLine: target.displayLine,
+    targetCharacter: target.displayCharacter,
+    edits: result.edits,
+    evidenceSource: sectionRename.evidenceSource,
+    authorizedMutationRoots: authority.canonicalRoots,
+    fileFingerprints: collectFileFingerprints(
+      result.edits.edits,
+      sectionRename.sourceFingerprint
+        ? { file, fingerprint: sectionRename.sourceFingerprint }
+        : undefined,
+    ),
+    createdAt: Date.now(),
+  };
+  deps.storePlan(plan);
+  return { kind: "completed", plan: immutablePlan(plan) };
+}
+
+async function planWithLatexSafety(input: {
+  readonly parsed: ParsedRefactorOperation;
+  readonly target: Readonly<TargetStoreEntry>;
+  readonly file: string;
+  readonly deps: RefactorWorkflowDeps;
+  readonly control?: WorkflowControl;
+}): Promise<RefinedRefactorResult> {
+  const { parsed, target, file, deps, control } = input;
+  const isLatexRename = parsed.operation === "rename_symbol" && isLatexSectionTarget(target);
+  if (isLatexRename && computeFileFingerprint(file) !== target.fileFingerprint) {
+    return {
+      result: {
+        kind: "unavailable",
+        reason: "The LaTeX source changed after the target was resolved. Re-resolve the target.",
+      },
+      evidenceSource: "semantic",
+    };
+  }
+
+  const result = await planWithProvider(
+    deps.capability.getSemanticProvider(deps.cwd),
+    {
+      operation: parsed.operation,
+      file,
+      position: toLspPosition(target.displayLine, target.displayCharacter),
+      range: parsed.range ? toLspRange(parsed.range) : undefined,
+      newName: parsed.newName,
+    },
+    control,
+  );
+  if (isLatexRename && computeFileFingerprint(file) !== target.fileFingerprint) {
+    return {
+      result: {
+        kind: "unavailable",
+        reason: "The LaTeX source changed while the rename provider was working.",
+      },
+      evidenceSource: "semantic",
+    };
+  }
+  return refineLatexSectionRenameResult({
+    operation: parsed.operation,
+    result,
+    target,
+    file,
+    newName: parsed.newName,
+    structural: deps.capability.getStructuralProvider(deps.cwd),
+    documentVersionReader: getDocumentVersionReader(deps),
+    control,
+  });
 }
 
 function getDocumentVersionReader(
@@ -287,9 +360,14 @@ async function planWithProvider(
 
 function collectFileFingerprints(
   edits: Array<{ file: string }>,
+  sourceSnapshot?: { readonly file: string; readonly fingerprint: string },
 ): Array<{ file: string; fingerprint: string }> {
   const files = [...new Set(edits.map((edit) => edit.file))];
-  return files.map((file) => ({ file, fingerprint: computeFileFingerprint(file) }));
+  return files.map((file) => ({
+    file,
+    fingerprint:
+      sourceSnapshot?.file === file ? sourceSnapshot.fingerprint : computeFileFingerprint(file),
+  }));
 }
 
 function immutablePlan(plan: RefactorPlan): Readonly<RefactorPlan> {

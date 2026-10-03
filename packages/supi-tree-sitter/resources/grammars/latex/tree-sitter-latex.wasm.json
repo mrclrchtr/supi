@@ -7,5 +7,11 @@
   "generatedWith": {
     "treeSitterCli": "0.27.0"
   },
-  "sha256": "fb3453ba8fd8f0fc4fb82f3a2dd6655759d94285d63b57479f04c38955816723"
+  "patches": [
+    {
+      "id": "label-underscore-v1",
+      "file": "grammar.js"
+    }
+  ],
+  "sha256": "122e3587a1faaed6316c2fadb2336e531252787ea541f897a966b0dc0c812d52"
 }

@@ -31,6 +31,7 @@ export async function runRenameRefactor(options: {
     return {
       kind: "unavailable",
       reason: response.reason ?? "No routed LSP client could plan the rename.",
+      authorizedMutationRoots: [...response.authorizedMutationRoots],
     };
   }
   return normalizeSemanticEdit(

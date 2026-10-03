@@ -19,7 +19,9 @@ export interface RefactorPlan {
   targetLine: number;
   targetCharacter: number;
   edits: WorkspaceEdit;
-  /** Canonical roots that the routed semantic provider authorized. */
+  /** Evidence source used to compose this plan. */
+  evidenceSource?: "semantic" | "structural";
+  /** Canonical roots that authorize the plan's files. */
   authorizedMutationRoots: string[];
   fileFingerprints: Array<{ file: string; fingerprint: string }>;
   createdAt: number;
