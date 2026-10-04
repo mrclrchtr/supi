@@ -1,0 +1,130 @@
+name: Sync skills
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - packages/supi-skill-patches/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skills-sync-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    if: >-
+      github.event.pull_request.user.login == 'renovate[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'renovate/mattpocock-skills-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      # This job has no write token or app secret. Patch conflicts stop the job.
+      - name: Set up workspace dependencies
+        uses: ./.github/actions/setup-pnpm
+
+      - name: Regenerate and check skills
+        run: |
+          pnpm skills:sync
+          pnpm skills:check
+
+      - name: Collect generated changes
+        id: changes
+        run: |
+          git add -- skills/ packages/supi-skill-patches/upstream.json .claude-plugin/marketplace.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git diff --cached --binary --full-index > "$RUNNER_TEMP/skills.patch"
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+
+      - name: Upload generated changes
+        id: upload
+        if: steps.changes.outputs.changed == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: skills-sync-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/skills.patch
+          if-no-files-found: error
+          retention-days: 1
+
+  commit:
+    needs: generate
+    if: needs.generate.outputs.artifact-id != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      # Do not run repository scripts or install dependencies in this job.
+      - name: Checkout PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Download generated changes
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.generate.outputs.artifact-id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/skills-sync
+
+      - name: Validate and commit generated changes
+        env:
+          PATCH_FILE: ${{ runner.temp }}/skills-sync/skills.patch
+        run: |
+          git apply --index --whitespace=nowarn -- "$PATCH_FILE"
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              skills/*|packages/supi-skill-patches/upstream.json|.claude-plugin/marketplace.json) ;;
+              *) echo "::error::Unexpected generated path: $path"; exit 1 ;;
+            esac
+            mode=$(git --literal-pathspecs ls-files --stage -- "$path" | cut -d ' ' -f 1)
+            case "$mode" in
+              ''|100644|100755) ;;
+              *) echo "::error::Generated path is not a regular file: $path"; exit 1 ;;
+            esac
+          done < <(git diff --cached --no-renames --name-only -z)
+          if git diff --cached --quiet; then
+            echo '::error::The generated patch is empty'
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(skills): regenerate the skill catalog'
+
+      # An app token lets the new commit start the normal PR checks.
+      - name: Create skill sync app token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.MRCLRCHTR_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.MRCLRCHTR_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: read
+
+      - name: Push if the PR head is unchanged
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          current=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '[.state, .head.sha, .head.ref] | join(" ")')
+          if [[ "$current" != "open $HEAD_SHA $HEAD_BRANCH" ]]; then
+            echo 'The PR head changed or the PR closed. Skip this commit.'
+            exit 0
+          fi
+          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
+            push origin "HEAD:refs/heads/$HEAD_BRANCH"

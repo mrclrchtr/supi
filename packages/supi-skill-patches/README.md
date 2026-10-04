@@ -31,6 +31,18 @@ A dependency update fails when a patch no longer applies. The maintenance test a
 
 Add and review one patch fragment for one upstream file. Do not add speculative patches.
 
+## Automatic updates
+
+[The skill sync workflow](../../.github/workflows/skills-sync.yml) runs for same-repository PRs opened by `renovate[bot]` on `renovate/mattpocock-skills-*` branches. It runs only when the PR changes files under `packages/supi-skill-patches/`. Upstream version updates change the dependency pin in this package's `package.json`, so they trigger the workflow. Changes only to `pnpm-lock.yaml` or `pnpm-workspace.yaml` do not trigger it.
+
+1. A read-only job installs dependencies with the frozen lockfile, then runs `skills:sync` and `skills:check`.
+2. A separate job checks the generated patch. It commits only changes to regular files in `skills/`, to `packages/supi-skill-patches/upstream.json`, and to `.claude-plugin/marketplace.json`. It does not install dependencies or run repository scripts.
+3. The job pushes only if the PR is still open and its head is unchanged. It does not force-push. Unchanged output creates no commit.
+
+The write job uses the existing `MRCLRCHTR_BOT_CLIENT_ID` variable and `MRCLRCHTR_BOT_PRIVATE_KEY` secret. The app needs repository contents write permission and pull request read permission. Its token lets the generated commit start normal PR checks. Renovate ignores the generated commit's author, so it can still update and rebase the PR.
+
+Patch conflicts stop the workflow before generation. Fix the affected fragments and rebuild the combined patch; the workflow does not resolve conflicts or discard patches. Skill updates still require manual review. Check added and removed skills, and update affected `.pi/skills/` links by hand.
+
 ## Credit
 
 The generated upstream skills are adapted from [mattpocock/skills](https://github.com/mattpocock/skills), licensed under MIT, and retain that license. SuPi-owned catalog skills include their own license.
