@@ -1,0 +1,13 @@
+diff --git a/skills/engineering/pr/SKILL.md b/skills/engineering/pr/SKILL.md
+index 84dd4fb..8b597e8 100644
+--- a/skills/engineering/pr/SKILL.md
++++ b/skills/engineering/pr/SKILL.md
+@@ -34,7 +34,7 @@ Use this template for writing the PR body:
+
+ ## Sections
+
+-Skip all preambles and keep prose brief. Use the user's domain language from `GLOSSARY.md`.
++Skip all preambles and keep prose brief. Use the user's domain language from `CONTEXT.md`.
+
+ ### Summary
+

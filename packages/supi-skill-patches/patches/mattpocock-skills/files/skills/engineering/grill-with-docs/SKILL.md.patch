@@ -1,0 +1,10 @@
+diff --git a/skills/engineering/grill-with-docs/SKILL.md b/skills/engineering/grill-with-docs/SKILL.md
+index 62b9efb..1cf370f 100644
+--- a/skills/engineering/grill-with-docs/SKILL.md
++++ b/skills/engineering/grill-with-docs/SKILL.md
+@@ -4,4 +4,4 @@ description: A relentless interview to sharpen a plan or design, which also crea
+ disable-model-invocation: true
+ ---
+
+-Call the Skill tool twice, for "grilling" and "domain-modeling".
++Read the `SKILL.md` files for `grilling` and `domain-modeling` at their advertised skill locations, then follow both skills.
