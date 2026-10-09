@@ -1,0 +1,13 @@
+diff --git a/skills/engineering/diagnosing-bugs/SKILL.md b/skills/engineering/diagnosing-bugs/SKILL.md
+index 1b929e2..061c25a 100644
+--- a/skills/engineering/diagnosing-bugs/SKILL.md
++++ b/skills/engineering/diagnosing-bugs/SKILL.md
+@@ -7,7 +7,7 @@ description: Diagnosis loop for hard bugs and performance regressions. Use when
+
+ A discipline for hard bugs. Skip phases only when explicitly justified.
+
+-When exploring the codebase, read `GLOSSARY.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
++When exploring the codebase, read `CONTEXT.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
+
+ ## Redact
+

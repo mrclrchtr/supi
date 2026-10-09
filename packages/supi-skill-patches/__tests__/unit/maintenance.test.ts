@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join, posix, win32 } from "node:path";
 import { describe, expect, it } from "vitest";
 import { normalizePatchText, validatePatchBundle } from "../../src/patch-bundle.ts";
 import { validateSkillMirror } from "../../src/skill-mirror.ts";
@@ -39,6 +39,52 @@ describe("skill patch maintenance", () => {
     expect(research).toMatch(/use `consulting_run` only for synthesis/i);
     expect(research).not.toContain("antigravity_run");
     expect(research).not.toContain("background agent");
+  });
+
+  it("keeps generated skills compatible with Pi and repository domain paths", () => {
+    const catalog = join(root, "skills");
+    const files = readdirSync(catalog, { recursive: true, encoding: "utf8" }).filter((path) =>
+      path.endsWith(".md"),
+    );
+    for (const path of files) {
+      const text = readFileSync(join(catalog, path), "utf8");
+      expect(text, path).not.toMatch(/\bSkill tool\b/i);
+      if (!path.startsWith(join("productivity", "teach", "/"))) {
+        expect(text, path).not.toMatch(/GLOSSARY(?:-MAP)?\.md/);
+      }
+    }
+    const domain = readFileSync(join(catalog, "engineering/domain-modeling/SKILL.md"), "utf8");
+    expect(domain).toContain("CONTEXT.md");
+    expect(domain).toContain("CONTEXT-MAP.md");
+    expect(existsSync(join(catalog, "engineering/domain-modeling/GLOSSARY-FORMAT.md"))).toBe(true);
+  });
+
+  it("matches only the teaching directory with either path format", () => {
+    for (const path of [posix, win32]) {
+      const prefix = path.join("productivity", "teach", "/");
+      expect(path.join("productivity", "teach", "SKILL.md").startsWith(prefix)).toBe(true);
+      expect(path.join("productivity", "teach-other", "SKILL.md").startsWith(prefix)).toBe(false);
+      expect(path.join("engineering", "domain-modeling", "SKILL.md").startsWith(prefix)).toBe(
+        false,
+      );
+    }
+  });
+
+  it("loads cross-group skills from their advertised locations", () => {
+    for (const name of ["grill-with-docs", "wayfinder"]) {
+      const text = readFileSync(join(root, ".pi/skills", name, "SKILL.md"), "utf8");
+      expect(text).toContain(
+        "Read the `SKILL.md` files for `grilling` and `domain-modeling` at their advertised skill locations",
+      );
+      expect(text).not.toContain("../../productivity/grilling/SKILL.md");
+    }
+  });
+
+  it("keeps every local skill link valid", () => {
+    const links = join(root, ".pi/skills");
+    for (const name of readdirSync(links)) {
+      expect(existsSync(join(links, name, "SKILL.md")), name).toBe(true);
+    }
   });
 
   it("groups public catalog skills by source", () => {

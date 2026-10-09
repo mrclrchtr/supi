@@ -20,6 +20,8 @@ This package is not a PI extension and is not published to npm. Skills installed
 
 One patch fragment exists for each changed upstream file under `patches/mattpocock-skills/files/`. pnpm consumes the generated `patches/mattpocock-skills/combined.patch`. The `grilling` patch uses `ask_user` from `@mrclrchtr/supi-ask-user` for each question round.
 
+Compatibility patches keep repository domain paths as `CONTEXT.md` and `CONTEXT-MAP.md`. The upstream `GLOSSARY-FORMAT.md` reference filename stays unchanged. The separate `teach` skill keeps its teaching glossary. Skill calls use `SKILL.md` reads because Pi does not provide a `Skill` tool.
+
 ```bash
 pnpm skills:patches:compose # rebuild the pnpm patch from fragments
 pnpm install                # apply the patch to the pinned dependency

@@ -1,81 +1,156 @@
 diff --git a/skills/engineering/README.md b/skills/engineering/README.md
-index 4a948b81..737133d8 100644
+index 381c82a..04b4368 100644
 --- a/skills/engineering/README.md
 +++ b/skills/engineering/README.md
-@@ -28,5 +28,6 @@ Model- or user-reachable (rich trigger phrasing so the model can reach for them)
- - **[domain-modeling](./domain-modeling/SKILL.md)** — Actively build and sharpen a project's domain model — challenge terms, stress-test with scenarios, update `CONTEXT.md` and ADRs inline.
- - **[codebase-design](./codebase-design/SKILL.md)** — Shared discipline and vocabulary for designing deep modules: small interfaces, clean seams, testable through the interface.
- - **[code-review](./code-review/SKILL.md)** — Two-axis review of the diff since a fixed point: **Standards** (does it follow the repo's coding standards, plus a Fowler smell baseline?) and **Spec** (does it faithfully implement the originating issue/spec?), run as parallel sub-agents.
+@@ -7,7 +7,7 @@ Skills I use daily for code work.
+ Reachable only when you type them (Claude Code: `disable-model-invocation: true`; Codex: `policy.allow_implicit_invocation: false` in `agents/openai.yaml`).
+
+ - **[ask-matt](./ask-matt/SKILL.md)**: Ask which skill or flow fits your situation. A router over the user-invoked skills in this repo.
+-- **[grill-with-docs](./grill-with-docs/SKILL.md)**: Grilling session that also builds your project's domain model, sharpening terminology and updating `GLOSSARY.md` and ADRs inline.
++- **[grill-with-docs](./grill-with-docs/SKILL.md)**: Grilling session that also builds your project's domain model, sharpening terminology and updating `CONTEXT.md` and ADRs inline.
+ - **[triage](./triage/SKILL.md)**: Move issues through a state machine of triage roles.
+ - **[improve-codebase-architecture](./improve-codebase-architecture/SKILL.md)**: Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick.
+ - **[setup-matt-pocock-skills](./setup-matt-pocock-skills/SKILL.md)**: Configure this repo for the engineering skills (issue tracker, triage labels, domain doc layout). Run once per repo.
+@@ -27,8 +27,9 @@ Model- or user-reachable (rich trigger phrasing so the model can reach for them)
+ - **[diagnosing-bugs](./diagnosing-bugs/SKILL.md)**: Disciplined diagnosis loop for hard bugs and performance regressions: build a feedback loop that goes red on this bug → minimise → hypothesise → instrument → fix → regression-test.
+ - **[research](./research/SKILL.md)**: Investigate a question against high-trust primary sources and capture the findings as a cited Markdown file in the repo, run as a background agent.
+ - **[tdd](./tdd/SKILL.md)**: Test-driven development with a red-green-refactor loop. Builds features or fixes bugs one vertical slice at a time.
+-- **[domain-modeling](./domain-modeling/SKILL.md)**: Actively build and sharpen a project's domain model by challenging terms, stress-testing with scenarios, and updating `GLOSSARY.md` and ADRs inline.
++- **[domain-modeling](./domain-modeling/SKILL.md)**: Actively build and sharpen a project's domain model by challenging terms, stress-testing with scenarios, and updating `CONTEXT.md` and ADRs inline.
+ - **[codebase-design](./codebase-design/SKILL.md)**: Shared discipline and vocabulary for designing deep modules: small interfaces, clean seams, testable through the interface.
+ - **[code-review](./code-review/SKILL.md)**: Two-axis review of the diff since a fixed point: **Standards** (does it follow the repo's coding standards, plus a Fowler smell baseline?) and **Spec** (does it faithfully implement the originating issue/spec?), run as parallel sub-agents.
 +- **[commit](./commit/SKILL.md)** — Stage and verify a task-scoped change, write a repository-style message, and create one coherent Git commit.
- - **[resolving-merge-conflicts](./resolving-merge-conflicts/SKILL.md)** — Work through an in-progress git merge or rebase conflict hunk by hunk, resolving by intent traced to each side's primary source, then finish the operation — never `--abort`.
- - **[wizard](./wizard/SKILL.md)** — Generate an interactive bash wizard that walks a human through steps only they can perform: provisioning infrastructure, setting up credentials or CI secrets, walking an unfamiliar third-party dashboard, or running a one-off migration or cutover.
+ - **[pr](./pr/SKILL.md)**: The shape a pull request body should take: a summary as the smallest visual that makes the change clear, before/after evidence that it works, and a merge-danger call (one-way or two-way door, plus blast radius).
+ - **[wizard](./wizard/SKILL.md)**: Generate an interactive bash wizard that walks a human through steps only they can perform: provisioning infrastructure, setting up credentials or CI secrets, walking an unfamiliar third-party dashboard, or running a one-off migration or cutover.
+diff --git a/skills/engineering/ask-matt/SKILL.md b/skills/engineering/ask-matt/SKILL.md
+index 8d38b2b..942438c 100644
+--- a/skills/engineering/ask-matt/SKILL.md
++++ b/skills/engineering/ask-matt/SKILL.md
+@@ -14,7 +14,7 @@ A **flow** is a path through the skills. Most paths run along one **main flow**,
+
+ The route most work travels. You have an idea and want it built.
+
+-1. **`/grill-with-docs`** sharpens the idea by interview. Start here whenever you are **working in a working directory**: it's stateful, retaining what it learns in `GLOSSARY.md` and ADRs. (No working directory? Use `/grill-me` instead, covered under Standalone. Both run the same `/grilling` primitive; `grill-with-docs` is the one that leaves a paper trail, which makes it the better of the two whenever a repo is there to leave it in.)
++1. **`/grill-with-docs`** sharpens the idea by interview. Start here whenever you are **working in a working directory**: it's stateful, retaining what it learns in `CONTEXT.md` and ADRs. (No working directory? Use `/grill-me` instead, covered under Standalone. Both run the same `/grilling` primitive; `grill-with-docs` is the one that leaves a paper trail, which makes it the better of the two whenever a repo is there to leave it in.)
+ 2. **Branch: can you settle every question in conversation?** If a question needs a runnable answer (state, business logic, a UI you have to see), detour through a prototype, bridged by **`/handoff`** in both directions (a prototype lives in its own directory, which is exactly what `/handoff` is for; see Phase boundaries):
+    - **`/handoff`** out, then open a fresh session against that file,
+    - **`/prototype`** to answer the question with throwaway code,
+@@ -61,7 +61,7 @@ Not feature work, just upkeep.
+
+ Two model-invoked references that run *beneath* the other skills, each the single source of truth for its vocabulary. Reach for them directly when the **words**, not the process, are the problem; or let the skills above pull them in.
+
+-- **`/domain-modeling`**: sharpen the project's *domain* language: challenge a fuzzy term, resolve an overloaded word ("account" doing three jobs), record a hard-to-reverse decision as an ADR. It's the active discipline `/grill-with-docs` drives to keep `GLOSSARY.md` a clean glossary.
++- **`/domain-modeling`**: sharpen the project's *domain* language: challenge a fuzzy term, resolve an overloaded word ("account" doing three jobs), record a hard-to-reverse decision as an ADR. It's the active discipline `/grill-with-docs` drives to keep `CONTEXT.md` a clean glossary.
+ - **`/codebase-design`** is the deep-module vocabulary (module, interface, depth, seam, adapter, leverage, locality) for designing a module's *shape*: a lot of behaviour behind a small interface at a clean seam. `/tdd` and `/improve-codebase-architecture` both speak it.
+
+ ## Phase boundaries
+@@ -80,13 +80,13 @@ Read [PHASE-BOUNDARIES.md](PHASE-BOUNDARIES.md) for the ordered tree: the five q
+
+ Off the main flow entirely.
+
+-- **`/grill-me`**: the same relentless interview as `/grill-with-docs`, but **stateless**: it saves nothing locally and builds no `GLOSSARY.md`. Reach for it when you are **not working in a working directory** (sharpening a plan, a design, a piece of writing, anything with no repo under it). If you are in a working directory, use `/grill-with-docs` instead: it runs the same interview and leaves a paper trail, so it is strictly the better one.
++- **`/grill-me`**: the same relentless interview as `/grill-with-docs`, but **stateless**: it saves nothing locally and builds no `CONTEXT.md`. Reach for it when you are **not working in a working directory** (sharpening a plan, a design, a piece of writing, anything with no repo under it). If you are in a working directory, use `/grill-with-docs` instead: it runs the same interview and leaves a paper trail, so it is strictly the better one.
+ - **`/grilling`** is the interview primitive itself: rounds, the frontier, facts are the agent's job and decisions are yours. `/grill-me` and `/grill-with-docs` are the two named ways in, and `/triage`, `/wayfinder` and `/improve-codebase-architecture` all run it internally. Reach for it directly only when you want the interview with no wrapper around it.
+ - **`/prototype`** is a small, throwaway program that answers one design question: does this state model feel right, or what should this UI look like. Throwaway is a constraint on how the code is written, not a promise to destroy it: the answer folds into the real code, and the prototype itself is kept as a **primary source** on a `prototype/<name>` branch out of main, pointed at from the implementation issue. It's the detour in step 2 of the main flow, but reach for it any time a design question is hard to settle on paper.
+ - **`/research`**: delegate reading legwork to a **background agent**: it investigates a question against **primary sources**, then leaves a cited Markdown file in the repo. Keep working while it reads. The file it produces is something to take *into* the main flow at `/grill-with-docs`, since research feeds the thinking rather than replacing it.
+ - **`/to-questionnaire`** comes in when the thing blocking you isn't in your head or the codebase but in **someone else's**, and it writes them a questionnaire to fill in. It's the inverse of `/grill-me`: instead of interviewing you about the subject, it interviews you about the **send** (who it's going to, what you need back) and aims the questions at the gap. What comes back is material for `/grill-with-docs` or `/to-spec`.
+ - **`/wizard`** is for the steps only a **human** can take: provisioning infrastructure, setting up credentials or CI secrets, clicking through an unfamiliar third-party dashboard, running a one-off migration or cutover. It generates an interactive bash script that opens each URL, captures each value, and writes it into `.env` and GitHub secrets, so the procedure stops being something you re-explain to an agent every time. Model-invoked, so the agent reaches for it the moment it hits a wall only you can pass. If the agent could just do it itself, it should; this is for where a human is genuinely in the loop.
+-- **`/wait-what`** is the corrective for a message that didn't land. Use it mid-conversation, inside any other skill, and the agent re-pitches what it just said with the context you were missing, in plain English, using the `GLOSSARY.md` vocabulary. It works after the fact; `/grill-with-docs` is the upfront cure, because a shared language agreed early is what stops the jargon arriving at all.
++- **`/wait-what`** is the corrective for a message that didn't land. Use it mid-conversation, inside any other skill, and the agent re-pitches what it just said with the context you were missing, in plain English, using the `CONTEXT.md` vocabulary. It works after the fact; `/grill-with-docs` is the upfront cure, because a shared language agreed early is what stops the jargon arriving at all.
+ - **`/teach`**: learn a concept over multiple sessions, using the current directory as a stateful workspace.
+ - **`/writing-for-agents`** is the reference for writing documents agents consume: skills, AGENTS.md, pointed-at docs.
+
 diff --git a/skills/engineering/code-review/SKILL.md b/skills/engineering/code-review/SKILL.md
+index e28d7ac..f57383c 100644
 --- a/skills/engineering/code-review/SKILL.md
 +++ b/skills/engineering/code-review/SKILL.md
 @@ -1,87 +1,88 @@
  ---
  name: code-review
--description: Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X".
+-description: "Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes: Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to \"review since X\"."
 +description: Review a branch, PR, commit range, or working tree with separate Standards and Spec tasks through review_run. Use when the user asks for a code review or asks to review changes since a fixed point.
  ---
 
 -Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
 +# Code review
 
--- **Standards** — does the code conform to this repo's documented coding standards?
--- **Spec** — does the code faithfully implement the originating issue / spec?
-+Use `review_run` for this workflow. It freezes one Review Target and runs the Standards and Spec tasks independently. Keep their results separate. If `review_run` is unavailable, report that this workflow is unavailable. Do not replace it with `agent_run` or generic agents.
-
+-- **Standards**: does the code conform to this repo's documented coding standards?
+-- **Spec**: does the code faithfully implement the originating issue / spec?
+-
 -Both axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings.
 -
--The issue tracker should have been provided to you — run `/setup-matt-pocock-skills` if `docs/agents/issue-tracker.md` is missing.
--
+-The issue tracker should have been provided to you. If `docs/agents/issue-tracker.md` is missing, tell the user to run `/setup-matt-pocock-skills`.
++Use `review_run` for this workflow. It freezes one Review Target and runs the Standards and Spec tasks independently. Keep their results separate. If `review_run` is unavailable, report that this workflow is unavailable. Do not replace it with `agent_run` or generic agents.
+
  ## Process
 
 -### 1. Pin the fixed point
+-
+-Whatever the user said is the fixed point (a commit SHA, branch name, tag, `main`, `HEAD~5`, etc.). If they didn't specify one, ask for it.
+-
+-Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so the comparison is against the merge-base). Also note the list of commits via `git log <fixed-point>..HEAD --oneline`.
+-
+-Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here, not inside two parallel sub-agents.
+-
+-### 2. Identify the spec source
+-
+-Look for the originating spec, in this order:
 +### 1. Resolve the Review Target
 
--Whatever the user said is the fixed point — a commit SHA, branch name, tag, `main`, `HEAD~5`, etc. If they didn't specify one, ask for it.
+-1. Issue references in the commit messages (`#123`, `Closes #45`, GitLab `!67`, etc.), fetched via the workflow in `docs/agents/issue-tracker.md`.
+-2. A path the user passed as an argument.
+-3. A spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
+-4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent will skip and report "no spec available".
 +Identify the before and after states once.
 
--Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so the comparison is against the merge-base). Also note the list of commits via `git log <fixed-point>..HEAD --oneline`.
+-### 3. Identify the standards sources
 +- For committed changes since a branch or tag, resolve the merge base with `git merge-base <fixed-point> HEAD`. Pass that full commit as `committed.from` and pass `HEAD` as `committed.to`.
 +- If the user gives two exact endpoints, resolve each endpoint and pass them as `committed.from` and `committed.to`.
 +- To include staged, unstaged, or non-ignored untracked files, use `workingTree.from`. Use the merge base for branch work, or `HEAD` for work-in-progress changes only.
 +- For a state audit, use `mode: "state"` and omit `from`.
 
--Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here — not inside two parallel sub-agents.
+-Anything in the repo that documents how code should be written, such as `CODING_STANDARDS.md` or `CONTRIBUTING.md`.
 +Review endpoints must resolve to commits. Do not pass Git range syntax to `review_run`. If the request is not a state audit or a work-in-progress review and no fixed point is available, ask for one.
 
--### 2. Identify the spec source
+-On top of whatever the repo documents, the Standards axis always carries the **smell baseline** below: a fixed set of Fowler code smells (_Refactoring_, ch.3) that applies even when a repo documents nothing. Two rules bind it:
 +### 2. Identify the Spec source
 
--Look for the originating spec, in this order:
+-- **The repo overrides.** A documented repo standard always wins; where it endorses something the baseline would flag, suppress the smell.
+-- **Always a judgement call.** Each smell is a labelled heuristic ("possible Feature Envy"), never a hard violation. Like any standard here, skip anything tooling already enforces.
 +Search in this order:
 
--1. Issue references in the commit messages (`#123`, `Closes #45`, GitLab `!67`, etc.) — fetch via the workflow in `docs/agents/issue-tracker.md`.
--2. A path the user passed as an argument.
--3. A spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
--4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent will skip and report "no spec available".
+-Each smell reads *what it is* → *how to fix*; match it against the diff:
 +1. Issue references in commit messages. Use the repository issue workflow when one exists.
 +2. A path or issue that the user supplied.
 +3. A specification under `docs/`, `specs/`, or `.scratch/` that matches the branch or change.
 +4. Ask the user when no source is available. If the user confirms that there is no Spec, omit the Spec task and state this in the report.
 
--### 3. Identify the standards sources
+-- **Mysterious Name**: a function, variable, or type whose name doesn't reveal what it does or holds. → rename it; if no honest name comes, the design's murky.
+-- **Duplicated Code**: the same logic shape appears in more than one hunk or file in the change. → extract the shared shape, call it from both.
+-- **Feature Envy**: a method that reaches into another object's data more than its own. → move the method onto the data it envies.
+-- **Data Clumps**: the same few fields or params keep travelling together (a type wanting to be born). → bundle them into one type, pass that.
+-- **Primitive Obsession**: a primitive or string standing in for a domain concept that deserves its own type. → give the concept its own small type.
+-- **Repeated Switches**: the same `switch`/`if`-cascade on the same type recurs across the change. → replace with polymorphism, or one map both sites share.
+-- **Shotgun Surgery**: one logical change forces scattered edits across many files in the diff. → gather what changes together into one module.
+-- **Divergent Change**: one file or module is edited for several unrelated reasons. → split so each module changes for one reason.
+-- **Speculative Generality**: abstraction, parameters, or hooks added for needs the spec doesn't have. → delete it; inline back until a real need shows.
+-- **Message Chains**: long `a.b().c().d()` navigation the caller shouldn't depend on. → hide the walk behind one method on the first object.
+-- **Middle Man**: a class or function that mostly just delegates onward. → cut it, call the real target direct.
+-- **Refused Bequest**: a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
 +Record each authoritative source as a `criteriaSources` item with a useful summary.
 
--Anything in the repo that documents how code should be written, such as `CODING_STANDARDS.md` or `CONTRIBUTING.md`.
+-### 4. Spawn both sub-agents in parallel
 +### 3. Identify the Standards sources
 
--On top of whatever the repo documents, the Standards axis always carries the **smell baseline** below — a fixed set of Fowler code smells (_Refactoring_, ch.3) that applies even when a repo documents nothing. Two rules bind it:
+-**Standards sub-agent prompt** should include:
 +Find repository instruction files, contribution guides, coding standards, and relevant package-local guidance. Reviewers do not receive ambient context files. Put each necessary rule in the task instructions or identify its repository file in `criteriaSources`.
 
--- **The repo overrides.** A documented repo standard always wins; where it endorses something the baseline would flag, suppress the smell.
--- **Always a judgement call.** Each smell is a labelled heuristic ("possible Feature Envy"), never a hard violation — and, like any standard here, skip anything tooling already enforces.
+-- The full diff command and commit list.
+-- The list of standards-source files you found in step 3, **plus the smell baseline from step 3** pasted in full (the sub-agent has no other access to it).
+-- The brief: "Report, per file/hunk where relevant, (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls: documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words."
 +Apply this smell baseline as advisory criteria. A documented repository rule overrides it. Report each match as a judgment, not as a hard violation. Skip checks that automated tooling already enforces.
 
--Each smell reads *what it is* → *how to fix*; match it against the diff:
+-**Spec sub-agent prompt** should include:
 +- **Mysterious Name** — a name does not show its purpose.
 +- **Duplicated Code** — the same logic appears in more than one changed place.
 +- **Feature Envy** — code uses another object's data more than its own data.
@@ -89,38 +164,25 @@ diff --git a/skills/engineering/code-review/SKILL.md b/skills/engineering/code-r
 +- **Middle Man** — a module mainly delegates to another module.
 +- **Refused Bequest** — an implementation inherits behavior that it does not use.
 
--- **Mysterious Name** — a function, variable, or type whose name doesn't reveal what it does or holds. → rename it; if no honest name comes, the design's murky.
--- **Duplicated Code** — the same logic shape appears in more than one hunk or file in the change. → extract the shared shape, call it from both.
--- **Feature Envy** — a method that reaches into another object's data more than its own. → move the method onto the data it envies.
--- **Data Clumps** — the same few fields or params keep travelling together (a type wanting to be born). → bundle them into one type, pass that.
--- **Primitive Obsession** — a primitive or string standing in for a domain concept that deserves its own type. → give the concept its own small type.
--- **Repeated Switches** — the same `switch`/`if`-cascade on the same type recurs across the change. → replace with polymorphism, or one map both sites share.
--- **Shotgun Surgery** — one logical change forces scattered edits across many files in the diff. → gather what changes together into one module.
--- **Divergent Change** — one file or module is edited for several unrelated reasons. → split so each module changes for one reason.
--- **Speculative Generality** — abstraction, parameters, or hooks added for needs the spec doesn't have. → delete it; inline back until a real need shows.
--- **Message Chains** — long `a.b().c().d()` navigation the caller shouldn't depend on. → hide the walk behind one method on the first object.
--- **Middle Man** — a class or function that mostly just delegates onward. → cut it, call the real target direct.
--- **Refused Bequest** — a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
-+### 4. Run the Review
-
--### 4. Spawn both sub-agents in parallel
-+Create one `review_run` call with up to two tasks:
-
--**Standards sub-agent prompt** — include:
-+- `standards`, with the applicable Standards sources and smell baseline.
-+- `spec`, with the authoritative Spec sources and requirement summary.
-
--- The full diff command and commit list.
--- The list of standards-source files you found in step 3, **plus the smell baseline from step 3** pasted in full — the sub-agent has no other access to it.
--- The brief: "Report — per file/hunk where relevant — (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls — documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words."
-+Use `mode: "change"` for a before-and-after review. Use `mode: "state"` only when the user asks to assess the after state without change attribution. Keep task instructions self-contained. Put only context that applies to every task in `sharedContext`. Use top-level `paths` only as an advisory focus.
-
--**Spec sub-agent prompt** — include:
-+Example shape:
-
 -- The diff command and commit list.
 -- The path or fetched contents of the spec.
 -- The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the spec line for each finding. Under 400 words."
++### 4. Run the Review
+
+-If the spec is missing, skip the Spec sub-agent and note this in the final report.
++Create one `review_run` call with up to two tasks:
+
+-### 5. Aggregate
++- `standards`, with the applicable Standards sources and smell baseline.
++- `spec`, with the authoritative Spec sources and requirement summary.
+
+-Present the two reports under `## Standards` and `## Spec` headings, verbatim or lightly cleaned. Do **not** merge or rerank findings, because the two axes are deliberately separate (see _Why two axes_).
++Use `mode: "change"` for a before-and-after review. Use `mode: "state"` only when the user asks to assess the after state without change attribution. Keep task instructions self-contained. Put only context that applies to every task in `sharedContext`. Use top-level `paths` only as an advisory focus.
+
+-End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes: that's the reranking the separation exists to prevent.
++Example shape:
+
+-## Why two axes
 +```text
 +review_run({
 +  target: { committed: { from: "<full-before-commit>", to: "<full-after-commit>" } },
@@ -141,28 +203,31 @@ diff --git a/skills/engineering/code-review/SKILL.md b/skills/engineering/code-r
 +})
 +```
 
--If the spec is missing, skip the Spec sub-agent and note this in the final report.
+-A change can pass one axis and fail the other:
 +### 5. Report the results
 
--### 5. Aggregate
-+Present `## Standards` and `## Spec` separately and in task order. Do not merge or rerank findings across tasks. If a Review Output Artifact is present, use `review_output` to read the remaining pages before the final report.
-
--Present the two reports under `## Standards` and `## Spec` headings, verbatim or lightly cleaned. Do **not** merge or rerank findings — the two axes are deliberately separate (see _Why two axes_).
--
--End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes — that's the reranking the separation exists to prevent.
--
--## Why two axes
--
--A change can pass one axis and fail the other:
--
 -- Code that follows every standard but implements the wrong thing → **Standards pass, Spec fail.**
 -- Code that does exactly what the issue asked but breaks the project's conventions → **Spec pass, Standards fail.**
--
++Present `## Standards` and `## Spec` separately and in task order. Do not merge or rerank findings across tasks. If a Review Output Artifact is present, use `review_output` to read the remaining pages before the final report.
+
 -Reporting them separately stops one axis from masking the other.
 +End with the finding count and most severe issue for each task. If a Post-Review Policy is present, follow it after the report. A direct user instruction about the findings overrides that policy.
+diff --git a/skills/engineering/codebase-design/DESIGN-IT-TWICE.md b/skills/engineering/codebase-design/DESIGN-IT-TWICE.md
+index d099013..7edc861 100644
+--- a/skills/engineering/codebase-design/DESIGN-IT-TWICE.md
++++ b/skills/engineering/codebase-design/DESIGN-IT-TWICE.md
+@@ -27,7 +27,7 @@ Prompt each sub-agent with a separate technical brief (file paths, coupling deta
+ - Agent 3: "Optimise for the most common caller: make the default case trivial."
+ - Agent 4 (if applicable): "Design around ports & adapters for cross-seam dependencies."
+
+-Include both [SKILL.md](SKILL.md) vocabulary and GLOSSARY.md vocabulary in the brief so each sub-agent names things consistently with the architecture language and the project's domain language.
++Include both [SKILL.md](SKILL.md) vocabulary and CONTEXT.md vocabulary in the brief so each sub-agent names things consistently with the architecture language and the project's domain language.
+
+ Each sub-agent outputs:
+
 diff --git a/skills/engineering/commit/LICENSE.mrclrchtr b/skills/engineering/commit/LICENSE.mrclrchtr
 new file mode 100644
-index 00000000..00000000
+index 0000000..a398554
 --- /dev/null
 +++ b/skills/engineering/commit/LICENSE.mrclrchtr
 @@ -0,0 +1,21 @@
@@ -189,7 +254,7 @@ index 00000000..00000000
 +SOFTWARE.
 diff --git a/skills/engineering/commit/SKILL.md b/skills/engineering/commit/SKILL.md
 new file mode 100644
-index 00000000..498f33be
+index 0000000..498f33b
 --- /dev/null
 +++ b/skills/engineering/commit/SKILL.md
 @@ -0,0 +1,44 @@
@@ -237,11 +302,179 @@ index 00000000..498f33be
 +6. **Verify the result.** Inspect the new commit's hash, subject, stat, and `git status`. Report the commit and the checks that ran. Confirm that remaining changes are intentional. If the commit fails, leave the state available for inspection and report the failure without retrying blindly.
 +
 +   **Done when:** `HEAD` contains the intended patch, the message follows repository style, check results are reported, and remaining changes are understood.
+diff --git a/skills/engineering/diagnosing-bugs/SKILL.md b/skills/engineering/diagnosing-bugs/SKILL.md
+index 1b929e2..061c25a 100644
+--- a/skills/engineering/diagnosing-bugs/SKILL.md
++++ b/skills/engineering/diagnosing-bugs/SKILL.md
+@@ -7,7 +7,7 @@ description: Diagnosis loop for hard bugs and performance regressions. Use when
+
+ A discipline for hard bugs. Skip phases only when explicitly justified.
+
+-When exploring the codebase, read `GLOSSARY.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
++When exploring the codebase, read `CONTEXT.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
+
+ ## Redact
+
+diff --git a/skills/engineering/domain-modeling/GLOSSARY-FORMAT.md b/skills/engineering/domain-modeling/GLOSSARY-FORMAT.md
+index 9c0b4c7..be355f5 100644
+--- a/skills/engineering/domain-modeling/GLOSSARY-FORMAT.md
++++ b/skills/engineering/domain-modeling/GLOSSARY-FORMAT.md
+@@ -1,4 +1,4 @@
+-# GLOSSARY.md Format
++# CONTEXT.md Format
+
+ ## Structure
+
+@@ -31,18 +31,18 @@ _Avoid_: Client, buyer, account
+
+ ## Single vs multi-context repos
+
+-**Single context (most repos):** One `GLOSSARY.md` at the repo root.
++**Single context (most repos):** One `CONTEXT.md` at the repo root.
+
+-**Multiple contexts:** A `GLOSSARY-MAP.md` at the repo root lists the contexts, where they live, and how they relate to each other:
++**Multiple contexts:** A `CONTEXT-MAP.md` at the repo root lists the contexts, where they live, and how they relate to each other:
+
+ ```md
+ # Glossary Map
+
+ ## Contexts
+
+-- [Ordering](./src/ordering/GLOSSARY.md): receives and tracks customer orders
+-- [Billing](./src/billing/GLOSSARY.md): generates invoices and processes payments
+-- [Fulfillment](./src/fulfillment/GLOSSARY.md): manages warehouse picking and shipping
++- [Ordering](./src/ordering/CONTEXT.md): receives and tracks customer orders
++- [Billing](./src/billing/CONTEXT.md): generates invoices and processes payments
++- [Fulfillment](./src/fulfillment/CONTEXT.md): manages warehouse picking and shipping
+
+ ## Relationships
+
+@@ -53,8 +53,8 @@ _Avoid_: Client, buyer, account
+
+ The skill infers which structure applies:
+
+-- If `GLOSSARY-MAP.md` exists, read it to find contexts
+-- If only a root `GLOSSARY.md` exists, single context
+-- If neither exists, create a root `GLOSSARY.md` lazily when the first term is resolved
++- If `CONTEXT-MAP.md` exists, read it to find contexts
++- If only a root `CONTEXT.md` exists, single context
++- If neither exists, create a root `CONTEXT.md` lazily when the first term is resolved
+
+ When multiple contexts exist, infer which one the current topic relates to. If unclear, ask.
+diff --git a/skills/engineering/domain-modeling/SKILL.md b/skills/engineering/domain-modeling/SKILL.md
+index a4438c6..93c27e2 100644
+--- a/skills/engineering/domain-modeling/SKILL.md
++++ b/skills/engineering/domain-modeling/SKILL.md
+@@ -1,11 +1,11 @@
+ ---
+ name: domain-modeling
+-description: Build and sharpen a project's domain model. Use when discussing codebase terminology, writing or editing a GLOSSARY.md, or recording or editing an ADR.
++description: Build and sharpen a project's domain model. Use when discussing codebase terminology, writing or editing a CONTEXT.md, or recording or editing an ADR.
+ ---
+
+ # Domain Modeling
+
+-Actively build and sharpen the project's domain model as you design. This is the *active* discipline: challenging terms, inventing edge-case scenarios, and writing the glossary and decisions down the moment they crystallise. (Merely *reading* `GLOSSARY.md` for vocabulary is not this skill: that's a one-line habit any skill can do. This skill is for when you're changing the model, not just consuming it.)
++Actively build and sharpen the project's domain model as you design. This is the *active* discipline: challenging terms, inventing edge-case scenarios, and writing the glossary and decisions down the moment they crystallise. (Merely *reading* `CONTEXT.md` for vocabulary is not this skill: that's a one-line habit any skill can do. This skill is for when you're changing the model, not just consuming it.)
+
+ ## File structure
+
+@@ -13,7 +13,7 @@ Most repos have a single context:
+
+ ```
+ /
+-├── GLOSSARY.md
++├── CONTEXT.md
+ ├── docs/
+ │   └── adr/
+ │       ├── 0001-event-sourced-orders.md
+@@ -21,29 +21,29 @@ Most repos have a single context:
+ └── src/
+ ```
+
+-If a `GLOSSARY-MAP.md` exists at the root, the repo has multiple contexts. The map points to where each one lives:
++If a `CONTEXT-MAP.md` exists at the root, the repo has multiple contexts. The map points to where each one lives:
+
+ ```
+ /
+-├── GLOSSARY-MAP.md
++├── CONTEXT-MAP.md
+ ├── docs/
+ │   └── adr/                          ← system-wide decisions
+ ├── src/
+ │   ├── ordering/
+-│   │   ├── GLOSSARY.md
++│   │   ├── CONTEXT.md
+ │   │   └── docs/adr/                 ← context-specific decisions
+ │   └── billing/
+-│       ├── GLOSSARY.md
++│       ├── CONTEXT.md
+ │       └── docs/adr/
+ ```
+
+-Create files lazily: only when you have something to write. If no `GLOSSARY.md` exists, create one when the first term is resolved. If no `docs/adr/` exists, create it when the first ADR is needed.
++Create files lazily: only when you have something to write. If no `CONTEXT.md` exists, create one when the first term is resolved. If no `docs/adr/` exists, create it when the first ADR is needed.
+
+ ## During the session
+
+ ### Challenge against the glossary
+
+-When the user uses a term that conflicts with the existing language in `GLOSSARY.md`, call it out immediately. "Your glossary defines 'cancellation' as X, but you seem to mean Y. Which is it?"
++When the user uses a term that conflicts with the existing language in `CONTEXT.md`, call it out immediately. "Your glossary defines 'cancellation' as X, but you seem to mean Y. Which is it?"
+
+ ### Sharpen fuzzy language
+
+@@ -57,11 +57,11 @@ When domain relationships are being discussed, stress-test them with specific sc
+
+ When the user states how something works, check whether the code agrees. If you find a contradiction, surface it: "Your code cancels entire Orders, but you just said partial cancellation is possible. Which is right?"
+
+-### Update GLOSSARY.md inline
++### Update CONTEXT.md inline
+
+-When a term is resolved, update `GLOSSARY.md` right there. Don't batch these up: capture them as they happen. Use the format in [GLOSSARY-FORMAT.md](./GLOSSARY-FORMAT.md).
++When a term is resolved, update `CONTEXT.md` right there. Don't batch these up: capture them as they happen. Use the format in [GLOSSARY-FORMAT.md](./GLOSSARY-FORMAT.md).
+
+-`GLOSSARY.md` should be totally devoid of implementation details. Do not treat `GLOSSARY.md` as a spec, a scratch pad, or a repository for implementation decisions. It is a glossary and nothing else.
++`CONTEXT.md` should be totally devoid of implementation details. Do not treat `CONTEXT.md` as a spec, a scratch pad, or a repository for implementation decisions. It is a glossary and nothing else.
+
+ ### Offer ADRs sparingly
+
+diff --git a/skills/engineering/grill-with-docs/SKILL.md b/skills/engineering/grill-with-docs/SKILL.md
+index 62b9efb..1cf370f 100644
+--- a/skills/engineering/grill-with-docs/SKILL.md
++++ b/skills/engineering/grill-with-docs/SKILL.md
+@@ -4,4 +4,4 @@ description: A relentless interview to sharpen a plan or design, which also crea
+ disable-model-invocation: true
+ ---
+
+-Call the Skill tool twice, for "grilling" and "domain-modeling".
++Read the `SKILL.md` files for `grilling` and `domain-modeling` at their advertised skill locations, then follow both skills.
+diff --git a/skills/engineering/implement-spec/SKILL.md b/skills/engineering/implement-spec/SKILL.md
+index 1839237..cff81d9 100644
+--- a/skills/engineering/implement-spec/SKILL.md
++++ b/skills/engineering/implement-spec/SKILL.md
+@@ -26,14 +26,14 @@ Communication to and from subagents should be sparse. Communicate primarily thro
+
+ 4. Use **implementer subagents** to implement each ticket, each in its own worktree on its own branch. Each implementer subagent:
+    - confirms its worktree is based on the integration branch before starting, and resets onto it if not;
+-   - calls the Skill tool with `tdd` to build the ticket;
++   - reads the `tdd` skill's `SKILL.md` file and follows its instructions to build the ticket;
+    - merges the integration branch tip into its own branch before reporting done
+
+ 5. Once an **implementer subagent** completes, merge its work to the integration branch with a **merger subagent**.
+
+ 6. If this changes the **frontier** of available tickets, kick off more **implementer subagents** to work on the new tickets. This allows for maximum concurrency.
+
+-7. Once all tickets are complete, call the Skill tool with `code-review` on the integration branch. Fix all issues raised by the code review in a single **implementer subagent**.
++7. Once all tickets are complete, read the `code-review` skill's `SKILL.md` file and follow its instructions on the integration branch. Fix all issues raised by the code review in a single **implementer subagent**.
+
+ 8. If a draft PR exists, mark it ready for review. Otherwise, resolve each ticket the way the issue tracker closes work, and report the integration branch.
+
 diff --git a/skills/engineering/implement/SKILL.md b/skills/engineering/implement/SKILL.md
-index 7a0b11f5..afb4fafb 100644
+index 7a0b11f..afb4faf 100644
 --- a/skills/engineering/implement/SKILL.md
 +++ b/skills/engineering/implement/SKILL.md
-@@ -6,6 +6,8 @@ disable-model-invocation: true
+@@ -6,10 +6,12 @@ disable-model-invocation: true
 
  Implement the work described by the user in the spec or tickets.
 
@@ -251,13 +484,77 @@ index 7a0b11f5..afb4fafb 100644
 +but still write tests when they provide useful coverage.
 
  Run typechecking regularly, single test files regularly, and the full test suite once at the end.
-@@ -13,3 +15,3 @@
+
 -Once done, use /code-review to review the work.
 +Once done, use `/code-review` to review the work.
 
 -Commit your work to the current branch.
 +After the review, load `/commit` and follow its instructions to commit the changes.
+diff --git a/skills/engineering/improve-codebase-architecture/SKILL.md b/skills/engineering/improve-codebase-architecture/SKILL.md
+index 44cc7d3..dd4a206 100644
+--- a/skills/engineering/improve-codebase-architecture/SKILL.md
++++ b/skills/engineering/improve-codebase-architecture/SKILL.md
+@@ -10,8 +10,8 @@ Surface architectural friction and propose **deepening opportunities**: refactor
+
+ This command is _informed_ by the project's domain model and built on a shared design vocabulary:
+
+-- Call the Skill tool with "codebase-design" for the architecture vocabulary (**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**) and its principles (the deletion test, "the interface is the test surface", "one adapter = hypothetical seam, two = real"). Use these terms exactly in every suggestion, and don't drift into "component," "service," "API," or "boundary."
+-- The domain language in `GLOSSARY.md` gives names to good seams; ADRs in `docs/adr/` record decisions this command should not re-litigate.
++- Read the `codebase-design` skill's `SKILL.md` file and follow its instructions for the architecture vocabulary (**module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality**) and its principles (the deletion test, "the interface is the test surface", "one adapter = hypothetical seam, two = real"). Use these terms exactly in every suggestion, and don't drift into "component," "service," "API," or "boundary."
++- The domain language in `CONTEXT.md` gives names to good seams; ADRs in `docs/adr/` record decisions this command should not re-litigate.
+
+ ## Process
+
+@@ -22,7 +22,7 @@ This command is _informed_ by the project's domain model and built on a shared d
+ - If the user named a direction (a module, a subsystem, a pain point), take it, and skip the inference below.
+ - Otherwise, walk back a good stretch of the commit history (`git log --oneline`) to find the codebase's hot spots, the files and areas that keep coming up, and let those paths pull your attention first. If the changes are scattered with no clear hot spot, widen the net.
+
+-Read the project's domain glossary (`GLOSSARY.md`) and any ADRs in the area you're touching first.
++Read the project's domain glossary (`CONTEXT.md`) and any ADRs in the area you're touching first.
+
+ Then spawn a sub-agent to walk the codebase. Don't follow rigid heuristics; explore organically and note where you experience friction:
+
+@@ -51,7 +51,7 @@ For each candidate, render a card with:
+
+ End the report with a **Top recommendation** section: which candidate you'd tackle first and why.
+
+-**Use GLOSSARY.md vocabulary for the domain, and the `/codebase-design` vocabulary for the architecture.** If `GLOSSARY.md` defines "Order," talk about "the Order intake module," not "the FooBarHandler," and not "the Order service."
++**Use CONTEXT.md vocabulary for the domain, and the `/codebase-design` vocabulary for the architecture.** If `CONTEXT.md` defines "Order," talk about "the Order intake module," not "the FooBarHandler," and not "the Order service."
+
+ **ADR conflicts**: if a candidate contradicts an existing ADR, only surface it when the friction is real enough to warrant revisiting the ADR. Mark it clearly in the card (e.g. a warning callout: _"contradicts ADR-0007, but worth reopening because…"_). Don't list every theoretical refactor an ADR forbids.
+
+@@ -61,11 +61,11 @@ Do NOT propose interfaces yet. After the file is written, ask the user: "Which o
+
+ ### 3. Grilling loop
+
+-Once the user picks a candidate, call the Skill tool with "grilling" to walk the decision tree with them: constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.
++Once the user picks a candidate, read the `grilling` skill's `SKILL.md` file and follow its instructions to walk the decision tree with them: constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.
+
+-Side effects happen inline as decisions crystallize; call the Skill tool with "domain-modeling" to keep the domain model current as you go:
++Side effects happen inline as decisions crystallize; read the `domain-modeling` skill's `SKILL.md` file and follow its instructions to keep the domain model current as you go:
+
+-- **Naming a deepened module after a concept not in `GLOSSARY.md`?** Add the term to `GLOSSARY.md`. Create the file lazily if it doesn't exist.
+-- **Sharpening a fuzzy term during the conversation?** Update `GLOSSARY.md` right there.
++- **Naming a deepened module after a concept not in `CONTEXT.md`?** Add the term to `CONTEXT.md`. Create the file lazily if it doesn't exist.
++- **Sharpening a fuzzy term during the conversation?** Update `CONTEXT.md` right there.
+ - **User rejects the candidate with a load-bearing reason?** Offer an ADR, framed as: _"Want me to record this as an ADR so future architecture reviews don't re-suggest it?"_ Only offer when the reason would actually be needed by a future explorer to avoid re-suggesting the same thing; skip ephemeral reasons ("not worth it right now") and self-evident ones.
+-- **Want to explore alternative interfaces for the deepened module?** Call the Skill tool with "codebase-design" and use its design-it-twice parallel sub-agent pattern.
++- **Want to explore alternative interfaces for the deepened module?** Read the `codebase-design` skill's `SKILL.md` file and follow its instructions and use its design-it-twice parallel sub-agent pattern.
+diff --git a/skills/engineering/pr/SKILL.md b/skills/engineering/pr/SKILL.md
+index 84dd4fb..8b597e8 100644
+--- a/skills/engineering/pr/SKILL.md
++++ b/skills/engineering/pr/SKILL.md
+@@ -34,7 +34,7 @@ Use this template for writing the PR body:
+
+ ## Sections
+
+-Skip all preambles and keep prose brief. Use the user's domain language from `GLOSSARY.md`.
++Skip all preambles and keep prose brief. Use the user's domain language from `CONTEXT.md`.
+
+ ### Summary
+
 diff --git a/skills/engineering/research/SKILL.md b/skills/engineering/research/SKILL.md
+index fecee97..9c9eb64 100644
 --- a/skills/engineering/research/SKILL.md
 +++ b/skills/engineering/research/SKILL.md
 @@ -1,12 +1,24 @@
@@ -273,7 +570,7 @@ diff --git a/skills/engineering/research/SKILL.md b/skills/engineering/research/
 -Its job:
 +Do the research in the current foreground task. Use primary sources.
 
--1. Investigate the question against **primary sources** — official docs, source code, specs, first-party APIs — not a secondary write-up of them. Follow every claim back to the source that owns it.
+-1. Investigate the question against **primary sources** (official docs, source code, specs, first-party APIs), not a secondary write-up of them. Follow every claim back to the source that owns it.
 -2. Write the findings to a single Markdown file, citing each claim's source.
 -3. Save it where the repo already keeps such notes; match the existing convention, and if there is none, put it somewhere sensible and say where.
 +## Process
@@ -291,18 +588,222 @@ diff --git a/skills/engineering/research/SKILL.md b/skills/engineering/research/
 +5. Report the saved path and a short result summary.
 +
 +When `agent_run` is available, use a read-only profile only for an independent repository investigation. Agent Runs are foreground work and do not replace primary web sources.
+diff --git a/skills/engineering/retro/SKILL.md b/skills/engineering/retro/SKILL.md
+index 12149ac..52fb58a 100644
+--- a/skills/engineering/retro/SKILL.md
++++ b/skills/engineering/retro/SKILL.md
+@@ -8,7 +8,7 @@ The user has asked for a **retrospective**. You are suggesting improvements to t
+
+ ## Steps
+
+-1. Call the Skill tool with `writing-for-agents` for the writing style guide.
++1. Read the `writing-for-agents` skill's `SKILL.md` file and follow its instructions for the writing style guide.
+
+ 2. Read the primary sources for the session the user specifies. This may mean searching through session logs on this machine. If the user doesn't specify a session, default to the current one.
+
+diff --git a/skills/engineering/setup-matt-pocock-skills/SKILL.md b/skills/engineering/setup-matt-pocock-skills/SKILL.md
+index c0d850b..7f6f576 100644
+--- a/skills/engineering/setup-matt-pocock-skills/SKILL.md
++++ b/skills/engineering/setup-matt-pocock-skills/SKILL.md
+@@ -10,7 +10,7 @@ Scaffold the per-repo configuration that the engineering skills assume:
+
+ - **Issue tracker**: where issues live (GitHub by default; local markdown is also supported out of the box)
+ - **Triage labels**: the strings used for the five canonical triage roles
+-- **Domain docs**: where `GLOSSARY.md` and ADRs live, and the consumer rules for reading them
++- **Domain docs**: where `CONTEXT.md` and ADRs live, and the consumer rules for reading them
+
+ This is a prompt-driven skill, not a deterministic script. Explore, present what you found, confirm with the user, then write.
+
+@@ -22,7 +22,7 @@ Look at the current repo to understand its starting state. Read whatever exists;
+
+ - `git remote -v` and `.git/config`: is this a GitHub repo? Which one?
+ - `AGENTS.md` and `CLAUDE.md` at the repo root: does either exist? Is there already an `## Agent skills` section in either?
+-- `GLOSSARY.md` and `GLOSSARY-MAP.md` at the repo root
++- `CONTEXT.md` and `CONTEXT-MAP.md` at the repo root
+ - `docs/adr/` and any `src/*/docs/adr/` directories
+ - `docs/agents/`: does this skill's prior output already exist?
+ - `.scratch/`: a sign that a local-markdown issue tracker convention is already in use
+@@ -56,9 +56,9 @@ If it is installed, ask exactly one question:
+
+ The defaults are the five canonical roles, each label string equal to its name: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. On **yes**, write them as-is. Only if the user says no, usually because their tracker already uses other names (e.g. `bug:triage` for `needs-triage`), collect the overrides so `triage` applies existing labels instead of creating duplicates.
+
+-**Section C: Domain docs.** Default to **single-context** (one `GLOSSARY.md` + `docs/adr/` at the repo root). This fits almost every repo; write it without asking.
++**Section C: Domain docs.** Default to **single-context** (one `CONTEXT.md` + `docs/adr/` at the repo root). This fits almost every repo; write it without asking.
+
+-Offer **multi-context** (a root `GLOSSARY-MAP.md` pointing to per-context `GLOSSARY.md` files) only when exploration found monorepo signals. Then confirm which layout they want.
++Offer **multi-context** (a root `CONTEXT-MAP.md` pointing to per-context `CONTEXT.md` files) only when exploration found monorepo signals. Then confirm which layout they want.
+
+ ### 3. Confirm and edit
+
+diff --git a/skills/engineering/setup-matt-pocock-skills/domain.md b/skills/engineering/setup-matt-pocock-skills/domain.md
+index 4032de0..3524904 100644
+--- a/skills/engineering/setup-matt-pocock-skills/domain.md
++++ b/skills/engineering/setup-matt-pocock-skills/domain.md
+@@ -4,8 +4,8 @@ How the engineering skills should consume this repo's domain documentation when
+
+ ## Before exploring, read these
+
+-- **`GLOSSARY.md`** at the repo root, or
+-- **`GLOSSARY-MAP.md`** at the repo root if it exists: it points at one `GLOSSARY.md` per context. Read each one relevant to the topic.
++- **`CONTEXT.md`** at the repo root, or
++- **`CONTEXT-MAP.md`** at the repo root if it exists: it points at one `CONTEXT.md` per context. Read each one relevant to the topic.
+ - **`docs/adr/`**: read ADRs that touch the area you're about to work in. In multi-context repos, also check `src/<context>/docs/adr/` for context-scoped decisions.
+
+ If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
+@@ -16,31 +16,31 @@ Single-context repo (most repos):
+
+ ```
+ /
+-├── GLOSSARY.md
++├── CONTEXT.md
+ ├── docs/adr/
+ │   ├── 0001-event-sourced-orders.md
+ │   └── 0002-postgres-for-write-model.md
+ └── src/
+ ```
+
+-Multi-context repo (presence of `GLOSSARY-MAP.md` at the root):
++Multi-context repo (presence of `CONTEXT-MAP.md` at the root):
+
+ ```
+ /
+-├── GLOSSARY-MAP.md
++├── CONTEXT-MAP.md
+ ├── docs/adr/                          ← system-wide decisions
+ └── src/
+     ├── ordering/
+-    │   ├── GLOSSARY.md
++    │   ├── CONTEXT.md
+     │   └── docs/adr/                  ← context-specific decisions
+     └── billing/
+-        ├── GLOSSARY.md
++        ├── CONTEXT.md
+         └── docs/adr/
+ ```
+
+ ## Use the glossary's vocabulary
+
+-When your output names a domain concept (in an issue title, a refactor proposal, a hypothesis, a test name), use the term as defined in `GLOSSARY.md`. Don't drift to synonyms the glossary explicitly avoids.
++When your output names a domain concept (in an issue title, a refactor proposal, a hypothesis, a test name), use the term as defined in `CONTEXT.md`. Don't drift to synonyms the glossary explicitly avoids.
+
+ If the concept you need isn't in the glossary yet, that's a signal: either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `/domain-modeling`).
+
+diff --git a/skills/engineering/tdd/SKILL.md b/skills/engineering/tdd/SKILL.md
+index 250871c..c3fd0e9 100644
+--- a/skills/engineering/tdd/SKILL.md
++++ b/skills/engineering/tdd/SKILL.md
+@@ -7,7 +7,7 @@ description: Test-driven development. Use when the user wants to build features
+
+ TDD is the red → green loop. This skill is the reference that makes that loop produce tests worth keeping: what a good test is, where tests go, the anti-patterns, and the rules of the loop. Every section applies on every cycle: consult them before and during the loop, not after.
+
+-When exploring the codebase, read `GLOSSARY.md` (if it exists) so test names and interface vocabulary match the project's domain language, and respect ADRs in the area you're touching.
++When exploring the codebase, read `CONTEXT.md` (if it exists) so test names and interface vocabulary match the project's domain language, and respect ADRs in the area you're touching.
+
+ ## What a good test is
+
+@@ -23,7 +23,7 @@ A **seam** is the public boundary you test at: the interface where you observe b
+
+ Ask: "What's the public interface, and which seams should we test?"
+
+-When the shape of that interface is itself in question (how deep the module is, where the seam belongs, what the interface should expose), call the Skill tool with "codebase-design" for the vocabulary. It is the shared source of the module, interface, depth, seam, adapter, leverage and locality terms, and it is a reference to consult, not a session to run.
++When the shape of that interface is itself in question (how deep the module is, where the seam belongs, what the interface should expose), read the `codebase-design` skill's `SKILL.md` file and follow its instructions for the vocabulary. It is the shared source of the module, interface, depth, seam, adapter, leverage and locality terms, and it is a reference to consult, not a session to run.
+
+ ## Anti-patterns
+
+diff --git a/skills/engineering/triage/SKILL.md b/skills/engineering/triage/SKILL.md
+index 3fd5617..2e0e39a 100644
+--- a/skills/engineering/triage/SKILL.md
++++ b/skills/engineering/triage/SKILL.md
+@@ -73,7 +73,7 @@ Show counts and a one-line summary per item. Let the maintainer pick.
+
+ 3. **Verify the claim.** Before any grilling, check that the claim holds up. For a bug, reproduce it from the reporter's steps. For a PR, confirm the diff does what it claims: check it out, run the relevant tests or commands. Report what happened: confirmed (with code path), failed, or insufficient detail (a strong `needs-info` signal). A confirmed verification makes a much stronger agent brief.
+
+-4. **Grill (if needed).** If the request needs fleshing out, call the Skill tool twice, for "grilling" and "domain-modeling", and grill it into shape a round of questions at a time, sharpening domain terms and updating `GLOSSARY.md`/ADRs inline as decisions land.
++4. **Grill (if needed).** If the request needs fleshing out, load the `grilling` and `domain-modeling` skills by reading their `SKILL.md` files, and grill it into shape a round of questions at a time, sharpening domain terms and updating `CONTEXT.md`/ADRs inline as decisions land.
+
+ 5. **Apply the outcome:**
+    - `ready-for-agent`: post an agent brief comment ([AGENT-BRIEF.md](AGENT-BRIEF.md)).
+diff --git a/skills/engineering/wayfinder/SKILL.md b/skills/engineering/wayfinder/SKILL.md
+index 812805b..82a6b8d 100644
+--- a/skills/engineering/wayfinder/SKILL.md
++++ b/skills/engineering/wayfinder/SKILL.md
+@@ -74,9 +74,9 @@ The answer isn't part of the body; it's recorded on resolution (see [Work throug
+
+ Every ticket is either **HITL** (human in the loop, worked _with_ a human who speaks for themselves) or **AFK**, driven by the agent alone. A HITL ticket only resolves through that live exchange; the agent never stands in for the human's side of it (a grilling agent that answers its own questions has broken this).
+
+-- **Research** (AFK): Reading documentation, third-party APIs, or local resources like knowledge bases to surface a fact a decision waits on. Resolved by a subagent that calls the Skill tool with "research". Use when knowledge outside the current working directory is required.
+-- **Prototype** (HITL): Raise the fidelity of the discussion by making a cheap, rough, concrete artifact to react to (an outline, a rough take, a stub, or UI/logic code) by calling the Skill tool with "prototype". Links the prototype as an asset. Use when "how should it look" or "how should it behave" is the key question.
+-- **Grilling** (HITL): Conversation. The default case. Always call the Skill tool twice, for "grilling" and "domain-modeling".
++- **Research** (AFK): Reading documentation, third-party APIs, or local resources like knowledge bases to surface a fact a decision waits on. Resolved by a subagent that reads the `research` skill's `SKILL.md` file and follows its instructions. Use when knowledge outside the current working directory is required.
++- **Prototype** (HITL): Raise the fidelity of the discussion by making a cheap, rough, concrete artifact to react to (an outline, a rough take, a stub, or UI/logic code) by reading and following `../prototype/SKILL.md`. Links the prototype as an asset. Use when "how should it look" or "how should it behave" is the key question.
++- **Grilling** (HITL): Conversation. The default case. Always load the `grilling` and `domain-modeling` skills by reading their `SKILL.md` files.
+ - **Task** (HITL or AFK): Manual work that must happen before a _decision_ can be made: nothing to decide, prototype, or research, but the discussion is blocked until it's done. Signing up for a service so its API can be judged, provisioning access, moving data so its shape can be seen. This is the one type that _does_ rather than decides, and it earns its place by unblocking a decision, not by delivering the destination. The agent drives it alone where it can (AFK); otherwise it hands the human a precise checklist (HITL). Resolved when the work is done; the answer records what was done and any resulting facts (credentials location, new URLs, row counts) later tickets depend on.
+
+ ## Fog of war
+@@ -108,11 +108,11 @@ Two modes. Either way, **never resolve more than one ticket per session**, with
+
+ User invokes with a loose idea.
+
+-1. **Name the destination.** Call the Skill tool twice, for "grilling" and "domain-modeling", to pin down what this map is finding its way to: the spec, decision, or change. The destination fixes the scope, so it's settled first.
++1. **Name the destination.** Read the `SKILL.md` files for `grilling` and `domain-modeling` at their advertised skill locations, then follow both skills to pin down what this map is finding its way to: the spec, decision, or change. The destination fixes the scope, so it's settled first.
+ 2. **Map the frontier.** Grill again, **breadth-first** this time: fan out across the whole space rather than deep on any one thread, surfacing the open decisions and the first steps takeable now. **If this surfaces no fog** (the way to the destination is already clear, the whole journey small enough for one session), you don't need a map. Stop and ask the user how they'd like to proceed.
+ 3. **Create the map** (label `wayfinder:map`): Destination and Notes filled in, Decisions-so-far empty, the fog sketched into **Not yet specified**.
+ 4. **Create the tickets you can specify now** as child issues of the map, then wire blocking edges in a **second pass** (issues need ids before they can reference each other). Wiring sorts them into the frontier and the blocked; everything you can't yet specify stays in the fog: the **Not yet specified** section.
+-5. **Fire the research subagents.** For each `research` ticket you just created, spin up a subagent that calls the Skill tool with "research" to resolve it in parallel, capturing its findings on a throwaway `research/<name>` branch with a context pointer from the ticket.
++5. **Fire the research subagents.** For each `research` ticket you just created, spin up a subagent that reads the `research` skill's `SKILL.md` file and follows its instructions to resolve it in parallel, capturing its findings on a throwaway `research/<name>` branch with a context pointer from the ticket.
+ 6. Stop: charting is one session's work; it hand-resolves nothing.
+
+ ### Work through the map
+@@ -121,7 +121,7 @@ User invokes with a map (URL or number). A ticket is **optional**: without one,
+
+ 1. Load the **map**: the low-res view, not every ticket body.
+ 2. Choose the ticket. If the user named one, use it. Otherwise take the first frontier ticket in order. **Claim it**: assign it to yourself before any work.
+-3. Resolve it. **Zoom as needed**: fetch the full body of any related or closed ticket on demand; call the Skill tool for whichever skills the `## Notes` block names. If in doubt, call the Skill tool twice, for "grilling" and "domain-modeling".
++3. Resolve it. **Zoom as needed**: fetch the full body of any related or closed ticket on demand; read the `SKILL.md` files for the skills named in the `## Notes` block. If in doubt, load the `grilling` and `domain-modeling` skills by reading their `SKILL.md` files.
+ 4. Record the resolution: post the answer as a **resolution comment**, **close** the issue, and **append a context pointer** to the map's Decisions-so-far.
+ 5. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. If the answer reveals that a ticket (this one or another) sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets.
+
+diff --git a/skills/productivity/README.md b/skills/productivity/README.md
+index 6fd3754..0ac94ab 100644
+--- a/skills/productivity/README.md
++++ b/skills/productivity/README.md
+@@ -10,7 +10,7 @@ Reachable only when you type them (Claude Code: `disable-model-invocation: true`
+ - **[handoff](./handoff/SKILL.md)**: Compact the current conversation into a handoff document so another agent can continue the work.
+ - **[teach](./teach/SKILL.md)**: Teach the user a new skill or concept over multiple sessions, using the current directory as a stateful teaching workspace.
+ - **[to-questionnaire](./to-questionnaire/SKILL.md)**: Turn a decision you can't answer alone into a Markdown questionnaire for the one person who can (filled in async, or together over a meeting).
+-- **[wait-what](./wait-what/SKILL.md)**: Fire this the moment a message doesn't land. The agent re-pitches it with the context you're missing, in plain English, using your `GLOSSARY.md` vocabulary.
++- **[wait-what](./wait-what/SKILL.md)**: Fire this the moment a message doesn't land. The agent re-pitches it with the context you're missing, in plain English, using your `CONTEXT.md` vocabulary.
+
+ ## Model-invoked
+
+diff --git a/skills/productivity/grill-me/SKILL.md b/skills/productivity/grill-me/SKILL.md
+index 3947ff9..f027ace 100644
+--- a/skills/productivity/grill-me/SKILL.md
++++ b/skills/productivity/grill-me/SKILL.md
+@@ -4,4 +4,4 @@ description: A relentless interview to sharpen a plan or design.
+ disable-model-invocation: true
+ ---
+
+-Call the Skill tool with "grilling".
++Read the `grilling` skill's `SKILL.md` file and follow its instructions.
 diff --git a/skills/productivity/grilling/SKILL.md b/skills/productivity/grilling/SKILL.md
-index 95bd01e..b7d2644 100644
+index 8ca78c6..3c9cfea 100644
 --- a/skills/productivity/grilling/SKILL.md
 +++ b/skills/productivity/grilling/SKILL.md
-@@ -7,13 +7,18 @@ Interview the user relentlessly until you reach a shared understanding. Map this
+@@ -7,19 +7,18 @@ Interview the user relentlessly until you reach a shared understanding. Map this
 
- Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled — the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask the whole frontier in one round: number each question and give your recommended answer. Then wait for the user's answers before the next round.
+ Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled: the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask the whole frontier in one round: number each question and give your recommended answer. Then wait for the user's answers before the next round.
 
--Each question should be formatted like so:
+-Format a round like so:
 -
 -```
 -❓ **Q1** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
+-
+-➡️ <your recommended answer>
+-
+----
+-
+-❓ **Q2** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
 -
 -➡️ <your recommended answer>
 -```
@@ -319,5 +820,28 @@ index 95bd01e..b7d2644 100644
 +- `details`: Explain trade-offs or consequences for a choice option. It can also contain a sketch.
 +- `recommendation`: For a choice question, use the recommended option `value`, or an array of values when `multi` is `true`. For a text question, give the recommended answer. Also give text questions a `placeholder` that shows the expected answer shape.
 
- Each round the user answers reshapes the tree — settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
+ Each round the user answers reshapes the tree: settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
 
+diff --git a/skills/productivity/handoff/SKILL.md b/skills/productivity/handoff/SKILL.md
+index 2eb98a5..e98eb15 100644
+--- a/skills/productivity/handoff/SKILL.md
++++ b/skills/productivity/handoff/SKILL.md
+@@ -7,7 +7,7 @@ disable-model-invocation: true
+
+ Write a handoff document summarising the current conversation so a fresh agent can continue the work. Save to the temporary directory of the user's OS - not the current workspace.
+
+-Include a "suggested skills" section in the document, naming which skills the next agent should call the Skill tool for.
++Include a "suggested skills" section in the document, naming the skill files that the next agent should read and follow.
+
+ Do not duplicate content already captured in other artifacts (specs, plans, ADRs, issues, commits, diffs). Reference them by path or URL instead.
+
+diff --git a/skills/productivity/wait-what/SKILL.md b/skills/productivity/wait-what/SKILL.md
+index 9b15cd1..f8854f1 100644
+--- a/skills/productivity/wait-what/SKILL.md
++++ b/skills/productivity/wait-what/SKILL.md
+@@ -4,4 +4,4 @@ description: "Stop. That last message did not land: re-pitch it."
+ disable-model-invocation: true
+ ---
+
+-Wait, I don't understand where you've got to here. Re-pitch that: give me a little bit of context, talk in ASD-STE100 Simplified Technical English, and use the ubiquitous language from `GLOSSARY.md` (follow `GLOSSARY-MAP.md` to the right one if the repo has more than one).
++Wait, I don't understand where you've got to here. Re-pitch that: give me a little bit of context, talk in ASD-STE100 Simplified Technical English, and use the ubiquitous language from `CONTEXT.md` (follow `CONTEXT-MAP.md` to the right one if the repo has more than one).
