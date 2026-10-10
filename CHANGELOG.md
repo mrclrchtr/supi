@@ -1,5 +1,43 @@
 # Changelog
 
+## [9.0.0](https://github.com/mrclrchtr/supi/compare/v8.0.1...v9.0.0) (2026-10-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **consulting:** Replace supi-antigravity and antigravity_run with supi-consulting and consulting_run. Use consulting.agentToolEnabled, start new handles, and sign in to the new isolated home.
+
+### Features
+
+* **latex:** add structural LaTeX support ([dd1e94a](https://github.com/mrclrchtr/supi/commit/dd1e94ae1e68e94c7af2e5ddb738ba163cc25f4d))
+* **prompt-improver:** add user-approved prompt improvement ([82ab416](https://github.com/mrclrchtr/supi/commit/82ab416570642138a4e428b30528640c7f3198ab))
+
+
+### Bug Fixes
+
+* **agent-runtime:** close viewer when Ask User opens ([b5453df](https://github.com/mrclrchtr/supi/commit/b5453df30815e464bbe8259455d7744d2d9a5405))
+* **deps:** lock file maintenance ([944d1fd](https://github.com/mrclrchtr/supi/commit/944d1fdacc6968dc5ec7e2dd30dc150862145a0e))
+* **deps:** update actions/setup-node action to v7.1.0 ([0ae97df](https://github.com/mrclrchtr/supi/commit/0ae97dfe46d6ce732941bbc01bb15389f799e574))
+* **deps:** update dependency @types/node to v25.9.9 ([86e8c2b](https://github.com/mrclrchtr/supi/commit/86e8c2bed575d4b7e68c5f09307b766b2f67d28c))
+* **deps:** update dependency hk to v2.5.0 ([4e9d9db](https://github.com/mrclrchtr/supi/commit/4e9d9db6d7233bbf3132d0af261820205dc85297))
+* **deps:** update dependency ignore to v7.0.11 ([458d93f](https://github.com/mrclrchtr/supi/commit/458d93f4699c179d7253db76f1f48809d93b75b8))
+* **deps:** update dependency jsdom to v30.1.2 ([82f68e5](https://github.com/mrclrchtr/supi/commit/82f68e5ae819c9fb1ffc16eae6440eb2ea968869))
+* **deps:** update dependency vitest to v5.0.3 ([fce020b](https://github.com/mrclrchtr/supi/commit/fce020b21b97efb8a97ba81140c96070d8aff715))
+* **deps:** update github actions ([81069d7](https://github.com/mrclrchtr/supi/commit/81069d700d4f7ba014562b5a752a61ba7327e251))
+* **deps:** update pnpm to v12.10.0 ([e7e535b](https://github.com/mrclrchtr/supi/commit/e7e535b2b081b5ee5c3ff10c31371f33a2d1f372))
+* **deps:** update pnpm to v12.10.1 ([77f9caf](https://github.com/mrclrchtr/supi/commit/77f9caf12ba7b603306b8e175fcbbae8d8155046))
+* **deps:** update pnpm to v12.8.2 ([9e7ee2d](https://github.com/mrclrchtr/supi/commit/9e7ee2d94f4d59605abe34830c9a703d41a6193e))
+* **deps:** update pnpm to v12.9.0 ([f53309b](https://github.com/mrclrchtr/supi/commit/f53309bd735687e21ef4a92e5624a45b11ed53a2))
+* **deps:** update pnpm to v12.9.1 ([f634aab](https://github.com/mrclrchtr/supi/commit/f634aabbe4184f4b22d779527cb519ba4c3cd91c))
+* **latex:** anchor heading renames and parse label underscores ([3f4b417](https://github.com/mrclrchtr/supi/commit/3f4b4175b492392259eef7d8489a4dc70df8d595))
+* **latex:** resolve label targets by key identity ([5c67f06](https://github.com/mrclrchtr/supi/commit/5c67f061ddd1382b3060ee382a5af8934b1a8a40))
+* **tree-sitter:** isolate parser from V8 memory spikes ([716d966](https://github.com/mrclrchtr/supi/commit/716d966f41dd15c10258d619196f349f929ed715))
+
+
+### Code Refactoring
+
+* **consulting:** replace the Antigravity package ([07ce5ee](https://github.com/mrclrchtr/supi/commit/07ce5ee9d2f392fb583ec2ed61d0ce5e2b050c94))
+
 ## [8.0.1](https://github.com/mrclrchtr/supi/compare/v8.0.0...v8.0.1) (2026-10-02)
 
 
