@@ -5,7 +5,7 @@
     "repository": "https://github.com/latex-lsp/tree-sitter-latex"
   },
   "generatedWith": {
-    "treeSitterCli": "0.27.0"
+    "treeSitterCli": "0.27.1"
   },
   "patches": [
     {
