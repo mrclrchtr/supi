@@ -1,0 +1,13 @@
+diff --git a/skills/engineering/retro/SKILL.md b/skills/engineering/retro/SKILL.md
+index 12149ac..52fb58a 100644
+--- a/skills/engineering/retro/SKILL.md
++++ b/skills/engineering/retro/SKILL.md
+@@ -8,7 +8,7 @@ The user has asked for a **retrospective**. You are suggesting improvements to t
+
+ ## Steps
+
+-1. Call the Skill tool with `writing-for-agents` for the writing style guide.
++1. Read the `writing-for-agents` skill's `SKILL.md` file and follow its instructions for the writing style guide.
+
+ 2. Read the primary sources for the session the user specifies. This may mean searching through session logs on this machine. If the user doesn't specify a session, default to the current one.
+

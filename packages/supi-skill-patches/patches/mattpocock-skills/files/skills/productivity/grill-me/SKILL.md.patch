@@ -1,0 +1,10 @@
+diff --git a/skills/productivity/grill-me/SKILL.md b/skills/productivity/grill-me/SKILL.md
+index 3947ff9..f027ace 100644
+--- a/skills/productivity/grill-me/SKILL.md
++++ b/skills/productivity/grill-me/SKILL.md
+@@ -4,4 +4,4 @@ description: A relentless interview to sharpen a plan or design.
+ disable-model-invocation: true
+ ---
+
+-Call the Skill tool with "grilling".
++Read the `grilling` skill's `SKILL.md` file and follow its instructions.

@@ -1,6 +1,6 @@
 {
   "repository": "mattpocock/skills",
-  "tag": "v1.2.3",
+  "tag": "v1.3.1",
   "includedGroups": {
     "engineering": true,
     "productivity": true
@@ -16,10 +16,12 @@
       "domain-modeling",
       "grill-with-docs",
       "implement",
+      "implement-spec",
       "improve-codebase-architecture",
+      "pr",
       "prototype",
       "research",
-      "resolving-merge-conflicts",
+      "retro",
       "setup-matt-pocock-skills",
       "tdd",
       "to-spec",

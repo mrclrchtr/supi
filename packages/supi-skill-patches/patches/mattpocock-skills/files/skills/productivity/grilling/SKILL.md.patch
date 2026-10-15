@@ -1,15 +1,21 @@
 diff --git a/skills/productivity/grilling/SKILL.md b/skills/productivity/grilling/SKILL.md
-index 95bd01e..b7d2644 100644
+index 8ca78c6..3c9cfea 100644
 --- a/skills/productivity/grilling/SKILL.md
 +++ b/skills/productivity/grilling/SKILL.md
-@@ -7,13 +7,18 @@ Interview the user relentlessly until you reach a shared understanding. Map this
+@@ -7,19 +7,18 @@ Interview the user relentlessly until you reach a shared understanding. Map this
 
- Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled — the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask the whole frontier in one round: number each question and give your recommended answer. Then wait for the user's answers before the next round.
+ Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled: the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask the whole frontier in one round: number each question and give your recommended answer. Then wait for the user's answers before the next round.
 
--Each question should be formatted like so:
+-Format a round like so:
 -
 -```
 -❓ **Q1** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
+-
+-➡️ <your recommended answer>
+-
+----
+-
+-❓ **Q2** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
 -
 -➡️ <your recommended answer>
 -```
@@ -26,5 +32,5 @@ index 95bd01e..b7d2644 100644
 +- `details`: Explain trade-offs or consequences for a choice option. It can also contain a sketch.
 +- `recommendation`: For a choice question, use the recommended option `value`, or an array of values when `multi` is `true`. For a text question, give the recommended answer. Also give text questions a `placeholder` that shows the expected answer shape.
 
- Each round the user answers reshapes the tree — settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
+ Each round the user answers reshapes the tree: settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
 

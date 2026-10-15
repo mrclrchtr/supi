@@ -1,0 +1,46 @@
+diff --git a/skills/engineering/domain-modeling/GLOSSARY-FORMAT.md b/skills/engineering/domain-modeling/GLOSSARY-FORMAT.md
+index 9c0b4c7..be355f5 100644
+--- a/skills/engineering/domain-modeling/GLOSSARY-FORMAT.md
++++ b/skills/engineering/domain-modeling/GLOSSARY-FORMAT.md
+@@ -1,4 +1,4 @@
+-# GLOSSARY.md Format
++# CONTEXT.md Format
+
+ ## Structure
+
+@@ -31,18 +31,18 @@ _Avoid_: Client, buyer, account
+
+ ## Single vs multi-context repos
+
+-**Single context (most repos):** One `GLOSSARY.md` at the repo root.
++**Single context (most repos):** One `CONTEXT.md` at the repo root.
+
+-**Multiple contexts:** A `GLOSSARY-MAP.md` at the repo root lists the contexts, where they live, and how they relate to each other:
++**Multiple contexts:** A `CONTEXT-MAP.md` at the repo root lists the contexts, where they live, and how they relate to each other:
+
+ ```md
+ # Glossary Map
+
+ ## Contexts
+
+-- [Ordering](./src/ordering/GLOSSARY.md): receives and tracks customer orders
+-- [Billing](./src/billing/GLOSSARY.md): generates invoices and processes payments
+-- [Fulfillment](./src/fulfillment/GLOSSARY.md): manages warehouse picking and shipping
++- [Ordering](./src/ordering/CONTEXT.md): receives and tracks customer orders
++- [Billing](./src/billing/CONTEXT.md): generates invoices and processes payments
++- [Fulfillment](./src/fulfillment/CONTEXT.md): manages warehouse picking and shipping
+
+ ## Relationships
+
+@@ -53,8 +53,8 @@ _Avoid_: Client, buyer, account
+
+ The skill infers which structure applies:
+
+-- If `GLOSSARY-MAP.md` exists, read it to find contexts
+-- If only a root `GLOSSARY.md` exists, single context
+-- If neither exists, create a root `GLOSSARY.md` lazily when the first term is resolved
++- If `CONTEXT-MAP.md` exists, read it to find contexts
++- If only a root `CONTEXT.md` exists, single context
++- If neither exists, create a root `CONTEXT.md` lazily when the first term is resolved
+
+ When multiple contexts exist, infer which one the current topic relates to. If unclear, ask.
