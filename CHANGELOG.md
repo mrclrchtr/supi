@@ -1,5 +1,18 @@
 # Changelog
 
+## [9.1.0](https://github.com/mrclrchtr/supi/compare/v9.0.0...v9.1.0) (2026-10-16)
+
+
+### Features
+
+* **installer:** add scoped package selection CLI ([160a888](https://github.com/mrclrchtr/supi/commit/160a888fb00d6d419fe2bbe3ff8c49e1f00fbee2))
+
+
+### Bug Fixes
+
+* **ci:** keep skill patch checkouts at LF ([58f8d29](https://github.com/mrclrchtr/supi/commit/58f8d296a3acdbc2e672bdfb6461c2648ad039f1))
+* **deps:** pin dependency @types/cross-spawn to 6.0.6 ([268df36](https://github.com/mrclrchtr/supi/commit/268df365067881b4150578e62f4a9d17690644cb))
+
 ## [9.0.0](https://github.com/mrclrchtr/supi/compare/v8.0.1...v9.0.0) (2026-10-16)
 
 
