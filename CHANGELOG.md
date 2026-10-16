@@ -1,5 +1,75 @@
 # Changelog
 
+## [9.0.0](https://github.com/mrclrchtr/supi/compare/v8.0.1...v9.0.0) (2026-10-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* **consulting:** Replace supi-antigravity and antigravity_run with supi-consulting and consulting_run. Use consulting.agentToolEnabled, start new handles, and sign in to the new isolated home.
+
+### Features
+
+* **agent:** add per-profile enablement settings ([14bde60](https://github.com/mrclrchtr/supi/commit/14bde60b5543ae68081a674b718770f959525acf))
+* **extras:** add session capability profiles ([99ac991](https://github.com/mrclrchtr/supi/commit/99ac991b8a4f88524dc045c2ffc227993c1a9ca0))
+* **latex:** add structural LaTeX support ([dd1e94a](https://github.com/mrclrchtr/supi/commit/dd1e94ae1e68e94c7af2e5ddb738ba163cc25f4d))
+* **prompt-improver:** add user-approved prompt improvement ([82ab416](https://github.com/mrclrchtr/supi/commit/82ab416570642138a4e428b30528640c7f3198ab))
+
+
+### Bug Fixes
+
+* **agent-runtime:** close viewer when Ask User opens ([b5453df](https://github.com/mrclrchtr/supi/commit/b5453df30815e464bbe8259455d7744d2d9a5405))
+* **deps:** keep Pi upgrades manual during lock maintenance ([493f7e3](https://github.com/mrclrchtr/supi/commit/493f7e317f755b9a45fc15973a73f25e9eb26b6e))
+* **deps:** lock file maintenance ([8772c1f](https://github.com/mrclrchtr/supi/commit/8772c1feca17ff4e9ad2aa0333ce2de3fc434b32))
+* **deps:** lock file maintenance ([944d1fd](https://github.com/mrclrchtr/supi/commit/944d1fdacc6968dc5ec7e2dd30dc150862145a0e))
+* **deps:** update actions/create-github-app-token action to v3.3.0 ([356437c](https://github.com/mrclrchtr/supi/commit/356437c7005ba1460392eea1f1ca51ad35c3da08))
+* **deps:** update actions/setup-node action to v7.1.0 ([0ae97df](https://github.com/mrclrchtr/supi/commit/0ae97dfe46d6ce732941bbc01bb15389f799e574))
+* **deps:** update dependency @biomejs/biome to v2.5.15 ([29f663a](https://github.com/mrclrchtr/supi/commit/29f663af8e7edf341cbfc10b3cc469f406b2e861))
+* **deps:** update dependency @types/node to v25.9.9 ([86e8c2b](https://github.com/mrclrchtr/supi/commit/86e8c2bed575d4b7e68c5f09307b766b2f67d28c))
+* **deps:** update dependency hk to v2.5.0 ([4e9d9db](https://github.com/mrclrchtr/supi/commit/4e9d9db6d7233bbf3132d0af261820205dc85297))
+* **deps:** update dependency hk to v2.6.0 ([6972dd4](https://github.com/mrclrchtr/supi/commit/6972dd4fee984643f4ad95623f50c90635c2b7a2))
+* **deps:** update dependency hk to v2.7.0 ([0444c94](https://github.com/mrclrchtr/supi/commit/0444c94556156b608fa88c85ffc9276a7f02c6b1))
+* **deps:** update dependency ignore to v7.0.11 ([458d93f](https://github.com/mrclrchtr/supi/commit/458d93f4699c179d7253db76f1f48809d93b75b8))
+* **deps:** update dependency jsdom to v30.1.2 ([82f68e5](https://github.com/mrclrchtr/supi/commit/82f68e5ae819c9fb1ffc16eae6440eb2ea968869))
+* **deps:** update dependency tree-sitter-cli to v0.27.1 ([7336095](https://github.com/mrclrchtr/supi/commit/733609532bf088eac0ff58205f5e4ff001ca2e54))
+* **deps:** update dependency typescript-language-server to v6.0.2 ([bf0ef90](https://github.com/mrclrchtr/supi/commit/bf0ef906ebd1fa96fcf5027a04bfe824a8ccf98b))
+* **deps:** update dependency vitest to v5.0.3 ([fce020b](https://github.com/mrclrchtr/supi/commit/fce020b21b97efb8a97ba81140c96070d8aff715))
+* **deps:** update dependency vitest to v5.0.4 ([6ff4075](https://github.com/mrclrchtr/supi/commit/6ff4075170a2210878ecc2330974ee70f3ea6c00))
+* **deps:** update dependency web-tree-sitter to v0.27.1 ([739114c](https://github.com/mrclrchtr/supi/commit/739114c320607afef0afb88335f8db9f5790fd86))
+* **deps:** update dependency web-tree-sitter to v0.27.1 ([14a9267](https://github.com/mrclrchtr/supi/commit/14a92678d1cc2839fbe1f21d5aa413a76f15c439))
+* **deps:** update github actions ([81069d7](https://github.com/mrclrchtr/supi/commit/81069d700d4f7ba014562b5a752a61ba7327e251))
+* **deps:** update node.js to lts ([caf719b](https://github.com/mrclrchtr/supi/commit/caf719bfa5ae43e648120f7cbd6bbb1653256e28))
+* **deps:** update Pi packages to v1.3.0 ([d957b1a](https://github.com/mrclrchtr/supi/commit/d957b1a236652aa5ac251a107497af8683895292))
+* **deps:** update pnpm to v12.10.0 ([e7e535b](https://github.com/mrclrchtr/supi/commit/e7e535b2b081b5ee5c3ff10c31371f33a2d1f372))
+* **deps:** update pnpm to v12.10.1 ([77f9caf](https://github.com/mrclrchtr/supi/commit/77f9caf12ba7b603306b8e175fcbbae8d8155046))
+* **deps:** update pnpm to v12.11.0 ([0f9d56c](https://github.com/mrclrchtr/supi/commit/0f9d56c5145f802f42c224f7e7eacaa5ca6e5344))
+* **deps:** update pnpm to v12.11.1 ([558efe1](https://github.com/mrclrchtr/supi/commit/558efe16ac79bc8cbf0161047480188bf51c29ff))
+* **deps:** update pnpm to v12.11.2 ([cabdaed](https://github.com/mrclrchtr/supi/commit/cabdaedc20b7cc856491aabb409a88fe3d666ed8))
+* **deps:** update pnpm to v12.13.0 ([de6729e](https://github.com/mrclrchtr/supi/commit/de6729edbb65d6fc3ce8aaf2692a5f9383b84598))
+* **deps:** update pnpm to v12.8.2 ([9e7ee2d](https://github.com/mrclrchtr/supi/commit/9e7ee2d94f4d59605abe34830c9a703d41a6193e))
+* **deps:** update pnpm to v12.9.0 ([f53309b](https://github.com/mrclrchtr/supi/commit/f53309bd735687e21ef4a92e5624a45b11ed53a2))
+* **deps:** update pnpm to v12.9.1 ([f634aab](https://github.com/mrclrchtr/supi/commit/f634aabbe4184f4b22d779527cb519ba4c3cd91c))
+* **deps:** upgrade Pi to 1.0.3 ([138f78f](https://github.com/mrclrchtr/supi/commit/138f78fc593d3bfdb190f66f80814fc8c0b413c7))
+* **deps:** upgrade Pi to 1.2.0 ([43009ab](https://github.com/mrclrchtr/supi/commit/43009ab0e8b8d5a100460658ef34b2f6fb5cfee4))
+* **latex:** anchor heading renames and parse label underscores ([3f4b417](https://github.com/mrclrchtr/supi/commit/3f4b4175b492392259eef7d8489a4dc70df8d595))
+* **latex:** resolve label targets by key identity ([5c67f06](https://github.com/mrclrchtr/supi/commit/5c67f061ddd1382b3060ee382a5af8934b1a8a40))
+* **lint:** satisfy Biome 2.5.15 checks ([2afb165](https://github.com/mrclrchtr/supi/commit/2afb165a6348a180284c1cc6ff255d3ba6829641))
+* **lsp:** surface server stderr tail in initialize failure errors ([b6e4fcb](https://github.com/mrclrchtr/supi/commit/b6e4fcba9c7c56cb65c7172de0678f652fc47a62))
+* **pi-upgrade:** apply upgrades without dry-run or confirmation ([8348892](https://github.com/mrclrchtr/supi/commit/834889209484620c33416f917935ce61bfd54e8a))
+* **skill:** add guideline to avoid using sub-agents ([a6f6e1f](https://github.com/mrclrchtr/supi/commit/a6f6e1f60fbf8f499d4d6b6b9e3036c28f6bb3ec))
+* **skills:** sync commit patch with catalog skill ([d71a8fd](https://github.com/mrclrchtr/supi/commit/d71a8fd1ecbd396e2f2a1b22a391bc27b52838a4))
+* **tree-sitter:** isolate parser from V8 memory spikes ([716d966](https://github.com/mrclrchtr/supi/commit/716d966f41dd15c10258d619196f349f929ed715))
+* **tree-sitter:** refresh CLI metadata ([3efc05b](https://github.com/mrclrchtr/supi/commit/3efc05b73f7ac6defe0b2a2f386ee7b37f8de33b))
+
+
+### Performance Improvements
+
+* **ci:** reduce verification time and repeated test setup ([bb86f49](https://github.com/mrclrchtr/supi/commit/bb86f49606a6f3c7a72342480c0c69cb5baedb0e))
+
+
+### Code Refactoring
+
+* **consulting:** replace the Antigravity package ([07ce5ee](https://github.com/mrclrchtr/supi/commit/07ce5ee9d2f392fb583ec2ed61d0ce5e2b050c94))
+
 ## [8.0.1](https://github.com/mrclrchtr/supi/compare/v8.0.0...v8.0.1) (2026-10-02)
 
 
