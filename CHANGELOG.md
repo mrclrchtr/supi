@@ -1,5 +1,12 @@
 # Changelog
 
+## [9.1.1](https://github.com/mrclrchtr/supi/compare/v9.1.0...v9.1.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* **tree-sitter:** launch Node workers from Bun parents ([6eaea43](https://github.com/mrclrchtr/supi/commit/6eaea432f780dc1c1d6a44d65c1675d6940aad8b)), closes [#501](https://github.com/mrclrchtr/supi/issues/501)
+
 ## [9.1.0](https://github.com/mrclrchtr/supi/compare/v9.0.0...v9.1.0) (2026-10-16)
 
 

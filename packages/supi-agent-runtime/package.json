@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-agent-runtime",
-  "version": "9.1.0",
+  "version": "9.1.1",
   "description": "SuPi Agent Run runtime — neutral lifecycle management for in-process pi sessions",
   "license": "MIT",
   "repository": {
