@@ -1,5 +1,16 @@
 # Changelog
 
+## [9.1.2](https://github.com/mrclrchtr/supi/compare/v9.1.1...v9.1.2) (2026-10-18)
+
+
+### Bug Fixes
+
+* **code-intelligence:** clarify symbol candidate results ([a3213ff](https://github.com/mrclrchtr/supi/commit/a3213ff86d082bbf1f7dc2363960aad04361e5bb))
+* **code-intelligence:** guide scoped symbol recovery ([feceb04](https://github.com/mrclrchtr/supi/commit/feceb04c9e731cb091b3d74201223cd414f2e3dd)), closes [#503](https://github.com/mrclrchtr/supi/issues/503)
+* **deps:** update dependency jsdom to v30.1.3 ([88849d0](https://github.com/mrclrchtr/supi/commit/88849d07e408f64ff5eabf1e846442810bc12ecb))
+* **lsp:** deduplicate workspace symbol exclusion paths ([8c5773e](https://github.com/mrclrchtr/supi/commit/8c5773e9a271a8b4dc41c9db856330662072cdcd))
+* **lsp:** respect scopes when warming workspace symbols ([7879457](https://github.com/mrclrchtr/supi/commit/78794575e6d755c5b51f73f88594d8907a4b0190)), closes [#503](https://github.com/mrclrchtr/supi/issues/503)
+
 ## [9.1.1](https://github.com/mrclrchtr/supi/compare/v9.1.0...v9.1.1) (2026-10-16)
 
 

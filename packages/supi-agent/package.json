@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-agent",
-  "version": "9.1.1",
+  "version": "9.1.2",
   "description": "Profile-based foreground Agent Runs for the Pi coding agent",
   "license": "MIT",
   "repository": {

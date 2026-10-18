@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-prompt-improver",
-  "version": "9.1.1",
+  "version": "9.1.2",
   "description": "Command-based prompt improvement with user-approved drafts",
   "license": "MIT",
   "repository": {
