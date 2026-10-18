@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-bash-timeout",
-  "version": "9.1.2",
+  "version": "10.0.0",
   "description": "Default shell timeouts that prevent stalled Pi sessions",
   "license": "MIT",
   "repository": {

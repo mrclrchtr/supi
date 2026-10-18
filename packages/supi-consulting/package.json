@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-consulting",
-  "version": "9.1.2",
+  "version": "10.0.0",
   "description": "Bounded consultations with explicit agent and workspace selection and observed evidence",
   "license": "MIT",
   "repository": {

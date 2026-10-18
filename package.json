@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-workspace",
-  "version": "9.1.2",
+  "version": "10.0.0",
   "private": true,
   "description": "SuPi (Super Pi) — a curated extension stack for the Pi coding agent.",
   "packageManager": "pnpm@12.14.0",

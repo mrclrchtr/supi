@@ -1,5 +1,24 @@
 # Changelog
 
+## [10.0.0](https://github.com/mrclrchtr/supi/compare/v9.1.2...v10.0.0) (2026-10-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* **agent:** Read-only agent_run calls default to background in TUI and RPC. Use mode: "foreground" for awaited results.
+
+### Features
+
+* **agent:** add session-owned background delegation ([640d207](https://github.com/mrclrchtr/supi/commit/640d2072d0da1a897d3e73785f45848dfe42e9c5))
+* **code-intelligence:** add bounded workspace navigation ([5672c4f](https://github.com/mrclrchtr/supi/commit/5672c4fc8ae5d8d388521e78b6d94db21dfaf5c5))
+
+
+### Bug Fixes
+
+* **agent:** clarify provider errors and suppress stale notices ([b1f22f0](https://github.com/mrclrchtr/supi/commit/b1f22f05575497a8ce544a599eb652be70c1be3e))
+* **deps:** update dependency vitest to v5.0.5 ([c35d2f9](https://github.com/mrclrchtr/supi/commit/c35d2f9334fc39d24f9a6d588b00640fb9add73a))
+* **deps:** update pnpm to v12.14.0 ([8af38f7](https://github.com/mrclrchtr/supi/commit/8af38f7e26e3d91b6517c9d47db1a35747552615))
+
 ## [9.1.2](https://github.com/mrclrchtr/supi/compare/v9.1.1...v9.1.2) (2026-10-18)
 
 
