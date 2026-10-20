@@ -141,6 +141,15 @@ const config: LspConfig = {
 const tempRoots: string[] = [];
 const managers: LspManager[] = [];
 
+function activeExplicitRetryCallers(manager: LspManager, key: string): number | undefined {
+  const leases = (
+    manager as unknown as {
+      explicitRouteAttempts: Map<string, { users: number }>;
+    }
+  ).explicitRouteAttempts;
+  return leases.get(key)?.users;
+}
+
 function createWorkspace(): string {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-root-retirement-"));
   tempRoots.push(workspace);
@@ -233,6 +242,99 @@ describe("LSP route root retirement", () => {
     }
     expect(manager.getKnownProjectServers([])).toMatchObject([{ root, status: "running" }]);
     expect(mocks.clients[0].status).toBe("shutdown");
+  });
+
+  it("starts a new explicit retry after a route root is recreated", async () => {
+    const root = createWorkspace();
+    const file = path.join(root, "source.test");
+    fs.writeFileSync(file, "source\n");
+    const manager = new LspManager(config, root);
+    managers.push(manager);
+    mocks.startBehaviors.push(async () => {
+      throw new Error("initial startup failed");
+    });
+    await expect(manager.startServerForRoot("test", root)).resolves.toBeNull();
+
+    const oldStart = deferred<void>();
+    mocks.startBehaviors.push(() => oldStart.promise);
+    const oldRefresh = manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { explicit: true, scopes: [file] },
+    });
+    await vi.waitFor(() => expect(mocks.clients).toHaveLength(2));
+
+    fs.rmSync(root, { recursive: true });
+    manager.pruneMissingFiles();
+    fs.mkdirSync(root);
+    fs.writeFileSync(file, "source\n");
+
+    const replacementStart = deferred<void>();
+    mocks.startBehaviors.push(() => replacementStart.promise);
+    const replacementRefresh = manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { explicit: true, scopes: [file] },
+    });
+
+    try {
+      await vi.waitFor(() => expect(mocks.clients).toHaveLength(3), { timeout: 1_000 });
+      replacementStart.resolve(undefined);
+      await replacementRefresh;
+      expect(manager.getProjectServerInfo("test", root, ["test"]).status).toBe("running");
+    } finally {
+      oldStart.resolve(undefined);
+      replacementStart.resolve(undefined);
+      await Promise.allSettled([oldRefresh, replacementRefresh]);
+    }
+
+    await expect(oldRefresh).resolves.toMatchObject({
+      startupRetry: { recoveredRoutes: 0, failedRoutes: 0 },
+    });
+  });
+
+  it("releases only the old caller's explicit retry lease after recreation", async () => {
+    const root = createWorkspace();
+    const file = path.join(root, "source.test");
+    fs.writeFileSync(file, "source\n");
+    const manager = new LspManager(config, root);
+    managers.push(manager);
+    mocks.startBehaviors.push(async () => {
+      throw new Error("initial startup failed");
+    });
+    await expect(manager.startServerForRoot("test", root)).resolves.toBeNull();
+
+    const oldStart = deferred<void>();
+    mocks.startBehaviors.push(() => oldStart.promise);
+    const oldRefresh = manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { explicit: true, scopes: [file] },
+    });
+    await vi.waitFor(() => expect(mocks.clients).toHaveLength(2));
+
+    fs.rmSync(root, { recursive: true });
+    manager.pruneMissingFiles();
+    fs.mkdirSync(root);
+    fs.writeFileSync(file, "source\n");
+
+    const replacementStart = deferred<void>();
+    mocks.startBehaviors.push(() => replacementStart.promise);
+    const replacementRefresh = manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { explicit: true, scopes: [file] },
+    });
+    const key = `test:${root}`;
+
+    try {
+      await vi.waitFor(() => expect(mocks.clients).toHaveLength(3));
+      oldStart.resolve(undefined);
+      await oldRefresh;
+      expect(activeExplicitRetryCallers(manager, key)).toBe(1);
+      replacementStart.resolve(undefined);
+      await replacementRefresh;
+    } finally {
+      oldStart.resolve(undefined);
+      replacementStart.resolve(undefined);
+      await Promise.allSettled([oldRefresh, replacementRefresh]);
+    }
   });
 
   it("retires a route when root inspection reports ENOTDIR", async () => {
@@ -350,6 +452,41 @@ describe("LSP route root retirement", () => {
     await expect(pending).resolves.toMatchObject([{ restarted: false }]);
     expect(manager.getKnownProjectServers([])).toEqual([]);
     expect(mocks.clients).toHaveLength(1);
+  });
+
+  it("restarts a recreated route with its new client while the old restart waits", async () => {
+    const root = createWorkspace();
+    const file = path.join(root, "source.test");
+    fs.writeFileSync(file, "source\n");
+    const manager = new LspManager(config, root);
+    managers.push(manager);
+    const original = await manager.startServerForRoot("test", root);
+    if (!original) throw new Error("Expected the route to start.");
+    (original as unknown as FakeClient).becomeReady();
+    (original as unknown as FakeClient).didOpen(file);
+
+    const oldShutdown = deferred<void>();
+    mocks.shutdownBehaviors.push(() => oldShutdown.promise);
+    const oldRestart = manager.restartClientsForFiles([file]);
+    await vi.waitFor(() => expect(mocks.shutdownBehaviors).toHaveLength(0));
+
+    fs.rmSync(root, { recursive: true });
+    manager.pruneMissingFiles();
+    fs.mkdirSync(root);
+    fs.writeFileSync(file, "source\n");
+    const recreated = await manager.startServerForRoot("test", root);
+    if (!recreated) throw new Error("Expected the recreated route to start.");
+
+    const replacementRestart = manager.restartClientsForFiles([file]);
+    try {
+      await vi.waitFor(() => expect(mocks.clients).toHaveLength(3), { timeout: 1_000 });
+      await expect(replacementRestart).resolves.toMatchObject([{ restarted: true }]);
+    } finally {
+      oldShutdown.resolve(undefined);
+      await Promise.allSettled([oldRestart, replacementRestart]);
+    }
+
+    await expect(oldRestart).resolves.toMatchObject([{ restarted: false }]);
   });
 
   it.each(["EACCES", "EPERM", "EIO"])(

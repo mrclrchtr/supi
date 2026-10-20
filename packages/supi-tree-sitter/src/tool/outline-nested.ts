@@ -80,6 +80,9 @@ function isNestedDeclaration(
 ): boolean {
   const allowed = NESTED_DECLARATION_TYPES[grammarId];
   if (!allowed?.has(node.type)) return false;
+  if (grammarId === "java" && node.type === "field_declaration") {
+    return isJavaAnonymousClassField(node, owner);
+  }
   if (node.type === "declaration" && (grammarId === "c" || grammarId === "cpp")) {
     let parent = node.parent;
     while (parent && parent !== owner) {
@@ -99,6 +102,19 @@ function isNestedDeclaration(
     return false;
   }
   return true;
+}
+
+/** Named class fields are already in the shallow outline; add only anonymous-class fields here. */
+function isJavaAnonymousClassField(node: SyntaxNodeLike, owner: SyntaxNodeLike): boolean {
+  let parent = node.parent;
+  while (parent && parent !== owner) {
+    if (parent.type === "class_body") {
+      const container = parent.parent?.type;
+      return container === "object_creation_expression" || container === "enum_constant";
+    }
+    parent = parent.parent;
+  }
+  return false;
 }
 
 function mergeOutlineChildren(
@@ -337,6 +353,7 @@ const NESTED_DECLARATION_TYPES: Partial<Record<GrammarId, ReadonlySet<string>>> 
     "annotation_type_declaration",
     "method_declaration",
     "constructor_declaration",
+    "field_declaration",
   ]),
   go: new Set(["function_declaration", "method_declaration", "type_spec", "type_alias"]),
   rust: new Set([

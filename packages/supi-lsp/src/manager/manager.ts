@@ -922,7 +922,7 @@ export class LspManager {
     callback: (results: ExplicitRouteAttemptResult[]) => Promise<T>,
   ): Promise<T> {
     throwIfCodeRequestInterrupted(control);
-    const leased: string[] = [];
+    const leased: Array<{ key: string; lease: ExplicitRouteAttemptLease }> = [];
     try {
       const promises = candidates.map((candidate) => {
         throwIfCodeRequestInterrupted(control);
@@ -930,7 +930,7 @@ export class LspManager {
         const existing = this.explicitRouteAttempts.get(key);
         if (existing) {
           existing.users++;
-          leased.push(key);
+          leased.push({ key, lease: existing });
           return raceRequestControl(existing.promise, control);
         }
         const promise = this.performExplicitRouteAttempt(candidate);
@@ -944,17 +944,17 @@ export class LspManager {
             }
           })
           .catch(() => {});
-        leased.push(key);
+        leased.push({ key, lease });
         return raceRequestControl(promise, control);
       });
       const results = await Promise.all(promises);
       return await callback(results);
     } finally {
-      for (const key of leased) {
-        const lease = this.explicitRouteAttempts.get(key);
-        if (!lease) continue;
+      for (const { key, lease } of leased) {
         lease.users--;
-        if (lease.users === 0 && lease.settled) this.explicitRouteAttempts.delete(key);
+        if (lease.users === 0 && lease.settled && this.explicitRouteAttempts.get(key) === lease) {
+          this.explicitRouteAttempts.delete(key);
+        }
       }
     }
   }
@@ -2254,9 +2254,11 @@ export class LspManager {
   private retireProjectRoute(key: string, serverName: string, root: string): void {
     this.routeRetirementGenerations.set(key, this.getRouteRetirementGeneration(key) + 1);
     this.retiredRoutes.add(key);
-    // Detach obsolete deduplication without cancelling or losing observation of its owner.
-    // The startup's identity-checked finalizer cannot remove a replacement entry.
+    // Detach old work from key-based joins. Promise observers still own cleanup.
+    // Identity checks keep old finalizers from removing replacement entries.
     this.pendingStarts.delete(key);
+    this.explicitRouteAttempts.delete(key);
+    this.pendingRestarts.delete(key);
     const roots = this.knownRoots.get(serverName)?.filter((knownRoot) => knownRoot !== root) ?? [];
     if (roots.length > 0) this.knownRoots.set(serverName, roots);
     else this.knownRoots.delete(serverName);
