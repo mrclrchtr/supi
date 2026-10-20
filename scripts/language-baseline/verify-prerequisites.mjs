@@ -101,7 +101,7 @@ requireVersion(
 requireVersion(
   process.env.CODE_BASELINE_RUST_ANALYZER_SERVER ?? "rust-analyzer",
   ["--version"],
-  servers.rustAnalyzer.commit,
+  `${servers.rustAnalyzer.version}-standalone (${servers.rustAnalyzer.commit}`,
   "rust-analyzer",
 );
 requireVersion(

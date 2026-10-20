@@ -3,19 +3,20 @@ import { createHash } from "node:crypto";
 import {
   appendFileSync,
   chmodSync,
+  createReadStream,
   createWriteStream,
   existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
+import { createGunzip } from "node:zlib";
 import { selectClangArtifact } from "./clang-artifacts.mjs";
 
 if (process.env.CI !== "true" || !process.env.RUNNER_TEMP) {
@@ -170,8 +171,10 @@ function installGopls() {
   return destination;
 }
 
-function installRustAnalyzer() {
+async function installRustAnalyzer() {
   const host = rustHost();
+  const artifact = pins.referenceServers.rustAnalyzer.artifacts[host];
+  if (!artifact) throw new Error(`No pinned standalone Rust Analyzer artifact exists for ${host}.`);
   const rustupInit = join(home, "rustup-init");
   const rustupUrl = `https://static.rust-lang.org/rustup/archive/${pins.toolchains.rustup}/${host}/rustup-init`;
   const rustupHashUrl = `${rustupUrl}.sha256`;
@@ -217,44 +220,20 @@ function installRustAnalyzer() {
     ],
     { env: rustEnv },
   );
-  const rustup = join(cargoHome, "bin", "rustup");
-  run(
-    rustup,
-    ["toolchain", "install", pins.referenceServers.rustAnalyzer.toolchain, "--profile", "minimal"],
-    {
-      env: rustEnv,
-    },
-  );
-  run(
-    rustup,
-    [
-      "component",
-      "add",
-      "rust-analyzer",
-      "rust-src",
-      "--toolchain",
-      pins.referenceServers.rustAnalyzer.toolchain,
-    ],
-    { env: rustEnv },
-  );
-  const analyzer = runOutput(
-    rustup,
-    ["which", "rust-analyzer", "--toolchain", pins.referenceServers.rustAnalyzer.toolchain],
-    {
-      env: rustEnv,
-    },
-  );
-  const link = join(bin, "rust-analyzer");
-  symlinkSync(analyzer, link);
+  const archive = join(home, artifact.file);
+  const analyzer = join(bin, "rust-analyzer");
+  await download(artifact.url, archive, artifact.sha256);
+  await pipeline(createReadStream(archive), createGunzip(), createWriteStream(analyzer));
+  chmodSync(analyzer, 0o755);
   addGitHubPath(join(cargoHome, "bin"));
-  return link;
+  return analyzer;
 }
 
 const clangd = await installClangToolchain(clangArtifact);
 const jdtls = await installJdtls();
 const basedpyright = await installBasedpyright();
 const gopls = installGopls();
-const rustAnalyzer = installRustAnalyzer();
+const rustAnalyzer = await installRustAnalyzer();
 const typescriptLanguageServer = join(root, "node_modules", ".bin", "typescript-language-server");
 for (const executable of [
   typescriptLanguageServer,
