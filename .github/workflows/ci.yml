@@ -163,7 +163,11 @@ jobs:
 
       - name: Remove isolated server installs
         if: always()
-        run: rm -rf "$RUNNER_TEMP/supi-language-baseline"
+        run: |
+          if [ -d "$RUNNER_TEMP/supi-language-baseline/gomodcache" ]; then
+            GOMODCACHE="$RUNNER_TEMP/supi-language-baseline/gomodcache" go clean -modcache
+          fi
+          rm -rf "$RUNNER_TEMP/supi-language-baseline"
 
   installer:
     runs-on: ${{ matrix.os }}

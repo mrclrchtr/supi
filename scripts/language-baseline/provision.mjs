@@ -206,7 +206,7 @@ function installRustAnalyzer() {
   run(
     rustupInit,
     [
-      "--yes",
+      "-y",
       "--no-modify-path",
       "--profile",
       "minimal",
