@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { javaRuntimeBuildMarker, requireBinaryDigest } from "./prerequisite-evidence.mjs";
 
 const root = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const pins = JSON.parse(readFileSync(new URL("./pins.json", import.meta.url), "utf8"));
@@ -98,10 +99,21 @@ requireVersion(
   servers.gopls.version,
   "gopls",
 );
+const rustAnalyzer = process.env.CODE_BASELINE_RUST_ANALYZER_SERVER;
+const rustHost = {
+  "linux:x64": "x86_64-unknown-linux-gnu",
+  "darwin:arm64": "aarch64-apple-darwin",
+}[`${process.platform}:${process.arch}`];
+const rustArtifact = servers.rustAnalyzer.artifacts[rustHost];
+if (!rustAnalyzer || !rustArtifact) {
+  throw new Error("A pinned standalone Rust Analyzer executable is required for this platform.");
+}
+// Some release builds omit the source commit from --version. Verify the exact binary instead.
+requireBinaryDigest(rustAnalyzer, rustArtifact.binarySha256, "rust-analyzer");
 requireVersion(
-  process.env.CODE_BASELINE_RUST_ANALYZER_SERVER ?? "rust-analyzer",
+  rustAnalyzer,
   ["--version"],
-  `${servers.rustAnalyzer.version}-standalone (${servers.rustAnalyzer.commit}`,
+  `${servers.rustAnalyzer.version}-standalone`,
   "rust-analyzer",
 );
 requireVersion(
@@ -133,7 +145,7 @@ requireVersion(
 requireVersion(
   process.env.JAVA_HOME ? join(process.env.JAVA_HOME, "bin/java") : "java",
   ["-version"],
-  pins.toolchains.java.version,
+  javaRuntimeBuildMarker(pins.toolchains.java.version),
   "Java",
 );
 requireVersion("go", ["version"], `go${pins.toolchains.go}`, "Go");

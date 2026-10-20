@@ -29,12 +29,14 @@
         "x86_64-unknown-linux-gnu": {
           "file": "rust-analyzer-x86_64-unknown-linux-gnu.gz",
           "url": "https://github.com/rust-lang/rust-analyzer/releases/download/2026-10-12/rust-analyzer-x86_64-unknown-linux-gnu.gz",
-          "sha256": "040cab4e2abc490fadd95c3f6cbc60b941a78761dbc3acf0ec66fd7a97f31db3"
+          "sha256": "040cab4e2abc490fadd95c3f6cbc60b941a78761dbc3acf0ec66fd7a97f31db3",
+          "binarySha256": "fd89304c85f6c1996b036ea8f2c9ad9d3e25a197dbd713661c7fe51ec9dc8e49"
         },
         "aarch64-apple-darwin": {
           "file": "rust-analyzer-aarch64-apple-darwin.gz",
           "url": "https://github.com/rust-lang/rust-analyzer/releases/download/2026-10-12/rust-analyzer-aarch64-apple-darwin.gz",
-          "sha256": "a2e45e828b37bfc4b507c2ca456e8b61096e0bdfbae225f3d33295546d1eeacf"
+          "sha256": "a2e45e828b37bfc4b507c2ca456e8b61096e0bdfbae225f3d33295546d1eeacf",
+          "binarySha256": "c863e967a7244fa3687d7bd6235ac7abae5a7ce44bcbf8307eb1dc80aa85f397"
         }
       }
     },
