@@ -80,7 +80,7 @@ async function resolveTarget(
     target: { anchor: { file, line: point.line, character: point.character } },
   });
   const data = resultData<{ resultKind: string; targets: TargetInfo[] }>(result);
-  expect(data.resultKind).toBe("resolved");
+  expect(data.resultKind, `${displayText(result)}\n${JSON.stringify(data)}`).toBe("resolved");
   const target = data.targets[0];
   expect(target, `No semantic target resolved for ${symbol} in ${relativeFile}`).toBeDefined();
   if (!target) throw new Error(`No semantic target resolved for ${symbol} in ${relativeFile}.`);
@@ -131,7 +131,9 @@ async function assertInspection(setup: ToolContext, spec: LanguageCase): Promise
   }>(result);
   for (const key of ["node", "hover", "definition"]) {
     const section = data.sections.find((entry) => entry.key === key);
-    expect(section?.status).toBe("complete");
+    expect(section?.status, `${key}: ${displayText(result)}\n${JSON.stringify(data)}`).toBe(
+      "complete",
+    );
     expect(section?.itemCount).toBeGreaterThan(0);
   }
   expect(data.sections.find((entry) => entry.key === "hover")?.confidence).toBe("semantic");
