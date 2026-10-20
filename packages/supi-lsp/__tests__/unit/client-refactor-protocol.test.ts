@@ -99,6 +99,27 @@ describe("LSP rename requests", () => {
     );
   });
 
+  it("does not retry a server ContentModified rename", async () => {
+    const target = createDiagnosticTestFile("rename.ts", "const oldName = 1;\n");
+    temporaryDirectories.push(target.tmpDir);
+    const { client, rpc } = createRunningTestClient({
+      root: target.tmpDir,
+      capabilities: { renameProvider: true },
+    });
+    client.didOpen(target.filePath, "const oldName = 1;\n");
+    rpc.sendRequest.mockRejectedValueOnce(
+      Object.assign(new Error("content modified"), { code: -32801 }),
+    );
+
+    await expect(
+      client.renameDetailed(target.filePath, { line: 0, character: 6 }, "newName"),
+    ).resolves.toMatchObject({
+      kind: "unavailable",
+      reason: "LSP request textDocument/rename failed: content modified",
+    });
+    expect(rpc.sendRequest).toHaveBeenCalledTimes(1);
+  });
+
   it("does not retry a ContentModified rename after content changes", async () => {
     const target = createDiagnosticTestFile("rename.ts", "const oldName = 1;\n");
     temporaryDirectories.push(target.tmpDir);
@@ -147,6 +168,27 @@ describe("LSP rename requests", () => {
 });
 
 describe("LSP code-action requests", () => {
+  it("does not retry a server ContentModified code action", async () => {
+    const { client, rpc } = createRunningTestClient({
+      capabilities: { codeActionProvider: true },
+    });
+    rpc.sendRequest.mockRejectedValueOnce(
+      Object.assign(new Error("content modified"), { code: -32801 }),
+    );
+
+    await expect(
+      client.codeActionsDetailed(
+        "/project/index.ts",
+        { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+        { diagnostics: [] },
+      ),
+    ).resolves.toMatchObject({
+      kind: "unavailable",
+      reason: "LSP request textDocument/codeAction failed: content modified",
+    });
+    expect(rpc.sendRequest).toHaveBeenCalledTimes(1);
+  });
+
   it("sends only and invoked context, then resolves lazy edit data", async () => {
     const { client, rpc } = createRunningTestClient({
       capabilities: {

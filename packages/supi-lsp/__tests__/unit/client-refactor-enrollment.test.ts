@@ -161,7 +161,8 @@ describe("LSP refactor transaction enrollment retry", () => {
 
     await expect(request).resolves.toMatchObject({
       kind: "unavailable",
-      reason: "LSP request textDocument/hover failed: server content changed",
+      reason:
+        "LSP request textDocument/hover failed: Semantic input changed while the request was running.",
     });
     expect(rpc.sendRequest).toHaveBeenCalledTimes(1);
   });

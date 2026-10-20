@@ -131,7 +131,7 @@ describe("registered public code_graph concurrent first access", () => {
     await graph("c");
     release(2);
     await expect(first).rejects.toThrow(
-      "LSP request textDocument/references failed: Semantic input changed while the request was running. Enrollment retry exhausted after 1 retry.",
+      "LSP request textDocument/references failed: Semantic input changed while the request was running. Request retry exhausted after 1 retry.",
     );
     expect(referenceEvents("response")).toHaveLength(2);
     expect(referenceEvents("request")).toHaveLength(2);
@@ -141,12 +141,13 @@ describe("registered public code_graph concurrent first access", () => {
   function expectRetryEvents(outcome: "completed" | "exhausted"): void {
     const events = getDebugEvents({
       source: "lsp",
-      category: "semantic-request.enrollment-retry",
+      category: "request.retry",
     }).events.reverse();
     expect(events.map((event) => event.data)).toMatchObject([{ outcome: "retry" }, { outcome }]);
     expect(events[0]?.data).toMatchObject({
       method: "textDocument/references",
       retryCount: 1,
+      retryReason: "enrollment",
       changeKind: "enrollment",
     });
     expect(events[0]?.operationId).toMatch(/^op-/);
