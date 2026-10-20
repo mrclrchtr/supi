@@ -235,7 +235,10 @@ type ClientRestartResult = {
   restarted: boolean;
 };
 
-export type ManagerLifecycleTransitionKind = LspClientLifecycleTransitionKind | "recovery";
+export type ManagerLifecycleTransitionKind =
+  | LspClientLifecycleTransitionKind
+  | "recovery"
+  | "retirement";
 
 /** Package-internal aggregate lifecycle snapshot for the runtime controller. */
 export interface ManagerLifecycleTransition {
@@ -377,6 +380,12 @@ export class LspManager {
   private commandAvailability = new Map<string, boolean>();
   /** Guards against concurrent client creation for the same server:root key. */
   private pendingStarts = new Map<string, Promise<LspClient | null>>();
+  /** Prevent retired route owners from publishing work after root removal. */
+  private routeRetirementGenerations = new Map<string, number>();
+  /** Retired route keys stay blocked until the same path is again a directory. */
+  private retiredRoutes = new Set<string>();
+  /** Runtime-owned cleanup for clients removed by route retirement. */
+  private retiredClientShutdowns = new Set<Promise<void>>();
   /** Shared diagnostic-recovery restart for each replaceable client route. */
   private pendingRestarts = new Map<string, Promise<{ files: string[]; restarted: boolean }>>();
   /** Monotonic ownership generation for each replaceable client route. */
@@ -535,6 +544,7 @@ export class LspManager {
   ): Promise<LspClient | null> {
     throwIfCodeRequestInterrupted(options.control);
     if (this.shuttingDown) return null;
+    if (options.recoverProcessCrash) this.retireMissingProjectRoots();
     const route = this.resolveFileRoute(filePath);
     if (!route) return null;
 
@@ -560,6 +570,8 @@ export class LspManager {
     if (!serverConfig) return null;
     const key = clientKey(serverName, root);
     const retryFailedStart = options.retryFailedStart === true;
+    if (this.shouldBlockRetiredRoute(key, root, retryFailedStart)) return null;
+    const routeGeneration = this.getRouteRetirementGeneration(key);
     if (retryFailedStart) this.unavailable.delete(key);
     if (!retryFailedStart && this.getUnavailableReason(key, serverConfig.command)) return null;
 
@@ -595,7 +607,10 @@ export class LspManager {
     const pending = this.pendingStarts.get(key);
     if (pending) return raceRequestControl(pending, control);
 
-    const startPromise = this.performStart(serverName, serverConfig, root, key);
+    const startPromise = this.performStart(
+      { serverName, serverConfig, root, key },
+      routeGeneration,
+    );
     this.pendingStarts.set(key, startPromise);
     // Keep the shared startup registered until it settles. A cancelled
     // caller only stops waiting; it must not allow a duplicate route start.
@@ -728,6 +743,7 @@ export class LspManager {
     control?: CodeRequestControl,
   ): Promise<ProcessCrashDemandResult> {
     throwIfCodeRequestInterrupted(control);
+    this.retireMissingProjectRoots();
     const scopes = this.processCrashDiagnosticScopes(demand);
     const candidates = this.selectExplicitRouteCandidates(scopes);
     return this.withExplicitRouteAttempts(candidates, control, async (results) => {
@@ -947,11 +963,15 @@ export class LspManager {
     candidate: ExplicitRouteCandidate,
   ): Promise<ExplicitRouteAttemptResult> {
     const { route } = candidate;
+    const routeGeneration = this.getRouteRetirementGeneration(route.key);
     const recovery = this.processCrashRecoveries.get(route.key) ?? candidate.processCrashRecovery;
     if (recovery?.statusReason) {
       const client = await this.acquireProcessCrashReplacement(recovery, route, undefined, {
         allowExhausted: true,
       });
+      if (this.getRouteRetirementGeneration(route.key) !== routeGeneration) {
+        return { candidate, kind: "none", client: null, attempted: false };
+      }
       return {
         candidate,
         kind: "process-crash",
@@ -969,6 +989,9 @@ export class LspManager {
     const client = await this.startServerForRoot(route.serverName, route.root, undefined, {
       retryFailedStart: true,
     });
+    if (this.getRouteRetirementGeneration(route.key) !== routeGeneration) {
+      return { candidate, kind: "none", client: null, attempted: false };
+    }
     const failureMessage =
       this.failedStarts.get(route.key)?.failureMessage ?? candidate.startupFailure?.failureMessage;
     return {
@@ -1031,18 +1054,20 @@ export class LspManager {
     control?: CodeRequestControl,
     options: { skipWhenNoRetainedFile?: boolean } = {},
   ): Promise<ProcessCrashDemandResult> {
+    throwIfCodeRequestInterrupted(control);
+    this.retireMissingProjectRoots();
     const { immediate, required } = this.selectProcessCrashDemandRoutes(
       this.snapshotProcessCrashRoutes(),
       selectFiles,
       options,
     );
-    const hasSupport = immediate.length > 0 || required.length > 0;
+    const hasSelectedSupport = immediate.length > 0 || required.length > 0;
     if (required.length === 0) {
       const failures = immediate
         .filter((entry) => !entry.reportOnly)
         .map((entry) => this.formatProcessCrashDemandFailure(entry.route, entry.route.outcome));
       return {
-        hasSupport,
+        hasSupport: hasSelectedSupport,
         requiresFreshEvidence: false,
         startupRetry: emptyStartupRetryReport(),
         processCrashRecovery: buildProcessCrashRecoveryReport(
@@ -1095,7 +1120,7 @@ export class LspManager {
     );
     const failedImmediate = immediate.filter((entry) => !entry.reportOnly);
     return {
-      hasSupport,
+      hasSupport: immediate.length > 0 || observedRequired.length > 0,
       requiresFreshEvidence: observedRequired.length > 0,
       startupRetry: emptyStartupRetryReport(),
       processCrashRecovery: buildProcessCrashRecoveryReport(
@@ -1439,12 +1464,8 @@ export class LspManager {
    * Perform the actual server start — extracted so the public method can
    * deduplicate via pendingStarts without wrapping the entire body.
    */
-  private async performStart(
-    serverName: string,
-    serverConfig: ServerConfig,
-    root: string,
-    key: string,
-  ): Promise<LspClient | null> {
+  private async performStart(route: FileRoute, routeGeneration: number): Promise<LspClient | null> {
+    const { serverName, serverConfig, root, key } = route;
     // Validate command exists
     if (!commandExists(serverConfig.command)) {
       this.unavailable.set(key, "missing-command");
@@ -1465,7 +1486,7 @@ export class LspManager {
     rememberKnownRoot(this.knownRoots, serverName, root);
     try {
       await client.start();
-      if (this.shuttingDown) {
+      if (!this.ownsCurrentStart(key, routeGeneration, client)) {
         await client.forceKill().catch(() => {});
         if (this.clients.get(key) === client) this.clients.delete(key);
         return null;
@@ -1474,6 +1495,11 @@ export class LspManager {
       this.failedStarts.delete(key);
       return client;
     } catch (error) {
+      if (!this.ownsCurrentStart(key, routeGeneration, client)) {
+        await client.forceKill().catch(() => {});
+        if (this.clients.get(key) === client) this.clients.delete(key);
+        return null;
+      }
       this.unavailable.set(key, "start-failed");
       this.failedStarts.set(key, {
         serverName,
@@ -1539,8 +1565,11 @@ export class LspManager {
     key: string,
   ): Promise<{ files: string[]; restarted: boolean }> {
     const restartEpoch = this.invalidationEpoch;
+    const routeGeneration = this.getRouteRetirementGeneration(key);
     const restartPromise = this.restartClient(client).then((result) => {
-      this.recoveryRestartEpochs.set(key, restartEpoch);
+      if (this.getRouteRetirementGeneration(key) === routeGeneration) {
+        this.recoveryRestartEpochs.set(key, restartEpoch);
+      }
       return result;
     });
     this.pendingRestarts.set(key, restartPromise);
@@ -1702,6 +1731,7 @@ export class LspManager {
     throwIfCodeRequestInterrupted(control);
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
     if (options.retryFailedRoute) {
+      this.retireMissingProjectRoots();
       const route = this.resolveFileRoute(resolvedPath);
       if (!route || !this.automaticPathPolicy.isEligible(route.root, "directory")) {
         return {
@@ -2148,7 +2178,117 @@ export class LspManager {
   }
   /** Remove any missing files from open-document and diagnostic state. */
   pruneMissingFiles(): string[] {
-    return pruneMissingFilesFromClients(this.clients.values());
+    const removed = pruneMissingFilesFromClients(this.clients.values());
+    this.retireMissingProjectRoots();
+    return removed;
+  }
+
+  /** Remove route-owned state only when filesystem evidence confirms root removal. */
+  private retireMissingProjectRoots(): void {
+    if (this.shuttingDown) return;
+    const routes = new Map<string, { serverName: string; root: string }>();
+    const addRoute = (serverName: string, root: string): void => {
+      routes.set(clientKey(serverName, root), { serverName, root });
+    };
+
+    for (const [serverName, roots] of this.knownRoots) {
+      for (const root of roots) addRoute(serverName, root);
+    }
+    for (const [key, client] of this.clients) {
+      if (this.clientGenerations.has(key)) addRoute(client.name, client.root);
+    }
+    for (const failure of this.failedStarts.values()) {
+      addRoute(failure.serverName, failure.root);
+    }
+    for (const recovery of this.processCrashRecoveries.values()) {
+      addRoute(recovery.failedClient.name, recovery.failedClient.root);
+    }
+
+    let retired = false;
+    for (const [key, route] of routes) {
+      if (!this.isMissingProjectRoot(route.root)) continue;
+      this.retireProjectRoute(key, route.serverName, route.root);
+      retired = true;
+    }
+    if (retired) this.publishLifecycle("retirement");
+  }
+
+  private shouldBlockRetiredRoute(key: string, root: string, retryFailedStart: boolean): boolean {
+    if (retryFailedStart) this.retireMissingProjectRoots();
+    return this.isRetiredRoute(key, root);
+  }
+
+  private ownsCurrentStart(key: string, generation: number, client: LspClient): boolean {
+    return (
+      !this.shuttingDown &&
+      this.getRouteRetirementGeneration(key) === generation &&
+      this.clients.get(key) === client
+    );
+  }
+
+  private isMissingProjectRoot(root: string): boolean {
+    try {
+      return !fs.statSync(root).isDirectory();
+    } catch (error) {
+      return isMissingFileError(error);
+    }
+  }
+
+  private isRetiredRoute(key: string, root: string): boolean {
+    if (!this.retiredRoutes.has(key)) return false;
+    try {
+      if (fs.statSync(root).isDirectory()) {
+        this.retiredRoutes.delete(key);
+        return false;
+      }
+    } catch {
+      // Keep the retirement marker until a directory is confirmed at this path.
+    }
+    return true;
+  }
+
+  private getRouteRetirementGeneration(key: string): number {
+    return this.routeRetirementGenerations.get(key) ?? 0;
+  }
+
+  private retireProjectRoute(key: string, serverName: string, root: string): void {
+    this.routeRetirementGenerations.set(key, this.getRouteRetirementGeneration(key) + 1);
+    this.retiredRoutes.add(key);
+    // Detach obsolete deduplication without cancelling or losing observation of its owner.
+    // The startup's identity-checked finalizer cannot remove a replacement entry.
+    this.pendingStarts.delete(key);
+    const roots = this.knownRoots.get(serverName)?.filter((knownRoot) => knownRoot !== root) ?? [];
+    if (roots.length > 0) this.knownRoots.set(serverName, roots);
+    else this.knownRoots.delete(serverName);
+
+    const client = this.clients.get(key);
+    if (client) this.clients.delete(key);
+    this.unavailable.delete(key);
+    this.failedStarts.delete(key);
+    this.processCrashRecoveries.delete(key);
+    this.recoveryRestartEpochs.delete(key);
+    this.clearWarmedWorkspaceSymbolFiles(serverName, root);
+    this.clearWarmedSemanticProjects(serverName, root);
+    this.clearPendingWarmProbes(serverName, root);
+
+    if (client) {
+      const shutdown = this.shutdownRetiredClient(client);
+      this.retiredClientShutdowns.add(shutdown);
+      void shutdown.finally(() => this.retiredClientShutdowns.delete(shutdown)).catch(() => {});
+    }
+  }
+
+  private async shutdownRetiredClient(client: LspClient): Promise<void> {
+    try {
+      await client.shutdown();
+    } catch {
+      try {
+        await client.forceKill();
+      } catch {
+        // Retired-route cleanup is best-effort.
+      }
+    }
+    client.dispose();
   }
   /** Re-sync all open documents across active clients and return exact evidence coverage. */
   async refreshOpenDiagnostics(
@@ -2245,6 +2385,8 @@ export class LspManager {
     processCrashDemand?: { scopes?: readonly string[]; explicit?: boolean };
     control?: CodeRequestControl;
   }): Promise<WorkspaceRecoveryResult> {
+    throwIfCodeRequestInterrupted(options?.control);
+    this.pruneMissingFiles();
     const processCrashDemand = options?.processCrashDemand;
     const demand = processCrashDemand?.explicit
       ? await this.recoverExplicitRouteDemand(processCrashDemand, options?.control)
@@ -2349,7 +2491,8 @@ export class LspManager {
     this.shuttingDown = true;
     const clients = Array.from(this.clients.values());
     const shutdowns = clients.map((client) => client.shutdown().catch(() => {}));
-    await Promise.all(shutdowns);
+    await Promise.all([...shutdowns, ...this.retiredClientShutdowns]);
+    this.retiredClientShutdowns.clear();
     // Dispose every client so pending or active progress tokens and
     // readiness promises cannot outlive the manager.
     for (const client of clients) client.dispose();
@@ -2359,6 +2502,8 @@ export class LspManager {
     this.handledCrashGenerations.clear();
     this.processCrashRecoveries.clear();
     this.failedStarts.clear();
+    this.routeRetirementGenerations.clear();
+    this.retiredRoutes.clear();
     this.explicitRouteAttempts.clear();
     this.recoveryRestartEpochs.clear();
     this.unavailable.clear();

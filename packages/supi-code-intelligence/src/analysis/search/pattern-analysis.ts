@@ -40,10 +40,20 @@ export interface StructuredFailure {
   readonly errorRanges?: readonly SourceRange[];
 }
 
-export type StructuredScanLimitation = AstScanLimitation | ProviderScanLimitation;
+export type StructuredScanLimitation =
+  | AstScanLimitation
+  | ProviderScanLimitation
+  | SyntaxRecoveryScanLimitation;
 
 export interface ProviderScanLimitation {
   readonly reason: "provider-failure";
+  readonly pathCount: number;
+  readonly examples: readonly string[];
+}
+
+/** Recovered syntax files that limit the scan without losing collected matches. */
+export interface SyntaxRecoveryScanLimitation {
+  readonly reason: "syntax-recovery";
   readonly pathCount: number;
   readonly examples: readonly string[];
 }
@@ -133,11 +143,20 @@ export async function analyzeStructuredFiles(
     if (fileFailures.length === 0) analyzedFileCount += 1;
   }
 
-  if (failures.length > 0) {
+  const recoveredFiles = failures.filter((failure) => failure.kind === "partial");
+  if (recoveredFiles.length > 0) {
+    limitations.push({
+      reason: "syntax-recovery",
+      pathCount: recoveredFiles.length,
+      examples: recoveredFiles.slice(0, 5).map((failure) => failure.file),
+    });
+  }
+  const failedFiles = failures.filter((failure) => failure.kind !== "partial");
+  if (failedFiles.length > 0) {
     limitations.push({
       reason: "provider-failure",
-      pathCount: failures.length,
-      examples: failures.slice(0, 5).map((failure) => failure.file),
+      pathCount: failedFiles.length,
+      examples: failedFiles.slice(0, 5).map((failure) => failure.file),
     });
   }
   return { matches, failures, limitations, analyzedFileCount };

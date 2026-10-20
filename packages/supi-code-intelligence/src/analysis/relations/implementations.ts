@@ -10,7 +10,7 @@ import {
 } from "./provider-locations.ts";
 import type { ImplementationEntry, RelationsServiceDeps } from "./types.ts";
 
-export interface ImplementationsResult {
+interface ImplementationsResultBase {
   kind: "implementations";
   targetName: string;
   implementations: ImplementationEntry[];
@@ -18,8 +18,11 @@ export interface ImplementationsResult {
   /** Provider locations omitted because their URI or position was unusable. */
   invalidLocationCount: number;
   partialReason: RelationLocationPartialReason | null;
-  confidence: "semantic" | "unavailable";
 }
+
+/** An implementation lookup result with a reason on every unavailable outcome. */
+export type ImplementationsResult = ImplementationsResultBase &
+  ({ confidence: "semantic" } | { confidence: "unavailable"; message: string });
 
 /**
  * Collect implementations for a target file/position using semantic provider.
@@ -41,6 +44,7 @@ export async function collectImplementations(
       invalidLocationCount: 0,
       partialReason: null,
       confidence: "unavailable",
+      message: "No semantic implementations provider",
     };
   }
 
@@ -54,6 +58,7 @@ export async function collectImplementations(
       invalidLocationCount: 0,
       partialReason: null,
       confidence: "unavailable",
+      message: result.reason,
     };
   }
 

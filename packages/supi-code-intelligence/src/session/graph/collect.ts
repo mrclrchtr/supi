@@ -187,7 +187,7 @@ async function collectImplementationsRelation(
     },
   });
   if (result.confidence === "unavailable") {
-    return { kind: "unavailable", rel: "implements", message: "Implementations unavailable" };
+    return { kind: "unavailable", rel: "implements", message: result.message };
   }
 
   return {

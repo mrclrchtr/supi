@@ -1298,7 +1298,9 @@ export class LspClient {
     control?: CodeRequestControl,
   ): Promise<CodeQueryResult<Location | Location[] | LocationLink[] | null>> {
     if (!this.capabilities?.implementationProvider) {
-      return unavailableCodeQuery("Implementation requests are not supported by this server.");
+      return unavailableCodeQuery(
+        `LSP server "${this.name}" does not advertise textDocument/implementation.`,
+      );
     }
     return this.query(
       "textDocument/implementation",

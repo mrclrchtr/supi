@@ -145,6 +145,28 @@ describe("LspRuntimeController lifecycle projection", () => {
     expect(transitions.map((transition) => transition.generation)).toEqual([1, 2, 3, 4]);
   });
 
+  it("publishes route retirement as pending readiness without dropping the runtime owner", async () => {
+    const capabilities = new WorkspaceRuntime();
+    const controller = new LspRuntimeController("/project", capabilities);
+    const transitions: LspRuntimeTransition[] = [];
+    controller.subscribeLifecycle((transition) => transitions.push(transition));
+
+    const result = await controller.start();
+    const runtime = result.kind === "ready" ? result.runtime : null;
+    if (!runtime) throw new Error("Expected a published workspace runtime.");
+    mocks.managers[0]?.emit(managerTransition("readiness", true));
+    mocks.managers[0]?.emit(managerTransition("retirement", false, []));
+
+    expect(capabilities.getWorkspace("/project").semantic.state.kind).toBe("pending");
+    expect(controller.kind).toBe("ready");
+    expect(controller.workspaceRuntime).toBe(runtime);
+    expect(transitions.at(-1)).toMatchObject({
+      kind: "retirement",
+      semanticReady: false,
+      projectServers: [],
+    });
+  });
+
   it("rebuilds the automatic path policy on runtime restart", async () => {
     const controller = new LspRuntimeController("/project", new WorkspaceRuntime());
 

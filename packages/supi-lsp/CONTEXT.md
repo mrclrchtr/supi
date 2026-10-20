@@ -42,6 +42,10 @@ _Avoid_: installed means supported, unavailable means server unsupported, comman
 The stable identity of one configured language server for one workspace root. A route can continue across a failed server process and its replacement. Lifecycle, status, and recovery state belong to the route, not to one process generation.
 _Avoid_: server, client route, project server, process directory, working directory
 
+**Retired LSP route**:
+A route removed from runtime state after a maintenance or recovery check confirms that its root is missing (`ENOENT` or `ENOTDIR`) or is not a directory. Access and other errors do not prove removal. Retirement removes state for that server/root pair and blocks in-flight startup or recovery from restoring it. It publishes a `retirement` lifecycle transition with readiness from the remaining routes. The route can start again after its root path is confirmed as a directory. It does not change the configured server definition.
+_Avoid_: disabled language, global shutdown, inaccessible root
+
 **Required LSP route**:
 A known LSP route that supports a requested operation and can contribute evidence within its scope. Unscoped demand requires every supporting route.
 _Avoid_: eligible route, relevant server, all configured servers

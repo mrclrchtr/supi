@@ -29,6 +29,7 @@ export type {
   StructuredMatch,
   StructuredPatternParams,
   StructuredScanLimitation,
+  SyntaxRecoveryScanLimitation,
 } from "./pattern-analysis.ts";
 
 /** Structured completeness state for the AST source-file scan. */

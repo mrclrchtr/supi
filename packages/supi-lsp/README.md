@@ -72,6 +72,26 @@ Pyright remains the default Python server, but the audited server lacks implemen
 
 JDTLS acceptance uses a compatible pinned JDK and isolated writable `-data` and `-configuration` directories. Keep test workspaces separate from personal JDTLS state. The [capability baseline](../../docs/conventions/code-language-baseline.md) defines the operation and evidence requirements.
 
+### Java startup and project JDKs
+
+The JDK that starts JDTLS can differ from the JDK that builds your project. Set a compatible server runtime through the Java route without changing the shell or project compiler:
+
+```json
+{
+  "lsp": {
+    "servers": {
+      "java": {
+        "env": { "JAVA_HOME": "/path/to/compatible-server-jdk" }
+      }
+    }
+  }
+}
+```
+
+Use the [pinned acceptance JDK](../../scripts/language-baseline/pins.json) for the reference combination. Do not rely only on the launcher's minimum-version check: bundled Eclipse components can require a newer Java execution environment. If startup exits before `initialize`, inspect the Eclipse configuration log for an unresolved `osgi.ee` / `JavaSE` requirement. An empty stderr tail does not establish that the JDK is compatible.
+
+For concurrent workspaces or isolated checks, pass separate writable `-data` and `-configuration` directories. Do not share a JDTLS data directory between processes. Restart or reload to establish a new runtime settings snapshot after changing the route configuration. SuPi does not select or install a JDK automatically.
+
 ### Historical diagnostic audit
 
 The following table describes diagnostic support, not the full semantic feature set. A push server can still provide hover, definitions, references, symbols, and refactors.
@@ -241,6 +261,8 @@ a safe exact extraction-name contract, so `extract_function` and `extract_variab
 plans report a SuPi planning limitation instead of selecting a generated name.
 
 Rename responses that need additional document state can trigger one bounded discovery/enrollment retry. SuPi validates edit shape and canonical mutation paths, enrolls at most 64 affected files on the same route, and requests fresh edits. The first response is not a plan. Numeric versions must still match. A null version for an open document requires verified synchronized-content evidence; the plan retains the request fingerprint and client version. Missing snapshots, changed inputs, a larger follow-up edit set, and unsafe edits remain unavailable. Planning and apply revalidate these preconditions; no version is discarded to make an edit fit.
+
+Explicit maintenance retires routes whose project roots are confirmed missing or no longer directories. Retirement shuts down the route, clears its failure/recovery state, and prevents pending work from restoring it. Permission errors do not establish removal. Other routes and the workspace runtime owner remain active. Passive inventory reads do not perform this cleanup.
 
 Clients, `LspManager`, and the default runtime implementation remain internal.
 

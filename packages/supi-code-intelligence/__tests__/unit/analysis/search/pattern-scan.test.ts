@@ -270,6 +270,65 @@ describe("structured pattern AST Scan", () => {
     });
   });
 
+  it("separates recovered syntax from provider failures in a mixed scan", async () => {
+    source("src/failed.ts");
+    source("src/recovered.ts");
+    const errorRanges = [{ start: { line: 0, character: 14 }, end: { line: 0, character: 14 } }];
+    const provider = outlineProvider(async (file) =>
+      file.endsWith("recovered.ts")
+        ? {
+            kind: "partial" as const,
+            file,
+            reason: "Tree-sitter recovered syntax.",
+            errorRanges,
+            data: [
+              {
+                name: "RecoveredTarget",
+                kind: "function",
+                startLine: 1,
+                startCharacter: 10,
+                endLine: 1,
+                endCharacter: 24,
+                children: [],
+              },
+            ],
+          }
+        : { kind: "unavailable" as const, message: "Structural provider failed.", file },
+    );
+
+    const outcome = await getStructuredPatternMatches({
+      params: { pattern: "RecoveredTarget", kind: "definition" },
+      roots: [path.join(tmpDir, "src")],
+      cwd: tmpDir,
+      structural: provider,
+    });
+
+    expect(outcome).toMatchObject({
+      kind: "completed",
+      result: {
+        partialReason: "provider-limited",
+        matches: [{ file: "src/recovered.ts", name: "RecoveredTarget" }],
+        failures: [
+          { file: "src/failed.ts", kind: "unavailable", reason: "Structural provider failed." },
+          {
+            file: "src/recovered.ts",
+            kind: "partial",
+            reason: "Tree-sitter recovered syntax.",
+            errorRanges,
+          },
+        ],
+        scan: {
+          eligibleFileCount: 2,
+          complete: false,
+          limitations: expect.arrayContaining([
+            { reason: "syntax-recovery", pathCount: 1, examples: ["src/recovered.ts"] },
+            { reason: "provider-failure", pathCount: 1, examples: ["src/failed.ts"] },
+          ]),
+        },
+      },
+    });
+  });
+
   it("keeps omitted files separate from match evidence at the safety cap", async () => {
     source("src/a.ts");
     source("src/b.ts");

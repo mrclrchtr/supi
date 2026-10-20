@@ -102,6 +102,7 @@ export type LspRuntimeTransitionKind =
   | "readiness"
   | "crash"
   | "recovery"
+  | "retirement"
   | "shutdown"
   | "tracked-files";
 

@@ -1,4 +1,4 @@
-import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
+import { completedCodeQuery, unavailableCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it } from "vitest";
 import { collectImplementations } from "../../../../src/analysis/relations/implementations.ts";
 import { collectCallers } from "../../../../src/analysis/relations/references.ts";
@@ -80,6 +80,33 @@ describe("provider relation locations", () => {
 
     expect(forward.references).toEqual(reversed.references);
     expect(forward.references).toHaveLength(1);
+  });
+
+  it("retains the implementation provider failure and distinguishes a missing provider", async () => {
+    const providerReason = "Implementation lookup is unavailable on this route.";
+    const providerResult = await collectImplementations(
+      "/repo/target.ts",
+      { line: 0, character: 0 },
+      "Target",
+      {
+        cwd: "/repo",
+        provider: {
+          implementation: async () => unavailableCodeQuery(providerReason),
+        },
+      },
+    );
+    const missingProviderResult = await collectImplementations(
+      "/repo/target.ts",
+      { line: 0, character: 0 },
+      "Target",
+      { cwd: "/repo", provider: null },
+    );
+
+    expect(providerResult).toMatchObject({ confidence: "unavailable", message: providerReason });
+    expect(missingProviderResult).toMatchObject({
+      confidence: "unavailable",
+      message: "No semantic implementations provider",
+    });
   });
 
   it("preserves, filters, partitions, and deduplicates implementation positions", async () => {

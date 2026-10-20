@@ -350,6 +350,37 @@ describe("workspace-symbol process-crash demand", () => {
     expect(mocks.clients).toHaveLength(1);
   });
 
+  it("does not retry a failed route after its project root is deleted", async () => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-deleted-startup-route-"));
+    tempRoots.push(workspace);
+    fs.writeFileSync(path.join(workspace, "source.test"), "source\n");
+    const manager = new LspManager(config, workspace);
+    managers.push(manager);
+    mocks.startBehaviors.push(async () => {
+      throw new Error("initial startup failed");
+    });
+
+    await expect(manager.startServerForRoot("test", workspace)).resolves.toBeNull();
+    fs.rmSync(workspace, { recursive: true, force: true });
+    const startsBeforeRefresh = mocks.clients.length;
+
+    const result = await manager.recoverWorkspaceDiagnostics({
+      restartIfStillStale: false,
+      processCrashDemand: { explicit: true, scopes: [workspace] },
+    });
+
+    expect(mocks.clients).toHaveLength(startsBeforeRefresh);
+    expect(result.startupRetry).toEqual({
+      recoveredRoutes: 0,
+      failedRoutes: 0,
+      entries: [],
+      omittedEntries: 0,
+    });
+
+    fs.mkdirSync(workspace);
+    await expect(manager.startServerForRoot("test", workspace)).resolves.not.toBeNull();
+  });
+
   it("reports a failed first start discovered during an explicit refresh", async () => {
     const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-discovery-failure-"));
     tempRoots.push(workspace);

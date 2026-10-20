@@ -76,6 +76,19 @@ describe("public WorkspaceLspRuntime semantic input barrier", () => {
     workspace = undefined;
   });
 
+  it("identifies the server and missing implementation capability", async () => {
+    workspace = setupWorkspace();
+    const { consumer, logPath, owner } = workspace;
+    const result = await owner.runtime.implementation(consumer, { line: 0, character: 0 });
+    expect(result).toEqual({
+      kind: "unavailable",
+      reason: 'LSP server "fixture" does not advertise textDocument/implementation.',
+    });
+    expect(readLog(logPath)).not.toContainEqual(
+      expect.objectContaining({ method: "textDocument/implementation" }),
+    );
+  });
+
   it("serves semantic routes before any diagnostic request", async () => {
     workspace = setupWorkspace(10, true);
     const { dependency, consumer, logPath, owner } = workspace;

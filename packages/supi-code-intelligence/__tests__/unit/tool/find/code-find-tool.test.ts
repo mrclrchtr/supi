@@ -679,17 +679,36 @@ describe("code_find tool", () => {
                 file: string;
                 errorRanges?: Array<{ start: { line: number } }>;
               }>;
-              evidenceLists?: Array<{ partialReason: string | null }>;
+              scan?: {
+                limitations: Array<{ reason: string; pathCount: number; examples: string[] }>;
+              };
+              evidenceLists?: Array<{
+                totalCount: number | null;
+                partialReason: string | null;
+              }>;
             };
           };
         };
         expect(result.content[0].text).toContain("kept");
         expect(result.content[0].text).toContain("1 file had partial syntax evidence");
         expect(result.content[0].text).toContain("Tree-sitter recovered syntax");
+        expect(result.content[0].text).toContain("syntax-recovery: 1 path");
+        expect(result.content[0].text).not.toContain("provider-failure");
         expect(result.content[0].text).not.toContain("could not be analyzed");
         expect(result.details?.data.astMatches?.map((match) => match.name)).toContain("kept");
         expect(result.details?.data.structuralFailures?.[0]?.errorRanges?.[0]?.start.line).toBe(1);
-        expect(result.details?.data.evidenceLists?.[0]?.partialReason).toBe("provider-limited");
+        expect(result.details?.data.scan?.limitations).toContainEqual({
+          reason: "syntax-recovery",
+          pathCount: 1,
+          examples: ["src/recovered.ts"],
+        });
+        expect(result.details?.data.scan?.limitations).not.toContainEqual(
+          expect.objectContaining({ reason: "provider-failure" }),
+        );
+        expect(result.details?.data.evidenceLists?.[0]).toMatchObject({
+          totalCount: null,
+          partialReason: "provider-limited",
+        });
       } finally {
         await session.dispose();
       }

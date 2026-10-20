@@ -90,6 +90,43 @@ afterEach(async () => {
 });
 
 describe("LSP manager lifecycle integration", () => {
+  it("shuts down a real process when maintenance retires its deleted root", async () => {
+    const root = createProject();
+    const sourceFile = path.join(root, "source.test");
+    fs.writeFileSync(sourceFile, "source\n");
+    const transitions: ManagerLifecycleTransition[] = [];
+    const manager = new LspManager(config("stable"), root, (transition) => {
+      transitions.push(transition);
+    });
+    managers.push(manager);
+
+    const runtime = createWorkspaceLspRuntimeOwner(manager).runtime;
+    const client = await manager.startServerForRoot("test", root);
+    if (!client) throw new Error("Expected the LSP process to start.");
+    await client.getReady();
+    const child = (
+      client as unknown as {
+        process: { exitCode: number | null; signalCode: NodeJS.Signals | null };
+      }
+    ).process;
+
+    fs.rmSync(root, { recursive: true });
+    runtime.pruneMissingFiles();
+    expect(client.status).toBe("shutdown");
+    await waitFor(
+      async () => ({ exitCode: child.exitCode, signalCode: child.signalCode }),
+      (state) => state.exitCode !== null || state.signalCode !== null,
+      { timeoutMs: 3_000, retryDelayMs: 20, label: "retired LSP process exit" },
+    );
+
+    expect(runtime.getProjectServers()).toEqual([]);
+    expect(transitions.at(-1)).toMatchObject({
+      kind: "retirement",
+      semanticReady: false,
+      projectServers: [],
+    });
+  }, 10_000);
+
   it("publishes a real process crash without restoring semantic readiness", async () => {
     const root = createProject();
     const transitions: ManagerLifecycleTransition[] = [];
