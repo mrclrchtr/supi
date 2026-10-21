@@ -3,7 +3,6 @@
 
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { validatePublicPositionBounds } from "../coordinates.ts";
-import { detectGrammar } from "../language.ts";
 import { withSyntaxCompleteness } from "../syntax-errors.ts";
 import type { SyntaxNodeLike } from "../syntax-node.ts";
 import type { GrammarId, SourceRange, TreeSitterResult } from "../types.ts";
@@ -83,11 +82,13 @@ const ENCLOSING_SCOPE_TYPES: Record<GrammarId, ReadonlySet<string>> = {
 // ── Main entrypoint ──────────────────────────────────────────────────
 
 /** Validate that coordinates are usable and grammar is supported. */
-function validateCalleeInput(
-  filePath: string,
-  line: number,
-  character: number,
-): { kind: "ok"; grammarId: GrammarId } | TreeSitterResult<CalleesAtResult> {
+function validateCalleeInput(input: {
+  filePath: string;
+  line: number;
+  character: number;
+  grammarId: GrammarId | undefined;
+}): { kind: "ok" } | TreeSitterResult<CalleesAtResult> {
+  const { filePath, line, character, grammarId } = input;
   if (!Number.isInteger(line) || line < 1) {
     return {
       kind: "validation-error" as const,
@@ -101,7 +102,6 @@ function validateCalleeInput(
     };
   }
 
-  const grammarId = detectGrammar(filePath);
   if (!grammarId) {
     return {
       kind: "unsupported-language" as const,
@@ -118,7 +118,7 @@ function validateCalleeInput(
     };
   }
 
-  return { kind: "ok", grammarId };
+  return { kind: "ok" };
 }
 
 /** Find the enclosing function/method node at a position in the tree. */
@@ -156,15 +156,19 @@ export async function lookupCalleesAt(
   control?: CodeRequestControl,
 ): Promise<TreeSitterResult<CalleesAtResult>> {
   // Validate coordinates and grammar
-  const validation = validateCalleeInput(filePath, line, character);
+  const validation = validateCalleeInput({
+    filePath,
+    line,
+    character,
+    grammarId: runtime.getGrammarForFile(filePath),
+  });
   if (validation.kind !== "ok") return validation;
-  const { grammarId } = validation;
 
   // Parse the file
   const parseResult = await runtime.parseFile(filePath, control);
   if (parseResult.kind !== "success") return parseResult;
 
-  const { tree, source } = parseResult.data;
+  const { tree, source, grammarId } = parseResult.data;
 
   try {
     const boundsError = validatePublicPositionBounds(line, character, source);

@@ -57,6 +57,7 @@ describe("workspace LSP rename snapshots", () => {
         .fn()
         .mockResolvedValueOnce({
           result: { kind: "completed", data: firstEdit },
+          inputRevision: 1,
           documentSnapshots: snapshots([target]),
         })
         .mockResolvedValueOnce({
@@ -83,6 +84,7 @@ describe("workspace LSP rename snapshots", () => {
     expect(client.renameDetailedWithSnapshots.mock.calls[1]?.[3]).toEqual({
       control: undefined,
       snapshotFiles: [target, reference],
+      inputRevision: 1,
     });
     expect(response?.value).toBe(finalEdit);
     expect(response?.documentSnapshots).toEqual(
@@ -131,6 +133,7 @@ describe("workspace LSP rename snapshots", () => {
         .fn()
         .mockResolvedValueOnce({
           result: { kind: "completed", data: workspaceEdit([target, reference], 0) },
+          inputRevision: 1,
           documentSnapshots: [],
         })
         .mockResolvedValueOnce({
@@ -205,6 +208,7 @@ describe("workspace LSP rename snapshots", () => {
           kind: "completed",
           data: workspaceEdit([target, reference], 0),
         },
+        inputRevision: 1,
         documentSnapshots: [],
       }),
     };

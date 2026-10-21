@@ -26,6 +26,8 @@ export type SemanticInputChangeLookup = (
 /** Optional request retry policies. ContentModified retries stay off by default. */
 export interface SemanticInputRequestRetryPolicy {
   readonly retryContentModified?: boolean;
+  /** Retain a verified revision across document enrollment and a follow-up request. */
+  readonly inputRevision?: number;
 }
 
 function isContentModifiedError(error: unknown): boolean {
@@ -41,18 +43,21 @@ function isContentModifiedError(error: unknown): boolean {
  * Keep one LSP request's input retry policy in one place.
  *
  * Synchronization passes have their own rejoin budget. This guard owns one
- * shared request retry budget and the first failed revision used to classify
- * later changes. Protocol retries are disabled unless the caller opts in.
+ * shared request retry budget and a protected revision used to classify later
+ * changes. A caller can retain an earlier verified revision across enrollment.
+ * Protocol retries are disabled unless the caller opts in.
  */
 export class SemanticInputRequestRetryGuard {
   #requestRetries = 0;
-  #firstFailedRevision: number | undefined;
+  #protectedRevision: number | undefined;
   #retryReason: SemanticInputRequestRetryReason | undefined;
 
   constructor(
     private readonly currentChangeSince: SemanticInputChangeLookup,
     private readonly policy: SemanticInputRequestRetryPolicy = {},
-  ) {}
+  ) {
+    this.#protectedRevision = policy.inputRevision;
+  }
 
   /** Number of request-level retries permitted for this request so far. */
   get retryCount(): number {
@@ -80,13 +85,13 @@ export class SemanticInputRequestRetryGuard {
     const reason = this.#getRetryReason(error);
     if (!reason) return { kind: "stop", error };
 
-    if (this.#firstFailedRevision !== undefined) {
+    if (this.#protectedRevision !== undefined) {
       const blockingChange = this.#getBlockingChange();
       if (blockingChange) return { kind: "stop", error: blockingChange };
     }
     if (inputRevision === undefined) return { kind: "stop", error };
 
-    this.#firstFailedRevision ??= inputRevision;
+    this.#protectedRevision ??= inputRevision;
     const blockingChange = this.#getBlockingChange();
     if (blockingChange) return { kind: "stop", error: blockingChange };
     if (this.#requestRetries >= MAX_REQUEST_RETRIES) {
@@ -107,8 +112,8 @@ export class SemanticInputRequestRetryGuard {
   }
 
   #getBlockingChange(): SemanticInputSynchronizationError | undefined {
-    if (this.#firstFailedRevision === undefined) return undefined;
-    const currentChange = this.currentChangeSince(this.#firstFailedRevision);
+    if (this.#protectedRevision === undefined) return undefined;
+    const currentChange = this.currentChangeSince(this.#protectedRevision);
     return currentChange?.changeKind === "enrollment" ? undefined : currentChange;
   }
 }

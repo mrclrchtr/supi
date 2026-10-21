@@ -91,6 +91,13 @@ async function renameWithSnapshots(options: {
     };
   }
 
+  if (first.inputRevision === undefined) {
+    return {
+      value: null,
+      authorizedMutationRoots,
+      reason: "Rename has no verified input revision for document enrollment.",
+    };
+  }
   const enrollment = await manager.enrollRenameDocuments(client, discovery.files, control);
   if (enrollment.kind === "unavailable") {
     return { value: null, authorizedMutationRoots, reason: enrollment.reason };
@@ -101,6 +108,7 @@ async function renameWithSnapshots(options: {
   const followup = await client.renameDetailedWithSnapshots(file, position, newName, {
     control,
     snapshotFiles,
+    inputRevision: first.inputRevision,
   });
   if (followup.result.kind === "unavailable" || followup.result.data === null) {
     return {

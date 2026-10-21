@@ -97,6 +97,8 @@ interface RefactorTransaction {
 
 export interface RenameDetailedWithSnapshotsResult {
   readonly result: CodeQueryResult<WorkspaceEdit | null>;
+  /** Verified input revision retained when a rename needs document enrollment. */
+  readonly inputRevision?: number;
   /** Exact documents synchronized before and rechecked after this request. */
   readonly documentSnapshots: readonly SemanticInputDocumentSnapshot[];
 }
@@ -1185,6 +1187,8 @@ export class LspClient {
     options: {
       readonly control?: CodeRequestControl;
       readonly snapshotFiles?: readonly string[];
+      /** Reject non-enrollment changes since this earlier rename request. */
+      readonly inputRevision?: number;
     } = {},
   ): Promise<RenameDetailedWithSnapshotsResult> {
     const { control, snapshotFiles = [filePath] } = options;
@@ -1215,6 +1219,7 @@ export class LspClient {
       newName,
     };
     let documentSnapshots: readonly SemanticInputDocumentSnapshot[] = [];
+    let inputRevision: number | undefined;
     const requestedFiles = new Set(snapshotFiles.map((file) => path.resolve(file)));
     const result = await this.runRefactorTransaction(
       "textDocument/rename",
@@ -1235,13 +1240,17 @@ export class LspClient {
           | null
           | undefined;
       },
-      (snapshot) => {
-        documentSnapshots = snapshot.documents.filter((document) =>
-          requestedFiles.has(path.resolve(document.filePath)),
-        );
+      {
+        inputRevision: options.inputRevision,
+        onVerifiedSnapshot: (snapshot) => {
+          inputRevision = snapshot.revision;
+          documentSnapshots = snapshot.documents.filter((document) =>
+            requestedFiles.has(path.resolve(document.filePath)),
+          );
+        },
       },
     );
-    return { result, documentSnapshots };
+    return { result, documentSnapshots, inputRevision };
   }
 
   async codeActions(
@@ -1353,7 +1362,10 @@ export class LspClient {
     method: string,
     control: CodeRequestControl | undefined,
     operation: (transaction: RefactorTransaction) => Promise<T | null | undefined>,
-    onVerifiedSnapshot?: (snapshot: SemanticInputSnapshot) => void,
+    options: {
+      readonly onVerifiedSnapshot?: (snapshot: SemanticInputSnapshot) => void;
+      readonly inputRevision?: number;
+    } = {},
   ): Promise<CodeQueryResult<T | null>> {
     throwIfCodeRequestInterrupted(control);
     if (!this.rpc || this._status !== "running") {
@@ -1362,8 +1374,9 @@ export class LspClient {
       );
     }
 
-    const retryGuard = new SemanticInputRequestRetryGuard((revision) =>
-      this.diagnostics.getSemanticInputChangeSince(revision),
+    const retryGuard = new SemanticInputRequestRetryGuard(
+      (revision) => this.diagnostics.getSemanticInputChangeSince(revision),
+      { inputRevision: options.inputRevision },
     );
     for (;;) {
       const attempt: SemanticRequestAttemptState = { inputRevision: undefined };
@@ -1375,7 +1388,7 @@ export class LspClient {
           operation,
           retryGuard,
           attempt,
-          onVerifiedSnapshot,
+          onVerifiedSnapshot: options.onVerifiedSnapshot,
         });
         if (retryGuard.hasRetried) {
           this.recordRequestRetry({ method, control, retryGuard, outcome: "completed" });
