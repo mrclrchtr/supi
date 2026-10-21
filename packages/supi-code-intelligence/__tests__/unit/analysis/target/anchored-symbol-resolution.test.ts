@@ -301,6 +301,52 @@ describe("resolveAnchoredSymbolTarget — structural fallback", () => {
     teardown();
   });
 
+  it("resolves a Rust function item when semantic symbols are empty", async () => {
+    const dir = setup();
+    const file = path.join(dir, "lib.rs");
+    writeFileSync(
+      file,
+      [
+        "pub trait Surface {",
+        "    fn render(&self) -> String;",
+        "}",
+        "",
+        "pub fn rename_me(value: i32) -> i32 {",
+        "    value + 1",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    const provider = {
+      documentSymbols: vi.fn(async () => completedCodeQuery([])),
+      nodeAt: vi.fn(async () => ({
+        kind: "success" as const,
+        data: {
+          type: "identifier",
+          startLine: 5,
+          startCharacter: 8,
+          endLine: 5,
+          endCharacter: 17,
+          text: "rename_me",
+          ancestry: [
+            { type: "function_item", startLine: 5, startCharacter: 1, endLine: 7, endCharacter: 2 },
+            { type: "source_file", startLine: 1, startCharacter: 1, endLine: 8, endCharacter: 1 },
+          ],
+        },
+      })),
+    };
+
+    const result = await resolveAnchoredSymbolTarget(file, 5, 8, provider);
+
+    expect(result.kind).toBe("resolved");
+    if (result.kind !== "resolved") return;
+    expect(result.target.name).toBe("rename_me");
+    expect(result.target.kind).toBe("Function");
+    expect(result.target.confidence).toBe("structural");
+    expect(result.target.anchorKind).toBe("name");
+    teardown();
+  });
+
   it("returns an error for a coordinate on a comment node when only structural evidence is available", async () => {
     const dir = setup();
     const file = path.join(dir, "widget.ts");

@@ -17,6 +17,7 @@ const DECLARATION_NODE_TYPES = new Set([
   "function_declaration",
   "generator_function_declaration",
   "function_signature",
+  "function_item",
   "method_definition",
   "method_declaration",
   "method_signature",
