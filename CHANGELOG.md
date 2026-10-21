@@ -1,5 +1,36 @@
 # Changelog
 
+## [11.0.0](https://github.com/mrclrchtr/supi/compare/v10.0.0...v11.0.0) (2026-10-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **agent:** agent_run tasks now select new: { profile } or
+
+### Features
+
+* **agent:** add resumable delegation conversations ([653ee7b](https://github.com/mrclrchtr/supi/commit/653ee7b6ce93d504cdb2693a9475f0874cd6b97c))
+* **code-intelligence:** implement common language capabilities ([03b48b8](https://github.com/mrclrchtr/supi/commit/03b48b822a7cc742293762f5778a26e5641dec7e))
+
+
+### Bug Fixes
+
+* **agent:** clarify collection and selector messages ([b65411b](https://github.com/mrclrchtr/supi/commit/b65411b87a6c5e8473c51df196d753433b817aed))
+* **ci:** correct language baseline provisioning and cleanup ([f1ef3c1](https://github.com/mrclrchtr/supi/commit/f1ef3c16d98e5dae1cad3ecad181d7c28cc6c58a))
+* **ci:** install the pinned standalone Rust Analyzer artifact ([c6293fd](https://github.com/mrclrchtr/supi/commit/c6293fd1d6ebb3ef49cd3f15fd0cbfae6a048d73))
+* **ci:** verify native prerequisite identity across platforms ([c757498](https://github.com/mrclrchtr/supi/commit/c75749892e62806f685a755238e78ae67232cc3f))
+* **code-intelligence:** address language baseline follow-ups ([ffc1503](https://github.com/mrclrchtr/supi/commit/ffc1503f36c87f11ca5a756b9d80c0910622bc7d))
+* **code-intelligence:** close final language baseline review gaps ([87888da](https://github.com/mrclrchtr/supi/commit/87888da3ebcbc8cdcd7e00a2b4cb33b75021eb48))
+* **code-intelligence:** guard rename freshness and callee grammar ([a6b57b9](https://github.com/mrclrchtr/supi/commit/a6b57b952573aee9366bfcfecc032654515a6a04))
+* **code-intelligence:** resolve Rust function items ([8822b13](https://github.com/mrclrchtr/supi/commit/8822b1344bc6bdf4dc96c2012c95cbcd559c035c))
+* **consulting:** report safe failure reasons and debug events ([2273086](https://github.com/mrclrchtr/supi/commit/22730860364de36f1d3ad6f670e7508fbfb856f7))
+* **deps:** lock file maintenance ([38ca191](https://github.com/mrclrchtr/supi/commit/38ca1919576b1d1dc302ce485a6b64842157056f))
+* **deps:** update dependency hk to v2.7.1 ([f765891](https://github.com/mrclrchtr/supi/commit/f765891af4e8fb2aeea6f1b656d0957f104ece37))
+* **deps:** update dependency hk to v2.8.0 ([77a489f](https://github.com/mrclrchtr/supi/commit/77a489f4f24bd464bec51375ba5dd0d96564a197))
+* **deps:** update github actions ([eb71846](https://github.com/mrclrchtr/supi/commit/eb71846754ace9be625c35ae81661fffa7706bd4))
+* **deps:** update github actions ([f77ccad](https://github.com/mrclrchtr/supi/commit/f77ccad2ed2e4b2e5da69a877ef44969407b441f))
+* **lsp:** retry ContentModified with stable semantic inputs ([d2cedce](https://github.com/mrclrchtr/supi/commit/d2cedcee2d88bb6b7bda54c739d006557bcb0cfe))
+
 ## [10.0.0](https://github.com/mrclrchtr/supi/compare/v9.1.2...v10.0.0) (2026-10-18)
 
 
