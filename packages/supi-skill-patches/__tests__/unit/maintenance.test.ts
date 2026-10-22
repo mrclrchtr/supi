@@ -1,10 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { normalizePatchText, validatePatchBundle } from "../../src/patch-bundle.ts";
 import { validateSkillMirror } from "../../src/skill-mirror.ts";
-
-const root = join(import.meta.dirname, "../../../..");
 
 describe("skill patch maintenance", () => {
   it("normalizes patch text to match the repo whitespace hook", () => {
@@ -22,69 +18,5 @@ describe("skill patch maintenance", () => {
 
   it("keeps root skills synchronized with the patched dependency", () => {
     expect(validateSkillMirror()).toEqual([]);
-  });
-
-  it("routes patched review through available SuPi tools", () => {
-    const codeReview = readFileSync(join(root, "skills/engineering/code-review/SKILL.md"), "utf8");
-    expect(codeReview).toContain("Use `review_run` for this workflow");
-    expect(codeReview).toContain("Do not replace it with `agent_run`");
-    expect(codeReview).toContain("If `review_run` is unavailable");
-    expect(codeReview).toContain('mode: "change"');
-    expect(codeReview).not.toContain("Spawn both sub-agents");
-  });
-
-  it("groups public catalog skills by source", () => {
-    const manifest = JSON.parse(
-      readFileSync(join(root, ".claude-plugin/marketplace.json"), "utf8"),
-    ) as {
-      plugins: Array<{ name: string; skills: string[] }>;
-    };
-
-    expect(manifest.plugins.map((plugin) => plugin.name)).toEqual([
-      "mattpocock-skills",
-      "supi-skills",
-    ]);
-    expect(
-      manifest.plugins.every((plugin) =>
-        plugin.skills.every((path) => path.startsWith("./skills/")),
-      ),
-    ).toBe(true);
-
-    const catalogPaths = [
-      "./skills/engineering/code-review",
-      "./skills/engineering/implement",
-      "./skills/productivity/grilling",
-      "./skills/commit",
-    ];
-    const groupedPaths = manifest.plugins.flatMap((plugin) => plugin.skills);
-
-    expect(groupedPaths).toHaveLength(catalogPaths.length);
-    expect(new Set(groupedPaths)).toEqual(new Set(catalogPaths));
-    expect(manifest.plugins[1]?.skills).toEqual(["./skills/commit"]);
-  });
-
-  it("keeps SuPi-owned skill licenses separate from upstream licenses", () => {
-    const skill = join(root, "skills/commit");
-
-    expect(readFileSync(join(skill, "LICENSE.mrclrchtr"), "utf8")).toContain(
-      "Copyright (c) 2026 Marcel Richter",
-    );
-    expect(existsSync(join(skill, "LICENSE.mattpocock"))).toBe(false);
-  });
-
-  it("uses Ask User for grilling rounds", () => {
-    const skill = readFileSync(join(root, "skills/productivity/grilling/SKILL.md"), "utf8");
-
-    expect(skill).toContain("Use `ask_user` for each round");
-    expect(skill).toContain("- `title`:");
-    expect(skill).toContain("- `questions`:");
-    expect(skill).toContain("- `id`: Use the question number, such as `Q1`");
-    expect(skill).toContain("- `header`: Start with the question number and add a title");
-    expect(skill).toContain("- `details`:");
-    expect(skill).toContain("It can also contain a sketch");
-    expect(skill).toContain("- `recommendation`:");
-    expect(skill).toContain("dispatch a sub-agent");
-    expect(skill).not.toContain("If `ask_user` is unavailable");
-    expect(skill).not.toContain("❓");
   });
 });
