@@ -1,5 +1,19 @@
 # Changelog
 
+## [11.0.1](https://github.com/mrclrchtr/supi/compare/v11.0.0...v11.0.1) (2026-10-22)
+
+
+### Bug Fixes
+
+* **deps:** update commitlint monorepo to v21.2.4 ([629bbb3](https://github.com/mrclrchtr/supi/commit/629bbb39b3b55b6ecca062c39d810bcc1b285f74))
+* **deps:** update dependency ignore to v7.0.13 ([0f8e806](https://github.com/mrclrchtr/supi/commit/0f8e806ad3f51ec08e6d06ec03b39d7d8f491fd5))
+* **deps:** update dependency mattpocock-skills to v1.3.1 ([b383dbb](https://github.com/mrclrchtr/supi/commit/b383dbbf58826e60ec0b92709f3bccfe1dd87860))
+* **deps:** update dependency pkl to v0.32.2 ([c43b125](https://github.com/mrclrchtr/supi/commit/c43b12531727981925a1c8800cebde171508d2b0))
+* **deps:** update node.js to lts ([c4297f9](https://github.com/mrclrchtr/supi/commit/c4297f94806c36c9a4ddf23b141e77fe1d99b08a))
+* **skills:** adapt the v1.3.1 catalog update ([3f23238](https://github.com/mrclrchtr/supi/commit/3f23238903361a82b28982c1c6f7e7fedaa04ada)), closes [#475](https://github.com/mrclrchtr/supi/issues/475)
+* **skills:** align patches with simplified review and implement skills ([aa3006b](https://github.com/mrclrchtr/supi/commit/aa3006b9dc01d57bcea9410e066dd4f6f6582a7e))
+* **skills:** limit catalog to patched skills ([9e89645](https://github.com/mrclrchtr/supi/commit/9e896453296b393734dcad56f79868938cc283d5))
+
 ## [11.0.0](https://github.com/mrclrchtr/supi/compare/v10.0.0...v11.0.0) (2026-10-21)
 
 
