@@ -111,18 +111,36 @@ function formatInventory(inventory: UpstreamInventory): string {
   return `${JSON.stringify(inventory, null, 2)}\n`;
 }
 
-function isSupiOwnedSkill(group: string, name: string): boolean {
-  return hasNamedFile(join(upstreamSkillsRoot, group, name), "LICENSE.mrclrchtr");
+/** Only skills with per-file patches belong in the upstream mirror. */
+function patchedSkillNames(group: string): string[] {
+  const fragments = join(packageRoot, "patches/mattpocock-skills/files/skills", group);
+  if (!existsSync(fragments)) return [];
+  return readdirSync(fragments, { withFileTypes: true })
+    .filter(
+      (entry) =>
+        entry.isDirectory() &&
+        walkFiles(join(fragments, entry.name)).some((path) => path.endsWith(".patch")),
+    )
+    .map((entry) => entry.name)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+function ownedSkillPaths(): string[] {
+  return readdirSync(skillsRoot, { withFileTypes: true })
+    .filter(
+      (entry) => entry.isDirectory() && hasNamedFile(join(skillsRoot, entry.name), "SKILL.md"),
+    )
+    .map((entry) => `./skills/${entry.name}`)
+    .sort((left, right) => left.localeCompare(right));
 }
 
 function publicSkillPaths(
   inventory: UpstreamInventory,
   groups: Record<string, string[]>,
-  supiOwned: boolean,
 ): string[] {
   return includedGroupNames(inventory).flatMap((group) =>
-    (groups[group] ?? [])
-      .filter((name) => isSupiOwnedSkill(group, name) === supiOwned)
+    patchedSkillNames(group)
+      .filter((name) => groups[group]?.includes(name))
       .map((name) => `./skills/${group}/${name}`),
   );
 }
@@ -131,8 +149,8 @@ function formatSkillMarketplaceManifest(
   inventory: UpstreamInventory,
   groups: Record<string, string[]>,
 ): string {
-  const mattpocockSkills = publicSkillPaths(inventory, groups, false);
-  const supiSkills = publicSkillPaths(inventory, groups, true);
+  const mattpocockSkills = publicSkillPaths(inventory, groups);
+  const supiSkills = ownedSkillPaths();
   const plugins: SkillMarketplacePlugin[] = [];
   if (mattpocockSkills.length > 0) {
     plugins.push({
@@ -191,13 +209,16 @@ function validateSkillMarketplaceManifest(
   return ["Generated skills marketplace manifest is stale: .claude-plugin/marketplace.json"];
 }
 
-/** Copy each selected pinned upstream skill group into the root skills catalog. */
+/** Replace generated groups with patched skills, preserving directly owned root skills. */
 export function syncSkillMirror(): void {
   const inventory = readInventory();
   const groups = discoverGroups(groupNames());
   const includedGroups = includedGroupNames(inventory);
   for (const group of includedGroups) {
-    if (!groups[group]) throw new Error(`Included upstream group disappeared: ${group}`);
+    for (const name of patchedSkillNames(group)) {
+      if (!groups[group]?.includes(name))
+        throw new Error(`Patched upstream skill disappeared: ${group}/${name}`);
+    }
   }
   mkdirSync(skillsRoot, { recursive: true });
   mkdirSync(dirname(skillMarketplaceManifestPath), { recursive: true });
@@ -206,9 +227,10 @@ export function syncSkillMirror(): void {
   try {
     for (const group of includedGroups) {
       const target = join(stagingRoot, group);
-      cpSync(join(upstreamSkillsRoot, group), target, { recursive: true });
-      for (const name of groups[group] ?? []) {
+      mkdirSync(target, { recursive: true });
+      for (const name of patchedSkillNames(group)) {
         const skillTarget = join(target, name);
+        cpSync(join(upstreamSkillsRoot, group, name), skillTarget, { recursive: true });
         if (!hasSkillLicense(skillTarget)) {
           cpSync(licensePath, join(skillTarget, upstreamLicenseName));
         }
@@ -245,7 +267,9 @@ function validateGroup(group: string, names: string[]): string[] {
       .filter((name) => !hasSkillLicense(join(source, name)))
       .map((name) => join(name, upstreamLicenseName)),
   );
-  const sourceFiles = relativeFiles(source);
+  const sourceFiles = names
+    .flatMap((name) => relativeFiles(join(source, name)).map((path) => join(name, path)))
+    .sort();
   const targetFiles = relativeFiles(target).filter((path) => !generatedLicenses.has(path));
   const errors =
     JSON.stringify(sourceFiles) === JSON.stringify(targetFiles)
@@ -277,7 +301,7 @@ export function validateSkillMirror(): string[] {
       ? []
       : ["Upstream added or removed stable skills; run skills:sync and review the inventory"];
   const skillErrors = includedGroupNames(inventory).flatMap((group) =>
-    validateGroup(group, inventory.groups[group] ?? []),
+    validateGroup(group, patchedSkillNames(group)),
   );
   const manifestErrors = validateSkillMarketplaceManifest(inventory, actualGroups);
   return [...inventoryErrors, ...skillErrors, ...manifestErrors];
