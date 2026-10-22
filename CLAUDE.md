@@ -122,7 +122,7 @@ node scripts/publish.mjs packages/supi-lsp --publish # pack + verify + publish
 
 - GitHub Issues (`gh`) are the tracker; external PRs are not a triage surface. See `docs/agents/issue-tracker.md`.
 - Use the triage vocabulary in `docs/agents/triage-labels.md`.
-- `CONTEXT-MAP.md` links domain contexts and ADRs; follow `docs/agents/domain.md` for domain-model changes.
+- `GLOSSARY-MAP.md` links domain contexts and ADRs; follow `docs/agents/domain.md` for domain-model changes.
 
 ## Testing patterns
 
