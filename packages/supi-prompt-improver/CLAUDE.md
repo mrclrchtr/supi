@@ -6,7 +6,7 @@
 
 - Before changes to input, context, requests, UI, or lifecycle behavior, read the relevant sections of [SPEC.md](SPEC.md). It defines the behavior contract and acceptance criteria.
 - Before changes to diagnostics, read [Opt-in diagnostics](SPEC.md#opt-in-diagnostics) for capture limits, provider-field rules, access controls, and retention.
-- Use [CONTEXT.md](CONTEXT.md) for domain terms and [README.md](README.md) for user instructions.
+- Use [GLOSSARY.md](GLOSSARY.md) for domain terms and [README.md](README.md) for user instructions.
 
 ## Design rules
 

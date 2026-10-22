@@ -165,7 +165,7 @@ Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-
 
 ### Domain docs
 
-Multi-context — `CONTEXT-MAP.md` at root pointing to per-package `CONTEXT.md` files + per-package `docs/adr/`. See `docs/agents/domain.md`.
+Multi-context — `GLOSSARY-MAP.md` at root pointing to per-package `GLOSSARY.md` files + per-package `docs/adr/`. See `docs/agents/domain.md`.
 
 ## Testing patterns
 

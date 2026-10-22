@@ -6,7 +6,7 @@ Status: Current behavior contract. Changes must use public Pi interfaces; upstre
 
 Reduce the effort needed to write a useful request. Clarify intent when necessary, then offer a replacement draft for approval. Do not execute the underlying task.
 
-Terms are defined in [CONTEXT.md](CONTEXT.md). User instructions are in [README.md](README.md).
+Terms are defined in [GLOSSARY.md](GLOSSARY.md). User instructions are in [README.md](README.md).
 
 ## Scope
 

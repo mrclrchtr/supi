@@ -15,7 +15,7 @@
 - The canonical provider-independent kind normally normalizes the provider-reported kind. When that kind cannot express the source declaration, exact structural evidence at the declaration's name anchor may refine identity for that declaration. A TypeScript LSP `Variable` proven by Tree-sitter to be a `type_alias_declaration`, for example, keeps `Variable` as its display kind but uses `type` for identity. Name-only matching and blanket `type`/`value` normalization are not declaration evidence.
 - Repeated observations refine Target facts independently. Name-anchor quality and confidence improve monotonically; the strongest available non-null observation supplies the Target display kind (semantic before structural, established value on equal-strength ties); and Target provider provenance is a typed set containing only `semantic` and `structural` whose registrations union independently of confidence. A later observation therefore cannot erase a name anchor or contributing provider. Selector and workflow origin are not provider provenance; anchored resolution path remains in its dedicated resolution metadata.
 
-The distinction is big-bang: no deprecated position alias or fallback shape is retained. Vocabulary is pinned in `packages/supi-code-intelligence/CONTEXT.md`.
+The distinction is big-bang: no deprecated position alias or fallback shape is retained. Vocabulary is pinned in `packages/supi-code-intelligence/GLOSSARY.md`.
 
 **Considered Options (rejected).** Provider-only standardization was rejected because `SymbolInformation` has no selection range. A structural point fix was rejected because future paths could reintroduce the conflation. Deprecated `line`/`character` aliases were rejected because they erase the distinction at the interface.
 

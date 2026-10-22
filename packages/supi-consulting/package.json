@@ -33,7 +33,7 @@
     "scripts/live-probe.ts",
     "README.md",
     "CLAUDE.md",
-    "CONTEXT.md",
+    "GLOSSARY.md",
     "docs/adr/*.md"
   ],
   "dependencies": {

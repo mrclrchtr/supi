@@ -41,6 +41,21 @@ describe("skill patch maintenance", () => {
     expect(research).not.toContain("background agent");
   });
 
+  it("blocks unsupported parallel implementation before starting the workflow", () => {
+    const skill = readFileSync(join(root, "skills/engineering/implement-spec/SKILL.md"), "utf8");
+    const guard = skill.slice(
+      skill.indexOf("## SuPi capability guard"),
+      skill.indexOf("## Workflow"),
+    );
+
+    expect(guard).toContain("concurrent mutation-capable agents");
+    expect(guard).toContain("explicit per-worktree working directories");
+    expect(guard).toContain("stop before creating branches, worktrees, files, or PRs");
+    expect(guard).toContain("`/skill:implement`");
+    expect(guard).toContain("Do not bypass this guard");
+    expect(guard).toContain("do not silently substitute sequential execution");
+  });
+
   it("groups public catalog skills by source", () => {
     const manifest = JSON.parse(
       readFileSync(join(root, ".claude-plugin/marketplace.json"), "utf8"),

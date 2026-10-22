@@ -19,7 +19,7 @@ Status: implemented and verified against the user-confirmed design.
 - Fail on malformed required result data. Accept additional fields and missing optional metadata. Do not return an implicit partial result.
 - Require deterministic tests. A live Brave smoke test is optional and is not a test-suite requirement.
 
-Domain terms: [supi-web glossary](../../packages/supi-web/CONTEXT.md).
+Domain terms: [supi-web glossary](../../packages/supi-web/GLOSSARY.md).
 
 ## Freshness support
 

@@ -9,7 +9,7 @@ Status: implemented and reviewed. Focused checks, full verification, and package
 - **Capability Profile Snapshot**: the session-owned copy of a profile at application time, including its identity, source, and exclusions.
 - **Session Capability Override**: the current session's tool and skill restrictions. These can differ from the applied snapshot.
 - Keep these terms separate from **Agent Profile**, which supplies instructions, model preferences, and allowed tools for a child Agent Run.
-- The canonical glossary is [CONTEXT.md](../../CONTEXT.md).
+- The canonical glossary is [GLOSSARY.md](../../GLOSSARY.md).
 
 ## Scope
 
@@ -243,7 +243,7 @@ Repository sources inspected during the design session:
 - [Capability extension](../../packages/supi-extras/src/session-capabilities.ts): command, persistence, lifecycle, and inventory retention.
 - [Tool reconciliation](../../packages/supi-extras/src/session-capabilities-tools.ts): explicit choices and late tool handling.
 - [Selector rows](../../packages/supi-extras/src/session-capabilities-ui-rows.ts): current tool, skill, and reset actions.
-- [Agent glossary](../../packages/supi-agent/CONTEXT.md): existing Agent Profile meaning.
+- [Agent glossary](../../packages/supi-agent/GLOSSARY.md): existing Agent Profile meaning.
 
 Installed Pi sources, relative to `node_modules/@earendil-works/pi-coding-agent/`:
 
