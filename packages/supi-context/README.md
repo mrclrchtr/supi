@@ -92,6 +92,7 @@ The tool is disabled by default and requires a `/reload` or restart after toggli
 - The extension caches the latest `systemPromptOptions` from `before_agent_start`. If those are missing or incomplete, it backfills context files and skills from the current system prompt.
 - Exact usage comes from Pi's current context-usage data when available. Otherwise the extension estimates usage and preserves an approximation note.
 - The Active Context Limit is the auto-compaction threshold while auto-compaction is enabled, otherwise the raw model context window. Headroom and pressure use that limit.
+- **Compaction reserve** reduces the auto-compaction threshold; it is not a summary output budget. Pi summary requests use the model's output limit, reduced when needed so input and output fit the context window (see installed Pi `docs/compaction.md` § When It Triggers).
 
 ## Source
 

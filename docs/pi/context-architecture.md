@@ -66,6 +66,7 @@ On the Anthropic Messages path, native tool changes keep the request-level tool 
 
 - A change to stable-prefix bytes can cause full input billing on the next request. Examples include a changed request-level tool list or a changed leading system prompt. Activation with `promptSnippet` or `promptGuidelines` changes the default system prompt. Pi records prompt and tool changes in later system messages; providers that cannot represent a transition receive a complete transcript checkpoint, which can invalidate the cached prefix. Native Anthropic tool changes can preserve the prefix for additions, removals, and same-name redefinitions. Official reference: installed Pi `docs/extensions.md` § Activate tools dynamically.
 - Compaction and branch-summary calls use fresh routing session IDs. They also disable prompt-cache writes where the provider supports this control (official: `docs/compaction.md` Overview).
+- `compaction.reserveTokens` controls the auto-compaction threshold (`contextWindow - reserveTokens`), not the summary output budget. Summary requests use the model's output limit, reduced when needed so input and output fit the context window (official: `docs/compaction.md` § When It Triggers).
 - **Inferred:** an append-only `context_edit` can still change an earlier request prefix. Less model-visible content does not guarantee a cache hit or lower cost on the next request. Compare context savings with the possible loss of cache reuse.
 - Design rule: keep stable input unchanged. Register all tools at startup. Keep activation changes additive and rare.
 
