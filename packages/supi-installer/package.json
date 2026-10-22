@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-installer",
-  "version": "11.0.0",
+  "version": "11.0.1",
   "description": "Select SuPi packages in project and global PI scopes",
   "type": "module",
   "license": "MIT",
