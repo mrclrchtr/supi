@@ -98,10 +98,10 @@ pi install npm:@mrclrchtr/supi-web
 
 ### Adapted skills
 
-The root [`skills/`](skills) catalog contains SuPi-compatible editions of selected third-party skills. Install only the skills you need:
+The root [`skills/`](skills) catalog contains patched SuPi-compatible editions of third-party skills and SuPi-owned skills. Install only the skills you need:
 
 ```bash
-npx skills add mrclrchtr/supi --skill code-review research
+npx skills add mrclrchtr/supi --skill code-review commit
 ```
 
 [`supi-skill-patches`](packages/supi-skill-patches/README.md) is the private maintenance workspace that synchronizes and validates this catalog.

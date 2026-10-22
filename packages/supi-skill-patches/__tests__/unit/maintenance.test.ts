@@ -24,36 +24,13 @@ describe("skill patch maintenance", () => {
     expect(validateSkillMirror()).toEqual([]);
   });
 
-  it("routes patched review and research skills through available SuPi tools", () => {
+  it("routes patched review through available SuPi tools", () => {
     const codeReview = readFileSync(join(root, "skills/engineering/code-review/SKILL.md"), "utf8");
     expect(codeReview).toContain("Use `review_run` for this workflow");
     expect(codeReview).toContain("Do not replace it with `agent_run`");
     expect(codeReview).toContain("If `review_run` is unavailable");
     expect(codeReview).toContain('mode: "change"');
     expect(codeReview).not.toContain("Spawn both sub-agents");
-
-    const research = readFileSync(join(root, "skills/engineering/research/SKILL.md"), "utf8");
-    expect(research).toContain("current foreground task");
-    expect(research).toMatch(/use Context7/i);
-    expect(research).toMatch(/use `web_fetch_md`/i);
-    expect(research).toMatch(/use `consulting_run` only for synthesis/i);
-    expect(research).not.toContain("antigravity_run");
-    expect(research).not.toContain("background agent");
-  });
-
-  it("blocks unsupported parallel implementation before starting the workflow", () => {
-    const skill = readFileSync(join(root, "skills/engineering/implement-spec/SKILL.md"), "utf8");
-    const guard = skill.slice(
-      skill.indexOf("## SuPi capability guard"),
-      skill.indexOf("## Workflow"),
-    );
-
-    expect(guard).toContain("concurrent mutation-capable agents");
-    expect(guard).toContain("explicit per-worktree working directories");
-    expect(guard).toContain("stop before creating branches, worktrees, files, or PRs");
-    expect(guard).toContain("`/skill:implement`");
-    expect(guard).toContain("Do not bypass this guard");
-    expect(guard).toContain("do not silently substitute sequential execution");
   });
 
   it("groups public catalog skills by source", () => {
@@ -73,21 +50,21 @@ describe("skill patch maintenance", () => {
       ),
     ).toBe(true);
 
-    const inventory = JSON.parse(
-      readFileSync(join(root, "packages/supi-skill-patches/upstream.json"), "utf8"),
-    ) as { includedGroups: Record<string, true>; groups: Record<string, string[]> };
-    const catalogPaths = Object.keys(inventory.includedGroups).flatMap((group) =>
-      (inventory.groups[group] ?? []).map((name) => `./skills/${group}/${name}`),
-    );
+    const catalogPaths = [
+      "./skills/engineering/code-review",
+      "./skills/engineering/implement",
+      "./skills/productivity/grilling",
+      "./skills/commit",
+    ];
     const groupedPaths = manifest.plugins.flatMap((plugin) => plugin.skills);
 
     expect(groupedPaths).toHaveLength(catalogPaths.length);
     expect(new Set(groupedPaths)).toEqual(new Set(catalogPaths));
-    expect(manifest.plugins[1]?.skills).toEqual(["./skills/engineering/commit"]);
+    expect(manifest.plugins[1]?.skills).toEqual(["./skills/commit"]);
   });
 
   it("keeps SuPi-owned skill licenses separate from upstream licenses", () => {
-    const skill = join(root, "skills/engineering/commit");
+    const skill = join(root, "skills/commit");
 
     expect(readFileSync(join(skill, "LICENSE.mrclrchtr"), "utf8")).toContain(
       "Copyright (c) 2026 Marcel Richter",

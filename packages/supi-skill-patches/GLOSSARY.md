@@ -14,7 +14,7 @@ The change for one upstream file. Fragments are the source of truth for SuPi com
 The generated patch that pnpm applies when one or more fragments are active.
 
 **Skill Mirror**:
-The committed root `skills/<group>/` output generated from the pinned dependency. Each selected group is replaced as one unit. skills.sh installs skills from this catalog.
+The committed root `skills/` catalog: only patched upstream skills are generated under `skills/<group>/`, while SuPi-owned skills are maintained directly under `skills/<name>/`. Each selected group is replaced as one unit. skills.sh installs skills from this catalog.
 
 **Local Skill Link**:
 A project-local `.pi/skills/<name>` symlink to a selected skill in the root catalog. It lets local agents use the generated files without a second copy.

@@ -7,7 +7,7 @@ Private maintenance workspace for the SuPi-compatible skills in the root [`skill
 Users install the committed skills through [skills.sh](https://skills.sh):
 
 ```bash
-npx skills add mrclrchtr/supi --skill code-review research
+npx skills add mrclrchtr/supi --skill code-review commit
 ```
 
 This checkout links selected catalog skills into `.pi/skills/`, so local agents use the generated files directly. `pnpm skills:sync` also generates `.claude-plugin/marketplace.json`, which groups the public catalog into Matt Pocock and SuPi skills in the skills.sh installer. It does not need a skills.sh install.
@@ -16,11 +16,11 @@ This package is not a PI extension and is not published to npm. Skills installed
 
 ## Maintenance
 
-`upstream.json` records every upstream skill group and uses `includedGroups` to mark the stable groups mirrored to the root catalog. Each skill keeps its upstream `skills/<group>/<name>/` path. Sync replaces each selected group directory as one generated unit, so these directories cannot contain unmanaged files. The `mattpocock-skills` development dependency pins the upstream release.
+`upstream.json` records every upstream skill group and uses `includedGroups` to mark the stable groups mirrored to the root catalog. Only skills with per-file patch fragments are mirrored; unpatched upstream skills are excluded. Each mirrored skill keeps its upstream `skills/<group>/<name>/` path. Sync replaces each selected group directory as one generated unit, so these directories cannot contain unmanaged files. The `mattpocock-skills` development dependency pins the upstream release.
 
 One patch fragment exists for each changed upstream file under `patches/mattpocock-skills/files/`. pnpm consumes the generated `patches/mattpocock-skills/combined.patch`. The `grilling` patch uses `ask_user` from `@mrclrchtr/supi-ask-user` for each question round.
 
-The `implement-spec` patch checks delegation capabilities before any workflow side effects. SuPi's `agent_run` does not support concurrent mutating agents with per-worktree working directories, so the skill stops and points the user to `/skill:implement` for sequential work. It does not launch detached workers or silently substitute a sequential workflow. The `retro` patch makes SuPi's explicit reviewer-criteria contract clear. Upstream's cross-skill invocation wording is retained.
+SuPi-owned skills live directly in `skills/<name>/` (currently `skills/commit/`), with their own license. They are maintained in place, not patched into the upstream dependency, and sync preserves them. Upstream cross-skill references are retained; referenced unpatched skills are not bundled in this catalog.
 
 ```bash
 pnpm skills:patches:compose # rebuild the pnpm patch from fragments

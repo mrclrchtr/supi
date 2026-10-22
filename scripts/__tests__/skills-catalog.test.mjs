@@ -7,11 +7,11 @@ import { expect, it } from "vitest";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 
 it("loads every catalog skill without frontmatter diagnostics", () => {
-  const inventory = JSON.parse(
-    readFileSync(join(root, "packages/supi-skill-patches/upstream.json"), "utf8"),
+  const marketplace = JSON.parse(
+    readFileSync(join(root, ".claude-plugin/marketplace.json"), "utf8"),
   );
-  const expectedPaths = Object.keys(inventory.includedGroups).flatMap((group) =>
-    inventory.groups[group].map((name) => join(root, "skills", group, name, "SKILL.md")),
+  const expectedPaths = marketplace.plugins.flatMap((plugin) =>
+    plugin.skills.map((path) => join(root, path, "SKILL.md")),
   );
   const { skills, diagnostics } = loadSkillsFromDir({
     dir: join(root, "skills"),
