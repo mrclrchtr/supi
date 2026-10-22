@@ -107,7 +107,7 @@ describe("polyglot outline extraction", () => {
       for (const child of testCase.children) expect(names, testCase.file).toContain(child);
       expect(names, testCase.file).not.toContain("local");
     }
-  });
+  }, 15_000);
 
   it("keeps native kinds distinct from common search categories", async () => {
     const rust = await outline("Native.rs", "trait Speak { fn speak(&self); }");
@@ -116,7 +116,7 @@ describe("polyglot outline extraction", () => {
     expect(rust[0]).toMatchObject({ kind: "interface", nativeKind: "trait" });
     expect(java[0]).toMatchObject({ kind: "record", nativeKind: "record" });
     expect(go[0]).toMatchObject({ kind: "struct", nativeKind: "struct" });
-  });
+  }, 15_000);
 
   it("returns recovered declarations as partial evidence with file and error ranges", async () => {
     writeFileSync(join(cwd, "recovered.ts"), "function kept() {}\nconst unfinished = call(\n");

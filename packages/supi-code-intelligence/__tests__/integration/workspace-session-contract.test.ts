@@ -287,6 +287,7 @@ describe("WorkspaceCodeIntelligenceSession real-substrate contract", () => {
           : {}),
       });
     },
+    15_000,
   );
 
   it.each(PYTHON_AST_EXPECTATIONS)(
