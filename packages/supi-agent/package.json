@@ -31,7 +31,7 @@
     "profiles/**/*.md",
     "README.md",
     "CLAUDE.md",
-    "CONTEXT.md",
+    "GLOSSARY.md",
     "docs/adr/*.md"
   ],
   "dependencies": {

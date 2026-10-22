@@ -65,5 +65,5 @@ The feature checks the complete conversation before each request, including clar
 ## Developer references
 
 - [Behavior contract](SPEC.md): ownership, context, model requests, diagnostics, and acceptance criteria.
-- [Domain terms](CONTEXT.md): draft, proposal, clarification, and improvement session.
+- [Domain terms](GLOSSARY.md): draft, proposal, clarification, and improvement session.
 - [Package guidance](CLAUDE.md): implementation safeguards and package checks.

@@ -22,7 +22,7 @@ Do not assume that context is useful because it already has tests or an ADR. Tre
 
 ## Establish the baseline
 
-1. Read the repository instructions, root `CONTEXT.md`, `CONTEXT-MAP.md`, and the context file for each package.
+1. Read the repository instructions, root `GLOSSARY.md`, `GLOSSARY-MAP.md`, and the glossary for each package.
 2. Read the relevant installed PI documentation before you make PI-specific claims. Start with PI's `docs/index.md`. Read the relevant sections of `docs/extensions.md`, especially the system-prompt build, event lifecycle, tool registration, tool results, `sendMessage()`, and `appendEntry()`.
 3. Read the repository guidance that defines prompt-surface intent, including:
    - `docs/pi/tool-guidance.md`
@@ -31,7 +31,7 @@ Do not assume that context is useful because it already has tests or an ADR. Tre
    - `docs/adr/0012-runtime-scoped-prompt-surfaces-and-settings.md`
    - `docs/adr/0013-centralized-code-intelligence-prompt-steering-assumes-all-tools-active.md`
 4. State the standard PI baseline. Separate PI-owned context from text that SuPi adds, replaces, or causes PI to expose.
-5. Derive the package list from the filesystem. Include empty, private, resource-only, infrastructure, and extension packages. Do not use `CONTEXT-MAP.md` as the package inventory.
+5. Derive the package list from the filesystem. Include empty, private, resource-only, infrastructure, and extension packages. Do not use `GLOSSARY-MAP.md` as the package inventory.
 
 ## Build a complete context-surface inventory
 

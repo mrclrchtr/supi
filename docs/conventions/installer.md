@@ -7,7 +7,7 @@ Status: implemented. See the [CLI README](../../packages/supi-installer/README.m
 - Provide a separate Node CLI, not a PI extension or a runtime meta-package.
 - Manage direct package declarations through PI package commands.
 - Do not manage effective resource activation, standalone skills, or user-data cleanup.
-- Use the terms [Installation Matrix and Installation Preset](../../CONTEXT.md).
+- Use the terms [Installation Matrix and Installation Preset](../../GLOSSARY.md).
 - Keep declarations separate from activation; see [ADR 0025](../adr/0025-installation-matrix-declarations.md).
 
 ## Distribution

@@ -54,6 +54,6 @@ Supersedes the content, rendering, and warning decisions in [Workspace Overview]
 
 - [Approved agent-output examples](../orientation/target.md)
 - [Pre-change agent-output examples](../orientation/current.md)
-- [Domain glossary](../../CONTEXT.md)
+- [Domain glossary](../../GLOSSARY.md)
 - [Tool architecture](../../../../docs/conventions/tool-architecture.md)
 - [Pi context architecture](../../../../docs/pi/context-architecture.md)

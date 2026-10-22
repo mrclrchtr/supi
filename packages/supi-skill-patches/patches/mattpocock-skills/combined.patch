@@ -1,41 +1,40 @@
 diff --git a/skills/engineering/README.md b/skills/engineering/README.md
-index 4a948b81..737133d8 100644
 --- a/skills/engineering/README.md
 +++ b/skills/engineering/README.md
-@@ -28,5 +28,6 @@ Model- or user-reachable (rich trigger phrasing so the model can reach for them)
- - **[domain-modeling](./domain-modeling/SKILL.md)** — Actively build and sharpen a project's domain model — challenge terms, stress-test with scenarios, update `CONTEXT.md` and ADRs inline.
- - **[codebase-design](./codebase-design/SKILL.md)** — Shared discipline and vocabulary for designing deep modules: small interfaces, clean seams, testable through the interface.
- - **[code-review](./code-review/SKILL.md)** — Two-axis review of the diff since a fixed point: **Standards** (does it follow the repo's coding standards, plus a Fowler smell baseline?) and **Spec** (does it faithfully implement the originating issue/spec?), run as parallel sub-agents.
-+- **[commit](./commit/SKILL.md)** — Stage and verify a task-scoped change, write a repository-style message, and create one coherent Git commit.
- - **[resolving-merge-conflicts](./resolving-merge-conflicts/SKILL.md)** — Work through an in-progress git merge or rebase conflict hunk by hunk, resolving by intent traced to each side's primary source, then finish the operation — never `--abort`.
- - **[wizard](./wizard/SKILL.md)** — Generate an interactive bash wizard that walks a human through steps only they can perform: provisioning infrastructure, setting up credentials or CI secrets, walking an unfamiliar third-party dashboard, or running a one-off migration or cutover.
+@@ -30,5 +30,6 @@
+ - **[domain-modeling](./domain-modeling/SKILL.md)**: Actively build and sharpen a project's domain model by challenging terms, stress-testing with scenarios, and updating `GLOSSARY.md` and ADRs inline.
+ - **[codebase-design](./codebase-design/SKILL.md)**: Shared discipline and vocabulary for designing deep modules: small interfaces, clean seams, testable through the interface.
+ - **[code-review](./code-review/SKILL.md)**: Two-axis review of the diff since a fixed point: **Standards** (does it follow the repo's coding standards, plus a Fowler smell baseline?) and **Spec** (does it faithfully implement the originating issue/spec?), run as parallel sub-agents.
++- **[commit](./commit/SKILL.md)**: Stage and verify a task-scoped change, write a repository-style message, and create one coherent Git commit.
+ - **[pr](./pr/SKILL.md)**: The shape a pull request body should take: a summary as the smallest visual that makes the change clear, before/after evidence that it works, and a merge-danger call (one-way or two-way door, plus blast radius).
+ - **[wizard](./wizard/SKILL.md)**: Generate an interactive bash wizard that walks a human through steps only they can perform: provisioning infrastructure, setting up credentials or CI secrets, walking an unfamiliar third-party dashboard, or running a one-off migration or cutover.
 diff --git a/skills/engineering/code-review/SKILL.md b/skills/engineering/code-review/SKILL.md
 --- a/skills/engineering/code-review/SKILL.md
 +++ b/skills/engineering/code-review/SKILL.md
 @@ -1,87 +1,88 @@
  ---
  name: code-review
--description: Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X".
+-description: "Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes: Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to \"review since X\"."
 +description: Review a branch, PR, commit range, or working tree with separate Standards and Spec tasks through review_run. Use when the user asks for a code review or asks to review changes since a fixed point.
  ---
 
 -Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
 +# Code review
 
--- **Standards** — does the code conform to this repo's documented coding standards?
--- **Spec** — does the code faithfully implement the originating issue / spec?
-+Use `review_run` for this workflow. It freezes one Review Target and runs the Standards and Spec tasks independently. Keep their results separate. If `review_run` is unavailable, report that this workflow is unavailable. Do not replace it with `agent_run` or generic agents.
-
+-- **Standards**: does the code conform to this repo's documented coding standards?
+-- **Spec**: does the code faithfully implement the originating issue / spec?
+-
 -Both axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings.
 -
--The issue tracker should have been provided to you — run `/setup-matt-pocock-skills` if `docs/agents/issue-tracker.md` is missing.
--
+-The issue tracker should have been provided to you. If `docs/agents/issue-tracker.md` is missing, tell the user to run `/setup-matt-pocock-skills`.
++Use `review_run` for this workflow. It freezes one Review Target and runs the Standards and Spec tasks independently. Keep their results separate. If `review_run` is unavailable, report that this workflow is unavailable. Do not replace it with `agent_run` or generic agents.
+
  ## Process
 
 -### 1. Pin the fixed point
 +### 1. Resolve the Review Target
 
--Whatever the user said is the fixed point — a commit SHA, branch name, tag, `main`, `HEAD~5`, etc. If they didn't specify one, ask for it.
+-Whatever the user said is the fixed point (a commit SHA, branch name, tag, `main`, `HEAD~5`, etc.). If they didn't specify one, ask for it.
 +Identify the before and after states once.
 
 -Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so the comparison is against the merge-base). Also note the list of commits via `git log <fixed-point>..HEAD --oneline`.
@@ -44,7 +43,7 @@ diff --git a/skills/engineering/code-review/SKILL.md b/skills/engineering/code-r
 +- To include staged, unstaged, or non-ignored untracked files, use `workingTree.from`. Use the merge base for branch work, or `HEAD` for work-in-progress changes only.
 +- For a state audit, use `mode: "state"` and omit `from`.
 
--Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here — not inside two parallel sub-agents.
+-Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here, not inside two parallel sub-agents.
 +Review endpoints must resolve to commits. Do not pass Git range syntax to `review_run`. If the request is not a state audit or a work-in-progress review and no fixed point is available, ask for one.
 
 -### 2. Identify the spec source
@@ -53,7 +52,7 @@ diff --git a/skills/engineering/code-review/SKILL.md b/skills/engineering/code-r
 -Look for the originating spec, in this order:
 +Search in this order:
 
--1. Issue references in the commit messages (`#123`, `Closes #45`, GitLab `!67`, etc.) — fetch via the workflow in `docs/agents/issue-tracker.md`.
+-1. Issue references in the commit messages (`#123`, `Closes #45`, GitLab `!67`, etc.), fetched via the workflow in `docs/agents/issue-tracker.md`.
 -2. A path the user passed as an argument.
 -3. A spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
 -4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent will skip and report "no spec available".
@@ -68,11 +67,11 @@ diff --git a/skills/engineering/code-review/SKILL.md b/skills/engineering/code-r
 -Anything in the repo that documents how code should be written, such as `CODING_STANDARDS.md` or `CONTRIBUTING.md`.
 +### 3. Identify the Standards sources
 
--On top of whatever the repo documents, the Standards axis always carries the **smell baseline** below — a fixed set of Fowler code smells (_Refactoring_, ch.3) that applies even when a repo documents nothing. Two rules bind it:
+-On top of whatever the repo documents, the Standards axis always carries the **smell baseline** below: a fixed set of Fowler code smells (_Refactoring_, ch.3) that applies even when a repo documents nothing. Two rules bind it:
 +Find repository instruction files, contribution guides, coding standards, and relevant package-local guidance. Reviewers do not receive ambient context files. Put each necessary rule in the task instructions or identify its repository file in `criteriaSources`.
 
 -- **The repo overrides.** A documented repo standard always wins; where it endorses something the baseline would flag, suppress the smell.
--- **Always a judgement call.** Each smell is a labelled heuristic ("possible Feature Envy"), never a hard violation — and, like any standard here, skip anything tooling already enforces.
+-- **Always a judgement call.** Each smell is a labelled heuristic ("possible Feature Envy"), never a hard violation. Like any standard here, skip anything tooling already enforces.
 +Apply this smell baseline as advisory criteria. A documented repository rule overrides it. Report each match as a judgment, not as a hard violation. Skip checks that automated tooling already enforces.
 
 -Each smell reads *what it is* → *how to fix*; match it against the diff:
@@ -89,33 +88,33 @@ diff --git a/skills/engineering/code-review/SKILL.md b/skills/engineering/code-r
 +- **Middle Man** — a module mainly delegates to another module.
 +- **Refused Bequest** — an implementation inherits behavior that it does not use.
 
--- **Mysterious Name** — a function, variable, or type whose name doesn't reveal what it does or holds. → rename it; if no honest name comes, the design's murky.
--- **Duplicated Code** — the same logic shape appears in more than one hunk or file in the change. → extract the shared shape, call it from both.
--- **Feature Envy** — a method that reaches into another object's data more than its own. → move the method onto the data it envies.
--- **Data Clumps** — the same few fields or params keep travelling together (a type wanting to be born). → bundle them into one type, pass that.
--- **Primitive Obsession** — a primitive or string standing in for a domain concept that deserves its own type. → give the concept its own small type.
--- **Repeated Switches** — the same `switch`/`if`-cascade on the same type recurs across the change. → replace with polymorphism, or one map both sites share.
--- **Shotgun Surgery** — one logical change forces scattered edits across many files in the diff. → gather what changes together into one module.
--- **Divergent Change** — one file or module is edited for several unrelated reasons. → split so each module changes for one reason.
--- **Speculative Generality** — abstraction, parameters, or hooks added for needs the spec doesn't have. → delete it; inline back until a real need shows.
--- **Message Chains** — long `a.b().c().d()` navigation the caller shouldn't depend on. → hide the walk behind one method on the first object.
--- **Middle Man** — a class or function that mostly just delegates onward. → cut it, call the real target direct.
--- **Refused Bequest** — a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
+-- **Mysterious Name**: a function, variable, or type whose name doesn't reveal what it does or holds. → rename it; if no honest name comes, the design's murky.
+-- **Duplicated Code**: the same logic shape appears in more than one hunk or file in the change. → extract the shared shape, call it from both.
+-- **Feature Envy**: a method that reaches into another object's data more than its own. → move the method onto the data it envies.
+-- **Data Clumps**: the same few fields or params keep travelling together (a type wanting to be born). → bundle them into one type, pass that.
+-- **Primitive Obsession**: a primitive or string standing in for a domain concept that deserves its own type. → give the concept its own small type.
+-- **Repeated Switches**: the same `switch`/`if`-cascade on the same type recurs across the change. → replace with polymorphism, or one map both sites share.
+-- **Shotgun Surgery**: one logical change forces scattered edits across many files in the diff. → gather what changes together into one module.
+-- **Divergent Change**: one file or module is edited for several unrelated reasons. → split so each module changes for one reason.
+-- **Speculative Generality**: abstraction, parameters, or hooks added for needs the spec doesn't have. → delete it; inline back until a real need shows.
+-- **Message Chains**: long `a.b().c().d()` navigation the caller shouldn't depend on. → hide the walk behind one method on the first object.
+-- **Middle Man**: a class or function that mostly just delegates onward. → cut it, call the real target direct.
+-- **Refused Bequest**: a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
 +### 4. Run the Review
 
 -### 4. Spawn both sub-agents in parallel
 +Create one `review_run` call with up to two tasks:
 
--**Standards sub-agent prompt** — include:
+-**Standards sub-agent prompt** should include:
 +- `standards`, with the applicable Standards sources and smell baseline.
 +- `spec`, with the authoritative Spec sources and requirement summary.
 
 -- The full diff command and commit list.
--- The list of standards-source files you found in step 3, **plus the smell baseline from step 3** pasted in full — the sub-agent has no other access to it.
--- The brief: "Report — per file/hunk where relevant — (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls — documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words."
+-- The list of standards-source files you found in step 3, **plus the smell baseline from step 3** pasted in full (the sub-agent has no other access to it).
+-- The brief: "Report, per file/hunk where relevant, (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls: documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words."
 +Use `mode: "change"` for a before-and-after review. Use `mode: "state"` only when the user asks to assess the after state without change attribution. Keep task instructions self-contained. Put only context that applies to every task in `sharedContext`. Use top-level `paths` only as an advisory focus.
 
--**Spec sub-agent prompt** — include:
+-**Spec sub-agent prompt** should include:
 +Example shape:
 
 -- The diff command and commit list.
@@ -147,9 +146,9 @@ diff --git a/skills/engineering/code-review/SKILL.md b/skills/engineering/code-r
 -### 5. Aggregate
 +Present `## Standards` and `## Spec` separately and in task order. Do not merge or rerank findings across tasks. If a Review Output Artifact is present, use `review_output` to read the remaining pages before the final report.
 
--Present the two reports under `## Standards` and `## Spec` headings, verbatim or lightly cleaned. Do **not** merge or rerank findings — the two axes are deliberately separate (see _Why two axes_).
+-Present the two reports under `## Standards` and `## Spec` headings, verbatim or lightly cleaned. Do **not** merge or rerank findings, because the two axes are deliberately separate (see _Why two axes_).
 -
--End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes — that's the reranking the separation exists to prevent.
+-End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes: that's the reranking the separation exists to prevent.
 -
 -## Why two axes
 -
@@ -242,6 +241,24 @@ index 00000000..719ef410
 +6. **Verify the result.** Inspect the new commit's hash, subject, stat, and `git status`. Report the commit and the checks that ran. Confirm that remaining changes are intentional. If the commit fails, leave the state available for inspection and report the failure without retrying blindly.
 +
 +   **Done when:** `HEAD` contains the intended patch, the message follows repository style, check results are reported, and remaining changes are understood.
+diff --git a/skills/engineering/implement-spec/SKILL.md b/skills/engineering/implement-spec/SKILL.md
+--- a/skills/engineering/implement-spec/SKILL.md
++++ b/skills/engineering/implement-spec/SKILL.md
+@@ -3,6 +3,14 @@
+ description: "Implement the result of /to-spec and /to-tickets in code."
+ disable-model-invocation: true
+ ---
++
++## SuPi capability guard
++
++This workflow requires concurrent mutation-capable agents with explicit per-worktree working directories. SuPi's `agent_run` does not support this: mutating runs require one foreground task, background exploration is read-only, and there is no per-task working-directory option.
++
++If these capabilities are unavailable, stop before creating branches, worktrees, files, or PRs. Explain the limitation and tell the user to run `/skill:implement` for sequential implementation instead. Do not bypass this guard using detached shell processes or nested Pi sessions, and do not silently substitute sequential execution.
++
++## Workflow
+
+ You have been provided a spec. This spec should have tickets associated with it, describing how to implement the spec.
+
 diff --git a/skills/engineering/implement/SKILL.md b/skills/engineering/implement/SKILL.md
 index 7a0b11f5..afb4fafb 100644
 --- a/skills/engineering/implement/SKILL.md
@@ -278,7 +295,7 @@ diff --git a/skills/engineering/research/SKILL.md b/skills/engineering/research/
 -Its job:
 +Do the research in the current foreground task. Use primary sources.
 
--1. Investigate the question against **primary sources** — official docs, source code, specs, first-party APIs — not a secondary write-up of them. Follow every claim back to the source that owns it.
+-1. Investigate the question against **primary sources** (official docs, source code, specs, first-party APIs), not a secondary write-up of them. Follow every claim back to the source that owns it.
 -2. Write the findings to a single Markdown file, citing each claim's source.
 -3. Save it where the repo already keeps such notes; match the existing convention, and if there is none, put it somewhere sensible and say where.
 +## Process
@@ -296,23 +313,48 @@ diff --git a/skills/engineering/research/SKILL.md b/skills/engineering/research/
 +5. Report the saved path and a short result summary.
 +
 +When `agent_run` is available, use a read-only profile only for an independent repository investigation. Agent Runs are foreground work and do not replace primary web sources.
+diff --git a/skills/engineering/retro/SKILL.md b/skills/engineering/retro/SKILL.md
+--- a/skills/engineering/retro/SKILL.md
++++ b/skills/engineering/retro/SKILL.md
+@@ -30,7 +30,7 @@
+
+ Remember that all work goes through two stages: implementation and review. The implementation agent has the most **context pressure**. They are responsible for exploration, writing code, and debugging failures.
+
+-The review agent has the least context pressure - it receives a diff, so no exploration needed. It often does not need to write code or debug.
++SuPi reviewers inspect a frozen workspace against explicit Review Criteria. They may need to explore repository files, but do not receive the implementation agent's conversation. Supply the applicable standards in the review task instructions or `criteriaSources`.
+
+ This means that the review agent should be responsible for imposing coding standards, not the implementation agent.
+
+@@ -38,7 +38,7 @@
+
+ You have access to several files in the repo:
+
+-- `CLAUDE.md`/`AGENTS.md`: these files are pushed to the context window of any agent working in this repo. They should be used incredibly sparingly, usually only for **navigation pointers** to other files.
++- `CLAUDE.md`/`AGENTS.md`: these files guide agents when the harness loads them; SuPi reviewers do not receive ambient instruction files. They should be used incredibly sparingly, usually only for **navigation pointers** to other files.
+ - `CODING_STANDARDS.md`: this file is read during review, not implementation. Add **navigation pointers** to docs folders if the standards file gets more than 1,000 lines long.
+ - Docs: use docs as references files, pointed to by other files. Look for existing docs before writing new ones.
+ - Skills: use skills for docs (since their description goes into the agent's context window), or for user-invoked commands. Follow the advice in the `writing-for-agents` skill.
 diff --git a/skills/productivity/grilling/SKILL.md b/skills/productivity/grilling/SKILL.md
-index 95bd01e..b7d2644 100644
 --- a/skills/productivity/grilling/SKILL.md
 +++ b/skills/productivity/grilling/SKILL.md
-@@ -7,13 +7,18 @@ Interview the user relentlessly until you reach a shared understanding. Map this
+@@ -7,19 +7,18 @@
 
- Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled — the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask the whole frontier in one round: number each question and give your recommended answer. Then wait for the user's answers before the next round.
+ Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled: the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask the whole frontier in one round: number each question and give your recommended answer. Then wait for the user's answers before the next round.
 
--Each question should be formatted like so:
--
+-Format a round like so:
++Use `ask_user` for each round. Put all frontier questions in one form. Fill the fields as follows:
+
 -```
 -❓ **Q1** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
 -
 -➡️ <your recommended answer>
+-
+----
+-
+-❓ **Q2** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
+-
+-➡️ <your recommended answer>
 -```
-+Use `ask_user` for each round. Put all frontier questions in one form. Fill the fields as follows:
-+
 +- `title`: Name the subject and the round.
 +- `intro`: Summarize what is settled and why this frontier is open.
 +- `questions`: Include the current frontier, up to the form limit of 10. If the frontier is larger, ask the first 10 and recompute it from the answers.
@@ -324,5 +366,5 @@ index 95bd01e..b7d2644 100644
 +- `details`: Explain trade-offs or consequences for a choice option. It can also contain a sketch.
 +- `recommendation`: For a choice question, use the recommended option `value`, or an array of values when `multi` is `true`. For a text question, give the recommended answer. Also give text questions a `placeholder` that shows the expected answer shape.
 
- Each round the user answers reshapes the tree — settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
+ Each round the user answers reshapes the tree: settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
 

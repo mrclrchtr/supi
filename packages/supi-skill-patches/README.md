@@ -20,6 +20,8 @@ This package is not a PI extension and is not published to npm. Skills installed
 
 One patch fragment exists for each changed upstream file under `patches/mattpocock-skills/files/`. pnpm consumes the generated `patches/mattpocock-skills/combined.patch`. The `grilling` patch uses `ask_user` from `@mrclrchtr/supi-ask-user` for each question round.
 
+The `implement-spec` patch checks delegation capabilities before any workflow side effects. SuPi's `agent_run` does not support concurrent mutating agents with per-worktree working directories, so the skill stops and points the user to `/skill:implement` for sequential work. It does not launch detached workers or silently substitute a sequential workflow. The `retro` patch makes SuPi's explicit reviewer-criteria contract clear. Upstream's cross-skill invocation wording is retained.
+
 ```bash
 pnpm skills:patches:compose # rebuild the pnpm patch from fragments
 pnpm install                # apply the patch to the pinned dependency

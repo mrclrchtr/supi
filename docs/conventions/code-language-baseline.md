@@ -21,7 +21,7 @@ JavaScript and TypeScript require separate evidence. C and C++ also require sepa
 
 ## Terms and evidence
 
-Use the terms in [the Code Intelligence glossary](../../packages/supi-code-intelligence/CONTEXT.md):
+Use the terms in [the Code Intelligence glossary](../../packages/supi-code-intelligence/GLOSSARY.md):
 
 - Language capability baseline.
 - Language verification case.
