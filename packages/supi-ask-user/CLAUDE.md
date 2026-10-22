@@ -2,12 +2,10 @@
 
 `@mrclrchtr/supi-ask-user` provides the redesigned `ask_user` tool: a small decision-form workflow for agent-user handoff.
 
-Entrypoint: `src/ask-user.ts`
-
 ## Design rules
 
 - Treat `ask_user` as a **decision form**, not a survey engine.
-- Keep the public contract aligned across `schema.ts`, `README.md`, and `tool/guidance.ts`.
+- Keep the public contract aligned across `src/schema.ts`, `README.md`, and `src/tool/ask_user/guidance.ts`.
 - The controller in `src/session/controller.ts` is the source of truth for selections, text values, form/question/option comments, unanswered state, navigation, and derived outcome.
 - UI renderers are adapters — they should not invent extra answer semantics.
 - All questions are expected for full submission. Unanswered questions produce `needs_discussion` outcome.
@@ -20,29 +18,9 @@ Entrypoint: `src/ask-user.ts`
 - `answersById`, `missingQuestionIds` — replaced by ordered `responses` array.
 - `status: "partial" | "discuss" | "cancelled" | "aborted"` — replaced by `outcome: "submitted" | "needs_discussion"` plus `AskUserInteractionResult` for cancel/abort.
 
-## Architecture
+## API boundary
 
-1. **Schema** — `src/schema.ts`
-2. **Normalization** — `src/normalize.ts` (rejects deprecated fields)
-3. **Headless state** — `src/session/controller.ts`
-4. **Renderer selection** — `src/ui/choose-renderer.ts`
-5. **UI renderers** — `src/ui/form*.ts`
-6. **Result assembly** — `src/tool/result.ts` (model-visible `content` + free `details`, truncation)
-7. **Tool guidance** — `src/tool/guidance.ts` (model-facing description, canonical name/label, single source of truth)
-8. **Transcript** — `src/render/transcript.ts` (human display only, never sent to the model)
-
-## Package surfaces
-
-- `@mrclrchtr/supi-ask-user/extension` — pi extension entrypoint
-- `@mrclrchtr/supi-ask-user/api` — reusable types, utilities, and `openAskUserForm()`
-
-```ts
-import {
-  normalizeQuestionnaire,
-  AskUserController,
-  openAskUserForm,
-} from "@mrclrchtr/supi-ask-user/api";
-```
+Reusable callers use `openAskUserForm()` from `@mrclrchtr/supi-ask-user/api`, not the registered tool. Keep model-visible result assembly separate from human-only transcript rendering.
 
 ## Non-obvious behavior
 
@@ -61,5 +39,5 @@ import {
 - A registered custom editor is instantiated once per form and reused for text answers and every comment surface. Invalid or throwing factories warn and fall back to the default editor.
 - Embedded `CustomEditor` instances receive `Esc` first for modal transitions; delegated interrupts return to Ask User's cancel/discard behavior. Main-prompt action handlers are not reproduced inside the form.
 - `recommendation` on single-select defaults to first option; on multi-select defaults to none.
-- Completed forms are labeled `decision` in the session tree for visibility and filtering (`labeled-only` filter mode in `/tree`). Results are persisted as a custom session entry (`pi.appendEntry("ask_user", ...)`) for state tracking. In chat history, results can be expanded read-only with `Ctrl+O` — this does not reopen the live form.
+- Completed forms are labeled `decision` in the session tree for visibility and filtering (`labeled-only` filter mode in `/tree`). The custom `ask_user` entry stores title/question-count metadata; full answers and outcome are retained in tool-result `details`. In chat history, results can be expanded read-only with `Ctrl+O` — this does not reopen the live form.
 - Model-visible result summaries are truncated to Pi's default 2,000-line / 50KB tool-output limits with a clear truncation notice.

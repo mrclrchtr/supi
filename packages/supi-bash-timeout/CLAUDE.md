@@ -10,13 +10,6 @@ A single `tool_call` handler intercepting `bash` events:
 2. Otherwise injects the configured default timeout (120s by default)
 3. Timeout is configurable via `/supi-settings` (uses `defineConfigSettings` and `registerSettings` from `supi-core`)
 
-## Key files
-
-- `bash-timeout.ts` — extension entry point, `tool_call` handler
-- `config.ts` — `loadBashTimeoutConfig()` with defaults
-- `settings-registration.ts` — registers settings with `supi-core` registry
-
 ## Gotchas
 
-- `pi.on("tool_call")` runs before the tool executes — it can mutate input parameters (e.g., inject a default timeout) or block the call, but cannot modify the result.
 - Call `registerBashTimeoutSettings()` during the factory function, not in async handlers.

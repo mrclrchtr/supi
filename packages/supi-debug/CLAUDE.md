@@ -2,34 +2,9 @@
 
 Session-local debug event capture, querying, and reporting for SuPi extensions.
 
-## Architecture
+## Ownership
 
-Registers four surfaces:
-
-1. **`debug` tool** — agent-callable tool for querying recent or persisted-session debug events with filters
-2. **`/supi-debug` command** — user-facing command for browsing live or persisted-session debug events in the TUI
-3. **`/supi-tooling-retro` prompt template** — post-task retrospective evaluating the SuPi surfaces used in the completed task
-4. **Settings** — `/supi-settings` integration for enable/disable, agent access level (off/sanitized/raw), and max events
-
-Uses `supi-core`'s shared debug registry (`configureDebugRegistry`, `getDebugEvents`, `getDebugSummary`) and `registerContextProvider` for the TUI context summary.
-
-## Package layout
-
-Stays flat per convention — no domain folders until responsibilities grow.
-
-## Key files
-
-| File | Role |
-|------|------|
-| `src/debug.ts` | Extension factory, settings, tool + command registration |
-| `src/format.ts` | Event formatting + data serialization |
-| `src/renderer.ts` | Custom message renderer for `supi-debug-report` type |
-| `src/session-events.ts` | Session-JSONL persistence and historical event reading |
-| `src/status-log.ts` | Optional load-status logging (`$SUPI_LOG_STATUS`) |
-| `src/extension.ts` | Pi extension entry, re-exports `src/debug.ts` default |
-| `__tests__/unit/` | Unit tests |
-| `__tests__/helpers/` | Shared test utilities |
-| `__tests__/fixtures/` | Shared test data, when added |
+Producers publish events through `supi-core`'s shared debug registry. This extension owns retention and agent-access policy, sanitized session persistence, and human reporting. Its context provider supplies the TUI context summary.
 
 ## Gotchas
 

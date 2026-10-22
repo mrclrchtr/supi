@@ -19,11 +19,5 @@
 - Use the reusable `@mrclrchtr/supi-ask-user/api` form. Do not call its registered tool or import its private files.
 - Use `overlay: true` for every local screen. Cleanup must not write to the main editor.
 - Transfer a draft only after confirmation and ownership checks. Apply a proposal only after a second synchronous ownership check.
-- Keep private content out of message content and logs by default. Optional debug capture must follow the diagnostics contract: bounded sanitized `data` through the public `@mrclrchtr/supi-core/debug` API, never `rawData` or an access-control bypass.
+- Do not persist private draft, context, answers, or proposals in session messages or logs by default. The selected provider request necessarily includes the confirmed draft and selected background. Optional debug capture must follow the diagnostics contract: bounded sanitized `data` through the public `@mrclrchtr/supi-core/debug` API, never `rawData` or an access-control bypass.
 - Keep text-only support. Do not add attachment handling, feature undo, shortcuts, retries, or automatic submission.
-
-## Package checks
-
-- `pnpm vitest run packages/supi-prompt-improver/`
-- `pnpm exec tsc -b packages/supi-prompt-improver/tsconfig.json packages/supi-prompt-improver/__tests__/tsconfig.json`
-- `pnpm exec biome check packages/supi-prompt-improver/`

@@ -9,15 +9,16 @@ Ghost-text prompt suggestions in the PI editor.
 The extension installs a `GhostTextEditor` (extends `CustomEditor`) via `setEditorComponent` on every
 `session_start` (including `/reload`). This creates a fresh editor instance, discarding the previous
 editor's in-memory history. History is re-seeded from the active `sessionManager.getBranch()` — see
-`seedHistoryFromSession`.
+`seedHistoryFromSession`. Recreate the shared `StatusSpinner` with the fresh `ExtensionContext` too.
 
 ### Fire-and-forget suggestion generation
 
 `SuggestionGenerator.start()` is fire-and-forget — callers do not await the returned promise. The
 class manages concurrency with an internal abort controller and generation ID. Calling `start` or
 `dismiss` cancels any in-flight generation. Generation is TUI-only; print, JSON, and RPC modes do
-not install the ghost editor or make background suggestion model calls. `extension.ts` owns the
-`SuggestionGenerator` instance directly rather than going through module-level wrappers. The
+not install the ghost editor or make background suggestion model calls. `extension.ts` creates one
+`SuggestionGenerator` and one `SessionLifecycle`; the latter owns the ghost editor, spinner, and
+session orchestration. Keep ownership explicit rather than using module-level wrappers. The
 generator emits one bounded warning for the first failure of each model/session stream, then
 suppresses repeated failures until success, a settings change, or a new session. It emits no warning
 for cancellation, stale results, disabled suggestions, or empty successful output. `SessionLifecycle`
@@ -28,7 +29,7 @@ outcomes (no assistant text, editor not empty at settle, editor not empty at del
 ### Suggestion model via PI registry
 
 Suggestions use `completeSimpleModelRequest` from `@mrclrchtr/supi-core/llm`, backed by
-`ctx.modelRegistry.streamSimple().result()` on PI 0.86.0 or later. PI resolves authentication,
+`ctx.modelRegistry.streamSimple().result()`. PI resolves authentication,
 headers, provider environment, and the effective endpoint. The request uses the stable
 `prompt-suggestions` affinity scope. PI's simple path supplies model output limits and context
 guards; the extension does not import Pi AI implementation subpaths. Only the last 8,000
@@ -44,19 +45,6 @@ The settings module uses `defineConfigSettings` and `registerSettings` from `sup
 can override a globally enabled suggestion model; only the Inherit/Reset actions delete scoped
 config keys.
 
-### Session lifecycle lives in SessionLifecycle
-
-The `SessionLifecycle` class in `src/session.ts` owns the ghost editor, status spinner, and
-suggestion generator orchestration across the session lifecycle. `extension.ts` is thin wiring —
-it creates one `SuggestionGenerator` and one `SessionLifecycle` instance, then wires the four
-event handlers.
-
-### StatusSpinner is shared from supi-core
-
-The `StatusSpinner` widget lives in `supi-core/status-spinner` (shared infrastructure). It manages
-a `setInterval`-based braille spinner via `ctx.ui.setStatus`. Recreated on every `session_start`
-with a fresh `ExtensionContext`.
-
 ### Ghost text rendering
 
 The ghost text is injected into the editor's rendered output by post-processing the cursor line after
@@ -67,10 +55,10 @@ Ghost text uses PI TUI's `wrapTextWithAnsi()` to wrap the full suggestion. Becau
 visible only when the editor is empty, the extension appends it to the rendered cursor line. It uses
 the public `CURSOR_MARKER` to find that line and does not parse the cursor's internal ANSI encoding.
 
-### Right Arrow acceptance
+### Suggestion acceptance
 
-The editor intercepts Right Arrow (ANSI `\x1b[C`, application `\x1bOC`, and Kitty keyboard protocol
-forms) to accept the visible suggestion. Escape dismisses the visible suggestion and is consumed; a
+The editor accepts a visible suggestion with Right Arrow or Tab through PI's `matchesKey()`,
+which handles ANSI, application, and Kitty keyboard protocol forms. Escape dismisses the visible suggestion and is consumed; a
 later Escape without ghost text reaches PI's normal interrupt/double-escape handling. Editor text
 suppresses the suggestion without destroying it. Any editor operation that makes the text exactly
 empty restores the suggestion.

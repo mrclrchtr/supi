@@ -2,10 +2,7 @@
 
 ## Scope
 
-This is a library-only package with two explicit exports:
-
-- `@mrclrchtr/supi-lsp/api` → controller, `WorkspaceLspRuntime` types, registry operations, configuration, coordinates, and diagnostics types
-- `@mrclrchtr/supi-lsp/provider/lsp-semantic-provider` → the shared semantic-provider adapter
+This library owns semantic analysis through language servers.
 
 There is no PI extension entrypoint and no model-callable `lsp_*` tool surface. `supi-code-intelligence` owns the public `code_*` family.
 
@@ -15,31 +12,9 @@ There is no PI extension entrypoint and no model-callable `lsp_*` tool surface. 
 
 `WorkspaceLspRuntime` is an exported interface. `DefaultWorkspaceLspRuntime`, clients, and `LspManager` remain internal. Never add manager/client access to the public runtime.
 
-The private `DefaultWorkspaceLspRuntime` is the single operational seam. It normalizes
-paths, coordinates readiness, semantic requests, tracked files, diagnostics, recovery,
-and owner-controlled shutdown around the package-internal `LspManager`. Clients and the
-manager never cross the public runtime interface.
-
 The registry uses the shared core session-state helper and retains explicit ready, pending, inactive, disabled, and unavailable states. Pending polling uses `waitForWorkspaceLspRuntime(cwd)`. Empty workspace warm-up leaves the ready owner published and semantic registration pending so a lazy file route can still start; never promote via `Promise.all([])` or retract the owner solely because no client was proactive.
 
 Runtime positions are raw 0-based LSP coordinates. Use `toLspPosition()` when starting from 1-based tool coordinates. Semantic and explicit diagnostic operations accept optional shared `CodeRequestControl` metadata. Preserve the exact value through adapters and runtime interfaces. Pass the exact signal and deadline into semantic requests and transport; the transport maps the signal to protocol cancellation and enforces the absolute deadline. Pass only its opaque Debug Operation ID to sanitized request and diagnostic timing events. Keep readiness, lifecycle, ambient push diagnostics, and direct library calls uncorrelated.
-
-## Key files
-
-- `src/client/` — protocol client, transport, document/diagnostic state, refresh, and request handling
-- `src/config/` — server definitions, settings, capabilities, actions, protocol types, and tsconfig scope
-- `src/diagnostics/` — diagnostic summaries, stale diagnostics, and workspace sentinels
-- `src/manager/manager.ts` + `manager-*.ts` — package-internal server pool, routing, diagnostics, and recovery mechanics
-- `src/provider/lsp-semantic-provider.ts` — semantic-provider adapter
-- `src/provider/semantic-symbol-mapper.ts` — LSP-to-shared symbol, location, and hover mapping
-- `src/provider/lsp-refactor-provider.ts` — refactor-capability adapter composition
-- `src/provider/refactor-planning.ts` — refactor request flow and code-action matching
-- `src/provider/semantic-edit-normalizer.ts` — fail-closed edit normalization and document preconditions
-- `src/session/runtime-controller.ts` — lifecycle/status
-- `src/session/workspace-lsp-runtime.ts` — public workspace runtime contracts
-- `src/session/runtime-registry.ts` — Workspace runtime implementation and registry
-- `src/session/runtime-registration.ts` — capability-broker registration
-- `src/session/scanner.ts` — workspace detection and startup
 
 ## Semantic and refactor behavior
 
@@ -81,7 +56,7 @@ See [ADR 0022](../../docs/adr/0022-request-confirmed-lsp-agnostic-diagnostics.md
 
 ## Configuration
 
-`loadConfig()` reads `lsp.servers` from SuPi project/global config. `.pi-lsp.json` is not read. Built-in keys are language names (`typescript`, `python`, `rust`, `go`, `c`, `ruby`, `java`, `kotlin`, `bash`, `html`, `sql`, `r`), not binary names; `cpp` aliases to `c`.
+`loadConfig()` reads `lsp.servers` from SuPi project/global config. `.pi-lsp.json` is not read. Built-in keys are language IDs, not binary names; `cpp` aliases to `c`.
 
 Always-on policy:
 
@@ -97,15 +72,3 @@ Thread `ctx.cwd` through manager and formatting code; do not use `process.cwd()`
 ## Tests
 
 Required TypeScript integration tests use `typescript-language-server` and `tsserver`. Python and Bash integration tests skip when their binaries are unavailable. All optional suites use `describe.skipIf(!HAS_COMMAND)`.
-
-Focused commands:
-
-```bash
-pnpm exec vitest run packages/supi-lsp/__tests__/unit/runtime-registry.test.ts
-pnpm exec vitest run packages/supi-lsp/__tests__/unit/runtime-controller.test.ts
-pnpm exec vitest run packages/supi-lsp/__tests__/unit/client-refresh.test.ts packages/supi-lsp/__tests__/unit/client-pull-diagnostics.test.ts packages/supi-lsp/__tests__/unit/transport.test.ts
-pnpm exec vitest run packages/supi-lsp/__tests__/unit/diagnostic-summary.test.ts packages/supi-lsp/__tests__/unit/stale-diagnostics.test.ts packages/supi-lsp/__tests__/unit/workspace-sentinels.test.ts
-pnpm exec vitest run packages/supi-lsp/__tests__/integration/*.integration.*.test.ts
-```
-
-After structural changes, run package TypeScript tests and `pnpm verify:ai`.

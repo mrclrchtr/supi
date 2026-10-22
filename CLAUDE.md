@@ -1,8 +1,6 @@
 # CLAUDE.md
 
-SuPi (**Super Pi**) is a curated extension repo for the [pi coding agent](https://github.com/earendil-works/pi) (`@earendil-works/pi-coding-agent`).
-
-It is a pnpm workspace monorepo of installable pi extensions. pi loads the extensions directly as TypeScript — there is no build step.
+Pi loads SuPi extensions directly as TypeScript — there is no build step.
 
 ## Development status
 
@@ -19,51 +17,35 @@ SuPi is pre-release and not API-stable. Intentional breaking changes to package 
 
 - `docs/INDEX.md` is the docs index — start there for repo documentation; add new docs per its maintenance rules.
 - Documentation describes the Pi version configured in dependencies. Omit version stamps; retain source references.
-- Add JSDoc for exported APIs, config surfaces, and non-obvious behavior; skip boilerplate for trivial private code.
-- Add inline JSDoc for complex internal logic where a short explanation would help maintainers.
+- Add JSDoc for exported APIs, config surfaces, and non-obvious behavior, including complex internal logic; skip boilerplate for trivial private code.
 
 ## Package layout convention
 
-- Follow `docs/conventions/package-layout.md` for repo-wide package structure.
-- Standardize package boundaries with `src/api.ts`, `src/index.ts`, and `src/extension.ts` when the package role requires them.
-- Prefer package-level tests in `__tests__/unit/` and `__tests__/integration/`, with `__tests__/helpers/` and `__tests__/fixtures/` as needed.
-- Prefer domain folders over catch-all names like `core/`, `shared/`, or `misc/`.
-- Keep small packages flat; add `config/`, `ui/`, `session/`, or other domain folders only when the package size and responsibilities clearly justify them. Packages that register tools use the per-tool directory layout under `src/tool/` (`docs/conventions/tool-architecture.md` § Per-tool directory layout).
-- Anchor examples: the large-package model (hybrid with domain folders) and the standard package model (flat with package-level tests).
-- This convention is the default for new packages and for existing packages when they receive structural work.
-- Packages that should stay flat unless they grow: `supi-bash-timeout`, `supi-context`, `supi-debug`, `supi-test-utils`.
-- `supi-skill-patches` is a private maintenance package. It owns upstream synchronization and per-file compatibility patches; generated skills live in the root `skills/` catalog, and selected project-local skills link into `.pi/skills/`.
-- `supi-web` should stay mostly flat, but may use `src/tool/` for per-tool guidance files.
+- Follow `docs/conventions/package-layout.md` for new packages and structural work. Use `src/api.ts`, `src/index.ts`, and `src/extension.ts` only when the package role requires them.
+- Keep small packages flat; use domain folders rather than catch-all `core/`, `shared/`, or `misc/` buckets when structure is justified.
+- Keep tests at package level under `__tests__/unit/`, `__tests__/integration/`, and optional helpers/fixtures.
+- Tool packages use per-tool directories under `src/tool/`; follow `docs/conventions/tool-architecture.md` for guidance, specs, execution, results, and rendering boundaries.
 
 ## Commands
 
 See `pnpm run` for routine build/lint/test. Toolchain versions pinned in `.mise.toml`.
 
 - When both standard and `*:ai` scripts exist, prefer the `*:ai` variant for agent runs (lower-noise output); use the plain variant only for prettier or interactive local output.
-- Run `pnpm verify:ai` (typecheck, lint, tests) for code, test, dependency, or package/config changes; skip it for specs, docs, and skill-only changes unless requested.
+- Run `pnpm verify:ai` (WASM checks, lint, typecheck, skill checks, tests, and tarball verification) for code, test, dependency, or package/config changes; skip it for specs, docs, and skill-only changes unless requested.
 
 ## Architecture
 
-This repo has two install surfaces:
-- repository root `package.json` exposes a `pi` manifest for local-path and git installs — supports `extensions`, `prompts`, `skills`, `themes` keys
-- each `packages/supi-*` is installable independently
-
-## Package tiers
-
-All runtime packages are published independently. There is no meta-package — each published package ships its own dependencies directly. `supi-skill-patches` is private maintenance tooling.
-
-New installable extension packages should be added to the root `package.json` `pi.extensions` array for development convenience; library-only packages must not be added there.
+The root Pi manifest is the development/local/git install surface; published runtime packages install independently, without a meta-package. Add new installable extensions to root `pi.extensions`; never add library-only packages.
 
 ## Packaging conventions
 
 - Every published SuPi pi-package exposes an explicit `./extension` export. Packages with a reusable library API expose an explicit `./api` export (optional — omit when there is no library surface). Do not rely on package-root (`.`) imports or cross-package `src/...` deep imports.
-- `supi-core` and `supi-agent-runtime` are library-only packages with no pi extension surface, no `./extension` export, and no `pi.extensions` entry. Library-only dependencies use normal npm resolution; installable packages bundle them when required by the pi package boundary.
+- Library-only packages must not expose `./extension` or `pi.extensions`. Their dependencies use normal npm resolution; installable packages bundle them when required by the pi package boundary.
 - `pi.extensions` / `pi.prompts` / `pi.skills` / `pi.themes` manifest entries must remain **real package-relative file paths**. Do not replace them with `exports` aliases.
 - Any installable SuPi package that depends on another `@mrclrchtr/supi-*` package must list it in both `dependencies` and `bundledDependencies`. Library-only packages use normal npm resolution. Per [pi packages docs](https://github.com/earendil-works/pi/blob/main/docs/packages.md), pi packages that depend on other pi packages must be bundled in the tarball — npm transitive dependency resolution is not guaranteed by pi's module isolation.
 - When a package bundles another extension-bearing `@mrclrchtr/supi-*` package, reference that package's extension in `pi.extensions` via `node_modules/<pkg>/src/extension.ts`. Library-only dependencies have no extension to forward. Otherwise, standalone `pi install npm:@mrclrchtr/supi-<name>` won't load the bundled extension — pi only reads the top-level installed package's `pi.extensions`.
 - Child-only adapters such as `supi-agent` and `supi-review` may bundle Code Intelligence solely to pass its headless factory into owned child sessions; they must not load the full parent extension, and `scripts/__tests__/bundled-extension-refs.test.mjs` documents this exception.
-- Adding bundled extension references breaks `expectExplicitSurface` in `scripts/__tests__/pack-staged.test.mjs` — use `.toContain`, not `.toEqual`.
-- Root `package.json` is `"private": true` — runtime dependencies belong in sub-packages or in root `devDependencies`, not in root `dependencies`.
+- Put runtime dependencies in the publishing package; root-only tooling belongs in `devDependencies`, not root `dependencies`.
 - For the publish pipeline (staging, manifest export, npm pack, verification), see the **Publish pipeline** section.
 
 ## supi-core entry points
@@ -78,19 +60,14 @@ SuPi extensions self-register their prompts, skills, and themes using the `resou
 
 Pattern: derive `baseDir = dirname(dirname(fileURLToPath(import.meta.url)))` and return `{ skillPaths: [join(baseDir, "skills")], promptPaths: [...] }` from a `resources_discover` handler.
 
-Extension packages with prompts/skills:
-- `packages/supi-claude-md` — skills via `resources_discover`
-- Root `package.json` and sub-package `package.json` files omit `pi.prompts` / `pi.skills` entries to avoid redundancy.
-- Root `skills/` is the skills.sh catalog: patched upstream skills in generated group directories, plus directly maintained SuPi-owned skills in `skills/<name>/`. The generated `.claude-plugin/marketplace.json` groups the public catalog into Matt Pocock and SuPi skills for skills.sh. Keep the catalog out of the root `pi.skills` manifest. Project-local `.pi/skills/` entries are symlinks to selected catalog skills.
+`supi-skill-patches` owns upstream synchronization and compatibility patches. Its generated root `skills/` catalog is for skills.sh; `.claude-plugin/marketplace.json` groups the public catalog. Keep the catalog out of root `pi.skills`; selected project-local `.pi/skills/` entries link to it.
 
 ## Settings registry
 
 Extensions register a `SettingsModule` via `registerSettings()` from `@mrclrchtr/supi-core/settings`. Call it during the factory function. Fixed SuPi config sections use `defineConfigSettings()`; catalog-backed or multi-store modules implement the same interface directly.
 
 - Each module provides asynchronous `read()` and `apply()` operations. The module owns persistence and refresh; the UI owns pending and error presentation.
-- `/supi-settings` (from `supi-settings`) renders all registered sections.
-- Scope toggle (Tab) switches between project/global; rows show source badges such as `(project)`, `(global)`, and `(default)`.
-- Enter opens row actions; Space cycles concrete values; Inherit/Reset actions delete the scoped key. Explicit values are distinct from inherited/default values.
+- Explicit values are distinct from inherited/default values. Inherit/Reset deletes the scoped key; the UI must preserve that distinction.
 
 ## Shared gotchas
 
@@ -116,72 +93,51 @@ Extensions register a `SettingsModule` via `registerSettings()` from `@mrclrchtr
 - Run `pnpm install` before editing `.ts` files when editing dependencies.
 
 ### Dev workflow
-- `hk` drives local hooks: `pre-commit` autofixes, `pre-push` runs `pnpm verify`.
+- `hk` pre-commit autofixes with `stash = "none"`; unstaged changes in fixed files may be staged together. No pre-push hook is configured.
 - `pnpm exec jiti /tmp/script.mjs` — ad-hoc workspace TS runtime probes; Node `--experimental-strip-types` breaks on TS parameter properties here.
 - pnpm `ignoredBuiltDependencies` silently skips install scripts; `onlyBuiltDependencies` explicitly allows them — confusing the two causes missing native binaries (e.g. tree-sitter-cli).
-- `tsc -b` (build mode) and `--noEmit` are incompatible — use `pnpm typecheck:ai` instead of raw `tsc` commands.
-- Per PI docs, signal real tool failures by throwing from `execute()` — returning error text is still a successful tool call. Only throw for actual invalid usage or capability-unavailable conditions, not for valid searches that find zero results.
+- Use `pnpm typecheck:ai` for project-reference builds; do not substitute ad-hoc `tsc --noEmit` invocations.
+- Signal real tool failures by throwing from `execute()`, or return `isError: true` when preserving structured failure data. Error text alone is still success. Valid searches with zero results are not failures.
 - `pi -p "Say ok" --model openai-codex/<model> --no-session` — quick repro harness for provider request errors; Codex rides the WebSocket transport under `transport: auto`, set `"transport": "sse"` in `~/.pi/agent/settings.json` to instrument the HTTP path.
 
-> For per-package gotchas (session entry parsing, message rendering, config patterns, WASM quirks), see individual `packages/*/CLAUDE.md` files — surfaced by `code_orientation(focus="packages/...")` when the agent orients into that directory.
+> For per-package gotchas (session entry parsing, message rendering, config patterns, WASM quirks), see individual `packages/*/CLAUDE.md` files — surfaced by `code_orientation({ focus: { path: "packages/..." } })` when the agent orients into that directory.
 ## Publish pipeline
 
-Published npm tarballs must produce npm-compatible manifests because PI installs packages via `npm install`. The pipeline has four stages:
+Use the staging pipeline, not direct `pnpm pack`: workspace packing can emit `../` dependency paths. Staging dereferences workspace symlinks, exports npm-compatible manifests (rewrites `workspace:` ranges, strips dev dependencies, preserves bundled dependencies), then runs `npm pack` and validates paths/manifests and extraction.
 
-1. **Standalone staging** — `scripts/pack-staged.mjs` copies a workspace package into a clean staging directory, dereferencing workspace symlinks.
-2. **Manifest export** — `scripts/staged-manifests.mjs` uses pnpm's `@pnpm/exportable-manifest` to rewrite staged workspace `package.json` files: `workspace:*` → exact version (`1.5.0`), `workspace:~` → `~1.5.0`, `workspace:^` → `^1.5.0`. It also strips `devDependencies` from publish manifests so private workspace-only test utilities never leak, and preserves `bundledDependencies`.
-3. **npm pack + tarball verification** — The cleaned staged directory is packed with `npm pack`, then `scripts/verify-tarball.mjs` rejects `../` paths and `workspace:` protocol in every packed `package.json` and checks extraction succeeds.
-
-Run:
 ```bash
-node scripts/publish.mjs packages/supi-lsp     # pack + verify
-node scripts/publish.mjs packages/supi-lsp --publish  # pack + verify + publish
+node scripts/publish.mjs packages/supi-lsp           # pack + verify
+node scripts/publish.mjs packages/supi-lsp --publish # pack + verify + publish
 ```
 
-`pack:check` runs this pipeline as a dry-run for all publishable packages. `pack:verify` runs the full pack + tarball verification for all publishable packages via a parallel Node.js runner (`scripts/pack-all.mjs`).
-
-Root cause: direct `pnpm pack` on workspace packages emits `../` tarball paths into root `node_modules`; staging dereferences symlinks so `npm pack` sees a flat tree.
+`pack:check` and `pack:verify` are aliases for full packing and tarball verification of all publishable packages; neither publishes.
 
 ## Release & tagging convention
 
-- **Single tag per release**: `vX.Y.Z` (not per-package tags), driven by release-please configured at the repo root with `include-component-in-tag: false`.
-- **Single GitHub release**: One release matching the tag — release-please creates it when the release PR is merged.
-- **Unified versioning**: All `packages/*/package.json` versions are synced in lockstep by release-please via `extra-files` in `release-please-config.json`. If any package triggers a breaking change, every package bumps major.
-- **Config files**:
-  - `release-please-config.json` — single root (`.`) package with `release-type: node`, `include-component-in-tag: false`, and all framework package.jsons listed in `extra-files`
-  - `.release-please-manifest.json` — single entry `{".": "<version>"}`
-- Per-package npm publish uses the matching version from the workspace.
-- Release-please manages the `.release-please-manifest.json` automatically — do not edit it manually.
+- Release-please creates one `vX.Y.Z` tag and one GitHub release, not per-package tags.
+- Publishable packages listed in `release-please-config.json` `extra-files` share the root version; a breaking change bumps them together. Private `supi-test-utils` and `supi-skill-patches` are outside this version lockstep.
+- Release-please owns `.release-please-manifest.json`; do not edit it manually.
 
 ## Agent skills
 
-### Issue tracker
-
-GitHub Issues (`gh` CLI). External PRs are not a triage surface. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Multi-context — `GLOSSARY-MAP.md` at root pointing to per-package `GLOSSARY.md` files + per-package `docs/adr/`. See `docs/agents/domain.md`.
+- GitHub Issues (`gh`) are the tracker; external PRs are not a triage surface. See `docs/agents/issue-tracker.md`.
+- Use the triage vocabulary in `docs/agents/triage-labels.md`.
+- `CONTEXT-MAP.md` links domain contexts and ADRs; follow `docs/agents/domain.md` for domain-model changes.
 
 ## Testing patterns
 
 - `vi.hoisted()` callbacks execute before imports — must be inline arrow functions, cannot reference imported values; each test file needs its own top-level `vi.hoisted` + `vi.mock` calls (supports single-value and object patterns, can't share through helpers)
-- Biome enforces `noExcessiveLinesPerFunction` (120) and `noExcessiveLinesPerFile` (400, style) on test files too — split large describe blocks into separate test files
-- Use `createPiMock()` / `makeCtx()` from `@mrclrchtr/supi-test-utils` for pi mocks instead of defining local factories — includes `events`, `getActiveTools`, `sendMessage`, `registerShortcut`, `exec`, `emit`, and `getAllTools`
-- Extension integration tests: mock internal modules, create fake `pi` object capturing handlers via `Map`, then call handlers directly
-- Package-scoped commands: `pnpm vitest run packages/<pkg>/`, `pnpm exec biome check packages/<pkg>`, `pnpm exec tsc -b packages/<pkg>/tsconfig.json`. For shared-config changes, sweep `packages/supi-core/ packages/supi-lsp/ packages/supi-claude-md/`.
+- Biome's function/file line limits are disabled under `__tests__`; production source remains subject to configured limits and explicit overrides.
+- Use `createPiMock()` / `makeCtx()` from `@mrclrchtr/supi-test-utils`, not local factories. For extension integration tests, mock internal boundaries and invoke captured handlers directly.
+- For shared-config changes, include regression coverage across `supi-core`, `supi-lsp`, and `supi-claude-md`.
 - Global-scope tests for `defineConfigSettings` should pass `homeDir` in the options object rather than mutating `process.env.HOME`.
 - `pnpm exec biome check --write --unsafe <files>` — auto-fix unused imports. `--max-diagnostics=20` caps output when the full check OOMs.
 - `ctx.ui.select()` accepts only `string[]`; use label-encoding (e.g. `"[id] name"`) if you need metadata
 - `vi.useFakeTimers()` + `vi.advanceTimersByTime(ms)` — required to trigger `setInterval` callbacks in vitest
-- Vitest 4.x: constructor mocks inside `vi.mock` factories must use `class` (not `vi.fn().mockImplementation`), hoisting errors propagate from the importing module (check the Caused-by chain), and prefer static `import { x }` over dynamic `await import()` — dynamic imports interact inconsistently with `vi.mock` hoisting
+- Prefer `class` for constructor mocks inside `vi.mock` factories. Hoisting errors propagate from the importing module (check the Caused-by chain); prefer static imports where dynamic imports interact with mock hoisting.
 - Shared `createPiMock` stores handlers as `Map<string, handler[]>`; access via `handlers.get(event)?.[0]` — use `getHandlerOrThrow(pi, event)` from `@mrclrchtr/supi-test-utils` to avoid Biome `noNonNullAssertedOptionalChain` (blocks CI)
 - `pnpm vitest run` strips types (esbuild) — always run per-package `pnpm exec tsc -b packages/<pkg>/tsconfig.json packages/<pkg>/__tests__/tsconfig.json` alongside.
-- Adding exports to `supi-core/index.ts` or deleting source files breaks every downstream `vi.mock` factory — audit all consuming test files for stale mocks after module changes
+- When public exports change, audit downstream mocks for the domain entrypoints consumers actually import; missing mocked exports fail at runtime.
 - **Removing code may leave `// biome-ignore` suppression comments unused** — Biome flags these; remove them
 - **Changing state shape requires updating every `createInitialState` mock in test files** — keep mock shapes in sync with real types
 - New installable extension package: add `package.json` + `tsconfig.json` + `__tests__/tsconfig.json` (`{"extends": "../../../tsconfig.json", "include": ["**/*.ts", "../src/**/*.ts"], "exclude": []}`), wire it into root `pi.extensions`, and run `pnpm install`. Library-only packages use the same package/test configs but must not enter `pi.extensions`.

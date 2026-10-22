@@ -2,26 +2,20 @@
 
 ## Scope
 
-`@mrclrchtr/supi-tree-sitter` is a **library-only** package with two explicit surfaces:
-- `@mrclrchtr/supi-tree-sitter/api` → `src/api.ts` → exports the owned session factory, lifecycle controller, language and operation-support helpers, and shared result types.
-- `@mrclrchtr/supi-tree-sitter/provider/tree-sitter-provider` → `src/provider/tree-sitter-provider.ts` → exports the shared `StructuralProvider` adapter.
-
-Raw runtime and extraction helpers are Worker-internal.
-
-This package has **no pi extension surface** — no `pi.extensions`, no `src/extension.ts`, no `./extension` export. Public tool registration and session lifecycle handlers live in `@mrclrchtr/supi-code-intelligence`. The package does not depend on `supi-lsp` and must remain correct when installed independently.
+This library owns parser-backed structural analysis. Raw runtime and extraction helpers are Worker-internal. `supi-code-intelligence` alone owns public tool registration and session lifecycle handlers; do not add a Pi extension here.
 
 ## WASM vendoring strategy
 
 All grammar WASM files are **vendored** in `resources/grammars/<id>/` and shipped with the package. The native `tree-sitter-*` npm packages are `devDependencies` only — they are never resolved at runtime.
 
-- **13 prebuilt grammars from 12 npm packages** (javascript, typescript, tsx, python, rust, go, c, cpp, java, ruby, bash, html, r) ship `.wasm` — `tree-sitter-typescript` provides both `typescript` and `tsx`. Copied by `scripts/vendor-wasm.mjs`.
+- Copy prebuilt WASM with `scripts/vendor-wasm.mjs`; `tree-sitter-typescript` supplies both TypeScript and TSX.
 - **Kotlin** (`tree-sitter-kotlin`) does not ship `.wasm` — built from source by `scripts/generate-kotlin-wasm.mjs` using `tree-sitter-cli`.
 - **SQL** (`@derekstride/tree-sitter-sql`) does not ship `.wasm` — built from source by `scripts/generate-sql-wasm.mjs` using `tree-sitter-cli`.
 - **LaTeX** (`@pfoerster/tree-sitter-latex`) does not ship `.wasm` — built from source by `scripts/generate-latex-wasm.mjs` using `tree-sitter-cli`. The script also copies and checks the upstream MIT `LICENSE` in `resources/grammars/latex/`.
 
 ### When to regenerate
 
-Run `pnpm --filter @mrclrchtr/supi-tree-sitter generate:all-wasm` to refresh every artifact. Use `vendor:wasm` only when the pre-built grammar packages changed.
+Refresh every artifact after grammar or CLI updates. Use `vendor:wasm` alone only when the prebuilt grammar packages changed.
 
 After any `tree-sitter-cli` update, first verify the resolved version:
 
@@ -65,23 +59,9 @@ Vendored WASM metadata (`.wasm.json`) tracks the source npm package version and 
 - CRLF input needs normalized line splitting in coordinate helpers and `node_at` bounds to stay LSP-compatible.
 - Outline remains shallow for existing grammars. For JavaScript/TypeScript, Python, Java, Go, Rust, C, and C++, it also extracts named declarations nested in functions and types. Do not index local variables, parameters, destructuring, or anonymous expressions as declarations.
 - `outline` supports every parser grammar. HTML outline evidence is limited to elements with non-empty `id` attributes; SQL outline evidence is limited to supported `CREATE` declarations plus shallow table/type members. Ruby gemspecs and KornShell files reuse the Ruby and Bash grammars. ERB and Go module manifests stay semantic-only because their syntax is not Ruby or Go source. `imports` supports JavaScript, TypeScript, TSX, Python `import`/`from`, Java ordinary/static imports, Go single/grouped imports, Rust `use`/`extern crate`/external `mod`, C/C++ literal includes, and LaTeX directives. It does not include dynamic loaders, computed specifiers, inline Rust modules, macro-generated targets, or include-macro expansion. `exports` supports JavaScript, TypeScript, and TSX. LaTeX imports include package, class, source, and bibliography directives. `call-sites` supports every parser grammar except HTML, SQL, and LaTeX. `getStructuralSearchSupportedExtensions()` is the authoritative public declaration used by AST Scan eligibility. The runtime also exposes a `query()` method on `TreeSitterSession` that works across all parser grammars.
-- `pnpm peers check` currently reports missing `tree-sitter` peers for `@derekstride/tree-sitter-sql` and `tree-sitter-kotlin`; these grammar packages are dev-only WASM generators, so treat that warning as known workspace noise unless the vendoring strategy changes.
-
-## Packaging
-
-- Native `tree-sitter-*` packages are `devDependencies` only — NOT bundled or resolved at runtime
-- `web-tree-sitter` and `jiti` are runtime dependencies and bundled dependencies
-- All grammar WASM files are vendored in `resources/` and shipped via the `files` field (`"resources"` entry in `package.json`)
-- This reduces `npm pack` size for consumers by ~89% compared to bundling native npm packages
 
 ## Layering
 
-`supi-tree-sitter` is the structural substrate in SuPi's code-understanding stack:
-
-1. `supi-tree-sitter` — parser-backed structural analysis (this package, library-only)
-2. `supi-lsp` — live semantic analysis through language servers (library-only)
-3. `supi-code-intelligence` — unified agent-facing layer above both (**the sole host for extension registration**)
-
-Keep this package independent of `supi-lsp` internals. Put shared capability state in `supi-code-runtime` and generic utilities in `supi-core`.
+Keep this package independent of `supi-lsp` internals and correct when installed independently. Put shared capability state in `supi-code-runtime` and generic utilities in `supi-core`.
 
 `WorkspaceRuntime` is the only process-shared provider seam. `TreeSitterRuntimeController` receives a `WorkspaceRuntime` in its constructor and registers or clears the structural provider for its cwd. Use `createTreeSitterSession()` only when you need an explicitly owned Worker lifecycle, and await its disposal.

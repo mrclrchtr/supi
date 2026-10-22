@@ -8,18 +8,11 @@ This package is skills-only in behavior. Its thin extension registers bundled sk
 
 Runtime instruction-file surfacing is owned by `@mrclrchtr/supi-code-intelligence`: `code_orientation` with a directory focus surfaces applicable `CLAUDE.md`/`AGENTS.md` files as part of explicit orientation.
 
-## Key files
-
-- `src/claude-md.ts`: resource-discovery-only extension entry point
-- `src/extension.ts`: package extension export
-- `skills/claude-md-improver`: bulk audit and scoring workflow for CLAUDE.md files
-- `skills/claude-md-revision`: targeted session-capture additions to CLAUDE.md/AGENTS.md
-
 ## Skills
 
 Two skills are shipped under `skills/`:
 
-- `claude-md-improver`: bulk audit and scoring of CLAUDE.md files across the repo. Includes SuPi-aware baseline review: compares CLAUDE.md sections against the context already delivered by `supi-code-intelligence` (workspace module graph and directory instruction-file orientation), then flags redundant sections or compressible overlap
+- `claude-md-improver`: bulk audit and scoring of CLAUDE.md files. Compares instructions with the delivered workspace overview and non-instruction facts from routine Orientation; flags redundant inventories while preserving human-only reasoning.
 - `claude-md-revision`: targeted session-capture additions to CLAUDE.md
 
 Both skills share a set of reference files (`references/quality-criteria.md`, `references/templates.md`, `references/update-guidelines.md`). The revision skill duplicates these for self-containment. **When editing one copy, keep the other in sync**; `__tests__/unit/skill-references-sync.test.ts` enforces this.

@@ -4,39 +4,11 @@
 
 `@mrclrchtr/supi-insights` is a PI extension that scans historical sessions, extracts metadata and LLM facets, and generates HTML reports. Command surface is `/supi-insights`, not `/insights`.
 
-## Package layout
-
-Source stays flat per convention. Tests are organized into `__tests__/unit/`.
-
-```
-src/
-├── extension.ts      # PI extension entrypoint
-├── insights.ts       # Extension factory — registers /supi-insights and settings
-├── aggregator.ts     # Pure data aggregation + multi-clauding detection
-├── cache.ts          # Facet and metadata caching
-├── extractor.ts      # LLM facet extraction via supi-core PI-owned requests
-├── generator.ts      # Parallel narrative insight generation (7 sections)
-├── insight-schemas.ts # TypeBox schemas and derived result types
-├── html.ts           # HTML report renderer with CSS bar charts
-├── parser.ts         # JSONL parsing, transcript extraction, tool stat aggregation
-├── scanner.ts        # Session discovery via SessionManager.listAll()
-├── types.ts          # Shared TypeScript types
-├── utils.ts          # Chart helpers, label mappings, text utilities
-├── report.css        # HTML report styling
-└── report.js         # HTML report interactivity
-__tests__/
-├── tsconfig.json
-└── unit/
-    ├── aggregator.test.ts
-    ├── parser.test.ts
-    └── utils.test.ts
-```
-
 ## Session file parsing
 
 - PI session files are append-only trees. The active branch is the path from the **last entry** (current leaf) back to root via `parentId` — do not analyze every entry in the file.
 - When parsing raw session files directly (bypassing `SessionManager`), call `migrateSessionEntries(entries)` after `parseSessionEntries()` to handle legacy v1/v2 files that lack `id`/`parentId`.
-- `buildSessionContext()` is the PI-native way to resolve branch paths; use it when possible instead of manual tree walks.
+- Use `getActiveBranchEntries()` from `@mrclrchtr/supi-core/session` for raw active-branch entries. `buildSessionContext()` builds model-message context, including compaction and context edits; it is not a raw-entry traversal.
 
 ## Caching
 
