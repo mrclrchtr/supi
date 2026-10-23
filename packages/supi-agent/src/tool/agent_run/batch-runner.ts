@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { Usage } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AgentRunRegistry } from "@mrclrchtr/supi-agent-runtime/api";
-import { combineAgentRunUsage } from "@mrclrchtr/supi-agent-runtime/api";
+import {
+  type AgentRunAuxiliaryModelSnapshot,
+  captureAgentRunAuxiliaryModels,
+  combineAgentRunUsage,
+  raceAgentRunStartup,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import type { ProfileCatalogue } from "../../types.ts";
 import type { ResolvedTask } from "./batch-preflight.ts";
 import { preflightDelegationBatch } from "./batch-preflight.ts";
@@ -50,6 +55,17 @@ function copyProgress(progress: BatchTaskProgress): BatchTaskProgress {
   };
 }
 
+function applyAuxiliaryModelSnapshot(
+  task: ResolvedTask,
+  snapshot: AgentRunAuxiliaryModelSnapshot | undefined,
+): ResolvedTask {
+  const { authorizedAuxiliaryModels: previousSnapshot, ...inputs } = task.inputs;
+  void previousSnapshot;
+  return task.profile.manifest.tools.includes("codemode") && snapshot
+    ? { ...task, inputs: { ...inputs, authorizedAuxiliaryModels: snapshot } }
+    : { ...task, inputs };
+}
+
 // ── Compatibility foreground interface ───────────────────────────
 
 /**
@@ -75,17 +91,59 @@ export async function runDelegationBatch(
   // Capture plain data before asynchronous child work. Do not retain the ExtensionContext.
   const cwd = ctx.cwd;
   const signal = ctx.signal ?? undefined;
-  return startDelegationBatch({
-    params,
-    tasks: preflightResult.tasks,
-    cwd,
-    ...(signal ? { signal } : {}),
-    ...(registry ? { registry } : {}),
-    ...(onUpdate ? { onUpdate } : {}),
-  }).result;
+  const startup = startDelegationBatchWithAuxiliaryModels(
+    {
+      params,
+      tasks: preflightResult.tasks,
+      cwd,
+      ...(signal ? { signal } : {}),
+      ...(registry ? { registry } : {}),
+      ...(onUpdate ? { onUpdate } : {}),
+    },
+    () => !signal?.aborted,
+  );
+  return (await startup.result).result;
 }
 
 // ── Background-capable batch runner ──────────────────────────────
+
+/**
+ * Capture auxiliary model authority once when at least one task opted in. The caller refreshes this
+ * for every top-level batch, including follow-ups; non-opted-in batches do not query the catalogue.
+ */
+function captureDelegationBatchAuxiliaryModels(
+  tasks: readonly ResolvedTask[],
+): Promise<AgentRunAuxiliaryModelSnapshot | undefined> {
+  const optedInTask = tasks.find((task) => task.profile.manifest.tools.includes("codemode"));
+  return optedInTask
+    ? captureAgentRunAuxiliaryModels(optedInTask.inputs.providerAuthority)
+    : Promise.resolve(undefined);
+}
+
+/**
+ * Capture auxiliary authority once, then start only while the caller's invocation fence remains
+ * open. Discovery itself is uncancelable; `settled` lets the owning controller await it on shutdown.
+ */
+export function startDelegationBatchWithAuxiliaryModels(
+  options: Omit<StartDelegationBatchOptions, "authorizedAuxiliaryModels">,
+  canStart: () => boolean,
+  signal: AbortSignal | undefined = options.signal,
+): {
+  result: Promise<DelegationBatchHandle>;
+  settled: Promise<void>;
+} {
+  const discovery = captureDelegationBatchAuxiliaryModels(options.tasks);
+  const raced = raceAgentRunStartup(discovery, signal);
+  const result = raced.result.then((authorizedAuxiliaryModels) => {
+    if (!canStart()) throw new Error("Delegation start canceled.");
+    return startDelegationBatch({
+      ...options,
+      ...(authorizedAuxiliaryModels ? { authorizedAuxiliaryModels } : {}),
+    });
+  });
+  const settled = Promise.allSettled([raced.settled, result]).then(() => undefined);
+  return { result, settled };
+}
 
 /**
  * Start a validated Delegation Batch without waiting for child setup or results.
@@ -157,9 +215,13 @@ export function startDelegationBatch(options: StartDelegationBatchOptions): Dele
       const task = tasks[index];
       const runKey = runKeys.get(task.taskId);
       if (!runKey) throw new Error(`Missing run key for task "${task.taskId}".`);
+      const taskWithAuxiliaryModels = applyAuxiliaryModelSnapshot(
+        task,
+        options.authorizedAuxiliaryModels,
+      );
       const started = startBatchTask({
         params,
-        task,
+        task: taskWithAuxiliaryModels,
         batchId,
         runKey,
         cwd: options.cwd,
@@ -174,7 +236,7 @@ export function startDelegationBatch(options: StartDelegationBatchOptions): Dele
           results[index] = result;
           if (!startFailed) {
             try {
-              onTaskResult?.(result);
+              onTaskResult?.(result, batchId);
             } catch {
               // Result observers cannot change batch execution.
             }

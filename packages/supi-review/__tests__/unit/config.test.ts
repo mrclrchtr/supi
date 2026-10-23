@@ -36,6 +36,7 @@ describe("review config", () => {
     try {
       expect(loadReviewConfig(path.join(homeDir, "repo"), homeDir)).toEqual({
         agentToolEnabled: true,
+        reviewerCodemodeEnabled: false,
         agentModel: CURRENT_SESSION_REVIEW_MODEL,
         plannerModel: CURRENT_SESSION_REVIEW_MODEL,
         reviewerThinkingLevel: "max",
@@ -59,6 +60,7 @@ describe("review config", () => {
         { section: REVIEW_CONFIG_SECTION, scope: "project", cwd },
         {
           agentToolEnabled: false,
+          reviewerCodemodeEnabled: true,
           agentModel: "  openai/reviewer  ",
           plannerModel: "  openai/planner  ",
           recoveryModel: "  openai/recovery  ",
@@ -72,6 +74,7 @@ describe("review config", () => {
 
       expect(loadReviewConfig(cwd, homeDir)).toEqual({
         agentToolEnabled: false,
+        reviewerCodemodeEnabled: true,
         agentModel: "openai/reviewer",
         plannerModel: "openai/planner",
         recoveryModel: "openai/recovery",
@@ -134,6 +137,7 @@ describe("review config", () => {
         defaults: REVIEW_DEFAULTS,
         fields: [
           expect.objectContaining({ kind: "boolean", key: "agentToolEnabled" }),
+          expect.objectContaining({ kind: "boolean", key: "reviewerCodemodeEnabled" }),
           expect.objectContaining({ kind: "modelPicker", key: "agentModel" }),
           expect.objectContaining({
             kind: "enum",

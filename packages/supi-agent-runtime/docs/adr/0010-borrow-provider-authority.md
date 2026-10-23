@@ -8,9 +8,11 @@ PI 0.83 does not expose the containing `ModelRuntime` through `ExtensionContext`
 
 - delegates the current provider implementation and model stream methods;
 - resolves provider authentication on every request;
-- combines model-specific request key, headers, and environment when PI exposes them;
+- resolves chat-model request keys, headers, environment, and effective base URLs for the exact chat model being dispatched;
 - preserves provider-owned OAuth refresh, runtime credentials, base URLs, and custom streams;
 - keeps child provider registration local to the Agent Run.
+
+For explicitly opted-in codemode children, callers capture `captureAgentRunAuxiliaryModels(authority)` once per top-level invocation and pass that immutable classifier/image catalogue as `AgentSessionInputs.authorizedAuxiliaryModels`. Omission leaves auxiliary access empty. The child runtime exposes only this snapshot for auxiliary enumeration and provider/model lookup, and validates the same snapshot again at dispatch. Classifier and image requests are delegated to the containing registry with the authorized model identity and cancellation signal only. The parent registry resolves that model's request-time auth, headers, and endpoint; auth prepared for the currently selected chat model is never forwarded to an auxiliary request. The snapshot is not refreshed during a run, and credentials are not copied into model-facing catalogue data.
 
 For each delegated request, the adapter keeps the matching parent catalog model when available, so provider-specific model metadata and custom stream behavior remain active. It then applies the effective `baseUrl` from the prepared child model to the delegated model for both `stream` and `streamSimple`. If catalog lookup fails, it applies the same endpoint to the authorized fallback.
 

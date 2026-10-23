@@ -930,6 +930,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
               options.inputs.model as Model<Api>,
               ...((options.inputs.authorizedContinuationModels ?? []) as Model<Api>[]),
             ],
+            options.inputs.authorizedAuxiliaryModels,
           );
           selectAuthorizedModel = createdModelRuntime.selectModel;
           const modelRuntime = createdModelRuntime.runtime;

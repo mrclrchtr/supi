@@ -110,6 +110,7 @@ export function makeRunReviewExecute(
         scope: input.scope,
         reviewerModel,
         reviewerThinkingLevel,
+        reviewerCodemodeEnabled: config.reviewerCodemodeEnabled,
         ...(recoveryModel ? { recoveryModel } : {}),
         ...(config.recoveryModel !== "disabled" &&
         config.recoveryModel !== CURRENT_SESSION_REVIEW_MODEL &&

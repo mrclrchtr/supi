@@ -134,6 +134,7 @@ function commandContext(selects: Array<string | undefined>, editors: Array<strin
     hasUI: true,
     ui: { ...makeCtx().ui, select, editor, confirm: vi.fn(async () => true), custom },
     sessionManager: { getEntries: vi.fn(() => []), getLeafId: vi.fn(() => null) },
+    modelRegistry: {} as never,
   });
   return { ctx, components, custom, editor, select };
 }
@@ -165,6 +166,7 @@ describe("/supi-review task editing", () => {
     mocks.loaders.length = 0;
     mocks.loadReviewConfig.mockReturnValue({
       agentToolEnabled: false,
+      reviewerCodemodeEnabled: false,
       agentModel: "current",
       plannerModel: "provider/planner",
       reviewerThinkingLevel: "high",
@@ -304,7 +306,19 @@ describe("/supi-review task editing", () => {
     await commandPromise;
   });
 
-  it("keeps Planner modes as visible choices and retains Planner-assisted provenance after edits", async () => {
+  it("keeps Planner modes visible while forwarding Reviewer codemode opt-in only to reviewer execution", async () => {
+    mocks.loadReviewConfig.mockReturnValue({
+      agentToolEnabled: false,
+      reviewerCodemodeEnabled: true,
+      agentModel: "current",
+      plannerModel: "provider/planner",
+      reviewerThinkingLevel: "high",
+      plannerThinkingLevel: "medium",
+      recoveryModel: "disabled",
+      auditEnabled: false,
+      bootstrapCommand: "",
+      postReviewPolicy: "report",
+    });
     const command = commandContext(
       [
         "Current work",
@@ -321,7 +335,10 @@ describe("/supi-review task editing", () => {
     await runCommand(command);
 
     expect(mocks.draftReviewTasks).toHaveBeenCalledWith(
-      expect.objectContaining({ plannerThinkingLevel: "medium" }),
+      expect.objectContaining({
+        plannerThinkingLevel: "medium",
+        reviewerCodemodeEnabled: true,
+      }),
     );
     expect(command.select).toHaveBeenCalledWith("Review Mode for change (current: change)", [
       "change",
@@ -337,6 +354,7 @@ describe("/supi-review task editing", () => {
         expectedSnapshotTarget: { workingTree: { from: head } },
         planning,
         provenance: "planner-assisted",
+        reviewerCodemodeEnabled: true,
         review: {
           tasks: [
             { id: "change", instructions: "Edited change task.", mode: "change" },

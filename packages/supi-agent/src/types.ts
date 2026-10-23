@@ -40,7 +40,8 @@ export type AgentCapabilityId =
   | "code_orientation"
   | "code_graph"
   | "code_find"
-  | "code_health";
+  | "code_health"
+  | "codemode";
 
 /** Values accepted by PI's model thinking policy. */
 export type AgentThinkingLevel = ModelThinkingLevel;

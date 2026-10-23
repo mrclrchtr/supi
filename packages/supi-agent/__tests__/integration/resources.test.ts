@@ -83,6 +83,11 @@ describe("profile resource policy", () => {
     });
 
     await inputs.resourceLoader.reload();
+    expect(
+      inputs.resourceLoader
+        .getExtensions()
+        .extensions.flatMap((extension) => [...extension.tools.keys()]),
+    ).not.toContain("codemode");
     expect(inputs.resourceLoader.getSystemPrompt()).toBe("complete custom prompt");
     expect(inputs.resourceLoader.getAppendSystemPrompt()).toEqual([]);
     expect(inputs.resourceLoader.getAgentsFiles().agentsFiles.map((file) => file.content)).toEqual(
@@ -107,6 +112,38 @@ describe("profile resource policy", () => {
     await nativeInputs.resourceLoader.reload();
     expect(nativeInputs.resourceLoader.getSystemPrompt()).toBeUndefined();
     expect(nativeInputs.resourceLoader.getSystemPromptSource()).toBeUndefined();
+  });
+
+  it("loads headless Code Intelligence and codemode only for an opted-in profile", async () => {
+    const profile: AgentProfile = {
+      id: "codemode",
+      source: "global",
+      directory: "/profiles/codemode",
+      manifest: {
+        description: "codemode",
+        tools: ["read", "code_find", "codemode"],
+        systemPrompt: "native",
+        instructionScopes: [],
+      },
+    };
+    const inputs = createAgentSessionInputs({
+      cwd: "/project",
+      agentDir: "/agent",
+      projectTrusted: false,
+      providerAuthority,
+      model: { provider: "openai", id: "gpt-5", reasoning: false } as never,
+      thinkingLevel: "off",
+      profile,
+    });
+
+    await inputs.resourceLoader.reload();
+    const extensions = inputs.resourceLoader.getExtensions().extensions;
+    const registeredTools = extensions.flatMap((extension) => [...extension.tools.keys()]);
+    expect(inputs.tools).toEqual(["read", "code_find", "codemode"]);
+    expect(registeredTools).toContain("codemode");
+    expect(registeredTools).toContain("code_find");
+    expect(registeredTools).toContain("code_resolve");
+    expect(extensions).toHaveLength(2);
   });
 
   it("keeps the package-owned Code Intelligence profile headless", async () => {

@@ -294,6 +294,7 @@ async function draftInteractiveReview(
       plannerContext: collectPlannerContext(session.messages),
       plannerModel,
       plannerThinkingLevel,
+      reviewerCodemodeEnabled: config.reviewerCodemodeEnabled,
       signal,
     }),
   );
@@ -350,6 +351,7 @@ async function executeInteractiveReview(
         scope: input.scope,
         reviewerModel: input.reviewerModel,
         reviewerThinkingLevel: input.reviewerThinkingLevel,
+        reviewerCodemodeEnabled: config.reviewerCodemodeEnabled,
         ...(recoveryModel ? { recoveryModel } : {}),
         ...(config.recoveryModel !== "disabled" &&
         config.recoveryModel !== CURRENT_SESSION_REVIEW_MODEL &&

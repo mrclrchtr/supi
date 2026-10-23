@@ -29,11 +29,27 @@ vi.mock("../../src/git.ts", async (original) => {
 });
 vi.mock("../../src/tool/review_run/runner.ts", () => ({ runReviewer: mocks.runReviewer }));
 
+import type { AgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/api";
 import { isRootCommit, resolveReviewSnapshot } from "../../src/git.ts";
 import { runReview } from "../../src/tool/review_run/workflow.ts";
 import type { ReviewModelSelection, ReviewTask } from "../../src/types.ts";
 
 vi.setConfig({ testTimeout: 20_000 });
+
+let cancelPendingReviews: Array<() => void> = [];
+let releasePendingCatalogues: Array<() => void> = [];
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((complete) => {
+    resolve = complete;
+  });
+  return { promise, resolve };
+}
+
+function timeout(ms: number): Promise<"timeout"> {
+  return new Promise((resolve) => setTimeout(() => resolve("timeout"), ms));
+}
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
@@ -87,7 +103,144 @@ describe("runReview exact Review Target workflow", () => {
     successfulReviewer();
   });
 
-  afterEach(() => rmSync(cwd, { recursive: true, force: true }));
+  afterEach(() => {
+    for (const cancel of cancelPendingReviews) cancel();
+    cancelPendingReviews = [];
+    for (const release of releasePendingCatalogues) release();
+    releasePendingCatalogues = [];
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it("captures one auxiliary catalogue per opted-in Review and shares it across Reviewer fanout", async () => {
+    const getAvailableAuxiliaryModels = vi.fn().mockResolvedValue({
+      classifiers: [{ provider: "classifier-provider", id: "reviewer-classifier" }],
+      images: [{ provider: "image-provider", id: "reviewer-image" }],
+    });
+    const providerAuthority = {
+      getAvailableAuxiliaryModels,
+      classify: vi.fn(),
+      generateImages: vi.fn(),
+    } as unknown as AgentRunProviderAuthority;
+    const reviewInput = { tasks: [stateTask, { ...stateTask, id: "state-2" }] };
+
+    await runReview({
+      cwd,
+      target: {},
+      review: reviewInput,
+      reviewerModel: model,
+      providerAuthority,
+    });
+    expect(getAvailableAuxiliaryModels).not.toHaveBeenCalled();
+    expect(
+      mocks.runReviewer.mock.calls.every(
+        ([invocation]) => !("authorizedAuxiliaryModels" in invocation),
+      ),
+    ).toBe(true);
+
+    mocks.runReviewer.mockClear();
+    const usage = (value: number) => ({
+      input: value,
+      output: value,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: value * 2,
+      cost: { input: value, output: value, cacheRead: 0, cacheWrite: 0, total: value * 2 },
+    });
+    for (const value of [1, 2]) {
+      mocks.runReviewer.mockImplementationOnce(async (invocation) => ({
+        kind: "success",
+        modelId: model.canonicalId,
+        reviewerExtensionSetStatus: "active",
+        usage: usage(value),
+        value: {
+          summary: `Reviewed ${invocation.task.id}.`,
+          findings: [],
+          criteriaCoverage: { status: "complete" },
+        },
+      }));
+    }
+    const enabledOutcome = await runReview({
+      cwd,
+      target: {},
+      review: reviewInput,
+      reviewerModel: model,
+      providerAuthority,
+      reviewerCodemodeEnabled: true,
+    });
+
+    expect(enabledOutcome).toMatchObject({
+      kind: "completed",
+      usage: {
+        input: 3,
+        output: 3,
+        totalTokens: 6,
+        cost: { input: 3, output: 3, total: 6 },
+      },
+    });
+    expect(getAvailableAuxiliaryModels).toHaveBeenCalledOnce();
+    const snapshots = mocks.runReviewer.mock.calls.map(
+      ([invocation]) => invocation.authorizedAuxiliaryModels,
+    );
+    expect(snapshots).toHaveLength(2);
+    expect(snapshots[0]).toBe(snapshots[1]);
+    expect(snapshots[0]).toMatchObject({
+      classifiers: [{ provider: "classifier-provider", id: "reviewer-classifier" }],
+      images: [{ provider: "image-provider", id: "reviewer-image" }],
+    });
+    expect(Object.isFrozen(snapshots[0])).toBe(true);
+
+    mocks.runReviewer.mockClear();
+    await runReview({
+      cwd,
+      target: {},
+      review: { tasks: [stateTask] },
+      reviewerModel: model,
+      providerAuthority,
+      reviewerCodemodeEnabled: true,
+    });
+    expect(getAvailableAuxiliaryModels).toHaveBeenCalledTimes(2);
+    expect(mocks.runReviewer.mock.calls[0]?.[0].authorizedAuxiliaryModels).not.toBe(snapshots[0]);
+  });
+
+  it("returns on cancellation while catalogue lookup is pending and never starts late workflow work", async () => {
+    const catalogue = deferred<{
+      classifiers: never[];
+      images: never[];
+    }>();
+    releasePendingCatalogues.push(() => catalogue.resolve({ classifiers: [], images: [] }));
+    const getAvailableAuxiliaryModels = vi.fn(() => catalogue.promise);
+    const providerAuthority = {
+      getAvailableAuxiliaryModels,
+      classify: vi.fn(),
+      generateImages: vi.fn(),
+    } as unknown as AgentRunProviderAuthority;
+    const controller = new AbortController();
+    cancelPendingReviews.push(() => controller.abort());
+    const beforeWorktrees = git(cwd, "worktree", "list", "--porcelain");
+    const pending = runReview({
+      cwd,
+      target: {},
+      review: { tasks: [stateTask] },
+      reviewerModel: model,
+      providerAuthority,
+      reviewerCodemodeEnabled: true,
+      signal: controller.signal,
+    });
+    const pendingOutcome = pending.then(
+      () => "resolved",
+      () => "rejected",
+    );
+    await vi.waitFor(() => expect(getAvailableAuxiliaryModels).toHaveBeenCalledOnce());
+
+    controller.abort(new Error("Review invocation canceled."));
+    await expect(Promise.race([pendingOutcome, timeout(250)])).resolves.toBe("rejected");
+    await expect(pending).rejects.toThrow("Review invocation canceled.");
+
+    catalogue.resolve({ classifiers: [], images: [] });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mocks.runReviewer).not.toHaveBeenCalled();
+    expect(git(cwd, "worktree", "list", "--porcelain")).toBe(beforeWorktrees);
+  });
 
   it("resolves branch, hash, ~, ^, and peeled tags to exact endpoint commits", async () => {
     const base = git(cwd, "rev-parse", "HEAD");

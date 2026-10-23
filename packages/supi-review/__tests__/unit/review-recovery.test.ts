@@ -64,7 +64,8 @@ function view(messages: unknown[]): AgentRunSessionView {
 describe("Reviewer Submission Recovery", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("recovers a clean missing submission on the original model with only terminal tools", async () => {
+  it("turns off opted-in codemode for submission recovery and leaves only terminal tools", async () => {
+    const authorizedAuxiliaryModels = { classifiers: [], images: [] } as const;
     mocks.runIsolatedChild.mockImplementation(async (config) => {
       config.onSessionCreated?.(
         view([{ role: "assistant", content: [{ type: "text", text: "inspection complete" }] }]),
@@ -78,6 +79,7 @@ describe("Reviewer Submission Recovery", () => {
         activeTools: ["submit_review", "decline_review_recovery"],
         thinkingLevel: "low",
       });
+      expect(step?.activeTools).toEqual(["submit_review", "decline_review_recovery"]);
       expect(step.model).toBeUndefined();
       config.holder.value = {
         summary: "Recovered",
@@ -94,7 +96,9 @@ describe("Reviewer Submission Recovery", () => {
       return { kind: "success", value: config.holder.value };
     });
 
-    await expect(runReviewer(invocation)).resolves.toMatchObject({
+    await expect(
+      runReviewer({ ...invocation, reviewerCodemodeEnabled: true, authorizedAuxiliaryModels }),
+    ).resolves.toMatchObject({
       kind: "success",
       modelId: originalModel.canonicalId,
       submissionRecovery: {
@@ -102,9 +106,12 @@ describe("Reviewer Submission Recovery", () => {
         attempts: [{ modelId: originalModel.canonicalId, outcome: "submitted" }],
       },
     });
-    expect(mocks.runIsolatedChild.mock.calls[0]?.[0].initialActiveTools).not.toContain(
-      "decline_review_recovery",
-    );
+    const runConfig = mocks.runIsolatedChild.mock.calls[0]?.[0];
+    expect(runConfig?.tools).toContain("codemode");
+    expect(runConfig?.initialActiveTools).toContain("codemode");
+    expect(runConfig?.codemode).toBe(true);
+    expect(runConfig?.authorizedAuxiliaryModels).toBe(authorizedAuxiliaryModels);
+    expect(runConfig?.initialActiveTools).not.toContain("decline_review_recovery");
   });
 
   it("uses an explicit cross-provider model once after the original recovery turn", async () => {

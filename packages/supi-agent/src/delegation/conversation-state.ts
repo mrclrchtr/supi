@@ -14,6 +14,20 @@ function isTerminalStatus(status: BatchTaskProgress["status"]): boolean {
 /** Own live conversation locks and one-time background checkpoint payload claims. */
 export class DelegationConversationState {
   readonly #checkpointClaims = new Map<string, string>();
+  readonly #startingConversations = new Set<string>();
+
+  /** Reserve conversation targets while the batch captures invocation-scoped authority. */
+  reserveStarting(targets: readonly { readonly conversationId: string }[]): () => void {
+    for (const target of targets) {
+      if (this.#startingConversations.has(target.conversationId)) {
+        throw new Error(`Conversation "${target.conversationId}" already has an active Agent Run.`);
+      }
+    }
+    for (const target of targets) this.#startingConversations.add(target.conversationId);
+    return () => {
+      for (const target of targets) this.#startingConversations.delete(target.conversationId);
+    };
+  }
 
   /** Reconcile prepared checkpoint payloads with data stored on the active raw branch. */
   reconcile(branch: readonly SessionEntry[], releaseUnstored = false): void {
@@ -76,6 +90,35 @@ export class DelegationConversationState {
     return activity;
   }
 
+  /** Verify a captured invocation still targets the active branch before child startup. */
+  assertCurrentBranch(
+    targets: readonly {
+      readonly conversationId: string;
+      readonly parentCheckpointId: string | null;
+    }[],
+    launchId: string | undefined,
+    branch: readonly SessionEntry[],
+  ): void {
+    if (launchId && !branch.some((entry) => entry.id === launchId)) {
+      throw new Error("Delegation start canceled because its launch left the active branch.");
+    }
+    const conversations = new Map(
+      readSavedDelegationConversations(branch).conversations.map((entry) => [
+        entry.conversationId,
+        entry,
+      ]),
+    );
+    for (const target of targets) {
+      if (target.parentCheckpointId === null) continue;
+      const current = conversations.get(target.conversationId);
+      if (current?.latest?.checkpointId !== target.parentCheckpointId) {
+        throw new Error(
+          `Conversation "${target.conversationId}" changed branches before its follow-up started.`,
+        );
+      }
+    }
+  }
+
   /** Reject conflicts before the controller starts any part of a batch. */
   assertAvailable(
     targets: readonly { taskId: string; conversationId: string }[],
@@ -85,6 +128,9 @@ export class DelegationConversationState {
   ): void {
     const activeBatches = [...batches];
     for (const target of targets) {
+      if (this.#startingConversations.has(target.conversationId)) {
+        throw new Error(`Conversation "${target.conversationId}" already has an active Agent Run.`);
+      }
       for (const batch of activeBatches) {
         const priorTaskId = [...batch.taskConversations].find(
           ([, conversationId]) => conversationId === target.conversationId,

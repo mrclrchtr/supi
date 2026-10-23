@@ -1,12 +1,15 @@
 // biome-ignore lint/style/noExcessiveLinesPerFile: Review Target and Workspace lifecycle remain in one workflow module.
 import type {
+  AgentRunAuxiliaryModelSnapshot,
   AgentRunProviderAuthority,
   AgentRunRegistry,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import {
+  captureAgentRunAuxiliaryModels,
   combineAgentRunUsage,
   createEarlyCancellationDiagnostics,
   createUnobservedAgentRunDiagnostics,
+  raceAgentRunStartup,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import type { LocalReviewAuditStore } from "../../audit/local-review-audit-store.ts";
 import { isRootCommit, resolveReviewSnapshot, summarizeReviewSnapshot } from "../../git.ts";
@@ -46,6 +49,8 @@ export interface DraftReviewTasksInput {
   plannerContext: string;
   plannerModel?: ReviewModelSelection;
   plannerThinkingLevel?: ReviewThinkingLevel;
+  /** Reflect the Reviewer capability option to the submit-only Planner; does not enable it there. */
+  reviewerCodemodeEnabled?: boolean;
   signal?: AbortSignal;
   onUpdate?: OnUpdate;
 }
@@ -61,6 +66,8 @@ export interface RunReviewInput {
   reviewerModel: ReviewModelSelection;
   /** Requested thinking level for Reviewer Sessions in this workflow. */
   reviewerThinkingLevel?: ReviewThinkingLevel;
+  /** Opt Reviewer investigation into PI codemode and scoped auxiliary models. */
+  reviewerCodemodeEnabled?: boolean;
   /** Optional explicit second model for Submission Recovery. */
   recoveryModel?: ReviewModelSelection;
   /** Requested recovery model id when configuration did not resolve. */
@@ -148,6 +155,7 @@ export async function draftReviewTasks(input: DraftReviewTasksInput) {
       model: input.plannerModel.model,
       requestedThinkingLevel: input.plannerThinkingLevel,
       ...(input.providerAuthority ? { providerAuthority: input.providerAuthority } : {}),
+      reviewerCodemodeEnabled: input.reviewerCodemodeEnabled,
       prompt: buildPlannerPrompt(snapshot, scope, input.plannerContext),
       signal: input.signal,
     });
@@ -335,8 +343,24 @@ async function resolveReviewInput(input: RunReviewInput): Promise<ResolvedReview
   }
 }
 
+function captureReviewerAuxiliaryModels(
+  enabled: boolean | undefined,
+  providerAuthority?: AgentRunProviderAuthority,
+): Promise<AgentRunAuxiliaryModelSnapshot | undefined> {
+  if (!enabled || !providerAuthority) return Promise.resolve(undefined);
+  return captureAgentRunAuxiliaryModels(providerAuthority);
+}
+
 /** Execute one caller-defined Review. */
 export async function runReview(input: RunReviewInput) {
+  input.signal?.throwIfAborted();
+  const capture = captureReviewerAuxiliaryModels(
+    input.reviewerCodemodeEnabled,
+    input.providerAuthority,
+  );
+  const { result: captureResult } = raceAgentRunStartup(capture, input.signal);
+  const authorizedAuxiliaryModels = await captureResult;
+  input.signal?.throwIfAborted();
   const resolved = await resolveReviewInput(input);
   if (resolved.kind !== "ready") return resolved;
   const { snapshot: resolvedSnapshot, review, scope } = resolved;
@@ -401,6 +425,8 @@ export async function runReview(input: RunReviewInput) {
       input.recoveryModel,
       input.recoveryModelId,
       input.registry,
+      input.reviewerCodemodeEnabled ?? false,
+      authorizedAuxiliaryModels,
     );
   } finally {
     cleanupWarning = await workspace.cleanup();

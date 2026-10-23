@@ -49,6 +49,7 @@ const capabilityList: readonly AgentCapability[] = [
     mutationCapable: false,
     label: "Inspect code health",
   },
+  { id: "codemode", toolName: "codemode", mutationCapable: false, label: "Run tool scripts" },
 ];
 
 /** The complete fixed capability set; callers must not mutate this array. */

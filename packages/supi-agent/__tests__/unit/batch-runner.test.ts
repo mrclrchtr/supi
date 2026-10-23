@@ -7,9 +7,13 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runDelegationBatch } from "../../src/tool/agent_run/batch-runner.ts";
 import { formatModelResult } from "../../src/tool/agent_run/result.ts";
-import type { ProfileCatalogue } from "../../src/types.ts";
+import type { AgentCapabilityId, ProfileCatalogue } from "../../src/types.ts";
 
 // Mock startRegisteredAgentRun from supi-agent-runtime
+const mocks = vi.hoisted(() => ({
+  captureAgentRunAuxiliaryModels: vi.fn(async () => ({ classifiers: [], images: [] })),
+}));
+
 const mockHandles: Array<{
   result: Promise<{ kind: string; value?: string; usage?: object }>;
   subscribe: ReturnType<typeof vi.fn>;
@@ -23,6 +27,7 @@ vi.mock("@mrclrchtr/supi-agent-runtime/api", async (importOriginal) => ({
     getProvider: () => undefined,
     getProviderAuth: async () => undefined,
   })),
+  captureAgentRunAuxiliaryModels: mocks.captureAgentRunAuxiliaryModels,
   startRegisteredAgentRun: vi.fn(
     (options: { prompt: string; readinessCheck?: (session: unknown) => boolean }) => {
       const handle = {
@@ -82,7 +87,7 @@ function mockCtx(overrides: Partial<ExtensionContext> = {}): ExtensionContext {
 
 function makeEntry(
   id: string,
-  tools: readonly ["read"] | readonly ["edit"] = ["read"],
+  tools: readonly AgentCapabilityId[] = ["read"],
 ): ProfileCatalogue["profiles"][number] {
   return {
     id,
@@ -116,7 +121,10 @@ function makeCatalogue(ids: string[]): ProfileCatalogue {
 }
 
 describe("runDelegationBatch", () => {
-  afterEach(() => resetDebugRegistry());
+  afterEach(() => {
+    resetDebugRegistry();
+    mocks.captureAgentRunAuxiliaryModels.mockClear();
+  });
 
   it("throws on duplicate task IDs", async () => {
     const catalogue = makeCatalogue(["explore"]);
@@ -191,6 +199,59 @@ describe("runDelegationBatch", () => {
         mockCtx(),
       ),
     ).rejects.toThrow("Mutation-capable");
+  });
+
+  it("shares one auxiliary-model snapshot only with opted-in tasks", async () => {
+    const { captureAgentRunAuxiliaryModels, startRegisteredAgentRun } = await import(
+      "@mrclrchtr/supi-agent-runtime/api"
+    );
+    const capture = vi.mocked(captureAgentRunAuxiliaryModels);
+    const start = vi.mocked(startRegisteredAgentRun);
+    const snapshot = { classifiers: [], images: [] };
+    capture.mockResolvedValueOnce(snapshot);
+    start.mockClear();
+    const catalogue: ProfileCatalogue = {
+      profiles: [makeEntry("codemode", ["read", "codemode"]), makeEntry("plain", ["read"])],
+      diagnostics: [],
+      profileIds: ["codemode", "plain"],
+      omittedProfileCount: 0,
+      sourceDirectories: { package: "/profiles", global: "/global" },
+    };
+
+    await runDelegationBatch(
+      {
+        tasks: [
+          { id: "one", new: { profile: "codemode" }, instructions: "one" },
+          { id: "two", new: { profile: "codemode" }, instructions: "two" },
+          { id: "plain", new: { profile: "plain" }, instructions: "plain" },
+        ],
+      },
+      catalogue,
+      mockCtx(),
+    );
+
+    expect(capture).toHaveBeenCalledTimes(1);
+    const started = start.mock.calls.map(([options]) => options.inputs);
+    expect(started).toHaveLength(3);
+    expect(started[0]?.authorizedAuxiliaryModels).toBe(snapshot);
+    expect(started[1]?.authorizedAuxiliaryModels).toBe(snapshot);
+    expect(started[2]).not.toHaveProperty("authorizedAuxiliaryModels");
+    expect(capture.mock.calls[0]?.[0]).toBe(started[0]?.providerAuthority);
+    expect(started[0]?.providerAuthority).toBe(started[1]?.providerAuthority);
+  });
+
+  it("does not query auxiliary models for a non-opted-in batch", async () => {
+    const { captureAgentRunAuxiliaryModels } = await import("@mrclrchtr/supi-agent-runtime/api");
+    const capture = vi.mocked(captureAgentRunAuxiliaryModels);
+    capture.mockClear();
+
+    await runDelegationBatch(
+      { tasks: [{ id: "t1", new: { profile: "explore" }, instructions: "inspect" }] },
+      makeCatalogue(["explore"]),
+      mockCtx(),
+    );
+
+    expect(capture).not.toHaveBeenCalled();
   });
 
   it("runs a read-only single-task batch and returns results", async () => {

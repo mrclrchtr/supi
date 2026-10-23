@@ -200,7 +200,10 @@ describe("runReviewer", () => {
   });
 
   it("wires the review tool allowlist and isolated prompt through the runtime adapter", async () => {
-    await runReviewer(invocation);
+    await runReviewer({
+      ...invocation,
+      authorizedAuxiliaryModels: { classifiers: [], images: [] },
+    });
 
     expect(mocks.runIsolatedChild).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -232,7 +235,48 @@ describe("runReviewer", () => {
           "code_health",
           "submit_review",
         ],
+        codemode: false,
       }),
+    );
+    expect(mocks.runIsolatedChild.mock.calls[0]?.[0]).not.toHaveProperty(
+      "authorizedAuxiliaryModels",
+    );
+  });
+
+  it("reports a missing opted-in codemode capability without turning it into a finding", async () => {
+    mocks.runIsolatedChild.mockImplementation(async (config) => {
+      config.onSessionCreated?.(createView());
+      return { kind: "failed", failureCode: "missing-structured-output", diagnostics };
+    });
+
+    const result = await runReviewer({ ...invocation, reviewerCodemodeEnabled: true });
+
+    expect(result).toMatchObject({
+      kind: "failed",
+      reviewerExtensionSetStatus: "degraded",
+      capabilityWarnings: [{ message: expect.stringContaining("codemode unavailable") }],
+    });
+  });
+
+  it("adds codemode and the invocation snapshot only to opted-in Reviewer investigation", async () => {
+    const authorizedAuxiliaryModels = { classifiers: [], images: [] } as const;
+    await runReviewer({
+      ...invocation,
+      reviewerCodemodeEnabled: true,
+      authorizedAuxiliaryModels,
+    });
+
+    expect(mocks.runIsolatedChild).toHaveBeenCalledWith(
+      expect.objectContaining({
+        codemode: true,
+        authorizedAuxiliaryModels,
+        tools: expect.arrayContaining(["codemode", "submit_review"]),
+        initialActiveTools: expect.arrayContaining(["codemode", "submit_review"]),
+        protocolPrompt: expect.stringContaining("codemode"),
+      }),
+    );
+    expect(mocks.runIsolatedChild.mock.calls[0]?.[0].initialActiveTools).not.toContain(
+      "decline_review_recovery",
     );
   });
 

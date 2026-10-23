@@ -1,5 +1,9 @@
 import type { ModelThinkingLevel, Usage } from "@earendil-works/pi-ai";
-import type { AgentRunProgress, AgentRunRegistry } from "@mrclrchtr/supi-agent-runtime/api";
+import type {
+  AgentRunAuxiliaryModelSnapshot,
+  AgentRunProgress,
+  AgentRunRegistry,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import type { DelegationCheckpoint } from "../../delegation/checkpoints.ts";
 import type { ResolvedTask } from "./batch-preflight.ts";
 import type { AgentConversationView, ConversationTaskMetadata } from "./conversation-view.ts";
@@ -69,12 +73,14 @@ export interface DelegationBatchOutcome {
 /** Options for starting a preflighted and capacity-admitted Delegation Batch. */
 export interface StartDelegationBatchOptions {
   params: AgentRunToolParams;
-  tasks: ResolvedTask[];
+  tasks: readonly ResolvedTask[];
   cwd: string;
   signal?: AbortSignal;
   registry?: AgentRunRegistry;
+  /** One model catalogue shared by the opted-in children of this invocation. */
+  authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot;
   onUpdate?: (progress: BatchProgressState) => void;
-  onTaskResult?: (result: BatchTaskResult) => void;
+  onTaskResult?: (result: BatchTaskResult, batchId: string) => void;
 }
 
 /** Session-owned control surface for one running Delegation Batch. */

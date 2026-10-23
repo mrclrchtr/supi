@@ -31,6 +31,10 @@ import { MAX_PAGE_CHARACTERS, MAX_PAGE_LINES } from "../../src/tool/output-page.
 import { registerReviewRunTool } from "../../src/tool/review_run/register.ts";
 import type { ReviewBatchDetails, ReviewModelSelection } from "../../src/types.ts";
 
+function reviewContext() {
+  return { ...makeCtx(), modelRegistry: {} as never };
+}
+
 const details: ReviewBatchDetails = {
   kind: "review-batch",
   provenance: "caller-supplied",
@@ -86,6 +90,7 @@ describe("agent review tool usage", () => {
     vi.clearAllMocks();
     mocks.loadReviewConfig.mockReturnValue({
       agentModel: "provider/model",
+      reviewerCodemodeEnabled: false,
       reviewerThinkingLevel: "high",
       recoveryModel: "disabled",
       auditEnabled: false,
@@ -102,7 +107,7 @@ describe("agent review tool usage", () => {
   it("does not start status UI when the execution context has no UI", async () => {
     const pi = createPiMock();
     registerReviewRunTool(pi as unknown as ExtensionAPI, new ReviewArtifactStore());
-    const ctx = { ...makeCtx(), hasUI: false };
+    const ctx = { ...reviewContext(), hasUI: false };
 
     await getTool(pi, "review_run").execute(
       "call",
@@ -113,6 +118,32 @@ describe("agent review tool usage", () => {
     );
 
     expect(mocks.spinnerStart).not.toHaveBeenCalled();
+  });
+
+  it("passes the configured Reviewer codemode opt-in into the Review workflow", async () => {
+    mocks.loadReviewConfig.mockReturnValue({
+      agentModel: "provider/model",
+      reviewerCodemodeEnabled: true,
+      reviewerThinkingLevel: "high",
+      recoveryModel: "disabled",
+      auditEnabled: false,
+      bootstrapCommand: "",
+      postReviewPolicy: "ask",
+    });
+    const pi = createPiMock();
+    registerReviewRunTool(pi as unknown as ExtensionAPI, new ReviewArtifactStore());
+
+    await getTool(pi, "review_run").execute(
+      "call",
+      { tasks: [{ id: "spec", instructions: "Review.", mode: "change" }] },
+      undefined,
+      undefined,
+      reviewContext(),
+    );
+
+    expect(mocks.runReview).toHaveBeenCalledWith(
+      expect.objectContaining({ reviewerCodemodeEnabled: true }),
+    );
   });
 
   it("passes the flat target and task mode into the Review workflow", async () => {
@@ -127,7 +158,7 @@ describe("agent review tool usage", () => {
       },
       undefined,
       undefined,
-      makeCtx(),
+      reviewContext(),
     );
 
     expect(mocks.runReview).toHaveBeenCalledWith(
@@ -178,7 +209,7 @@ describe("agent review tool usage", () => {
       { tasks: [{ id: "spec", instructions: "Review.", mode: "change" }] },
       undefined,
       undefined,
-      makeCtx(),
+      reviewContext(),
     )) as { content: Array<{ text: string }> };
     const text = output.content[0]?.text ?? "";
 

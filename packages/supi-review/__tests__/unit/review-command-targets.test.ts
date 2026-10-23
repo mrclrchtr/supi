@@ -97,6 +97,7 @@ function commandContext(selects: Array<string | undefined>) {
       ),
     },
     sessionManager: { getEntries: vi.fn(() => []), getLeafId: vi.fn(() => null) },
+    modelRegistry: {} as never,
   });
   return { ctx, notify, select };
 }
@@ -116,6 +117,7 @@ describe("/supi-review exact target picker", () => {
     vi.clearAllMocks();
     mocks.loadReviewConfig.mockReturnValue({
       agentToolEnabled: false,
+      reviewerCodemodeEnabled: false,
       agentModel: "current",
       plannerModel: "provider/planner",
       recoveryModel: "disabled",

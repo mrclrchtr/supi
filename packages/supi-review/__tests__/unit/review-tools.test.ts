@@ -6,6 +6,14 @@ import {
 import type { ReviewSubmission } from "../../src/types.ts";
 
 describe("submit_review", () => {
+  it("remains model-callable but is not exposed to nested codemode scripts", () => {
+    const submit = createReviewSubmissionTool({});
+    const decline = createReviewRecoveryDeclineTool({});
+
+    expect(submit.exposure).toBe("model-only");
+    expect(decline.exposure).toBe("model-only");
+  });
+
   it("validates direct-call arguments before normalization", async () => {
     const submission: { value?: ReviewSubmission } = {};
     const tool = createReviewSubmissionTool(submission);

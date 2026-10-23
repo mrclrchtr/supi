@@ -8,6 +8,7 @@ import type {
   SettingsManager,
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
+import type { AgentRunAuxiliaryModelSnapshot } from "./auxiliary-models.ts";
 import type { AgentRunProviderAuthority } from "./provider-authority.ts";
 import type { AgentRunRegistry } from "./session/agent-run-registry.ts";
 import type { AgentRunRegistration } from "./session/agent-run-registry-types.ts";
@@ -56,6 +57,8 @@ export interface AgentSessionInputs {
   readonly authorizedContinuationModels?: readonly Model<any>[];
   /** Caller-owned provider and credential authority borrowed for this run. */
   providerAuthority: AgentRunProviderAuthority;
+  /** Optional frozen classifier/image allowlist captured for this invocation. */
+  readonly authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot;
   /** Effective thinking level, normally clamped by the caller. */
   thinkingLevel: ModelThinkingLevel;
   /** Complete built-in and custom-tool allowlist for the run. */

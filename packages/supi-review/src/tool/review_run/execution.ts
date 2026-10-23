@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
+  type AgentRunAuxiliaryModelSnapshot,
   type AgentRunProviderAuthority,
   type AgentRunRegistry,
   createUnobservedAgentRunDiagnostics,
@@ -129,6 +130,8 @@ export async function executeReviewTasks(
   recoveryModel?: ReviewModelSelection,
   recoveryModelId?: string,
   registry?: AgentRunRegistry,
+  reviewerCodemodeEnabled = false,
+  authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot,
 ): Promise<ReviewTaskResult[]> {
   const review = normalizeReviewInput(reviewInput);
   let completedCount = 0;
@@ -158,6 +161,10 @@ export async function executeReviewTasks(
     content: [{ type: "text", text: "Reviewing frozen Review Workspace…" }],
     details: progressDetails(),
   });
+  const reviewerCapabilities = {
+    reviewerCodemodeEnabled,
+    ...(authorizedAuxiliaryModels ? { authorizedAuxiliaryModels } : {}),
+  };
 
   return Promise.all(
     review.tasks.map(async (task) => {
@@ -193,6 +200,7 @@ export async function executeReviewTasks(
           packetHash: packet.packetHash,
           model,
           requestedThinkingLevel: reviewerThinkingLevel,
+          ...reviewerCapabilities,
           ...(recoveryModel ? { recoveryModel } : {}),
           ...(recoveryModelId ? { recoveryModelId } : {}),
           ...(registry ? { registry } : {}),

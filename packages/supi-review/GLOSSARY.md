@@ -47,11 +47,11 @@ A behavioral protocol that permits repository inspection, read-only retrieval of
 _Avoid_: read-only, sandboxed, write-protected, runtime verification, general web research
 
 **Reviewer Extension Set**:
-The fixed, package-owned extensions requested for every Reviewer Session: currently only the headless Code Intelligence inspection profile under the containing session's project-trust decision. Registration failure falls back to direct read and shell inspection with a Reviewer Capability Warning; unrelated extensions and non-extension resources remain excluded.
+The package-owned extensions requested for Reviewer Sessions: headless Code Intelligence, plus PI codemode only when `review.reviewerCodemodeEnabled` is on. Codemode does not add tools or inherit parent extensions; unrelated extensions and non-extension resources remain excluded.
 _Avoid_: ambient extensions, inherited tools, caller-selected extensions
 
 **Reviewer Capability Warning**:
-A bounded parent-facing notice that a requested Reviewer Extension Set capability was unavailable and the task continued with direct read and shell inspection. It is execution provenance, not a finding and does not determine the Task Verdict.
+A bounded parent-facing notice that a requested Reviewer Extension Set capability was unavailable and the task continued with its other permitted tools. It is execution provenance, not a finding and does not determine the Task Verdict.
 _Avoid_: review finding, provider diagnostic, task failure
 
 **Review Task**:

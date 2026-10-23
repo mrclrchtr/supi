@@ -1,14 +1,25 @@
 import {
   type Api,
+  type AssistantImages,
   type AuthResult,
+  type ClassifierApi,
+  type ClassifierContext,
+  type ClassifierModel,
+  type ClassifierResult,
+  type ImageApi,
+  type ImageModel,
+  type ImagesContext,
   InMemoryCredentialStore,
   InMemoryModelsStore,
   lazyStream,
   type Model,
+  type ModelsClassifierOptions,
+  type ModelsImagesOptions,
   type Provider,
   type ProviderHeaders,
 } from "@earendil-works/pi-ai";
 import { type ModelRegistry, ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { type AgentRunAuxiliaryModelSnapshot, freezeAuxiliaryModels } from "./auxiliary-models.ts";
 
 /** Provider and authentication authority borrowed from the containing PI session. */
 export interface AgentRunProviderAuthority {
@@ -16,8 +27,22 @@ export interface AgentRunProviderAuthority {
   getProvider(providerId: string): Provider | undefined;
   /** Resolve current provider authentication, including runtime credentials and OAuth refresh. */
   getProviderAuth(providerId: string): Promise<AuthResult | undefined>;
-  /** Resolve model-specific headers, environment, and request API key when PI exposes them. */
+  /** Resolve model-specific request auth when PI exposes it. */
   getApiKeyAndHeaders?: (model: Model<Api>) => Promise<AgentRunRequestAuth>;
+  /** Return the currently available auxiliary models for a caller-owned invocation snapshot. */
+  getAvailableAuxiliaryModels?: () => Promise<AgentRunAuxiliaryModelSnapshot>;
+  /** Dispatch one classifier request through the containing provider authority. */
+  classify?: (
+    model: ClassifierModel<ClassifierApi>,
+    context: ClassifierContext,
+    options?: ModelsClassifierOptions,
+  ) => Promise<ClassifierResult>;
+  /** Dispatch one image-generation request through the containing provider authority. */
+  generateImages?: (
+    model: ImageModel<ImageApi>,
+    context: ImagesContext,
+    options?: ModelsImagesOptions,
+  ) => Promise<AssistantImages>;
 }
 
 /** Model-specific request auth returned by PI's compatibility registry facade. */
@@ -31,18 +56,37 @@ export type AgentRunRequestAuth =
     }
   | { ok: false; error: string };
 
+type AgentRunModelRegistry = Pick<
+  ModelRegistry,
+  "getProvider" | "getProviderAuth" | "getApiKeyAndHeaders"
+> &
+  Partial<Pick<ModelRegistry, "getAvailableOfType" | "classify" | "generateImages">>;
+
 /** Adapt PI's public model registry to the narrow Agent Run authority interface. */
 export function createAgentRunProviderAuthority(
-  registry: Pick<ModelRegistry, "getProvider" | "getProviderAuth" | "getApiKeyAndHeaders">,
+  registry: AgentRunModelRegistry,
 ): AgentRunProviderAuthority {
+  const classify = registry.classify?.bind(registry);
+  const generateImages = registry.generateImages?.bind(registry);
   return {
     getProvider: (providerId) => registry.getProvider(providerId),
     getProviderAuth: (providerId) => registry.getProviderAuth(providerId),
     getApiKeyAndHeaders: (model) => registry.getApiKeyAndHeaders(model),
+    getAvailableAuxiliaryModels: async () => {
+      const [classifiers, images] = registry.getAvailableOfType
+        ? await Promise.all([
+            registry.getAvailableOfType("classifier"),
+            registry.getAvailableOfType("image"),
+          ])
+        : [[], []];
+      return freezeAuxiliaryModels({ classifiers, images });
+    },
+    ...(classify ? { classify } : {}),
+    ...(generateImages ? { generateImages } : {}),
   };
 }
 
-/** Private model runtime plus its authorized active-model selector. */
+/** Private model runtime plus its authorized model-selection predicate. */
 export interface CreatedAgentRunModelRuntime {
   runtime: ModelRuntime;
   selectModel(model: Model<Api>): boolean;
@@ -52,6 +96,7 @@ export interface CreatedAgentRunModelRuntime {
 export async function createAgentRunModelRuntime(
   authority: AgentRunProviderAuthority,
   models: readonly Model<Api>[],
+  auxiliaryModels: AgentRunAuxiliaryModelSnapshot = { classifiers: [], images: [] },
 ): Promise<CreatedAgentRunModelRuntime> {
   const configuredModels = uniqueModels(models);
   const originalModel = configuredModels[0];
@@ -62,6 +107,7 @@ export async function createAgentRunModelRuntime(
   const authorizedModels = configuredModels.filter(
     (model, index) => index === 0 || authority.getProvider(model.provider) !== undefined,
   );
+  const authorizedAuxiliaryModels = freezeAuxiliaryModels(auxiliaryModels);
 
   const runtime = await ModelRuntime.create({
     credentials: new InMemoryCredentialStore(),
@@ -69,44 +115,62 @@ export async function createAgentRunModelRuntime(
     modelsPath: null,
     allowModelNetwork: false,
   });
-  let activeModel = originalModel;
-  const authorizedProviders = new Set(authorizedModels.map((model) => model.provider));
-  for (const builtin of runtime.getProviders()) {
-    if (!authorizedProviders.has(builtin.id)) {
-      runtime.registerNativeProvider(createUnavailableProvider(builtin));
-    }
-  }
-  for (const providerId of authorizedProviders) {
+  const requestedProviderIds = new Set([
+    ...authorizedModels.map((model) => model.provider),
+    ...authorizedAuxiliaryModels.classifiers.map((model) => model.provider),
+    ...authorizedAuxiliaryModels.images.map((model) => model.provider),
+  ]);
+  const registeredProviderIds = new Set<string>();
+  for (const providerId of requestedProviderIds) {
+    const provider = authority.getProvider(providerId);
+    if (!provider) continue;
+    registeredProviderIds.add(providerId);
     runtime.registerNativeProvider(
-      createBorrowedProvider(
+      createBorrowedProvider({
         authority,
         providerId,
-        authorizedModels.filter((model) => model.provider === providerId),
-        () => activeModel,
-      ),
+        provider,
+        models: authorizedModels.filter((model) => model.provider === providerId),
+        classifiers: authorizedAuxiliaryModels.classifiers.filter(
+          (model) => model.provider === providerId,
+        ),
+        images: authorizedAuxiliaryModels.images.filter((model) => model.provider === providerId),
+      }),
     );
+  }
+  for (const builtin of runtime.getProviders()) {
+    if (!registeredProviderIds.has(builtin.id)) {
+      runtime.registerNativeProvider(createUnavailableProvider(builtin));
+    }
   }
   await runtime.refresh({ allowNetwork: false });
   return {
     runtime,
     selectModel(model) {
-      const selected = authorizedModels.find(
+      return authorizedModels.some(
         (candidate) => candidate.provider === model.provider && candidate.id === model.id,
       );
-      if (!selected) return false;
-      activeModel = selected;
-      return true;
     },
   };
 }
 
-function createBorrowedProvider(
-  authority: AgentRunProviderAuthority,
-  providerId: string,
-  models: readonly Model<Api>[],
-  getActiveModel: () => Model<Api>,
-): Provider {
-  const provider = requireProvider(authority, providerId);
+interface BorrowedProviderOptions {
+  authority: AgentRunProviderAuthority;
+  providerId: string;
+  provider: Provider;
+  models: readonly Model<Api>[];
+  classifiers: readonly ClassifierModel<ClassifierApi>[];
+  images: readonly ImageModel<ImageApi>[];
+}
+
+function createBorrowedProvider({
+  authority,
+  providerId,
+  provider,
+  models,
+  classifiers,
+  images,
+}: BorrowedProviderOptions): Provider {
   return {
     id: provider.id,
     name: provider.name,
@@ -121,39 +185,71 @@ function createBorrowedProvider(
       apiKey: {
         name: `${provider.name} borrowed authority`,
         resolve: async () => {
-          const auth = await authority.getProviderAuth(providerId);
-          const activeModel = getActiveModel();
-          const requestAuth =
-            activeModel.provider === providerId
-              ? await authority.getApiKeyAndHeaders?.(activeModel)
-              : undefined;
-          if (requestAuth && !requestAuth.ok) throw new Error(requestAuth.error);
-          if (!auth && !requestAuth?.ok) return undefined;
-          return mergeRequestAuth(auth, requestAuth);
+          const providerAuth = await authority.getProviderAuth(providerId);
+          if (providerAuth || !authority.getApiKeyAndHeaders) return providerAuth;
+          // ModelRuntime gates chat requests at provider scope; real credentials stay in the exact-model wrapper.
+          return { auth: {} };
         },
       },
     },
     getModels: () => [...models],
+    getAllModels: () => [...models, ...classifiers, ...images],
     stream: (childModel, context, options) =>
       lazyStream(childModel, async () => {
         const currentProvider = requireProvider(authority, providerId);
         const authorizedModel = requireAuthorizedModel(models, childModel);
+        const requestAuth = await resolveRequestAuth(authority, authorizedModel);
+        const requestModel = resolveParentModel(
+          currentProvider,
+          applyRequestBaseUrl(childModel, requestAuth),
+          authorizedModel,
+        );
         return currentProvider.stream(
-          resolveParentModel(currentProvider, childModel, authorizedModel),
+          requestModel,
           context,
-          options,
+          applyRequestAuth(options, requestAuth),
         );
       }),
     streamSimple: (childModel, context, options) =>
       lazyStream(childModel, async () => {
         const currentProvider = requireProvider(authority, providerId);
         const authorizedModel = requireAuthorizedModel(models, childModel);
+        const requestAuth = await resolveRequestAuth(authority, authorizedModel);
+        const requestModel = resolveParentModel(
+          currentProvider,
+          applyRequestBaseUrl(childModel, requestAuth),
+          authorizedModel,
+        );
         return currentProvider.streamSimple(
-          resolveParentModel(currentProvider, childModel, authorizedModel),
+          requestModel,
           context,
-          options,
+          applyRequestAuth(options, requestAuth),
         );
       }),
+    ...(authority.classify && classifiers.length > 0
+      ? {
+          classify: (model, context, options) => {
+            // Child auth may contain the active chat model's credentials; only forward cancellation.
+            return authority.classify?.(
+              requireAuthorizedModel(classifiers, model),
+              context,
+              options?.signal ? { signal: options.signal } : undefined,
+            ) as Promise<ClassifierResult>;
+          },
+        }
+      : {}),
+    ...(authority.generateImages && images.length > 0
+      ? {
+          generateImages: (model, context, options) => {
+            // Resolve image credentials against the authorized image model in the parent registry.
+            return authority.generateImages?.(
+              requireAuthorizedModel(images, model),
+              context,
+              options?.signal ? { signal: options.signal } : undefined,
+            ) as Promise<AssistantImages>;
+          },
+        }
+      : {}),
   };
 }
 
@@ -167,14 +263,18 @@ function uniqueModels(models: readonly Model<Api>[]): Model<Api>[] {
   });
 }
 
-function requireAuthorizedModel(models: readonly Model<Api>[], requested: Model<Api>): Model<Api> {
+function requireAuthorizedModel<TModel extends { provider: string; id: string }>(
+  models: readonly TModel[],
+  requested: { provider: string; id: string },
+): TModel {
   const model = models.find(
     (candidate) => candidate.provider === requested.provider && candidate.id === requested.id,
   );
-  if (!model)
+  if (!model) {
     throw new Error(
       `Model is not authorized for this Agent Run: ${requested.provider}/${requested.id}`,
     );
+  }
   return model;
 }
 
@@ -222,25 +322,41 @@ function resolveParentModel(
     : { ...parentModel, baseUrl: childModel.baseUrl };
 }
 
-function mergeRequestAuth(
-  providerAuth: AuthResult | undefined,
-  requestAuth: AgentRunRequestAuth | undefined,
-): AuthResult {
-  const auth = providerAuth?.auth;
-  const resolved = requestAuth?.ok ? requestAuth : undefined;
-  const baseUrl = resolved?.baseUrl ?? auth?.baseUrl;
+async function resolveRequestAuth(
+  authority: AgentRunProviderAuthority,
+  model: Model<Api>,
+): Promise<Extract<AgentRunRequestAuth, { ok: true }> | undefined> {
+  const requestAuth = await authority.getApiKeyAndHeaders?.(model);
+  if (requestAuth && !requestAuth.ok) throw new Error(requestAuth.error);
+  return requestAuth?.ok ? requestAuth : undefined;
+}
+
+function applyRequestBaseUrl<TModel extends { baseUrl: string }>(
+  model: TModel,
+  requestAuth: Extract<AgentRunRequestAuth, { ok: true }> | undefined,
+): TModel {
+  return requestAuth?.baseUrl ? { ...model, baseUrl: requestAuth.baseUrl } : model;
+}
+
+function applyRequestAuth<
+  TOptions extends {
+    apiKey?: string;
+    headers?: ProviderHeaders;
+    env?: Record<string, string>;
+  },
+>(
+  options: TOptions | undefined,
+  requestAuth: Extract<AgentRunRequestAuth, { ok: true }> | undefined,
+): TOptions | undefined {
+  if (!requestAuth) return options;
   return {
-    ...(providerAuth?.source ? { source: providerAuth.source } : {}),
-    ...(providerAuth?.env || resolved?.env
-      ? { env: { ...(providerAuth?.env ?? {}), ...(resolved?.env ?? {}) } }
+    ...options,
+    ...(requestAuth.apiKey ? { apiKey: requestAuth.apiKey } : {}),
+    ...(options?.headers || requestAuth.headers
+      ? { headers: { ...(options?.headers ?? {}), ...(requestAuth.headers ?? {}) } }
       : {}),
-    auth: {
-      ...(auth ?? {}),
-      ...(baseUrl ? { baseUrl } : {}),
-      ...(resolved?.apiKey ? { apiKey: resolved.apiKey } : {}),
-      ...(auth?.headers || resolved?.headers
-        ? { headers: { ...(auth?.headers ?? {}), ...(resolved?.headers ?? {}) } }
-        : {}),
-    },
-  };
+    ...(options?.env || requestAuth.env
+      ? { env: { ...(options?.env ?? {}), ...(requestAuth.env ?? {}) } }
+      : {}),
+  } as TOptions;
 }

@@ -1,5 +1,10 @@
 /** Public API for @mrclrchtr/supi-agent-runtime. */
 
+export type {
+  AgentRunAuxiliaryModelSnapshot,
+  AgentRunStartupRace,
+} from "./auxiliary-models.ts";
+export { captureAgentRunAuxiliaryModels, raceAgentRunStartup } from "./auxiliary-models.ts";
 export { cloneAgentRunContext } from "./context.ts";
 export type { AgentRunDiagnosticErrorRow } from "./diagnostics.ts";
 export {
@@ -8,10 +13,7 @@ export {
   formatAgentRunDiagnostics,
   getAgentRunDiagnosticErrorRows,
 } from "./diagnostics.ts";
-export type {
-  AgentRunProviderAuthority,
-  AgentRunRequestAuth,
-} from "./provider-authority.ts";
+export type { AgentRunProviderAuthority, AgentRunRequestAuth } from "./provider-authority.ts";
 export { createAgentRunProviderAuthority } from "./provider-authority.ts";
 export { startAgentRun, startRegisteredAgentRun } from "./run.ts";
 export { AgentRunRegistry } from "./session/agent-run-registry.ts";

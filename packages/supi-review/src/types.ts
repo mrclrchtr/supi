@@ -1,5 +1,6 @@
 import type { Model, ModelThinkingLevel, Usage } from "@earendil-works/pi-ai";
 import type {
+  AgentRunAuxiliaryModelSnapshot,
   AgentRunDiagnostics,
   AgentRunProviderAuthority,
   AgentRunRegistry,
@@ -237,6 +238,8 @@ export interface ReviewProgress {
 
 export interface PlannerInvocation {
   prompt: string;
+  /** Reflect whether downstream Reviewers can use codemode; the Planner remains submit-only. */
+  reviewerCodemodeEnabled?: boolean;
   /** Requested level for this Planner Draft; omitted values keep the package default. */
   requestedThinkingLevel?: ReviewThinkingLevel;
   providerAuthority?: AgentRunProviderAuthority;
@@ -261,6 +264,10 @@ export interface ReviewerAuditRequest {
 
 export interface ReviewerInvocation {
   prompt: string;
+  /** Enable codemode scripting during Reviewer investigation, never during recovery. */
+  reviewerCodemodeEnabled?: boolean;
+  /** Frozen classifier/image authorization shared across Reviewer siblings in this Review. */
+  authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot;
   /** Requested level for this Reviewer Session; omitted values keep the package default. */
   requestedThinkingLevel?: ReviewThinkingLevel;
   providerAuthority?: AgentRunProviderAuthority;

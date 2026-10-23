@@ -1,4 +1,8 @@
-import { DefaultResourceLoader, SettingsManager } from "@earendil-works/pi-coding-agent";
+import {
+  createCodemodeExtension,
+  DefaultResourceLoader,
+  SettingsManager,
+} from "@earendil-works/pi-coding-agent";
 import headlessInspectionProfile from "@mrclrchtr/supi-code-intelligence/headless";
 
 /** Loader and settings manager preconfigured for an isolated child session. */
@@ -10,6 +14,8 @@ export interface IsolatedChildResources {
 /** Optional Reviewer Extension Set settings for one isolated child. */
 export interface IsolatedChildResourceOptions {
   headlessInspection?: boolean;
+  /** Load PI codemode only for an explicitly opted-in Reviewer. */
+  codemode?: boolean;
   projectTrusted?: boolean;
 }
 
@@ -34,10 +40,13 @@ export function createIsolatedChildResources(
     agentDir,
     settingsManager,
     noExtensions: true,
-    ...(options.headlessInspection
+    ...(options.headlessInspection || options.codemode
       ? {
           extensionFactories: [
-            { name: "supi-code-intelligence-headless", factory: headlessInspectionProfile },
+            ...(options.headlessInspection
+              ? [{ name: "supi-code-intelligence-headless", factory: headlessInspectionProfile }]
+              : []),
+            ...(options.codemode ? [createCodemodeExtension({ models: true, mode: "on" })] : []),
           ],
         }
       : {}),

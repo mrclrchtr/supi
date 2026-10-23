@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  type Api,
   createAssistantMessageEventStream,
   type Model,
   type Provider,
@@ -139,6 +140,81 @@ describe("Agent Run Provider Authority contract", () => {
       usage,
     });
     expect(streamSimple).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses exact-model request auth when provider-level auth is unavailable", async () => {
+    const unauthorizedModel = { ...model, id: "unauthorized-model", name: "Unauthorized Model" };
+    const respond = (requestModel: Model<"openai-completions">) => {
+      const stream = createAssistantMessageEventStream();
+      const message = {
+        role: "assistant" as const,
+        content: [{ type: "text" as const, text: "request-auth-only response" }],
+        api: requestModel.api,
+        provider: requestModel.provider,
+        model: requestModel.id,
+        usage,
+        stopReason: "stop" as const,
+        timestamp: Date.now(),
+      };
+      queueMicrotask(() => stream.push({ type: "done", reason: "stop", message }));
+      return stream;
+    };
+    const streamSimple = vi.fn(
+      (
+        requestModel: Model<"openai-completions">,
+        _context: Parameters<Provider["streamSimple"]>[1],
+        _options?: Parameters<Provider["streamSimple"]>[2],
+      ) => respond(requestModel),
+    );
+    const provider: Provider<"openai-completions"> = {
+      id: model.provider,
+      name: "Request Auth Only Provider",
+      auth: {
+        apiKey: {
+          name: "Provider key unavailable",
+          resolve: async () => undefined,
+        },
+      },
+      getModels: () => [parentCatalogModel, unauthorizedModel],
+      stream: (requestModel) => respond(requestModel),
+      streamSimple,
+    };
+    const getApiKeyAndHeaders = vi.fn(async (selected: Model<Api>) => ({
+      ok: true as const,
+      apiKey: "request-only-key",
+      headers: { "x-request-only": selected.id },
+      baseUrl: resolvedBaseUrl,
+    }));
+    const created = await createAgentRunModelRuntime(
+      {
+        getProvider: () => provider,
+        getProviderAuth: async () => undefined,
+        getApiKeyAndHeaders,
+      },
+      [model],
+    );
+    const childModel = created.runtime.getModel(model.provider, model.id);
+    if (!childModel) throw new Error("The authorized child model was not registered");
+
+    expect((await created.runtime.getAvailable(model.provider)).map((item) => item.id)).toEqual([
+      model.id,
+    ]);
+    expect(created.runtime.getModel(model.provider, unauthorizedModel.id)).toBeUndefined();
+    await expect(created.runtime.getAuth(childModel)).resolves.toEqual({ auth: {} });
+    expect(getApiKeyAndHeaders).not.toHaveBeenCalled();
+
+    await created.runtime.streamSimple(childModel, { messages: [] }).result();
+
+    expect(getApiKeyAndHeaders).toHaveBeenCalledTimes(1);
+    expect(getApiKeyAndHeaders).toHaveBeenCalledWith(model);
+    expect(streamSimple.mock.calls[0]?.[0]).toMatchObject({
+      name: parentCatalogModel.name,
+      baseUrl: resolvedBaseUrl,
+    });
+    expect(streamSimple.mock.calls[0]?.[2]).toMatchObject({
+      apiKey: "request-only-key",
+      headers: { "x-request-only": model.id },
+    });
   });
 
   it("preserves the effective endpoint for both borrowed stream methods", async () => {

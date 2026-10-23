@@ -40,7 +40,7 @@ export function makeAgentRunExecute(
         }
       : undefined;
 
-    const batch = controller.start({
+    const batch = await controller.start({
       params: toolParams,
       catalogue,
       ctx,

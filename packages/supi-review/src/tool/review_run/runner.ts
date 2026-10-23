@@ -52,6 +52,44 @@ function auditOutcome(result: ReviewerRunResult): {
   return { kind: result.kind };
 }
 
+interface ReviewerSessionObservation {
+  reviewerExtensionSetStatus: ReviewerExtensionSetStatus;
+  warnings: ReviewerCapabilityWarning[];
+  trace?: ReviewAuditTraceCollector;
+  capturedReplay?: ReturnType<ReviewAuditTraceCollector["snapshot"]>;
+  unsubscribe?: () => void;
+}
+
+function observeReviewerSession(
+  created: AgentRunSessionView,
+  invocation: ReviewerInvocation,
+  observation: ReviewerSessionObservation,
+): (() => void) | undefined {
+  if (invocation.audit) {
+    observation.trace = new ReviewAuditTraceCollector();
+    observation.unsubscribe = created.subscribe((event) => observation.trace?.observe(event));
+  }
+  const active = new Set(created.getActiveToolNames());
+  const missingCapabilities = [
+    ...(HEADLESS_INSPECTION_TOOL_NAMES.every((name) => active.has(name))
+      ? []
+      : ["Headless Code Intelligence"]),
+    ...(invocation.reviewerCodemodeEnabled && !active.has("codemode") ? ["codemode"] : []),
+  ];
+  if (missingCapabilities.length === 0) {
+    observation.reviewerExtensionSetStatus = "active";
+  } else {
+    observation.reviewerExtensionSetStatus = "degraded";
+    observation.warnings.push({
+      message: `${missingCapabilities.join(" and ")} unavailable; the Reviewer continued with its other permitted tools.`,
+    });
+  }
+  if (!invocation.audit || !observation.trace) return undefined;
+  return () => {
+    observation.capturedReplay ??= observation.trace?.snapshot(created);
+  };
+}
+
 /** Run one caller-defined task in an isolated Inspection-only Reviewer Session. */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: review, recovery, and continuous audit stay in one adapter lifecycle.
 export async function runReviewer(invocation: ReviewerInvocation): Promise<ReviewerRunResult> {
@@ -78,26 +116,38 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
   } = {};
   const submit = createReviewSubmissionTool(holder, recoveryTerminal);
   const decline = createReviewRecoveryDeclineTool(recoveryTerminal);
-  const warnings: ReviewerCapabilityWarning[] = [];
-  const protocolPrompt = buildReviewerSystemPrompt(invocation.dependencyBootstrapConfigured);
-  let reviewerExtensionSetStatus: ReviewerExtensionSetStatus = "unobserved";
+  const observation: ReviewerSessionObservation = {
+    reviewerExtensionSetStatus: "unobserved",
+    warnings: [],
+  };
+  const protocolPrompt = buildReviewerSystemPrompt(
+    invocation.dependencyBootstrapConfigured,
+    invocation.reviewerCodemodeEnabled,
+  );
   let session: AgentRunSessionView | undefined;
-  let trace: ReviewAuditTraceCollector | undefined;
-  let capturedReplay: ReturnType<ReviewAuditTraceCollector["snapshot"]> | undefined;
-  let unsubscribe: (() => void) | undefined;
   const recovery = new ReviewRecoveryPolicy({
     originalModel: invocation.model,
     ...(invocation.recoveryModel ? { recoveryModel: invocation.recoveryModel } : {}),
     ...(invocation.recoveryModelId ? { recoveryModelId: invocation.recoveryModelId } : {}),
     submission: holder,
     terminal: recoveryTerminal,
-    trace: () => trace,
+    trace: () => observation.trace,
   });
 
-  const originalTools = ["read", "bash", "grep", ...HEADLESS_INSPECTION_TOOL_NAMES, submit.name];
+  const originalTools = [
+    "read",
+    "bash",
+    "grep",
+    ...HEADLESS_INSPECTION_TOOL_NAMES,
+    submit.name,
+    ...(invocation.reviewerCodemodeEnabled ? ["codemode"] : []),
+  ];
   const outcome = await runIsolatedChild<ReviewSubmission>({
     cwd: invocation.cwd,
     ...(invocation.providerAuthority ? { providerAuthority: invocation.providerAuthority } : {}),
+    ...(invocation.reviewerCodemodeEnabled && invocation.authorizedAuxiliaryModels
+      ? { authorizedAuxiliaryModels: invocation.authorizedAuxiliaryModels }
+      : {}),
     protocolPrompt,
     model: invocation.model.model,
     thinkingLevel: effectiveThinkingLevel,
@@ -115,6 +165,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
       : {}),
     ...(invocation.registry ? { registry: invocation.registry } : {}),
     headlessInspection: true,
+    codemode: invocation.reviewerCodemodeEnabled ?? false,
     projectTrusted: invocation.projectTrusted ?? false,
     runDisplay: reviewerRunDisplay(invocation, effectiveThinkingLevel, originalTools),
     displayResult: (result) => {
@@ -133,28 +184,11 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     },
     onSessionCreated: (created) => {
       session = created;
-      if (invocation.audit) {
-        trace = new ReviewAuditTraceCollector();
-        unsubscribe = created.subscribe((event) => trace?.observe(event));
-      }
-      const active = new Set(created.getActiveToolNames());
-      if (HEADLESS_INSPECTION_TOOL_NAMES.every((name) => active.has(name))) {
-        reviewerExtensionSetStatus = "active";
-      } else {
-        reviewerExtensionSetStatus = "degraded";
-        warnings.push({
-          message:
-            "Headless Code Intelligence was unavailable; this reviewer continued with read, bash, and grep inspection.",
-        });
-      }
-      if (!invocation.audit || !trace) return;
-      return () => {
-        capturedReplay ??= trace?.snapshot(created);
-      };
+      return observeReviewerSession(created, invocation, observation);
     },
     onProgress: invocation.onProgress,
   });
-  unsubscribe?.();
+  observation.unsubscribe?.();
   const submissionRecovery =
     outcome.kind === "canceled" || outcome.kind === "timeout" ? undefined : recovery.result();
   const result: ReviewerRunResult = {
@@ -162,22 +196,22 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     modelId: invocation.model.canonicalId,
     requestedThinkingLevel,
     effectiveThinkingLevel,
-    reviewerExtensionSetStatus,
-    ...(warnings.length > 0 ? { capabilityWarnings: warnings } : {}),
+    reviewerExtensionSetStatus: observation.reviewerExtensionSetStatus,
+    ...(observation.warnings.length > 0 ? { capabilityWarnings: observation.warnings } : {}),
     ...(submissionRecovery ? { submissionRecovery } : {}),
   };
-  if (!invocation.audit || !session || !trace) return result;
+  if (!invocation.audit || !session || !observation.trace) return result;
 
   try {
-    const replay = capturedReplay
+    const replay = observation.capturedReplay
       ? {
-          ...capturedReplay,
+          ...observation.capturedReplay,
           trace: {
-            ...capturedReplay.trace,
+            ...observation.capturedReplay.trace,
             ...(result.usage ? { usage: result.usage } : {}),
           },
         }
-      : trace.snapshot(session, result.usage);
+      : observation.trace.snapshot(session, result.usage);
     const audit = await invocation.audit.store.create({
       task: invocation.task,
       modelId: invocation.model.canonicalId,

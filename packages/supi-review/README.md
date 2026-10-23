@@ -93,6 +93,8 @@ Workspaces are marked and locked in the Git worktree list. Normal cleanup remove
 
 `review.agentModel` selects the reviewer model for agent-started Reviews. `review.plannerModel` selects the model for the optional Planner Draft in `/supi-review`. Both default to `current`, which uses the active session model.
 
+`review.reviewerCodemodeEnabled` defaults to `false`. When enabled, both `review_run` and `/supi-review` give Reviewer investigation PI codemode scripting and the invocation's scoped classifier/image-model catalogue. This does not enable codemode for Planner Drafts or Submission Recovery, inherit parent codemode settings, add MCP servers, load ambient extensions, or expand Reviewer tool permissions. Auxiliary-model calls may transmit supplied inputs, including repository evidence, to external providers and may incur provider costs; availability does not guarantee provider entitlement or success.
+
 `review.reviewerThinkingLevel` selects the PI reasoning level for Reviewer Sessions. It defaults to `max`. `review.plannerThinkingLevel` selects the level for Planner Drafts. It defaults to `low`. Both settings use `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`. Project and global values are independent. The selected level is clamped to the selected model's capabilities. Invalid hand-written values stop the affected Review flow with a role-specific error.
 
 `review.recoveryModel` selects one optional explicit model for Submission Recovery. It defaults to `disabled`. `current` is not a valid implicit Recovery Model. If the configured model is unavailable, the original review still runs. Recovery records the failed model switch only if the chain reaches that model.
@@ -101,7 +103,7 @@ Workspaces are marked and locked in the Git worktree list. Normal cleanup remove
 
 ## Reviewer Protocol
 
-Reviewer Sessions have `read`, `bash`, `grep`, headless Code Intelligence tools, and `submit_review` during inspection. They inspect one shared frozen Review Workspace. They do not run tests, builds, linters, services, runtime experiments, nested Pi sessions, or nested reviews. They do not intentionally change Target Evidence or Git history.
+Reviewer Sessions have `read`, `bash`, `grep`, headless Code Intelligence tools, and `submit_review` during investigation. With `review.reviewerCodemodeEnabled`, they also have PI codemode in `on` mode: direct tools remain visible, and scripts can call only the permitted Reviewer inspection tools. Classifier and image-model access is limited to the frozen catalogue captured once for that Review and shared by its Reviewer children. Use codemode only for investigation; it does not change the Inspection-only protocol or make the Review Workspace a sandbox. Reviewers inspect one shared frozen Review Workspace. They do not run tests, builds, linters, services, runtime experiments, nested Pi sessions, or nested reviews. They do not intentionally change Target Evidence or Git history.
 
 The Reviewer Protocol owns finding eligibility:
 

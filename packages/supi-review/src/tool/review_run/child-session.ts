@@ -2,6 +2,7 @@ import type { clampThinkingLevel, Model } from "@earendil-works/pi-ai";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import {
+  type AgentRunAuxiliaryModelSnapshot,
   type AgentRunContinuation,
   type AgentRunDisplayMetadata,
   type AgentRunDisplayResult,
@@ -40,13 +41,23 @@ export interface IsolatedRunConfig<T> {
   continuation?: AgentRunContinuation;
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
   authorizedContinuationModels?: readonly Model<any>[];
+  authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot;
   headlessInspection?: boolean;
+  codemode?: boolean;
   projectTrusted?: boolean;
   onSessionCreated?: (session: AgentRunSessionView) => undefined | (() => void);
   runDisplay?: AgentRunDisplayMetadata & { readonly runKey: string; readonly batchId: string };
   registry?: AgentRunRegistry;
   displayResult?: (outcome: ChildRunOutcome<T>) => AgentRunDisplayResult;
   onProgress?: (progress: ReviewProgress) => void;
+}
+
+function authorizedAuxiliaryModelInputs(config: {
+  codemode?: boolean;
+  authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot;
+}): { authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot } {
+  if (!config.codemode || !config.authorizedAuxiliaryModels) return {};
+  return { authorizedAuxiliaryModels: config.authorizedAuxiliaryModels };
 }
 
 /** Convert the runtime's complete Usage snapshot to review's compact progress shape. */
@@ -123,6 +134,7 @@ export async function runIsolatedChild<T>(
     agentDir,
     {
       headlessInspection: config.headlessInspection,
+      ...(config.codemode ? { codemode: true } : {}),
       projectTrusted: config.projectTrusted,
     },
   );
@@ -138,6 +150,7 @@ export async function runIsolatedChild<T>(
       ...(config.authorizedContinuationModels
         ? { authorizedContinuationModels: [...config.authorizedContinuationModels] }
         : {}),
+      ...authorizedAuxiliaryModelInputs(config),
       resourceLoader: loader,
       settingsManager,
       agentDir,

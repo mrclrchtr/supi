@@ -154,6 +154,42 @@ describe("runIsolatedChild", () => {
     expect(runtimeAgentDir).toBe(resourceAgentDir);
   });
 
+  it("withholds auxiliary model authorization unless the child explicitly loads codemode", async () => {
+    const authorizedAuxiliaryModels = { classifiers: [], images: [] } as const;
+    mocks.startAgentRun.mockReturnValue(handle({ kind: "success", value: "done" }));
+
+    await runIsolatedChild({ ...config, authorizedAuxiliaryModels });
+
+    expect(mocks.startAgentRun).toHaveBeenCalledOnce();
+    expect(mocks.startAgentRun.mock.calls[0]?.[0].inputs).not.toHaveProperty(
+      "authorizedAuxiliaryModels",
+    );
+  });
+
+  it("passes opted-in codemode and one authorized auxiliary snapshot into the child runtime", async () => {
+    const authorizedAuxiliaryModels = { classifiers: [], images: [] } as const;
+    mocks.startAgentRun.mockReturnValue(handle({ kind: "success", value: "done" }));
+
+    await runIsolatedChild({
+      ...config,
+      codemode: true,
+      authorizedAuxiliaryModels,
+      headlessInspection: true,
+    });
+
+    expect(mocks.createResources).toHaveBeenCalledWith(
+      "/repo",
+      "protocol",
+      expect.any(String),
+      expect.objectContaining({ headlessInspection: true, codemode: true }),
+    );
+    expect(mocks.startAgentRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        inputs: expect.objectContaining({ authorizedAuxiliaryModels }),
+      }),
+    );
+  });
+
   it("keeps Review observer cleanup in a registered child", async () => {
     const unsubscribeAudit = vi.fn();
     const session = {

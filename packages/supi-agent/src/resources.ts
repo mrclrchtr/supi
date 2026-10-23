@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  createCodemodeExtension,
   DefaultResourceLoader,
   getAgentDir,
   loadProjectContextFiles,
@@ -27,18 +28,20 @@ export function createAgentSessionInputs(options: AgentSessionInputOptions): Age
   );
   const contextFiles = selectInstructionFiles(options.profile, options.cwd, options.agentDir);
   const systemPrompt = resolveSystemPrompt(options.profile);
+  const extensionFactories = [
+    ...(usesHeadlessInspection(options.profile.manifest.tools)
+      ? [{ name: "supi-code-intelligence-headless", factory: headlessInspectionProfile }]
+      : []),
+    ...(options.profile.manifest.tools.includes("codemode")
+      ? [createCodemodeExtension({ models: true, mode: "on" })]
+      : []),
+  ];
   const loader = new DefaultResourceLoader({
     cwd: options.cwd,
     agentDir: options.agentDir,
     settingsManager,
     noExtensions: true,
-    ...(usesHeadlessInspection(options.profile.manifest.tools)
-      ? {
-          extensionFactories: [
-            { name: "supi-code-intelligence-headless", factory: headlessInspectionProfile },
-          ],
-        }
-      : {}),
+    ...(extensionFactories.length > 0 ? { extensionFactories } : {}),
     noSkills: true,
     noPromptTemplates: true,
     noThemes: true,

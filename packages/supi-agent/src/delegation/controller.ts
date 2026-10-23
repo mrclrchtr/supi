@@ -6,7 +6,7 @@ import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import { isReadOnlyCapabilitySet } from "../capabilities.ts";
 import { loadAgentConfig } from "../config.ts";
 import { preflightDelegationBatch } from "../tool/agent_run/batch-preflight.ts";
-import { startDelegationBatch } from "../tool/agent_run/batch-runner.ts";
+import { startDelegationBatchWithAuxiliaryModels } from "../tool/agent_run/batch-runner.ts";
 import type {
   BatchProgressState,
   BatchTaskResult,
@@ -34,6 +34,7 @@ export interface ManagedBatch {
 /** Own delegation admission, retained results, and completion delivery for one session. */
 export class DelegationController {
   readonly #batches = new Map<string, ManagedBatch>();
+  readonly #starting = new Set<Promise<void>>();
   readonly #outputPaths = new Set<string>();
   readonly receipts = new DelegationUsageReceipts();
   readonly #conversationState = new DelegationConversationState();
@@ -52,13 +53,13 @@ export class DelegationController {
   ) {}
 
   /** Validate all tasks before starting a session-owned batch. */
-  start(options: {
+  async start(options: {
     params: AgentRunToolParams;
     catalogue: ProfileCatalogue;
     ctx: ExtensionContext;
     callId: string;
     onUpdate?: (state: BatchProgressState) => void;
-  }): ManagedBatch {
+  }): Promise<ManagedBatch> {
     if (this.#closed) throw new Error("The delegation session is closed.");
     const { params, catalogue, ctx, callId, onUpdate } = options;
     this.observeParent(ctx.signal);
@@ -116,36 +117,54 @@ export class DelegationController {
         `Agent Run capacity exceeded: ${active.length + this.#reserved}/${limit} active. No tasks started. Active batches: ${batches.join(", ") || "none"}.`,
       );
     }
+    const releaseStarting = this.#conversationState.reserveStarting(preflight.tasks);
     this.#reserved += preflight.tasks.length;
-    let handle: DelegationBatchHandle;
-    try {
-      handle = startDelegationBatch({
+    const startup = startDelegationBatchWithAuxiliaryModels(
+      {
         params,
         tasks: preflight.tasks,
         cwd: ctx.cwd,
         registry: this.registry,
         ...(mode === "foreground" ? { signal: ctx.signal, onUpdate } : {}),
-        onTaskResult: () => {
-          this.#updateUsage(this.#batches.get(handle.batchId));
+        onTaskResult: (_result, batchId) => {
+          this.#updateUsage(this.#batches.get(batchId));
           this.#scheduleNotice();
         },
+      },
+      () => {
+        if (this.#closed || ctx.signal?.aborted) return false;
+        const branch = ctx.sessionManager.getBranch();
+        this.#conversationState.assertCurrentBranch(preflight.tasks, launch?.id, branch);
+        return true;
+      },
+      AbortSignal.any(ctx.signal ? [ctx.signal, this.#shutdown.signal] : [this.#shutdown.signal]),
+    );
+    const ownedStart = startup.result
+      .then((handle) => {
+        const batch: ManagedBatch = {
+          handle,
+          mode,
+          callId,
+          taskConversations: new Map(
+            preflight.tasks.map((task) => [task.taskId, task.conversationId]),
+          ),
+          launchId: launch?.id,
+          sharedContext: params.sharedContext,
+          notified: new Set(),
+          acknowledged: false,
+          abandoned: false,
+        };
+        this.#batches.set(handle.batchId, batch);
+        return batch;
+      })
+      .finally(() => {
+        releaseStarting();
+        this.#reserved -= preflight.tasks.length;
       });
-    } finally {
-      this.#reserved -= preflight.tasks.length;
-    }
-    const batch: ManagedBatch = {
-      handle,
-      mode,
-      callId,
-      taskConversations: new Map(preflight.tasks.map((task) => [task.taskId, task.conversationId])),
-      launchId: launch?.id,
-      sharedContext: params.sharedContext,
-      notified: new Set(),
-      acknowledged: false,
-      abandoned: false,
-    };
-    this.#batches.set(handle.batchId, batch);
-    return batch;
+    const ownedSettlement = Promise.allSettled([startup.settled, ownedStart]).then(() => undefined);
+    this.#starting.add(ownedSettlement);
+    void ownedSettlement.then(() => this.#starting.delete(ownedSettlement));
+    return ownedStart;
   }
 
   /** Resolve only a background handle that belongs to the active branch. */
@@ -187,12 +206,7 @@ export class DelegationController {
   }
 
   /** Return live status for saved conversations on the active parent branch. */
-  conversationActivity(
-    ctx: ExtensionContext,
-  ): ReadonlyMap<
-    string,
-    { status: "busy" | "pending-collection"; label: string; profileId: string }
-  > {
+  conversationActivity(ctx: ExtensionContext): ReturnType<DelegationConversationState["activity"]> {
     this.#manager = ctx.sessionManager;
     return this.#conversationState.activity(
       this.#batches.values(),
@@ -300,6 +314,10 @@ export class DelegationController {
     this.#shutdown.abort();
     this.#removeParentAbort?.();
     clearTimeout(this.#noticeTimer);
+    // Fence existing runs immediately; a pending catalogue must not delay their cancellation.
+    const stopping = [...this.#batches.values()].map((batch) => batch.handle.stop());
+    await Promise.allSettled([...this.#starting, ...stopping]);
+    // Include handles whose already-accepted startup finished while shutdown began.
     const batches = [...this.#batches.values()];
     await Promise.allSettled(batches.map((batch) => batch.handle.stop()));
     await Promise.allSettled(batches.map((batch) => batch.handle.result));

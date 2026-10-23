@@ -22,6 +22,7 @@ Reference material for agents that develop PI extensions in this repo. Docs here
 | Doc | Answers | Read when |
 | --- | --- | --- |
 | `conventions/package-layout.md` | Package directory structure, boundary files (`api.ts` / `index.ts` / `extension.ts`), test layout, per-package target matrix | You create a package or do structural work on one |
+| [Child codemode](conventions/child-codemode.md) | Opt-in Agent and Reviewer codemode: scoped tools, auxiliary-model authorization, lifecycle, and verification | You implement codemode for child sessions |
 | [Installer design](conventions/installer.md) | Approved npx CLI design: two-scope Installation Matrix, presets, trust, source limits, failures, and verification requirements | You implement or change the SuPi installer |
 | `conventions/tool-architecture.md` | Internal architecture for tool packages: per-tool directory layout, spec/guidance modules, workflow, result assembly, presentation adapters, PI adapter, context-channel ownership | You add or restructure a package that registers tools |
 | `conventions/tool-rendering.md` | Transcript rendering: `renderCall`/`renderResult`, `details` contract, collapsed/expanded/partial/error states | You add or change tool renderers |

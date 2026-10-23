@@ -10,6 +10,7 @@ Caller-defined code review tasks run in managed, Inspection-only Reviewer Sessio
 - The Review Engine owns target resolution, canonical packets and hashes, Review Workspace lifecycle, structured submissions, usage accounting, and per-task Task Verdicts.
 - One to four independent tasks share a single frozen Review Workspace and run concurrently. Results remain separate; never aggregate or rerank their verdicts.
 - `review.postReviewPolicy` controls the containing Agent's prompt-level response to findings on both review surfaces; direct user disposition wins while `/supi-review` with `report` remains terminal.
+- `review.reviewerCodemodeEnabled` defaults to `false`. When enabled, Reviewer investigation on both surfaces gets PI codemode plus one invocation-scoped classifier/image catalogue shared across Reviewer children. This may transmit repository evidence to providers and incur costs; it does not inherit parent settings or grant additional tools, MCP servers, or ambient extensions. Planner Drafts and Submission Recovery never get codemode.
 
 ## Targets and Review Workspaces
 
@@ -22,15 +23,15 @@ Caller-defined code review tasks run in managed, Inspection-only Reviewer Sessio
 
 ## Reviewer sessions
 
-Reviewers receive Pi `read`, `bash`, and `grep`, headless Code Intelligence (`code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, `code_health`), and `submit_review`. Do not restore the five target-specific inspection tools.
+Reviewers receive Pi `read`, `bash`, and `grep`, headless Code Intelligence (`code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, `code_health`), and `submit_review`. When opted in, codemode runs in `on` mode with the same permitted inspection tools and the invocation's authorized auxiliary-model snapshot. Do not restore the five target-specific inspection tools.
 
 Inspection-only is a prompt protocol, not access control. The surrounding Sandboxed Pi Environment is the security boundary. When `review.bootstrapCommand` is configured, the Review Engine performs that one Dependency Bootstrap before fan-out and reviewers receive no bootstrap instruction; otherwise they may choose one. Reviewers must not intentionally mutate Target Evidence or Git history; tests, builds, linters, runtime experiments, nested Pi, and nested reviews are outside protocol.
 
-Reviewer resource loading replaces Pi's generic coding prompt with the package-owned Reviewer Protocol and suppresses ambient extensions, context files, skills, prompt templates, themes, and discovered system prompts. The fixed Reviewer Extension Set is only the Code Intelligence Headless inspection profile, under the containing session's project-trust decision. Its registration failure leaves `read`/`bash`/`grep` available and produces a Reviewer Capability Warning separate from findings.
+Reviewer resource loading replaces Pi's generic coding prompt with the package-owned Reviewer Protocol and suppresses ambient extensions, context files, skills, prompt templates, themes, and discovered system prompts. The Reviewer Extension Set contains the Code Intelligence Headless inspection profile under the containing session's project-trust decision, plus PI codemode only when `review.reviewerCodemodeEnabled` is true. Do not load MCP or inherit parent codemode settings. Keep `submit_review` and `decline_review_recovery` model-only so codemode scripts cannot invoke terminal submission tools. Missing requested capabilities leave the other permitted tools available and produce a Reviewer Capability Warning separate from findings.
 
 ## Submission Recovery
 
-After an accepted Reviewer Packet settles with usable history but no valid structured submission, Agent Run can perform one low-thinking same-session turn on the original model and one optional turn on `review.recoveryModel`. Recovery uses exactly `submit_review` and `decline_review_recovery`. It must not start after creation, readiness, preflight, cancellation, or timeout failure. Declined or exhausted recovery keeps the original failure and has no Task Verdict.
+After an accepted Reviewer Packet settles with usable history but no valid structured submission, Agent Run can perform one low-thinking same-session turn on the original model and one optional turn on `review.recoveryModel`. Recovery uses exactly `submit_review` and `decline_review_recovery`; codemode is inactive even when Reviewer investigation opted in, and only those two terminal tools are active. It must not start after creation, readiness, preflight, cancellation, or timeout failure. Declined or exhausted recovery keeps the original failure and has no Task Verdict.
 
 ## Result grammar
 
@@ -51,3 +52,4 @@ Use the agreed seams:
 3. Inline Planner Draft provenance, failure, and Review Snapshot drift behavior
 4. Headless Code Intelligence registration and Workspace provider-host leases
 5. `/supi-review-cleanup` command and picker behavior
+6. Reviewer codemode resource opt-in, shared auxiliary snapshot, no indirect submission exposure, and Planner/recovery exclusion

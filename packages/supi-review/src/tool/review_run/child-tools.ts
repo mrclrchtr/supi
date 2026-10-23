@@ -24,6 +24,7 @@ export const REVIEW_CHILD_TOOL_SPECS = {
     label: "Submit Review",
     description:
       "Submit the one final structured result for this review task. A successful call ends the Reviewer Session.",
+    exposure: "model-only",
     parameters: reviewSubmissionSchema,
   },
   declineReviewRecovery: {
@@ -31,6 +32,7 @@ export const REVIEW_CHILD_TOOL_SPECS = {
     label: "Decline Review Recovery",
     description:
       "End Submission Recovery without a Task Verdict when retained history cannot support a valid review submission.",
+    exposure: "model-only",
     parameters: declineReviewRecoverySchema,
   },
   submitPlannerDraft: {

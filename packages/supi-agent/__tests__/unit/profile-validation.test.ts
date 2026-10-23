@@ -106,6 +106,25 @@ describe("profile validation", () => {
     ]);
   });
 
+  it("accepts codemode as a fixed profile capability", async () => {
+    const paths = await roots();
+    await writeProfile(
+      paths.packageDirectory,
+      "codemode",
+      manifest({ tools: ["read", "codemode"] }),
+    );
+
+    const catalogue = await discoverProfileCatalogue({
+      cwd: paths.root,
+      agentDir: paths.agentDirectory,
+      packageDirectory: paths.packageDirectory,
+      projectTrusted: false,
+    });
+
+    expect(catalogue.diagnostics).toEqual([]);
+    expect(catalogue.profiles[0]?.sources[0]?.manifest?.tools).toEqual(["read", "codemode"]);
+  });
+
   it("accepts provider/model IDs whose model portion contains slashes", async () => {
     const paths = await roots();
     await writeProfile(

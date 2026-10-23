@@ -98,6 +98,19 @@ describe("runPlanner", () => {
     );
   });
 
+  it("keeps Planner children submit-only when Reviewer codemode is enabled", async () => {
+    await runPlanner({ ...args, reviewerCodemodeEnabled: true });
+
+    const config = mocks.runIsolatedChild.mock.calls[0]?.[0];
+    expect(config).toMatchObject({
+      tools: ["submit_planner_draft"],
+      protocolPrompt: expect.stringContaining("codemode"),
+    });
+    expect(config).not.toHaveProperty("codemode");
+    expect(config).not.toHaveProperty("authorizedAuxiliaryModels");
+    expect(config).not.toHaveProperty("headlessInspection", true);
+  });
+
   it("passes a configured Planner thinking level through the runtime adapter", async () => {
     await runPlanner({ ...args, requestedThinkingLevel: "high" });
 
