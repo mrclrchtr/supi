@@ -1,3 +1,4 @@
 self-hosted-runner:
   labels:
     - ubicloud-standard-2
+    - avrea-ubuntu-latest-2-vcpu
