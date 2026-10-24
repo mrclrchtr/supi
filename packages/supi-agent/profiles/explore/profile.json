@@ -7,7 +7,8 @@
     "code_orientation",
     "code_graph",
     "code_find",
-    "code_health"
+    "code_health",
+    "codemode"
   ],
   "systemPrompt": "supi:explore",
   "instructionScopes": []

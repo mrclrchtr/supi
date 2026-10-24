@@ -7,7 +7,7 @@ Status: implemented. The sections below record the approved contract and impleme
 | Area | Approved behavior |
 | --- | --- |
 | Consumers | Agent Runs and Reviewer Sessions |
-| Availability | Explicit opt-in; default behavior remains unchanged |
+| Availability | Selected through Agent Profile tools; built-in `explore` and `general` include codemode. Review remains explicitly opt-in. |
 | Functionality | PI codemode scripting, tool discovery, storage, classifier APIs, and image-model APIs |
 | Tool access | Existing permitted child tools only; no ambient extensions or inherited MCP servers |
 | Presentation | PI codemode mode `on`: direct tools remain available |
@@ -25,7 +25,7 @@ Opt-in authorizes auxiliary provider requests, transmission of supplied model in
 
 - Add `codemode` to the fixed Agent Capability Set and manifest validation.
 - Opt in by including `codemode` in the existing Agent Profile `tools` array.
-- Leave package-provided profiles unchanged by default.
+- Include `codemode` in the package-provided `explore` and `general` profiles. User/project tool-list overrides remain authoritative.
 - Preserve whole-field list replacement when resolving profile sources; adding a tool requires retaining the other desired tools in that array.
 - A Delegation Follow-Up uses current profile policy, including whether codemode is enabled.
 
@@ -105,7 +105,7 @@ An empty available catalogue does not prevent tool scripting. Do not substitute 
 
 ## Acceptance criteria
 
-- [x] Existing Agent Profiles and Review settings remain codemode-free by default.
+- [x] Built-in `explore` and `general` profiles include codemode; custom profiles select it through their tools list. Review remains disabled by default.
 - [x] An opted-in Agent Profile can execute scripts over its selected tools.
 - [x] An opted-in Reviewer can use scripts during investigation while direct tools remain available.
 - [x] Discovery and nested calls cannot access excluded tools, including tools with indirect exposure.
@@ -133,7 +133,7 @@ Verification during implementation: package-focused Vitest and TypeScript checks
 
 ## Evidence and implementation risks
 
-Executable regression coverage uses controlled providers and real PI codemode for auxiliary discovery/dispatch, tool reachability, reported Usage, worker-queue cancellation, and storage restoration across Agent Runs. Adapter tests cover default-off configuration, shared snapshots, background collection, and Review phase restrictions. Live provider entitlement and billing are not tested.
+Executable regression coverage uses controlled providers and real PI codemode for auxiliary discovery/dispatch, tool reachability, reported Usage, worker-queue cancellation, and storage restoration across Agent Runs. Adapter tests cover profile opt-in and Review's default-off configuration, shared snapshots, background collection, and Review phase restrictions. Live provider entitlement and billing are not tested.
 
 Catalogue discovery is not cancelable in PI. Invocation cancellation races that lookup, releases Agent admission reservations, and discards late results. The Agent controller retains settlement ownership and awaits pending discovery during shutdown while stopping existing children immediately. Review performs discovery before target/workspace creation, so canceled discovery cannot create later resources. A permanently stalled provider lookup can delay Agent session shutdown; it cannot start a canceled child.
 
