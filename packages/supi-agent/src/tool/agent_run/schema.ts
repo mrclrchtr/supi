@@ -37,7 +37,8 @@ export function buildAgentRunSchema(catalogue: ProfileCatalogue): TSchema {
     instructions: Type.String({
       minLength: 1,
       maxLength: MAX_INSTRUCTIONS_CHARS,
-      description: "New instructions for this Agent Run.",
+      description:
+        "Scoped objective, required result, and task-specific findings with accessible sources or excerpts. Label uncertainty. For follow-ups, include only new work or changed facts.",
     }),
   };
   const taskSchema = Type.Object(
@@ -81,7 +82,8 @@ export function buildAgentRunSchema(catalogue: ProfileCatalogue): TSchema {
       sharedContext: Type.Optional(
         Type.String({
           maxLength: MAX_SHARED_CONTEXT_CHARS,
-          description: "Optional new context copied to every child Agent Run.",
+          description:
+            "Evidence and background needed by every task, with uncertainty labeled. For follow-ups, include only new or changed context.",
         }),
       ),
     },

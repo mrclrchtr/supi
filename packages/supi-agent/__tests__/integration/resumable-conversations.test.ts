@@ -63,6 +63,7 @@ describe("resumable conversations through registered tools", () => {
     harness = await backgroundHarness(sdk);
     const firstRun = harness.invoke("agent_run", {
       mode: "foreground",
+      sharedContext: "Observed: deploy.yml:12 starts a worker pool.",
       tasks: [
         {
           id: "deployment",
@@ -81,6 +82,7 @@ describe("resumable conversations through registered tools", () => {
 
     const followUp = harness.invoke("agent_run", {
       mode: "foreground",
+      sharedContext: "Changed: deploy.yml now reads production secrets from the service account.",
       tasks: [
         {
           id: "deployment-secrets",
@@ -97,6 +99,11 @@ describe("resumable conversations through registered tools", () => {
       checkpoint: { checkpointId: string; entries: unknown[]; parentCheckpointId: string | null };
     };
 
+    const newPrompt = harness.children[1]?.session.prompt.mock.calls[0]?.[0];
+    expect(newPrompt).toContain("Changed: deploy.yml now reads production secrets");
+    expect(newPrompt).toContain("Check how production secrets reach the service.");
+    expect(newPrompt).not.toContain("Observed: deploy.yml:12");
+    expect(newPrompt).not.toContain("Inspect deployment configuration.");
     expect(secondTask.conversationId).toBe(firstTask.conversationId);
     expect(secondTask.checkpoint.parentCheckpointId).toBe(firstTask.checkpoint.checkpointId);
     expect(secondTask.checkpoint.entries).toHaveLength(2);
@@ -109,6 +116,9 @@ describe("resumable conversations through registered tools", () => {
     );
     expect(
       restoredEntries.some((entry) => JSON.stringify(entry).includes("production secrets")),
+    ).toBe(true);
+    expect(
+      restoredEntries.some((entry) => JSON.stringify(entry).includes("Observed: deploy.yml:12")),
     ).toBe(true);
 
     const listed = await harness.invoke("agent_list", {});

@@ -146,6 +146,27 @@ describe("profile resource policy", () => {
     expect(extensions).toHaveLength(2);
   });
 
+  it("excludes ambient instructions when the profile selects no instruction scopes", async () => {
+    const { profile, project, agentDir } = await setup();
+    const inputs = createAgentSessionInputs({
+      cwd: project,
+      agentDir,
+      projectTrusted: true,
+      providerAuthority,
+      model: { provider: "openai", id: "gpt-5", reasoning: false } as never,
+      thinkingLevel: "off",
+      profile: {
+        ...profile,
+        manifest: { ...profile.manifest, instructionScopes: [] },
+      },
+    });
+
+    await inputs.resourceLoader.reload();
+    expect(inputs.resourceLoader.getAgentsFiles().agentsFiles).toEqual([]);
+    expect(inputs.resourceLoader.getSystemPrompt()).toBe("complete custom prompt");
+    expect(inputs.resourceLoader.getAppendSystemPrompt()).toEqual([]);
+  });
+
   it("keeps the package-owned Code Intelligence profile headless", async () => {
     const profile: AgentProfile = {
       id: "inspect",

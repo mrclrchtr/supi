@@ -51,6 +51,47 @@ In TUI and RPC, `agent_run` defaults to background execution for read-only profi
 
 See the [background delegation design](docs/background-delegation.md) for the full contract.
 
+## Choosing handoff context
+
+A fresh Delegation Conversation does not inherit the parent's conversation history. The parent selects what to pass; SuPi does not summarize or forward that history automatically.
+
+| Input | Include | Leave out |
+| --- | --- | --- |
+| Task `instructions` | Scoped objective, task-specific evidence and uncertainty, required result | Unrelated history and unrequested implementation alternatives |
+| `sharedContext` | Background and source-backed findings needed by **every** task | Sibling-specific work and whole previous reports |
+| Delegation Follow-Up | New work, changed facts, and new relevant context | Earlier findings already retained in that conversation |
+
+- Supply findings with accessible source locations or short excerpts, not just a reading itinerary. Separate observations, assumptions, and unresolved questions. Supplied evidence is not a required conclusion: the child should surface contradictions or stale evidence.
+- Match evidence access to the selected Agent Profile. For example, fetch an issue in the parent and pass its relevant requirements when the child has no shell or web tools; do not tell that child to run `gh`. Put task-specific evidence in `instructions`, not batch-wide context.
+- Resolve product choices before assigning work that depends on them. A child can report a blocking choice rather than investigate every possible implementation branch.
+- Continue a relevant saved conversation rather than restart discovery. Collect completed background work first. Use fresh conversations when independence is intentional; keep independent review requirements and evidence separate from a preferred verdict.
+
+The following investigation and follow-up use illustrative paths and findings.
+
+**Fresh investigation with existing evidence:**
+
+```ts
+agent_run({
+  tasks: [{
+    id: "retry-source",
+    new: { profile: "explore" },
+    instructions: "Decision: where should a retry-limit change be made? Known: src/config.ts:40–55 reads retryLimit; src/worker.ts:80–95 consumes it. Unknown: whether environment configuration overrides it between those points. Trace that remaining path and return the controlling source locations and any uncertainty; do not remap the whole worker system.",
+  }],
+});
+```
+
+**Follow-up after collecting that conversation:**
+
+```ts
+agent_run({
+  tasks: [{
+    id: "retry-change",
+    continue: { conversationId: "<collected conversation reference>" },
+    instructions: "Changed: the proposed default is now five retries. Using the earlier configuration findings, identify which behavior tests would need updating. Report gaps; do not edit files.",
+  }],
+});
+```
+
 ## Resumable Agent Conversations
 
 Start a new conversation with `new`, then use its conversation reference with `continue`:
