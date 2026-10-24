@@ -40,6 +40,7 @@
         },
         "noForEach": "error",
         "useArrayFind": "error",
+        "useArraySome": "error",
         "useMaxParams": "error"
       },
       "correctness": {
@@ -79,7 +80,6 @@
       "nursery": {
         "noFloatingPromises": "error",
         "noMisusedPromises": "error",
-        "useArraySome": "error",
         "useExhaustiveSwitchCases": "error",
         "useNullishCoalescing": "error"
       }
@@ -91,6 +91,17 @@
       "semicolons": "always",
       "trailingCommas": "all",
       "arrowParentheses": "always"
+    }
+  },
+  // Keep the pre-2.6 formatting scope; adopting Markdown/YAML formatting is separate work.
+  "markdown": {
+    "formatter": {
+      "enabled": false
+    }
+  },
+  "yaml": {
+    "formatter": {
+      "enabled": false
     }
   },
   "assist": {

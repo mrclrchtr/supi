@@ -72,7 +72,10 @@ function canonicalizeProviderRoots(providerRoots: readonly string[]): MutationAu
     }
   }
 
-  return { kind: "authorized", canonicalRoots: [...canonicalRoots].sort() };
+  return {
+    kind: "authorized",
+    canonicalRoots: [...canonicalRoots].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
+  };
 }
 
 function validateFiles(

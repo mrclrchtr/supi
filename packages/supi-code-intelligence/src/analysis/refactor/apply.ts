@@ -57,7 +57,7 @@ export async function applyWorkspaceEdit(
   options: ApplyOptions,
 ): Promise<ApplyResult> {
   const grouped = groupEditsByFile(edit.edits);
-  const files = [...grouped.keys()].sort();
+  const files = [...grouped.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   return withAllMutationQueues(files, async () => {
     const authority = revalidateMutationAuthority(files, options.authorizedMutationRoots);
     if (authority.kind === "unavailable") {
@@ -198,7 +198,7 @@ function readOriginalContents(
   const contents = new Map<string, string>();
 
   try {
-    for (const file of [...grouped.keys()].sort()) {
+    for (const file of [...grouped.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))) {
       contents.set(file, readFileSync(file, "utf-8"));
     }
   } catch (error) {

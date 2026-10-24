@@ -114,7 +114,7 @@ function makeCatalogue(ids: string[]): ProfileCatalogue {
   return {
     profiles,
     diagnostics: [],
-    profileIds: [...ids].sort(),
+    profileIds: [...ids].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
     omittedProfileCount: 0,
     sourceDirectories: { package: "/profiles", global: "/global" },
   };

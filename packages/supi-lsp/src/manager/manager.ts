@@ -2975,7 +2975,7 @@ export class LspManager {
     control?: CodeRequestControl,
   ): Promise<{ kind: "enrolled" } | { kind: "unavailable"; reason: string }> {
     throwIfCodeRequestInterrupted(control);
-    const files = [...new Set(filePaths)].sort();
+    const files = [...new Set(filePaths)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
     const routeKey = clientKey(client.name, client.root);
     if (this.clients.get(routeKey) !== client) {
       return { kind: "unavailable", reason: "The semantic route changed during rename planning." };

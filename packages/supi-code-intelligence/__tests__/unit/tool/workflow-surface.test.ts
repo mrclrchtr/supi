@@ -87,10 +87,12 @@ describe("code intelligence tool specs", () => {
 
     const specNames = CODE_INTELLIGENCE_TOOL_SPECS.map((spec) => spec.name);
     expect(new Set(specNames).size).toBe(CODE_INTELLIGENCE_TOOL_NAMES.length);
-    expect([...specNames].sort()).toEqual([...CODE_INTELLIGENCE_TOOL_NAMES].sort());
+    expect([...specNames].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))).toEqual(
+      [...CODE_INTELLIGENCE_TOOL_NAMES].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
+    );
     expect(
       Object.keys(CODE_INTELLIGENCE_TOOL_SCHEMAS).sort((left, right) => left.localeCompare(right)),
-    ).toEqual([...CODE_INTELLIGENCE_TOOL_NAMES].sort());
+    ).toEqual([...CODE_INTELLIGENCE_TOOL_NAMES].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)));
 
     for (const spec of CODE_INTELLIGENCE_TOOL_SPECS) {
       expect(Object.hasOwn(CODE_INTELLIGENCE_TOOL_SCHEMAS, spec.name)).toBe(true);

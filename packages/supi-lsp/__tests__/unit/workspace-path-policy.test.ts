@@ -41,7 +41,9 @@ describe("automatic LSP path policy", () => {
     const root = makeWorkspace();
     const policy = createAutomaticLspPathPolicy(root, []);
 
-    expect([...AUTOMATIC_LSP_EXCLUDED_DIRECTORIES].sort()).toEqual([
+    expect(
+      [...AUTOMATIC_LSP_EXCLUDED_DIRECTORIES].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
+    ).toEqual([
       ".cache",
       ".git",
       ".next",
