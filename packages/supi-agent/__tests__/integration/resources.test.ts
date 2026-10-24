@@ -171,7 +171,7 @@ describe("profile resource policy", () => {
     await inputs.resourceLoader.reload();
     const extensions = inputs.resourceLoader.getExtensions().extensions;
     expect(extensions).toHaveLength(1);
-    expect([...extensions[0].tools.keys()].sort()).toEqual([
+    expect([...extensions[0].tools.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))).toEqual([
       "code_find",
       "code_graph",
       "code_health",

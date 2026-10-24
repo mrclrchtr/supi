@@ -121,6 +121,16 @@ describe("computePromptFingerprint", () => {
     expect(fp1.selectedToolsHash).toBe(fp2.selectedToolsHash);
   });
 
+  it.concurrent("preserves code-unit tool ordering without mutating the selection", () => {
+    const selectedTools = ["ä", "z", "Z", "😀", "a"];
+    const fp = computePromptFingerprint(
+      opts({ selectedTools, customPrompt: "Z,a,z,ä,😀" }) as never,
+    );
+
+    expect(fp.selectedToolsHash).toBe(fp.customPromptHash);
+    expect(selectedTools).toEqual(["ä", "z", "Z", "😀", "a"]);
+  });
+
   it.concurrent("produces different hashes for different custom prompts", () => {
     const fp1 = computePromptFingerprint(opts({ customPrompt: "Be concise" }) as never);
     const fp2 = computePromptFingerprint(opts({ customPrompt: "Be detailed" }) as never);

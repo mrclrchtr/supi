@@ -127,7 +127,9 @@ function relationshipSection(
   limit: number,
 ): OrientationSectionData {
   const selected = edges.slice(0, limit);
-  const ids = [...new Set(selected.flatMap((edge) => [edge.from, edge.to]))].sort();
+  const ids = [...new Set(selected.flatMap((edge) => [edge.from, edge.to]))].sort((a, b) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  );
   const labels = new Map(facts.observation.projects.map((entry) => [entry.id, entry]));
   const lines = ["flowchart LR"];
   for (const [index, id] of ids.entries()) {

@@ -134,7 +134,9 @@ describe("packStaged clean manifest", () => {
     const entries = listTarballEntries(tarball);
     const manifests = entries.filter((entry) => entry.endsWith("/package.json"));
     expect(manifests.sort()).toEqual(
-      ["package/package.json", `${childPath}/package.json`, `${leafPath}/package.json`].sort(),
+      ["package/package.json", `${childPath}/package.json`, `${leafPath}/package.json`].sort(
+        (a, b) => (a < b ? -1 : a > b ? 1 : 0),
+      ),
     );
 
     const app = extractJson(tarball, "package/package.json");

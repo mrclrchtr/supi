@@ -48,7 +48,7 @@ export function computePromptFingerprint(opts?: BuildSystemPromptOptions): Promp
     : 0;
 
   const selectedToolsHash = opts.selectedTools
-    ? fastHash([...opts.selectedTools].sort().join(","))
+    ? fastHash([...opts.selectedTools].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join(","))
     : 0;
 
   const toolSnippetsHash = opts.toolSnippets
