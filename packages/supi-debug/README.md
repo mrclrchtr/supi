@@ -108,8 +108,11 @@ Available settings:
 - `enabled` — turn session-local event capture on or off
 - `agentAccess` — `off`, `sanitized`, or `raw`
 - `maxEvents` — maximum retained events in memory
+- `agentRunRetrospectivesEnabled` — opt in to Agent Run retrospectives; off by default and eligible only while Debug capture and its session persistence sink are active. Retrospective prose is stored in the sanitized event data using the existing Debug session-entry path.
 
-Historical inspection works for events captured after this version is loaded. For example, an
+With retrospective collection enabled, completed Delegation and Reviewer Runs publish their task results before performing one tool-free assessment. Find the reports using category `agent-run-retrospective` and source `supi-agent` or `supi-review`. Reports include their own Usage, separate from task Usage. Collection is best effort and stops on cancellation or session shutdown. Assessment prose can still contain sensitive task details despite best-effort secret redaction; it is self-reported feedback, not verified savings.
+
+Historical inspection works for events captured after this extension is loaded. For example, an
 agent can call `debug` with `sessionFile` set to a PI session JSONL path.
 
 Defaults come from the shared debug registry:
@@ -119,7 +122,8 @@ Defaults come from the shared debug registry:
   "debug": {
     "enabled": false,
     "agentAccess": "sanitized",
-    "maxEvents": 100
+    "maxEvents": 100,
+    "agentRunRetrospectivesEnabled": false
   }
 }
 ```

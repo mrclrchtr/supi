@@ -16,6 +16,7 @@ const mockFns = vi.hoisted(() => ({
   registerContextProvider: vi.fn(),
   redactDebugData: vi.fn((value) => value),
   subscribeDebugEvents: vi.fn(() => vi.fn()),
+  subscribeDebugPersistence: vi.fn<(sink: (event: unknown) => void) => () => void>(() => vi.fn()),
   maybeLogLoadStatus: vi.fn(),
 }));
 
@@ -39,10 +40,12 @@ vi.mock("../../src/status-log.ts", () => ({
 vi.mock("@mrclrchtr/supi-core/debug", () => ({
   clearDebugEvents: mockFns.clearDebugEvents,
   configureDebugRegistry: mockFns.configureDebugRegistry,
+  DEBUG_EVENT_ENTRY_TYPE: "supi-debug-event",
   DEBUG_REGISTRY_DEFAULTS: {
     enabled: false,
     agentAccess: "sanitized",
     maxEvents: 100,
+    agentRunRetrospectivesEnabled: false,
   },
   getDebugEvents: mockFns.getDebugEvents,
   getDebugSummary: mockFns.getDebugSummary,
@@ -51,6 +54,7 @@ vi.mock("@mrclrchtr/supi-core/debug", () => ({
   matchesDebugEventQuery: mockFns.matchesDebugEventQuery,
   redactDebugData: mockFns.redactDebugData,
   subscribeDebugEvents: mockFns.subscribeDebugEvents,
+  subscribeDebugPersistence: mockFns.subscribeDebugPersistence,
 }));
 
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
@@ -60,12 +64,14 @@ const ENABLED_CONFIG = {
   enabled: true,
   agentAccess: "sanitized",
   maxEvents: 100,
+  agentRunRetrospectivesEnabled: false,
 } as const;
 
 type MockDebugConfig = {
   enabled: unknown;
   agentAccess: unknown;
   maxEvents: unknown;
+  agentRunRetrospectivesEnabled?: unknown;
 };
 
 function setup(config: MockDebugConfig = ENABLED_CONFIG) {
@@ -120,6 +126,7 @@ describe("supi-debug extension setup", () => {
       enabled: true,
       agentAccess: "raw",
       maxEvents: 250,
+      agentRunRetrospectivesEnabled: false,
     });
   });
 
@@ -130,6 +137,37 @@ describe("supi-debug extension setup", () => {
       enabled: false,
       agentAccess: "raw",
       maxEvents: 250,
+      agentRunRetrospectivesEnabled: false,
+    });
+  });
+
+  it("normalizes the Agent Run retrospective opt-in without truthiness", () => {
+    setup({
+      enabled: true,
+      agentAccess: "raw",
+      maxEvents: 250,
+      agentRunRetrospectivesEnabled: "YES",
+    });
+
+    expect(mockFns.configureDebugRegistry).toHaveBeenCalledWith({
+      enabled: true,
+      agentAccess: "raw",
+      maxEvents: 250,
+      agentRunRetrospectivesEnabled: true,
+    });
+
+    mockFns.configureDebugRegistry.mockClear();
+    setup({
+      enabled: true,
+      agentAccess: "raw",
+      maxEvents: 250,
+      agentRunRetrospectivesEnabled: "false",
+    });
+    expect(mockFns.configureDebugRegistry).toHaveBeenCalledWith({
+      enabled: true,
+      agentAccess: "raw",
+      maxEvents: 250,
+      agentRunRetrospectivesEnabled: false,
     });
   });
 
@@ -181,6 +219,38 @@ describe("supi-debug extension setup", () => {
   });
 });
 
+describe("supi-debug persistence sink", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("persists sanitized debug events through appendEntry and unsubscribes at shutdown", () => {
+    const unsubscribe = vi.fn();
+    mockFns.subscribeDebugPersistence.mockReturnValue(unsubscribe);
+    const piWithSink = setup();
+    const sink = mockFns.subscribeDebugPersistence.mock.calls.at(-1)?.[0];
+    const event = {
+      id: 1,
+      timestamp: 1_700_000_000_000,
+      source: "agent-run",
+      level: "info",
+      category: "retrospective",
+      message: "Agent Run retrospective captured",
+      data: {
+        runId: "run-42",
+        caller: "delegation",
+        retrospective: "Observed friction: API_TOKEN=[REDACTED].",
+      },
+    };
+
+    sink?.(event);
+    expect(piWithSink.appendEntry).toHaveBeenCalledWith("supi-debug-event", event);
+
+    piWithSink.handlers.get("session_shutdown")?.[0]?.();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+});
+
 describe("supi-debug settings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -192,7 +262,7 @@ describe("supi-debug settings", () => {
     const options = mockFns.defineConfigSettings.mock.calls[0][0];
 
     // Verify fields are declared declaratively
-    expect(options.fields).toHaveLength(3);
+    expect(options.fields).toHaveLength(4);
     expect(options.fields[0]).toMatchObject({ kind: "boolean", key: "enabled" });
     expect(options.fields[1]).toMatchObject({
       kind: "enum",
@@ -200,6 +270,11 @@ describe("supi-debug settings", () => {
       values: ["off", "sanitized", "raw"],
     });
     expect(options.fields[2]).toMatchObject({ kind: "number", key: "maxEvents" });
+    expect(options.fields[3]).toMatchObject({
+      kind: "boolean",
+      // biome-ignore lint/security/noSecrets: Setting name, not a credential.
+      key: "agentRunRetrospectivesEnabled",
+    });
 
     // Verify afterPersist triggers live sync
     mockFns.configureDebugRegistry.mockClear();

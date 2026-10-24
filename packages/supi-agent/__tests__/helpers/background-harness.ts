@@ -63,7 +63,12 @@ export async function backgroundHarness(
       gate.enter();
       await gate.ready;
     }
-    const child = controlledSession(inputs.tools, usage, inputs.sessionManager);
+    const child = controlledSession(
+      inputs.tools,
+      usage,
+      inputs.sessionManager,
+      inputs.settingsManager,
+    );
     children.push(child);
     return { session: child.session, extensionsResult: { runtime: child.extensionRuntime } };
   });

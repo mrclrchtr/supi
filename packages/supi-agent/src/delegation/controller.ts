@@ -109,7 +109,9 @@ export class DelegationController {
       throw new Error("The background launch is not on the active branch.");
     const active = this.registry
       .snapshot()
-      .runs.filter((run) => run.kind === "Agent Run" && run.active);
+      .runs.filter(
+        (run) => run.kind === "Agent Run" && run.active && run.status !== "retrospecting",
+      );
     const limit = loadAgentConfig(ctx.cwd).maxConcurrentRuns;
     if (active.length + this.#reserved + preflight.tasks.length > limit) {
       const batches = [...new Set(active.map((run) => run.batchId))].slice(0, 4);
@@ -270,13 +272,13 @@ export class DelegationController {
     if (signal.aborted) abort();
   }
 
-  /** Stop background batches immediately when a parent operation aborts. */
+  /** Stop owned work, including post-result assessments, when a parent operation aborts. */
   abortParent(): void {
     this.#paused = true;
     clearTimeout(this.#noticeTimer);
     this.#noticeTimer = undefined;
     for (const batch of this.#batches.values()) {
-      if (batch.mode === "background") void batch.handle.stop().catch(() => undefined);
+      void batch.handle.stop().catch(() => undefined);
     }
   }
 

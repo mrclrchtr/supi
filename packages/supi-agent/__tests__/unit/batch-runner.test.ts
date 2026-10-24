@@ -32,6 +32,9 @@ vi.mock("@mrclrchtr/supi-agent-runtime/api", async (importOriginal) => ({
     (options: { prompt: string; readinessCheck?: (session: unknown) => boolean }) => {
       const handle = {
         steeringAvailable: false,
+        get taskResult() {
+          return this.result;
+        },
         result: new Promise<{ kind: string; value?: string }>((resolve) => {
           // Resolve immediately with success.
           resolve({ kind: "success", value: `completed: ${options.prompt}` });
@@ -320,6 +323,9 @@ describe("runDelegationBatch", () => {
     // Mock startRegisteredAgentRun to return failure for this test only.
     const { startRegisteredAgentRun } = await import("@mrclrchtr/supi-agent-runtime/api");
     (startRegisteredAgentRun as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+      get taskResult() {
+        return this.result;
+      },
       result: Promise.resolve({
         kind: "failed",
         failureCode: "session-not-ready",
@@ -346,6 +352,9 @@ describe("runDelegationBatch", () => {
     configureDebugRegistry({ enabled: true });
     const { startRegisteredAgentRun } = await import("@mrclrchtr/supi-agent-runtime/api");
     (startRegisteredAgentRun as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+      get taskResult() {
+        return this.result;
+      },
       result: Promise.resolve({
         kind: "failed",
         failureCode: "missing-completion",
@@ -404,6 +413,9 @@ describe("runDelegationBatch", () => {
     const bigAnswer = "x".repeat(16_000);
     for (let i = 0; i < 4; i++) {
       (startRegisteredAgentRun as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
+        get taskResult() {
+          return this.result;
+        },
         result: Promise.resolve({ kind: "success" as const, value: bigAnswer }),
         subscribe: vi.fn(() => () => undefined),
         steer: vi.fn(async () => "not-running" as const),
@@ -450,6 +462,9 @@ describe("runDelegationBatch", () => {
     const { startRegisteredAgentRun } = await import("@mrclrchtr/supi-agent-runtime/api");
     (startRegisteredAgentRun as ReturnType<typeof vi.fn>).mockImplementationOnce(
       (options: { completionResolver: (session: unknown) => string | undefined }) => ({
+        get taskResult() {
+          return this.result;
+        },
         result: Promise.resolve(
           options.completionResolver({ getLastAssistantText: () => undefined }),
         ).then((value) =>

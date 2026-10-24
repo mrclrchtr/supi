@@ -14,6 +14,7 @@ export interface DebugConfig extends Record<string, unknown> {
   enabled: boolean;
   agentAccess: DebugAgentAccess;
   maxEvents: number;
+  agentRunRetrospectivesEnabled: boolean;
 }
 
 export const DEBUG_DEFAULTS: DebugConfig = { ...DEBUG_REGISTRY_DEFAULTS };
@@ -27,7 +28,7 @@ export function normalizeMaxEvents(value: string | number): number {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : DEBUG_DEFAULTS.maxEvents;
 }
 
-function normalizeEnabled(value: unknown): boolean {
+function normalizeBoolean(value: unknown, fallback: boolean): boolean {
   if (typeof value === "boolean") {
     return value;
   }
@@ -51,20 +52,24 @@ function normalizeEnabled(value: unknown): boolean {
     ) {
       return false;
     }
-    return DEBUG_DEFAULTS.enabled;
+    return fallback;
   }
 
   if (value === 1) return true;
   if (value === 0) return false;
-  return DEBUG_DEFAULTS.enabled;
+  return fallback;
 }
 
 export function loadDebugConfig(cwd: string): DebugConfig {
   const config = loadSupiConfig(DEBUG_SECTION, cwd, DEBUG_DEFAULTS);
   return {
-    enabled: normalizeEnabled(config.enabled),
+    enabled: normalizeBoolean(config.enabled, DEBUG_DEFAULTS.enabled),
     agentAccess: normalizeAgentAccess(String(config.agentAccess)),
     maxEvents: normalizeMaxEvents(config.maxEvents),
+    agentRunRetrospectivesEnabled: normalizeBoolean(
+      config.agentRunRetrospectivesEnabled,
+      DEBUG_DEFAULTS.agentRunRetrospectivesEnabled,
+    ),
   };
 }
 

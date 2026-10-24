@@ -10,7 +10,7 @@ import type { AgentConversationView, ConversationTaskMetadata } from "./conversa
 import type { AgentRunToolParams } from "./schema.ts";
 
 /** Per-task status tracked during live Delegation Batch execution. */
-export type BatchTaskStatus = AgentRunProgress["status"];
+export type BatchTaskStatus = Exclude<AgentRunProgress["status"], "retrospecting">;
 
 /** Live progress for one Delegation Task. */
 export interface BatchTaskProgress {

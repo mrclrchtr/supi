@@ -136,7 +136,8 @@ function renderRunControlHints(run?: AgentsOverlayRun): string[] {
   if (!run?.active) return [];
   const controls: string[] = [];
   if (run.steeringAvailable) controls.push("s steer");
-  if (run.status === "starting" || run.status === "running") controls.push("x stop");
+  if (run.status === "starting" || run.status === "running" || run.status === "retrospecting")
+    controls.push("x stop");
   return controls;
 }
 

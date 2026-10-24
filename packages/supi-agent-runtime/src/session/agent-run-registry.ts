@@ -222,7 +222,7 @@ export class AgentRunRegistry {
     if (
       !run ||
       !handle ||
-      (run.status !== "starting" && run.status !== "running") ||
+      (run.status !== "starting" && run.status !== "running" && run.status !== "retrospecting") ||
       !this.#isCurrent(run)
     ) {
       return "not-running";
@@ -359,7 +359,12 @@ export class AgentRunRegistry {
 }
 
 function isActive(status: AgentRunRegistryRun["status"]): boolean {
-  return status === "starting" || status === "running" || status === "stopping";
+  return (
+    status === "starting" ||
+    status === "running" ||
+    status === "retrospecting" ||
+    status === "stopping"
+  );
 }
 
 function copyConversation(conversation: AgentRunDisplayConversation): AgentRunDisplayConversation {

@@ -31,7 +31,7 @@ export interface AgentRunContext {
   readonly leafId: string | null;
 }
 
-/** Terminal outcome of one managed Agent Run. */
+/** Task outcome snapshot; the terminal handle outcome additionally includes all session Usage. */
 export type AgentRunOutcome<T> = (
   | { kind: "success"; value: T; usage?: Usage }
   | ({ kind: "failed"; usage?: Usage } & (
@@ -191,10 +191,28 @@ export interface AgentRunContinuation {
   onTurn?: (turn: AgentRunContinuationTurn) => void;
 }
 
+/** Result of the optional, tool-free assessment phase; never changes task completion. */
+export interface AgentRunRetrospectiveResult {
+  readonly status: "completed" | "failed";
+  readonly text?: string;
+  /** Newly billed retrospective Usage, excluding the completed task. */
+  readonly usage?: Usage;
+}
+
+/** Caller-owned assessment prompt and evidence policy. */
+export interface AgentRunRetrospective {
+  readonly prompt: string;
+  /** Recheck opt-in and logging availability immediately before the assessment. */
+  readonly isEnabled?: () => boolean;
+  /** Synchronous evidence sink; failures cannot invalidate the task result. */
+  readonly onResult: (result: AgentRunRetrospectiveResult) => void;
+}
+
 /** Non-terminal and terminal status exposed through progress snapshots. */
 export type AgentRunStatus =
   | "starting"
   | "running"
+  | "retrospecting"
   | "stopping"
   | "completed"
   | "failed"
@@ -303,7 +321,9 @@ export interface StartAgentRunOptions<T> {
   observer?: AgentRunObserver;
   /** Optional bounded same-session continuation after an accepted recoverable failure. */
   continuation?: AgentRunContinuation;
-  /** Optional host timeout, measured from immediately before prompting. */
+  /** Optional post-result assessment; the runtime retains lifecycle ownership. */
+  retrospective?: AgentRunRetrospective;
+  /** Optional task timeout, measured before prompting and cleared at result readiness. */
   timeoutMs?: number;
   /** Optional containing-session cancellation signal. */
   signal?: AbortSignal;
@@ -315,6 +335,8 @@ export interface StartAgentRunOptions<T> {
 export interface AgentRunHandle<T> {
   /** True only while the initial user prompt accepts steering. */
   readonly steeringAvailable: boolean;
+  /** Frozen task outcome and task-only Usage, available before an optional retrospective. */
+  readonly taskResult: Promise<AgentRunOutcome<T>>;
   /** Terminal outcome, including all usage attributable to the owned Agent Run session. */
   readonly result: Promise<AgentRunOutcome<T>>;
   /** Subscribe to immutable progress snapshots; the current snapshot is immediate. */

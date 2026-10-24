@@ -12,6 +12,7 @@ import {
   createAgentSession,
   createAgentSessionRuntime,
   getAgentDir,
+  SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import {
   captureAgentRunContext,
@@ -149,6 +150,11 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     sessionSetupFinished = true;
     resolveSessionSetupFinished();
   };
+  let taskOutcome: AgentRunOutcome<T> | undefined;
+  let resolveTaskResult!: (outcome: AgentRunOutcome<T>) => void;
+  const taskResult = new Promise<AgentRunOutcome<T>>((resolve) => {
+    resolveTaskResult = resolve;
+  });
   let resolveResult!: (outcome: AgentRunOutcome<T>) => void;
   const result = new Promise<AgentRunOutcome<T>>((resolve) => {
     resolveResult = resolve;
@@ -327,8 +333,9 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     if (finalizing) return finalization ?? Promise.resolve();
     finalizing = true;
     closeSessionAdmission();
+    const capturedContext = taskOutcome ? taskOutcome.context : captureFinalizedContext();
+    const selectedOutcome = taskOutcome ?? outcome;
     finalization = (async () => {
-      const capturedContext = captureFinalizedContext();
       if (timeoutId) clearTimeout(timeoutId);
       timeoutId = undefined;
       unsubscribe?.();
@@ -341,11 +348,12 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       observerCleanup = undefined;
       if (view) deactivateAgentRunSessionView(view);
       await disposeRuntime();
-      const finalOutcome = outcomeWithUsage(withAgentRunContext(outcome, capturedContext));
+      const finalOutcome = outcomeWithUsage(withAgentRunContext(selectedOutcome, capturedContext));
       terminal = true;
       progressState.status = finalOutcome.kind === "success" ? "completed" : finalOutcome.kind;
       progressState.usage = finalOutcome.usage ?? progressState.usage;
       publish();
+      resolveTaskResult(finalOutcome);
       resolveResult(finalOutcome);
       runtime = undefined;
       session = undefined;
@@ -651,6 +659,118 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
     return completed;
   };
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: freeze task evidence, publish readiness, then retain one cancellable assessment in the audited lifecycle.
+  const finishTask = async (value: T): Promise<void> => {
+    const policy = options.retrospective;
+    let enabled = false;
+    try {
+      enabled = Boolean(policy && (policy.isEnabled?.() ?? true));
+    } catch {
+      // Unavailable evidence policy fails closed without affecting the task.
+    }
+    if (!enabled || !policy || !session) {
+      await finish(outcomeWithUsage({ kind: "success", value }));
+      return;
+    }
+    const activeSession = session;
+    taskOutcome = withAgentRunContext(
+      outcomeWithUsage({ kind: "success", value }),
+      captureFinalizedContext(),
+    );
+    if (taskOutcome.usage) taskOutcome = { ...taskOutcome, usage: cloneUsage(taskOutcome.usage) };
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = undefined;
+    try {
+      observerCleanup?.();
+    } catch {
+      // Task evidence is best effort and must be frozen before the extra turn.
+    }
+    observerCleanup = undefined;
+    closeSessionAdmission();
+    resolveTaskResult(taskOutcome);
+    // Drain already-admitted steering before changing tools; late writes are fenced.
+    const steeringDrained = await awaitInitialSteeringDrain();
+    if (aborting || terminal || finalizing) return;
+    if (!steeringDrained) {
+      await finish(taskOutcome);
+      return;
+    }
+    setStatus("retrospecting");
+    const before = refreshUsage();
+    const previousAssistant = latestAssistant(activeSession);
+    let accepted = false;
+    let failed = false;
+    let promptClosed = false;
+    let dispositionSeen = false;
+    let requested = false;
+    let exceededRequestLimit = false;
+    try {
+      activeSession.settingsManager.applyOverrides({
+        retry: { enabled: false, maxRetries: 0, provider: { maxRetries: 0 } },
+        compaction: { enabled: false },
+        cacheWarming: "off",
+      });
+      activeSession.setActiveToolsByName([]);
+      activeSession.agent.beforeToolCall = async () => ({
+        block: true,
+        terminate: true,
+        reason: "Agent Run retrospectives cannot execute tools",
+      });
+      const stream = activeSession.agent.streamFunction;
+      activeSession.agent.streamFunction = (...args) => {
+        if (
+          requested ||
+          aborting ||
+          terminal ||
+          finalizing ||
+          activeSession.getActiveToolNames().length > 0
+        ) {
+          exceededRequestLimit = true;
+          beginAbort();
+          throw new Error("Agent Run retrospective allows one request only");
+        }
+        requested = true;
+        return stream(...args);
+      };
+      await activeSession.prompt(policy.prompt, {
+        preflightResult: (disposition) => {
+          if (
+            disposition === "started" &&
+            (promptClosed || aborting || terminal || finalizing || (dispositionSeen && !accepted))
+          ) {
+            throw new Error("Agent Run assessment closed");
+          }
+          if (dispositionSeen) return;
+          dispositionSeen = true;
+          accepted = disposition === "started";
+        },
+      });
+      promptClosed = true;
+      await awaitSessionQuiescence(activeSession);
+    } catch {
+      failed = true;
+    } finally {
+      promptClosed = true;
+    }
+    if (aborting || terminal || finalizing) return;
+    const completed =
+      accepted &&
+      !failed &&
+      !exceededRequestLimit &&
+      latestAssistant(activeSession) !== previousAssistant &&
+      !isProviderError(activeSession);
+    try {
+      policy.onResult({
+        status: completed ? "completed" : "failed",
+        ...(completed ? { text: activeSession.getLastAssistantText() } : {}),
+        ...usageDeltaFields(before, refreshUsage()),
+      });
+    } catch {
+      // Evidence failures cannot replace an already published task result.
+    }
+    await finish(taskOutcome);
+  };
+
   const runContinuation = async (
     initialFailureCode: AgentRunContinuationFailureCode,
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: the bounded loop keeps continuation and terminal selection in the lifecycle closure.
@@ -698,7 +818,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
         const value = await options.completionResolver(activeView);
         if (aborting || terminal || finalizing) return;
         if (value !== undefined) {
-          await finish(outcomeWithUsage({ kind: "success", value }));
+          await finishTask(value);
           return;
         }
       } catch {
@@ -782,7 +902,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
       if (value === undefined) {
         await runContinuation("missing-completion");
       } else {
-        await finish(outcomeWithUsage({ kind: "success", value }));
+        await finishTask(value);
       }
     } catch {
       if (!terminal && !finalizing && !aborting) {
@@ -922,6 +1042,12 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
         return;
       }
       const agentDir = options.inputs.agentDir ?? process.env.PI_CODING_AGENT_DIR ?? getAgentDir();
+      // Phase-specific retry overrides must never mutate caller or sibling settings.
+      const settingsManager = options.retrospective
+        ? SettingsManager.inMemory(options.inputs.settingsManager.getSettings(), {
+            projectTrusted: options.inputs.settingsManager.isProjectTrusted(),
+          })
+        : options.inputs.settingsManager;
       runtime = await createAgentSessionRuntime(
         async ({ cwd, agentDir: runtimeAgentDir, sessionManager, sessionStartEvent }) => {
           const createdModelRuntime = await createAgentRunModelRuntime(
@@ -943,7 +1069,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
             tools: [...options.inputs.tools],
             customTools: options.inputs.customTools ? [...options.inputs.customTools] : undefined,
             resourceLoader: options.inputs.resourceLoader,
-            settingsManager: options.inputs.settingsManager,
+            settingsManager,
             sessionManager,
             sessionStartEvent,
           });
@@ -954,7 +1080,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
               cwd,
               agentDir: runtimeAgentDir,
               modelRuntime,
-              settingsManager: options.inputs.settingsManager,
+              settingsManager,
               resourceLoader: options.inputs.resourceLoader,
               diagnostics: [],
             },
@@ -1052,6 +1178,7 @@ export function startAgentRun<T>(options: StartAgentRunOptions<T>): AgentRunHand
         !aborting
       );
     },
+    taskResult,
     result,
     subscribe(listener) {
       listeners.add(listener);
@@ -1130,18 +1257,12 @@ export function startRegisteredAgentRun<T>(
     batchId: registration.metadata.batchId ?? "default",
   };
   const transcript = registry?.createTranscriptCapture(metadata, transcriptSystemPrompt ?? "");
+  let detachTranscript: (() => void) | undefined;
   const observer = async (session: AgentRunSessionView): Promise<(() => void) | undefined> => {
-    const detachTranscript = registry?.attachSession(runKey, session);
+    detachTranscript = registry?.attachSession(runKey, session);
     try {
       const detachCallerObserver = await options.observer?.(session);
-      if (!detachTranscript && typeof detachCallerObserver !== "function") return undefined;
-      return () => {
-        try {
-          detachCallerObserver?.();
-        } finally {
-          detachTranscript?.();
-        }
-      };
+      return detachCallerObserver;
     } catch (error) {
       try {
         detachTranscript?.();
@@ -1154,6 +1275,7 @@ export function startRegisteredAgentRun<T>(
   const handle = startAgentRun({ ...runOptions, observer });
   const result = handle.result.then(async (outcome) => {
     try {
+      detachTranscript?.();
       await transcript?.finish();
     } catch {
       // Transcript storage cannot change the Agent Run outcome.
@@ -1165,6 +1287,7 @@ export function startRegisteredAgentRun<T>(
     get steeringAvailable() {
       return handle.steeringAvailable;
     },
+    taskResult: handle.taskResult,
     result,
     subscribe(listener) {
       return handle.subscribe(listener);

@@ -224,7 +224,7 @@ export class AgentsRunViewer {
     const run = this.selectedRun;
     if (!controlsEnabled || !run?.active) return undefined;
     if (data === "s" && run.steeringAvailable) return "steer";
-    if (data === "x" && (run.status === "starting" || run.status === "running")) return "stop";
+    if (data === "x" && run.active && run.status !== "stopping") return "stop";
     return undefined;
   }
 

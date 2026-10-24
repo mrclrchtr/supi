@@ -38,6 +38,9 @@ const config = {
 function handle(outcome: unknown, progress: unknown[] = []) {
   return {
     steeringAvailable: false,
+    get taskResult() {
+      return this.result;
+    },
     result: Promise.resolve(outcome),
     subscribe: vi.fn((listener: (progress: unknown) => void) => {
       for (const snapshot of progress) listener(snapshot);
@@ -209,6 +212,9 @@ describe("runIsolatedChild", () => {
         registration: { metadata: { runKey: string } };
       }) => ({
         ...handle({ kind: "success", value: "submitted" }),
+        get taskResult() {
+          return this.result;
+        },
         runKey: options.registration.metadata.runKey,
         result: Promise.resolve().then(async () => {
           const cleanup = await options.observer?.(session);

@@ -62,6 +62,7 @@ function controlledHandle(): ControlledHandle {
   const listeners = new Set<(progress: AgentRunProgress) => void>();
   const handle = {
     steeringAvailable: false,
+    taskResult: result,
     result,
     resolve,
     subscribe: (listener: (progress: AgentRunProgress) => void) => {

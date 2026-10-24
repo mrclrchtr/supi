@@ -110,6 +110,7 @@ describe("/agents with a stacked Ask User overlay", () => {
         startedAt: Date.now(),
       },
       handle: {
+        taskResult: new Promise(() => {}),
         result: new Promise(() => {}),
         steeringAvailable: true,
         subscribe(listener) {

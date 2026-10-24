@@ -10,6 +10,7 @@ import {
   type AgentRunProgress,
   type AgentRunProviderAuthority,
   type AgentRunRegistry,
+  type AgentRunRetrospective,
   type AgentRunSessionView,
   type StartAgentRunOptions,
   startAgentRun,
@@ -39,6 +40,8 @@ export interface IsolatedRunConfig<T> {
     reason?: string;
   };
   continuation?: AgentRunContinuation;
+  /** Caller-owned opt-in; Planner Drafts deliberately omit this policy. */
+  retrospective?: AgentRunRetrospective;
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is Pi's canonical type
   authorizedContinuationModels?: readonly Model<any>[];
   authorizedAuxiliaryModels?: AgentRunAuxiliaryModelSnapshot;
@@ -164,6 +167,7 @@ export async function runIsolatedChild<T>(
         : config.holder.value,
     ...(config.continuation ? { continuation: config.continuation } : {}),
     observer: config.onSessionCreated,
+    ...(config.retrospective ? { retrospective: config.retrospective } : {}),
   };
   const registeredRun = config.runDisplay
     ? startRegisteredAgentRun<T>({
@@ -186,7 +190,7 @@ export async function runIsolatedChild<T>(
       })
     : undefined;
   try {
-    const outcome = mapOutcome(await run.result);
+    const outcome = mapOutcome(await run.taskResult);
     if (registeredRun) {
       config.registry?.setDisplayResult(
         registeredRun.runKey,

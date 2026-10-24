@@ -12,6 +12,7 @@ const mockFns = vi.hoisted(() => ({
   registerSettings: vi.fn(),
   registerContextProvider: vi.fn(),
   subscribeDebugEvents: vi.fn<(listener: (event: unknown) => void) => () => void>(() => vi.fn()),
+  subscribeDebugPersistence: vi.fn<(sink: (event: unknown) => void) => () => void>(() => vi.fn()),
   readSessionDebugEvents: vi.fn(),
 }));
 
@@ -31,16 +32,19 @@ vi.mock("@mrclrchtr/supi-core/context", () => ({
 vi.mock("@mrclrchtr/supi-core/debug", () => ({
   clearDebugEvents: mockFns.clearDebugEvents,
   configureDebugRegistry: mockFns.configureDebugRegistry,
+  DEBUG_EVENT_ENTRY_TYPE: "supi-debug-event",
   DEBUG_REGISTRY_DEFAULTS: {
     enabled: false,
     agentAccess: "sanitized",
     maxEvents: 100,
+    agentRunRetrospectivesEnabled: false,
   },
   getDebugEvents: mockFns.getDebugEvents,
   getDebugSummary: mockFns.getDebugSummary,
   isDebugLevel: mockFns.isDebugLevel,
   isDebugOperationId: mockFns.isDebugOperationId,
   subscribeDebugEvents: mockFns.subscribeDebugEvents,
+  subscribeDebugPersistence: mockFns.subscribeDebugPersistence,
 }));
 
 vi.mock("../../src/session-events.ts", () => ({
@@ -97,7 +101,9 @@ describe("supi-debug tool output", () => {
 
   it("persists sanitized events as session entries", () => {
     const pi = setup();
-    const listener = mockFns.subscribeDebugEvents.mock.calls[0]?.[0] as (event: unknown) => void;
+    const listener = mockFns.subscribeDebugPersistence.mock.calls[0]?.[0] as (
+      event: unknown,
+    ) => void;
     const event = {
       id: 1,
       timestamp: 1_700_000_000_000,

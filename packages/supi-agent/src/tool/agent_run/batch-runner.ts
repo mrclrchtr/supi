@@ -255,11 +255,9 @@ export function startDelegationBatch(options: StartDelegationBatchOptions): Dele
   const result = Promise.allSettled(completions).then(() => buildOutcome());
   const stop = (): Promise<void> => {
     if (stopPromise !== undefined) return stopPromise;
-    const activeTasks = startedTasks.filter((started) => {
-      const status = progressMap.get(started.taskId)?.status;
-      return status === undefined || !isTerminalStatus(status);
-    });
-    stopPromise = requestStops(activeTasks);
+    // Task results can be ready while their child still owns a retrospective.
+    // Terminal handles make stop idempotent, so do not infer liveness from task status.
+    stopPromise = requestStops(startedTasks);
     return stopPromise;
   };
 

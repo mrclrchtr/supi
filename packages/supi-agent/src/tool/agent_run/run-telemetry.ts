@@ -101,7 +101,9 @@ function timingToolName(toolName: string, args: unknown): string {
 }
 
 /** Return the public status for one Agent Run outcome. */
-export function statusFromOutcome(outcome: AgentRunOutcome<string>): AgentRunStatus {
+export function statusFromOutcome(
+  outcome: AgentRunOutcome<string>,
+): Exclude<AgentRunStatus, "retrospecting"> {
   return outcome.kind === "success" ? "completed" : outcome.kind;
 }
 

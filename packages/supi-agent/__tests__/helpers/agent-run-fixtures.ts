@@ -88,6 +88,9 @@ export function runDouble(
 
   return {
     steeringAvailable: false,
+    get taskResult() {
+      return this.result;
+    },
     result: Promise.resolve()
       .then(() => options.observer?.(controlled.session))
       .then((cleanup) => {

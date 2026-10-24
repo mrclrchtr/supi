@@ -1,5 +1,9 @@
 import type { Usage } from "@earendil-works/pi-ai";
-import { type AgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
+import {
+  type AgentSession,
+  SessionManager,
+  SettingsManager,
+} from "@earendil-works/pi-coding-agent";
 import { vi } from "vitest";
 
 /** A controlled Pi SDK session, without dependencies on private SuPi test helpers. */
@@ -7,6 +11,7 @@ export function controlledSession(
   tools: string[],
   defaultUsage: Usage,
   manager: SessionManager = SessionManager.inMemory(process.cwd()),
+  settingsManager = SettingsManager.inMemory(),
 ) {
   const listeners = new Set<(event: { type: string; [key: string]: unknown }) => void>();
   let active = true;
@@ -25,6 +30,7 @@ export function controlledSession(
   };
   const session = {
     modelRuntime: {},
+    settingsManager,
     model: {},
     thinkingLevel: "off",
     systemPrompt: "",
@@ -85,8 +91,8 @@ export function controlledSession(
       session.dispose();
     }),
   };
-  const bill = (text = "", usage = defaultUsage) =>
-    manager.appendMessage({
+  const bill = (text = "", usage = defaultUsage) => {
+    const id = manager.appendMessage({
       role: "assistant",
       content: [{ type: "text", text }],
       api: "openai-completions",
@@ -96,6 +102,9 @@ export function controlledSession(
       stopReason: "stop",
       timestamp: Date.now(),
     });
+    session.messages = manager.buildSessionContext().messages;
+    return id;
+  };
   return {
     session,
     runtime,

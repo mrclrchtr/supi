@@ -5,7 +5,7 @@ import { registerContextProvider } from "@mrclrchtr/supi-core/context";
 import {
   clearDebugEvents,
   getDebugSummary,
-  subscribeDebugEvents,
+  subscribeDebugPersistence,
 } from "@mrclrchtr/supi-core/debug";
 import { defineConfigSettings, registerSettings } from "@mrclrchtr/supi-core/settings";
 import { registerDebugCommand } from "./command.ts";
@@ -52,6 +52,14 @@ function registerDebugSettings(pi: ExtensionAPI): void {
           description: "Maximum session-local debug events retained in memory",
           values: ["50", "100", "250", "500"],
         },
+        {
+          kind: "boolean" as const,
+          // biome-ignore lint/security/noSecrets: Configuration field name, not a credential.
+          key: "agentRunRetrospectivesEnabled",
+          label: "Agent Run Retrospectives",
+          description:
+            "Allow completed Agent Runs to request a retrospective when Debug logging is active",
+        },
       ],
       afterPersist: ({ cwd }) => {
         syncLiveDebugRegistry(cwd);
@@ -79,7 +87,7 @@ export default function debugExtension(pi: ExtensionAPI) {
   applyDebugConfig(process.cwd());
   registerDebugSettings(pi);
   registerDebugMessageRenderer(pi);
-  const unsubscribeDebugEvents = subscribeDebugEvents((event) => {
+  const unsubscribeDebugPersistence = subscribeDebugPersistence((event) => {
     pi.appendEntry(DEBUG_EVENT_ENTRY_TYPE, event);
   });
 
@@ -102,7 +110,7 @@ export default function debugExtension(pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", () => {
-    unsubscribeDebugEvents();
+    unsubscribeDebugPersistence();
   });
 
   registerDebugCommand(pi, applyDebugConfig, normalizeMaxEvents);

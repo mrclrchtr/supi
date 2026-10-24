@@ -4,6 +4,7 @@ import { REVIEW_CHILD_TOOL_SPECS } from "./child-tools.ts";
 export function buildReviewerSystemPrompt(
   dependencyBootstrapConfigured = false,
   reviewerCodemodeEnabled = false,
+  retrospectiveEnabled = false,
 ): string {
   return [
     "You are executing one caller-defined code review task.",
@@ -30,5 +31,10 @@ export function buildReviewerSystemPrompt(
     "confidence is a value from 0 to 1; the Review Engine applies no confidence threshold.",
     "Preserve your intended finding order.",
     `Submit one valid result with ${REVIEW_CHILD_TOOL_SPECS.submitReview.name}. If it is rejected, correct the result and retry. Do not return review prose outside that tool.`,
+    ...(retrospectiveEnabled
+      ? [
+          "After the runtime publishes your task result, it may explicitly request a tool-free retrospective. Only for that final assessment, return brief retrospective prose instead of another submission; do not continue the review.",
+        ]
+      : []),
   ].join("\n");
 }

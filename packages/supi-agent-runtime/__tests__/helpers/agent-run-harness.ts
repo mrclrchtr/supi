@@ -1,4 +1,4 @@
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import { type AgentSession, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { type Mock, vi } from "vitest";
 import type { AgentRunProviderAuthority, AgentSessionInputs } from "../../src/api.ts";
 
@@ -10,6 +10,7 @@ export interface AgentRunMocks {
 export function createHarness(mocks: AgentRunMocks, entries: unknown[] = []) {
   const listeners = new Set<(event: { type: string; [key: string]: unknown }) => void>();
   let extensionActive = true;
+  let activeTools = ["read"];
   const extensionRuntime = {
     sendMessage: vi.fn(),
     sendUserMessage: vi.fn(),
@@ -28,7 +29,12 @@ export function createHarness(mocks: AgentRunMocks, entries: unknown[] = []) {
   };
   const session = {
     modelRuntime: {},
-    agent: { waitForIdle: vi.fn(async () => undefined) },
+    agent: {
+      waitForIdle: vi.fn(async () => undefined),
+      streamFunction: vi.fn<AgentSession["agent"]["streamFunction"]>(() => undefined as never),
+      beforeToolCall: undefined as AgentSession["agent"]["beforeToolCall"],
+    },
+    settingsManager: SettingsManager.inMemory(),
     extensionRunner,
     model: {},
     systemPrompt: "",
@@ -51,7 +57,9 @@ export function createHarness(mocks: AgentRunMocks, entries: unknown[] = []) {
       session.emit({ type: "agent_settled" });
       session.isStreaming = false;
     }),
-    setActiveToolsByName: vi.fn(),
+    setActiveToolsByName: vi.fn((names: string[]) => {
+      activeTools = [...names];
+    }),
     setModel: vi.fn(async () => undefined),
     setThinkingLevel: vi.fn(),
     steer: vi.fn<AgentSession["steer"]>(async () => "queued"),
@@ -68,7 +76,7 @@ export function createHarness(mocks: AgentRunMocks, entries: unknown[] = []) {
     waitForIdle: vi.fn(async () => undefined),
     abort: vi.fn(async () => undefined),
     dispose: vi.fn(() => extensionRunner.invalidate()),
-    getActiveToolNames: vi.fn(() => ["read"]),
+    getActiveToolNames: vi.fn(() => [...activeTools]),
     getAllTools: vi.fn(() => []),
     getToolDefinition: vi.fn(() => undefined),
     getSessionStats: vi.fn(() => ({
@@ -83,9 +91,9 @@ export function createHarness(mocks: AgentRunMocks, entries: unknown[] = []) {
       session.dispose();
     }),
   };
-  mocks.createAgentSession.mockResolvedValue({
-    session,
-    extensionsResult: { runtime: extensionRuntime },
+  mocks.createAgentSession.mockImplementation(async (options) => {
+    session.settingsManager = options.settingsManager;
+    return { session, extensionsResult: { runtime: extensionRuntime } };
   });
   mocks.createAgentSessionRuntime.mockImplementation(async (factory) => {
     await factory({ cwd: "/repo", agentDir: "/agent", sessionManager: {} });
@@ -141,6 +149,6 @@ export function inputs(
     tools: ["read"],
     customTools: [],
     resourceLoader: resourceLoader as unknown as AgentSessionInputs["resourceLoader"],
-    settingsManager: {} as AgentSessionInputs["settingsManager"],
+    settingsManager: SettingsManager.inMemory(),
   };
 }

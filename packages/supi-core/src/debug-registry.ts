@@ -14,6 +14,8 @@ export interface DebugRegistryConfig {
   enabled: boolean;
   /** What the agent-callable debug tool may return. */
   agentAccess: DebugAgentAccess;
+  /** Whether Agent Run retrospective capture is explicitly enabled. */
+  agentRunRetrospectivesEnabled: boolean;
   /** Maximum number of session-local events to keep in memory. */
   maxEvents: number;
 }
@@ -21,6 +23,7 @@ export interface DebugRegistryConfig {
 export const DEBUG_REGISTRY_DEFAULTS: DebugRegistryConfig = {
   enabled: false,
   agentAccess: "sanitized",
+  agentRunRetrospectivesEnabled: false,
   maxEvents: 100,
 };
 
@@ -75,6 +78,9 @@ export interface DebugEventQueryResult {
 /** Receives a sanitized event whenever the registry records one. */
 export type DebugEventListener = (event: DebugEventView) => void;
 
+/** Receives sanitized events for persistence; separate from ordinary event subscriptions. */
+export type DebugPersistenceSink = (event: DebugEventView) => void;
+
 export interface DebugSummary {
   total: number;
   byLevel: Partial<Record<DebugLevel, number>>;
@@ -85,6 +91,7 @@ interface DebugRegistryState {
   config: DebugRegistryConfig;
   events: DebugEvent[];
   listeners: Set<DebugEventListener>;
+  persistenceSinks: Set<DebugPersistenceSink>;
   nextId: number;
 }
 
@@ -111,13 +118,15 @@ function getState(): DebugRegistryState {
       config: cloneConfig(DEBUG_REGISTRY_DEFAULTS),
       events: [],
       listeners: new Set(),
+      persistenceSinks: new Set(),
       nextId: 1,
     };
     (globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = state;
   }
   // Keep the shared registry compatible with extension reloads that reuse an
-  // instance created before listeners existed.
+  // instance created before listener sets existed.
   if (!state.listeners) state.listeners = new Set();
+  if (!state.persistenceSinks) state.persistenceSinks = new Set();
   return state;
 }
 
@@ -200,6 +209,19 @@ export function isDebugRegistryEnabled(): boolean {
   return getState().config.enabled;
 }
 
+/**
+ * Return whether a retrospective can be captured: Debug and its explicit opt-in
+ * must be enabled, and at least one persistence sink must be registered.
+ */
+export function canRecordAgentRunRetrospective(): boolean {
+  const state = getState();
+  return (
+    state.config.enabled &&
+    state.config.agentRunRetrospectivesEnabled &&
+    state.persistenceSinks.size > 0
+  );
+}
+
 /** Best-effort redaction helper for data exposed through sanitized debug views. */
 export function redactDebugData<T>(value: T): T {
   return redactValue(value, 8) as T;
@@ -226,6 +248,16 @@ export function subscribeDebugEvents(listener: DebugEventListener): () => void {
   return () => state.listeners.delete(listener);
 }
 
+/**
+ * Register a sanitized event persistence sink. Sinks are tracked separately from
+ * ordinary listeners so eligibility checks only succeed when logging is active.
+ */
+export function subscribeDebugPersistence(sink: DebugPersistenceSink): () => void {
+  const state = getState();
+  state.persistenceSinks.add(sink);
+  return () => state.persistenceSinks.delete(sink);
+}
+
 /** Record a session-local debug event if debugging is enabled. */
 export function recordDebugEvent(input: DebugEventInput): DebugEvent | null {
   const state = getState();
@@ -249,6 +281,13 @@ export function recordDebugEvent(input: DebugEventInput): DebugEvent | null {
       listener(toSanitizedView(event));
     } catch {
       // Debug-event consumers must not alter producer behavior.
+    }
+  }
+  for (const sink of state.persistenceSinks) {
+    try {
+      sink(toSanitizedView(event));
+    } catch {
+      // Persistence failures must not alter producer behavior.
     }
   }
   return {
@@ -309,5 +348,6 @@ export function resetDebugRegistry(): void {
   state.config = cloneConfig(DEBUG_REGISTRY_DEFAULTS);
   state.events = [];
   state.listeners.clear();
+  state.persistenceSinks.clear();
   state.nextId = 1;
 }

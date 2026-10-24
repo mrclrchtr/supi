@@ -24,6 +24,14 @@ _Avoid_: API key, model configuration, runtime policy
 The terminal success, failure, cancellation, or timeout result of one Agent Run, including all model usage billed during that execution and bounded diagnostics.
 _Avoid_: Batch result, tool result, agent response
 
+**Agent Run Result Readiness**:
+The boundary at which an Agent Run's task completion, task Usage, and retained follow-up context are fixed and available to its caller. It can precede an optional Agent Run Retrospective and final Agent Run completion.
+_Avoid_: Terminal outcome, Session Readiness Check, Agent Run Settlement
+
+**Agent Run Retrospective**:
+An optional self-assessment of an Agent Run's normally completed task, separate from its task result and retained follow-up context. Its observations and untested suggestions support later human-led tooling improvements.
+_Avoid_: Retro facts, self-improvement, Delegation Follow-Up
+
 **Agent Run Registry**:
 The containing-session list of managed Agent and Reviewer runs. The runtime owns neutral display data, transcript access, and selected-run controls. Agent and Review packages keep their own policy.
 _Avoid_: profile catalogue, review audit, process-wide history
@@ -53,7 +61,7 @@ A bounded caller-owned policy that selects declarative same-session steps after 
 _Avoid_: Session controls, retry loop, mutable callback view
 
 **Cancellation Fence**:
-The synchronous point at which stop or timeout claims an Agent Run. The runtime closes extension-send admission, clears PI queues, and starts abort before awaiting. A steering call already inside PI is rechecked and any late queue write is cleared. PI context invalidation occurs during normal or forced disposal after `session_shutdown` gets its bounded attempt. After the fence, no queued turn or tool work may start and completion cannot win; active work proceeds only toward bounded disposal.
+The synchronous point at which stop or timeout claims an Agent Run. The runtime closes extension-send admission, clears PI queues, and starts abort before awaiting. A steering call already inside PI is rechecked and any late queue write is cleared. PI context invalidation occurs during normal or forced disposal after `session_shutdown` gets its bounded attempt. After the fence, no queued turn or tool work may start and unpublished completion cannot win; active work proceeds only toward bounded disposal.
 _Avoid_: Best-effort abort, graceful drain
 
 **Bounded Agent Run Disposal**:
@@ -73,5 +81,5 @@ An optional caller-owned adapter that receives a read-only session view, effecti
 _Avoid_: Progress listener, session owner, transcript recorder
 
 **Agent Run Handle**:
-The sole public control interface returned by `startAgentRun()`, exposing the outcome promise, current-snapshot progress subscription, active-only steering, and idempotent stopping without exposing lifecycle controls for the owned AgentSession. A completed stop means the Agent Run is terminal and its owned resources have undergone bounded disposal.
+The sole public control interface returned by `startAgentRun()`, exposing separate task-result and terminal-outcome promises, current-snapshot progress subscription, active-only steering, and idempotent stopping without exposing lifecycle controls for the owned AgentSession. A completed stop means the Agent Run is terminal and its owned resources have undergone bounded disposal.
 _Avoid_: Session handle, controller service, run promise wrapper

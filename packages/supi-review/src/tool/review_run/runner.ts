@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   type AgentRunDisplayMetadata,
   type AgentRunSessionView,
+  createDebugAgentRunRetrospective,
   createEarlyCancellationDiagnostics,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import { HEADLESS_INSPECTION_TOOL_NAMES } from "@mrclrchtr/supi-code-intelligence/headless";
@@ -20,6 +21,8 @@ import { createReviewRecoveryDeclineTool, createReviewSubmissionTool } from "./c
 import { ReviewRecoveryPolicy } from "./recovery.ts";
 import { normalizeReviewSubmission } from "./submission.ts";
 import { buildReviewerSystemPrompt } from "./system-prompt.ts";
+
+const REVIEWER_INSPECTION_TOOLS = ["read", "bash", "grep", ...HEADLESS_INSPECTION_TOOL_NAMES];
 
 function reviewerRunDisplay(
   invocation: ReviewerInvocation,
@@ -87,7 +90,19 @@ function observeReviewerSession(
   if (!invocation.audit || !observation.trace) return undefined;
   return () => {
     observation.capturedReplay ??= observation.trace?.snapshot(created);
+    observation.unsubscribe?.();
+    observation.unsubscribe = undefined;
   };
+}
+
+function reviewerRetrospective(invocation: ReviewerInvocation, runKey: string) {
+  return invocation.registry
+    ? createDebugAgentRunRetrospective({
+        source: "supi-review",
+        runKey,
+        cwd: invocation.snapshot.repositoryRoot,
+      })
+    : undefined;
 }
 
 /** Run one caller-defined task in an isolated Inspection-only Reviewer Session. */
@@ -120,9 +135,17 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     reviewerExtensionSetStatus: "unobserved",
     warnings: [],
   };
+  const originalTools = [
+    ...REVIEWER_INSPECTION_TOOLS,
+    submit.name,
+    ...(invocation.reviewerCodemodeEnabled ? ["codemode"] : []),
+  ];
+  const runDisplay = reviewerRunDisplay(invocation, effectiveThinkingLevel, originalTools);
+  const retrospective = reviewerRetrospective(invocation, runDisplay.runKey);
   const protocolPrompt = buildReviewerSystemPrompt(
     invocation.dependencyBootstrapConfigured,
     invocation.reviewerCodemodeEnabled,
+    Boolean(retrospective),
   );
   let session: AgentRunSessionView | undefined;
   const recovery = new ReviewRecoveryPolicy({
@@ -134,14 +157,6 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     trace: () => observation.trace,
   });
 
-  const originalTools = [
-    "read",
-    "bash",
-    "grep",
-    ...HEADLESS_INSPECTION_TOOL_NAMES,
-    submit.name,
-    ...(invocation.reviewerCodemodeEnabled ? ["codemode"] : []),
-  ];
   const outcome = await runIsolatedChild<ReviewSubmission>({
     cwd: invocation.cwd,
     ...(invocation.providerAuthority ? { providerAuthority: invocation.providerAuthority } : {}),
@@ -160,6 +175,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     holder,
     declineHolder: recoveryTerminal,
     continuation: recovery.continuation,
+    ...(retrospective ? { retrospective } : {}),
     ...(invocation.recoveryModel
       ? { authorizedContinuationModels: [invocation.recoveryModel.model] }
       : {}),
@@ -167,7 +183,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     headlessInspection: true,
     codemode: invocation.reviewerCodemodeEnabled ?? false,
     projectTrusted: invocation.projectTrusted ?? false,
-    runDisplay: reviewerRunDisplay(invocation, effectiveThinkingLevel, originalTools),
+    runDisplay,
     displayResult: (result) => {
       if (result.kind === "failed") return { failureCode: result.failureCode };
       if (result.kind !== "success") return {};
@@ -188,7 +204,6 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     },
     onProgress: invocation.onProgress,
   });
-  observation.unsubscribe?.();
   const submissionRecovery =
     outcome.kind === "canceled" || outcome.kind === "timeout" ? undefined : recovery.result();
   const result: ReviewerRunResult = {

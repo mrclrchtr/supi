@@ -30,6 +30,7 @@ function makeHandle(
   const unsubscribeProgress = vi.fn();
   const handle: AgentRunHandle<string> = {
     steeringAvailable: options.steering ?? true,
+    taskResult: result,
     result,
     subscribe(listener) {
       listener(progress);

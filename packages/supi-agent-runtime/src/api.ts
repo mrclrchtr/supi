@@ -6,6 +6,7 @@ export type {
 } from "./auxiliary-models.ts";
 export { captureAgentRunAuxiliaryModels, raceAgentRunStartup } from "./auxiliary-models.ts";
 export { cloneAgentRunContext } from "./context.ts";
+export { createDebugAgentRunRetrospective } from "./debug-retrospective.ts";
 export type { AgentRunDiagnosticErrorRow } from "./diagnostics.ts";
 export {
   createEarlyCancellationDiagnostics,
@@ -55,6 +56,8 @@ export type {
   AgentRunOutcome,
   AgentRunProgress,
   AgentRunProgressListener,
+  AgentRunRetrospective,
+  AgentRunRetrospectiveResult,
   AgentRunSessionView,
   AgentRunStatus,
   AgentRunSteerResult,

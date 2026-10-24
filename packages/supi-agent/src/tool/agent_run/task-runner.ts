@@ -6,6 +6,7 @@ import type {
   RegisteredAgentRunHandle,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import {
+  createDebugAgentRunRetrospective,
   getAgentRunDiagnosticErrorRows,
   startRegisteredAgentRun,
 } from "@mrclrchtr/supi-agent-runtime/api";
@@ -102,7 +103,15 @@ class TaskConversation {
         taskMetadata: this.taskMetadata,
       });
     }
-    return this.views.get(this.task.taskId) ?? emptyConversationView(this.task, this.taskMetadata);
+    return (
+      this.views.get(this.task.taskId) ??
+      buildConversationView({
+        taskId: this.task.taskId,
+        profileId: this.task.profileId,
+        messages: [],
+        taskMetadata: this.taskMetadata,
+      })
+    );
   }
 
   display(queuedSteering: readonly string[]): AgentRunDisplayConversation {
@@ -149,6 +158,9 @@ export function startBatchTask(options: StartBatchTaskOptions): StartedBatchTask
     inputs: task.inputs,
     prompt: buildChildPrompt(task, params.sharedContext),
     captureContext: true,
+    retrospective: registry
+      ? createDebugAgentRunRetrospective({ source: "supi-agent", runKey, cwd: options.cwd })
+      : undefined,
     ...(options.signal ? { signal: options.signal } : {}),
     ...(task.timeoutMs === undefined ? {} : { timeoutMs: task.timeoutMs }),
     readinessCheck: makeReadinessCheck(task.profile),
@@ -186,13 +198,21 @@ export function startBatchTask(options: StartBatchTaskOptions): StartedBatchTask
     currentProgress: () => latestProgress,
     publishProgress,
   };
-  const completion = handle.result.then(
-    (outcome) => finalizeTaskOutcome(finalizeContext, outcome),
-    () => finalizeRejectedTask(finalizeContext),
+  let taskFinished = false;
+  const completion = handle.taskResult.then(
+    (outcome) => {
+      taskFinished = true;
+      return finalizeTaskOutcome(finalizeContext, outcome);
+    },
+    () => {
+      taskFinished = true;
+      return finalizeRejectedTask(finalizeContext);
+    },
   );
 
   try {
     handle.subscribe((progress) => {
+      if (taskFinished || progress.status === "retrospecting") return;
       if (progress.status === "running") telemetry.markRunning();
       publishProgress({
         taskId: task.taskId,
@@ -374,25 +394,6 @@ function finalizeRejectedTask(context: FinalizeContext): BatchTaskResult {
 }
 
 function makeReadinessCheck(profile: AgentProfile): (session: AgentRunSessionView) => boolean {
-  return (session: AgentRunSessionView): boolean => {
-    const activeNames = session.getActiveToolNames();
-    const required = toAgentToolNames(profile.manifest.tools);
-    if (required.length === 0) return true;
-    return required.every((name) => activeNames.includes(name));
-  };
-}
-
-function emptyConversationView(
-  task: ResolvedTask,
-  taskMetadata: ConversationTaskMetadata,
-): AgentConversationView {
-  return {
-    taskId: task.taskId,
-    profileId: task.profileId,
-    entries: [],
-    omittedEntryCount: 0,
-    omittedCharacterCount: 0,
-    textTruncated: false,
-    taskMetadata,
-  };
+  const required = toAgentToolNames(profile.manifest.tools);
+  return (session) => required.every((name) => session.getActiveToolNames().includes(name));
 }
