@@ -1,5 +1,18 @@
 # Changelog
 
+## [11.1.0](https://github.com/mrclrchtr/supi/compare/v11.0.1...v11.1.0) (2026-10-24)
+
+
+### Features
+
+* **agent:** enable codemode in built-in profiles ([e631c36](https://github.com/mrclrchtr/supi/commit/e631c3686745988677b22e4f3c70a0ff4ea99c24))
+* **agents:** add opt-in codemode for Agent Runs and Review ([e8c4643](https://github.com/mrclrchtr/supi/commit/e8c4643ced10492e4262ae7bf8972badfe3f12ea))
+
+
+### Bug Fixes
+
+* **deps:** update dependency hk to v2.8.1 ([109eaea](https://github.com/mrclrchtr/supi/commit/109eaea0fa01a59364c7947b1669ae8a59c47ec3))
+
 ## [11.0.1](https://github.com/mrclrchtr/supi/compare/v11.0.0...v11.0.1) (2026-10-22)
 
 
