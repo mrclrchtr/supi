@@ -95,11 +95,17 @@ function observeReviewerSession(
   };
 }
 
-function reviewerRetrospective(invocation: ReviewerInvocation, runKey: string) {
+function reviewerRetrospective(
+  invocation: ReviewerInvocation,
+  display: ReturnType<typeof reviewerRunDisplay>,
+) {
   return invocation.registry
     ? createDebugAgentRunRetrospective({
         source: "supi-review",
-        runKey,
+        runKey: display.runKey,
+        batchId: display.batchId,
+        taskId: display.taskId,
+        label: display.label,
         cwd: invocation.snapshot.repositoryRoot,
       })
     : undefined;
@@ -141,7 +147,7 @@ export async function runReviewer(invocation: ReviewerInvocation): Promise<Revie
     ...(invocation.reviewerCodemodeEnabled ? ["codemode"] : []),
   ];
   const runDisplay = reviewerRunDisplay(invocation, effectiveThinkingLevel, originalTools);
-  const retrospective = reviewerRetrospective(invocation, runDisplay.runKey);
+  const retrospective = reviewerRetrospective(invocation, runDisplay);
   const protocolPrompt = buildReviewerSystemPrompt(
     invocation.dependencyBootstrapConfigured,
     invocation.reviewerCodemodeEnabled,

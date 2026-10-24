@@ -12,10 +12,16 @@ The task result has already been published. Do not continue the task, submit ano
  * Opt a caller into the existing Debug evidence path only when capture, explicit
  * retrospective permission, and a persistence sink are active. The runtime
  * rechecks that permission before publishing a result and beginning assessment.
+ * Caller identifiers and display labels are recorded in sanitized Debug data only;
+ * never supply task instructions or inspected evidence as correlation metadata.
  */
 export function createDebugAgentRunRetrospective(input: {
   readonly source: string;
   readonly runKey: string;
+  readonly batchId: string;
+  readonly taskId: string;
+  readonly label: string;
+  readonly conversationId?: string;
   readonly cwd: string;
 }): AgentRunRetrospective | undefined {
   if (!canRecordAgentRunRetrospective()) return undefined;
@@ -33,6 +39,10 @@ export function createDebugAgentRunRetrospective(input: {
         data: {
           runKey: input.runKey,
           caller: input.source,
+          batchId: input.batchId,
+          taskId: input.taskId,
+          label: input.label,
+          ...(input.conversationId === undefined ? {} : { conversationId: input.conversationId }),
           ...assessment,
           // Avoid secret-like "token" keys in the shared Debug sanitizer.
           ...(usage

@@ -16,7 +16,7 @@ export function buildCollectedResult(
     .tasks.filter((task) => !outcome.results.some((ready) => ready.taskId === task.taskId));
   const status = pending.length
     ? `Pending: ${pending.map((task) => `${task.taskId} (${task.status})`).join(", ")}. Wait for a completion notice or use wait: true; do not poll.`
-    : "Batch complete.";
+    : "All task results are ready.";
   const introduction = alreadyCollected ? `Already collected; no new Usage.\n${status}` : status;
   const result = buildAgentRunResult(outcome, undefined, introduction);
   return {

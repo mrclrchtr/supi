@@ -1,7 +1,12 @@
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
-import type { AgentRunOutcome, AgentRunStatus } from "@mrclrchtr/supi-agent-runtime/api";
+import {
+  type AgentRunOutcome,
+  type AgentRunStatus,
+  createDebugAgentRunRetrospective,
+} from "@mrclrchtr/supi-agent-runtime/api";
 import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
+import type { ResolvedTask } from "./batch-preflight.ts";
 
 /** Bounded timing totals for one tool in an Agent Run. */
 export interface AgentToolTiming {
@@ -112,6 +117,24 @@ export function failureCodeFromOutcome(outcome: AgentRunOutcome<string>): string
   if (outcome.kind === "failed") return outcome.failureCode;
   if (outcome.kind === "canceled" || outcome.kind === "timeout") return outcome.kind;
   return undefined;
+}
+
+/** Build Delegation's Debug policy from identity only, never task instructions or evidence. */
+export function createTaskDebugRetrospective(input: {
+  readonly batchId: string;
+  readonly runKey: string;
+  readonly cwd: string;
+  readonly task: Pick<ResolvedTask, "taskId" | "conversationLabel" | "conversationId">;
+}) {
+  return createDebugAgentRunRetrospective({
+    source: "supi-agent",
+    runKey: input.runKey,
+    batchId: input.batchId,
+    taskId: input.task.taskId,
+    label: input.task.conversationLabel,
+    conversationId: input.task.conversationId,
+    cwd: input.cwd,
+  });
 }
 
 /** Record one safe summary for a completed Agent Run. */

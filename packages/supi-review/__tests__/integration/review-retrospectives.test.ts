@@ -149,7 +149,8 @@ it("returns a Review and task-only audit while its tool-free retrospective remai
   });
   await vi.waitFor(() => expect(releaseRetrospective).toBeDefined());
   expect(registry.hasActive()).toBe(true);
-  const workspace = registry.snapshot().runs[0]?.cwd;
+  const reviewer = registry.snapshot().runs[0];
+  const workspace = reviewer?.cwd;
   expect(workspace && existsSync(workspace)).toBe(false);
   expect(createAudit).toHaveBeenCalledOnce();
   expect(JSON.stringify(createAudit.mock.calls)).not.toContain("Reflect briefly");
@@ -159,6 +160,10 @@ it("returns a Review and task-only audit while its tool-free retrospective remai
   expect(
     getDebugEvents({ category: "agent-run-retrospective", source: "supi-review" }).events[0]?.data,
   ).toMatchObject({
+    runKey: reviewer?.runKey,
+    batchId: reviewer?.batchId,
+    taskId: "state",
+    label: "state review",
     status: "completed",
     text: "Observed: the task needed no further context.",
     usage: { total: 15 },

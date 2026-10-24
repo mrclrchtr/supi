@@ -42,6 +42,7 @@ Constraints:
 - Keep the child owned and stoppable until disposal; do not detach retrospective work from the shared run registry or containing session. Delegation and Reviewer adapters only opt in when their registry is available; direct runtime callers retain their own Handle.
 - A normal parent turn ending does not itself cancel the retrospective. Parent abort, ownership loss, and shutdown still apply through the owning adapter's lifecycle.
 - A parent follow-up uses the frozen checkpoint, never retrospective messages or retrospective-specific context changes. It need not wait for the retrospective to finish.
+- Parent-facing tools describe task-result readiness, collection, and generic cancellation/cleanup only. Do not expose retrospective progress or ask the parent to wait for assessment. Collection advice applies only to pending or uncollected task results.
 - Preserve task-result Usage at publication. Log retrospective Usage separately; it cannot be retroactively added to a returned tool result. The final Agent Run Outcome still accounts for all billed work, without counting either phase twice.
 - Stop or failure during the retrospective affects only that phase, not the already published task result. The terminal outcome preserves the successful task completion and frozen task context, with final session-wide Usage.
 - This phase is distinct from finite continuation for missing completion. In particular, a Reviewer retrospective must not need another `submit_review` call.
@@ -65,7 +66,8 @@ Adapt the existing [`/supi-tooling-retro` prompt](../../packages/supi-debug/prom
 
 - Use the existing Debug event persistence path in the containing session, not normal Agent Run Diagnostics or parent-facing result content.
 - Keep the event message static; put assessment prose in event `data` so it receives existing best-effort redaction. Do not use raw-only data, which is not persisted.
-- Include the run identifier, caller, retrospective text, and retrospective Usage so later manual review can correlate reports.
+- Include `runKey`, `caller`, `batchId`, `taskId`, and a readable `label` alongside retrospective text and Usage. Delegation also includes `conversationId`; its label remains the saved conversation label on follow-ups. Reviewer labels identify the Review Mode.
+- Correlation metadata belongs in sanitized Debug `data`, not parent tool results. Include identifiers and display labels only, never task instructions or inspected evidence.
 - Debug capture retains session entries outside automatic model context. Existing Debug access and retention behavior apply; assessment text may still contain sensitive task details.
 - Do not add a new durable transcript copy, replay store, aggregation command, or automatic feedback channel.
 

@@ -6,7 +6,6 @@ import type {
   RegisteredAgentRunHandle,
 } from "@mrclrchtr/supi-agent-runtime/api";
 import {
-  createDebugAgentRunRetrospective,
   getAgentRunDiagnosticErrorRows,
   startRegisteredAgentRun,
 } from "@mrclrchtr/supi-agent-runtime/api";
@@ -20,6 +19,7 @@ import { buildConversationView } from "./conversation-view.ts";
 import { buildChildPrompt } from "./prompt.ts";
 import {
   AgentRunTelemetry,
+  createTaskDebugRetrospective,
   failureCodeFromOutcome,
   recordAgentRunOutcomeDebug,
   statusFromOutcome,
@@ -158,9 +158,7 @@ export function startBatchTask(options: StartBatchTaskOptions): StartedBatchTask
     inputs: task.inputs,
     prompt: buildChildPrompt(task, params.sharedContext),
     captureContext: true,
-    retrospective: registry
-      ? createDebugAgentRunRetrospective({ source: "supi-agent", runKey, cwd: options.cwd })
-      : undefined,
+    retrospective: registry ? createTaskDebugRetrospective(options) : undefined,
     ...(options.signal ? { signal: options.signal } : {}),
     ...(task.timeoutMs === undefined ? {} : { timeoutMs: task.timeoutMs }),
     readinessCheck: makeReadinessCheck(task.profile),

@@ -45,7 +45,7 @@ describe("background delegation through registered tools", () => {
     expect(JSON.stringify(final.content)).not.toContain("Already collected");
     const reread = await harness.invoke("agent_result", { batchId });
     expect(JSON.stringify(reread.content)).toContain("Already collected; no new Usage.");
-    expect(JSON.stringify(reread.content)).toContain("Batch complete.");
+    expect(JSON.stringify(reread.content)).toContain("All task results are ready.");
     expect(reread.usage).toBeUndefined();
     const tool = getTool(harness.pi, "agent_result") as unknown as Pick<
       RegisteredAgentRunTool,

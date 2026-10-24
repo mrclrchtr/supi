@@ -120,6 +120,10 @@ describe("background collection receipts", () => {
         }),
       },
     );
+    const stopped = await harness.invoke("agent_cancel", { batchId: start.details.batchId });
+    expect(JSON.stringify(stopped.content)).toContain(
+      "Collect any remaining task results and Usage with agent_result.",
+    );
     const retry = await harness.invoke("agent_result", { batchId: start.details.batchId });
     expect(retry.usage?.totalTokens).toBe(15);
     expect(retry.details.alreadyCollected).toBe(false);

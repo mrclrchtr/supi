@@ -21,8 +21,11 @@ export function registerAgentCancelTool(pi: ExtensionAPI, controller: Delegation
       const requested = controller.registry
         .snapshot()
         .runs.some((run) => run.batchId === batch.handle.batchId && run.active);
+      const needsCollection =
+        batch.handle.snapshot().results.length < batch.handle.progress().totalCount ||
+        !controller.isCollected(batch, ctx);
       if (requested) void batch.handle.stop().catch(() => undefined);
-      return buildCancelResult(params.batchId, requested);
+      return buildCancelResult(params.batchId, requested, needsCollection);
     },
   });
 }

@@ -15,15 +15,17 @@ export function renderResult(
   context: { isError?: boolean } = {},
 ): Text {
   if (context.isError) return renderBatchError(result, theme);
-  const details = result.details as { batchId?: string; requested?: boolean } | undefined;
+  const details = result.details as
+    | { batchId?: string; requested?: boolean; needsCollection?: boolean }
+    | undefined;
   const status = options.isPartial
     ? "Requesting stop…"
     : details?.requested
-      ? "Stop requested; cleanup can still be active."
-      : "Batch already terminal.";
-  return new Text(
-    theme.fg("dim", `${status}${options.expanded ? `\n${details?.batchId ?? ""}` : ""}`),
-    0,
-    0,
-  );
+      ? "Stop requested. Cleanup may still be active."
+      : "No active work remains.";
+  const lines = [status];
+  if (!options.isPartial && details?.needsCollection)
+    lines.push("Collect any remaining task results and Usage with agent_result.");
+  if (options.expanded && details?.batchId) lines.push(details.batchId);
+  return new Text(theme.fg("dim", lines.join("\n")), 0, 0);
 }
