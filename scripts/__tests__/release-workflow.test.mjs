@@ -13,7 +13,22 @@ const identityStep = steps.find((step) => step.startsWith("name: Require release
 const identityCommand = identityStep.split("run: |\n")[1].replace(/^ {10}/gm, "");
 const checkoutStep = steps.find((step) => step.includes("uses: actions/checkout@"));
 
+function jobCondition(job) {
+  return (
+    job
+      .match(/^ {4}if: >-\n((?: {6}.+\n)+)/m)?.[1]
+      .trim()
+      .replace(/\s+/g, " ") ?? job.match(/^ {4}if: (.+)$/m)?.[1]
+  );
+}
+
 describe("release workflow handoff", () => {
+  it("allows planned ancestor skips only after every required release dependency succeeds", () => {
+    expect(jobCondition(releaseJob)).toBe(
+      "!cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && " +
+        "needs.actionlint.result == 'success' && needs.conventional-commits.result == 'success' && needs.verify.result == 'success'",
+    );
+  });
   it("passes root release outputs without a trigger-commit fallback", () => {
     expect(releaseJob).toContain("release_sha: ${{ steps.release.outputs.sha }}");
     expect(releaseJob).toContain("release_version: ${{ steps.release.outputs.version }}");
@@ -27,9 +42,9 @@ describe("release workflow handoff", () => {
   });
 
   it("keeps publication gated on a release from a main push", () => {
-    const condition = publishJob.match(/^ {4}if: (.+)$/m)[1];
-    expect(condition).toBe(
-      "github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.release-please.outputs.releases_created == 'true'",
+    expect(jobCondition(publishJob)).toBe(
+      "!cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' && " +
+        "needs.release-please.result == 'success' && needs.release-please.outputs.releases_created == 'true'",
     );
   });
 

@@ -39,6 +39,12 @@
   ],
   "packageRules": [
     {
+      "description": "Batch routine updates; later rules preserve dedicated dependency groups and review policies.",
+      "groupName": "routine non-major dependencies",
+      "matchUpdateTypes": ["minor", "patch", "pin", "pinDigest", "digest"],
+      "matchPackageNames": ["!mattpocock/skills", "!mattpocock-skills"]
+    },
+    {
       "matchManagers": ["github-actions"],
       "groupName": "github actions"
     },

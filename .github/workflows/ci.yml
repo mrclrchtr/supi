@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
@@ -14,6 +15,27 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  ci-plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      language-baseline: ${{ steps.plan.outputs.language-baseline }}
+      installer: ${{ steps.plan.outputs.installer }}
+    steps:
+      - name: Checkout exact event commit with comparison history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Set up Node.js without workspace dependencies
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Select verification matrices
+        id: plan
+        run: node scripts/ci-plan.mjs
+
   actionlint:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -53,7 +75,7 @@ jobs:
           fi
 
       - name: Validate current commit (last commit)
-        if: github.event_name == 'push'
+        if: github.event_name != 'pull_request'
         run: pnpm exec commitlint --last --verbose
 
       - name: Validate PR commits
@@ -105,11 +127,7 @@ jobs:
 
   tests:
     runs-on: ubicloud-standard-2
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4]
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -121,10 +139,12 @@ jobs:
       - name: Install ripgrep
         run: sudo apt-get install -y ripgrep
 
-      - name: Run test shard
-        run: pnpm test --shard=${{ matrix.shard }}/4
+      - name: Run complete test suite
+        run: pnpm test:ai
 
   language-baseline:
+    needs: ci-plan
+    if: needs.ci-plan.outputs.language-baseline == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     strategy:
@@ -170,6 +190,8 @@ jobs:
           rm -rf "$RUNNER_TEMP/supi-language-baseline"
 
   installer:
+    needs: ci-plan
+    if: needs.ci-plan.outputs.installer == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
@@ -194,26 +216,43 @@ jobs:
 
   verify:
     if: always()
-    needs: [workspace-checks, tests, installer, language-baseline]
+    needs: [ci-plan, workspace-checks, tests, installer, language-baseline]
     runs-on: ubicloud-standard-2
     timeout-minutes: 5
 
     steps:
-      - name: Require all verification jobs to pass
+      - name: Require all selected verification jobs to pass
         env:
+          PLAN_RESULT: ${{ needs.ci-plan.result }}
           WORKSPACE_RESULT: ${{ needs.workspace-checks.result }}
           TEST_RESULT: ${{ needs.tests.result }}
+          RUN_INSTALLER: ${{ needs.ci-plan.outputs.installer }}
+          RUN_LANGUAGE_BASELINE: ${{ needs.ci-plan.outputs.language-baseline }}
           INSTALLER_RESULT: ${{ needs.installer.result }}
           LANGUAGE_BASELINE_RESULT: ${{ needs.language-baseline.result }}
         run: |
-          if [[ "$WORKSPACE_RESULT" != "success" || "$TEST_RESULT" != "success" || "$INSTALLER_RESULT" != "success" || "$LANGUAGE_BASELINE_RESULT" != "success" ]]; then
-            echo "::error::Verification failed: workspace=$WORKSPACE_RESULT tests=$TEST_RESULT installer=$INSTALLER_RESULT language-baseline=$LANGUAGE_BASELINE_RESULT"
+          if [[ "$PLAN_RESULT" != "success" || "$WORKSPACE_RESULT" != "success" || "$TEST_RESULT" != "success" ]]; then
+            echo "::error::Verification failed: plan=$PLAN_RESULT workspace=$WORKSPACE_RESULT tests=$TEST_RESULT"
             exit 1
           fi
+          require_matrix_result() {
+            case "$2:$3" in
+              true:success|false:skipped) ;;
+              *) echo "::error::Unexpected $1 result: selected=$2 result=$3"; return 1 ;;
+            esac
+          }
+          require_matrix_result installer "$RUN_INSTALLER" "$INSTALLER_RESULT"
+          require_matrix_result language-baseline "$RUN_LANGUAGE_BASELINE" "$LANGUAGE_BASELINE_RESULT"
 
   release-please:
     needs: [actionlint, conventional-commits, verify]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Override implicit success(): intentionally skipped matrix ancestors must not block releases.
+    if: >-
+      !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.actionlint.result == 'success' &&
+      needs.conventional-commits.result == 'success' &&
+      needs.verify.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -244,7 +283,11 @@ jobs:
 
   publish:
     needs: release-please
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.release-please.outputs.releases_created == 'true'
+    if: >-
+      !cancelled() &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.release-please.result == 'success' &&
+      needs.release-please.outputs.releases_created == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

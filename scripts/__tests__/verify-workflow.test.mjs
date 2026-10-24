@@ -33,24 +33,44 @@ describe("parallel verification workflow", () => {
     expect(workspace).not.toMatch(/run: pnpm (?:test|verify)\n/);
   });
 
-  it("runs four test shards with normal isolation and the required test tools", () => {
+  it("runs the complete test suite once with normal isolation and required tools", () => {
     expect(tests).not.toMatch(/^ {4}needs:/m);
-    expect(tests).toContain("fail-fast: false");
-    expect(tests).toContain("shard: [1, 2, 3, 4]");
+    expect(tests).not.toContain("strategy:");
+    expect(tests).not.toContain("--shard");
     expect(tests).toContain("uses: ./.github/actions/setup-pnpm");
     expect(tests).toContain("run: sudo apt-get install -y ripgrep");
-    expect(tests).toContain("run: pnpm test --shard=${{ matrix.shard }}/4");
+    expect(tests).toContain("run: pnpm test:ai\n");
     expect(tests).not.toMatch(/--(?:no-isolate|exclude|project|passWithNoTests)/);
     expect(tests).not.toContain("continue-on-error:");
   });
 
   it("keeps verify as the required result and release dependency", () => {
-    expect(verify).toContain("needs: [workspace-checks, tests, installer, language-baseline]");
+    expect(verify).toContain(
+      "needs: [ci-plan, workspace-checks, tests, installer, language-baseline]",
+    );
+    expect(verify).toContain("PLAN_RESULT: ${{ needs.ci-plan.result }}");
     expect(verify).toContain("if: always()");
     expect(verify).toContain("WORKSPACE_RESULT: ${{ needs.workspace-checks.result }}");
     expect(verify).toContain("TEST_RESULT: ${{ needs.tests.result }}");
     expect(verify).toContain("LANGUAGE_BASELINE_RESULT: ${{ needs.language-baseline.result }}");
     expect(job("release-please")).toContain("needs: [actionlint, conventional-commits, verify]");
+  });
+
+  it("plans matrices without installing dependencies and supports manual full verification", () => {
+    const plan = job("ci-plan");
+    expect(workflow).toContain("  workflow_dispatch:");
+    expect(plan).toContain("fetch-depth: 0");
+    expect(plan).toContain("ref: ${{ github.sha }}");
+    expect(plan).toContain("run: node scripts/ci-plan.mjs");
+    expect(plan).not.toContain("setup-pnpm");
+    for (const [name, body] of [
+      ["language-baseline", languageBaseline],
+      ["installer", installer],
+    ]) {
+      expect(plan).toContain(`${name}: \u0024{{ steps.plan.outputs.${name} }}`);
+      expect(body).toContain("needs: ci-plan");
+      expect(body).toContain(`if: needs.ci-plan.outputs.${name} == 'true'`);
+    }
   });
 
   it("requires pinned live language-server checks on Linux and macOS", () => {
@@ -70,48 +90,72 @@ describe("parallel verification workflow", () => {
     expect(verify).toContain("INSTALLER_RESULT: ${{ needs.installer.result }}");
   });
 
-  it.each([
-    ["success", "success", "success", 0],
-    ["failure", "success", "success", 1],
-    ["success", "failure", "success", 1],
-    ["success", "success", "failure", 1],
-    ["cancelled", "success", "success", 1],
-    ["success", "cancelled", "success", 1],
-    ["success", "success", "cancelled", 1],
-    ["skipped", "success", "success", 1],
-    ["success", "skipped", "success", 1],
-    ["success", "success", "skipped", 1],
-  ])(
-    "requires success from all jobs: workspace=%s tests=%s language-baseline=%s",
-    (workspaceResult, testResult, baselineResult, status) => {
-      const result = spawnSync("bash", ["-e", "-o", "pipefail", "-c", gate], {
-        encoding: "utf8",
-        env: {
-          ...process.env,
-          WORKSPACE_RESULT: workspaceResult,
-          TEST_RESULT: testResult,
-          INSTALLER_RESULT: "success",
-          LANGUAGE_BASELINE_RESULT: baselineResult,
-        },
-      });
-      expect(result.status, result.stderr).toBe(status);
+  function runGate(overrides = {}) {
+    return spawnSync("bash", ["-e", "-o", "pipefail", "-c", gate], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PLAN_RESULT: "success",
+        WORKSPACE_RESULT: "success",
+        TEST_RESULT: "success",
+        RUN_INSTALLER: "true",
+        RUN_LANGUAGE_BASELINE: "true",
+        INSTALLER_RESULT: "success",
+        LANGUAGE_BASELINE_RESULT: "success",
+        ...overrides,
+      },
+    });
+  }
+
+  it("accepts a successful complete run", () => {
+    expect(runGate().status).toBe(0);
+  });
+
+  it.each(["PLAN_RESULT", "WORKSPACE_RESULT", "TEST_RESULT"])(
+    "requires success from %s even when both matrices are intentionally skipped",
+    (name) => {
+      for (const result of ["failure", "cancelled", "skipped", ""]) {
+        expect(
+          runGate({
+            [name]: result,
+            RUN_INSTALLER: "false",
+            RUN_LANGUAGE_BASELINE: "false",
+            INSTALLER_RESULT: "skipped",
+            LANGUAGE_BASELINE_RESULT: "skipped",
+          }).status,
+          `${name}=${result}`,
+        ).toBe(1);
+      }
     },
   );
 
-  it.each(["failure", "cancelled", "skipped"])(
-    "rejects an installer job result of %s",
-    (result) => {
-      const check = spawnSync("bash", ["-e", "-o", "pipefail", "-c", gate], {
-        encoding: "utf8",
-        env: {
-          ...process.env,
-          WORKSPACE_RESULT: "success",
-          TEST_RESULT: "success",
-          INSTALLER_RESULT: result,
-          LANGUAGE_BASELINE_RESULT: "success",
-        },
-      });
-      expect(check.status).toBe(1);
+  it.each(["INSTALLER", "LANGUAGE_BASELINE"])(
+    "only accepts the planned result for %s",
+    (matrix) => {
+      for (const selected of ["true", "false", "", "invalid"]) {
+        for (const result of ["success", "failure", "cancelled", "skipped", ""]) {
+          const expected =
+            (selected === "true" && result === "success") ||
+            (selected === "false" && result === "skipped")
+              ? 0
+              : 1;
+          expect(
+            runGate({ [`RUN_${matrix}`]: selected, [`${matrix}_RESULT`]: result }).status,
+            `${matrix}: selected=${selected}, result=${result}`,
+          ).toBe(expected);
+        }
+      }
     },
   );
+
+  it("accepts both matrices being intentionally skipped", () => {
+    expect(
+      runGate({
+        RUN_INSTALLER: "false",
+        RUN_LANGUAGE_BASELINE: "false",
+        INSTALLER_RESULT: "skipped",
+        LANGUAGE_BASELINE_RESULT: "skipped",
+      }).status,
+    ).toBe(0);
+  });
 });
