@@ -14,6 +14,15 @@
   "customManagers": [
     {
       "customType": "regex",
+      "description": "Keep the language-baseline pnpm pin aligned with the workspace package manager",
+      "managerFilePatterns": ["/^scripts/language-baseline/pins\\.json$/"],
+      "matchStrings": ["\"pnpm\"\\s*:\\s*\"(?<currentValue>[^\"]+)\""],
+      "depNameTemplate": "pnpm",
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "npm"
+    },
+    {
+      "customType": "regex",
       "managerFilePatterns": ["/packages/supi-skill-patches/package\\.json$/"],
       "matchStrings": [
         "\\\"mattpocock-skills\\\"\\s*:\\s*\\\"github:mattpocock/skills#v(?<currentValue>[^\\\"]+)\\\""
