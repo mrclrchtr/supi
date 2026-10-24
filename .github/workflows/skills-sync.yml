@@ -19,7 +19,7 @@ jobs:
       github.event.pull_request.user.login == 'renovate[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       startsWith(github.event.pull_request.head.ref, 'renovate/mattpocock-skills-')
-    runs-on: ubicloud-standard-2
+    runs-on: avrea-ubuntu-latest-2-vcpu
     timeout-minutes: 10
     outputs:
       artifact-id: ${{ steps.upload.outputs.artifact-id }}
@@ -62,7 +62,7 @@ jobs:
   commit:
     needs: generate
     if: needs.generate.outputs.artifact-id != ''
-    runs-on: ubuntu-latest
+    runs-on: avrea-ubuntu-latest-2-vcpu
     timeout-minutes: 5
     env:
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
