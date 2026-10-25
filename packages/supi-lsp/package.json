@@ -36,7 +36,7 @@
     "@mrclrchtr/supi-core": "workspace:*",
     "ignore": "^7.0.5",
     "typescript": "6.0.3",
-    "vscode-jsonrpc": "^9.0.0",
+    "vscode-jsonrpc": "^10.0.0",
     "vscode-languageserver-protocol": "^3.18.0",
     "vscode-languageserver-types": "^3.18.0"
   },
