@@ -5,6 +5,7 @@ import { FileChangeType } from "@mrclrchtr/supi-lsp/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { registerCodeIntelligenceTools } from "../../src/tool/register.ts";
+import { waitFor } from "../helpers/integration-utils.ts";
 import {
   createRealLanguageWorkspace,
   type RealLanguageWorkspace,
@@ -45,6 +46,7 @@ export function registerLanguageBaselineCase(spec: LanguageCase): void {
       const workspace = await createRealLanguageWorkspace(spec);
       setup = createToolContext(workspace);
       target = await resolveTarget(setup, spec.sourceFile, spec.renameName);
+      await waitForInspectionReadiness(setup, spec);
     }, 90_000);
 
     afterAll(async () => {
@@ -114,6 +116,34 @@ async function assertSemanticSearch(setup: ToolContext, spec: LanguageCase): Pro
   expect(displayText(result)).toContain(query);
 }
 
+// Route readiness on sourceFile does not establish that a different file's
+// reference is indexed. Warm the exact fixture point before its one-shot test.
+async function waitForInspectionReadiness(setup: ToolContext, spec: LanguageCase): Promise<void> {
+  const file = resolve(setup.workspace.cwd, spec.inspectFile);
+  const point = findPoint(readFileSync(file, "utf8"), spec.renameName, spec.inspectOccurrence);
+  const position = { line: point.line - 1, character: point.character - 1 };
+  const control = { deadline: Date.now() + 20_000 };
+  const runtime = setup.workspace.lspRuntime;
+  await waitFor(
+    () =>
+      Promise.all([
+        runtime.hover(file, position, control),
+        runtime.definition(file, position, control),
+      ]),
+    ([hover, definition]) =>
+      hover.kind === "completed" &&
+      hover.data !== null &&
+      definition.kind === "completed" &&
+      definition.data !== null &&
+      (!Array.isArray(definition.data) || definition.data.length > 0),
+    {
+      timeoutMs: 20_000,
+      retryDelayMs: 100,
+      label: `${spec.label} inspection reference in ${spec.inspectFile}`,
+    },
+  );
+}
+
 async function assertInspection(setup: ToolContext, spec: LanguageCase): Promise<void> {
   const file = resolve(setup.workspace.cwd, spec.inspectFile);
   const point = findPoint(readFileSync(file, "utf8"), spec.renameName, spec.inspectOccurrence);
@@ -134,7 +164,10 @@ async function assertInspection(setup: ToolContext, spec: LanguageCase): Promise
     expect(section?.status, `${key}: ${displayText(result)}\n${JSON.stringify(data)}`).toBe(
       "complete",
     );
-    expect(section?.itemCount).toBeGreaterThan(0);
+    expect(
+      section?.itemCount,
+      `${key}: ${displayText(result)}\n${JSON.stringify(data)}`,
+    ).toBeGreaterThan(0);
   }
   expect(data.sections.find((entry) => entry.key === "hover")?.confidence).toBe("semantic");
   expect(data.sections.find((entry) => entry.key === "definition")?.provenance).toContainEqual({

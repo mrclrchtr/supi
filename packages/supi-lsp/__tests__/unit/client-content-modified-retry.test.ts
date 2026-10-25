@@ -55,11 +55,20 @@ describe("LSP ContentModified retry", () => {
     const target = makeTarget();
     const { client, rpc } = createRunningTestClient({ root: target.tmpDir, cwd: target.tmpDir });
     client.didOpen(target.filePath, "const target = true;\n");
+    const firstResponse = deferred<unknown>();
     rpc.sendRequest
-      .mockRejectedValueOnce(contentModifiedError())
+      .mockImplementationOnce(() => firstResponse.promise)
       .mockResolvedValueOnce({ contents: { kind: "plaintext", value: "fresh" } });
 
-    const result = await client.hover(target.filePath, { line: 0, character: 6 });
+    const request = client.hover(target.filePath, { line: 0, character: 6 });
+    await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(1));
+    vi.useFakeTimers();
+    firstResponse.reject(contentModifiedError());
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(99);
+    expect(rpc.sendRequest).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    const result = await request;
 
     expect(result).toEqual({
       kind: "completed",
@@ -218,6 +227,59 @@ describe("LSP ContentModified retry", () => {
     response.reject(contentModifiedError());
 
     await expect(request).rejects.toThrow("Code request deadline exceeded");
+    expect(rpc.sendRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["cancellation", "deadline"] as const)(
+    "interrupts the backoff promptly on %s without sending a retry",
+    async (interruption) => {
+      const target = makeTarget();
+      const { client, rpc } = createRunningTestClient({ root: target.tmpDir, cwd: target.tmpDir });
+      client.didOpen(target.filePath, "const target = true;\n");
+      const response = deferred<unknown>();
+      rpc.sendRequest.mockImplementationOnce(() => response.promise);
+      const controller = new AbortController();
+      const control = { signal: controller.signal, deadline: Date.now() + 60_000 };
+      const request = client.hover(target.filePath, { line: 0, character: 6 }, control);
+      await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(1));
+      vi.useFakeTimers();
+      vi.setSystemTime(control.deadline - 50);
+      response.reject(contentModifiedError());
+      await vi.advanceTimersByTimeAsync(0);
+
+      const rejected = expect(request).rejects.toThrow(
+        interruption === "cancellation"
+          ? "cancelled during backoff"
+          : "Code request deadline exceeded",
+      );
+      if (interruption === "cancellation") controller.abort(new Error("cancelled during backoff"));
+      else await vi.advanceTimersByTimeAsync(50);
+      await rejected;
+      await vi.advanceTimersByTimeAsync(100);
+      expect(rpc.sendRequest).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it("rejects input changes made during the backoff before sending a retry", async () => {
+    const target = makeTarget();
+    const { client, rpc } = createRunningTestClient({ root: target.tmpDir, cwd: target.tmpDir });
+    client.didOpen(target.filePath, "const target = true;\n");
+    const response = deferred<unknown>();
+    rpc.sendRequest.mockImplementationOnce(() => response.promise);
+    const request = client.hover(target.filePath, { line: 0, character: 6 });
+    await vi.waitFor(() => expect(rpc.sendRequest).toHaveBeenCalledTimes(1));
+    vi.useFakeTimers();
+    response.reject(contentModifiedError());
+    await vi.advanceTimersByTimeAsync(0);
+
+    client.didChange(target.filePath, "const target = false;\n");
+    await vi.advanceTimersByTimeAsync(100);
+
+    await expect(request).resolves.toMatchObject({
+      kind: "unavailable",
+      reason: expect.stringContaining("Semantic input changed while the request was running."),
+    });
     expect(rpc.sendRequest).toHaveBeenCalledTimes(1);
   });
 
