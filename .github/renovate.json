@@ -64,6 +64,7 @@
     {
       "description": "vscode-languageserver-node monorepo",
       "groupName": "vscode-languageserver-node",
+      "separateMajorMinor": false,
       "matchPackageNames": [
         "vscode-jsonrpc",
         "vscode-languageserver-protocol",

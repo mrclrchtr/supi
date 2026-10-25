@@ -612,10 +612,10 @@ importers:
         specifier: ^10.0.0
         version: 10.0.0
       vscode-languageserver-protocol:
-        specifier: ^3.18.0
+        specifier: ^3.18.5
         version: 3.18.5
       vscode-languageserver-types:
-        specifier: ^3.18.0
+        specifier: ^3.18.5
         version: 3.18.5
     devDependencies:
       '@mrclrchtr/supi-test-utils':
@@ -2684,10 +2684,6 @@ packages:
     resolution: {integrity: sha512-JvONPptw3GAQGXlVV2utDcHx0BiY34FupW/kI6mZ5x06ER5DdPG/tXWMVHjTNULF5uKPOUUD0SaXg5QaubJL0A==}
     engines: {node: '>=8.0.0 || >=10.0.0'}
 
-  vscode-jsonrpc@9.0.3:
-    resolution: {integrity: sha512-qETYf9PCl1lVfwR+oBmMfc4vP2nqLNA35ABxorw3j06+xlKRgDVxbLgKm4Y/xPL0YWdeDjLoI4ImICIT3nB0zQ==}
-    engines: {node: '>=14.0.0'}
-
   vscode-languageserver-protocol@3.18.5:
     resolution: {integrity: sha512-FW4fBMzZ99N8xeob4py0l050wgCoRgTpEq5Xcsb9lM1bc29UKGR/wSV+4knaqFxssFHajy7OzNiKP/m3U1ZEuA==}
 
@@ -4519,8 +4515,6 @@ snapshots:
   vscode-jsonrpc@10.0.0: {}
 
   vscode-jsonrpc@5.0.1: {}
-
-  vscode-jsonrpc@9.0.3: {}
 
   vscode-languageserver-protocol@3.18.5:
     dependencies:
