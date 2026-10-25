@@ -4,6 +4,7 @@ let input = Buffer.alloc(0);
 const logPath = process.argv[2];
 const contentModifiedLimit = process.argv[3] === "always" ? Infinity : Number(process.argv[3] ?? 1);
 let hoverCount = 0;
+let busyUntil;
 
 function send(message) {
   const body = JSON.stringify(message);
@@ -44,7 +45,8 @@ function handle(message) {
   }
   if (message.method === "textDocument/hover") {
     hoverCount++;
-    if (hoverCount <= contentModifiedLimit) {
+    if (process.argv[3] === "busy") busyUntil ??= performance.now() + 50;
+    if (hoverCount <= contentModifiedLimit || performance.now() < busyUntil) {
       send({
         jsonrpc: "2.0",
         id: message.id,

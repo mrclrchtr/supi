@@ -11,7 +11,7 @@ const serverFixture = fileURLToPath(
 const temporaryDirectories: string[] = [];
 const clients: LspClient[] = [];
 
-async function startClient(contentModifiedLimit: number | "always"): Promise<{
+async function startClient(contentModifiedLimit: number | "always" | "busy"): Promise<{
   client: LspClient;
   filePath: string;
   logPath: string;
@@ -55,6 +55,16 @@ afterEach(async () => {
 describe("LSP ContentModified JSON-RPC runtime", () => {
   it("sends the same read-only request once more after ContentModified", async () => {
     const { client, filePath, logPath } = await startClient(1);
+
+    await expect(client.hover(filePath, { line: 0, character: 3 })).resolves.toEqual({
+      kind: "completed",
+      data: { contents: { kind: "plaintext", value: "current result" } },
+    });
+    expect(countHoverRequests(logPath)).toBe(2);
+  });
+
+  it("allows a busy server to settle before retrying a read-only request", async () => {
+    const { client, filePath, logPath } = await startClient("busy");
 
     await expect(client.hover(filePath, { line: 0, character: 3 })).resolves.toEqual({
       kind: "completed",

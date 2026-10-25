@@ -82,6 +82,9 @@ import { SemanticInputSynchronizationError } from "./client-semantic-input-error
 import { JsonRpcClient, JsonRpcRequestError } from "./transport.ts";
 
 const SHUTDOWN_TIMEOUT_MS = 5_000;
+// ContentModified can outlive the server's progress notifications. Yield before
+// spending the single retry instead of immediately racing the same analysis.
+const CONTENT_MODIFIED_RETRY_DELAY_MS = 100;
 
 /** Bounded stderr tail kept for startup-failure error messages. */
 const STDERR_TAIL_MAX_CHARS = 4_000;
@@ -1498,6 +1501,9 @@ export class LspClient {
     for (;;) {
       const attempt: SemanticRequestAttemptState = { inputRevision: undefined };
       try {
+        if (retryGuard.retryReason === "content-modified") {
+          await this.waitForContentModifiedRetry(control);
+        }
         const data = await this.runSemanticRequestAttempt<T>({
           method,
           params,
@@ -1512,6 +1518,21 @@ export class LspClient {
       } catch (error) {
         this.prepareSemanticRetry({ method, control, retryGuard, attempt, error });
       }
+    }
+  }
+
+  /** Pause only the protocol retry, without extending the caller's deadline. */
+  private async waitForContentModifiedRetry(control?: CodeRequestControl): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await raceRequestControl(
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, CONTENT_MODIFIED_RETRY_DELAY_MS);
+        }),
+        control,
+      );
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
