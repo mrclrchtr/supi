@@ -76,8 +76,9 @@ describe("registerCodeIntelligenceTools adapter", () => {
       const res = await tool.execute("t", {}, undefined, undefined, makeCtx({ cwd: "/tmp" }));
 
       const text = res.content[0].text;
-      expect(text).toMatch(/\[truncated: kept \d+ of \d+ lines \([^)]+\)\]/);
-      expect(text.startsWith("line 0\n")).toBe(true);
+      expect(text).toContain("[truncated: model preview");
+      expect(text).toContain("line 0\n");
+      expect(text.length).toBeLessThanOrEqual(8000);
       const spillPath = text.match(/Full output saved to: `([^`]+)`/)?.[1];
       expect(spillPath).toBeDefined();
       expect(readFileSync(spillPath as string, "utf8")).toBe(big);

@@ -270,6 +270,7 @@ function finishCompletedOrientation(data: OrientationResultData): CodeIntelResul
       type: "context",
       data: assembly.details,
       budgetWarning: navigation?.warning,
+      ...(navigation ? { modelBudgetManaged: true } : {}),
       status: "completed",
       displaySections: assembly.displaySections,
     },

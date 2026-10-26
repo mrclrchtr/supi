@@ -84,6 +84,7 @@ export function assembleInspectResult(
       confidence: data.confidence,
       focusTarget: `${data.relPath}:${data.line}:${data.character}`,
       diagnosticWindow: { ...data.diagnosticWindow },
+      diagnostics: (diagnosticEvidence?.items ?? []).map((diagnostic) => ({ ...diagnostic })),
       sections: inspectSectionDetails(data),
       evidenceLists: [...assembled.evidenceLists],
       nextQueries: assembledNextQueries(assembled),

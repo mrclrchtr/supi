@@ -1,6 +1,6 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { completedCodeQuery } from "@mrclrchtr/supi-code-runtime/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import type { TSchema } from "typebox";
@@ -208,6 +208,46 @@ describe("structured navigation results", () => {
       automaticPathExclusion: { excludedCount: 2, examples: ["build/index.ts"] },
     });
     expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);
+  });
+
+  it("bounds model text without truncating codemode evidence", async () => {
+    const name = `widget${"LongName".repeat(1500)}`;
+    registerMockProvider(cwd, {
+      workspaceSymbols: async () =>
+        completedCodeQuery([
+          {
+            name,
+            kind: "Function",
+            file: join(cwd, "index.ts"),
+            declarationAnchor: { line: 1, character: 1 },
+          },
+        ]),
+    });
+    const pi = createPiMock();
+    registerCodeIntelligenceTools(pi as never, sessionCache.getOrCreate);
+    const tool = getTool(pi, "code_find") as unknown as StructuredTool;
+    const result = await tool.execute(
+      "large",
+      { query: "widget", mode: "semantic" },
+      undefined,
+      undefined,
+      makeCtx({ cwd }),
+    );
+    const text = result.content[0].text;
+    const snapshot = text.match(/Full output saved to: `([^`]+)`/)?.[1];
+    expect(snapshot).toBeDefined();
+    try {
+      expect(text.length).toBeLessThanOrEqual(8000);
+      expect(text).toContain("returned=1, total=1, cap-omitted=0");
+      expect(result.structuredContent).toMatchObject({
+        matches: [{ name }],
+        evidenceLists: [{ shownCount: 1, totalCount: 1 }],
+      });
+      expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);
+      expect(readFileSync(snapshot as string, "utf8")).toContain(name);
+    } finally {
+      if (snapshot) rmSync(dirname(snapshot), { recursive: true, force: true });
+    }
   });
 
   it("returns capped semantic matches with their anchor type and exact totals", async () => {

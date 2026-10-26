@@ -182,6 +182,16 @@ describe("workspace Orientation output", () => {
     expect(captured).toContain('"inventory"');
   });
 
+  it("preserves supplied instruction text beyond the general inline preview budget", async () => {
+    const instructions = "Keep private fields scoped to their caller. ".repeat(300);
+    put("notes/CLAUDE.md", instructions);
+    const text = await orient({ focus: { path: "notes" } });
+    expect(text.length).toBeGreaterThan(8000);
+    expect(text).toContain(instructions.trimEnd());
+    expect(text).not.toContain("model preview");
+    capturedDetails(text);
+  });
+
   it("keeps incomplete ancillary observations and collection problems inline", async () => {
     put("units/app/package.json", JSON.stringify({ name: "app" }));
     put("units/app/fixtures/broken/package.json", "{ invalid json");

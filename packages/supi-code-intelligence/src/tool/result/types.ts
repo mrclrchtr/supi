@@ -18,7 +18,7 @@ import type {
   HealthSection,
   SemanticHealthState,
 } from "../../session/health-types.ts";
-import type { InspectResultData } from "../../session/inspect-types.ts";
+import type { InspectDiagnostic, InspectResultData } from "../../session/inspect-types.ts";
 import type { TargetSymbolKind } from "../../session/target-input.ts";
 import type {
   AnchorKind,
@@ -32,7 +32,7 @@ export type ToolResultStatus = "completed" | "invalid-input" | "disambiguation" 
 
 /** Separate model-content and human-display bounds, with one optional continuation file. */
 export interface ToolOutputTruncationDetails {
-  /** Model content exceeded the PI output limit. */
+  /** Model content exceeded its economic budget or the PI safety limit. */
   truncated: boolean;
   /** The TUI omits evidence that remains in the model content. */
   displayTruncated?: boolean;
@@ -238,6 +238,8 @@ export interface InspectDetails {
   confidence: ConfidenceMode;
   focusTarget: string;
   diagnosticWindow: { startLine: number; endLine: number } | null;
+  /** Bounded diagnostic facts, independent of TUI preview strings. */
+  diagnostics?: readonly InspectDiagnostic[];
   sections: InspectSectionDetails[];
   evidenceLists?: EvidenceListMetadata[];
   nextQueries: string[];

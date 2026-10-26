@@ -52,12 +52,13 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CodeIntelResult } from "../../types/index.ts";
+import { boundModelContent } from "../result/model-budget.ts";
 import type { ToolOutputTruncationDetails } from "../result/types.ts";
 
 /**
  * Apply the canonical output bound to one assembled code-tool result:
- * truncate at PI limits, spill the full content to a temp file when it
- * overflowed or the human display omits returned evidence. A display-only
+ * bound the inline preview before applying PI safety limits, and spill the
+ * original content when either bound or the human display omits evidence. A display-only
  * continuation does not add text to model content. File failure is fatal only
  * when model content would otherwise be lost.
  */
@@ -69,10 +70,13 @@ export function boundCodeToolResult(
   const withTruncation = (truncation: ToolOutputTruncationDetails) =>
     details ? { ...details, truncation } : details;
 
-  const { text, truncated } = truncateToolContent(content, {
+  const preview = boundModelContent(content, details);
+  const safety = truncateToolContent(preview.text, {
     maxLines: options.maxLines,
     maxBytes: options.maxBytes,
   });
+  const { text } = safety;
+  const truncated = preview.truncated || safety.truncated;
   const displayTruncated = details?.truncation?.displayTruncated === true;
   const truncation = { truncated, ...(displayTruncated ? { displayTruncated } : {}) };
   if ((truncated || displayTruncated) && content.length > 0) {
@@ -82,7 +86,11 @@ export function boundCodeToolResult(
         content: [
           {
             type: "text" as const,
-            text: truncated ? `${text}\n_Full output saved to: \`${spillPath}\`_` : text,
+            text: preview.truncated
+              ? `_Full output saved to: \`${spillPath}\`_\n\n${text}`
+              : truncated
+                ? `${text}\n_Full output saved to: \`${spillPath}\`_`
+                : text,
           },
         ],
         details: withTruncation({ ...truncation, fullOutputPath: spillPath }),

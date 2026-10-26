@@ -1,7 +1,13 @@
+import { readFileSync, rmSync } from "node:fs";
+import { dirname } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { HealthData } from "../../../../src/session/health-types.ts";
 import { renderHealthResult } from "../../../../src/tool/code_health/markdown.ts";
-import { assembleHealthResult } from "../../../../src/tool/code_health/result.ts";
+import {
+  assembleHealthResult,
+  finishHealthResult,
+} from "../../../../src/tool/code_health/result.ts";
+import { boundCodeToolResult } from "../../../../src/tool/infra/truncate.ts";
 
 function cleanEvidence() {
   return {
@@ -163,6 +169,53 @@ describe("code_health result assembly", () => {
     expect(markdown).toContain("No errors or warnings reported in this scope.");
     expect(markdown).toContain("0 requested, 0 confirmed, 0 unconfirmed, 0 failed, 0 removed");
     expect(markdown).not.toContain("No diagnostics found");
+  });
+
+  it("retains snapshot scope, confirmation counts, and warnings in an oversized preview", () => {
+    const raw = finishHealthResult(
+      {
+        kind: "completed",
+        data: makeHealthData({
+          level: "detailed",
+          diagnostics: {
+            kind: "partial",
+            scope: { kind: "tracked-files", filter: "/repo/src" },
+            reason: "Fresh diagnostics were not confirmed",
+            evidence: fileEvidence("unconfirmed"),
+            entries: [
+              {
+                file: "/repo/src/a.ts",
+                errors: 1,
+                warnings: 0,
+                messages: [
+                  { line: 1, severity: "error", message: "Long diagnostic. ".repeat(2000) },
+                ],
+              },
+            ],
+          },
+          capabilityWarnings: {
+            hasWarnings: true,
+            warnings: [{ type: "missing-server", message: "Rust language server missing" }],
+          },
+        }),
+      },
+      "/repo",
+    );
+    const result = boundCodeToolResult(raw.content, raw.details, { toolName: "code_health" });
+    const snapshot = result.details?.truncation?.fullOutputPath;
+    expect(snapshot).toBeDefined();
+    try {
+      const text = result.content[0].text;
+      expect(text.length).toBeLessThanOrEqual(8000);
+      expect(text).toContain("Diagnostics: partial; tracked-file snapshot; filter=/repo/src");
+      expect(text).toContain("not workspace-wide verification");
+      expect(text).toContain("requested=1, confirmed=0, unconfirmed=1, failed=0, removed=0");
+      expect(text).toContain("Fresh diagnostics were not confirmed");
+      expect(text).toContain("Rust language server missing");
+      expect(readFileSync(snapshot as string, "utf8")).toBe(raw.content);
+    } finally {
+      if (snapshot) rmSync(dirname(snapshot), { recursive: true, force: true });
+    }
   });
 
   it("does not duplicate punctuation in a partial diagnostic reason", () => {
