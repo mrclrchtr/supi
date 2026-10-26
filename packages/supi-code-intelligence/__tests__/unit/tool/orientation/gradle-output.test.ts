@@ -1,4 +1,5 @@
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -172,6 +173,56 @@ it.each(["8.14.3", "10.0.0"])(
   },
 );
 
+it.each(["denied", "unsupported-wrapper", "missing-java", "model-failure"] as const)(
+  "attributes %s to the evidence source that actually established the limitation",
+  async (mode) => {
+    const { orient } = setup(
+      mode === "missing-java"
+        ? queryGradleModel
+        : async (selectedRoot) => ({
+            selectedRoot,
+            query: "GradleBuild/BasicGradleProject",
+            status: "failed",
+            stage: "query",
+            reason: "fixture-model-failure",
+          }),
+    );
+    if (mode === "denied")
+      writeSupiConfig(
+        { cwd: root, section: "code-intelligence", scope: "project" },
+        { gradleObservation: "deny" },
+      );
+    if (mode === "unsupported-wrapper")
+      put(
+        "gradle/wrapper/gradle-wrapper.properties",
+        "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.14.3-bin.zip",
+      );
+    if (mode === "missing-java") {
+      vi.stubEnv("JAVA_HOME", join(home, "missing-java"));
+      vi.stubEnv("PATH", "");
+    }
+    const result = await orient();
+    const attempted = mode === "model-failure";
+    expect(result.details).toMatchObject({
+      data: {
+        sections: expect.arrayContaining([
+          expect.objectContaining({
+            key: "gradle.observation",
+            provenance: [
+              expect.objectContaining({ source: attempted ? "runtime" : "configuration" }),
+            ],
+          }),
+        ]),
+      },
+    });
+    expect(result.content).toContain(
+      attempted ? "Model query was attempted." : "Model query was not run.",
+    );
+    const stage = mode === "denied" ? "authorization" : attempted ? "query" : "prerequisites";
+    expect(capture(result.content)).toContain(`"stage": "${stage}"`);
+  },
+);
+
 it("uses a real PATH installation when properties are absent, but does not execute unresolved shims", async () => {
   rmSync(join(root, "gradle"), { recursive: true });
   const install = join(home, "gradle-9.4.0");
@@ -207,6 +258,7 @@ it.each(["unavailable", "failed", "interrupted", "timeout", "oversized"] as cons
       selectedRoot,
       query: "GradleBuild/BasicGradleProject",
       status,
+      stage: "query",
       reason: "Test prerequisite or model failure",
     }));
     const result = await orient();
@@ -216,6 +268,126 @@ it.each(["unavailable", "failed", "interrupted", "timeout", "oversized"] as cons
     expect(capture(result.content)).toContain(`"status": "${status}"`);
   },
 );
+
+it("keeps a helper prerequisite failure distinct from an attempted Gradle query", async () => {
+  const javaHome = join(home, "fake-java");
+  mkdirSync(join(javaHome, "bin"), { recursive: true });
+  const failure = JSON.stringify({
+    status: "unavailable",
+    stage: "prerequisites",
+    reason: "Selected root has no Gradle settings file",
+  });
+  writeFileSync(
+    join(javaHome, "bin/java"),
+    `#!${process.execPath}\nif (process.argv.includes('-version')) process.stderr.write('openjdk version "21.0.13"');\nelse process.stdout.write(${JSON.stringify(failure)});\n`,
+    { mode: 0o755 },
+  );
+  vi.stubEnv("JAVA_HOME", javaHome);
+  const { orient } = setup(queryGradleModel);
+  const result = await orient();
+  expect(result.content).toContain("Model query was not run.");
+  expect(result.details).toMatchObject({
+    data: {
+      sections: expect.arrayContaining([
+        expect.objectContaining({
+          key: "gradle.observation",
+          provenance: [expect.objectContaining({ source: "configuration" })],
+        }),
+      ]),
+    },
+  });
+  expect(capture(result.content)).toContain('"stage": "prerequisites"');
+});
+
+it("discloses unknown query execution when Java starts but the helper fails before returning evidence", async () => {
+  const javaHome = join(home, "fake-java");
+  mkdirSync(join(javaHome, "bin"), { recursive: true });
+  writeFileSync(
+    join(javaHome, "bin/java"),
+    `#!${process.execPath}\nif (process.argv.includes('-version')) process.stderr.write('openjdk version "21.0.13"');\nelse process.exit(1);\n`,
+    { mode: 0o755 },
+  );
+  vi.stubEnv("JAVA_HOME", javaHome);
+  const { orient } = setup(queryGradleModel);
+  const result = await orient();
+  expect(result.content).toContain("Model query execution is unknown.");
+  expect(result.content).not.toContain("Model query was attempted.");
+  expect(result.content).not.toContain("Model query was not run.");
+  expect(result.content).toContain("Gradle helper exited with code 1");
+  expect(capture(result.content)).toContain('"stage": "unknown"');
+});
+
+it("does not claim a query when the deadline expires after Java selection but before helper launch", async () => {
+  const javaHome = join(home, "fake-java");
+  const selected = join(home, "java-selected");
+  mkdirSync(join(javaHome, "bin"), { recursive: true });
+  writeFileSync(
+    join(javaHome, "bin/java"),
+    `#!${process.execPath}\nif (process.argv.includes('-version')) { require('node:fs').writeFileSync(${JSON.stringify(selected)}, ''); process.stderr.write('openjdk version "21.0.13"'); }\nelse throw new Error('Helper must not launch after the deadline');\n`,
+    { mode: 0o755 },
+  );
+  vi.stubEnv("JAVA_HOME", javaHome);
+  const { service } = setup(queryGradleModel);
+  const clock = vi.spyOn(Date, "now").mockImplementation(() => (existsSync(selected) ? 20_000 : 0));
+  try {
+    expect(await service.observe(root, { deadline: 10_000 })).toMatchObject({
+      status: "timeout",
+      stage: "prerequisites",
+    });
+  } finally {
+    clock.mockRestore();
+  }
+});
+
+it("retains the actual Gradle version and initialization cause through the helper process boundary", async () => {
+  const javaHome = join(home, "fake-java");
+  mkdirSync(join(javaHome, "bin"), { recursive: true });
+  const failure = JSON.stringify({
+    status: "failed",
+    stage: "query",
+    reason: "fixture-initialization-failure",
+    gradleVersion: "9.4.0",
+  });
+  writeFileSync(
+    join(javaHome, "bin/java"),
+    `#!${process.execPath}\nif (process.argv.includes('-version')) process.stderr.write('openjdk version "21.0.13"');\nelse process.stdout.write(${JSON.stringify(failure)});\n`,
+    { mode: 0o755 },
+  );
+  vi.stubEnv("JAVA_HOME", javaHome);
+  const { orient } = setup(queryGradleModel);
+  const result = await orient();
+  expect(capture(result.content)).toContain('"gradleVersion": "9.4.0"');
+  expect(result.content).toContain("Gradle `9.4.0`");
+  expect(result.content).toContain("fixture-initialization-failure");
+  expect(result.content).toContain("notes.txt");
+});
+
+it("renders a failure reason once as single-line literal Markdown without doubled punctuation", async () => {
+  const reason = [
+    "fixture-render-failure.\n## untrusted <message> `text`",
+    "![image](image.png)",
+    "*emphasis* [help](https://example.invalid/help) \\path.",
+  ].join(" ");
+  const { orient } = setup(async (selectedRoot) => ({
+    selectedRoot,
+    query: "GradleBuild/BasicGradleProject",
+    status: "failed",
+    stage: "query",
+    reason,
+  }));
+  const result = await orient();
+  expect(result.content.match(/fixture-render-failure/g)).toHaveLength(1);
+  expect(result.content).not.toContain("\n## untrusted");
+  expect(result.content).toContain(
+    [
+      "`` failed: fixture-render-failure. ## untrusted <message> `text`",
+      "![image](image.png)",
+      "*emphasis* [help](https://example.invalid/help) \\path. `` runtime",
+    ].join(" "),
+  );
+  expect(result.content).not.toContain(".. runtime");
+  expect(capture(result.content)).toContain(`"reason": ${JSON.stringify(reason)}`);
+});
 
 it("keeps navigation when no compatible Java is installed", async () => {
   vi.stubEnv("JAVA_HOME", join(home, "missing-java"));
@@ -242,7 +414,8 @@ it.each(["oversized", "timeout"] as const)(
     const result = await orient({}, Date.now() + (mode === "timeout" ? 500 : 1500));
     expect(result.content).toContain(`${mode}:`);
     expect(result.content).toContain("notes.txt");
-    capture(result.content);
+    expect(result.content).toContain("Model query execution is unknown.");
+    expect(capture(result.content)).toContain('"stage": "unknown"');
   },
 );
 

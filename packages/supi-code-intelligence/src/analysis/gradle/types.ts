@@ -17,6 +17,12 @@ export interface GradleProjectObservation {
   readonly parentPath: string | null;
 }
 
+/**
+ * Phase that established a limitation. Query confirms an attempted model request;
+ * unknown means collection failed without evidence of whether a request started.
+ */
+export type GradleFailureStage = "authorization" | "prerequisites" | "query" | "unknown";
+
 /** One selected-build query, not a parsed Project declaration or a filesystem inventory. */
 export type GradleObservation = {
   readonly selectedRoot: string;
@@ -40,6 +46,9 @@ export type GradleObservation = {
         | "timeout"
         | "oversized";
       readonly reason: string;
+      readonly stage: GradleFailureStage;
+      /** Actual runtime version obtained before failure, not the declared distribution version. */
+      readonly gradleVersion?: string;
     }
 );
 

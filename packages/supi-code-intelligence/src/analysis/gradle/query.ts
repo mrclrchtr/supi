@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import type { CodeRequestControl } from "@mrclrchtr/supi-code-runtime/api";
 import { findExecutable, GradlePrerequisiteError, requireGradle9 } from "./runtime.ts";
 import type {
+  GradleFailureStage,
   GradleModelQuery,
   GradleObservation,
   GradleProjectObservation,
@@ -25,6 +26,7 @@ const failureStates = new Set([
 export const queryGradleModel: GradleModelQuery = async (root, runtime, control) => {
   const base = { selectedRoot: root, query: "GradleBuild/BasicGradleProject" as const, runtime };
   const deadline = control?.deadline ?? Date.now() + 30_000;
+  let stage: GradleFailureStage = "prerequisites";
   try {
     const java = await selectJava({ ...control, deadline });
     const output = await runProcess(
@@ -39,13 +41,18 @@ export const queryGradleModel: GradleModelQuery = async (root, runtime, control)
         String(deadline),
       ],
       { ...control, deadline },
-      false,
+      {
+        onSpawn: () => {
+          stage = "unknown";
+        },
+      },
     );
     const result: unknown = JSON.parse(output);
     return validateModel(result, base, await fs.realpath(root));
   } catch (error) {
     return {
       ...base,
+      stage,
       status:
         error instanceof ProcessFailure || error instanceof GradlePrerequisiteError
           ? error.status
@@ -65,7 +72,7 @@ async function selectJava(control: CodeRequestControl): Promise<string> {
   for (const candidate of new Set(candidates)) {
     if (!candidate) continue;
     try {
-      const version = await runProcess(candidate, ["-version"], control, true);
+      const version = await runProcess(candidate, ["-version"], control, { captureError: true });
       const major = Number(version.match(/(?:openjdk|java) version "(\d+)/)?.[1]);
       // This conservative intersection is compatible with the Gradle 9 runtime family.
       if (major >= 17 && major <= 24) return candidate;
@@ -93,7 +100,7 @@ function runProcess(
   command: string,
   args: string[],
   control: CodeRequestControl,
-  captureError: boolean,
+  options: { readonly captureError?: boolean; readonly onSpawn?: () => void } = {},
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     if (control.signal?.aborted)
@@ -102,6 +109,7 @@ function runProcess(
     if (remaining <= 0)
       return reject(new ProcessFailure("timeout", "Gradle observation deadline expired."));
     const child = spawn(command, args, { stdio: ["pipe", "pipe", "pipe"], shell: false });
+    child.once("spawn", () => options.onSpawn?.());
     const chunks: Buffer[] = [];
     let bytes = 0;
     let settled = false;
@@ -155,7 +163,7 @@ function runProcess(
       chunks.push(chunk);
     };
     child.stdout.on("data", collect);
-    child.stderr.on("data", captureError ? collect : () => {});
+    child.stderr.on("data", options.captureError ? collect : () => {});
     child.stdin.on("error", () => {});
     child.once("error", (error) => finish(error));
     child.once("close", (code) =>
@@ -175,7 +183,15 @@ function validateModel(
 ): GradleObservation {
   if (!isRecord(value)) throw new Error("Gradle helper returned a non-object result.");
   if (failureStates.has(String(value.status)) && typeof value.reason === "string") {
-    return { ...base, status: value.status as "failed", reason: value.reason.slice(0, 500) };
+    if (value.stage !== "prerequisites" && value.stage !== "query")
+      throw new Error("Gradle helper returned an invalid failure stage.");
+    return {
+      ...base,
+      status: value.status as "failed",
+      stage: value.stage,
+      reason: value.reason.slice(0, 500),
+      gradleVersion: validateFailureVersion(value),
+    };
   }
   if (
     value.status !== "complete" ||
@@ -202,6 +218,18 @@ function validateModel(
     projects,
     includedBuilds: value.includedBuilds as { buildRoot: string }[],
   };
+}
+
+function validateFailureVersion(value: Record<string, unknown>): string | undefined {
+  if (value.gradleVersion === undefined) return undefined;
+  if (
+    value.stage !== "query" ||
+    typeof value.gradleVersion !== "string" ||
+    value.gradleVersion.length === 0 ||
+    value.gradleVersion.length > 100
+  )
+    throw new Error("Gradle helper returned an invalid runtime version.");
+  return value.gradleVersion;
 }
 
 function validateProjects(projects: unknown[], canonicalRoot: string): GradleProjectObservation[] {

@@ -20,6 +20,7 @@ import {
   selectGradleRuntime,
 } from "../analysis/gradle/runtime.ts";
 import type {
+  GradleFailureStage,
   GradleModelQuery,
   GradleObservation,
   GradleObserver,
@@ -33,6 +34,25 @@ const explanation =
 function permission(cwd: string): "allow" | "deny" | undefined {
   const value = loadSupiConfigSectionForScope(section, cwd, { scope: "project" })?.[key];
   return value === "allow" || value === "deny" ? value : undefined;
+}
+
+function collectionFailure(
+  root: string,
+  stage: GradleFailureStage,
+  error: unknown,
+): GradleObservation {
+  return {
+    selectedRoot: root,
+    query: "GradleBuild/BasicGradleProject",
+    stage,
+    status:
+      error instanceof GradlePrerequisiteError
+        ? error.status
+        : stage === "query" || stage === "unknown"
+          ? "failed"
+          : "unavailable",
+    reason: error instanceof Error ? error.message.slice(0, 500) : "Gradle collection failed.",
+  };
 }
 
 /** Owned, live-authorized Gradle requests for one Pi session working directory. */
@@ -51,12 +71,15 @@ class SessionGradleObserver implements GradleObserver {
     control?: CodeRequestControl,
   ): Promise<GradleObservation | undefined> {
     const base = { selectedRoot: root, query: "GradleBuild/BasicGradleProject" as const };
+    let stage: GradleFailureStage = "prerequisites";
     try {
       if (!(await hasGradleSettings(root))) return undefined;
+      stage = "authorization";
       if (!this.trusted(root))
         return {
           ...base,
           status: "blocked",
+          stage: "authorization",
           reason:
             "Gradle execution requires an actual Pi project-trust gate. Use /trust and reload; a bare SuPi config is insufficient.",
         };
@@ -65,6 +88,7 @@ class SessionGradleObserver implements GradleObserver {
         return {
           ...base,
           status: "blocked",
+          stage: "authorization",
           reason:
             decision === "deny"
               ? "Gradle model collection was denied in project settings."
@@ -72,14 +96,7 @@ class SessionGradleObserver implements GradleObserver {
         };
       return await this.collect(root, control);
     } catch (error) {
-      return {
-        ...base,
-        status: error instanceof GradlePrerequisiteError ? error.status : "unavailable",
-        reason:
-          error instanceof Error
-            ? error.message.slice(0, 500)
-            : "Gradle prerequisites could not be resolved.",
-      };
+      return collectionFailure(root, stage, error);
     }
   }
 
@@ -87,6 +104,7 @@ class SessionGradleObserver implements GradleObserver {
     const base = { selectedRoot: root, query: "GradleBuild/BasicGradleProject" as const };
     const controller = new AbortController();
     this.active.add(controller);
+    let stage: GradleFailureStage = "prerequisites";
     try {
       const signal = control?.signal
         ? AbortSignal.any([control.signal, controller.signal])
@@ -95,12 +113,14 @@ class SessionGradleObserver implements GradleObserver {
         return {
           ...base,
           status: "interrupted",
+          stage,
           reason: "Gradle model collection was cancelled.",
         };
       if (control?.deadline !== undefined && Date.now() >= control.deadline)
         return {
           ...base,
           status: "timeout",
+          stage,
           reason: "Gradle observation deadline expired before runtime selection.",
         };
       const runtime = await selectGradleRuntime(root);
@@ -108,18 +128,24 @@ class SessionGradleObserver implements GradleObserver {
         return {
           ...base,
           status: "interrupted",
+          stage: "authorization",
           reason: "Gradle authorization was revoked; no new query was started.",
         };
+      stage = "unknown";
       const result = await this.query(root, runtime, { ...control, signal });
       if (signal.aborted || !this.trusted(root) || permission(this.cwd) !== "allow")
         return {
           ...base,
           runtime,
           status: "interrupted",
+          stage: result.status === "complete" ? "query" : result.stage,
+          gradleVersion: result.gradleVersion,
           reason:
             "Gradle authorization changed or collection was cancelled; prior side effects may remain.",
         };
       return { ...result, runtime };
+    } catch (error) {
+      return collectionFailure(root, stage, error);
     } finally {
       this.active.delete(controller);
     }

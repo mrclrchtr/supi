@@ -7,6 +7,7 @@ import type {
 } from "../../session/orientation-types.ts";
 import { assembledReadNext } from "../result/assembly.ts";
 import type { OrientationResultAssembly } from "./result.ts";
+import { code } from "./workspace-format.ts";
 
 /**
  * Sole model-facing markdown adapter for Orientation.
@@ -93,29 +94,39 @@ function renderItems(
   }
 }
 
-/** Keep source-written fences inside the enclosing code block. */
-function codeFence(lines: readonly string[]): string {
-  let size = 3;
+/** Choose delimiters longer than any source-written backtick run. */
+function codeFence(lines: readonly string[], minimum = 3): string {
+  let size = minimum;
   for (const line of lines)
     for (const match of line.matchAll(/`+/g)) size = Math.max(size, match[0].length + 1);
   return "`".repeat(size);
 }
 
+function literalReason(reason: string): string {
+  const text = reason
+    .replace(/[\p{Cc}\p{Cf}\p{Z}]/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+  const delimiter = codeFence([text], 1);
+  return `${delimiter} ${text} ${delimiter}`;
+}
+
 function compactSectionNote(section: OrientationSectionData): string {
+  const facts = section.evidenceLists.map(evidenceSummary).join("; ");
   return [
-    section.evidenceLists.map(evidenceSummary).join("; "),
-    section.reason,
+    facts ? `${facts}${/[.!?…]$/.test(facts) ? "" : "."}` : null,
+    section.reason ? literalReason(section.reason) : null,
     section.provenance.map(formatProvenance).join(", "),
   ]
     .filter(Boolean)
-    .join(". ");
+    .join(" ");
 }
 
 /** Render the same section status/provenance metadata stored in result details. */
 function formatSectionNote(section: OrientationSectionData): string {
   const facts = section.evidenceLists.map(evidenceSummary).join("; ");
   const provenance = section.provenance.map(formatProvenance).join(", ");
-  return `_(status: ${section.status}; provenance: ${provenance || "none"}${section.reason ? `; ${section.reason}` : ""}${facts ? `; ${facts}` : ""})_`;
+  return `_(status: ${section.status}; provenance: ${provenance || "none"}${section.reason ? `; ${literalReason(section.reason)}` : ""}${facts ? `; ${facts}` : ""})_`;
 }
 
 function evidenceSummary(metadata: EvidenceListMetadata): string {
@@ -130,6 +141,6 @@ function evidenceSummary(metadata: EvidenceListMetadata): string {
 }
 
 function formatProvenance(provenance: OrientationProvenance): string {
-  const detail = provenance.detail ? ` \`${provenance.detail}\`` : "";
+  const detail = provenance.detail ? ` ${code(provenance.detail)}` : "";
   return `${provenance.source}${provenance.capability ? ` (${provenance.capability})` : ""}${detail}`;
 }

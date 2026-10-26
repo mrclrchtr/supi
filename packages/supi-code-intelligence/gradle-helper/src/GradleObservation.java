@@ -1,3 +1,4 @@
+import org.gradle.tooling.BuildException;
 import org.gradle.tooling.CancellationToken;
 import org.gradle.tooling.CancellationTokenSource;
 import org.gradle.tooling.GradleConnectionException;
@@ -20,10 +21,14 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -46,6 +51,7 @@ public final class GradleObservation {
     private static final int MAX_OUTPUT_BYTES = 1_048_576;
     private static final int MAX_LOG_BYTES = 64 * 1024;
     private static final int MAX_FAILURE_REASON_CHARS = 500;
+    private static final int MAX_FAILURE_CAUSE_DEPTH = 8;
     private static final Pattern VERSION_PATTERN = Pattern.compile("^(\\d+)(?:\\.|$)");
     private static final PrintStream JSON_OUTPUT = System.out;
     private static final PrintStream ORIGINAL_STDERR = System.err;
@@ -115,10 +121,11 @@ public final class GradleObservation {
             watchdog.schedule(() -> cancellation.request("timeout"), delayMillis, TimeUnit.MILLISECONDS);
         }
 
+        ObservationState observation = new ObservationState();
         CompletableFuture<String> work = new CompletableFuture<>();
         Thread worker = new Thread(() -> {
             try {
-                work.complete(observe(selectedRoot, args[1], args[2], tokenSource.token()));
+                work.complete(observe(selectedRoot, args[1], args[2], tokenSource.token(), observation));
             } catch (Throwable error) {
                 work.completeExceptionally(error);
             }
@@ -135,28 +142,28 @@ public final class GradleObservation {
             if (cancellation.reason() != null) {
                 response = failureJson(cancellation.reason(), cancellation.reason().equals("timeout")
                         ? "Gradle observation deadline expired"
-                        : "Gradle observation was cancelled");
+                        : "Gradle observation was cancelled", observation);
             } else {
                 response = work.get();
             }
         } catch (TimeoutException error) {
             cancellation.request("timeout");
-            response = failureJson("timeout", "Gradle observation deadline expired");
+            response = failureJson("timeout", "Gradle observation deadline expired", observation);
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             cancellation.request("interrupted");
-            response = failureJson("interrupted", "Gradle observation was interrupted");
+            response = failureJson("interrupted", "Gradle observation was interrupted", observation);
         } catch (ExecutionException error) {
             if (cancellation.reason() != null) {
                 String reason = cancellation.reason();
                 response = failureJson(reason, reason.equals("timeout")
                         ? "Gradle observation deadline expired"
-                        : "Gradle observation was cancelled");
+                        : "Gradle observation was cancelled", observation);
             } else {
-                response = exceptionJson(error.getCause());
+                response = exceptionJson(error.getCause(), observation);
             }
         } catch (Throwable error) {
-            response = exceptionJson(error);
+            response = exceptionJson(error, observation);
         } finally {
             watchdog.shutdownNow();
         }
@@ -165,13 +172,19 @@ public final class GradleObservation {
             String reason = cancellation.reason();
             response = failureJson(reason, reason.equals("timeout")
                     ? "Gradle observation deadline expired"
-                    : "Gradle observation was cancelled");
+                    : "Gradle observation was cancelled", observation);
         }
         emit(response);
         if (cancellation.reason() != null) {
             // Tooling API cancellation is best-effort; the parent owns a final process-kill grace period.
             Runtime.getRuntime().halt(0);
         }
+    }
+
+    /** Metadata shared with the deadline thread, recorded at actual collection boundaries. */
+    private static final class ObservationState {
+        private volatile String stage = "prerequisites";
+        private volatile String gradleVersion;
     }
 
     private static boolean hasBuildDefinition(File root) {
@@ -183,14 +196,15 @@ public final class GradleObservation {
             File selectedRoot,
             String runtimeKind,
             String runtimeValue,
-            CancellationToken token) throws Exception {
+            CancellationToken token,
+            ObservationState observation) throws Exception {
         GradleConnector connector = GradleConnector.newConnector().forProjectDirectory(selectedRoot);
         if (runtimeKind.equals("distribution")) {
             connector.useDistribution(URI.create(runtimeValue));
         } else {
             File installation = new File(runtimeValue).getCanonicalFile();
             if (!installation.isDirectory()) {
-                throw new ObservationFailure("failed", "Selected Gradle installation is not a directory");
+                throw new ObservationFailure("unavailable", "Selected Gradle installation is not a directory");
             }
             connector.useInstallation(installation);
         }
@@ -199,8 +213,11 @@ public final class GradleObservation {
         try (ProjectConnection connection = connector.connect()) {
             ModelBuilder<BuildEnvironment> environmentRequest = configured(
                     connection.model(BuildEnvironment.class), token, javaHome);
+            checkCancelled(token);
+            observation.stage = "query";
             BuildEnvironment environment = environmentRequest.get();
             String gradleVersion = environment.getGradle().getGradleVersion();
+            observation.gradleVersion = gradleVersion;
             requireGradle9(gradleVersion);
             checkCancelled(token);
 
@@ -344,24 +361,27 @@ public final class GradleObservation {
         reader.start();
     }
 
-    private static String exceptionJson(Throwable error) {
+    private static String exceptionJson(Throwable error, ObservationState observation) {
         Throwable cause = unwrap(error);
         if (cause instanceof ObservationFailure failure) {
-            return failureJson(failure.status, failure.getMessage());
+            return failureJson(failure.status, failure.getMessage(), observation);
         }
         if (cause instanceof JsonTooLargeException) {
-            return failureJson("oversized", "Observation output exceeds 1 MiB");
+            return failureJson("oversized", "Observation output exceeds 1 MiB", observation);
         }
         if (cause instanceof UnsupportedMethodException) {
-            return failureJson("unsupported", "Gradle does not support the requested model operation");
+            return failureJson("unsupported", "Gradle does not support the requested model operation", observation);
+        }
+        if (cause instanceof BuildException) {
+            return failureJson("failed", safeMessage(cause), observation);
         }
         if (cause instanceof GradleConnectionException) {
-            return failureJson("unavailable", safeMessage(cause));
+            return failureJson("unavailable", safeMessage(cause), observation);
         }
         if (cause instanceof InterruptedException) {
-            return failureJson("interrupted", "Gradle observation was interrupted");
+            return failureJson("interrupted", "Gradle observation was interrupted", observation);
         }
-        return failureJson("failed", safeMessage(cause));
+        return failureJson("failed", safeMessage(cause), observation);
     }
 
     private static Throwable unwrap(Throwable error) {
@@ -373,24 +393,55 @@ public final class GradleObservation {
         return current;
     }
 
+    /** Keep the deepest available cause first so generic Tooling API context cannot crowd it out. */
     private static String safeMessage(Throwable error) {
-        String message = error == null ? null : error.getMessage();
-        if (message == null || message.isBlank()) {
-            message = error == null ? "Gradle observation failed" : error.getClass().getSimpleName();
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        List<String> messages = new ArrayList<>();
+        Throwable current = error;
+        for (int depth = 0; current != null && depth < MAX_FAILURE_CAUSE_DEPTH && seen.add(current); depth++) {
+            String message = current.getMessage();
+            if (message == null || message.isBlank()) {
+                message = current.getClass().getSimpleName();
+            }
+            if (message.length() > MAX_FAILURE_REASON_CHARS) {
+                message = message.substring(0, MAX_FAILURE_REASON_CHARS - 1) + "…";
+            }
+            message = message.replaceAll("[\\p{Cc}\\p{Cf}\\p{Z}]", " ").replaceAll("(?U)\\s+", " ").trim();
+            if (!message.isEmpty()) messages.add(message);
+            current = current.getCause();
         }
-        message = message.replaceAll("[\\p{Cntrl}&&[^\\n\\t]]", " ").trim();
-        if (message.length() > MAX_FAILURE_REASON_CHARS) {
-            message = message.substring(0, MAX_FAILURE_REASON_CHARS);
+        Collections.reverse(messages);
+        StringBuilder summary = new StringBuilder();
+        for (String message : new LinkedHashSet<>(messages)) {
+            String separator = summary.length() == 0 ? "" : "; context: ";
+            int remaining = MAX_FAILURE_REASON_CHARS - summary.length() - separator.length();
+            if (remaining <= 1) break;
+            summary.append(separator);
+            if (message.length() > remaining) {
+                summary.append(message, 0, remaining - 1).append("…");
+                break;
+            }
+            summary.append(message);
         }
-        return message;
+        return summary.length() == 0 ? "Gradle observation failed" : summary.toString();
     }
 
     private static String failureJson(String status, String reason) {
+        return failureJson(status, reason, null);
+    }
+
+    private static String failureJson(String status, String reason, ObservationState observation) {
         JsonWriter json = new JsonWriter();
         json.raw("{\"status\":");
         json.string(status);
+        json.raw(",\"stage\":");
+        json.string(observation == null ? "prerequisites" : observation.stage);
         json.raw(",\"reason\":");
         json.string(reason == null ? "Gradle observation failed" : reason);
+        if (observation != null && observation.gradleVersion != null) {
+            json.raw(",\"gradleVersion\":");
+            json.string(observation.gradleVersion);
+        }
         json.raw("}");
         return json.toString();
     }

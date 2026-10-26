@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import unicodedata
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_ROOT = REPO_ROOT / "packages/supi-code-intelligence/__tests__/fixtures/gradle"
@@ -178,7 +179,23 @@ def assert_fixture(dsl: str, runtime_kind: str, installation: Path | None = None
 def assert_failures(installation: Path) -> None:
     with tempfile.TemporaryDirectory(prefix="supi-gradle-failures-") as temporary:
         root = Path(temporary)
-        (root / "settings.gradle").write_text('throw new GradleException("fixture-initialization-failure")\n', encoding="utf-8")
+        (root / "settings.gradle").write_text(
+            'throw new GradleException("fixture-initialization-failure\\n\\u001b\\u0085\\u009b\\u2028\\u2029\\u202e" + ("x" * 1000))\n',
+            encoding="utf-8",
+        )
+        missing_settings = root / "without-settings"
+        missing_settings.mkdir()
+        prerequisite = subprocess.run(
+            [JAVA, "-cp", f"{HELPER_LIB}/*", "GradleObservation", canonical(missing_settings),
+             "installation", str(installation), str(int(time.time() * 1000) + 60_000)],
+            input="", capture_output=True, text=True, timeout=70, check=True,
+        )
+        prerequisite_result = json.loads(prerequisite.stdout)
+        if (prerequisite_result.get("stage") != "prerequisites"
+                or prerequisite_result.get("status") != "unavailable"
+                or "gradleVersion" in prerequisite_result or "projects" in prerequisite_result):
+            raise AssertionError(f"Pre-query prerequisite was misattributed: {prerequisite_result!r}")
+        print("PASS missing settings: prerequisites, no query or runtime version")
         for expected, stdin, duration in [
             ("initialization", "", 60_000),
             ("interrupted", "cancel\n", 60_000),
@@ -190,9 +207,20 @@ def assert_failures(installation: Path) -> None:
                 input=stdin, capture_output=True, text=True, timeout=70, check=True,
             )
             result = json.loads(completed.stdout)
-            accepted = {"unavailable", "failed"} if expected == "initialization" else {expected}
+            accepted = {"failed"} if expected == "initialization" else {expected}
             if result.get("status") not in accepted or "projects" in result:
                 raise AssertionError(f"{expected} returned misleading evidence: {result!r}")
+            if expected == "initialization":
+                if result.get("stage") != "query":
+                    raise AssertionError(f"Initialization query was misattributed: {result!r}")
+                if "fixture-initialization-failure" not in result.get("reason", ""):
+                    raise AssertionError(f"Initialization cause was lost: {result!r}")
+                if result.get("gradleVersion") != "9.4.0":
+                    raise AssertionError(f"Known runtime version was lost: {result!r}")
+                if len(result["reason"]) > 500 or any(unicodedata.category(char) in {"Cc", "Cf", "Zl", "Zp"} for char in result["reason"]):
+                    raise AssertionError(f"Initialization reason is not bounded single-line text: {result!r}")
+                if not result["reason"].endswith("…"):
+                    raise AssertionError(f"Truncated diagnostic is not disclosed: {result!r}")
             print(f"PASS {expected}: {result['status']}, no project evidence")
 
 
