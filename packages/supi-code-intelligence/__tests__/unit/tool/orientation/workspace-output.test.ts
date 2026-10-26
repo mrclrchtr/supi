@@ -147,7 +147,7 @@ describe("workspace Orientation output", () => {
     rmSync(dirname(snapshot as string), { recursive: true, force: true });
   });
 
-  it("renders separate dependency categories as Mermaid edges without duplicate dependency lists", async () => {
+  it("defers directory metadata while capturing dependency categories and instructions intact", async () => {
     put("package.json", JSON.stringify({ name: "root", workspaces: ["units/*"] }));
     put(
       "units/app/package.json",
@@ -158,12 +158,40 @@ describe("workspace Orientation output", () => {
       }),
     );
     put("units/core/package.json", JSON.stringify({ name: "core" }));
+    put("units/app/CLAUDE.md", "Keep caller data private.\n");
+    put("units/app/fixtures/example/go.mod", "module example.com/fixture\ngo 1.23\n");
     const text = await orient({ focus: { path: "units/app" } });
-    expect(text).toContain("```mermaid");
-    expect(text).toContain("dependencies: workspace:*");
-    expect(text).toContain("devDependencies: workspace:*");
-    expect(text.match(/ -->/g)).toHaveLength(2);
-    expect(text).not.toContain("## Manifest dependencies");
+    expect(text).toContain("Project: `app`");
+    expect(text).toContain("## Direct directories");
+    expect(text).toContain("## Direct files");
+    expect(text).toContain("Keep caller data private.");
+    expect(text).toContain("## Captured navigation");
+    expect(text).toContain("omitted");
+    expect(text).not.toContain("```mermaid");
+    expect(text).not.toContain("## Project declarations");
+    expect(text).not.toContain("## File extensions");
+    const snapshot = capturedDetails(text);
+    expect(snapshot).toBeDefined();
+    const captured = readFileSync(snapshot as string, "utf8");
+    expect(captured).toContain("```mermaid");
+    expect(captured).toContain("dependencies: workspace:*");
+    expect(captured).toContain("devDependencies: workspace:*");
+    expect(captured.match(/ -->/g)).toHaveLength(2);
+    expect(captured).toContain("example.com/fixture");
+    expect(captured).toContain("Keep caller data private.");
+    expect(captured).toContain('"inventory"');
+  });
+
+  it("keeps incomplete ancillary observations and collection problems inline", async () => {
+    put("units/app/package.json", JSON.stringify({ name: "app" }));
+    put("units/app/fixtures/broken/package.json", "{ invalid json");
+    const text = await orient({ focus: { path: "units/app" } });
+    expect(text).toContain("## Collection limits");
+    expect(text).toContain("## Project declarations");
+    expect(text).toContain("Metadata collection is incomplete");
+    expect(text).toContain("fixtures/broken/package.json");
+    const snapshot = capturedDetails(text);
+    expect(snapshot).toBeDefined();
   });
 
   it("bounds large declarations and retains the complete captured text", async () => {

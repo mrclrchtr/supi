@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@earendil-works/pi-coding-agent";
 import type { WorkspaceOrientationFacts } from "../../session/orientation/workspace-context.ts";
 import type { OrientationResultData } from "../../session/orientation-types.ts";
+import { selectDirectoryNavigation } from "./directory-navigation.ts";
 import { renderOrientationData } from "./markdown.ts";
 import { fitWorkspaceInstructions } from "./workspace-instructions.ts";
 import { workspaceSections } from "./workspace-sections.ts";
@@ -41,16 +42,16 @@ export function prepareWorkspaceOutput(input: OrientationResultData): {
     ? Math.max(10, workspace.observation.projects.length)
     : workspace.maxResults;
   let descriptions = true;
-  let data = workspaceSections(input, limit, descriptions);
+  let data = selectDirectoryNavigation(workspaceSections(input, limit, descriptions));
   if (navigationText(data).length > budget.warning * 4) {
     descriptions = false;
-    data = workspaceSections(input, limit, descriptions);
+    data = selectDirectoryNavigation(workspaceSections(input, limit, descriptions));
   }
   // Reserve room for the snapshot path and omission notice before reducing rows.
   const reserved = 1024;
   while (exceedsNavigationBudget(data, budget.cap * 4 - reserved) && limit > 0) {
     limit = Math.floor(limit / 2);
-    data = workspaceSections(input, limit, descriptions);
+    data = selectDirectoryNavigation(workspaceSections(input, limit, descriptions));
   }
   const overflow = exceedsNavigationBudget(data, budget.cap * 4 - reserved);
   if (overflow) {
