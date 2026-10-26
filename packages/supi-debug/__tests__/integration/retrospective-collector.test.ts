@@ -110,7 +110,21 @@ describe("retrospective collector CLI", () => {
     });
     expect(preview.evidenceFile).toBe(output);
     expect(preview.sessionsDir).toBe(sessions);
-    expect(preview.omittedRefs).toEqual([]);
+    expect(preview.display).toMatchObject({
+      complete: true,
+      displayedReports: 2,
+      remainingReports: 0,
+    });
+    expect(preview.nextCommand).toBeNull();
+    expect(preview.summary).toEqual({
+      reports: 2,
+      containingSessions: 1,
+      bySource: { "supi-agent": 1, "supi-review": 1 },
+      byStatus: { completed: 2, failed: 0 },
+      earliest: "1970-01-01T00:00:00.500Z",
+      latest: "1970-01-01T00:00:01.000Z",
+    });
+    expect(evidence.summary).toEqual(preview.summary);
     expect(preview.records[0].entryId).toBeUndefined();
   });
 
@@ -123,10 +137,13 @@ describe("retrospective collector CLI", () => {
     const { preview, evidence } = await collect();
     expect(Buffer.byteLength(JSON.stringify(preview)) + 1).toBeLessThanOrEqual(16_000);
     expect(evidence.records[0].text).toBe(longText);
-    expect(preview.omittedRefs).toEqual([evidence.records[0].ref]);
     expect(preview.records).toHaveLength(1);
-    expect(preview.records[0].text).toBe("Complete short assessment.");
-    expect(preview.coverage.returnedReports).toBe(2);
+    expect(preview.records[0].ref).toBe(evidence.records[0].ref);
+    expect(preview.records[0].textRange).toMatchObject({ start: 0, total: longText.length });
+    expect(preview.records[0].textRange.end).toBeLessThan(longText.length);
+    expect(preview.records[0].text.endsWith("🧭")).toBe(true);
+    expect(preview.display).toMatchObject({ complete: false, remainingReports: 2, nextOffset: 0 });
+    expect(preview.nextCommand).toContain("--text-offset");
     expect(preview.coverage.complete).toBe(true);
   });
 
@@ -149,17 +166,102 @@ describe("retrospective collector CLI", () => {
       matchingEvents: 3,
       duplicateEvents: 1,
       uniqueReports: 2,
-      returnedReports: 1,
-      nextOffset: 1,
     });
+    expect(first.evidence.records).toHaveLength(2);
+    expect(first.preview.display).toMatchObject({ displayedReports: 1, nextOffset: 1 });
     expect(first.evidence.records[0].runKey).toBe("shared");
     const ref = first.evidence.records[0].ref;
+    // A new session must not shift snapshot offsets or change the original scan evidence.
+    await session("new.jsonl", workspace, [retrospective("new", "Newer.", "supi-agent", 3000)]);
+    const result = await execute("/bin/sh", ["-c", first.preview.nextCommand]);
+    const second = JSON.parse(result.stdout);
+    expect(second.records[0].text).toBe("Older.");
+    expect(second.display.complete).toBe(true);
+    expect(second.nextCommand).toBeNull();
+    expect(second.coverage).toEqual(first.preview.coverage);
     await rm(output);
-    const second = await collect(["--limit", "1", "--offset", "1"]);
-    expect(second.evidence.records[0].runKey).toBe("older");
-    expect(second.evidence.coverage.nextOffset).toBeNull();
-    await rm(output);
-    expect((await collect()).evidence.records[0].ref).toBe(ref);
+    expect((await collect()).evidence.records[1].ref).toBe(ref);
+  });
+
+  it("reads every report and oversized fragment exactly once without original storage", async () => {
+    // Include shell-sensitive paths and JSON escaping as well as multibyte characters.
+    output = join(root, "evidence ' quoted.json");
+    const entries = Array.from({ length: 25 }, (_, i) =>
+      retrospective(
+        `run-${i}`,
+        `${i}: ${'🧭"\\\n'.repeat(i === 0 ? 5000 : 150)}`,
+        i % 2 ? "supi-review" : "supi-agent",
+        1000 - i,
+      ),
+    );
+    await session("a.jsonl", workspace, entries);
+    const { preview, evidence } = await collect();
+    const originalSnapshot = await readFile(output, "utf8");
+    await rm(sessions, { recursive: true });
+    const texts = new Map<string, string>();
+    let page = preview;
+    let pages = 0;
+    while (true) {
+      expect(Buffer.byteLength(JSON.stringify(page)) + 1).toBeLessThanOrEqual(16_000);
+      expect(page.coverage.complete).toBe(true);
+      expect(page.summary).toEqual(preview.summary);
+      for (const record of page.records) {
+        const previous = texts.get(record.ref) ?? "";
+        if (record.textRange) expect(record.textRange.start).toBe(previous.length);
+        else expect(texts.has(record.ref)).toBe(false);
+        texts.set(record.ref, previous + record.text);
+      }
+      pages++;
+      expect(pages).toBeLessThan(30);
+      if (page.display.complete) break;
+      expect(page.display.remainingReports).toBeGreaterThan(0);
+      const result = await execute("/bin/sh", ["-c", page.nextCommand], {
+        env: { ...process.env, PI_CODING_AGENT_SESSION_DIR: "/does-not-exist" },
+      });
+      page = JSON.parse(result.stdout);
+    }
+    expect(pages).toBeGreaterThan(2);
+    expect(page.nextCommand).toBeNull();
+    expect(texts.size).toBe(25);
+    for (const record of evidence.records) expect(texts.get(record.ref)).toBe(record.text);
+    expect(await readFile(output, "utf8")).toBe(originalSnapshot);
+  });
+
+  it("selects refs from a snapshot and rejects unknown refs, invalid cursors, and mixed modes", async () => {
+    await session("a.jsonl", workspace, [
+      retrospective("one", "First."),
+      retrospective("two", "Second."),
+    ]);
+    const { evidence } = await collect();
+    const read = (...args: string[]) =>
+      execute(process.execPath, [script.pathname, "--read", output, ...args]);
+    const result = JSON.parse((await read("--refs", evidence.records[1].ref)).stdout);
+    expect(result.records).toHaveLength(1);
+    expect(result.records[0].text).toBe(evidence.records[1].text);
+    expect(result.display).toMatchObject({ complete: true, selectedReports: 1 });
+    expect(result.summary.reports).toBe(2);
+    await expect(read("--refs", "R-0000000000000000")).rejects.toMatchObject({ code: 1 });
+    await expect(read("--offset", "3")).rejects.toMatchObject({ code: 1 });
+    await expect(read("--text-offset", "999")).rejects.toMatchObject({ code: 1 });
+    await expect(read("--workspace", workspace)).rejects.toMatchObject({ code: 1 });
+    await expect(read("--output", output)).rejects.toMatchObject({ code: 1 });
+    await expect(read("--max-sessions", "5")).rejects.toMatchObject({ code: 1 });
+    await writeFile(output, JSON.stringify({ version: 0, records: [] }));
+    await expect(read()).rejects.toMatchObject({ code: 1 });
+  });
+
+  it("summarizes an empty snapshot without a continuation or invented dates", async () => {
+    const { preview } = await collect();
+    expect(preview.summary).toEqual({
+      reports: 0,
+      containingSessions: 0,
+      bySource: { "supi-agent": 0, "supi-review": 0 },
+      byStatus: { completed: 0, failed: 0 },
+      earliest: null,
+      latest: null,
+    });
+    expect(preview.display).toMatchObject({ complete: true, remainingReports: 0 });
+    expect(preview.nextCommand).toBeNull();
   });
 
   it("supports explicit cross-workspace access and source/date filters", async () => {
@@ -198,6 +300,7 @@ describe("retrospective collector CLI", () => {
     expect(evidence.records[0].text).toBe("Legacy evidence.");
     expect(evidence.records[1]).toMatchObject({ status: "failed" });
     expect(evidence.records[1].text).toBeUndefined();
+    expect(evidence.summary.byStatus).toEqual({ completed: 1, failed: 1 });
   });
 
   it("reports incomplete coverage for malformed events and session scan limits", async () => {

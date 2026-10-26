@@ -4,23 +4,30 @@ import { createReadStream } from "node:fs";
 import { readdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { displayPage, readEvidence, summarize } from "./snapshot.mjs";
 
 const help = `Collect stored Agent Run retrospectives without modifying sessions.
-Usage: node collect.mjs --output <new-file.json> [options]
+Usage: node collect.mjs --output <new-file.json> [collection options]
+       node collect.mjs --read <evidence.json> [display options]
   --workspace <path>     Include sessions in this directory tree (default: cwd)
   --all-workspaces       Explicitly include other projects; replaces --workspace
   --sessions-dir <path>  Override PI storage discovery
   --source <name>        supi-agent or supi-review (default: both, not a topic filter)
   --since <date|Nd>      Inclusive ISO date/time or number of days ago
-  --limit <1..100>       Reports in this page (default: 20)
-  --offset <number>      Page offset (default: 0; rescan against a stable corpus)
   --max-sessions <n>     Bound session scans (default: 5000)
-  --output <path>        Save full page and coverage; existing files are preserved
+  --output <path>        Save all matching reports; existing files are preserved
+  --read <path>          Read a saved snapshot without accessing session storage
+  --refs <ref,ref>       Select report references from --read (default: all)
+  --limit <1..100>       Maximum reports displayed per response (default: 20)
+  --offset <number>      Report offset within the selection (default: 0)
+  --text-offset <number> UTF-16 offset within an oversized report (--read only)
   --help                Show this help
 Only persisted supi-debug-event / agent-run-retrospective entries are collected.
-Interactive reports and quoted tool results are excluded. Stdout contains complete
-assessments within 16 KB; omittedRefs identifies text available only in the file.
+Interactive reports and quoted tool results are excluded. Stdout is bounded to
+16 KB. Follow nextCommand until display.complete; oversized text is continued
+with explicit textRange offsets. coverage.complete describes the scan, not display.
 Storage precedence: flag, PI_CODING_AGENT_SESSION_DIR, project/global sessionDir,
 then <PI_CODING_AGENT_DIR or ~/.pi/agent>/sessions. Relative paths use cwd.
 `;
@@ -87,6 +94,23 @@ function sinceTimestamp(value) {
   return parsed;
 }
 
+function readOptions(values, display) {
+  const collectionFlags = [
+    "workspace",
+    "all-workspaces",
+    "sessions-dir",
+    "source",
+    "since",
+    "max-sessions",
+    "output",
+  ];
+  if (collectionFlags.some((key) => values[key] !== undefined))
+    throw new Error("--read cannot be combined with collection options.");
+  if (display.refs?.some((ref) => !/^R-[a-f0-9]{16}$/.test(ref)))
+    throw new Error("--refs must contain comma-separated report references.");
+  return { read: localPath(values.read), display };
+}
+
 async function options() {
   const { values } = parseArgs({
     options: {
@@ -97,12 +121,24 @@ async function options() {
       since: { type: "string" },
       limit: { type: "string", default: "20" },
       offset: { type: "string", default: "0" },
-      "max-sessions": { type: "string", default: "5000" },
+      "max-sessions": { type: "string" },
       output: { type: "string" },
+      read: { type: "string" },
+      refs: { type: "string" },
+      "text-offset": { type: "string" },
       help: { type: "boolean" },
     },
   });
   if (values.help) return null;
+  const display = {
+    limit: integer(values.limit, "--limit", 1, 100),
+    offset: integer(values.offset, "--offset", 0, Number.MAX_SAFE_INTEGER),
+    textOffset: integer(values["text-offset"] ?? "0", "--text-offset", 0, Number.MAX_SAFE_INTEGER),
+    refs: values.refs?.split(",") ?? null,
+  };
+  if (values.read) return readOptions(values, display);
+  if (values.refs !== undefined || values["text-offset"] !== undefined)
+    throw new Error("--refs and --text-offset require --read.");
   if (!values.output) throw new Error("--output must name a new JSON evidence file.");
   if (values.workspace && values["all-workspaces"])
     throw new Error("Choose --workspace or --all-workspaces, not both.");
@@ -118,10 +154,9 @@ async function options() {
     sessionsDir: await sessionDirectory(values["sessions-dir"]),
     source: values.source ?? null,
     since: sinceTimestamp(values.since),
-    limit: integer(values.limit, "--limit", 1, 100),
-    offset: integer(values.offset, "--offset", 0, Number.MAX_SAFE_INTEGER),
-    maxSessions: integer(values["max-sessions"], "--max-sessions", 1, 100000),
+    maxSessions: integer(values["max-sessions"] ?? "5000", "--max-sessions", 1, 100000),
     output: localPath(values.output),
+    display,
   };
 }
 
@@ -318,10 +353,10 @@ async function collect(config) {
   const sorted = [...reports.values()].sort(
     (a, b) => b.timestamp - a.timestamp || a.ref.localeCompare(b.ref),
   );
-  const records = sorted.slice(config.offset, config.offset + config.limit);
-  const next = config.offset + records.length;
+  const { display: _display, output: _output, ...filters } = config;
   return {
-    filters: config,
+    version: 1,
+    filters,
     coverage: {
       ...coverage,
       complete:
@@ -330,8 +365,6 @@ async function collect(config) {
         coverage.readFailures === 0 &&
         coverage.malformedEntries === 0,
       uniqueReports: sorted.length,
-      returnedReports: records.length,
-      nextOffset: next < sorted.length ? next : null,
     },
     limitations: [
       "Structured persisted retrospectives only; interactive reports are excluded.",
@@ -339,58 +372,26 @@ async function collect(config) {
       "Successful-task selection and optional logging prevent population failure-rate estimates.",
       "Source identifies the producer, not the topic; suggestions are not verified improvements.",
     ],
-    records,
+    records: sorted,
   };
-}
-
-/** Display whole assessments once; preserve oversized text only in the evidence artifact. */
-function displayPage({ filters, coverage, records }) {
-  const { failures: _failures, ...counts } = coverage;
-  let display = {
-    evidenceFile: filters.output,
-    sessionsDir: filters.sessionsDir,
-    scope: {
-      workspace: filters.workspace,
-      source: filters.source,
-      since: filters.since === null ? null : new Date(filters.since).toISOString(),
-    },
-    coverage: counts,
-    records: [],
-    omittedRefs: records.map((record) => record.ref),
-  };
-  const fits = (value) => Buffer.byteLength(JSON.stringify(value)) + 1 <= 16_000;
-  if (!fits(display))
-    throw new Error("Display metadata exceeds 16 KB; full evidence was saved to --output.");
-  for (const record of records) {
-    const item = {
-      ref: record.ref,
-      source: record.source,
-      date: new Date(record.timestamp).toISOString(),
-      status: record.status,
-      file: relative(filters.sessionsDir, record.sessionFile),
-      line: record.line,
-      text: record.text,
-    };
-    const candidate = {
-      ...display,
-      records: [...display.records, item],
-      omittedRefs: display.omittedRefs.filter((ref) => ref !== record.ref),
-    };
-    if (fits(candidate)) display = candidate;
-  }
-  return display;
 }
 
 try {
   const config = await options();
   if (!config) process.stdout.write(help);
   else {
-    const evidence = await collect(config);
-    await writeFile(config.output, `${JSON.stringify(evidence, null, 2)}\n`, {
-      flag: "wx",
-      mode: 0o600,
-    });
-    process.stdout.write(`${JSON.stringify(displayPage(evidence))}\n`);
+    const evidence = config.read ? await readEvidence(config.read) : await collect(config);
+    const evidenceFile = config.read ?? config.output;
+    if (!config.read) {
+      evidence.summary = summarize(evidence.records);
+      await writeFile(evidenceFile, `${JSON.stringify(evidence, null, 2)}\n`, {
+        flag: "wx",
+        mode: 0o600,
+      });
+    }
+    process.stdout.write(
+      `${JSON.stringify(displayPage(evidence, evidenceFile, config.display, fileURLToPath(import.meta.url)))}\n`,
+    );
   }
 } catch (error) {
   process.stderr.write(`Retrospective collection failed: ${error.message}\n`);

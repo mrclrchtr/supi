@@ -30,6 +30,21 @@
         "Finishes after collection without rereading empty evidence or requesting routine --help.",
         "Keeps the empty-result report within 120 words while preserving coverage and selection limits."
       ]
+    },
+    {
+      "id": 3,
+      "prompt": "Gather all retrospective feedback about supi-agent from the supplied session directory, scoped to /example/widget and all dates. Reports may exceed a page or the output budget. Read every assessment completely, including oversized text, and summarize useful themes with exact counts and original source references. Keep session inputs unchanged and put temporary evidence in the supplied output directory.",
+      "expected_output": "Reads all 25 deduplicated reports, including both ends of the oversized assessment and the final report. Reports 13 supi-agent and 12 supi-review assessments, with one clone excluded. Uses one collection scan and supported snapshot continuations instead of handwritten JSON extraction or repeated session scans.",
+      "files": ["evals/files/overflow-sessions"],
+      "expectations": [
+        "Reports 25 unique assessments (13 supi-agent, 12 supi-review) and one excluded clone.",
+        "Reads every report, including OVERSIZED_BEGIN, OVERSIZED_END, and FINAL_REPORT, with full oversized text rather than just marker searches.",
+        "Uses exactly one session collection scan; all follow-up reads use the frozen evidence snapshot.",
+        "Uses supported collector commands rather than handwritten JSON extraction to retrieve undisplayed assessments.",
+        "Distinguishes complete scan coverage from display completion and finishes reading before making exhaustive claims.",
+        "Provides original source locations, labels proposals as untested, and preserves all session inputs.",
+        "Keeps the user-facing summary within 200 words and links one complete evidence snapshot."
+      ]
     }
   ]
 }
