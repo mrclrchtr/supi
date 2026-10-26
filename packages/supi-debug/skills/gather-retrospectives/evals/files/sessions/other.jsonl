@@ -1,0 +1,2 @@
+{"type":"session","version":3,"id":"other","cwd":"/example/unrelated"}
+{"type":"custom","id":"entry-other","customType":"supi-debug-event","data":{"id":1,"timestamp":1793008800000,"source":"supi-agent","level":"info","category":"agent-run-retrospective","message":"Agent Run retrospective","rawData":{"credential":"RAW_ONLY_FIXTURE_MARKER"},"data":{"runKey":"other","status":"completed","text":"OUT_OF_SCOPE_FIXTURE_MARKER: unrelated project feedback.","taskId":"other","label":"other"}}}

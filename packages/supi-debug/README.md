@@ -32,7 +32,19 @@ After install, this package wires the shared debug registry into three user-faci
 - `debug` — let the model query recent debug events during troubleshooting
 - `/supi-settings` integration — configure whether events are captured and how much data is exposed
 
-It also registers a **Debug** provider section for `/supi-context`, and ships a `/supi-tooling-retro` prompt template for post-task retrospective feedback on the SuPi tooling used in the completed task.
+It also registers a **Debug** provider section for `/supi-context`, ships a `/supi-tooling-retro` prompt template for feedback on the task just completed, and discovers the **`gather-retrospectives` skill** for collecting feedback from past sessions.
+
+### Gather past retrospectives
+
+Ask naturally, for example “gather retrospective feedback about `packages/supi-agent`,” or invoke:
+
+```text
+/skill:gather-retrospectives collect feedback from delegated runs in this workspace
+```
+
+The skill uses a bundled Node.js collector to read existing structured Agent Run assessments. It defaults to the current workspace directory tree and all dates, preserves source references, deduplicates cloned runs, and saves paginated evidence in temporary files. Other projects and sibling worktrees require explicit scope. Source filters identify who produced an assessment, not which package it concerns. The collector displays complete assessments within a 16 KB stdout budget; `omittedRefs` identifies assessments that need a targeted read from the full evidence file.
+
+The collector excludes older interactive `/supi-tooling-retro` reports. It does not enable capture, execute new assessments, or verify historical claims. Stored prose may still contain sensitive task details. Run the bundled `skills/gather-retrospectives/scripts/collect.mjs` with `--help` for storage overrides and filters. Node and shell access are required; no extra runtime dependencies are needed.
 
 ## Event behavior
 

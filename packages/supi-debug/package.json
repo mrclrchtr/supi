@@ -29,6 +29,8 @@
   "files": [
     "src/**/*.ts",
     "prompts",
+    "skills/**/SKILL.md",
+    "skills/**/scripts/*.mjs",
     "README.md"
   ],
   "dependencies": {

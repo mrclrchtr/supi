@@ -104,9 +104,8 @@ export default function debugExtension(pi: ExtensionAPI) {
 
   pi.on("resources_discover", async (_event, ctx) => {
     maybeLogLoadStatus(pi, ctx.cwd, "resources_discover");
-    // Self-register the package prompt template so standalone installs and
-    // workspace-root loads expose the same `/supi-tooling-retro` surface.
-    return { promptPaths: [join(baseDir, "prompts")] };
+    // Standalone installs and workspace-root loads expose the same resources.
+    return { promptPaths: [join(baseDir, "prompts")], skillPaths: [join(baseDir, "skills")] };
   });
 
   pi.on("session_shutdown", () => {

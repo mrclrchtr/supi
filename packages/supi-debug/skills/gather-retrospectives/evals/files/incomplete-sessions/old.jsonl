@@ -1,0 +1,2 @@
+{"type":"session","version":3,"id":"old","cwd":"/example/widget"}
+{"type":"custom","id":"entry-old","customType":"supi-debug-event","data":{"id":1,"timestamp":1792836000000,"source":"supi-agent","level":"info","category":"agent-run-retrospective","message":"Agent Run retrospective","rawData":{"credential":"RAW_ONLY_FIXTURE_MARKER"},"data":{"runKey":"old","status":"completed","text":"Observed: no notable friction in this probe.","taskId":"old","label":"old"}}}

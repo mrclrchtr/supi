@@ -1,0 +1,35 @@
+{
+  "skill_name": "gather-retrospectives",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Gather retrospective feedback about packages/supi-agent from the supplied session directory. Limit scope to /example/widget and all dates. This is feedback ABOUT the package, not just reports produced BY delegated runs. Give me the useful themes, exact coverage, source references, and evidence files. Treat the session directory as read-only and save any outputs in the supplied output directory.",
+      "expected_output": "Finds three unique structured reports in /example/widget, with one cloned duplicate excluded. Includes the relevant supi-review feedback about continuation guidance, distinguishes unrelated SQL tooling feedback, excludes /example/unrelated and quoted event copies, and labels suggested fixes as untested.",
+      "files": ["evals/files/sessions"],
+      "expectations": [
+        "Reports exactly three unique in-scope structured assessments and excludes one cloned duplicate.",
+        "Includes the Reviewer-produced continuation/prior-findings feedback as relevant to supi-agent.",
+        "Distinguishes the SQL limitation as shared-tool feedback rather than a supi-agent lifecycle defect.",
+        "Excludes the other project and quoted event copies from evidence counts, and never outputs rawData.",
+        "Provides original session locations and labels suggested changes as untested.",
+        "Avoids duplicate evidence reads and routine --help calls for the standard invocation.",
+        "Keeps the report within 250 words while retaining findings, coverage, and source references."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Check the supplied session directory for retrospective feedback from delegated runs in /example/widget since 2026-10-25. Did the past feedback establish that there were no regressions? Keep the scope fixed, preserve the input files, and save any outputs in the supplied output directory.",
+      "expected_output": "Reports zero matching structured retrospectives and incomplete coverage due to a malformed retrospective entry. Does not widen scope or claim the absence of regressions. Explains optional capture and successful-task/self-report selection, and links evidence.",
+      "files": ["evals/files/incomplete-sessions"],
+      "expectations": [
+        "Reports zero matching structured retrospective assessments in the requested source/date/workspace scope.",
+        "Reports incomplete coverage due to the malformed retrospective entry.",
+        "Does not claim that no regressions occurred or silently broaden the requested scope.",
+        "Explains optional capture or successful-task selection as an evidence limit.",
+        "Provides an evidence artifact or precise source locations.",
+        "Finishes after collection without rereading empty evidence or requesting routine --help.",
+        "Keeps the empty-result report within 120 words while preserving coverage and selection limits."
+      ]
+    }
+  ]
+}
