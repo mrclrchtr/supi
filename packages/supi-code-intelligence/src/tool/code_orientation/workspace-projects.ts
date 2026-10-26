@@ -1,10 +1,14 @@
 import * as path from "node:path";
-import type { ProjectDeclaration, ProjectRelationship } from "../../analysis/workspace/types.ts";
+import type {
+  ProjectDeclaration,
+  ProjectMembership,
+  ProjectRelationship,
+} from "../../analysis/workspace/types.ts";
 import {
   type WorkspaceOrientationFacts,
   within,
 } from "../../session/orientation/workspace-context.ts";
-import type { OrientationSectionData } from "../../session/orientation-types.ts";
+import type { OrientationItem, OrientationSectionData } from "../../session/orientation-types.ts";
 import { code, plain, sourcePath, tableSection } from "./workspace-format.ts";
 
 /** Project identities and native declarations, without inferred roles or source roots. */
@@ -20,54 +24,14 @@ export function projectSections(
   const nested = projects.filter(
     (project) => path.resolve(observation.root, project.directory) !== (focus ?? observation.root),
   );
-  const header = [
-    "Kind",
-    "Name",
-    "Path",
-    "Identity source",
-    ...(descriptions ? ["Declared description"] : []),
-  ];
-  const result = [
-    tableSection("workspace.projects", "Project declarations", {
-      headers: header,
-      rows: nested.map((project) => [
-        project.kind,
-        code(project.name ?? "Unnamed declaration"),
-        code(sourcePath(facts, project.directory)),
-        code(
-          `${sourcePath(facts, project.manifestPath)}${project.nameField ? `#${project.nameField}` : ""}`,
-        ),
-        ...(descriptions
-          ? [
-              project.description
-                ? `${plain(project.description)} (${code(`${sourcePath(facts, project.manifestPath)}#${project.descriptionField}`)})`
-                : "—",
-            ]
-          : []),
-      ]),
+  const result = [projectDeclarations(nested, facts, { limit, descriptions })];
+  if (!facts.overview) {
+    const memberships = membershipSection(projects, facts, {
       limit,
-      detail: "parsed project metadata",
-      source: "manifest",
-    }),
-  ];
-  const memberships = projects.flatMap((project) =>
-    project.memberships.map((membership) => [
-      code(sourcePath(facts, project.directory)),
-      membership.kind,
-      code(`${sourcePath(facts, membership.manifestPath)}#${membership.field}`),
-      code(membership.value),
-    ]),
-  );
-  if (memberships.length > 0 && !facts.overview)
-    result.push(
-      tableSection("workspace.memberships", "Declared memberships", {
-        headers: ["Project", "Kind", "Source", "Value"],
-        rows: memberships,
-        limit,
-        detail: "workspace configuration",
-        source: "manifest",
-      }),
-    );
+      listedProjects: nested.slice(0, limit),
+    });
+    if (memberships) result.push(memberships);
+  }
   if (!focus) return result;
   for (const project of projects.filter(
     (project) => path.resolve(observation.root, project.directory) === focus,
@@ -96,6 +60,159 @@ export function projectSections(
     });
   }
   return result;
+}
+
+/** Bound declarations before grouping so shared provenance cannot multiply the list cap. */
+function projectDeclarations(
+  projects: readonly ProjectDeclaration[],
+  facts: WorkspaceOrientationFacts,
+  options: { limit: number; descriptions: boolean },
+): OrientationSectionData {
+  const selected = projects.slice(0, options.limit);
+  const groups = new Map<
+    string,
+    { kind: ProjectDeclaration["kind"]; source: string; projects: ProjectDeclaration[] }
+  >();
+  for (const project of selected) {
+    const manifest = path.posix.relative(project.directory, project.manifestPath);
+    const source = `${manifest}${project.nameField ? `#${project.nameField}` : ""}`;
+    const key = JSON.stringify([project.kind, source]);
+    let group = groups.get(key);
+    if (!group) {
+      group = { kind: project.kind, source, projects: [] };
+      groups.set(key, group);
+    }
+    group.projects.push(project);
+  }
+  const items: OrientationItem[] = [];
+  for (const group of groups.values()) {
+    if (items.length > 0) items.push({ kind: "blank" });
+    items.push(
+      {
+        kind: "paragraph",
+        text: `${group.kind}; identity source: ${code(group.source)} relative to each listed project path.`,
+      },
+      {
+        kind: "table",
+        headers: ["Name", "Path", ...(options.descriptions ? ["Declared description"] : [])],
+        rows: group.projects.map((project) => [
+          code(project.name ?? "Unnamed declaration"),
+          code(sourcePath(facts, project.directory)),
+          ...(options.descriptions
+            ? [
+                project.description
+                  ? `${plain(project.description)} (${code(`${sourcePath(facts, project.manifestPath)}#${project.descriptionField}`)})`
+                  : "—",
+              ]
+            : []),
+        ]),
+      },
+    );
+  }
+  return projectListSection("workspace.projects", "Project declarations", {
+    totalCount: projects.length,
+    shownCount: selected.length,
+    items,
+    detail: "parsed project metadata",
+  });
+}
+
+/** Group only identical native declarations, retaining counts of individual memberships. */
+function membershipSection(
+  projects: readonly ProjectDeclaration[],
+  facts: WorkspaceOrientationFacts,
+  options: { limit: number; listedProjects: readonly ProjectDeclaration[] },
+): OrientationSectionData | null {
+  const memberships = projects.flatMap((project) =>
+    project.memberships.map((membership) => ({ project, membership })),
+  );
+  if (memberships.length === 0) return null;
+  const selected = memberships.slice(0, options.limit);
+  const groups = new Map<
+    string,
+    { membership: ProjectMembership; projects: ProjectDeclaration[] }
+  >();
+  for (const { project, membership } of selected) {
+    const key = JSON.stringify([
+      membership.kind,
+      membership.manifestPath,
+      membership.field,
+      membership.value,
+    ]);
+    let group = groups.get(key);
+    if (!group) {
+      group = { membership, projects: [] };
+      groups.set(key, group);
+    }
+    group.projects.push(project);
+  }
+  const items: OrientationItem[] = [];
+  for (const { membership, projects: members } of groups.values()) {
+    const source = `${sourcePath(facts, membership.manifestPath)}#${membership.field}`;
+    const reference = listedProjectReference(members, options.listedProjects);
+    const paths =
+      reference ?? members.map((project) => code(sourcePath(facts, project.directory))).join(", ");
+    items.push({
+      kind: "paragraph",
+      text: `${membership.kind}; source: ${code(source)}; value: ${code(membership.value)}. Projects: ${paths}.`,
+    });
+  }
+  return projectListSection("workspace.memberships", "Declared memberships", {
+    totalCount: memberships.length,
+    shownCount: selected.length,
+    items,
+    detail: "workspace configuration",
+  });
+}
+
+/** A shared label is safe only when the selected members exactly match the named visible set. */
+function listedProjectReference(
+  members: readonly ProjectDeclaration[],
+  listed: readonly ProjectDeclaration[],
+): string | null {
+  const kind = members[0]?.kind;
+  const candidates = listed.filter((project) => project.kind === kind);
+  const ids = new Set(members.map((project) => project.id));
+  return candidates.length === members.length && candidates.every((project) => ids.has(project.id))
+    ? `all ${members.length} listed ${kind} declarations`
+    : null;
+}
+
+function projectListSection(
+  key: string,
+  title: string,
+  options: {
+    totalCount: number;
+    shownCount: number;
+    items: OrientationItem[];
+    detail: string;
+  },
+): OrientationSectionData {
+  return {
+    key,
+    title,
+    status: "complete",
+    reason: null,
+    confidence: "unavailable",
+    provenance: [{ source: "manifest", detail: options.detail }],
+    evidenceLists: [
+      {
+        key,
+        totalCount: options.totalCount,
+        shownCount: options.shownCount,
+        omittedCount: options.totalCount - options.shownCount,
+        partialReason: null,
+      },
+    ],
+    items: options.items.length
+      ? options.items
+      : [
+          {
+            kind: "paragraph",
+            text: options.totalCount > 0 ? "No entries shown." : "No collected entries.",
+          },
+        ],
+  };
 }
 
 function declaredPaths(

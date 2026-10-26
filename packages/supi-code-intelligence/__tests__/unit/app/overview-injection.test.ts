@@ -281,7 +281,7 @@ describe("overview injection", () => {
     const notify = vi.fn();
     const handler = getOverviewHandler();
     const sessionStartHandler = pi.getHandlers("session_start")[0];
-    const root = makeWorkspace(60);
+    const root = makeWorkspace(100);
     writeProjectConfig(root, { overviewEnabled: true });
     const ctx = { ...makeCtx(root), hasUI: true, ui: { notify } };
     await sessionStartHandler?.({ reason: "startup" }, ctx);
@@ -304,7 +304,7 @@ describe("overview injection", () => {
     configureDebugRegistry({ enabled: true, maxEvents: 100 });
     const handler = getOverviewHandler();
     const sessionStartHandler = pi.getHandlers("session_start")[0];
-    const root = makeWorkspace(60);
+    const root = makeWorkspace(100);
     writeProjectConfig(root, { overviewEnabled: true });
     // makeCtx carries no hasUI/ui, matching headless child sessions.
     const ctx = makeCtx(root);

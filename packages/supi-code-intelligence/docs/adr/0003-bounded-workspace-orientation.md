@@ -19,6 +19,7 @@ Supersedes the content, rendering, and warning decisions in [Workspace Overview]
 | Overview budget | Warn above 1,000 estimated tokens; cap navigation at 2,000. |
 | Orientation budget | Warn above 2,000 estimated tokens; cap workspace/directory navigation at 4,000. |
 | Estimate | Use `ceil(characters / 4)`. Select deterministically. Keep names and paths before descriptions. Per-list limits cannot bypass the total cap. |
+| Compact provenance | Group declarations by observed kind and exact project-relative identity source. Group memberships only when kind, manifest, field, and value match. Apply list limits before grouping and retain counts of declarations and individual memberships. Refer to a listed project set only when its identities exactly match the selected members; otherwise name member paths explicitly. |
 | Warning channel | Send soft warnings to UI and debug, not model-facing text. |
 | Omitted evidence | Give the agent a path to the complete captured result. Preserve raw collected facts as well as the complete navigation rendering. Reading the file does not scan again. |
 | Instructions | Keep applicable trusted instruction files inline once per context, with branch-aware deduplication and re-delivery after compaction. Their budget is separate from navigation. |
