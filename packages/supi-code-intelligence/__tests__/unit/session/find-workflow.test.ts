@@ -286,7 +286,7 @@ describe("runFindWorkflow", () => {
               excludedDirectories: ["node_modules"],
               configuredExclusions: [],
               hiddenEntries: "excluded",
-              ignoreFiles: false,
+              ignoreFiles: true,
               symlinks: "explicit-roots-only",
               maxFiles: 1,
               timeoutMs: 10_000,

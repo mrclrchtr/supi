@@ -259,6 +259,62 @@ describe("code_find tool", () => {
       expect(result.details?.data.confidence).toBe("structural");
     });
 
+    it.each(["foo", "missing"])(
+      "reports gitignore exclusions independently of matches for %s",
+      async (query) => {
+        writeFileSync(path.join(tmpDir, ".gitignore"), "generated.ts\n");
+        writeFileSync(path.join(tmpDir, "generated.ts"), "export const foo = true;\n");
+        writeFileSync(path.join(tmpDir, "visible.ts"), "export const foo = true;\n");
+        registerMockProvider(tmpDir, {
+          outline: async () => ({
+            kind: "success" as const,
+            data: [
+              {
+                name: "foo",
+                kind: "variable",
+                startLine: 1,
+                startCharacter: 14,
+                endLine: 1,
+                endCharacter: 17,
+                children: [],
+              },
+            ],
+          }),
+        });
+        const tool = getCodeFindTool();
+
+        const result = (await tool.execute(
+          `test-ast-gitignore-${query}`,
+          { query, mode: "ast", kind: "definition" },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        )) as TextToolResult;
+
+        const scan = {
+          policy: { ignoreFiles: true },
+          eligibleFileCount: 1,
+          analyzedFileCount: 1,
+          complete: true,
+          limitations: [],
+          exclusions: expect.arrayContaining([
+            { reason: "gitignore", pathCount: 1, examples: ["generated.ts"] },
+          ]),
+        };
+        expect(result).toMatchObject({
+          structuredContent: {
+            matches:
+              query === "foo" ? [expect.objectContaining({ name: "foo", file: "visible.ts" })] : [],
+            partialReason: null,
+            scan,
+          },
+          details: { data: { scan } },
+        });
+        expect(result.content[0].text).toContain("excluded 1 path by `.gitignore`");
+        expect(result.content[0].text).toContain("Explicit scopes remain available");
+      },
+    );
+
     it("finds exports when structural support is available", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), 'export const foo = "hello";\n');
       registerMockProvider(tmpDir, {

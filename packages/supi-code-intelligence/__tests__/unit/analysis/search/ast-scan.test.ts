@@ -4,6 +4,7 @@ import {
   mkdtempSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import * as os from "node:os";
@@ -32,7 +33,7 @@ function write(relativePath: string, content = "export const target = true;\n"):
 describe("enumerateAstFiles", () => {
   it("enumerates supported visible files within the declared default universe", async () => {
     const source = write("src/source.ts");
-    const gitIgnoredSource = write("src/generated.ts");
+    write("src/generated.ts");
     writeFileSync(path.join(tmpDir, ".gitignore"), "src/generated.ts\n");
     write("src/readme.md", "target\n");
     const python = write("src/python.py", "target()\n");
@@ -52,15 +53,18 @@ describe("enumerateAstFiles", () => {
     expect(result.kind).toBe("completed");
     if (result.kind !== "completed") return;
     expect(result.files).toEqual(
-      [
-        realpathSync(gitIgnoredSource),
-        realpathSync(python),
-        realpathSync(source),
-        realpathSync(sql),
-      ].sort((a, b) => a.localeCompare(b)),
+      [realpathSync(python), realpathSync(source), realpathSync(sql)].sort((a, b) =>
+        a.localeCompare(b),
+      ),
     );
-    expect(result.eligibleFileCount).toBe(4);
+    expect(result.eligibleFileCount).toBe(3);
     expect(result.complete).toBe(true);
+    expect(result.policy.ignoreFiles).toBe(true);
+    expect(result.exclusions).toContainEqual({
+      reason: "gitignore",
+      pathCount: 1,
+      examples: ["src/generated.ts"],
+    });
     expect(result.exclusions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ reason: "hidden-entry" }),
@@ -69,6 +73,153 @@ describe("enumerateAstFiles", () => {
       ]),
     );
   });
+
+  it.each([".", "src"])("applies root and nested rules with negation within %s", async (scope) => {
+    write(".gitignore", "*.generated.ts\n!src/kept.generated.ts\nblocked/\n");
+    write("src/.gitignore", "local.ts\n!nested.generated.ts\n");
+    write("src/root.generated.ts");
+    write("src/local.ts");
+    write("src/blocked/hidden.ts");
+    write("src/blocked/.gitignore", "!hidden.ts\n");
+    const kept = write("src/kept.generated.ts");
+    const nested = write("src/nested.generated.ts");
+    const visible = write("src/visible.ts");
+
+    const result = await enumerateAstFiles({
+      cwd: tmpDir,
+      roots: [path.join(tmpDir, scope)],
+      operation: "outline",
+      deadline: Number.POSITIVE_INFINITY,
+      maxFiles: 5_000,
+    });
+
+    expect(result).toMatchObject({
+      kind: "completed",
+      files: [kept, nested, visible].map((file) => realpathSync(file)),
+      eligibleFileCount: 3,
+      complete: true,
+      limitations: [],
+      exclusions: expect.arrayContaining([
+        {
+          reason: "gitignore",
+          pathCount: 3,
+          examples: ["src/blocked", "src/local.ts", "src/root.generated.ts"],
+        },
+      ]),
+    });
+  });
+
+  it.each([false, true])(
+    "honors explicit ignored roots with broad scope first: %s",
+    async (broadFirst) => {
+      write(".gitignore", "generated/\n*.generated.ts\n");
+      write("generated/.gitignore", "skip.ts\n");
+      write("generated/skip.ts");
+      const ignoredDirectorySource = write("generated/source.ts");
+      const ignoredFile = write("src/file.generated.ts");
+      const visible = write("src/source.ts");
+      const explicitRoots = [path.join(tmpDir, "generated"), ignoredFile];
+
+      const result = await enumerateAstFiles({
+        cwd: tmpDir,
+        roots: broadFirst ? [tmpDir, ...explicitRoots] : [...explicitRoots, tmpDir],
+        operation: "outline",
+        deadline: Number.POSITIVE_INFINITY,
+        maxFiles: 5_000,
+      });
+
+      expect(result).toMatchObject({
+        kind: "completed",
+        files: [ignoredDirectorySource, ignoredFile, visible].map((file) => realpathSync(file)),
+        eligibleFileCount: 3,
+        complete: true,
+        limitations: [],
+        exclusions: expect.arrayContaining([
+          expect.objectContaining({
+            reason: "gitignore",
+            examples: expect.arrayContaining(["generated/skip.ts"]),
+          }),
+        ]),
+      });
+    },
+  );
+
+  it.each([
+    { scope: ".", directory: "src" },
+    { scope: "src", directory: "src" },
+    { scope: ".", directory: "src[1]" },
+  ])(
+    "reincludes directory contents through nested negation within $scope ($directory)",
+    async ({ scope, directory }) => {
+      write(".gitignore", "blocked/\n*.generated.ts\n");
+      write(`${directory}/.gitignore`, "!blocked/\n");
+      const visible = write(`${directory}/blocked/source.ts`);
+      write(`${directory}/blocked/source.generated.ts`);
+
+      const result = await enumerateAstFiles({
+        cwd: tmpDir,
+        roots: [path.join(tmpDir, scope)],
+        operation: "outline",
+        deadline: Number.POSITIVE_INFINITY,
+        maxFiles: 5_000,
+      });
+
+      expect(result).toMatchObject({
+        kind: "completed",
+        files: [realpathSync(visible)],
+        complete: true,
+      });
+    },
+  );
+
+  it.each([false, true])(
+    "honors overlapping ignored directory roots with parent first: %s",
+    async (parentFirst) => {
+      write(".gitignore", "generated/\n");
+      write("generated/.gitignore", "skip.ts\n");
+      const source = write("generated/sub/skip.ts");
+      const parent = path.join(tmpDir, "generated");
+      const child = path.join(parent, "sub");
+
+      const result = await enumerateAstFiles({
+        cwd: tmpDir,
+        roots: parentFirst ? [parent, child] : [child, parent],
+        operation: "outline",
+        deadline: Number.POSITIVE_INFINITY,
+        maxFiles: 5_000,
+      });
+
+      expect(result).toMatchObject({
+        kind: "completed",
+        files: [realpathSync(source)],
+        complete: true,
+      });
+    },
+  );
+
+  it.each(["symlink", "directory"])(
+    "does not read a discovered %s as an ignore file",
+    async (kind) => {
+      const source = write("workspace/source.ts");
+      const ignorePath = path.join(tmpDir, "workspace/.gitignore");
+      if (kind === "symlink") symlinkSync(write("outside.ignore", "*.ts\n"), ignorePath);
+      else mkdirSync(ignorePath);
+
+      const result = await enumerateAstFiles({
+        cwd: path.join(tmpDir, "workspace"),
+        roots: [path.join(tmpDir, "workspace")],
+        operation: "outline",
+        deadline: Number.POSITIVE_INFINITY,
+        maxFiles: 5_000,
+      });
+
+      expect(result).toMatchObject({
+        kind: "completed",
+        files: [realpathSync(source)],
+        complete: true,
+      });
+    },
+  );
 
   it("applies the shared configured exclusions only to broad roots", async () => {
     const excluded = write("fixtures/projects/example/source.ts");
@@ -191,6 +342,68 @@ describe("enumerateAstFiles", () => {
       eligibleFileCount: 1,
       complete: true,
       policy: { operation: "call-sites", supportedExtensions: expect.arrayContaining([".py"]) },
+    });
+  });
+
+  it("discloses unreadable ignore files instead of claiming a complete scan", async () => {
+    const source = write("source.ts");
+    write(".gitignore", "generated.ts\n");
+
+    const result = await enumerateAstFiles({
+      cwd: tmpDir,
+      roots: [tmpDir],
+      operation: "outline",
+      deadline: Number.POSITIVE_INFINITY,
+      maxFiles: 5_000,
+      operations: {
+        realpath: fs.realpath,
+        stat: fs.stat,
+        readDirectory: (directory) => fs.readdir(directory, { withFileTypes: true }),
+        readFile: async () => {
+          throw Object.assign(new Error("Cannot read ignore file"), { code: "EACCES" });
+        },
+      },
+    });
+
+    expect(result).toMatchObject({
+      kind: "completed",
+      files: [realpathSync(source)],
+      eligibleFileCount: null,
+      complete: false,
+      limitations: [{ reason: "unreadable-path", pathCount: 1, examples: [".gitignore"] }],
+    });
+  });
+
+  it("shares the enumeration deadline with ignore-file reads", async () => {
+    write("source.ts");
+    write(".gitignore", "*.ts\n");
+    let expired = false;
+
+    const result = await enumerateAstFiles({
+      cwd: tmpDir,
+      roots: [tmpDir],
+      operation: "outline",
+      deadline: 10,
+      now: () => (expired ? 10 : 0),
+      schedule: () => () => undefined,
+      maxFiles: 5_000,
+      operations: {
+        realpath: fs.realpath,
+        stat: fs.stat,
+        readDirectory: (directory) => fs.readdir(directory, { withFileTypes: true }),
+        readFile: async () => {
+          expired = true;
+          return "*.ts\n";
+        },
+      },
+    });
+
+    expect(result).toMatchObject({
+      kind: "completed",
+      files: [],
+      eligibleFileCount: null,
+      complete: false,
+      limitations: [{ reason: "timeout", pathCount: null }],
     });
   });
 

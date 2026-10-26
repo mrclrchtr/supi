@@ -7,6 +7,7 @@ import {
   getSupportedExtensions,
   type StructuralSearchOperation,
 } from "@mrclrchtr/supi-tree-sitter/api";
+import ignore from "ignore";
 import { type DeadlineOutcome, type ScheduleDeadline, settleByDeadline } from "./deadline.ts";
 import { relativeDisplayPath } from "./paths.ts";
 
@@ -37,6 +38,7 @@ export type AstScanExclusionReason =
   | "hidden-entry"
   | "excluded-directory"
   | "configured-exclusion"
+  | "gitignore"
   | "unsupported-extension"
   | "unsupported-operation"
   | "symlink"
@@ -66,7 +68,8 @@ export interface AstScanPolicy {
   /** Patterns captured from code-intelligence.exclude for this scan. */
   readonly configuredExclusions: readonly string[];
   readonly hiddenEntries: "excluded";
-  readonly ignoreFiles: false;
+  /** Root and nested regular, non-symlink .gitignore files apply below directory roots. */
+  readonly ignoreFiles: true;
   readonly symlinks: "explicit-roots-only";
   readonly maxFiles: number;
   readonly timeoutMs: number;
@@ -77,6 +80,8 @@ export interface AstScanOperations {
   readonly realpath: (filePath: string) => Promise<string>;
   readonly stat: (filePath: string) => Promise<Stats>;
   readonly readDirectory: (directory: string) => Promise<Dirent[]>;
+  readonly readFile?: (filePath: string) => Promise<string>;
+  readonly lstat?: (filePath: string) => Promise<Stats>;
 }
 
 export interface EnumerateAstFilesOptions {
@@ -124,7 +129,7 @@ export function astScanPolicy(
     excludedDirectories: [...AST_SCAN_EXCLUDED_DIRECTORIES],
     configuredExclusions: [...(automaticPathPolicy?.configuredPatterns ?? [])],
     hiddenEntries: "excluded",
-    ignoreFiles: false,
+    ignoreFiles: true,
     symlinks: "explicit-roots-only",
     maxFiles,
     timeoutMs,
@@ -136,6 +141,17 @@ const DEFAULT_OPERATIONS: AstScanOperations = {
   stat: fs.stat,
   readDirectory: (directory) => fs.readdir(directory, { withFileTypes: true }),
 };
+
+interface RepositoryIgnoreRule {
+  readonly directory: string;
+  readonly matcher: ReturnType<typeof ignore>;
+}
+
+interface DirectoryScanPolicy {
+  readonly bypassConfiguredExclusions: boolean;
+  readonly ignoreRoot: string;
+  readonly rules: readonly RepositoryIgnoreRule[];
+}
 
 interface MutableObservation<T extends string> {
   reason: T;
@@ -227,7 +243,8 @@ class AstFileEnumerator {
       const bypassConfiguredExclusions =
         this.options.automaticPathPolicy?.isConfiguredExcluded?.(canonicalRoot, "directory") ??
         false;
-      await this.#walk(canonicalRoot, bypassConfiguredExclusions);
+      const policy = await this.#rootDirectoryPolicy(canonicalRoot, bypassConfiguredExclusions);
+      await this.#walk(canonicalRoot, policy);
       return null;
     }
     return {
@@ -255,16 +272,107 @@ class AstFileEnumerator {
     };
   }
 
-  async #walk(directory: string, bypassConfiguredExclusions = false): Promise<void> {
-    if (!this.#checkControl() || this.#visitedDirectories.has(directory)) return;
-    this.#visitedDirectories.add(directory);
+  async #walk(directory: string, policy: DirectoryScanPolicy): Promise<void> {
+    // An overlapping explicit root may revisit this directory with different overrides.
+    const visitKey = JSON.stringify([
+      directory,
+      policy.ignoreRoot,
+      policy.bypassConfiguredExclusions,
+    ]);
+    if (!this.#checkControl() || this.#visitedDirectories.has(visitKey)) return;
+    this.#visitedDirectories.add(visitKey);
+    const inheritedRules = this.#allowDirectory(directory, policy.rules);
+    const rules = await this.#readIgnoreRules(directory, inheritedRules);
     const entries = await this.#readDirectory(directory);
     if (!entries) return;
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
       if (!this.#checkControl()) return;
-      await this.#processEntry(directory, entry, bypassConfiguredExclusions);
+      await this.#processEntry(directory, entry, { ...policy, rules });
     }
+  }
+
+  /** Explicit ignored roots override ancestor rules, but keep their own nested rules. */
+  async #rootDirectoryPolicy(
+    root: string,
+    bypassConfiguredExclusions: boolean,
+  ): Promise<DirectoryScanPolicy> {
+    const explicitPolicy = { bypassConfiguredExclusions, ignoreRoot: root, rules: [] };
+    const relative = path.relative(this.#displayBase, root);
+    if (!relative || relative === ".." || relative.startsWith(`..${path.sep}`))
+      return explicitPolicy;
+    let directory = this.#displayBase;
+    let rules: readonly RepositoryIgnoreRule[] = [];
+    for (const segment of relative.split(path.sep)) {
+      if (!this.#checkControl()) break;
+      rules = await this.#readIgnoreRules(directory, this.#allowDirectory(directory, rules));
+      directory = path.join(directory, segment);
+      if (this.#isRepositoryIgnored(directory, true, rules)) return explicitPolicy;
+    }
+    return { bypassConfiguredExclusions, ignoreRoot: this.#displayBase, rules };
+  }
+
+  /**
+   * Each matcher recursively tests parents. Carry the combined policy's already
+   * established directory eligibility into every ancestor matcher, so a nested
+   * directory negation also restores its contents without erasing file rules.
+   */
+  #allowDirectory(
+    directory: string,
+    rules: readonly RepositoryIgnoreRule[],
+  ): readonly RepositoryIgnoreRule[] {
+    return rules.map((rule) => {
+      const localPath = path.relative(rule.directory, directory).split(path.sep).join("/");
+      const literalPath = localPath.replace(/[\\*?[\]]/g, "\\$&");
+      return {
+        directory: rule.directory,
+        matcher: ignore({ ignorecase: false }).add(rule.matcher).add(`!/${literalPath}/`),
+      };
+    });
+  }
+
+  async #readIgnoreRules(
+    directory: string,
+    inheritedRules: readonly RepositoryIgnoreRule[],
+  ): Promise<readonly RepositoryIgnoreRule[]> {
+    const ignorePath = path.join(directory, ".gitignore");
+    try {
+      const metadata = await this.#settle(() => (this.#operations.lstat ?? fs.lstat)(ignorePath));
+      if (metadata.kind === "timeout" || !metadata.value.isFile()) return inheritedRules;
+      const outcome = await this.#settle(() =>
+        this.#operations.readFile
+          ? this.#operations.readFile(ignorePath)
+          : fs.readFile(ignorePath, "utf8"),
+      );
+      if (outcome.kind === "completed" && outcome.value.length > 0) {
+        return [
+          ...inheritedRules,
+          { directory, matcher: ignore({ ignorecase: false }).add(outcome.value) },
+        ];
+      }
+    } catch (error) {
+      this.options.signal?.throwIfAborted();
+      if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) {
+        this.#record(this.#limitations, "unreadable-path", ignorePath);
+        this.#interrupted = true;
+      }
+    }
+    return inheritedRules;
+  }
+
+  #isRepositoryIgnored(
+    candidate: string,
+    directory: boolean,
+    rules: readonly RepositoryIgnoreRule[],
+  ): boolean {
+    let ignored = false;
+    for (const rule of rules) {
+      const localPath = path.relative(rule.directory, candidate).split(path.sep).join("/");
+      const result = rule.matcher.test(directory ? `${localPath}/` : localPath);
+      if (result.ignored) ignored = true;
+      else if (result.unignored) ignored = false;
+    }
+    return ignored;
   }
 
   async #readDirectory(directory: string): Promise<Dirent[] | null> {
@@ -282,16 +390,16 @@ class AstFileEnumerator {
   async #processEntry(
     directory: string,
     entry: Dirent,
-    bypassConfiguredExclusions: boolean,
+    policy: DirectoryScanPolicy,
   ): Promise<void> {
     const entryPath = path.join(directory, entry.name);
-    const exclusion = this.#entryExclusion(entryPath, entry, bypassConfiguredExclusions);
+    const exclusion = this.#entryExclusion(entryPath, entry, policy);
     if (exclusion) {
       this.#record(this.#exclusions, exclusion, entryPath);
       return;
     }
     if (entry.isDirectory()) {
-      await this.#walk(entryPath, bypassConfiguredExclusions);
+      await this.#walk(entryPath, policy);
       return;
     }
     if (entry.isFile()) this.#addFile(entryPath);
@@ -300,14 +408,15 @@ class AstFileEnumerator {
   #entryExclusion(
     entryPath: string,
     entry: Dirent,
-    bypassConfiguredExclusions: boolean,
+    policy: DirectoryScanPolicy,
   ): AstScanExclusionReason | null {
     if (entry.name.startsWith(".")) return "hidden-entry";
     if (entry.isSymbolicLink()) return "symlink";
+    if (this.#isRepositoryIgnored(entryPath, entry.isDirectory(), policy.rules)) return "gitignore";
     if (entry.isDirectory()) {
       if (EXCLUDED_DIRECTORY_SET.has(entry.name)) return "excluded-directory";
       if (
-        !bypassConfiguredExclusions &&
+        !policy.bypassConfiguredExclusions &&
         this.options.automaticPathPolicy?.isConfiguredExcluded?.(entryPath, "directory")
       ) {
         return "configured-exclusion";
@@ -316,7 +425,7 @@ class AstFileEnumerator {
     }
     if (!entry.isFile()) return "non-regular";
     if (
-      !bypassConfiguredExclusions &&
+      !policy.bypassConfiguredExclusions &&
       this.options.automaticPathPolicy?.isConfiguredExcluded?.(entryPath, "file")
     ) {
       return "configured-exclusion";

@@ -73,7 +73,7 @@ describe("structured pattern AST Scan", () => {
           policy: {
             operation: "outline",
             hiddenEntries: "excluded",
-            ignoreFiles: false,
+            ignoreFiles: true,
             symlinks: "explicit-roots-only",
             maxFiles: 5_000,
             timeoutMs: 10_000,

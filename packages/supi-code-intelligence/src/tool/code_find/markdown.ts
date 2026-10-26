@@ -65,16 +65,18 @@ function renderScanLimitations(limitations: readonly StructuredScanLimitation[])
 }
 
 function appendScanAndFailures(lines: string[], result: StructuredPatternResult): void {
-  const configuredExclusion = result.scan.exclusions.find(
-    (exclusion) => exclusion.reason === "configured-exclusion",
-  );
-  if (configuredExclusion) {
-    const examples = configuredExclusion.examples.length
-      ? ` Examples: ${configuredExclusion.examples.map((file) => `\`${file}\``).join(", ")}.`
+  for (const [reason, source] of [
+    ["configured-exclusion", "`code-intelligence.exclude`"],
+    ["gitignore", "`.gitignore`"],
+  ] as const) {
+    const excluded = result.scan.exclusions.find((exclusion) => exclusion.reason === reason);
+    if (!excluded) continue;
+    const examples = excluded.examples.length
+      ? ` Examples: ${excluded.examples.map((file) => `\`${file}\``).join(", ")}.`
       : "";
     lines.push(
       "",
-      `_AST Scan excluded ${configuredExclusion.pathCount} configured path${configuredExclusion.pathCount === 1 ? "" : "s"} by \`code-intelligence.exclude\`. Explicit scopes remain available.${examples}`,
+      `_AST Scan excluded ${excluded.pathCount} path${excluded.pathCount === 1 ? "" : "s"} by ${source}. Explicit scopes remain available.${examples}_`,
     );
   }
   const operationExclusion = result.scan.exclusions.find(
