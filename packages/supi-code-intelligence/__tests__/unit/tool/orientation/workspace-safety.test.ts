@@ -47,7 +47,7 @@ async function orient(pi: ReturnType<typeof createPiMock>, input: object = {}) {
     .filter((part) => part.type === "text")
     .map((part) => part.text)
     .join("\n");
-  const snapshot = text.match(/Complete captured result[^`]*`([^`]+)`/)?.[1];
+  const snapshot = text.match(/Captured details[^`]*`([^`]+)`/)?.[1];
   if (snapshot) captures.add(dirname(snapshot));
   return { result, text, snapshot };
 }
@@ -132,7 +132,7 @@ describe("public workspace output safety", () => {
     for (let index = 0; index < 150; index++) {
       put(
         `units/p${String(index).padStart(3, "0")}/package.json`,
-        JSON.stringify({ name: `package-${index}` }),
+        JSON.stringify({ name: `package-${index}-${"navigation".repeat(10)}` }),
       );
     }
     const pi = create();
@@ -140,7 +140,7 @@ describe("public workspace output safety", () => {
       const { text, snapshot } = await orient(pi, { maxResults: 10000 });
       expect(text.length).toBeLessThanOrEqual(16000);
       expect(text).toContain("package-0");
-      expect(text).toContain("omitted");
+      expect(text).toMatch(/showing \d+ of 150; \d+ omitted/);
       expect(readFileSync(snapshot as string, "utf8")).toContain("package-149");
     }
   });

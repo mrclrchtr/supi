@@ -98,7 +98,7 @@ Automatic collection stays within the session working directory. Ancestor Git ro
 
 Estimated tokens are `ceil(characters / 4)`. The overview warns above 1,000 and has a 2,000-token hard cap. Workspace and directory navigation warn above 2,000 and have a 4,000-token hard cap. Warnings go to UI and debug only. `maxResults` can reduce a list, but cannot bypass the total cap.
 
-Captured-result files contain the complete collected observation, not just the selected rows. Reading them does not refresh facts or establish that every possible fact was collected. Instruction snippets have a separate budget and still respect Pi's final output safety limit. Unread instruction text is identified and is not recorded as supplied. File- and symbol-focused navigation retain their existing output.
+The overview links captured details only when navigation rows or descriptions are omitted. Explicit workspace/directory Orientation also preserves raw inventory evidence. Captured-result files contain the complete collected observation, not just the selected rows. Reading them does not refresh facts or establish that every possible fact was collected. Instruction snippets have a separate budget and still respect Pi's final output safety limit. Unread instruction text is identified and is not recorded as supplied. File- and symbol-focused navigation retain their existing output.
 
 ### Transcript failures
 

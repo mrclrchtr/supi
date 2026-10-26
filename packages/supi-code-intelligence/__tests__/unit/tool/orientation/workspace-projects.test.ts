@@ -218,11 +218,13 @@ describe("compact workspace project evidence", () => {
           maxResults: 50,
         }),
       );
-      const snapshot = output.data.notes
-        .join("\n")
-        .match(/Complete captured result[^`]*`([^`]+)`/)?.[1];
-      expect(snapshot).toBeDefined();
-      snapshots.push(snapshot!);
+      const snapshot = output.data.notes.join("\n").match(/Captured details[^`]*`([^`]+)`/)?.[1];
+      if (surface === "overview") expect(snapshot).toBeUndefined();
+      else {
+        expect(snapshot).toBeDefined();
+        snapshots.push(snapshot!);
+        expect(readFileSync(snapshot!, "utf8")).toContain('"manifestPath": "pnpm-workspace.yaml"');
+      }
       expect(output.warning).toBeUndefined();
       expect(Math.ceil(output.content.length / 4)).toBeLessThanOrEqual(
         WORKSPACE_BUDGETS[surface].warning,
@@ -239,7 +241,6 @@ describe("compact workspace project evidence", () => {
           `\`${project.directory}\``,
         ]);
       }
-      expect(readFileSync(snapshot!, "utf8")).toContain('"manifestPath": "pnpm-workspace.yaml"');
     }
   });
 });
