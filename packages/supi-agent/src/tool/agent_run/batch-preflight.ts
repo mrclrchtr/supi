@@ -1,13 +1,12 @@
-import { randomUUID } from "node:crypto";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AgentRunContext, AgentSessionInputs } from "@mrclrchtr/supi-agent-runtime/api";
 import { createAgentRunProviderAuthority } from "@mrclrchtr/supi-agent-runtime/api";
 import { isReadOnlyCapabilitySet } from "../../capabilities.ts";
-import type {
-  DelegationCheckpoint,
-  SavedDelegationConversation,
-} from "../../delegation/checkpoints.ts";
-import { readSavedDelegationConversations } from "../../delegation/checkpoints.ts";
+import type { DelegationCheckpoint } from "../../delegation/checkpoints.ts";
+import {
+  type ConversationTargetResult,
+  createConversationTargetResolver,
+} from "../../delegation/conversation-state.ts";
 import { resolveAgentProfile } from "../../model-policy.ts";
 import { resolveProfileDefinition } from "../../profile-catalogue.ts";
 import { resolveAgentDirectory } from "../../resources.ts";
@@ -18,16 +17,6 @@ interface PreflightError {
   taskId?: string;
   profileId: string;
   message: string;
-}
-
-interface ConversationTarget {
-  conversationId: string;
-  label: string;
-  profileId: string;
-  parentCheckpointId: string | null;
-  context?: AgentRunContext;
-  previousRunStatus?: DelegationCheckpoint["runStatus"];
-  previousFailureCode?: string;
 }
 
 interface CurrentProfileOptions {
@@ -61,8 +50,7 @@ export function preflightDelegationBatch(
   ctx: ExtensionContext,
 ): { tasks: ResolvedTask[] } | { errors: PreflightError[] } {
   const errors = duplicateTaskErrors(params);
-  const saved = readSavedDelegationConversations(ctx.sessionManager.getBranch());
-  const conversations = new Map(saved.conversations.map((entry) => [entry.conversationId, entry]));
+  const resolveTarget = createConversationTargetResolver(ctx.sessionManager.getBranch());
   const profileOptions: CurrentProfileOptions = {
     catalogue,
     ctx,
@@ -73,7 +61,7 @@ export function preflightDelegationBatch(
   const targets = new Set<string>();
 
   for (const task of params.tasks) {
-    const result = resolvePreflightTask(task, conversations, targets, profileOptions);
+    const result = resolvePreflightTask(task, resolveTarget(task), targets, profileOptions);
     if ("message" in result) errors.push(result);
     else resolved.push(result);
   }
@@ -99,11 +87,10 @@ export function currentProfileUnavailableReason(
 
 function resolvePreflightTask(
   task: AgentRunTaskInput,
-  conversations: ReadonlyMap<string, SavedDelegationConversation>,
+  target: ConversationTargetResult,
   targets: Set<string>,
   profileOptions: CurrentProfileOptions,
 ): ResolvedTask | PreflightError {
-  const target = resolveConversationTarget(task, conversations);
   if ("error" in target) {
     return { taskId: task.id, profileId: target.profileId, message: target.error };
   }
@@ -138,55 +125,6 @@ function resolvePreflightTask(
     timeoutMs: policy.effective.timeoutMs,
     model: policy.effective.model,
     inputs,
-  };
-}
-
-function resolveConversationTarget(
-  task: AgentRunTaskInput,
-  conversations: ReadonlyMap<string, SavedDelegationConversation>,
-): ConversationTarget | { profileId: string; error: string } {
-  if ("new" in task) {
-    return {
-      conversationId: randomUUID(),
-      label: task.id,
-      profileId: task.new.profile,
-      parentCheckpointId: null,
-    };
-  }
-  return resolveSavedConversation(task.continue.conversationId, conversations);
-}
-
-function resolveSavedConversation(
-  conversationId: string,
-  conversations: ReadonlyMap<string, SavedDelegationConversation>,
-): ConversationTarget | { profileId: string; error: string } {
-  const saved = conversations.get(conversationId);
-  if (!saved) {
-    return {
-      profileId: "(unknown)",
-      error: `Unknown or off-branch conversation reference "${conversationId}". Use agent_list to see saved conversations on this branch.`,
-    };
-  }
-  if (
-    !saved.latest ||
-    !saved.context ||
-    !saved.profileId ||
-    !saved.label ||
-    saved.unavailableReason
-  ) {
-    return {
-      profileId: saved.profileId ?? "(unavailable)",
-      error: `Conversation "${conversationId}" cannot continue: ${saved.unavailableReason ?? "saved context is incomplete"}`,
-    };
-  }
-  return {
-    conversationId,
-    label: saved.label,
-    profileId: saved.profileId,
-    parentCheckpointId: saved.latest.checkpointId,
-    context: saved.context,
-    previousRunStatus: saved.latest.runStatus,
-    previousFailureCode: saved.latest.failureCode,
   };
 }
 

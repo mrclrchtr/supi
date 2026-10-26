@@ -207,10 +207,10 @@ export class DelegationController {
     );
   }
 
-  /** Return live status for saved conversations on the active parent branch. */
-  conversationActivity(ctx: ExtensionContext): ReturnType<DelegationConversationState["activity"]> {
+  /** Return list-safe saved/live conversation facts from the active parent branch. */
+  conversations(ctx: ExtensionContext): ReturnType<DelegationConversationState["listCandidates"]> {
     this.#manager = ctx.sessionManager;
-    return this.#conversationState.activity(
+    return this.#conversationState.listCandidates(
       this.#batches.values(),
       ctx.sessionManager.getBranch(),
       (batch) => this.#onBranch(batch),

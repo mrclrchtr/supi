@@ -1,8 +1,7 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Value } from "typebox/value";
-import type { SavedDelegationConversation } from "../../delegation/checkpoints.ts";
-import { readSavedDelegationConversations } from "../../delegation/checkpoints.ts";
 import type { DelegationController } from "../../delegation/controller.ts";
+import type { DelegationConversationCandidate } from "../../delegation/conversation-state.ts";
 import { agentProfileCatalogueStore } from "../../session.ts";
 import { currentProfileUnavailableReason } from "../agent_run/batch-preflight.ts";
 import { type AgentListRow, buildAgentListResult } from "./result.ts";
@@ -21,58 +20,43 @@ export function makeAgentListExecute(controller: DelegationController): Execute 
       throw new Error("Agent Profile catalogue is not yet loaded. Wait for session start.");
     const offset = params.offset ?? 0;
     const limit = params.limit ?? 20;
-    const saved = readSavedDelegationConversations(ctx.sessionManager.getBranch());
-    const activity = controller.conversationActivity(ctx);
-    const conversations = new Map(
-      saved.conversations.map((conversation) => [conversation.conversationId, conversation]),
-    );
-    for (const [conversationId, live] of activity) {
-      if (!conversations.has(conversationId)) {
-        conversations.set(conversationId, {
-          conversationId,
-          label: live.label,
-          profileId: live.profileId,
-        });
-      }
-    }
-    const rows: AgentListRow[] = [...conversations.values()].map((conversation) =>
-      buildAgentListRow(conversation, activity.get(conversation.conversationId), catalogue, ctx),
-    );
+    const rows = controller
+      .conversations(ctx)
+      .map((conversation) => buildAgentListRow(conversation, catalogue, ctx));
     return buildAgentListResult({ rows, offset, limit });
   };
 }
 
 function buildAgentListRow(
-  conversation: SavedDelegationConversation,
-  live: { status: "busy" | "pending-collection" } | undefined,
+  conversation: DelegationConversationCandidate,
   catalogue: NonNullable<ReturnType<typeof agentProfileCatalogueStore.get>>,
-  ctx: Parameters<DelegationController["conversationActivity"]>[0],
+  ctx: ExtensionContext,
 ): AgentListRow {
-  const unavailableReason = conversationUnavailableReason(conversation, live, catalogue, ctx);
-  const status = unavailableReason ? "unavailable" : (live?.status ?? "available");
+  const unavailableReason = conversationUnavailableReason(conversation, catalogue, ctx);
+  const status = unavailableReason ? "unavailable" : (conversation.activity ?? "available");
   return {
     conversationId: conversation.conversationId,
     label: conversation.label ?? "(unavailable)",
     profileId: conversation.profileId ?? "(unavailable)",
     status,
     ...(unavailableReason ? { reason: unavailableReason } : {}),
-    ...(live ? { activity: live.status } : {}),
+    ...(conversation.activity ? { activity: conversation.activity } : {}),
   };
 }
 
 function conversationUnavailableReason(
-  conversation: SavedDelegationConversation,
-  live: { status: "busy" | "pending-collection" } | undefined,
+  conversation: DelegationConversationCandidate,
   catalogue: NonNullable<ReturnType<typeof agentProfileCatalogueStore.get>>,
-  ctx: Parameters<DelegationController["conversationActivity"]>[0],
+  ctx: ExtensionContext,
 ): string | undefined {
   if (conversation.unavailableReason) return conversation.unavailableReason;
-  if (!conversation.profileId && !live) return "Saved profile information is missing.";
+  if (!conversation.profileId && !conversation.activity)
+    return "Saved profile information is missing.";
   if (conversation.profileId) {
     const profileReason = currentProfileUnavailableReason(conversation.profileId, catalogue, ctx);
     if (profileReason) return profileReason;
   }
-  if (!live && (!conversation.latest || !conversation.context)) {
+  if (!conversation.activity && !conversation.hasSavedContext) {
     return "No valid saved checkpoint is available.";
   }
   return undefined;

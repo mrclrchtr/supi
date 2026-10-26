@@ -1,5 +1,8 @@
+import { randomUUID } from "node:crypto";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
+import type { AgentRunContext } from "@mrclrchtr/supi-agent-runtime/api";
 import type { BatchTaskProgress, BatchTaskResult } from "../tool/agent_run/batch-types.ts";
+import type { AgentRunTaskInput } from "../tool/agent_run/schema.ts";
 import { AGENT_RESULT_TOOL_NAME } from "../tool/names.ts";
 import type { DelegationCheckpoint } from "./checkpoints.ts";
 import { readSavedDelegationConversations } from "./checkpoints.ts";
@@ -11,7 +14,85 @@ function isTerminalStatus(status: BatchTaskProgress["status"]): boolean {
   );
 }
 
-/** Own live conversation locks and one-time background checkpoint payload claims. */
+interface ConversationTarget {
+  conversationId: string;
+  label: string;
+  profileId: string;
+  parentCheckpointId: string | null;
+  context?: AgentRunContext;
+  previousRunStatus?: DelegationCheckpoint["runStatus"];
+  previousFailureCode?: string;
+}
+
+/** A new or saved conversation target, or its preflight failure without Profile policy. */
+export type ConversationTargetResult = ConversationTarget | { profileId: string; error: string };
+
+/** List-safe saved/live conversation facts, without child context or current Profile policy. */
+export interface DelegationConversationCandidate {
+  readonly conversationId: string;
+  readonly label?: string;
+  readonly profileId?: string;
+  readonly unavailableReason?: string;
+  readonly hasSavedContext: boolean;
+  readonly activity?: "busy" | "pending-collection";
+}
+
+/**
+ * Resolve targets against one raw active branch during synchronous preflight.
+ * Callers retain per-task Profile policy and error ordering. Never retain this resolver across
+ * asynchronous startup: launch ownership and checkpoint lineage must be checked again afterward.
+ */
+export function createConversationTargetResolver(
+  branch: readonly SessionEntry[],
+): (task: AgentRunTaskInput) => ConversationTargetResult {
+  const conversations = new Map(
+    readSavedDelegationConversations(branch).conversations.map((entry) => [
+      entry.conversationId,
+      entry,
+    ]),
+  );
+  return (task) => {
+    if ("new" in task) {
+      return {
+        conversationId: randomUUID(),
+        label: task.id,
+        profileId: task.new.profile,
+        parentCheckpointId: null,
+      };
+    }
+    const conversationId = task.continue.conversationId;
+    const saved = conversations.get(conversationId);
+    if (!saved) {
+      return {
+        profileId: "(unknown)",
+        error: `Unknown or off-branch conversation reference "${conversationId}". Use agent_list to see saved conversations on this branch.`,
+      };
+    }
+    if (
+      !saved.latest ||
+      !saved.context ||
+      !saved.profileId ||
+      !saved.label ||
+      saved.unavailableReason
+    ) {
+      return {
+        profileId: saved.profileId ?? "(unavailable)",
+        error: `Conversation "${conversationId}" cannot continue: ${saved.unavailableReason ?? "saved context is incomplete"}`,
+      };
+    }
+    return {
+      conversationId,
+      label: saved.label,
+      profileId: saved.profileId,
+      parentCheckpointId: saved.latest.checkpointId,
+      context: saved.context,
+      previousRunStatus: saved.latest.runStatus,
+      previousFailureCode: saved.latest.failureCode,
+    };
+  };
+}
+
+/** Own saved/live conversation interpretation, startup locks, and checkpoint payload claims. */
 export class DelegationConversationState {
   readonly #checkpointClaims = new Map<string, string>();
   readonly #startingConversations = new Set<string>();
@@ -71,15 +152,18 @@ export class DelegationConversationState {
     );
   }
 
-  /** Report busy and pending-collection runs without exposing child output. */
-  activity(
+  /** Merge saved conversations and live-only activity without exposing child context. */
+  listCandidates(
     batches: Iterable<ManagedBatch>,
     branch: readonly SessionEntry[],
     isOnBranch: (batch: ManagedBatch) => boolean,
-  ): ReadonlyMap<
-    string,
-    { status: "busy" | "pending-collection"; label: string; profileId: string }
-  > {
+  ): readonly DelegationConversationCandidate[] {
+    const conversations = new Map(
+      readSavedDelegationConversations(branch).conversations.map((entry) => [
+        entry.conversationId,
+        entry,
+      ]),
+    );
     const activity = new Map<
       string,
       { status: "busy" | "pending-collection"; label: string; profileId: string }
@@ -87,7 +171,23 @@ export class DelegationConversationState {
     for (const batch of batches) {
       addBatchActivity(activity, batch, branch, !batch.launchId || isOnBranch(batch));
     }
-    return activity;
+    for (const [conversationId, live] of activity) {
+      if (!conversations.has(conversationId)) {
+        conversations.set(conversationId, {
+          conversationId,
+          label: live.label,
+          profileId: live.profileId,
+        });
+      }
+    }
+    return [...conversations.values()].map((conversation) => ({
+      conversationId: conversation.conversationId,
+      label: conversation.label,
+      profileId: conversation.profileId,
+      unavailableReason: conversation.unavailableReason,
+      hasSavedContext: Boolean(conversation.latest && conversation.context),
+      activity: activity.get(conversation.conversationId)?.status,
+    }));
   }
 
   /** Verify a captured invocation still targets the active branch before child startup. */

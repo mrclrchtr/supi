@@ -15,6 +15,34 @@ afterEach(async () => {
 });
 
 describe("saved Agent Conversation checkpoints through registered tools", () => {
+  it("keeps duplicate-task and conversation-target errors in preflight order", async () => {
+    harness = await backgroundHarness(sdk);
+    await expect(
+      harness.invoke("agent_run", {
+        mode: "foreground",
+        tasks: [
+          {
+            id: "repeat",
+            continue: { conversationId: "missing-first" },
+            instructions: "Inspect A.",
+          },
+          { id: "repeat", new: { profile: "explore" }, instructions: "Inspect B." },
+          {
+            id: "third",
+            continue: { conversationId: "missing-last" },
+            instructions: "Inspect C.",
+          },
+        ],
+      }),
+    ).rejects.toThrow(
+      "Delegation Batch preflight failed:\n" +
+        'Duplicate task ID "repeat".\n' +
+        'Unknown or off-branch conversation reference "missing-first". Use agent_list to see saved conversations on this branch.\n' +
+        'Unknown or off-branch conversation reference "missing-last". Use agent_list to see saved conversations on this branch.',
+    );
+    expect(harness.children).toHaveLength(0);
+  });
+
   it("blocks corrupt latest checkpoints instead of falling back to older context", async () => {
     harness = await backgroundHarness(sdk);
     const firstRun = harness.invoke("agent_run", {

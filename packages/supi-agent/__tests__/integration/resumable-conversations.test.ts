@@ -15,6 +15,50 @@ afterEach(async () => {
 });
 
 describe("resumable conversations through registered tools", () => {
+  it("lists saved and live-only conversations without exposing child context", async () => {
+    harness = await backgroundHarness(sdk);
+    const savedRun = harness.invoke("agent_run", {
+      mode: "foreground",
+      tasks: [
+        { id: "saved-label", new: { profile: "explore" }, instructions: "Inspect saved context." },
+      ],
+    });
+    await vi.waitFor(() => expect(harness?.children[0]?.session.isStreaming).toBe(true));
+    harness.children[0]?.finish("Private saved findings.");
+    const saved = await savedRun;
+    const savedId = (saved.details as { tasks: Array<{ conversationId: string }> }).tasks[0]
+      ?.conversationId;
+    const started = await harness.invoke("agent_run", {
+      tasks: [
+        { id: "live-label", new: { profile: "explore" }, instructions: "Inspect live context." },
+      ],
+    });
+    await vi.waitFor(() => expect(harness?.children[1]?.session.isStreaming).toBe(true));
+    const liveId = (started.details as { tasks: Array<{ conversationId: string }> }).tasks[0]
+      ?.conversationId;
+
+    const listed = await harness.invoke("agent_list", {});
+    expect(listed.details).toMatchObject({
+      total: 2,
+      rows: [
+        {
+          conversationId: savedId,
+          label: "saved-label",
+          profileId: "explore",
+          status: "available",
+        },
+        {
+          conversationId: liveId,
+          label: "live-label",
+          profileId: "explore",
+          status: "busy",
+          activity: "busy",
+        },
+      ],
+    });
+    expect(JSON.stringify(listed)).not.toMatch(/Private saved findings|Inspect live context/);
+  });
+
   it("continues a saved conversation with only the new child entries in its checkpoint", async () => {
     harness = await backgroundHarness(sdk);
     const firstRun = harness.invoke("agent_run", {
