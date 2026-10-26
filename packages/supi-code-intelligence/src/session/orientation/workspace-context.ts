@@ -4,9 +4,13 @@ import { loadAutomaticExclusionPatterns } from "@mrclrchtr/supi-core/config";
 import ignore from "ignore";
 import { isGitIgnoredDirectory } from "../../analysis/workspace/git.ts";
 import { observeWorkspace } from "../../analysis/workspace/observe.ts";
-import { assertUnlinkedPath } from "../../analysis/workspace/safe-path.ts";
+import { assertUnlinkedPath, WorkspaceSymlinkError } from "../../analysis/workspace/safe-path.ts";
 import type { WorkspaceObservation } from "../../analysis/workspace/types.ts";
-import type { OrientationResultData, OrientationWorkflowInput } from "../orientation-types.ts";
+import type {
+  OrientationResultData,
+  OrientationWorkflowInput,
+  OrientationWorkflowOutcome,
+} from "../orientation-types.ts";
 import type { WorkflowControl } from "../workflow-control.ts";
 
 /** Captured facts for workspace and directory presentation; no provider or live state. */
@@ -26,31 +30,40 @@ export async function orientWorkspaceContext(
   control?: WorkflowControl,
 ): Promise<
   | { kind: "completed"; data: OrientationResultData; directory: string | null }
-  | { kind: "invalid-input"; message: string }
+  | Extract<OrientationWorkflowOutcome, { kind: "invalid-input" }>
   | null
 > {
-  const selected = directoryFocus(request, options.cwd);
-  if (!selected || selected.kind === "invalid-input") return selected;
-  let focus = selected.path;
-  const exclude = loadAutomaticExclusionPatterns(options.cwd, options);
-  if (focus) await assertFocusPath(options.cwd, focus);
-  let observation = await initialObservation(options.cwd, focus, exclude, control);
-  if (request.focus && "module" in request.focus) {
-    const selected = resolveModule(observation, request.focus.module);
-    if (selected.kind === "invalid-input") return selected;
-    focus = selected.path;
+  try {
+    const selected = directoryFocus(request, options.cwd);
+    if (!selected) return null;
+    let focus = selected.path;
+    const exclude = loadAutomaticExclusionPatterns(options.cwd, options);
+    if (focus) await assertFocusPath(options.cwd, focus);
+    let observation = await initialObservation(options.cwd, focus, exclude, control);
+    if (request.focus && "module" in request.focus) {
+      const selected = resolveModule(observation, request.focus.module);
+      if (selected.kind === "invalid-input") return selected;
+      focus = selected.path;
+    }
+    if (focus) observation = await focusObservation(observation, focus, exclude, control);
+    return {
+      kind: "completed",
+      directory: focus,
+      data: workspaceOrientationData({
+        observation,
+        cwd: options.cwd,
+        focus,
+        maxResults: request.maxResults ?? 10,
+      }),
+    };
+  } catch (error) {
+    if (!(error instanceof WorkspaceSymlinkError)) throw error;
+    return {
+      kind: "invalid-input",
+      message: error.message,
+      symlinkRejection: { requestedPath: error.requestedPath, blockedPath: error.blockedPath },
+    };
   }
-  if (focus) observation = await focusObservation(observation, focus, exclude, control);
-  return {
-    kind: "completed",
-    directory: focus,
-    data: workspaceOrientationData({
-      observation,
-      cwd: options.cwd,
-      focus,
-      maxResults: request.maxResults ?? 10,
-    }),
-  };
 }
 
 async function initialObservation(
@@ -107,13 +120,12 @@ async function assertFocusPath(cwd: string, focus: string): Promise<void> {
 function directoryFocus(
   request: OrientationWorkflowInput,
   cwd: string,
-): { kind: "directory"; path: string | null } | { kind: "invalid-input"; message: string } | null {
+): { kind: "directory"; path: string | null } | null {
   if (!request.focus || "module" in request.focus) return { kind: "directory", path: null };
   if ("target" in request.focus) return null;
   const focus = path.resolve(cwd, request.focus.path.replace(/^@/, ""));
   if (!existsSync(focus) || !statSync(focus).isDirectory()) return null;
-  if (lstatSync(focus).isSymbolicLink())
-    return { kind: "invalid-input", message: "Symbolic-link directory focus is not followed." };
+  if (lstatSync(focus).isSymbolicLink()) throw new WorkspaceSymlinkError(focus, focus);
   return { kind: "directory", path: focus };
 }
 

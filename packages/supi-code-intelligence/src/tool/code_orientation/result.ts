@@ -274,12 +274,7 @@ type OrientationOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["or
 /** Assemble the final model-visible code_orientation result for one workflow outcome. */
 export function finishOrientationResult(outcome: OrientationOutcome): CodeIntelResult {
   if (outcome.kind === "unavailable") throw new Error(outcome.reason);
-  if (outcome.kind === "invalid-input") {
-    return contextErrorResult(`**Error:** ${outcome.message}`, {
-      nextQueries: ["Choose an existing path, module, or precise target"],
-      message: outcome.message,
-    });
-  }
+  if (outcome.kind === "invalid-input") return invalidOrientationResult(outcome);
   if (outcome.kind === "disambiguation" || outcome.kind === "kind-mismatch") {
     const candidates = outcome.candidates;
     const lines = [
@@ -327,6 +322,20 @@ export function finishOrientationResult(outcome: OrientationOutcome): CodeIntelR
     };
   }
   return finishCompletedOrientation(outcome.data);
+}
+
+function invalidOrientationResult(
+  outcome: Extract<OrientationOutcome, { kind: "invalid-input" }>,
+): CodeIntelResult {
+  const rejection = outcome.symlinkRejection;
+  const recovery = "Resolve the requested path explicitly and retry with its canonical path.";
+  const message = rejection
+    ? `Requested focus ${JSON.stringify(rejection.requestedPath)} traverses a symbolic link: ${JSON.stringify(rejection.blockedPath)}. Orientation does not follow symbolic links.\n\n${recovery}`
+    : outcome.message;
+  return contextErrorResult(`**Error:** ${message}`, {
+    nextQueries: rejection ? [recovery] : ["Choose an existing path, module, or precise target"],
+    message,
+  });
 }
 
 function finishCompletedOrientation(data: OrientationResultData): CodeIntelResult {

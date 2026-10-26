@@ -143,5 +143,13 @@ export type OrientationWorkflowOutcome =
       readonly requestedKind: TargetSymbolKind;
       readonly candidates: readonly OrientationCandidate[];
     } & TargetCandidateCompleteness)
-  | { readonly kind: "invalid-input"; readonly message: string }
+  | {
+      readonly kind: "invalid-input";
+      readonly message: string;
+      /** No-follow facts for actionable explicit-focus guidance; never a resolved retry path. */
+      readonly symlinkRejection?: {
+        readonly requestedPath: string;
+        readonly blockedPath: string;
+      };
+    }
   | { readonly kind: "unavailable"; readonly reason: string };

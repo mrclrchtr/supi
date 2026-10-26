@@ -1,8 +1,10 @@
 import { execFileSync } from "node:child_process";
 import {
+  promises as fs,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -11,7 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import extension from "../../../../src/extension.ts";
 
 let root: string;
@@ -22,6 +24,7 @@ beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), "orientation-home-"));
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const directory of [root, home, ...captures])
     rmSync(directory, { recursive: true, force: true });
   captures.clear();
@@ -61,15 +64,61 @@ describe("public workspace output safety", () => {
     expect(text).toContain("entry-limit");
   }, 20000);
 
-  it("rejects an external focus below a symbolic-link ancestor", async () => {
-    const external = mkdtempSync(join(tmpdir(), "orientation-external-"));
+  it.each(["leaf", "ancestor"])(
+    "rejects a symbolic-link %s with actionable paths and an explicit canonical retry",
+    async (position) => {
+      const external = realpathSync(mkdtempSync(join(tmpdir(), "orientation-external-")));
+      captures.add(external);
+      mkdirSync(join(external, "actual", "leaf"), { recursive: true });
+      writeFileSync(join(external, "actual", "outside.py"), "pass\n");
+      writeFileSync(join(external, "actual", "leaf", "outside.py"), "pass\n");
+      const blocked = join(external, "alias");
+      symlinkSync(join(external, "actual"), blocked);
+      const suffix = position === "ancestor" ? "leaf" : "";
+      const requested = join(blocked, suffix);
+      const pi = create();
+
+      const rejected = await orient(pi, { focus: { path: requested } });
+      expect(rejected.result.details).toMatchObject({ status: "invalid-input" });
+      expect(rejected.text).toContain(requested);
+      expect(rejected.text).toContain(`symbolic link: ${JSON.stringify(blocked)}`);
+      expect(rejected.text).toContain("canonical path");
+      expect(rejected.text).not.toContain("outside.py");
+      expect(rejected.snapshot).toBeUndefined();
+
+      const retried = await orient(pi, { focus: { path: join(external, "actual", suffix) } });
+      expect(retried.result.details).toMatchObject({ status: "completed" });
+      expect(retried.text).toContain("outside.py");
+    },
+  );
+
+  it.each(["EACCES", "ENOENT"])(
+    "does not disguise unrelated %s validation failures as symlink input",
+    async (code) => {
+      put("notes/example.py", "pass\n");
+      const error = Object.assign(new Error(`${code}: filesystem access failed`), { code });
+      vi.spyOn(fs, "lstat").mockRejectedValueOnce(error);
+
+      await expect(orient(create(), { focus: { path: "notes" } })).rejects.toBe(error);
+    },
+  );
+
+  it("continues recording automatic symlink inventory without reading linked metadata", async () => {
+    const external = realpathSync(mkdtempSync(join(tmpdir(), "orientation-linked-metadata-")));
     captures.add(external);
-    mkdirSync(join(external, "actual", "leaf"), { recursive: true });
-    writeFileSync(join(external, "actual", "leaf", "outside.py"), "pass\n");
-    symlinkSync(join(external, "actual"), join(external, "alias"));
-    await expect(
-      orient(create(), { focus: { path: join(external, "alias", "leaf") } }),
-    ).rejects.toThrow(/symbolic.link/i);
+    writeFileSync(
+      join(external, "package.json"),
+      JSON.stringify({ name: "do-not-follow-outside" }),
+    );
+    symlinkSync(external, join(root, "linked"));
+    symlinkSync(join(external, "package.json"), join(root, "package.json"));
+
+    const { result, snapshot } = await orient(create());
+    expect(result.details).toMatchObject({ status: "completed" });
+    const captured = readFileSync(snapshot as string, "utf8");
+    expect(captured).toContain('"kind": "symlink"');
+    expect(captured).toContain("Symbolic-link metadata is not read.");
+    expect(captured).not.toContain("do-not-follow-outside");
   });
 
   it("retains exclusions and unmatched workspace patterns in the captured result", async () => {
