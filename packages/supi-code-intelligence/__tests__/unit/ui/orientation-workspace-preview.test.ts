@@ -35,6 +35,36 @@ function projectTable(count: number, limit = count): OrientationSectionData {
   });
 }
 
+async function projectMemberships(
+  count: number,
+  limit = count,
+  distinctGroups = false,
+): Promise<OrientationSectionData> {
+  const root = makeWorkspace("orientation-membership-preview-");
+  writeJson(root, "package.json", { name: "root" });
+  const names = Array.from(
+    { length: count },
+    (_, index) => `member-${String(index + 1).padStart(2, "0")}`,
+  );
+  const patterns = distinctGroups ? names.map((name) => `units/${name}`) : ["units/*"];
+  write(
+    root,
+    "pnpm-workspace.yaml",
+    `packages:\n${patterns.map((value) => `  - ${value}\n`).join("")}`,
+  );
+  for (const name of names) {
+    writeJson(root, `units/${name}/package.json`, { name });
+  }
+  const sections = projectSections(
+    { observation: await observeWorkspace(root), cwd: root, focus: null, maxResults: limit },
+    limit,
+    false,
+  );
+  const memberships = sections.find((section) => section.key === "workspace.memberships");
+  if (!memberships) throw new Error("The workspace fixture has no declared memberships.");
+  return memberships;
+}
+
 function assemblePreview(...sections: OrientationSectionData[]) {
   return assembleOrientationResult({
     title: "Workspace Orientation",
@@ -129,6 +159,79 @@ describe("Workspace Orientation structured previews", () => {
     expect(preview.match(/Name \| Path/g)).toHaveLength(2);
   });
 
+  it("distinguishes canonical memberships from their single preview group", async () => {
+    const assembly = assemblePreview(await projectMemberships(25));
+
+    expect(renderPreview(assembly)).toContain(
+      "Declared memberships (25 memberships; 1 preview group)",
+    );
+    expect(assembly.details.evidenceLists).toContainEqual({
+      key: "workspace.memberships",
+      totalCount: 25,
+      shownCount: 25,
+      omittedCount: 0,
+      partialReason: null,
+    });
+  });
+
+  it("preserves canonical membership omissions separately from preview groups", async () => {
+    const assembly = assemblePreview(await projectMemberships(25, 5));
+
+    expect(renderPreview(assembly)).toContain(
+      "Declared memberships (5 of 25 memberships selected; 20 omitted; 1 preview group)",
+    );
+  });
+
+  it.each([
+    { count: 25, summary: "25 memberships", omitted: 0 },
+    { count: 30, summary: "25 of 30 memberships selected; 5 omitted", omitted: 5 },
+  ])(
+    "bounds preview groups separately from $count canonical memberships",
+    async ({ count, summary, omitted }) => {
+      const assembly = assemblePreview(await projectMemberships(count, 25, true));
+      const preview = renderPreview(assembly);
+
+      expect(preview).toContain(
+        `Declared memberships (${summary}; 20 of 25 preview groups; 5 preview groups omitted)`,
+      );
+      expect(preview).toContain("units/member-20");
+      expect(preview).not.toContain("units/member-21");
+      expect(assembly.details.evidenceLists).toContainEqual({
+        key: "workspace.memberships",
+        totalCount: count,
+        shownCount: 25,
+        omittedCount: omitted,
+        partialReason: null,
+      });
+    },
+  );
+
+  it("does not turn unknown membership totals into a preview-group evidence count", async () => {
+    const section = await projectMemberships(25, 5);
+    const assembly = assemblePreview({
+      ...section,
+      status: "partial",
+      evidenceLists: section.evidenceLists.map((list) => ({
+        ...list,
+        totalCount: null,
+        omittedCount: null,
+        partialReason: "timeout",
+      })),
+    });
+    const preview = renderPreview(assembly);
+
+    expect(preview).toContain(
+      "Declared memberships (5 memberships selected; more may exist — timeout; 1 preview group)",
+    );
+    expect(assembly.details.evidenceLists).toContainEqual({
+      key: "workspace.memberships",
+      totalCount: null,
+      shownCount: 5,
+      omittedCount: null,
+      partialReason: "timeout",
+    });
+  });
+
   it.each([
     { count: 30, limit: 25, shown: 20, omitted: 10 },
     { count: 25, limit: 5, shown: 5, omitted: 20 },
@@ -188,7 +291,7 @@ describe("Workspace Orientation structured previews", () => {
     });
   });
 
-  it("leaves graph evidence and other non-table previews unchanged", () => {
+  it("distinguishes graph evidence from non-table preview blocks", () => {
     const assembly = assemblePreview({
       key: "project.relationships",
       title: "Declared project relationships",
@@ -216,7 +319,9 @@ describe("Workspace Orientation structured previews", () => {
       totalCount: 2,
       omittedCount: 0,
     });
-    expect(renderPreview(assembly)).toContain("Declared project relationships (2)");
+    expect(renderPreview(assembly)).toContain(
+      "Declared project relationships (25 observed; 2 preview blocks)",
+    );
   });
 
   it("keeps an empty table message without counting it as evidence", () => {

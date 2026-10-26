@@ -51,6 +51,12 @@ export interface ToolDisplaySection {
   partialReason: string | null;
   /** Provider explanation for incomplete collection, when available. */
   partialMessage?: string;
+  /** Content counts are separate from canonical evidence when rows are grouped or framed. */
+  preview?: {
+    unit: "group" | "block";
+    /** Assembly-owned canonical evidence summary, not evidence inferred from display rows. */
+    evidenceSummary?: string;
+  };
 }
 
 // ── Anchored coordinate resolution metadata ───────────────────────────

@@ -20,18 +20,24 @@ export function renderToolDisplaySections(
 }
 
 function formatDisplayBounds(section: ToolDisplaySection): string {
+  const summary = section.preview?.evidenceSummary;
+  const prefix = summary ? `${summary}; ` : "";
+  const unit = section.preview?.unit;
+  const label = (count: number) => (unit ? ` preview ${unit}${count === 1 ? "" : "s"}` : "");
   if (section.totalCount === null) {
-    const omitted = section.omittedCount ? `; ${section.omittedCount} collected omitted` : "";
+    const omitted = section.omittedCount
+      ? `; ${section.omittedCount}${label(section.omittedCount)} collected omitted`
+      : "";
     const reason = section.partialReason
       ? `; more may exist — ${section.partialReason}`
       : "; partial";
     const message = section.partialMessage ? `; ${section.partialMessage}` : "";
-    return ` (${section.shownCount}${omitted}${reason}${message})`;
+    return ` (${prefix}${section.shownCount}${label(section.shownCount)}${omitted}${reason}${message})`;
   }
   if (section.omittedCount && section.omittedCount > 0) {
-    return ` (${section.shownCount} of ${section.totalCount}; ${section.omittedCount} omitted)`;
+    return ` (${prefix}${section.shownCount} of ${section.totalCount}${label(section.totalCount)}; ${section.omittedCount}${label(section.omittedCount)} omitted)`;
   }
-  return ` (${section.totalCount})`;
+  return ` (${prefix}${section.totalCount}${label(section.totalCount)})`;
 }
 
 /** Format one call argument for a compact human transcript row. */

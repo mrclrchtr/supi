@@ -164,13 +164,37 @@ function orientationDisplaySection(section: OrientationSectionData): ToolDisplay
             .map((item) => truncateDisplayText(formatOrientationItem(item))),
         };
   }
+  const grouped = section.key === "workspace.memberships";
+  const summaries = section.evidenceLists.map((list) => {
+    const prefix = section.evidenceLists.length > 1 ? `${list.key}: ` : "";
+    return `${prefix}${orientationEvidenceSelection(list, grouped ? "memberships" : undefined)}`;
+  });
   return createToolDisplaySection({
     ...input,
     items,
     totalCount: items.length,
     omittedCount: 0,
     format: formatOrientationItem,
+    preview: {
+      unit: grouped ? "group" : "block",
+      ...(summaries.length ? { evidenceSummary: summaries.join("; ") } : {}),
+    },
   });
+}
+
+/** Describe canonical selection separately: a capped group preview need not show every atom. */
+function orientationEvidenceSelection(list: EvidenceListMetadata, noun?: string): string {
+  const label = noun ? ` ${noun}` : "";
+  const explanation = list.partialMessage ? `; ${list.partialMessage}` : "";
+  if (list.totalCount === null) {
+    const omitted = list.omittedCount ? `; ${list.omittedCount} collected omitted` : "";
+    return `${list.shownCount}${label} selected${omitted}; more may exist — ${list.partialReason ?? "partial"}${explanation}`;
+  }
+  const partial = list.partialReason ? `; partial — ${list.partialReason}` : "";
+  if (list.omittedCount) {
+    return `${list.shownCount} of ${list.totalCount}${label} selected; ${list.omittedCount} omitted${partial}${explanation}`;
+  }
+  return `${list.totalCount}${label || " observed"}${partial}${explanation}`;
 }
 
 /** Keep table headers and group context with the first evidence row, outside its count. */

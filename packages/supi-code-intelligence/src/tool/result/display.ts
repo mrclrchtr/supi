@@ -18,6 +18,8 @@ export interface ToolDisplaySectionInput<T> {
   /** Provider explanation for incomplete collection, when available. */
   partialMessage?: string;
   maxItems?: number;
+  /** Explicit content-count meaning when display rows are not individual Evidence atoms. */
+  preview?: ToolDisplaySection["preview"];
 }
 
 /** Build a bounded, serializable TUI section from collected facts. */
@@ -45,6 +47,7 @@ export function createToolDisplaySection<T>(input: ToolDisplaySectionInput<T>): 
     omittedCount,
     partialReason: input.partialReason ?? null,
     ...(input.partialMessage === undefined ? {} : { partialMessage: input.partialMessage }),
+    ...(input.preview ? { preview: { ...input.preview } } : {}),
   };
 }
 
@@ -81,6 +84,7 @@ export function readToolDisplaySections(value: unknown): ToolDisplaySection[] {
     ) {
       return [];
     }
+    const preview = readPreview(record.preview);
     return [
       {
         key: record.key,
@@ -95,9 +99,22 @@ export function readToolDisplaySections(value: unknown): ToolDisplaySection[] {
         ...(typeof record.partialMessage === "string"
           ? { partialMessage: record.partialMessage }
           : {}),
+        ...(preview ? { preview } : {}),
       },
     ];
   });
+}
+
+function readPreview(value: unknown): ToolDisplaySection["preview"] {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  if (record.unit !== "group" && record.unit !== "block") return undefined;
+  return {
+    unit: record.unit,
+    ...(typeof record.evidenceSummary === "string"
+      ? { evidenceSummary: truncateDisplayText(record.evidenceSummary) }
+      : {}),
+  };
 }
 
 function isCount(value: unknown): value is number {
