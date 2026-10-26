@@ -19,6 +19,7 @@ export function renderResult(
   const details = result.details as
     | {
         total?: number;
+        offset?: number;
         rows?: Array<{
           label: string;
           profileId: string;
@@ -29,6 +30,11 @@ export function renderResult(
       }
     | undefined;
   const rows = details?.rows ?? [];
+  const count = details?.total ?? rows.length;
+  const emptyPage =
+    details?.offset === undefined
+      ? "No Agent Conversations on this page."
+      : `No Agent Conversations at offset ${details.offset}; ${count} total.`;
   const text = rows.length
     ? rows
         .map(
@@ -36,8 +42,9 @@ export function renderResult(
             `${row.conversationId} · ${row.label} · ${row.profileId} · ${row.status}${row.reason ? ` — ${row.reason}` : ""}`,
         )
         .join("\n")
-    : "No saved Agent Conversations on this branch.";
-  const count = details?.total ?? rows.length;
+    : count === 0
+      ? "No saved Agent Conversations on this branch."
+      : emptyPage;
   return new Text(
     theme.fg("accent", `${count} saved Agent Conversation${count === 1 ? "" : "s"}\n${text}`),
     0,

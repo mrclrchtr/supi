@@ -37,9 +37,7 @@ describe("native parent session copies", () => {
     });
     const emptyPage = await harness.invoke("agent_list", { offset: 20 });
     expect(emptyPage.content).toEqual([
-      expect.objectContaining({
-        text: expect.stringContaining("Agent Conversations 0-0 of 1:"),
-      }),
+      { type: "text", text: "No Agent Conversations at offset 20; 1 total." },
     ]);
     expect(JSON.stringify(harness.manager.getBranch())).not.toContain("Inspect B module.");
     const forkRun = startFollowUp(conversationId, "C-fork");

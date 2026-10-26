@@ -18,17 +18,15 @@ export function buildAgentListResult(options: {
 }): AgentToolResult<Record<string, unknown>> {
   const page = options.rows.slice(options.offset, options.offset + options.limit).map(sanitizeRow);
   const content = page.length
-    ? page.map(formatRow).join("\n")
+    ? `Agent Conversations ${options.offset + 1}-${options.offset + page.length} of ${options.rows.length}:\n${page.map(formatRow).join("\n")}`
     : options.rows.length === 0
       ? "No saved Agent Conversations on this branch."
-      : "No Agent Conversations on this page.";
-  const first = page.length > 0 ? options.offset + 1 : 0;
-  const last = page.length > 0 ? options.offset + page.length : 0;
+      : `No Agent Conversations at offset ${options.offset}; ${options.rows.length} total.`;
   return {
     content: [
       {
         type: "text",
-        text: `Agent Conversations ${first}-${last} of ${options.rows.length}:\n${content}`,
+        text: content,
       },
     ],
     details: {
