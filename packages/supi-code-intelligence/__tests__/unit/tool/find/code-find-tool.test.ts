@@ -3,14 +3,21 @@
  * Tests for the code_find tool.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  promises as fs,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { completedCodeQuery, getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
 import { createTreeSitterProvider } from "@mrclrchtr/supi-tree-sitter/provider/tree-sitter-provider";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codeIntelligenceExtension from "../../../../src/extension.ts";
 import { clearMockRuntime, registerMockProvider } from "../../../helpers/register-mock-runtime.ts";
 
@@ -29,6 +36,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   rmSync(tmpDir, { recursive: true, force: true });
   clearMockRuntime();
 });
@@ -298,7 +306,7 @@ describe("code_find tool", () => {
           complete: true,
           limitations: [],
           exclusions: expect.arrayContaining([
-            { reason: "gitignore", pathCount: 1, examples: ["generated.ts"] },
+            { scopeRoot: ".", reason: "gitignore", pathCount: 1, examples: ["generated.ts"] },
           ]),
         };
         expect(result).toMatchObject({
@@ -310,10 +318,200 @@ describe("code_find tool", () => {
           },
           details: { data: { scan } },
         });
-        expect(result.content[0].text).toContain("excluded 1 path by `.gitignore`");
-        expect(result.content[0].text).toContain("Explicit scopes remain available");
+        expect(result.content[0].text).toContain(
+          "While scanning `.`, skipped 1 path by `.gitignore`",
+        );
+        expect(result.content[0].text).toContain("Other explicit scopes may include these paths");
       },
     );
+
+    it.each([false, true])(
+      "reports overlapping-scope skip provenance with parent first: %s",
+      async (parentFirst) => {
+        mkdirSync(path.join(tmpDir, "generated/sub"), { recursive: true });
+        writeFileSync(path.join(tmpDir, ".gitignore"), "generated/\n");
+        writeFileSync(path.join(tmpDir, "generated/.gitignore"), "skip.ts\n");
+        writeFileSync(path.join(tmpDir, "generated/sub/.gitignore"), "local.ts\n");
+        for (const file of [
+          "generated/skip.ts",
+          "generated/sub/skip.ts",
+          "generated/sub/local.ts",
+        ]) {
+          writeFileSync(path.join(tmpDir, file), "export const foo = true;\n");
+        }
+        registerMockProvider(tmpDir, {
+          outline: async () => ({
+            kind: "success" as const,
+            data: [
+              {
+                name: "foo",
+                kind: "variable",
+                startLine: 1,
+                startCharacter: 14,
+                endLine: 1,
+                endCharacter: 17,
+                children: [],
+              },
+            ],
+          }),
+        });
+        const tool = getCodeFindTool();
+        const scope = parentFirst ? ["generated", "generated/sub"] : ["generated/sub", "generated"];
+
+        const result = (await tool.execute(
+          "test-ast-overlapping-exclusions",
+          { query: "foo", mode: "ast", kind: "definition", scope },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        )) as TextToolResult;
+
+        const exclusions = expect.arrayContaining([
+          {
+            scopeRoot: "generated",
+            reason: "gitignore",
+            pathCount: 3,
+            examples: ["generated/skip.ts", "generated/sub/local.ts", "generated/sub/skip.ts"],
+          },
+          {
+            scopeRoot: "generated/sub",
+            reason: "gitignore",
+            pathCount: 1,
+            examples: ["generated/sub/local.ts"],
+          },
+        ]);
+        expect(result).toMatchObject({
+          structuredContent: {
+            matches: [expect.objectContaining({ name: "foo", file: "generated/sub/skip.ts" })],
+            scan: { eligibleFileCount: 1, analyzedFileCount: 1, complete: true, exclusions },
+          },
+          details: { data: { scan: { exclusions } } },
+        });
+        expect(result.content[0].text).toContain(
+          "While scanning `generated`, skipped 3 paths by `.gitignore`",
+        );
+        expect(result.content[0].text).toContain(
+          "While scanning `generated/sub`, skipped 1 path by `.gitignore`",
+        );
+        expect(result.content[0].text).toContain("Other explicit scopes may include these paths");
+      },
+    );
+
+    it.each(["foo", "missing"])(
+      "names unreadable ignore files in partial results for %s",
+      async (query) => {
+        writeFileSync(path.join(tmpDir, ".gitignore"), "*.ts\n");
+        writeFileSync(path.join(tmpDir, "source.ts"), "export const foo = true;\n");
+        const ignorePath = realpathSync(path.join(tmpDir, ".gitignore"));
+        const readFile = fs.readFile;
+        vi.spyOn(fs, "readFile").mockImplementation(async (file, options) => {
+          if (file === ignorePath)
+            throw Object.assign(new Error("Cannot read ignore file"), { code: "EACCES" });
+          return readFile(file, options);
+        });
+        registerMockProvider(tmpDir, {
+          outline: async () => ({
+            kind: "success" as const,
+            data: [
+              {
+                name: "foo",
+                kind: "variable",
+                startLine: 1,
+                startCharacter: 14,
+                endLine: 1,
+                endCharacter: 17,
+                children: [],
+              },
+            ],
+          }),
+        });
+        const tool = getCodeFindTool();
+
+        const result = (await tool.execute(
+          `test-ast-unreadable-ignore-${query}`,
+          { query, mode: "ast", kind: "definition" },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        )) as TextToolResult;
+
+        expect(result).toMatchObject({
+          structuredContent: {
+            matches:
+              query === "foo" ? [expect.objectContaining({ name: "foo", file: "source.ts" })] : [],
+            partialReason: "interrupted",
+            evidenceLists: [{ totalCount: null, partialReason: "interrupted" }],
+            scan: {
+              complete: false,
+              eligibleFileCount: null,
+              analyzedFileCount: 1,
+              limitations: [{ reason: "unreadable-path", pathCount: 1, examples: [".gitignore"] }],
+            },
+          },
+        });
+        expect(result.content[0].text).toContain(
+          "unreadable-path: 1 path (examples: `.gitignore`)",
+        );
+        expect(result.content[0].text).toContain("Match total is unknown");
+      },
+    );
+
+    it("keeps scope provenance and unreadable paths in oversized-result summaries", async () => {
+      mkdirSync(path.join(tmpDir, "nested"));
+      writeFileSync(path.join(tmpDir, ".gitignore"), "ignored.ts\n");
+      writeFileSync(path.join(tmpDir, "source.ts"), "export const foo = true;\n");
+      writeFileSync(path.join(tmpDir, "nested/.gitignore"), "skip.ts\n");
+      writeFileSync(path.join(tmpDir, "nested/skip.ts"), "export const ignored = true;\n");
+      const ignorePath = realpathSync(path.join(tmpDir, ".gitignore"));
+      const readFile = fs.readFile;
+      vi.spyOn(fs, "readFile").mockImplementation(async (file, options) => {
+        if (file === ignorePath)
+          throw Object.assign(new Error("Cannot read ignore file"), { code: "EACCES" });
+        return readFile(file, options);
+      });
+      registerMockProvider(tmpDir, {
+        outline: async () => ({
+          kind: "success" as const,
+          data: [
+            {
+              name: `foo${"LongName".repeat(1500)}`,
+              kind: "variable",
+              startLine: 1,
+              startCharacter: 14,
+              endLine: 1,
+              endCharacter: 17,
+              children: [],
+            },
+          ],
+        }),
+      });
+      const tool = getCodeFindTool();
+
+      const result = (await tool.execute(
+        "test-ast-oversized-policy-summary",
+        { query: "foo", mode: "ast", kind: "definition" },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult;
+      const text = result.content[0].text;
+      const snapshot = text.match(/Full output saved to: `([^`]+)`/)?.[1];
+      try {
+        expect(snapshot).toBeDefined();
+        expect(text.length).toBeLessThanOrEqual(8000);
+        expect(text).toContain("Policy skip: gitignore; paths=1; scope=.");
+        expect(text).toContain("other explicit scopes may include these paths");
+        expect(text).toContain("Scan limitation: unreadable-path; paths=1; examples=.gitignore.");
+        expect(result).toMatchObject({
+          structuredContent: {
+            partialReason: "interrupted",
+            scan: { complete: false, eligibleFileCount: null, analyzedFileCount: 1 },
+          },
+        });
+      } finally {
+        if (snapshot) rmSync(path.dirname(snapshot), { recursive: true, force: true });
+      }
+    });
 
     it("finds exports when structural support is available", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), 'export const foo = "hello";\n');

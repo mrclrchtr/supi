@@ -239,7 +239,7 @@ describe("runFindWorkflow", () => {
     expect(assembly.details.omittedCount).toBe(1);
     const rendered = renderFindResult(assembly);
     expect(rendered).toContain("_(showing 1 of 2; 1 omitted)_");
-    expect(rendered).toContain("AST Scan policy excluded 1 file");
+    expect(rendered).toContain("While scanning `.`, skipped 1 file because imports analysis");
     expect(rendered).not.toContain("Duplicate Definitions");
     expect(rendered).not.toContain("beta.ts");
   });

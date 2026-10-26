@@ -174,11 +174,16 @@ describe("structured navigation results", () => {
         complete: true,
         eligibleFileCount: 1,
         analyzedFileCount: 1,
-        exclusions: [{ reason: "unsupported-extension", pathCount: 1 }],
+        exclusions: [{ scopeRoot: ".", reason: "unsupported-extension", pathCount: 1 }],
       },
       evidenceLists: [{ totalCount: 1, partialReason: null }],
     });
     expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);
+    const missingScope = structuredClone(result.structuredContent);
+    const exclusions = (missingScope.scan as { exclusions: Array<{ scopeRoot?: string }> })
+      .exclusions;
+    delete exclusions[0]?.scopeRoot;
+    expect(Value.Check(tool.outputSchema, missingScope)).toBe(false);
   });
 
   it("does not turn a completed partial empty search into complete absence", async () => {

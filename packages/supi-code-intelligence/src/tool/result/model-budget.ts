@@ -145,10 +145,15 @@ function searchFacts(data: SearchDetails): string[] {
     lines.push(
       `AST universe: ${scan.universe}; complete=${scan.complete}; eligible=${scan.eligibleFileCount ?? "unknown"}; analyzed=${scan.analyzedFileCount}.`,
       ...scan.limitations.map(
-        (limit) => `Scan limitation: ${limit.reason}; paths=${limit.pathCount ?? "unknown"}.`,
+        (limit) =>
+          `Scan limitation: ${limit.reason}; paths=${limit.pathCount ?? "unknown"}${limit.reason === "unreadable-path" && limit.examples.length ? `; examples=${limit.examples.join(", ")}` : ""}.`,
       ),
+      ...(scan.exclusions.length
+        ? ["Policy skips are traversal decisions; other explicit scopes may include these paths."]
+        : []),
       ...scan.exclusions.map(
-        (exclusion) => `Policy exclusion: ${exclusion.reason}; paths=${exclusion.pathCount}.`,
+        (exclusion) =>
+          `Policy skip: ${exclusion.reason}; paths=${exclusion.pathCount}; scope=${exclusion.scopeRoot}.`,
       ),
     );
   }

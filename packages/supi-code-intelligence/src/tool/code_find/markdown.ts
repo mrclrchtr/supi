@@ -59,7 +59,11 @@ function renderScanLimitations(limitations: readonly StructuredScanLimitation[])
       limitation.pathCount === null
         ? "unknown paths"
         : `${limitation.pathCount} path${limitation.pathCount === 1 ? "" : "s"}`;
-    return `${limitation.reason}: ${count}`;
+    const examples =
+      limitation.reason === "unreadable-path" && limitation.examples.length > 0
+        ? ` (examples: ${limitation.examples.map((file) => `\`${file}\``).join(", ")})`
+        : "";
+    return `${limitation.reason}: ${count}${examples}`;
   });
   return `_AST Scan incomplete — ${descriptions.join("; ")}. Match total is unknown._`;
 }
@@ -69,24 +73,25 @@ function appendScanAndFailures(lines: string[], result: StructuredPatternResult)
     ["configured-exclusion", "`code-intelligence.exclude`"],
     ["gitignore", "`.gitignore`"],
   ] as const) {
-    const excluded = result.scan.exclusions.find((exclusion) => exclusion.reason === reason);
-    if (!excluded) continue;
-    const examples = excluded.examples.length
-      ? ` Examples: ${excluded.examples.map((file) => `\`${file}\``).join(", ")}.`
-      : "";
-    lines.push(
-      "",
-      `_AST Scan excluded ${excluded.pathCount} path${excluded.pathCount === 1 ? "" : "s"} by ${source}. Explicit scopes remain available.${examples}_`,
-    );
+    for (const excluded of result.scan.exclusions.filter(
+      (exclusion) => exclusion.reason === reason,
+    )) {
+      const examples = excluded.examples.length
+        ? ` Examples: ${excluded.examples.map((file) => `\`${file}\``).join(", ")}.`
+        : "";
+      lines.push(
+        "",
+        `_While scanning \`${excluded.scopeRoot}\`, skipped ${excluded.pathCount} path${excluded.pathCount === 1 ? "" : "s"} by ${source}. Other explicit scopes may include these paths.${examples}_`,
+      );
+    }
   }
-  const operationExclusion = result.scan.exclusions.find(
+  for (const excluded of result.scan.exclusions.filter(
     (exclusion) => exclusion.reason === "unsupported-operation",
-  );
-  if (operationExclusion) {
-    const count = operationExclusion.pathCount;
+  )) {
+    const count = excluded.pathCount;
     lines.push(
       "",
-      `_AST Scan policy excluded ${count} file${count === 1 ? "" : "s"} because ${result.scan.policy.operation} analysis is not supported for their language._`,
+      `_While scanning \`${excluded.scopeRoot}\`, skipped ${count} file${count === 1 ? "" : "s"} because ${result.scan.policy.operation} analysis is not supported for their language._`,
     );
   }
   const scanWarning = renderScanLimitations(result.scan.limitations);

@@ -61,6 +61,7 @@ describe("enumerateAstFiles", () => {
     expect(result.complete).toBe(true);
     expect(result.policy.ignoreFiles).toBe(true);
     expect(result.exclusions).toContainEqual({
+      scopeRoot: ".",
       reason: "gitignore",
       pathCount: 1,
       examples: ["src/generated.ts"],
@@ -101,6 +102,7 @@ describe("enumerateAstFiles", () => {
       limitations: [],
       exclusions: expect.arrayContaining([
         {
+          scopeRoot: scope,
           reason: "gitignore",
           pathCount: 3,
           examples: ["src/blocked", "src/local.ts", "src/root.generated.ts"],
@@ -173,10 +175,13 @@ describe("enumerateAstFiles", () => {
   );
 
   it.each([false, true])(
-    "honors overlapping ignored directory roots with parent first: %s",
+    "attributes overlapping-root skips to their requested scope with parent first: %s",
     async (parentFirst) => {
       write(".gitignore", "generated/\n");
       write("generated/.gitignore", "skip.ts\n");
+      write("generated/skip.ts");
+      write("generated/sub/.gitignore", "local.ts\n");
+      write("generated/sub/local.ts");
       const source = write("generated/sub/skip.ts");
       const parent = path.join(tmpDir, "generated");
       const child = path.join(parent, "sub");
@@ -193,6 +198,20 @@ describe("enumerateAstFiles", () => {
         kind: "completed",
         files: [realpathSync(source)],
         complete: true,
+        exclusions: expect.arrayContaining([
+          {
+            scopeRoot: "generated",
+            reason: "gitignore",
+            pathCount: 3,
+            examples: ["generated/skip.ts", "generated/sub/local.ts", "generated/sub/skip.ts"],
+          },
+          {
+            scopeRoot: "generated/sub",
+            reason: "gitignore",
+            pathCount: 1,
+            examples: ["generated/sub/local.ts"],
+          },
+        ]),
       });
     },
   );

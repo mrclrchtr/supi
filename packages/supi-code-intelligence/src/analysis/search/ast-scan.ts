@@ -46,9 +46,12 @@ export type AstScanExclusionReason =
 
 export type AstScanLimitationReason = "timeout" | "safety-limit" | "unreadable-path";
 
-/** Bounded examples and exact encountered-path count for one policy exclusion. */
+/** Bounded examples and exact skip-decision count for one scope root and policy reason. */
 export interface AstScanExclusion {
+  /** Canonical requested scan root, relative to cwd when inside it. */
+  readonly scopeRoot: string;
   readonly reason: AstScanExclusionReason;
+  /** Encountered skips, not distinct files absent from the combined result. */
   readonly pathCount: number;
   readonly examples: readonly string[];
 }
@@ -148,6 +151,7 @@ interface RepositoryIgnoreRule {
 }
 
 interface DirectoryScanPolicy {
+  readonly scopeRoot: string;
   readonly bypassConfiguredExclusions: boolean;
   readonly ignoreRoot: string;
   readonly rules: readonly RepositoryIgnoreRule[];
@@ -180,8 +184,8 @@ class AstFileEnumerator {
   readonly #files = new Set<string>();
   readonly #visitedDirectories = new Set<string>();
   readonly #exclusions = new Map<
-    AstScanExclusionReason,
-    MutableObservation<AstScanExclusionReason>
+    string,
+    Map<AstScanExclusionReason, MutableObservation<AstScanExclusionReason>>
   >();
   readonly #limitations = new Map<
     AstScanLimitationReason,
@@ -297,7 +301,12 @@ class AstFileEnumerator {
     root: string,
     bypassConfiguredExclusions: boolean,
   ): Promise<DirectoryScanPolicy> {
-    const explicitPolicy = { bypassConfiguredExclusions, ignoreRoot: root, rules: [] };
+    const explicitPolicy = {
+      scopeRoot: relativeDisplayPath(this.#displayBase, root),
+      bypassConfiguredExclusions,
+      ignoreRoot: root,
+      rules: [],
+    };
     const relative = path.relative(this.#displayBase, root);
     if (!relative || relative === ".." || relative.startsWith(`..${path.sep}`))
       return explicitPolicy;
@@ -309,7 +318,7 @@ class AstFileEnumerator {
       directory = path.join(directory, segment);
       if (this.#isRepositoryIgnored(directory, true, rules)) return explicitPolicy;
     }
-    return { bypassConfiguredExclusions, ignoreRoot: this.#displayBase, rules };
+    return { ...explicitPolicy, ignoreRoot: this.#displayBase, rules };
   }
 
   /**
@@ -395,7 +404,12 @@ class AstFileEnumerator {
     const entryPath = path.join(directory, entry.name);
     const exclusion = this.#entryExclusion(entryPath, entry, policy);
     if (exclusion) {
-      this.#record(this.#exclusions, exclusion, entryPath);
+      let exclusions = this.#exclusions.get(policy.scopeRoot);
+      if (!exclusions) {
+        exclusions = new Map();
+        this.#exclusions.set(policy.scopeRoot, exclusions);
+      }
+      this.#record(exclusions, exclusion, entryPath);
       return;
     }
     if (entry.isDirectory()) {
@@ -511,7 +525,9 @@ class AstFileEnumerator {
         this.options.timeoutMs ?? DEFAULT_AST_SCAN_TIMEOUT_MS,
         this.options.automaticPathPolicy,
       ),
-      exclusions: [...this.#exclusions.values()],
+      exclusions: [...this.#exclusions].flatMap(([scopeRoot, exclusions]) =>
+        [...exclusions.values()].map((entry) => ({ ...entry, scopeRoot })),
+      ),
       limitations: [...this.#limitations.values()].map((entry) => ({
         ...entry,
         pathCount:

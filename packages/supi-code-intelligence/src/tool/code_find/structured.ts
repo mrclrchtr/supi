@@ -46,7 +46,9 @@ export const FindOutputSchema = Type.Object(
         eligibleFileCount: Type.Union([Type.Integer(), Type.Null()]),
         analyzedFileCount: Type.Integer(),
         complete: Type.Boolean(),
-        exclusions: Type.Array(ScanPathSummary),
+        exclusions: Type.Array(
+          Type.Object({ ...ScanPathSummary.properties, scopeRoot: Type.String() }),
+        ),
         limitations: Type.Array(ScanPathSummary),
         policy: Type.Object({
           operation: Type.String(),
