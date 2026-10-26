@@ -8,7 +8,8 @@ This library owns parser-backed structural analysis. Raw runtime and extraction 
 
 All grammar WASM files are **vendored** in `resources/grammars/<id>/` and shipped with the package. The native `tree-sitter-*` npm packages are `devDependencies` only — they are never resolved at runtime.
 
-- Copy prebuilt WASM with `scripts/vendor-wasm.mjs`; `tree-sitter-typescript` supplies both TypeScript and TSX.
+- Copy unmodified prebuilt WASM with `scripts/vendor-wasm.mjs`.
+- **TypeScript and TSX** are built from source by `scripts/generate-typescript-wasm.mjs` with checked grammar patches for type-only star re-exports and import-type arrays. Preserve these grammar fixes rather than rewriting parse input or hiding recovery evidence.
 - **Kotlin** (`tree-sitter-kotlin`) does not ship `.wasm` — built from source by `scripts/generate-kotlin-wasm.mjs` using `tree-sitter-cli`.
 - **SQL** (`@derekstride/tree-sitter-sql`) does not ship `.wasm` — built from source by `scripts/generate-sql-wasm.mjs` using `tree-sitter-cli`.
 - **LaTeX** (`@pfoerster/tree-sitter-latex`) does not ship `.wasm` — built from source by `scripts/generate-latex-wasm.mjs` using `tree-sitter-cli`. The script also copies and checks the upstream MIT `LICENSE` in `resources/grammars/latex/`.

@@ -39,6 +39,8 @@
     "check:wasm": "node scripts/vendor-wasm.mjs --check",
     "check:all-wasm": "node scripts/check-all-wasm.mjs",
     "generate:all-wasm": "node scripts/generate-all-wasm.mjs",
+    "generate:typescript-wasm": "node scripts/generate-typescript-wasm.mjs",
+    "check:typescript-wasm": "node scripts/generate-typescript-wasm.mjs --check",
     "generate:kotlin-wasm": "node scripts/generate-kotlin-wasm.mjs",
     "check:kotlin-wasm": "node scripts/generate-kotlin-wasm.mjs --check",
     "generate:sql-wasm": "node scripts/generate-sql-wasm.mjs",

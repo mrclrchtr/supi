@@ -9,6 +9,7 @@
 import { checkKotlinWasm } from "./generate-kotlin-wasm.mjs";
 import { checkLatexWasm } from "./generate-latex-wasm.mjs";
 import { checkSqlWasm } from "./generate-sql-wasm.mjs";
+import { checkTypescriptWasm } from "./generate-typescript-wasm.mjs";
 import { checkWasm } from "./vendor-wasm.mjs";
 import { formatError, isMain, runScript } from "./wasm-utils.mjs";
 
@@ -24,6 +25,7 @@ Options:
 export function checkAllWasm() {
   const checks = [
     ["pre-built grammars", checkWasm],
+    ["TypeScript/TSX", checkTypescriptWasm],
     ["Kotlin", checkKotlinWasm],
     ["SQL", checkSqlWasm],
     ["LaTeX", checkLatexWasm],

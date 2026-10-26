@@ -243,7 +243,8 @@ export function writeWasmArtifacts({ sourceWasmPath, artifacts, metadata }) {
  * @param {string} options.wasmFile Generated WASM file name.
  * @param {{ wasmPath: string, metadataPath: string }} options.artifacts Destination paths.
  * @param {string} options.tempPrefix Temporary directory prefix.
- * @param {(grammarDir: string) => void} [options.prepare] Optional source edit.
+ * @param {string} [options.grammarSubdirectory] Grammar location within the source package.
+ * @param {(grammarDir: string) => void} [options.prepare] Optional source-package edit.
  * @param {(cliPath: string, grammarDir: string) => void} [options.generate]
  *   Optional parser generation after the source edit.
  * @param {(details: { sourcePackage: object, cliPackage: object, sha256: string }) => object}
@@ -256,6 +257,7 @@ export function generateWasmArtifact({
   wasmFile,
   artifacts,
   tempPrefix,
+  grammarSubdirectory,
   prepare,
   generate,
   createMetadata,
@@ -264,11 +266,12 @@ export function generateWasmArtifact({
   const cliPackage = readInstalledPackage("tree-sitter-cli");
   const cliPath = resolveTreeSitterCli(cliPackage);
   const tempRoot = mkdtempSync(join(tmpdir(), tempPrefix));
-  const grammarDir = join(tempRoot, projectName);
+  const projectDir = join(tempRoot, projectName);
+  const grammarDir = grammarSubdirectory ? join(projectDir, grammarSubdirectory) : projectDir;
 
   try {
-    cpSync(sourcePackage.dir, grammarDir, { recursive: true });
-    prepare?.(grammarDir);
+    cpSync(sourcePackage.dir, projectDir, { recursive: true });
+    prepare?.(projectDir);
     generate?.(cliPath, grammarDir);
     runTreeSitterBuild(cliPath, grammarDir);
 

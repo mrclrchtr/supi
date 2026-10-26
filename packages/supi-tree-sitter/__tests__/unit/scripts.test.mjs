@@ -16,6 +16,7 @@ const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const scriptsDir = join(packageRoot, "scripts");
 const commands = [
   "vendor-wasm.mjs",
+  "generate-typescript-wasm.mjs",
   "generate-kotlin-wasm.mjs",
   "generate-sql-wasm.mjs",
   "generate-latex-wasm.mjs",

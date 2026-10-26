@@ -9,6 +9,7 @@ import { checkAllWasm } from "./check-all-wasm.mjs";
 import { generateKotlinWasm } from "./generate-kotlin-wasm.mjs";
 import { generateLatexWasm } from "./generate-latex-wasm.mjs";
 import { generateSqlWasm } from "./generate-sql-wasm.mjs";
+import { generateTypescriptWasm } from "./generate-typescript-wasm.mjs";
 import { vendorWasm } from "./vendor-wasm.mjs";
 import { isMain, runScript } from "./wasm-utils.mjs";
 
@@ -23,6 +24,7 @@ Options:
 /** Generate all vendored Tree-sitter WASM files. */
 export function generateAllWasm() {
   vendorWasm();
+  generateTypescriptWasm();
   generateKotlinWasm();
   generateSqlWasm();
   generateLatexWasm();

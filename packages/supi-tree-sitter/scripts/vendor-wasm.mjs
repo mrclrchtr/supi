@@ -4,7 +4,7 @@
  * Vendor Tree-sitter grammar WASM files from installed npm packages.
  *
  * Grammars whose npm packages ship pre-built WASM files are copied directly.
- * Kotlin and SQL are handled by the dedicated generator scripts.
+ * Patched TypeScript/TSX, Kotlin, SQL, and LaTeX use dedicated generators.
  *
  * Usage:
  *   node scripts/vendor-wasm.mjs           # Copy WASM files
@@ -36,12 +36,10 @@ Options:
 
 /**
  * Map: grammar ID → source package and WASM file.
- * Kotlin and SQL are built by their dedicated generator scripts.
+ * Patched TypeScript/TSX and source-only grammars use dedicated generators.
  */
 const GRAMMAR_SOURCES = {
   javascript: { npmPackage: "tree-sitter-javascript", wasmFile: "tree-sitter-javascript.wasm" },
-  typescript: { npmPackage: "tree-sitter-typescript", wasmFile: "tree-sitter-typescript.wasm" },
-  tsx: { npmPackage: "tree-sitter-typescript", wasmFile: "tree-sitter-tsx.wasm" },
   python: { npmPackage: "tree-sitter-python", wasmFile: "tree-sitter-python.wasm" },
   rust: { npmPackage: "tree-sitter-rust", wasmFile: "tree-sitter-rust.wasm" },
   go: { npmPackage: "tree-sitter-go", wasmFile: "tree-sitter-go.wasm" },

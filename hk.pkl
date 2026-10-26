@@ -27,7 +27,13 @@ local precommit = new Mapping<String, Step> {
   ["gitleaks"] = (Builtins.gitleaks) {
     prefix = List("pnpm", "-s", "exec")
   }
-  ["check-added-large-files"] = Builtins.check_added_large_files
+  ["check-added-large-files"] = (Builtins.check_added_large_files) {
+    // Existing generated grammars; source metadata and SHA-256 checks validate them.
+    exclude = List(
+      "packages/supi-tree-sitter/resources/grammars/typescript/tree-sitter-typescript.wasm",
+      "packages/supi-tree-sitter/resources/grammars/tsx/tree-sitter-tsx.wasm"
+    )
+  }
 
   ["biome"] = (Builtins.biome) {
     prefix = List("pnpm", "-s", "exec")
