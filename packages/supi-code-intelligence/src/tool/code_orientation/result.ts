@@ -19,7 +19,11 @@ import {
   type ToolResultAssembly,
 } from "../result/assembly.ts";
 import { formatCandidateRow, formatPartialCandidateDisclosure } from "../result/candidate-row.ts";
-import { createToolDisplaySection } from "../result/display.ts";
+import {
+  createToolDisplaySection,
+  MAX_TUI_DISPLAY_ITEMS,
+  truncateDisplayText,
+} from "../result/display.ts";
 import type {
   ContextDetails,
   OrientationSectionDetails,
@@ -131,17 +135,57 @@ export function assembleOrientationDetails(input: OrientationDetailsInput): Cont
 
 function orientationDisplaySection(section: OrientationSectionData): ToolDisplaySection {
   const items = section.items.filter((item) => item.kind !== "blank");
-  return createToolDisplaySection({
+  const input = {
     key: `orientation.${section.key}`,
     title: section.title,
-    items,
-    totalCount: items.length,
-    omittedCount: 0,
     partialReason:
       section.evidenceLists.find((evidence) => evidence.partialReason)?.partialReason ??
       (section.reason ? "provider-limited" : null),
     ...(section.reason ? { partialMessage: section.reason } : {}),
+  };
+  const evidence = section.evidenceLists.find((list) => list.key === section.tableEvidenceKey);
+  if (evidence) {
+    const rows = orientationTableRows(items);
+    const display = createToolDisplaySection({
+      ...input,
+      items: rows,
+      totalCount: evidence.totalCount,
+      omittedCount: evidence.omittedCount,
+      partialReason: evidence.partialReason ?? input.partialReason,
+      partialMessage: evidence.partialMessage ?? input.partialMessage,
+      format: (row) => row,
+    });
+    return rows.length
+      ? display
+      : {
+          ...display,
+          lines: items
+            .slice(0, MAX_TUI_DISPLAY_ITEMS)
+            .map((item) => truncateDisplayText(formatOrientationItem(item))),
+        };
+  }
+  return createToolDisplaySection({
+    ...input,
+    items,
+    totalCount: items.length,
+    omittedCount: 0,
     format: formatOrientationItem,
+  });
+}
+
+/** Keep table headers and group context with the first evidence row, outside its count. */
+function orientationTableRows(items: readonly OrientationItem[]): string[] {
+  let framing: string[] = [];
+  return items.flatMap((item) => {
+    if (item.kind !== "table") {
+      framing.push(formatOrientationItem(item));
+      return [];
+    }
+    const rows = item.rows.map((row, index) =>
+      [...(index === 0 ? [...framing, item.headers.join(" | ")] : []), row.join(" | ")].join("\n"),
+    );
+    framing = [];
+    return rows;
   });
 }
 

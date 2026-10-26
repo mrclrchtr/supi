@@ -66,6 +66,7 @@ export function tableSection(
         partialReason: null,
       },
     ],
+    tableEvidenceKey: key,
     items:
       rows.length === 0
         ? [{ kind: "paragraph", text: "No collected entries." }]

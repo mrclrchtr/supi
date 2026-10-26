@@ -109,12 +109,13 @@ function projectDeclarations(
       },
     );
   }
-  return projectListSection("workspace.projects", "Project declarations", {
+  const section = projectListSection("workspace.projects", "Project declarations", {
     totalCount: projects.length,
     shownCount: selected.length,
     items,
     detail: "parsed project metadata",
   });
+  return { ...section, tableEvidenceKey: section.key };
 }
 
 /** Group only identical native declarations, retaining counts of individual memberships. */

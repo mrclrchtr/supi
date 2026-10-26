@@ -94,6 +94,8 @@ export interface OrientationSectionData {
   readonly confidence: ConfidenceMode;
   readonly provenance: readonly OrientationProvenance[];
   readonly evidenceLists: readonly EvidenceListMetadata[];
+  /** Evidence list counted by table rows, including when only empty-result framing remains. */
+  readonly tableEvidenceKey?: string;
   /** Content atoms for this section; the adapter frames them under the title + note. */
   readonly items: readonly OrientationItem[];
 }
