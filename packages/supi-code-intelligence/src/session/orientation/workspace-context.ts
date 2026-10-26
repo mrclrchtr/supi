@@ -26,7 +26,12 @@ export interface WorkspaceOrientationFacts {
 /** Select the new navigation path without changing file or symbol-focused workflows. */
 export async function orientWorkspaceContext(
   request: OrientationWorkflowInput,
-  options: { cwd: string; homeDir?: string; projectTrusted: boolean },
+  options: {
+    cwd: string;
+    homeDir?: string;
+    projectTrusted: boolean;
+    gradleObserver?: import("../../analysis/gradle/types.ts").GradleObserver;
+  },
   control?: WorkflowControl,
 ): Promise<
   | { kind: "completed"; data: OrientationResultData; directory: string | null }
@@ -46,6 +51,10 @@ export async function orientWorkspaceContext(
       focus = selected.path;
     }
     if (focus) observation = await focusObservation(observation, focus, exclude, control);
+    const selectedRoot =
+      request.focus && "path" in request.focus ? (focus ?? options.cwd) : options.cwd;
+    const gradle = await options.gradleObserver?.observe(selectedRoot, control);
+    if (gradle) observation = { ...observation, gradle };
     return {
       kind: "completed",
       directory: focus,

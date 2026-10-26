@@ -101,6 +101,17 @@ function createDirtyParentPlusNestedTarball() {
 }
 
 describe("verifyTarball workspace protocol check", () => {
+  it.each([
+    "package/package.json",
+    "package/node_modules/@mrclrchtr/supi-code-intelligence/package.json",
+  ])("rejects missing JVM assets in a Code Intelligence package at %s", (manifestPath) => {
+    const tarball = createTarball(
+      { name: "@mrclrchtr/supi-code-intelligence", version: "1.0.0" },
+      manifestPath,
+    );
+    expect(() => verifyTarball(tarball)).toThrow("missing bundled Gradle artifact");
+  });
+
   it("passes a clean tarball without workspace: protocol", () => {
     const tarball = createCleanTarball();
     expect(verifyTarball(tarball)).toBe(true);

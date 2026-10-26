@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createSessionCache } from "./app/app.ts";
+import { registerGradleObservations } from "./gradle/consent.ts";
 import { registerLspSessionLifecycle } from "./substrate/lsp/lifecycle.ts";
 import { createLspAdapterState } from "./substrate/lsp/state.ts";
 import { registerCodeIntelligenceTools } from "./tool/register.ts";
@@ -24,11 +25,13 @@ const inspectionToolNames = new Set<string>(HEADLESS_INSPECTION_TOOL_NAMES);
 export default function headlessInspectionProfile(pi: ExtensionAPI): void {
   const sessions = createSessionCache();
   const lspState = createLspAdapterState();
+  const gradle = registerGradleObservations(pi, { interactive: false });
   registerLspSessionLifecycle(pi, lspState, (ctx) => {
     const session = sessions.getOrCreate(ctx.cwd);
     session.attachLspController(lspState.controller);
     session.seedSentinelSnapshot(lspState.sentinelSnapshot);
     session.setProjectTrusted(ctx.isProjectTrusted());
+    session.setGradleObserver(gradle.forContext(ctx));
     session.setAutomaticPathPolicy(lspState.providerLease?.automaticPathPolicy ?? null);
   });
   pi.on("session_shutdown", () => sessions.clear());

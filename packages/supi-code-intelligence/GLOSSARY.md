@@ -58,6 +58,14 @@ _Avoid_: brief generator, treating it as the public Orientation surface
 An identity or property explicitly established by parsed project metadata, with its source and native declaration kind retained. It does not establish workspace membership, source-file ownership, or relationships unless those facts are also declared. Workspace declarations retain their patterns and exclusions, including values that match no observed project.
 _Avoid_: inferred project role, treating every project declaration as a workspace member, inferred source root
 
+**Gradle model observation**:
+Build structure reported by Gradle for one explicitly selected build, distinct from a parsed Project declaration. Project identity combines the build identity with a logical project path; actual directories and included-build references do not establish inventory inclusion, source ownership, dependency resolution, or runtime architecture.
+_Avoid_: parsed Gradle declaration, inferred project directory, dependency graph, project name as identity
+
+**Gradle observation permission**:
+A project-local Allow or Deny decision for obtaining Gradle model observations, separate from project trust. An unset decision grants no execution, and permission never establishes a sandbox or reverses execution side effects.
+_Avoid_: trusted config as consent, global opt-in, safe build inspection
+
 **Orientation snapshot**:
 A captured observation behind one Workspace Overview or Orientation result, including the evidence omitted by its display limit. Reading its complete result does not refresh the observation or establish facts outside its collected focus.
 _Avoid_: live workspace state, complete repository knowledge, treating an omitted row as uncollected evidence

@@ -16,6 +16,7 @@ export function selectDirectoryNavigation(data: OrientationResultData): Orientat
   const workspaceRoot = data.workspace.focus === data.workspace.observation.root;
   const inline = (section: OrientationSectionData): boolean =>
     INLINE_SECTIONS.has(section.key) ||
+    section.key.startsWith("gradle.") ||
     (workspaceRoot &&
       (section.key === "workspace.projects" || section.key === "workspace.memberships")) ||
     section.status !== "complete" ||

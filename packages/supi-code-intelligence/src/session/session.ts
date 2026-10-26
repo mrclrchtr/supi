@@ -178,6 +178,7 @@ export class WorkspaceCodeIntelligenceSession {
 
   /** Global config home for hermetic config reads; undefined uses os.homedir(). */
   #homeDir: string | undefined;
+  #gradleObserver: import("../analysis/gradle/types.ts").GradleObserver | undefined;
 
   /** One automatic exclusion snapshot shared by this session's broad searches. */
   #automaticPathPolicy: AutomaticLspPathPolicy | null = null;
@@ -332,6 +333,11 @@ export class WorkspaceCodeIntelligenceSession {
     );
   }
 
+  /** Attach this profile's separately authorized Gradle observation boundary. */
+  setGradleObserver(observer: import("../analysis/gradle/types.ts").GradleObserver): void {
+    this.#gradleObserver = observer;
+  }
+
   /** Orient around the workspace or one exact focus. */
   async orient(
     input: OrientationWorkflowInput,
@@ -343,6 +349,7 @@ export class WorkspaceCodeIntelligenceSession {
         ...this.targetWorkflowDeps(),
         nativeInstructionPaths: this.#nativeInstructionPaths,
         surfacedInstructionDirs: this.#surfacedInstructionDirs,
+        gradleObserver: this.#gradleObserver,
         projectTrusted: this.#projectTrusted,
         homeDir: this.#homeDir,
       },
@@ -470,6 +477,7 @@ export class WorkspaceCodeIntelligenceSession {
     this.#lspController = null;
     this.#automaticPathPolicy = null;
     this.#projectTrusted = false;
+    this.#gradleObserver = undefined;
   }
 }
 

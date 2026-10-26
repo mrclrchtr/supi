@@ -36,6 +36,8 @@ export interface OrientationWorkflowDeps extends TargetWorkflowDeps {
   readonly projectTrusted: boolean;
   /** Global config home for hermetic config reads; undefined uses os.homedir(). */
   readonly homeDir?: string;
+  /** Separately authorized runtime model collection; absent in profiles that do not own it. */
+  readonly gradleObserver?: import("../analysis/gradle/types.ts").GradleObserver;
 }
 
 /** Resolve the Orientation focus and collect immutable facts for presentation adapters. */

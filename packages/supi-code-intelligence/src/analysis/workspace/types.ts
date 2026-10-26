@@ -214,6 +214,8 @@ export interface WorkspaceInventory {
 export interface WorkspaceObservation {
   /** Absolute requested working directory. It is never widened to an ancestor. */
   readonly root: string;
+  /** Runtime-reported structure from one separately authorized selected build. */
+  readonly gradle?: import("../gradle/types.ts").GradleObservation;
   readonly inventory: WorkspaceInventory;
   readonly inclusion: WorkspaceInclusionPolicy;
   readonly collection: WorkspaceCollection;

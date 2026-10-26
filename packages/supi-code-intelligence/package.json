@@ -31,7 +31,12 @@
   ],
   "type": "module",
   "files": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "gradle-helper/lib/*.jar",
+    "gradle-helper/licenses/**",
+    "gradle-helper/src/*.java",
+    "gradle-helper/build.sh",
+    "gradle-helper/README.md"
   ],
   "dependencies": {
     "@mrclrchtr/supi-code-runtime": "workspace:*",

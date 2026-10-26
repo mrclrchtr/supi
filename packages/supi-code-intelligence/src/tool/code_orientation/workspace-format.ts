@@ -45,7 +45,7 @@ export function tableSection(
     rows: string[][];
     limit: number;
     detail: string;
-    source?: "filesystem" | "manifest";
+    source?: "filesystem" | "manifest" | "runtime";
   },
 ): OrientationSectionData {
   const { headers, rows, limit, detail, source = "filesystem" } = options;

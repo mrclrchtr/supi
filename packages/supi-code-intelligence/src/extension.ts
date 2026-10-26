@@ -4,6 +4,7 @@
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createCodeIntelligenceApp } from "./app/app.ts";
 import { registerCodeIntelligenceSettings, resolveOverviewEnabled } from "./config.ts";
+import { registerGradleObservations } from "./gradle/consent.ts";
 import { reportWorkspaceBudget } from "./overview/budget.ts";
 import { collectOverview } from "./overview/collect.ts";
 import type { WorkspaceCodeIntelligenceSession } from "./session/session.ts";
@@ -25,6 +26,7 @@ export default function codeIntelligenceExtension(
 ) {
   const app = createCodeIntelligenceApp(pi);
   const lspState = createLspAdapterState();
+  const gradle = registerGradleObservations(pi, { homeDir });
 
   registerCodeIntelligenceSettings(pi, homeDir);
   registerLspSettings(pi, homeDir);
@@ -38,6 +40,7 @@ export default function codeIntelligenceExtension(
       session.seedSentinelSnapshot(lspState.sentinelSnapshot);
       session.setProjectTrusted(ctx.isProjectTrusted());
       session.setHomeDir(homeDir);
+      session.setGradleObserver(gradle.forContext(ctx));
       session.setAutomaticPathPolicy(lspState.providerLease?.automaticPathPolicy ?? null);
     },
     homeDir,
@@ -80,6 +83,7 @@ export default function codeIntelligenceExtension(
     const session = app.getSession(ctx.cwd) ?? app.createSession(ctx.cwd);
     session.captureNativeInstructionPaths(event.systemPromptOptions.contextFiles ?? []);
     session.setHomeDir(homeDir);
+    session.setGradleObserver(gradle.forContext(ctx));
     if (!session.hasPinnedOverview()) {
       session.setOverviewEnabledOnce(
         resolveOverviewEnabled(ctx.cwd, ctx.isProjectTrusted(), homeDir),
@@ -100,7 +104,12 @@ export default function codeIntelligenceExtension(
       if (!session.claimOverviewInjection()) return;
 
       try {
-        const overview = await collectOverview(ctx.cwd, ctx.isProjectTrusted(), homeDir);
+        const overview = await collectOverview(
+          ctx.cwd,
+          ctx.isProjectTrusted(),
+          homeDir,
+          gradle.forContext(ctx),
+        );
         if (!overview) {
           session.restoreOverviewInjection(false);
           return;

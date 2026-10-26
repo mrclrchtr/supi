@@ -21,7 +21,7 @@ Most coding agents can read files and search text. [`@mrclrchtr/supi-code-intell
 - **Language servers (LSP)** provide types, definitions, references, implementations, diagnostics, workspace symbols, and semantic refactoring.
 - **Tree-sitter ASTs** provide syntax, outlines, source structure, structural search, and outgoing calls.
 
-The agent receives focused `code_*` tools for workspace orientation, precise symbol inspection, relationship analysis, code-aware search, live health, and safe refactor previews. Results disclose their evidence and say when semantic or structural analysis is unavailable instead of silently guessing.
+The agent receives focused `code_*` tools for workspace orientation, precise symbol inspection, relationship analysis, code-aware search, live health, and safe refactor previews. Results disclose their evidence and say when semantic or structural analysis is unavailable instead of silently guessing. Workspace navigation can also include [consent-gated Gradle 9 build structure](packages/supi-code-intelligence/README.md#consent-gated-gradle-observations), separately authorized behind Pi project trust.
 
 Tree-sitter support is bundled. Full LSP features require the matching language-server binary on `PATH`; see the [Code Intelligence setup and screenshots](packages/supi-code-intelligence/README.md#language-support).
 

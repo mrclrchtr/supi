@@ -8,6 +8,7 @@ import type {
   OrientationResultData,
   OrientationSectionData,
 } from "../../session/orientation-types.ts";
+import { gradleSections } from "./gradle-sections.ts";
 import { code, plain, sourcePath, tableSection } from "./workspace-format.ts";
 import { projectSections } from "./workspace-projects.ts";
 
@@ -53,6 +54,7 @@ export function workspaceSections(
   }
   const sections = inventorySections(entries, facts, limit);
   sections.push(...projectSections(facts, limit, descriptions));
+  sections.push(...gradleSections(observation.gradle, limit));
   const issues = [
     ...observation.collection.errors
       .filter(
@@ -101,7 +103,7 @@ function collectionStatus(
   section: OrientationSectionData,
   observation: WorkspaceObservation,
 ): OrientationSectionData {
-  if (section.key === "workspace.issues") return section;
+  if (section.key === "workspace.issues" || section.key.startsWith("gradle.")) return section;
   const { collection } = observation;
   const inventoryPartial =
     collection.stopReason !== "complete" ||

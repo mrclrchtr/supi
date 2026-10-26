@@ -12,7 +12,7 @@ Supersedes the content, rendering, and warning decisions in [Workspace Overview]
 | Automatic boundary | The session working directory is the root. Ancestor repositories and workspace manifests do not expand it. An explicit focus is a separate request. |
 | Inclusion | Include Git-tracked and non-ignored untracked files, subject to configured exclusions. Keep ignored-but-tracked files. Without Git, use accessible files and configured exclusions. Do not classify directories by their names. |
 | Links | Record symbolic links, but do not follow them during navigation collection. |
-| Metadata | Parse explicit Node, Python, Rust, and Go declarations. Preserve native kinds, fields, values, and manifest identities. Never run project code or build tools to infer facts. |
+| Metadata | Parse explicit Node, Python, Rust, and Go declarations. Preserve native kinds, fields, values, and manifest identities. Static readers never run project code or build tools. Separately authorized Gradle model observations are the explicit execution exception below. |
 | Descriptions | Retain source-written prose with its source field. Treat it as untrusted evidence. Do not generate responsibilities or architectural roles. |
 | Relationships | Directory-focused output uses Mermaid. Keep separate dependency fields between the same pair of projects. Name matches do not establish installed resolution or runtime architecture. |
 | Context independence | Each tool response must work without the overview or earlier tool output. Do not suppress ordinary facts based on session history. |
@@ -34,6 +34,20 @@ Supersedes the content, rendering, and warning decisions in [Workspace Overview]
 - Report collection errors, limits, and unsupported metadata. Empty collected results do not prove that an incomplete scan found every file or declaration.
 - Do not replace a failed Git inventory with a broader filesystem scan. A missing Git executable permits a disclosed filesystem fallback.
 - Configuration exclusions are not access controls. An exact ignored or excluded directory can have its own observation.
+
+## Authorized Gradle model observations
+
+| Area | Rule |
+| --- | --- |
+| Selection | One selected build: session working directory for Overview/workspace Orientation, exact explicit directory for directory Orientation. Require a regular settings file there; no ancestor search or independent nested-build scheduling. |
+| Evidence | Request `BuildEnvironment` for runtime verification, then only `GradleBuild` / `BasicGradleProject`. Keep model observations separate from parsed Project declarations. Identity is build-root identity plus logical project path. Preserve names, parent paths, actual directories, and included-build references without expanding their trees. No source ownership, resolution, architecture, or original declaration-field/range claims. |
+| Runtime | Gradle 9 only. Prefer wrapper-declared distribution; absent properties permit an identified PATH installation. Never silently substitute the client version or override unsupported wrappers. Fail closed on unidentifiable archive names or opaque version-manager shims. Use installed compatible Java, never provision a JDK. Exact qualification and artifact/license references live in the helper README. |
+| Authorization | Project-only unset/Allow/Deny in `.pi/supi/config.json`, plus an actual Pi project-trust gate. Pi's implicit trusted state for a directory without protected resources is insufficient: require saved Pi trust there. External roots require their own saved approval. A repository-supplied Allow value alone never authorizes execution. |
+| Interaction | Ask at eligible interactive startup only when unset. Explain arbitrary settings/plugin execution, possible downloads/cache writes, and access beyond the reporting root. Persist Allow/Deny; Cancel does not persist. Without UI, unset means no execution. |
+| Changes | Project-only `/supi-settings` editor; changes affect the next query. Reset deletes the key and restores asking at the next eligible startup. Deny/reset cancel owned work where possible. Cancellation does not reverse side effects or stop unrelated daemons. |
+| Bounds | Existing inventory, metadata, request deadline (including Overview's 10 seconds), token budgets, captures, and untrusted-evidence rules stay in force. The JVM helper additionally caps model output at 1 MiB and 10,000 projects. These bounds do not sandbox Gradle. |
+| Failure | Retain generic navigation and disclose blocked, unavailable, interrupted, unsupported, failed, expired, or oversized model collection; never equate these with no projects. No retries, CLI-report parsing, or stale-model reuse. |
+| Non-goals | No Maven/CMake, Gradle ≤8 or ≥10, recursive included-build queries, task scheduling, dependency/task/source-set/IDE models, or changes to language support/LSP readiness/static readers. |
 
 ## Captured results
 
@@ -57,4 +71,6 @@ Supersedes the content, rendering, and warning decisions in [Workspace Overview]
 - [Pre-change agent-output examples](../orientation/current.md)
 - [Domain glossary](../../GLOSSARY.md)
 - [Tool architecture](../../../../docs/conventions/tool-architecture.md)
+- [Gradle helper qualification, packaging, and licenses](../../gradle-helper/README.md)
+- [Pi project-trust semantics](https://github.com/earendil-works/pi/blob/main/docs/security.md#project-trust)
 - [Pi context architecture](../../../../docs/pi/context-architecture.md)

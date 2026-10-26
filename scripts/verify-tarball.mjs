@@ -37,6 +37,9 @@ export function verifyTarball(tarballPath) {
     if (content.includes("workspace:")) {
       dirtyEntries.push(entry);
     }
+    if (JSON.parse(content).name === "@mrclrchtr/supi-code-intelligence") {
+      verifyGradleArtifacts(entry.slice(0, -"package.json".length), entries);
+    }
   }
 
   if (dirtyEntries.length > 0) {
@@ -58,6 +61,24 @@ export function verifyTarball(tarballPath) {
   }
 
   return true;
+}
+
+/** Check direct and transitively bundled Code Intelligence packages retain the JVM runtime assets. */
+function verifyGradleArtifacts(prefix, entries) {
+  for (const required of [
+    "gradle-helper/lib/supi-gradle-observation.jar",
+    "gradle-helper/lib/gradle-tooling-api-9.4.0.jar",
+    "gradle-helper/lib/slf4j-api-2.0.17.jar",
+    "gradle-helper/lib/slf4j-simple-2.0.17.jar",
+    "gradle-helper/licenses/LICENSE-gradle-tooling-api.txt",
+    "gradle-helper/licenses/NOTICE-gradle.txt",
+    "gradle-helper/licenses/LICENSE-slf4j.txt",
+    "gradle-helper/licenses/DEPENDENCIES.md",
+  ]) {
+    if (!entries.includes(`${prefix}${required}`)) {
+      throw new Error(`Code Intelligence package is missing bundled Gradle artifact: ${required}`);
+    }
+  }
 }
 
 function main() {
