@@ -49,10 +49,7 @@ export function renderReadNextSection(items: ReadNextItem[], maxItems = 3): stri
 
   const lines = ["## Read Next"];
   for (const item of visible) {
-    const lineCount = item.endLine - item.startLine + 1;
-    lines.push(
-      `- \`${item.file}\` ${formatLineRange(item)} — ${item.reason} (\`read\` offset ${item.startLine}, limit ${lineCount})`,
-    );
+    lines.push(`- \`${item.file}\` ${formatLineRange(item)} — ${item.reason}`);
   }
   lines.push("");
   return lines;

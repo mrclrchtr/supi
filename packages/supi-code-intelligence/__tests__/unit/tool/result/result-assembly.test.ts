@@ -175,8 +175,14 @@ describe("canonical Tool result assembly", () => {
     expect(assembly.assembled.provenance[0]?.source).toBe("semantic");
     expect(assembly.assembled.actions).toHaveLength(0);
     expect(assembly.details.nextQueries).toEqual([]);
-    expect(renderResolveResult(assembly)).not.toContain("code_graph");
-    expect(renderResolveResult(assembly)).not.toContain("Chain next");
+    const markdown = renderResolveResult(assembly);
+    expect(markdown).toContain("`src/a.ts:1:1`");
+    expect(markdown).toContain("`tg-1`");
+    expect(markdown).toContain("confidence: semantic; provenance: semantic");
+    expect(markdown).not.toContain("sp-1");
+    expect(assembly.details.targets[0]?.spanId).toBe("sp-1");
+    expect(markdown).not.toContain("code_graph");
+    expect(markdown).not.toContain("Chain next");
   });
 
   it("keeps no-symbol coordinate errors plain in details and frames markdown once", () => {
@@ -325,6 +331,8 @@ describe("canonical Tool result assembly", () => {
       partialMessage: "Tree-sitter recovered syntax.",
     });
     expect(markdown).toContain("Targets in `src/a.ts`");
+    expect(markdown.match(/src\/a\.ts/g)).toHaveLength(1);
+    expect(markdown).toContain("`1:8`");
     expect(markdown).toContain(
       "Partial discovery: Tree-sitter recovered syntax. Error locations: L3:1.",
     );

@@ -69,9 +69,7 @@ function renderRefreshStatus(
   if (data.refresh.lastAttempt) {
     renderRetainedAttempt(lines, data.refresh.lastAttempt, cwd);
   } else {
-    lines.push(
-      "**Diagnostic refresh attempt**: not requested this session. Use `refresh: true` to try one.",
-    );
+    lines.push("Refresh: not requested (`refresh: true` to attempt).");
   }
   lines.push("");
 }
@@ -236,8 +234,9 @@ function renderStatusLine(lines: string[], data: HealthData, semanticRequested: 
   if (!semanticRequested) return;
 
   const routeSummary = formatProjectServerRouteSummary(data.servers);
-  lines.push(`**LSP**: ${displaySemanticStatus(data)}${routeSummary ? ` — ${routeSummary}` : ""}`);
-  if (data.structuralStatus) lines.push(`**Structural**: ${data.structuralStatus}`);
+  lines.push(
+    `**LSP**: ${displaySemanticStatus(data)}${routeSummary ? ` — ${routeSummary}` : ""}${data.structuralStatus ? `; **Structural**: ${data.structuralStatus}` : ""}`,
+  );
   lines.push("");
 }
 
@@ -297,7 +296,7 @@ function renderDiagnosticObservation(lines: string[], data: HealthData, cwd: str
     return;
   }
   if (observation.entries.length === 0) {
-    lines.push(emptyDiagnosticText(observation.scope, cwd));
+    lines.push("No errors or warnings reported in this scope.");
     return;
   }
   renderDiagnosticEntries(lines, data, cwd);
@@ -309,15 +308,6 @@ function currentRefreshAttempt(data: HealthData): HealthRefreshAttempt | null {
 
 function asSentence(text: string): string {
   return /[.!?]$/.test(text) ? text : `${text}.`;
-}
-
-function emptyDiagnosticText(scope: HealthDiagnosticScope, cwd: string): string {
-  if (scope.kind === "file") {
-    return `No errors or warnings found for \`${makeRelative(cwd, scope.path)}\`.`;
-  }
-  return scope.filter
-    ? `No errors or warnings are reported by the tracked-file diagnostic snapshot under \`${makeRelative(cwd, scope.filter)}\`.`
-    : "No errors or warnings are reported by the tracked-file diagnostic snapshot.";
 }
 
 function renderDiagnosticEntries(lines: string[], data: HealthData, cwd: string): void {

@@ -50,12 +50,44 @@ describe("renderInspectResult", () => {
     );
 
     expect(result).toContain("# Inspect: src/index.ts:2:10");
+    expect(result.match(/src\/index\.ts/g)).toHaveLength(1);
     expect(result).toContain("## Syntax node");
     expect(result).toContain("variable_declarator L2:9–L2:12");
     expect(result).toContain("`widget` (function) L1:1–L4:2");
     expect(result).toContain("No hover result at this point");
     expect(result).toContain("No definition result at this point");
     expect(result).toContain("No diagnostics intersect the nearby window");
+  });
+
+  it("uses same-point and same-file definitions without repeating the focus path", () => {
+    const assembly = assembleInspectResult(
+      {
+        relPath: "src/widget.ts",
+        line: 2,
+        character: 10,
+        maxResults: 5,
+        confidence: "semantic",
+        diagnosticWindow: { startLine: 1, endLine: 4 },
+        sections: {
+          node: completedCodeQuery(null),
+          enclosingSymbol: completedCodeQuery(null),
+          hover: completedCodeQuery(null),
+          definition: completedCodeQuery([
+            { file: "src/widget.ts", line: 2, character: 10 },
+            { file: "src/widget.ts", line: 8, character: 3 },
+            { file: "src/other.ts", line: 1, character: 1 },
+          ]),
+          diagnostics: completedCodeQuery([]),
+        },
+      },
+      [],
+    );
+    const result = renderInspectResult(assembly);
+    expect(result).toContain("- Same point");
+    expect(result).toContain("- L8:3");
+    expect(result).toContain("src/other.ts:1:1");
+    expect(result.match(/src\/widget\.ts/g)).toHaveLength(1);
+    expect(assembly.displayedDefinitions).toHaveLength(3);
   });
 
   it("uses a neutral fence for source text with a non-TypeScript extension", () => {

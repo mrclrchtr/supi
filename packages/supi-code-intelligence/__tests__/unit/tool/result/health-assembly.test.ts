@@ -159,9 +159,9 @@ describe("code_health result assembly", () => {
       evidence: cleanEvidence(),
     });
     expect(markdown).toContain("tracked-file diagnostic snapshot");
-    expect(markdown).toContain(
-      "No errors or warnings are reported by the tracked-file diagnostic snapshot.",
-    );
+    expect(markdown.match(/tracked-file diagnostic snapshot/g)).toHaveLength(1);
+    expect(markdown).toContain("No errors or warnings reported in this scope.");
+    expect(markdown).toContain("0 requested, 0 confirmed, 0 unconfirmed, 0 failed, 0 removed");
     expect(markdown).not.toContain("No diagnostics found");
   });
 

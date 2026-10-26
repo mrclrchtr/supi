@@ -566,9 +566,7 @@ describe("code_health tool", () => {
       content: Array<{ type: string; text: string }>;
     };
 
-    expect(result.content[0].text).toContain(
-      "No errors or warnings are reported by the tracked-file diagnostic snapshot.",
-    );
+    expect(result.content[0].text).toContain("No errors or warnings reported in this scope.");
     expect(result.content[0].text).not.toContain("1 file with issues: 0 errors, 0 warnings");
     expect(result.content[0].text).not.toContain("src/clean.ts");
   });

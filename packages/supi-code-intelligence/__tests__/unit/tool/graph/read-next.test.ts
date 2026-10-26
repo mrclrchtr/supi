@@ -92,6 +92,11 @@ describe("code_graph read-next guidance", () => {
     expect(result.content.match(/`index.ts` L1/g)).toHaveLength(1);
     expect(result.content).toContain("`consumer.ts` L1–L42");
     expect(result.content).toContain("inspect a reference site");
-    expect(result.content).toContain("`read` offset 1, limit");
+    expect(result.content).not.toContain("`read` offset");
+    expect(result.details?.data).toMatchObject({
+      readNext: expect.arrayContaining([
+        expect.objectContaining({ file: "consumer.ts", startLine: 1, endLine: 42 }),
+      ]),
+    });
   });
 });

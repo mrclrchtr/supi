@@ -1,5 +1,5 @@
 import { renderEvidenceListDisclosure } from "../../analysis/evidence.ts";
-import type { InspectObservation } from "../../session/inspect-types.ts";
+import type { InspectDefinition, InspectObservation } from "../../session/inspect-types.ts";
 import type { InspectResultAssembly } from "./result.ts";
 
 export function renderInspectResult(assembly: InspectResultAssembly): string {
@@ -11,7 +11,7 @@ export function renderInspectResult(assembly: InspectResultAssembly): string {
     "",
   ];
 
-  renderNode(lines, input, input.sections.node);
+  renderNode(lines, input.sections.node);
   renderEnclosingSymbol(lines, input.sections.enclosingSymbol);
   renderHover(lines, input.sections.hover);
   renderDefinitions(lines, assembly);
@@ -21,7 +21,6 @@ export function renderInspectResult(assembly: InspectResultAssembly): string {
 
 function renderNode(
   lines: string[],
-  input: InspectResultAssembly["data"],
   observation: InspectResultAssembly["data"]["sections"]["node"],
 ): void {
   lines.push("## Syntax node");
@@ -37,16 +36,13 @@ function renderNode(
     return;
   }
   lines.push(
-    `- Type: \`${node.type}\` at ${input.relPath}:${node.startLine}:${node.startCharacter}–${node.endLine}:${node.endCharacter}`,
+    `- \`${node.type}\` L${node.startLine}:${node.startCharacter}–L${node.endLine}:${node.endCharacter}`,
   );
   if (node.text) lines.push("```text", node.text, "```");
   if (node.ancestry.length > 0) {
-    lines.push("", "### Ancestry");
-    for (const ancestor of node.ancestry) {
-      lines.push(
-        `- \`${ancestor.type} L${ancestor.startLine}:${ancestor.startCharacter}–L${ancestor.endLine}:${ancestor.endCharacter}\``,
-      );
-    }
+    lines.push(
+      `Ancestry: ${node.ancestry.map((ancestor) => `\`${ancestor.type} L${ancestor.startLine}:${ancestor.startCharacter}–L${ancestor.endLine}:${ancestor.endCharacter}\``).join(" > ")}`,
+    );
   }
   lines.push("");
 }
@@ -95,7 +91,7 @@ function renderDefinitions(lines: string[], assembly: InspectResultAssembly): vo
     lines.push("_No definition result at this point._");
   } else {
     for (const definition of assembly.displayedDefinitions) {
-      lines.push(`- \`${definition.file}:${definition.line}:${definition.character}\``);
+      lines.push(`- ${formatDefinition(definition, assembly.data)}`);
     }
   }
   const disclosure = assembly.definitionEvidence
@@ -103,6 +99,18 @@ function renderDefinitions(lines: string[], assembly: InspectResultAssembly): vo
     : null;
   if (disclosure) lines.push("", disclosure);
   lines.push("");
+}
+
+function formatDefinition(
+  definition: InspectDefinition,
+  focus: InspectResultAssembly["data"],
+): string {
+  if (definition.file !== focus.relPath) {
+    return `\`${definition.file}:${definition.line}:${definition.character}\``;
+  }
+  if (definition.line === focus.line && definition.character === focus.character)
+    return "Same point";
+  return `L${definition.line}:${definition.character}`;
 }
 
 function renderDiagnostics(lines: string[], assembly: InspectResultAssembly): void {

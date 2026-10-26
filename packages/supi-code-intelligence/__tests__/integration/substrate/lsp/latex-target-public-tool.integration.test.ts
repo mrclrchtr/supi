@@ -305,7 +305,7 @@ describe.skipIf(!HAS_TEXLAB)("LaTeX targets through real Texlab and Tree-sitter"
     )) as { content: Array<{ text: string }> };
     const text = result.content[0]?.text ?? "";
 
-    expect(text).toContain("Type: `label` at underscore.tex:4:8–4:20");
+    expect(text).toContain("`label` L4:8–L4:20");
     expect(text).toContain("sec:my_label");
     expect(text).toContain("`curly_group_label");
     expect(text).toContain("`label_definition");

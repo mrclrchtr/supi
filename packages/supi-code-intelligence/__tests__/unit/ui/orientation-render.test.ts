@@ -48,7 +48,7 @@ describe("Orientation result projections", () => {
 
     expect(markdown).toContain("## Read Next");
     expect(markdown).toContain("`src/index.ts` L4–L12");
-    expect(markdown).toContain("read` offset 4, limit 9");
+    expect(markdown).not.toContain("read` offset");
     expect(assembly.assembled.actions).toContainEqual({ kind: "read-next", ...readNext });
     expect(assembly.details).toMatchObject({
       confidence: "structural",

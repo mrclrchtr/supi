@@ -36,14 +36,9 @@ function renderResolved(
   const kind = displayKind ? ` \`${displayKind}\`` : "";
   const name = target.name ? ` **${target.name}**${kind}` : "";
   const lines = [
-    `Resolved${name}:`,
-    "",
-    `- File: \`${relFile}\``,
-    `- Line: ${target.displayLine}, Column: ${target.displayCharacter}`,
-    `- Target ID: \`${target.targetId}\``,
-    `- Span ID: \`${target.spanId}\``,
-    `- Confidence: \`${target.confidence}\``,
-    `- Provenance: \`${target.provenance.join("+")}\``,
+    `${name.trim() || "Resolved target"} — \`${relFile}:${target.displayLine}:${target.displayCharacter}\``,
+    `Handle: \`${target.targetId}\``,
+    `confidence: ${target.confidence}; provenance: ${target.provenance.join("+")}`,
   ];
 
   const resolutionNote = renderAnchoredResolutionNote(target);
@@ -93,8 +88,7 @@ function appendTargetGroupItems(lines: string[], details: ResolveDetails): void 
     const kind = displayKind ? ` (\`${displayKind}\`)` : "";
     const container = target.container ? ` in \`${target.container}\`` : "";
     lines.push(
-      `- **${target.name ?? "anonymous"}**${kind}${container} — \`${target.file}:${target.displayLine}:${target.displayCharacter}\``,
-      `  Target ID: \`${target.targetId}\` (${target.anchorKind} anchor, ${target.confidence}, provenance: ${target.provenance.join("+")})`,
+      `- \`${target.targetId}\` **${target.name ?? "anonymous"}**${kind}${container} — \`${target.displayLine}:${target.displayCharacter}\` (${target.anchorKind} anchor, ${target.confidence}, provenance: ${target.provenance.join("+")})`,
     );
   }
 }
