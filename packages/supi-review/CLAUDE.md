@@ -23,7 +23,7 @@ Caller-defined code review tasks run in managed, Inspection-only Reviewer Sessio
 
 ## Reviewer sessions
 
-Reviewers receive Pi `read`, `bash`, and `grep`, headless Code Intelligence (`code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, `code_health`), and `submit_review`. When opted in, codemode runs in `on` mode with the same permitted inspection tools and the invocation's authorized auxiliary-model snapshot. Do not restore the five target-specific inspection tools.
+Reviewers receive Pi `read`, `bash`, `grep`, `find`, and `ls`, headless Code Intelligence (`code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_find`, `code_health`), and `submit_review`. When opted in, codemode runs in `on` mode with the same permitted inspection tools and the invocation's authorized auxiliary-model snapshot. Do not restore the five target-specific inspection tools.
 
 Inspection-only is a prompt protocol, not access control. The surrounding Sandboxed Pi Environment is the security boundary. When `review.bootstrapCommand` is configured, the Review Engine performs that one Dependency Bootstrap before fan-out and reviewers receive no bootstrap instruction; otherwise they may choose one. Reviewers must not intentionally mutate Target Evidence or Git history; tests, builds, linters, runtime experiments, nested Pi, and nested reviews are outside protocol.
 

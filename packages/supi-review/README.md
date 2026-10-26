@@ -103,7 +103,7 @@ Workspaces are marked and locked in the Git worktree list. Normal cleanup remove
 
 ## Reviewer Protocol
 
-Reviewer Sessions have `read`, `bash`, `grep`, headless Code Intelligence tools, and `submit_review` during investigation. With `review.reviewerCodemodeEnabled`, they also have PI codemode in `on` mode: direct tools remain visible, and scripts can call only the permitted Reviewer inspection tools. Classifier and image-model access is limited to the frozen catalogue captured once for that Review and shared by its Reviewer children. Use codemode only for investigation; it does not change the Inspection-only protocol or make the Review Workspace a sandbox. Reviewers inspect one shared frozen Review Workspace. They do not run tests, builds, linters, services, runtime experiments, nested Pi sessions, or nested reviews. They do not intentionally change Target Evidence or Git history.
+Reviewer Sessions have `read`, `bash`, `grep`, `find`, `ls`, headless Code Intelligence tools, and `submit_review` during investigation. With `review.reviewerCodemodeEnabled`, they also have PI codemode in `on` mode: direct tools remain visible, and scripts can call only the permitted Reviewer inspection tools. Classifier and image-model access is limited to the frozen catalogue captured once for that Review and shared by its Reviewer children. Use codemode only for investigation; it does not change the Inspection-only protocol or make the Review Workspace a sandbox. Reviewers inspect one shared frozen Review Workspace. They do not run tests, builds, linters, services, runtime experiments, nested Pi sessions, or nested reviews. They do not intentionally change Target Evidence or Git history.
 
 The Reviewer Protocol owns finding eligibility:
 

@@ -22,7 +22,14 @@ import { ReviewRecoveryPolicy } from "./recovery.ts";
 import { normalizeReviewSubmission } from "./submission.ts";
 import { buildReviewerSystemPrompt } from "./system-prompt.ts";
 
-const REVIEWER_INSPECTION_TOOLS = ["read", "bash", "grep", ...HEADLESS_INSPECTION_TOOL_NAMES];
+const REVIEWER_INSPECTION_TOOLS = [
+  "read",
+  "bash",
+  "grep",
+  "find",
+  "ls",
+  ...HEADLESS_INSPECTION_TOOL_NAMES,
+];
 
 function reviewerRunDisplay(
   invocation: ReviewerInvocation,

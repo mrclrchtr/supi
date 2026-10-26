@@ -106,13 +106,12 @@ describe("profile validation", () => {
     ]);
   });
 
-  it("accepts codemode as a fixed profile capability", async () => {
+  it.each([
+    ["codemode", ["read", "codemode"]],
+    ["discovery", ["read", "grep", "find", "ls"]],
+  ] as const)("accepts %s as fixed profile capabilities", async (id, tools) => {
     const paths = await roots();
-    await writeProfile(
-      paths.packageDirectory,
-      "codemode",
-      manifest({ tools: ["read", "codemode"] }),
-    );
+    await writeProfile(paths.packageDirectory, id, manifest({ tools }));
 
     const catalogue = await discoverProfileCatalogue({
       cwd: paths.root,
@@ -122,7 +121,11 @@ describe("profile validation", () => {
     });
 
     expect(catalogue.diagnostics).toEqual([]);
-    expect(catalogue.profiles[0]?.sources[0]?.manifest?.tools).toEqual(["read", "codemode"]);
+    const profile = catalogue.profiles[0];
+    if (!profile) throw new Error("Expected a valid profile.");
+    const resolved = resolveProfileDefinition(profile);
+    if (!("manifest" in resolved)) throw new Error(resolved.message);
+    expect(resolved.manifest.tools).toEqual(tools);
   });
 
   it("accepts provider/model IDs whose model portion contains slashes", async () => {

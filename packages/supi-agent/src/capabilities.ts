@@ -10,6 +10,9 @@ export interface AgentCapability {
 
 const capabilityList: readonly AgentCapability[] = [
   { id: "read", toolName: "read", mutationCapable: false, label: "Read files" },
+  { id: "grep", toolName: "grep", mutationCapable: false, label: "Search file contents" },
+  { id: "find", toolName: "find", mutationCapable: false, label: "Find files" },
+  { id: "ls", toolName: "ls", mutationCapable: false, label: "List directory contents" },
   { id: "bash", toolName: "bash", mutationCapable: true, label: "Run shell commands" },
   { id: "edit", toolName: "edit", mutationCapable: true, label: "Edit files" },
   { id: "write", toolName: "write", mutationCapable: true, label: "Write files" },

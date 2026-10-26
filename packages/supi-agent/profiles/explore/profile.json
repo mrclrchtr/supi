@@ -2,6 +2,9 @@
   "description": "Read-only agent specialized in repository exploration. Use when you need to locate files, understand code, or answer questions about the repository.",
   "tools": [
     "read",
+    "grep",
+    "find",
+    "ls",
     "code_resolve",
     "code_inspect",
     "code_orientation",

@@ -32,6 +32,9 @@ export type AgentSystemPrompt = "native" | "custom" | PackagePromptId;
 /** Fixed child capability names accepted by profile.json. */
 export type AgentCapabilityId =
   | "read"
+  | "grep"
+  | "find"
+  | "ls"
   | "bash"
   | "edit"
   | "write"

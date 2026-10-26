@@ -14,8 +14,8 @@ This package is the policy layer for `@mrclrchtr/supi-agent-runtime`. It discove
 
 Built-in profiles:
 
-- `explore` — read, headless Code Intelligence tools, and codemode, no instruction files, read-only.
-- `general` — read, bash, edit, write, headless Code Intelligence tools, and codemode, global/project instruction files, mutation-capable.
+- `explore` — read, grep, find, ls, headless Code Intelligence tools, and codemode, no instruction files, read-only.
+- `general` — read, grep, find, ls, bash, edit, write, headless Code Intelligence tools, and codemode, global/project instruction files, mutation-capable.
 
 Profile sources overlay fields by ID with project → global → package precedence. A partial user manifest can pin only `model` or `thinking`; package tools and prompts continue to flow through. An invalid source falls through with a bounded diagnostic. Profiles are context-isolated, not permission- or filesystem-sandboxed.
 
