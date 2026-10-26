@@ -1,5 +1,55 @@
 # Changelog
 
+## [11.1.0](https://github.com/mrclrchtr/supi/compare/v11.0.1...v11.1.0) (2026-10-26)
+
+
+### Features
+
+* **agent-runtime:** add optional post-result retrospectives ([c086d01](https://github.com/mrclrchtr/supi/commit/c086d01b2f2c51cf825769ecb047ef4c90338cfa))
+* **agent:** enable codemode in built-in profiles ([e631c36](https://github.com/mrclrchtr/supi/commit/e631c3686745988677b22e4f3c70a0ff4ea99c24))
+* **agents:** add opt-in codemode for Agent Runs and Review ([e8c4643](https://github.com/mrclrchtr/supi/commit/e8c4643ced10492e4262ae7bf8972badfe3f12ea))
+* **code-intelligence:** add consent-gated Gradle observations ([ff2a024](https://github.com/mrclrchtr/supi/commit/ff2a02471b0cdae6e318f645a02d9e7f501ccebe)), closes [#509](https://github.com/mrclrchtr/supi/issues/509)
+* **code-intelligence:** expose structured navigation results ([30dbbd9](https://github.com/mrclrchtr/supi/commit/30dbbd977ab07f2a893030a2d75603ab394d32bb))
+* **debug:** add historical retrospective gathering skill ([950cc3c](https://github.com/mrclrchtr/supi/commit/950cc3c5a1b896e9d58b462ec47de0fa5c6a71c6))
+* **debug:** add snapshot-backed retrospective reads ([b2f992c](https://github.com/mrclrchtr/supi/commit/b2f992c934536a0d0182c8b088c20bd8a956aac7))
+* **debug:** expose native structured tool results ([d530c0c](https://github.com/mrclrchtr/supi/commit/d530c0cebec153ba4cce62eaabde87210e7b7cbe))
+* enable discovery tools in agent and reviewer sessions ([6928fa7](https://github.com/mrclrchtr/supi/commit/6928fa74b7342fb6bcd8492d6343cf46c44380a9))
+* **web:** expose native structured tool results ([229f1ed](https://github.com/mrclrchtr/supi/commit/229f1ed7288e52b6d718e9081c49f93dc5d7ddb0))
+
+
+### Bug Fixes
+
+* **agent:** clarify exhausted conversation list pages ([edad79f](https://github.com/mrclrchtr/supi/commit/edad79fa0b4504c95f321663e382ba5119cf5c16))
+* **agent:** clarify task status and correlate retrospectives ([6cb23e9](https://github.com/mrclrchtr/supi/commit/6cb23e958c2d22b1a5fac2ed2797252de213efad))
+* **code-intelligence:** bound workspace previews by evidence rows ([5cfc16e](https://github.com/mrclrchtr/supi/commit/5cfc16e4ee8906ea734b044d078d85b612ee9b34))
+* **code-intelligence:** clarify AST scan skip reporting ([d7ca586](https://github.com/mrclrchtr/supi/commit/d7ca5869dce76b4803e3656fcdca6542b8e0614e)), closes [#469](https://github.com/mrclrchtr/supi/issues/469)
+* **code-intelligence:** clarify Gradle failure evidence ([d6c72ab](https://github.com/mrclrchtr/supi/commit/d6c72ab36e70dd5ffb67dd9d2dfd1865a76c84fc)), closes [#509](https://github.com/mrclrchtr/supi/issues/509)
+* **code-intelligence:** compact workspace orientation evidence ([f54cd3f](https://github.com/mrclrchtr/supi/commit/f54cd3fd094a7bb3d6641bf8b451a3330ce2d168))
+* **code-intelligence:** condition captured overview links ([fce40c5](https://github.com/mrclrchtr/supi/commit/fce40c5b3b11b350939bf46e7c66c84a9bef00de))
+* **code-intelligence:** distinguish evidence and preview counts ([1c84a57](https://github.com/mrclrchtr/supi/commit/1c84a572a22f9fe32e9318827837dc862b4c809c))
+* **code-intelligence:** honor .gitignore in broad AST scans ([43ae5cc](https://github.com/mrclrchtr/supi/commit/43ae5ccc5160abed3dc7a942a5bf8569aef04d6e)), closes [#469](https://github.com/mrclrchtr/supi/issues/469)
+* **code-intelligence:** make symlink focus failures actionable ([93b8878](https://github.com/mrclrchtr/supi/commit/93b88785a81d0c897e1142c9d65bb0168ce55120))
+* **deps:** align language server release family ([3f53d26](https://github.com/mrclrchtr/supi/commit/3f53d26dcb9e5a8217b1398185352594b7fc91c0))
+* **deps:** lock file maintenance ([8ed97e1](https://github.com/mrclrchtr/supi/commit/8ed97e122537104933bfd3ae7d64122bf62cd833))
+* **deps:** lock file maintenance ([3a3e37f](https://github.com/mrclrchtr/supi/commit/3a3e37f902a6dd3587b38a30475d050cc5ab4c1d))
+* **deps:** satisfy Biome 2.6 checks ([d22caba](https://github.com/mrclrchtr/supi/commit/d22caba5a538ac8a67e700e00ab05e544684f97c))
+* **deps:** synchronize pnpm baseline pin with Renovate ([204b305](https://github.com/mrclrchtr/supi/commit/204b305b61c4d7089202557186e29488564c30c1))
+* **deps:** update dependency @biomejs/biome to v2.6.2 ([9855b4e](https://github.com/mrclrchtr/supi/commit/9855b4e7aefa52924e08880b643cedcf16864058))
+* **deps:** update dependency hk to v2.8.1 ([109eaea](https://github.com/mrclrchtr/supi/commit/109eaea0fa01a59364c7947b1669ae8a59c47ec3))
+* **deps:** update dependency hk to v2.9.0 ([cc69a28](https://github.com/mrclrchtr/supi/commit/cc69a2826507b38350fa22c87094b6ac52f0db07))
+* **deps:** update dependency vscode-jsonrpc to v10 ([ee119cb](https://github.com/mrclrchtr/supi/commit/ee119cb14103ede05c2cca3d5e4a29a963927610))
+* **deps:** update vscode-languageserver-node to v3.18.5 ([412fa71](https://github.com/mrclrchtr/supi/commit/412fa7112bc7dbb821f338c638b922d3d3540b74))
+* **lsp:** back off ContentModified semantic retries ([9e02add](https://github.com/mrclrchtr/supi/commit/9e02add1fb1a2645ccc42ce1517486b793c78195))
+* **tree-sitter:** parse type-only star exports and import arrays ([7facaba](https://github.com/mrclrchtr/supi/commit/7facaba3624f3828748e008078b8cf438a91deec))
+* **web:** adopt official Context7 SDK ([63cbd18](https://github.com/mrclrchtr/supi/commit/63cbd1855a3833662f31e26c94212e673525e393))
+
+
+### Performance Improvements
+
+* **code-intelligence:** bound inline model previews ([fecf68c](https://github.com/mrclrchtr/supi/commit/fecf68cdf6f104f81e94d78e208543d2af290f88))
+* **code-intelligence:** compact navigation result text ([4106639](https://github.com/mrclrchtr/supi/commit/410663928e5b3fdbd235b973151d6efd675f51cc))
+* **code-intelligence:** defer ancillary directory navigation ([241bb1b](https://github.com/mrclrchtr/supi/commit/241bb1b720ed3d85d2f4bbfd60b8bec5a8acf928))
+
 ## [11.0.1](https://github.com/mrclrchtr/supi/compare/v11.0.0...v11.0.1) (2026-10-22)
 
 
