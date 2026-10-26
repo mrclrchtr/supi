@@ -5,6 +5,7 @@ import { FindQueryParam, FindScopeParam, MaxResultsParam } from "../schemas.ts";
 import { CODE_FIND_AST_KINDS } from "./ast-kinds.ts";
 import { executeFindTool } from "./execute.ts";
 import { CODE_FIND_MODES } from "./modes.ts";
+import { FindOutputSchema } from "./structured.ts";
 import { renderFindCall, renderFindResult } from "./tui.ts";
 
 export const CODE_FIND_TOOL_NAME = "code_find";
@@ -14,6 +15,7 @@ export const CODE_FIND_TOOL_LABEL = "Code Find";
 export const codeFindSpec = {
   name: CODE_FIND_TOOL_NAME,
   label: CODE_FIND_TOOL_LABEL,
+  outputSchema: FindOutputSchema,
   parameters: Type.Object(
     {
       query: FindQueryParam,

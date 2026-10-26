@@ -19,5 +19,5 @@ export async function executeFindTool(
   ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   const outcome = await ctx.session.find(params as FindWorkflowInput, toWorkflowControl(ctx));
-  return finishFindResult(outcome, params.scope, params.mode);
+  return finishFindResult(outcome, ctx.cwd, params.scope, params.mode);
 }

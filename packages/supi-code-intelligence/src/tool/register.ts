@@ -105,6 +105,7 @@ export function registerCodeIntelligenceTools(
       promptSnippet: surface.promptSnippet,
       promptGuidelines: surface.promptGuidelines,
       parameters: spec.parameters,
+      outputSchema: spec.outputSchema,
       // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
       execute: async (toolCallId, params, signal, onUpdate, ctx: ExtensionContext) => {
         const operationId = createDebugOperationId(operationSecret, toolCallId);
@@ -115,7 +116,7 @@ export function registerCodeIntelligenceTools(
         try {
           const session = getOrCreateSession(ctx.cwd);
           session.setProjectTrusted(ctx.isProjectTrusted());
-          const { content, details } = await spec.run(params, {
+          const { content, details, structuredContent } = await spec.run(params, {
             cwd: ctx.cwd,
             operationId,
             signal,
@@ -131,11 +132,14 @@ export function registerCodeIntelligenceTools(
             outcome: "completed",
           });
           reportWorkspaceBudget(ctx, details?.budgetWarning, operationId);
-          return boundCodeToolResult(content, details, {
-            toolName: spec.name,
-            maxLines: spec.maxLines,
-            maxBytes: spec.maxBytes,
-          });
+          return {
+            ...boundCodeToolResult(content, details, {
+              toolName: spec.name,
+              maxLines: spec.maxLines,
+              maxBytes: spec.maxBytes,
+            }),
+            ...(structuredContent === undefined ? {} : { structuredContent }),
+          };
         } catch (error) {
           const outcome = terminalCodeOperationOutcome(error, signal);
           recordCodeWorkflowTiming(workflowTimer, operationId, spec.name, {

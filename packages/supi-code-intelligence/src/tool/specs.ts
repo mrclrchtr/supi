@@ -28,6 +28,8 @@ export interface CodeIntelligenceToolDefinitionSpec {
   name: CodeIntelligenceToolName;
   label: string;
   parameters: TSchema;
+  /** Machine-readable success and recoverable-input outcomes for programmatic callers. */
+  outputSchema?: TSchema;
   maxLines?: number;
   maxBytes?: number;
   run: (params: unknown, ctx: CodeIntelToolExecCtx) => Promise<CodeIntelResult> | CodeIntelResult;

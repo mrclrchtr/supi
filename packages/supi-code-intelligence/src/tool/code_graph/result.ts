@@ -26,6 +26,7 @@ import type { GraphDetails, GraphFileGroup, GraphSectionDetails } from "./detail
 import { graphDisplaySection } from "./display.ts";
 import { formatGraphEvidence } from "./format.ts";
 import { graphReadNext } from "./read-next.ts";
+import { structuredGraphCandidates, structuredGraphResult } from "./structured.ts";
 
 export type { GraphRelationKind, GraphSection } from "../../session/graph-types.ts";
 
@@ -265,7 +266,17 @@ type GraphOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["graph"]>
 export function finishGraphResult(outcome: GraphOutcome, cwd: string): CodeIntelResult {
   if (outcome.kind === "unavailable") throw new Error(outcome.reason);
   if (outcome.kind === "invalid-input") {
-    return searchErrorResult(`**Error:** ${outcome.message}`, { message: outcome.message });
+    return {
+      ...searchErrorResult(`**Error:** ${outcome.message}`, { message: outcome.message }),
+      structuredContent: {
+        kind: "invalid-input",
+        message: outcome.message,
+        sections: [],
+        evidenceLists: [],
+        readNext: [],
+        nextQueries: [],
+      },
+    };
   }
   if (outcome.kind === "disambiguation" || outcome.kind === "kind-mismatch") {
     return finishGraphCandidates(outcome);
@@ -281,6 +292,7 @@ export function finishGraphResult(outcome: GraphOutcome, cwd: string): CodeIntel
   const displayTruncated = hasHiddenDisplayEvidence(assembly);
   return {
     content: renderGraphResult(assembly),
+    structuredContent: structuredGraphResult(assembly),
     details: {
       type: "graph",
       data: assembly.details,
@@ -328,20 +340,25 @@ function finishGraphCandidates(
       format: (candidate) => formatCandidateRow(candidate, "handle-first"),
     }),
   ];
-  return searchErrorResult(lines.join("\n"), {
-    confidence: "semantic",
-    evidenceLists: [evidence],
-    nextQueries:
-      outcome.kind === "kind-mismatch"
-        ? ["Retry without symbolKind, use an observed provider kind, or choose a near-match handle"]
-        : ["Choose one candidate handle, or narrow the symbol selector with scope or symbolKind"],
-    status: outcome.kind === "disambiguation" ? "disambiguation" : "invalid-input",
-    message:
-      outcome.kind === "kind-mismatch"
-        ? `No target matched provider kind ${outcome.requestedKind}.`
-        : "The target is ambiguous.",
-    displaySections,
-  });
+  const nextQueries =
+    outcome.kind === "kind-mismatch"
+      ? ["Retry without symbolKind, use an observed provider kind, or choose a near-match handle"]
+      : ["Choose one candidate handle, or narrow the symbol selector with scope or symbolKind"];
+  const message =
+    outcome.kind === "kind-mismatch"
+      ? `No target matched provider kind ${outcome.requestedKind}.`
+      : "The target is ambiguous.";
+  return {
+    ...searchErrorResult(lines.join("\n"), {
+      confidence: "semantic",
+      evidenceLists: [evidence],
+      nextQueries,
+      status: outcome.kind === "disambiguation" ? "disambiguation" : "invalid-input",
+      message,
+      displaySections,
+    }),
+    structuredContent: structuredGraphCandidates(outcome, evidence, { message, nextQueries }),
+  };
 }
 
 function graphCandidateEvidence(

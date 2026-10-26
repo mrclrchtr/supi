@@ -302,6 +302,7 @@ function resolveProvenance(outcome: TargetWorkflowOutcome): ResultProvenance[] {
 
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
 import { renderResolveResult } from "./markdown.ts";
+import { structuredResolveResult } from "./structured.ts";
 
 type ResolveOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["resolve"]>>;
 
@@ -324,6 +325,7 @@ export function finishResolveResult(
 
   return {
     content,
+    structuredContent: structuredResolveResult(assembly.details, outcome),
     details: {
       type: "resolve",
       data: assembly.details,

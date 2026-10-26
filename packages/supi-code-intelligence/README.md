@@ -83,6 +83,25 @@ Important tool rules:
 
 `code_health({ refresh: true })` retries failed startup and exhausted process-crash routes in scope, with at most one attempt per route per call. It collects fresh diagnostic evidence and reports recovery separately from diagnostic confirmation. A broad maintenance attempt can include active tracked files outside a requested directory, but the diagnostic result keeps the requested directory and tracked-file boundary. The report labels maintenance evidence separately from result coverage. A later refresh can retry a failed route. Reports show up to 16 route entries per recovery list and disclose omitted entries. Use an exact file scope when a route reports `use-exact-file`.
 
+### Structured codemode results
+
+`code_resolve`, `code_find`, and `code_graph` declare output schemas. Direct calls retain compact text; codemode receives JSON instead of Markdown. Resolve returns `targets` with reusable `handle` values; Find returns bounded `matches`; Graph returns per-relation `sections` with bounded `items`. UI details and internal target-store entries are not exposed.
+
+Check `kind` before consuming evidence. Invalid input and candidate selection return recovery data; whole-tool capability failures still throw. `evidenceLists` (and Graph's per-section `evidence`) retain exact or unknown totals, shown/omitted counts, partial reasons, and invalid-location counts. AST results retain their scan policy, exclusions, limitations, and failures. Coordinates are one-based UTF-16 except zero-based recovery error ranges.
+
+Example codemode script that returns counts rather than every reference:
+
+```javascript
+const graph = await tools.code_graph({
+  target: { symbol: { query: "PaymentProvider", scope: "packages/api" } },
+  relations: ["references"],
+});
+return graph.kind === "completed"
+  ? graph.sections.map(({ relation, source, status, evidence, message }) =>
+      ({ relation, source, status, evidence, message }))
+  : graph;
+```
+
 ### Workspace and directory observations
 
 Automatic collection stays within the session working directory. Ancestor Git roots and workspace manifests do not expand that boundary. An explicit directory focus can select a different root. Each tool call makes a new observation; its output does not depend on an earlier overview.

@@ -1,4 +1,4 @@
-import type { AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
+import type { AgentToolResult, AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
 import type { WorkspaceCodeIntelligenceSession } from "../session/session.ts";
 import type { GraphDetails } from "../tool/code_graph/details.ts";
 import type {
@@ -58,6 +58,8 @@ export interface CodeIntelResultDetails {
 /** Tool result shape returned by executeAction. */
 export interface CodeIntelResult {
   content: string;
+  /** Caller-facing JSON for codemode; independent of UI details and model-visible text. */
+  structuredContent?: AgentToolResult<unknown>["structuredContent"];
   details?:
     | (CodeIntelResultDetails & { type: "context"; data: ContextDetails })
     | (CodeIntelResultDetails & { type: "inspect"; data: InspectDetails })

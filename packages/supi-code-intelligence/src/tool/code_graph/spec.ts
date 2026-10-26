@@ -3,6 +3,7 @@ import { Type } from "typebox";
 import type { CodeIntelToolExecCtx } from "../../types/index.ts";
 import { GraphTargetParam, MaxResultsParam } from "../schemas.ts";
 import { executeGraphTool } from "./execute.ts";
+import { GraphOutputSchema } from "./structured.ts";
 import { renderGraphCall, renderGraphResult } from "./tui.ts";
 
 export const CODE_GRAPH_TOOL_NAME = "code_graph";
@@ -12,6 +13,7 @@ export const CODE_GRAPH_TOOL_LABEL = "Code Graph";
 export const codeGraphSpec = {
   name: CODE_GRAPH_TOOL_NAME,
   label: CODE_GRAPH_TOOL_LABEL,
+  outputSchema: GraphOutputSchema,
   parameters: Type.Object(
     {
       target: GraphTargetParam,

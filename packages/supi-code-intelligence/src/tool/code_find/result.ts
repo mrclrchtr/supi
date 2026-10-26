@@ -171,12 +171,14 @@ function findProvenance(
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
 import { scopedSymbolFailureMessage, searchErrorResult } from "../result/errors.ts";
 import { renderFindResult } from "./render.ts";
+import { structuredFindResult } from "./structured.ts";
 
 type FindOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["find"]>>;
 
 /** Assemble the final model-visible code_find result for one workflow outcome. */
 export function finishFindResult(
   outcome: FindOutcome,
+  cwd: string,
   scope: readonly string[] | undefined,
   mode?: FindMode,
 ): CodeIntelResult {
@@ -188,16 +190,27 @@ export function finishFindResult(
     throw new Error(reason);
   }
   if (outcome.kind === "invalid-input") {
-    return searchErrorResult(`**Error:** ${outcome.message}`, {
-      scope: Array.isArray(scope) ? scope.join(", ") : null,
-      nextQueries: ["Fix the search input and retry"],
-      message: outcome.message,
-    });
+    return {
+      ...searchErrorResult(`**Error:** ${outcome.message}`, {
+        scope: Array.isArray(scope) ? scope.join(", ") : null,
+        nextQueries: ["Fix the search input and retry"],
+        message: outcome.message,
+      }),
+      structuredContent: {
+        kind: "invalid-input",
+        confidence: "unavailable",
+        matches: [],
+        evidenceLists: [],
+        nextQueries: ["Fix the search input and retry"],
+        message: outcome.message,
+      },
+    };
   }
 
   const assembly = assembleFindWorkflowResult(outcome);
   return {
     content: renderFindResult(assembly),
+    structuredContent: structuredFindResult(assembly, cwd),
     details: {
       type: "search",
       data: assembly.details,
