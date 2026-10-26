@@ -19,14 +19,10 @@ SuPi is pre-release and API-unstable. Breaking changes to APIs, commands, config
 
 ## Package layout convention
 
-- For new packages or structural work, follow `docs/conventions/package-layout.md`. Add `src/api.ts`, `src/index.ts`, and `src/extension.ts` only as the package role requires.
-- Keep small packages flat; use domain folders, not catch-all `core/`, `shared/`, or `misc/` buckets.
-- Keep package-level tests in `__tests__/unit/`, `__tests__/integration/`, and optional helpers/fixtures.
-- Tool packages use per-tool `src/tool/` directories; follow `docs/conventions/tool-architecture.md` for guidance, specs, execution, results, and rendering boundaries.
+- For new packages or structural work, follow `docs/conventions/package-layout.md` for role-specific boundaries, layout, and source/test configs.
+- For tool packages, follow `docs/conventions/tool-architecture.md` for per-tool guidance, specs, execution, results, and rendering boundaries.
 
 ## Commands
-
-Discover commands with `pnpm run`; toolchain versions are pinned in `.mise.toml`.
 
 - Prefer lower-noise `*:ai` scripts when available; plain variants are for prettier/interactive output.
 - Run `pnpm verify:ai` for code, test, dependency, or package/config changes. Skip for specs/docs/skills-only changes unless requested.
@@ -91,7 +87,7 @@ Register a `SettingsModule` with `registerSettings()` from `@mrclrchtr/supi-core
 ### Dev workflow
 - `hk` pre-commit autofixes with `stash = "none"`; unstaged changes in fixed files may be staged too. No pre-push hook.
 - Use `pnpm exec jiti /tmp/script.mjs` for TS runtime probes; Node `--experimental-strip-types` breaks on TS parameter properties here.
-- pnpm `ignoredBuiltDependencies` skips install scripts; `onlyBuiltDependencies` allows them. Confusing these causes missing native binaries (e.g. tree-sitter-cli).
+- Dependency install scripts use `allowBuilds` in `pnpm-workspace.yaml` (`true` allows, `false` skips); keep `tree-sitter-cli` enabled so its native binary is installed.
 - Use `pnpm typecheck:ai` for project-reference builds, not ad-hoc `tsc --noEmit`.
 - Report tool failures by throwing from `execute()` or returning `isError: true` with structured failure data. Error text alone is success; valid zero-result searches are not failures.
 - Reproduce provider errors with `pi -p "Say ok" --model openai-codex/<model> --no-session`. Codex uses WebSockets under `transport: auto`; set `"transport": "sse"` in `~/.pi/agent/settings.json` to instrument HTTP.
@@ -107,8 +103,6 @@ node scripts/publish.mjs packages/supi-lsp           # pack + verify
 node scripts/publish.mjs packages/supi-lsp --publish # pack + verify + publish
 ```
 
-`pack:check` and `pack:verify` both pack and verify tarballs for all publishable packages; neither publishes.
-
 ## Release & tagging convention
 
 - Release-please creates one `vX.Y.Z` tag and GitHub release, not per-package tags.
@@ -123,20 +117,17 @@ node scripts/publish.mjs packages/supi-lsp --publish # pack + verify + publish
 
 ## Testing patterns
 
-- `vi.hoisted()` runs before imports: use inline arrows without imported values. Each test file needs top-level `vi.hoisted` + `vi.mock` (single-value or object patterns); helpers cannot share them.
-- Biome function/file line limits are disabled under `__tests__`; production code keeps configured limits/overrides.
+- Keep `vi.mock()` declarations at test-file top level. Use `vi.hoisted()` when mock factories need shared setup; its callback runs before imports and cannot use imported runtime values.
 - Use `createPiMock()` / `makeCtx()` from `@mrclrchtr/supi-test-utils`, not local factories. For extension integration tests, mock internal boundaries and invoke captured handlers directly.
 - Shared-config changes need regression coverage across `supi-core`, `supi-lsp`, and `supi-claude-md`.
 - For global `defineConfigSettings` tests, pass `homeDir` in options rather than changing `process.env.HOME`.
 - Auto-fix unused imports with `pnpm exec biome check --write --unsafe <files>`; cap output with `--max-diagnostics=20` if the full check OOMs.
-- Use `vi.useFakeTimers()` + `vi.advanceTimersByTime(ms)` to trigger Vitest `setInterval` callbacks.
 - Prefer `class` for constructor mocks in `vi.mock`. Check hoisting errors' Caused-by chain; prefer static imports when dynamic imports interact with hoisting.
 - `createPiMock` stores handlers as `Map<string, handler[]>` (`handlers.get(event)?.[0]`); use `getHandlerOrThrow(pi, event)` from `@mrclrchtr/supi-test-utils` to avoid CI-blocking `noNonNullAssertedOptionalChain`.
 - Vitest/esbuild strips types. Alongside `pnpm vitest run`, run `pnpm exec tsc -b packages/<pkg>/tsconfig.json packages/<pkg>/__tests__/tsconfig.json`.
 - When public exports change, audit downstream mocks for consumers' actual domain entrypoints; missing exports fail at runtime.
-- Remove unused `// biome-ignore` comments after deleting code; Biome flags them.
 - State-shape changes require updating **every** `createInitialState` mock to match real types.
-- New packages need `package.json`, `tsconfig.json`, and `__tests__/tsconfig.json` (`{"extends": "../../../tsconfig.json", "include": ["**/*.ts", "../src/**/*.ts"], "exclude": []}`). Add installable extensions (never library-only packages) to root `pi.extensions`; run `pnpm install`.
+- After adding a package, run `pnpm install` to refresh workspace links.
 - Module-level state persists across Vitest tests (cached ES modules); verify behavior rather than constructor counts.
 - Vitest `fsModuleCache` (`node_modules/.vitest-cache`) can retain stale evaluations during refactors; delete it when module errors won't reproduce.
 - `noImportCycles` counts `export ... from` re-exports, not `import type`; delete dead type re-exports rather than suppressing.
