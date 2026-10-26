@@ -1,7 +1,5 @@
 # supi-extras
 
-Collection of small pi extension utilities bundled into one package.
-
 ## Ownership
 
 Keep these small utilities flat. Shared clipboard behavior belongs in `clipboard.ts`; both copy-prompt and prompt-stash use it. Session capability snapshots belong in `supi-core/session`, while this package owns the selector and reconciliation of explicit tool choices.

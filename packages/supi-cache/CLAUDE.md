@@ -6,7 +6,7 @@
 
 ## Ownership and output
 
-Keep live cache statistics, notices, and recovery reporting in PI. SuPi settings expose only forensics thresholds.
+SuPi settings expose only forensics thresholds.
 
 Cache history reads the current branch; forensics investigates historical sessions. The agent tool is machine-only and returns a bounded JSON envelope with redacted shape fingerprints. Human reports use command renderers. List queries default to at most 50 findings and accept a limit up to 200.
 

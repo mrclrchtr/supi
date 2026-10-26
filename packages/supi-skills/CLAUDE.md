@@ -1,7 +1,5 @@
 # supi-skills
 
-Scoped skill controls and `$skill-name` input shortcuts.
-
 ## Package-specific gotchas
 
 - PI settings own Skill Load. Scoped SuPi config owns Model Invocation overrides.

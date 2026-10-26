@@ -8,7 +8,6 @@
 
 - Keep the API minimal and package-agnostic.
 - Keep C-family association validation and matching here so Tree-sitter and LSP use one rule set. The resolver only changes existing C-family suffixes. It does not load config or apply trust policy.
-- Do not add pi tool registration or extension exports here.
 - Capability interfaces remain interfaces, not classes, so adapters and test fakes can satisfy the contract without inheritance.
 - Read-only semantic queries use `CodeQueryResult<T>`; preserve completed empty data separately from partial or unavailable collection.
 - Availability states must distinguish pending, ready, inactive, disabled, and unavailable.

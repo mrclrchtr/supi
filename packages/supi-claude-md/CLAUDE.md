@@ -1,7 +1,5 @@
 # supi-claude-md
 
-CLAUDE.md/AGENTS.md maintenance skills for the pi coding agent.
-
 ## Architecture
 
 This package is skills-only in behavior. Its thin extension registers bundled skills through `resources_discover`; it does not inject instruction files, register tools, or expose settings.
@@ -9,8 +7,6 @@ This package is skills-only in behavior. Its thin extension registers bundled sk
 Runtime instruction-file surfacing is owned by `@mrclrchtr/supi-code-intelligence`: `code_orientation` with a directory focus surfaces applicable `CLAUDE.md`/`AGENTS.md` files as part of explicit orientation.
 
 ## Skills
-
-Two skills are shipped under `skills/`:
 
 - `claude-md-improver`: bulk audit and scoring of CLAUDE.md files. Compares instructions with the delivered workspace overview and non-instruction facts from routine Orientation; flags redundant inventories while preserving human-only reasoning.
 - `claude-md-revision`: targeted session-capture additions to CLAUDE.md

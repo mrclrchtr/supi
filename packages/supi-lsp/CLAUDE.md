@@ -8,7 +8,7 @@ There is no PI extension entrypoint and no model-callable `lsp_*` tool surface. 
 
 ## Runtime architecture
 
-`LspRuntimeController` owns lifecycle and status. `WorkspaceLspRuntime` owns routing, semantic readiness and operations, tracked files, diagnostics, and recovery. A ready controller publishes `{ kind: "ready", runtime }`; when every configured server definition is disabled, the controller publishes `{ kind: "disabled", reason }` without creating a runtime owner. Runtime ownership is not semantic readiness: workspace readiness requires at least one concrete active-ready client, and file readiness requires a non-null routed client.
+`LspRuntimeController` owns lifecycle and status. `WorkspaceLspRuntime` owns routing, semantic readiness and operations, tracked files, diagnostics, and recovery. A ready controller publishes `{ kind: "ready", runtime }`; when every configured server definition is disabled, startup succeeds and the controller publishes `{ kind: "disabled", reason }` without creating a runtime owner. Runtime ownership is not semantic readiness: workspace readiness requires at least one concrete active-ready client, and file readiness requires a non-null routed client.
 
 `WorkspaceLspRuntime` is an exported interface. `DefaultWorkspaceLspRuntime`, clients, and `LspManager` remain internal. Never add manager/client access to the public runtime.
 
@@ -61,7 +61,6 @@ See [ADR 0022](../../docs/adr/0022-request-confirmed-lsp-agnostic-diagnostics.md
 Always-on policy:
 
 - `lsp.servers.<language>.enabled: false` is the language opt-out.
-- If every server definition is disabled, startup is a successful disabled state, not a ready runtime with zero servers.
 
 `code-intelligence.exclude` contains gitignore-style patterns for automatic LSP workspace work and broad AST searches. The LSP policy also reads root and nested `.gitignore` files. Built-in private, generated, and dependency directories stay excluded and cannot be enabled again. Explicit semantic requests for one exact file can still route an excluded file; this does not add the file to later automatic work. Runtime and AST consumers use one immutable configured-pattern snapshot per active session. Diagnostic output keeps its configured suppression. An old `lsp.exclude` value is a migration error.
 

@@ -1,7 +1,5 @@
 # supi-prompt-suggestions
 
-Ghost-text prompt suggestions in the PI editor.
-
 ## Package-specific gotchas
 
 ### Editor replacement on session_start
