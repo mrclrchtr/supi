@@ -18,10 +18,16 @@ type PersistedDebugEventQuery = Pick<
   "operationId" | "source" | "level" | "category" | "limit"
 >;
 
-/** Sanitized events and total persisted entries found in one PI session file. */
+/** Sanitized selection and scan totals from one PI session file. */
 export interface SessionDebugEvents {
   events: DebugEventView[];
   persistedEventCount: number;
+  /** Valid matching events before the query limit is applied. */
+  matchedEventCount: number;
+  /** Recognized debug entries whose event payload could not be validated. */
+  invalidEventCount: number;
+  /** Nonblank JSONL lines that could not be parsed; their event identity is unknown. */
+  malformedLineCount: number;
 }
 
 /** Small progress facts emitted while a persisted session file is scanned. */
@@ -68,12 +74,13 @@ function parsePersistedEvent(data: unknown): DebugEventView | undefined {
   };
 }
 
-function parseDebugEntry(line: string): unknown {
-  if (!line.includes('"customType"')) return undefined;
+function parseSessionLine(line: string): { entry?: unknown; malformed: boolean } {
+  if (!line.trim()) return { malformed: false };
   try {
-    return JSON.parse(line);
+    return { entry: JSON.parse(line), malformed: false };
   } catch {
-    return undefined;
+    // Do not retain line contents: damaged rows can contain unsanitized session data.
+    return { malformed: true };
   }
 }
 
@@ -99,6 +106,8 @@ export async function readSessionDebugEvents(
 ): Promise<SessionDebugEvents> {
   const events: DebugEventView[] = [];
   let persistedEventCount = 0;
+  let invalidEventCount = 0;
+  let malformedLineCount = 0;
   let scannedLines = 0;
   throwIfAborted(options.signal);
 
@@ -117,7 +126,8 @@ export async function readSessionDebugEvents(
     for await (const line of lines) {
       scannedLines++;
       throwIfAborted(options.signal);
-      const entry = parseDebugEntry(line);
+      const { entry, malformed } = parseSessionLine(line);
+      malformedLineCount += Number(malformed);
       if (
         typeof entry !== "object" ||
         entry === null ||
@@ -136,6 +146,7 @@ export async function readSessionDebugEvents(
 
       persistedEventCount++;
       const event = parsePersistedEvent((entry as Record<string, unknown>).data);
+      invalidEventCount += Number(event === undefined);
       if (event && matchesDebugEventQuery(event, query)) events.push(event);
 
       if (scannedLines % 250 === 0) {
@@ -164,5 +175,8 @@ export async function readSessionDebugEvents(
   return {
     events: events.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit),
     persistedEventCount,
+    matchedEventCount: events.length,
+    invalidEventCount,
+    malformedLineCount,
   };
 }

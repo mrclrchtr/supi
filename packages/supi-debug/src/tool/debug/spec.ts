@@ -1,6 +1,7 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { makeDebugExecute } from "./execute.ts";
+import { debugLevelSchema, debugOperationIdSchema } from "./input.ts";
+import { debugOutputSchema } from "./result-schema.ts";
 
 export const DEBUG_TOOL_NAME = "debug";
 export const DEBUG_TOOL_LABEL = "SuPi Debug";
@@ -10,18 +11,12 @@ export const debugSpec = {
   name: DEBUG_TOOL_NAME,
   label: DEBUG_TOOL_LABEL,
   parameters: Type.Object({
-    operationId: Type.Optional(
-      Type.String({
-        description: "Filter by exact Debug Operation ID",
-        pattern: "^op-[A-Za-z0-9_-]{21}[AQgw]$",
-      }),
-    ),
+    operationId: Type.Optional({
+      ...debugOperationIdSchema,
+      description: "Filter by exact Debug Operation ID",
+    }),
     source: Type.Optional(Type.String({ description: "Filter by extension source, e.g. lsp" })),
-    level: Type.Optional(
-      StringEnum(["debug", "info", "warning", "error"], {
-        description: "Filter by debug level",
-      }),
-    ),
+    level: Type.Optional({ ...debugLevelSchema, description: "Filter by debug level" }),
     category: Type.Optional(Type.String({ description: "Filter by event category" })),
     limit: Type.Optional(Type.Number({ description: "Maximum number of events to return" })),
     sessionFile: Type.Optional(
@@ -31,5 +26,6 @@ export const debugSpec = {
       Type.Boolean({ description: "Request raw event data when settings permit it" }),
     ),
   }),
+  outputSchema: debugOutputSchema,
   execute: makeDebugExecute(),
 } as const;

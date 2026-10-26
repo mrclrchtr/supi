@@ -85,6 +85,49 @@ representation, subject to PI's standard tool-output truncation limits. This is
 useful for automated troubleshooting flows while protecting the model context
 from very large event payloads.
 
+## Structured results
+
+`debug` declares PI's native `outputSchema`. Direct calls retain readable, bounded
+text; default codemode calls resolve to structured data without parsing that text:
+
+```js
+const result = await tools.debug({ source: "lsp", limit: 20 });
+return {
+  messages: result.events.map((event) => event.message),
+  complete: result.selection.complete,
+  omitted: result.selection.omittedEventCount,
+};
+```
+
+| Field | Contract |
+| --- | --- |
+| `events` | All query-selected events, newest first: `id`, millisecond `timestamp`, `source`, `level`, `category`, `message`, and optional `operationId`, `cwd`, `data`, `rawData`. Producer-defined diagnostic fields remain data, not rendered Markdown. |
+| `provenance` | Live: `{ kind: "live", scope: "retained-buffer" }`. Historical: `{ kind: "persisted", sessionFile, persistedEventCount, invalidEventCount, malformedLineCount }`, with the resolved file path. Event counts cover recognized persisted debug entries. `malformedLineCount` counts every nonblank line that cannot be parsed, independently of event filters; malformed contents are never returned. Blank lines and valid unrelated entries are ignored. |
+| `selection` | Exact `matchedEventCount` before the query limit, `returnedEventCount`, `omittedEventCount`, and `complete`. Complete means all matches in this source were returned, no recognized persisted debug payloads were invalid, and no nonblank JSONL lines were malformed. Live evidence covers only the retained buffer, not the entire session. |
+| `rawAccessDenied`, `rawDataUnavailable` | Disclose denied live raw requests or requested historical raw data, which is never available. Sanitized `data` retains the existing best-effort secret redaction; identity fields remain identifying. |
+| `dataNormalized` | Non-JSON diagnostic values were replaced with text markers. Ordinary JSON values are preserved without the UI's data-size bounds. |
+| `emptyReason` | Present for empty selections: `no-persisted-events`, `no-matches`, or `query-limit` (a positive fractional limit can round down to zero). `no-persisted-events` requires a parseable session with no recognized debug entries; a malformed-only file reports `no-matches` with incomplete evidence instead. An empty selection is not a failure; check `selection.complete` for incomplete evidence. |
+| `modelOutput` | `truncated`, plus `outputLines`, `totalLines`, `outputBytes`, and `totalBytes` when text was truncated. These bounds do not truncate structured events. |
+
+Structured event data is a detached JSON snapshot. Bigints become strings such as
+`"2n"`; non-finite numbers become their text names. Unsupported values use
+`[Undefined]`, `[Function]`, `[Symbol]`, `[Non-JSON object]`, `[Circular]`, or
+`[MaxDepth]` (nesting at 64 containers). Runtime instances and hidden state are not
+exposed. Repeated non-cyclic JSON objects are preserved independently.
+
+Filters and `limit` control structured selection; there is no separate format or
+execution mode and no pagination. Use a smaller limit or narrower filters when
+processing large historical sessions. Tool UI details remain separately bounded
+to 12 raw-free events; query-limit omissions, invalid event payloads, and malformed
+JSONL lines are disclosed in the transcript. Requested raw-access warnings are
+retained even for empty selections. Opted-in live raw data can appear in both result text
+and structured data, even though it is excluded from UI details and sanitized
+debug-event persistence.
+
+Invalid input, disabled access/capture, file-read failures, and scan cancellation
+still throw; they are not converted to successful empty results. Codemode callers
+can catch these rejections normally. This tool has no returned-failure variant.
+
 ## Filters
 
 Both `/supi-debug` and `debug` support the same basic filters:

@@ -121,7 +121,13 @@ describe("supi-debug tool output", () => {
 
   it("resolves relative historical tool paths from the tool cwd", async () => {
     const pi = setup({ enabled: false, agentAccess: "sanitized", maxEvents: 100 });
-    mockFns.readSessionDebugEvents.mockResolvedValue({ events: [], persistedEventCount: 0 });
+    mockFns.readSessionDebugEvents.mockResolvedValue({
+      events: [],
+      persistedEventCount: 0,
+      matchedEventCount: 0,
+      invalidEventCount: 0,
+      malformedLineCount: 0,
+    });
     const tool = makeTool(pi);
 
     await tool.execute("id", { sessionFile: "@logs/other.jsonl" }, undefined, undefined, {
@@ -151,6 +157,9 @@ describe("supi-debug tool output", () => {
         },
       ],
       persistedEventCount: 1,
+      matchedEventCount: 1,
+      invalidEventCount: 0,
+      malformedLineCount: 0,
     });
     const tool = makeTool(pi);
 
@@ -193,6 +202,9 @@ describe("supi-debug tool output", () => {
         },
       ],
       persistedEventCount: 1,
+      matchedEventCount: 1,
+      invalidEventCount: 0,
+      malformedLineCount: 0,
     });
     const tool = makeTool(pi);
 
@@ -217,7 +229,13 @@ describe("supi-debug tool output", () => {
 
   it("identifies sessions recorded before debug persistence", async () => {
     const pi = setup({ enabled: false, agentAccess: "sanitized", maxEvents: 100 });
-    mockFns.readSessionDebugEvents.mockResolvedValue({ events: [], persistedEventCount: 0 });
+    mockFns.readSessionDebugEvents.mockResolvedValue({
+      events: [],
+      persistedEventCount: 0,
+      matchedEventCount: 0,
+      invalidEventCount: 0,
+      malformedLineCount: 0,
+    });
     const tool = makeTool(pi);
 
     const result = (await tool.execute(
@@ -233,7 +251,13 @@ describe("supi-debug tool output", () => {
 
   it("resolves relative historical command paths from the command cwd", async () => {
     const pi = setup({ enabled: false, agentAccess: "sanitized", maxEvents: 100 });
-    mockFns.readSessionDebugEvents.mockResolvedValue({ events: [], persistedEventCount: 0 });
+    mockFns.readSessionDebugEvents.mockResolvedValue({
+      events: [],
+      persistedEventCount: 0,
+      matchedEventCount: 0,
+      invalidEventCount: 0,
+      malformedLineCount: 0,
+    });
     const command = pi.commands.get("supi-debug") as {
       handler: (args: string, ctx: { cwd: string }) => Promise<void>;
     };
@@ -251,7 +275,13 @@ describe("supi-debug tool output", () => {
 
   it("accepts sessionFile for historical command inspection", async () => {
     const pi = setup({ enabled: false, agentAccess: "sanitized", maxEvents: 100 });
-    mockFns.readSessionDebugEvents.mockResolvedValue({ events: [], persistedEventCount: 0 });
+    mockFns.readSessionDebugEvents.mockResolvedValue({
+      events: [],
+      persistedEventCount: 0,
+      matchedEventCount: 0,
+      invalidEventCount: 0,
+      malformedLineCount: 0,
+    });
     const command = pi.commands.get("supi-debug") as {
       handler: (args: string, ctx: { cwd: string }) => Promise<void>;
     };

@@ -66,6 +66,30 @@ function formatTruncation(truncation: DebugRenderDetails["truncation"]): string 
 
 function buildDetailNotes(details: DebugRenderDetails, theme: Theme): string[] {
   const notes: string[] = [];
+  if (details.queryOmittedEventCount) {
+    notes.push(
+      theme.fg(
+        "warning",
+        `${details.queryOmittedEventCount} matching events excluded by the query limit.`,
+      ),
+    );
+  }
+  if (details.invalidEventCount) {
+    notes.push(
+      theme.fg(
+        "warning",
+        `${details.invalidEventCount} invalid persisted debug entries skipped; evidence is incomplete.`,
+      ),
+    );
+  }
+  if (details.malformedLineCount) {
+    notes.push(
+      theme.fg(
+        "warning",
+        `${details.malformedLineCount} malformed JSONL lines skipped; evidence is incomplete.`,
+      ),
+    );
+  }
   if (details.omittedEventCount > 0) {
     notes.push(
       theme.fg(
@@ -104,7 +128,9 @@ function buildEventLines(details: DebugRenderDetails, theme: Theme): string[] {
         "muted",
         details.emptyReason === "no-persisted-events"
           ? "This session has no persisted debug events."
-          : "No matching debug events available.",
+          : details.emptyReason === "query-limit"
+            ? "No events selected by limit."
+            : "No matching debug events available.",
       ),
     );
   }
@@ -141,6 +167,8 @@ function renderCollapsedMessage(details: DebugRenderDetails, theme: Theme): Text
   let summary = `${details.eventCount} event${details.eventCount === 1 ? "" : "s"} — ${first?.source ?? "debug"}/${first?.category ?? "event"}`;
   if (details.eventCount > 1) summary += ` +${details.eventCount - 1} more`;
   if (details.omittedEventCount > 0) summary += ` · ${details.omittedEventCount} omitted`;
+  if (details.invalidEventCount) summary += ` · ${details.invalidEventCount} invalid entries`;
+  if (details.malformedLineCount) summary += ` · ${details.malformedLineCount} malformed lines`;
   if (details.eventDataTruncated) summary += " · data bounded";
   if (details.truncation?.truncated) summary += " · output truncated";
   if (details.rawDataUnavailable || details.rawAccessDenied) summary += " · raw unavailable";

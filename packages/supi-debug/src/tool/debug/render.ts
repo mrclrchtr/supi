@@ -53,15 +53,29 @@ export function renderDebugToolCall(args: unknown, theme: Theme): Text {
   return new Text(content, 0, 0);
 }
 
+function formatEmptySummary(details: DebugRenderDetails): string {
+  const empty =
+    details.emptyReason === "no-persisted-events"
+      ? "No persisted debug events"
+      : details.emptyReason === "query-limit"
+        ? "No events selected by limit"
+        : "No matching debug events";
+  const notes = [empty];
+  if (details.invalidEventCount) notes.push("invalid entries skipped");
+  if (details.malformedLineCount) notes.push(`${details.malformedLineCount} malformed lines`);
+  if (details.rawAccessDenied || details.rawDataUnavailable) notes.push("raw unavailable");
+  return notes.join(" · ");
+}
+
 function renderToolSummary(details: DebugRenderDetails, theme: Theme): string {
-  if (details.eventCount === 0) {
-    return details.emptyReason === "no-persisted-events"
-      ? theme.fg("muted", "No persisted debug events")
-      : theme.fg("muted", "No matching debug events");
-  }
+  if (details.eventCount === 0) return theme.fg("muted", formatEmptySummary(details));
 
   let summary = `${details.eventCount} event${details.eventCount === 1 ? "" : "s"}`;
   if (details.omittedEventCount > 0) summary += ` · ${details.omittedEventCount} omitted`;
+  if (details.queryOmittedEventCount)
+    summary += ` · ${details.queryOmittedEventCount} excluded by limit`;
+  if (details.invalidEventCount) summary += ` · ${details.invalidEventCount} invalid entries`;
+  if (details.malformedLineCount) summary += ` · ${details.malformedLineCount} malformed lines`;
   if (details.eventDataTruncated) summary += " · data bounded";
   if (details.truncation?.truncated) summary += " · output truncated";
   if (details.rawDataUnavailable || details.rawAccessDenied) summary += " · raw unavailable";

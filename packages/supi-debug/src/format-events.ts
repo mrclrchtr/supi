@@ -7,6 +7,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { DebugEventView } from "@mrclrchtr/supi-core/debug";
 import { formatDataLines } from "./format.ts";
+import type { SessionDebugEvents } from "./session-events.ts";
 
 const TRUNCATION_RESERVE_LINES = 2;
 const TRUNCATION_RESERVE_BYTES = 512;
@@ -27,22 +28,28 @@ function formatTimestamp(timestamp: number): string {
   return Number.isNaN(date.getTime()) ? String(timestamp) : date.toISOString();
 }
 
-/** Format debug events for model-facing or command output. */
+/** Session-wide scan counts and empty-selection context for both debug surfaces. */
+export type DebugEventFormatOptions = Partial<
+  Pick<SessionDebugEvents, "persistedEventCount" | "invalidEventCount" | "malformedLineCount">
+> & { queryLimitExcludedAll?: boolean };
+
+function formatEmptySelection(options: DebugEventFormatOptions): string {
+  if (options.queryLimitExcludedAll) {
+    return "No events selected: the query limit excludes all matching events.";
+  }
+  return options.persistedEventCount === 0 && !options.malformedLineCount
+    ? "This session has no persisted debug events; sessions recorded before persistence cannot be backfilled."
+    : "No matching debug events available.";
+}
+
+/** Format debug events and access/integrity warnings, including empty selections. */
 export function formatDebugEvents(
   events: readonly DebugEventView[],
   rawAccessDenied: boolean,
   rawDataUnavailable = false,
-  persistedEventCount?: number,
+  options: DebugEventFormatOptions = {},
 ): string[] {
-  if (events.length === 0) {
-    return persistedEventCount === 0
-      ? [
-          "This session has no persisted debug events; sessions recorded before persistence cannot be backfilled.",
-        ]
-      : ["No matching debug events available."];
-  }
-
-  const lines: string[] = [];
+  const lines: string[] = events.length === 0 ? [formatEmptySelection(options)] : [];
   for (const event of events) {
     lines.push(
       `[${formatTimestamp(event.timestamp)}] ${event.level.toUpperCase()} ${event.source}/${event.category}: ${event.message}`,
@@ -51,6 +58,16 @@ export function formatDebugEvents(
     if (event.cwd) lines.push(`  cwd: ${event.cwd}`);
     pushFormattedData(lines, "data", event.data);
     pushFormattedData(lines, "rawData", event.rawData);
+  }
+  if (options.invalidEventCount) {
+    lines.unshift(
+      `Skipped ${options.invalidEventCount} invalid persisted debug entries; evidence is incomplete.`,
+    );
+  }
+  if (options.malformedLineCount) {
+    lines.unshift(
+      `Skipped ${options.malformedLineCount} malformed JSONL line${options.malformedLineCount === 1 ? "" : "s"}; evidence is incomplete.`,
+    );
   }
   if (rawDataUnavailable) {
     lines.push("", "Raw debug data is not persisted for historical sessions.");

@@ -33,10 +33,16 @@ export interface DebugRenderDetails {
   events: DebugRenderEvent[];
   eventCount: number;
   omittedEventCount: number;
+  /** Matching events excluded by the query limit, separate from transcript omissions. */
+  queryOmittedEventCount?: number;
+  /** Recognized persisted entries with invalid event payloads. */
+  invalidEventCount?: number;
+  /** Nonblank session lines that could not be parsed. */
+  malformedLineCount?: number;
   eventDataTruncated: boolean;
   persistedEventCount?: number;
   truncation?: DebugOutputTruncation;
-  emptyReason?: "no-persisted-events" | "no-matches";
+  emptyReason?: "no-persisted-events" | "no-matches" | "query-limit";
 }
 
 interface DetailValueState {
@@ -55,7 +61,10 @@ interface CreateDebugRenderDetailsOptions {
   persistedEventCount?: number;
   truncation?: TruncationResult;
   eventCount?: number;
-  emptyReason?: "no-persisted-events" | "no-matches";
+  queryOmittedEventCount?: number;
+  invalidEventCount?: number;
+  malformedLineCount?: number;
+  emptyReason?: "no-persisted-events" | "no-matches" | "query-limit";
 }
 
 function boundedText(value: string, maxChars: number): { value: string; truncated: boolean } {
@@ -242,6 +251,15 @@ export function createDebugRenderDetails(
     events: boundedEvents.map((entry) => entry.event),
     eventCount,
     omittedEventCount: Math.max(0, eventCount - boundedEvents.length),
+    ...(options.queryOmittedEventCount === undefined
+      ? {}
+      : { queryOmittedEventCount: boundedCount(options.queryOmittedEventCount, 0) }),
+    ...(options.invalidEventCount === undefined
+      ? {}
+      : { invalidEventCount: boundedCount(options.invalidEventCount, 0) }),
+    ...(options.malformedLineCount === undefined
+      ? {}
+      : { malformedLineCount: boundedCount(options.malformedLineCount, 0) }),
     eventDataTruncated,
     ...(options.persistedEventCount === undefined
       ? {}
@@ -317,12 +335,17 @@ export function readDebugRenderDetails(value: unknown): DebugRenderDetails {
     rawAccessDenied: record.rawAccessDenied === true,
     rawDataUnavailable: record.rawDataUnavailable === true,
     emptyReason:
-      record.emptyReason === "no-persisted-events" || record.emptyReason === "no-matches"
+      record.emptyReason === "no-persisted-events" ||
+      record.emptyReason === "no-matches" ||
+      record.emptyReason === "query-limit"
         ? record.emptyReason
         : undefined,
     persistedEventCount:
       typeof record.persistedEventCount === "number" ? record.persistedEventCount : undefined,
     eventCount: boundedCount(record.eventCount, events.length),
+    queryOmittedEventCount: boundedCount(record.queryOmittedEventCount, 0),
+    invalidEventCount: boundedCount(record.invalidEventCount, 0),
+    malformedLineCount: boundedCount(record.malformedLineCount, 0),
   });
 
   const parsedTruncation = parseTruncation(record.truncation);

@@ -175,6 +175,9 @@ describe("readSessionDebugEvents", () => {
         },
       ],
       persistedEventCount: 3,
+      matchedEventCount: 2,
+      invalidEventCount: 1,
+      malformedLineCount: 0,
     });
 
     await expect(readSessionDebugEvents(file, { level: "warning" })).resolves.toEqual({
@@ -191,11 +194,17 @@ describe("readSessionDebugEvents", () => {
         },
       ],
       persistedEventCount: 3,
+      matchedEventCount: 1,
+      invalidEventCount: 1,
+      malformedLineCount: 0,
     });
 
     await expect(readSessionDebugEvents(file, { source: "review" })).resolves.toEqual({
       events: [],
       persistedEventCount: 3,
+      matchedEventCount: 0,
+      invalidEventCount: 1,
+      malformedLineCount: 0,
     });
   });
 
@@ -233,6 +242,9 @@ describe("readSessionDebugEvents", () => {
     await expect(readSessionDebugEvents(file, { operationId })).resolves.toEqual({
       events: [expect.objectContaining({ id: 1, operationId })],
       persistedEventCount: 2,
+      matchedEventCount: 1,
+      invalidEventCount: 1,
+      malformedLineCount: 0,
     });
   });
 });

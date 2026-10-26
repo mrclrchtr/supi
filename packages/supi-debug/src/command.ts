@@ -54,7 +54,7 @@ async function sendPersistedDebugReport(
           })
         : await readSessionDebugEvents(sessionFile, filters);
     const output = truncateDebugOutput(
-      formatDebugEvents(persisted.events, false, false, persisted.persistedEventCount).join("\n"),
+      formatDebugEvents(persisted.events, false, false, persisted).join("\n"),
     );
     pi.sendMessage({
       customType: DEBUG_REPORT_TYPE,
@@ -63,10 +63,12 @@ async function sendPersistedDebugReport(
       details: createDebugMessageDetails(persisted.events, {
         sessionFile: query.sessionFile,
         persistedEventCount: persisted.persistedEventCount,
+        invalidEventCount: persisted.invalidEventCount,
+        malformedLineCount: persisted.malformedLineCount,
         eventCount: persisted.events.length,
         emptyReason:
           persisted.events.length === 0
-            ? persisted.persistedEventCount === 0
+            ? persisted.persistedEventCount === 0 && persisted.malformedLineCount === 0
               ? "no-persisted-events"
               : "no-matches"
             : undefined,
