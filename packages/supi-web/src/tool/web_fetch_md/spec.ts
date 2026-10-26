@@ -1,5 +1,6 @@
 import { runWebFetch } from "./execute.ts";
 import { webFetchMdParameters } from "./input.ts";
+import { webFetchMdOutputSchema } from "./result-schema.ts";
 
 export {
   WEB_FETCH_INLINE_MAX_CHARS,
@@ -17,5 +18,6 @@ export const webFetchMdSpec = {
   name: WEB_FETCH_MD_TOOL_NAME,
   label: WEB_FETCH_MD_TOOL_LABEL,
   parameters: webFetchMdParameters,
+  outputSchema: webFetchMdOutputSchema,
   execute: runWebFetch,
 } as const;

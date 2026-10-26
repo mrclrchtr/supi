@@ -1,8 +1,4 @@
-import type {
-  AgentToolResult,
-  AgentToolUpdateCallback,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import type { AgentToolUpdateCallback, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { htmlToMarkdown, wrapAsCodeBlock } from "../../convert.ts";
 import { fetchWithNegotiation, isValidHttpUrl } from "../../fetch.ts";
 import { writeTempFile } from "../../temp-file.ts";
@@ -12,7 +8,7 @@ import {
   type WebFetchMdInput,
   type WebFetchOutputMode,
 } from "./input.ts";
-import { buildFileResult, buildInlineResult, type WebFetchDetails } from "./result.ts";
+import { buildFileResult, buildInlineResult, type WebFetchResult } from "./result.ts";
 
 // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
 export async function runWebFetch(
@@ -21,7 +17,7 @@ export async function runWebFetch(
   signal: AbortSignal | undefined,
   onUpdate: AgentToolUpdateCallback<Record<string, unknown>> | undefined,
   _ctx: ExtensionContext,
-): Promise<AgentToolResult<WebFetchDetails>> {
+): Promise<WebFetchResult> {
   const input = (params ?? {}) as WebFetchMdInput;
   const url = String(input.url || "").trim();
   if (!isValidHttpUrl(url)) {
@@ -52,7 +48,7 @@ export async function runWebFetch(
     tempPrefix: "web-fetch-md",
     suffix: ".md",
   });
-  return buildInlineResult(base, output);
+  return buildInlineResult(base, markdown, output);
 }
 
 function shouldReturnFile(outputMode: WebFetchOutputMode, chars: number): boolean {

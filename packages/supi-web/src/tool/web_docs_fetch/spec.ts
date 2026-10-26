@@ -1,6 +1,7 @@
 import type { Static } from "typebox";
 import { Type } from "typebox";
 import { runFetch } from "./execute.ts";
+import { webDocsFetchOutputSchema } from "./result-schema.ts";
 
 export const WEB_DOCS_FETCH_TOOL_NAME = "web_docs_fetch";
 export const WEB_DOCS_FETCH_TOOL_LABEL = "Web Docs Fetch";
@@ -28,5 +29,6 @@ export const webDocsFetchSpec = {
   name: WEB_DOCS_FETCH_TOOL_NAME,
   label: WEB_DOCS_FETCH_TOOL_LABEL,
   parameters: webDocsFetchParameters,
+  outputSchema: webDocsFetchOutputSchema,
   execute: runFetch,
 } as const;

@@ -1,15 +1,11 @@
-import type {
-  AgentToolResult,
-  AgentToolUpdateCallback,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import type { AgentToolUpdateCallback, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { searchLibrary } from "../../context7-client.ts";
 import { limitModelVisibleOutput } from "../result.ts";
 import {
   buildNoResultsResult,
   buildSearchResult,
   formatSearchResults,
-  type SearchDetails,
+  type SearchResult,
 } from "./result.ts";
 import type { WebDocsSearchInput } from "./spec.ts";
 
@@ -20,7 +16,7 @@ export async function runSearch(
   signal: AbortSignal | undefined,
   onUpdate: AgentToolUpdateCallback<Record<string, unknown>> | undefined,
   _ctx: ExtensionContext,
-): Promise<AgentToolResult<SearchDetails>> {
+): Promise<SearchResult> {
   const input = (params ?? {}) as WebDocsSearchInput;
   const libraryName = input.library_name?.trim();
   const query = input.query?.trim();

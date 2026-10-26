@@ -1,5 +1,9 @@
+import { readFile, rm } from "node:fs/promises";
+import { dirname } from "node:path";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it, vi } from "vitest";
+import type { WebFetchMdOutput } from "../../src/tool/web_fetch_md/result-schema.ts";
+import { expectStructuredContent } from "../helpers/structured-result.ts";
 
 interface ThemeMock {
   fg: (_color: string, text: string) => string;
@@ -87,6 +91,14 @@ describe("webExtension", () => {
     expect(result.content[0].text).toBe("# Small\n\nContent");
     expect(result.details?.chars).toBe(16);
     expect(result.details?.lines).toBe(3);
+    expect(expectStructuredContent<WebFetchMdOutput>(tool, result)).toEqual({
+      mode: "inline",
+      url: "https://example.com/doc",
+      chars: 16,
+      lines: 3,
+      markdown: result.content[0].text,
+      modelOutput: { truncated: false },
+    });
 
     const collapsed = renderToolResult(tool, result, false);
     const expanded = renderToolResult(tool, result, true);
@@ -98,6 +110,56 @@ describe("webExtension", () => {
 
     vi.unstubAllGlobals();
   });
+
+  it.each([
+    ["file", "# Small"],
+    ["auto", "x".repeat(15_001)],
+  ])(
+    "keeps %s file delivery usable without duplicating the body",
+    async (output_mode, markdown) => {
+      const pi = createPiMock();
+      webExtension(pi as never);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async (_url: unknown, init?: RequestInit) =>
+            new Response(init?.method === "HEAD" ? null : markdown, {
+              headers: { "content-type": "text/markdown" },
+            }),
+        ),
+      );
+      const tool = pi.tools[0] as RenderableTool;
+      try {
+        const result = await tool.execute(
+          "file",
+          {
+            url: "https://example.com/file",
+            output_mode,
+          },
+          undefined,
+          undefined,
+          makeCtx(),
+        );
+        const data = expectStructuredContent<WebFetchMdOutput>(tool, result);
+        expect(data.mode).toBe("file");
+        if (data.mode !== "file") throw new Error("Expected file payload");
+        try {
+          expect(data.chars).toBe(markdown.length);
+          expect(await readFile(data.filePath, "utf8")).toBe(markdown);
+          expect(result).toMatchObject({
+            content: [{ text: expect.stringContaining(data.filePath) }],
+            details: { filePath: data.filePath },
+          });
+          expect(renderToolResult(tool, result, false)).toContain("Saved Markdown to");
+          expect(data).not.toHaveProperty("markdown");
+        } finally {
+          await rm(dirname(data.filePath), { recursive: true, force: true });
+        }
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    },
+  );
 
   it("truncates model-visible inline output and saves full content", async () => {
     const pi = createPiMock();
@@ -132,6 +194,18 @@ describe("webExtension", () => {
     expect(result.content[0].text).toContain("Output truncated");
     expect(result.details?.truncation?.truncated).toBe(true);
     expect(result.details?.fullOutputPath).toMatch(/web-fetch-md-/);
+    const data = expectStructuredContent<WebFetchMdOutput>(tool, result);
+    expect(data.mode).toBe("inline");
+    if (data.mode !== "inline") throw new Error("Expected inline payload");
+    expect(data.markdown).toBe(largeMarkdown);
+    expect(data.modelOutput).toEqual({
+      truncated: true,
+      fullOutputPath: result.details?.fullOutputPath,
+    });
+    expect(renderToolResult(tool, result, false)).toContain("[truncated]");
+    if (data.modelOutput.fullOutputPath) {
+      await rm(dirname(data.modelOutput.fullOutputPath), { recursive: true, force: true });
+    }
 
     vi.unstubAllGlobals();
   });

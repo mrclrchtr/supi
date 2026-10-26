@@ -1,6 +1,12 @@
 import type { AgentToolResult, TruncationResult } from "@earendil-works/pi-coding-agent";
 import type { searchLibrary } from "../../context7-client.ts";
-import type { ModelVisibleOutput } from "../result.ts";
+import { type ModelVisibleOutput, modelOutputMetadata } from "../result.ts";
+import type { WebDocsSearchOutput } from "./result-schema.ts";
+
+/** Final library search includes complete matches, not a Markdown table as data. */
+export type SearchResult = AgentToolResult<SearchDetails> & {
+  structuredContent: WebDocsSearchOutput;
+};
 
 export interface SearchDetails extends Record<string, unknown> {
   count: number;
@@ -16,7 +22,7 @@ const MAX_DESCRIPTION_CHARS = 120;
 const MAX_VERSION_COUNT = 5;
 
 /** Assemble the empty-search result. */
-export function buildNoResultsResult(libraryName: string): AgentToolResult<SearchDetails> {
+export function buildNoResultsResult(libraryName: string): SearchResult {
   return {
     content: [
       {
@@ -24,6 +30,11 @@ export function buildNoResultsResult(libraryName: string): AgentToolResult<Searc
         text: `No libraries found for "${libraryName}". Try a different search term.`,
       },
     ],
+    structuredContent: {
+      results: [],
+      count: 0,
+      modelOutput: { truncated: false, omittedResults: 0 },
+    },
     details: { count: 0, libraryName },
   };
 }
@@ -33,9 +44,25 @@ export function buildSearchResult(
   libraryName: string,
   results: Awaited<ReturnType<typeof searchLibrary>>,
   output: ModelVisibleOutput,
-): AgentToolResult<SearchDetails> {
+): SearchResult {
   return {
     content: [{ type: "text", text: output.text }],
+    structuredContent: {
+      results: results.map((result) => ({
+        id: result.id,
+        name: result.name,
+        description: result.description,
+        totalSnippets: result.totalSnippets,
+        trustScore: result.trustScore,
+        benchmarkScore: result.benchmarkScore,
+        ...(result.versions ? { versions: [...result.versions] } : {}),
+      })),
+      count: results.length,
+      modelOutput: {
+        ...modelOutputMetadata(output),
+        omittedResults: Math.max(0, results.length - MAX_SEARCH_RESULTS),
+      },
+    },
     details: {
       count: results.length,
       libraryName,

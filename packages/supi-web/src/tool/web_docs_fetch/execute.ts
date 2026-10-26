@@ -1,11 +1,7 @@
-import type {
-  AgentToolResult,
-  AgentToolUpdateCallback,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import type { AgentToolUpdateCallback, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getContext } from "../../context7-client.ts";
 import { limitModelVisibleOutput } from "../result.ts";
-import { buildFetchResult, type FetchDetails } from "./result.ts";
+import { buildFetchResult, type FetchResult } from "./result.ts";
 import type { WebDocsFetchInput } from "./spec.ts";
 
 // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
@@ -15,7 +11,7 @@ export async function runFetch(
   signal: AbortSignal | undefined,
   onUpdate: AgentToolUpdateCallback<Record<string, unknown>> | undefined,
   _ctx: ExtensionContext,
-): Promise<AgentToolResult<FetchDetails>> {
+): Promise<FetchResult> {
   const input = (params ?? {}) as WebDocsFetchInput;
   const libraryId = input.library_id?.trim();
   const query = input.query?.trim();
@@ -37,5 +33,5 @@ export async function runFetch(
     suffix: raw ? ".json" : ".md",
   });
 
-  return buildFetchResult(libraryId, raw, textContent, output);
+  return buildFetchResult(libraryId, { raw, content, textContent }, output);
 }

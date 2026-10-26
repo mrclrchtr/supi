@@ -21,3 +21,7 @@ export {
   type WebSearchInput,
   type WebToolName,
 } from "./tool/tool-specs.ts";
+export type { WebDocsFetchOutput } from "./tool/web_docs_fetch/result-schema.ts";
+export type { WebDocsSearchOutput } from "./tool/web_docs_search/result-schema.ts";
+export type { WebFetchMdOutput } from "./tool/web_fetch_md/result-schema.ts";
+export type { WebSearchOutput } from "./tool/web_search/result-schema.ts";

@@ -1,5 +1,6 @@
 import { runWebSearch } from "./execute.ts";
 import { webSearchParameters } from "./input.ts";
+import { webSearchOutputSchema } from "./result-schema.ts";
 
 export {
   type WebSearchInput,
@@ -14,5 +15,6 @@ export const webSearchSpec = {
   name: WEB_SEARCH_TOOL_NAME,
   label: WEB_SEARCH_TOOL_LABEL,
   parameters: webSearchParameters,
+  outputSchema: webSearchOutputSchema,
   execute: runWebSearch,
 } as const;

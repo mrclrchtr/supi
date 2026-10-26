@@ -46,6 +46,39 @@ The package adds four tools that Pi selects as needed:
 
 Pi searches Context7 first when the library ID is unknown, then fetches docs with the selected ID. Narrow questions produce more useful documentation context than broad requests. Documentation returns as Markdown by default; the agent can request structured JSON snippets when needed.
 
+### Structured results in codemode
+
+All four tools declare PI-native `outputSchema` contracts. Direct calls still return readable, bounded text; `await tools.<name>(args)` in codemode resolves to structured data, not that text or UI `details`.
+
+| Tool | Structured value |
+|---|---|
+| `web_fetch_md` | `mode: "inline"` with complete `markdown`, or `mode: "file"` with `filePath`; both include resolved `url`, `chars`, and `lines` |
+| `web_search` | Complete `sources` (`title`, `url`, `excerpts`, optional `sourceDate`), `sourceCount`, and `excerptCount` |
+| `web_docs_search` | All `results` with IDs, names, complete descriptions/versions, scores, and snippet counts; `count` is the number returned by Context7 |
+| `web_docs_fetch` | `libraryId`, `chars`, `lines`, and either `format: "markdown"` with complete `markdown`, or `format: "snippets"` with parsed `snippets` (`title`, `content`, `source`) for `raw: true` |
+
+Inline/data results include `modelOutput.truncated` and, when text is truncated, `modelOutput.fullOutputPath`. These describe the **direct-call text**, not missing structured data. Library search also reports `modelOutput.omittedResults`: matches excluded by the table's top-10 row limit before line/byte truncation. Structured descriptions and version lists are not shortened. File-mode page fetches retain the existing disk delivery instead of duplicating the body in structured data.
+
+Results describe the evidence returned by the provider, not exhaustive coverage of the web or a library. Empty search arrays and empty snippet arrays are successful outcomes. Authentication, network, malformed web-search data, and cancellation failures still throw; codemode calls reject rather than returning a successful empty result. No tool currently returns a schema-defined failure or paginated result.
+
+```javascript
+const libraries = await tools.web_docs_search({
+  library_name: "react",
+  query: "effect cleanup",
+});
+if (libraries.results.length > 0) {
+  const docs = await tools.web_docs_fetch({
+    library_id: libraries.results[0].id,
+    query: "effect cleanup",
+    raw: true,
+  });
+  return docs.snippets.map(({ title, source }) => ({ title, source }));
+}
+return [];
+```
+
+Structured values can be larger than their text previews. Select the fields you need before printing them. The package's `./api` export provides `WebFetchMdOutput`, `WebSearchOutput`, `WebDocsSearchOutput`, and `WebDocsFetchOutput` types. Active Pi sessions need `/reload` or a restart to load extension changes.
+
 ## Web Search
 
 `web_search` uses the installed `bx` executable. The tool is enabled by default, but it is available only when `bx` is on `PATH`. Search freshness accepts `pd`, `pw`, `pm`, `py`, or an ordered `YYYY-MM-DDtoYYYY-MM-DD` range.

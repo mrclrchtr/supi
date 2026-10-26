@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runBxContext } from "../../src/tool/web_search/bx.ts";
+import type { WebSearchOutput } from "../../src/tool/web_search/result-schema.ts";
 import webExtension from "../../src/web.ts";
 import { createFakeBx, type FakeBx, useFakeBx, writeWebSearchSetting } from "../helpers/fake-bx.ts";
+import { expectStructuredContent } from "../helpers/structured-result.ts";
 
 type WebSearchTool = {
   execute: (...args: unknown[]) => Promise<unknown>;
@@ -169,5 +171,11 @@ describe("web_search failures and output limits", () => {
     expect(result.content[0]?.text).toContain("Output truncated");
     expect(result.details.fullOutputPath).toBeDefined();
     expect(readFileSync(result.details.fullOutputPath as string, "utf8")).toContain("line 2000");
+    const data = expectStructuredContent<WebSearchOutput>(tool, result);
+    expect(data.sources[0]?.excerpts).toEqual([excerpt]);
+    expect(data.modelOutput).toEqual({
+      truncated: true,
+      fullOutputPath: result.details.fullOutputPath,
+    });
   });
 });

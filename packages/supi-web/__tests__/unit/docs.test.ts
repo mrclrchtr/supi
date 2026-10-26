@@ -1,5 +1,8 @@
 import { createPiMock, getTool, getTools, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { WebDocsFetchOutput } from "../../src/tool/web_docs_fetch/result-schema.ts";
+import type { WebDocsSearchOutput } from "../../src/tool/web_docs_search/result-schema.ts";
+import { expectStructuredContent } from "../helpers/structured-result.ts";
 
 interface ThemeMock {
   fg: (_color: string, text: string) => string;
@@ -108,6 +111,10 @@ describe("docsExtension", () => {
       expect(result.content[0].text).toContain("/facebook/react");
       expect(result.content[0].text).toContain("95.5");
       expect(result.details?.count).toBe(1);
+      const data = expectStructuredContent<WebDocsSearchOutput>(tool, result);
+      expect(data.results).toEqual(await mockSearchLibrary.mock.results[0].value);
+      expect(data.count).toBe(result.details?.count);
+      expect(data.modelOutput).toEqual({ truncated: false, omittedResults: 0 });
 
       const collapsed = renderToolResult(tool, result, false);
       const expanded = renderToolResult(tool, result, true);
@@ -145,6 +152,15 @@ describe("docsExtension", () => {
       expect(text).toContain("v1, v2, v3, v4, v5, +3");
       expect(text).toContain("…");
       expect(text).not.toContain("/example/lib-10");
+      const data = expectStructuredContent<WebDocsSearchOutput>(tool, result);
+      expect(data.count).toBe(12);
+      expect(data.results).toHaveLength(12);
+      expect(data.results[11]).toMatchObject({
+        id: "/example/lib-11",
+        description: "Long description for library 11. ".repeat(10),
+        versions: ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8"],
+      });
+      expect(data.modelOutput).toEqual({ truncated: false, omittedResults: 2 });
     });
 
     it("returns helpful message when no results found", async () => {
@@ -160,6 +176,11 @@ describe("docsExtension", () => {
       )) as ToolResult;
 
       expect(result.content[0].text).toContain("No libraries found");
+      expect(expectStructuredContent<WebDocsSearchOutput>(tool, result)).toEqual({
+        results: [],
+        count: 0,
+        modelOutput: { truncated: false, omittedResults: 0 },
+      });
     });
   });
 
@@ -199,6 +220,12 @@ describe("docsExtension", () => {
         undefined,
       );
       expect(result.content[0].text).toBe("### React Hooks\n\nContent here");
+      expect(expectStructuredContent<WebDocsFetchOutput>(tool, result)).toMatchObject({
+        libraryId: "/facebook/react",
+        format: "markdown",
+        markdown: result.content[0].text,
+        modelOutput: { truncated: false },
+      });
 
       const collapsed = renderToolResult(tool, result, false);
       const expanded = renderToolResult(tool, result, true);
@@ -210,9 +237,7 @@ describe("docsExtension", () => {
     });
 
     it("returns raw json when raw=true", async () => {
-      const snippets = JSON.stringify([
-        { title: "useState", content: "code", source: "react.dev" },
-      ]);
+      const snippets = [{ title: "useState", content: "code", source: "react.dev" }];
       mockGetContext.mockResolvedValue(snippets);
 
       const tool = getTool(pi, "web_docs_fetch");
@@ -229,7 +254,13 @@ describe("docsExtension", () => {
       )) as ToolResult;
 
       expect(mockGetContext).toHaveBeenCalledWith("useState", "/facebook/react", true, undefined);
-      expect(result.content[0].text).toContain("useState");
+      expect(result.content[0].text).toBe(JSON.stringify(snippets, null, 2));
+      expect(expectStructuredContent<WebDocsFetchOutput>(tool, result)).toMatchObject({
+        libraryId: "/facebook/react",
+        format: "snippets",
+        snippets,
+        modelOutput: { truncated: false },
+      });
     });
 
     it("truncates large docs output and saves the full response", async () => {
@@ -249,6 +280,35 @@ describe("docsExtension", () => {
       expect(result.content[0].text).toContain("Output truncated");
       expect(result.details?.truncation).toMatchObject({ truncated: true });
       expect(result.details?.fullOutputPath).toMatch(/web-docs-fetch-/);
+      const data = expectStructuredContent<WebDocsFetchOutput>(tool, result);
+      if (data.format !== "markdown") throw new Error("Expected text payload");
+      expect(data.markdown).toContain("docs line 2000");
+      expect(data.modelOutput).toEqual({
+        truncated: true,
+        fullOutputPath: result.details?.fullOutputPath,
+      });
+    });
+
+    it("returns successful empty raw snippets without treating them as failure", async () => {
+      mockGetContext.mockResolvedValue([]);
+      const tool = getTool(pi, "web_docs_fetch");
+      const result = await tool.execute(
+        "empty",
+        {
+          library_id: "/facebook/react",
+          query: "unknown",
+          raw: true,
+        },
+        undefined,
+        undefined,
+        makeCtx(),
+      );
+      expect(expectStructuredContent<WebDocsFetchOutput>(tool, result)).toMatchObject({
+        format: "snippets",
+        snippets: [],
+        modelOutput: { truncated: false },
+      });
+      expect(result).not.toHaveProperty("isError", true);
     });
 
     it("propagates Context7Error", async () => {

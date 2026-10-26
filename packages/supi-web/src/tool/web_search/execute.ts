@@ -1,13 +1,9 @@
-import type {
-  AgentToolResult,
-  AgentToolUpdateCallback,
-  ExtensionContext,
-} from "@earendil-works/pi-coding-agent";
+import type { AgentToolUpdateCallback, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { limitModelVisibleOutput } from "../result.ts";
 import { runBxContext } from "./bx.ts";
 import { validateWebSearchInput } from "./input.ts";
 import { parseBxResponse } from "./parse.ts";
-import { buildSearchResult, formatSearchResults, type WebSearchDetails } from "./result.ts";
+import { buildSearchResult, formatSearchResults, type WebSearchResult } from "./result.ts";
 
 /** Execute one direct bx context search. */
 // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
@@ -17,7 +13,7 @@ export async function runWebSearch(
   signal: AbortSignal | undefined,
   onUpdate: AgentToolUpdateCallback<Record<string, unknown>> | undefined,
   ctx: ExtensionContext,
-): Promise<AgentToolResult<WebSearchDetails>> {
+): Promise<WebSearchResult> {
   const input = validateWebSearchInput(params);
   onUpdate?.({
     content: [{ type: "text", text: "Searching the web..." }],

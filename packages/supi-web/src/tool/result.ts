@@ -5,7 +5,9 @@ import {
   type TruncationResult,
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
+import type { Static } from "typebox";
 import { writeTempFile } from "../temp-file.ts";
+import type { modelOutputSchema } from "./result-schema.ts";
 
 /** Result of preparing content for a tool response visible to the model. */
 export interface ModelVisibleOutput {
@@ -15,6 +17,14 @@ export interface ModelVisibleOutput {
   truncation?: TruncationResult;
   /** Temp file containing the full, untruncated output when truncation happened. */
   fullOutputPath?: string;
+}
+
+/** Project only public truncation metadata, without copying preview text or internal state. */
+export function modelOutputMetadata(output: ModelVisibleOutput): Static<typeof modelOutputSchema> {
+  return {
+    truncated: output.truncation?.truncated === true,
+    ...(output.fullOutputPath ? { fullOutputPath: output.fullOutputPath } : {}),
+  };
 }
 
 /** Prepare content for model-visible output, preserving full output in a temp file if truncated. */

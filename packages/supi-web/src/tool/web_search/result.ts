@@ -1,6 +1,12 @@
 import type { AgentToolResult, TruncationResult } from "@earendil-works/pi-coding-agent";
-import type { ModelVisibleOutput } from "../result.ts";
+import { type ModelVisibleOutput, modelOutputMetadata } from "../result.ts";
 import type { WebSearchSource } from "./parse.ts";
+import type { WebSearchOutput } from "./result-schema.ts";
+
+/** Final search result requires source data as well as direct-call text. */
+export type WebSearchResult = AgentToolResult<WebSearchDetails> & {
+  structuredContent: WebSearchOutput;
+};
 
 /** Human-facing and model-facing facts for one Web Search result. */
 export interface WebSearchDetails extends Record<string, unknown> {
@@ -14,12 +20,25 @@ export interface WebSearchDetails extends Record<string, unknown> {
 export function buildSearchResult(
   sources: WebSearchSource[],
   output: ModelVisibleOutput,
-): AgentToolResult<WebSearchDetails> {
+): WebSearchResult {
+  const sourceCount = sources.length;
+  const excerptCount = sources.reduce((count, source) => count + source.excerpts.length, 0);
   return {
     content: [{ type: "text", text: output.text }],
+    structuredContent: {
+      sources: sources.map(({ title, url, excerpts, sourceDate }) => ({
+        title,
+        url,
+        excerpts: [...excerpts],
+        ...(sourceDate ? { sourceDate } : {}),
+      })),
+      sourceCount,
+      excerptCount,
+      modelOutput: modelOutputMetadata(output),
+    },
     details: {
-      sourceCount: sources.length,
-      excerptCount: sources.reduce((count, source) => count + source.excerpts.length, 0),
+      sourceCount,
+      excerptCount,
       truncation: output.truncation,
       fullOutputPath: output.fullOutputPath,
     },

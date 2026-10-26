@@ -10,6 +10,7 @@ import {
   WEB_DOCS_FETCH_TOOL_LABEL,
   WEB_DOCS_FETCH_TOOL_NAME,
   webDocsFetchParameters,
+  webDocsFetchSpec,
 } from "./web_docs_fetch/spec.ts";
 import {
   toolDescription as searchDescription,
@@ -20,6 +21,7 @@ import {
   WEB_DOCS_SEARCH_TOOL_LABEL,
   WEB_DOCS_SEARCH_TOOL_NAME,
   webDocsSearchParameters,
+  webDocsSearchSpec,
 } from "./web_docs_search/spec.ts";
 import {
   toolDescription as fetchDescription,
@@ -31,6 +33,7 @@ import {
   WEB_FETCH_MD_TOOL_LABEL,
   WEB_FETCH_MD_TOOL_NAME,
   webFetchMdParameters,
+  webFetchMdSpec,
 } from "./web_fetch_md/spec.ts";
 import {
   toolDescription as webSearchDescription,
@@ -41,6 +44,7 @@ import {
   WEB_SEARCH_TOOL_LABEL,
   WEB_SEARCH_TOOL_NAME,
   webSearchParameters,
+  webSearchSpec,
 } from "./web_search/spec.ts";
 
 export type { WebDocsFetchInput } from "./web_docs_fetch/spec.ts";
@@ -74,6 +78,7 @@ export interface WebToolSpec {
   promptSnippet: string;
   promptGuidelines: readonly string[];
   parameters: TSchema;
+  outputSchema: TSchema;
 }
 
 export const WEB_TOOL_SPECS = [
@@ -84,6 +89,7 @@ export const WEB_TOOL_SPECS = [
     promptSnippet: fetchSnippet,
     promptGuidelines: fetchGuidelines,
     parameters: webFetchMdParameters,
+    outputSchema: webFetchMdSpec.outputSchema,
   },
   {
     name: WEB_DOCS_SEARCH_TOOL_NAME,
@@ -92,6 +98,7 @@ export const WEB_TOOL_SPECS = [
     promptSnippet: searchSnippet,
     promptGuidelines: searchGuidelines,
     parameters: webDocsSearchParameters,
+    outputSchema: webDocsSearchSpec.outputSchema,
   },
   {
     name: WEB_DOCS_FETCH_TOOL_NAME,
@@ -100,6 +107,7 @@ export const WEB_TOOL_SPECS = [
     promptSnippet: docsFetchSnippet,
     promptGuidelines: docsFetchGuidelines,
     parameters: webDocsFetchParameters,
+    outputSchema: webDocsFetchSpec.outputSchema,
   },
   {
     name: WEB_SEARCH_TOOL_NAME,
@@ -108,6 +116,7 @@ export const WEB_TOOL_SPECS = [
     promptSnippet: webSearchSnippet,
     promptGuidelines: webSearchGuidelines,
     parameters: webSearchParameters,
+    outputSchema: webSearchSpec.outputSchema,
   },
 ] as const satisfies readonly WebToolSpec[];
 

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { createPiMock, getTool, getTools, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import extension from "../../src/extension.ts";
+import type { WebSearchOutput } from "../../src/tool/web_search/result-schema.ts";
 import webExtension from "../../src/web.ts";
 import {
   createFakeBx,
@@ -12,6 +13,7 @@ import {
   useFakeBx,
   writeWebSearchSetting,
 } from "../helpers/fake-bx.ts";
+import { expectStructuredContent } from "../helpers/structured-result.ts";
 
 type WebSearchTool = {
   execute: (...args: unknown[]) => Promise<unknown>;
@@ -170,6 +172,21 @@ describe("web_search process integration", () => {
     expect(result.content[0]?.text).not.toContain("Source Excerpt:");
     expect(result.content[0]?.text).not.toContain("not a date");
     expect(result.details).toEqual(expect.objectContaining({ sourceCount: 2, excerptCount: 3 }));
+    const data = expectStructuredContent<WebSearchOutput>(tool, result);
+    expect(data).toEqual({
+      sources: [
+        {
+          title: "First source",
+          url: firstUrl,
+          excerpts: ["first excerpt", encodedSnippet],
+          sourceDate: "2024-02-29",
+        },
+        { title: "Second source", url: secondUrl, excerpts: ["second excerpt"] },
+      ],
+      sourceCount: result.details.sourceCount,
+      excerptCount: result.details.excerptCount,
+      modelOutput: { truncated: false },
+    });
   });
 
   it("decodes UTF-8 when a multibyte character crosses stdout chunks", async () => {
@@ -213,6 +230,12 @@ describe("web_search process integration", () => {
 
     expect(result.content[0]?.text).toBe("No web search sources found.");
     expect(result.details.sourceCount).toBe(0);
+    expect(expectStructuredContent<WebSearchOutput>(tool, result)).toEqual({
+      sources: [],
+      sourceCount: 0,
+      excerptCount: 0,
+      modelOutput: { truncated: false },
+    });
   });
 
   it("applies persisted settings only in fresh extension instances", async () => {
