@@ -22,20 +22,20 @@ The tool registers only when Web Search is enabled and `bx` is available on `PAT
 
 ## Context7 pipeline (web_docs_search + web_docs_fetch)
 
-1. **web_docs_search** — calls `GET /api/v2/libs/search` directly with `libraryName` + `query`
+1. **web_docs_search** — uses `@upstash/context7-sdk` library search
    - Returns compact Markdown table: ID, Name, Trust Score, Benchmark Score, Snippets, shortened Versions, Description
 2. **agent picks a library ID** from the results
-3. **web_docs_fetch** — calls `GET /api/v2/context` directly with `libraryId` + `query`
+3. **web_docs_fetch** — uses SDK `getContext` with explicit `type: "txt"` or `"json"`
    - Default mode returns pre-formatted text from Context7's API response
-   - `raw: true` returns parsed JSON snippet objects for programmatic use
-4. API key read from `CONTEXT7_API_KEY` env var automatically; without a key, requests return an authentication error
+   - `raw: true` uses SDK normalization of both `codeSnippets` and `infoSnippets` into `{ title, content, source }[]`; this is not the untouched REST envelope
+4. Resolve `CONTEXT7_API_KEY` lazily per call; missing credentials fail the call, not extension loading. Disable SDK retries and timeout to retain single-attempt, signal-driven requests.
 
 ## Output and failure contracts
 
 - `web_fetch_md` accepts only HTTP(S). Auto mode returns content inline up to 15,000 characters, otherwise a temporary-file path. Inline model-visible output also respects Pi's line/byte limits; retain the full output when truncating.
 - Resolve relative links by default. Wrap plain-text responses in fenced code blocks with a language hint from the URL extension.
 - Search preserves provider sources and excerpts rather than generating an answer. Valid empty searches are successful results, not failures.
-- Context7 execution propagates authentication, network, rate-limit, and API failures as failed tool calls. Do not return error text as an ordinary success result.
+- Context7 execution propagates authentication, network, rate-limit, cancellation, and API failures as failed tool calls. Normalize only HTTP 404 with SDK error code `no_libraries_found` to an empty successful library search. Other 404s and library redirects remain failures.
 
 ## Key gotchas
 
@@ -48,6 +48,14 @@ The tool registers only when Web Search is enabled and `bx` is available on `PAT
 
 ## Test layout
 
-Pure logic and settings tests live in `__tests__/unit/`. Tests that start the `bx` subprocess live in `__tests__/integration/`.
+Pure logic and settings tests live in `__tests__/unit/`. Tests that start the `bx` subprocess or PI codemode runtime live in `__tests__/integration/`.
+
+Context7 adapter tests use the real SDK with provider-shaped HTTP fixtures, including both snippet lists and explicit JSON negotiation. Run the opt-in live contract check from the workspace root with `CONTEXT7_API_KEY` set:
+
+```bash
+SUPI_WEB_LIVE_TESTS=1 pnpm exec vitest run packages/supi-web/__tests__/integration/context7-live.test.ts
+```
+
+The live check consumes provider quota. Ordinary verification skips it and stays offline.
 
 

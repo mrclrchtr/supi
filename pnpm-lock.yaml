@@ -865,6 +865,9 @@ importers:
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
+      '@upstash/context7-sdk':
+        specifier: 0.6.0
+        version: 0.6.0
       jsdom:
         specifier: ^30.0.0
         version: 30.1.3
@@ -1563,6 +1566,9 @@ packages:
 
   '@types/turndown@5.0.6':
     resolution: {integrity: sha512-ru00MoyeeouE5BX4gRL+6m/BsDfbRayOskWqUvh7CLGW+UXxHQItqALa38kKnOiZPqJrtzJUgAC2+F0rL1S4Pg==}
+
+  '@upstash/context7-sdk@0.6.0':
+    resolution: {integrity: sha512-38CYY/rpJfkvQXHCAo0engQasosS2MJKZXJfezCLYJSoTUacGNP7iAUP9PnHtncUgsCRtW+UGhnvyPhIKBEbSQ==}
 
   '@vitest/mocker@5.0.5':
     resolution: {integrity: sha512-xLL3lkDegJZw+MGoGaCCsFayDZthGgpAtr3Vziyfc4p7xH89K7KRPcRBBh/kEYm0Aqkt5DtTmkYpBtRV/FrHZg==}
@@ -3584,6 +3590,8 @@ snapshots:
   '@types/tough-cookie@4.0.5': {}
 
   '@types/turndown@5.0.6': {}
+
+  '@upstash/context7-sdk@0.6.0': {}
 
   '@vitest/mocker@5.0.5(vite@8.3.5(@types/node@25.9.9)(jiti@2.7.0)(yaml@2.9.1))':
     dependencies:

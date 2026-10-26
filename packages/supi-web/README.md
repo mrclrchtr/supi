@@ -55,7 +55,7 @@ All four tools declare PI-native `outputSchema` contracts. Direct calls still re
 | `web_fetch_md` | `mode: "inline"` with complete `markdown`, or `mode: "file"` with `filePath`; both include resolved `url`, `chars`, and `lines` |
 | `web_search` | Complete `sources` (`title`, `url`, `excerpts`, optional `sourceDate`), `sourceCount`, and `excerptCount` |
 | `web_docs_search` | All `results` with IDs, names, complete descriptions/versions, scores, and snippet counts; `count` is the number returned by Context7 |
-| `web_docs_fetch` | `libraryId`, `chars`, `lines`, and either `format: "markdown"` with complete `markdown`, or `format: "snippets"` with parsed `snippets` (`title`, `content`, `source`) for `raw: true` |
+| `web_docs_fetch` | `libraryId`, `chars`, `lines`, and either `format: "markdown"` with complete `markdown`, or `format: "snippets"` with SDK-normalized `snippets` (`title`, `content`, `source`) for `raw: true` |
 
 Inline/data results include `modelOutput.truncated` and, when text is truncated, `modelOutput.fullOutputPath`. These describe the **direct-call text**, not missing structured data. Library search also reports `modelOutput.omittedResults`: matches excluded by the table's top-10 row limit before line/byte truncation. Structured descriptions and version lists are not shortened. File-mode page fetches retain the existing disk delivery instead of duplicating the body in structured data.
 
@@ -124,14 +124,18 @@ pi -e npm:@mrclrchtr/supi-web
 
 ## Context7 API key
 
-The documentation tools call the [Context7 API](https://context7.com/). Create a free key at <https://context7.com/dashboard>, export it before starting Pi, and keep it out of repository files:
+The documentation tools use the official [Context7 TypeScript SDK](https://github.com/upstash/context7/tree/master/packages/sdk). Create a free key at <https://context7.com/dashboard>, export it before starting Pi, and keep it out of repository files:
 
 ```bash
 export CONTEXT7_API_KEY="ctx7sk-..."
 pi
 ```
 
-`web_fetch_md` does not use Context7 and needs no API key.
+`web_fetch_md` does not use Context7 and needs no API key. Credentials are resolved when a documentation tool is called, not while the extension loads.
+
+`raw: true` requests JSON and normalizes both provider code snippets and information snippets into `{ title, content, source }` objects. It does not expose the untouched REST envelope or provider ranking metadata. Default mode retains Context7's formatted text.
+
+Requests make one attempt, forward cancellation, and add no SDK timeout. The explicit `no_libraries_found` HTTP 404 response is a successful empty library search; other API errors remain failures. Use a library ID returned by search: stale IDs can produce redirect errors instead of documentation.
 
 ## Boundaries
 
