@@ -288,7 +288,7 @@ jobs:
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       needs.release-please.result == 'success' &&
       needs.release-please.outputs.releases_created == 'true'
-    runs-on: avrea-ubuntu-latest-2-vcpu
+    runs-on: ubicloud-standard-2
     timeout-minutes: 15
     permissions:
       contents: read
