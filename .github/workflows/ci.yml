@@ -2,6 +2,12 @@ name: CI
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_tag:
+        description: "Retry publishing an existing release tag (leave empty for verification only)"
+        required: false
+        type: string
+        default: ""
   pull_request:
   push:
     branches:
@@ -282,12 +288,18 @@ jobs:
           manifest-file: .release-please-manifest.json
 
   publish:
-    needs: release-please
+    needs: [release-please, actionlint, conventional-commits, verify]
     if: >-
-      !cancelled() &&
-      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-      needs.release-please.result == 'success' &&
-      needs.release-please.outputs.releases_created == 'true'
+      !cancelled() && github.ref == 'refs/heads/main' &&
+      needs.actionlint.result == 'success' &&
+      needs.conventional-commits.result == 'success' &&
+      needs.verify.result == 'success' &&
+      (
+        (github.event_name == 'push' &&
+         needs.release-please.result == 'success' &&
+         needs.release-please.outputs.releases_created == 'true') ||
+        (github.event_name == 'workflow_dispatch' && inputs.publish_tag != '')
+      )
     runs-on: ubicloud-standard-2
     timeout-minutes: 15
     permissions:
@@ -297,6 +309,33 @@ jobs:
       RELEASE_SHA: ${{ needs.release-please.outputs.release_sha }}
       RELEASE_VERSION: ${{ needs.release-please.outputs.release_version }}
     steps:
+      # Resolve the tag once, then pin checkout to its commit rather than a moving ref.
+      - name: Resolve retry release
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PUBLISH_TAG: ${{ inputs.publish_tag }}
+        run: |
+          if [[ ! "$PUBLISH_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::publish_tag: expected a versioned release tag such as v1.2.3"
+            exit 1
+          fi
+          release=$(gh release view "$PUBLISH_TAG" --json tagName,isDraft)
+          if ! jq -e --arg tag "$PUBLISH_TAG" '.tagName == $tag and .isDraft == false' <<< "$release" > /dev/null; then
+            echo "::error::publish_tag: expected an existing published GitHub release"
+            exit 1
+          fi
+          release_sha=$(gh api "repos/$GH_REPO/commits/$PUBLISH_TAG" --jq .sha)
+          if [[ ! "$release_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::publish_tag: expected the tag to resolve to a 40-character commit SHA"
+            exit 1
+          fi
+          {
+            echo "RELEASE_SHA=$release_sha"
+            echo "RELEASE_VERSION=${PUBLISH_TAG#v}"
+          } >> "$GITHUB_ENV"
+
       # Repository scripts are not available yet. Full validation follows checkout.
       - name: Require release identity
         run: |

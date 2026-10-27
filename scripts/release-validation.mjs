@@ -49,7 +49,8 @@ function readPublicPackage(manifestPath, releaseVersion) {
 
 /**
  * Check the release identity and all public package versions before npm access.
- * RELEASE_SHA and RELEASE_VERSION must be root outputs from Release Please.
+ * RELEASE_SHA and RELEASE_VERSION come from root Release Please outputs or a
+ * validated published GitHub release tag selected by a manual retry.
  * Read packages only from the current checkout. Never select a subset from paths_released.
  * The workflow also checks required inputs before checkout, when this script is not available.
  *
