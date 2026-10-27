@@ -310,6 +310,9 @@ function evidenceIsComplete(
 }
 
 function diagnosticEvidenceReason(evidence: DiagnosticEvidenceSummary): string {
+  if (evidence.requested === 0) {
+    return "No document-level diagnostic evidence was collected for this scope. An empty result does not establish that the scope is clean. Request diagnostics for an exact file.";
+  }
   let reason = `Diagnostic evidence is partial: ${evidence.requested} requested, ${evidence.confirmed} confirmed, ${evidence.unconfirmed} unconfirmed, ${evidence.failed} failed, ${evidence.removed} removed.`;
   if (evidence.unconfirmed > 0) {
     reason += " Unconfirmed documents have no request-based confirmation.";

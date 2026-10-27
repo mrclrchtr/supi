@@ -143,13 +143,26 @@ async function buildRequestedSection(options: {
     case "defs": {
       const result = await buildEnrichedDefsSection(target, deps, treeContext, limit);
       const contextFacts = targetContextFacts(treeContext, limit);
+      const operations = treeContext?.operations;
+      const semanticObserved =
+        result.hasSemanticEvidence ||
+        (operations &&
+          [operations.hover, operations.definition].some(
+            ({ status }) => status === "complete" || status === "partial",
+          ));
+      const structuralObserved =
+        operations &&
+        [operations.nodeAt, operations.outline, operations.imports, operations.exports].some(
+          ({ status }) => status === "complete" || status === "partial",
+        );
       return targetSectionResult(
         section,
         { ...result, facts: { ...contextFacts, ...result.facts } },
         [
-          result.hasSemanticEvidence
-            ? { source: "semantic", capability: "LSP" }
-            : { source: "structural", capability: "tree-sitter" },
+          ...(semanticObserved ? [{ source: "semantic" as const, capability: "LSP" }] : []),
+          ...(structuralObserved
+            ? [{ source: "structural" as const, capability: "tree-sitter" }]
+            : []),
         ],
       );
     }

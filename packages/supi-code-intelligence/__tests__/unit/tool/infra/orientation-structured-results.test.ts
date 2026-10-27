@@ -559,6 +559,10 @@ describe("orientation structured results", () => {
       sections: expect.arrayContaining([
         expect.objectContaining({
           key: "defs",
+          provenance: [
+            { source: "semantic", capability: "LSP" },
+            { source: "structural", capability: "tree-sitter" },
+          ],
           facts: expect.objectContaining({
             node: expect.objectContaining({ type: "identifier", text: "widget" }),
             hover: expect.objectContaining({ contents: "function widget(): void" }),
@@ -593,6 +597,46 @@ describe("orientation structured results", () => {
       /fileFingerprint|spanId|operationId/,
     );
   });
+
+  it.each(["unavailable", "empty", "partial"] as const)(
+    "credits structural observations without treating target summary text as evidence: %s",
+    async (mode) => {
+      registerMockProvider(cwd, {
+        hover: async () => completedCodeQuery(null),
+        definition: async () => completedCodeQuery([]),
+        imports: async () =>
+          mode === "unavailable"
+            ? { kind: "unsupported-language", file: "index.ts", message: "Not supported" }
+            : mode === "partial"
+              ? {
+                  kind: "partial",
+                  file: "index.ts",
+                  reason: "Imports incomplete",
+                  errorRanges: [],
+                  data: [],
+                }
+              : { kind: "success", data: [] },
+      });
+      readyLsp();
+      const result = await execute(tool(), {
+        focus: { target: { anchor: { file: "index.ts", line: 1, character: 14 } } },
+      });
+      expect(result.structuredContent).toMatchObject({
+        sections: expect.arrayContaining([
+          expect.objectContaining({
+            key: "defs",
+            provenance:
+              mode === "unavailable"
+                ? [{ source: "semantic", capability: "LSP" }]
+                : [
+                    { source: "semantic", capability: "LSP" },
+                    { source: "structural", capability: "tree-sitter" },
+                  ],
+          }),
+        ]),
+      });
+    },
+  );
 
   it.each(["empty", "unavailable", "partial", "failed"] as const)(
     "reports independent hover and context-definition observations: %s",

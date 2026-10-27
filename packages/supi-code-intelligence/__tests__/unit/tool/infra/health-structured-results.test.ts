@@ -125,6 +125,21 @@ describe("registered health structured results", () => {
     ]);
     expect(invalid.structuredContent.kind).toBe("invalid-input");
   });
+  it("explains zero-document partial evidence without treating an empty result as clean", async () => {
+    ready({
+      getWorkspaceDiagnosticSummary: () => ({ entries: [], current: false, evidence: empty }),
+    });
+    const result = await call(tool(), {});
+    expect(result.structuredContent).toMatchObject({
+      diagnostics: { kind: "partial", entries: [], evidence: empty },
+    });
+    const { reason } = result.structuredContent.diagnostics as { reason: string };
+    expect(reason).toMatch(/no document-level diagnostic evidence/i);
+    expect(reason).toMatch(/does not establish.*clean/i);
+    expect(reason).toMatch(/exact file/i);
+    expect(result.content[0].text).toContain(reason);
+  });
+
   it("retains partial evidence independently of server scope and exposes rich server capabilities", async () => {
     const evidence = {
       requested: 1,

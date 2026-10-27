@@ -449,8 +449,7 @@ describe("code_health diagnostic observations", () => {
     expect(observation).toMatchObject({
       kind: "partial",
       evidence: emptyEvidence(),
-      reason:
-        "Diagnostic evidence is partial: 0 requested, 0 confirmed, 0 unconfirmed, 0 failed, 0 removed.",
+      reason: expect.stringMatching(/no document-level diagnostic evidence/i),
     });
   });
 
@@ -473,8 +472,7 @@ describe("code_health diagnostic observations", () => {
     expect(observation).toMatchObject({
       kind: "partial",
       evidence: emptyEvidence(),
-      reason:
-        "Diagnostic evidence is partial: 0 requested, 0 confirmed, 0 unconfirmed, 0 failed, 0 removed.",
+      reason: expect.stringMatching(/no document-level diagnostic evidence/i),
     });
   });
 
