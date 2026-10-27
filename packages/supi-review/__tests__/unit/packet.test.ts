@@ -24,7 +24,7 @@ const scopeAdvisory =
 
 describe("buildReviewPacket", () => {
   it("builds a change packet with exact before and after guidance", () => {
-    expect(REVIEW_PACKET_PROTOCOL_VERSION).toBe("7");
+    expect(REVIEW_PACKET_PROTOCOL_VERSION).toBe("8");
     const task = { id: "spec", instructions: "Check requirement R1.", mode: "change" as const };
     const packet = buildReviewPacket(
       snapshot,
@@ -144,14 +144,14 @@ describe("buildReviewPacket", () => {
     expect(packet).toEqual(buildReviewPacket(snapshot, review, {}, task, model));
     expect(packet.packetHash).toBe(
       [
-        "d2bc4f02",
-        "a49bf85a",
-        "b4af3464",
-        "c6095f80",
-        "2b2aff85",
-        "a67065ca",
-        "896eba1b",
-        "5c0171cf",
+        "b7488ff3",
+        "4af03391",
+        "eb478abd",
+        "66ed3126",
+        "ff8cb0e7",
+        "5677b0d9",
+        "97bdac2e",
+        "e5f3f420",
       ].join(""),
     );
   });

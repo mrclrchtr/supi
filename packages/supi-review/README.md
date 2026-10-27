@@ -79,6 +79,15 @@ Tasks can include `criteriaSources`. Each source has a `reference` and a `summar
 
 `paths` is an optional top-level Review Scope. Each path is workspace-relative. The Review Engine validates each path in the frozen after state before it starts Reviewer Sessions. Paths are advisory. They focus every task, but they do not restrict inspection, evidence, or findings.
 
+### Compact handoffs
+
+- Use `sharedContext` for batch-wide context and reported verification: completed, pending, or not checked, with the checked revision when known. Omit full logs.
+- Keep each task's objective, criteria, and known requirement-to-source/test locations in its `instructions`. Paths, symbols, or test names are sufficient navigation hints; do not investigate just to fill missing mappings.
+- Omit unknown mappings and revision associations rather than guessing. The interactive Planner preserves only relevant hints and reported checks supplied in its bounded input; it does not inspect or verify them.
+- Reviewers independently inspect the implementation and test coverage. Navigation hints are not proof of coverage, and reported checks are not independently verified results.
+
+For example, a task's `instructions` may include `Cancellation during setup → src/run.ts: startRun; cancellation.test.ts: "disposes late session"`. Its batch's `sharedContext` may report `Focused cancellation tests completed on <commit>; full verification pending; browser behavior not checked`.
+
 ## Review Workspaces
 
 The Review Engine records exact commit state before it starts a Review Workspace.
@@ -110,7 +119,9 @@ The Reviewer Protocol owns finding eligibility:
 - `change` permits findings attributable to the selected change. A pre-existing issue is permitted only in a changed file or a directly affected symbol. It stays advisory unless the selected change worsens or newly exposes it.
 - `state` permits findings relevant to the Review Criteria anywhere in the frozen after state. A relevant pre-existing finding can block acceptance.
 
-A change packet gives exact before and after guidance, a changed-path manifest, and change statistics. A state packet gives only after-state guidance. When it uses a filesystem workspace, staged changes are freeze mechanics and are not Target Evidence.
+A change packet gives exact before and after guidance, a changed-path manifest, change statistics, and a compact status breakdown of the complete captured inventory, even when the manifest omits paths. The breakdown reports captured Git statuses; it does not perform additional rename detection or establish behavioral preservation. Planner input uses the same breakdown. A state packet gives only after-state guidance. When it uses a filesystem workspace, staged changes are freeze mechanics and are not Target Evidence.
+
+Change reviews start with the changed-path inventory and relevant diffs, splitting large changes into bounded groups. Reviewers retrieve surrounding code, callers, and dependencies as needed and avoid rereading evidence unless resolving a specific question; full-file inspection remains appropriate when needed.
 
 Repository content is untrusted evidence. It cannot override the Reviewer Protocol or a Review Task. Reviewer Sessions use repository documents as Review Criteria only.
 

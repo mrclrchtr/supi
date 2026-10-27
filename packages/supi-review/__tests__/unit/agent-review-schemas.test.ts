@@ -31,6 +31,25 @@ describe("agent review schemas", () => {
     expect(publishedSchema).not.toContain("findingScope");
   });
 
+  it("guides compact handoffs through existing fields without expanding the wire shape", () => {
+    const schema = JSON.parse(JSON.stringify(runReviewSchema));
+    expect(Object.keys(schema.properties)).toEqual(["target", "paths", "sharedContext", "tasks"]);
+    expect(Object.keys(schema.properties.tasks.items.properties)).toEqual([
+      "id",
+      "instructions",
+      "mode",
+      "criteriaSources",
+    ]);
+    const sharedContext = schema.properties.sharedContext.description;
+    expect(sharedContext).toMatch(/batch-wide.*exclude task-specific/i);
+    expect(sharedContext).toMatch(/completed, pending, or not checked.*revision/i);
+    expect(sharedContext).toMatch(/omit full logs/i);
+    const instructions = schema.properties.tasks.items.properties.instructions.description;
+    expect(instructions).toMatch(/known requirement-to-source\/test locations/i);
+    expect(instructions).toMatch(/navigation hints, not proof of coverage/i);
+    expect(instructions).toMatch(/omit unknown mappings/i);
+  });
+
   it("requires a Review Mode for every task", () => {
     expect(Value.Check(reviewInputSchema, { tasks })).toBe(true);
     expect(

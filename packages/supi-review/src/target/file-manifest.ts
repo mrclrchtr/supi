@@ -19,6 +19,30 @@ export function formatReviewChange(change: ReviewChange): string {
   return `${change.status} ${formatLineStats(change)} ${path}`;
 }
 
+/** Summarize the complete captured inventory, without inferring behavioral preservation. */
+export function buildChangeSummary(changes: readonly ReviewChange[]): string {
+  const groups = [
+    ["M", "modified", "modified"],
+    ["A", "added", "added"],
+    ["D", "deleted", "deleted"],
+    ["R", "detected rename", "detected renames"],
+    ["C", "detected copy", "detected copies"],
+    ["T", "type change", "type changes"],
+    ["other", "other", "other"],
+  ] as const;
+  const counts = new Map<string, number>();
+  for (const change of changes) {
+    const status = change.status.charAt(0);
+    const group = groups.some(([code]) => code === status) ? status : "other";
+    counts.set(group, (counts.get(group) ?? 0) + 1);
+  }
+  const summary = groups.flatMap(([code, singular, plural]) => {
+    const count = counts.get(code) ?? 0;
+    return count ? [`${count} ${count === 1 ? singular : plural}`] : [];
+  });
+  return `Change summary: ${summary.join(", ") || "no changes"}.`;
+}
+
 /** Render a deterministic bounded change manifest with an explicit omission count. */
 export function buildFileManifest(
   changes: ReviewChange[],

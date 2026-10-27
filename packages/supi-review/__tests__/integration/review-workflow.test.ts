@@ -425,6 +425,68 @@ describe("runReview exact Review Target workflow", () => {
     expect(reviewerCwd).not.toBe(cwd);
   });
 
+  it.each(["workingTree", "committed"] as const)(
+    "summarizes captured %s changes without changing canonical target evidence",
+    async (source) => {
+      git(cwd, "config", "diff.renames", "true");
+      writeFileSync(join(cwd, "old-name.txt"), "unique rename content\n");
+      writeFileSync(join(cwd, "deleted.txt"), "deleted content\n");
+      git(cwd, "add", ".");
+      git(cwd, "commit", "-m", "change summary baseline");
+      const from = git(cwd, "rev-parse", "HEAD");
+      git(cwd, "mv", "old-name.txt", "new-name.txt");
+      writeFileSync(join(cwd, "tracked.txt"), "modified content\n");
+      unlinkSync(join(cwd, "deleted.txt"));
+      writeFileSync(join(cwd, "added.txt"), "added content\n");
+      if (source === "committed") {
+        git(cwd, "add", ".");
+        git(cwd, "commit", "-m", "mixed changes");
+      }
+      const target = source === "workingTree" ? { workingTree: { from } } : { committed: { from } };
+      const captured = await resolveReviewSnapshot(cwd, target);
+
+      const outcome = await review(cwd, target, [changeTask, stateTask]);
+
+      expect(outcome.kind).toBe("completed");
+      if (outcome.kind !== "completed") return;
+      const [changeInvocation, stateInvocation] = mocks.runReviewer.mock.calls.map(
+        ([call]) => call,
+      );
+      expect(changeInvocation.prompt).toContain(
+        source === "committed"
+          ? "Change summary: 1 modified, 1 added, 1 deleted, 1 detected rename."
+          : "Change summary: 1 modified, 2 added, 2 deleted.",
+      );
+      if (source === "committed") {
+        expect(changeInvocation.prompt).toContain('R100 +0 -0 "old-name.txt" -> "new-name.txt"');
+      }
+      expect(stateInvocation.prompt).not.toContain("Change summary:");
+      expect(outcome.details.snapshot).toMatchObject({
+        diffHash: captured.diffHash,
+        changes: captured.changes,
+        stats: captured.stats,
+      });
+      expect(outcome.details.workspaceReceipt).toMatchObject({
+        expectedDiffHash: captured.diffHash,
+        observedDiffHash: captured.diffHash,
+        changedPathCount: source === "committed" ? 4 : 5,
+      });
+    },
+  );
+
+  it("counts the complete captured inventory when the packet manifest omits paths", async () => {
+    for (let index = 0; index < 205; index++) {
+      writeFileSync(join(cwd, `added-${String(index).padStart(3, "0")}.txt`), "new content\n");
+    }
+
+    const outcome = await review(cwd, {}, [changeTask]);
+
+    expect(outcome.kind).toBe("completed");
+    const packet = mocks.runReviewer.mock.calls[0]?.[0].prompt;
+    expect(packet).toContain("Change summary: 205 added.");
+    expect(packet).toContain("5 additional change(s) omitted");
+  });
+
   it("rejects a full batch with an empty change before workspace creation and permits empty state", async () => {
     const before = git(cwd, "worktree", "list", "--porcelain");
     const emptyChange = await review(cwd, {}, [changeTask]);

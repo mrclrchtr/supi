@@ -8,10 +8,10 @@ import type {
   ReviewSnapshot,
   ReviewTask,
 } from "../types.ts";
-import { buildFileManifest } from "./file-manifest.ts";
+import { buildChangeSummary, buildFileManifest } from "./file-manifest.ts";
 
 /** Protocol version included in every canonical reviewer packet for future evolution. */
-export const REVIEW_PACKET_PROTOCOL_VERSION = "7";
+export const REVIEW_PACKET_PROTOCOL_VERSION = "8";
 
 function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
@@ -101,6 +101,7 @@ export function buildReviewPacket(
     parts.push(
       `Target diff SHA-256: ${snapshot.diffHash}`,
       `Changed files: ${snapshot.changes.length}`,
+      buildChangeSummary(snapshot.changes),
       `Diff stats: +${snapshot.stats.additions} / -${snapshot.stats.deletions}`,
     );
   }

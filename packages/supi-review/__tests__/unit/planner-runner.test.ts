@@ -85,6 +85,16 @@ describe("runPlanner", () => {
     });
   });
 
+  it("keeps handoff hints grounded in supplied context without inventing missing evidence", async () => {
+    await runPlanner(args);
+
+    const protocol = mocks.runIsolatedChild.mock.calls[0]?.[0].protocolPrompt;
+    expect(protocol).toMatch(/preserve only supplied.*navigation.*reported verification/i);
+    expect(protocol).toMatch(/do not invent missing mappings, outcomes, or revision associations/i);
+    expect(protocol).toMatch(/do not repeat engine-supplied target facts.*full logs or documents/i);
+    expect(protocol).toContain("Do not claim to have inspected or verified code.");
+  });
+
   it("passes the submit tool, isolated prompt, and five-minute timeout to the runtime adapter", async () => {
     await runPlanner(args);
 

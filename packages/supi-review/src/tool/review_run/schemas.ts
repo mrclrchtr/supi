@@ -15,7 +15,8 @@ export const reviewTaskSchema = Type.Object(
       minLength: 1,
       maxLength: REVIEW_LIMITS.taskInstructionCharacters,
       pattern: "\\S",
-      description: "Self-contained review objective and criteria for one task.",
+      description:
+        "Self-contained review objective and criteria. Add known requirement-to-source/test locations as navigation hints, not proof of coverage; omit unknown mappings rather than investigating just to fill them.",
     }),
     mode: StringEnum(["change", "state"] as const, {
       description:
@@ -58,7 +59,8 @@ export const reviewInputSchema = Type.Object(
       Type.String({
         maxLength: REVIEW_LIMITS.sharedContextCharacters,
         pattern: "\\S",
-        description: "Context for all tasks; exclude task-specific instructions.",
+        description:
+          "Batch-wide context; exclude task-specific instructions. When known, report checks as completed, pending, or not checked and identify their revision; omit full logs.",
       }),
     ),
     tasks: Type.Array(reviewTaskSchema, {

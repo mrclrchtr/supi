@@ -81,6 +81,20 @@ describe("runReviewer", () => {
     model,
   };
 
+  it("delivers bounded inspection guidance without treating caller navigation as coverage evidence", async () => {
+    await runReviewer(invocation);
+
+    const protocol = mocks.runIsolatedChild.mock.calls[0]?.[0].protocolPrompt;
+    expect(protocol).toMatch(/change reviews.*inventory.*diffs/i);
+    expect(protocol).toMatch(/large changes.*bounded groups/i);
+    expect(protocol).toMatch(/unchanged surrounding code, callers, and dependency source/i);
+    expect(protocol).toMatch(/avoid rereading evidence.*specific question/i);
+    expect(protocol).toMatch(/navigation hints, not proof of coverage/i);
+    expect(protocol).toMatch(/reported checks.*caller claims.*not independently verified/i);
+    expect(protocol).toMatch(/revision.*pending or unchecked/i);
+    expect(protocol).toContain("Do not run tests, builds, linters");
+  });
+
   it("sends caller-owned target and finding data to the shared registry", async () => {
     const setDisplayResult = vi.fn();
     const registry = { setDisplayResult } as unknown as AgentRunRegistry;
