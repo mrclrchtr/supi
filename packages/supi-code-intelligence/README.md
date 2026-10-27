@@ -85,9 +85,26 @@ Important tool rules:
 
 ### Structured codemode results
 
-`code_resolve`, `code_find`, and `code_graph` declare output schemas. Direct calls retain compact text; codemode receives JSON instead of Markdown. Resolve returns `targets` with reusable `handle` values; Find returns bounded `matches`; Graph returns per-relation `sections` with bounded `items`. UI details and internal target-store entries are not exposed.
+All eight tools declare native output schemas and return JSON-serializable `structuredContent`. Direct calls retain readable `content`; Pi's default codemode route resolves to native data instead of Markdown. `details` remains a separate UI/state contract, not the script API. Text, script data, and UI details project the same collected facts; no representation is recovered by parsing another.
 
-Check `kind` before consuming evidence. Invalid input and candidate selection return recovery data; whole-tool capability failures still throw. `evidenceLists` (and Graph's per-section `evidence`) retain exact or unknown totals, shown/omitted counts, partial reasons, and invalid-location counts. AST results retain their scan policy, exclusions, limitations, and failures. Coordinates are one-based UTF-16 except zero-based recovery error ranges.
+| Tool | Native data |
+|---|---|
+| Resolve | `targets` with reusable `handle` values, candidate selection, and evidence counts |
+| Inspect | `point`, independently completed/partial/unavailable `sections` with `data`, recovery, bounded definitions/diagnostics, provenance, and next queries |
+| Orientation | `focusKind`, named section `facts`, selected `workspace` inventories/declarations/relationships and Gradle observations when applicable, instructions, limitations, and optional captured `snapshot` |
+| Graph | Per-relation `sections` with bounded `items` and evidence |
+| Find | Bounded `matches`; AST scan policy, exclusions, limitations, and failures |
+| Health | Requested `includedSections` and `level`, actual `diagnostics` with scope and confirmation evidence, all collected `servers`, workspace inventory scope, capability state, warnings, and separate `refresh` outcomes |
+| Refactor Plan | `planId`, operation, safe target facts, every exact edit in `edits`, file/edit counts, provenance, and `nextAction` |
+| Refactor Apply | Explicit `kind: "applied"`, changed `files` with per-file counts, and total file/edit counts |
+
+Check `kind` before consuming evidence. Invalid input and candidate selection remain corrective returned outcomes; real execution/capability failures and cancellation throw. Internal providers, target records, fingerprints, mutation authority, and session state are not exposed. Apply recovery continues to consume `details.data.changedFiles` independently of script data.
+
+Limits belong to their representation. Inspect retains its evidence limits. Orientation native records retain the focus, ordering, `maxResults`, and collection limits even when text budgets hide descriptions or navigation rows. A captured snapshot describes the same observation; reading it does not refresh facts. Health returns all collected diagnostic-file/server entries, with at most three error/warning messages per file in detailed mode; neither a complete returned list nor successful maintenance proves workspace-wide diagnostic completeness. Plan returns every edit even when text previews only five. Text-preview omission counts do not describe these complete native lists. Evidence metadata preserves exact versus unknown totals and partial reasons.
+
+Source points, target positions, Inspect source coordinates, and Orientation source-item coordinates use one-based lines and UTF-16 columns. Refactor edit ranges and Orientation provider ranges (hover, definitions, diagnostics), like syntax-recovery ranges, use zero-based lines and UTF-16 columns; range ends are exclusive. Health messages use one-based lines.
+
+Registered-tool tests validate results against the registered output schemas and JSON round-tripping; Pi does not validate output schemas at runtime. Separate deterministic integration tests execute all five migrated tools through Pi's real default codemode route, including fixture mutation by Apply. These tests use controlled providers, not live language-server qualification.
 
 Example codemode script that returns counts rather than every reference:
 
@@ -116,7 +133,7 @@ Automatic collection stays within the session working directory. Ancestor Git ro
 - Captured directory diagrams retain separate dependency categories and declared values. Unique declared-name matches do not prove installed dependency resolution or runtime architecture.
 - The inventory retains at most 10,000 entries. An explicit in-root directory is collected before unrelated paths use that budget. External directory focus uses its own observation. Metadata files have a 1 MiB read limit. The first-turn collector has a 10-second deadline; tool calls use their request control. Results disclose incomplete collection.
 
-Estimated tokens are `ceil(characters / 4)`. The overview warns above 1,000 and has a 2,000-token hard cap. Workspace and directory navigation warn above 2,000 and have a 4,000-token hard cap. Warnings go to UI and debug only. `maxResults` can reduce a list, but cannot bypass the total cap.
+Estimated tokens are `ceil(characters / 4)`. The overview warns above 1,000 and has a 2,000-token hard cap. Workspace and directory navigation warn above 2,000 and have a 4,000-token hard cap. Warnings go to UI and debug only. `maxResults` can reduce a list, but cannot bypass the text cap. Native records retain their caller-limited selection independently of that text budget.
 
 The overview links captured details only when navigation rows or descriptions are omitted. Explicit workspace/directory Orientation also preserves raw inventory evidence. Captured-result files contain the complete collected observation, not just the selected rows. Reading them does not refresh facts or establish that every possible fact was collected. Instruction snippets have a separate budget and still respect Pi's final output safety limit. Unread instruction text is identified and is not recorded as supplied. File- and symbol-focused navigation retain their existing output.
 

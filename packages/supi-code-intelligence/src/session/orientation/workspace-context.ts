@@ -58,12 +58,15 @@ export async function orientWorkspaceContext(
     return {
       kind: "completed",
       directory: focus,
-      data: workspaceOrientationData({
-        observation,
-        cwd: options.cwd,
-        focus,
-        maxResults: request.maxResults ?? 10,
-      }),
+      data: {
+        ...workspaceOrientationData({
+          observation,
+          cwd: options.cwd,
+          focus,
+          maxResults: request.maxResults ?? 10,
+        }),
+        focusKind: workspaceFocusKind(request),
+      },
     };
   } catch (error) {
     if (!(error instanceof WorkspaceSymlinkError)) throw error;
@@ -73,6 +76,13 @@ export async function orientWorkspaceContext(
       symlinkRejection: { requestedPath: error.requestedPath, blockedPath: error.blockedPath },
     };
   }
+}
+
+function workspaceFocusKind(
+  request: OrientationWorkflowInput,
+): "workspace" | "module" | "directory" {
+  if (!request.focus) return "workspace";
+  return "module" in request.focus ? "module" : "directory";
 }
 
 async function initialObservation(

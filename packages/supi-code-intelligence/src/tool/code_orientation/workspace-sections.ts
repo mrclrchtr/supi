@@ -10,6 +10,7 @@ import type {
 } from "../../session/orientation-types.ts";
 import { gradleSections } from "./gradle-sections.ts";
 import { code, plain, sourcePath, tableSection } from "./workspace-format.ts";
+import { workspaceCollectionStatus } from "./workspace-observations.ts";
 import { projectSections } from "./workspace-projects.ts";
 
 /** Build output facts from one captured observation, with no filesystem reads. */
@@ -104,37 +105,25 @@ function collectionStatus(
   observation: WorkspaceObservation,
 ): OrientationSectionData {
   if (section.key === "workspace.issues" || section.key.startsWith("gradle.")) return section;
-  const { collection } = observation;
-  const inventoryPartial =
-    collection.stopReason !== "complete" ||
-    collection.errors.some((error) => error.stage === "inventory");
+  const state = workspaceCollectionStatus(observation.collection);
   const partial = section.provenance.some((source) => source.source === "filesystem")
-    ? inventoryPartial
-    : collection.status === "partial";
+    ? state.inventoryPartial
+    : state.metadataPartial;
   if (!partial) return section;
-  const reason =
-    collection.stopReason === "entry-limit"
-      ? "safety-limit"
-      : collection.stopReason === "deadline"
-        ? "timeout"
-        : inventoryPartial
-          ? "filesystem-error"
-          : "configuration-error";
   return {
     ...section,
     status: "partial",
-    reason: inventoryPartial
-      ? "Inventory collection is incomplete"
-      : "Metadata collection is incomplete",
+    reason: state.reason,
     evidenceLists: section.evidenceLists.map((list) => ({
       ...list,
       totalCount: null,
-      partialReason: reason,
+      partialReason: state.partialReason,
     })),
   };
 }
 
-function containingProjects(facts: WorkspaceOrientationFacts, root: string) {
+/** Nearest project declarations containing the focus, established by parsed metadata. */
+export function containingProjects(facts: WorkspaceOrientationFacts, root: string) {
   const candidates = facts.observation.projects.filter((project) =>
     within(path.resolve(facts.observation.root, project.directory), root),
   );
@@ -166,11 +155,17 @@ function inventoryNote(
   return `Inventory: ${files} regular file${files === 1 ? "" : "s"} and ${links} symbolic links. Includes ${policy}; link targets are not followed.${exclusions} Collection ${collection.status}${collection.stopReason !== "complete" ? ` (${collection.stopReason}; more entries may exist)` : ""}.`;
 }
 
-function inventorySections(
+/** Named inventory observations before presentation and per-list selection. */
+export interface WorkspaceInventoryFacts {
+  readonly directories: readonly { path: string; entryCount: number }[];
+  readonly directFiles: readonly InventoryEntry[];
+  readonly extensions: readonly { extension: string; fileCount: number }[];
+}
+
+/** Derive direct children and extension counts from the already captured inventory. */
+export function collectWorkspaceInventory(
   entries: readonly InventoryEntry[],
-  facts: WorkspaceOrientationFacts,
-  limit: number,
-): OrientationSectionData[] {
+): WorkspaceInventoryFacts {
   const directories = new Map<string, number>();
   const extensions = new Map<string, number>();
   for (const entry of entries) {
@@ -181,13 +176,30 @@ function inventorySections(
       extensions.set(extension, (extensions.get(extension) ?? 0) + 1);
     }
   }
-  const directFiles = entries.filter((entry) => !entry.path.includes("/"));
+  return {
+    directories: [...directories]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, count]) => ({ path: `${name}/`, entryCount: count })),
+    directFiles: entries.filter((entry) => !entry.path.includes("/")),
+    extensions: [...extensions]
+      .sort(([a, an], [b, bn]) => bn - an || a.localeCompare(b))
+      .map(([extension, count]) => ({ extension, fileCount: count })),
+  };
+}
+
+function inventorySections(
+  entries: readonly InventoryEntry[],
+  facts: WorkspaceOrientationFacts,
+  limit: number,
+): OrientationSectionData[] {
+  const { directories, directFiles, extensions } = collectWorkspaceInventory(entries);
   const sections = [
     tableSection("workspace.directories", "Direct directories", {
       headers: ["Path", "Entries at all depths"],
-      rows: [...directories]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([name, count]) => [code(`${name}/`), String(count)]),
+      rows: directories.map(({ path: directory, entryCount }) => [
+        code(directory),
+        String(entryCount),
+      ]),
       limit,
       detail: "included paths",
     }),
@@ -204,9 +216,10 @@ function inventorySections(
   sections.push(
     tableSection("workspace.extensions", "File extensions (filenames, not language support)", {
       headers: ["Extension", "Regular files"],
-      rows: [...extensions]
-        .sort(([a, an], [b, bn]) => bn - an || a.localeCompare(b))
-        .map(([extension, count]) => [extension ? code(extension) : "No extension", String(count)]),
+      rows: extensions.map(({ extension, fileCount }) => [
+        extension ? code(extension) : "No extension",
+        String(fileCount),
+      ]),
       limit: facts.overview ? Math.min(5, limit) : limit,
       detail: "included regular files",
     }),

@@ -51,6 +51,7 @@ Context surfaces bill differently (`context-architecture.md#2-cache-lifecycle-an
 | `promptSnippet` | Default system prompt, `Available tools` | Paid model input only when the tool is active and the default prompt uses it. Keep it to one line. |
 | `promptGuidelines` | Default system prompt, `Guidelines` | Paid model input only when the tool is active and the default prompt uses it. Keep it to high-value bullets. |
 | Result `content` | Tool-result messages | Tier 2: full once when appended, cached after, re-paid on misses. Keep it decision-sufficient. |
+| `structuredContent` | Native programmatic result, including codemode | Not direct tool-result model text. A script's selected output becomes model-facing content. |
 | `details`, `appendEntry`, spill files | Extension state and files | Free — never sent to the model (`context-architecture.md#1-what-extensions-pay-for--and-what-is-free`). |
 
 ### Decision-first placement
@@ -78,7 +79,7 @@ Placement rules:
    A snippet can summarize the main capability. Human docs can restate behavior without copying model-facing text.
 2. **Post-call facts** — what the model needs after calling — go in result `content`, decision-first: answer and totals before evidence, compact formats (paths, counts, IDs) over dumps.
 3. **Everything the model does not read** goes to free channels: `details` for state, evidence, and diagnostics (zero cost, durable, drives UI and state reconstruction); spill files for bulk output — `content` carries a short preview plus the path.
-4. Never duplicate facts between `content` and `details`. Never echo input arguments or boilerplate headers back in results. Return handles and pointers instead of data the model can re-query.
+4. Do not duplicate bulk output unnecessarily. Text, script data, and UI details may intentionally project overlapping canonical facts for different consumers; maintain one collection/assembly policy, not independent fact reconstruction. Avoid boilerplate input echoes; retain input context only when needed to interpret evidence. Return handles and pointers instead of data the model can re-query.
 5. Progressive disclosure: keep always-on guidance selection-sufficient; rare usage detail belongs on demand (result pointers, skills, docs), not in the prefix.
 
 ## Naming
@@ -172,7 +173,12 @@ Contract, throw-for-failure semantics (`isError: true`), `onUpdate` streaming, `
 
 SuPi rules:
 
-- `content` = what the model must read; `details` = everything else. `details` is never sent to the model — zero context cost — and is the durable home for UI data and branch-aware state.
+- `content` is the readable direct-call result; `structuredContent` is the allowlisted native script contract; `details` is the durable UI/state contract. `details` is not automatically exposed to scripts or sent to the model. Do not copy UI details wholesale into script data.
+- For data tools, register `outputSchema` and return matching JSON-serializable `structuredContent` on every returned final-result branch, including corrective outcomes. Pi's default codemode route selects structured data for tools with an output schema, and text for tools without one. Pi does **not** validate output schemas at runtime: test actual registered-tool execution against the registered schema and JSON round-tripping. Verify real codemode routing separately; schema checks alone do not test adapters or hooks.
+- Build text, script data, and UI details from canonical collected/assembled facts. Never parse Markdown or table cells to reconstruct evidence. Allowlist public fields, excluding providers, caches, authority, credentials, and private synchronization/session state.
+- Keep list selection, collection limitations, and text/UI-preview limits independent. Text shortening must not silently shorten script lists; counts and omission metadata must describe the representation they accompany. Complete returned lists do not establish complete collection. Document path and coordinate conventions.
+- Preserve failure routing: corrective invalid input and valid empty outcomes may return typed data; real execution/capability failures and cancellation throw. Use `isError: true` only when a genuine returned failure needs structured data; do not add failure branches solely to exercise it.
+- Audit parent and child adapters and `tool_result` hooks. Pi drops `structuredContent` when a hook replaces `content` without also replacing `structuredContent`; redaction must update both. A hook that only observes a result should return nothing. Preserve `details` fields used for state and recovery.
 - Shape results decision-first: answer/totals before evidence; totals instead of full lists when counts suffice; handles and next-step pointers instead of re-derivable data; bulk output to a spill file with preview + path in `content`.
 - Valid empty outcomes (for example, no matches) return success. Throw only for real failures or capability-unavailable conditions.
 
@@ -234,7 +240,9 @@ SuPi additions:
 - [ ] Each detailed model-facing fact has one authoritative field. A snippet only summarizes the main capability.
 - [ ] Model-facing guidance is concise, information-dense, and omits low-value hints.
 - [ ] Result `content` holds only what the model must read; evidence, state, and bulk output live in `details` or spill files.
-- [ ] No fact duplicated between `content` and `details`; inputs are not echoed in results.
+- [ ] Overlapping text, script, and UI facts derive from canonical assembly; no Markdown parsing or wholesale copying of private UI details.
+- [ ] Data tools declare `outputSchema`; all returned final outcomes match it and JSON-round-trip in registered-execution tests. Real codemode-route tests verify adapters/hooks separately.
+- [ ] Script list limits and counts remain independent of text/UI preview limits; public paths and coordinate conventions are documented.
 - [ ] Parameter prose does not restate required status, bounds, enums, patterns, or object shape unless a non-obvious consequence changes a valid call.
 - [ ] Shared parameter rules live once on the nearest common object; leaf descriptions contain only leaf-specific meaning.
 - [ ] The complete serialized schema was checked for repeated descriptions, and its wire shape has a test.

@@ -110,8 +110,9 @@ async function collectFileFacts(
   appendList(builder, {
     key: "filesystem.file",
     title: "Filesystem facts",
-    items: [`Size: ${byteSize} bytes`],
-    render: (item) => item,
+    items: [byteSize],
+    render: (item) => `Size: ${item} bytes`,
+    facts: (items) => (items.length ? { fileSizeBytes: items[0] } : {}),
     confidence: "unavailable",
     provenance: [filesystemProvenance(input.cwd, focus)],
   });
@@ -225,6 +226,7 @@ function appendPackageContext(
     title: "Containing package",
     items: [module],
     render: packageLabel,
+    facts: (items) => (items[0] ? { package: packageFact(items[0]) } : {}),
     confidence: "unavailable",
     provenance: [{ source: "manifest", detail: module.manifestPath }],
   });
@@ -243,6 +245,7 @@ function appendPackageFacts(
     title,
     items: identity,
     render: (item) => item,
+    facts: () => ({ package: packageFact(module) }),
     confidence: "unavailable",
     provenance: [{ source: "manifest", detail: module.manifestPath }],
   });
@@ -253,6 +256,7 @@ function appendPackageFacts(
       title: "Manifest declarations",
       items: module.fields,
       render: (field) => `\`${field.field}\`: ${formatManifestValue(field.value)}`,
+      facts: (items) => ({ manifestFields: items.map(({ field, value }) => ({ field, value })) }),
       confidence: "unavailable",
       provenance: [{ source: "manifest", detail: module.manifestPath }],
     });
@@ -272,6 +276,9 @@ function appendDependencySection(
     title: `Manifest ${section.field}`,
     items: section.entries,
     render: (dependency) => `\`${dependency.name}\`: ${formatManifestValue(dependency.specifier)}`,
+    facts: (items) => ({
+      dependencies: items.map(({ field, name, specifier }) => ({ field, name, value: specifier })),
+    }),
     confidence: "unavailable",
     provenance: [{ source: "manifest", detail: `${module.manifestPath}#${section.field}` }],
   });
@@ -293,6 +300,15 @@ function appendRelationshipFacts(
     items: input.edges,
     render: (edge) =>
       `\`${edge.from}\` → \`${edge.to}\` — \`${edge.manifestPath}#${edge.field}\`: ${formatManifestValue(edge.specifier)}`,
+    facts: (items) => ({
+      relationships: items.map(({ from, to, field, manifestPath, specifier }) => ({
+        from,
+        to,
+        field,
+        manifestPath,
+        value: specifier,
+      })),
+    }),
     confidence: "unavailable",
     provenance: [{ source: "manifest", detail: "package dependency fields" }],
     status: input.status,
@@ -313,6 +329,15 @@ function topologyProvenance(
   return source
     ? { source: "configuration", detail: `${source.path}#${source.field}` }
     : { source: "configuration", detail: "supported workspace metadata" };
+}
+
+function packageFact(module: ModuleInfo) {
+  return {
+    name: module.name,
+    description: module.description,
+    manifestPath: module.manifestPath,
+    directory: module.relativePath,
+  };
 }
 
 function packageLabel(module: ModuleInfo): string {

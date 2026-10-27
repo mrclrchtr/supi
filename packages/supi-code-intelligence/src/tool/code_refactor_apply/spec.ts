@@ -1,6 +1,7 @@
 import { Type } from "typebox";
 import type { CodeIntelToolExecCtx } from "../../types/index.ts";
 import { executeRefactorApplyTool } from "./execute.ts";
+import { RefactorApplyOutputSchema } from "./structured.ts";
 import { renderRefactorApplyCall, renderRefactorApplyResult } from "./tui.ts";
 
 export const CODE_REFACTOR_APPLY_TOOL_NAME = "code_refactor_apply";
@@ -19,6 +20,7 @@ export const codeRefactorApplySpec = {
     },
     { additionalProperties: false },
   ),
+  outputSchema: RefactorApplyOutputSchema,
   run: (params: unknown, ctx: CodeIntelToolExecCtx) =>
     executeRefactorApplyTool(params as Parameters<typeof executeRefactorApplyTool>[0], ctx),
   renderCall: renderRefactorApplyCall,

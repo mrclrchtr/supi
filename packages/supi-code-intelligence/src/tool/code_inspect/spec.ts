@@ -2,6 +2,7 @@ import { Type } from "typebox";
 import type { CodeIntelToolExecCtx } from "../../types/index.ts";
 import { MaxResultsParam, SourcePointParam } from "../schemas.ts";
 import { executeInspectTool } from "./execute.ts";
+import { InspectOutputSchema } from "./structured.ts";
 import { renderInspectCall, renderInspectResult } from "./tui.ts";
 
 export const CODE_INSPECT_TOOL_NAME = "code_inspect";
@@ -11,6 +12,7 @@ export const CODE_INSPECT_TOOL_LABEL = "Code Inspect";
 export const codeInspectSpec = {
   name: CODE_INSPECT_TOOL_NAME,
   label: CODE_INSPECT_TOOL_LABEL,
+  outputSchema: InspectOutputSchema,
   parameters: Type.Object(
     {
       point: SourcePointParam,

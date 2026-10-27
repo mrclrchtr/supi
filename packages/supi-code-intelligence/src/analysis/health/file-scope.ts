@@ -26,6 +26,7 @@ import type {
   HealthDiagnosticObservation,
   HealthDiagnosticScope,
 } from "../../session/health-types.ts";
+import { HEALTH_DIAGNOSTIC_MESSAGE_LIMIT } from "../../session/health-types.ts";
 
 /** Collect a live per-file diagnostic pull with an applicable config scope decision. */
 export async function collectScopedFileDiagnostics(options: {
@@ -114,8 +115,6 @@ export function toFileDiagnosticEntries(
 
 // ── Message extraction ────────────────────────────────────────────────
 
-const MAX_MESSAGES_PER_FILE = 3;
-
 function extractMessages(
   diagnostics: ReadonlyArray<Pick<Diagnostic, "severity" | "message" | "source" | "range">>,
 ): HealthDiagnosticMessage[] {
@@ -125,7 +124,7 @@ function extractMessages(
       (a, b) => (a.severity ?? 1) - (b.severity ?? 1) || a.range.start.line - b.range.start.line,
     );
 
-  return errorsAndWarnings.slice(0, MAX_MESSAGES_PER_FILE).map((d) => ({
+  return errorsAndWarnings.slice(0, HEALTH_DIAGNOSTIC_MESSAGE_LIMIT).map((d) => ({
     line: d.range.start.line + 1,
     severity: (d.severity ?? 1) === 1 ? ("error" as const) : ("warning" as const),
     message: typeof d.message === "string" ? d.message : d.message.value,

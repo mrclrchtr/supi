@@ -6,6 +6,7 @@ A tool has separate surfaces:
 
 - **Agent surface** — Final `content` text or image blocks. PI stores this content in the tool-result session entry and uses it as model-facing tool-result content. The content can already be bounded or truncated. Collapsing or expanding the TUI does not change it. Partial `onUpdate()` content is not sent to the model or stored in the session.
 - **Human transcript surface** — `renderCall` and `renderResult` components. PI uses these in the interactive TUI. Current-session HTML export can also reuse them for custom tools. Standalone `pi --export` has no active extension tool definitions and does not reuse extension renderers.
+- **Script surface** — Final `structuredContent`, declared by `outputSchema`, for native programmatic callers such as codemode. This is separate from UI details and direct-call text; text/UI preview limits must not silently truncate script data.
 - **Details surface** — Final `details` metadata for UI, logs, and state reconstruction. PI stores it with the tool result. PI does not automatically send it to the model as tool output. Partial `details` from `onUpdate()` are transient runtime data unless the final result includes them.
 - **Transient UI** — `ctx.ui.custom()` components shown while a tool runs. This is separate from transcript rendering.
 

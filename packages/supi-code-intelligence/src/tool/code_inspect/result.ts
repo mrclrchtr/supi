@@ -328,6 +328,7 @@ function overallProvenance(data: InspectResultData): ResultProvenance[] {
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
 import { inspectErrorResult } from "../result/errors.ts";
 import { renderInspectResult } from "./markdown.ts";
+import { structuredInspectResult } from "./structured.ts";
 
 type InspectOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["inspect"]>>;
 
@@ -335,16 +336,21 @@ type InspectOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["inspec
 export function finishInspectResult(outcome: InspectOutcome): CodeIntelResult {
   if (outcome.kind === "unavailable") throw new Error(outcome.reason);
   if (outcome.kind === "invalid-input") {
-    return inspectErrorResult(`**Error:** ${outcome.message}`, {
-      focusTarget: "invalid input",
-      nextQueries: ["Provide an existing file and exact 1-based point"],
-      message: outcome.message,
-    });
+    const nextQueries = ["Provide an existing file and exact 1-based point"];
+    return {
+      ...inspectErrorResult(`**Error:** ${outcome.message}`, {
+        focusTarget: "invalid input",
+        nextQueries,
+        message: outcome.message,
+      }),
+      structuredContent: { kind: "invalid-input", message: outcome.message, nextQueries },
+    };
   }
 
   const assembly = assembleInspectResult(outcome.data, outcome.nextQueries);
   return {
     content: renderInspectResult(assembly),
+    structuredContent: structuredInspectResult(assembly),
     details: {
       type: "inspect",
       data: assembly.details,

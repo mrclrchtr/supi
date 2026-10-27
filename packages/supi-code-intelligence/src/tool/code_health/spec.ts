@@ -3,6 +3,7 @@ import { Type } from "typebox";
 import type { CodeIntelToolExecCtx } from "../../types/index.ts";
 import { ScopeParam } from "../schemas.ts";
 import { executeHealthTool } from "./execute.ts";
+import { HealthOutputSchema } from "./structured-schema.ts";
 import { renderHealthCall, renderHealthResult } from "./tui.ts";
 
 export const CODE_HEALTH_TOOL_NAME = "code_health";
@@ -35,6 +36,7 @@ export const codeHealthSpec = {
     },
     { additionalProperties: false },
   ),
+  outputSchema: HealthOutputSchema,
   run: (params: unknown, ctx: CodeIntelToolExecCtx) =>
     executeHealthTool(params as Parameters<typeof executeHealthTool>[0], ctx),
   renderCall: renderHealthCall,

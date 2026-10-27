@@ -13,5 +13,5 @@ export async function executeRefactorApplyTool(
   ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   const outcome = await ctx.session.applyRefactor(params, toWorkflowControl(ctx));
-  return finishRefactorApplyResult(outcome);
+  return finishRefactorApplyResult(outcome, ctx.cwd);
 }

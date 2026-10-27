@@ -257,6 +257,7 @@ function uniqueProvenance(provenance: readonly ResultProvenance[]): ResultProven
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
 import { healthErrorResult } from "../result/errors.ts";
 import { renderHealthResult } from "./markdown.ts";
+import { structuredHealthResult } from "./structured.ts";
 
 type HealthOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["health"]>>;
 
@@ -264,12 +265,16 @@ type HealthOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["health"
 export function finishHealthResult(outcome: HealthOutcome, cwd: string): CodeIntelResult {
   if (outcome.kind === "unavailable") throw new Error(outcome.reason);
   if (outcome.kind === "invalid-input") {
-    return healthErrorResult(`**Error:** ${outcome.message}`, outcome.message);
+    return {
+      ...healthErrorResult(`**Error:** ${outcome.message}`, outcome.message),
+      structuredContent: { kind: "invalid-input", message: outcome.message },
+    };
   }
 
   const assembly = assembleHealthResult(outcome.data, cwd);
   return {
     content: renderHealthResult(assembly, cwd),
+    structuredContent: structuredHealthResult(outcome.data),
     details: {
       type: "health",
       data: assembly.details,

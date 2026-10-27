@@ -36,6 +36,7 @@ interface TargetSectionCollection {
   readonly reason: string | null;
   readonly evidenceLists: readonly EvidenceListMetadata[];
   readonly errorRanges?: readonly SourceRange[];
+  readonly facts?: import("./facts.ts").OrientationFacts;
 }
 
 const DEFAULT_TARGET_SECTIONS: OrientationSection[] = ["defs", "docs", "diagnostics"];
@@ -141,11 +142,16 @@ async function buildRequestedSection(options: {
   switch (section) {
     case "defs": {
       const result = await buildEnrichedDefsSection(target, deps, treeContext, limit);
-      return targetSectionResult(section, result, [
-        result.hasSemanticEvidence
-          ? { source: "semantic", capability: "LSP" }
-          : { source: "structural", capability: "tree-sitter" },
-      ]);
+      const contextFacts = targetContextFacts(treeContext, limit);
+      return targetSectionResult(
+        section,
+        { ...result, facts: { ...contextFacts, ...result.facts } },
+        [
+          result.hasSemanticEvidence
+            ? { source: "semantic", capability: "LSP" }
+            : { source: "structural", capability: "tree-sitter" },
+        ],
+      );
     }
     case "docs":
       return targetSectionResult(section, await buildDocsSection(target, deps, limit), [
@@ -156,6 +162,75 @@ async function buildRequestedSection(options: {
         { source: "semantic", capability: "LSP diagnostics" },
       ]);
   }
+}
+
+/** Select the independently gathered source observations without rendering them. */
+function targetContextFacts(
+  treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>,
+  limit: number,
+) {
+  return treeContext
+    ? {
+        node: treeContext.nodeInfo
+          ? {
+              type: treeContext.nodeInfo.type,
+              text: treeContext.nodeInfo.text,
+              startLine: treeContext.nodeInfo.startLine,
+              startCharacter: treeContext.nodeInfo.startCharacter,
+              endLine: treeContext.nodeInfo.endLine,
+              endCharacter: treeContext.nodeInfo.endCharacter,
+              ancestry: treeContext.nodeInfo.ancestry.map(
+                ({ type, startLine, startCharacter, endLine, endCharacter }) => ({
+                  type,
+                  startLine,
+                  startCharacter,
+                  endLine,
+                  endCharacter,
+                }),
+              ),
+            }
+          : null,
+        nodeObservation: { ...treeContext.operations.nodeAt },
+        hoverObservation: { ...treeContext.operations.hover },
+        hover: treeContext.hover
+          ? {
+              contents: treeContext.hover.contents,
+              ...(treeContext.hover.range
+                ? {
+                    range: publicRange(treeContext.hover.range),
+                  }
+                : {}),
+            }
+          : null,
+        recovery: treeContext.recovery.map(({ operation, file, reason, errorRanges }) => ({
+          operation,
+          file,
+          reason,
+          errorRanges: errorRanges.map(publicRange),
+        })),
+        contextDefinitions: {
+          ...treeContext.operations.definition,
+          ...(treeContext.definition !== null
+            ? {
+                entries: treeContext.definition
+                  .slice(0, limit)
+                  .map(({ uri, range }) => ({ uri, range: publicRange(range) })),
+                collectedCount: treeContext.definition.length,
+                omittedCount: Math.max(0, treeContext.definition.length - limit),
+              }
+            : {}),
+        },
+        sourceContext: {
+          outline: sourceSelection(treeContext.operations.outline, treeContext.outline, limit),
+          imports: sourceSelection(
+            treeContext.operations.imports,
+            treeContext.imports.map(({ moduleSpecifier }) => ({ moduleSpecifier })),
+            limit,
+          ),
+          exports: sourceSelection(treeContext.operations.exports, treeContext.exports, limit),
+        },
+      }
+    : {};
 }
 
 /** Build enriched defs section: tree-sitter definitions + LSP definition targets. */
@@ -252,6 +327,7 @@ function mergeDefinitionCollection(input: {
     reason:
       [input.recoveryReason || null, input.definitions.reason].filter(Boolean).join(" ") || null,
     evidenceLists: input.definitions.evidenceLists,
+    ...(input.definitions.facts ? { facts: input.definitions.facts } : {}),
     ...(input.recoveryRanges.length > 0 ? { errorRanges: [...input.recoveryRanges] } : {}),
   };
 }
@@ -263,7 +339,7 @@ async function collectDefinitionTargets(
 ): Promise<
   Pick<
     TargetSectionCollection,
-    "items" | "hasSemanticEvidence" | "status" | "reason" | "evidenceLists"
+    "items" | "hasSemanticEvidence" | "status" | "reason" | "evidenceLists" | "facts"
   >
 > {
   if (!deps.provider?.definition) {
@@ -289,11 +365,10 @@ async function collectDefinitionTargets(
         evidenceLists: [],
       };
     }
-    const locations = result.data.map((definition) => {
-      const filePath = uriToFile(definition.uri);
-      const relPath = path.relative(deps.cwd, filePath);
-      return `\`${relPath}:${definition.range.start.line + 1}:${definition.range.start.character + 1}\``;
-    });
+    const locations = result.data.map((definition) => ({
+      file: path.relative(deps.cwd, uriToFile(definition.uri)),
+      range: publicRange(definition.range),
+    }));
     const evidence =
       result.kind === "partial"
         ? createPartialEvidenceList({
@@ -308,7 +383,11 @@ async function collectDefinitionTargets(
             maxResults: limit,
           });
     return {
-      items: evidence.items.map((location) => ({ kind: "paragraph", text: location })),
+      items: evidence.items.map((location) => ({
+        kind: "paragraph",
+        text: `\`${location.file}:${location.range.start.line + 1}:${location.range.start.character + 1}\``,
+      })),
+      facts: { definitions: evidence.items },
       hasSemanticEvidence: true,
       status: result.kind === "partial" ? "partial" : "complete",
       reason: result.kind === "partial" ? result.reason : null,
@@ -384,6 +463,15 @@ async function buildDiagnosticsSection(
           : evidence.items.map((diagnostic) => formatDiagnosticItem(diagnostic)),
       hasStructuralEvidence: false,
       hasSemanticEvidence: true,
+      facts: {
+        diagnostics: evidence.items.map((diagnostic) => ({
+          range: publicRange(diagnostic.range),
+          severity: diagnostic.severity ?? null,
+          message: diagnosticMessageString(diagnostic),
+          source: diagnostic.source ?? null,
+          code: diagnostic.code ?? null,
+        })),
+      },
       status: result.kind === "partial" ? "partial" : "complete",
       reason: result.kind === "partial" ? result.reason : null,
       evidenceLists: [evidence.metadata],
@@ -409,6 +497,7 @@ function formatDiagnosticItem(diagnostic: Diagnostic): OrientationItem {
 function completedDocsSection(
   items: OrientationItem[],
   evidenceLists: readonly EvidenceListMetadata[],
+  documentation: readonly string[] = [],
 ): TargetSectionCollection {
   return {
     items,
@@ -417,6 +506,7 @@ function completedDocsSection(
     status: "complete",
     reason: null,
     evidenceLists,
+    facts: { documentation },
   };
 }
 
@@ -529,6 +619,7 @@ async function buildDocsSection(
     return completedDocsSection(
       [{ kind: "code", language: "ts", lines: evidence.items }],
       [evidence.metadata],
+      evidence.items,
     );
   } catch (error) {
     return unavailableTargetSection(
@@ -553,6 +644,27 @@ async function maybeGatherTreeContext(
     target.anchorKind !== "declaration",
     deps.requestControl,
   );
+}
+
+function publicRange(range: SourceRange): SourceRange {
+  return {
+    start: { line: range.start.line, character: range.start.character },
+    end: { line: range.end.line, character: range.end.character },
+  };
+}
+
+/** These best-effort lists preserve availability separately from collected counts. */
+function sourceSelection<T>(
+  status: { status: "complete" | "partial" | "unavailable"; reason: string | null },
+  entries: readonly T[],
+  limit: number,
+) {
+  return {
+    ...status,
+    entries: entries.slice(0, limit),
+    collectedCount: entries.length,
+    omittedCount: Math.max(0, entries.length - limit),
+  };
 }
 
 function uniqueRecoveryRanges(
@@ -754,6 +866,7 @@ function targetSectionResult(
       provenance,
       evidenceLists: collection.evidenceLists,
       ...(collection.errorRanges ? { errorRanges: [...collection.errorRanges] } : {}),
+      ...(collection.facts ? { facts: collection.facts } : {}),
       items: collection.items,
     },
     hasStructuralEvidence: collection.hasStructuralEvidence,

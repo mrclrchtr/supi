@@ -95,7 +95,7 @@ export async function runOrientationWorkflow(
     { model, provider, lspRuntime, cwd: deps.cwd, requestControl: control },
   );
   throwIfAborted(control);
-  const withInstructions = addInstructionFiles(result, focus.path, deps);
+  const withInstructions = addInstructionFiles({ ...result, focusKind: "file" }, focus.path, deps);
   return { kind: "completed", data: withInstructions };
 }
 
@@ -195,7 +195,7 @@ async function orientTarget(options: {
   throwIfAborted(control);
   return {
     kind: "completed",
-    data: addTargetSummary(result, entry, target.notes, deps.cwd),
+    data: addTargetSummary({ ...result, focusKind: "symbol" }, entry, target.notes, deps.cwd),
   };
 }
 
@@ -279,6 +279,7 @@ function addInstructionFiles(
     sections: [section, ...result.sections],
     renderedSections: ["instructions", ...result.renderedSections],
     instructions: collected.metadata,
+    instructionFiles: collected.files,
   };
 }
 

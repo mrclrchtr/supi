@@ -96,6 +96,8 @@ export interface OrientationSectionData {
   readonly evidenceLists: readonly EvidenceListMetadata[];
   /** Evidence list counted by table rows, including when only empty-result framing remains. */
   readonly tableEvidenceKey?: string;
+  /** Named collected facts, independent of presentation atoms. */
+  readonly facts?: import("./orientation/facts.ts").OrientationFacts;
   /** Content atoms for this section; the adapter frames them under the title + note. */
   readonly items: readonly OrientationItem[];
 }
@@ -121,12 +123,15 @@ export interface OrientationResultData {
   readonly sections: readonly OrientationSectionData[];
   readonly confidence: ConfidenceMode;
   readonly focusTarget: string | null;
+  readonly focusKind?: "workspace" | "directory" | "module" | "file" | "symbol";
   readonly requestedSections: readonly string[];
   readonly renderedSections: readonly string[];
   readonly omittedCount: number;
   readonly nextQueries: readonly string[];
   readonly readNext: readonly ReadNextItem[];
   readonly instructions?: InstructionFilesMetadata;
+  /** Collected instruction snippets; separate from mutable session deduplication state. */
+  readonly instructionFiles?: readonly import("../analysis/instruction-files.ts").RenderedInstructionFile[];
   /** Captured generic workspace facts; absent for the unchanged file and symbol paths. */
   readonly workspace?: import("./orientation/workspace-context.ts").WorkspaceOrientationFacts;
   readonly target?: Readonly<TargetStoreEntry>;

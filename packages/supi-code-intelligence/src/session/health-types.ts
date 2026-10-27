@@ -10,6 +10,9 @@ import type {
 import type { CapabilityWarningReport } from "../analysis/capability/capability-warnings.ts";
 import type { SourceTrackingReport } from "../substrate/lsp/source-tracking.ts";
 
+/** Maximum detailed error and warning messages retained for each diagnostic file. */
+export const HEALTH_DIAGNOSTIC_MESSAGE_LIMIT = 3;
+
 export type HealthSection = "diagnostics" | "servers";
 
 /** Final semantic-diagnostics readiness after routing and requested recovery. */

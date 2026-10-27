@@ -9,7 +9,7 @@ Every registered tool keeps its public surface in one place: its per-tool direct
 A tool's `spec.ts` owns:
 
 - canonical name and label
-- parameter schemas
+- parameter schemas and native result `outputSchema` (declared locally or in a paired `structured.ts` / `structured-schema.ts`)
 - execution bindings — `execute` lives on the spec object when it needs no runtime dependencies; when a tool's schema or execute is dynamic (depends on catalog or session state), `spec.ts` exports the factory (e.g. a parameter builder or execute factory) and `register.ts` evaluates it at registration time
 - concise purpose and substrate metadata
 
@@ -62,6 +62,7 @@ Each PI context channel (`../pi/context-architecture.md`) maps to exactly one se
 | `description`, `promptSnippet`, `promptGuidelines`, schema field descriptions | Tier 1 prefix | Metadata (spec + guidance) |
 | System-prompt injection, skill catalog entries | Tier 1 prefix | PI adapter; skill files |
 | Result `content`, injected message `content` | Tier 2 addition | Result assembly |
+| Result `structuredContent` | Programmatic; selected script output becomes model content | Result assembly, projected against the registered output schema |
 | Result `details`, `pi.appendEntry`, spill files | Free | Result assembly; session code |
 | Transcript renderers, TUI components | Never sent | Presentation adapters |
 
@@ -74,7 +75,7 @@ Metadata rules:
 
 Result rules:
 
-- The result module is the sole producer of model-visible `content` and free `details`, and owns truncation and spill-file policy.
+- The result module is the sole producer of final `content`, native `structuredContent`, and UI/state `details`, and owns text truncation and spill-file policy. A per-tool `structured.ts` may own the allowlisted script projection; it consumes canonical facts, not rendered text or copied UI details.
 - Presentation folders (`render/`, `ui/`, markdown/TUI adapters) never produce model-visible text; result assembly never lives under a presentation folder.
 
 ## Result module naming
@@ -114,9 +115,13 @@ When multiple tools share result policy, centralize it. Result assembly should b
 - unknown-remainder and partial-reason metadata
 - confidence and provenance
 - next queries and read-next actions
-- structured details
+- native script data and structured UI/state details
 
-Markdown and TUI adapters consume the assembly independently. Neither adapter parses the other, collects evidence, or recomputes truncation.
+Markdown, native script, and TUI adapters consume canonical assembly independently. None parses another representation or collects evidence. Local collector/assembly changes may expose existing observations as named typed facts rather than presentation atoms.
+
+Keep caller selection and collection limits separate from text/TUI preview reductions. Each representation's counts describe its own list. A complete native list must not carry a shortened text preview's omitted count; an unknown collection remainder remains unknown. Health returns every collected diagnostic-file/server entry (with its per-file message limit); Refactor Plan returns every proposed edit; Orientation retains the focus, ordering, caller cap, and collection limits independently of text budgets. Snapshot references describe captured observations, not refresh operations.
+
+The PI adapter forwards `outputSchema` and `structuredContent` unchanged, including through child profiles. Preserve UI/state fields consumed by hooks (for example Apply recovery's `details.data.changedFiles`). Hooks replacing `content` must also replace `structuredContent` or Pi removes it. See [Execution and Results](../pi/tool-guidance.md#execution-and-results) for failure routing and schema-validation responsibility. Test actual registrations for schema validity and JSON round-tripping; test the real default codemode route separately. Pi does not validate output schemas at runtime.
 
 ## Schemas and exact-one inputs
 

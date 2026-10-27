@@ -39,6 +39,7 @@ export interface ListSectionInput<T> {
   readonly unknownRemainder?: boolean;
   readonly partialReason?: EvidencePartialReason;
   readonly errorRanges?: readonly SourceRange[];
+  readonly facts?: (items: readonly T[]) => import("./facts.ts").OrientationFacts;
 }
 
 /** Start a context-Oriented document with one factual focus title. */
@@ -78,6 +79,7 @@ export function appendList<T>(
     provenance: input.provenance,
     evidenceLists: [{ ...metadata, key: input.key }],
     items: list.items.map((item) => ({ kind: "list-item", text: input.render(item) })),
+    ...(input.facts ? { facts: input.facts(list.items) } : {}),
     ...(input.errorRanges ? { errorRanges: [...input.errorRanges] } : {}),
   });
 }
@@ -175,6 +177,16 @@ export async function appendStructuralFileFacts(
     collect: () => provider.outline(file, requestControl),
     requestControl,
     render: (item) => `\`${item.name}\` (${item.kind}, L${item.startLine}–L${item.endLine})`,
+    facts: (items) => ({
+      outline: items.map(({ name, kind, startLine, startCharacter, endLine, endCharacter }) => ({
+        name,
+        kind,
+        startLine,
+        startCharacter,
+        endLine,
+        endCharacter,
+      })),
+    }),
   });
   await appendStructuralList(builder, {
     key: "structural.imports",
@@ -182,6 +194,17 @@ export async function appendStructuralFileFacts(
     collect: () => provider.imports(file, requestControl),
     requestControl,
     render: (item) => `\`${item.moduleSpecifier}\``,
+    facts: (items) => ({
+      imports: items.map(
+        ({ moduleSpecifier, startLine, startCharacter, endLine, endCharacter }) => ({
+          moduleSpecifier,
+          startLine,
+          startCharacter,
+          endLine,
+          endCharacter,
+        }),
+      ),
+    }),
   });
   await appendStructuralList(builder, {
     key: "structural.exports",
@@ -189,6 +212,19 @@ export async function appendStructuralFileFacts(
     collect: () => provider.exports(file, requestControl),
     requestControl,
     render: (item) => `\`${item.name}\` (${item.kind})`,
+    facts: (items) => ({
+      exports: items.map(
+        ({ name, kind, startLine, startCharacter, endLine, endCharacter, moduleSpecifier }) => ({
+          name,
+          kind,
+          startLine,
+          startCharacter,
+          endLine,
+          endCharacter,
+          ...(moduleSpecifier === undefined ? {} : { moduleSpecifier }),
+        }),
+      ),
+    }),
   });
 }
 
@@ -214,6 +250,7 @@ async function appendStructuralList<T>(
     title: string;
     collect: () => Promise<CodeResult<T[]>>;
     render: (item: T) => string;
+    facts: (items: readonly T[]) => import("./facts.ts").OrientationFacts;
     requestControl?: CodeRequestControl;
   },
 ): Promise<void> {
@@ -252,6 +289,7 @@ async function appendStructuralList<T>(
     title: input.title,
     items: result.data,
     render: input.render,
+    facts: input.facts,
     confidence: "structural",
     provenance: [{ source: "structural", capability: "tree-sitter" }],
     ...(result.kind === "partial"
@@ -296,6 +334,15 @@ export function appendPrioritySignals(
       return `Diagnostics: \`${displayPath(input.cwd, entry.file)}\` (${parts.join(", ")})`;
     },
     confidence: "semantic",
+    facts: (items) => ({
+      diagnosticSnapshot: items.map(({ file, total, errors, warnings }) => ({
+        file: displayPath(input.cwd, file),
+        total,
+        errors,
+        warnings,
+      })),
+      snapshotCurrent: snapshot.current,
+    }),
     provenance: [{ source: "semantic", capability: "LSP diagnostic snapshot" }],
     status: "partial",
     reason: snapshot.current

@@ -267,6 +267,7 @@ function uniqueProvenance(sections: readonly OrientationSectionData[]) {
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
 import { contextErrorResult } from "../result/errors.ts";
 import { renderOrientationResult } from "./markdown.ts";
+import { structuredOrientation } from "./structured.ts";
 import { prepareWorkspaceOutput } from "./workspace-output.ts";
 
 type OrientationOutcome = Awaited<ReturnType<CodeIntelToolExecCtx["session"]["orient"]>>;
@@ -312,6 +313,7 @@ export function finishOrientationResult(outcome: OrientationOutcome): CodeIntelR
     });
     return {
       content: lines.join("\n"),
+      structuredContent: structuredOrientation(outcome),
       details: {
         type: "context",
         data: details,
@@ -332,10 +334,13 @@ function invalidOrientationResult(
   const message = rejection
     ? `Requested focus ${JSON.stringify(rejection.requestedPath)} traverses a symbolic link: ${JSON.stringify(rejection.blockedPath)}. Orientation does not follow symbolic links.\n\n${recovery}`
     : outcome.message;
-  return contextErrorResult(`**Error:** ${message}`, {
-    nextQueries: rejection ? [recovery] : ["Choose an existing path, module, or precise target"],
-    message,
-  });
+  return {
+    ...contextErrorResult(`**Error:** ${message}`, {
+      nextQueries: rejection ? [recovery] : ["Choose an existing path, module, or precise target"],
+      message,
+    }),
+    structuredContent: structuredOrientation(outcome),
+  };
 }
 
 function finishCompletedOrientation(data: OrientationResultData): CodeIntelResult {
@@ -343,6 +348,7 @@ function finishCompletedOrientation(data: OrientationResultData): CodeIntelResul
   const assembly = assembleOrientationResult(navigation?.data ?? data);
   return {
     content: navigation?.content ?? renderOrientationResult(assembly),
+    structuredContent: structuredOrientation({ kind: "completed", data }, navigation?.snapshotPath),
     details: {
       type: "context",
       data: assembly.details,

@@ -4,12 +4,14 @@ import type {
   ProjectMembership,
   ProjectRelationship,
 } from "../../analysis/workspace/types.ts";
-import {
-  type WorkspaceOrientationFacts,
-  within,
-} from "../../session/orientation/workspace-context.ts";
+import type { WorkspaceOrientationFacts } from "../../session/orientation/workspace-context.ts";
 import type { OrientationItem, OrientationSectionData } from "../../session/orientation-types.ts";
 import { code, plain, sourcePath, tableSection } from "./workspace-format.ts";
+import {
+  declaredPathObservations,
+  projectObservations,
+  projectRelationships,
+} from "./workspace-observations.ts";
 
 /** Project identities and native declarations, without inferred roles or source roots. */
 export function projectSections(
@@ -18,28 +20,19 @@ export function projectSections(
   descriptions: boolean,
 ): OrientationSectionData[] {
   const { observation, focus } = facts;
-  const projects = observation.projects.filter(
-    (project) => !focus || within(focus, path.resolve(observation.root, project.directory)),
-  );
-  const nested = projects.filter(
-    (project) => path.resolve(observation.root, project.directory) !== (focus ?? observation.root),
-  );
+  const { nested, focused, memberships } = projectObservations(facts);
   const result = [projectDeclarations(nested, facts, { limit, descriptions })];
   if (!facts.overview) {
-    const memberships = membershipSection(projects, facts, {
+    const section = membershipSection(memberships, facts, {
       limit,
       listedProjects: nested.slice(0, limit),
     });
-    if (memberships) result.push(memberships);
+    if (section) result.push(section);
   }
   if (!focus) return result;
-  for (const project of projects.filter(
-    (project) => path.resolve(observation.root, project.directory) === focus,
-  )) {
+  for (const project of focused) {
     result.push(declaredPaths(project, limit, facts));
-    const edges = observation.relationships.filter(
-      (edge) => edge.from === project.id || edge.to === project.id,
-    );
+    const edges = projectRelationships(observation, project);
     result.push(relationshipSection(project, edges, facts, limit));
     const unmatched =
       project.dependencies.length - edges.filter((edge) => edge.from === project.id).length;
@@ -120,13 +113,10 @@ function projectDeclarations(
 
 /** Group only identical native declarations, retaining counts of individual memberships. */
 function membershipSection(
-  projects: readonly ProjectDeclaration[],
+  memberships: ReturnType<typeof projectObservations>["memberships"],
   facts: WorkspaceOrientationFacts,
   options: { limit: number; listedProjects: readonly ProjectDeclaration[] },
 ): OrientationSectionData | null {
-  const memberships = projects.flatMap((project) =>
-    project.memberships.map((membership) => ({ project, membership })),
-  );
   if (memberships.length === 0) return null;
   const selected = memberships.slice(0, options.limit);
   const groups = new Map<
@@ -221,17 +211,12 @@ function declaredPaths(
   limit: number,
   facts: WorkspaceOrientationFacts,
 ): OrientationSectionData {
-  const byPath = new Map<string, string[]>();
-  for (const entry of project.declaredPaths) {
-    const fields = byPath.get(entry.path) ?? [];
-    fields.push(entry.field);
-    byPath.set(entry.path, fields);
-  }
   return tableSection(`${project.id}.paths`, "Declared paths (project-relative)", {
     headers: ["Path", "Fields"],
-    rows: [...byPath]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([value, fields]) => [code(value), fields.map(code).join(", ")]),
+    rows: declaredPathObservations(project).map(({ path: value, fields }) => [
+      code(value),
+      fields.map(code).join(", "),
+    ]),
     limit,
     detail: sourcePath(facts, project.manifestPath),
     source: "manifest",
