@@ -300,7 +300,7 @@ jobs:
          needs.release-please.outputs.releases_created == 'true') ||
         (github.event_name == 'workflow_dispatch' && inputs.publish_tag != '')
       )
-    runs-on: ubicloud-standard-2
+    runs-on: avrea-ubuntu-latest-2-vcpu
     timeout-minutes: 15
     permissions:
       contents: read
