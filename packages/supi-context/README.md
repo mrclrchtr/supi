@@ -96,7 +96,7 @@ To enable the agent-callable `context_report` tool, set `agentToolEnabled` to `t
 
 ```json
 {
-  "supi-context": {
+  "context": {
     "agentToolEnabled": true
   }
 }
