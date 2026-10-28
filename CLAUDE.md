@@ -120,8 +120,9 @@ node scripts/publish.mjs packages/supi-lsp --publish # pack + verify + publish
 
 ## Testing patterns
 
+- When adding, changing, reviewing, or removing tests, follow [the testing convention](docs/conventions/testing.md) for test admission, coverage value, and the review checkpoint.
 - Keep `vi.mock()` declarations at test-file top level. Use `vi.hoisted()` when mock factories need shared setup; its callback runs before imports and cannot use imported runtime values.
-- Use `createPiMock()` / `makeCtx()` from `@mrclrchtr/supi-test-utils`, not local factories. For extension integration tests, mock internal boundaries and invoke captured handlers directly.
+- Use `createPiMock()` / `makeCtx()` from `@mrclrchtr/supi-test-utils`, not local factories. For extension integration tests, isolate collaborators at stable boundaries and invoke captured handlers directly; keep the behavior under test real.
 - Shared-config changes need regression coverage across `supi-core`, `supi-lsp`, and `supi-claude-md`.
 - For global `defineConfigSettings` tests, pass `homeDir` in options rather than changing `process.env.HOME`.
 - Auto-fix unused imports with `pnpm exec biome check --write --unsafe <files>`; cap output with `--max-diagnostics=20` if the full check OOMs.

@@ -104,12 +104,6 @@ describe("WorkspaceRuntime", () => {
   });
 
   describe("state transitions", () => {
-    it("keeps ready state for registered semantic capability", () => {
-      runtime = new WorkspaceRuntime();
-      runtime.registerSemantic("/project", createMockSemanticProvider());
-      expect(runtime.getWorkspace("/project")?.semantic.state.kind).toBe("ready");
-    });
-
     it("supports pending semantic registration before promotion to ready", () => {
       runtime = new WorkspaceRuntime();
       runtime.registerSemanticPending("/project", createMockSemanticProvider());
@@ -117,24 +111,6 @@ describe("WorkspaceRuntime", () => {
 
       runtime.markSemanticReady("/project");
       expect(runtime.getWorkspace("/project")?.semantic.state.kind).toBe("ready");
-    });
-
-    it("transitions back to unavailable after clearing", () => {
-      runtime = new WorkspaceRuntime();
-      runtime.registerSemantic("/project", createMockSemanticProvider());
-      runtime.clearWorkspace("/project");
-      expect(runtime.getWorkspace("/project")?.semantic.state.kind).toBe("unavailable");
-    });
-  });
-
-  describe("refactor availability", () => {
-    it("semantic slot exposes refactorAvailable indicator", () => {
-      runtime = new WorkspaceRuntime();
-      const provider = createMockSemanticProvider();
-      runtime.registerSemantic("/project", provider);
-      const ws = runtime.getWorkspace("/project");
-      // refactorAvailable must exist and be boolean
-      expect(typeof ws.semantic.refactorAvailable).toBe("boolean");
     });
   });
 
@@ -166,14 +142,13 @@ describe("WorkspaceRuntime", () => {
       expect(ws?.structural.provider).not.toBeNull();
     });
 
-    it("removes the Map entry when both slots become unavailable", () => {
+    it("leaves both capabilities unavailable after clearing a semantic-only workspace", () => {
       runtime = new WorkspaceRuntime();
       runtime.registerSemantic("/project", createMockSemanticProvider());
       // No structural registered — it's already unavailable by default
 
       runtime.clearSemantic("/project");
       const ws = runtime.getWorkspace("/project");
-      // Both slots unavailable → entry removed, getWorkspace returns a fresh default
       expect(ws?.semantic.state.kind).toBe("unavailable");
       expect(ws?.structural.state.kind).toBe("unavailable");
     });

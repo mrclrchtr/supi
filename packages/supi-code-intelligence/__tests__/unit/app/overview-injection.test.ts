@@ -8,7 +8,7 @@ import {
   getDebugEvents,
   resetDebugRegistry,
 } from "@mrclrchtr/supi-core/debug";
-import { createPiMock } from "@mrclrchtr/supi-test-utils";
+import { createPiMock, getHandlerOrThrow } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codeIntelligenceExtension from "../../../src/extension.ts";
 
@@ -18,7 +18,6 @@ import codeIntelligenceExtension from "../../../src/extension.ts";
  * Verifies:
  * - A fresh session injects the hidden overview once via before_agent_start
  * - Reinjection is suppressed when the branch already contains code-intelligence-overview
- * - Shutdown resets injected state for the session
  * - session_tree restores overview state from the active branch
  *
  * Uses the full extension factory (codeIntelligenceExtension) because the
@@ -134,52 +133,41 @@ describe("overview injection", () => {
   });
 
   it("suppresses reinjection when branch already has overview custom message", async () => {
-    const handler = getOverviewHandler();
-    const sessionStartHandler = pi.getHandlers("session_start")[0];
-
+    const root = makeWorkspace(1);
+    writeProjectConfig(root, { overviewEnabled: true });
     const branchWithOverview = [
       { type: "custom_message", customType: "code-intelligence-overview" },
     ];
-    const ctx = makeCtx("/project-a", branchWithOverview);
-    await sessionStartHandler?.({ reason: "startup" }, ctx);
+    const ctx = makeCtx(root, branchWithOverview);
+    await getHandlerOrThrow(pi, "session_start")({ reason: "startup" }, ctx);
 
-    const result = (await handler(null, ctx)) as { message?: { customType?: string } } | undefined;
-    // Should not inject since branch already has overview
-    expect(result?.message?.customType).toBeUndefined();
+    expect(await getOverviewHandler()(null, ctx)).toBeUndefined();
   });
 
-  it("returns undefined on repeated calls (claim already taken)", async () => {
+  it("injects only once across repeated calls", async () => {
+    const root = makeWorkspace(1);
+    writeProjectConfig(root, { overviewEnabled: true });
+    const ctx = makeCtx(root);
+    await getHandlerOrThrow(pi, "session_start")({ reason: "startup" }, ctx);
     const handler = getOverviewHandler();
-    const sessionStartHandler = pi.getHandlers("session_start")[0];
 
-    const ctx = makeCtx("/project-a");
-    await sessionStartHandler?.({ reason: "startup" }, ctx);
-
-    await handler(null, ctx);
-    const secondResult = (await handler(null, ctx)) as
-      | { message?: { customType?: string } }
-      | undefined;
-    expect(secondResult?.message?.customType).toBeUndefined();
+    expect(await handler(null, ctx)).toMatchObject({
+      message: { customType: "code-intelligence-overview" },
+    });
+    expect(await handler(null, ctx)).toBeUndefined();
   });
 
-  it("session_tree restores overview state from active branch", async () => {
-    const sessionStartHandler = pi.getHandlers("session_start")[0];
-    const sessionTreeHandler = pi.getHandlers("session_tree")[0];
+  it("suppresses injection after switching to a branch with an overview", async () => {
+    const root = makeWorkspace(1);
+    writeProjectConfig(root, { overviewEnabled: true });
+    await getHandlerOrThrow(pi, "session_start")({ reason: "startup" }, makeCtx(root));
 
-    // Start a session with an existing overview in the branch
-    const branchWithOverview = [
+    const ctx = makeCtx(root, [
       { type: "custom_message", customType: "code-intelligence-overview" },
-    ];
-    const ctx = makeCtx("/project-a", branchWithOverview);
-    await sessionStartHandler?.({ reason: "startup" }, ctx);
+    ]);
+    await getHandlerOrThrow(pi, "session_tree")({ newLeafId: "leaf-2" }, ctx);
 
-    // Now simulate a tree navigation to a different branch that also has overview
-    await sessionTreeHandler?.({ newLeafId: "leaf-2" }, ctx);
-
-    // The overview handler should not re-inject because the state was restored
-    const handler = getOverviewHandler();
-    const result = (await handler(null, ctx)) as { message?: { customType?: string } } | undefined;
-    expect(result?.message?.customType).toBeUndefined();
+    expect(await getOverviewHandler()(null, ctx)).toBeUndefined();
   });
 
   it("injects after switching from a branch with an overview to one without it", async () => {
@@ -194,18 +182,6 @@ describe("overview injection", () => {
     await pi.getHandlers("session_tree")[0]?.({ newLeafId: "empty-branch" }, next);
     const result = await getOverviewHandler()(null, next);
     expect(result).toMatchObject({ message: { customType: "code-intelligence-overview" } });
-  });
-
-  it("shutdown resets sessions", async () => {
-    const sessionStartHandler = pi.getHandlers("session_start")[0];
-    const shutdownHandler = pi.getHandlers("session_shutdown")[0];
-
-    const ctx = makeCtx("/project-a");
-    await sessionStartHandler?.({ reason: "startup" }, ctx);
-
-    await shutdownHandler?.({ reason: "quit" }, null as never);
-    // Shutdown succeeds without throwing
-    expect(true).toBe(true);
   });
 
   it("injects the hidden overview on the first turn when enabled", async () => {

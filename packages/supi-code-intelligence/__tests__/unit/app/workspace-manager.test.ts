@@ -4,7 +4,7 @@ import {
   getDefaultWorkspaceRuntime,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
-import { createPiMock, getHandlerOrThrow } from "@mrclrchtr/supi-test-utils";
+import { createPiMock, getHandlerOrThrow, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createCodeIntelligenceApp } from "../../../src/app/app.ts";
 
@@ -66,16 +66,6 @@ describe("workspace-manager", () => {
     expect(session.claimOverviewInjection()).toBe(false);
   });
 
-  it("does not replace the shared capability broker", () => {
-    // The shared runtime should still work independently
-    const runtime = getDefaultWorkspaceRuntime();
-    expect(runtime.getWorkspace).toBeDefined();
-
-    // Create a session — this should not break the broker
-    app.createSession("/project-a");
-    expect(runtime.getWorkspace("/project-a")).toBeDefined();
-  });
-
   it("removes session on release", () => {
     app.createSession("/project-a");
     expect(app.getSession("/project-a")).toBeDefined();
@@ -124,25 +114,18 @@ describe("workspace-manager", () => {
     expect(ws.semantic.state.kind).toBe("ready");
   });
 
-  it("registers session_start handler that creates session for ctx.cwd", () => {
-    // The app should have registered a session_start handler
-    const handler = getHandlerOrThrow(pi, "session_start");
-    expect(handler).toBeDefined();
-  });
+  it("creates and clears workspace sessions through lifecycle events", async () => {
+    const start = getHandlerOrThrow(pi, "session_start");
+    const shutdown = getHandlerOrThrow(pi, "session_shutdown");
+    const first = makeCtx({ cwd: "/project-a" });
+    const second = makeCtx({ cwd: "/project-b" });
 
-  it("registers session_shutdown handler that clears sessions", () => {
-    const handler = getHandlerOrThrow(pi, "session_shutdown");
-    expect(handler).toBeDefined();
-  });
+    await start({ type: "session_start", reason: "startup" }, first);
+    await start({ type: "session_start", reason: "startup" }, second);
+    expect(app.getSession("/project-a")).toMatchObject({ cwd: "/project-a" });
+    expect(app.getSession("/project-b")).toMatchObject({ cwd: "/project-b" });
 
-  it("handles session lifecycle via pi events", () => {
-    // Simulate session_start with a cwd
-    const _mockCtx = { cwd: "/project-a", sessionManager: { getBranch: () => [] } };
-    app.createSession("/project-a");
-    expect(app.getSession("/project-a")).toBeDefined();
-
-    // Simulate session_shutdown
-    app.shutdown();
+    await shutdown({ type: "session_shutdown" }, first);
     expect(app.getSession("/project-a")).toBeUndefined();
     expect(app.getSession("/project-b")).toBeUndefined();
   });

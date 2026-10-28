@@ -1,7 +1,15 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { expect, it } from "vitest";
 import { packStaged } from "../pack-staged.mjs";
 
@@ -22,8 +30,24 @@ it("packs a standalone executable with no PI extension surface or build output",
       /^#!\/usr\/bin\/env node/,
     );
     expect(statSync(join(root, manifest.bin["supi-installer"])).mode & 0o111).not.toBe(0);
-    expect(readFileSync(join(root, "src/cli.mjs"), "utf8")).toContain("runCli");
-    expect(readFileSync(join(root, "README.md"), "utf8")).toContain("Installation Matrix");
+    // Supply only declared runtime dependencies; the CLI itself must load from the tarball.
+    for (const dependency of Object.keys(manifest.dependencies ?? {})) {
+      const source = [
+        resolve(import.meta.dirname, "../../packages/supi-installer/node_modules", dependency),
+        resolve(import.meta.dirname, "../../node_modules", dependency),
+      ].find((candidate) => existsSync(candidate));
+      if (!source) throw new Error(`Runtime dependency is not installed: ${dependency}`);
+      const destination = join(root, "node_modules", dependency);
+      mkdirSync(dirname(destination), { recursive: true });
+      symlinkSync(source, destination, "junction");
+    }
+
+    const help = execFileSync(
+      process.execPath,
+      [join(root, manifest.bin["supi-installer"]), "--help"],
+      { cwd: directory, encoding: "utf8", timeout: 10_000 },
+    );
+    expect(help).toContain("Usage: supi-installer");
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

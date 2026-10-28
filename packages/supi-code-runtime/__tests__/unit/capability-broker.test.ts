@@ -16,102 +16,20 @@ describe("capability-broker", () => {
     runtime?.clearAll();
   });
 
-  describe("independent capability registration", () => {
-    it("allows registering semantic capability independently of structural", () => {
-      runtime = new WorkspaceRuntime();
-      runtime.registerSemantic("/project", createMockSemanticProvider());
-      const ws = runtime.getWorkspace("/project");
+  it("replacing the semantic provider preserves the structural provider", () => {
+    runtime = new WorkspaceRuntime();
+    const structural = createMockStructuralProvider();
+    runtime.registerSemantic("/project", createMockSemanticProvider());
+    runtime.registerStructural("/project", structural);
+    const replacement = createMockSemanticProvider();
 
-      expect(ws.semantic.state.kind).toBe("ready");
-      expect(ws.semantic.provider).not.toBeNull();
-      expect(ws.structural.state.kind).toBe("unavailable");
-      expect(ws.structural.provider).toBeNull();
-    });
+    runtime.registerSemantic("/project", replacement);
 
-    it("allows registering structural capability independently of semantic", () => {
-      runtime = new WorkspaceRuntime();
-      runtime.registerStructural("/project", createMockStructuralProvider());
-      const ws = runtime.getWorkspace("/project");
-
-      expect(ws.structural.state.kind).toBe("ready");
-      expect(ws.structural.provider).not.toBeNull();
-      expect(ws.semantic.state.kind).toBe("unavailable");
-      expect(ws.semantic.provider).toBeNull();
-    });
-
-    it("supports both capabilities registered separately for same cwd", () => {
-      runtime = new WorkspaceRuntime();
-      runtime.registerSemantic("/project", createMockSemanticProvider());
-      runtime.registerStructural("/project", createMockStructuralProvider());
-
-      const ws = runtime.getWorkspace("/project");
-      expect(ws.semantic.state.kind).toBe("ready");
-      expect(ws.structural.state.kind).toBe("ready");
-    });
-  });
-
-  describe("slot isolation", () => {
-    it("replacing semantic slot does not affect structural slot", () => {
-      runtime = new WorkspaceRuntime();
-      runtime.registerSemantic("/project", createMockSemanticProvider());
-      runtime.registerStructural("/project", createMockStructuralProvider());
-
-      runtime.registerSemantic("/project", createMockSemanticProvider());
-      const ws = runtime.getWorkspace("/project");
-      expect(ws.semantic.state.kind).toBe("ready");
-      expect(ws.structural.state.kind).toBe("ready");
-      expect(ws.structural.provider).not.toBeNull();
-    });
-
-    it("clearing semantic slot does not affect structural slot", () => {
-      runtime = new WorkspaceRuntime();
-      runtime.registerSemantic("/project", createMockSemanticProvider());
-      runtime.registerStructural("/project", createMockStructuralProvider());
-
-      runtime.clearSemantic("/project");
-      const ws = runtime.getWorkspace("/project");
-      expect(ws.semantic.state.kind).toBe("unavailable");
-      expect(ws.structural.state.kind).toBe("ready");
-    });
-
-    it("clearing structural slot does not affect semantic slot", () => {
-      runtime = new WorkspaceRuntime();
-      runtime.registerSemantic("/project", createMockSemanticProvider());
-      runtime.registerStructural("/project", createMockStructuralProvider());
-
-      runtime.clearStructural("/project");
-      const ws = runtime.getWorkspace("/project");
-      expect(ws.structural.state.kind).toBe("unavailable");
-      expect(ws.semantic.state.kind).toBe("ready");
-    });
-  });
-
-  describe("explicit availability states", () => {
-    it("returns unavailable for unknown cwd", () => {
-      runtime = new WorkspaceRuntime();
-      const ws = runtime.getWorkspace("/unknown");
-      expect(ws.semantic.state.kind).toBe("unavailable");
-      expect(ws.structural.state.kind).toBe("unavailable");
-    });
-
-    it("returns ready after registering semantic provider", () => {
-      runtime = new WorkspaceRuntime();
-      runtime.registerSemantic("/project", createMockSemanticProvider());
-      expect(runtime.getWorkspace("/project").semantic.state.kind).toBe("ready");
-    });
-
-    it("returns ready after registering structural provider", () => {
-      runtime = new WorkspaceRuntime();
-      runtime.registerStructural("/project", createMockStructuralProvider());
-      expect(runtime.getWorkspace("/project").structural.state.kind).toBe("ready");
-    });
-
-    it("transitions back to unavailable after clearWorkspace", () => {
-      runtime = new WorkspaceRuntime();
-      runtime.registerSemantic("/project", createMockSemanticProvider());
-      runtime.clearWorkspace("/project");
-      expect(runtime.getWorkspace("/project").semantic.state.kind).toBe("unavailable");
-    });
+    const ws = runtime.getWorkspace("/project");
+    expect(ws.semantic.state.kind).toBe("ready");
+    expect(ws.semantic.provider).toBe(replacement);
+    expect(ws.structural.state.kind).toBe("ready");
+    expect(ws.structural.provider).toBe(structural);
   });
 
   describe("refactor availability metadata", () => {

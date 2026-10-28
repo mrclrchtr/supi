@@ -4,7 +4,6 @@ import * as path from "node:path";
 import {
   type CodeQueryResult,
   completedCodeQuery,
-  type SemanticProvider,
   unavailableCodeQuery,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it, vi } from "vitest";
@@ -117,15 +116,6 @@ describe("LspSemanticProvider", () => {
     if (!result || result.kind === "unavailable") throw new Error("Expected query data");
     return result.data;
   }
-
-  it("creates a SemanticProvider from a WorkspaceLspRuntime", () => {
-    const lsp = createMockLsp();
-    const provider: SemanticProvider = createLspSemanticProvider(lsp);
-    expect(typeof provider.references).toBe("function");
-    expect(typeof provider.implementation).toBe("function");
-    expect(typeof provider.documentSymbols).toBe("function");
-    expect(typeof provider.workspaceSymbols).toBe("function");
-  });
 
   describe("references", () => {
     it("preserves the exact provider request control without activating it", async () => {

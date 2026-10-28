@@ -22,20 +22,14 @@ afterEach(() => {
 });
 
 describe("CacheForensicsConfig", () => {
-  it("has stable query defaults", () => {
-    expect(CACHE_FORENSICS_DEFAULTS).toEqual({
-      regressionThreshold: 25,
-      idleThresholdMinutes: 5,
-    });
-  });
-
-  it("returns defaults when no config exists", () => {
+  it("returns default thresholds when no config exists", () => {
     const root = makeTempDir();
     testFiles.push(root);
 
-    expect(loadCacheForensicsConfig(path.join(root, "project"), root)).toEqual(
-      CACHE_FORENSICS_DEFAULTS,
-    );
+    expect(loadCacheForensicsConfig(path.join(root, "project"), root)).toEqual({
+      regressionThreshold: 25,
+      idleThresholdMinutes: 5,
+    });
   });
 
   it("reads current cache thresholds over legacy values", () => {

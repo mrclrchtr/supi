@@ -124,9 +124,3 @@ describe("workspace LSP runtime registry", () => {
     });
   });
 });
-
-describe("public LSP API", () => {
-  it("exports the workspace registry", () => {
-    expect(getWorkspaceLspRuntime).toBeInstanceOf(Function);
-  });
-});
