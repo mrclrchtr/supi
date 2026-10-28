@@ -21,7 +21,7 @@ After installation, keep asking Pi normal questions. The agent can:
 - **Search public web sources** — return source titles, URLs, and source excerpts without generating an answer.
 - **Protect the context window** — return small results inline, move long pages to temporary files, and preserve full output when model-visible text must be truncated.
 
-Relative page links and images become absolute by default, so the agent can follow them without reconstructing URLs.
+When converting HTML, relative links and image sources become absolute by default. Native Markdown is returned unchanged.
 
 ## Example requests
 
@@ -115,7 +115,9 @@ Search results are provider-reported source material. A source date can be a pub
 3. Check common `.md`, `.markdown`, `index.md`, and `README.md` alternatives.
 4. For HTML, extract the primary readable content and convert it to GitHub-flavored Markdown.
 
-It follows redirects, removes scripts and styles, preserves useful structures such as headings, links, lists, code blocks, and tables, and makes relative links absolute by default.
+It follows redirects and, for HTML, removes scripts and styles while preserving headings, links, lists, code blocks, and tables.
+
+Native Markdown is returned unchanged, including relative links and code examples. For HTML conversion, `abs_links` defaults to `true`; set it to `false` to preserve original link and image destinations. Unsafe URL schemes are removed in either HTML mode.
 
 ### Large pages
 

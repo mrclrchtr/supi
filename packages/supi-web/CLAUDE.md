@@ -33,7 +33,7 @@ The tool registers only when Web Search is enabled and `bx` is available on `PAT
 ## Output and failure contracts
 
 - `web_fetch_md` accepts only HTTP(S). Auto mode returns content inline up to 15,000 characters, otherwise a temporary-file path. Inline model-visible output also respects Pi's line/byte limits; retain the full output when truncating.
-- Resolve relative links by default. Wrap plain-text responses in fenced code blocks with a language hint from the URL extension.
+- Preserve native Markdown unchanged. For HTML conversion, `abs_links` defaults to true; false preserves original destinations. Filter unsafe URL schemes in both HTML modes. Wrap plain-text responses in fenced code blocks with a language hint from the URL extension.
 - Search preserves provider sources and excerpts rather than generating an answer. Valid empty searches are successful results, not failures.
 - Context7 execution propagates authentication, network, rate-limit, cancellation, and API failures as failed tool calls. Normalize only HTTP 404 with SDK error code `no_libraries_found` to an empty successful library search. Other 404s and library redirects remain failures.
 

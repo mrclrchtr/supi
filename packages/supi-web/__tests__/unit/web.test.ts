@@ -111,6 +111,91 @@ describe("webExtension", () => {
     vi.unstubAllGlobals();
   });
 
+  it.each([true, false])("honors abs_links=%s for converted HTML", async (abs_links) => {
+    const pi = createPiMock();
+    webExtension(pi as never);
+    const html = `
+      <html><body><h1>Guide</h1>
+      <p>Read the <a href="./reference">reference</a>.</p>
+      <p><img src="../images/diagram.png" alt="diagram"></p>
+      </body></html>
+    `;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL | Request) =>
+        String(url) === "https://example.com/docs/page"
+          ? new Response(html, { headers: { "content-type": "text/html" } })
+          : new Response("Not Found", { status: 404 }),
+      ),
+    );
+
+    const tool = pi.tools[0] as RenderableTool;
+    try {
+      const result = await tool.execute(
+        "links",
+        { url: "https://example.com/docs/page", abs_links },
+        undefined,
+        undefined,
+        makeCtx(),
+      );
+      const data = expectStructuredContent<WebFetchMdOutput>(tool, result);
+      expect(data.mode).toBe("inline");
+      if (data.mode !== "inline") throw new Error("Expected inline payload");
+      expect(data.markdown).toContain(
+        abs_links ? "[reference](https://example.com/docs/reference)" : "[reference](./reference)",
+      );
+      // biome-ignore lint/security/noSecrets: expected Markdown image, not a credential
+      const absoluteImage = "![diagram](https://example.com/images/diagram.png)";
+      expect(data.markdown).toContain(
+        abs_links ? absoluteImage : "![diagram](../images/diagram.png)",
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("returns native Markdown unchanged, including relative links and code examples", async () => {
+    const pi = createPiMock();
+    webExtension(pi as never);
+    const markdown = [
+      "# Guide",
+      "",
+      "[reference](./reference)",
+      "![diagram](../images/diagram.png)",
+      "",
+      "```md",
+      "[example](./keep-this-relative)",
+      "```",
+      "",
+    ].join("\n");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async (_url: unknown, init?: RequestInit) =>
+          new Response(init?.method === "HEAD" ? null : markdown, {
+            headers: { "content-type": "text/markdown" },
+          }),
+      ),
+    );
+
+    const tool = pi.tools[0] as RenderableTool;
+    try {
+      const result = await tool.execute(
+        "native-markdown",
+        { url: "https://example.com/docs/page" },
+        undefined,
+        undefined,
+        makeCtx(),
+      );
+      expect(expectStructuredContent<WebFetchMdOutput>(tool, result)).toMatchObject({
+        mode: "inline",
+        markdown,
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it.each([
     ["file", "# Small"],
     ["auto", "x".repeat(15_001)],

@@ -7,12 +7,15 @@ import { JSDOM, VirtualConsole } from "jsdom";
 import Turndown from "turndown";
 import { guessLanguage } from "./fetch.ts";
 
+const ORIGINAL_URL_ATTRIBUTE = "data-supi-original-url";
+
 /**
  * Convert HTML to clean Markdown.
  *
  * @param html - Raw HTML string.
  * @param baseUrl - Base URL for resolving relative links.
- * @param options.absLinks - Whether to absolutize links and image sources.
+ * @param options.absLinks - Whether to absolutize HTML links and image sources. False preserves
+ * original destinations; unsafe URL schemes are removed in either mode.
  * @returns Clean Markdown string.
  */
 export async function htmlToMarkdown(
@@ -28,6 +31,7 @@ export async function htmlToMarkdown(
   }
 
   const doc = createDocument(html, baseUrl);
+  if (!absLinks) rememberOriginalUrls(doc);
 
   // Remove script/style/noscript
   for (const tag of ["script", "style", "noscript"]) {
@@ -49,9 +53,7 @@ export async function htmlToMarkdown(
   const contentDoc = createDocument(`<html><body>${contentHtml}</body></html>`, baseUrl);
   const body = contentDoc.body;
 
-  if (absLinks) {
-    absolutizeLinks(body, baseUrl);
-  }
+  normalizeLinks(body, baseUrl, absLinks);
 
   const turndown = await createTurndown();
   let markdown = turndown.turndown(body);
@@ -91,22 +93,36 @@ function createDocument(html: string, url: string): Document {
   return new JSDOM(html, { url, virtualConsole }).window.document;
 }
 
-function absolutizeLinks(root: Element, baseUrl: string): void {
-  for (const a of root.querySelectorAll("a[href]")) {
-    const resolved = resolveUrl(a.getAttribute("href") || "", baseUrl);
-    if (resolved) {
-      a.setAttribute("href", resolved);
+/**
+ * Readability rewrites URLs during extraction. DOM attributes survive its cloning, so
+ * remember original destinations there, discarding any input-supplied markers first.
+ */
+function rememberOriginalUrls(doc: Document): void {
+  for (const element of doc.querySelectorAll(`[${ORIGINAL_URL_ATTRIBUTE}]`)) {
+    element.removeAttribute(ORIGINAL_URL_ATTRIBUTE);
+  }
+  for (const element of doc.querySelectorAll("a[href], img[src]")) {
+    const attribute = element.localName === "a" ? "href" : "src";
+    element.setAttribute(ORIGINAL_URL_ATTRIBUTE, element.getAttribute(attribute) ?? "");
+  }
+}
+
+/** Restore original destinations when requested and filter unsafe URLs in both modes. */
+function normalizeLinks(root: Element, baseUrl: string, absLinks: boolean): void {
+  for (const element of root.querySelectorAll("a, img")) {
+    const attribute = element.localName === "a" ? "href" : "src";
+    const original = absLinks ? null : element.getAttribute(ORIGINAL_URL_ATTRIBUTE);
+    const value = original ?? element.getAttribute(attribute);
+    if (value === null) continue;
+    const normalized = normalizeUrl(value, baseUrl, absLinks);
+    if (normalized) {
+      element.setAttribute(attribute, normalized);
     } else {
-      a.removeAttribute("href");
+      element.removeAttribute(attribute);
     }
   }
-  for (const img of root.querySelectorAll("img[src]")) {
-    const resolved = resolveUrl(img.getAttribute("src") || "", baseUrl);
-    if (resolved) {
-      img.setAttribute("src", resolved);
-    } else {
-      img.removeAttribute("src");
-    }
+  for (const element of root.querySelectorAll(`[${ORIGINAL_URL_ATTRIBUTE}]`)) {
+    element.removeAttribute(ORIGINAL_URL_ATTRIBUTE);
   }
 }
 
@@ -121,7 +137,7 @@ function hasDangerousScheme(value: string): boolean {
   return DANGEROUS_SCHEMES.includes(scheme);
 }
 
-function resolveUrl(href: string, baseUrl: string): string {
+function normalizeUrl(href: string, baseUrl: string, absLinks: boolean): string {
   const trimmed = String(href || "").trim();
   if (
     !trimmed ||
@@ -140,7 +156,7 @@ function resolveUrl(href: string, baseUrl: string): string {
     if (resolved.protocol !== "http:" && resolved.protocol !== "https:") {
       return "";
     }
-    return resolved.toString();
+    return absLinks ? resolved.toString() : trimmed;
   } catch {
     return trimmed;
   }

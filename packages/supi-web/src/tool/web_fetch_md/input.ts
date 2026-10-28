@@ -23,7 +23,12 @@ export const webFetchMdParameters = Type.Object(
   {
     url: Type.String({ description: "Public http(s) URL" }),
     output_mode: Type.Optional(OutputModeEnum),
-    abs_links: Type.Optional(Type.Boolean({ description: "Absolute links/images", default: true })),
+    abs_links: Type.Optional(
+      Type.Boolean({
+        description: "Absolutize HTML links/images; false preserves original destinations.",
+        default: true,
+      }),
+    ),
     timeout_ms: Type.Optional(
       Type.Integer({
         description: "Fetch timeout (ms)",
