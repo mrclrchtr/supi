@@ -48,7 +48,7 @@
   },
   "devDependencies": {
     "@mrclrchtr/supi-ask-user": "workspace:*",
-    "@types/node": "25.9.9",
+    "@types/node": "26.6.5",
     "vitest": "5.0.5"
   },
   "main": "src/api.ts",
