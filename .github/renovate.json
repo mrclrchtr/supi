@@ -62,6 +62,12 @@
       "matchPackageNames": ["@earendil-works/{/,}**"]
     },
     {
+      "description": "Keep the Node.js runtime and its TypeScript definitions together.",
+      "groupName": "node and @types/node",
+      "separateMajorMinor": false,
+      "matchPackageNames": ["node", "@types/node"]
+    },
+    {
       "description": "vscode-languageserver-node monorepo",
       "groupName": "vscode-languageserver-node",
       "separateMajorMinor": false,
