@@ -8,10 +8,11 @@
 // confirms the fixture's type error.
 
 import * as fs from "node:fs";
+import { mkdtempDisposable } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { aroundAll, describe, expect, it } from "vitest";
 import { LspClient } from "../../src/client/client.ts";
 import type { Diagnostic, ServerConfig } from "../../src/config/types.ts";
 import { hasCommand, waitFor } from "../helpers/integration-utils.ts";
@@ -27,48 +28,53 @@ const KOTLIN_CONFIG: ServerConfig = defaults.servers.kotlin;
 
 const HAS_KOTLIN = hasCommand("kotlin-lsp") && hasCommand("gradle");
 
-// ── Fixture Setup ─────────────────────────────────────────────────────
-
-let tmpDir: string;
-let badFile: string;
-
-beforeAll(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-kotlin-integration-"));
-
-  // kotlin-lsp imports the project through Gradle; a proper minimal project
-  // is required for analysis (a bare .kt file is never analyzed).
-  fs.writeFileSync(path.join(tmpDir, "settings.gradle.kts"), 'rootProject.name = "kotlinprobe"\n');
-  fs.writeFileSync(
-    path.join(tmpDir, "build.gradle.kts"),
-    'plugins {\n    kotlin("jvm") version "2.2.0"\n}\n\nrepositories {\n    mavenCentral()\n}\n',
-  );
-  const srcDir = path.join(tmpDir, "src", "main", "kotlin");
-  fs.mkdirSync(srcDir, { recursive: true });
-
-  badFile = path.join(srcDir, "Main.kt");
-  fs.writeFileSync(badFile, 'fun main() {\n    val x: Int = "not a number"\n    println(x)\n}\n');
-});
-
-afterAll(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true });
-});
-
-// ── Tests ─────────────────────────────────────────────────────────────
-
 describe.skipIf(!HAS_KOTLIN)("LspClient integration (kotlin-lsp)", () => {
+  let projectDir: string;
+  let cacheDir: string;
+  let badFile: string;
   let client: LspClient;
 
-  afterAll(async () => {
-    if (client?.status === "running") {
-      await client.shutdown();
+  aroundAll(async (runSuite) => {
+    // Keep the project and IntelliJ indexes alive until the server has stopped.
+    await using fixture = await mkdtempDisposable(
+      path.join(os.tmpdir(), "lsp-kotlin-integration-"),
+    );
+    projectDir = path.join(fixture.path, "project");
+    cacheDir = path.join(fixture.path, "cache");
+    fs.mkdirSync(projectDir);
+
+    // kotlin-lsp imports the project through Gradle; a proper minimal project
+    // is required for analysis (a bare .kt file is never analyzed).
+    fs.writeFileSync(
+      path.join(projectDir, "settings.gradle.kts"),
+      'rootProject.name = "kotlinprobe"\n',
+    );
+    fs.writeFileSync(
+      path.join(projectDir, "build.gradle.kts"),
+      'plugins {\n    kotlin("jvm") version "2.2.0"\n}\n\nrepositories {\n    mavenCentral()\n}\n',
+    );
+    const srcDir = path.join(projectDir, "src", "main", "kotlin");
+    fs.mkdirSync(srcDir, { recursive: true });
+
+    badFile = path.join(srcDir, "Main.kt");
+    fs.writeFileSync(badFile, 'fun main() {\n    val x: Int = "not a number"\n    println(x)\n}\n');
+
+    try {
+      await runSuite();
+    } finally {
+      await client?.shutdown();
     }
-  });
+  }, 15_000);
 
   it("starts through the built-in configuration with --stdio", async () => {
     expect(KOTLIN_CONFIG.command).toBe("kotlin-lsp");
     expect(KOTLIN_CONFIG.args).toEqual(["--stdio"]);
 
-    client = new LspClient("kotlin", KOTLIN_CONFIG, tmpDir);
+    client = new LspClient(
+      "kotlin",
+      { ...KOTLIN_CONFIG, args: [...(KOTLIN_CONFIG.args ?? []), "--system-path", cacheDir] },
+      projectDir,
+    );
     // kotlin-lsp is a JVM server with a slow cold start and a Gradle import.
     // Under full-suite load other test processes starve this JVM, so keep a
     // generous budget well above isolation-run times.
