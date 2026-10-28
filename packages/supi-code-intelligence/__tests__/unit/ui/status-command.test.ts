@@ -1,402 +1,220 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { completedCodeQuery, getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { getWorkspaceLspRuntime, type WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
-import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
+import { createPiMock, getHandlerOrThrow, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { registerCiStatusCommand } from "../../../src/ui/status-command.ts";
+import type { CiStatusDialog } from "../../../src/ui/status-overlay.ts";
 
 vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@mrclrchtr/supi-lsp/api")>();
-  return {
-    ...actual,
-    getWorkspaceLspRuntime: vi.fn(),
-  };
+  return { ...actual, getWorkspaceLspRuntime: vi.fn() };
 });
 
-/** Register a minimal semantic provider so getCodeProvider returns "ready" with the mocked LSP. */
-function registerMinimalSemantic(cwd: string) {
-  getDefaultWorkspaceRuntime().registerSemantic(cwd, {
-    references: async () => completedCodeQuery([]),
-    implementation: async () => completedCodeQuery([]),
-    documentSymbols: async () => completedCodeQuery([]),
-    workspaceSymbols: async () => completedCodeQuery([]),
-  });
-}
+const cleanups: Array<() => void> = [];
+afterEach(() => {
+  for (const cleanup of cleanups.splice(0)) cleanup();
+  getDefaultWorkspaceRuntime().clearAll();
+  vi.clearAllMocks();
+});
 
-function emptyDiagnosticEvidence() {
-  return {
-    requested: 0,
-    confirmed: 0,
-    unconfirmed: 0,
-    failed: 0,
-    removed: 0,
-    documents: [],
+const evidence = {
+  requested: 1,
+  confirmed: 1,
+  unconfirmed: 0,
+  failed: 0,
+  removed: 0,
+  documents: [{ file: "src/warn.ts", status: "confirmed" as const }],
+};
+
+function readyRuntime() {
+  const runtime = {
+    getProjectServers: vi.fn(() => [
+      {
+        name: "typescript",
+        root: "/project",
+        status: "running",
+        ready: true,
+        fileTypes: ["ts"],
+        openFiles: [],
+      },
+    ]),
+    getWorkspaceDiagnosticSummary: vi.fn(() => ({
+      current: true,
+      evidence,
+      entries: [{ file: "src/warn.ts", errors: 0, warnings: 1 }],
+    })),
+    getOutstandingDiagnosticSummary: vi.fn((severity: number) => ({
+      current: true,
+      evidence,
+      entries:
+        severity >= 2
+          ? [{ file: "src/warn.ts", total: 1, errors: 0, warnings: 1, information: 0, hints: 0 }]
+          : [],
+    })),
+    getOutstandingDiagnostics: vi.fn(() => ({ current: true, evidence, entries: [] })),
   };
+  vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
+    kind: "ready",
+    runtime: runtime as unknown as WorkspaceLspRuntime,
+  });
+  return runtime;
 }
 
-function readyProjectServer() {
+async function openStatus(options: { cwd?: string; homeDir?: string } = {}) {
+  const pi = createPiMock();
+  pi.setActiveTools(["code_graph", "code_health", "read"]);
+  const ctx = makeCtx({ cwd: options.cwd ?? "/project", isProjectTrusted: () => true });
+  const setFooter = vi.fn();
+  Object.assign(ctx.ui, { setFooter });
+  let dialog: CiStatusDialog | undefined;
+  let close: () => void = () => {};
+  vi.mocked(ctx.ui.custom).mockImplementation(
+    (...args: unknown[]) =>
+      new Promise((resolve) => {
+        const factory = args[0] as (...args: unknown[]) => CiStatusDialog;
+        close = () => resolve(undefined);
+        dialog = factory(
+          { terminal: { rows: 200 }, requestRender: vi.fn() },
+          ctx.ui.theme,
+          undefined,
+          close,
+        );
+      }),
+  );
+  registerCiStatusCommand(pi as never, options.homeDir);
+  const command = pi.getCommandHandler("supi-ci-status") as (
+    args: string,
+    context: ReturnType<typeof makeCtx>,
+  ) => Promise<void>;
+  const pending = command("", ctx);
+  await vi.waitFor(() => expect(dialog).toBeDefined());
+  const opened = dialog as CiStatusDialog;
+  cleanups.push(() => {
+    opened.dispose();
+    close();
+  });
   return {
-    name: "typescript",
-    root: "/project",
-    status: "running",
-    ready: true,
-    fileTypes: ["ts", "tsx"],
-    openFiles: [],
+    pi,
+    ctx,
+    command,
+    pending,
+    dialog: opened,
+    close: () => close(),
+    setFooter,
+    render: () => opened.render(120).join("\n"),
   };
 }
 
 describe("/supi-ci-status command", () => {
-  const tempDirs: string[] = [];
-
-  afterEach(() => {
-    getDefaultWorkspaceRuntime().clearAll();
-    vi.clearAllMocks();
-    for (const directory of tempDirs.splice(0)) {
-      rmSync(directory, { recursive: true, force: true });
-    }
+  it("includes warnings without mutating the footer, status, or editor widgets", async () => {
+    readyRuntime();
+    const status = await openStatus();
+    expect(status.render()).toContain("src/warn.ts");
+    expect(status.render()).toContain("1 warning");
+    expect(status.render()).not.toContain("no issues");
+    status.close();
+    await status.pending;
+    expect(status.setFooter).not.toHaveBeenCalled();
+    expect(status.ctx.ui.setStatus).not.toHaveBeenCalled();
+    expect(status.ctx.ui.setWidget).not.toHaveBeenCalled();
   });
 
-  it("does NOT call ctx.ui.notify (replaced by overlay)", async () => {
+  it("renders only active code tools, not other tools", async () => {
+    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({ kind: "unavailable", reason: "no LSP" });
+    const status = await openStatus();
+    expect(status.render()).toContain("code_graph");
+    expect(status.render()).toContain("code_health");
+    expect(status.render()).not.toMatch(/\bread\b/);
+  });
+
+  it("closes and disposes the existing interaction when toggled, then allows reopening", async () => {
+    readyRuntime();
+    const status = await openStatus();
+    await status.command("", status.ctx);
+    await status.pending;
+    const next = status.command("", status.ctx);
+    await vi.waitFor(() => expect(status.ctx.ui.custom).toHaveBeenCalledTimes(2));
+    status.close();
+    await next;
+  });
+
+  it("closes the active inspector on session shutdown", async () => {
+    readyRuntime();
+    const status = await openStatus();
+    await getHandlerOrThrow(status.pi, "session_shutdown")({}, status.ctx);
+    await status.pending;
+    expect(status.setFooter).not.toHaveBeenCalled();
+  });
+
+  it("reports custom UI failure and permits another attempt", async () => {
+    readyRuntime();
     const pi = createPiMock();
     registerCiStatusCommand(pi as never);
-    pi.setActiveTools(["code_graph", "code_health", "lsp_hover", "tree_sitter_outline"]);
-
-    const ctx = makeCtx({ cwd: "/project" });
+    const ctx = makeCtx();
     Object.assign(ctx.ui, { setFooter: vi.fn() });
-    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
-      kind: "unavailable",
-      reason: "no LSP session",
-    });
-
-    const cmd = pi.getCommandHandler("supi-ci-status") as (
+    vi.mocked(ctx.ui.custom).mockRejectedValue(new Error("cannot open inspector"));
+    const command = pi.getCommandHandler("supi-ci-status") as (
       args: string,
-      ctx: ReturnType<typeof makeCtx>,
+      ctx: unknown,
     ) => Promise<void>;
-
-    await cmd("", ctx);
-
-    expect(ctx.ui.notify).not.toHaveBeenCalled();
+    await command("", ctx);
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining("cannot open inspector"),
+      "error",
+    );
+    vi.mocked(ctx.ui.custom).mockResolvedValue(undefined);
+    await command("", ctx);
+    expect(ctx.ui.custom).toHaveBeenCalledTimes(2);
   });
 
-  it("creates overlay with center anchor and 66% width", async () => {
+  it("explains that RPC cannot display a terminal inspector", async () => {
     const pi = createPiMock();
     registerCiStatusCommand(pi as never);
-    pi.setActiveTools(["code_orientation"]);
-
-    const ctx = makeCtx({ cwd: "/project" });
+    const ctx = makeCtx({ mode: "rpc", hasUI: true });
     Object.assign(ctx.ui, { setFooter: vi.fn() });
-    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
-      kind: "unavailable",
-      reason: "no LSP",
-    });
-
-    const cmd = pi.getCommandHandler("supi-ci-status") as (
+    const command = pi.getCommandHandler("supi-ci-status") as (
       args: string,
-      ctx: ReturnType<typeof makeCtx>,
+      ctx: unknown,
     ) => Promise<void>;
-
-    await cmd("", ctx);
-
-    expect(ctx.ui.custom).toHaveBeenCalled();
-    const customMock = ctx.ui.custom as unknown as {
-      mock: { calls: Array<[unknown, { overlay?: boolean; overlayOptions?: unknown }]> };
-    };
-    const [, opts] = customMock.mock.calls[0] ?? [];
-    expect(opts?.overlay).toBe(true);
-    expect(opts?.overlayOptions).toMatchObject({
-      anchor: "center",
-      width: "66%",
-      minWidth: 60,
-    });
+    await command("", ctx);
+    expect(ctx.ui.custom).not.toHaveBeenCalled();
+    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("code_health"), "warning");
   });
 
-  it("shows configuration failure in the status dialog", async () => {
+  it("cancels an opening inspector instead of creating duplicate overlays on rapid toggles", async () => {
+    readyRuntime();
+    const pi = createPiMock();
+    registerCiStatusCommand(pi as never);
+    const ctx = makeCtx();
+    const command = pi.getCommandHandler("supi-ci-status") as (
+      args: string,
+      ctx: unknown,
+    ) => Promise<void>;
+    const opening = command("", ctx);
+    await command("", ctx);
+    await opening;
+    expect(ctx.ui.custom).not.toHaveBeenCalled();
+    await command("", ctx);
+    expect(ctx.ui.custom).toHaveBeenCalledOnce();
+  });
+
+  it("shows configuration failure inside the inspector", async () => {
     const cwd = mkdtempSync(path.join(os.tmpdir(), "status-config-"));
     const homeDir = mkdtempSync(path.join(os.tmpdir(), "status-config-home-"));
-    tempDirs.push(cwd, homeDir);
+    cleanups.push(() => {
+      rmSync(cwd, { recursive: true, force: true });
+      rmSync(homeDir, { recursive: true, force: true });
+    });
     mkdirSync(path.join(cwd, ".pi/supi"), { recursive: true });
     writeFileSync(
       path.join(cwd, ".pi/supi/config.json"),
       JSON.stringify({ lsp: { exclude: ["legacy-generated"] } }),
     );
-
-    const pi = createPiMock();
-    registerCiStatusCommand(pi as never, homeDir);
-    const ctx = makeCtx({ cwd, isProjectTrusted: () => true });
-    Object.assign(ctx.ui, { setFooter: vi.fn() });
-    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
-      kind: "unavailable",
-      reason: "no LSP session",
-    });
-
-    const cmd = pi.getCommandHandler("supi-ci-status") as (
-      args: string,
-      ctx: ReturnType<typeof makeCtx>,
-    ) => Promise<void>;
-    await cmd("", ctx);
-
-    const customMock = ctx.ui.custom as unknown as {
-      mock: { calls: Array<[(...args: unknown[]) => unknown]> };
-    };
-    const factory = customMock.mock.calls[0]?.[0];
-    const dialog = factory?.({ requestRender: vi.fn() }, ctx.ui.theme, undefined, vi.fn()) as
-      | { render(width: number): string[] }
-      | undefined;
-    expect(dialog?.render(100).join("\\n")).toContain("Code intelligence configuration failed");
-  });
-
-  it("sets status bar with readiness and typed route errors", async () => {
-    const pi = createPiMock();
-    registerCiStatusCommand(pi as never);
-    pi.setActiveTools(["code_orientation"]);
-
-    const ctx = makeCtx({ cwd: "/project" });
-    Object.assign(ctx.ui, { setFooter: vi.fn() });
-    registerMinimalSemantic("/project");
-    const mockService = {
-      getProjectServers: vi.fn(() => [
-        readyProjectServer(),
-        {
-          ...readyProjectServer(),
-          root: "/project/packages/app",
-          status: "error",
-          ready: false,
-          statusReason: "process-crash-recovery-exhausted",
-        },
-      ]),
-      getOutstandingDiagnosticSummary: vi.fn(() => ({
-        entries: [],
-        current: true,
-        evidence: emptyDiagnosticEvidence(),
-      })),
-      getOutstandingDiagnostics: vi.fn(() => ({
-        entries: [],
-        current: true,
-        evidence: emptyDiagnosticEvidence(),
-      })),
-    } as unknown as WorkspaceLspRuntime;
-
-    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
-      kind: "ready",
-      runtime: mockService,
-    });
-
-    const cmd = pi.getCommandHandler("supi-ci-status") as (
-      args: string,
-      ctx: ReturnType<typeof makeCtx>,
-    ) => Promise<void>;
-
-    await cmd("", ctx);
-
-    const setStatusMock = ctx.ui.setStatus as unknown as {
-      mock: { calls: Array<[string, string | undefined]> };
-    };
-    const call = setStatusMock.mock.calls.find(([key]) => key === "code-intelligence");
-    expect(call).toBeDefined();
-    expect(call?.[1]).toBeDefined();
-    expect(call?.[1]).toContain("1 server");
-    expect(call?.[1]).toContain("1 route error");
-  });
-
-  it("passes invalidated diagnostic freshness to the status dialog", async () => {
-    const pi = createPiMock();
-    registerCiStatusCommand(pi as never);
-    pi.setActiveTools(["code_orientation"]);
-    const ctx = makeCtx({ cwd: "/project" });
-    Object.assign(ctx.ui, { setFooter: vi.fn() });
-    registerMinimalSemantic("/project");
-    const mockService = {
-      getProjectServers: vi.fn(() => [readyProjectServer()]),
-      getOutstandingDiagnosticSummary: vi.fn(() => ({
-        entries: [],
-        current: false,
-        evidence: emptyDiagnosticEvidence(),
-      })),
-      getOutstandingDiagnostics: vi.fn(() => ({
-        entries: [],
-        current: false,
-        evidence: emptyDiagnosticEvidence(),
-      })),
-    } as unknown as WorkspaceLspRuntime;
-    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({ kind: "ready", runtime: mockService });
-
-    const cmd = pi.getCommandHandler("supi-ci-status") as (
-      args: string,
-      ctx: ReturnType<typeof makeCtx>,
-    ) => Promise<void>;
-    await cmd("", ctx);
-
-    const customMock = ctx.ui.custom as unknown as {
-      mock: { calls: Array<[(t: unknown, theme: unknown, kb: unknown, done: unknown) => unknown]> };
-    };
-    const dialog = customMock.mock.calls[0]?.[0]?.(
-      { requestRender: vi.fn() },
-      ctx.ui.theme,
-      undefined,
-      vi.fn(),
-    ) as { render(width: number): string[] };
-    expect(dialog.render(100).join("\n")).toContain("diagnostic snapshot is stale");
-  });
-
-  it("sets belowEditor widget when diagnostics exist", async () => {
-    const pi = createPiMock();
-    registerCiStatusCommand(pi as never);
-    pi.setActiveTools(["code_orientation"]);
-
-    const ctx = makeCtx({ cwd: "/project" });
-    Object.assign(ctx.ui, { setFooter: vi.fn() });
-    registerMinimalSemantic("/project");
-    const mockService = {
-      getProjectServers: vi.fn(() => [readyProjectServer()]),
-      getOutstandingDiagnosticSummary: vi.fn(() => ({
-        current: true,
-        entries: [
-          { file: "src/index.ts", total: 2, errors: 2, warnings: 0, information: 0, hints: 0 },
-        ],
-        evidence: emptyDiagnosticEvidence(),
-      })),
-      getOutstandingDiagnostics: vi.fn(() => ({
-        entries: [],
-        current: true,
-        evidence: emptyDiagnosticEvidence(),
-      })),
-    } as unknown as WorkspaceLspRuntime;
-
-    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
-      kind: "ready",
-      runtime: mockService,
-    });
-
-    const cmd = pi.getCommandHandler("supi-ci-status") as (
-      args: string,
-      ctx: ReturnType<typeof makeCtx>,
-    ) => Promise<void>;
-
-    await cmd("", ctx);
-
-    const setWidgetMock = ctx.ui.setWidget as unknown as {
-      mock: { calls: Array<[string, unknown, { placement?: string } | undefined]> };
-    };
-    const call = setWidgetMock.mock.calls.find(([key]) => key === "code-intelligence");
-    expect(call).toBeDefined();
-    expect(call?.[2]?.placement).toBe("belowEditor");
-    expect(call?.[1]).toBeDefined();
-  });
-
-  it("filters active tools to only code_* tools in command data", async () => {
-    const pi = createPiMock();
-    registerCiStatusCommand(pi as never);
-    pi.setActiveTools(["code_graph", "code_health", "lsp_hover", "tree_sitter_outline"]);
-
-    const ctx = makeCtx({ cwd: "/project" });
-    Object.assign(ctx.ui, { setFooter: vi.fn() });
-    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
-      kind: "unavailable",
-      reason: "no LSP",
-    });
-
-    const cmd = pi.getCommandHandler("supi-ci-status") as (
-      args: string,
-      ctx: ReturnType<typeof makeCtx>,
-    ) => Promise<void>;
-
-    await cmd("", ctx);
-
-    // The custom factory is called with (tui, theme, _kb, done) — we can inspect
-    // what the dialog receives. Verify the custom call was made; the dialog's
-    // rendering of tools is tested separately in code-intelligence-status-overlay.test.ts
-    expect(ctx.ui.custom).toHaveBeenCalled();
-  });
-
-  it("sets custom footer while overlay is open", async () => {
-    const pi = createPiMock();
-    registerCiStatusCommand(pi as never);
-    pi.setActiveTools(["code_orientation"]);
-
-    const setFooterMock = vi.fn();
-    const ctx = makeCtx({ cwd: "/project" });
-    Object.assign(ctx.ui, { setFooter: setFooterMock });
-
-    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
-      kind: "unavailable",
-      reason: "no LSP",
-    });
-
-    const cmd = pi.getCommandHandler("supi-ci-status") as (
-      args: string,
-      ctx: ReturnType<typeof makeCtx>,
-    ) => Promise<void>;
-
-    await cmd("", ctx);
-
-    // setFooter was called with a factory function (and later with undefined for cleanup)
-    expect(setFooterMock).toHaveBeenCalledTimes(2);
-    expect(typeof setFooterMock.mock.calls[0]?.[0]).toBe("function");
-    expect(setFooterMock.mock.calls[1]?.[0]).toBeUndefined();
-  });
-
-  it("sorts diagnostics: errors first, then warnings", async () => {
-    const pi = createPiMock();
-    registerCiStatusCommand(pi as never);
-    pi.setActiveTools(["code_orientation"]);
-
-    const ctx = makeCtx({ cwd: "/project" });
-    Object.assign(ctx.ui, { setFooter: vi.fn() });
-    registerMinimalSemantic("/project");
-    const mockService = {
-      getProjectServers: vi.fn(() => [readyProjectServer()]),
-      getOutstandingDiagnosticSummary: vi.fn(() => ({
-        current: true,
-        entries: [
-          { file: "src/warn.ts", total: 1, errors: 0, warnings: 1, information: 0, hints: 0 },
-          { file: "src/err.ts", total: 2, errors: 2, warnings: 0, information: 0, hints: 0 },
-          { file: "src/mixed.ts", total: 3, errors: 1, warnings: 2, information: 0, hints: 0 },
-        ],
-        evidence: emptyDiagnosticEvidence(),
-      })),
-      getOutstandingDiagnostics: vi.fn(() => ({
-        entries: [],
-        current: true,
-        evidence: emptyDiagnosticEvidence(),
-      })),
-    } as unknown as WorkspaceLspRuntime;
-
-    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
-      kind: "ready",
-      runtime: mockService,
-    });
-
-    const cmd = pi.getCommandHandler("supi-ci-status") as (
-      args: string,
-      ctx: ReturnType<typeof makeCtx>,
-    ) => Promise<void>;
-
-    await cmd("", ctx);
-
-    expect(ctx.ui.custom).toHaveBeenCalled();
-    const customMock = ctx.ui.custom as unknown as {
-      mock: { calls: Array<[(t: unknown, theme: unknown, kb: unknown, done: unknown) => unknown]> };
-    };
-    const factoryFn = customMock.mock.calls[0]?.[0];
-    expect(factoryFn).toBeDefined();
-
-    // Call the factory to see what data the dialog got
-    const tui = { requestRender: vi.fn() };
-    const done = vi.fn();
-    const dialog = factoryFn?.(tui, ctx.ui.theme, undefined, done);
-    // Verify dialog exists
-    expect(dialog).toBeDefined();
-
-    // The dialog constructor receives sorted diagnostics.
-    // src/err.ts (2 errors) should come before src/mixed.ts (1 error)
-    // src/warn.ts (0 errors) should come last
-    const lines = (dialog as { render: (w: number) => string[] }).render(80).join("\n");
-    const errIdx = lines.indexOf("src/err.ts");
-    const mixedIdx = lines.indexOf("src/mixed.ts");
-    const warnIdx = lines.indexOf("src/warn.ts");
-    expect(errIdx).toBeLessThan(mixedIdx);
-    expect(mixedIdx).toBeLessThan(warnIdx);
+    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({ kind: "unavailable", reason: "no LSP" });
+    const status = await openStatus({ cwd, homeDir });
+    expect(status.render()).toContain("Code intelligence configuration failed");
   });
 });

@@ -1,413 +1,336 @@
-import type { OutstandingDiagnosticSummaryEntry, ProjectServerInfo } from "@mrclrchtr/supi-lsp/api";
+import { KeybindingsManager, TUI_KEYBINDINGS, visibleWidth } from "@earendil-works/pi-tui";
+import type { Diagnostic, ProjectServerInfo } from "@mrclrchtr/supi-lsp/api";
 import { makeCtx } from "@mrclrchtr/supi-test-utils";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { HealthDiagnosticObservation } from "../../../src/session/health-types.ts";
 import {
+  type CiDiagnosticDetails,
   type CiStatusData,
   type CiStatusDialogDeps,
   createCiStatusDialog,
 } from "../../../src/ui/status-overlay.ts";
 
-const theme = makeCtx().ui.theme;
-
-const mockServers: ProjectServerInfo[] = [
-  {
-    name: "typescript",
-    root: "/project",
-    status: "running",
-    fileTypes: ["ts", "tsx", "js", "jsx"],
-    openFiles: ["src/index.ts", "src/utils.ts"],
-    ready: true,
-  },
-  {
-    name: "bash",
-    root: "/project",
-    status: "running",
-    fileTypes: ["sh", "bash"],
-    openFiles: [],
-    ready: true,
-  },
-];
-
-const mockDiagnostics: OutstandingDiagnosticSummaryEntry[] = [
-  { file: "src/index.ts", total: 3, errors: 2, warnings: 1, information: 0, hints: 0 },
-  { file: "src/utils.ts", total: 1, errors: 1, warnings: 0, information: 0, hints: 0 },
-  { file: "src/types.ts", total: 1, errors: 0, warnings: 1, information: 0, hints: 0 },
-];
-
-const baseCapabilities: CiStatusData["capabilities"] = {
-  semantic: { kind: "ready", providerAvailable: true },
-  structural: { kind: "ready", providerAvailable: true },
-  refactorAvailable: true,
-};
-
-function makeTui() {
-  return { requestRender: vi.fn() };
+const files = ["src/A.ts", "src/B.ts"];
+function observation(names = files, current = true): HealthDiagnosticObservation {
+  return {
+    kind: current ? "completed" : "partial",
+    scope: { kind: "tracked-files", filter: null },
+    entries: names.map((file) => ({ file, errors: 1, warnings: 0 })),
+    evidence: {
+      requested: names.length,
+      confirmed: current ? names.length : 0,
+      unconfirmed: current ? 0 : names.length,
+      failed: 0,
+      removed: 0,
+      documents: names.map((file) => ({
+        file,
+        status: current ? ("confirmed" as const) : ("unconfirmed" as const),
+      })),
+    },
+    ...(!current ? { reason: "Unconfirmed documents have no request-based confirmation." } : {}),
+  } as HealthDiagnosticObservation;
 }
-
-function makeData(overrides: Partial<CiStatusData> = {}): CiStatusData {
+function data(overrides: Partial<CiStatusData> = {}): CiStatusData {
   return {
     workspaceRoot: "/project",
     servers: [],
     serverInventoryAvailable: true,
-    semanticAvailable: true,
-    diagnosticSnapshotCurrent: true,
-    diagnostics: [],
-    capabilities: baseCapabilities,
+    capabilities: { semantic: { kind: "ready" }, structural: { kind: "ready" } },
+    diagnostics: observation(),
     activeTools: [],
     ...overrides,
   };
 }
-
-function makeDeps(overrides: Partial<CiStatusDialogDeps> = {}): CiStatusDialogDeps {
+function diagnostic(message: string): Diagnostic {
   return {
-    theme,
-    done: vi.fn(),
-    tui: makeTui(),
-    ...overrides,
+    message,
+    severity: 1,
+    range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
   };
 }
+function details(file: string, message: string, current = true): CiDiagnosticDetails {
+  return { current, entries: [{ file, diagnostics: [diagnostic(message)] }] };
+}
+function deferred<T>() {
+  let resolve: (value: T) => void = () => {};
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+const dialogs: ReturnType<typeof createCiStatusDialog>[] = [];
+afterEach(() => {
+  for (const dialog of dialogs.splice(0)) dialog.dispose();
+});
+function setup(snapshot = data(), overrides: Partial<CiStatusDialogDeps> = {}) {
+  const deps = {
+    theme: makeCtx().ui.theme,
+    done: vi.fn(),
+    tui: { terminal: { rows: 200 }, requestRender: vi.fn() },
+    ...overrides,
+  };
+  const dialog = createCiStatusDialog(snapshot, deps);
+  dialogs.push(dialog);
+  return { dialog, deps, render: (width = 100) => dialog.render(width).join("\n") };
+}
+const server: ProjectServerInfo = {
+  name: "typescript",
+  root: "/project",
+  status: "running",
+  ready: true,
+  fileTypes: ["ts"],
+  openFiles: [],
+};
 
-describe("CiStatusDialog", () => {
-  describe("rendering", () => {
-    it("renders process-crash recovery reasons in server rows", () => {
-      const servers: ProjectServerInfo[] = [
-        {
-          ...mockServers[0],
-          status: "error",
-          statusReason: "process-crashed",
-          ready: false,
-        },
-        {
-          ...mockServers[1],
-          status: "error",
-          statusReason: "process-crash-recovery-pending",
-          ready: false,
-        },
-        {
-          ...mockServers[1],
-          name: "rust",
-          status: "error",
-          statusReason: "process-crash-recovery-exhausted",
-          ready: false,
-        },
-      ];
-      const dialog = createCiStatusDialog(makeData({ servers }), makeDeps());
-
-      const rendered = dialog.render(100).join("\\n");
-
-      expect(rendered).toContain("process crashed; next evidence operation will recover");
-      expect(rendered).toContain("process recovery in progress");
-      expect(rendered).toContain("process recovery exhausted; try another explicit health refresh");
-      expect(rendered).toContain("1 route recovering");
-      expect(rendered).toContain("2 route errors");
-    });
-
-    it("renders header with title and toggle hint", () => {
-      const dialog = createCiStatusDialog(makeData(), makeDeps());
-      const lines = dialog.render(80);
-      const all = lines.join("\n");
-      expect(all).toContain("Code Intelligence");
-      expect(all).toContain("/supi-ci-status");
-      expect(all).toContain("esc");
-    });
-
-    it("shows servers section when servers provided", () => {
-      const dialog = createCiStatusDialog(makeData({ servers: mockServers }), makeDeps());
-      const lines = dialog.render(80);
-      const all = lines.join("\n");
-      expect(all).toContain("Servers");
-      expect(all).toContain("typescript");
-      expect(all).toContain("bash");
-      expect(all).toContain("root: .");
-    });
-
-    it("hides servers section when empty and LSP not ready", () => {
-      const dialog = createCiStatusDialog(
-        makeData({
-          servers: [],
-          serverInventoryAvailable: false,
-          semanticAvailable: false,
-          diagnostics: [],
-          capabilities: {
-            semantic: { kind: "unavailable", providerAvailable: false },
-            structural: { kind: "unavailable", providerAvailable: false },
-            refactorAvailable: false,
-          },
-        }),
-        makeDeps(),
-      );
-      const lines = dialog.render(80);
-      const all = lines.join("\n");
-      // The capabilities section should still be visible
-      expect(all).toContain("Capabilities");
-    });
-
-    it("shows problems section with file list", () => {
-      const dialog = createCiStatusDialog(makeData({ diagnostics: mockDiagnostics }), makeDeps());
-      const lines = dialog.render(80);
-      const all = lines.join("\n");
-      expect(all).toContain("src/index.ts");
-      expect(all).toContain("src/utils.ts");
-      expect(all).toContain("src/types.ts");
-      expect(all).toContain("2 errors");
-    });
-
-    it('shows "no issues" message when current diagnostics are empty', () => {
-      const dialog = createCiStatusDialog(makeData({ diagnostics: [] }), makeDeps());
-      const lines = dialog.render(80);
-      const all = lines.join("\n");
-      expect(all).toMatch(/no issues|✓.*no.*issues/i);
-    });
-
-    it("shows stale status when an invalidated diagnostic snapshot is empty", () => {
-      const dialog = createCiStatusDialog(
-        makeData({ diagnostics: [], diagnosticSnapshotCurrent: false }),
-        makeDeps(),
-      );
-      const all = dialog.render(80).join("\n");
-      expect(all).toContain("diagnostic snapshot is stale");
-      expect(all).not.toContain("✓ no issues");
-    });
-
-    it("shows capabilities section with semantic, structural, refactor", () => {
-      const dialog = createCiStatusDialog(makeData(), makeDeps());
-      const lines = dialog.render(80);
-      const all = lines.join("\n");
-      expect(all).toContain("Capabilities");
-      expect(all).toContain("Semantic");
-      expect(all).toContain("Structural");
-      expect(all).toContain("Refactor");
-    });
-
-    it("shows unavailable state with reason for missing capabilities", () => {
-      const dialog = createCiStatusDialog(
-        makeData({
-          capabilities: {
-            semantic: { kind: "unavailable", reason: "no LSP session", providerAvailable: false },
-            structural: {
-              kind: "unavailable",
-              reason: "tree-sitter not installed",
-              providerAvailable: false,
-            },
-            refactorAvailable: false,
-          },
-        }),
-        makeDeps(),
-      );
-      const lines = dialog.render(80);
-      const all = lines.join("\n");
-      expect(all).toContain("no LSP session");
-      expect(all).toContain("tree-sitter not installed");
-    });
-
-    it("shows tools section with active code_* tools", () => {
-      const dialog = createCiStatusDialog(
-        makeData({ activeTools: ["code_orientation", "code_graph", "code_find"] }),
-        makeDeps(),
-      );
-      const lines = dialog.render(80);
-      const all = lines.join("\n");
-      expect(all).toContain("code_orientation");
-      expect(all).toContain("code_graph");
-      expect(all).toContain("code_find");
-    });
-
-    it("skips tools section when no active code_* tools", () => {
-      const dialog = createCiStatusDialog(makeData({ activeTools: [] }), makeDeps());
-      const lines = dialog.render(80);
-      const all = lines.join("\n");
-      expect(all).not.toContain("Tools:");
-    });
-
-    it("every line respects width parameter", () => {
-      const dialog = createCiStatusDialog(
-        makeData({
-          servers: mockServers,
-          diagnostics: mockDiagnostics,
-          activeTools: ["code_orientation", "code_graph", "code_find", "code_health"],
-        }),
-        makeDeps(),
-      );
-      const lines = dialog.render(60);
-      for (const line of lines) {
-        // visibleWidth of a plain string equals its length
-        expect(line.length).toBeLessThanOrEqual(60);
-      }
-    });
+describe("Code intelligence inspector", () => {
+  it("keeps file 11 selected and expandable inside the viewport", () => {
+    const names = Array.from({ length: 12 }, (_, i) => `src/file-${i + 1}.ts`);
+    const { dialog, render, deps } = setup(data({ diagnostics: observation(names) }));
+    deps.tui.terminal.rows = 24;
+    dialog.render(80);
+    for (let i = 0; i < 10; i++) dialog.handleInput("j");
+    expect(render(80)).toContain("▶ src/file-11.ts");
+    dialog.handleInput("\r");
+    expect(render(80)).toContain("▼ src/file-11.ts");
+    expect(dialog.render(80).length).toBeLessThanOrEqual(20);
+    expect(render(80)).toContain("esc close");
   });
 
-  describe("interaction", () => {
-    it("arrow down increments selected file index", () => {
-      const dialog = createCiStatusDialog(makeData({ diagnostics: mockDiagnostics }), makeDeps());
-      dialog.render(80);
-      const first = dialog.render(80).join("\n");
-      dialog.handleInput("\x1b[B"); // down
-      const second = dialog.render(80).join("\n");
-      // Selection indicator should change position
-      expect(second).not.toBe(first);
-    });
-
-    it("arrow up decrements selected file index and clamps at 0", () => {
-      const dialog = createCiStatusDialog(makeData({ diagnostics: mockDiagnostics }), makeDeps());
-      dialog.render(80);
-      dialog.handleInput("\x1b[A"); // up at idx 0 — should clamp
-      // No error, no negative index
-      const lines = dialog.render(80);
-      expect(lines.length).toBeGreaterThan(0);
-    });
-
-    it("enter toggles file expansion on selected row", () => {
-      const dialog = createCiStatusDialog(makeData({ diagnostics: mockDiagnostics }), makeDeps());
-      dialog.render(80);
-      dialog.handleInput("\r"); // enter
-      const expanded = dialog.render(80).join("\n");
-      // Should show selection/expand indicator change
-      // First file was src/index.ts
-      dialog.handleInput("\r"); // enter again
-      const collapsed = dialog.render(80).join("\n");
-      // Output should differ
-      expect(expanded).not.toBe(collapsed);
-    });
-
-    it("escape calls done callback", () => {
-      const done = vi.fn();
-      const dialog = createCiStatusDialog(makeData(), makeDeps({ done }));
-      dialog.handleInput("\x1b"); // esc
-      expect(done).toHaveBeenCalledTimes(1);
-    });
-
-    it("'a' collapses all expanded files", () => {
-      const dialog = createCiStatusDialog(makeData({ diagnostics: mockDiagnostics }), makeDeps());
-      dialog.render(80);
-      dialog.handleInput("\r"); // expand first file
-      dialog.handleInput("a"); // collapse all
-      const lines = dialog.render(80).join("\n");
-      // No ▼ indicator — everything collapsed
-      expect(lines).not.toContain("▼");
-    });
-
-    it("'r' triggers refresh and re-renders", async () => {
-      const onRefresh = vi.fn(async () => makeData({ diagnostics: [] }));
-      const dialog = createCiStatusDialog(
-        makeData({ diagnostics: mockDiagnostics }),
-        makeDeps({ onRefresh }),
-      );
-      dialog.render(80);
-      const before = dialog.render(80).join("\n");
-      expect(before).toContain("src/index.ts");
-
-      dialog.handleInput("r");
-      // Wait for async refresh
-      await vi.waitFor(() => {
-        expect(onRefresh).toHaveBeenCalled();
-      });
-      const after = dialog.render(80).join("\n");
-      expect(after).toContain("no issues");
-    });
-
-    it("state changes call tui.requestRender", () => {
-      const tui = makeTui();
-      const dialog = createCiStatusDialog(
-        makeData({ diagnostics: mockDiagnostics }),
-        makeDeps({ tui }),
-      );
-      dialog.render(80);
-      dialog.handleInput("\x1b[B"); // down
-      expect(tui.requestRender).toHaveBeenCalled();
-    });
+  it("bounds the dialog on short terminals, exposes all sections by scrolling, and responds to resize", () => {
+    const { dialog, deps, render } = setup(
+      data({
+        servers: Array.from({ length: 4 }, (_, i) => ({
+          ...server,
+          root: `/project/package-${i}`,
+        })),
+        activeTools: ["code_health"],
+      }),
+    );
+    deps.tui.terminal.rows = 24;
+    expect(dialog.render(100).length).toBeLessThanOrEqual(20);
+    expect(render()).toContain("src/A.ts");
+    dialog.handleInput("\x1b[F"); // End: the tail remains reachable.
+    expect(render()).toContain("code_health");
+    expect(render()).toContain("esc close");
+    dialog.handleInput("\x1b[H"); // Home
+    expect(render()).toContain("Capabilities");
+    dialog.handleInput("j");
+    deps.tui.terminal.rows = 14;
+    expect(dialog.render(100).length).toBeLessThanOrEqual(11);
+    expect(render()).toContain("▶ src/B.ts");
+    expect(render()).toContain("esc close");
   });
 
-  describe("caching", () => {
-    it("caches render output by width", () => {
-      const dialog = createCiStatusDialog(makeData(), makeDeps());
-      const first = dialog.render(80);
-      const second = dialog.render(80);
-      // Same width → same content
-      expect(second).toEqual(first);
+  it("honors injected navigation and cancel bindings", () => {
+    const keybindings = new KeybindingsManager(TUI_KEYBINDINGS, {
+      "tui.select.down": "ctrl+n",
+      "tui.select.cancel": "ctrl+x",
     });
-
-    it("invalidates cache on state change", () => {
-      const dialog = createCiStatusDialog(makeData({ diagnostics: mockDiagnostics }), makeDeps());
-      const before = dialog.render(80);
-      dialog.handleInput("\x1b[B"); // down — changes state
-      const after = dialog.render(80);
-      expect(after).not.toEqual(before);
-    });
+    const { dialog, render, deps } = setup(data(), { keybindings });
+    dialog.handleInput("\x0e");
+    expect(render()).toContain("▶ src/B.ts");
+    dialog.handleInput("\x18");
+    expect(deps.done).toHaveBeenCalledOnce();
   });
 
-  // ── Capability Warnings ──────────────────────────────────────────
-
-  describe("Capability Warnings", () => {
-    it("shows Capability Warnings when semantic capability is reduced", () => {
-      const dialog = createCiStatusDialog(
-        makeData({
-          servers: [],
-          diagnostics: [],
-          capabilities: {
-            semantic: { kind: "unavailable", reason: "no LSP session", providerAvailable: false },
-            structural: { kind: "ready", providerAvailable: true },
-            refactorAvailable: false,
-          },
-          capabilityWarnings: {
-            hasWarnings: true,
-            warnings: [
-              {
-                type: "missing-server",
-                language: "python",
-                message: "pyright-langserver not found on PATH",
-              },
-            ],
-          },
-        }),
-        makeDeps(),
-      );
-      const lines = dialog.render(80).join("\n");
-      expect(lines).toContain("Capability Warnings");
-      expect(lines).toContain("python");
+  it("gives configured actions priority over k/r/a shortcut aliases", async () => {
+    const keybindings = new KeybindingsManager(TUI_KEYBINDINGS, {
+      "tui.select.down": "k",
+      "tui.select.confirm": "r",
+      "tui.select.up": "a",
     });
+    const reload = vi.fn(async () => data());
+    const { dialog, render } = setup(data(), { keybindings, onRefresh: reload });
+    dialog.handleInput("k");
+    expect(render()).toContain("▶ src/B.ts");
+    dialog.handleInput("r");
+    expect(render()).toContain("▼ src/B.ts");
+    expect(reload).not.toHaveBeenCalled();
+    expect(render()).not.toContain("r reload");
+    expect(render()).not.toContain("a collapse");
+    dialog.handleInput("a");
+    expect(render()).toContain("▶ src/A.ts");
+  });
 
-    it("hides Capability Warnings when no warnings exist", () => {
-      const dialog = createCiStatusDialog(
-        makeData({
-          servers: mockServers,
-          diagnostics: [],
-          capabilities: {
-            semantic: { kind: "ready", providerAvailable: true },
-            structural: { kind: "ready", providerAvailable: true },
-            refactorAvailable: true,
-          },
-          capabilityWarnings: { hasWarnings: false, warnings: [] },
-        }),
-        makeDeps(),
-      );
-      const lines = dialog.render(80).join("\n");
-      expect(lines).not.toContain("Capability Warnings");
+  it("consumes configured confirmation even when there is no file to expand", () => {
+    const keybindings = new KeybindingsManager(TUI_KEYBINDINGS, { "tui.select.confirm": "r" });
+    const reload = vi.fn(async () => data());
+    const { dialog } = setup(data({ diagnostics: observation([]) }), {
+      keybindings,
+      onRefresh: reload,
     });
+    dialog.handleInput("r");
+    expect(reload).not.toHaveBeenCalled();
+  });
 
-    it("shows a structural warning when tree-sitter is unavailable", () => {
-      const dialog = createCiStatusDialog(
-        makeData({
-          servers: mockServers,
-          diagnostics: [],
-          capabilities: {
-            semantic: { kind: "ready", providerAvailable: true },
-            structural: {
-              kind: "unavailable",
-              reason: "tree-sitter not initialized",
-              providerAvailable: false,
-            },
-            refactorAvailable: true,
-          },
-          capabilityWarnings: {
-            hasWarnings: true,
-            warnings: [{ type: "structural-unavailable", message: "Tree-sitter is unavailable" }],
-          },
-        }),
-        makeDeps(),
-      );
-      const lines = dialog.render(80).join("\n");
-      expect(lines).toContain("Capability Warnings");
-      expect(lines).toContain("Tree-sitter");
+  it("keeps filenames and counts readable with long absolute workspace paths", () => {
+    const workspaceRoot = "/very/long/workspace/prefix/that/exceeds/the/terminal/width";
+    const { dialog } = setup(
+      data({
+        workspaceRoot,
+        diagnostics: observation([
+          `${workspaceRoot}/src/first.ts`,
+          `${workspaceRoot}/src/second.ts`,
+        ]),
+      }),
+    );
+    const rendered = dialog.render(32).join("\n");
+    expect(rendered).toContain("src/first.ts");
+    expect(rendered).toContain("src/second.ts");
+    expect(rendered).toContain("1 error");
+    expect(rendered).not.toContain("/very/long/workspace");
+  });
+
+  it("does not put a late A response under expanded file B", async () => {
+    const a = deferred<CiDiagnosticDetails>();
+    const b = deferred<CiDiagnosticDetails>();
+    const fetch = vi.fn().mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise);
+    const { dialog, render } = setup(data(), { fetchDetailedDiagnostics: fetch });
+    dialog.handleInput("\r");
+    dialog.handleInput("j");
+    dialog.handleInput("\r");
+    b.resolve(details("src/B.ts", "B message"));
+    await vi.waitFor(() => expect(render()).toContain("B message"));
+    a.resolve(details("src/A.ts", "A message"));
+    await a.promise;
+    expect(render()).toContain("▼ src/B.ts");
+    expect(render()).toContain("B message");
+    expect(render()).not.toContain("A message");
+  });
+
+  it("does not render or restart work after disposal", async () => {
+    const pending = deferred<CiDiagnosticDetails>();
+    const { dialog, deps } = setup(data(), { fetchDetailedDiagnostics: () => pending.promise });
+    dialog.handleInput("\r");
+    dialog.dispose();
+    const renderCount = vi.mocked(deps.tui.requestRender).mock.calls.length;
+    pending.resolve(details("src/A.ts", "late response"));
+    await pending.promise;
+    expect(deps.tui.requestRender).toHaveBeenCalledTimes(renderCount);
+    expect(dialog.handleInput("\r")).toBe(false);
+  });
+
+  it("shows detail failures and stale detail data instead of silently reporting an empty result", async () => {
+    const fetch = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("snapshot read failed"))
+      .mockResolvedValueOnce(details("src/A.ts", "old message", false));
+    const { dialog, render } = setup(data(), { fetchDetailedDiagnostics: fetch });
+    dialog.handleInput("\r");
+    await vi.waitFor(() => expect(render()).toContain("Details unavailable: snapshot read failed"));
+    dialog.handleInput("a");
+    dialog.handleInput("\r");
+    await vi.waitFor(() => expect(render()).toContain("old message"));
+    expect(render()).toContain("Diagnostic details are stale");
+  });
+
+  it("matches runtime-relative details to an absolute summary file", async () => {
+    const { dialog, render } = setup(data({ diagnostics: observation(["/project/src/A.ts"]) }), {
+      fetchDetailedDiagnostics: () => details("src/A.ts", "matching message"),
     });
+    dialog.handleInput("\r");
+    await vi.waitFor(() => expect(render()).toContain("matching message"));
+  });
+
+  it("retains the previous snapshot after reload failure and coalesces repeated reloads", async () => {
+    const pending = deferred<CiStatusData>();
+    const refresh = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("reload failed"))
+      .mockReturnValueOnce(pending.promise);
+    const { dialog, render } = setup(data(), { onRefresh: refresh });
+    dialog.handleInput("r");
+    await vi.waitFor(() => expect(render()).toContain("Reload failed: reload failed"));
+    expect(render()).toContain("src/A.ts");
+    dialog.handleInput("r");
+    dialog.handleInput("r");
+    expect(refresh).toHaveBeenCalledTimes(2);
+    pending.resolve(data({ diagnostics: observation(["src/new.ts"]) }));
+    await vi.waitFor(() => expect(render()).toContain("src/new.ts"));
+    expect(render()).not.toContain("Reload failed");
+  });
+
+  it("preserves selection by file identity when reload reorders files", async () => {
+    const { dialog, render } = setup(data(), {
+      onRefresh: async () => data({ diagnostics: observation(["src/B.ts", "src/A.ts"]) }),
+    });
+    dialog.handleInput("j");
+    dialog.handleInput("r");
+    await vi.waitFor(() => expect(render()).toContain("▶ src/B.ts"));
+    dialog.handleInput("\r");
+    expect(render()).toContain("▼ src/B.ts");
+  });
+
+  it("discloses stale nonempty diagnostic evidence beside the file list", () => {
+    const { render } = setup(data({ diagnostics: observation(files, false) }));
+    expect(render()).toContain("diagnostic snapshot is stale or incomplete");
+    expect(render()).toContain("0/2 confirmed tracked files");
+    expect(render()).toContain("src/A.ts");
+    expect(render()).not.toContain("no issues");
+  });
+
+  it("distinguishes no tracked documents from confirmed clean tracked files", () => {
+    const empty = observation([]);
+    const unknown = setup(data({ diagnostics: empty })).render();
+    expect(unknown).toContain("No confirmed tracked files");
+    expect(unknown).not.toContain("no issues");
+    const clean = setup(
+      data({ diagnostics: { ...observation(["src/clean.ts"]), entries: [] } }),
+    ).render();
+    expect(clean).toContain("no issues in 1 confirmed tracked files");
+    expect(clean).toContain("not a workspace-wide check");
+  });
+
+  it("preserves disabled capability state and does not infer refactor support from provider presence", () => {
+    const { render } = setup(
+      data({
+        capabilities: {
+          semantic: { kind: "disabled", reason: "Disabled by configuration" },
+          structural: { kind: "ready" },
+        },
+        servers: [
+          {
+            ...server,
+            ready: false,
+            operationSupport: { rename_symbol: { server: "not-advertised", supi: "supported" } },
+          },
+        ],
+      }),
+    );
+    expect(render()).toContain("Semantic: disabled");
+    expect(render()).toContain("typescript: starting");
+    expect(render()).toContain("rename_symbol: server not-advertised; SuPi supported");
+    expect(render()).not.toContain("Refactor: available");
+  });
+
+  it("keeps recovery reasons, warnings and the entire active tool list reachable", () => {
+    const { render } = setup(
+      data({
+        servers: [
+          {
+            ...server,
+            status: "error",
+            ready: false,
+            statusReason: "process-crash-recovery-exhausted",
+          },
+        ],
+        capabilityWarnings: {
+          hasWarnings: true,
+          warnings: [{ type: "missing-server", language: "python", message: "Server missing" }],
+        },
+        activeTools: ["code_orientation", "code_graph", "code_find", "code_health"],
+      }),
+    );
+    expect(render()).toContain("process recovery exhausted");
+    expect(render()).toContain("python: Server missing");
+    expect(render()).toContain("code_health");
+  });
+
+  it("fits narrow widths using visible columns, including wide paths", () => {
+    const { dialog, deps } = setup(data({ diagnostics: observation(["src/日本語.ts"]) }));
+    deps.tui.terminal.rows = 12;
+    for (const line of dialog.render(32)) expect(visibleWidth(line)).toBeLessThanOrEqual(32);
+    expect(dialog.render(32).length).toBeLessThanOrEqual(10);
+    expect(dialog.render(32).join("\n")).toContain("esc close");
   });
 });

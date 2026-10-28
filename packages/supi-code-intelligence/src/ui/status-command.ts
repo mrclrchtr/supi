@@ -1,31 +1,11 @@
-// Code Intelligence status command — toggleable center dialog with persistent
-// status bar, custom footer, and below-editor widget for LSP + structural awareness.
-
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth } from "@earendil-works/pi-tui";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import {
-  type AutomaticLspPathPolicy,
-  getWorkspaceLspRuntime,
-  type WorkspaceLspRuntimeState,
-} from "@mrclrchtr/supi-lsp/api";
-import {
-  type CapabilityWarningMissingServerSource,
-  evaluateCapabilityWarnings,
-  gatherCapabilityWarningInput,
-} from "../analysis/capability/capability-warnings.ts";
-import { countProjectServerRouteStatuses } from "../analysis/health/server-status.ts";
-import { type CiStatusData, createCiStatusDialog } from "./status-overlay.ts";
+import { type AutomaticLspPathPolicy, getWorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
+import type { CapabilityWarningMissingServerSource } from "../analysis/capability/capability-warnings.ts";
+import { observeWorkspaceStatus } from "../analysis/health/status.ts";
+import { type CiStatusDialog, createCiStatusDialog } from "./status-overlay.ts";
 
-const STATUS_KEY = "code-intelligence";
-const WIDGET_KEY = "code-intelligence";
-
-interface InspectorState {
-  handle: unknown;
-  close: (() => void) | null;
-}
-
-/** Owned LSP facts used by the status warning collector. */
+/** Owned LSP facts used by the passive status warning collector. */
 export interface CiStatusWarningSource {
   get(cwd: string): {
     lspController: CapabilityWarningMissingServerSource | null;
@@ -33,317 +13,104 @@ export interface CiStatusWarningSource {
   };
 }
 
-/** Register the interactive /supi-ci-status overlay command. */
+async function collectStatusData(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  homeDir?: string,
+  warningSource?: CiStatusWarningSource,
+) {
+  const workspace = getDefaultWorkspaceRuntime().getWorkspace(ctx.cwd);
+  const facts = warningSource?.get(ctx.cwd);
+  return {
+    ...(await observeWorkspaceStatus({
+      cwd: ctx.cwd,
+      lspState: getWorkspaceLspRuntime(ctx.cwd),
+      semanticState: workspace.semantic.state,
+      structuralState: workspace.structural.state,
+      projectTrusted: ctx.isProjectTrusted(),
+      homeDir,
+      lspController: facts?.lspController,
+      automaticPathPolicy: facts?.automaticPathPolicy,
+    })),
+    activeTools: pi.getActiveTools().filter((tool) => tool.startsWith("code_")),
+  };
+}
+
+function readDiagnosticDetails(cwd: string) {
+  const lsp = getWorkspaceLspRuntime(cwd);
+  if (lsp.kind !== "ready") throw new Error("LSP diagnostics are unavailable");
+  return lsp.runtime.getOutstandingDiagnostics(2);
+}
+
+interface StatusInteraction {
+  cancelled: boolean;
+  close?: () => void;
+  dialog?: CiStatusDialog;
+}
+
+/** Register the terminal inspector. Persistent footer contributions have a separate owner. */
 export function registerCiStatusCommand(
   pi: ExtensionAPI,
   homeDir?: string,
   warningSource?: CiStatusWarningSource,
 ): void {
-  const inspector: InspectorState = { handle: null, close: null };
+  let interaction: StatusInteraction | undefined;
+  const close = () => {
+    if (!interaction) return;
+    interaction.cancelled = true;
+    interaction.dialog?.dispose();
+    interaction.close?.();
+  };
+  pi.on("session_shutdown", close);
+  pi.on("session_start", close);
+
   pi.registerCommand("supi-ci-status", {
-    description: "Toggle code intelligence status — LSP and structural analysis state",
-    handler: async (_args: string, ctx: ExtensionContext) => {
-      if (inspector.close) {
-        inspector.close();
+    description: "Toggle the code intelligence inspector (passive health snapshot)",
+    handler: async (_args, ctx) => {
+      if (ctx.mode !== "tui") {
+        ctx.ui.notify(
+          "The status inspector requires a terminal UI. Use code_health instead.",
+          "warning",
+        );
         return;
       }
-
-      const dataRef = {
-        current: await gatherCiStatusData({
-          cwd: ctx.cwd,
-          pi,
-          projectTrusted: ctx.isProjectTrusted(),
-          homeDir,
-          warningSource,
-        }),
-      };
-      updateStatusAndWidget(ctx, dataRef.current);
-
-      // Custom footer while overlay is open — reads latest data via ref
-      ctx.ui.setFooter((_tui, _theme) => ({
-        render(width: number): string[] {
-          return [truncateFooterLine(renderFooterLine(ctx, dataRef.current), width)];
-        },
-        invalidate(): void {},
-      }));
-
-      void ctx.ui
-        .custom<void>(
-          (tui, theme, _kb, done) => {
-            inspector.close = () => done(undefined);
-            return createCiStatusDialog(dataRef.current, {
-              theme: theme as unknown as import("./status-overlay.ts").CiDialogTheme,
-              done: () => done(undefined),
+      if (interaction) {
+        close();
+        return;
+      }
+      const current: StatusInteraction = { cancelled: false };
+      interaction = current;
+      const observe = () => collectStatusData(pi, ctx, homeDir, warningSource);
+      try {
+        const data = await observe();
+        if (current.cancelled) return;
+        await ctx.ui.custom<void>(
+          (tui, theme, keybindings, done) => {
+            current.close = () => done(undefined);
+            const dialog = createCiStatusDialog(data, {
               tui,
-              fetchDetailedDiagnostics: async (maxSeverity) => {
-                const lspState = getWorkspaceLspRuntime(ctx.cwd);
-                if (lspState.kind !== "ready") return [];
-                return lspState.runtime.getOutstandingDiagnostics(maxSeverity).entries;
-              },
-              onRefresh: async () => {
-                const fresh = await gatherCiStatusData({
-                  cwd: ctx.cwd,
-                  pi,
-                  projectTrusted: ctx.isProjectTrusted(),
-                  homeDir,
-                  warningSource,
-                });
-                dataRef.current = fresh;
-                updateStatusAndWidget(ctx, fresh);
-                return fresh;
-              },
+              theme,
+              keybindings,
+              done: current.close,
+              onRefresh: observe,
+              fetchDetailedDiagnostics: () => readDiagnosticDetails(ctx.cwd),
             });
+            current.dialog = dialog;
+            if (current.cancelled) current.close();
+            return dialog;
           },
           {
             overlay: true,
-            overlayOptions: {
-              anchor: "center",
-              width: "66%",
-              minWidth: 60,
-              maxHeight: "85%",
-              visible: (termWidth: number) => termWidth >= 60,
-            },
-            onHandle: (handle) => {
-              inspector.handle = handle;
-            },
+            overlayOptions: { anchor: "center", width: "85%", maxHeight: "85%" },
           },
-        )
-        .finally(() => {
-          inspector.handle = null;
-          inspector.close = null;
-          clearStatusAndWidget(ctx);
-          ctx.ui.setFooter(undefined);
-        });
+        );
+      } catch (error) {
+        if (!current.cancelled)
+          ctx.ui.notify(`Unable to open code intelligence status: ${String(error)}`, "error");
+      } finally {
+        current.dialog?.dispose();
+        if (interaction === current) interaction = undefined;
+      }
     },
   });
-}
-
-/** Inputs for one status dialog snapshot. */
-interface GatherCiStatusOptions {
-  cwd: string;
-  pi: ExtensionAPI;
-  projectTrusted: boolean;
-  homeDir?: string;
-  warningSource?: CiStatusWarningSource;
-}
-
-/** Gather a snapshot of LSP and structural state for the dialog. */
-async function gatherCiStatusData(options: GatherCiStatusOptions): Promise<CiStatusData> {
-  const { cwd, pi, projectTrusted, homeDir, warningSource } = options;
-  const workspace = getDefaultWorkspaceRuntime().getWorkspace(cwd);
-  const lspState = getWorkspaceLspRuntime(cwd);
-  const serverInventoryAvailable = lspState.kind === "ready" || lspState.kind === "disabled";
-  const servers = lspState.kind === "ready" ? lspState.runtime.getProjectServers() : [];
-  const semanticAvailable = servers.some(
-    (server) => server.status === "running" && server.ready === true,
-  );
-  const diagnosticSnapshot =
-    lspState.kind === "ready" && semanticAvailable
-      ? lspState.runtime.getOutstandingDiagnosticSummary(1)
-      : { entries: [], current: false };
-  const diagnostics = diagnosticSnapshot.entries;
-  const semanticState = deriveSemanticCapabilityState(workspace, lspState, semanticAvailable);
-
-  // Sort: errors desc, warnings desc, info desc, hints desc
-  diagnostics.sort((a, b) => {
-    if (b.errors !== a.errors) return b.errors - a.errors;
-    if (b.warnings !== a.warnings) return b.warnings - a.warnings;
-    if (b.information !== a.information) return b.information - a.information;
-    return b.hints - a.hints;
-  });
-
-  const structState = workspace.structural.state;
-  const structKind = structState.kind;
-  const structReason = structState.kind === "unavailable" ? structState.reason : undefined;
-
-  const activeTools = pi.getActiveTools().filter((t) => t.startsWith("code_"));
-
-  // Evaluate current Capability Warnings from available data.
-  const warningFacts = warningSource?.get(cwd);
-  const capabilityWarnings = evaluateCapabilityWarnings(
-    gatherCapabilityWarningInput(cwd, warningFacts?.lspController ?? null, {
-      projectTrusted,
-      homeDir,
-      automaticPathPolicy: warningFacts?.automaticPathPolicy ?? undefined,
-    }),
-  );
-
-  return {
-    workspaceRoot: cwd,
-    servers,
-    diagnostics,
-    serverInventoryAvailable,
-    semanticAvailable,
-    diagnosticSnapshotCurrent: diagnosticSnapshot.current,
-    capabilities: {
-      semantic: semanticState,
-      structural: {
-        kind: structKind,
-        reason: structReason,
-        providerAvailable: structState.kind === "ready",
-      },
-      refactorAvailable: workspace.semantic.refactorAvailable,
-    },
-    activeTools,
-    capabilityWarnings: capabilityWarnings.hasWarnings ? capabilityWarnings : undefined,
-  };
-}
-
-function deriveSemanticCapabilityState(
-  workspace: {
-    semantic: {
-      state: { kind: string };
-      provider: unknown | null;
-    };
-  },
-  lspState: WorkspaceLspRuntimeState,
-  semanticAvailable: boolean,
-): CiStatusData["capabilities"]["semantic"] {
-  if (lspState.kind === "ready") {
-    return semanticAvailable
-      ? {
-          kind: "ready",
-          providerAvailable: workspace.semantic.provider !== null,
-        }
-      : {
-          kind: "pending",
-          reason: "No active, ready project servers",
-          providerAvailable: workspace.semantic.provider !== null,
-        };
-  }
-  if (workspace.semantic.state.kind === "pending" || lspState.kind === "pending") {
-    return {
-      kind: "pending",
-      providerAvailable: workspace.semantic.provider !== null,
-    };
-  }
-  if (lspState.kind === "inactive") {
-    return { kind: "inactive", providerAvailable: workspace.semantic.provider !== null };
-  }
-  if (lspState.kind === "disabled") {
-    return {
-      kind: "disabled",
-      reason: "LSP is disabled in settings",
-      providerAvailable: workspace.semantic.provider !== null,
-    };
-  }
-  return {
-    kind: workspace.semantic.state.kind,
-    reason: "reason" in lspState ? lspState.reason : "No LSP service",
-    providerAvailable: workspace.semantic.provider !== null,
-  };
-}
-
-/** Render the custom footer line. */
-function renderFooterLine(ctx: ExtensionContext, data: CiStatusData): string {
-  const t = ctx.ui.theme;
-  const parts: string[] = [];
-  const running = data.servers.filter((s) => s.status === "running").length;
-  if (running > 0) {
-    parts.push(
-      t.fg("accent", "λ ci") + t.fg("dim", ` ${running} server${running === 1 ? "" : "s"}`),
-    );
-  }
-  const totalErrors = data.diagnostics.reduce((sum, d) => sum + d.errors, 0);
-  if (totalErrors > 0) {
-    parts.push(t.fg("error", `${totalErrors} error${totalErrors === 1 ? "" : "s"}`));
-  }
-  const totalWarnings = data.diagnostics.reduce((sum, d) => sum + d.warnings, 0);
-  if (totalWarnings > 0) {
-    parts.push(t.fg("warning", `${totalWarnings} warning${totalWarnings === 1 ? "" : "s"}`));
-  }
-  addProjectServerRouteCounts(parts, data, t);
-  const structKind = data.capabilities.structural.kind;
-  if (structKind === "ready") parts.push(t.fg("success", "✓ ts"));
-  if (parts.length === 0) return t.fg("dim", "CI — no data available");
-  return parts.join(t.fg("dim", "  "));
-}
-
-function addProjectServerRouteCounts(
-  parts: string[],
-  data: CiStatusData,
-  theme: ExtensionContext["ui"]["theme"],
-): void {
-  const counts = countProjectServerRouteStatuses(data.servers);
-  if (counts.recovering > 0) {
-    parts.push(
-      theme.fg(
-        "warning",
-        `${counts.recovering} route${counts.recovering === 1 ? "" : "s"} recovering`,
-      ),
-    );
-  }
-  if (counts.error > 0) {
-    parts.push(theme.fg("error", `${counts.error} route error${counts.error === 1 ? "" : "s"}`));
-  }
-  if (counts.unavailable > 0) {
-    parts.push(
-      theme.fg(
-        "warning",
-        `${counts.unavailable} route${counts.unavailable === 1 ? "" : "s"} unavailable`,
-      ),
-    );
-  }
-}
-
-function truncateFooterLine(line: string, width: number): string {
-  return truncateToWidth(line, width, "…");
-}
-
-/** Update the persistent status bar and below-editor widget. */
-function updateStatusAndWidget(ctx: ExtensionContext, data: CiStatusData): void {
-  const t = ctx.ui.theme;
-
-  // Status bar: concise one-liner
-  const parts: string[] = [t.fg("accent", "λ ci")];
-  const runningServers = data.servers.filter((s) => s.status === "running").length;
-  if (runningServers > 0) {
-    parts.push(t.fg("dim", `${runningServers} server${runningServers === 1 ? "" : "s"}`));
-  }
-  const totalErrors = data.diagnostics.reduce((sum, d) => sum + d.errors, 0);
-  if (totalErrors > 0) {
-    parts.push(t.fg("error", `${totalErrors} error${totalErrors === 1 ? "" : "s"}`));
-  }
-  const totalWarnings = data.diagnostics.reduce((sum, d) => sum + d.warnings, 0);
-  if (totalWarnings > 0) {
-    parts.push(t.fg("warning", `${totalWarnings} warning${totalWarnings === 1 ? "" : "s"}`));
-  }
-  addProjectServerRouteCounts(parts, data, t);
-  const structKind = data.capabilities.structural.kind;
-  if (structKind === "ready") parts.push(t.fg("success", "✓ ts"));
-
-  const statusText = parts.length > 1 ? parts.join(t.fg("dim", " · ")) : undefined;
-  ctx.ui.setStatus(STATUS_KEY, statusText);
-
-  // Widget (below editor) — top problem files
-  if (data.diagnostics.length > 0) {
-    const top = data.diagnostics.slice(0, 2);
-    const fileLines = top.map((d) => {
-      const counts: string[] = [];
-      if (d.errors > 0) {
-        counts.push(t.fg("error", `${d.errors} error${d.errors === 1 ? "" : "s"}`));
-      }
-      if (d.warnings > 0) {
-        counts.push(t.fg("warning", `${d.warnings} warning${d.warnings === 1 ? "" : "s"}`));
-      }
-      return `  ${d.file} (${counts.join(", ")})`;
-    });
-    const more = data.diagnostics.length - top.length;
-    const moreSuffix = more > 0 ? t.fg("dim", ` +${more} more`) : "";
-    ctx.ui.setWidget(
-      WIDGET_KEY,
-      [
-        t.fg("accent", `λ CI — ${data.diagnostics.length} files with issues`) + moreSuffix,
-        ...fileLines,
-      ],
-      { placement: "belowEditor" },
-    );
-  } else {
-    ctx.ui.setWidget(WIDGET_KEY, undefined);
-  }
-}
-
-function clearStatusAndWidget(ctx: ExtensionContext): void {
-  ctx.ui.setStatus(STATUS_KEY, undefined);
-  ctx.ui.setWidget(WIDGET_KEY, undefined);
 }

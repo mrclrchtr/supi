@@ -20,6 +20,7 @@ import {
   isScopedFile,
 } from "../analysis/health/diagnostics.ts";
 import { describeStructuralState } from "../analysis/health/recovery.ts";
+import { deriveWorkspaceSemanticHealthState } from "../analysis/health/semantic-state.ts";
 import { collectServers } from "../analysis/health/signals.ts";
 import { SEMANTIC_READINESS_TIMEOUT_REASON } from "../analysis/readiness.ts";
 import { resolveScope } from "../analysis/search/paths.ts";
@@ -175,55 +176,19 @@ async function establishSemanticHealthState(
             options.control,
           )
         : null);
-    if (!readiness) return deriveNonReadySemanticState(options.lspState, options.capabilityState);
+    if (!readiness)
+      return deriveWorkspaceSemanticHealthState(options.lspState, options.capabilityState, []);
     if (readiness.kind === "ready") return { kind: "ready" };
     if (readiness.kind === "timeout") {
       return { kind: "pending", reason: SEMANTIC_READINESS_TIMEOUT_REASON };
     }
     return { kind: "unavailable", reason: readiness.reason };
   }
-  if (
-    options.runtime
-      ?.getProjectServers()
-      .some((server) => server.status === "running" && server.ready === true)
-  ) {
-    return { kind: "ready" };
-  }
-  return deriveNonReadySemanticState(options.lspState, options.capabilityState);
-}
-
-function deriveNonReadySemanticState(
-  lspState: WorkspaceLspRuntimeState,
-  capabilityState: CapabilityState,
-): Exclude<SemanticHealthState, { kind: "ready" }> {
-  switch (lspState.kind) {
-    case "pending":
-      return { kind: "pending", reason: "LSP is starting" };
-    case "inactive":
-      return { kind: "inactive", reason: "Inactive on the current session branch" };
-    case "disabled":
-      return { kind: "disabled", reason: "Disabled by configuration" };
-    case "unavailable":
-      return { kind: "unavailable", reason: lspState.reason };
-    case "ready":
-      return deriveReadyOwnerWithoutServerState(capabilityState);
-  }
-}
-
-function deriveReadyOwnerWithoutServerState(
-  capabilityState: CapabilityState,
-): Exclude<SemanticHealthState, { kind: "ready" }> {
-  switch (capabilityState.kind) {
-    case "inactive":
-      return { kind: "inactive", reason: "Inactive on the current session branch" };
-    case "disabled":
-      return { kind: "disabled", reason: "Disabled by configuration" };
-    case "unavailable":
-      return { kind: "unavailable", reason: capabilityState.reason };
-    case "pending":
-    case "ready":
-      return { kind: "pending", reason: "No active, ready project servers" };
-  }
+  return deriveWorkspaceSemanticHealthState(
+    options.lspState,
+    options.capabilityState,
+    options.runtime?.getProjectServers() ?? [],
+  );
 }
 
 function collectCapabilityWarnings(

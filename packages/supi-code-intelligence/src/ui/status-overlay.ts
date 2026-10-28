@@ -1,563 +1,580 @@
-// Code Intelligence status dialog — toggleable center overlay showing LSP + Tree-sitter
-// status, expandable per-file diagnostics, and active code_* tool surface.
-
-import { DynamicBorder } from "@earendil-works/pi-coding-agent";
+import { relative, resolve } from "node:path";
+import { DynamicBorder, type Theme } from "@earendil-works/pi-coding-agent";
 import {
   Container,
+  getKeybindings,
   Key,
+  type KeybindingsManager,
   matchesKey,
+  ScrollView,
   Spacer,
   Text,
   truncateToWidth,
-  visibleWidth,
 } from "@earendil-works/pi-tui";
 import { BRAILLE_SPINNER_FRAMES } from "@mrclrchtr/supi-core/spinner-frames";
-import type {
-  Diagnostic,
-  OutstandingDiagnosticSummaryEntry,
-  ProjectServerInfo,
-} from "@mrclrchtr/supi-lsp/api";
-import type { CapabilityWarningReport } from "../analysis/capability/capability-warnings.ts";
+import type { Diagnostic, ProjectServerInfo } from "@mrclrchtr/supi-lsp/api";
 import {
   countProjectServerRouteStatuses,
-  formatProjectServerOperationSupport,
   formatProjectServerRoot,
   formatProjectServerStatusReason,
 } from "../analysis/health/server-status.ts";
+import type { WorkspaceStatusSnapshot } from "../analysis/health/status.ts";
+import type { HealthDiagnosticEntry } from "../session/health-types.ts";
 import { diagnosticMessageString } from "../substrate/lsp/utils.ts";
 
-/**
- * Minimal theme contract used by the dialog. Matches the public `theme.fg()` /
- * `theme.bold()` shape exposed by `@earendil-works/pi-tui` — the full Theme
- * type is internal to pi-coding-agent and not re-exported.
- */
-export interface CiDialogTheme {
-  fg: (color: string, text: string) => string;
-  bg?: (color: string, text: string) => string;
-  bold: (text: string) => string;
+/** Passive health facts plus the session's active tool surface. */
+export interface CiStatusData extends WorkspaceStatusSnapshot {
+  readonly activeTools: readonly string[];
 }
 
-export interface CiStatusData {
-  /** Canonical workspace root used to display LSP route roots. */
-  workspaceRoot: string;
-  servers: ProjectServerInfo[];
-  /** Whether the server list is complete status evidence. */
-  serverInventoryAvailable: boolean;
-  /** Whether diagnostics and semantic absence claims are currently supported. */
-  semanticAvailable: boolean;
-  /** Whether tracked-file diagnostic counts prove the current document and workspace state. */
-  diagnosticSnapshotCurrent: boolean;
-  /** Sorted: errors desc, then warnings desc, then info desc, then hints desc. */
-  diagnostics: OutstandingDiagnosticSummaryEntry[];
-  capabilities: {
-    semantic: { kind: string; reason?: string; providerAvailable: boolean };
-    structural: { kind: string; reason?: string; providerAvailable: boolean };
-    refactorAvailable: boolean;
-  };
-  activeTools: string[];
-  /** Supplemental Capability Warnings. Undefined when fully healthy. */
-  capabilityWarnings?: CapabilityWarningReport;
+/** Full error/warning messages retain freshness independently from the summary. */
+export interface CiDiagnosticDetails {
+  readonly current: boolean;
+  readonly entries: readonly {
+    readonly file: string;
+    readonly diagnostics: readonly Diagnostic[];
+  }[];
 }
 
-/** Fetcher for full diagnostic details when a file row is expanded. */
-export type DiagFetcher = (
-  maxSeverity: number,
-) =>
-  | Array<{ file: string; diagnostics: Diagnostic[] }>
-  | Promise<Array<{ file: string; diagnostics: Diagnostic[] }>>;
-
+/** Dependencies owned by one terminal interaction. Reload is passive, not LSP recovery. */
 export interface CiStatusDialogDeps {
-  theme: CiDialogTheme;
+  theme: Pick<Theme, "fg" | "bold">;
   done: () => void;
-  tui: { requestRender: () => void };
-  /** Async fetcher for full diagnostics on expand. Optional. */
-  fetchDetailedDiagnostics?: DiagFetcher;
-  /** Refresh callback — re-fetches data when 'r' is pressed. */
+  tui: { terminal: { rows: number }; requestRender: () => void };
+  keybindings?: KeybindingsManager;
+  fetchDetailedDiagnostics?: () => CiDiagnosticDetails | Promise<CiDiagnosticDetails>;
   onRefresh?: () => Promise<CiStatusData>;
 }
 
-const MAX_FILES_IN_LIST = 10;
+type DetailState =
+  | { kind: "loading" }
+  | { kind: "ready"; diagnostics: readonly Diagnostic[]; current: boolean }
+  | { kind: "error"; message: string };
 const MAX_INLINE_MESSAGES = 5;
 const MAX_OPEN_FILES_SHOWN = 3;
-const SPINNER_INTERVAL_MS = 80;
+const FRAME_ROWS = 6;
+const STATUS_ACTIONS = [
+  "tui.select.cancel",
+  "tui.select.up",
+  "tui.select.down",
+  "tui.select.confirm",
+  "tui.select.pageUp",
+  "tui.select.pageDown",
+] as const;
 
+/** A bounded inspector with file-keyed selection and interaction-local asynchronous work. */
 export class CiStatusDialog {
-  private selectedFileIdx = 0;
-  private expandedFileIdx: number | null = null;
-  private expandedDiagnostics: Diagnostic[] | null = null;
-  private cachedWidth: number | undefined;
-  private cachedLines: string[] | undefined;
-  private spinnerInterval: ReturnType<typeof setInterval> | null = null;
+  private selectedFile: string | undefined;
+  private expandedFile: string | undefined;
+  private details: DetailState | undefined;
+  private detailGeneration = 0;
+  private refreshGeneration = 0;
+  private refreshing = false;
+  private refreshError: string | undefined;
+  private disposed = false;
+  private spinner: ReturnType<typeof setInterval> | undefined;
   private spinnerFrame = 0;
-  private loading = false;
+  private cachedWidth: number | undefined;
+  private cachedHeight: number | undefined;
+  private cachedLines: string[] | undefined;
+  private bodyLines: string[] = [];
+  private selectedRow = 0;
+  private expandedRows = 1;
+  private revealSelection = false;
+  private readonly scroll = new ScrollView({ render: () => this.bodyLines, invalidate() {} });
+  private readonly keybindings: KeybindingsManager;
 
   constructor(
     private data: CiStatusData,
-    deps: CiStatusDialogDeps,
+    private readonly deps: CiStatusDialogDeps,
   ) {
-    this.theme = deps.theme;
-    this.done = deps.done;
-    this.tui = deps.tui;
-    this.fetchDetailedDiagnostics = deps.fetchDetailedDiagnostics;
-    this.onRefresh = deps.onRefresh;
+    this.selectedFile = data.diagnostics.entries[0]?.file;
+    this.keybindings = deps.keybindings ?? getKeybindings();
   }
 
-  /** Called by pi-tui when the overlay is removed. */
+  /** Invalidate in-flight work before releasing the spinner and terminal interaction. */
   dispose(): void {
+    this.disposed = true;
+    this.detailGeneration++;
+    this.refreshGeneration++;
     this.stopSpinner();
   }
 
   render(width: number): string[] {
-    if (this.cachedLines && this.cachedWidth === width) {
+    const height = Math.max(1, Math.floor(this.deps.tui.terminal.rows * 0.85));
+    if (this.cachedLines && this.cachedWidth === width && this.cachedHeight === height)
       return this.cachedLines;
+    if (height <= FRAME_ROWS)
+      return [truncateToWidth(`CI · ${this.keyLabel("tui.select.cancel")} close`, width)];
+    const bodyHeight = height - FRAME_ROWS;
+    const resized =
+      this.cachedHeight !== undefined &&
+      (this.cachedHeight !== height || this.cachedWidth !== width);
+    this.bodyLines = this.renderBody(width);
+    this.scroll.updateLayout(this.bodyLines.length, bodyHeight, () =>
+      this.deps.tui.requestRender(),
+    );
+    if ((this.revealSelection || resized) && this.selectedFile) {
+      const end = this.selectedRow + Math.min(this.expandedRows, bodyHeight) - 1;
+      if (this.selectedRow < this.scroll.scrollTop) this.scroll.scrollTo(this.selectedRow);
+      else if (end >= this.scroll.scrollTop + bodyHeight)
+        this.scroll.scrollTo(end - bodyHeight + 1);
     }
-    const container = new Container();
-    container.addChild(new DynamicBorder((s: string) => this.theme.fg("accent", s)));
-    container.addChild(new Text(this.renderHeader(), 1, 0));
-    container.addChild(new Spacer(1));
-    container.addChild(new Text(this.renderSummaryLine(width), 1, 0));
-    container.addChild(new Spacer(1));
-    this.addServerSection(container);
-    container.addChild(new Spacer(1));
-    this.addProblemsSection(container, width);
-    container.addChild(new Spacer(1));
-    this.addCapabilitiesSection(container);
-    this.addCapabilityWarningsSection(container);
-    this.addToolsSection(container, width);
-    container.addChild(new Text(this.renderKeyHints(), 1, 0));
-    container.addChild(new DynamicBorder((s: string) => this.theme.fg("accent", s)));
-
-    const lines = container.render(width).map((line) => truncateToWidth(line, width));
+    this.revealSelection = false;
+    const t = this.deps.theme;
+    const border = new DynamicBorder((s) => t.fg("accent", s)).render(width)[0] ?? "";
+    const position =
+      this.bodyLines.length > bodyHeight
+        ? ` · ${this.scroll.scrollTop + 1}–${Math.min(this.scroll.scrollTop + bodyHeight, this.bodyLines.length)}/${this.bodyLines.length}`
+        : "";
+    // Pi's overlay adapter only calls render(width), not the fullscreen layout engine.
+    // ScrollView owns offsets/clamping; apply its viewport explicitly for this adapter.
+    const lines = [
+      border,
+      t.fg("accent", t.bold("◆ Code Intelligence")) + t.fg("dim", " · /supi-ci-status"),
+      this.summaryLine(),
+      ...this.scroll.render(width).slice(this.scroll.scrollTop, this.scroll.scrollTop + bodyHeight),
+      t.fg("dim", this.controlHints()),
+      t.fg(
+        "dim",
+        `${this.keyLabel("tui.select.up")}/${this.keyLabel("tui.select.down")} files · ${this.keyLabel("tui.select.pageUp")}/${this.keyLabel("tui.select.pageDown")} scroll · home/end${position}`,
+      ),
+      border,
+    ].map((line) => truncateToWidth(line, width));
     this.cachedWidth = width;
+    this.cachedHeight = height;
     this.cachedLines = lines;
     return lines;
   }
 
   invalidate(): void {
-    this.cachedWidth = undefined;
     this.cachedLines = undefined;
   }
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: single handler dispatching keyboard shortcuts
-  handleInput(data: string): boolean {
-    // ── Global actions ───────────────────────────────────────────────
-    if (matchesKey(data, Key.ctrl("c")) || matchesKey(data, Key.escape)) {
-      this.stopSpinner();
-      this.done();
+  handleInput(input: string): boolean {
+    if (this.disposed) return false;
+    if (this.keybindings.matches(input, "tui.select.cancel")) {
+      this.dispose();
+      this.deps.done();
       return true;
     }
+    return (
+      this.handleScrollInput(input) ||
+      this.handleFileInput(input) ||
+      this.handleShortcutInput(input)
+    );
+  }
 
-    if (data === "a") {
-      this.expandedFileIdx = null;
-      this.expandedDiagnostics = null;
-      this.stopSpinner();
-      this.invalidate();
-      this.tui.requestRender();
+  private handleShortcutInput(input: string): boolean {
+    if (input === "r" && this.deps.onRefresh) {
+      void this.reload();
       return true;
     }
-
-    if (data === "r" && this.onRefresh) {
-      void this.handleRefresh();
+    if (input === "a") {
+      this.collapse();
+      this.changed();
       return true;
     }
+    if (input === "j" || input === "k") return this.moveSelection(input === "k" ? -1 : 1);
+    if (matchesKey(input, Key.home)) this.scroll.scrollToStart();
+    else if (matchesKey(input, Key.end)) this.scroll.scrollToEnd();
+    else return false;
+    this.changed();
+    return true;
+  }
 
-    // ── Navigation ───────────────────────────────────────────────────
-    const fileCount = this.data.diagnostics.length;
-
-    if ((matchesKey(data, Key.up) || data === "k") && this.selectedFileIdx > 0) {
-      this.selectedFileIdx--;
-      this.invalidate();
-      this.tui.requestRender();
-      return true;
+  private handleScrollInput(input: string): boolean {
+    const pageUp = this.keybindings.matches(input, "tui.select.pageUp");
+    const pageDown = this.keybindings.matches(input, "tui.select.pageDown");
+    if (pageUp || pageDown) {
+      this.scroll.scrollBy((pageUp ? -1 : 1) * Math.max(1, this.scroll.viewportHeight - 1));
+    } else {
+      return false;
     }
+    this.changed();
+    return true;
+  }
 
-    if ((matchesKey(data, Key.down) || data === "j") && this.selectedFileIdx < fileCount - 1) {
-      this.selectedFileIdx++;
-      this.invalidate();
-      this.tui.requestRender();
-      return true;
-    }
-
-    if (
-      (matchesKey(data, Key.enter) || matchesKey(data, Key.space) || data === " ") &&
-      fileCount > 0
-    ) {
-      if (this.expandedFileIdx === this.selectedFileIdx) {
-        this.expandedFileIdx = null;
-        this.expandedDiagnostics = null;
-        this.stopSpinner();
-      } else {
-        this.expandedFileIdx = this.selectedFileIdx;
-        this.expandedDiagnostics = null;
-        void this.loadDetailedDiagnostics();
+  private handleFileInput(input: string): boolean {
+    const up = this.keybindings.matches(input, "tui.select.up");
+    const down = this.keybindings.matches(input, "tui.select.down");
+    if (up || down) return this.moveSelection(up ? -1 : 1);
+    if (this.keybindings.matches(input, "tui.select.confirm") || matchesKey(input, Key.space)) {
+      if (!this.selectedFile) return true;
+      if (this.expandedFile === this.selectedFile) this.collapse();
+      else {
+        this.collapse();
+        this.expandedFile = this.selectedFile;
+        void this.loadDetails(this.selectedFile);
       }
-      this.invalidate();
-      this.tui.requestRender();
+      this.revealSelection = true;
+      this.changed();
       return true;
     }
-
     return false;
   }
 
-  // ── Spinner ───────────────────────────────────────────────────────
+  private moveSelection(direction: number): boolean {
+    const files = this.data.diagnostics.entries;
+    const index = files.findIndex((entry) => entry.file === this.selectedFile);
+    const next = files[Math.max(0, Math.min(files.length - 1, index + direction))];
+    if (next) this.selectedFile = next.file;
+    this.revealSelection = true;
+    this.changed();
+    return true;
+  }
 
-  private startSpinner(): void {
-    if (this.spinnerInterval) return;
-    this.loading = true;
-    this.spinnerFrame = 0;
-    this.spinnerInterval = setInterval(() => {
-      this.spinnerFrame = (this.spinnerFrame + 1) % BRAILLE_SPINNER_FRAMES.length;
+  private collapse(): void {
+    this.detailGeneration++;
+    this.expandedFile = undefined;
+    this.details = undefined;
+    this.updateSpinner();
+  }
+
+  private async loadDetails(file: string): Promise<void> {
+    const fetch = this.deps.fetchDetailedDiagnostics;
+    if (!fetch) {
+      this.details = { kind: "error", message: "Diagnostic details are unavailable" };
+      return;
+    }
+    const generation = ++this.detailGeneration;
+    this.details = { kind: "loading" };
+    this.changed();
+    try {
+      const result = await fetch();
+      if (this.disposed || generation !== this.detailGeneration) return;
+      const entry = result.entries.find(
+        (entry) =>
+          resolve(this.data.workspaceRoot, entry.file) === resolve(this.data.workspaceRoot, file),
+      );
+      this.details = {
+        kind: "ready",
+        diagnostics: entry?.diagnostics ?? [],
+        current: result.current,
+      };
+    } catch (error) {
+      if (this.disposed || generation !== this.detailGeneration) return;
+      this.details = { kind: "error", message: errorText(error) };
+    }
+    if (!this.disposed && generation === this.detailGeneration) this.changed();
+  }
+
+  private async reload(): Promise<void> {
+    if (this.refreshing || !this.deps.onRefresh) return;
+    const generation = ++this.refreshGeneration;
+    this.refreshing = true;
+    this.refreshError = undefined;
+    this.collapse();
+    this.changed();
+    try {
+      const data = await this.deps.onRefresh();
+      if (this.disposed || generation !== this.refreshGeneration) return;
+      this.data = data;
+      if (!data.diagnostics.entries.some((entry) => entry.file === this.selectedFile))
+        this.selectedFile = data.diagnostics.entries[0]?.file;
+      this.collapse();
+      this.revealSelection = true;
+    } catch (error) {
+      if (this.disposed || generation !== this.refreshGeneration) return;
+      this.refreshError = errorText(error);
+    }
+    if (!this.disposed && generation === this.refreshGeneration) {
+      this.refreshing = false;
+      this.changed();
+    }
+  }
+
+  private changed(): void {
+    if (this.disposed) return;
+    this.updateSpinner();
+    this.invalidate();
+    this.deps.tui.requestRender();
+  }
+
+  private updateSpinner(): void {
+    if (this.disposed || (!this.refreshing && this.details?.kind !== "loading")) {
+      this.stopSpinner();
+      return;
+    }
+    if (this.spinner) return;
+    this.spinner = setInterval(() => {
+      this.spinnerFrame++;
       this.invalidate();
-      this.tui.requestRender();
-    }, SPINNER_INTERVAL_MS);
+      this.deps.tui.requestRender();
+    }, 80);
   }
 
   private stopSpinner(): void {
-    if (this.spinnerInterval) {
-      clearInterval(this.spinnerInterval);
-      this.spinnerInterval = null;
-    }
-    this.loading = false;
+    if (this.spinner) clearInterval(this.spinner);
+    this.spinner = undefined;
   }
 
-  // ── Async data loading ─────────────────────────────────────────────
-
-  private async handleRefresh(): Promise<void> {
-    if (!this.onRefresh) return;
-    this.startSpinner();
-    try {
-      this.data = await this.onRefresh();
-    } finally {
-      this.stopSpinner();
-    }
-    this.selectedFileIdx = Math.min(
-      this.selectedFileIdx,
-      Math.max(0, this.data.diagnostics.length - 1),
-    );
-    this.expandedFileIdx = null;
-    this.expandedDiagnostics = null;
-    this.invalidate();
-    this.tui.requestRender();
-  }
-
-  private async loadDetailedDiagnostics(): Promise<void> {
-    if (!this.fetchDetailedDiagnostics || this.expandedFileIdx === null) return;
-    const fileName = this.data.diagnostics[this.expandedFileIdx]?.file;
-    if (!fileName) return;
-    this.startSpinner();
-    try {
-      const detailed = await this.fetchDetailedDiagnostics(1);
-      const entry = detailed.find((d) => d.file === fileName);
-      this.expandedDiagnostics = entry?.diagnostics ?? [];
-    } catch {
-      this.expandedDiagnostics = [];
-    } finally {
-      this.stopSpinner();
-    }
-    this.invalidate();
-    this.tui.requestRender();
-  }
-
-  // ── Section builders ──────────────────────────────────────────────
-
-  private renderHeader(): string {
-    const accent = this.theme.fg("accent", this.theme.bold("◆ Code Intelligence"));
-    const hint = this.theme.fg("dim", "  /supi-ci-status toggles · ↑↓ nav · enter expand");
-    return truncateToWidth(accent + hint, 1000);
-  }
-
-  private renderKeyHints(): string {
-    return this.theme.fg("dim", "  r refresh  ·  a collapse all  ·  esc close");
-  }
-
-  private renderSummaryLine(width: number): string {
-    const parts = [
-      ...this.serverSummaryParts(),
-      ...this.diagnosticSummaryParts(),
-      ...this.routeSummaryParts(),
-      this.structuralSummaryPart(),
-    ];
-    const joined =
-      parts.length > 0
-        ? parts.join(this.theme.fg("dim", " · "))
-        : this.theme.fg("dim", "(no data)");
-    return truncateToWidth(joined, width);
-  }
-
-  private serverSummaryParts(): string[] {
-    const running = this.data.servers.filter((server) => server.status === "running").length;
-    return running > 0
-      ? [this.theme.fg("text", `${running} server${running === 1 ? "" : "s"}`)]
-      : [];
-  }
-
-  private diagnosticSummaryParts(): string[] {
-    const errors = this.data.diagnostics.reduce((sum, entry) => sum + entry.errors, 0);
-    const warnings = this.data.diagnostics.reduce((sum, entry) => sum + entry.warnings, 0);
-    return [
-      errors > 0 ? this.theme.fg("error", `${errors} error${errors === 1 ? "" : "s"}`) : null,
-      warnings > 0
-        ? this.theme.fg("warning", `${warnings} warning${warnings === 1 ? "" : "s"}`)
-        : null,
-    ].filter((part): part is string => part !== null);
-  }
-
-  private routeSummaryParts(): string[] {
+  private summaryLine(): string {
+    const t = this.deps.theme;
+    if (this.refreshError) return t.fg("error", `Reload failed: ${this.refreshError}`);
+    const ready = this.data.servers.filter(
+      (server) => server.status === "running" && server.ready,
+    ).length;
+    const starting = this.data.servers.filter(
+      (server) => server.status === "running" && !server.ready,
+    ).length;
     const counts = countProjectServerRouteStatuses(this.data.servers);
+    const entries = this.data.diagnostics.entries;
+    const errors = entries.reduce((sum, entry) => sum + entry.errors, 0);
+    const warnings = entries.reduce((sum, entry) => sum + entry.warnings, 0);
     return [
-      counts.recovering > 0
-        ? this.theme.fg(
+      `${ready} ready${starting ? ` · ${starting} starting` : ""}`,
+      errors ? t.fg("error", countLabel(errors, "error")) : "",
+      warnings ? t.fg("warning", countLabel(warnings, "warning")) : "",
+      counts.recovering
+        ? t.fg(
             "warning",
             `${counts.recovering} route${counts.recovering === 1 ? "" : "s"} recovering`,
           )
-        : null,
-      counts.error > 0
-        ? this.theme.fg("error", `${counts.error} route error${counts.error === 1 ? "" : "s"}`)
-        : null,
-      counts.unavailable > 0
-        ? this.theme.fg(
-            "warning",
-            `${counts.unavailable} route${counts.unavailable === 1 ? "" : "s"} unavailable`,
-          )
-        : null,
-    ].filter((part): part is string => part !== null);
+        : "",
+      counts.error ? t.fg("error", countLabel(counts.error, "route error")) : "",
+      counts.unavailable ? t.fg("warning", `${counts.unavailable} routes unavailable`) : "",
+      this.data.diagnostics.kind === "partial" ? t.fg("warning", "partial snapshot") : "",
+      this.refreshing ? t.fg("accent", `${this.frame()} reloading…`) : "",
+    ]
+      .filter(Boolean)
+      .join(t.fg("dim", " · "));
   }
 
-  private structuralSummaryPart(): string {
-    const kind = this.data.capabilities.structural.kind;
-    if (kind === "ready") return this.theme.fg("success", "✓ ts ready");
-    if (kind === "pending") return this.theme.fg("dim", "ts pending…");
-    return this.theme.fg("error", "ts unavailable");
-  }
-
-  private addServerSection(container: Container): void {
-    const t = this.theme;
-    container.addChild(new Text(t.fg("accent", t.bold(" Servers")), 1, 0));
-    if (this.data.servers.length === 0) {
-      this.addEmptyServerRow(container);
-      return;
+  private renderBody(width: number): string[] {
+    const t = this.deps.theme;
+    const body = new Container();
+    const text = (value: string) => body.addChild(new Text(value, 0, 0));
+    const heading = (value: string) => text(t.fg("accent", t.bold(value)));
+    heading("Capabilities");
+    this.addCapabilities(text);
+    body.addChild(new Spacer(1));
+    heading("Problems · tracked-file snapshot (not a workspace-wide check)");
+    this.addProblems(body, width, text);
+    body.addChild(new Spacer(1));
+    heading("Servers");
+    this.addServers(text);
+    if (this.data.capabilityWarnings?.hasWarnings) {
+      body.addChild(new Spacer(1));
+      heading("Capability Warnings");
+      this.addWarnings(text);
     }
-    for (const server of this.data.servers) {
-      this.addServerRow(container, server);
+    if (this.data.activeTools.length) {
+      body.addChild(new Spacer(1));
+      heading("Tools");
+      text(this.data.activeTools.join(", "));
+    }
+    return body.render(width);
+  }
+
+  private addCapabilities(text: (value: string) => void): void {
+    const t = this.deps.theme;
+    for (const [label, state] of Object.entries(this.data.capabilities)) {
+      const color =
+        state.kind === "ready" ? "success" : state.kind === "unavailable" ? "error" : "dim";
+      const reason = "reason" in state ? ` — ${state.reason}` : "";
+      text(
+        t.fg(
+          color,
+          `  ${label === "semantic" ? "Semantic" : "Structural"}: ${state.kind}${reason}`,
+        ),
+      );
+    }
+    text(t.fg("dim", "  Refactor: negotiated per route; see Servers"));
+  }
+
+  private addProblems(body: Container, width: number, text: (value: string) => void): void {
+    this.addDiagnosticEvidence(text);
+    if (this.refreshError) text(this.deps.theme.fg("error", `Reload failed: ${this.refreshError}`));
+    this.selectedRow = 0;
+    this.expandedRows = 1;
+    for (const entry of this.data.diagnostics.entries) this.addProblemRow(entry, body, width);
+  }
+
+  private addProblemRow(entry: HealthDiagnosticEntry, body: Container, width: number): void {
+    const text = (value: string) => body.addChild(new Text(value, 0, 0));
+    if (entry.file === this.selectedFile) this.selectedRow = body.render(width).length;
+    const indicator =
+      entry.file === this.expandedFile ? "▼" : entry.file === this.selectedFile ? "▶" : " ";
+    const label = relative(
+      this.data.workspaceRoot,
+      resolve(this.data.workspaceRoot, entry.file),
+    ).replaceAll("\\", "/");
+    text(`${indicator} ${label}  ${problemCounts(entry)}`);
+    if (entry.file === this.selectedFile)
+      this.expandedRows = body.render(width).length - this.selectedRow;
+    if (entry.file === this.expandedFile) {
+      const start = body.render(width).length;
+      this.addDetails(text);
+      if (entry.file === this.selectedFile) this.expandedRows += body.render(width).length - start;
     }
   }
 
-  private addEmptyServerRow(container: Container): void {
-    const t = this.theme;
+  private addServers(text: (value: string) => void): void {
+    const t = this.deps.theme;
     if (!this.data.serverInventoryAvailable) {
-      container.addChild(new Text(t.fg("dim", "  server inventory unavailable"), 1, 0));
-      return;
+      text(t.fg("dim", "  server inventory unavailable"));
+    } else if (!this.data.servers.length) {
+      text(
+        t.fg(
+          "dim",
+          this.data.capabilities.semantic.kind === "disabled"
+            ? "  all language servers disabled"
+            : "  no active project servers; routes may start lazily",
+        ),
+      );
     }
-    if (this.data.capabilities.semantic.kind === "disabled") {
-      container.addChild(new Text(t.fg("dim", "  all language servers disabled"), 1, 0));
-      return;
-    }
-    container.addChild(
-      new Text(t.fg("dim", "  no active project servers; routes may start lazily"), 1, 0),
-    );
+    for (const server of this.data.servers) this.addServer(server, text);
   }
 
-  private addServerRow(container: Container, server: ProjectServerInfo): void {
-    const t = this.theme;
-    const statusColor =
-      server.status === "running" ? "success" : server.status === "error" ? "error" : "warning";
-    const icon = server.status === "running" ? "✓" : server.status === "error" ? "✗" : "?";
+  private addWarnings(text: (value: string) => void): void {
+    for (const warning of this.data.capabilityWarnings?.warnings ?? []) {
+      const language = warning.language ? `${warning.language}: ` : "";
+      const detail = warning.detail ? ` — ${warning.detail}` : "";
+      text(this.deps.theme.fg("warning", `⚠ ${language}${warning.message}${detail}`));
+    }
+  }
 
-    container.addChild(
-      new Text(
-        t.fg("accent", "  ▸ ") +
-          t.fg("text", server.name) +
-          " " +
-          t.fg(statusColor, icon) +
-          " " +
-          t.fg("dim", `root: ${formatProjectServerRoot(this.data.workspaceRoot, server.root)}`),
-        0,
-        0,
+  private addDiagnosticEvidence(text: (value: string) => void): void {
+    const observation = this.data.diagnostics;
+    const t = this.deps.theme;
+    if (observation.kind === "not-requested") return;
+    const evidence = observation.evidence;
+    text(
+      t.fg(
+        "dim",
+        `  ${evidence.confirmed}/${evidence.requested} confirmed tracked files · ${evidence.unconfirmed} unconfirmed · ${evidence.failed} failed · ${evidence.removed} removed`,
       ),
     );
-
-    const fileTypes = server.fileTypes.map((f) => `.${f}`).join(" ");
-    container.addChild(new Text(t.fg("dim", `    files: ${fileTypes || "(none)"}`), 0, 0));
-
-    const statusReason = formatProjectServerStatusReason(server.statusReason);
-    if (statusReason) {
-      container.addChild(new Text(t.fg("warning", `    ${statusReason}`), 0, 0));
-    }
-    const operationSupport = formatProjectServerOperationSupport(server.operationSupport);
-    if (operationSupport) {
-      container.addChild(new Text(t.fg("dim", `    ${operationSupport}`), 0, 0));
-    }
-
-    if (server.openFiles.length > 0) {
-      const shown = server.openFiles.slice(0, MAX_OPEN_FILES_SHOWN);
-      const remaining = server.openFiles.length - shown.length;
-      const suffix = remaining > 0 ? t.fg("dim", ` +${remaining}`) : "";
-      container.addChild(new Text(t.fg("dim", `    open: ${shown.join(", ")}`) + suffix, 0, 0));
-    } else {
-      container.addChild(new Text(t.fg("dim", "    open: (none)"), 0, 0));
-    }
+    if (observation.kind === "unavailable")
+      text(t.fg("warning", `  diagnostics unavailable — ${observation.reason}`));
+    else if (observation.kind === "partial")
+      text(t.fg("warning", `  diagnostic snapshot is stale or incomplete — ${observation.reason}`));
+    else if (evidence.confirmed === 0)
+      text(
+        t.fg(
+          "dim",
+          "  No confirmed tracked files; an empty result does not establish a clean workspace.",
+        ),
+      );
+    else if (!observation.entries.length)
+      text(t.fg("success", `  ✓ no issues in ${evidence.confirmed} confirmed tracked files`));
   }
 
-  private addProblemsSection(container: Container, width: number): void {
-    const t = this.theme;
-    container.addChild(new Text(t.fg("accent", t.bold(" Problems")), 1, 0));
-    if (this.data.diagnostics.length === 0) {
-      this.addEmptyProblemsRow(container);
+  private addDetails(text: (value: string) => void): void {
+    const t = this.deps.theme;
+    const details = this.details;
+    if (!details) return;
+    if (details.kind === "loading") {
+      text(t.fg("accent", `    ${this.frame()} loading…`));
       return;
     }
-    container.addChild(
-      new Text(t.fg("dim", "  ↑↓ navigate · enter to expand · single-expand"), 1, 0),
+    if (details.kind === "error") {
+      text(t.fg("error", `    Details unavailable: ${details.message}`));
+      return;
+    }
+    if (!details.current) text(t.fg("warning", "    Diagnostic details are stale"));
+    if (!details.diagnostics.length)
+      text(t.fg("dim", "    No error or warning messages in this snapshot"));
+    for (const diagnostic of details.diagnostics.slice(0, MAX_INLINE_MESSAGES)) {
+      text(
+        t.fg(
+          diagnostic.severity === 1 ? "error" : "warning",
+          `    ${diagnostic.range.start.line + 1}:${diagnostic.range.start.character + 1} ${diagnosticMessageString(diagnostic)}`,
+        ),
+      );
+    }
+    if (details.diagnostics.length > MAX_INLINE_MESSAGES)
+      text(t.fg("dim", `    +${details.diagnostics.length - MAX_INLINE_MESSAGES} more messages`));
+  }
+
+  private addServer(server: ProjectServerInfo, text: (value: string) => void): void {
+    const t = this.deps.theme;
+    const state =
+      server.status === "running" ? (server.ready ? "ready" : "starting") : server.status;
+    text(
+      t.fg(
+        state === "ready" ? "success" : state === "error" ? "error" : "warning",
+        `  ${server.name}: ${state} · root: ${formatProjectServerRoot(this.data.workspaceRoot, server.root)}`,
+      ),
     );
+    text(
+      t.fg("dim", `    files: ${server.fileTypes.map((type) => `.${type}`).join(" ") || "(none)"}`),
+    );
+    const reason = formatProjectServerStatusReason(server.statusReason);
+    if (reason) text(t.fg("warning", `    ${reason}`));
+    const shown = server.openFiles.slice(0, MAX_OPEN_FILES_SHOWN);
+    text(
+      t.fg(
+        "dim",
+        `    open: ${shown.join(", ") || "(none)"}${server.openFiles.length > shown.length ? ` +${server.openFiles.length - shown.length} more` : ""}`,
+      ),
+    );
+    this.addOperationSupport(server, text);
+  }
 
-    const visible = this.data.diagnostics.slice(0, MAX_FILES_IN_LIST);
-    visible.forEach((entry, idx) => {
-      this.addProblemRow(container, entry, idx, width);
-    });
-
-    const remaining = this.data.diagnostics.length - visible.length;
-    if (remaining > 0) {
-      container.addChild(
-        new Text(t.fg("dim", `  ↳ +${remaining} more file${remaining === 1 ? "" : "s"}`), 1, 0),
+  private addOperationSupport(server: ProjectServerInfo, text: (value: string) => void): void {
+    const t = this.deps.theme;
+    if (!server.operationSupport || !Object.keys(server.operationSupport).length)
+      text(t.fg("dim", "    Refactor support: not negotiated"));
+    for (const [operation, support] of Object.entries(server.operationSupport ?? {})) {
+      text(
+        t.fg(
+          "dim",
+          `    ${operation}: server ${support.server}; SuPi ${support.supi}${support.reason ? ` — ${support.reason}` : ""}`,
+        ),
       );
     }
   }
 
-  private addEmptyProblemsRow(container: Container): void {
-    const t = this.theme;
-    if (!this.data.semanticAvailable) {
-      container.addChild(new Text(t.fg("dim", "  (diagnostics unavailable)"), 1, 0));
-    } else if (!this.data.diagnosticSnapshotCurrent) {
-      container.addChild(new Text(t.fg("warning", "  diagnostic snapshot is stale"), 1, 0));
-    } else {
-      container.addChild(new Text(t.fg("success", "  ✓ no issues"), 1, 0));
-    }
+  private controlHints(): string {
+    const reserved = (key: string) =>
+      STATUS_ACTIONS.some((action) => this.keybindings.matches(key, action));
+    return [
+      `${this.keyLabel("tui.select.cancel")} close`,
+      `${this.keyLabel("tui.select.confirm")} expand`,
+      this.deps.onRefresh && !reserved("r") ? "r reload" : "",
+      !reserved("a") ? "a collapse" : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
 
-  private addProblemRow(
-    container: Container,
-    entry: OutstandingDiagnosticSummaryEntry,
-    idx: number,
-    width: number,
-  ): void {
-    const t = this.theme;
-    const isSelected = idx === this.selectedFileIdx;
-    const isExpanded = idx === this.expandedFileIdx;
-
-    const counts: string[] = [];
-    if (entry.errors > 0) {
-      counts.push(t.fg("error", `${entry.errors} error${entry.errors === 1 ? "" : "s"}`));
-    }
-    if (entry.warnings > 0) {
-      counts.push(t.fg("warning", `${entry.warnings} warning${entry.warnings === 1 ? "" : "s"}`));
-    }
-    const countsText = counts.length > 0 ? `  ${counts.join("  ")}` : "";
-    const indicator = isExpanded ? t.fg("accent", "▼") : isSelected ? t.fg("accent", "▶") : " ";
-    const fileColor = isSelected ? "accent" : "muted";
-    const line = `${indicator} ${t.fg(fileColor, entry.file)}${countsText}`;
-    container.addChild(new Text(truncateToWidth(line, width), 0, 0));
-
-    if (isExpanded) {
-      this.addInlineDiagnostics(container, width);
-    }
+  private keyLabel(action: Parameters<KeybindingsManager["getKeys"]>[0]): string {
+    const key = this.keybindings.getKeys(action)[0];
+    const labels: Record<string, string> = {
+      escape: "esc",
+      up: "↑",
+      down: "↓",
+      pageUp: "PgUp",
+      pageDown: "PgDn",
+    };
+    return key ? (labels[key] ?? key) : "unbound";
   }
 
-  private addInlineDiagnostics(container: Container, width: number): void {
-    const t = this.theme;
-    if (this.loading) {
-      const frame = BRAILLE_SPINNER_FRAMES[this.spinnerFrame] ?? BRAILLE_SPINNER_FRAMES[0];
-      container.addChild(new Text(t.fg("accent", `    └ ${frame} loading…`), 0, 0));
-      return;
-    }
-    if (this.expandedDiagnostics === null) {
-      container.addChild(new Text(t.fg("dim", "    └ no diagnostics available"), 0, 0));
-      return;
-    }
-    const messages = this.expandedDiagnostics;
-    for (const diag of messages.slice(0, MAX_INLINE_MESSAGES)) {
-      const lineNum = diag.range.start.line + 1;
-      const colNum = diag.range.start.character + 1;
-      const sevColor = diag.severity === 1 ? "error" : "warning";
-      const messageText = truncateTextForInline(diagnosticMessageString(diag), width - 14);
-      const msg = `    ${t.fg(sevColor, "└")} ${lineNum}:${colNum}  ${t.fg("dim", messageText)}`;
-      container.addChild(new Text(msg, 0, 0));
-    }
-    const remaining = messages.length - MAX_INLINE_MESSAGES;
-    if (remaining > 0) {
-      container.addChild(new Text(t.fg("dim", `    └ +${remaining} more`), 0, 0));
-    }
+  private frame(): string {
+    return BRAILLE_SPINNER_FRAMES[this.spinnerFrame % BRAILLE_SPINNER_FRAMES.length] ?? "…";
   }
-
-  private addCapabilitiesSection(container: Container): void {
-    const t = this.theme;
-    container.addChild(new Text(t.fg("accent", t.bold(" Capabilities")), 1, 0));
-    this.addCapabilityRow(container, "Semantic    ", this.data.capabilities.semantic);
-    this.addCapabilityRow(container, "Structural  ", this.data.capabilities.structural);
-    const refLabel = this.data.capabilities.refactorAvailable ? "✓ available" : "✗ unavailable";
-    const refColor = this.data.capabilities.refactorAvailable ? "success" : "error";
-    container.addChild(
-      new Text(`  ${t.fg("text", "Refactor    ")} ${t.fg(refColor, refLabel)}`, 0, 0),
-    );
-  }
-
-  private addCapabilityRow(
-    container: Container,
-    label: string,
-    cap: { kind: string; reason?: string },
-  ): void {
-    const t = this.theme;
-    const capLabel =
-      cap.kind === "ready" ? "✓ ready" : cap.kind === "pending" ? "⏳ pending" : "✗ unavailable";
-    const capColor = cap.kind === "ready" ? "success" : cap.kind === "pending" ? "dim" : "error";
-    const reason = cap.reason ? t.fg("dim", ` — ${cap.reason}`) : "";
-    container.addChild(
-      new Text(`  ${t.fg("text", label)} ${t.fg(capColor, capLabel)}${reason}`, 0, 0),
-    );
-  }
-
-  private addCapabilityWarningsSection(container: Container): void {
-    const warnings = this.data.capabilityWarnings;
-    if (!warnings?.hasWarnings) return;
-
-    const t = this.theme;
-    container.addChild(new Spacer(1));
-    container.addChild(new Text(t.fg("error", t.bold(" Capability Warnings")), 1, 0));
-
-    for (const w of warnings.warnings) {
-      const lang = w.language ? `${t.fg("accent", w.language)} ` : "";
-      const detail = w.detail ? t.fg("dim", ` — ${w.detail}`) : "";
-      container.addChild(
-        new Text(`  ${t.fg("warning", "⚠")} ${lang}${t.fg("dim", w.message)}${detail}`, 0, 0),
-      );
-    }
-    container.addChild(new Spacer(1));
-  }
-
-  private addToolsSection(container: Container, width: number): void {
-    const t = this.theme;
-    if (this.data.activeTools.length === 0) return;
-    container.addChild(new Spacer(1));
-    container.addChild(new Text(t.fg("accent", t.bold(" Tools")), 1, 0));
-    const label = `  ${this.data.activeTools.map((tool) => t.fg("text", tool)).join(t.fg("dim", ", "))}`;
-    const truncated = truncateTextForInline(label, width - 4);
-    container.addChild(new Text(truncated, 0, 0));
-    container.addChild(new Spacer(1));
-  }
-
-  private readonly theme: CiDialogTheme;
-  private readonly done: () => void;
-  private readonly tui: { requestRender: () => void };
-  private readonly fetchDetailedDiagnostics?: DiagFetcher;
-  private readonly onRefresh?: () => Promise<CiStatusData>;
 }
 
-function truncateTextForInline(text: string, maxWidth: number): string {
-  if (visibleWidth(text) <= maxWidth) return text;
-  return truncateToWidth(text, Math.max(8, maxWidth), "…");
+function problemCounts(entry: HealthDiagnosticEntry): string {
+  return [
+    entry.errors ? countLabel(entry.errors, "error") : "",
+    entry.warnings ? countLabel(entry.warnings, "warning") : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
-/**
- * Factory for use with `ctx.ui.custom()`.
- */
+function countLabel(count: number, label: string): string {
+  return `${count} ${label}${count === 1 ? "" : "s"}`;
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** Construct a fresh, disposable inspector for ctx.ui.custom(). */
 export function createCiStatusDialog(data: CiStatusData, deps: CiStatusDialogDeps): CiStatusDialog {
   return new CiStatusDialog(data, deps);
 }

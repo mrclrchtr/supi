@@ -40,7 +40,12 @@ async function renderStatusOverlay(): Promise<string> {
     mock: { calls: Array<[(tui: unknown, theme: unknown, kb: unknown, done: unknown) => unknown]> };
   };
   const factory = custom.mock.calls[0]?.[0];
-  const dialog = factory?.({ requestRender: vi.fn() }, ctx.ui.theme, undefined, vi.fn()) as {
+  const dialog = factory?.(
+    { terminal: { rows: 200 }, requestRender: vi.fn() },
+    ctx.ui.theme,
+    undefined,
+    vi.fn(),
+  ) as {
     render(width: number): string[];
   };
   return dialog.render(80).join("\n");

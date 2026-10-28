@@ -241,7 +241,11 @@ In interactive Pi, open the status overlay:
 /supi-ci-status
 ```
 
-It shows server routes and roots, missing or running servers, diagnostics, and capability warnings. The terminal must be at least 60 columns wide. Use Up/Down to select a diagnostic file, Enter or Space to expand it, `r` to reload the displayed snapshot, `a` to collapse it, and Escape to close. The extension also adds LSP status to the footer. Use `code_health` for health reports outside the interactive terminal.
+The inspector shows semantic and structural readiness, error and warning counts, diagnostic confirmation evidence, server routes and roots, negotiated operation support, capability warnings, and active code tools. Diagnostic counts describe tracked files, not a workspace-wide check; stale, incomplete, and unavailable observations remain explicit. An empty snapshot without confirmed files is not reported as clean.
+
+Use Up/Down (or `j`/`k`) to select a diagnostic file, Enter or Space to expand it, Page Up/Page Down to scroll, Home/End to jump to the beginning/end, `r` to reload the passive snapshot, `a` to collapse details, and Escape to close. Selection, confirmation, scrolling, and cancel actions honor Pi's configured keybindings. The viewport adjusts to terminal size, with controls kept visible. Reloading does not retry servers or request fresh diagnostics; use `code_health` with `refresh: true` for explicit recovery and diagnostic refresh.
+
+The inspector does not replace the footer or add editor widgets. The extension's separate LSP footer contribution remains active. Outside the interactive terminal, use `code_health`.
 
 The package registers **Code Intelligence** and **LSP** settings. If `@mrclrchtr/supi-settings` is installed, use `/supi-settings` to edit them. A standalone Code Intelligence install does not include that settings UI.
 
