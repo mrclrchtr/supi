@@ -30,7 +30,7 @@ Reference material for agents that develop PI extensions in this repo. Docs here
 | `conventions/tool-rendering.md` | Transcript rendering: `renderCall`/`renderResult`, `details` contract, collapsed/expanded/partial/error states | You add or change tool renderers |
 | `conventions/code-runtime-architecture.md` | Ownership split of the code stack: `supi-code-intelligence`, `supi-lsp`, `supi-tree-sitter`, `supi-code-runtime` | You work on the code-understanding stack |
 | [Code language capability baseline](conventions/code-language-baseline.md) | Approved, not-yet-qualified baseline for six language families: operations, source-form limits, C/C++ associations, and required Linux/macOS verification | You implement or verify language compatibility in the code-understanding stack |
-| [CI verification selection](conventions/ci-verification.md) | Conservative matrix selection, required checks, manual full verification, and Renovate grouping | You change CI jobs, workspace dependencies, or dependency-update policy |
+| [CI and release gates](conventions/ci-verification.md) | Fast PR checks, exhaustive pre-tag verification, immutable release candidates, manual retries, and Renovate grouping | You change CI jobs, releasing, workspace dependencies, or dependency-update policy |
 
 ## adr/ and agents/
 

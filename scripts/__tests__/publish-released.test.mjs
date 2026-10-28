@@ -114,15 +114,19 @@ describe("release publication", () => {
     const events = fixture.events();
     expect(events.map((event) => event.args[0])).toEqual([
       "view",
+      "view",
       "pack",
       "publish",
+      "view",
       "view",
       "pack",
       "publish",
     ]);
     expect(events.filter((event) => event.args[0] === "view").map((event) => event.args)).toEqual([
-      ["view", "@mrclrchtr/test-core@6.3.1", "version"],
-      ["view", "@mrclrchtr/test-app@6.3.1", "version"],
+      ["view", "@mrclrchtr/test-core@6.3.1", "version", "--json"],
+      ["view", "@mrclrchtr/test-core@>6.3.1", "version", "--json"],
+      ["view", "@mrclrchtr/test-app@6.3.1", "version", "--json"],
+      ["view", "@mrclrchtr/test-app@>6.3.1", "version", "--json"],
     ]);
     const published = events.filter((event) => event.args[0] === "publish");
     expect(published.map((event) => event.manifest)).toEqual([
@@ -134,7 +138,13 @@ describe("release publication", () => {
       },
     ]);
     for (const event of published) {
-      expect(event.args.slice(2)).toEqual(["--access", "public", "--provenance"]);
+      expect(event.args.slice(2)).toEqual([
+        "--access",
+        "public",
+        "--provenance",
+        "--tag",
+        "latest",
+      ]);
       expect(existsSync(event.args[1])).toBe(false);
     }
   });
@@ -148,11 +158,38 @@ describe("release publication", () => {
     });
     expect(result.status, result.stderr).toBe(0);
     const events = fixture.events();
-    expect(events.map((event) => event.args[0])).toEqual(["view", "view", "pack", "publish"]);
+    expect(events.map((event) => event.args[0])).toEqual([
+      "view",
+      "view",
+      "view",
+      "pack",
+      "publish",
+    ]);
     expect(events.at(-1).manifest.name).toBe("@mrclrchtr/test-app");
     expect(events.at(-1).manifest.version).toBe("6.3.1");
     expect(result.stdout).toContain("@mrclrchtr/test-core@6.3.1 already published");
   });
+
+  it("recovers an older partial release without moving latest backwards", () => {
+    const result = fixture.run({
+      TEST_NPM_EXISTING: JSON.stringify(["@mrclrchtr/test-core@6.3.1"]),
+      TEST_NPM_NEWER: JSON.stringify({ "@mrclrchtr/test-app": ["6.4.0", "7.0.0"] }),
+    });
+    expect(result.status, result.stderr).toBe(0);
+    const published = fixture.events().filter((event) => event.args[0] === "publish");
+    expect(published).toHaveLength(1);
+    expect(published[0].manifest).toMatchObject({ name: "@mrclrchtr/test-app", version: "6.3.1" });
+    expect(published[0].args.slice(-2)).toEqual(["--tag", "release-6.3.1"]);
+  });
+
+  it.each(["E403", "E500", "ENOTFOUND"])(
+    "does not publish on registry lookup failure %s",
+    (code) => {
+      const result = fixture.run({ TEST_NPM_VIEW_ERROR: code });
+      expect(result.status).not.toBe(0);
+      expect(fixture.events().map((event) => event.args[0])).toEqual(["view"]);
+    },
+  );
 
   it("succeeds without packing when every target version exists", () => {
     const result = fixture.run({
@@ -163,8 +200,8 @@ describe("release publication", () => {
     });
     expect(result.status, result.stderr).toBe(0);
     expect(fixture.events().map((event) => event.args)).toEqual([
-      ["view", "@mrclrchtr/test-core@6.3.1", "version"],
-      ["view", "@mrclrchtr/test-app@6.3.1", "version"],
+      ["view", "@mrclrchtr/test-core@6.3.1", "version", "--json"],
+      ["view", "@mrclrchtr/test-app@6.3.1", "version", "--json"],
     ]);
   });
 
@@ -187,13 +224,16 @@ describe("release publication", () => {
       "@mrclrchtr/test-core@7.0.0-rc.1+build.2",
       "@mrclrchtr/test-app@7.0.0-rc.1+build.2",
     ]);
+    for (const event of fixture.events().filter((entry) => entry.args[0] === "publish")) {
+      expect(event.args.slice(-2)).toEqual(["--tag", "release-7.0.0-rc.1+build.2"]);
+    }
   });
 
   it("stops on publication failure and removes staged tarballs", () => {
     const result = fixture.run({ TEST_NPM_PUBLISH_FAIL: "true" });
     expect(result.status).toBe(1);
     const events = fixture.events();
-    expect(events.map((event) => event.args[0])).toEqual(["view", "pack", "publish"]);
+    expect(events.map((event) => event.args[0])).toEqual(["view", "view", "pack", "publish"]);
     expect(existsSync(events.at(-1).args[1])).toBe(false);
   });
 });

@@ -4,20 +4,27 @@ on:
   workflow_dispatch:
     inputs:
       publish_tag:
-        description: "Retry publishing an existing release tag (leave empty for verification only)"
+        description: "Verify and retry publishing an existing release tag"
+        required: false
+        type: string
+        default: ""
+      release_pr:
+        description: "Verify and retry a merged release PR before tagging"
         required: false
         type: string
         default: ""
   pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
   push:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
   contents: read
+  pull-requests: read
 
+# PR updates supersede old checks. Distinct main commits must not replace queued release candidates.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -25,80 +32,106 @@ jobs:
     runs-on: avrea-ubuntu-latest-2-vcpu
     timeout-minutes: 5
     outputs:
-      language-baseline: ${{ steps.plan.outputs.language-baseline }}
-      installer: ${{ steps.plan.outputs.installer }}
+      mode: ${{ steps.plan.outputs.mode }}
+      sha: ${{ steps.plan.outputs.sha }}
+      version: ${{ steps.plan.outputs.version }}
+      release-pr: ${{ steps.plan.outputs.release-pr }}
     steps:
       - name: Checkout exact event commit with comparison history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
+          persist-credentials: false
       - name: Set up Node.js without workspace dependencies
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           package-manager-cache: false
-      - name: Select verification matrices
+      - name: Select verification and immutable checkout
         id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/ci-plan.mjs
 
   actionlint:
+    needs: ci-plan
+    if: needs.ci-plan.outputs.mode != 'none'
     runs-on: avrea-ubuntu-latest-2-vcpu
     timeout-minutes: 5
-
     steps:
-      - name: Checkout
+      - name: Checkout verification commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
+        with:
+          ref: ${{ needs.ci-plan.outputs.sha }}
+          persist-credentials: false
       - name: Lint GitHub Actions workflows
         uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
 
   conventional-commits:
+    needs: ci-plan
+    if: needs.ci-plan.outputs.mode != 'none'
     runs-on: avrea-ubuntu-latest-2-vcpu
     timeout-minutes: 10
-
     steps:
-      - name: Checkout
+      - name: Checkout verification commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.ci-plan.outputs.sha }}
           fetch-depth: 0
-
+          persist-credentials: false
       - name: Set up workspace dependencies
+        if: needs.ci-plan.outputs.mode != 'metadata'
         uses: ./.github/actions/setup-pnpm
-
       - name: Validate PR title
         if: github.event_name == 'pull_request'
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           REGEX='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?(!)?: .+$'
-
           if [[ ! "$PR_TITLE" =~ $REGEX ]]; then
-            echo "PR title must follow Conventional Commits."
-            echo "Example: feat(lsp): add diagnostics summary"
-            echo "Got: $PR_TITLE"
+            echo "PR title must follow Conventional Commits. Got: $PR_TITLE"
+            exit 1
+          fi
+      - name: Validate current commit
+        if: github.event_name != 'pull_request'
+        run: pnpm exec commitlint --last --verbose
+      - name: Validate PR commits
+        if: github.event_name == 'pull_request' && needs.ci-plan.outputs.mode != 'metadata'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+      - name: Validate the metadata-only release commit without dependencies
+        if: needs.ci-plan.outputs.mode == 'metadata'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RELEASE_VERSION: ${{ needs.ci-plan.outputs.version }}
+        run: |
+          subject=$(git log --format=%s "$BASE_SHA..$HEAD_SHA")
+          if [[ "$subject" != "chore: release $RELEASE_VERSION" ]]; then
+            echo '::error::Expected exactly one conventional release commit'
             exit 1
           fi
 
-      - name: Validate current commit (last commit)
-        if: github.event_name != 'pull_request'
-        run: pnpm exec commitlint --last --verbose
-
-      - name: Validate PR commits
-        if: github.event_name == 'pull_request'
-        run: pnpm exec commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
-
   workspace-checks:
+    needs: ci-plan
+    if: needs.ci-plan.outputs.mode != 'none'
     runs-on: avrea-ubuntu-latest-2-vcpu
     timeout-minutes: 15
-
+    env:
+      RELEASE_SHA: ${{ needs.ci-plan.outputs.sha }}
+      RELEASE_VERSION: ${{ needs.ci-plan.outputs.version }}
     steps:
-      - name: Checkout
+      - name: Checkout verification commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up workspace dependencies
-        uses: ./.github/actions/setup-pnpm
-
+        with:
+          ref: ${{ needs.ci-plan.outputs.sha }}
+          persist-credentials: false
+      - name: Validate release metadata before dependencies
+        if: needs.ci-plan.outputs.version != ''
+        run: node scripts/release-validation.mjs
       - name: Check release-please config coverage
         run: |
           publishable=$(mktemp)
@@ -108,85 +141,81 @@ jobs:
               echo "${dir%/}"
             fi
           done | sort > "$publishable"
-          # Single-root release-please config manages versions via extra-files
           jq -r '.packages["."]["extra-files"][] // empty' release-please-config.json | sed 's|/package\.json$||' | sort > "$configured"
           if ! diff -q "$publishable" "$configured"; then
             echo "::error::Mismatch between publishable packages and release-please config"
             diff "$publishable" "$configured" || true
             exit 1
           fi
-
-      - name: Check vendored WASM files
-        run: pnpm --filter @mrclrchtr/supi-tree-sitter check:all-wasm
-
-      - name: Check code style
-        run: pnpm biome
-
-      - name: Check TypeScript
-        run: pnpm typecheck
-
-      - name: Check skills
-        run: pnpm skills:check
-
+      - name: Set up workspace dependencies
+        if: needs.ci-plan.outputs.mode != 'metadata'
+        uses: ./.github/actions/setup-pnpm
+      - name: Run fast workspace checks
+        if: needs.ci-plan.outputs.mode != 'metadata'
+        run: |
+          pnpm --filter @mrclrchtr/supi-tree-sitter check:all-wasm
+          pnpm biome:ai
+          pnpm typecheck:ai
+          pnpm skills:check
+      - name: Check CI planning and release safety contracts
+        if: needs.ci-plan.outputs.mode == 'pr'
+        run: pnpm vitest run scripts/__tests__/ci-plan.test.mjs scripts/__tests__/release-workflow.test.mjs scripts/__tests__/verify-workflow.test.mjs --reporter=agent
       - name: Verify staged package tarballs
+        if: needs.ci-plan.outputs.mode == 'full'
         run: pnpm pack:verify
 
   tests:
+    needs: ci-plan
+    if: needs.ci-plan.outputs.mode == 'full'
     runs-on: avrea-ubuntu-latest-2-vcpu
     timeout-minutes: 20
-
     steps:
-      - name: Checkout
+      - name: Checkout verification commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
+        with:
+          ref: ${{ needs.ci-plan.outputs.sha }}
+          persist-credentials: false
       - name: Set up workspace dependencies
         uses: ./.github/actions/setup-pnpm
-
       - name: Install ripgrep
         run: sudo apt-get install -y ripgrep
-
       - name: Run complete test suite
         run: pnpm test:ai
 
   language-baseline:
     needs: ci-plan
-    if: needs.ci-plan.outputs.language-baseline == 'true'
+    if: needs.ci-plan.outputs.mode == 'full'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
         os: [avrea-ubuntu-latest-2-vcpu, macos-latest]
-
     steps:
-      - name: Checkout
+      - name: Checkout verification commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
+        with:
+          ref: ${{ needs.ci-plan.outputs.sha }}
+          persist-credentials: false
       - name: Load pinned language toolchains
         run: node scripts/language-baseline/ci-env.mjs >> "$GITHUB_ENV"
-
       - name: Set up workspace dependencies
         uses: ./.github/actions/setup-pnpm
         with:
           node-version: ${{ env.SUPI_BASELINE_NODE_VERSION }}
-
       - name: Set up Java
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: ${{ env.SUPI_BASELINE_JAVA_DISTRIBUTION }}
           java-version: ${{ env.SUPI_BASELINE_JAVA_VERSION }}
-
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.SUPI_BASELINE_GO_VERSION }}
-
       - name: Provision pinned reference servers
         run: node scripts/language-baseline/provision.mjs
-
       - name: Run required real-server acceptance suite
         run: pnpm test:language-baseline:acceptance
-
       - name: Remove isolated server installs
         if: always()
         run: |
@@ -197,7 +226,7 @@ jobs:
 
   installer:
     needs: ci-plan
-    if: needs.ci-plan.outputs.installer == 'true'
+    if: needs.ci-plan.outputs.mode == 'full'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
@@ -209,8 +238,11 @@ jobs:
           - os: avrea-ubuntu-latest-2-vcpu
             node: "22.19.0"
     steps:
-      - name: Checkout
+      - name: Checkout verification commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.ci-plan.outputs.sha }}
+          persist-credentials: false
       - name: Set up workspace dependencies
         uses: ./.github/actions/setup-pnpm
         with:
@@ -221,56 +253,64 @@ jobs:
         run: pnpm vitest run packages/supi-installer/ scripts/__tests__/patch-checkout.test.mjs --reporter=agent
 
   verify:
-    if: always()
-    needs: [ci-plan, workspace-checks, tests, installer, language-baseline]
+    if: always() && (needs.ci-plan.result != 'success' || needs.ci-plan.outputs.mode != 'none')
+    needs: [ci-plan, actionlint, conventional-commits, workspace-checks, tests, installer, language-baseline]
     runs-on: avrea-ubuntu-latest-2-vcpu
     timeout-minutes: 5
-
     steps:
-      - name: Require all selected verification jobs to pass
+      - name: Require exactly the checks selected for this verification mode
         env:
           PLAN_RESULT: ${{ needs.ci-plan.result }}
+          MODE: ${{ needs.ci-plan.outputs.mode }}
+          ACTIONLINT_RESULT: ${{ needs.actionlint.result }}
+          COMMITS_RESULT: ${{ needs.conventional-commits.result }}
           WORKSPACE_RESULT: ${{ needs.workspace-checks.result }}
           TEST_RESULT: ${{ needs.tests.result }}
-          RUN_INSTALLER: ${{ needs.ci-plan.outputs.installer }}
-          RUN_LANGUAGE_BASELINE: ${{ needs.ci-plan.outputs.language-baseline }}
           INSTALLER_RESULT: ${{ needs.installer.result }}
           LANGUAGE_BASELINE_RESULT: ${{ needs.language-baseline.result }}
         run: |
-          if [[ "$PLAN_RESULT" != "success" || "$WORKSPACE_RESULT" != "success" || "$TEST_RESULT" != "success" ]]; then
-            echo "::error::Verification failed: plan=$PLAN_RESULT workspace=$WORKSPACE_RESULT tests=$TEST_RESULT"
+          if [[ "$PLAN_RESULT" != success || "$ACTIONLINT_RESULT" != success || "$COMMITS_RESULT" != success || "$WORKSPACE_RESULT" != success ]]; then
+            echo '::error::Required verification checks did not succeed'
             exit 1
           fi
-          require_matrix_result() {
-            case "$2:$3" in
-              true:success|false:skipped) ;;
-              *) echo "::error::Unexpected $1 result: selected=$2 result=$3"; return 1 ;;
-            esac
-          }
-          require_matrix_result installer "$RUN_INSTALLER" "$INSTALLER_RESULT"
-          require_matrix_result language-baseline "$RUN_LANGUAGE_BASELINE" "$LANGUAGE_BASELINE_RESULT"
+          case "$MODE" in
+            full) expected=success ;;
+            pr|metadata) expected=skipped ;;
+            *) echo '::error::Unknown verification mode'; exit 1 ;;
+          esac
+          for result in "$TEST_RESULT" "$INSTALLER_RESULT" "$LANGUAGE_BASELINE_RESULT"; do
+            if [[ "$result" != "$expected" ]]; then
+              echo "::error::Unexpected exhaustive-check result: expected=$expected actual=$result"
+              exit 1
+            fi
+          done
 
-  release-please:
-    needs: [actionlint, conventional-commits, verify]
-    # Override implicit success(): intentionally skipped matrix ancestors must not block releases.
+  create-release:
+    needs: [ci-plan, verify]
     if: >-
-      !cancelled() &&
-      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
-      needs.actionlint.result == 'success' &&
-      needs.conventional-commits.result == 'success' &&
-      needs.verify.result == 'success'
+      !cancelled() && github.ref == 'refs/heads/main' &&
+      needs.ci-plan.result == 'success' && needs.verify.result == 'success' &&
+      needs.ci-plan.outputs.mode == 'full' && needs.ci-plan.outputs.release-pr != ''
     runs-on: avrea-ubuntu-latest-2-vcpu
     timeout-minutes: 10
+    concurrency:
+      group: create-release-${{ needs.ci-plan.outputs.version }}
+      cancel-in-progress: false
     permissions:
       contents: write
-      issues: write
-      pull-requests: write
-    outputs:
-      releases_created: ${{ steps.release.outputs.releases_created }}
-      release_sha: ${{ steps.release.outputs.sha }}
-      release_version: ${{ steps.release.outputs.version }}
+      pull-requests: read
+    env:
+      RELEASE_SHA: ${{ needs.ci-plan.outputs.sha }}
+      RELEASE_VERSION: ${{ needs.ci-plan.outputs.version }}
+      RELEASE_PR: ${{ needs.ci-plan.outputs.release-pr }}
     steps:
-      - name: Create release-please app token
+      - name: Checkout verified release candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Create release app token
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
@@ -279,85 +319,57 @@ jobs:
           permission-contents: write
           permission-issues: write
           permission-pull-requests: write
-
-      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
-        id: release
+      - name: Checkout release tooling from the workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          token: ${{ steps.app-token.outputs.token }}
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
+          ref: ${{ github.sha }}
+          path: .release-tools
+          sparse-checkout: scripts
+          persist-credentials: false
+      - name: Tag only the verified commit and create its release
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: node .release-tools/scripts/create-release.mjs
 
   publish:
-    needs: [release-please, actionlint, conventional-commits, verify]
+    needs: [ci-plan, verify, create-release]
     if: >-
       !cancelled() && github.ref == 'refs/heads/main' &&
-      needs.actionlint.result == 'success' &&
-      needs.conventional-commits.result == 'success' &&
-      needs.verify.result == 'success' &&
+      needs.ci-plan.result == 'success' && needs.verify.result == 'success' &&
+      needs.ci-plan.outputs.mode == 'full' && needs.ci-plan.outputs.version != '' &&
       (
-        (github.event_name == 'push' &&
-         needs.release-please.result == 'success' &&
-         needs.release-please.outputs.releases_created == 'true') ||
-        (github.event_name == 'workflow_dispatch' && inputs.publish_tag != '')
+        needs.create-release.result == 'success' ||
+        (github.event_name == 'workflow_dispatch' && inputs.publish_tag != '' &&
+         needs.create-release.result == 'skipped')
       )
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    concurrency:
+      # npm dist-tags are shared across versions, not just retries of one version.
+      group: supi-npm-publish
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
     env:
-      RELEASE_SHA: ${{ needs.release-please.outputs.release_sha }}
-      RELEASE_VERSION: ${{ needs.release-please.outputs.release_version }}
+      RELEASE_SHA: ${{ needs.ci-plan.outputs.sha }}
+      RELEASE_VERSION: ${{ needs.ci-plan.outputs.version }}
     steps:
-      # Resolve the tag once, then pin checkout to its commit rather than a moving ref.
-      - name: Resolve retry release
-        if: github.event_name == 'workflow_dispatch'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          PUBLISH_TAG: ${{ inputs.publish_tag }}
-        run: |
-          if [[ ! "$PUBLISH_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::publish_tag: expected a versioned release tag such as v1.2.3"
-            exit 1
-          fi
-          release=$(gh release view "$PUBLISH_TAG" --json tagName,isDraft)
-          if ! jq -e --arg tag "$PUBLISH_TAG" '.tagName == $tag and .isDraft == false' <<< "$release" > /dev/null; then
-            echo "::error::publish_tag: expected an existing published GitHub release"
-            exit 1
-          fi
-          release_sha=$(gh api "repos/$GH_REPO/commits/$PUBLISH_TAG" --jq .sha)
-          if [[ ! "$release_sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::publish_tag: expected the tag to resolve to a 40-character commit SHA"
-            exit 1
-          fi
-          {
-            echo "RELEASE_SHA=$release_sha"
-            echo "RELEASE_VERSION=${PUBLISH_TAG#v}"
-          } >> "$GITHUB_ENV"
-
-      # Repository scripts are not available yet. Full validation follows checkout.
-      - name: Require release identity
-        run: |
-          if [[ ! "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::RELEASE_SHA: expected a 40-character commit SHA; actual '$RELEASE_SHA'"
-            exit 1
-          fi
-          if [[ -z "$RELEASE_VERSION" ]]; then
-            echo "::error::RELEASE_VERSION: expected a release version; actual '$RELEASE_VERSION'"
-            exit 1
-          fi
-
-      - name: Checkout release commit
+      - name: Checkout verified release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.RELEASE_SHA }}
-
-      - name: Validate release checkout
-        run: node scripts/release-validation.mjs
-
+          persist-credentials: false
+      - name: Checkout publishing tooling from the workflow commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: .release-tools
+          sparse-checkout: scripts
+          persist-credentials: false
+      - name: Validate release checkout before dependencies or npm access
+        run: node .release-tools/scripts/release-validation.mjs
       - name: Set up workspace dependencies
         uses: ./.github/actions/setup-pnpm
-
       - name: Publish released packages from staged tarballs
-        run: node scripts/publish-released.mjs
+        run: node .release-tools/scripts/publish-released.mjs

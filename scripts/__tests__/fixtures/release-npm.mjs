@@ -15,9 +15,21 @@ appendFileSync(process.env.TEST_NPM_LOG, `${JSON.stringify(event)}\n`);
 
 switch (args[0]) {
   case "view": {
+    const fail = (code) => {
+      console.log(JSON.stringify({ error: { code } }));
+      process.exit(1);
+    };
+    if (process.env.TEST_NPM_VIEW_ERROR) fail(process.env.TEST_NPM_VIEW_ERROR);
     const existing = JSON.parse(process.env.TEST_NPM_EXISTING ?? "[]");
-    if (!existing.includes(args[1])) process.exit(1);
-    console.log(args[1].slice(args[1].lastIndexOf("@") + 1));
+    let version;
+    if (args[1].includes("@>")) {
+      const newer = JSON.parse(process.env.TEST_NPM_NEWER ?? "{}");
+      version = newer[args[1].split("@>")[0]];
+    } else if (existing.includes(args[1])) {
+      version = args[1].slice(args[1].lastIndexOf("@") + 1);
+    }
+    if (!version) fail("E404");
+    console.log(args.includes("--json") ? JSON.stringify(version) : version);
     break;
   }
   case "pack": {

@@ -1,265 +1,243 @@
-import { execFileSync, spawnSync } from "node:child_process";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
-import { selectCiJobs } from "../ci-plan.mjs";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createCiFixture } from "./helpers/ci-fixture.mjs";
 
-const packages = new Set([
-  "supi-core",
-  "supi-code-intelligence",
-  "supi-installer",
-  "supi-extras",
-  "supi-skill-patches",
-]);
-
-const temporaryDirectories = [];
-afterEach(() => {
-  for (const path of temporaryDirectories.splice(0)) rmSync(path, { recursive: true, force: true });
+let repo;
+beforeEach(() => {
+  repo = createCiFixture();
 });
+afterEach(() => {
+  repo.cleanup();
+});
+const root = "repos/mrclrchtr/supi";
+const response = (body) => ({ body });
 
-function repository() {
-  const root = mkdtempSync(join(tmpdir(), "supi-ci-plan-"));
-  temporaryDirectories.push(root);
-  const cwd = join(root, "repo");
-  mkdirSync(cwd);
-  const env = {
-    ...process.env,
-    GIT_CONFIG_NOSYSTEM: "1",
-    GIT_CONFIG_GLOBAL: join(root, "no-global-config"),
-    GIT_AUTHOR_NAME: "CI test",
-    GIT_AUTHOR_EMAIL: "ci@example.test",
-    GIT_COMMITTER_NAME: "CI test",
-    GIT_COMMITTER_EMAIL: "ci@example.test",
+function pushResponses(pr = repo.pr) {
+  return {
+    [`GET ${root}/commits/${repo.sha}/pulls?per_page=100&page=1`]: response([pr]),
+    [`GET ${root}/pulls/42`]: response(pr),
   };
-  const git = (...args) => execFileSync("git", args, { cwd, env, encoding: "utf8" }).trim();
-  const write = (path, content) => {
-    mkdirSync(dirname(join(cwd, path)), { recursive: true });
-    writeFileSync(join(cwd, path), content);
-  };
-  const commit = () => {
-    git("add", "--all");
-    git("commit", "--quiet", "-m", "test: fixture");
-    return git("rev-parse", "HEAD");
-  };
-  git("init", "--quiet", "--initial-branch=main");
-  for (const name of packages) write(`packages/${name}/package.json`, JSON.stringify({ name }));
-  write("packages/supi-core/src/config.ts", "export const original = true;\n");
-  const base = commit();
-  const run = (eventName, event, sha = git("rev-parse", "HEAD")) => {
-    const output = join(root, "outputs");
-    const summary = join(root, "summary");
-    writeFileSync(join(root, "event.json"), JSON.stringify(event));
-    writeFileSync(output, "");
-    const result = spawnSync(
-      process.execPath,
-      [fileURLToPath(new URL("../ci-plan.mjs", import.meta.url))],
-      {
-        cwd,
-        encoding: "utf8",
-        env: {
-          ...env,
-          GITHUB_EVENT_NAME: eventName,
-          GITHUB_EVENT_PATH: join(root, "event.json"),
-          GITHUB_SHA: sha,
-          GITHUB_OUTPUT: output,
-          GITHUB_STEP_SUMMARY: summary,
-        },
-      },
-    );
-    expect(result.status, result.stderr).toBe(0);
-    return {
-      outputs: Object.fromEntries(
-        readFileSync(output, "utf8")
-          .trim()
-          .split("\n")
-          .map((line) => line.split("=")),
-      ),
-      summary: readFileSync(summary, "utf8"),
-    };
-  };
-  return { cwd, base, git, write, commit, run };
 }
 
-describe("CI matrix selection", () => {
-  it.each([
-    [["docs/INDEX.md", "README.md"], { languageBaseline: false, installer: false }],
-    [["packages/supi-extras/src/extension.ts"], { languageBaseline: false, installer: false }],
-    [["packages/supi-core/src/config.ts"], { languageBaseline: true, installer: false }],
-    [["packages/supi-installer/src/cli.mjs"], { languageBaseline: false, installer: true }],
-    [["packages/supi-extras/package.json"], { languageBaseline: true, installer: true }],
-    [["new-infrastructure/config.json"], { languageBaseline: true, installer: true }],
-    [["packages/new-package/src/api.ts"], { languageBaseline: true, installer: true }],
-    [
-      ["packages/supi-code-intelligence/__tests__/fixtures/README.md"],
-      { languageBaseline: true, installer: false },
-    ],
-    [["scripts/language-baseline/pins.json"], { languageBaseline: true, installer: false }],
-    [
-      ["packages/supi-skill-patches/patches/upstream.patch"],
-      { languageBaseline: false, installer: true },
-    ],
-    [
-      ["packages/supi-core/src/api.ts", "packages/supi-installer/bin/cli.mjs"],
-      { languageBaseline: true, installer: true },
-    ],
-  ])("selects the required matrices for %j", (paths, expected) => {
-    expect(selectCiJobs(paths, packages)).toEqual(expected);
-  });
-});
-
-describe("conservative shared inputs", () => {
-  it.each([
+function releaseMerge() {
+  const base = repo.sha;
+  repo.git(["checkout", "-qb", "release"]);
+  for (const path of [
     "package.json",
-    "pnpm-lock.yaml",
-    "pnpm-workspace.yaml",
-    ".npmrc",
-    ".gitattributes",
-    ".mise.toml",
-    "mise.lock",
-    "tsconfig.json",
-    "vitest.config.ts",
-    "vitest.workspace.ts",
-    ".github/actions/setup-pnpm/action.yml",
-    ".github/workflows/ci.yml",
-    "scripts/ci-plan.mjs",
-    "scripts/pack-staged.mjs",
-    "scripts/__tests__/patch-checkout.test.mjs",
-  ])("runs both matrices when %s changes", (path) => {
-    expect(selectCiJobs([path], packages)).toEqual({ languageBaseline: true, installer: true });
+    "packages/a-app/package.json",
+    "packages/z-core/package.json",
+  ]) {
+    repo.updateJson(path, { version: "6.3.2" });
+  }
+  repo.writeJson(".release-please-manifest.json", { ".": "6.3.2" });
+  writeFileSync(join(repo.cwd, "CHANGELOG.md"), "# Changelog\n\n## 6.3.2\n\n* Fix\n");
+  repo.git(["add", "CHANGELOG.md"]);
+  const head = repo.commit();
+  repo.git(["checkout", "-q", "main"]);
+  repo.git(["merge", "--no-ff", "release", "-m", "chore: release 6.3.2"]);
+  const sha = repo.git(["rev-parse", "HEAD"]);
+  const pr = {
+    ...repo.pr,
+    merged: false,
+    title: "chore: release 6.3.2",
+    base: { ...repo.pr.base, sha: base },
+    head: { ...repo.pr.head, sha: head },
+  };
+  return { sha, pr };
+}
+
+function runPr(pr, sha = repo.sha) {
+  return repo.runScript("ci-plan.mjs", {
+    event: { pull_request: pr },
+    overrides: { GITHUB_EVENT_NAME: "pull_request", GITHUB_SHA: sha },
+  });
+}
+
+describe("fast PR verification", () => {
+  it("uses fast checks for ordinary PRs without GitHub API access", () => {
+    const result = runPr({ ...repo.pr, user: { login: "contributor" } });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.outputs).toEqual({ mode: "pr", sha: repo.sha, version: "", "release-pr": "" });
+    expect(result.calls).toEqual([]);
   });
 
-  it("covers the language baseline's current workspace dependency closure", () => {
-    const root = fileURLToPath(new URL("../../packages/", import.meta.url));
-    const manifests = new Map(
-      readdirSync(root)
-        .filter((directory) => existsSync(join(root, directory, "package.json")))
-        .map((directory) => {
-          const manifest = JSON.parse(readFileSync(join(root, directory, "package.json"), "utf8"));
-          return [manifest.name, { directory, manifest }];
-        }),
-    );
-    const known = new Set([...manifests.values()].map(({ directory }) => directory));
-    const pending = ["@mrclrchtr/supi-code-intelligence", "@mrclrchtr/supi-test-utils"];
-    const visited = new Set();
-    while (pending.length > 0) {
-      const name = pending.pop();
-      if (visited.has(name)) continue;
-      visited.add(name);
-      const { directory, manifest } = manifests.get(name);
-      expect(selectCiJobs([`packages/${directory}/src/api.ts`], known).languageBaseline, name).toBe(
-        true,
-      );
-      for (const dependency of Object.keys({
-        ...manifest.dependencies,
-        ...manifest.devDependencies,
-        ...manifest.peerDependencies,
-        ...manifest.optionalDependencies,
-      })) {
-        if (manifests.has(dependency)) pending.push(dependency);
-      }
+  it("only grants the metadata path to a trusted version-only release PR", () => {
+    const { sha, pr } = releaseMerge();
+    const result = runPr(pr, sha);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.outputs).toEqual({ mode: "metadata", sha, version: "6.3.2", "release-pr": "" });
+    for (const untrusted of [
+      { user: { login: "contributor", type: "User" } },
+      { head: { ...pr.head, repo: { full_name: "fork/supi" } } },
+      { head: { ...pr.head, ref: "release-lookalike" } },
+      { labels: [] },
+      { title: "chore: release 99.0.0" },
+    ]) {
+      expect(runPr({ ...pr, ...untrusted }, sha).outputs.mode).toBe("pr");
     }
+  }, 10_000);
+
+  it.each(["dependency", "code", "symlink", "stale-parent"])(
+    "falls back to ordinary checks for unexpected %s changes",
+    (change) => {
+      const { pr } = releaseMerge();
+      repo.git(["reset", "--hard", pr.head.sha]);
+      if (change === "dependency")
+        repo.updateJson("package.json", { dependencies: { unexpected: "1.0.0" } });
+      if (change === "code") {
+        writeFileSync(join(repo.cwd, "unexpected.mjs"), "throw new Error('unexpected');\n");
+        repo.git(["add", "unexpected.mjs"]);
+      }
+      if (change === "symlink") {
+        repo.git(["rm", "CHANGELOG.md"]);
+        repo.git([
+          "update-index",
+          "--add",
+          "--cacheinfo",
+          `120000,${repo.git(["hash-object", "package.json"])},CHANGELOG.md`,
+        ]);
+      }
+      repo.git(["commit", "--allow-empty", "-am", "test: unexpected changes"]);
+      const head = repo.git(["rev-parse", "HEAD"]);
+      repo.git(["checkout", "--detach", pr.base.sha]);
+      repo.git(["merge", "--no-ff", head, "-m", "test: PR merge"]);
+      const sha = repo.git(["rev-parse", "HEAD"]);
+      const updated = { ...pr, head: { ...pr.head, sha: head } };
+      if (change === "stale-parent") updated.base = { ...pr.base, sha: "a".repeat(40) };
+      expect(runPr(updated, sha).outputs.mode).toBe("pr");
+    },
+  );
+});
+
+describe("release candidate planning", () => {
+  it("does no heavy work on an ordinary main push", () => {
+    const result = repo.runScript("ci-plan.mjs", {
+      responses: {
+        [`GET ${root}/commits/${repo.sha}/pulls?per_page=100&page=1`]: response([]),
+      },
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.outputs.mode).toBe("none");
+  });
+
+  it("selects full verification and a fixed SHA for a merged release PR", () => {
+    const result = repo.runScript("ci-plan.mjs", { responses: pushResponses() });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.outputs).toEqual({
+      mode: "full",
+      sha: repo.sha,
+      version: "6.3.1",
+      "release-pr": "42",
+    });
+  });
+
+  it("reads all association pages rather than missing a queued release", () => {
+    const responses = pushResponses();
+    responses[`GET ${root}/commits/${repo.sha}/pulls?per_page=100&page=1`] = response(
+      Array.from({ length: 100 }, () => ({ user: {} })),
+    );
+    responses[`GET ${root}/commits/${repo.sha}/pulls?per_page=100&page=2`] = response([repo.pr]);
+    expect(repo.runScript("ci-plan.mjs", { responses }).outputs.mode).toBe("full");
+  });
+
+  it.each([
+    { merged: false },
+    { merge_commit_sha: "a".repeat(40) },
+    { title: "chore: release 99.0.0" },
+    { user: { login: "contributor", type: "User" } },
+  ])("fails closed when the detailed candidate no longer matches: %j", (fields) => {
+    const responses = pushResponses();
+    responses[`GET ${root}/pulls/42`] = response({ ...repo.pr, ...fields });
+    const result = repo.runScript("ci-plan.mjs", { responses });
+    expect(result.status).not.toBe(0);
+    expect(result.outputs).toEqual({});
+  });
+
+  it("does not turn API failures into a successful no-release decision", () => {
+    const result = repo.runScript("ci-plan.mjs", { responses: {} });
+    expect(result.status).not.toBe(0);
+    expect(result.outputs).toEqual({});
   });
 });
 
-describe("CI planning command", () => {
-  it("compares the PR merge tree against its actual main-side parent", () => {
-    const repo = repository();
-    repo.git("checkout", "--quiet", "-b", "feature");
-    repo.write("packages/supi-extras/src/extension.ts", "export const feature = true;\n");
-    const head = repo.commit();
-    repo.git("checkout", "--quiet", "main");
-    repo.write("packages/supi-core/src/config.ts", "export const updatedOnMain = true;\n");
-    const base = repo.commit();
-    repo.git("merge", "--quiet", "--no-ff", "feature", "-m", "test: synthetic PR merge");
-    const plan = repo.run("pull_request", {
-      pull_request: { base: { sha: base }, head: { sha: head } },
+describe("manual verification and retries", () => {
+  function dispatch(inputs = {}, responses = {}, overrides = {}) {
+    return repo.runScript("ci-plan.mjs", {
+      event: { inputs },
+      responses,
+      overrides: { GITHUB_EVENT_NAME: "workflow_dispatch", ...overrides },
     });
-    expect(plan.outputs).toEqual({ "language-baseline": "false", installer: "false" });
-    const stale = repo.run("pull_request", {
-      pull_request: { base: { sha: repo.base }, head: { sha: head } },
+  }
+
+  it("runs exhaustive checks without release creation when no retry is selected", () => {
+    const result = dispatch();
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.outputs).toEqual({ mode: "full", sha: repo.sha, version: "", "release-pr": "" });
+  });
+
+  it("retries a merged candidate at its SHA even after main advances", () => {
+    repo.updateJson("package.json", { version: "6.4.0" });
+    const main = repo.commit();
+    const result = dispatch(
+      { release_pr: "42" },
+      { [`GET ${root}/pulls/42`]: response(repo.pr) },
+      { GITHUB_SHA: main },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.outputs).toEqual({
+      mode: "full",
+      sha: repo.sha,
+      version: "6.3.1",
+      "release-pr": "42",
     });
-    expect(stale.outputs).toEqual({ "language-baseline": "true", installer: "true" });
-  }, 10_000);
+  });
 
-  it("compares the entire push, not only its last commit", () => {
-    const repo = repository();
-    repo.write("packages/supi-core/src/config.ts", "export const changed = true;\n");
-    repo.commit();
-    repo.write("README.md", "Documentation\n");
-    const after = repo.commit();
-    const plan = repo.run("push", { before: repo.base, after });
-    expect(plan.outputs).toEqual({ "language-baseline": "true", installer: "false" });
-    expect(plan.summary).toContain("push");
-  }, 10_000);
-
-  it.each(["delete", "rename"])(
-    "includes the original path of a %s",
-    (operation) => {
-      const repo = repository();
-      const original = "packages/supi-core/src/config.ts";
-      if (operation === "delete") {
-        repo.git("rm", original);
-      } else {
-        repo.git("mv", original, "packages/supi-extras/moved.ts");
-      }
-      const after = repo.commit();
-      expect(repo.run("push", { before: repo.base, after }).outputs).toEqual({
-        "language-baseline": "true",
-        installer: "false",
-      });
-    },
-    10_000,
-  );
-
-  it("preserves unusual filenames in Git's NUL-delimited diff", () => {
-    const repo = repository();
-    repo.write("packages/supi-installer/new\nname.mjs", "export {};\n");
-    const after = repo.commit();
-    expect(repo.run("push", { before: repo.base, after }).outputs).toEqual({
-      "language-baseline": "false",
-      installer: "true",
+  it("verifies an annotated tag's commit rather than the newer main checkout", () => {
+    repo.git(["-c", "tag.gpgsign=false", "tag", "-a", "v6.3.1", "-m", "Release", repo.sha]);
+    repo.updateJson("package.json", { version: "6.4.0" });
+    const main = repo.commit();
+    const result = dispatch(
+      { publish_tag: "v6.3.1" },
+      {
+        [`GET ${root}/releases/tags/v6.3.1`]: response({ tag_name: "v6.3.1", draft: false }),
+        [`GET ${root}/commits/v6.3.1`]: response({
+          sha: repo.git(["rev-parse", "v6.3.1^{commit}"]),
+        }),
+      },
+      { GITHUB_SHA: main },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.outputs).toEqual({
+      mode: "full",
+      sha: repo.sha,
+      version: "6.3.1",
+      "release-pr": "",
     });
-  }, 10_000);
+  });
 
   it.each([
-    "missing-history",
-    "new-branch",
-    "wrong-checkout",
-    "non-merge-pr",
-    "unsupported-event",
-    "manual",
-  ])(
-    "runs both matrices for %s",
-    (scenario) => {
-      const repo = repository();
-      repo.write("README.md", "Only docs changed\n");
-      const after = repo.commit();
-      let eventName = "push";
-      let event = { before: repo.base, after };
-      let sha = after;
-      if (scenario === "missing-history") event.before = "f".repeat(40);
-      if (scenario === "new-branch") event.before = "0".repeat(40);
-      if (scenario === "wrong-checkout") sha = repo.base;
-      if (scenario === "non-merge-pr") {
-        eventName = "pull_request";
-        event = { pull_request: { base: { sha: repo.base }, head: { sha: after } } };
-      }
-      if (scenario === "unsupported-event") eventName = "schedule";
-      if (scenario === "manual") eventName = "workflow_dispatch";
-      const plan = repo.run(eventName, event, sha);
-      expect(plan.outputs).toEqual({ "language-baseline": "true", installer: "true" });
-      expect(plan.summary.toLowerCase()).toContain("full verification");
-    },
-    10_000,
-  );
+    [{ publish_tag: "v6.3.1", release_pr: "42" }, {}],
+    [{ publish_tag: "main" }, {}],
+    [{ publish_tag: "v6.3.1\nx=y" }, {}],
+    [{ release_pr: "--help" }, {}],
+    [{ release_pr: "42" }, { GITHUB_REF: "refs/heads/other" }],
+  ])("rejects invalid retry input before API access: %j", (inputs, overrides) => {
+    const result = dispatch(inputs, {}, overrides);
+    expect(result.status).not.toBe(0);
+    expect(result.outputs).toEqual({});
+    expect(result.calls).toEqual([]);
+  });
+
+  it.each([
+    { tag_name: "v6.3.1", draft: true },
+    { tag_name: "v6.3.0", draft: false },
+  ])("rejects an unpublished or mismatched retry release: %j", (release) => {
+    const result = dispatch(
+      { publish_tag: "v6.3.1" },
+      { [`GET ${root}/releases/tags/v6.3.1`]: response(release) },
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.outputs).toEqual({});
+  });
 });

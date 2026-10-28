@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -61,27 +61,60 @@ if (sorted.length !== pkgMap.size) {
 
 const tarballDir = mkdtempSync(join(tmpdir(), "supi-publish-"));
 
+/** Let npm resolve SemVer ranges; only E404 means no matching published version. */
+function registryVersions(spec) {
+  let output;
+  try {
+    output = execFileSync("npm", ["view", spec, "version", "--json"], {
+      encoding: "utf8",
+      stdio: "pipe",
+    });
+  } catch (error) {
+    let code;
+    try {
+      code = JSON.parse(error.stdout).error?.code;
+    } catch {
+      // Network/authentication/invalid responses must not authorize a publish or latest update.
+    }
+    if (code === "E404") return [];
+    throw error;
+  }
+  const versions = JSON.parse(output);
+  if (typeof versions === "string") return [versions];
+  if (Array.isArray(versions) && versions.every((version) => typeof version === "string"))
+    return versions;
+  throw new Error(`Invalid registry versions response for ${spec}`);
+}
+
 async function publishAll() {
   for (const path of sorted) {
     const pkg = pkgMap.get(path);
     const { name, version } = pkg;
 
     // Idempotent skip — handles retries without failing.
-    try {
-      execSync(`npm view "${name}@${version}" version`, { stdio: "pipe" });
+    if (registryVersions(`${name}@${version}`).includes(version)) {
       console.log(`${name}@${version} already published — skipping`);
       continue;
-    } catch {
-      // Not published yet; proceed.
     }
+    // Publication is serialized across versions in CI. Older recovery and prereleases must
+    // not regress the shared latest dist-tag or hit npm's implicit-latest version guard.
+    const prerelease = version.split("+")[0].includes("-");
+    const tag =
+      prerelease || registryVersions(`${name}@>${version}`).length > 0
+        ? `release-${version}`
+        : "latest";
 
     console.log(`Packing ${name}@${version} from staged copy ...`);
     const tarballPath = await packStaged(resolve(path), { outDir: tarballDir });
 
     console.log(`Publishing ${name}@${version} from ${tarballPath} ...`);
-    execSync(`npm publish "${tarballPath}" --access public --provenance`, {
-      stdio: "inherit",
-    });
+    execFileSync(
+      "npm",
+      ["publish", tarballPath, "--access", "public", "--provenance", "--tag", tag],
+      {
+        stdio: "inherit",
+      },
+    );
   }
 }
 

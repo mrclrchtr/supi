@@ -47,9 +47,19 @@ function readPublicPackage(manifestPath, releaseVersion) {
   return pkg;
 }
 
+/** Reject missing or unsafe release identity before writing workflow outputs or accessing npm. */
+export function validateReleaseIdentity(releaseSha, releaseVersion) {
+  if (typeof releaseSha !== "string" || !/^[0-9a-f]{40}$/.test(releaseSha)) {
+    throw invalidField("RELEASE_SHA", "a 40-character lowercase commit SHA", releaseSha);
+  }
+  if (typeof releaseVersion !== "string" || !RELEASE_VERSION_PATTERN.test(releaseVersion)) {
+    throw invalidField("RELEASE_VERSION", "a SemVer version without a v prefix", releaseVersion);
+  }
+}
+
 /**
- * Check the release identity and all public package versions before npm access.
- * RELEASE_SHA and RELEASE_VERSION come from root Release Please outputs or a
+ * Check the release identity and all public package versions before tagging or npm access.
+ * RELEASE_SHA and RELEASE_VERSION identify a trusted merged release PR or a
  * validated published GitHub release tag selected by a manual retry.
  * Read packages only from the current checkout. Never select a subset from paths_released.
  * The workflow also checks required inputs before checkout, when this script is not available.
@@ -58,12 +68,7 @@ function readPublicPackage(manifestPath, releaseVersion) {
  */
 export function validateReleaseCheckout() {
   const { RELEASE_SHA: releaseSha, RELEASE_VERSION: releaseVersion } = process.env;
-  if (typeof releaseSha !== "string" || !/^[0-9a-f]{40}$/.test(releaseSha)) {
-    throw invalidField("RELEASE_SHA", "a 40-character lowercase commit SHA", releaseSha);
-  }
-  if (typeof releaseVersion !== "string" || !RELEASE_VERSION_PATTERN.test(releaseVersion)) {
-    throw invalidField("RELEASE_VERSION", "a SemVer version without a v prefix", releaseVersion);
-  }
+  validateReleaseIdentity(releaseSha, releaseVersion);
 
   const head = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   if (head !== releaseSha) throw invalidField("HEAD", JSON.stringify(releaseSha), head);

@@ -1,58 +1,85 @@
-# CI verification selection
+# CI and release gates
 
-`.github/workflows/ci.yml` runs workspace checks and the complete, unsharded test suite on every PR and main push. Runner selection and release/publish gates are unchanged by matrix selection.
+## Verification policy
 
-## Runner policy
-
-- Non-publishing Linux jobs use `avrea-ubuntu-latest-2-vcpu`, including Linux matrix legs and the minimum-Node installer check.
-- Required cross-platform matrix legs retain the GitHub-hosted macOS and Windows runners.
-- npm publishing uses the official GitHub-hosted `ubuntu-latest` runner for trusted publishing, for both automatic releases and manual retries. Release Please and skill synchronization stay on Avrea.
-
-## Matrix selection
-
-`scripts/ci-plan.mjs` selects only the language-baseline and installer matrices:
-
-| Changes | Language baseline | Installer |
+| Event | Checks | Release effects |
 | --- | --- | --- |
-| Code Intelligence, Code Runtime, Core, LSP, Tree-sitter packages | Run | Skip |
-| Shared test utilities | Run | Run |
-| Installer or skill-patch packages | Skip | Run |
-| `scripts/language-baseline/` | Run | Skip |
-| Any workspace package manifest | Run | Run |
-| Other existing packages | Skip | Skip |
-| Root Markdown/license, `docs/`, `assets/`, `screenshots/`, `skills/` | Skip | Skip |
-| Shared configuration, other scripts, `.github/`, `.gitattributes`, unknown infrastructure or packages | Run | Run |
+| Ordinary PR | Actionlint, Conventional Commits, Biome, TypeScript, skills, WASM/config consistency, focused CI/release regression tests | None |
+| Trusted version-only release PR | Actionlint, Conventional Commits, release/config consistency | None |
+| Ordinary main push | Read-only release-candidate discovery | Release Please updates its PR independently |
+| Merged release PR on main | Complete workspace checks, unsharded test suite, staged tarball verification, both full cross-platform matrices | Tag/release creation, then npm publishing, only after verification succeeds |
+| Manual CI run without inputs | Same exhaustive verification at the selected event commit | None |
+| Manual `release_pr` retry | Same exhaustive verification at that PR's merge commit | Recover tag/release creation and publishing |
+| Manual `publish_tag` retry | Same exhaustive verification at the existing release tag's commit | Retry npm publishing only |
 
-Rules combine across the complete change. Package rules include all files, including Markdown fixtures. Shared-input rules take precedence over package-specific selection.
+The complete test suite, tarball verification, and cross-platform matrices are release gates, not main-branch admission checks. `main` may contain failures that only exhaustive verification detects. Run manual full verification when early cross-platform feedback is needed.
 
-- PRs compare the exact checked-out merge commit with its main-side parent, after verifying both parents against the event.
-- Main pushes compare the event's `before` and `after` commits, not just the last commit.
-- Deletions and both sides of renames participate in selection.
-- Missing history, unexpected checkout/event data, or comparison errors run both matrices.
-- A manual **Run workflow** (`workflow_dispatch`) runs both matrices without change filtering and never creates releases. Publishing is skipped unless `publish_tag` selects an existing release for retry.
-- The planner writes its comparison/fallback reason and selections to the job summary.
+## Workflow ownership
 
-The language-baseline matrix retains Linux and macOS. The installer matrix retains Linux, macOS, Windows, and the minimum Node runtime. Installer selection also covers the skill-patch line-ending regression.
+- `.github/workflows/ci.yml` owns checks, release-candidate verification, tag/release creation, and npm publishing.
+- `.github/workflows/release-please.yml` maintains release PRs on main pushes or manual dispatch. It installs no workspace dependencies and sets `skip-github-release: true`.
+- `.github/workflows/skills-sync.yml` retains the independent upstream-skill regeneration flow.
+- Keep npm publishing in `ci.yml`: its filename is part of the existing npm trusted-publisher identity.
+- Release Please's release action cannot select an immutable candidate SHA. `scripts/create-release.mjs` creates the Git tag and GitHub release explicitly at the verified SHA, then applies `autorelease: tagged` and removes `autorelease: pending` so Release Please can maintain subsequent PRs.
 
-## Retry release publishing
+## Planning and immutable checkouts
 
-Use the existing CI workflow so the npm trusted-publisher workflow identity stays unchanged:
+`scripts/ci-plan.mjs` emits one mode and an exact checkout SHA:
+
+| Mode | Selection |
+| --- | --- |
+| `pr` | Ordinary PR or an unrecognized/non-metadata release PR |
+| `metadata` | Trusted release PR with only permitted metadata changes |
+| `full` | Merged release PR or manual full verification/retry |
+| `none` | Ordinary main push; no duplicate PR checks |
+
+- Release PR identity requires the `mrclrchtr-bot[bot]` app, the repository's Release Please branch, same-repository head and base, main as the base, and an `autorelease: pending` or `autorelease: tagged` label. A title or branch name alone is insufficient.
+- The metadata-only path verifies the synthetic PR merge's parents against the event. Permitted changes are a regular-file changelog, the root release-manifest version, and version-only updates to the root/configured public package manifests. Unexpected content, file types, or uncertain comparisons fall back to ordinary PR checks.
+- Main-push discovery paginates the commit-associated PRs, then requires a trusted merged release PR whose merge SHA equals the event SHA and whose title matches the candidate version. API errors and ambiguous/inconsistent candidate data fail planning.
+- Every source check and published package uses the planner's SHA, including manual retries. A newer main commit is never substituted for a candidate or existing tag. Release/publishing tooling is checked out separately from the immutable workflow-event SHA, so retries of older candidates retain current safety policy without changing package contents.
+- Manual release/publish retries must use the workflow definition on `main`; their candidate must remain an ancestor of that main checkout. Version, checkout SHA, release manifest, and every public package version are validated before dependencies/npm access.
+- Exhaustive verification never uses path filtering: both language-baseline legs and every installer leg must pass.
+
+## Release safety and concurrency
+
+- Keep required PR check names `actionlint`, `conventional-commits`, and `verify` stable.
+- `verify` requires successful planning, actionlint, Conventional Commits, and workspace checks. Full verification additionally requires successful tests and both matrices. PR modes require those heavy jobs to be intentionally skipped. Missing/unknown modes, missing results, cancellations, and unexpected skips fail verification.
+- Tagging requires a successful full gate and a merged release PR. Publishing requires that gate plus successful release creation, or an explicitly selected existing tag on a manual retry. Manual verification without inputs never releases.
+- Immediately before tagging, revalidate the candidate's checkout, package versions, merged PR identity, ancestry on main, and first changelog entry.
+- Existing tags are never moved. Annotated tags are peeled to their commit. An existing tag at another SHA, a draft/mismatched release, or an API failure blocks release creation. Tag-only/fully-created releases can be recovered without deleting or recreating a tag/release.
+- PR checks cancel superseded runs. Distinct main runs do not replace queued verification candidates. Creation serializes by version; npm publishing uses one cross-version concurrency group because packages share dist-tags. GitHub concurrency is not a durable FIFO: newer arrivals can replace pending publication jobs; retry their tag explicitly if needed. Release-PR maintenance can coalesce queued main pushes independently.
+- npm resolves whether a newer stable package version exists. Stable releases with no newer version publish with `--tag latest`; older recovery and prereleases use a version-specific `release-<version>` tag and never move `latest` backwards. Registry failures other than an explicit E404 block publication. Already-published versions are skipped.
+
+## Manual operations
+
+Full verification without publishing:
+
+```bash
+gh workflow run ci.yml --repo mrclrchtr/supi --ref main
+```
+
+Retry a merged release candidate after checks/tagging failed, even if main has advanced:
+
+```bash
+gh workflow run ci.yml --repo mrclrchtr/supi --ref main -f release_pr=123
+```
+
+Retry publishing an existing, non-draft GitHub release:
 
 ```bash
 gh workflow run ci.yml --repo mrclrchtr/supi --ref main -f publish_tag=v1.2.3
 ```
 
-- Replace `v1.2.3` with an existing published GitHub release tag. Do not delete or recreate the release or move its tag.
-- The workflow definition must already be on `main`. Re-running an older run retains its original workflow definition and runner.
-- Retry publishing uses the same publishing job, only from `main`, after actionlint, conventional-commit checks, and verification succeed. Release Please remains skipped for manual runs.
-- The resolver requires a versioned, non-draft GitHub release and resolves its tag to a commit SHA, including annotated tags. Checkout is pinned to that SHA; the version comes from the tag without `v`.
-- Before installing dependencies or accessing npm, the release validator checks the checkout SHA, root version, release manifest, and every public package version. Already-published package versions are skipped by the publisher.
+- Select only one retry input. Use the real release PR number/tag; do not delete/recreate releases or move tags.
+- Re-running an older Actions run retains its original workflow definition. Dispatch the current workflow on main to use the new flow.
+- The publisher skips package versions already on npm.
 
-## Required checks and maintenance
+## Runner policy
 
-- Keep required check names `actionlint`, `conventional-commits`, and `verify` stable.
-- `verify` requires successful planning, workspace checks, and tests. Each selected matrix must succeed; each unselected matrix must be skipped. Missing outputs, failures, cancellations, and unexpected skips fail verification.
-- Update package selection when workspace dependencies change. The planner regression suite checks the language baseline's workspace dependency closure.
-- Release/publish conditions explicitly check direct dependency success and cancellation so planned matrix skips cannot propagate past `verify` and suppress releases.
-- Release PRs have no special bypass. Their package-version changes select both matrices.
-- Routine Renovate minor, patch, pin, and digest updates share a group unless a later dedicated-group rule applies. Upstream skills remain separate and manually reviewed; Pi remains manually upgraded. Existing schedules and automerge policies are retained.
+- Non-publishing Linux jobs use `avrea-ubuntu-latest-2-vcpu`, including Linux matrix legs and the minimum-Node installer check.
+- Language acceptance retains Linux and macOS. Installer verification retains Linux, macOS, Windows, and the minimum Node runtime, including the skill-patch line-ending regression.
+- npm publishing uses the official GitHub-hosted `ubuntu-latest` runner for trusted publishing, for automatic releases and manual retries.
+
+## Dependency maintenance
+
+Routine Renovate minor, patch, pin, and digest updates share a group unless a later dedicated-group rule applies. Upstream skills remain separate and manually reviewed; Pi remains manually upgraded. Existing schedules and automerge policies are retained.
