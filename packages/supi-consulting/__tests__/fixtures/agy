@@ -52,7 +52,7 @@ process.stdin.on("end", () => {
     return;
   }
   const expectedRoots = userEvent.message.content.match(/^read-only-roots=(.*)$/)?.[1];
-  if (expectedRoots) {
+  {
     const roots = args.flatMap((arg, index) =>
       arg === "--add-dir" ? [args[index + 1]] : [],
     );
@@ -61,13 +61,14 @@ process.stdin.on("end", () => {
       "utf8",
     ));
     const expectedDenials = [
-      "write_file(*)", "command(*)", "unsandboxed(*)", "mcp(*)", "execute_url(*)",
+      "write_file(*)", "command(*)", "mcp(*)", "execute_url(*)",
     ];
     if (
-      JSON.stringify(roots) !== expectedRoots ||
+      (expectedRoots && JSON.stringify(roots) !== expectedRoots) ||
       settings.allowNonWorkspaceAccess !== false ||
       JSON.stringify(settings.permissions.allow) !== JSON.stringify(["read_url(*)"]) ||
-      expectedDenials.some((rule) => !settings.permissions.deny.includes(rule))
+      expectedDenials.some((rule) => !settings.permissions.deny.includes(rule)) ||
+      settings.permissions.deny.includes("unsandboxed(*)")
     ) {
       process.stderr.write("fixture expected per-process roots with unchanged inspection policy\n");
       process.exitCode = 1;
@@ -79,6 +80,10 @@ process.stdin.on("end", () => {
     conversationIndex < 0 || input.includes("different-conversation")
       ? `fixture-conversation-${randomUUID()}`
       : args[conversationIndex + 1];
+  const schemaIndex = args.indexOf("--json-schema");
+  const responseToken = JSON.parse(readFileSync(args[schemaIndex + 1], "utf8"))
+    .properties?.responseToken?.enum?.[0];
+  const answerFile = join(process.env.HOME, `${encodeURIComponent(conversationId)}.fixture-answer.json`);
   if (input.includes("malformed")) {
     process.stdout.write("not-json\n");
     return;
@@ -132,15 +137,83 @@ process.stdin.on("end", () => {
   const emitResult = () => {
     const scenario = userEvent.message.content.match(/^response-case=([\w-]+)/)?.[1];
     if (scenario) {
-      emitResponseCase(scenario, conversationId, emitEvent);
+      emitResponseCase(scenario, conversationId, emitEvent, responseToken);
       return;
     }
     emitEvent({ event: "init", conversation_id: conversationId, init: {} });
-    if (input.includes("fail")) {
+    if (input.includes("stale-follow-up")) {
+      emitEvent({ event: "step_update", step_update: {
+        step_type: "agent_response", state: "DONE", text_delta: "Fresh follow-up answer.",
+      } });
+      emitEvent({ event: "result", result: {
+        conversation_id: conversationId, status: "SUCCESS",
+        structured_output: JSON.parse(readFileSync(answerFile, "utf8")),
+      } });
+      return;
+    }
+    if (userEvent.message.content.startsWith("summary-events=")) {
+      const { events, denied_actions } = JSON.parse(userEvent.message.content.slice("summary-events=".length));
+      for (const event of events) emitEvent(event);
+      emitEvent({ event: "result", result: {
+        conversation_id: conversationId, status: "SUCCESS", denied_actions,
+      } });
+      return;
+    }
+    if (userEvent.message.content.startsWith("fail")) {
       emitEvent({
         event: "result",
         result: { conversation_id: conversationId, status: "ERROR" },
       });
+      return;
+    }
+    const resourceEvents = userEvent.message.content.startsWith("resource-events=")
+      ? userEvent.message.content.slice("resource-events=".length)
+      : undefined;
+    if (resourceEvents) {
+      const events = JSON.parse(resourceEvents);
+      for (const event of events) emitEvent(event);
+      if (!events.some((event) => event.event === "result" || event.type === "result")) {
+        emitEvent({ event: "result", result: { conversation_id: conversationId, status: "SUCCESS" } });
+      }
+      return;
+    }
+    if (input.includes("denied-pending")) {
+      emitEvent({
+        type: "tool_result",
+        tool_use_id: "pending-read",
+        name: "read_file",
+        status: "in_progress",
+        input: { path: "/private/tmp/private-image.png" },
+      });
+      emitEvent({ type: "tool_result", tool_use_id: "pending-read", status: "permission_denied" });
+      emitEvent({ event: "result", result: { conversation_id: conversationId, status: "SUCCESS" } });
+      return;
+    }
+    const deniedTarget = userEvent.message.content.match(/^denied-target=(.*)$/)?.[1];
+    if (deniedTarget) {
+      const { name, path } = JSON.parse(deniedTarget);
+      const stepIndex = nextStepIndex++;
+      emitToolStep(stepIndex, "ACTIVE", name, { Path: path });
+      emitToolStep(stepIndex, "ERROR", name, undefined, { message: "Permission denied" });
+      emitEvent({ event: "result", result: { conversation_id: conversationId, status: "SUCCESS" } });
+      return;
+    }
+    if (input.includes("denied-inspection")) {
+      for (const command of [
+        "curl -I http://localhost:6006 -H 'X-Fixture-Private: fixture-auth'",
+        "agent-browser --version",
+        "git status",
+      ]) {
+        emitToolPair("run_command", { CommandLine: command }, "ERROR", {
+          message: `Permission denied for command(${command}). Matches user-configured deny rule.`,
+        });
+      }
+      const parameters = { Path: "/private/tmp/private-image.png" };
+      const error = { message: "Permission denied: private diagnostic text" };
+      emitToolPair("read_file", parameters, "ERROR", error);
+      // Repeated terminal updates must not inflate the denial counts.
+      emitToolStep(nextStepIndex - 1, "ERROR", "read_file", parameters, error);
+      emitEvent({ event: "result", result: { conversation_id: conversationId, status: "SUCCESS" } });
       return;
     }
     if (input.includes("denied-incomplete")) {
@@ -175,28 +248,30 @@ process.stdin.on("end", () => {
     const workspaceEvidence = input.includes("workspace")
       ? [{ path: "README.md", summary: "fixture file" }]
       : [];
-    emitEvent({
-      event: "result",
-      result: {
-        conversation_id: conversationId,
-        status: "SUCCESS",
-        usage: { input_tokens: 4, output_tokens: 6 },
-        structured_output: {
+    const structuredOutput = {
+          ...(responseToken ? { responseToken } : {}),
           answer: conversationIndex >= 0
             ? "The prior consultation is retained."
             : "Node documentation explains child process cancellation.",
           sources: [{ title: "Node.js child_process", url: "https://nodejs.org/api/child_process.html" }],
           workspaceEvidence,
-        },
-      },
-    });
+    };
+    writeFileSync(answerFile, JSON.stringify(structuredOutput));
+    emitEvent({ event: "result", result: {
+      conversation_id: conversationId,
+      status: "SUCCESS",
+      usage: { input_tokens: 4, output_tokens: 6 },
+      structured_output: structuredOutput,
+    } });
   };
   if (input.includes("delay")) setTimeout(emitResult, 250);
   else emitResult();
 });
 
-function emitResponseCase(scenario, conversationId, emitEvent) {
-  const answer = { answer: "Done.", sources: [], workspaceEvidence: [] };
+function emitResponseCase(scenario, conversationId, emitEvent, responseToken) {
+  const answer = { answer: "Done.", sources: [], workspaceEvidence: [], ...(responseToken ? { responseToken } : {}) };
+  if (scenario === "missing-response-token") delete answer.responseToken;
+  if (scenario === "wrong-response-token") answer.responseToken = "not-the-current-request";
   const result = { status: "SUCCESS", structured_output: answer };
   if (scenario !== "missing-conversation") {
     emitEvent({ event: "init", conversation_id: conversationId });

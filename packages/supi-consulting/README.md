@@ -109,12 +109,16 @@ Directory registration and deny-rule precedence follow Antigravity's [CLI refere
 
 Execution failures report a fixed reason when the adapter can identify it:
 
-- Missing final result, missing structured answer, or answer schema mismatch.
+- Missing final result, missing structured answer, answer schema mismatch, or an answer not bound to the current request.
 - Unsuccessful final result or data received after the final result.
 - Malformed JSON, a non-object event, or an output limit exceeded.
 - Missing conversation identifier, process failure, timeout, or cancellation.
 
+Each invocation adds a unique response token to its private answer schema and validates the returned token locally before accepting the answer. The token is removed from public results and excluded from failure diagnostics. This prevents a resumed Antigravity conversation's previous structured answer from being accepted as the current result. Missing or mismatched tokens fail with `unbound-answer`; plain-text answers are not substituted for the structured contract. A started follow-up that fails retires its Conversation Handle; start a new Consultation.
+
 An observed tool permission denial is reported separately. It does not prove the cause of a later failure. A denial does not fail a Consultation that returns a valid answer. Workspace Access alone does not grant access to files outside the selected workspace; configure additional read-only directories explicitly.
+
+Failure messages returned to the calling agent include the observed terminal status and denial counts by fixed operation category (`command`, `file-read`, `file-write`, `web-read`, `browser`, `mcp`, or `other`). They distinguish a successful agent terminal status from a usable final answer and recommend permitted inspection or a limited/blocked report rather than repeating denied actions unchanged. This feedback remains available when Debug is disabled.
 
 When SuPi Debug is enabled, failed executions emit one `consulting/consultation.failed` event at `error` level. Cancellations emit `consulting/consultation.cancelled` at `info` level. Use the `debug` tool:
 
@@ -124,11 +128,24 @@ When SuPi Debug is enabled, failed executions emit one `consulting/consultation.
 
 Omit `level` to include cancellations. Add `sessionFile` to inspect events persisted in a saved PI session. A response aborted before the adapter starts has no Consulting event.
 
-Events contain the execution phase, timing, selected model, workspace-access and follow-up flags, failure category and reason, and available event counts, terminal-state flags, permission-denial count, and exit code. They exclude prompts, answers, resource paths, conversation IDs, raw stdout, stderr, tool payloads, and error causes, even when raw Debug access is enabled. The event's `cwd` identifies the selected working directory. Failure messages remain specific when Debug is disabled.
+Events contain the execution phase, timing, selected model, workspace-access and follow-up flags, failure category and reason, and available event counts, terminal-state flags, permission-denial count, and exit code. `permissionDenialsByOperation` breaks down deduplicated denials by fixed category; unknown tool names become `other`. `deniedFileAccessOutsideReadRoots` counts denied file operations whose requested paths resolve outside the selected directory and configured additional read-only directories, following symlinks and existing parents of missing targets. Unavailable path information, dangling symlink destinations, and paths containing parent traversal (`..`) remain unclassified rather than risking an incorrect outside-root claim. This location observation does not identify which rule caused a denial.
+
+Antigravity's terminal `denied_actions` summary can establish a denial even when its detailed tool-error update is absent. It establishes a minimum of one observation per operation category, not additional calls on top of already-correlated denials. Summary entries have no tool-call IDs or file parameters, so the adapter does not attribute them to nearby or unfinished file requests.
+
+Failures also include bounded requested file-target metadata in both Debug and caller-visible feedback:
+
+- `deniedResources` lists at most eight distinct `{ operation, requestedPath }` references for known file operations observed as denied. Targets come from structured parameters on the denied event or earlier updates correlated by tool-call ID, never from error text, command parsing, nearby calls, or transcripts.
+- `requestedPath` preserves the supplied path, including significant whitespace. It is not a canonical filesystem path or the permission checker's resolved target, and does not identify a permanent path blacklist or the denying rule. Paths are limited to 1,024 UTF-16 characters; longer paths are unavailable rather than silently shortened.
+- `deniedResourcesOmitted` counts file-denial observations whose known targets were omitted because the list was full, not unique omitted paths. Repeated denials for listed targets do not duplicate entries.
+- `deniedResourcePathsUnavailable` counts known file-denial observations without an available, bounded structured target. Missing correlation or parameters remain unknown; the adapter does not infer a path from prose. Explicit replacement targets supersede earlier metadata, including when the replacement is invalid or overlong; only omitted path parameters preserve an earlier target.
+- `unfinishedResources` separately lists at most eight distinct requested targets from ID-correlated file calls with no observed terminal outcome. These are **unknown outcomes, not confirmed denials**, even if a terminal summary reports the same operation category. Successful and already-denied calls are excluded. `unfinishedResourcesOmitted` counts capacity-omitted observations; `unfinishedResourcePathsUnavailable` counts observations lacking a usable target. The same path limits, replacement semantics, and deduplication rules apply as for denied resources.
+- Caller-visible references are JSON-quoted, with terminal control characters and line separators escaped. **Denied and unfinished requested paths can contain sensitive metadata and are exposed to the calling agent and persisted with enabled Debug events.**
+
+Events otherwise exclude prompts, answers, arbitrary tool names, raw stdout, stderr, complete tool payloads, and error causes, even when raw Debug access is enabled. The event's `cwd` identifies the selected working directory. Successful Consultations do not gain a failure event merely because an action was denied.
 
 ## Security limits
 
-The Antigravity adapter enforces its Inspection Permission Set in the Isolated Antigravity Home. It allows `read_url(*)` and denies known file writes, commands, unsandboxed actions, MCP, and URL execution. These rules are **not an operating-system sandbox**.
+The Antigravity adapter enforces its Inspection Permission Set in the Isolated Antigravity Home. It allows `read_url(*)` and denies known file writes, commands, MCP, and URL execution. The `command(*)` rule covers commands inside and outside Antigravity's terminal sandbox; the obsolete, ignored `unsandboxed(*)` rule is not emitted. These rules are **not an operating-system sandbox**.
 
 For Consultations with Workspace Access or additional read-only directories, project-local hooks can run commands, read the Antigravity transcript, and cause side effects outside these permission rules. The adapter probes hook state with the additional roots before the paid process and warns when hooks are active or unknown. Directory grants are intended for inspection artifacts, not untrusted project customizations.
 

@@ -1,9 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type IsolatedAntigravityPaths, prepareIsolatedAntigravityHome } from "../isolated-home.ts";
 import type { AntigravityExecutionFacts, AntigravityProgressCallback } from "../types.ts";
-import { eventType, toolName } from "./event-values.ts";
+import { eventType, isRecord, toolName } from "./event-values.ts";
 import { AntigravityEventAccumulator } from "./events.ts";
 import { MAX_STREAM_EVENTS, parseNdjsonLine, StreamLimitError } from "./ndjson.ts";
 import { AntigravityResponseError } from "./response-error.ts";
@@ -84,10 +85,28 @@ export async function runAntigravityConversation(options: {
     join(options.schemaDirectoryParent ?? tmpdir(), "supi-consulting-schema-"),
   );
   const schemaPath = join(schemaDirectory, "answer.json");
-  const accumulator = new AntigravityEventAccumulator({ workspaceDirectory: options.cwd });
+  const responseToken = randomUUID();
+  const accumulator = new AntigravityEventAccumulator({
+    expectedResponseToken: responseToken,
+    workspaceDirectory: options.cwd,
+    additionalReadOnlyDirectories: options.additionalReadOnlyDirectories,
+  });
   let eventCount = 0;
   try {
-    await writeFile(schemaPath, `${JSON.stringify(options.schema)}\n`, { mode: 0o600 });
+    // A resumed CLI can replay its previous structured output. Bind and locally
+    // validate this invocation rather than trusting terminal success or schema shape.
+    const schema = {
+      ...options.schema,
+      properties: {
+        ...(isRecord(options.schema.properties) ? options.schema.properties : {}),
+        responseToken: { type: "string", enum: [responseToken] },
+      },
+      required: [
+        ...(Array.isArray(options.schema.required) ? options.schema.required : []),
+        "responseToken",
+      ],
+    };
+    await writeFile(schemaPath, `${JSON.stringify(schema)}\n`, { mode: 0o600 });
     const args = buildAntigravityRunArguments({
       schemaPath,
       model: options.model,

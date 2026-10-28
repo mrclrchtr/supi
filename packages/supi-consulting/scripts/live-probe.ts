@@ -30,14 +30,17 @@ async function main(): Promise<void> {
   requireWebEvidence(first);
 
   const second = await adapter.execute({
-    prompt: `What exact context token did I give you? Answer in one sentence and include ${CONTEXT_TOKEN}.`,
+    prompt:
+      "Without using tools, return only the exact context token I gave you in the preceding request.",
     model: MODEL,
     canonicalWorkingDirectory: consultationWorkspace,
     workspaceAccess: false,
     continuation: first.continuation,
   });
-  if (!second.answer.answer.includes(CONTEXT_TOKEN)) {
-    throw new Error("The follow-up did not retain the Conversation Handle context.");
+  if (second.answer.answer.trim() !== CONTEXT_TOKEN) {
+    throw new Error(
+      "The follow-up did not return the requested current-turn answer from conversation context.",
+    );
   }
 
   const fixture = await realpath(await mkdtemp(join(tmpdir(), "supi-consulting-live-")));

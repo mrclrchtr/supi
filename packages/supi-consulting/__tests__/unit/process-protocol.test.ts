@@ -2,6 +2,32 @@ import { describe, expect, it } from "vitest";
 import { AntigravityEventAccumulator } from "../../src/agents/antigravity/process/events.ts";
 
 describe("Antigravity event protocol", () => {
+  it.each(["success", "permission_denied"])(
+    "counts ID-less %s activity once per event without inventing correlation",
+    (status) => {
+      for (const count of [1, 2]) {
+        const accumulator = new AntigravityEventAccumulator();
+        accumulator.consume({ event: "init", conversation_id: "id-less" });
+        for (let index = 0; index < count; index++) {
+          accumulator.consume({
+            type: "step_update",
+            step_type: "tool",
+            name: "read_file",
+            status,
+          });
+        }
+        accumulator.consume({
+          type: "result",
+          status: "success",
+          structured_output: { answer: "Done.", sources: [], workspaceEvidence: [] },
+        });
+        expect(accumulator.finish()).toMatchObject({
+          observedToolCounts: { read_file: count },
+          permissionDenials: status === "permission_denied" ? count : 0,
+        });
+      }
+    },
+  );
   it("reduces nested agy step update envelopes", () => {
     const accumulator = new AntigravityEventAccumulator();
     accumulator.consume({

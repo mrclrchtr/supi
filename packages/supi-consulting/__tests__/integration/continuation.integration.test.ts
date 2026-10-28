@@ -20,7 +20,10 @@ afterEach(async () => {
 });
 
 describe("consulting_run continuation identity", () => {
-  it("retires a handle when its agent returns a different conversation", async () => {
+  it.each([
+    { prompt: "different-conversation", failure: { kind: "conversation-mismatch" } },
+    { prompt: "stale-follow-up", failure: { kind: "invalid-response", reason: "unbound-answer" } },
+  ])("retires a started follow-up after $prompt", async ({ prompt, failure }) => {
     const root = await mkdtemp(join(tmpdir(), "supi-consulting-continuation-"));
     roots.push(root);
     vi.stubEnv("PATH", `${fixtureDirectory(import.meta.dirname)}:${process.env.PATH ?? ""}`);
@@ -51,16 +54,17 @@ describe("consulting_run continuation identity", () => {
       undefined,
       context,
     );
+    expect(JSON.stringify(first)).not.toContain("responseToken");
     const handle = first.details.handle;
     await expect(
       tool.execute(
         "changed-conversation",
-        { prompt: "different-conversation", continue: { handle } },
+        { prompt, continue: { handle } },
         undefined,
         undefined,
         context,
       ),
-    ).rejects.toMatchObject({ name: "ConsultingAgentError", kind: "conversation-mismatch" });
+    ).rejects.toMatchObject({ name: "ConsultingAgentError", ...failure });
     expect(pi.entries).toContainEqual({
       type: CONSULTING_HANDLE_ENTRY_TYPE,
       data: expect.objectContaining({ action: "retired", handle }),

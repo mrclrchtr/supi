@@ -88,7 +88,7 @@ describe("Isolated Antigravity Home", () => {
     expect(settings.permissions).toEqual({
       customPermission: true,
       allow: [...INSPECTION_PERMISSION_SET.permissions.allow],
-      deny: [...INSPECTION_PERMISSION_SET.permissions.deny],
+      deny: ["write_file(*)", "command(*)", "mcp(*)", "execute_url(*)"],
     });
     expect((await stat(paths.settingsPath)).mode & 0o777).toBe(0o600);
   });

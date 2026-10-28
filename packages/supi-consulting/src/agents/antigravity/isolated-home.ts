@@ -67,13 +67,7 @@ export const INSPECTION_PERMISSION_SET = Object.freeze({
   allowNonWorkspaceAccess: false,
   permissions: Object.freeze({
     allow: Object.freeze(["read_url(*)"]),
-    deny: Object.freeze([
-      "write_file(*)",
-      "command(*)",
-      "unsandboxed(*)",
-      "mcp(*)",
-      "execute_url(*)",
-    ]),
+    deny: Object.freeze(["write_file(*)", "command(*)", "mcp(*)", "execute_url(*)"]),
   }),
 });
 

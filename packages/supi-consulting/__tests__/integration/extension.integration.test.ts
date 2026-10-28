@@ -43,6 +43,11 @@ async function setup(): Promise<{ root: string; cwd: string }> {
   const root = await mkdtemp(join(tmpdir(), "supi-consulting-extension-"));
   const cwd = join(root, "repo");
   await mkdir(cwd, { recursive: true });
+  writeSupiConfig(
+    { section: CONSULTING_CONFIG_SECTION, scope: "project", cwd },
+    { additionalReadOnlyDirectories: [] },
+    { homeDir: root },
+  );
   roots.push(root);
   vi.stubEnv("PI_CODING_AGENT_DIR", root);
   return { root, cwd };

@@ -171,24 +171,42 @@ export function extractUrl(value: unknown): string | undefined {
   );
 }
 
-export function extractWorkspacePath(value: unknown): string | undefined {
-  return readBoundedField(value, [
-    "path",
-    "file",
-    "file_path",
-    "relative_path",
-    "directory_path",
-    "search_path",
-    "search_directory",
-    "absolute_path",
-    "directory",
-  ]);
+const WORKSPACE_PATH_FIELDS = [
+  "path",
+  "file",
+  "file_path",
+  "relative_path",
+  "directory_path",
+  "search_path",
+  "search_directory",
+  "absolute_path",
+  "directory",
+] as const;
+
+/** Distinguish an omitted path parameter from an explicitly supplied but invalid target. */
+export function structuredWorkspacePath(value: unknown): { value: unknown } | undefined {
+  if (!isRecord(value)) return undefined;
+  for (const name of WORKSPACE_PATH_FIELDS) {
+    for (const [key, field] of Object.entries(value)) {
+      if (normalizeFieldName(key) === normalizeFieldName(name)) return { value: field };
+    }
+  }
+  return undefined;
+}
+
+/** Read a structured path; requested-target diagnostics preserve significant filename whitespace. */
+export function extractWorkspacePath(
+  value: unknown,
+  options: { preserveWhitespace?: boolean } = {},
+): string | undefined {
+  return readBoundedField(value, WORKSPACE_PATH_FIELDS, () => true, options.preserveWhitespace);
 }
 
 function readBoundedField(
   value: unknown,
   names: readonly string[],
   predicate: (candidate: string) => boolean = () => true,
+  preserveWhitespace = false,
 ): string | undefined {
   if (!isRecord(value)) return undefined;
   const fields = Object.entries(value);
@@ -196,11 +214,18 @@ function readBoundedField(
     const normalizedName = normalizeFieldName(name);
     for (const [key, field] of fields) {
       if (normalizeFieldName(key) !== normalizedName) continue;
-      const candidate = safeString(field, 4_096);
+      const candidate = boundedFieldText(field, preserveWhitespace);
       if (candidate && predicate(candidate)) return candidate;
     }
   }
   return undefined;
+}
+
+function boundedFieldText(value: unknown, preserveWhitespace: boolean): string | undefined {
+  if (preserveWhitespace && typeof value === "string") {
+    return value.length > 0 && value.length <= 4_096 ? value : undefined;
+  }
+  return safeString(value, 4_096);
 }
 
 function normalizeFieldName(value: string): string {
@@ -246,6 +271,7 @@ function selectAnswerFields(value: Record<string, unknown>): Record<string, unkn
     answer: value.answer,
     sources: value.sources,
     workspaceEvidence: value.workspaceEvidence,
+    ...(Object.hasOwn(value, "responseToken") ? { responseToken: value.responseToken } : {}),
   };
 }
 
