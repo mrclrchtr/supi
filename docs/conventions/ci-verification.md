@@ -2,6 +2,12 @@
 
 `.github/workflows/ci.yml` runs workspace checks and the complete, unsharded test suite on every PR and main push. Runner selection and release/publish gates are unchanged by matrix selection.
 
+## Runner policy
+
+- Non-publishing Linux jobs use `avrea-ubuntu-latest-2-vcpu`, including Linux matrix legs and the minimum-Node installer check.
+- Required cross-platform matrix legs retain the GitHub-hosted macOS and Windows runners.
+- npm publishing uses the official GitHub-hosted `ubuntu-latest` runner for trusted publishing, for both automatic releases and manual retries. Release Please and skill synchronization stay on Avrea.
+
 ## Matrix selection
 
 `scripts/ci-plan.mjs` selects only the language-baseline and installer matrices:
@@ -38,7 +44,7 @@ gh workflow run ci.yml --repo mrclrchtr/supi --ref main -f publish_tag=v1.2.3
 
 - Replace `v1.2.3` with an existing published GitHub release tag. Do not delete or recreate the release or move its tag.
 - The workflow definition must already be on `main`. Re-running an older run retains its original workflow definition and runner.
-- Retry publishing runs on `ubicloud-standard-2` only from `main`, after actionlint, conventional-commit checks, and verification succeed. Release Please remains skipped for manual runs.
+- Retry publishing uses the same publishing job, only from `main`, after actionlint, conventional-commit checks, and verification succeed. Release Please remains skipped for manual runs.
 - The resolver requires a versioned, non-draft GitHub release and resolves its tag to a commit SHA, including annotated tags. Checkout is pinned to that SHA; the version comes from the tag without `v`.
 - Before installing dependencies or accessing npm, the release validator checks the checkout SHA, root version, release manifest, and every public package version. Already-published package versions are skipped by the publisher.
 

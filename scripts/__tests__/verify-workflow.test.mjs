@@ -74,16 +74,16 @@ describe("parallel verification workflow", () => {
   });
 
   it("requires pinned live language-server checks on Linux and macOS", () => {
-    expect(languageBaseline).toContain("os: [ubuntu-latest, macos-latest]");
+    expect(languageBaseline).toContain("os: [avrea-ubuntu-latest-2-vcpu, macos-latest]");
     expect(languageBaseline).toContain("node scripts/language-baseline/provision.mjs");
     expect(languageBaseline).toContain("pnpm test:language-baseline:acceptance");
     expect(languageBaseline).not.toContain("continue-on-error:");
   });
 
   it("checks the CLI on supported systems and the minimum Node runtime", () => {
-    expect(installer).toContain("os: [ubuntu-latest, macos-latest, windows-latest]");
+    expect(installer).toContain("os: [avrea-ubuntu-latest-2-vcpu, macos-latest, windows-latest]");
     expect(installer).toContain('node: ["24"]');
-    expect(installer).toContain('node: "22.19.0"');
+    expect(installer).toContain('- os: avrea-ubuntu-latest-2-vcpu\n            node: "22.19.0"');
     expect(installer).toContain(
       "pnpm vitest run packages/supi-installer/ scripts/__tests__/patch-checkout.test.mjs --reporter=agent",
     );

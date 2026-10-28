@@ -166,7 +166,8 @@ describe("release workflow handoff", () => {
     expect(retryStep).toContain("PUBLISH_TAG: ${{ inputs.publish_tag }}");
     expect(retryStep).toContain("GH_TOKEN: ${{ github.token }}");
     expect(retryStep).toContain("GH_REPO: ${{ github.repository }}");
-    expect(publishJob).toContain("runs-on: ubicloud-standard-2");
+    // npm trusted publishing requires the official GitHub-hosted runner.
+    expect(publishJob).toMatch(/^ {4}runs-on: ubuntu-latest$/m);
     expect(steps[0]).toBe(retryStep);
     expect(steps[1]).toBe(identityStep);
     expect(steps[2]).toBe(checkoutStep);
