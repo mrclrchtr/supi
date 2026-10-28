@@ -1,6 +1,7 @@
-import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { writeSupiConfig } from "@mrclrchtr/supi-core/config";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -165,6 +166,127 @@ describe("consulting_run with a private test adapter", () => {
     expect(pi.entries).toContainEqual({
       type: CONSULTING_HANDLE_ENTRY_TYPE,
       data: expect.objectContaining({ action: "created" }),
+    });
+  });
+
+  it.each([false, true])("reloads directory grants: %s", async (workspace) => {
+    const { cwd, execute, pi } = await setup();
+    const root = join(cwd, "..");
+    const directory = join(root, "review-artifacts");
+    await mkdir(directory);
+    const save = (directories: string[]) =>
+      writeSupiConfig(
+        { section: "consulting", scope: "project", cwd },
+        { additionalReadOnlyDirectories: directories },
+        { homeDir: root },
+      );
+    save([directory]);
+    const context = makeCtx({ cwd });
+    const tool = pi.tools[0] as {
+      execute: (...args: unknown[]) => Promise<{ details?: unknown }>;
+    };
+    const first = await tool.execute(
+      "first",
+      { prompt: "review", new: { agent: "antigravity", model: "local-model-v2", workspace } },
+      undefined,
+      undefined,
+      context,
+    );
+    expect(execute.mock.calls[0]?.[0]).toMatchObject({
+      additionalReadOnlyDirectories: [await realpath(directory)],
+    });
+    save([]);
+    await tool.execute(
+      "follow-up",
+      { prompt: "continue", continue: { handle: (first.details as { handle: string }).handle } },
+      undefined,
+      undefined,
+      context,
+    );
+    expect(execute.mock.calls[1]?.[0]).toMatchObject({ additionalReadOnlyDirectories: [] });
+    save([join(root, "missing")]);
+    await expect(
+      tool.execute(
+        "invalid-directory",
+        { prompt: "review", new: { agent: "antigravity", model: "local-model-v2", workspace } },
+        undefined,
+        undefined,
+        context,
+      ),
+    ).rejects.toThrow(/directory/i);
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it.skipIf(process.getuid?.() === 0).each([0o100, 0o400])(
+    "rejects inaccessible roots: %s",
+    async (mode) => {
+      const { cwd, execute, pi } = await setup();
+      const directory = join(cwd, "..", "restricted");
+      await mkdir(directory);
+      const tool = pi.tools[0] as {
+        execute: (...args: unknown[]) => Promise<{ details?: unknown }>;
+      };
+      const context = makeCtx({ cwd });
+      const first = await tool.execute(
+        "first",
+        {
+          prompt: "begin",
+          new: { agent: "antigravity", model: "local-model-v2", workspace: false },
+        },
+        undefined,
+        undefined,
+        context,
+      );
+      const followUp = {
+        prompt: "continue",
+        continue: { handle: (first.details as { handle: string }).handle },
+      };
+      writeSupiConfig(
+        { section: "consulting", scope: "project", cwd },
+        { additionalReadOnlyDirectories: [directory] },
+      );
+      await chmod(directory, mode);
+      try {
+        await expect(
+          tool.execute("denied", followUp, undefined, undefined, context),
+        ).rejects.toThrow(/directory/i);
+        expect(execute).toHaveBeenCalledTimes(1);
+      } finally {
+        await chmod(directory, 0o700);
+      }
+      await tool.execute("retry", followUp, undefined, undefined, context);
+      expect(execute).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("ignores project directory grants when the project is untrusted", async () => {
+    const { cwd, execute, pi } = await setup();
+    const root = join(cwd, "..");
+    const directory = join(root, "global-artifacts");
+    await mkdir(directory);
+    writeSupiConfig(
+      { section: "consulting", scope: "global", cwd },
+      { additionalReadOnlyDirectories: [directory] },
+      { homeDir: root },
+    );
+    writeSupiConfig(
+      { section: "consulting", scope: "project", cwd },
+      { additionalReadOnlyDirectories: ["/untrusted-external-root"] },
+      { homeDir: root },
+    );
+    const tool = pi.tools[0] as { execute: (...args: unknown[]) => Promise<unknown> };
+    await tool.execute(
+      "untrusted",
+      {
+        prompt: "review",
+        new: { agent: "antigravity", model: "local-model-v2", workspace: false },
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd, isProjectTrusted: () => false }),
+    );
+    expect(execute.mock.calls[0]?.[0]).toMatchObject({
+      additionalReadOnlyDirectories: [await realpath(directory)],
     });
   });
 

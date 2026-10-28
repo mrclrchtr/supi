@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const args = process.argv.slice(2);
@@ -50,6 +50,29 @@ process.stdin.on("end", () => {
     process.stderr.write("fixture did not expect a workspace directory\n");
     process.exitCode = 1;
     return;
+  }
+  const expectedRoots = userEvent.message.content.match(/^read-only-roots=(.*)$/)?.[1];
+  if (expectedRoots) {
+    const roots = args.flatMap((arg, index) =>
+      arg === "--add-dir" ? [args[index + 1]] : [],
+    );
+    const settings = JSON.parse(readFileSync(
+      join(process.env.HOME, ".gemini", "antigravity-cli", "settings.json"),
+      "utf8",
+    ));
+    const expectedDenials = [
+      "write_file(*)", "command(*)", "unsandboxed(*)", "mcp(*)", "execute_url(*)",
+    ];
+    if (
+      JSON.stringify(roots) !== expectedRoots ||
+      settings.allowNonWorkspaceAccess !== false ||
+      JSON.stringify(settings.permissions.allow) !== JSON.stringify(["read_url(*)"]) ||
+      expectedDenials.some((rule) => !settings.permissions.deny.includes(rule))
+    ) {
+      process.stderr.write("fixture expected per-process roots with unchanged inspection policy\n");
+      process.exitCode = 1;
+      return;
+    }
   }
   const conversationIndex = args.indexOf("--conversation");
   const conversationId =

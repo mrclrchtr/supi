@@ -12,6 +12,8 @@ export interface RegisterConsultingRunOptions {
   adapter: ConsultingAgentAdapter;
   availability: ConsultingAgentAvailability;
   handles: ConversationHandleStore;
+  /** Override the user home for scoped configuration loading. */
+  homeDir?: string;
 }
 
 /** Register consulting_run from one immutable availability snapshot. */
@@ -31,6 +33,7 @@ export function registerConsultingRunTool(options: RegisterConsultingRunOptions)
       adapter: options.adapter,
       availability: options.availability,
       handles: options.handles,
+      homeDir: options.homeDir,
     }),
   });
 }

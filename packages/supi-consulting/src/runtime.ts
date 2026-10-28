@@ -17,6 +17,7 @@ type FooterState = "idle" | "checking" | "ready";
 /** Context needed to report availability and update the footer. */
 export type ConsultingRefreshContext = {
   ui: Pick<ExtensionContext["ui"], "notify" | "setStatus">;
+  isProjectTrusted?: ExtensionContext["isProjectTrusted"];
 };
 
 /** Session runtime for immutable availability and Conversation Handle state. */
@@ -85,7 +86,7 @@ export class ConsultingRuntime {
     if (context) this.#statusUi = context.ui;
     this.#stopSpinner();
     this.#setFooterState("idle");
-    const config = loadConsultingConfig(cwd, this.#homeDir);
+    const config = loadConsultingConfig(cwd, this.#homeDir, context?.isProjectTrusted?.() ?? true);
     if (!config.agentToolEnabled) {
       this.#deactivateTool();
       return;
@@ -141,6 +142,7 @@ export class ConsultingRuntime {
         adapter: this.adapter,
         availability,
         handles: this.handles,
+        homeDir: this.#homeDir,
       });
       this.#toolRegistered = true;
     }

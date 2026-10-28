@@ -111,8 +111,10 @@ class AntigravityAdapter implements ConsultingAgentAdapter {
       ? decodeContinuation(options.continuation)
       : undefined;
     await prepareIsolatedAntigravityHome(this.#paths);
-    if (options.workspaceAccess) onPhase("hook-probe");
-    const hookWarning = options.workspaceAccess
+    const inspectHooks =
+      options.workspaceAccess || (options.additionalReadOnlyDirectories?.length ?? 0) > 0;
+    if (inspectHooks) onPhase("hook-probe");
+    const hookWarning = inspectHooks
       ? await inspectProjectHooks(this.#paths, options, options.onWarning)
       : undefined;
     onPhase("conversation");
@@ -123,6 +125,7 @@ class AntigravityAdapter implements ConsultingAgentAdapter {
       model: options.model,
       ...(expectedConversationId ? { conversationId: expectedConversationId } : {}),
       ...(options.workspaceAccess ? { workspaceDirectory: options.canonicalWorkingDirectory } : {}),
+      additionalReadOnlyDirectories: options.additionalReadOnlyDirectories,
       schema: ANTIGRAVITY_ANSWER_SCHEMA as Record<string, unknown>,
       signal: options.signal,
       onActivity: options.onProgress,
@@ -161,6 +164,7 @@ async function inspectProjectHooks(
   const probe = await probeProjectHooks({
     paths,
     cwd: options.canonicalWorkingDirectory,
+    additionalReadOnlyDirectories: options.additionalReadOnlyDirectories,
     signal: options.signal,
     onProcessStart: options.onProcessStart,
   });

@@ -5,6 +5,7 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import type { ConsultingAgentAdapter, ConsultingAgentAvailability } from "../../agents/types.ts";
+import { resolveAdditionalReadOnlyDirectories } from "../../config.ts";
 import {
   appendHandleCreated,
   appendHandleRetired,
@@ -19,6 +20,8 @@ export interface ConsultingRunDependencies {
   adapter: ConsultingAgentAdapter;
   availability: ConsultingAgentAvailability;
   handles: ConversationHandleStore;
+  /** Override the user home for scoped configuration loading. */
+  homeDir?: string;
 }
 
 type ConsultingExecute = NonNullable<Parameters<ExtensionAPI["registerTool"]>[0]["execute"]>;
@@ -84,6 +87,11 @@ async function runNew(options: NewRunOptions): Promise<ReturnType<typeof buildCo
     model: input.new.model,
     canonicalWorkingDirectory: cwd,
     workspaceAccess,
+    additionalReadOnlyDirectories: await resolveAdditionalReadOnlyDirectories(
+      ctx.cwd,
+      dependencies.homeDir,
+      ctx.isProjectTrusted(),
+    ),
     signal,
     onProgress: progress,
     onWarning: (warning) => {
@@ -136,6 +144,11 @@ async function runContinue(
       model: record.model,
       canonicalWorkingDirectory: record.canonicalWorkingDirectory,
       workspaceAccess: record.workspaceAccess,
+      additionalReadOnlyDirectories: await resolveAdditionalReadOnlyDirectories(
+        ctx.cwd,
+        dependencies.homeDir,
+        ctx.isProjectTrusted(),
+      ),
       continuation: record.continuation,
       signal,
       onProgress: progress,

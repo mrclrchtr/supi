@@ -1,4 +1,13 @@
-import { chmod, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -100,6 +109,29 @@ describe("Antigravity Consulting Agent adapter", () => {
       name: "ConsultingAgentError",
       kind: "conversation-mismatch",
     });
+  });
+
+  it.each([false, true])("isolates extra roots: %s", async (workspaceAccess) => {
+    const paths = getIsolatedAntigravityPaths();
+    const adapter = createAntigravityAdapter(paths);
+    await adapter.discover();
+    const cwd = await realpath(paths.consultationWorkspace);
+    const firstRoot = join(cwd, "..", "first artifacts");
+    const secondRoot = join(cwd, "..", "second-artifacts");
+    await Promise.all([mkdir(firstRoot), mkdir(secondRoot)]);
+    const baseRoots = workspaceAccess ? [cwd] : [];
+    const execute = (directory?: string, continuation?: string) =>
+      adapter.execute({
+        prompt: `read-only-roots=${JSON.stringify(directory ? [...baseRoots, directory] : baseRoots)}`,
+        model: "gemini-3.8-flash-low",
+        canonicalWorkingDirectory: cwd,
+        workspaceAccess,
+        additionalReadOnlyDirectories: directory ? [directory, directory] : [],
+        continuation,
+      });
+    const [first] = await Promise.all([execute(firstRoot), execute(secondRoot)]);
+    const followUp = await execute(undefined, first.continuation);
+    expect(followUp.continuation).toBe(first.continuation);
   });
 
   it("normalizes permission and workspace facts and reports hook process work", async () => {

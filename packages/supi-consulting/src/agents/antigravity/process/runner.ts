@@ -16,28 +16,37 @@ const DEFAULT_PROBE_TIMEOUT_MS = 15 * 1_000;
 export type { AntigravityProbeResult } from "./subprocess.ts";
 export { AntigravityProcessError } from "./subprocess.ts";
 
-/** Build the fixed paid-run argument list. */
-export function buildAntigravityRunArguments(
-  schemaPath: string,
-  model: string,
-  conversationId?: string,
-  workspaceDirectory?: string,
-): string[] {
+/**
+ * Register extra roots per process, never in the shared profile. The enforced
+ * write_file(*) and command(*) denials keep these additional roots inspection-only.
+ */
+export function buildAntigravityRunArguments(options: {
+  schemaPath: string;
+  model: string;
+  conversationId?: string;
+  workspaceDirectory?: string;
+  additionalReadOnlyDirectories?: readonly string[];
+}): string[] {
   return [
     "--input-format",
     "stream-json",
     "--output-format",
     "stream-json",
     "--json-schema",
-    schemaPath,
+    options.schemaPath,
     "--model",
-    model,
+    options.model,
     "--print-timeout",
     "5m",
     "--sandbox",
-    ...(workspaceDirectory ? ["--add-dir", workspaceDirectory] : []),
+    ...[
+      ...new Set([
+        ...(options.workspaceDirectory ? [options.workspaceDirectory] : []),
+        ...(options.additionalReadOnlyDirectories ?? []),
+      ]),
+    ].flatMap((directory) => ["--add-dir", directory]),
     "--disable-slash-commands",
-    ...(conversationId ? ["--conversation", conversationId] : []),
+    ...(options.conversationId ? ["--conversation", options.conversationId] : []),
   ];
 }
 
@@ -60,6 +69,8 @@ export async function runAntigravityConversation(options: {
   conversationId?: string;
   /** Add the selected project directory to agy's sandbox workspace. */
   workspaceDirectory?: string;
+  /** Canonical inspection roots; fixed profile rules still deny writes and commands. */
+  additionalReadOnlyDirectories?: readonly string[];
   schema: Record<string, unknown>;
   signal?: AbortSignal;
   timeoutMs?: number;
@@ -77,12 +88,13 @@ export async function runAntigravityConversation(options: {
   let eventCount = 0;
   try {
     await writeFile(schemaPath, `${JSON.stringify(options.schema)}\n`, { mode: 0o600 });
-    const args = buildAntigravityRunArguments(
+    const args = buildAntigravityRunArguments({
       schemaPath,
-      options.model,
-      options.conversationId,
-      options.workspaceDirectory,
-    );
+      model: options.model,
+      conversationId: options.conversationId,
+      workspaceDirectory: options.workspaceDirectory,
+      additionalReadOnlyDirectories: options.additionalReadOnlyDirectories,
+    });
     await runBoundedChildProcess({
       args,
       cwd: options.cwd,

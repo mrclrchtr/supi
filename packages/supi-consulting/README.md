@@ -65,7 +65,7 @@ A new Consultation requires the agent, an available model, and Workspace Access:
 
 The Model Catalogue is the intersection of the curated Antigravity models and the models available to the signed-in account. It stays fixed until the next session start or reload. There is no default model or automatic agent fallback.
 
-Set `workspace` to `true` only when the Consultation needs repository evidence. This exposes the current PI workspace. Set it to `false` to use the empty Consultation Workspace.
+Set `workspace` to `true` only when the Consultation needs repository evidence. This exposes the current PI workspace. Set it to `false` to use the empty Consultation Workspace. Explicitly configured additional read-only directories remain accessible with either selection.
 
 A follow-up supplies only a returned Conversation Handle:
 
@@ -82,6 +82,29 @@ Results report web use, workspace use, observed and claimed references, warnings
 
 Use `/supi-settings` → **Consulting** to disable the tool. Disabling it skips availability checks and removes `consulting_run` from the active tool list.
 
+## Additional read-only directories
+
+Use `/supi-settings` → **Consulting** → **Additional read-only directories** to enter comma-separated absolute directory paths. The default is an empty list. No shell expansion or glob matching is performed. For paths containing commas, edit the JSON configuration instead.
+
+Global configuration lives at `~/.pi/agent/supi/config.json`; project configuration lives at `.pi/supi/config.json`:
+
+```json
+{
+  "consulting": {
+    "additionalReadOnlyDirectories": ["/tmp/octalog-filter-previews"]
+  }
+}
+```
+
+- Project values replace the global list, rather than extending it. An explicit `[]` removes inherited grants; Inherit/Reset deletes the scoped key. Untrusted project configuration cannot grant access; global grants still apply.
+- Directories must exist and be accessible when a Consultation starts. Symlinks are resolved and duplicate roots are removed, so `/tmp` resolves to `/private/tmp` on macOS without needing both entries.
+- Settings are read from the current Pi workspace before each new Consultation and follow-up. Changes apply to the next invocation without reloading. They do not modify an already-running process.
+- The directories are registered with Antigravity per process using `--add-dir`, not persisted as permission grants in the shared profile. The fixed write, command, MCP, and URL-execution denials remain in force; `allowNonWorkspaceAccess` stays `false`.
+- Configured directories are available even with `workspace: false`. Prefer task-specific artifact folders over all of `/tmp`, which may contain unrelated sensitive files. This setting does not authorize shell-based browser automation.
+- Reads from extra directories can contribute inspection activity, but references outside the selected workspace are not reported as validated workspace-relative evidence.
+
+Directory registration and deny-rule precedence follow Antigravity's [CLI reference](https://antigravity.google/docs/cli/reference/) and [permissions reference](https://antigravity.google/docs/permissions/). These are Antigravity policy restrictions, not a new operating-system security boundary.
+
 ## Failure diagnostics
 
 Execution failures report a fixed reason when the adapter can identify it:
@@ -91,7 +114,7 @@ Execution failures report a fixed reason when the adapter can identify it:
 - Malformed JSON, a non-object event, or an output limit exceeded.
 - Missing conversation identifier, process failure, timeout, or cancellation.
 
-An observed tool permission denial is reported separately. It does not prove the cause of a later failure. A denial does not fail a Consultation that returns a valid answer. Workspace Access does not grant access to files outside the selected workspace.
+An observed tool permission denial is reported separately. It does not prove the cause of a later failure. A denial does not fail a Consultation that returns a valid answer. Workspace Access alone does not grant access to files outside the selected workspace; configure additional read-only directories explicitly.
 
 When SuPi Debug is enabled, failed executions emit one `consulting/consultation.failed` event at `error` level. Cancellations emit `consulting/consultation.cancelled` at `info` level. Use the `debug` tool:
 
@@ -107,7 +130,7 @@ Events contain the execution phase, timing, selected model, workspace-access and
 
 The Antigravity adapter enforces its Inspection Permission Set in the Isolated Antigravity Home. It allows `read_url(*)` and denies known file writes, commands, unsandboxed actions, MCP, and URL execution. These rules are **not an operating-system sandbox**.
 
-For workspace Consultations, project-local hooks can run commands, read the Antigravity transcript, and cause side effects outside these permission rules. The adapter probes hook state before the paid process and warns when hooks are active or unknown.
+For Consultations with Workspace Access or additional read-only directories, project-local hooks can run commands, read the Antigravity transcript, and cause side effects outside these permission rules. The adapter probes hook state with the additional roots before the paid process and warns when hooks are active or unknown. Directory grants are intended for inspection artifacts, not untrusted project customizations.
 
 `read_url(*)` can reach local, private-network, and link-local endpoints that Antigravity accepts. It does not enforce public-internet-only access.
 

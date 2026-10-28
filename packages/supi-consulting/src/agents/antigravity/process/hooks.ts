@@ -14,6 +14,8 @@ export interface ProjectHookProbeResult {
 export async function probeProjectHooks(options: {
   paths: IsolatedAntigravityPaths;
   cwd: string;
+  /** Match the paid process's inspection roots when checking project hook state. */
+  additionalReadOnlyDirectories?: readonly string[];
   signal?: AbortSignal;
   onProcessStart?: () => void;
 }): Promise<ProjectHookProbeResult> {
@@ -21,7 +23,13 @@ export async function probeProjectHooks(options: {
     const result = await runAntigravityProbe({
       paths: options.paths,
       cwd: options.cwd,
-      args: [...PROJECT_HOOK_PROBE_ARGUMENTS],
+      args: [
+        ...PROJECT_HOOK_PROBE_ARGUMENTS,
+        ...(options.additionalReadOnlyDirectories ?? []).flatMap((directory) => [
+          "--add-dir",
+          directory,
+        ]),
+      ],
       signal: options.signal,
       timeoutMs: 15_000,
       onProcessStart: options.onProcessStart,

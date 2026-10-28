@@ -25,6 +25,8 @@ export interface ConsultingAgentExecutionOptions {
   model: ConsultingModel;
   canonicalWorkingDirectory: string;
   workspaceAccess: boolean;
+  /** Canonical extra directory roots for inspection; writes and commands remain denied. */
+  additionalReadOnlyDirectories?: readonly string[];
   continuation?: string;
   signal?: AbortSignal;
   onProgress?: (activity: string) => void;
