@@ -83,13 +83,62 @@ const server: ProjectServerInfo = {
 };
 
 describe("Code intelligence inspector", () => {
+  it("scrolls the whole inspector with arrow keys even when there are no problem files", () => {
+    const { dialog, deps, render } = setup(
+      data({
+        diagnostics: observation([]),
+        servers: Array.from({ length: 8 }, (_, i) => ({
+          ...server,
+          root: `/project/package-${i}`,
+        })),
+      }),
+    );
+    deps.tui.terminal.rows = 24;
+    expect(render()).toContain("Capabilities");
+    dialog.handleInput("\x1b[B");
+    expect(render()).not.toContain("Capabilities");
+    expect(render()).toContain("esc close");
+    dialog.handleInput("k");
+    expect(render()).toContain("Capabilities");
+    dialog.handleInput("j");
+    expect(render()).not.toContain("Capabilities");
+    for (let i = 0; i < 80; i++) dialog.handleInput("\x1b[B");
+    expect(render()).toContain("root: package-7");
+    for (let i = 0; i < 80; i++) dialog.handleInput("\x1b[A");
+    expect(render()).toContain("Capabilities");
+    expect(render()).not.toContain("root: package-7");
+  });
+
+  it("continues downward after paging instead of jumping back to the Problems list", () => {
+    const { dialog, deps, render } = setup(
+      data({
+        servers: Array.from({ length: 8 }, (_, i) => ({
+          ...server,
+          root: `/project/package-${i}`,
+        })),
+      }),
+    );
+    deps.tui.terminal.rows = 24;
+    render();
+    dialog.handleInput("\x1b[6~");
+    expect(render()).not.toContain("Capabilities");
+    expect(render()).not.toContain("src/A.ts");
+    dialog.handleInput("\x1b[B");
+    expect(render()).not.toContain("src/A.ts");
+    expect(render()).not.toContain("src/B.ts");
+    expect(render()).toContain("root: package-");
+  });
+
   it("keeps file 11 selected and expandable inside the viewport", () => {
     const names = Array.from({ length: 12 }, (_, i) => `src/file-${i + 1}.ts`);
     const { dialog, render, deps } = setup(data({ diagnostics: observation(names) }));
     deps.tui.terminal.rows = 24;
     dialog.render(80);
-    for (let i = 0; i < 10; i++) dialog.handleInput("j");
+    for (let i = 0; i < 10; i++) dialog.handleInput("\t");
     expect(render(80)).toContain("▶ src/file-11.ts");
+    dialog.handleInput("\x1b[Z");
+    expect(render(80)).toContain("▶ src/file-10.ts");
+    dialog.handleInput("\t");
     dialog.handleInput("\r");
     expect(render(80)).toContain("▼ src/file-11.ts");
     expect(dialog.render(80).length).toBeLessThanOrEqual(20);
@@ -114,20 +163,46 @@ describe("Code intelligence inspector", () => {
     expect(render()).toContain("esc close");
     dialog.handleInput("\x1b[H"); // Home
     expect(render()).toContain("Capabilities");
-    dialog.handleInput("j");
+    dialog.handleInput("\t");
     deps.tui.terminal.rows = 14;
     expect(dialog.render(100).length).toBeLessThanOrEqual(11);
     expect(render()).toContain("▶ src/B.ts");
     expect(render()).toContain("esc close");
   });
 
+  it("does not snap a manually scrolled server view back to Problems on resize or reload", async () => {
+    const snapshot = data({
+      servers: Array.from({ length: 8 }, (_, i) => ({ ...server, root: `/project/package-${i}` })),
+    });
+    const { dialog, render, deps } = setup(snapshot, { onRefresh: async () => snapshot });
+    deps.tui.terminal.rows = 24;
+    render();
+    dialog.handleInput("\x1b[F");
+    expect(render()).toContain("root: package-7");
+    deps.tui.terminal.rows = 20;
+    expect(render()).not.toContain("src/A.ts");
+    dialog.handleInput("r");
+    await vi.waitFor(() => expect(render()).not.toContain("reloading"));
+    expect(render()).not.toContain("src/A.ts");
+  });
+
   it("honors injected navigation and cancel bindings", () => {
     const keybindings = new KeybindingsManager(TUI_KEYBINDINGS, {
       "tui.select.down": "ctrl+n",
       "tui.select.cancel": "ctrl+x",
+      "tui.input.tab": "ctrl+t",
     });
-    const { dialog, render, deps } = setup(data(), { keybindings });
+    const { dialog, render, deps } = setup(
+      data({
+        servers: Array.from({ length: 8 }, () => server),
+      }),
+      { keybindings },
+    );
+    deps.tui.terminal.rows = 24;
+    render();
     dialog.handleInput("\x0e");
+    expect(render()).not.toContain("Capabilities");
+    dialog.handleInput("\x14");
     expect(render()).toContain("▶ src/B.ts");
     dialog.handleInput("\x18");
     expect(deps.done).toHaveBeenCalledOnce();
@@ -140,16 +215,32 @@ describe("Code intelligence inspector", () => {
       "tui.select.up": "a",
     });
     const reload = vi.fn(async () => data());
-    const { dialog, render } = setup(data(), { keybindings, onRefresh: reload });
+    const { dialog, render, deps } = setup(
+      data({
+        servers: Array.from({ length: 8 }, () => server),
+      }),
+      { keybindings, onRefresh: reload },
+    );
+    deps.tui.terminal.rows = 24;
+    render();
     dialog.handleInput("k");
-    expect(render()).toContain("▶ src/B.ts");
+    expect(render()).not.toContain("Capabilities");
     dialog.handleInput("r");
-    expect(render()).toContain("▼ src/B.ts");
+    expect(render()).toContain("▼ src/A.ts");
     expect(reload).not.toHaveBeenCalled();
     expect(render()).not.toContain("r reload");
     expect(render()).not.toContain("a collapse");
     dialog.handleInput("a");
-    expect(render()).toContain("▶ src/A.ts");
+    expect(render()).toContain("Capabilities");
+  });
+
+  it("honors configured Shift+Tab confirmation before previous-file navigation", () => {
+    const keybindings = new KeybindingsManager(TUI_KEYBINDINGS, {
+      "tui.select.confirm": "shift+tab",
+    });
+    const { dialog, render } = setup(data(), { keybindings });
+    dialog.handleInput("\x1b[Z");
+    expect(render()).toContain("▼ src/A.ts");
   });
 
   it("consumes configured confirmation even when there is no file to expand", () => {
@@ -187,7 +278,7 @@ describe("Code intelligence inspector", () => {
     const fetch = vi.fn().mockReturnValueOnce(a.promise).mockReturnValueOnce(b.promise);
     const { dialog, render } = setup(data(), { fetchDetailedDiagnostics: fetch });
     dialog.handleInput("\r");
-    dialog.handleInput("j");
+    dialog.handleInput("\t");
     dialog.handleInput("\r");
     b.resolve(details("src/B.ts", "B message"));
     await vi.waitFor(() => expect(render()).toContain("B message"));
@@ -254,7 +345,7 @@ describe("Code intelligence inspector", () => {
     const { dialog, render } = setup(data(), {
       onRefresh: async () => data({ diagnostics: observation(["src/B.ts", "src/A.ts"]) }),
     });
-    dialog.handleInput("j");
+    dialog.handleInput("\t");
     dialog.handleInput("r");
     await vi.waitFor(() => expect(render()).toContain("▶ src/B.ts"));
     dialog.handleInput("\r");
@@ -332,5 +423,6 @@ describe("Code intelligence inspector", () => {
     for (const line of dialog.render(32)) expect(visibleWidth(line)).toBeLessThanOrEqual(32);
     expect(dialog.render(32).length).toBeLessThanOrEqual(10);
     expect(dialog.render(32).join("\n")).toContain("esc close");
+    expect(dialog.render(32).join("\n")).toContain("tab/⇧tab files");
   });
 });

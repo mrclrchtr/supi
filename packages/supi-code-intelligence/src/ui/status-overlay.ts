@@ -60,6 +60,7 @@ const STATUS_ACTIONS = [
   "tui.select.confirm",
   "tui.select.pageUp",
   "tui.select.pageDown",
+  "tui.input.tab",
 ] as const;
 
 /** A bounded inspector with file-keyed selection and interaction-local asynchronous work. */
@@ -81,6 +82,7 @@ export class CiStatusDialog {
   private selectedRow = 0;
   private expandedRows = 1;
   private revealSelection = false;
+  private followingSelection = false;
   private readonly scroll = new ScrollView({ render: () => this.bodyLines, invalidate() {} });
   private readonly keybindings: KeybindingsManager;
 
@@ -114,7 +116,7 @@ export class CiStatusDialog {
     this.scroll.updateLayout(this.bodyLines.length, bodyHeight, () =>
       this.deps.tui.requestRender(),
     );
-    if ((this.revealSelection || resized) && this.selectedFile) {
+    if ((this.revealSelection || (resized && this.followingSelection)) && this.selectedFile) {
       const end = this.selectedRow + Math.min(this.expandedRows, bodyHeight) - 1;
       if (this.selectedRow < this.scroll.scrollTop) this.scroll.scrollTo(this.selectedRow);
       else if (end >= this.scroll.scrollTop + bodyHeight)
@@ -137,7 +139,7 @@ export class CiStatusDialog {
       t.fg("dim", this.controlHints()),
       t.fg(
         "dim",
-        `${this.keyLabel("tui.select.up")}/${this.keyLabel("tui.select.down")} files · ${this.keyLabel("tui.select.pageUp")}/${this.keyLabel("tui.select.pageDown")} scroll · home/end${position}`,
+        `${this.keyLabel("tui.select.up")}/${this.keyLabel("tui.select.down")} scroll · ${this.fileNavigationHint()} · ${this.keyLabel("tui.select.pageUp")}/${this.keyLabel("tui.select.pageDown")} page · home/end${position}`,
       ),
       border,
     ].map((line) => truncateToWidth(line, width));
@@ -175,43 +177,55 @@ export class CiStatusDialog {
       this.changed();
       return true;
     }
-    if (input === "j" || input === "k") return this.moveSelection(input === "k" ? -1 : 1);
-    if (matchesKey(input, Key.home)) this.scroll.scrollToStart();
+    if (input === "j" || input === "k") {
+      this.scroll.scrollBy(input === "k" ? -1 : 1);
+    } else if (matchesKey(input, Key.home)) this.scroll.scrollToStart();
     else if (matchesKey(input, Key.end)) this.scroll.scrollToEnd();
     else return false;
-    this.changed();
+    this.scrolled();
     return true;
   }
 
   private handleScrollInput(input: string): boolean {
-    const pageUp = this.keybindings.matches(input, "tui.select.pageUp");
-    const pageDown = this.keybindings.matches(input, "tui.select.pageDown");
-    if (pageUp || pageDown) {
-      this.scroll.scrollBy((pageUp ? -1 : 1) * Math.max(1, this.scroll.viewportHeight - 1));
-    } else {
-      return false;
-    }
-    this.changed();
+    const page = Math.max(1, this.scroll.viewportHeight - 1);
+    let lines: number;
+    if (this.keybindings.matches(input, "tui.select.up")) lines = -1;
+    else if (this.keybindings.matches(input, "tui.select.down")) lines = 1;
+    else if (this.keybindings.matches(input, "tui.select.pageUp")) lines = -page;
+    else if (this.keybindings.matches(input, "tui.select.pageDown")) lines = page;
+    else return false;
+    this.scroll.scrollBy(lines);
+    this.scrolled();
     return true;
   }
 
+  /** Manual scrolling owns the viewport until diagnostic-file navigation resumes. */
+  private scrolled(): void {
+    this.followingSelection = false;
+    this.revealSelection = false;
+    this.changed();
+  }
+
   private handleFileInput(input: string): boolean {
-    const up = this.keybindings.matches(input, "tui.select.up");
-    const down = this.keybindings.matches(input, "tui.select.down");
-    if (up || down) return this.moveSelection(up ? -1 : 1);
-    if (this.keybindings.matches(input, "tui.select.confirm") || matchesKey(input, Key.space)) {
-      if (!this.selectedFile) return true;
-      if (this.expandedFile === this.selectedFile) this.collapse();
-      else {
-        this.collapse();
-        this.expandedFile = this.selectedFile;
-        void this.loadDetails(this.selectedFile);
-      }
-      this.revealSelection = true;
-      this.changed();
-      return true;
-    }
+    if (this.keybindings.matches(input, "tui.select.confirm")) return this.expandSelection();
+    if (this.keybindings.matches(input, "tui.input.tab")) return this.moveSelection(1);
+    if (matchesKey(input, Key.shift("tab"))) return this.moveSelection(-1);
+    if (matchesKey(input, Key.space)) return this.expandSelection();
     return false;
+  }
+
+  private expandSelection(): boolean {
+    if (!this.selectedFile) return true;
+    if (this.expandedFile === this.selectedFile) this.collapse();
+    else {
+      this.collapse();
+      this.expandedFile = this.selectedFile;
+      void this.loadDetails(this.selectedFile);
+    }
+    this.followingSelection = true;
+    this.revealSelection = true;
+    this.changed();
+    return true;
   }
 
   private moveSelection(direction: number): boolean {
@@ -219,6 +233,7 @@ export class CiStatusDialog {
     const index = files.findIndex((entry) => entry.file === this.selectedFile);
     const next = files[Math.max(0, Math.min(files.length - 1, index + direction))];
     if (next) this.selectedFile = next.file;
+    this.followingSelection = true;
     this.revealSelection = true;
     this.changed();
     return true;
@@ -273,7 +288,7 @@ export class CiStatusDialog {
       if (!data.diagnostics.entries.some((entry) => entry.file === this.selectedFile))
         this.selectedFile = data.diagnostics.entries[0]?.file;
       this.collapse();
-      this.revealSelection = true;
+      this.revealSelection = this.followingSelection;
     } catch (error) {
       if (this.disposed || generation !== this.refreshGeneration) return;
       this.refreshError = errorText(error);
@@ -527,14 +542,21 @@ export class CiStatusDialog {
     }
   }
 
+  private hasConfiguredAction(input: string): boolean {
+    return STATUS_ACTIONS.some((action) => this.keybindings.matches(input, action));
+  }
+
+  private fileNavigationHint(): string {
+    const previous = this.hasConfiguredAction("\x1b[Z") ? "" : "/⇧tab";
+    return `${this.keyLabel("tui.input.tab")}${previous} files`;
+  }
+
   private controlHints(): string {
-    const reserved = (key: string) =>
-      STATUS_ACTIONS.some((action) => this.keybindings.matches(key, action));
     return [
       `${this.keyLabel("tui.select.cancel")} close`,
       `${this.keyLabel("tui.select.confirm")} expand`,
-      this.deps.onRefresh && !reserved("r") ? "r reload" : "",
-      !reserved("a") ? "a collapse" : "",
+      this.deps.onRefresh && !this.hasConfiguredAction("r") ? "r reload" : "",
+      !this.hasConfiguredAction("a") ? "a collapse" : "",
     ]
       .filter(Boolean)
       .join(" · ");
