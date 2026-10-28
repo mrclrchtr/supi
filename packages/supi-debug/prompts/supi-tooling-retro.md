@@ -1,77 +1,55 @@
 ---
-description: Retrospect on SuPi tooling used during the completed task
+description: Assess SuPi tooling for the preceding task with evidence-linked improvements
 ---
 
-Produce a compact, evidence-based retrospective of the task that just ended. Evaluate the SuPi surfaces that were available and relevant: tools, skills, prompts, extensions, injected context or guidance, documentation, settings, and human-only TUI commands. Do not evaluate the entire suite in the abstract. Do not evaluate pi-core behavior.
+Produce a compact retrospective of the task immediately preceding this prompt. Assess SuPi tooling, not the project's code or general development practices. Cover relevant tools, skills, prompts, extensions, injected guidance, docs, settings, and human-only TUI commands—not the suite in the abstract. Look for ways to reduce baseline model-input tokens while preserving correct tool selection and use.
 
-## Evidence rules
+## Scope and evidence
 
-- Reconstruct the retrospective from this session only. Do not invent tool calls, outcomes, failures, token costs, or user impact.
-- You may query the `debug` tool to verify event-level claims. You may query `cache_forensics` when it is available to verify cache-related claims. Use such queries only for verification, and keep them few. Do not perform any other tool calls or follow-up investigation. Stop after you write the retrospective.
-- Tag every claim as `[observed]`, `[inferred]`, or `[unknown]`. An observed claim is supported by the transcript, a tool result, or an evidence query. An inferred claim is plausible but untested.
-- Rate the impact of each surfaced item as `high`, `medium`, or `low`. The impact is the degree to which the item changed the task outcome or its cost.
-- Use the exact surface name that appears in the session. Do not treat an available but unused tool as evidence of failure.
-- If no SuPi surface was used or relevant, say so explicitly. Do not build a wishlist. List only task-specific, plausible missed help.
+1. Identify the preceding task and its actual completion status from the visible session. If no task is identifiable, state that limit and stop. Keep unrelated tasks and this retrospective's own verification outside the assessment.
+2. Use the task transcript as the primary evidence. If verification would materially change a finding or recommendation, make at most two narrowly filtered `debug` calls against the live session, using sanitized data only. Use only events attributable to this task. A retained buffer can omit earlier events; empty or incomplete results do not establish that nothing failed. If verification is unavailable, disclose the limit and proceed.
+3. Make no other tool calls or follow-up investigation. Historical scans, delegation, file edits, issue creation, settings changes, and continuing the task are outside this retrospective. Stop after the report.
 
-## Evaluate
+For each finding, give a brief evidence anchor: a tool result or error, a retry, a user correction, or a specific instruction/context excerpt. Use exact surface names from the session. Keep excerpts minimal and omit secrets or unnecessary identifying details.
 
-- SuPi surfaces that were actually used: what they enabled, where they fell short, and any failure or friction.
-- Failed or mis-parameterized tool calls: SuPi surface calls that failed or were rejected for wrong, missing, or invalid parameters, including calls corrected on retry. Name the cause: agent misuse, ambiguous tool description, missing guidance (promptSnippet or promptGuidelines), a schema gap, or a tool bug.
-- Recognized problems or bugs: concrete defects in SuPi surfaces, such as crashes, wrong output, failed calls for valid usage, regressions, inconsistent behavior, or guidance that led to a wrong action. Do not report defects in the project's own code.
-- Missed opportunities: a relevant unused tool (for example a supi-code-intelligence tool) or context source, and why it was missed. Name the cause: discoverability, guidance, timing, capability, or not applicable.
-- Missing pieces: a concrete utility, capability, documentation page, example, or output improvement that would have changed this task.
-- Noise: redundant instructions, repeated advice without added value, stale or irrelevant context, excessive output, unnecessary long paths, poor timing, or misleading guidance. Do not criticize necessary context without naming the avoidable cost.
-- Keep SuPi or tooling recommendations separate from general code or project recommendations.
+Use these evidence labels:
+- `[observed]`: directly supported by the visible transcript or verification result.
+- `[inferred]`: a plausible interpretation or missed benefit, not demonstrated.
+- `[unknown]`: an unresolved cause, ownership, or measurement; not a standalone finding.
 
-## Output rules
+Separate the observed outcome from its explanation. An observed failure does not make its suspected cause observed. Attribute problems to SuPi, agent misuse, or upstream Pi/provider behavior only when supported; otherwise mark ownership or cause `[unknown]`. Keep upstream behavior and project-code defects out of SuPi bug claims.
 
-- Keep the result under about 600 words and specific to this task.
-- Open with a one-line overall verdict on SuPi tooling for this task.
-- Give each item a confidence tag and an impact rating. `None identified` lines need neither.
-- Prefer concrete evidence and observed friction over generic praise or a feature wishlist.
-- If a section has no supported item, write `None identified` and briefly explain the evidence limit.
-- Include at most three recommendations. Each must name a changeable surface (tool, prompt, skill, docs, guidance, or feature), the proposed change, and the expected benefit. Recommended changes may target tool descriptions, parameter schemas, or guidance, especially when they address the Failed or mis-parameterized tool calls listed above. Do not recommend "use the tool more" unless discoverability is the identified cause.
-- Do not edit files, open issues, update OpenSpec artifacts, or take any other follow-up action.
+Rate each finding's impact on this task as `high`, `medium`, or `low`, based on the demonstrated effect or explicitly inferred benefit. Report time, token, cache, or cost figures only when measured in the task evidence; describe unmeasured costs qualitatively. Claims about recurring problems or suite-wide reliability require evidence beyond this retrospective's scope.
 
-## Required output
+## Assessment checklist
+
+Consider each category, but report each finding once:
+- **Help:** What a used surface enabled, including useful guidance or context—not just a list of calls.
+- **Tool guidance quality:** Assess visible tool descriptions, parameter explanations, `promptSnippet`, `promptGuidelines`, and result guidance for clarity, correctness, and sufficiency at the decision point. Rate relevant guidance as `effective`, `needs improvement`, or `not assessable`, citing evidence. Distinguish unclear guidance from the agent failing to follow clear guidance.
+- **Baseline token cost:** Audit visible recurring tool metadata and injected guidance separately from result text and on-demand content. Look for duplicated facts, prose already expressed by schema constraints, implementation detail, and post-call instructions. Propose exact deletions, shorter wording, or on-demand destinations, explaining why pre-call selection, argument validity, and safety remain supported. Non-use in this task alone does not justify removal. Mark uncertain request placement `[unknown]`; quantify savings only from task evidence.
+- **Failures and retries:** Rejected, failed, or mis-parameterized SuPi calls, including ones corrected on retry. Name the relevant parameter or error and eventual outcome. Distinguish agent misuse, ambiguous descriptions, missing guidance, schema gaps, and tool bugs; leave the cause unknown when the evidence cannot decide.
+- **Defects:** Wrong output, crashes, regressions, or inconsistent behavior under valid usage. Label suspected defects as inferred and state what remains unverified.
+- **Missed or missing help:** A specific unused surface or absent capability that plausibly would have changed this task. For unused surfaces, establish that they were available and relevant at the decision point; non-use alone is not a gap. Infer a reason such as discoverability, guidance, or timing only when supported.
+- **Noise:** Identify redundant, stale, misleading, oversized, or poorly timed results/on-demand context and their avoidable cost. Explain what could be reduced or deferred while preserving necessary guidance.
+
+## Report
+
+Use the structure below, within 600 words; shorter when evidence is sparse. Prioritize consequential findings rather than filling categories. If a findings section is empty, write `None observed in the available task context.` If no SuPi surface was used or relevant, say so explicitly and omit unsupported findings and recommendations.
 
 ## SuPi Tooling Retrospective
 
-**Task completed**: <1–2 sentence summary>
+**Task**: <one sentence, including actual completion status>
 
-**Verdict**: <one line: the overall state of SuPi tooling for this task and its biggest lever>
+**Verdict**: <overall contribution and biggest supported improvement, or no change warranted>
 
-### Tools used
-- `[observed · impact: high|medium|low]` **`<surface>`** — concrete help, friction, or failure.
-- If none: `None identified — no SuPi surface materially participated in this task.`
+### What helped
+- `[observed · impact: high|medium|low]` **`<surface>`** — <concrete contribution; evidence anchor>.
 
-### Failed or mis-parameterized tool calls
-- `[observed|inferred · impact: high|medium|low]` **`<surface>`** — the call, the invalid or missing parameter, the outcome, and the cause: agent misuse, ambiguous description, missing guidance, schema gap, or tool bug. Include near misses: a call rejected once and corrected on retry is stronger evidence than a clean pass.
-- If none: `None identified — every SuPi call used valid parameters.`
+### Friction and gaps
+- `[observed|inferred · impact: high|medium|low]` **`<surface>`** — <category and finding; evidence anchor; task effect>. <Cause or ownership, separately labeled if inferred or unknown. For failed calls, include the retry outcome if visible.>
 
-### Recognized problems or bugs
-- `[observed|inferred · impact: high|medium|low]` **`<surface>`** — the concrete defect (crash, wrong behavior, regression, inconsistency) and how it affected the task. Do not repeat ordinary friction that belongs under Tools used, and do not repeat parameter-caused call failures that belong under Failed or mis-parameterized tool calls.
-- If none: `None identified — no defect surfaced in this task.`
+### Prioritized changes
+Include at most three recommendations, each tied to a reported finding: **named changeable surface → specific change → expected benefit**. Rank by likely benefit to task effectiveness or baseline token reduction; mark benefits as untested. Prefer the smallest intervention that addresses the evidence, including guidance/schema fixes for misuse. Recommend increased tool use only when a supported discoverability or guidance gap explains the miss. If no change is supported, write `None warranted by the available evidence.`
 
-### Missed opportunities
-- `[inferred · impact: high|medium|low]` **`<surface>`** — task-specific help it might have provided. Name the cause: discoverability, guidance, timing, capability, or not applicable.
-- If none: `None identified — do not infer a gap from non-use alone.`
-
-### Missing pieces
-- `[observed|inferred · impact: high|medium|low]` **`<utility, feature, docs, example, or output change>`** — the concrete gap and how it affected this task.
-- If none: `None identified.`
-
-### Unhelpful or noisy context
-- `[observed|inferred · impact: high|medium|low]` **`<instruction, context, or output>`** — what was unnecessary or costly, and how it could be reduced or better timed.
-- If none: `None identified.`
-
-### Prioritized recommendations
-1. **`<named surface>`** — <specific change>; <expected benefit>; confidence: <high|medium|low>.
-2. **`<named surface>`** — <specific change>; <expected benefit>; confidence: <high|medium|low>.
-3. **`<named surface>`** — <specific change>; <expected benefit>; confidence: <high|medium|low>.
-- Include only supported recommendations. If none are supported, write `None identified`.
-
-### Confidence / evidence
-- Direct evidence: <what the session and any evidence queries demonstrate>
-- Inference: <what is plausible but untested>
-- Limits: <what the session cannot establish>
+### Evidence limits
+<Briefly state material limits: missing or compacted task context, unavailable verification, uncertain attribution, or unmeasured costs. Distinguish an uneventful observed task from incomplete evidence.>
