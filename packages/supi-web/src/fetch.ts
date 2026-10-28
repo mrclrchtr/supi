@@ -93,7 +93,7 @@ async function tryHeadNegotiation(
       signal,
     );
     if (!getRes.ok)
-      throw new FetchError(`Fetch failed: ${getRes.status} ${getRes.statusText}`, {
+      throw new FetchError(`Fetch failed for ${url}: ${getRes.status} ${getRes.statusText}`, {
         status: getRes.status,
       });
     return {
@@ -227,9 +227,12 @@ async function fetchFullTextResult(options: FetchFullTextOptions): Promise<Fetch
     options.signal,
   );
   if (!fullRes.ok)
-    throw new FetchError(`Fetch failed: ${fullRes.status} ${fullRes.statusText}`, {
-      status: fullRes.status,
-    });
+    throw new FetchError(
+      `Fetch failed for ${options.url}: ${fullRes.status} ${fullRes.statusText}`,
+      {
+        status: fullRes.status,
+      },
+    );
   return buildFetchResult(fullRes, options.url, options.contentType, options.kind);
 }
 
@@ -280,7 +283,9 @@ async function fetchAsHtml(
     signal,
   );
   if (!res.ok)
-    throw new FetchError(`Fetch failed: ${res.status} ${res.statusText}`, { status: res.status });
+    throw new FetchError(`Fetch failed for ${url}: ${res.status} ${res.statusText}`, {
+      status: res.status,
+    });
   return {
     url: res.url || url,
     text: await res.text(),

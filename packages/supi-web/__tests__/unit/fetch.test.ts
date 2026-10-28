@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   FETCH_TIMEOUT_MAX_MS,
-  FetchError,
   fetchWithNegotiation,
   guessLanguage,
   isHtml,
@@ -110,13 +109,54 @@ describe("fetchWithNegotiation", () => {
     expect(result.text).toBe("# Hello\n\nWorld");
   });
 
-  it("throws FetchError on non-ok response", async () => {
+  it("preserves HTTP status when no representation exists", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response("Not Found", { status: 404 })),
     );
 
-    await expect(fetchWithNegotiation("https://example.com/missing")).rejects.toThrow(FetchError);
+    await expect(fetchWithNegotiation("https://example.com/missing")).rejects.toMatchObject({
+      name: "FetchError",
+      status: 404,
+    });
+  });
+
+  it("uses an available Markdown sibling when the original page returns 404", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL | Request) =>
+        String(url) === "https://example.com/guide.md"
+          ? new Response("# Guide\n\nMarkdown source", {
+              headers: { "content-type": "text/markdown" },
+            })
+          : new Response("Not Found", { status: 404 }),
+      ),
+    );
+
+    await expect(fetchWithNegotiation("https://example.com/guide")).resolves.toMatchObject({
+      url: "https://example.com/guide.md",
+      text: "# Guide\n\nMarkdown source",
+      isMarkdown: true,
+    });
+  });
+
+  it("returns valid HTML when Markdown siblings return 404", async () => {
+    // biome-ignore lint/security/noSecrets: static HTML fixture, not a credential
+    const html = "<html><body>Guide</body></html>";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL | Request) =>
+        String(url) === "https://example.com/guide"
+          ? new Response(html, { headers: { "content-type": "text/html" } })
+          : new Response("Not Found", { status: 404 }),
+      ),
+    );
+
+    await expect(fetchWithNegotiation("https://example.com/guide")).resolves.toMatchObject({
+      url: "https://example.com/guide",
+      text: html,
+      isMarkdown: false,
+    });
   });
 
   it("honors an already-aborted signal without trying fallbacks", async () => {

@@ -79,6 +79,21 @@ return [];
 
 Structured values can be larger than their text previews. Select the fields you need before printing them. The package's `./api` export provides `WebFetchMdOutput`, `WebSearchOutput`, `WebDocsSearchOutput`, and `WebDocsFetchOutput` types. Active Pi sessions need `/reload` or a restart to load extension changes.
 
+HTTP fetch failures include the requested URL and response status in the error message. For independent batch fetches, catch each call so a missing page does not stop the remaining work:
+
+```javascript
+for (const url of urls) {
+  try {
+    const page = await tools.web_fetch_md({ url, output_mode: "file" });
+    text({ url, filePath: page.filePath });
+  } catch (error) {
+    text({ url, error: String(error) });
+  }
+}
+```
+
+Uncaught failures stop the codemode script; `store()` writes are committed only when the script succeeds. The fetch tool does not discover relocated pages automatically.
+
 ## Web Search
 
 `web_search` uses the installed `bx` executable. The tool is enabled by default, but it is available only when `bx` is on `PATH`. Search freshness accepts `pd`, `pw`, `pm`, `py`, or an ordered `YYYY-MM-DDtoYYYY-MM-DD` range.

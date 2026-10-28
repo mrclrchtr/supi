@@ -121,7 +121,10 @@ it("delivers actual web tool data through PI's default codemode and rejects thro
           infoSnippets: [{ content: "Fixture guidance", breadcrumb: "Guide", pageId: source.url }],
         });
       }
-      if (url.href === "https://example.test/page") {
+      if (url.origin === "https://example.test") {
+        if (url.pathname !== "/page") {
+          return new Response("Not Found", { status: 404, statusText: "Not Found" });
+        }
         return new Response(init?.method === "HEAD" ? null : "# Page\n\nBody", {
           headers: { "content-type": "text/markdown" },
         });
@@ -251,6 +254,17 @@ it("delivers actual web tool data through PI's default codemode and rejects thro
         });
       }
     }
+
+    const httpFailure = await runScript(
+      'return await tools.web_fetch_md({ url: "https://example.test/missing" });',
+    );
+    expect(httpFailure.isError).toBe(true);
+    const httpErrorText = httpFailure.content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
+      .join("\n");
+    expect(httpErrorText).toContain("https://example.test/missing");
+    expect(httpErrorText).toContain("404 Not Found");
 
     const failure = await runScript(
       'return await tools.web_fetch_md({ url: "ftp://example.test/page" });',
