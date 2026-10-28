@@ -8,7 +8,12 @@ import {
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
 import type { ContextAnalysis } from "../../analysis.ts";
-import type { ContextPressureSnapshot } from "../../capacity.ts";
+import { type ContextPressureSnapshot, createContextPressureSnapshot } from "../../capacity.ts";
+import type {
+  ContextReportInlineResult,
+  ContextReportOutput,
+  ContextReportSnapshot,
+} from "./result-schema.ts";
 
 export interface ContextToolConciseDetails {
   mode: "concise";
@@ -20,67 +25,57 @@ export interface ContextToolFullDetails {
   analysis: ContextAnalysis;
 }
 
-/** Mode-specific details returned to the agent and mirrored for TUI rendering. */
+/** Mode-specific details retained separately for TUI rendering and reconstruction. */
 export type ContextToolDetails = ContextToolConciseDetails | ContextToolFullDetails;
 
-interface TruncatedOutputEnvelope {
-  truncated: true;
-  fullOutputPath: string;
-  totalLines: number;
-  totalBytes: number;
-  maxLines: number;
-  maxBytes: number;
-}
-
-/**
- * Serialize a diagnostic report without ever returning invalid partial JSON.
- *
- * When Pi's normal tool-output limits would truncate the report, the complete
- * compact JSON is stored in a temporary file and the agent receives a small,
- * valid JSON envelope pointing to it instead.
- */
-export async function serializeFullContextAnalysis(analysis: ContextAnalysis): Promise<string> {
-  const fullJson = JSON.stringify(analysis);
-  const truncation = truncateHead(fullJson, {
-    maxLines: DEFAULT_MAX_LINES,
-    maxBytes: DEFAULT_MAX_BYTES,
-  });
-
-  if (!truncation.truncated) {
-    return fullJson;
-  }
-
-  const outputDir = await mkdtemp(join(tmpdir(), "supi-context-"));
-  const fullOutputPath = join(outputDir, "context-usage-report.json");
-  await writeFile(fullOutputPath, fullJson, "utf8");
-
-  const envelope: TruncatedOutputEnvelope = {
-    truncated: true,
-    fullOutputPath,
-    totalLines: truncation.totalLines,
-    totalBytes: truncation.totalBytes,
-    maxLines: DEFAULT_MAX_LINES,
-    maxBytes: DEFAULT_MAX_BYTES,
-  };
-  return JSON.stringify(envelope);
-}
-
-/** Assemble the concise-mode model-facing result. */
+/** Assemble the concise-mode model-facing and native result without diagnostic analysis. */
 export function buildConciseResult(
   snapshot: ContextPressureSnapshot,
-): AgentToolResult<ContextToolConciseDetails> {
+): AgentToolResult<ContextToolConciseDetails> & { structuredContent: ContextReportSnapshot } {
+  const data = { ...snapshot };
   return {
-    content: [{ type: "text", text: JSON.stringify(snapshot) }],
+    content: [{ type: "text", text: JSON.stringify(data) }],
+    structuredContent: data,
     details: { mode: "concise", snapshot },
   };
 }
 
-/** Assemble the full-mode model-facing result. */
+/**
+ * Project existing attribution facts without reconciling overlapping estimates.
+ * The complete compact public result alone determines whether attribution spills;
+ * the human report, including excluded text, remains available only in details.
+ */
 export async function buildFullResult(
   analysis: ContextAnalysis,
-): Promise<AgentToolResult<ContextToolFullDetails>> {
+): Promise<AgentToolResult<ContextToolFullDetails> & { structuredContent: ContextReportOutput }> {
+  const snapshot = createContextPressureSnapshot(analysis.modelName, analysis);
+  const full: ContextReportInlineResult = {
+    ...snapshot,
+    attribution: {
+      scaled: analysis.scaled,
+      categories: analysis.categories,
+      systemPromptBreakdown: analysis.systemPromptBreakdown,
+      injectedFiles: analysis.injectedFiles,
+      toolDefinitions: {
+        count: analysis.toolDefinitions.count,
+        tokens: analysis.toolDefinitions.tokens,
+        tools: analysis.toolDefinitions.tools.map(({ name, tokens }) => ({ name, tokens })),
+      },
+    },
+  };
+  let data: ContextReportOutput = full;
+  let text = JSON.stringify(full);
+  const size = truncateHead(text, { maxLines: DEFAULT_MAX_LINES, maxBytes: DEFAULT_MAX_BYTES });
+  if (size.truncated) {
+    const outputDir = await mkdtemp(join(tmpdir(), "supi-context-"));
+    const path = join(outputDir, "context-usage-report.json");
+    await writeFile(path, text, "utf8");
+    data = { ...snapshot, attributionFile: { path, bytes: Buffer.byteLength(text, "utf8") } };
+    text = JSON.stringify(data);
+  }
   return {
-    content: [{ type: "text", text: await serializeFullContextAnalysis(analysis) }],
+    content: [{ type: "text", text }],
+    structuredContent: data,
     details: { mode: "full", analysis },
   };
 }

@@ -55,7 +55,26 @@ interface ContextPressureSnapshot {
 }
 ```
 
-Use `context_report({ mode: "full" })` only when diagnostic attribution is needed. Full mode returns compact JSON for the Context Usage Report. If it exceeds Pi's normal tool-output limits, it returns a small valid-JSON envelope with the path to a temporary file containing the complete report.
+Use `context_report({ mode: "full" })` only when diagnostic attribution is needed. Full mode returns `{ ...snapshot, attribution }`. Attribution contains only:
+
+- `scaled` and `categories`
+- `systemPromptBreakdown`: composition totals, instruction/context files, skills, tool snippets, and guideline sources
+- `injectedFiles`: existing file, turn, token, and line records
+- `toolDefinitions`: count, token estimate, and `{ name, tokens }` records
+
+These are existing attribution estimates, not an exact or exhaustive accounting. Category scaling and detailed inventory estimates retain their separate meanings; overlapping inventories are not reconciled or summed. Raw tool descriptions, guideline text, duplicated top-level attribution fields, and provider telemetry are excluded.
+
+If the complete compact result exceeds Pi's default output limits, the tool instead returns `{ ...snapshot, attributionFile: { path, bytes } }`, with no inline attribution. The temporary file contains the exact complete focused result, and `bytes` is its UTF-8 byte length. The path is ephemeral; no retention is guaranteed.
+
+The registered output schema covers all three shapes. Codemode receives native data through `structuredContent`; direct calls receive compact JSON for that same object. Scripts need not parse tool content or use rendering `details`:
+
+```js
+const snapshot = await tools.context_report({});
+text({ headroomTokens: snapshot.headroomTokens, pressurePercent: snapshot.pressurePercent });
+const report = await tools.context_report({ mode: "full" });
+if ("attribution" in report) text(report.attribution.toolDefinitions);
+else if ("attributionFile" in report) text(report.attributionFile);
+```
 
 The tool TUI never shows raw agent JSON: concise results render as a dense snapshot that expands into its metrics; full results expand into the diagnostic report.
 
@@ -102,6 +121,6 @@ The tool is disabled by default and requires a `/reload` or restart after toggli
 - `src/entry-renderer.ts` — TUI-only custom-entry renderer for the human command
 - `src/format*.ts` and `src/report-component.ts` — Context Usage Report rendering
 - `src/snapshot-component.ts` — compact, width-safe snapshot rendering
-- `src/tool/guidance.ts`, `src/tool/output.ts`, and `src/tool/render.ts` — agent-tool guidance, safe full JSON output, and tool rendering
+- `src/tool/context_report/{spec,result-schema,guidance,result,render}.ts` — agent-tool schema, guidance, native/direct result assembly, and human rendering
 
 Tests live under `__tests__/unit/`.

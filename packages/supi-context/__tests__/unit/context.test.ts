@@ -1,6 +1,8 @@
 import { readFile, rm } from "node:fs/promises";
 import { dirname } from "node:path";
-import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@earendil-works/pi-coding-agent";
+import { DEFAULT_MAX_BYTES } from "@earendil-works/pi-coding-agent";
+import type { TSchema } from "typebox";
+import { Value } from "typebox/value";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFns = vi.hoisted(() => ({
@@ -24,9 +26,10 @@ vi.mock("../../src/settings-registration.ts", () => ({
 }));
 
 import { createPiMock, getHandlerOrThrow, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
+import type { ContextAnalysis } from "../../src/analysis.ts";
 import contextExtension from "../../src/context.ts";
 
-const analysis = {
+const analysis: ContextAnalysis = {
   modelName: "Test Model",
   contextWindow: 100_000,
   usedTokens: 50_000,
@@ -48,23 +51,35 @@ const analysis = {
   },
   systemPromptBreakdown: {
     base: 5_000,
-    instructionFiles: [],
-    contextFiles: [],
-    skills: [],
+    instructionFiles: [{ path: "/project/CLAUDE.md", tokens: 120, lines: 30, origin: "project" }],
+    contextFiles: [{ path: "/home/context.md", tokens: 80, lines: 20, origin: "global" }],
+    skills: [{ name: "testing", tokens: 150 }],
     guidelines: 500,
     toolSnippets: 300,
-    toolSnippetDetails: [],
-    guidelineSources: [],
+    toolSnippetDetails: [{ name: "read", tokens: 12 }],
+    guidelineSources: [{ source: "read", tokens: 25, bulletCount: 2 }],
     appendText: 0,
   },
-  injectedFiles: [],
-  skills: [],
+  injectedFiles: [{ file: "/project/src/main.ts", turn: 3, tokens: 200, lines: 50 }],
+  skills: [{ name: "testing", tokens: 150 }],
   guidelines: 500,
-  guidelineBullets: [],
-  guidelineSources: [],
-  toolSnippetDetails: [],
-  toolDefinitions: { count: 0, tokens: 0, tools: [] },
-  providerSections: [],
+  guidelineBullets: ["EXCLUDED_GUIDELINE"],
+  guidelineSources: [{ source: "read", tokens: 25, bulletCount: 2 }],
+  toolSnippetDetails: [{ name: "read", tokens: 12 }],
+  toolDefinitions: {
+    count: 1,
+    tokens: 600,
+    tools: [{ name: "read", tokens: 600, description: "EXCLUDED_DESCRIPTION" }],
+  },
+  providerSections: [{ id: "telemetry", label: "EXCLUDED_PROVIDER", data: { calls: 2 } }],
+};
+
+const focusedAttribution = {
+  scaled: analysis.scaled,
+  categories: analysis.categories,
+  systemPromptBreakdown: analysis.systemPromptBreakdown,
+  injectedFiles: analysis.injectedFiles,
+  toolDefinitions: { count: 1, tokens: 600, tools: [{ name: "read", tokens: 600 }] },
 };
 
 const snapshot = {
@@ -79,6 +94,22 @@ const snapshot = {
   compacted: analysis.compacted,
   approximationNote: analysis.approximationNote,
 };
+
+function expectNativeResult(
+  pi: ReturnType<typeof createPiMock>,
+  result: { content: Array<{ type: string; text: string }>; structuredContent: unknown },
+): void {
+  const tool = getTool(pi, "context_report") as { outputSchema?: TSchema };
+  expect(tool.outputSchema).toBeDefined();
+  if (!tool.outputSchema) throw new Error("Expected context_report outputSchema");
+  expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);
+  const roundTripped = JSON.parse(JSON.stringify(result.structuredContent));
+  expect(roundTripped).toEqual(result.structuredContent);
+  expect(Value.Check(tool.outputSchema, roundTripped)).toBe(true);
+  expect(result.content).toEqual([
+    { type: "text", text: JSON.stringify(result.structuredContent) },
+  ]);
+}
 
 function commandHandler(
   pi: ReturnType<typeof createPiMock>,
@@ -180,15 +211,71 @@ describe("supi-context extension surfaces", () => {
     expect(tool.description).not.toMatch(/2,000 lines|50 KB/i);
     const result = (await tool.execute("tool-call", {}, undefined, undefined, ctx)) as {
       content: Array<{ type: string; text: string }>;
+      structuredContent: unknown;
       details: unknown;
     };
 
+    expectNativeResult(pi, result);
+    expect(result.structuredContent).toEqual(snapshot);
     expect(result.content[0]?.text).toBe(JSON.stringify(snapshot));
     expect(result.content[0]?.text).not.toContain("\n");
     expect(Object.keys(JSON.parse(result.content[0]?.text ?? "{}"))).toEqual(Object.keys(snapshot));
     expect(result.details).toEqual({ mode: "concise", snapshot });
     expect(mockFns.analyzeContextPressure).toHaveBeenCalledWith(ctx);
     expect(mockFns.analyzeContext).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      contextWindow: null,
+      usagePercent: null,
+      headroomTokens: null,
+      pressurePercent: null,
+      compacted: false,
+      approximationNote: "Usage pending after compaction",
+    },
+    {
+      usedTokens: 120_000,
+      usagePercent: 120,
+      headroomTokens: 0,
+      pressurePercent: 143.5,
+      approximationNote: "Approximate usage",
+    },
+  ])(
+    "preserves nullable capacity, notes, compaction facts, and pressure beyond 100%: %j",
+    async (capacity) => {
+      const expected = { ...snapshot, ...capacity };
+      mockFns.analyzeContextPressure.mockReturnValue(expected);
+      mockFns.analyzeContext.mockReturnValue({ ...analysis, ...expected });
+      const pi = createPiMock();
+      contextExtension(pi as never);
+      for (const mode of ["concise", "full"] as const) {
+        const result = (await getTool(pi, "context_report").execute(
+          "tool-call",
+          { mode },
+          undefined,
+          undefined,
+          makeCtx(),
+        )) as { content: Array<{ type: string; text: string }>; structuredContent: unknown };
+        expectNativeResult(pi, result);
+        expect(result.structuredContent).toEqual(
+          mode === "concise" ? expected : { ...expected, attribution: focusedAttribution },
+        );
+      }
+    },
+  );
+
+  it.each(["concise", "full"])("keeps %s analysis failures as thrown failures", async (mode) => {
+    const failure = new Error("Analysis failed");
+    const analyze = mode === "full" ? mockFns.analyzeContext : mockFns.analyzeContextPressure;
+    analyze.mockImplementationOnce(() => {
+      throw failure;
+    });
+    const pi = createPiMock();
+    contextExtension(pi as never);
+    await expect(
+      getTool(pi, "context_report").execute("tool-call", { mode }, undefined, undefined, makeCtx()),
+    ).rejects.toBe(failure);
   });
 
   it("takes the snapshot before its own tool result changes session state", async () => {
@@ -212,76 +299,99 @@ describe("supi-context extension surfaces", () => {
     expect(pi.messages).toEqual([]);
   });
 
-  it("returns compact diagnostic JSON only when full mode is requested", async () => {
+  it("returns only focused attribution while retaining the human report in full-mode details", async () => {
     const pi = createPiMock();
     contextExtension(pi as never);
-    const ctx = { ...makeCtx(), mode: "tui" };
-    const tool = getTool(pi, "context_report");
-    const result = (await tool.execute(
+    const result = (await getTool(pi, "context_report").execute(
       "tool-call",
       { mode: "full" },
       undefined,
       undefined,
-      ctx,
+      makeCtx(),
     )) as {
       content: Array<{ type: string; text: string }>;
+      structuredContent: unknown;
       details: unknown;
     };
 
-    expect(result.content[0]?.text).toBe(JSON.stringify(analysis));
-    expect(result.content[0]?.text).not.toContain("\n");
+    expectNativeResult(pi, result);
+    expect(result.structuredContent).toEqual({ ...snapshot, attribution: focusedAttribution });
+    expect(result.content[0]?.text).not.toContain("EXCLUDED_");
     expect(result.details).toEqual({ mode: "full", analysis });
   });
 
-  it("returns a valid JSON envelope and preserves oversized full output in a temp file", async () => {
-    const oversizedAnalysis = {
+  it("does not spill large excluded descriptions, guideline text, or provider telemetry", async () => {
+    const excludedText = "EXCLUDED_".repeat(DEFAULT_MAX_BYTES);
+    const largeHumanReport = {
       ...analysis,
+      guidelineBullets: [excludedText],
+      providerSections: [{ id: "provider", label: "Provider", data: { text: excludedText } }],
       toolDefinitions: {
-        count: 1,
-        tokens: DEFAULT_MAX_BYTES,
-        tools: [
-          { name: "large", description: "x".repeat(DEFAULT_MAX_BYTES), tokens: DEFAULT_MAX_BYTES },
-        ],
+        ...analysis.toolDefinitions,
+        tools: [{ name: "read", tokens: 600, description: excludedText }],
       },
     };
+    mockFns.analyzeContext.mockReturnValue(largeHumanReport);
+    const pi = createPiMock();
+    contextExtension(pi as never);
+    const result = (await getTool(pi, "context_report").execute(
+      "tool-call",
+      { mode: "full" },
+      undefined,
+      undefined,
+      makeCtx(),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      structuredContent: unknown;
+      details: unknown;
+    };
+
+    expectNativeResult(pi, result);
+    expect(result.structuredContent).toEqual({ ...snapshot, attribution: focusedAttribution });
+    expect(result.details).toEqual({ mode: "full", analysis: largeHumanReport });
+  });
+
+  it("spills complete focused attribution with snapshot capacity and the exact UTF-8 byte length", async () => {
+    const injectedFiles = Array.from({ length: 1000 }, (_, turn) => ({
+      file: `/project/資料-${turn}.ts`,
+      turn,
+      tokens: 123,
+      lines: 40,
+    }));
+    const oversizedAnalysis = { ...analysis, injectedFiles };
+    const expected = { ...snapshot, attribution: { ...focusedAttribution, injectedFiles } };
+    expect(Buffer.byteLength(JSON.stringify(expected), "utf8")).toBeGreaterThan(DEFAULT_MAX_BYTES);
     mockFns.analyzeContext.mockReturnValue(oversizedAnalysis);
     const pi = createPiMock();
     contextExtension(pi as never);
-    const ctx = { ...makeCtx(), mode: "tui" };
     const tool = getTool(pi, "context_report");
     const result = (await tool.execute(
       "tool-call",
       { mode: "full" },
       undefined,
       undefined,
-      ctx,
+      makeCtx(),
     )) as {
       content: Array<{ type: string; text: string }>;
+      structuredContent: { attributionFile: { path: string; bytes: number } };
+      details: unknown;
     };
-    const envelope = JSON.parse(result.content[0]?.text ?? "{}") as {
-      truncated?: boolean;
-      fullOutputPath?: string;
-      totalLines?: number;
-      totalBytes?: number;
-      maxLines?: number;
-      maxBytes?: number;
-    };
-
-    expect(envelope).toMatchObject({
-      truncated: true,
-      fullOutputPath: expect.any(String),
-      totalLines: expect.any(Number),
-      totalBytes: expect.any(Number),
-      maxLines: DEFAULT_MAX_LINES,
-      maxBytes: DEFAULT_MAX_BYTES,
-    });
-
-    const fullOutputPath = envelope.fullOutputPath;
-    if (!fullOutputPath) throw new Error("Expected a full output path");
+    const { path, bytes } = result.structuredContent.attributionFile;
     try {
-      expect(JSON.parse(await readFile(fullOutputPath, "utf8"))).toEqual(oversizedAnalysis);
+      expectNativeResult(pi, result);
+      expect(result.structuredContent).toEqual({
+        ...snapshot,
+        attributionFile: { path: expect.any(String), bytes: expect.any(Number) },
+      });
+      const saved = await readFile(path, "utf8");
+      expect(saved).toBe(JSON.stringify(expected));
+      expect(saved).not.toContain("EXCLUDED_");
+      expect(bytes).toBe(Buffer.byteLength(saved, "utf8"));
+      const { outputSchema } = tool as typeof tool & { outputSchema: TSchema };
+      expect(Value.Check(outputSchema, JSON.parse(saved))).toBe(true);
+      expect(result.details).toEqual({ mode: "full", analysis: oversizedAnalysis });
     } finally {
-      await rm(dirname(fullOutputPath), { recursive: true, force: true });
+      await rm(dirname(path), { recursive: true, force: true });
     }
   });
 });

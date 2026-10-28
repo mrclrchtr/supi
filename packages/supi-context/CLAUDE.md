@@ -7,7 +7,7 @@ Observability for how a pi session occupies and approaches its context-window li
 - **Context Pressure Snapshot** — the agent-facing, constant-shape capacity reading. `context_report({})` defaults to this concise mode; it intentionally excludes diagnostic inventories.
 - **Context Usage Report** — the human-facing diagnostic report. `/supi-context` is registered only in TUI mode and appends a custom entry, so it stays visible in the transcript without entering LLM context.
 
-`mode: "full"` on `context_report` returns compact diagnostic JSON. It uses Pi's normal output limits only to detect oversized output, then writes the complete valid JSON to a temporary file and returns a valid JSON envelope.
+`context_report` declares an output schema and returns the same public object as native `structuredContent` and compact direct-call JSON. Full mode adds only focused `attribution` (categories, system-prompt composition, injected files, and description-free tool estimates). Oversized full results return snapshot fields plus `attributionFile: { path, bytes }`; the ephemeral file contains the complete focused result. Preserve existing estimates without reconciling overlapping inventories. Mode-specific `details` retain the separate human report, including text and provider telemetry excluded from machine results.
 
 ## Shared capacity model
 
