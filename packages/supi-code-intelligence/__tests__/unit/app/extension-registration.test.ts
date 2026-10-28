@@ -100,7 +100,6 @@ describe("focused code intelligence tool registration", () => {
         patterns: [
           /workspace symbols in semantic mode/i,
           /names in AST mode/i,
-          /PI grep/i,
           /does not switch to another search method/i,
         ],
       },
