@@ -2,7 +2,7 @@
 description: Assess SuPi tooling for the preceding task with evidence-linked improvements
 ---
 
-Produce a compact retrospective of the task immediately preceding this prompt. Assess SuPi tooling, not the project's code or general development practices. Cover relevant tools, skills, prompts, extensions, injected guidance, docs, settings, and human-only TUI commands—not the suite in the abstract. Look for ways to reduce baseline model-input tokens while preserving correct tool selection and use.
+Produce a compact retrospective of the task immediately preceding this prompt. Assess SuPi tooling, not the project's code or general development practices. Cover relevant tools, skills, prompts, extensions, injected guidance, docs, settings, and human-only TUI commands—not the suite in the abstract. Assess context efficiency where the task provides concrete evidence, preserving correct tool selection and use.
 
 ## Scope and evidence
 
@@ -17,7 +17,7 @@ Use these evidence labels:
 - `[inferred]`: a plausible interpretation or missed benefit, not demonstrated.
 - `[unknown]`: an unresolved cause, ownership, or measurement; not a standalone finding.
 
-Separate the observed outcome from its explanation. An observed failure does not make its suspected cause observed. Attribute problems to SuPi, agent misuse, or upstream Pi/provider behavior only when supported; otherwise mark ownership or cause `[unknown]`. Keep upstream behavior and project-code defects out of SuPi bug claims.
+Separate the observed outcome from its explanation. An observed failure does not make its suspected cause observed. Distinguish SuPi-owned surfaces, upstream Pi/provider behavior, project-local guidance, and agent behavior. Attribute ownership and cause only when supported; otherwise mark them `[unknown]`. Keep upstream behavior and project-code defects out of SuPi bug claims.
 
 Rate each finding's impact on this task as `high`, `medium`, or `low`, based on the demonstrated effect or explicitly inferred benefit. Report time, token, cache, or cost figures only when measured in the task evidence; describe unmeasured costs qualitatively. Claims about recurring problems or suite-wide reliability require evidence beyond this retrospective's scope.
 
@@ -26,11 +26,11 @@ Rate each finding's impact on this task as `high`, `medium`, or `low`, based on 
 Consider each category, but report each finding once:
 - **Help:** What a used surface enabled, including useful guidance or context—not just a list of calls.
 - **Tool guidance quality:** Assess visible tool descriptions, parameter explanations, `promptSnippet`, `promptGuidelines`, and result guidance for clarity, correctness, and sufficiency at the decision point. Rate relevant guidance as `effective`, `needs improvement`, or `not assessable`, citing evidence. Distinguish unclear guidance from the agent failing to follow clear guidance.
-- **Baseline token cost:** Audit visible recurring tool metadata and injected guidance separately from result text and on-demand content. Look for duplicated facts, prose already expressed by schema constraints, implementation detail, and post-call instructions. Propose exact deletions, shorter wording, or on-demand destinations, explaining why pre-call selection, argument validity, and safety remain supported. Non-use in this task alone does not justify removal. Mark uncertain request placement `[unknown]`; quantify savings only from task evidence.
+- **Context efficiency:** Where concrete task evidence supports a finding, distinguish recurring tool metadata and injected guidance from result text and on-demand content. For deletion proposals, quote the exact overlapping excerpt and identify retained guidance that preserves pre-call selection, argument validity, and safety. Visible overlap is a candidate for reduction, not proof of redundancy; non-use alone does not justify removal. Mark uncertain request placement `[unknown]`; quantify savings only from task evidence.
 - **Failures and retries:** Rejected, failed, or mis-parameterized SuPi calls, including ones corrected on retry. Name the relevant parameter or error and eventual outcome. Distinguish agent misuse, ambiguous descriptions, missing guidance, schema gaps, and tool bugs; leave the cause unknown when the evidence cannot decide.
 - **Defects:** Wrong output, crashes, regressions, or inconsistent behavior under valid usage. Label suspected defects as inferred and state what remains unverified.
 - **Missed or missing help:** A specific unused surface or absent capability that plausibly would have changed this task. For unused surfaces, establish that they were available and relevant at the decision point; non-use alone is not a gap. Infer a reason such as discoverability, guidance, or timing only when supported.
-- **Noise:** Identify redundant, stale, misleading, oversized, or poorly timed results/on-demand context and their avoidable cost. Explain what could be reduced or deferred while preserving necessary guidance.
+- **Noise:** Identify redundant, stale, misleading, oversized, or poorly timed results/on-demand context and their avoidable cost. Account for visible mandatory-reading requirements before calling a read unnecessary. Explain what could be reduced or deferred while preserving necessary guidance.
 
 ## Report
 
@@ -49,7 +49,7 @@ Use the structure below, within 600 words; shorter when evidence is sparse. Prio
 - `[observed|inferred · impact: high|medium|low]` **`<surface>`** — <category and finding; evidence anchor; task effect>. <Cause or ownership, separately labeled if inferred or unknown. For failed calls, include the retry outcome if visible.>
 
 ### Prioritized changes
-Include at most three recommendations, each tied to a reported finding: **named changeable surface → specific change → expected benefit**. Rank by likely benefit to task effectiveness or baseline token reduction; mark benefits as untested. Prefer the smallest intervention that addresses the evidence, including guidance/schema fixes for misuse. Recommend increased tool use only when a supported discoverability or guidance gap explains the miss. If no change is supported, write `None warranted by the available evidence.`
+Include at most three recommendations, each tied to a reported finding: **owner / named surface → specific change → expected benefit**. Rank by supported task benefit or context reduction; mark benefits as untested. Keep agent-behavior lessons distinct from persistent tooling or guidance changes. Prefer the smallest intervention: persistent changes require a concrete editable target and evidence that changing the surface, rather than following existing guidance, addresses the finding. When ownership or necessity is unresolved, recommend narrow verification rather than deletion. Recommend increased tool use only when a supported discoverability or guidance gap explains the miss. If no change is supported, write `None warranted by the available evidence.`
 
 ### Evidence limits
 <Briefly state material limits: missing or compacted task context, unavailable verification, uncertain attribution, or unmeasured costs. Distinguish an uneventful observed task from incomplete evidence.>
