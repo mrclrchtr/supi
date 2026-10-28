@@ -25,7 +25,10 @@ SuPi is pre-release and API-unstable. Breaking changes to APIs, commands, config
 ## Commands
 
 - Prefer lower-noise `*:ai` scripts when available; plain variants are for prettier/interactive output.
-- Run `pnpm verify:ai` for code, test, dependency, or package/config changes. Skip for specs/docs/skills-only changes unless requested.
+- Choose validation by impact, not file type. Use the smallest checks that cover the change and its affected consumers.
+- For localized code/test changes, run focused tests and affected package typechecks. For docs/specs/skills or automation-policy-only changes (e.g. Renovate grouping), use relevant content, syntax, or config validation instead of `pnpm verify:ai`.
+- Run `pnpm verify:ai` for workspace-wide impact: shared APIs or cross-package behavior, dependency/lockfile updates, packaging/publishing, or shared build/test configuration. Also run it when impact cannot be safely bounded or the user requests it.
+- Report checks run, failures, and validation skipped.
 
 ## Architecture
 
