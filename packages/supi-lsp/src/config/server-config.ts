@@ -36,7 +36,7 @@ export interface ServerConfig {
 
 /** Compiler selection facts; absent versions are unknown, not inferred from the wrapper. */
 export interface TypeScriptSelection {
-  backend: "tsserver";
+  backend: "tsserver" | "native";
   packageName: string;
   compilerVersion?: string;
   wrapperVersion?: string;

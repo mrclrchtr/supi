@@ -161,7 +161,7 @@ Use the following reference commands. Python qualification uses an explicit Base
 
 | Language | Reference command |
 | --- | --- |
-| TypeScript/JavaScript | `typescript-language-server` |
+| TypeScript/JavaScript | Project-local native TypeScript `tsc --lsp --stdio`; explicit TS6 control through `typescript-language-server` |
 | Python | `basedpyright-langserver` through an explicit `lsp.servers.python` override |
 | Java | `jdtls` |
 | Go | `gopls` |

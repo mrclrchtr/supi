@@ -33,21 +33,16 @@ export function scanProjectCapabilities(
 
   return Object.entries(config.servers)
     .flatMap(([serverName, server]) => {
-      if (!commandExists(server.command)) return [];
       const allRoots = new Set(markerMatches.get(serverName) ?? []);
       if (extensionBasedServers.has(serverName)) {
         allRoots.add(cwd);
       }
       const roots = dedupeTopmostRoots(Array.from(allRoots));
-      return roots.map(
-        (root) =>
-          ({
-            name: serverName,
-            root,
-            fileTypes: [...server.fileTypes],
-            ...inspectTypeScriptLaunch(serverName, server, root),
-          }) satisfies DetectedProjectServer,
-      );
+      return roots.flatMap((root) => {
+        const { command, ...selection } = inspectTypeScriptLaunch(serverName, server, root);
+        if (!selection.failureMessage && !commandExists(command)) return [];
+        return [{ name: serverName, root, fileTypes: [...server.fileTypes], ...selection }];
+      });
     })
     .sort((a, b) => a.root.localeCompare(b.root) || a.name.localeCompare(b.name));
 }
@@ -151,16 +146,19 @@ export function scanMissingServers(
     const roots = dedupeTopmostRoots(Array.from(markerMatches.get(name) ?? []));
     for (const root of roots.length ? roots : [cwd]) {
       const selection = inspectTypeScriptLaunch(name, server, root);
+      const command = selection.command;
       if (selection.failureMessage) {
         missing.push({
           name,
-          command: server.command,
+          command,
           foundExtensions: matching,
           root,
           failureMessage: selection.failureMessage,
         });
-      } else if (!commandExists(server.command)) {
-        missing.push({ name, command: server.command, foundExtensions: matching });
+        continue;
+      }
+      if (!commandExists(command)) {
+        missing.push({ name, command, foundExtensions: matching });
         break;
       }
     }

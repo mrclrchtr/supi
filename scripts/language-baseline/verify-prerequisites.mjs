@@ -82,6 +82,22 @@ requireVersion("pnpm", ["--version"], pins.toolchains.pnpm, "pnpm");
 
 const servers = pins.referenceServers;
 const require = createRequire(import.meta.url);
+const nativePin = servers.typescriptNative;
+if (
+  packageJson.devDependencies?.[nativePin.package] !==
+  `npm:${nativePin.identity}@${nativePin.version}`
+) {
+  throw new Error("The test-only native TypeScript alias does not match pins.json.");
+}
+const nativeManifest = require.resolve(`${nativePin.package}/package.json`);
+requirePackageVersion(nativeManifest, nativePin.identity, nativePin.version);
+const nativeMetadata = JSON.parse(readFileSync(nativeManifest, "utf8"));
+requireVersion(
+  process.execPath,
+  [join(dirname(nativeManifest), nativeMetadata.bin.tsc), "--version"],
+  nativePin.version,
+  "native TypeScript",
+);
 const tsPin = servers.typescriptLanguageServer;
 const wrapperPin = tsPin.compatibilityWrapper;
 if (packageJson.devDependencies?.[wrapperPin.package] !== wrapperPin.version) {

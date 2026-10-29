@@ -20,7 +20,7 @@ npm install @mrclrchtr/supi-lsp
 
 ## Language-server support
 
-SuPi provides 13 built-in server definitions. All are enabled unless `lsp.servers.<key>.enabled` is `false`. Install the language servers yourself; SuPi does not download or install them. Built-in commands must be on `PATH`; a configured absolute command path is also supported. Code Intelligence starts the runtime only for trusted projects.
+SuPi provides 13 built-in server definitions. All are enabled unless `lsp.servers.<key>.enabled` is `false`. Install the language servers yourself; SuPi does not download or install them. Built-in commands must be on `PATH`, except project-local native TypeScript; a configured absolute command path is also supported. Code Intelligence starts the runtime only for trusted projects.
 
 ### Built-in route matrix
 
@@ -28,7 +28,7 @@ This matrix describes the default routing configuration, not a live test or a gu
 
 | Language / config key | Default command and arguments | File extensions | Root markers for automatic discovery |
 |---|---|---|---|
-| TypeScript / JavaScript — `typescript` | `typescript-language-server --stdio` | `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs`, `.cjs` | `tsconfig.json`, `jsconfig.json`, `package.json` |
+| TypeScript / JavaScript — `typescript` | Project-local native `tsc --lsp --stdio`, otherwise `typescript-language-server --stdio` | `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs`, `.cjs` | `tsconfig.json`, `jsconfig.json`, `package.json` |
 | Python — `python` | `pyright-langserver --stdio` | `.py`, `.pyi` | `pyproject.toml`, `setup.py`, `setup.cfg`, `requirements.txt`, `pyrightconfig.json` |
 | Rust — `rust` | `rust-analyzer` | `.rs` | `Cargo.toml` |
 | Go — `go` | `gopls serve` | `.go`, `.mod` | `go.mod`, `go.sum` |
@@ -74,11 +74,11 @@ JDTLS acceptance uses a compatible pinned JDK and isolated writable `-data` and 
 
 ### TypeScript compiler selection
 
-The default TypeScript route still requires `typescript-language-server` on PATH (or an explicitly configured command). Compiler resolution does not discover or install a project-local language-server executable.
+The default TypeScript route prefers a project-local stable native TS7 server. Native launches use the selected package's declared `tsc` Node launcher with `--lsp --stdio`; neither TLS nor a global native executable is required. Legacy compiler launches still require `typescript-language-server` (TLS) on PATH. Nothing is installed automatically.
 
 | Configuration | Launch policy |
 |---|---|
-| No explicit launch fields | Resolve `typescript` from the route root; only if absent, resolve `@typescript/typescript6`. If both are absent, retain TLS's existing lookup. |
+| No explicit launch fields | Prefer stable native TS7 as `typescript`, then as `@typescript/native`. Otherwise use legacy `typescript`, or—only if absent—`@typescript/typescript6`. If all are absent, retain TLS's existing lookup. |
 | `lsp.servers.typescript.typescriptPackage` | Resolve exactly this installed package name/alias. No arbitrary alias scan, package subpath, URL, or filesystem-path selector. |
 | Explicit `command` **or** `args` | Manual launch, including inherited values equal to defaults. No automatic compiler selection or initialization-option injection. |
 | Explicit `initializationOptions.tsserver.path` | Use the configured path without automatic compiler selection. |
@@ -91,14 +91,20 @@ For example, select a compiler installed as `my-ts6` without changing the TLS co
 ```
 
 - Resolve packages using the route root's normal Node package search paths, including hoisted and symlinked packages. A package whose actual identity is `@typescript/typescript6`, including one installed as `typescript` or another alias, resolves `@typescript/old` from the wrapper's dependency graph. Pass the underlying implementation's actual `lib/tsserver.js` through `initializationOptions.tsserver.path`; preserve other initialization options.
-- A broken symlink, malformed manifest, missing implementation/compiler version, or unsupported selected backend is an error, not permission to try the next candidate. Automatically selected TypeScript 7 is rejected with guidance to select an installed TS6 package or configure a manual native launch. Existing explicit native launch configurations are unchanged, not newly qualified.
+- Native-first precedence deliberately replaces canonical-package-first selection: a native `@typescript/native` alias wins over legacy `typescript`. This alias must resolve to the stable native `typescript` package, not legacy TS or the old preview package. Other aliases require `typescriptPackage`.
+- A consulted broken symlink, malformed manifest, missing compiler version, unsupported identity/major, or prerelease is an error, not absence. Stable TS7 releases are eligible without a patch allowlist; unknown native majors and preview/nightly packages require manual launch. Do not inspect lower-priority packages after a native winner. Only the winner's launch files are validated, so a legacy loser's missing `tsserver.js` does not block a healthy native alias.
+- Never fall back after resolution or startup failure of the selected package. Manual launches receive no automatic initialization-option injection.
 - Discovery, missing-server warnings, lazy starts, and recovery use the same policy. Every actual start/retry resolves fresh package files using the active settings snapshot. Installing or repairing a compiler can be followed by explicit health refresh; changing settings requires reload/restart. Healthy clients do not hot-swap.
-- `code_health` and `/supi-ci-status` show the `tsserver` backend and resolved compiler version when known, separately from wrapper version. Manual/legacy-fallback launches have no inferred compiler identity. Missing versions remain unknown. Selection failures identify the package/root and a corrective action.
-- Topmost-root collapsing remains unchanged. Mixed nested backends, native TS7 selection/qualification ([#553](https://github.com/mrclrchtr/supi/issues/553)), Windows qualification, dependency watchers, and full feature parity are outside this change. Existing legacy TLS support is not deliberately removed.
+- `code_health` and `/supi-ci-status` show the `native` or `tsserver` backend and resolved compiler version when known, separately from wrapper version. Manual/legacy-fallback launches have no inferred compiler identity. Missing versions remain unknown. Selection failures identify the package/root and a corrective action.
+- Topmost-root collapsing remains unchanged. Mixed nested backends, Windows live qualification, dependency watchers, performance benchmarking, and full TLS/native feature parity are outside this change. Existing legacy TLS support is not deliberately removed.
 
-Focused qualification uses `typescript-language-server` **6.0.2**, ordinary TypeScript **6.0.3**, and `@typescript/typescript6` **6.0.2** backed by `@typescript/old` → TypeScript **6.0.3**. The wrapper's dependency range does not guarantee that compiler version; the lockfile and [prerequisite pins](../../scripts/language-baseline/pins.json) fix this test combination. SuPi's own compiler-API dependency is unchanged.
+Focused qualification pins native TypeScript **7.0.2**, TLS **6.0.2**, ordinary TypeScript **6.0.3**, and `@typescript/typescript6` **6.0.2** backed by `@typescript/old` → TypeScript **6.0.3**. The wrapper's dependency range does not guarantee that compiler version; the lockfile and [prerequisite pins](../../scripts/language-baseline/pins.json) fix these combinations. SuPi's own TS6 compiler-API dependency is unchanged. Workspace typecheck scripts name the TS6 compiler directly to avoid the test-only native alias's `tsc` bin collision.
 
-The required [Linux/macOS CI matrix](../../.github/workflows/ci.yml) runs [real-wrapper startup, retry, hover, confirmed error → clean diagnostics, restart, and shutdown](__tests__/integration/workspace-runtime.integration.typescript-launch.test.ts), plus existing ordinary-TS6 diagnostic freshness tests. [Selection-policy tests](__tests__/unit/typescript-launch.test.ts) cover wrapper/alias/symlink layouts and overrides; existing semantic/refactor suites retain stale-result, cross-file, Unicode rename, and applicable code-action protection. Focused verification passed on macOS arm64 (Node 24.22.1) and Linux arm64 (Debian container, Node 24.22.0). The pinned Linux/macOS CI jobs remain pending until they run. This is not a qualification claim for the complete language baseline.
+The required [Linux/macOS CI matrix](../../.github/workflows/ci.yml) keeps [selection/layout tests](__tests__/unit/typescript-launch.test.ts), [real native lifecycle tests](__tests__/integration/workspace-runtime.integration.typescript-native.test.ts), and [wrapper lifecycle tests](__tests__/integration/workspace-runtime.integration.typescript-launch.test.ts) separate from the [public TS/JS semantic matrix](../supi-code-intelligence/__tests__/acceptance/language-baseline-harness.ts). Required missing/unavailable behavior fails rather than skips. The matrix covers hover, definitions, references, meaningful implementations, document/workspace symbols, confirmed error → clean diagnostics, refresh, cross-file invalidation, Unicode-safe rename plan/apply and stale-plan rejection, and precise organize-imports. Native TSX/JSX and module suffixes receive routing/synchronization checks rather than duplicate matrices. Existing stale-result and edit-safety suites remain in place.
+
+[Bounded config comparisons](__tests__/integration/typescript-config-coverage.test.ts) compare TS6 and native TS7 `--showConfig` root-file coverage for TS/JS defaults, include/exclude, `allowJs`/`checkJs`, inherited patterns (including late-created files), and separate referenced projects. These cases found no false exclusion; filtering is unchanged. **Config coverage state is not TypeScript program membership**: imports may bring excluded files into a program, and references do not merge root-file lists.
+
+Capability gaps: native `delete_dead_code`/unused-import actions remain explicitly unavailable ([#554](https://github.com/mrclrchtr/supi/issues/554)); extraction remains unavailable ([#467](https://github.com/mrclrchtr/supi/issues/467)). Organize-imports is qualified separately; no TLS/native feature-parity claim is made. Only the pinned combinations are tested, not every stable TS7 release. Focused qualification passed on macOS arm64 (Node 24.22.1) and Linux arm64 (Debian container, Node 24.22.0), including the native/TS6 public TS/JS matrix. The pinned Linux/macOS CI jobs remain pending until they run; this is not a qualification claim for the complete multi-language baseline.
 
 ### Java startup and project JDKs
 

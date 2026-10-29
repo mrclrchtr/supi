@@ -1,6 +1,11 @@
 {
   "schemaVersion": 1,
   "referenceServers": {
+    "typescriptNative": {
+      "package": "@typescript/native",
+      "identity": "typescript",
+      "version": "7.0.2"
+    },
     "typescriptLanguageServer": {
       "version": "6.0.2",
       "package": "typescript-language-server",

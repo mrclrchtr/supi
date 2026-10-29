@@ -6,10 +6,12 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import {
   LspRuntimeController,
@@ -68,6 +70,8 @@ export interface RealLanguageWorkspaceOptions {
   readonly language: "typescript" | "javascript" | "python" | "java" | "go" | "rust" | "c" | "cpp";
   readonly command?: string;
   readonly args?: readonly string[];
+  /** Test installation to expose as canonical typescript; launch remains automatic. */
+  readonly typescriptInstallation?: "typescript" | "@typescript/native";
 }
 
 export interface RealLanguageWorkspace extends RealSubstrateWorkspace {
@@ -112,6 +116,15 @@ export async function createRealLanguageWorkspace(
   try {
     cpSync(options.fixturePath, cwd, { recursive: true });
     normalizeCompilationDatabase(cwd);
+    if (options.typescriptInstallation) {
+      const require = createRequire(import.meta.url);
+      mkdirSync(join(cwd, "node_modules"), { recursive: true });
+      symlinkSync(
+        dirname(require.resolve(`${options.typescriptInstallation}/package.json`)),
+        join(cwd, "node_modules/typescript"),
+        "dir",
+      );
+    }
     const routeName = routeNameFor(options.language);
     const serverConfig = loadConfig(cwd, { homeDir }).servers;
     const selected = serverConfig[routeName];
@@ -124,15 +137,17 @@ export async function createRealLanguageWorkspace(
       Object.entries(serverConfig).map(([name, config]) => [
         name,
         name === routeName
-          ? {
-              ...config,
-              enabled: true,
-              command,
-              args,
-              ...(options.language === "python"
-                ? { settings: { basedpyright: { analysis: { typeCheckingMode: "strict" } } } }
-                : {}),
-            }
+          ? options.typescriptInstallation
+            ? { enabled: true }
+            : {
+                ...config,
+                enabled: true,
+                command,
+                args,
+                ...(options.language === "python"
+                  ? { settings: { basedpyright: { analysis: { typeCheckingMode: "strict" } } } }
+                  : {}),
+              }
           : { ...config, enabled: false },
       ]),
     );
@@ -165,6 +180,13 @@ export async function createRealLanguageWorkspace(
       throw new Error(`No concrete ready ${routeName} server serves ${sourcePath}.`);
     }
 
+    if (
+      options.typescriptInstallation &&
+      activeServer.typescript?.backend !==
+        (options.typescriptInstallation === "typescript" ? "tsserver" : "native")
+    ) {
+      throw new Error(`Unexpected TypeScript backend: ${JSON.stringify(activeServer)}.`);
+    }
     const session = new WorkspaceCodeIntelligenceSession(cwd);
     session.setHomeDir(homeDir);
     return {

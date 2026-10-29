@@ -101,7 +101,7 @@ const server = object({
   operationSupport: Type.Optional(support),
   typescript: Type.Optional(
     object({
-      backend: Type.Literal("tsserver"),
+      backend: Type.Union([Type.Literal("tsserver"), Type.Literal("native")]),
       packageName: Type.String(),
       compilerVersion: Type.Optional(Type.String()),
       wrapperVersion: Type.Optional(Type.String()),

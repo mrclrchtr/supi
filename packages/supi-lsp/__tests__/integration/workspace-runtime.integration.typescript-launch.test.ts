@@ -27,7 +27,7 @@ it("retries fresh package paths, starts the real wrapper, and confirms diagnosti
   fs.mkdirSync(path.join(root, "broken"));
   fs.writeFileSync(
     path.join(root, "broken/package.json"),
-    JSON.stringify({ name: "typescript", version: "7.0.2" }),
+    JSON.stringify({ name: "typescript", version: "8.0.2" }),
   );
   const link = path.join(root, "node_modules/typescript");
   fs.symlinkSync(path.join(root, "broken"), link, "dir");
@@ -47,7 +47,7 @@ it("retries fresh package paths, starts the real wrapper, and confirms diagnosti
   owner = createWorkspaceLspRuntimeOwner(manager);
   const runtime = owner.runtime;
 
-  // Lazy routing must refuse canonical TS7 rather than silently finding TS6 elsewhere.
+  // Lazy routing must refuse unknown native majors rather than silently finding TS6 elsewhere.
   await expect(runtime.waitUntilReadyForFile(file)).resolves.toMatchObject({ kind: "unavailable" });
   expect(runtime.getProjectServers()).toMatchObject([
     {

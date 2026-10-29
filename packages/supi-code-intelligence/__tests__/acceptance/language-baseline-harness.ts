@@ -65,6 +65,45 @@ export function registerLanguageBaselineCase(spec: LanguageCase): void {
       60_000,
     );
     it("finds workspace symbols", async () => assertSemanticSearch(setup, spec), 30_000);
+    if (spec.typescriptInstallation && spec.language === "typescript") {
+      it("plans and applies precise organize-import edits through public tools", async () => {
+        const file = join(setup.workspace.cwd, "src/organize.ts");
+        const original =
+          'import { zeta } from "./imports";\nimport { alpha } from "./imports";\nexport const organized = zeta + alpha;\n';
+        writeFileSync(
+          join(setup.workspace.cwd, "src/imports.ts"),
+          "export const alpha = 1;\nexport const zeta = 2;\n",
+        );
+        writeFileSync(file, original);
+        const plan = await runTool(setup, "code_refactor_plan", {
+          target: { anchor: { file, line: 3, character: 14 } },
+          operation: { update_imports: {} },
+        });
+        expect(plan.details.status, displayText(plan)).toBe("completed");
+        expect(readFileSync(file, "utf8")).toBe(original);
+        const applied = await runTool(setup, "code_refactor_apply", {
+          planId: extractPlanId(plan),
+        });
+        expect(applied.details.status, displayText(applied)).toBe("completed");
+        expect(readFileSync(file, "utf8")).toBe(
+          'import { alpha, zeta } from "./imports";\nexport const organized = zeta + alpha;\n',
+        );
+      }, 30_000);
+    }
+    if (spec.typescriptInstallation === "@typescript/native" && spec.language === "typescript") {
+      it("reports native unused-import actions unavailable rather than inventing an edit (#554)", async () => {
+        const file = join(setup.workspace.cwd, "src/unused.ts");
+        const original = 'import { renameMe } from "./model";\nexport const unusedControl = 1;\n';
+        writeFileSync(file, original);
+        await expect(
+          runTool(setup, "code_refactor_plan", {
+            target: { anchor: { file, line: 2, character: 14 } },
+            operation: { delete_dead_code: {} },
+          }),
+        ).rejects.toThrow("The server does not advertise the requested code-action kind.");
+        expect(readFileSync(file, "utf8")).toBe(original);
+      }, 30_000);
+    }
     it("plans and applies exact renames, then rejects stale plans", async () => {
       await assertRenameAndStalePlan(setup, spec, target);
     }, 60_000);
@@ -92,13 +131,29 @@ async function resolveTarget(
 }
 
 async function assertDocumentSymbols(setup: ToolContext, spec: LanguageCase): Promise<void> {
-  const result = await runTool(setup, "code_resolve", {
-    target: { file: resolve(setup.workspace.cwd, spec.sourceFile) },
-  });
-  const data = resultData<{ resultKind: string; targets: TargetInfo[] }>(result);
-  expect(data.resultKind).toBe("target-group");
-  expect(data.targets.some((target) => target.name === spec.renameName)).toBe(true);
-  expect(data.targets.every((target) => target.provenance.length > 0)).toBe(true);
+  // The TS backend qualification must not pass on structural-only fallback.
+  if (spec.typescriptInstallation) setup.workspace.disableStructural();
+  try {
+    const result = await runTool(setup, "code_resolve", {
+      target: { file: resolve(setup.workspace.cwd, spec.sourceFile) },
+    });
+    const data = resultData<{
+      resultKind: string;
+      targets: TargetInfo[];
+      groupPartialReason: string | null;
+    }>(result);
+    expect(data.resultKind).toBe("target-group");
+    expect(data.targets.some((target) => target.name === spec.renameName)).toBe(true);
+    expect(data.targets.every((target) => target.provenance.length > 0)).toBe(true);
+    if (spec.typescriptInstallation) {
+      expect(data.targets.find((target) => target.name === spec.renameName)?.provenance).toContain(
+        "semantic",
+      );
+      expect(data.groupPartialReason).toBeNull();
+    }
+  } finally {
+    if (spec.typescriptInstallation) setup.workspace.enableStructural();
+  }
 }
 
 async function assertSemanticSearch(setup: ToolContext, spec: LanguageCase): Promise<void> {
@@ -291,6 +346,7 @@ async function assertDiagnostics(setup: ToolContext, spec: LanguageCase): Promis
   assertDiagnosticScope(firstData, file);
   expect(["completed", "partial"]).toContain(firstData.diagnosticObservation.kind);
   assertDiagnosticFreshness(firstData.diagnosticObservation);
+  if (spec.typescriptInstallation) expect(firstData.diagnosticObservation.kind).toBe("completed");
   expect(firstData.refresh.kind).toBe("completed");
   expect(firstData.refresh.fileReadiness).toBe("ready");
 
@@ -322,6 +378,7 @@ async function assertDiagnostics(setup: ToolContext, spec: LanguageCase): Promis
   expect(changed.refresh.kind).toBe("completed");
   expect(changed.refresh.fileReadiness).toBe("ready");
   assertChangedDiagnosticFreshness(changed.diagnosticObservation);
+  if (spec.typescriptInstallation) expect(changed.diagnosticObservation.kind).toBe("completed");
 
   const sourceWithoutControl = replaceExactlyOnce(
     sourceWithPrimaryFixed,
@@ -334,6 +391,7 @@ async function assertDiagnostics(setup: ToolContext, spec: LanguageCase): Promis
   const finalData = resultData<HealthData>(await healthFor(setup, file));
   assertDiagnosticScope(finalData, file);
   assertTruthfulFinalDiagnosticState(finalData.diagnosticObservation);
+  if (spec.typescriptInstallation) expect(finalData.diagnosticObservation.kind).toBe("completed");
   expect(finalData.refresh.kind).toBe("completed");
   expect(finalData.refresh.fileReadiness).toBe("ready");
 }

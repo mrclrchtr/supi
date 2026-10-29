@@ -684,8 +684,8 @@ export class LspClient {
       this.handleProcessFailure(error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
-    const cmd = this.config.command;
-    const args = this.config.args ?? [];
+    const { command: cmd = this.config.command, args = this.config.args ?? [] } =
+      this.launchSelection;
     this.startedAt = Date.now();
 
     try {

@@ -58,7 +58,154 @@ it("uses the route root's hoisted compiler and preserves other initialization op
   expect(server.initializationOptions).not.toHaveProperty("tsserver.path");
 });
 
-it.each(["7.0.2", "v7.0.2"])(
+it("prefers a hoisted native alias over legacy canonical metadata without validating the loser's launch files", () => {
+  const root = project();
+  write(root, "node_modules/typescript/package.json", { name: "typescript", version: "6.0.3" });
+  const native = path.join(root, "dependencies/native");
+  write(native, "package.json", { name: "typescript", version: "7.0.2", bin: { tsc: "bin/tsc" } });
+  const executable = write(native, "bin/tsc", "// native launcher");
+  fs.mkdirSync(path.join(root, "node_modules/@typescript"), { recursive: true });
+  fs.symlinkSync(native, path.join(root, "node_modules/@typescript/native"), "dir");
+  const nested = path.join(root, "packages/app");
+  fs.mkdirSync(nested, { recursive: true });
+  const launch = resolveTypeScriptLaunch("typescript", config(root), nested);
+  expect(launch).toMatchObject({
+    command: process.execPath,
+    args: [executable, "--lsp", "--stdio"],
+    initializationOptions: undefined,
+    typescript: { backend: "native", packageName: "@typescript/native", compilerVersion: "7.0.2" },
+  });
+});
+
+it.each(["7.0.2", "7.4.19", "v7.0.2"])(
+  "launches stable canonical native %s and never consults a broken lower-priority alias",
+  (version) => {
+    const root = project();
+    write(root, "node_modules/typescript/package.json", {
+      name: "typescript",
+      version,
+      bin: { tsc: "cli/server.mjs" },
+    });
+    const executable = write(root, "node_modules/typescript/cli/server.mjs", "// launcher");
+    fs.mkdirSync(path.join(root, "node_modules/@typescript"), { recursive: true });
+    fs.symlinkSync(
+      path.join(root, "missing"),
+      path.join(root, "node_modules/@typescript/native"),
+      "dir",
+    );
+    const launch = resolveTypeScriptLaunch(
+      "typescript",
+      config(root, { initializationOptions: { preferences: { quotePreference: "single" } } }),
+      root,
+    );
+    expect(launch.command).toBe(process.execPath);
+    expect(launch.args).toEqual([executable, "--lsp", "--stdio"]);
+    expect(launch.initializationOptions).toEqual({ preferences: { quotePreference: "single" } });
+    expect(launch.typescript).toEqual({
+      backend: "native",
+      packageName: "typescript",
+      compilerVersion: version,
+    });
+  },
+);
+
+it.each([
+  "broken link",
+  "malformed manifest",
+  "legacy alias",
+  "native prerelease",
+  "unknown identity",
+])(
+  "fails a consulted native alias with %s rather than falling back to healthy legacy TS",
+  (fault) => {
+    const root = project();
+    compiler(root);
+    const alias = path.join(root, "node_modules/@typescript/native");
+    fs.mkdirSync(path.dirname(alias), { recursive: true });
+    if (fault === "broken link") fs.symlinkSync(path.join(root, "missing"), alias, "dir");
+    else
+      write(
+        alias,
+        "package.json",
+        fault === "malformed manifest"
+          ? "{"
+          : {
+              name: fault === "unknown identity" ? "other-compiler" : "typescript",
+              version: fault === "legacy alias" ? "6.0.3" : "7.1.0-dev.1",
+            },
+      );
+    expect(() => resolveTypeScriptLaunch("typescript", config(root), root)).toThrow(
+      /package "@typescript\/native".*Repair\/install/s,
+    );
+  },
+);
+
+it.each([
+  "missing executable",
+  "missing bin",
+  "invalid identity",
+  "prerelease",
+  "future major",
+  "broken link",
+  "malformed manifest",
+])("does not bypass canonical %s to use an otherwise healthy native alias", (fault) => {
+  const root = project();
+  write(root, "node_modules/@typescript/native/package.json", {
+    name: "typescript",
+    version: "7.0.2",
+    bin: { tsc: "bin/tsc" },
+  });
+  write(root, "node_modules/@typescript/native/bin/tsc", "// healthy native");
+  if (fault === "broken link")
+    fs.symlinkSync(path.join(root, "missing"), path.join(root, "node_modules/typescript"), "dir");
+  else
+    write(
+      root,
+      "node_modules/typescript/package.json",
+      fault === "malformed manifest"
+        ? "{"
+        : {
+            name: fault === "invalid identity" ? "other-compiler" : "typescript",
+            version:
+              ({ prerelease: "7.1.0-beta.1", "future major": "8.0.0" } as Record<string, string>)[
+                fault
+              ] ?? "7.0.2",
+            ...(fault === "missing bin" ? {} : { bin: { tsc: "bin/tsc" } }),
+          },
+    );
+  expect(() => resolveTypeScriptLaunch("typescript", config(root), root)).toThrow(
+    /package "typescript".*Repair\/install/s,
+  );
+});
+
+it("resolves exactly an explicit native or legacy alias without probing broken automatic candidates", () => {
+  const root = project();
+  write(root, "node_modules/typescript/package.json", "{");
+  write(root, "node_modules/@typescript/native/package.json", "{");
+  const legacy = compiler(root, "selected-ts6");
+  expect(
+    resolveTypeScriptLaunch("typescript", config(root, { typescriptPackage: "selected-ts6" }), root)
+      .initializationOptions,
+  ).toEqual({ tsserver: { path: legacy } });
+  write(root, "node_modules/selected-native/package.json", {
+    name: "typescript",
+    version: "7.0.2",
+    bin: { tsc: "bin/tsc" },
+  });
+  const executable = write(root, "node_modules/selected-native/bin/tsc", "// native launcher");
+  expect(
+    resolveTypeScriptLaunch(
+      "typescript",
+      config(root, { typescriptPackage: "selected-native" }),
+      root,
+    ),
+  ).toMatchObject({
+    args: [executable, "--lsp", "--stdio"],
+    typescript: { backend: "native", packageName: "selected-native" },
+  });
+});
+
+it.each(["8.0.2", "7.1.0-dev.1"])(
   "reports unsupported canonical %s consistently without falling back",
   (version) => {
     const root = project();

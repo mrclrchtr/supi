@@ -214,9 +214,12 @@ jobs:
           go-version: ${{ env.SUPI_BASELINE_GO_VERSION }}
       - name: Provision pinned reference servers
         run: node scripts/language-baseline/provision.mjs
-      - name: Qualify ordinary and compatibility-wrapped TypeScript 6
+      - name: Verify TypeScript installation selection and lifecycle
         run: >-
           pnpm exec vitest run --reporter=agent
+          packages/supi-lsp/__tests__/unit/typescript-launch.test.ts
+          packages/supi-lsp/__tests__/integration/workspace-runtime.integration.typescript-native.test.ts
+          packages/supi-lsp/__tests__/integration/typescript-config-coverage.test.ts
           packages/supi-lsp/__tests__/integration/workspace-runtime.integration.typescript-launch.test.ts
           packages/supi-lsp/__tests__/integration/workspace-runtime.integration.typescript.test.ts
           packages/supi-lsp/__tests__/integration/client.integration.typescript-diagnostics.test.ts

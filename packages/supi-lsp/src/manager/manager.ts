@@ -438,8 +438,12 @@ export class LspManager {
   canServeFile(filePath: string): boolean {
     const route = this.resolveFileRoute(filePath);
     if (!route) return false;
-    if (this.getUnavailableReason(route.key, route.serverConfig.command)) return false;
-    return this.isServerCommandAvailable(route.serverConfig.command);
+    if (this.getUnavailableReason(route.key, route.serverName, route.root)) return false;
+    if (this.clients.get(route.key)?.status === "running") return true;
+    const launch = inspectTypeScriptLaunch(route.serverName, route.serverConfig, route.root);
+    // A broken selection is a route failure, not an absent executable. Let
+    // startup record it so lazy readiness and health expose the actual error.
+    return Boolean(launch.failureMessage) || this.isServerCommandAvailable(launch.command);
   }
 
   /**
@@ -518,13 +522,21 @@ export class LspManager {
     return available;
   }
 
-  private getUnavailableReason(key: string, command?: string): UnavailableReason | null {
+  private getUnavailableReason(
+    key: string,
+    serverName: string,
+    root: string,
+  ): UnavailableReason | null {
     const reason = this.unavailable.get(key);
     if (!reason) return null;
 
-    if (reason === "missing-command" && command && this.isServerCommandAvailable(command)) {
-      this.unavailable.delete(key);
-      return null;
+    const config = this.config.servers[serverName];
+    if (reason === "missing-command" && config) {
+      const launch = inspectTypeScriptLaunch(serverName, config, root);
+      if (!launch.failureMessage && this.isServerCommandAvailable(launch.command)) {
+        this.unavailable.delete(key);
+        return null;
+      }
     }
 
     return reason;
@@ -574,7 +586,7 @@ export class LspManager {
     if (this.shouldBlockRetiredRoute(key, root, retryFailedStart)) return null;
     const routeGeneration = this.getRouteRetirementGeneration(key);
     if (retryFailedStart) this.unavailable.delete(key);
-    if (!retryFailedStart && this.getUnavailableReason(key, serverConfig.command)) return null;
+    if (!retryFailedStart && this.getUnavailableReason(key, serverName, root)) return null;
 
     // Return existing client
     const existing = this.clients.get(key);
@@ -1461,22 +1473,30 @@ export class LspManager {
     }
   }
 
+  /** Record a root-aware selection/command failure without starting a client. */
+  private recordUnavailableLaunch(route: FileRoute): boolean {
+    const { serverName, serverConfig, root, key } = route;
+    const launch = inspectTypeScriptLaunch(serverName, serverConfig, root);
+    const command = launch.command;
+    if (!launch.failureMessage && commandExists(command)) return false;
+    this.unavailable.set(key, launch.failureMessage ? "start-failed" : "missing-command");
+    this.failedStarts.set(key, {
+      serverName,
+      root,
+      failureMessage:
+        launch.failureMessage ?? `Configured server command is not available: ${command}`,
+    });
+    return true;
+  }
+
   /**
    * Perform the actual server start — extracted so the public method can
    * deduplicate via pendingStarts without wrapping the entire body.
    */
   private async performStart(route: FileRoute, routeGeneration: number): Promise<LspClient | null> {
     const { serverName, serverConfig, root, key } = route;
-    // Validate command exists
-    if (!commandExists(serverConfig.command)) {
-      this.unavailable.set(key, "missing-command");
-      this.failedStarts.set(key, {
-        serverName,
-        root,
-        failureMessage: `Configured server command is not available: ${serverConfig.command}`,
-      });
-      return null;
-    }
+    // Client.start resolves again at actual spawn time, including every retry.
+    if (this.recordUnavailableLaunch(route)) return null;
 
     // Spawn new client
     const client = this.createClient(serverName, serverConfig, root, key);
@@ -1662,7 +1682,7 @@ export class LspManager {
     const key = clientKey(serverName, root);
     const client = this.clients.get(key);
     const config = this.config.servers[serverName];
-    const selection =
+    const selection: Pick<DetectedProjectServer, "typescript" | "failureMessage"> =
       client?.status === "running"
         ? { typescript: client.typescriptSelection }
         : config
@@ -1679,8 +1699,7 @@ export class LspManager {
         root,
         fileTypes,
         client: this.clients.get(key),
-        unavailableReason:
-          this.getUnavailableReason(key, this.config.servers[serverName]?.command) ?? undefined,
+        unavailableReason: this.getUnavailableReason(key, serverName, root) ?? undefined,
         statusReason: this.processCrashRecoveries.get(key)?.statusReason,
         includeOpenFile: (file) => this.isAutomaticScopePath(file),
       },
