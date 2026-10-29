@@ -1,7 +1,7 @@
 // Prompt guidance and tool description for the redesigned ask_user tool.
 
 export const toolDescription =
-  "Open a blocking interactive TUI form only when a focused user decision blocks progress after available inspection. Not for status updates or broad surveys. Supports 1-10 choice/text questions, one active form, and sequential execution; requires TUI custom UI.";
+  "Open a blocking interactive TUI form only when a focused user decision blocks progress after available inspection. Not for status updates or broad surveys. Supports 1-10 choice/text questions, one active form, and sequential execution; requires TUI custom UI. ask_user is unavailable inside codemode; call it only directly.";
 
 export const promptSnippet = "request a focused blocking user decision";
 
