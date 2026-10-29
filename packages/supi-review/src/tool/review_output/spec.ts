@@ -26,4 +26,14 @@ export const reviewOutputSpec = {
   name: REVIEW_OUTPUT_TOOL_NAME,
   label: REVIEW_OUTPUT_TOOL_LABEL,
   parameters: reviewOutputParameters,
+  outputSchema: Type.Object(
+    {
+      artifactId: Type.String(),
+      text: Type.String({
+        description: "Complete stored report, independent of the direct-call page.",
+      }),
+      totalCharacters: Type.Integer({ minimum: 0 }),
+    },
+    { additionalProperties: false },
+  ),
 } as const;

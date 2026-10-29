@@ -1,5 +1,6 @@
 import { Type } from "typebox";
 import { pageLimitSchema, pageOffsetSchema } from "../page-schemas.ts";
+import { reviewAuditOutputSchema } from "./structured.ts";
 
 export const REVIEW_AUDIT_TOOL_NAME = "review_audit";
 export const REVIEW_AUDIT_TOOL_LABEL = "Inspect Review Replay";
@@ -41,4 +42,5 @@ export const reviewAuditSpec = {
   name: REVIEW_AUDIT_TOOL_NAME,
   label: REVIEW_AUDIT_TOOL_LABEL,
   parameters: reviewAuditParameters,
+  outputSchema: reviewAuditOutputSchema,
 } as const;

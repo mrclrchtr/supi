@@ -8,6 +8,7 @@ import { LocalReviewAuditStore } from "../../src/audit/local-review-audit-store.
 import type { ReviewAuditRecordInput } from "../../src/audit/review-audit.ts";
 import { MAX_PAGE_CHARACTERS } from "../../src/tool/output-page.ts";
 import { registerReviewAuditTool } from "../../src/tool/review_audit/register.ts";
+import { expectStructuredContent } from "../helpers/structured-result.ts";
 
 const directories: string[] = [];
 const secrets = {
@@ -96,9 +97,9 @@ function record(): ReviewAuditRecordInput {
   };
 }
 
-async function setup() {
+async function setup(input = record()) {
   const store = createStore();
-  const artifact = await store.create(record());
+  const artifact = await store.create(input);
   const pi = createPiMock();
   registerReviewAuditTool(pi as unknown as ExtensionAPI, store);
   return { store, artifact, tool: getTool(pi, "review_audit") };
@@ -111,6 +112,14 @@ describe("review_audit views", () => {
       content: Array<{ text: string }>;
       details: { mode: string };
     };
+    expect(expectStructuredContent(tool, listed)).toEqual({
+      mode: "list",
+      audits: [artifact],
+      totalAudits: 1,
+      text: `# Local Reviewer Replays\n\n- ${artifact.artifactId} (expires ${artifact.expiresAt})`,
+      offset: 0,
+      totalCharacters: listed.content[0]?.text.length,
+    });
     expect(listed.details.mode).toBe("list");
     expect(listed.content[0]?.text).toContain(artifact.artifactId);
 
@@ -129,6 +138,49 @@ describe("review_audit views", () => {
       totalMessages: 4,
       messageIndexes: [0, 1, 2, 3],
     });
+    const native = expectStructuredContent(tool, outlined);
+    expect(native).toMatchObject({
+      mode: "outline",
+      artifactId: artifact.artifactId,
+      totalMessages: 4,
+      messageIndexes: [0, 1, 2, 3],
+      text: outlined.content[0]?.text,
+      offset: 0,
+      totalCharacters: outlined.content[0]?.text.length,
+      rows: [
+        {
+          index: 0,
+          role: "assistant",
+          contentKinds: ["text", "toolCall"],
+          toolNames: ["read"],
+          stopReason: "toolUse",
+          hasError: false,
+        },
+        {
+          index: 1,
+          role: "toolResult",
+          contentKinds: ["text"],
+          toolNames: ["read"],
+          hasError: false,
+        },
+        {
+          index: 2,
+          role: "assistant",
+          contentKinds: [],
+          toolNames: [],
+          stopReason: "error",
+          hasError: true,
+        },
+        {
+          index: 3,
+          role: "unknown",
+          contentKinds: ["unknown"],
+          contentCharacters: 0,
+          toolNames: [],
+          hasError: false,
+        },
+      ],
+    });
     expect(outlined.content[0]?.text).toContain("[0] · role=assistant");
     expect(outlined.content[0]?.text).not.toContain("model_switch_failed");
     const allOutput = JSON.stringify(outlined);
@@ -137,10 +189,16 @@ describe("review_audit views", () => {
   });
 
   it("returns one stable indexed message with paging", async () => {
-    const { artifact, tool } = await setup();
+    const input = record();
+    input.messages[1] = {
+      role: "toolResult",
+      toolName: "read",
+      content: [{ type: "text", text: secrets.result.repeat(100) }],
+    };
+    const { artifact, tool } = await setup(input);
     const result = (await tool.execute(
       "call",
-      { artifactId: artifact.artifactId, view: "message", messageIndex: 1, limit: 512 },
+      { artifactId: artifact.artifactId, view: "message", messageIndex: 1, limit: 1_024 },
       undefined,
       undefined,
       {} as never,
@@ -149,6 +207,32 @@ describe("review_audit views", () => {
       details: { mode: string; messageIndex: number; nextOffset?: number };
     };
 
+    const native = expectStructuredContent(tool, result);
+    expect(native).toMatchObject({
+      mode: "message",
+      artifactId: artifact.artifactId,
+      messageIndex: 1,
+      offset: 0,
+      nextOffset: 512,
+    });
+    expect(native.text).not.toContain("[output paged;");
+    expect(result.content[0]?.text).toContain('"view":"message","messageIndex":1,"offset":512');
+    let text = String(native.text);
+    let offset = native.nextOffset as number | undefined;
+    while (offset !== undefined) {
+      const next = await tool.execute(
+        "call",
+        { artifactId: artifact.artifactId, view: "message", messageIndex: 1, offset, limit: 1_024 },
+        undefined,
+        undefined,
+        {} as never,
+      );
+      const page = expectStructuredContent(tool, next);
+      text += page.text;
+      offset = page.nextOffset as number | undefined;
+    }
+    expect(text).toBe(JSON.stringify(input.messages[1], null, 2));
+    expect(JSON.stringify(native)).not.toContain(secrets.text);
     expect(result.details).toMatchObject({ mode: "message", messageIndex: 1 });
     expect(result.content[0]?.text).toContain(secrets.result);
     expect(result.content[0]?.text).not.toContain(secrets.text);
@@ -167,6 +251,162 @@ describe("review_audit views", () => {
 
     expect(result.details.mode).toBe("raw");
     expect(result.content[0]?.text).toBe(exact);
+    expect(expectStructuredContent(tool, result)).toEqual({
+      mode: "raw",
+      artifactId: artifact.artifactId,
+      text: exact,
+      offset: 0,
+      totalCharacters: exact?.length,
+    });
+
+    let reconstructed = "";
+    let offset: number | undefined = 0;
+    while (offset !== undefined) {
+      const page = expectStructuredContent(
+        tool,
+        await tool.execute(
+          "call",
+          {
+            artifactId: artifact.artifactId,
+            view: "raw",
+            offset,
+            limit: 1_024,
+          },
+          undefined,
+          undefined,
+          {} as never,
+        ),
+      );
+      expect(page.text).not.toContain("[output paged;");
+      expect(String(page.text).length).toBeLessThanOrEqual(1_024);
+      reconstructed += page.text;
+      offset = page.nextOffset as number | undefined;
+    }
+    expect(reconstructed).toBe(exact);
+  });
+
+  it("selects list identities and complete outline rows without promoting split rows", async () => {
+    const input = record();
+    input.messages = Array.from({ length: 20 }, () => ({ role: "user", content: secrets.text }));
+    const { artifact, tool } = await setup(input);
+    const listed = expectStructuredContent(
+      tool,
+      await tool.execute("call", {}, undefined, undefined, {} as never),
+    );
+    const idStart = String(listed.text).indexOf(artifact.artifactId);
+    expect(idStart).toBeGreaterThan(0);
+    for (const [offset, audits] of [
+      [idStart, [artifact]],
+      [idStart + 1, []],
+    ] as const) {
+      const page = expectStructuredContent(
+        tool,
+        await tool.execute("call", { offset }, undefined, undefined, {} as never),
+      );
+      expect(page).toMatchObject({ mode: "list", audits, totalAudits: 1 });
+    }
+
+    const split = expectStructuredContent(
+      tool,
+      await tool.execute(
+        "call",
+        { artifactId: artifact.artifactId, limit: 512 },
+        undefined,
+        undefined,
+        {} as never,
+      ),
+    );
+    expect(split).toMatchObject({
+      mode: "outline",
+      text: "[",
+      rows: [],
+      messageIndexes: [],
+      totalMessages: 20,
+      nextOffset: 1,
+    });
+    const continued = await tool.execute(
+      "call",
+      { artifactId: artifact.artifactId, offset: 1 },
+      undefined,
+      undefined,
+      {} as never,
+    );
+    const native = expectStructuredContent(tool, continued);
+    expect(native.messageIndexes).toEqual(Array.from({ length: 19 }, (_, index) => index + 1));
+    expect((native.rows as Array<{ index: number }>).map((row) => row.index)).toEqual(
+      native.messageIndexes,
+    );
+    expect((continued as { details: { messageIndexes: number[] } }).details.messageIndexes).toEqual(
+      native.messageIndexes,
+    );
+    expect(JSON.stringify(native)).not.toContain(secrets.text);
+  });
+
+  it("returns clean empty text at end offsets in every audit mode", async () => {
+    const { artifact, tool } = await setup();
+    const selections = [
+      {},
+      { artifactId: artifact.artifactId },
+      { artifactId: artifact.artifactId, view: "message", messageIndex: 1 },
+      { artifactId: artifact.artifactId, view: "raw" },
+    ];
+    for (const selection of selections) {
+      const first = expectStructuredContent(
+        tool,
+        await tool.execute("call", selection, undefined, undefined, {} as never),
+      );
+      const result = await tool.execute(
+        "call",
+        { ...selection, offset: first.totalCharacters },
+        undefined,
+        undefined,
+        {} as never,
+      );
+      const native = expectStructuredContent(tool, result);
+      expect(native.text).toBe("");
+      expect(native.nextOffset).toBeUndefined();
+      if (native.mode === "list") expect(native.audits).toEqual([]);
+      if (native.mode === "outline") {
+        expect(native.rows).toEqual([]);
+        expect(native.messageIndexes).toEqual([]);
+      }
+      expect((result as { content: Array<{ text: string }> }).content[0]?.text).toBe(
+        "[no content]",
+      );
+    }
+  });
+
+  it("keeps empty lists and message arrays as successful metadata-only results", async () => {
+    const pi = createPiMock();
+    registerReviewAuditTool(pi as unknown as ExtensionAPI, createStore());
+    const emptyList = expectStructuredContent(
+      getTool(pi, "review_audit"),
+      await getTool(pi, "review_audit").execute("call", {}, undefined, undefined, {} as never),
+    );
+    expect(emptyList).toMatchObject({
+      mode: "list",
+      audits: [],
+      totalAudits: 0,
+      text: "No non-expired local reviewer replays were found.",
+    });
+    const { artifact, tool } = await setup({ ...record(), messages: [] });
+    const emptyOutline = expectStructuredContent(
+      tool,
+      await tool.execute(
+        "call",
+        { artifactId: artifact.artifactId },
+        undefined,
+        undefined,
+        {} as never,
+      ),
+    );
+    expect(emptyOutline).toMatchObject({
+      mode: "outline",
+      rows: [],
+      messageIndexes: [],
+      totalMessages: 0,
+      text: "[no messages]",
+    });
   });
 
   it("rejects each invalid view combination with a correction", async () => {

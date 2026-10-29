@@ -154,7 +154,15 @@ Each task result includes its Review Mode, packet SHA-256, verdict, finding coun
 
 `blocksAcceptance` keeps its existing meaning. The Review Engine derives `issues` for a blocking finding. It derives `incomplete` for incomplete Criteria Coverage without a blocking finding, `pass_with_findings` for only non-blocking findings, and `pass` for no findings.
 
-Parent-facing output from `review_run` or `/supi-review` is stored as a bounded session artifact. Use `review_output` with its returned `artifactId` and offset to read more output.
+Parent-facing output from `review_run` or `/supi-review` is stored as a bounded session artifact. Use `review_output` with its returned `artifactId` and offset to read more output. Artifacts retain the existing session limits and expire after 30 minutes, reload, resume, or a branch change.
+
+`review_output` declares a native output schema. Direct calls remain paged: `offset` and `limit` select the readable page, with continuation instructions when needed. Codemode receives `{ artifactId, text, totalCharacters }`, where `text` is the **complete stored report**, independent of that page selection. It contains no synthetic paging notice or empty-page marker. `totalCharacters` counts UTF-16 code units. This is formatted report text, not typed findings or Task Verdict data.
+
+```js
+const report = await tools.review_output({ artifactId });
+// Select what reaches the model; the script receives the full stored report.
+return report.text.slice(-2000);
+```
 
 ## Local reviewer replay
 
@@ -162,7 +170,22 @@ Parent-facing output from `review_run` or `/supi-review` is stored as a bounded 
 
 With an artifact id, the audit tool now returns **Replay Outline** by default. The outline gives one metadata-only row for each stable zero-based position in the persisted captured-message array. It includes role, content kinds and size, tool names, stop reason, and error presence. It does not include message prose, provider error text, tool arguments, tool results, arbitrary message fields, or file paths.
 
-Use `view: "message"` with `messageIndex` to page one selected persisted message. Use `view: "raw"` to page the exact complete replay JSON. Message and raw views remain private opt-in audit access and can contain repository evidence, provider errors, tool arguments, and tool output. New records keep `thinkingLevel` as the effective level and add `requestedThinkingLevel`; older records have no requested level.
+Use `view: "message"` with `messageIndex` to page one selected persisted message. Use `view: "raw"` to page the exact persisted replay JSON. Message and raw views remain private opt-in audit access and can contain repository evidence, provider errors, tool arguments, and tool output. New records keep `thinkingLevel` as the effective level and add `requestedThinkingLevel`; older records have no requested level.
+
+`review_audit` declares mode-discriminated native data for the **selected page only**, unlike `review_output`:
+
+| `mode` | Native selection |
+| --- | --- |
+| `list` | `audits` (page-visible `{ artifactId, expiresAt }` entries) and `totalAudits`. An entry is included only when its full artifact ID is on the page, even if the rest of its row is split. |
+| `outline` | `artifactId`, allowlisted `rows`, their `messageIndexes`, and `totalMessages`. Only complete rows on the page are included; split rows remain in page text only. |
+| `message` | Explicitly selected `artifactId` and `messageIndex`; text is only that message's selected page. |
+| `raw` | Explicitly selected `artifactId`; text is only the raw JSON page, never an implicit full replay. |
+
+Every mode includes clean `text`, `offset`, `totalCharacters`, and optional `nextOffset`. Offsets and totals count UTF-16 code units. Native text excludes synthetic continuation notices and is `""` at end-of-content; direct-call text retains continuation instructions and `[no content]`. Follow `nextOffset` with the same view/identity to continue. Empty lists and outlines remain successful metadata-only results. Reaching the last page establishes neither complete review evidence nor Criteria Coverage.
+
+List and outline results do not include message contents, provider error text, tool arguments/results, file paths, or unselected replay evidence. Auditing consent, activation, seven-day expiry, and cancellation/error behavior are unchanged. Existing renderer/state `details` are separate from native script data.
+
+After updating the extension, active Pi sessions require `/reload` or a restart.
 
 ## Post-review behavior
 

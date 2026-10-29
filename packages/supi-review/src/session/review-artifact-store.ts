@@ -65,9 +65,14 @@ export class ReviewArtifactStore {
 
   /** Read one page without consuming the artifact so callers may retry pages. */
   read(id: string, offset?: number, limit?: number, maxLines?: number): TextPage | undefined {
+    const text = this.readReport(id);
+    return text === undefined ? undefined : pageText(text, offset, limit, maxLines);
+  }
+
+  /** Read complete stored report text under the same expiry and eviction policy as pages. */
+  readReport(id: string): string | undefined {
     this.#pruneExpired();
-    const entry = this.#entries.get(id);
-    return entry ? pageText(entry.text, offset, limit, maxLines) : undefined;
+    return this.#entries.get(id)?.text;
   }
 
   clear(): void {

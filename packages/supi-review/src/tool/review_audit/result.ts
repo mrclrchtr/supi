@@ -1,6 +1,11 @@
-import { formatReplayOutline, projectReplayOutline } from "../../audit/replay-outline.ts";
+import {
+  formatReplayOutline,
+  projectReplayOutline,
+  type ReplayOutlineRow,
+} from "../../audit/replay-outline.ts";
 import { modelFacingPage, pageText, type TextPage } from "../output-page.ts";
 import { REVIEW_AUDIT_TOOL_NAME } from "./spec.ts";
+import type { ReviewAuditOutput } from "./structured.ts";
 
 export interface AuditPageDetails {
   offset: number;
@@ -25,20 +30,15 @@ function formatAuditList(audits: Array<{ artifactId: string; expiresAt: string }
   ].join("\n");
 }
 
-function completeOutlineRowIndexes(text: string, page: TextPage): number[] {
-  if (text === "[no messages]") return [];
-  const starts: Array<{ index: number; start: number; end: number }> = [];
+function completeOutlineRows(rows: readonly ReplayOutlineRow[], page: TextPage) {
   let start = 0;
-  for (const line of text.split("\n")) {
-    const match = /^\[(\d+)\]/.exec(line);
-    const end = start + line.length;
-    if (match) starts.push({ index: Number(match[1]), start, end });
-    start = end + 1;
-  }
   const pageEnd = page.nextOffset ?? page.totalCharacters;
-  return starts
-    .filter((row) => row.start >= page.offset && row.end <= pageEnd)
-    .map((row) => row.index);
+  return rows.filter((row) => {
+    const end = start + formatReplayOutline([row]).length;
+    const visible = start >= page.offset && end <= pageEnd;
+    start = end + 1;
+    return visible;
+  });
 }
 
 /** Assemble the model-facing result listing non-expired local reviewer replays. */
@@ -50,9 +50,16 @@ export function buildAuditListResult(
   const page = pageText(formatAuditList(audits), params.offset, params.limit);
   const visibleAudits = audits.filter((audit) => {
     signal?.throwIfAborted();
-    return page.text.includes(audit.artifactId);
+    return page.body.includes(audit.artifactId);
   });
   return {
+    structuredContent: {
+      mode: "list",
+      audits: visibleAudits.map(({ artifactId, expiresAt }) => ({ artifactId, expiresAt })),
+      totalAudits: audits.length,
+      text: page.body,
+      ...pageDetails(page),
+    } satisfies ReviewAuditOutput,
     content: [{ type: "text" as const, text: modelFacingPage(REVIEW_AUDIT_TOOL_NAME, {}, page) }],
     details: {
       kind: "review-audit" as const,
@@ -72,6 +79,12 @@ export function buildAuditRawResult(
 ) {
   const page = pageText(raw, params.offset, params.limit);
   return {
+    structuredContent: {
+      mode: "raw",
+      artifactId,
+      text: page.body,
+      ...pageDetails(page),
+    } satisfies ReviewAuditOutput,
     content: [
       {
         type: "text" as const,
@@ -96,6 +109,13 @@ export function buildAuditMessageResult(
 ) {
   const page = pageText(text, params.offset, params.limit);
   return {
+    structuredContent: {
+      mode: "message",
+      artifactId,
+      messageIndex,
+      text: page.body,
+      ...pageDetails(page),
+    } satisfies ReviewAuditOutput,
     content: [
       {
         type: "text" as const,
@@ -125,7 +145,22 @@ export function buildAuditOutlineResult(
   const rows = projectReplayOutline(messages);
   const text = formatReplayOutline(rows);
   const page = pageText(text, params.offset, params.limit);
+  const visibleRows = completeOutlineRows(rows, page);
+  const messageIndexes = visibleRows.map((row) => row.index);
   return {
+    structuredContent: {
+      mode: "outline",
+      artifactId,
+      rows: visibleRows.map((row) => ({
+        ...row,
+        contentKinds: [...row.contentKinds],
+        toolNames: [...row.toolNames],
+      })),
+      messageIndexes,
+      totalMessages: rows.length,
+      text: page.body,
+      ...pageDetails(page),
+    } satisfies ReviewAuditOutput,
     content: [
       {
         type: "text" as const,
@@ -137,7 +172,7 @@ export function buildAuditOutlineResult(
       mode: "outline" as const,
       artifactId,
       totalMessages: rows.length,
-      messageIndexes: completeOutlineRowIndexes(text, page),
+      messageIndexes,
       ...pageDetails(page),
     },
   };

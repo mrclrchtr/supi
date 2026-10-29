@@ -1,6 +1,7 @@
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
+import type { Static } from "typebox";
 import { modelFacingPage, type TextPage } from "../output-page.ts";
-import { REVIEW_OUTPUT_TOOL_NAME } from "./spec.ts";
+import { REVIEW_OUTPUT_TOOL_NAME, type reviewOutputSpec } from "./spec.ts";
 
 export interface ReviewOutputPageDetails {
   kind: "review-output-page";
@@ -10,11 +11,14 @@ export interface ReviewOutputPageDetails {
   totalCharacters: number;
 }
 
-/** Assemble the model-facing page result for a stored Review output artifact. */
+/** Assemble a readable page and complete native text without changing the UI/state contract. */
 export function buildOutputPageResult(
   artifactId: string,
+  text: string,
   page: TextPage,
-): AgentToolResult<ReviewOutputPageDetails> {
+): AgentToolResult<ReviewOutputPageDetails> & {
+  structuredContent: Static<typeof reviewOutputSpec.outputSchema>;
+} {
   return {
     content: [
       {
@@ -22,6 +26,7 @@ export function buildOutputPageResult(
         text: modelFacingPage(REVIEW_OUTPUT_TOOL_NAME, { artifactId }, page),
       },
     ],
+    structuredContent: { artifactId, text, totalCharacters: page.totalCharacters },
     details: {
       kind: "review-output-page",
       artifactId,

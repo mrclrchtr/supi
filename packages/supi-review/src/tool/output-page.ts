@@ -17,6 +17,8 @@ const CONTINUATION_FOOTER_RESERVE = MIN_PAGE_CHARACTERS;
 
 /** One page of paged tool or rendering output with an optional continuation offset. */
 export interface TextPage {
+  /** Clean source slice, without synthetic notices or the empty-page presentation marker. */
+  body: string;
   text: string;
   offset: number;
   nextOffset?: number;
@@ -45,8 +47,7 @@ export function modelFacingPage(
   page: TextPage,
 ): string {
   if (page.nextOffset === undefined) return page.text;
-  const marker = "\n\n[output paged;";
-  const body = page.text.slice(0, page.text.lastIndexOf(marker));
+  const body = page.body;
   const call = JSON.stringify({ ...nextInput, offset: page.nextOffset });
   return [
     body,
@@ -77,13 +78,14 @@ export function pageText(
       : proposedEnd;
   let end = lineBoundedEnd(text, offset, characterEnd, maxLines);
   if (end < text.length && end > offset && /[\uD800-\uDBFF]/.test(text[end - 1] ?? "")) end--;
-  const body = text.slice(offset, end) || "[no content]";
+  const body = text.slice(offset, end);
   const nextOffset = end < text.length ? end : undefined;
   const notice = nextOffset
     ? `\n\n[output paged; next offset: ${nextOffset}; total characters: ${text.length}]`
     : "";
   return {
-    text: `${body}${notice}`,
+    body,
+    text: `${body || "[no content]"}${notice}`,
     offset,
     ...(nextOffset !== undefined ? { nextOffset } : {}),
     totalCharacters: text.length,
