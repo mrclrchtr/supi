@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { type AutomaticLspPathPolicy, getWorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 import type { CapabilityWarningMissingServerSource } from "../analysis/capability/capability-warnings.ts";
+import { checkWorkspaceDiagnostics } from "../analysis/health/check.ts";
 import { observeWorkspaceStatus } from "../analysis/health/status.ts";
 import { type CiStatusDialog, createCiStatusDialog } from "./status-overlay.ts";
 
@@ -81,6 +82,26 @@ export function registerCiStatusCommand(
       const current: StatusInteraction = { cancelled: false };
       interaction = current;
       const observe = () => collectStatusData(pi, ctx, homeDir, warningSource);
+      let checkOffset = 0;
+      const check = async (signal: AbortSignal) => {
+        const lsp = getWorkspaceLspRuntime(ctx.cwd);
+        if (lsp.kind !== "ready")
+          throw new Error(`LSP runtime is ${lsp.kind}; diagnostics cannot be checked.`);
+        pi.events.emit("supi:working:start", { source: "supi-code-intelligence" });
+        try {
+          const diagnosticCheck = await checkWorkspaceDiagnostics({
+            runtime: lsp.runtime,
+            cwd: ctx.cwd,
+            offset: checkOffset,
+            control: { signal, deadline: Date.now() + 30_000 },
+          });
+          const snapshot = await observe();
+          checkOffset = diagnosticCheck.nextOffset;
+          return { ...snapshot, diagnosticCheck };
+        } finally {
+          pi.events.emit("supi:working:end", { source: "supi-code-intelligence" });
+        }
+      };
       try {
         const data = await observe();
         if (current.cancelled) return;
@@ -93,6 +114,7 @@ export function registerCiStatusCommand(
               keybindings,
               done: current.close,
               onRefresh: observe,
+              onCheck: check,
               fetchDetailedDiagnostics: () => readDiagnosticDetails(ctx.cwd),
             });
             current.dialog = dialog;

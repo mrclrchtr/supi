@@ -1,8 +1,20 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import { getWorkspaceLspRuntime, type WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
+import { setImmediate as flushInputFrame } from "node:timers/promises";
+import {
+  type CodeQueryResult,
+  type CodeRequestControl,
+  getDefaultWorkspaceRuntime,
+  throwIfCodeRequestInterrupted,
+} from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type BulkTrackFilesResult,
+  type Diagnostic,
+  getWorkspaceLspRuntime,
+  type WorkspaceLspRuntime,
+  type WorkspaceSourceInventory,
+} from "@mrclrchtr/supi-lsp/api";
 import { createPiMock, getHandlerOrThrow, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { registerCiStatusCommand } from "../../../src/ui/status-command.ts";
@@ -63,6 +75,48 @@ function readyRuntime() {
   return runtime;
 }
 
+function checkableRuntime(files = ["/project/src/clean.ts"]) {
+  const service = readyRuntime();
+  const checked: string[] = [];
+  service.getWorkspaceDiagnosticSummary.mockImplementation(() => ({
+    current: true,
+    entries: [],
+    evidence: {
+      requested: checked.length,
+      confirmed: checked.length,
+      unconfirmed: 0,
+      failed: 0,
+      removed: 0,
+      documents: checked.map((file) => ({ file, status: "confirmed" as const })),
+    },
+  }));
+  return Object.assign(service, {
+    scanWorkspaceSources: vi.fn(
+      async (): Promise<WorkspaceSourceInventory> => ({
+        status: "complete" as const,
+        reason: null,
+        observedFileCount: files.length,
+        files,
+      }),
+    ),
+    bulkTrackFiles: vi.fn(
+      async (paths: readonly string[]): Promise<BulkTrackFilesResult> => ({
+        outcomes: paths.map((file) => ({ file, kind: "tracked" as const })),
+      }),
+    ),
+    fileDiagnostics: vi.fn(
+      async (
+        file: string,
+        _severity?: number,
+        _control?: CodeRequestControl,
+      ): Promise<CodeQueryResult<Diagnostic[]>> => {
+        if (!checked.includes(file)) checked.push(file);
+        return { kind: "completed" as const, data: [] };
+      },
+    ),
+  });
+}
+
 async function openStatus(options: { cwd?: string; homeDir?: string } = {}) {
   const pi = createPiMock();
   pi.setActiveTools(["code_graph", "code_health", "read"]);
@@ -109,6 +163,150 @@ async function openStatus(options: { cwd?: string; homeDir?: string } = {}) {
 }
 
 describe("/supi-ci-status command", () => {
+  it("checks existing source files explicitly and displays clean filenames without making reload active", async () => {
+    const runtime = checkableRuntime();
+    const status = await openStatus();
+    expect(status.render()).toContain("0/0 confirmed tracked files");
+    expect(runtime.scanWorkspaceSources).not.toHaveBeenCalled();
+    status.dialog.handleInput("r");
+    await vi.waitFor(() => expect(status.render()).not.toContain("reloading"));
+    expect(status.render()).toContain("0/0 confirmed tracked files");
+    expect(runtime.scanWorkspaceSources).not.toHaveBeenCalled();
+
+    status.dialog.handleInput("c"); // Check diagnostics
+    await vi.waitFor(() => expect(status.render()).toContain("src/clean.ts"));
+    expect(status.render()).toContain("1/1 confirmed tracked files");
+    expect(status.render()).toContain("no errors or warnings");
+    expect(runtime.fileDiagnostics).toHaveBeenCalledOnce();
+    expect(status.setFooter).not.toHaveBeenCalled();
+  });
+
+  it("checks at most 32 files per action and continues with the next batch", async () => {
+    const runtime = checkableRuntime(
+      Array.from({ length: 33 }, (_, i) => `/project/src/file-${i + 1}.ts`),
+    );
+    const status = await openStatus();
+    status.dialog.handleInput("\x1b[15~");
+    await vi.waitFor(() => expect(status.render()).toContain("32/32 confirmed tracked files"));
+    expect(runtime.fileDiagnostics).toHaveBeenCalledTimes(32);
+    expect(status.render()).toContain("1 remaining in pass");
+    status.dialog.handleInput("\x1b[15~");
+    await vi.waitFor(() => expect(status.render()).toContain("33/33 confirmed tracked files"));
+    expect(runtime.fileDiagnostics).toHaveBeenCalledTimes(33);
+    expect(runtime.fileDiagnostics.mock.calls.at(-1)?.[0]).toBe("/project/src/file-33.ts");
+    expect(status.render()).toContain("0 remaining in pass");
+  });
+
+  it("reports incomplete discovery without treating it as an empty clean workspace", async () => {
+    const runtime = checkableRuntime();
+    runtime.scanWorkspaceSources.mockResolvedValue({
+      status: "limited",
+      reason: "filesystem-error",
+      observedFileCount: 8,
+      files: [],
+    });
+    const status = await openStatus();
+    status.dialog.handleInput("\x1b[15~");
+    await vi.waitFor(() =>
+      expect(status.render()).toContain("Source discovery incomplete: filesystem-error"),
+    );
+    expect(status.render()).toContain("unknown remaining");
+    expect(status.render()).not.toContain("✓ no issues");
+    expect(runtime.bulkTrackFiles).not.toHaveBeenCalled();
+    expect(runtime.fileDiagnostics).not.toHaveBeenCalled();
+  });
+
+  it("preserves batch progress when source discovery is incomplete between checks", async () => {
+    const runtime = checkableRuntime(
+      Array.from({ length: 33 }, (_, i) => `/project/src/file-${i + 1}.ts`),
+    );
+    const status = await openStatus();
+    status.dialog.handleInput("c");
+    await vi.waitFor(() => expect(status.render()).toContain("32/32 confirmed tracked files"));
+    runtime.scanWorkspaceSources.mockResolvedValueOnce({
+      status: "limited",
+      reason: "filesystem-error",
+      observedFileCount: 8,
+      files: [],
+    });
+    status.dialog.handleInput("c");
+    await vi.waitFor(() => expect(status.render()).toContain("Source discovery incomplete"));
+    status.dialog.handleInput("c");
+    await vi.waitFor(() => expect(status.render()).toContain("src/file-33.ts"));
+    expect(runtime.fileDiagnostics).toHaveBeenCalledTimes(33);
+  });
+
+  it("shows files whose routes cannot check diagnostics without labeling them clean", async () => {
+    const runtime = checkableRuntime(["/project/src/unsupported.ts"]);
+    runtime.bulkTrackFiles.mockResolvedValue({
+      outcomes: [
+        {
+          file: "/project/src/unsupported.ts",
+          kind: "unavailable",
+          reason: "No available LSP route",
+        },
+      ],
+    });
+    const status = await openStatus();
+    status.dialog.handleInput("\x1b[15~");
+    await vi.waitFor(() => expect(status.render()).toContain("src/unsupported.ts  unavailable"));
+    expect(status.render()).toContain("No available LSP route");
+    expect(status.render()).not.toContain("no errors or warnings");
+    expect(runtime.fileDiagnostics).not.toHaveBeenCalled();
+  });
+
+  it("retains partial check coverage at the deadline and retries the unfinished file next", async () => {
+    const runtime = checkableRuntime([
+      "/project/src/one.ts",
+      "/project/src/two.ts",
+      "/project/src/three.ts",
+    ]);
+    const normalCheck = runtime.fileDiagnostics.getMockImplementation();
+    if (!normalCheck) throw new Error("Missing diagnostic service fixture");
+    runtime.fileDiagnostics
+      .mockImplementationOnce(normalCheck)
+      .mockImplementationOnce(async (_file, _severity, control) => {
+        throwIfCodeRequestInterrupted({ ...control, deadline: 0 });
+        return { kind: "completed", data: [] };
+      });
+    const status = await openStatus();
+    status.dialog.handleInput("\x1b[15~");
+    await vi.waitFor(() => expect(status.render()).toContain("Check time limit reached"));
+    expect(status.render()).toContain("2 remaining in pass");
+    status.dialog.handleInput("\x1b[15~");
+    await vi.waitFor(() => expect(status.render()).toContain("3/3 confirmed tracked files"));
+    expect(runtime.fileDiagnostics.mock.calls.map(([file]) => file)).toEqual([
+      "/project/src/one.ts",
+      "/project/src/two.ts",
+      "/project/src/two.ts",
+      "/project/src/three.ts",
+    ]);
+  });
+
+  it("aborts the active check on close and starts no more file requests", async () => {
+    const runtime = checkableRuntime(["/project/src/one.ts", "/project/src/two.ts"]);
+    let signal: AbortSignal | undefined;
+    runtime.fileDiagnostics.mockImplementation(
+      (_file, _severity, control) =>
+        new Promise((_resolve, reject) => {
+          signal = control?.signal;
+          signal?.addEventListener("abort", () => reject(new Error("Stopped")), { once: true });
+        }),
+    );
+    const status = await openStatus();
+    const working = vi.spyOn(status.pi.events, "emit");
+    status.dialog.handleInput("\x1b[15~");
+    await vi.waitFor(() => expect(signal).toBeDefined());
+    status.dialog.handleInput("\x1b[15~");
+    expect(runtime.scanWorkspaceSources).toHaveBeenCalledOnce();
+    await getHandlerOrThrow(status.pi, "session_shutdown")({}, status.ctx);
+    await status.pending;
+    await flushInputFrame();
+    expect(signal?.aborted).toBe(true);
+    expect(runtime.fileDiagnostics).toHaveBeenCalledOnce();
+    expect(working).toHaveBeenCalledWith("supi:working:end", { source: "supi-code-intelligence" });
+  });
+
   it("includes warnings without mutating the footer, status, or editor widgets", async () => {
     readyRuntime();
     const status = await openStatus();

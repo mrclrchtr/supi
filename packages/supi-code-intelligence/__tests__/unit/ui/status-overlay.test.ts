@@ -243,6 +243,71 @@ describe("Code intelligence inspector", () => {
     expect(render()).toContain("▼ src/A.ts");
   });
 
+  it("respects a configured c action and keeps F5 available for checking", async () => {
+    const onCheck = vi.fn(async () => data());
+    const keybindings = new KeybindingsManager(TUI_KEYBINDINGS, { "tui.select.down": "c" });
+    const { dialog, render, deps } = setup(
+      data({ servers: Array.from({ length: 8 }, () => server) }),
+      { keybindings, onCheck },
+    );
+    deps.tui.terminal.rows = 24;
+    expect(render()).toContain("F5 check");
+    dialog.handleInput("c");
+    expect(render()).not.toContain("Capabilities");
+    expect(onCheck).not.toHaveBeenCalled();
+    dialog.handleInput("\x1b[15~");
+    await vi.waitFor(() => expect(onCheck).toHaveBeenCalledOnce());
+  });
+
+  it("does not override scrolling or file selection performed while a check is pending", async () => {
+    const first = deferred<CiStatusData>();
+    const second = deferred<CiStatusData>();
+    const snapshot = data({
+      servers: Array.from({ length: 8 }, (_, i) => ({ ...server, root: `/project/package-${i}` })),
+      diagnosticCheck: {
+        kind: "completed",
+        files: [{ file: "src/A.ts", status: "confirmed" }],
+        total: 2,
+        startOffset: 0,
+        nextOffset: 1,
+        remaining: 1,
+      },
+    });
+    const { dialog, render, deps } = setup(snapshot, {
+      onCheck: vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise),
+      fetchDetailedDiagnostics: vi
+        .fn()
+        .mockResolvedValueOnce(details("src/B.ts", "before check"))
+        .mockResolvedValueOnce(details("src/B.ts", "after check")),
+    });
+    deps.tui.terminal.rows = 24;
+    render();
+    dialog.handleInput("c");
+    dialog.handleInput("\x1b[F");
+    expect(render()).toContain("root: package-7");
+    first.resolve(snapshot);
+    await vi.waitFor(() => expect(render()).not.toContain("checking"));
+    expect(render()).toContain("root: package-7");
+
+    dialog.handleInput("c");
+    dialog.handleInput("\t");
+    expect(render()).toContain("▶ src/B.ts");
+    dialog.handleInput("\r");
+    await vi.waitFor(() => expect(render()).toContain("before check"));
+    second.resolve(snapshot);
+    await vi.waitFor(() => expect(render()).not.toContain("checking"));
+    expect(render()).toContain("▼ src/B.ts");
+    await vi.waitFor(() => expect(render()).toContain("after check"));
+  });
+
+  it("shows tracked unconfirmed filenames without treating empty diagnostics as clean", () => {
+    const diagnostics = observation(["src/wait.ts"], false);
+    const { render } = setup(data({ diagnostics: { ...diagnostics, entries: [] } }));
+    expect(render()).toContain("src/wait.ts  unconfirmed");
+    expect(render()).not.toContain("no errors or warnings");
+    expect(render()).not.toContain("✓ no issues");
+  });
+
   it("consumes configured confirmation even when there is no file to expand", () => {
     const keybindings = new KeybindingsManager(TUI_KEYBINDINGS, { "tui.select.confirm": "r" });
     const reload = vi.fn(async () => data());
@@ -418,11 +483,14 @@ describe("Code intelligence inspector", () => {
   });
 
   it("fits narrow widths using visible columns, including wide paths", () => {
-    const { dialog, deps } = setup(data({ diagnostics: observation(["src/日本語.ts"]) }));
+    const { dialog, deps } = setup(data({ diagnostics: observation(["src/日本語.ts"]) }), {
+      onCheck: async () => data(),
+    });
     deps.tui.terminal.rows = 12;
     for (const line of dialog.render(32)) expect(visibleWidth(line)).toBeLessThanOrEqual(32);
     expect(dialog.render(32).length).toBeLessThanOrEqual(10);
     expect(dialog.render(32).join("\n")).toContain("esc close");
     expect(dialog.render(32).join("\n")).toContain("tab/⇧tab files");
+    expect(dialog.render(32).join("\n")).toContain("c check");
   });
 });
