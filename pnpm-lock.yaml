@@ -628,7 +628,7 @@ importers:
         specifier: workspace:*
         version: link:../supi-test-utils
       '@types/semver':
-        specifier: ^7.8.0
+        specifier: 7.8.0
         version: 7.8.0
       vitest:
         specifier: 5.0.5
