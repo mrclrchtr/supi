@@ -8,7 +8,7 @@
 
 SuPi settings expose only forensics thresholds.
 
-Cache history reads the current branch; forensics investigates historical sessions. The agent tool is machine-only and returns a bounded JSON envelope with redacted shape fingerprints. Human reports use command renderers. List queries default to at most 50 findings and accept a limit up to 200.
+Cache history reads the current branch; forensics investigates historical sessions. The agent tool is machine-only: it intentionally uses PI's transcript-rendering fallback, not `model-only` exposure. It declares an output schema and returns the same bounded public data as native `structuredContent` and direct-call JSON. Human reports use command renderers. List queries default to at most 50 findings and accept a limit up to 200.
 
 ## Key gotchas
 
@@ -23,7 +23,9 @@ Cache history reads the current branch; forensics investigates historical sessio
   section. The old `enabled` and `notifications` values are ignored. Configure
   live PI notices with `showCacheMissNotices`.
 - Tool correlation uses native assistant timestamps, not assistant-message count.
-- The forensics engine strips `_prefixed` fields before returning results to the
-  agent. These fields are for human report details only.
+- Tool result assembly allowlists public facts, including nested causes and
+  redacted tool shapes. Human-only detail stays in command reports. Normalize
+  before size checks; both tool representations use the same all-or-spill
+  summary, and spill files contain the complete query-limited public result.
 - Do not import PI's private `dist/core/cache-stats` module. It is not a public
   package export. Keep the native extraction adapter small and provider-neutral.

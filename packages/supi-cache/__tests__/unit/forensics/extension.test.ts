@@ -8,8 +8,12 @@ vi.mock("../../../src/forensics/forensics.ts", () => ({
   runForensics: mockFns.runForensics,
 }));
 
+import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
 import { createPiMock, getHandlerOrThrow, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
+import type { TSchema } from "typebox";
+import { Value } from "typebox/value";
 import cacheForensicsExtension from "../../../src/forensics/extension.ts";
+import type { ForensicsOutput } from "../../../src/tool/cache_forensics/structured-schema.ts";
 
 function assistantEntry(
   id: string,
@@ -41,6 +45,30 @@ function assistantEntry(
 beforeEach(() => {
   mockFns.runForensics.mockReset();
 });
+
+async function executeForensics(params: Record<string, unknown>) {
+  const pi = createPiMock();
+  cacheForensicsExtension(pi as never);
+  const tool = getTool(pi, "cache_forensics") as ReturnType<typeof getTool> & {
+    outputSchema?: TSchema;
+  };
+  const result = (await tool.execute(
+    "test",
+    params,
+    undefined,
+    undefined,
+    makeCtx(),
+  )) as AgentToolResult<unknown> & {
+    structuredContent: ForensicsOutput;
+  };
+  if (!tool.outputSchema) throw new Error("Missing registered cache_forensics outputSchema");
+  expect(Value.Check(tool.outputSchema, result.structuredContent)).toBe(true);
+  const roundTripped = JSON.parse(JSON.stringify(result.structuredContent));
+  expect(roundTripped).toStrictEqual(result.structuredContent);
+  expect(Value.Check(tool.outputSchema, roundTripped)).toBe(true);
+  expect(result.content).toEqual([{ type: "text", text: JSON.stringify(roundTripped, null, 2) }]);
+  return result;
+}
 
 describe("cacheForensicsExtension", () => {
   it("registers reports without installing live monitor handlers", () => {
@@ -133,6 +161,102 @@ describe("cacheForensicsExtension", () => {
     expect(schema.properties.pattern.description).toMatch(/hotspots=largest drops/i);
     expect(schema.properties.pattern.description).toMatch(/correlate=preceding tool shapes/i);
     expect(schema.properties.pattern.description).toMatch(/idle=drops after long gaps/i);
+  });
+
+  it("returns schema-valid native findings and equivalent direct-call JSON", async () => {
+    mockFns.runForensics.mockResolvedValue({
+      pattern: "hotspots",
+      sessionsScanned: 2,
+      turnsAnalyzed: 8,
+      findings: [
+        {
+          sessionId: "session-1",
+          turnIndex: 3,
+          previousRate: 90,
+          currentRate: 10,
+          drop: 80,
+          cause: { type: "unknown" },
+          toolsBefore: [],
+          missedCost: 0.39730000000000004,
+        },
+      ],
+    });
+    const result = await executeForensics({ pattern: "hotspots" });
+
+    expect(result.structuredContent).toEqual({
+      pattern: "hotspots",
+      sessionsScanned: 2,
+      turnsAnalyzed: 8,
+      findings: [
+        {
+          sessionId: "session-1",
+          turnIndex: 3,
+          previousRate: 90,
+          currentRate: 10,
+          drop: 80,
+          cause: { type: "unknown" },
+          toolsBefore: [],
+          missedCost: 0.3973,
+        },
+      ],
+    });
+  });
+
+  it.each(["hotspots", "correlate", "idle"])(
+    "returns native empty %s findings without query-limit totals",
+    async (pattern) => {
+      mockFns.runForensics.mockResolvedValue({
+        pattern,
+        findings: [],
+        sessionsScanned: 0,
+        turnsAnalyzed: 0,
+      });
+      const result = await executeForensics({ pattern });
+      expect(result.structuredContent).toStrictEqual({
+        pattern,
+        findings: [],
+        sessionsScanned: 0,
+        turnsAnalyzed: 0,
+      });
+    },
+  );
+
+  it("allowlists all cause counts for native breakdown queries", async () => {
+    mockFns.runForensics.mockResolvedValue({
+      pattern: "breakdown",
+      sessionsScanned: 4,
+      turnsAnalyzed: 20,
+      breakdown: {
+        compaction: 1,
+        branch_summary: 2,
+        model_change: 3,
+        prompt_change: 4,
+        unknown: 5,
+        idle: 6,
+        internal: "private",
+      },
+      internal: "private",
+    });
+    const result = await executeForensics({ pattern: "breakdown" });
+    expect(result.structuredContent).toStrictEqual({
+      pattern: "breakdown",
+      sessionsScanned: 4,
+      turnsAnalyzed: 20,
+      breakdown: {
+        compaction: 1,
+        branch_summary: 2,
+        model_change: 3,
+        prompt_change: 4,
+        unknown: 5,
+        idle: 6,
+      },
+    });
+  });
+
+  it("preserves thrown execution failures rather than returning a success-shaped envelope", async () => {
+    const failure = new Error("Session listing failed");
+    mockFns.runForensics.mockRejectedValue(failure);
+    await expect(executeForensics({ pattern: "breakdown" })).rejects.toBe(failure);
   });
 
   it("does not expose a live message handler after registration", () => {

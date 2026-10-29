@@ -2,6 +2,7 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { DEFAULT_FINDINGS_LIMIT, MAX_FINDINGS_LIMIT } from "../../forensics/types.ts";
 import { makeCacheForensicsExecute } from "./execute.ts";
+import { cacheForensicsOutputSchema } from "./structured-schema.ts";
 
 export const CACHE_FORENSICS_TOOL_NAME = "cache_forensics";
 export const CACHE_FORENSICS_TOOL_LABEL = "Cache Forensics";
@@ -42,5 +43,6 @@ export const cacheForensicsSpec = {
       }),
     ),
   }),
+  outputSchema: cacheForensicsOutputSchema,
   execute: makeCacheForensicsExecute(),
 } as const;

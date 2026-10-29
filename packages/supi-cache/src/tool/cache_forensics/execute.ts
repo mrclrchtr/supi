@@ -6,7 +6,6 @@ import type {
 import type { Static } from "typebox";
 import { loadCacheForensicsConfig } from "../../config.ts";
 import { runForensics } from "../../forensics/forensics.ts";
-import { stripHumanDetail } from "../../forensics/redact.ts";
 import { normalizeFindingsLimit } from "../../forensics/types.ts";
 import { buildForensicsResult, type ForensicsBoundQuery } from "./result.ts";
 import type { cacheForensicsSpec } from "./spec.ts";
@@ -30,7 +29,7 @@ export function makeCacheForensicsExecute(): CacheForensicsExecute {
   return async (_toolCallId, params, _signal, _onUpdate, ctx) => {
     const config = loadCacheForensicsConfig(ctx.cwd);
     const query: ForensicsBoundQuery = {
-      pattern: (params.pattern as string) ?? "breakdown",
+      pattern: (params.pattern as ForensicsPattern) ?? "breakdown",
       since: (params.since as string) ?? "7d",
       minDrop: (params.minDrop as number) ?? 0,
       maxSessions: (params.maxSessions as number) ?? 100,
@@ -45,11 +44,6 @@ export function makeCacheForensicsExecute(): CacheForensicsExecute {
       idleThresholdMinutes: config.idleThresholdMinutes,
       regressionThreshold: config.regressionThreshold,
     });
-
-    // Strip human-only detail before returning to agent
-    if (result.findings) {
-      result.findings = stripHumanDetail(result.findings);
-    }
 
     return buildForensicsResult(result, query);
   };

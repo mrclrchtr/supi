@@ -83,6 +83,15 @@ Adds one model-callable tool with the same four patterns. The result uses struct
 
 List patterns return at most 50 findings by default. Use the tool's `limit` parameter, or the command's `--limit` flag, to request up to 200 findings. Hotspots exclude structural events with no measurable drop. The result is also bounded to 2,000 lines or 51,200 bytes. Large results are written to a private temporary file and return a summary envelope.
 
+Codemode receives native data matching the registered output schema; direct calls receive JSON for the same object. Both return either the complete result or a spill summary with `truncated: true` and `fullOutputPath`, never partial findings. The spill file contains the complete normalized, redacted, query-limited result. `findingsTotal` and `findingsLimit` appear only when the query limit removes findings. `sessionsScanned` counts sessions with extracted turns; unreadable sessions and sessions without turns are skipped.
+
+```js
+const result = await tools.cache_forensics({ pattern: "hotspots", limit: 5 });
+return "truncated" in result
+  ? { fullOutputPath: result.fullOutputPath }
+  : { sessions: result.sessionsScanned, drops: result.findings.map((finding) => finding.drop) };
+```
+
 ## Configuration
 
 Forensics reads these optional values from the `cache` section. They are also available in `/supi-settings` under **Cache Forensics**:
