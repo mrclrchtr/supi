@@ -1,63 +1,41 @@
 diff --git a/skills/engineering/code-review/SKILL.md b/skills/engineering/code-review/SKILL.md
 --- a/skills/engineering/code-review/SKILL.md
 +++ b/skills/engineering/code-review/SKILL.md
-@@ -9,6 +9,7 @@
- - **Spec**: does the code faithfully implement the originating issue / spec?
+@@ -59,6 +59,8 @@
 
- Both axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings.
-+Use `review_run` for this if available.
+ Issue both sub-agent calls together, in the foreground, and aggregate the reports they return.
 
- The issue tracker should have been provided to you. If `docs/agents/issue-tracker.md` is missing, tell the user to run `/setup-matt-pocock-skills`.
-
-@@ -57,15 +58,18 @@
-
- ### 4. Spawn both sub-agents in parallel
-
-+Call `review_run` with the target from step 1 and two tasks: `standards` and `spec`, both with `mode: "change"`.
-+Include applicable repository guidance explicitly, using `criteriaSources` entries (`reference` and `summary`) for authoritative files or issues.
++Use `review_run` when available: one batch with `standards` and `spec` tasks, both with `mode: "change"`, using the pinned comparison and applicable `criteriaSources`.
 +
  **Standards sub-agent prompt** should include:
 
--- The full diff command and commit list.
-+- The commit list; the tool supplies the frozen diff.
- - The list of standards-source files you found in step 3, **plus the smell baseline from step 3** pasted in full (the sub-agent has no other access to it).
- - The brief: "Report, per file/hunk where relevant, (a) every place the diff violates a documented standard: cite the standard (file + the rule); and (b) any baseline smell you spot: name it and quote the hunk. Distinguish hard violations from judgement calls: documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words."
-
- **Spec sub-agent prompt** should include:
-
--- The diff command and commit list.
-+- The commit list; the tool supplies the frozen diff.
- - The path or fetched contents of the spec.
- - The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the spec line for each finding. Under 400 words."
-
-@@ -77,6 +81,8 @@
-
- End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes: that's the reranking the separation exists to prevent.
-
-+Follow any Post-Review Policy after the report unless the user gives a conflicting instruction.
-+
- ## Why two axes
-
- A change can pass one axis and fail the other:
+ - The full diff command and commit list.
 diff --git a/skills/engineering/implement/SKILL.md b/skills/engineering/implement/SKILL.md
 --- a/skills/engineering/implement/SKILL.md
 +++ b/skills/engineering/implement/SKILL.md
-@@ -12,4 +12,4 @@
+@@ -8,10 +8,10 @@
 
- Once done, use /code-review to review the work.
+ If the user passes a ticket reference, fetch it from the issue tracker and state its title before starting. If the reference is ambiguous, ask.
+
+-Call the Skill tool with "tdd" where possible, at pre-agreed seams.
++Use `read` to load the `tdd` skill's `SKILL.md` and follow it where possible, at pre-agreed seams.
+
+ Run typechecking regularly, single test files regularly, and the full test suite once at the end.
+
+-Once done, call the Skill tool with "code-review" to review the work.
++Once done, use `read` to load the `code-review` skill's `SKILL.md` and follow it to review the work.
 
 -Commit your work to the current branch.
-+After the review, load /commit and follow its instructions to commit the changes.
++After the review, use `read` to load the `commit` skill's `SKILL.md` and follow it to commit the changes.
 diff --git a/skills/productivity/grilling/SKILL.md b/skills/productivity/grilling/SKILL.md
 --- a/skills/productivity/grilling/SKILL.md
 +++ b/skills/productivity/grilling/SKILL.md
-@@ -7,19 +7,18 @@
+@@ -7,19 +7,7 @@
 
  Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled: the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask the whole frontier in one round: number each question and give your recommended answer. Then wait for the user's answers before the next round.
 
 -Format a round like so:
-+Use `ask_user` for each round. Put all frontier questions in one form. Fill the fields as follows:
-
+-
 -```
 -❓ **Q1** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
 -
@@ -69,16 +47,7 @@ diff --git a/skills/productivity/grilling/SKILL.md b/skills/productivity/grillin
 -
 -➡️ <your recommended answer>
 -```
-+- `title`: Name the subject and the round.
-+- `intro`: Summarize what is settled and why this frontier is open.
-+- `questions`: Include the current frontier, up to the form limit of 10. If the frontier is larger, ask the first 10 and recompute it from the answers.
-+- `id`: Use the question number, such as `Q1`.
-+- `header`: Start with the question number and add a title.
-+- `prompt`: State the decision and the context that the user needs.
-+- `type`: Use `choice` when the answer set is known. Use `text` only for an open answer.
-+- `options`: For a choice question, use stable `value` ids, concise `label` text, and a brief `description`. Set `multi` to `true` only when the user can select more than one option.
-+- `details`: Explain trade-offs or consequences for a choice option. It can also contain a sketch.
-+- `recommendation`: For a choice question, use the recommended option `value`, or an array of values when `multi` is `true`. For a text question, give the recommended answer. Also give text questions a `placeholder` that shows the expected answer shape.
++Use `ask_user` for each round, grouping the current frontier in one form. If the frontier exceeds 10 questions, ask the first 10 and recompute after their answers.
 
- Each round the user answers reshapes the tree: settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
+ Word each question so "yes" accepts your recommended answer.
 

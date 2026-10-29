@@ -6,10 +6,12 @@ disable-model-invocation: true
 
 Implement the work described by the user in the spec or tickets.
 
-Use /tdd where possible, at pre-agreed seams.
+If the user passes a ticket reference, fetch it from the issue tracker and state its title before starting. If the reference is ambiguous, ask.
+
+Use `read` to load the `tdd` skill's `SKILL.md` and follow it where possible, at pre-agreed seams.
 
 Run typechecking regularly, single test files regularly, and the full test suite once at the end.
 
-Once done, use /code-review to review the work.
+Once done, use `read` to load the `code-review` skill's `SKILL.md` and follow it to review the work.
 
-After the review, load /commit and follow its instructions to commit the changes.
+After the review, use `read` to load the `commit` skill's `SKILL.md` and follow it to commit the changes.

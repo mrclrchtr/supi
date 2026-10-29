@@ -1,6 +1,6 @@
 {
   "repository": "mattpocock/skills",
-  "tag": "v1.3.1",
+  "tag": "v1.3.2",
   "includedGroups": {
     "engineering": true,
     "productivity": true
@@ -30,6 +30,7 @@
       "wizard"
     ],
     "in-progress": [
+      "chief-of-staff",
       "claude-handoff",
       "loop-me",
       "setup-ts-deep-modules",
