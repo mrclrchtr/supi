@@ -1,6 +1,8 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
-import type { ProfileCatalogue } from "../../types.ts";
+import { isReadOnlyCapabilitySet } from "../../capabilities.ts";
+import { resolveProfileDefinition } from "../../profile-catalogue.ts";
+import type { AgentCapabilityId, ProfileCatalogue } from "../../types.ts";
 import {
   MAX_INSTRUCTIONS_CHARS,
   MAX_SHARED_CONTEXT_CHARS,
@@ -8,19 +10,24 @@ import {
   MAX_TASKS,
 } from "./bounds.ts";
 
-/** Build the tool schema with only effective Profile IDs and their resolved descriptions. */
+/** Build the selection schema with effective Profile IDs, purposes, and compact capability tags. */
 export function buildAgentRunSchema(catalogue: ProfileCatalogue): TSchema {
   const ids = catalogue.profileIds;
   const profileEnum =
     ids.length > 0
       ? StringEnum(ids as unknown as readonly string[] & [string, ...string[]], {
-          description: ids
-            .map((id) => {
-              const profile = catalogue.profiles.find((entry) => entry.id === id);
-              const description = (profile?.description ?? id).replace(/\s+/g, " ").trim();
-              return `${id}: ${description}`;
-            })
-            .join("\n"),
+          description: [
+            "No inherited tools or dedicated web tools.",
+            ...ids.map((id) => {
+              const entry = catalogue.profiles.find((profile) => profile.id === id);
+              const description = (entry?.description ?? id).replace(/\s+/g, " ").trim();
+              // Resolve the captured sources without refreshing live Model/Thinking settings.
+              const profile = entry && resolveProfileDefinition(entry);
+              if (!profile || "code" in profile) return `${id}: ${description}`;
+
+              return `${id}: ${description} [${summarizeCapabilities(profile.manifest.tools)}]`;
+            }),
+          ].join("\n"),
         })
       : Type.String({
           minLength: 1,
@@ -89,6 +96,13 @@ export function buildAgentRunSchema(catalogue: ProfileCatalogue): TSchema {
     },
     { additionalProperties: false },
   );
+}
+
+function summarizeCapabilities(tools: readonly AgentCapabilityId[]): string {
+  const tags = isReadOnlyCapabilitySet(tools) ? ["read-only"] : [];
+  tags.push(tools.includes("bash") ? "shell" : "no shell");
+  if (tools.includes("edit") || tools.includes("write")) tags.push("edit");
+  return tags.join("; ");
 }
 
 export type AgentRunTaskInput =

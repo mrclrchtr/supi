@@ -3,14 +3,18 @@ import { describe, expect, it } from "vitest";
 import { buildAgentRunSchema } from "../../src/tool/agent_run/schema.ts";
 import type { AgentProfile, ProfileCatalogue, ProfileDiagnostic } from "../../src/types.ts";
 
-function makeProfile(id: string, description = id): AgentProfile {
+function makeProfile(
+  id: string,
+  description = id,
+  tools: AgentProfile["manifest"]["tools"] = ["read"],
+): AgentProfile {
   return {
     id,
     source: "package",
     directory: `/profiles/${id}`,
     manifest: {
       description,
-      tools: ["read"],
+      tools,
       systemPrompt: "native",
       instructionScopes: [],
     },
@@ -78,19 +82,59 @@ describe("buildAgentRunSchema", () => {
     expect(raw).toContain("general");
   });
 
-  it("describes custom profiles beside their IDs in catalogue order", () => {
+  it("describes custom profiles and their capabilities in catalogue order", () => {
     const catalogue = makeCatalogue([
       makeProfile("trace", "Trace repository calls without changing files."),
-      makeProfile("fix", "Implement a focused code change."),
+      makeProfile("fix", "Implement a focused code change.", ["bash", "edit", "write"]),
     ]);
     const schema = JSON.parse(JSON.stringify(buildAgentRunSchema(catalogue)));
     const profile = getNewProfileProperty(schema);
 
     expect(profile).toMatchObject({ type: "string", enum: ["fix", "trace"] });
-    expect(profile.description).toBe(
-      "fix: Implement a focused code change.\ntrace: Trace repository calls without changing files.",
-    );
+    expect(profile.description.split("\n")).toEqual([
+      expect.stringMatching(/no inherited tools.*dedicated web tools/i),
+      "fix: Implement a focused code change. [shell; edit]",
+      "trace: Trace repository calls without changing files. [read-only; no shell]",
+    ]);
     expect(JSON.stringify(schema)).not.toContain("/profiles/");
+  });
+
+  it("summarizes resolved tool overrides rather than profile IDs or package defaults", () => {
+    const catalogue = makeCatalogue([
+      makeProfile("explore", "Inspection"),
+      makeProfile("general", "Implementation", ["bash", "edit"]),
+    ]);
+    const overridden: ProfileCatalogue = {
+      ...catalogue,
+      profiles: catalogue.profiles.map((entry) => ({
+        ...entry,
+        sources: [
+          ...entry.sources,
+          {
+            id: entry.id,
+            source: "global",
+            directory: `/global/${entry.id}`,
+            manifest: { tools: ["bash", "write"] },
+          },
+          ...(entry.id === "general"
+            ? [
+                {
+                  id: entry.id,
+                  source: "project" as const,
+                  directory: `/project/${entry.id}`,
+                  manifest: { tools: ["write"] as const },
+                },
+              ]
+            : []),
+        ],
+      })),
+    };
+    const schema = JSON.parse(JSON.stringify(buildAgentRunSchema(overridden)));
+    const { description } = getNewProfileProperty(schema);
+
+    expect(description).toContain("explore: Inspection [shell; edit]");
+    expect(description).toContain("general: Implementation [no shell; edit]");
+    expect(JSON.stringify(schema)).not.toMatch(/\/global\/|\/project\//);
   });
 
   it("keeps each profile description on one line", () => {
@@ -98,12 +142,12 @@ describe("buildAgentRunSchema", () => {
       makeProfile("trace", "  Trace\nrepository\r\ncalls\twithout  changes.  "),
     ]);
     const schema = JSON.parse(JSON.stringify(buildAgentRunSchema(catalogue)));
-    expect(getNewProfileProperty(schema).description).toBe(
-      "trace: Trace repository calls without changes.",
-    );
+    expect(getNewProfileProperty(schema).description.split("\n").slice(1)).toEqual([
+      "trace: Trace repository calls without changes. [read-only; no shell]",
+    ]);
   });
 
-  it("bounds description text through the existing catalogue limits", () => {
+  it("bounds capability guidance at the catalogue limits", () => {
     const catalogue = makeCatalogue(
       Array.from({ length: 32 }, (_, index) =>
         makeProfile(`profile-${index}`.padEnd(64, "x"), "x".repeat(200)),
@@ -112,8 +156,9 @@ describe("buildAgentRunSchema", () => {
     const schema = JSON.parse(JSON.stringify(buildAgentRunSchema(catalogue)));
     const profile = getNewProfileProperty(schema);
     expect(profile.enum).toHaveLength(32);
-    expect(profile.description.split("\n")).toHaveLength(32);
-    expect(profile.description.length).toBeLessThanOrEqual(8_543);
+    // One shared policy line plus one compact choice per profile.
+    expect(profile.description.split("\n")).toHaveLength(33);
+    expect(profile.description.length).toBeLessThanOrEqual(9_500);
   });
 
   it("excludes invalid and overflow profiles from IDs and descriptions", () => {
