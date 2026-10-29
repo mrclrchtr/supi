@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ServerCapabilities } from "vscode-languageserver-protocol";
 import { CodeActionKind } from "vscode-languageserver-types";
 import {
+  codeActionKindsForOperation,
   getServerOperationSupport,
   isCodeActionKindInRange,
   supportsRequestedCodeActionKinds,
@@ -32,6 +33,42 @@ describe("code-action operation support", () => {
     expect(supportsRequestedCodeActionKinds(value, ["refactor.extract.function"])).toBe(false);
     expect(getServerOperationSupport(value).extract_function?.server).toBe("not-advertised");
   });
+
+  it("accepts native unused-import kinds without treating them as general removal", () => {
+    const value = capabilities(["source.removeUnusedImports"]);
+
+    expect(supportsRequestedCodeActionKinds(value, ["source.removeUnused"])).toBe(false);
+    expect(
+      supportsRequestedCodeActionKinds(value, codeActionKindsForOperation("delete_dead_code")),
+    ).toBe(true);
+    expect(getServerOperationSupport(value).delete_dead_code).toEqual({
+      server: "advertised",
+      supi: "limited",
+      reason:
+        "Only unused-import removal is supported by this mapping, not arbitrary unused declarations.",
+    });
+  });
+
+  it.each([["source.removeUnused"], ["source.removeUnused.ts", "source.removeUnusedImports.ts"]])(
+    "preserves general unused-code support for %j",
+    (...kinds) => {
+      expect(getServerOperationSupport(capabilities(kinds)).delete_dead_code).toEqual({
+        server: "advertised",
+        supi: "supported",
+      });
+    },
+  );
+
+  it.each(["quickfix", "source.fixAll", "source.removeUnusedImportsExtra"])(
+    "does not advertise dead-code removal for %s",
+    (kind) => {
+      const value = capabilities([kind]);
+      expect(
+        supportsRequestedCodeActionKinds(value, codeActionKindsForOperation("delete_dead_code")),
+      ).toBe(false);
+      expect(getServerOperationSupport(value).delete_dead_code?.server).toBe("not-advertised");
+    },
+  );
 
   it("treats CodeActionKind.Empty as a generic advertisement", () => {
     const value = capabilities([CodeActionKind.Empty]);

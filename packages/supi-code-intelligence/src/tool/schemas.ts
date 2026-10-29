@@ -147,7 +147,13 @@ const RefactorOperationProperties = {
     { additionalProperties: false },
   ),
   update_imports: Type.Object({}, { additionalProperties: false }),
-  delete_dead_code: Type.Object({}, { additionalProperties: false }),
+  delete_dead_code: Type.Object(
+    {},
+    {
+      additionalProperties: false,
+      description: "Remove server-supported unused code; support may be limited to unused imports.",
+    },
+  ),
 } satisfies Record<PublicRefactorOperationName, TSchema>;
 
 export const RefactorOperationParam = exactOneSelector(

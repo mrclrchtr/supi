@@ -26,12 +26,15 @@ export type ServerOperationSupportMap = Partial<
   Record<ServerOperationName, ServerOperationSupport>
 >;
 
+const REMOVE_UNUSED_KIND = "source.removeUnused";
+const REMOVE_UNUSED_IMPORTS_KIND = "source.removeUnusedImports";
+
 /** Code-action kinds requested by each operation-specific planner. */
 export const REFACTOR_CODE_ACTION_KINDS = {
   extract_function: ["refactor.extract.function"],
   extract_variable: ["refactor.extract.constant", "refactor.extract.variable"],
   update_imports: ["source.organizeImports"],
-  delete_dead_code: ["source.removeUnused"],
+  delete_dead_code: [REMOVE_UNUSED_KIND, REMOVE_UNUSED_IMPORTS_KIND],
 } as const satisfies Record<
   "extract_function" | "extract_variable" | "update_imports" | "delete_dead_code",
   readonly string[]
@@ -143,6 +146,20 @@ function supportedOperation(
   return { server, supi, ...(reason ? { reason } : {}) };
 }
 
+function deleteDeadCodeSupport(capabilities: ServerCapabilities | null): ServerOperationSupport {
+  const server = codeActionAdvertisement(capabilities, REFACTOR_CODE_ACTION_KINDS.delete_dead_code);
+  const importsOnly =
+    codeActionAdvertisement(capabilities, [REMOVE_UNUSED_KIND]) !== "advertised" &&
+    codeActionAdvertisement(capabilities, [REMOVE_UNUSED_IMPORTS_KIND]) === "advertised";
+  return importsOnly
+    ? supportedOperation(
+        server,
+        "limited",
+        "Only unused-import removal is supported by this mapping, not arbitrary unused declarations.",
+      )
+    : supportedOperation(server);
+}
+
 /** Build the honest operation-support projection for one negotiated server. */
 export function getServerOperationSupport(
   capabilities: ServerCapabilities | null,
@@ -181,9 +198,7 @@ export function getServerOperationSupport(
     update_imports: supportedOperation(
       codeActionAdvertisement(capabilities, REFACTOR_CODE_ACTION_KINDS.update_imports),
     ),
-    delete_dead_code: supportedOperation(
-      codeActionAdvertisement(capabilities, REFACTOR_CODE_ACTION_KINDS.delete_dead_code),
-    ),
+    delete_dead_code: deleteDeadCodeSupport(capabilities),
     code_action_resolve: supportedOperation(resolveServer),
   };
 }

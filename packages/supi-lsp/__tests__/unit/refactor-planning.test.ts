@@ -69,16 +69,23 @@ describe("collectCodeActionResults", () => {
 });
 
 describe("isDeleteDeadCodeCodeAction", () => {
-  it("requires the documented source.removeUnused kind", () => {
-    expect(
-      isDeleteDeadCodeCodeAction(
-        makeDeleteDeadCodeAction("Remove unused declaration", "source.removeUnused"),
-      ),
-    ).toBe(true);
-    expect(
-      isDeleteDeadCodeCodeAction(makeDeleteDeadCodeAction("Remove unused declaration", "quickfix")),
-    ).toBe(false);
+  it.each([
+    "source.removeUnused",
+    "source.removeUnused.ts",
+    "source.removeUnusedImports",
+    "source.removeUnusedImports.ts",
+  ])("accepts the explicit kind %s", (kind) => {
+    expect(isDeleteDeadCodeCodeAction(makeDeleteDeadCodeAction("Remove unused", kind))).toBe(true);
   });
+
+  it.each(["source", "source.removeUnusedExtra", "source.removeUnusedImportsExtra", "quickfix"])(
+    "rejects the nonmatching kind %s",
+    (kind) => {
+      expect(isDeleteDeadCodeCodeAction(makeDeleteDeadCodeAction("Remove unused", kind))).toBe(
+        false,
+      );
+    },
+  );
 
   it("rejects title-only and unrelated kinds", () => {
     expect(

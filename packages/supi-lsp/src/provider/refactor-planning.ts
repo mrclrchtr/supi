@@ -135,7 +135,9 @@ export function isUpdateImportsCodeAction(action: CodeAction): boolean {
 
 export function isDeleteDeadCodeCodeAction(action: CodeAction): boolean {
   const kind = typeof action?.kind === "string" ? action.kind : "";
-  return kind === "source.removeUnused" || kind.startsWith("source.removeUnused.");
+  return codeActionKindsForOperation("delete_dead_code").some(
+    (requested) => kind === requested || kind.startsWith(`${requested}.`),
+  );
 }
 
 interface PreciseCodeActionPlan {

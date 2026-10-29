@@ -570,24 +570,111 @@ describe("LspRefactorProvider", () => {
       expect(codeActionsSpy).not.toHaveBeenCalled();
     });
 
-    it("routes delete_dead_code through code actions and rejects edit-less actions", async () => {
-      const renameSpy = vi.fn().mockResolvedValue(null);
-      const codeActionsSpy = vi
-        .fn()
-        .mockResolvedValue(routed([{ title: "Remove unused declaration", kind: "quickfix" }]));
-      const provider = createLspSemanticProvider(
-        createMockLsp({ rename: renameSpy, codeActions: codeActionsSpy }),
-      ) as OperationAwareSemanticProvider;
+    it.each(["source.removeUnused.ts", "source.removeUnusedImports"])(
+      "requests both unused-code families and normalizes precise %s edits",
+      async (kind) => {
+        const edit = {
+          range: { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } },
+          newText: "",
+        };
+        const codeActions = vi.fn().mockResolvedValue(
+          routed([
+            {
+              title: "Remove unused",
+              kind,
+              edit: { changes: { "file:///src/index.ts": [edit] } },
+            },
+          ]),
+        );
+        const provider = createLspSemanticProvider(createMockLsp({ codeActions }));
+        const result = await provider.refactor?.({
+          operation: "delete_dead_code",
+          file: "/src/index.ts",
+          position: { line: 0, character: 0 },
+        });
 
-      expect(provider.refactor).toBeDefined();
+        expect(codeActions).toHaveBeenCalledWith(
+          "/src/index.ts",
+          { line: 0, character: 0 },
+          undefined,
+          {
+            only: ["source.removeUnused", "source.removeUnusedImports"],
+            triggerKind: 1,
+          },
+        );
+        expect(result).toMatchObject({
+          kind: "precise",
+          edits: { edits: [{ file: "/src/index.ts", ...edit }] },
+          authorizedMutationRoots: ["/src"],
+        });
+      },
+    );
+
+    it.each([
+      ["missing edits", {}],
+      [
+        "command-only action",
+        { command: { title: "Remove unused", command: "server.removeUnused" } },
+      ],
+      ["empty edits", { edit: { changes: {} } }],
+      [
+        "invalid range",
+        {
+          edit: {
+            changes: {
+              "file:///src/index.ts": [
+                {
+                  range: { start: { line: 1, character: 0 }, end: { line: 0, character: 0 } },
+                  newText: "",
+                },
+              ],
+            },
+          },
+        },
+      ],
+      [
+        "resource operations",
+        { edit: { documentChanges: [{ kind: "delete", uri: "file:///src/index.ts" }] } },
+      ],
+      [
+        "stale document version",
+        {
+          edit: {
+            documentChanges: [
+              {
+                textDocument: { uri: "file:///src/index.ts", version: 1 },
+                edits: [
+                  {
+                    range: { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } },
+                    newText: "",
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    ])("keeps unused-import actions unavailable for %s", async (_label, fields) => {
+      const codeActions = vi.fn().mockResolvedValue(
+        routed([
+          {
+            title: "Remove unused imports",
+            kind: "source.removeUnusedImports",
+            ...fields,
+          },
+        ]),
+      );
+      const provider = createLspSemanticProvider(
+        createMockLsp({
+          codeActions,
+          getOpenDocumentVersion: vi.fn().mockReturnValue(2),
+        }),
+      );
       const result = await provider.refactor?.({
         operation: "delete_dead_code",
         file: "/src/index.ts",
         position: { line: 0, character: 0 },
       });
-
-      expect(codeActionsSpy).toHaveBeenCalled();
-      expect(renameSpy).not.toHaveBeenCalled();
       expect(result?.kind).toBe("unavailable");
     });
   });

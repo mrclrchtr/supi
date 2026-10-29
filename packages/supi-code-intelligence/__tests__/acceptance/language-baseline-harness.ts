@@ -14,6 +14,7 @@ import { type DiagnosticFixMessage, waitForDiagnosticFix } from "./diagnostic-fi
 import type { LanguageCase } from "./language-cases.ts";
 
 interface PublicToolResult {
+  readonly structuredContent?: unknown;
   readonly content: readonly { readonly type: string; readonly text?: string }[];
   readonly details: {
     readonly status?: string;
@@ -90,25 +91,75 @@ export function registerLanguageBaselineCase(spec: LanguageCase): void {
         );
       }, 30_000);
     }
-    if (spec.typescriptInstallation === "@typescript/native" && spec.language === "typescript") {
-      it("reports native unused-import actions unavailable rather than inventing an edit (#554)", async () => {
+    if (spec.typescriptInstallation && spec.language === "typescript") {
+      it("plans and applies unused-import removal without changing unrelated source", async () => {
         const file = join(setup.workspace.cwd, "src/unused.ts");
-        const original = 'import { renameMe } from "./model";\nexport const unusedControl = 1;\n';
+        const importsOnly = spec.typescriptInstallation === "@typescript/native";
+        const preserved = [
+          "// Keep this comment and the exported value unchanged.",
+          ...(importsOnly ? ['const unusedDeclaration = "keep this too";'] : []),
+          'export const unusedControl = "🧭 unchanged";',
+          "",
+        ].join("\n");
+        const original = `import { renameMe } from "./model";\n${preserved}`;
+        const params = {
+          target: { anchor: { file, line: importsOnly ? 4 : 3, character: 14 } },
+          operation: { delete_dead_code: {} },
+        };
         writeFileSync(file, original);
-        await expect(
-          runTool(setup, "code_refactor_plan", {
-            target: { anchor: { file, line: 2, character: 14 } },
-            operation: { delete_dead_code: {} },
-          }),
-        ).rejects.toThrow(
-          'Refactor operation "delete_dead_code" is unavailable: LSP server "typescript" (native backend) does not advertise the requested code-action kind: source.removeUnused.',
-        );
+        await assertUnusedImportSupport(setup, file, importsOnly);
+        const stale = await runTool(setup, "code_refactor_plan", params);
+        expect(stale.details.status, displayText(stale)).toBe("completed");
         expect(readFileSync(file, "utf8")).toBe(original);
+        const changed = `${original}// Intervening edit.\n`;
+        writeFileSync(file, changed);
+        const rejected = await runTool(setup, "code_refactor_apply", {
+          planId: extractPlanId(stale),
+        });
+        expect(rejected.details.status, displayText(rejected)).toBe("invalid-input");
+        expect(displayText(rejected)).toContain("has changed since the plan was generated");
+        expect(readFileSync(file, "utf8")).toBe(changed);
+        writeFileSync(file, original);
+        const plan = await runTool(setup, "code_refactor_plan", params);
+        expect(plan.details.status, displayText(plan)).toBe("completed");
+        expect(readFileSync(file, "utf8")).toBe(original);
+        const applied = await runTool(setup, "code_refactor_apply", {
+          planId: extractPlanId(plan),
+        });
+        expect(applied.details.status, displayText(applied)).toBe("completed");
+        expect(readFileSync(file, "utf8")).toBe(preserved);
       }, 30_000);
     }
     it("plans and applies exact renames, then rejects stale plans", async () => {
       await assertRenameAndStalePlan(setup, spec, target);
     }, 60_000);
+  });
+}
+
+async function assertUnusedImportSupport(
+  setup: ToolContext,
+  file: string,
+  importsOnly: boolean,
+): Promise<void> {
+  const health = await runTool(setup, "code_health", { scope: file, include: ["servers"] });
+  const support = importsOnly
+    ? {
+        server: "advertised",
+        supi: "limited",
+        reason: expect.stringContaining("not arbitrary unused declarations"),
+      }
+    : { server: "advertised", supi: "supported" };
+  const compiler = importsOnly
+    ? { backend: "native", compilerVersion: "7.0.2" }
+    : { backend: "tsserver" };
+  expect(health.structuredContent).toMatchObject({
+    kind: "completed",
+    servers: expect.arrayContaining([
+      expect.objectContaining({
+        typescript: expect.objectContaining(compiler),
+        operationSupport: expect.objectContaining({ delete_dead_code: support }),
+      }),
+    ]),
   });
 }
 
