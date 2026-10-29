@@ -87,8 +87,7 @@ export async function runFilteredCodeActionRefactor(options: {
   if (!response || response.reason) {
     return {
       kind: "unavailable",
-      reason:
-        response?.reason ?? `No code actions are available for refactor operation "${operation}".`,
+      reason: `Refactor operation "${operation}" is unavailable: ${response?.reason ?? "No code actions are available."}`,
     };
   }
   const actions = response.value;

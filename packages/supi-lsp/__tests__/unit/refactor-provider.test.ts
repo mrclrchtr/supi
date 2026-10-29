@@ -380,6 +380,30 @@ describe("LspRefactorProvider", () => {
       );
     });
 
+    it("names the requested refactor operation while retaining the routed failure reason", async () => {
+      const provider = createLspSemanticProvider(
+        createMockLsp({
+          codeActions: vi.fn().mockResolvedValue({
+            kind: "unavailable",
+            reason:
+              'LSP server "typescript" (tsserver backend) does not advertise textDocument/codeAction.',
+          }),
+        }),
+      ) as OperationAwareSemanticProvider;
+
+      const result = await provider.refactor?.({
+        operation: "update_imports",
+        file: "/src/index.ts",
+        position: { line: 0, character: 0 },
+      });
+
+      expect(result).toEqual({
+        kind: "unavailable",
+        reason:
+          'Refactor operation "update_imports" is unavailable: LSP server "typescript" (tsserver backend) does not advertise textDocument/codeAction.',
+      });
+    });
+
     it.each([
       ["null entry", null],
       ["numeric kind", { title: "Bad action", kind: 1 }],

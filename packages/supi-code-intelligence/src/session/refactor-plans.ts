@@ -9,6 +9,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import type { RefactorOperation, WorkspaceEdit } from "@mrclrchtr/supi-code-runtime/api";
+import { toDisplayPath } from "../analysis/search/paths.ts";
 
 export interface RefactorPlan {
   id: string;
@@ -41,6 +42,7 @@ export function computeFileFingerprint(file: string): string {
 export function validateSynchronizedContentFingerprints(
   preconditions: WorkspaceEdit["documentPreconditions"],
   fileFingerprints: readonly { file: string; fingerprint: string }[],
+  cwd: string,
 ): string | null {
   const fingerprints = new Map(
     fileFingerprints.map(({ file, fingerprint }) => [file, fingerprint]),
@@ -48,7 +50,7 @@ export function validateSynchronizedContentFingerprints(
   for (const precondition of preconditions ?? []) {
     if (precondition.kind !== "open-document-content") continue;
     if (fingerprints.get(precondition.file) !== precondition.fingerprint) {
-      return `File ${precondition.file} changed after the semantic input snapshot. Request a new rename plan.`;
+      return `File ${toDisplayPath(cwd, precondition.file)} changed after the semantic input snapshot. Request a new rename plan.`;
     }
   }
   return null;
@@ -89,13 +91,14 @@ export function removePlan(store: Map<string, RefactorPlan>, id: string): void {
 /** Check if a plan is still fresh (all file fingerprints match). */
 export function isPlanFresh(
   plan: RefactorPlan,
+  cwd: string,
 ): { fresh: true } | { fresh: false; reason: string } {
   for (const fp of plan.fileFingerprints) {
     const current = computeFileFingerprint(fp.file);
     if (current !== fp.fingerprint) {
       return {
         fresh: false,
-        reason: `File ${fp.file} has changed since the plan was generated. Regenerate with code_refactor_plan.`,
+        reason: `File ${toDisplayPath(cwd, fp.file)} has changed since the plan was generated. Regenerate with code_refactor_plan.`,
       };
     }
   }

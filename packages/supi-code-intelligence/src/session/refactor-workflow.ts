@@ -130,7 +130,7 @@ export async function runRefactorApplyWorkflow(
     plan.authorizedMutationRoots,
   );
   if (authority.kind === "unavailable") return authority;
-  const freshness = isPlanFresh(plan);
+  const freshness = isPlanFresh(plan, deps.cwd);
   if (!freshness.fresh) return { kind: "invalid-input", message: freshness.reason };
   const validation = validateEdit(plan.edits);
   if (!validation.safe) return { kind: "invalid-input", message: validation.reason };
@@ -144,11 +144,11 @@ export async function runRefactorApplyWorkflow(
   const expectedFingerprints = new Map(
     plan.fileFingerprints.map(({ file, fingerprint }) => [file, fingerprint]),
   );
-  const getOpenDocumentVersion = getDocumentVersionReader(deps);
   const result = await applyWorkspaceEdit(plan.edits, {
+    cwd: deps.cwd,
     authorizedMutationRoots: plan.authorizedMutationRoots,
     expectedFingerprints,
-    getOpenDocumentVersion,
+    getOpenDocumentVersion: getDocumentVersionReader(deps),
   });
   if (result.kind === "error") return { kind: "unavailable", reason: result.reason };
   deps.removePlan(plan.id);
@@ -199,6 +199,7 @@ async function planResolvedRefactor(
   const snapshotError = validateSynchronizedContentFingerprints(
     result.edits.documentPreconditions,
     fileFingerprints,
+    deps.cwd,
   );
   if (snapshotError) return { kind: "unavailable", reason: snapshotError };
 

@@ -100,7 +100,9 @@ export function registerLanguageBaselineCase(spec: LanguageCase): void {
             target: { anchor: { file, line: 2, character: 14 } },
             operation: { delete_dead_code: {} },
           }),
-        ).rejects.toThrow("The server does not advertise the requested code-action kind.");
+        ).rejects.toThrow(
+          'Refactor operation "delete_dead_code" is unavailable: LSP server "typescript" (native backend) does not advertise the requested code-action kind: source.removeUnused.',
+        );
         expect(readFileSync(file, "utf8")).toBe(original);
       }, 30_000);
     }
@@ -565,6 +567,7 @@ async function assertRenameAndStalePlan(
   const rejected = await runTool(setup, "code_refactor_apply", { planId: staleId });
   expect(rejected.details.status).toBe("invalid-input");
   expect(displayText(rejected)).toContain("changed since the plan was generated");
+  expect(displayText(rejected)).not.toContain(setup.workspace.cwd);
 }
 
 async function planRename(

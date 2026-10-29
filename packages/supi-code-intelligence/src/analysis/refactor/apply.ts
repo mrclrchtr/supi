@@ -16,6 +16,7 @@ import { readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:
 import { basename, dirname, join } from "node:path";
 import { withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import type { FileEdit, WorkspaceEdit } from "@mrclrchtr/supi-code-runtime/api";
+import { toDisplayPath } from "../search/paths.ts";
 import { revalidateMutationAuthority } from "./mutation-authority.ts";
 import { compareCodePositions, createLogicalLineIndex } from "./position.ts";
 import { validateEditAgainstFiles } from "./safety.ts";
@@ -25,6 +26,8 @@ export type ApplyResult =
   | { kind: "error"; reason: string };
 
 export interface ApplyOptions {
+  /** Workspace root for relative error paths; omitted roots retain absolute paths. */
+  cwd?: string;
   /** Canonical roots authorized by the semantic provider that made the plan. */
   authorizedMutationRoots: readonly string[];
   /** Expected SHA-256 fingerprints per file, validated after queue acquisition. */
@@ -65,7 +68,7 @@ export async function applyWorkspaceEdit(
     }
 
     if (options.expectedFingerprints) {
-      const freshness = validateFingerprints(files, options.expectedFingerprints);
+      const freshness = validateFingerprints(files, options.expectedFingerprints, options.cwd);
       if (!freshness.ok) return { kind: "error", reason: freshness.reason };
     }
 
@@ -73,6 +76,7 @@ export async function applyWorkspaceEdit(
       edit,
       options.getOpenDocumentVersion,
       options.expectedFingerprints,
+      options.cwd,
     );
     if (!documentState.ok) return { kind: "error", reason: documentState.reason };
 
@@ -97,6 +101,7 @@ function validateDocumentPreconditions(
   edit: WorkspaceEdit,
   getOpenDocumentVersion: ApplyOptions["getOpenDocumentVersion"],
   expectedFingerprints: ApplyOptions["expectedFingerprints"],
+  cwd: ApplyOptions["cwd"],
 ): { ok: true } | { ok: false; reason: string } {
   const preconditions = edit.documentPreconditions ?? [];
   if (preconditions.length === 0) return { ok: true };
@@ -112,6 +117,7 @@ function validateDocumentPreconditions(
       precondition,
       getOpenDocumentVersion,
       expectedFingerprints,
+      cwd,
     );
     if (reason) return { ok: false, reason };
   }
@@ -122,21 +128,23 @@ function validateDocumentPrecondition(
   precondition: NonNullable<WorkspaceEdit["documentPreconditions"]>[number],
   getOpenDocumentVersion: NonNullable<ApplyOptions["getOpenDocumentVersion"]>,
   expectedFingerprints: ApplyOptions["expectedFingerprints"],
+  cwd: ApplyOptions["cwd"],
 ): string | null {
+  const file = cwd ? toDisplayPath(cwd, precondition.file) : precondition.file;
   const currentVersion = getOpenDocumentVersion(precondition.file);
   if (precondition.kind === "disk-content") {
     return currentVersion === null
       ? null
-      : `File ${precondition.file} is now open and no longer uses disk content as its master.`;
+      : `File ${file} is now open and no longer uses disk content as its master.`;
   }
   if (currentVersion !== precondition.version) {
-    return `File ${precondition.file} open document version has changed since the plan was generated.`;
+    return `File ${file} open document version has changed since the plan was generated.`;
   }
   if (
     precondition.kind === "open-document-content" &&
     expectedFingerprints?.get(precondition.file) !== precondition.fingerprint
   ) {
-    return `File ${precondition.file} synchronized content fingerprint does not match the stored plan.`;
+    return `File ${file} synchronized content fingerprint does not match the stored plan.`;
   }
   return null;
 }
@@ -144,6 +152,7 @@ function validateDocumentPrecondition(
 function validateFingerprints(
   files: string[],
   expected: ReadonlyMap<string, string>,
+  cwd: ApplyOptions["cwd"],
 ): { ok: true } | { ok: false; reason: string } {
   for (const file of files) {
     const expectedFingerprint = expected.get(file);
@@ -152,9 +161,9 @@ function validateFingerprints(
     try {
       actual = sha256File(file);
     } catch {
-      return stalePlanError(file);
+      return stalePlanError(file, cwd);
     }
-    if (actual !== expectedFingerprint) return stalePlanError(file);
+    if (actual !== expectedFingerprint) return stalePlanError(file, cwd);
   }
   return { ok: true };
 }
@@ -163,10 +172,10 @@ function sha256File(file: string): string {
   return createHash("sha256").update(readFileSync(file, "utf-8")).digest("hex");
 }
 
-function stalePlanError(file: string): { ok: false; reason: string } {
+function stalePlanError(file: string, cwd: ApplyOptions["cwd"]): { ok: false; reason: string } {
   return {
     ok: false,
-    reason: `File ${file} has changed since the plan was generated. Regenerate with code_refactor_plan.`,
+    reason: `File ${cwd ? toDisplayPath(cwd, file) : file} has changed since the plan was generated. Regenerate with code_refactor_plan.`,
   };
 }
 

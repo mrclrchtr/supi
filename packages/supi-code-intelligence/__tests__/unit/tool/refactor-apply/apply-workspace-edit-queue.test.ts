@@ -112,10 +112,14 @@ describe("applyWorkspaceEdit file-mutation queue", () => {
             },
           ],
         },
-        { expectedFingerprints: new Map([[file, sha256(original)]]) },
+        { cwd: tmpDir, expectedFingerprints: new Map([[file, sha256(original)]]) },
       );
 
-      expect(result).toMatchObject({ kind: "error" });
+      expect(result).toMatchObject({
+        kind: "error",
+        reason:
+          "File source.ts has changed since the plan was generated. Regenerate with code_refactor_plan.",
+      });
       expect(readFileSync(file, "utf-8")).toBe("const value = 'sibling';\n");
     } finally {
       beforeQueuedCallbacks.length = 0;
@@ -194,12 +198,13 @@ describe("applyWorkspaceEdit file-mutation queue", () => {
           authorizedMutationRoots: [realpathSync(tmpDir)],
           expectedFingerprints: new Map([[file, sha256(original)]]),
           getOpenDocumentVersion: () => openVersion,
+          cwd: tmpDir,
         },
       );
 
       expect(result).toEqual({
         kind: "error",
-        reason: expect.stringContaining("open document version has changed"),
+        reason: "File source.ts open document version has changed since the plan was generated.",
       });
       expect(readFileSync(file, "utf-8")).toBe(original);
     } finally {

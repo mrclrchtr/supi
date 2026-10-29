@@ -1287,8 +1287,10 @@ export class LspClient {
     context: CodeActionContext,
     control?: CodeRequestControl,
   ): Promise<CodeQueryResult<CodeAction[] | null>> {
+    const backend = this.typescriptSelection?.backend;
+    const server = `LSP server "${this.name}"${backend ? ` (${backend} backend)` : ""}`;
     if (!this.supportsCodeActions) {
-      return unavailableCodeQuery("The server does not advertise textDocument/codeAction.");
+      return unavailableCodeQuery(`${server} does not advertise textDocument/codeAction.`);
     }
     if (typeof filePath !== "string" || filePath.length === 0 || !isRange(range)) {
       return unavailableCodeQuery("Code actions require a valid file and range.");
@@ -1297,7 +1299,9 @@ export class LspClient {
       return unavailableCodeQuery("Code actions require a valid context.");
     }
     if (context.only && !this.supportsCodeActionKinds(context.only)) {
-      return unavailableCodeQuery("The server does not advertise the requested code-action kind.");
+      return unavailableCodeQuery(
+        `${server} does not advertise the requested code-action kind: ${context.only.join(", ")}.`,
+      );
     }
 
     const requestContext: CodeActionContext = {

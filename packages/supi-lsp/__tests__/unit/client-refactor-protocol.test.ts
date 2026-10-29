@@ -254,7 +254,7 @@ describe("LSP code-action requests", () => {
     expect(rpc.sendRequest).not.toHaveBeenCalled();
   });
 
-  it("reports an unsupported requested kind before transport", async () => {
+  it("identifies the server and unsupported requested kind before transport", async () => {
     const { client, rpc } = createRunningTestClient({
       capabilities: { codeActionProvider: { codeActionKinds: ["quickfix"] } },
     });
@@ -265,7 +265,11 @@ describe("LSP code-action requests", () => {
         { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
         { diagnostics: [], only: ["source.removeUnused"] },
       ),
-    ).resolves.toMatchObject({ kind: "unavailable" });
+    ).resolves.toMatchObject({
+      kind: "unavailable",
+      reason:
+        'LSP server "test" does not advertise the requested code-action kind: source.removeUnused.',
+    });
     expect(rpc.sendRequest).not.toHaveBeenCalled();
   });
 

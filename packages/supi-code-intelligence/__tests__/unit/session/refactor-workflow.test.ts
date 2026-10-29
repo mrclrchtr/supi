@@ -171,7 +171,8 @@ describe("runRefactorPlanWorkflow", () => {
 
       expect(outcome).toMatchObject({
         kind: "unavailable",
-        reason: expect.stringContaining("changed after the semantic input snapshot"),
+        reason:
+          "File src/index.ts changed after the semantic input snapshot. Request a new rename plan.",
       });
       expect(stored).toBe(false);
     },
