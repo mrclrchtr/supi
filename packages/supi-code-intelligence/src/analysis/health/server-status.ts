@@ -67,6 +67,14 @@ export function formatProjectServerStatusReason(
   }
 }
 
+/** Render the selected compiler without confusing a wrapper version with its implementation. */
+export function formatProjectServerCompiler(
+  selection: ProjectServerInfo["typescript"],
+): string | null {
+  if (!selection) return null;
+  return `${selection.backend}: TypeScript ${selection.compilerVersion ?? "(unknown version)"} via ${selection.packageName}${selection.wrapperVersion ? ` (wrapper ${selection.wrapperVersion})` : ""}`;
+}
+
 /** Render operation support without hiding server limits or SuPi limits. */
 export function formatProjectServerOperationSupport(
   support: ServerOperationSupportMap | undefined,

@@ -1,6 +1,7 @@
 /** Markdown renderer for code_health results. */
 import type { CapabilityWarningReport } from "../../analysis/capability/capability-warnings.ts";
 import {
+  formatProjectServerCompiler,
   formatProjectServerOperationSupport,
   formatProjectServerRoot,
   formatProjectServerRouteSummary,
@@ -372,11 +373,20 @@ function renderServersSection(
       lines.push(
         `- ${statusIcon} **${server.name}** @ \`${formatProjectServerRoot(cwd, server.root)}\` (${server.fileTypes.join(", ")}) — ${server.status}${reason}`,
       );
-      const operationSupport = formatProjectServerOperationSupport(server.operationSupport);
-      if (operationSupport) lines.push(`  - ${operationSupport}`);
+      renderServerDetails(lines, server);
     }
   }
   lines.push("");
+}
+
+function renderServerDetails(lines: string[], server: HealthData["servers"][number]): void {
+  for (const detail of [
+    formatProjectServerCompiler(server.typescript),
+    server.failureMessage,
+    formatProjectServerOperationSupport(server.operationSupport),
+  ]) {
+    if (detail) lines.push(`  - ${detail}`);
+  }
 }
 
 function displaySemanticStatus(data: HealthData): string {

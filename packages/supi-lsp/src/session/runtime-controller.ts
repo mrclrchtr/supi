@@ -519,8 +519,8 @@ export class LspRuntimeController {
     return this.#configurationError;
   }
 
-  /** Get the missing servers warning (servers whose binary is not on PATH). */
-  getMissingServers(): Array<{ name: string; command: string }> {
+  /** Report missing executables and root-specific compiler selection failures. */
+  getMissingServers(): ReturnType<typeof scanMissingServers> {
     if (this.#state.kind !== "ready") return [];
     return scanMissingServers(
       this.#state.config,

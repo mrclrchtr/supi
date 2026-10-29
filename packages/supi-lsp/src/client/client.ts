@@ -51,6 +51,7 @@ import type {
   WorkspaceEdit,
   WorkspaceSymbol,
 } from "../config/types.ts";
+import { resolveTypeScriptLaunch, type TypeScriptLaunch } from "../config/typescript-launch.ts";
 import { boundCwd } from "../debug-telemetry.ts";
 import type { DiagnosticEvidenceSummary } from "../diagnostics/evidence.ts";
 import { raceRequestControl } from "../session/readiness.ts";
@@ -591,6 +592,13 @@ export class LspClient {
     });
   }
 
+  private launchSelection: TypeScriptLaunch | undefined;
+
+  /** Compiler used by this generation, never re-probed while it is healthy. */
+  get typescriptSelection() {
+    return this.launchSelection?.typescript;
+  }
+
   get status(): ClientStatus {
     return this._status;
   }
@@ -670,6 +678,12 @@ export class LspClient {
   // ── Lifecycle ───────────────────────────────────────────────────────
   /** Spawn the server process and perform the initialize handshake. */
   async start(): Promise<void> {
+    try {
+      this.launchSelection = resolveTypeScriptLaunch(this.name, this.config, this.root);
+    } catch (error) {
+      this.handleProcessFailure(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
     const cmd = this.config.command;
     const args = this.config.args ?? [];
     this.startedAt = Date.now();
@@ -741,7 +755,7 @@ export class LspClient {
           },
         ],
         capabilities: CLIENT_CAPABILITIES,
-        initializationOptions: this.config.initializationOptions,
+        initializationOptions: this.launchSelection.initializationOptions,
       })) as InitializeResult;
 
       const positionEncoding = result.capabilities.positionEncoding ?? "utf-16";

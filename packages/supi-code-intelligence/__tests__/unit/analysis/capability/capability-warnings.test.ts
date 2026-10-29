@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   CapabilityWarningState,
   evaluateCapabilityWarnings,
+  gatherCapabilityWarningInput,
 } from "../../../../src/analysis/capability/capability-warnings.ts";
 
 const healthyInput = {
@@ -22,6 +23,26 @@ describe("evaluateCapabilityWarnings", () => {
     expect(result.warnings).toEqual([
       expect.objectContaining({ type: "language-disabled", language: "python" }),
     ]);
+  });
+
+  it("reports compiler selection failures without claiming the TLS executable is missing", () => {
+    const failureMessage =
+      "TypeScript launch at /project, package typescript: unsupported TS7. Select TS6.";
+    const input = gatherCapabilityWarningInput("/project", {
+      getMissingServers: () => [
+        {
+          name: "typescript",
+          command: "typescript-language-server",
+          foundExtensions: ["ts"],
+          failureMessage,
+        },
+      ],
+    });
+    const result = evaluateCapabilityWarnings({ ...input, structuralState: { kind: "ready" } });
+    expect(result.warnings).toEqual([
+      expect.objectContaining({ type: "configuration-error", message: failureMessage }),
+    ]);
+    expect(result.warnings[0]?.message).not.toContain("not found on PATH");
   });
 
   it("reports missing server binaries", () => {

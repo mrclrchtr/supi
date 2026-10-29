@@ -29,9 +29,18 @@ export interface CapabilityWarningReport {
   warnings: CapabilityWarning[];
 }
 
+/** Narrow launch-failure evidence accepted from a controller, before extension normalization. */
+interface MissingServerEvidence {
+  name: string;
+  command: string;
+  foundExtensions?: string[];
+  failureMessage?: string;
+}
+type NormalizedMissingServerEvidence = MissingServerEvidence & { foundExtensions: string[] };
+
 /** Minimal LSP-controller surface needed to discover missing servers. */
 export interface CapabilityWarningMissingServerSource {
-  getMissingServers(): Array<{ name: string; command: string; foundExtensions?: string[] }>;
+  getMissingServers(): MissingServerEvidence[];
   /** Explicit disablement captured with the active LSP configuration snapshot. */
   getExplicitlyDisabledLanguages?(): readonly string[];
   /** Configuration validation failure that prevented automatic startup. */
@@ -41,7 +50,7 @@ export interface CapabilityWarningMissingServerSource {
 /** Current runtime/config facts needed to evaluate Capability Warnings. */
 export interface CapabilityWarningInput {
   explicitlyDisabledLanguages: string[];
-  missingServers: Array<{ name: string; command: string; foundExtensions: string[] }>;
+  missingServers: NormalizedMissingServerEvidence[];
   structuralState: { kind: string; reason?: string };
   /** Configuration could not be validated for automatic capability work. */
   configurationError?: string;
@@ -68,9 +77,11 @@ export function evaluateCapabilityWarnings(input: CapabilityWarningInput): Capab
 
   for (const server of input.missingServers) {
     warnings.push({
-      type: "missing-server",
+      type: server.failureMessage ? "configuration-error" : "missing-server",
       language: server.name,
-      message: `Cannot start "${server.name}" server — "${server.command}" not found on PATH`,
+      message:
+        server.failureMessage ??
+        `Cannot start "${server.name}" server — "${server.command}" not found on PATH`,
       detail:
         server.foundExtensions.length > 0
           ? `Affected file types: ${server.foundExtensions.join(", ")}`
@@ -157,11 +168,7 @@ export function gatherCapabilityWarningInput(
   const projectTrusted = options.projectTrusted !== false;
   const structuralState = getDefaultWorkspaceRuntime().getWorkspace(cwd).structural.state;
   let explicitlyDisabledLanguages: string[] = [];
-  let missingServers: Array<{
-    name: string;
-    command: string;
-    foundExtensions: string[];
-  }> = [];
+  let missingServers: NormalizedMissingServerEvidence[] = [];
   let configurationError: string | undefined;
 
   try {
@@ -197,12 +204,11 @@ export function gatherCapabilityWarningInput(
   };
 }
 
-function normalizeMissingServers(
-  raw: Array<{ name: string; command: string; foundExtensions?: string[] }>,
-): Array<{ name: string; command: string; foundExtensions: string[] }> {
+function normalizeMissingServers(raw: MissingServerEvidence[]): NormalizedMissingServerEvidence[] {
   return raw.map((entry) => ({
     name: entry.name,
     command: entry.command,
     foundExtensions: entry.foundExtensions ?? [],
+    ...(entry.failureMessage ? { failureMessage: entry.failureMessage } : {}),
   }));
 }

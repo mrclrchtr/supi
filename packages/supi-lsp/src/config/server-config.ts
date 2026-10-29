@@ -26,6 +26,20 @@ export interface ServerConfig {
   initializationOptions?: unknown;
   /** Maximum time to wait for a single $/progress cycle, in ms. Default: 10_000. */
   readinessTimeoutMs?: number;
+  /** TypeScript compiler package name or installed alias, resolved from the route root. */
+  typescriptPackage?: string;
+  /** @internal Effective explicit-field origins for TypeScript launch policy, not user configuration. */
+  typescriptExplicitFields?: Partial<
+    Record<"command" | "args" | "tsserverPath" | "typescriptPackage", string>
+  >;
+}
+
+/** Compiler selection facts; absent versions are unknown, not inferred from the wrapper. */
+export interface TypeScriptSelection {
+  backend: "tsserver";
+  packageName: string;
+  compilerVersion?: string;
+  wrapperVersion?: string;
 }
 
 /** LSP configuration keyed by language name (e.g. `typescript`, `python`). */
@@ -37,6 +51,10 @@ export interface DetectedProjectServer {
   name: string;
   root: string;
   fileTypes: string[];
+  /** Resolved automatic compiler selection, when available. */
+  typescript?: TypeScriptSelection;
+  /** Actionable launch-selection failure, including its root and package. */
+  failureMessage?: string;
 }
 
 /** Structured reason for a route-level process-crash recovery state. */
@@ -64,4 +82,8 @@ export interface MissingServer {
   command: string;
   /** File extensions found in the project (subset of server.fileTypes). */
   foundExtensions: string[];
+  /** Route root when a compiler-selection failure prevents launch. */
+  root?: string;
+  /** Compiler selection failure, distinct from a missing executable. */
+  failureMessage?: string;
 }

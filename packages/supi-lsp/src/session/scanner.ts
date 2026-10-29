@@ -7,6 +7,7 @@ import type {
   MissingServer,
   ServerConfig,
 } from "../config/types.ts";
+import { inspectTypeScriptLaunch } from "../config/typescript-launch.ts";
 import type { LspManager } from "../manager/manager.ts";
 import { commandExists } from "../utils.ts";
 import {
@@ -44,6 +45,7 @@ export function scanProjectCapabilities(
             name: serverName,
             root,
             fileTypes: [...server.fileTypes],
+            ...inspectTypeScriptLaunch(serverName, server, root),
           }) satisfies DetectedProjectServer,
       );
     })
@@ -79,8 +81,6 @@ function inspectDirectory(
   ctx: HintContext,
 ): void {
   for (const [serverName, server] of Object.entries(servers)) {
-    if (!commandExists(server.command)) continue;
-
     if (server.rootMarkers.length === 0) {
       if (hasMatchingFile(directory, entryNames, server.fileTypes)) {
         ctx.extensionBasedServers.add(serverName);
@@ -122,7 +122,7 @@ export async function startDetectedServers(
 
 /**
  * Scan the project for languages whose source files exist but whose LSP server
- * binary is not installed on PATH. Walks the project directory tree collecting
+ * executable or selected compiler is unavailable. Walks the project tree collecting
  * file extensions, then checks each configured server.
  */
 export function scanMissingServers(
@@ -142,14 +142,28 @@ export function scanMissingServers(
   });
 
   const missing: MissingServer[] = [];
+  const { markerMatches } = collectServerHints(config, cwd, maxDepth, policy);
 
   for (const [name, server] of Object.entries(config.servers)) {
-    if (commandExists(server.command)) continue;
-
     const matching = server.fileTypes.filter((ft) => foundExtensions.has(ft));
     if (matching.length === 0) continue;
 
-    missing.push({ name, command: server.command, foundExtensions: matching });
+    const roots = dedupeTopmostRoots(Array.from(markerMatches.get(name) ?? []));
+    for (const root of roots.length ? roots : [cwd]) {
+      const selection = inspectTypeScriptLaunch(name, server, root);
+      if (selection.failureMessage) {
+        missing.push({
+          name,
+          command: server.command,
+          foundExtensions: matching,
+          root,
+          failureMessage: selection.failureMessage,
+        });
+      } else if (!commandExists(server.command)) {
+        missing.push({ name, command: server.command, foundExtensions: matching });
+        break;
+      }
+    }
   }
 
   return missing;

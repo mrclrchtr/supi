@@ -88,6 +88,42 @@ afterEach(() => {
 });
 
 describe("registered health structured results", () => {
+  it("reports the actual wrapped compiler and actionable selection failures in structured and rendered health", async () => {
+    const typescript = {
+      backend: "tsserver",
+      packageName: "typescript",
+      wrapperVersion: "6.0.2",
+      compilerVersion: "6.0.3",
+    };
+    const failureMessage =
+      "TypeScript launch at /project, package typescript: unsupported TS7. Select an installed TS6 package.";
+    ready({
+      getProjectServers: () => [
+        {
+          name: "typescript",
+          root: cwd,
+          fileTypes: ["ts"],
+          status: "running",
+          ready: true,
+          typescript,
+        },
+        {
+          name: "typescript",
+          root: join(cwd, "other"),
+          fileTypes: ["ts"],
+          status: "error",
+          ready: false,
+          failureMessage,
+        },
+      ],
+    });
+    const result = await call(tool(), { include: ["servers"] });
+    expect(result.structuredContent.servers).toMatchObject([{ typescript }, { failureMessage }]);
+    expect(result.content[0].text).toContain(
+      "tsserver: TypeScript 6.0.3 via typescript (wrapper 6.0.2)",
+    );
+    expect(result.content[0].text).toContain(failureMessage);
+  });
   it("distinguishes empty observations, omitted sections, and invalid input", async () => {
     ready();
     const t = tool();

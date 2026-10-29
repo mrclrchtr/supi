@@ -16,6 +16,8 @@ export function collectServers(
     fileTypes: server.fileTypes,
     status: server.status,
     ...(server.statusReason ? { statusReason: server.statusReason } : {}),
+    ...(server.typescript ? { typescript: server.typescript } : {}),
+    ...(server.failureMessage ? { failureMessage: server.failureMessage } : {}),
     ready: server.ready,
     ...(server.operationSupport ? { operationSupport: server.operationSupport } : {}),
   }));

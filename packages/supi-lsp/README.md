@@ -72,6 +72,34 @@ Pyright remains the default Python server, but the audited server lacks implemen
 
 JDTLS acceptance uses a compatible pinned JDK and isolated writable `-data` and `-configuration` directories. Keep test workspaces separate from personal JDTLS state. The [capability baseline](../../docs/conventions/code-language-baseline.md) defines the operation and evidence requirements.
 
+### TypeScript compiler selection
+
+The default TypeScript route still requires `typescript-language-server` on PATH (or an explicitly configured command). Compiler resolution does not discover or install a project-local language-server executable.
+
+| Configuration | Launch policy |
+|---|---|
+| No explicit launch fields | Resolve `typescript` from the route root; only if absent, resolve `@typescript/typescript6`. If both are absent, retain TLS's existing lookup. |
+| `lsp.servers.typescript.typescriptPackage` | Resolve exactly this installed package name/alias. No arbitrary alias scan, package subpath, URL, or filesystem-path selector. |
+| Explicit `command` **or** `args` | Manual launch, including inherited values equal to defaults. No automatic compiler selection or initialization-option injection. |
+| Explicit `initializationOptions.tsserver.path` | Use the configured path without automatic compiler selection. |
+| Package selector plus any explicit launch field above | Configuration conflict; the failure identifies fields and their configuration origins when available. Remove one side and reload. |
+
+For example, select a compiler installed as `my-ts6` without changing the TLS command:
+
+```json
+{ "lsp": { "servers": { "typescript": { "typescriptPackage": "my-ts6" } } } }
+```
+
+- Resolve packages using the route root's normal Node package search paths, including hoisted and symlinked packages. A package whose actual identity is `@typescript/typescript6`, including one installed as `typescript` or another alias, resolves `@typescript/old` from the wrapper's dependency graph. Pass the underlying implementation's actual `lib/tsserver.js` through `initializationOptions.tsserver.path`; preserve other initialization options.
+- A broken symlink, malformed manifest, missing implementation/compiler version, or unsupported selected backend is an error, not permission to try the next candidate. Automatically selected TypeScript 7 is rejected with guidance to select an installed TS6 package or configure a manual native launch. Existing explicit native launch configurations are unchanged, not newly qualified.
+- Discovery, missing-server warnings, lazy starts, and recovery use the same policy. Every actual start/retry resolves fresh package files using the active settings snapshot. Installing or repairing a compiler can be followed by explicit health refresh; changing settings requires reload/restart. Healthy clients do not hot-swap.
+- `code_health` and `/supi-ci-status` show the `tsserver` backend and resolved compiler version when known, separately from wrapper version. Manual/legacy-fallback launches have no inferred compiler identity. Missing versions remain unknown. Selection failures identify the package/root and a corrective action.
+- Topmost-root collapsing remains unchanged. Mixed nested backends, native TS7 selection/qualification ([#553](https://github.com/mrclrchtr/supi/issues/553)), Windows qualification, dependency watchers, and full feature parity are outside this change. Existing legacy TLS support is not deliberately removed.
+
+Focused qualification uses `typescript-language-server` **6.0.2**, ordinary TypeScript **6.0.3**, and `@typescript/typescript6` **6.0.2** backed by `@typescript/old` → TypeScript **6.0.3**. The wrapper's dependency range does not guarantee that compiler version; the lockfile and [prerequisite pins](../../scripts/language-baseline/pins.json) fix this test combination. SuPi's own compiler-API dependency is unchanged.
+
+The required [Linux/macOS CI matrix](../../.github/workflows/ci.yml) runs [real-wrapper startup, retry, hover, confirmed error → clean diagnostics, restart, and shutdown](__tests__/integration/workspace-runtime.integration.typescript-launch.test.ts), plus existing ordinary-TS6 diagnostic freshness tests. [Selection-policy tests](__tests__/unit/typescript-launch.test.ts) cover wrapper/alias/symlink layouts and overrides; existing semantic/refactor suites retain stale-result, cross-file, Unicode rename, and applicable code-action protection. Focused verification passed on macOS arm64 (Node 24.22.1) and Linux arm64 (Debian container, Node 24.22.0). The pinned Linux/macOS CI jobs remain pending until they run. This is not a qualification claim for the complete language baseline.
+
 ### Java startup and project JDKs
 
 The JDK that starts JDTLS can differ from the JDK that builds your project. Set a compatible server runtime through the Java route without changing the shell or project compiler:

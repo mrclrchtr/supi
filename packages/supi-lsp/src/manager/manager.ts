@@ -48,6 +48,7 @@ import type {
   WorkspaceSymbol,
 } from "../config/types.ts";
 import { FileChangeType } from "../config/types.ts";
+import { inspectTypeScriptLaunch } from "../config/typescript-launch.ts";
 import { boundCwd } from "../debug-telemetry.ts";
 import {
   accumulateOutstandingDiagnostics,
@@ -1659,8 +1660,21 @@ export class LspManager {
 
   getProjectServerInfo(serverName: string, root: string, fileTypes: string[]): ProjectServerInfo {
     const key = clientKey(serverName, root);
+    const client = this.clients.get(key);
+    const config = this.config.servers[serverName];
+    const selection =
+      client?.status === "running"
+        ? { typescript: client.typescriptSelection }
+        : config
+          ? inspectTypeScriptLaunch(serverName, config, root)
+          : {};
     return buildProjectServerInfo(
       {
+        ...selection,
+        failureMessage:
+          this.failedStarts.get(key)?.failureMessage ??
+          this.processCrashRecoveries.get(key)?.failureMessage ??
+          selection.failureMessage,
         serverName,
         root,
         fileTypes,

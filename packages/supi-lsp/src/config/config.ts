@@ -3,9 +3,15 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadSupiConfigForScope, loadSupiConfigSectionForScope } from "@mrclrchtr/supi-core/config";
+import {
+  getSupiConfigPath,
+  loadSupiConfigForScope,
+  loadSupiConfigSectionForScope,
+} from "@mrclrchtr/supi-core/config";
 import { truncateDebugIdentity } from "@mrclrchtr/supi-core/debug";
 import type { JsonObject, JsonValue, LspConfig, ServerConfig } from "./types.ts";
+
+import { isManualTypeScriptLaunch, isTypeScriptPackageName } from "./typescript-launch.ts";
 
 const CONFIG_DIR = path.dirname(fileURLToPath(import.meta.url));
 
@@ -65,9 +71,45 @@ export function loadConfig(cwd: string, options?: LoadConfigOptions): LspConfig 
           { scope: "project" },
         );
 
+  const fields: NonNullable<ServerConfig["typescriptExplicitFields"]> = {};
+  for (const [scope, servers] of [
+    ["global", globalLsp.servers],
+    ["project", projectLsp.servers],
+  ] as const) {
+    captureTypeScriptOrigins(fields, servers?.typescript, getSupiConfigPath(scope, cwd, options));
+  }
   const merged = mergeServerConfigs(defaults.servers, globalLsp.servers, projectLsp.servers);
-
+  if (merged.typescript) {
+    merged.typescript = { ...merged.typescript, typescriptExplicitFields: fields };
+    isManualTypeScriptLaunch(merged.typescript, cwd);
+  }
   return { servers: merged };
+}
+
+/** Retain only effective explicit launch fields; initializationOptions replaces its inherited object. */
+function captureTypeScriptOrigins(
+  fields: NonNullable<ServerConfig["typescriptExplicitFields"]>,
+  value: unknown,
+  origin: string,
+): void {
+  if (!isRecord(value)) return;
+  if (
+    Object.hasOwn(value, "typescriptPackage") &&
+    !isTypeScriptPackageName(value.typescriptPackage)
+  ) {
+    throw new Error(
+      `Invalid lsp.servers.typescript.typescriptPackage in ${origin}: use an installed package name or alias, not a path.`,
+    );
+  }
+  const { override } = validateServerOverride(value);
+  for (const field of ["command", "args", "typescriptPackage"] as const) {
+    if (Object.hasOwn(override, field)) fields[field] = origin;
+  }
+  if (!Object.hasOwn(override, "initializationOptions")) return;
+  delete fields.tsserverPath;
+  const init = override.initializationOptions;
+  if (isRecord(init) && isRecord(init.tsserver) && Object.hasOwn(init.tsserver, "path"))
+    fields.tsserverPath = origin;
 }
 
 /**
@@ -205,6 +247,10 @@ function mergeSingleServer(options: {
 }): ServerConfig | null {
   const { name, base, value, builtIn, reportWarning } = options;
   const { override, invalidFields } = validateServerOverride(value);
+  if (name !== "typescript" && override.typescriptPackage !== undefined) {
+    delete override.typescriptPackage;
+    invalidFields.push("typescriptPackage");
+  }
   const missingFields = base
     ? []
     : [
@@ -232,6 +278,11 @@ function mergeSingleServer(options: {
 type ServerOverrideSetter = (override: Partial<ServerConfig>, candidate: unknown) => boolean;
 
 const SERVER_OVERRIDE_SETTERS: Record<string, ServerOverrideSetter> = {
+  typescriptPackage(override, candidate) {
+    if (!isTypeScriptPackageName(candidate)) return false;
+    override.typescriptPackage = candidate;
+    return true;
+  },
   command(override, candidate) {
     if (typeof candidate !== "string" || candidate.trim().length === 0) return false;
     override.command = candidate;

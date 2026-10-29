@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { javaRuntimeBuildMarker, requireBinaryDigest } from "./prerequisite-evidence.mjs";
@@ -80,6 +81,25 @@ if (
 requireVersion("pnpm", ["--version"], pins.toolchains.pnpm, "pnpm");
 
 const servers = pins.referenceServers;
+const require = createRequire(import.meta.url);
+const tsPin = servers.typescriptLanguageServer;
+const wrapperPin = tsPin.compatibilityWrapper;
+if (packageJson.devDependencies?.[wrapperPin.package] !== wrapperPin.version) {
+  throw new Error("The test-only TypeScript wrapper dependency does not match pins.json.");
+}
+requirePackageVersion(
+  require.resolve("typescript/lib/tsserver.js"),
+  "typescript",
+  tsPin.compilerVersion,
+);
+const wrapperManifest = require.resolve(`${wrapperPin.package}/package.json`);
+requirePackageVersion(wrapperManifest, wrapperPin.package, wrapperPin.version);
+const wrapperRequire = createRequire(wrapperManifest);
+requirePackageVersion(
+  wrapperRequire.resolve("@typescript/old/lib/tsserver.js"),
+  "typescript",
+  wrapperPin.compilerVersion,
+);
 requireVersion(
   process.env.CODE_BASELINE_TYPESCRIPT_SERVER ??
     join(root, "node_modules/.bin/typescript-language-server"),

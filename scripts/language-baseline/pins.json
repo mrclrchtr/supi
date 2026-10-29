@@ -3,7 +3,13 @@
   "referenceServers": {
     "typescriptLanguageServer": {
       "version": "6.0.2",
-      "package": "typescript-language-server"
+      "package": "typescript-language-server",
+      "compilerVersion": "6.0.3",
+      "compatibilityWrapper": {
+        "package": "@typescript/typescript6",
+        "version": "6.0.2",
+        "compilerVersion": "6.0.3"
+      }
     },
     "basedpyright": {
       "version": "1.40.2",

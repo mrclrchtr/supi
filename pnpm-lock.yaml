@@ -209,6 +209,9 @@ importers:
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
+      '@typescript/typescript6':
+        specifier: 6.0.2
+        version: 6.0.2
       clipboardy:
         specifier: 5.3.2
         version: 5.3.2
@@ -605,6 +608,9 @@ importers:
       ignore:
         specifier: ^7.0.5
         version: 7.0.14
+      semver:
+        specifier: ^7.8.5
+        version: 7.8.5
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -621,6 +627,9 @@ importers:
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
         version: link:../supi-test-utils
+      '@types/semver':
+        specifier: ^7.8.0
+        version: 7.8.0
       vitest:
         specifier: 5.0.5
         version: 5.0.5(@types/node@26.6.5)(jsdom@30.1.3)(vite@8.3.5(@types/node@26.6.5)(jiti@2.7.0)(yaml@2.9.1))
@@ -1561,11 +1570,18 @@ packages:
   '@types/retry@0.12.0':
     resolution: {integrity: sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==}
 
+  '@types/semver@7.8.0':
+    resolution: {integrity: sha512-1mAINjtQCXXeLkJ9ehXkwOcBpqtLxiVtKhpUf83DdRNdQKV0iXZpaHYqRr7nj+wvxuJzoAmAwXI+sCNMv1CzLQ==}
+
   '@types/tough-cookie@4.0.5':
     resolution: {integrity: sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA==}
 
   '@types/turndown@5.0.6':
     resolution: {integrity: sha512-ru00MoyeeouE5BX4gRL+6m/BsDfbRayOskWqUvh7CLGW+UXxHQItqALa38kKnOiZPqJrtzJUgAC2+F0rL1S4Pg==}
+
+  '@typescript/typescript6@6.0.2':
+    resolution: {integrity: sha512-mbCddXd+jm7hfx7w2YU64/Av4/NqqeG3GoRZgxPcgoTxYjhrcfJRw9ULch71SS4G+Q3bOXFhRvPqjguN0Hyp5w==}
+    hasBin: true
 
   '@upstash/context7-sdk@0.6.0':
     resolution: {integrity: sha512-38CYY/rpJfkvQXHCAo0engQasosS2MJKZXJfezCLYJSoTUacGNP7iAUP9PnHtncUgsCRtW+UGhnvyPhIKBEbSQ==}
@@ -3587,9 +3603,15 @@ snapshots:
 
   '@types/retry@0.12.0': {}
 
+  '@types/semver@7.8.0': {}
+
   '@types/tough-cookie@4.0.5': {}
 
   '@types/turndown@5.0.6': {}
+
+  '@typescript/typescript6@6.0.2':
+    dependencies:
+      '@typescript/old': typescript@6.0.3
 
   '@upstash/context7-sdk@0.6.0': {}
 

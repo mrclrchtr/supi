@@ -36,6 +36,10 @@ export interface HealthServerInfo {
   readonly fileTypes: readonly string[];
   readonly status: ProjectServerInfo["status"];
   readonly statusReason?: ProjectServerStatusReason;
+  /** Compiler selection used by this route generation, if automatically resolved. */
+  readonly typescript?: ProjectServerInfo["typescript"];
+  /** Actionable launch failure, distinct from process recovery status. */
+  readonly failureMessage?: string;
   readonly ready: boolean;
   /** Negotiated operation support and SuPi planning limitations. */
   readonly operationSupport?: ServerOperationSupportMap;

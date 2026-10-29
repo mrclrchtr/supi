@@ -1,6 +1,7 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import {
   countProjectServerRouteStatuses,
+  formatProjectServerCompiler,
   formatProjectServerOperationSupport,
   formatProjectServerRoot,
   formatProjectServerStatusReason,
@@ -117,7 +118,14 @@ function buildHealthDisplaySections(data: HealthData, cwd?: string): ToolDisplay
         totalCount: data.servers.length,
         format: (server) => {
           const root = cwd ? formatProjectServerRoot(cwd, server.root) : server.root;
-          const support = formatProjectServerOperationSupport(server.operationSupport);
+          const compiler = formatProjectServerCompiler(server.typescript);
+          const support = [
+            compiler,
+            server.failureMessage,
+            formatProjectServerOperationSupport(server.operationSupport),
+          ]
+            .filter(Boolean)
+            .join(" — ");
           return `${server.name} @ ${root} (${server.fileTypes.join(", ")}) — ${server.status}${server.statusReason ? ` — ${formatProjectServerStatusReason(server.statusReason)}` : ""}${support ? ` — ${support}` : ""}`;
         },
       }),

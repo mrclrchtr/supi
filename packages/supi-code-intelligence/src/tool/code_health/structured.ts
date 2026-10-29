@@ -173,13 +173,25 @@ export function structuredHealthResult(data: HealthData): Output {
     "code_action_resolve",
   ] as const;
   const servers = data.servers.map(
-    ({ name, root, fileTypes, status, statusReason, ready, operationSupport }) => ({
+    ({
+      name,
+      root,
+      fileTypes,
+      status,
+      statusReason,
+      ready,
+      operationSupport,
+      typescript,
+      failureMessage,
+    }) => ({
       name,
       root,
       fileTypes: [...fileTypes],
       status,
       ready,
       ...(statusReason === undefined ? {} : { statusReason }),
+      ...(typescript ? { typescript } : {}),
+      ...(failureMessage ? { failureMessage } : {}),
       ...(operationSupport
         ? {
             operationSupport: Object.fromEntries(

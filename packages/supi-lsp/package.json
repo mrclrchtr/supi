@@ -35,6 +35,7 @@
     "@mrclrchtr/supi-code-runtime": "workspace:*",
     "@mrclrchtr/supi-core": "workspace:*",
     "ignore": "^7.0.5",
+    "semver": "^7.8.5",
     "typescript": "6.0.3",
     "vscode-jsonrpc": "^10.0.0",
     "vscode-languageserver-protocol": "^3.18.5",
@@ -44,6 +45,7 @@
     "@mrclrchtr/supi-code-runtime",
     "@mrclrchtr/supi-core",
     "ignore",
+    "semver",
     "typescript",
     "vscode-jsonrpc",
     "vscode-languageserver-protocol",
@@ -51,6 +53,7 @@
   ],
   "devDependencies": {
     "@mrclrchtr/supi-test-utils": "workspace:*",
+    "@types/semver": "^7.8.0",
     "vitest": "5.0.5"
   },
   "main": "src/api.ts",

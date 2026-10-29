@@ -19,6 +19,7 @@ import type {
 } from "../analysis/health/check.ts";
 import {
   countProjectServerRouteStatuses,
+  formatProjectServerCompiler,
   formatProjectServerRoot,
   formatProjectServerStatusReason,
 } from "../analysis/health/server-status.ts";
@@ -585,6 +586,9 @@ export class CiStatusDialog {
     text(
       t.fg("dim", `    files: ${server.fileTypes.map((type) => `.${type}`).join(" ") || "(none)"}`),
     );
+    const compiler = formatProjectServerCompiler(server.typescript);
+    if (compiler) text(t.fg("dim", `    ${compiler}`));
+    if (server.failureMessage) text(t.fg("warning", `    ${server.failureMessage}`));
     const reason = formatProjectServerStatusReason(server.statusReason);
     if (reason) text(t.fg("warning", `    ${reason}`));
     const shown = server.openFiles.slice(0, MAX_OPEN_FILES_SHOWN);

@@ -99,6 +99,15 @@ const server = object({
   ),
   ready: Type.Boolean(),
   operationSupport: Type.Optional(support),
+  typescript: Type.Optional(
+    object({
+      backend: Type.Literal("tsserver"),
+      packageName: Type.String(),
+      compilerVersion: Type.Optional(Type.String()),
+      wrapperVersion: Type.Optional(Type.String()),
+    }),
+  ),
+  failureMessage: Type.Optional(Type.String()),
 });
 const stale = object({
   scope: StringEnum(["file", "workspace"]),
