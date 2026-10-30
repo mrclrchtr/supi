@@ -257,7 +257,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - name: Check installer types
-        run: pnpm exec tsc -b packages/supi-installer/tsconfig.json packages/supi-installer/__tests__/tsconfig.json
+        run: node node_modules/@typescript/native/bin/tsc -b packages/supi-installer/tsconfig.json packages/supi-installer/__tests__/tsconfig.json
       - name: Check installer behavior
         run: pnpm vitest run packages/supi-installer/ scripts/__tests__/patch-checkout.test.mjs --reporter=agent
 

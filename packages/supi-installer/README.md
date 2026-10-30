@@ -80,7 +80,7 @@ Use `--help` or `--version` without a trust requirement. Unattended package chan
 ```sh
 node packages/supi-installer/bin/supi-installer.mjs --help
 pnpm vitest run packages/supi-installer/ --reporter=agent
-pnpm exec tsc -b packages/supi-installer/tsconfig.json packages/supi-installer/__tests__/tsconfig.json
+node node_modules/@typescript/native/bin/tsc -b packages/supi-installer/tsconfig.json packages/supi-installer/__tests__/tsconfig.json
 ```
 
 The CLI uses checked JavaScript and has no build step. Tests use temporary settings, trust stores, and a fake PI executable. See the [installer contract](../../docs/conventions/installer.md) for the full design and verification requirements.
