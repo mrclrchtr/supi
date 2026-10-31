@@ -1,5 +1,54 @@
 # Changelog
 
+## [11.2.0](https://github.com/mrclrchtr/supi/compare/v11.1.0...v11.2.0) (2026-10-31)
+
+
+### Features
+
+* **cache:** expose native cache forensics results ([68d7f24](https://github.com/mrclrchtr/supi/commit/68d7f24c31d63b034479e6a96f51f378d7621b9d)), closes [#539](https://github.com/mrclrchtr/supi/issues/539)
+* **code-intelligence:** finish native structured tool results ([3c9198c](https://github.com/mrclrchtr/supi/commit/3c9198c0964afd2a3e79082eabd3ad313f810433)), closes [#537](https://github.com/mrclrchtr/supi/issues/537)
+* **consulting:** configure additional read-only directories ([abca326](https://github.com/mrclrchtr/supi/commit/abca326336eac9d0ee8a0bdedfba5708a3eaf37b))
+* **context:** add native results with focused attribution ([b493113](https://github.com/mrclrchtr/supi/commit/b493113acd93e40ab4175d65dd794cf5bff0c803)), closes [#538](https://github.com/mrclrchtr/supi/issues/538)
+* **lsp:** support native-first TypeScript 7 launches ([809bf17](https://github.com/mrclrchtr/supi/commit/809bf1788c67ab4ea267db6724cad21ced6f8745)), closes [#553](https://github.com/mrclrchtr/supi/issues/553)
+* **review:** add native results for report and audit readers ([2799bc5](https://github.com/mrclrchtr/supi/commit/2799bc5d02ed52b06bfcd1c329975f9a1430e0a9)), closes [#542](https://github.com/mrclrchtr/supi/issues/542)
+* **review:** streamline reviewer handoffs ([3a90081](https://github.com/mrclrchtr/supi/commit/3a9008114be2a7e57dcdc8008216db07590fe265))
+
+
+### Bug Fixes
+
+* **agent:** clarify context handoffs for delegated work ([6031d69](https://github.com/mrclrchtr/supi/commit/6031d6936028925cf56cfe227767775fcbcb5a0a))
+* **agent:** clarify direct-only delegation tool invocation ([518b381](https://github.com/mrclrchtr/supi/commit/518b381d3b5d7ac8800b7bb940e0fbd4104e8ea4)), closes [#541](https://github.com/mrclrchtr/supi/issues/541)
+* **ask-user:** clarify direct invocation guidance ([d7bb596](https://github.com/mrclrchtr/supi/commit/d7bb5967b304a08ff4ef7a3b0b64e5d3bf17380f))
+* **ci:** allow manual retries of release publishing ([9cd6562](https://github.com/mrclrchtr/supi/commit/9cd6562f9f0e57967563a85a980e1450955f7122))
+* **ci:** publish npm packages on GitHub-hosted runners ([59ae4ce](https://github.com/mrclrchtr/supi/commit/59ae4ce1cb11936d63eff05a25afd8b30643ca45))
+* **ci:** use Ubicloud runner for publishing ([57a3780](https://github.com/mrclrchtr/supi/commit/57a37803514e007950be5c839b178a94a7d081d1))
+* **code-intelligence:** add explicit checks to the status inspector ([04c73db](https://github.com/mrclrchtr/supi/commit/04c73dbf201efd51c48bb94914847948adb87440))
+* **code-intelligence:** clarify refactor failure messages ([5673f0b](https://github.com/mrclrchtr/supi/commit/5673f0b55ca02fdd40c8ec3face9abcc270ab999))
+* **code-intelligence:** correct evidence reporting ([090f137](https://github.com/mrclrchtr/supi/commit/090f13789fb607884fe1355f37bc43c2e1a46024)), closes [#537](https://github.com/mrclrchtr/supi/issues/537)
+* **code-intelligence:** redesign the status inspector ([cdc5160](https://github.com/mrclrchtr/supi/commit/cdc5160f263fafa7128076017545f95f2fd36248))
+* **code-intelligence:** scroll the whole status overlay ([5360475](https://github.com/mrclrchtr/supi/commit/5360475a257ce6b0e7ce6bf0dc808f06e00acd8e))
+* **consulting:** report denied targets and reject stale answers ([7d95680](https://github.com/mrclrchtr/supi/commit/7d9568025023944c22b7f84a2fc8040ed54f9014))
+* **debug:** assess guidance quality and baseline token cost ([0a0085f](https://github.com/mrclrchtr/supi/commit/0a0085f3b8c297f254de77d5c50b94a32ed93100))
+* **debug:** ground tooling retro recommendations in evidence ([6ee7560](https://github.com/mrclrchtr/supi/commit/6ee7560506b6099949d355dcf2d2da773e7e428c))
+* **deps:** group Node.js and @types/node Renovate updates ([7165826](https://github.com/mrclrchtr/supi/commit/716582651710f180a69b78655301f351007cfd9a))
+* **deps:** pin dependency @types/semver to 7.8.0 ([9df9c13](https://github.com/mrclrchtr/supi/commit/9df9c133431e8e493557dcd730c14ab5619f81ef))
+* **deps:** update dependency @biomejs/biome to v2.6.3 ([0b4ed66](https://github.com/mrclrchtr/supi/commit/0b4ed66f62da2f78eb41ee7b5c456b098f93289e))
+* **deps:** update dependency @types/node to v26.6.6 ([caca2a9](https://github.com/mrclrchtr/supi/commit/caca2a96e36cbef1d6ee09bf65f0aa3ad81d48bd))
+* **deps:** update dependency hk to v2.10.0 ([66731a2](https://github.com/mrclrchtr/supi/commit/66731a25db770a9d70e97d4c85f5ff5ce6e64901))
+* **deps:** update dependency mattpocock-skills to v1.3.2 ([3823282](https://github.com/mrclrchtr/supi/commit/3823282744322a69332b76f33b556992836415e9))
+* **deps:** update dependency pnpm to v12.16.0 ([8c51172](https://github.com/mrclrchtr/supi/commit/8c51172788af552f68dd1603a104deb5724297ea))
+* **deps:** update dependency pnpm to v12.16.1 ([9f1db85](https://github.com/mrclrchtr/supi/commit/9f1db85886e7390c66d5407e7a739f60224accdd))
+* **deps:** update node and @types/node to v26 ([5c6cf8b](https://github.com/mrclrchtr/supi/commit/5c6cf8bb58acba1420e242758a3449edf93bc0bc))
+* **deps:** update node.js to v26 ([3407493](https://github.com/mrclrchtr/supi/commit/34074937c9489d230e3ef00b7ad33ab805f933c4))
+* **guidance:** update tool description to remove PI grep reference ([a239492](https://github.com/mrclrchtr/supi/commit/a23949268d4cc1065010357f9f7e59eb44d708ec))
+* **lsp:** resolve root-aware TypeScript 6 compiler launches ([ad17369](https://github.com/mrclrchtr/supi/commit/ad173699d2b99ccdd980b4eaa0b75973a8f2c32a)), closes [#550](https://github.com/mrclrchtr/supi/issues/550)
+* **lsp:** support native TypeScript unused-import refactors ([6277109](https://github.com/mrclrchtr/supi/commit/6277109d6ac18e9240b64852178810caa1fcc775)), closes [#554](https://github.com/mrclrchtr/supi/issues/554)
+* **review:** tighten direct invocation guidance ([df984c7](https://github.com/mrclrchtr/supi/commit/df984c7c196ed4a46e5061d978388a126ed34d01))
+* **skills:** refresh patches for upstream v1.3.2 ([17a227c](https://github.com/mrclrchtr/supi/commit/17a227ccc7e56d288e6af1d089c1654b264f7f64))
+* **tools:** clarify review invocation and agent capabilities ([78a0bc9](https://github.com/mrclrchtr/supi/commit/78a0bc9ae8cd5fd8d1c921b9f3698a1c3b83c5d8))
+* **web:** honor abs_links for HTML conversion ([84fd911](https://github.com/mrclrchtr/supi/commit/84fd91130c8ec10634df8ebc48dc10a325274cbc))
+* **web:** include requested URLs in HTTP fetch errors ([1c919e5](https://github.com/mrclrchtr/supi/commit/1c919e5c33dccdd661e6c3ce9f44dc935a2fda11))
+
 ## [11.1.0](https://github.com/mrclrchtr/supi/compare/v11.0.1...v11.1.0) (2026-10-26)
 
 
