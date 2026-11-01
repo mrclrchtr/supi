@@ -1,8 +1,8 @@
 ---
-description: Assess SuPi tooling for the preceding task with evidence-linked improvements
+description: Find evidence-grounded tooling improvements from the preceding task
 ---
 
-Produce a compact retrospective of the task immediately preceding this prompt. Assess SuPi tooling, not the project's code or general development practices. Cover relevant tools, skills, prompts, extensions, injected guidance, docs, settings, and human-only TUI commands—not the suite in the abstract. Assess context efficiency where the task provides concrete evidence, preserving correct tool selection and use.
+Produce a compact retrospective of the task immediately preceding this prompt. Extract reusable improvements to relevant tools, skills, prompts, extensions, injected guidance, docs, settings, and human-only TUI commands. Assess what helped, what got in the way, and what could make the next similar task easier—even when no tool failed. Focus on tooling and workflow fit, not the project's code or a general grade of the agent's performance.
 
 ## Scope and evidence
 
@@ -17,7 +17,7 @@ Use these evidence labels:
 - `[inferred]`: a plausible interpretation or missed benefit, not demonstrated.
 - `[unknown]`: an unresolved cause, ownership, or measurement; not a standalone finding.
 
-Separate the observed outcome from its explanation. An observed failure does not make its suspected cause observed. Distinguish SuPi-owned surfaces, upstream Pi/provider behavior, project-local guidance, and agent behavior. Attribute ownership and cause only when supported; otherwise mark them `[unknown]`. Keep upstream behavior and project-code defects out of SuPi bug claims.
+Separate observed outcomes from suspected causes. Distinguish SuPi-owned surfaces, upstream Pi/provider behavior, project-local guidance, and agent behavior; mark unresolved ownership or cause `[unknown]`. Keep upstream behavior and project-code defects out of SuPi bug claims. Judge fault separately from improvement potential: agent error can still expose a useful interface or workflow change.
 
 Rate each finding's impact on this task as `high`, `medium`, or `low`, based on the demonstrated effect or explicitly inferred benefit. Report time, token, cache, or cost figures only when measured in the task evidence; describe unmeasured costs qualitatively. Claims about recurring problems or suite-wide reliability require evidence beyond this retrospective's scope.
 
@@ -25,31 +25,34 @@ Rate each finding's impact on this task as `high`, `medium`, or `low`, based on 
 
 Consider each category, but report each finding once:
 - **Help:** What a used surface enabled, including useful guidance or context—not just a list of calls.
-- **Tool guidance quality:** Assess visible tool descriptions, parameter explanations, `promptSnippet`, `promptGuidelines`, and result guidance for clarity, correctness, and sufficiency at the decision point. Rate relevant guidance as `effective`, `needs improvement`, or `not assessable`, citing evidence. Distinguish unclear guidance from the agent failing to follow clear guidance.
-- **Context efficiency:** Where concrete task evidence supports a finding, distinguish recurring tool metadata and injected guidance from result text and on-demand content. For deletion proposals, quote the exact overlapping excerpt and identify retained guidance that preserves pre-call selection, argument validity, and safety. Visible overlap is a candidate for reduction, not proof of redundancy; non-use alone does not justify removal. Mark uncertain request placement `[unknown]`; quantify savings only from task evidence.
-- **Failures and retries:** Rejected, failed, or mis-parameterized SuPi calls, including ones corrected on retry. Name the relevant parameter or error and eventual outcome. Distinguish agent misuse, ambiguous descriptions, missing guidance, schema gaps, and tool bugs; leave the cause unknown when the evidence cannot decide.
-- **Defects:** Wrong output, crashes, regressions, or inconsistent behavior under valid usage. Label suspected defects as inferred and state what remains unverified.
-- **Missed or missing help:** A specific unused surface or absent capability that plausibly would have changed this task. For unused surfaces, establish that they were available and relevant at the decision point; non-use alone is not a gap. Infer a reason such as discoverability, guidance, or timing only when supported.
-- **Noise:** Identify redundant, stale, misleading, oversized, or poorly timed results/on-demand context and their avoidable cost. Account for visible mandatory-reading requirements before calling a read unnecessary. Explain what could be reduced or deferred while preserving necessary guidance.
+- **Failures, retries, and defects:** Include rejected or mis-parameterized calls even when corrected on retry. Name the parameter or error, task effect, and eventual outcome. Distinguish misuse, guidance/schema gaps, and suspected tool defects; keep uncertain causes explicit.
+- **Guidance and workflow fit:** Assess visible descriptions, parameter explanations, `promptSnippet`, `promptGuidelines`, result guidance, and skill instructions at the decision point. Look for ambiguity, poorly timed guidance, and workflow assumptions that did not fit this task. Distinguish missing or unhelpful guidance from clear guidance the agent did not follow.
+- **Missed opportunities and missing pieces:** Look for workarounds, repetitive manual steps, missing capabilities, and output improvements that could have helped. For an unused surface, establish its availability and relevance; non-use alone is not a gap. Ground ideas in a specific task moment, not a suite-wide wishlist.
+- **Context efficiency:** Identify oversized, redundant, stale, or poorly timed context. Distinguish recurring metadata/injections from results and on-demand reads; mark uncertain placement `[unknown]`. For deletion proposals, quote the overlap and name retained guidance that preserves tool selection, valid arguments, and safety. Account for mandatory reading: a required read is not agent waste, but its routing or packaging may be an improvement candidate.
+
+For consequential friction, consider a concrete tooling or guidance change as well as an agent lesson. A proposal needs an evidence anchor and a plausible mechanism; root-cause proof or demonstrated recurrence is not required to suggest an experiment. Repeating an existing instruction belongs under agent lessons; an interface, timing, or workflow change needs its own rationale.
 
 ## Report
 
-Use the structure below, within 600 words; shorter when evidence is sparse. Prioritize consequential findings rather than filling categories. If a findings section is empty, write `None observed in the available task context.` If no SuPi surface was used or relevant, say so explicitly and omit unsupported findings and recommendations.
+Use the structure below, within 600 words; shorter when evidence is sparse. Prioritize consequential findings rather than filling categories or a recommendation quota. Use evidence labels to express uncertainty; add prose caveats only when they change the proposed action. Omit empty sections. If no SuPi surface was used or relevant, say so explicitly and omit unsupported findings and recommendations.
 
 ## SuPi Tooling Retrospective
 
 **Task**: <one sentence, including actual completion status>
 
-**Verdict**: <overall contribution and biggest supported improvement, or no change warranted>
+**Verdict**: <overall contribution and highest-leverage tooling opportunity, or no tooling change warranted>
 
 ### What helped
 - `[observed · impact: high|medium|low]` **`<surface>`** — <concrete contribution; evidence anchor>.
 
-### Friction and gaps
-- `[observed|inferred · impact: high|medium|low]` **`<surface>`** — <category and finding; evidence anchor; task effect>. <Cause or ownership, separately labeled if inferred or unknown. For failed calls, include the retry outcome if visible.>
+### Failures and friction
+- `[observed|inferred · impact: high|medium|low]` **`<surface>`** — <finding; evidence anchor; task effect>. <Cause or ownership, separately labeled if inferred or unknown. Include retry outcomes where visible.>
 
-### Prioritized changes
-Include at most three recommendations, each tied to a reported finding: **owner / named surface → specific change → expected benefit**. Rank by supported task benefit or context reduction; mark benefits as untested. Keep agent-behavior lessons distinct from persistent tooling or guidance changes. Prefer the smallest intervention: persistent changes require a concrete editable target and evidence that changing the surface, rather than following existing guidance, addresses the finding. When ownership or necessity is unresolved, recommend narrow verification rather than deletion. Recommend increased tool use only when a supported discoverability or guidance gap explains the miss. If no change is supported, write `None warranted by the available evidence.`
+### Tooling improvements
+Include at most three prioritized proposals tied to reported findings: **owner / named surface → specific change → expected benefit → validation**. Name the editable surface and changed behavior; use a file path only if known. Mark untested changes and benefits `[inferred]`. Prefer the smallest experiment that addresses the friction; when evidence is insufficient to choose a change, name the narrow verification that would decide it. Preserve selection, argument validity, and safety in context-reduction proposals. If none emerge, state `No tooling change warranted by the available evidence.`
+
+### Agent lessons
+<At most two task-specific execution lessons, separate from tooling improvements. Omit when there are none.>
 
 ### Evidence limits
-<Briefly state material limits: missing or compacted task context, unavailable verification, uncertain attribution, or unmeasured costs. Distinguish an uneventful observed task from incomplete evidence.>
+<State only limits that materially affect the findings or proposals; omit inventories of unassessed internals. Distinguish incomplete evidence from an uneventful observed task.>
