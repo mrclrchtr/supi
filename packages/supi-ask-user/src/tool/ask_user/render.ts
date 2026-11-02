@@ -1,4 +1,4 @@
-import { type AgentToolResult, keyText, type Theme } from "@earendil-works/pi-coding-agent";
+import type { AgentToolResult, KeybindingHints, Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import type { AskUserParams } from "../../schema.ts";
 import type {
@@ -12,7 +12,6 @@ import { isErrorDetails } from "../../types.ts";
 import { ASK_USER_TOOL_NAME } from "./spec.ts";
 
 const COLLAPSED_ANSWER_LIMIT = 2;
-const DEFAULT_REVIEW_KEY = "Ctrl+O";
 
 type AskUserRenderOptions = {
   expanded?: boolean;
@@ -21,6 +20,7 @@ type AskUserRenderOptions = {
 
 type AskUserRenderContext = {
   isError?: boolean;
+  keyText?: KeybindingHints["keyText"];
 };
 
 export function renderAskUserCall(args: AskUserParams, theme: Theme): Text {
@@ -56,7 +56,7 @@ export function renderAskUserResult(
 
   const lines = options.expanded
     ? buildExpandedResultLines(result.details, theme)
-    : buildCollapsedResultLines(result.details, theme);
+    : buildCollapsedResultLines(result.details, theme, context.keyText?.("app.tools.expand") ?? "");
   return new Text(lines.join("\n"), 0, 0);
 }
 
@@ -83,11 +83,15 @@ function firstTextContent(
   return result.content.find((block) => block.type === "text")?.text;
 }
 
-function buildCollapsedResultLines(details: AskUserDetails, theme: Theme): string[] {
+function buildCollapsedResultLines(
+  details: AskUserDetails,
+  theme: Theme,
+  reviewKey: string,
+): string[] {
   const answerLines = buildAnswerLines(details, theme);
   const shownAnswerLines = answerLines.slice(0, COLLAPSED_ANSWER_LIMIT);
   const hiddenAnswerCount = Math.max(answerLines.length - shownAnswerLines.length, 0);
-  const metaLine = buildCollapsedMetaLine(details, hiddenAnswerCount, theme);
+  const metaLine = buildCollapsedMetaLine(details, hiddenAnswerCount, theme, reviewKey);
 
   return [formatStatusLine(details, theme), ...shownAnswerLines, ...(metaLine ? [metaLine] : [])];
 }
@@ -192,6 +196,7 @@ function buildCollapsedMetaLine(
   details: AskUserDetails,
   hiddenAnswerCount: number,
   theme: Theme,
+  reviewKey: string,
 ): string {
   const parts: string[] = [];
   const unansweredCount = details.responses.filter((r) => !r.answer.answered).length;
@@ -203,11 +208,13 @@ function buildCollapsedMetaLine(
     parts.push(`${hiddenAnswerCount} more answer${hiddenAnswerCount === 1 ? "" : "s"}`);
   }
 
-  const reviewKey = keyText("app.tools.expand") || DEFAULT_REVIEW_KEY;
-  const reviewHint = `${theme.fg("dim", reviewKey)}${theme.fg("muted", " to review")}`;
+  const reviewHint = reviewKey
+    ? `${theme.fg("dim", reviewKey)}${theme.fg("muted", " to review")}`
+    : "";
 
   if (parts.length === 0) return reviewHint;
-  return `${theme.fg("dim", parts.join(" · "))}${theme.fg("dim", " · ")}${reviewHint}`;
+  const meta = theme.fg("dim", parts.join(" · "));
+  return reviewHint ? `${meta}${theme.fg("dim", " · ")}${reviewHint}` : meta;
 }
 
 function formatStatusLine(details: AskUserDetails, theme: Theme): string {

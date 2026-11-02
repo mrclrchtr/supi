@@ -83,6 +83,8 @@ async function sessionFile(events: unknown[]) {
 function rendered(result: DebugToolResult, expanded: boolean): string {
   return renderDebugToolResult(result, { expanded, isPartial: false }, theme, {
     isError: false,
+    keyText: () => "",
+    keyHint: () => "",
   })
     .render(200)
     .join("\n");

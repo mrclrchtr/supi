@@ -52,6 +52,7 @@ export interface OpenAskUserFormOptions {
  *
  * This API does not persist results, label transcript entries, or abort a Pi
  * agent turn. It uses Pi's editor area by default and one shared lock for all callers.
+ * Inline forms report that Pi is waiting for an answer; overlays leave program status unchanged.
  */
 export async function openAskUserForm(
   questionnaire: NormalizedQuestionnaire,
@@ -84,7 +85,9 @@ export async function openAskUserForm(
               options.onAcquire?.();
               return factory(tui, theme, keybindings, done);
             },
-            options.overlay ? { overlay: true } : undefined,
+            options.overlay
+              ? { overlay: true }
+              : { blocked: { kind: "question", message: "Waiting for your answer" } },
           ),
       },
       signal: options.signal,

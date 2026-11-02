@@ -179,7 +179,7 @@ Pure, domain-neutral formatters may be shared when the shared package owns the m
 
 ## Keybinding hints
 
-The default binding for `app.tools.expand` is `Ctrl+O`, but users can change it. Use `keyHint("app.tools.expand", "to expand")` when a collapsed view needs an affordance. Do not hardcode `Ctrl+O` in rendered UI text.
+The default binding for `app.tools.expand` is `Ctrl+O`, but users can change or disable it. Use the injected render-context `keyText()` and `keyHint()` functions, not static imports: an extension's own Pi copy may not know the host's bindings. Show `context.keyHint("app.tools.expand", "to expand")` only when `context.keyText("app.tools.expand")` is non-empty. Do not hardcode `Ctrl+O` in rendered UI text.
 
 ## Review checklist
 

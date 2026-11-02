@@ -1,6 +1,10 @@
 /** Transcript renderers for the debug tool. */
 
-import { keyHint, type Theme, type ToolRenderResultOptions } from "@earendil-works/pi-coding-agent";
+import type {
+  KeybindingHints,
+  Theme,
+  ToolRenderResultOptions,
+} from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { type DebugRenderDetails, readDebugRenderDetails } from "../../render-details.ts";
 import { renderExpandedReport } from "../../renderer.ts";
@@ -96,13 +100,11 @@ function renderProgress(details: unknown, expanded: boolean, theme: Theme): Text
 }
 
 /** Render the compact or expanded result for the `debug` tool. */
-
-/** Render the compact or expanded result for the `debug` tool. */
 export function renderDebugToolResult(
   result: DebugToolResult,
   options: ToolRenderResultOptions,
   theme: Theme,
-  context: { isError: boolean },
+  context: Pick<KeybindingHints, "keyText" | "keyHint"> & { isError: boolean },
 ): Text {
   if (options.isPartial) return renderProgress(result.details, options.expanded, theme);
   if (context.isError) return new Text(theme.fg("error", "debug failed"), 0, 0);
@@ -110,8 +112,8 @@ export function renderDebugToolResult(
   const details = readDebugRenderDetails(result.details);
   if (!options.expanded) {
     let summary = renderToolSummary(details, theme);
-    if (details.eventCount > 0)
-      summary += theme.fg("dim", ` ${keyHint("app.tools.expand", "to expand")}`);
+    if (details.eventCount > 0 && context.keyText("app.tools.expand"))
+      summary += theme.fg("dim", ` ${context.keyHint("app.tools.expand", "to expand")}`);
     return new Text(summary, 0, 0);
   }
 

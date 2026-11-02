@@ -76,7 +76,7 @@ describe("debug tool renderer", () => {
       },
       makeOptions(false, true),
       createMockTheme(),
-      { isError: false },
+      { isError: false, keyText: () => "", keyHint: () => "" },
     );
     expect((partial as unknown as { text: string }).text).toContain(
       "Reading persisted debug events",
@@ -86,7 +86,7 @@ describe("debug tool renderer", () => {
       { content: [{ type: "text", text: "secret failure" }], details: undefined },
       makeOptions(false),
       createMockTheme(),
-      { isError: true },
+      { isError: true, keyText: () => "", keyHint: () => "" },
     );
     expect((error as unknown as { text: string }).text).toBe("debug failed");
     expect((error as unknown as { text: string }).text).not.toContain("secret failure");

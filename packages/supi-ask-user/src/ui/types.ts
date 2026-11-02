@@ -25,7 +25,7 @@ export interface AskUserUiContext {
       keybindings: KeybindingsManager,
       done: (result: T) => void,
     ) => Component & { dispose?(): void },
-    options?: { overlay?: boolean },
+    options?: Pick<NonNullable<Parameters<ExtensionUIContext["custom"]>[1]>, "overlay" | "blocked">,
   ): Promise<T>;
 }
 
