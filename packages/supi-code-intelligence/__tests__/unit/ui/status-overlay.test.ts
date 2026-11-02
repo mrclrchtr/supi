@@ -49,7 +49,9 @@ function diagnostic(message: string): Diagnostic {
   };
 }
 function details(file: string, message: string, current = true): CiDiagnosticDetails {
-  return { current, entries: [{ file, diagnostics: [diagnostic(message)] }] };
+  const snapshot = observation([file], current);
+  if (snapshot.kind === "not-requested") throw new Error("Expected diagnostic evidence");
+  return { evidence: snapshot.evidence, entries: [{ file, diagnostics: [diagnostic(message)] }] };
 }
 function deferred<T>() {
   let resolve: (value: T) => void = () => {};
@@ -61,6 +63,7 @@ function deferred<T>() {
 const dialogs: ReturnType<typeof createCiStatusDialog>[] = [];
 afterEach(() => {
   for (const dialog of dialogs.splice(0)) dialog.dispose();
+  vi.useRealTimers();
 });
 function setup(snapshot = data(), overrides: Partial<CiStatusDialogDeps> = {}) {
   const deps = {
@@ -259,6 +262,80 @@ describe("Code intelligence inspector", () => {
     await vi.waitFor(() => expect(onCheck).toHaveBeenCalledOnce());
   });
 
+  it.each([
+    {
+      bindings: { "tui.select.down": "h" as const },
+      hint: "F6 Refresh health",
+      input: "\x1b[17~",
+      calls: 1,
+    },
+    {
+      bindings: { "tui.select.down": "h" as const, "tui.select.up": "f6" as const },
+      hint: "unbound Refresh health",
+      input: "\x1b[17~",
+      calls: 0,
+    },
+  ])("respects configured health shortcuts: $hint", async ({ bindings, hint, input, calls }) => {
+    const onHealth = vi.fn(async () => data());
+    const keybindings = new KeybindingsManager(TUI_KEYBINDINGS, bindings);
+    const { dialog, render, deps } = setup(
+      data({ servers: Array.from({ length: 8 }, () => server) }),
+      { keybindings, onHealth },
+    );
+    deps.tui.terminal.rows = 24;
+    expect(render()).toContain(hint);
+    dialog.handleInput("h");
+    expect(render()).not.toContain("Capabilities");
+    expect(onHealth).not.toHaveBeenCalled();
+    dialog.handleInput(input);
+    expect(onHealth).toHaveBeenCalledTimes(calls);
+  });
+
+  it("shares one action guard and keeps navigation, details and the spinner usable during health refresh", async () => {
+    vi.useFakeTimers();
+    const pending = deferred<CiStatusData>();
+    const onHealth = vi.fn(() => pending.promise);
+    const onCheck = vi.fn(async () => data());
+    const onRefresh = vi.fn(async () => data());
+    const { dialog, deps, render } = setup(data(), {
+      onHealth,
+      onCheck,
+      onRefresh,
+      fetchDetailedDiagnostics: () => details("src/B.ts", "visible during health refresh"),
+    });
+    expect(render()).toContain("h Refresh health");
+    dialog.handleInput("h");
+    const firstFrame = render();
+    const renders = vi.mocked(deps.tui.requestRender).mock.calls.length;
+    await vi.advanceTimersByTimeAsync(80);
+    expect(vi.mocked(deps.tui.requestRender).mock.calls.length).toBeGreaterThan(renders);
+    expect(render()).not.toBe(firstFrame);
+    expect(render()).toContain("refreshing health");
+    dialog.handleInput("r");
+    dialog.handleInput("c");
+    dialog.handleInput("h");
+    expect(onHealth).toHaveBeenCalledOnce();
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(onCheck).not.toHaveBeenCalled();
+    dialog.handleInput("\t");
+    dialog.handleInput("\r");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(render()).toContain("▼ src/B.ts");
+    expect(render()).toContain("visible during health refresh");
+    pending.resolve(data());
+    await vi.advanceTimersByTimeAsync(0);
+    expect(render()).not.toContain("refreshing health");
+    expect(render()).toContain("▼ src/B.ts");
+    const finishedRenders = vi.mocked(deps.tui.requestRender).mock.calls.length;
+    await vi.advanceTimersByTimeAsync(160);
+    expect(deps.tui.requestRender).toHaveBeenCalledTimes(finishedRenders);
+
+    dialog.handleInput("r");
+    dialog.handleInput("h");
+    expect(onRefresh).toHaveBeenCalledOnce();
+    expect(onHealth).toHaveBeenCalledOnce();
+  });
+
   it("does not override scrolling or file selection performed while a check is pending", async () => {
     const first = deferred<CiStatusData>();
     const second = deferred<CiStatusData>();
@@ -366,7 +443,7 @@ describe("Code intelligence inspector", () => {
     expect(dialog.handleInput("\r")).toBe(false);
   });
 
-  it("shows detail failures and stale detail data instead of silently reporting an empty result", async () => {
+  it("shows detail failures and tentative messages without claiming staleness", async () => {
     const fetch = vi
       .fn()
       .mockRejectedValueOnce(new Error("snapshot read failed"))
@@ -377,7 +454,8 @@ describe("Code intelligence inspector", () => {
     dialog.handleInput("a");
     dialog.handleInput("\r");
     await vi.waitFor(() => expect(render()).toContain("old message"));
-    expect(render()).toContain("Diagnostic details are stale");
+    expect(render()).toContain("Details: unconfirmed");
+    expect(render()).not.toContain("stale");
   });
 
   it("matches runtime-relative details to an absolute summary file", async () => {
@@ -417,24 +495,146 @@ describe("Code intelligence inspector", () => {
     expect(render()).toContain("▼ src/B.ts");
   });
 
-  it("discloses stale nonempty diagnostic evidence beside the file list", () => {
+  it("discloses incomplete nonempty diagnostic evidence beside the file list", () => {
     const { render } = setup(data({ diagnostics: observation(files, false) }));
-    expect(render()).toContain("diagnostic snapshot is stale or incomplete");
+    expect(render()).toContain("Diagnostic evidence is incomplete");
+    expect(render()).not.toContain("stale");
     expect(render()).toContain("0/2 confirmed tracked files");
     expect(render()).toContain("src/A.ts");
     expect(render()).not.toContain("no issues");
   });
 
+  it("keeps confirmed clean evidence file-local when another file is unconfirmed", async () => {
+    const snapshot = observation(files, false);
+    if (snapshot.kind === "not-requested") throw new Error("Expected evidence");
+    const evidence = {
+      ...snapshot.evidence,
+      confirmed: 1,
+      unconfirmed: 1,
+      documents: [
+        { file: "src/A.ts", status: "confirmed" as const },
+        { file: "src/B.ts", status: "unconfirmed" as const },
+      ],
+    };
+    const { dialog, render } = setup(data({ diagnostics: { ...snapshot, evidence } }), {
+      fetchDetailedDiagnostics: () => ({
+        evidence,
+        entries: [{ file: "src/A.ts", diagnostics: [diagnostic("confirmed message")] }],
+      }),
+    });
+    dialog.handleInput("\r");
+    await vi.waitFor(() => expect(render()).toContain("confirmed message"));
+    expect(render()).toContain("Details: confirmed");
+    expect(render()).not.toContain("stale");
+    expect(render()).toContain("1/2 confirmed tracked files");
+    expect(render()).toContain("1 unconfirmed");
+  });
+
   it("distinguishes no tracked documents from confirmed clean tracked files", () => {
     const empty = observation([]);
     const unknown = setup(data({ diagnostics: empty })).render();
-    expect(unknown).toContain("No confirmed tracked files");
+    expect(unknown).toContain("No tracked diagnostic evidence.");
     expect(unknown).not.toContain("no issues");
     const clean = setup(
       data({ diagnostics: { ...observation(["src/clean.ts"]), entries: [] } }),
     ).render();
-    expect(clean).toContain("no issues in 1 confirmed tracked files");
+    expect(clean).toContain("no issues in 1 confirmed tracked file");
     expect(clean).toContain("not a workspace-wide check");
+  });
+
+  it.each([
+    {
+      kind: "unavailable" as const,
+      statuses: [],
+      summary: "Diagnostics unavailable",
+      clean: false,
+    },
+    {
+      kind: "partial" as const,
+      statuses: [],
+      summary: "No tracked diagnostic evidence.",
+      clean: false,
+    },
+    {
+      kind: "completed" as const,
+      statuses: ["confirmed" as const],
+      summary: "no issues in 1 confirmed tracked file",
+      clean: true,
+    },
+    {
+      kind: "partial" as const,
+      statuses: ["unconfirmed" as const],
+      summary: "Diagnostic evidence is incomplete",
+      clean: false,
+    },
+    {
+      kind: "partial" as const,
+      statuses: ["failed" as const],
+      summary: "Diagnostic evidence is incomplete",
+      clean: false,
+    },
+    {
+      kind: "completed" as const,
+      statuses: ["removed" as const],
+      summary: "Diagnostic evidence is incomplete",
+      clean: false,
+    },
+    {
+      kind: "completed" as const,
+      statuses: ["confirmed" as const, "removed" as const],
+      summary: "Diagnostic evidence is incomplete",
+      clean: false,
+    },
+    {
+      kind: "partial" as const,
+      statuses: [
+        "confirmed" as const,
+        "unconfirmed" as const,
+        "failed" as const,
+        "removed" as const,
+      ],
+      summary: "Diagnostic evidence is incomplete",
+      clean: false,
+    },
+  ])(
+    "bounds summary claims for $kind evidence: $statuses",
+    ({ kind, statuses, summary, clean }) => {
+      const documents = statuses.map((status, i) => ({ file: `src/file-${i}.ts`, status }));
+      const evidence = {
+        requested: documents.length,
+        confirmed: statuses.filter((status) => status === "confirmed").length,
+        unconfirmed: statuses.filter((status) => status === "unconfirmed").length,
+        failed: statuses.filter((status) => status === "failed").length,
+        removed: statuses.filter((status) => status === "removed").length,
+        documents,
+      };
+      const { render } = setup(
+        data({
+          diagnostics: {
+            kind,
+            entries: [],
+            scope: { kind: "tracked-files", filter: null },
+            evidence,
+            reason: "Request evidence is not available for every file.",
+          },
+        }),
+      );
+      expect(render()).toContain(summary);
+      expect(render().includes("✓ no issues")).toBe(clean);
+      expect(render()).not.toContain("stale");
+      for (const document of documents) expect(render()).toContain(document.file);
+      if (statuses.length === 4) {
+        expect(render()).toContain(
+          "1/4 confirmed tracked files · 1 unconfirmed · 1 failed · 1 removed",
+        );
+      }
+    },
+  );
+
+  it("reports confirmed problems even when every requested file is confirmed", () => {
+    const { render } = setup();
+    expect(render()).toContain("Errors or warnings reported in 2 confirmed tracked files");
+    expect(render()).not.toContain("✓ no issues");
   });
 
   it("preserves disabled capability state and does not infer refactor support from provider presence", () => {

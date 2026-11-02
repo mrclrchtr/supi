@@ -4,7 +4,11 @@ import { type AutomaticLspPathPolicy, getWorkspaceLspRuntime } from "@mrclrchtr/
 import type { CapabilityWarningMissingServerSource } from "../analysis/capability/capability-warnings.ts";
 import { checkWorkspaceDiagnostics } from "../analysis/health/check.ts";
 import { observeWorkspaceStatus } from "../analysis/health/status.ts";
+import type { WorkspaceCodeIntelligenceSession } from "../session/session.ts";
+import { throwIfAborted } from "../session/workflow-control.ts";
+import { DEFAULT_WORKFLOW_DEADLINE_MS } from "../tool/infra/workflow-control.ts";
 import { type CiStatusDialog, createCiStatusDialog } from "./status-overlay.ts";
+import { CiHealthRefreshError, presentHealthRefresh } from "./status-presentation.ts";
 
 /** Owned LSP facts used by the passive status warning collector. */
 export interface CiStatusWarningSource {
@@ -54,6 +58,7 @@ export function registerCiStatusCommand(
   pi: ExtensionAPI,
   homeDir?: string,
   warningSource?: CiStatusWarningSource,
+  getSession?: (ctx: ExtensionContext) => Pick<WorkspaceCodeIntelligenceSession, "health">,
 ): void {
   let interaction: StatusInteraction | undefined;
   const close = () => {
@@ -66,7 +71,8 @@ export function registerCiStatusCommand(
   pi.on("session_start", close);
 
   pi.registerCommand("supi-ci-status", {
-    description: "Toggle the code intelligence inspector (passive health snapshot)",
+    description:
+      "Toggle diagnostic evidence inspector with explicit check and health refresh actions",
     handler: async (_args, ctx) => {
       if (ctx.mode !== "tui") {
         ctx.ui.notify(
@@ -95,9 +101,38 @@ export function registerCiStatusCommand(
             offset: checkOffset,
             control: { signal, deadline: Date.now() + 30_000 },
           });
+          throwIfAborted({ signal });
           const snapshot = await observe();
           checkOffset = diagnosticCheck.nextOffset;
           return { ...snapshot, diagnosticCheck };
+        } finally {
+          pi.events.emit("supi:working:end", { source: "supi-code-intelligence" });
+        }
+      };
+      const refreshHealth = async (signal: AbortSignal) => {
+        const startedAt = Date.now();
+        const control = { signal, deadline: startedAt + DEFAULT_WORKFLOW_DEADLINE_MS };
+        let stage = "health workflow";
+        let healthRefresh: readonly string[] | undefined;
+        pi.events.emit("supi:working:start", { source: "supi-code-intelligence" });
+        try {
+          if (!getSession) throw new Error("Session health workflow is unavailable");
+          const outcome = await getSession(ctx).health(
+            { refresh: true, include: ["diagnostics", "servers"] },
+            control,
+          );
+          throwIfAborted(control);
+          healthRefresh = presentHealthRefresh(outcome, Date.now() - startedAt);
+          stage = "passive snapshot";
+          const snapshot = await observe();
+          throwIfAborted(control);
+          return { ...snapshot, healthRefresh };
+        } catch (error) {
+          throw new CiHealthRefreshError(stage, {
+            cause: error,
+            elapsedMs: Date.now() - startedAt,
+            healthRefresh,
+          });
         } finally {
           pi.events.emit("supi:working:end", { source: "supi-code-intelligence" });
         }
@@ -115,6 +150,7 @@ export function registerCiStatusCommand(
               done: current.close,
               onRefresh: observe,
               onCheck: check,
+              onHealth: refreshHealth,
               fetchDetailedDiagnostics: () => readDiagnosticDetails(ctx.cwd),
             });
             current.dialog = dialog;

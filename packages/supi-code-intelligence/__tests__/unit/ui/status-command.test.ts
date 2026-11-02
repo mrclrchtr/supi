@@ -17,6 +17,13 @@ import {
 } from "@mrclrchtr/supi-lsp/api";
 import { createPiMock, getHandlerOrThrow, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import codeIntelligenceExtension from "../../../src/extension.ts";
+import type {
+  HealthData,
+  HealthRefreshState,
+  HealthWorkflowOutcome,
+} from "../../../src/session/health-types.ts";
+import { WorkspaceCodeIntelligenceSession } from "../../../src/session/session.ts";
 import { registerCiStatusCommand } from "../../../src/ui/status-command.ts";
 import type { CiStatusDialog } from "../../../src/ui/status-overlay.ts";
 
@@ -30,6 +37,7 @@ afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
   getDefaultWorkspaceRuntime().clearAll();
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 const evidence = {
@@ -40,6 +48,48 @@ const evidence = {
   removed: 0,
   documents: [{ file: "src/warn.ts", status: "confirmed" as const }],
 };
+
+function healthOutcome(
+  refresh?: HealthRefreshState,
+): Extract<HealthWorkflowOutcome, { kind: "completed" }> {
+  const historicalEvidence = {
+    ...evidence,
+    documents: [{ file: "src/historical.ts", status: "confirmed" as const }],
+  };
+  const data: HealthData = {
+    includedSections: ["diagnostics", "servers"],
+    semanticState: { kind: "ready" },
+    serverInventoryAvailable: true,
+    diagnostics: {
+      kind: "completed",
+      scope: { kind: "tracked-files", filter: null },
+      entries: [{ file: "src/historical.ts", errors: 99, warnings: 0 }],
+      evidence: historicalEvidence,
+    },
+    servers: [],
+    level: "summary",
+    refresh: refresh ?? {
+      kind: "completed",
+      attemptedAt: 0,
+      elapsedMs: 100,
+      requestedDiagnosticScope: { kind: "tracked-files", filter: null },
+      operationScope: "workspace-runtime",
+      attemptedActiveClients: 1,
+      restartedClients: 0,
+      diagnosticEvidence: historicalEvidence,
+      processCrashRecovery: {
+        recoveredRoutes: 0,
+        skippedRoutes: 0,
+        failedRoutes: 0,
+        exhaustedRoutes: 0,
+        entries: [],
+        omittedEntries: 0,
+      },
+      staleAssessment: { scope: "workspace", suspected: false, matchedFileCount: 0, warning: null },
+    },
+  };
+  return { kind: "completed", data };
+}
 
 function readyRuntime() {
   const runtime = {
@@ -117,7 +167,14 @@ function checkableRuntime(files = ["/project/src/clean.ts"]) {
   });
 }
 
-async function openStatus(options: { cwd?: string; homeDir?: string } = {}) {
+async function openStatus(
+  options: {
+    cwd?: string;
+    homeDir?: string;
+    session?: Pick<WorkspaceCodeIntelligenceSession, "health">;
+    extensionSession?: WorkspaceCodeIntelligenceSession;
+  } = {},
+) {
   const pi = createPiMock();
   pi.setActiveTools(["code_graph", "code_health", "read"]);
   const ctx = makeCtx({ cwd: options.cwd ?? "/project", isProjectTrusted: () => true });
@@ -125,20 +182,29 @@ async function openStatus(options: { cwd?: string; homeDir?: string } = {}) {
   Object.assign(ctx.ui, { setFooter });
   let dialog: CiStatusDialog | undefined;
   let close: () => void = () => {};
+  const requestRender = vi.fn();
   vi.mocked(ctx.ui.custom).mockImplementation(
     (...args: unknown[]) =>
       new Promise((resolve) => {
         const factory = args[0] as (...args: unknown[]) => CiStatusDialog;
         close = () => resolve(undefined);
         dialog = factory(
-          { terminal: { rows: 200 }, requestRender: vi.fn() },
+          { terminal: { rows: 200 }, requestRender },
           ctx.ui.theme,
           undefined,
           close,
         );
       }),
   );
-  registerCiStatusCommand(pi as never, options.homeDir);
+  if (options.extensionSession) {
+    const session = options.extensionSession;
+    codeIntelligenceExtension(pi as never, () => session, options.homeDir);
+  } else {
+    registerCiStatusCommand(pi as never, options.homeDir, undefined, () => {
+      if (!options.session) throw new Error("No test health session");
+      return options.session;
+    });
+  }
   const command = pi.getCommandHandler("supi-ci-status") as (
     args: string,
     context: ReturnType<typeof makeCtx>,
@@ -158,11 +224,268 @@ async function openStatus(options: { cwd?: string; homeDir?: string } = {}) {
     dialog: opened,
     close: () => close(),
     setFooter,
+    requestRender,
     render: () => opened.render(120).join("\n"),
   };
 }
 
 describe("/supi-ci-status command", () => {
+  it("refreshes health once with caller controls, then observes current evidence passively", async () => {
+    const runtime = readyRuntime();
+    const health = vi.fn<WorkspaceCodeIntelligenceSession["health"]>(async () => {
+      // The later passive view, not the health call's earlier observation, owns evidence.
+      runtime.getWorkspaceDiagnosticSummary.mockReturnValue({
+        current: true,
+        evidence: { ...evidence, requested: 0, confirmed: 0, documents: [] },
+        entries: [],
+      });
+      return { kind: "unavailable", reason: "Health refresh is unavailable here" };
+    });
+    const status = await openStatus({ session: { health } });
+    expect(health).not.toHaveBeenCalled();
+    const before = Date.now();
+    const reads = runtime.getWorkspaceDiagnosticSummary.mock.calls.length;
+    status.dialog.handleInput("h");
+    status.dialog.handleInput("h");
+    await vi.waitFor(() => expect(status.render()).toContain("Health refresh is unavailable here"));
+    expect(health).toHaveBeenCalledOnce();
+    expect(health).toHaveBeenCalledWith(
+      { refresh: true, include: ["diagnostics", "servers"] },
+      { signal: expect.any(AbortSignal), deadline: expect.any(Number) },
+    );
+    const control = vi.mocked(health).mock.calls[0]?.[1];
+    expect(control?.deadline).toBeGreaterThanOrEqual(before + 60_000);
+    expect(control?.deadline).toBeLessThanOrEqual(Date.now() + 60_000);
+    expect(runtime.getWorkspaceDiagnosticSummary).toHaveBeenCalledTimes(reads + 1);
+    expect(status.render()).toContain("No tracked diagnostic evidence.");
+    expect(status.render()).not.toContain("src/warn.ts");
+  });
+
+  it("uses the extension's session workflow without copying historical health evidence into the view", async () => {
+    const runtime = readyRuntime();
+    const session = new WorkspaceCodeIntelligenceSession("/project");
+    const health = vi.spyOn(session, "health").mockResolvedValue(healthOutcome());
+    const status = await openStatus({ extensionSession: session });
+    status.dialog.handleInput("h");
+    await vi.waitFor(() => expect(status.render()).toContain("Refresh health: completed"));
+    expect(health).toHaveBeenCalledOnce();
+    expect(status.render()).toMatch(/Refresh health: completed \(\d+\.\ds\)/);
+    expect(status.render()).toContain("Action completion is not diagnostic confirmation");
+    expect(status.render()).toContain("1/1 confirmed tracked files");
+    expect(status.render()).toContain("src/warn.ts");
+    expect(status.render()).toContain("typescript: ready");
+    expect(status.render()).not.toContain("src/historical.ts");
+    expect(status.render()).not.toContain("99 errors");
+    expect(status.render()).not.toContain("restarted");
+    expect(runtime.getWorkspaceDiagnosticSummary).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows relevant route outcomes and limited source discovery separately from current evidence", async () => {
+    readyRuntime();
+    const outcome = healthOutcome();
+    if (outcome.data.refresh.kind !== "completed") throw new Error("Expected refresh fixture");
+    const health = vi.fn<WorkspaceCodeIntelligenceSession["health"]>().mockResolvedValue(
+      healthOutcome({
+        ...outcome.data.refresh,
+        processCrashRecovery: {
+          recoveredRoutes: 0,
+          skippedRoutes: 0,
+          failedRoutes: 0,
+          exhaustedRoutes: 1,
+          entries: [
+            {
+              name: "python",
+              root: "backend",
+              outcome: "recovery-exhausted",
+              nextAction: "refresh",
+            },
+          ],
+          omittedEntries: 0,
+        },
+        startupRetry: {
+          recoveredRoutes: 0,
+          failedRoutes: 1,
+          entries: [
+            {
+              name: "rust",
+              root: "engine",
+              outcome: "retry-failed",
+              nextAction: "refresh",
+              failureMessage: "launch failed",
+            },
+          ],
+          omittedEntries: 0,
+        },
+        sourceTracking: {
+          status: "limited",
+          reason: "file-limit",
+          observedFileCount: 50_001,
+          discovered: [],
+          tracked: [],
+          skipped: [],
+          unavailable: [],
+          deferred: 4,
+        },
+      }),
+    );
+    const status = await openStatus({ session: { health } });
+    status.dialog.handleInput("h");
+    await vi.waitFor(() => expect(status.render()).toContain("Refresh health: completed"));
+    const rendered = status.render().replace(/\s+/g, " ");
+    expect(rendered).toContain("python @ backend: recovery exhausted; next: refresh");
+    expect(rendered).toContain("rust @ engine: retry failed; next: refresh; launch failed");
+    expect(status.render()).toContain("source discovery: limited (file-limit)");
+    expect(status.render()).toContain("50001 source files observed");
+    expect(status.render()).toContain("4 deferred");
+    expect(status.render()).toContain("1/1 confirmed tracked files");
+  });
+
+  it.each(["health workflow", "passive snapshot"])(
+    "preserves the prior coherent view when %s fails",
+    async (stage) => {
+      const runtime = readyRuntime();
+      const health = vi.fn<WorkspaceCodeIntelligenceSession["health"]>(async () => {
+        if (stage === "health workflow") throw new Error("workflow rejected");
+        runtime.getProjectServers.mockImplementationOnce(() => {
+          throw new Error("snapshot rejected");
+        });
+        return healthOutcome();
+      });
+      const status = await openStatus({ session: { health } });
+      const reads = runtime.getWorkspaceDiagnosticSummary.mock.calls.length;
+      const working = vi.spyOn(status.pi.events, "emit");
+      status.dialog.handleInput("h");
+      await vi.waitFor(() => expect(status.render()).toContain(`Refresh health failed: ${stage}:`));
+      expect(status.render()).toContain("src/warn.ts");
+      expect(status.render()).toContain("typescript: ready");
+      expect(status.render()).not.toContain("src/historical.ts");
+      expect(status.render()).toMatch(/\d+\.\ds elapsed/);
+      if (stage === "passive snapshot")
+        expect(status.render()).toContain("Action completion is not diagnostic confirmation");
+      expect(runtime.getWorkspaceDiagnosticSummary).toHaveBeenCalledTimes(reads);
+      expect(working).toHaveBeenCalledWith("supi:working:end", {
+        source: "supi-code-intelligence",
+      });
+      health.mockResolvedValue(healthOutcome());
+      status.dialog.handleInput("h");
+      await vi.waitFor(() => expect(status.render()).toContain("Refresh health: completed"));
+      expect(status.render()).not.toContain("Refresh health failed:");
+      health.mockRejectedValueOnce(new Error("later workflow failure"));
+      status.dialog.handleInput("h");
+      await vi.waitFor(() => expect(status.render()).toContain("later workflow failure"));
+      expect(status.render()).not.toContain("Refresh health: completed");
+    },
+  );
+
+  it("still collects one passive view after a normally returned failed maintenance attempt", async () => {
+    const runtime = readyRuntime();
+    const health = vi.fn<WorkspaceCodeIntelligenceSession["health"]>().mockResolvedValue(
+      healthOutcome({
+        kind: "failed",
+        attemptedAt: 0,
+        elapsedMs: 20,
+        requestedDiagnosticScope: { kind: "tracked-files", filter: null },
+        operationScope: "workspace-runtime",
+        reason: "maintenance failed",
+      }),
+    );
+    const status = await openStatus({ session: { health } });
+    status.dialog.handleInput("h");
+    await vi.waitFor(() => expect(status.render()).toContain("maintenance failed"));
+    expect(status.render()).toContain("Refresh health: failed");
+    expect(runtime.getWorkspaceDiagnosticSummary).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports an unavailable refresh without presenting the session's historical attempt", async () => {
+    readyRuntime();
+    const previous = healthOutcome().data.refresh;
+    if (previous.kind !== "completed") throw new Error("Expected refresh fixture");
+    const health = vi.fn<WorkspaceCodeIntelligenceSession["health"]>().mockResolvedValue(
+      healthOutcome({
+        kind: "not-attempted",
+        reason: "Runtime disabled",
+        lastAttempt: previous,
+      }),
+    );
+    const status = await openStatus({ session: { health } });
+    status.dialog.handleInput("h");
+    await vi.waitFor(() => expect(status.render()).toContain("Refresh health: unavailable"));
+    expect(status.render()).toContain("Runtime disabled");
+    expect(status.render()).not.toContain("src/historical.ts");
+    expect(status.render()).not.toContain("Refresh health: completed");
+  });
+
+  it.each(["escape", "toggle", "session_start", "session_shutdown"])(
+    "aborts on %s and ignores late workflow results without collecting a snapshot",
+    async (close) => {
+      const runtime = readyRuntime();
+      let finish: (outcome: HealthWorkflowOutcome) => void = () => {};
+      const health = vi.fn<WorkspaceCodeIntelligenceSession["health"]>(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const status = await openStatus({ session: { health } });
+      const working = vi.spyOn(status.pi.events, "emit");
+      const reads = runtime.getWorkspaceDiagnosticSummary.mock.calls.length;
+      status.dialog.handleInput("h");
+      const control = health.mock.calls[0]?.[1];
+      expect(control?.signal?.aborted).toBe(false);
+      if (close === "escape") status.dialog.handleInput("\x1b");
+      else if (close === "toggle") await status.command("", status.ctx);
+      else await getHandlerOrThrow(status.pi, close)({}, status.ctx);
+      await status.pending;
+      const renders = status.requestRender.mock.calls.length;
+      expect(control?.signal?.aborted).toBe(true);
+      finish(healthOutcome());
+      await flushInputFrame();
+      expect(runtime.getWorkspaceDiagnosticSummary).toHaveBeenCalledTimes(reads);
+      expect(status.requestRender).toHaveBeenCalledTimes(renders);
+      expect(working).toHaveBeenCalledWith("supi:working:end", {
+        source: "supi-code-intelligence",
+      });
+    },
+  );
+
+  it("applies the 60-second caller deadline before starting the post-health snapshot", async () => {
+    const runtime = readyRuntime();
+    const clock = vi.spyOn(Date, "now");
+    const health = vi.fn<WorkspaceCodeIntelligenceSession["health"]>(async (_input, control) => {
+      if (!control?.deadline) throw new Error("Missing caller deadline");
+      clock.mockReturnValue(control.deadline + 1);
+      return healthOutcome();
+    });
+    const status = await openStatus({ session: { health } });
+    const reads = runtime.getWorkspaceDiagnosticSummary.mock.calls.length;
+    status.dialog.handleInput("h");
+    await flushInputFrame();
+    expect(status.render()).toContain("Refresh health failed: health workflow:");
+    expect(status.render()).toContain("src/warn.ts");
+    expect(runtime.getWorkspaceDiagnosticSummary).toHaveBeenCalledTimes(reads);
+  });
+
+  it("keeps opening, rendering, details and reload passive", async () => {
+    const runtime = checkableRuntime();
+    runtime.getWorkspaceDiagnosticSummary.mockReturnValue({
+      current: true,
+      evidence,
+      entries: [{ file: "src/warn.ts", errors: 0, warnings: 1 }],
+    });
+    const health = vi.fn<WorkspaceCodeIntelligenceSession["health"]>();
+    const status = await openStatus({ session: { health } });
+    status.render();
+    status.dialog.handleInput("\r");
+    await vi.waitFor(() => expect(status.render()).toContain("Details: confirmed"));
+    expect(runtime.getOutstandingDiagnostics).toHaveBeenCalledOnce();
+    status.dialog.handleInput("r");
+    await vi.waitFor(() => expect(status.render()).not.toContain("reloading"));
+    expect(health).not.toHaveBeenCalled();
+    expect(runtime.scanWorkspaceSources).not.toHaveBeenCalled();
+    expect(runtime.bulkTrackFiles).not.toHaveBeenCalled();
+    expect(runtime.fileDiagnostics).not.toHaveBeenCalled();
+  });
+
   it("checks existing source files explicitly and displays clean filenames without making reload active", async () => {
     const runtime = checkableRuntime();
     const status = await openStatus();

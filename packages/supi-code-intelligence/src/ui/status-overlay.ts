@@ -12,7 +12,11 @@ import {
   truncateToWidth,
 } from "@earendil-works/pi-tui";
 import { BRAILLE_SPINNER_FRAMES } from "@mrclrchtr/supi-core/spinner-frames";
-import type { Diagnostic, ProjectServerInfo } from "@mrclrchtr/supi-lsp/api";
+import type {
+  Diagnostic,
+  DiagnosticEvidenceSummary,
+  ProjectServerInfo,
+} from "@mrclrchtr/supi-lsp/api";
 import type {
   DiagnosticCheckFile,
   WorkspaceDiagnosticCheckReport,
@@ -26,16 +30,23 @@ import {
 import type { WorkspaceStatusSnapshot } from "../analysis/health/status.ts";
 import type { HealthDiagnosticEntry } from "../session/health-types.ts";
 import { diagnosticMessageString } from "../substrate/lsp/utils.ts";
+import {
+  CiHealthRefreshError,
+  presentDiagnosticDetails,
+  presentDiagnosticEvidence,
+} from "./status-presentation.ts";
 
 /** Passive health facts plus the session's active tool surface. */
 export interface CiStatusData extends WorkspaceStatusSnapshot {
   readonly activeTools: readonly string[];
   readonly diagnosticCheck?: WorkspaceDiagnosticCheckReport;
+  /** Compact outcome of the latest health action, never a source of current evidence. */
+  readonly healthRefresh?: readonly string[];
 }
 
-/** Full error/warning messages retain freshness independently from the summary. */
+/** Full messages and file-specific evidence from one passive diagnostic snapshot. */
 export interface CiDiagnosticDetails {
-  readonly current: boolean;
+  readonly evidence: DiagnosticEvidenceSummary;
   readonly entries: readonly {
     readonly file: string;
     readonly diagnostics: readonly Diagnostic[];
@@ -51,17 +62,23 @@ export interface CiStatusDialogDeps {
   fetchDetailedDiagnostics?: () => CiDiagnosticDetails | Promise<CiDiagnosticDetails>;
   onRefresh?: (signal: AbortSignal) => Promise<CiStatusData>;
   onCheck?: (signal: AbortSignal) => Promise<CiStatusData>;
+  onHealth?: (signal: AbortSignal) => Promise<CiStatusData>;
 }
 
 type DiagnosticFile = DiagnosticCheckFile & HealthDiagnosticEntry;
 
 type DetailState =
   | { kind: "loading" }
-  | { kind: "ready"; diagnostics: readonly Diagnostic[]; current: boolean }
+  | { kind: "ready"; diagnostics: readonly Diagnostic[]; evidenceLabel: string }
   | { kind: "error"; message: string };
 const MAX_INLINE_MESSAGES = 5;
 const MAX_OPEN_FILES_SHOWN = 3;
 const FRAME_ROWS = 6;
+const ACTION_LABELS = {
+  reload: { name: "Reload", progress: "reloading" },
+  check: { name: "Check", progress: "checking" },
+  health: { name: "Refresh health", progress: "refreshing health" },
+};
 const STATUS_ACTIONS = [
   "tui.select.cancel",
   "tui.select.up",
@@ -82,7 +99,8 @@ export class CiStatusDialog {
   private refreshGeneration = 0;
   private refreshing = false;
   private refreshError: string | undefined;
-  private refreshAction: "reload" | "check" = "reload";
+  private healthRefresh: readonly string[] | undefined;
+  private refreshAction: "reload" | "check" | "health" = "reload";
   private refreshController: AbortController | undefined;
   private disposed = false;
   private spinner: ReturnType<typeof setInterval> | undefined;
@@ -105,6 +123,7 @@ export class CiStatusDialog {
     private readonly deps: CiStatusDialogDeps,
   ) {
     this.files = diagnosticFiles(data);
+    this.healthRefresh = data.healthRefresh;
     this.selectedFile = this.files[0]?.file;
     this.keybindings = deps.keybindings ?? getKeybindings();
   }
@@ -179,19 +198,23 @@ export class CiStatusDialog {
     return (
       this.handleScrollInput(input) ||
       this.handleFileInput(input) ||
+      this.handleDiagnosticActionInput(input) ||
       this.handleShortcutInput(input)
     );
   }
 
+  private handleDiagnosticActionInput(input: string): boolean {
+    if (this.hasConfiguredAction(input)) return false;
+    let action: "check" | "health";
+    if (input === "c" || matchesKey(input, "f5")) action = "check";
+    else if (input === "h" || matchesKey(input, "f6")) action = "health";
+    else return false;
+    if (!(action === "check" ? this.deps.onCheck : this.deps.onHealth)) return false;
+    void this.reload(action);
+    return true;
+  }
+
   private handleShortcutInput(input: string): boolean {
-    if (
-      this.deps.onCheck &&
-      (input === "c" || matchesKey(input, "f5")) &&
-      !this.hasConfiguredAction(input)
-    ) {
-      void this.reload(true);
-      return true;
-    }
     if (input === "r" && this.deps.onRefresh) {
       void this.reload();
       return true;
@@ -292,7 +315,7 @@ export class CiStatusDialog {
       this.details = {
         kind: "ready",
         diagnostics: entry?.diagnostics ?? [],
-        current: result.current,
+        evidenceLabel: presentDiagnosticDetails(result.evidence, this.data.workspaceRoot, file),
       };
     } catch (error) {
       if (this.disposed || generation !== this.detailGeneration) return;
@@ -301,24 +324,30 @@ export class CiStatusDialog {
     if (!this.disposed && generation === this.detailGeneration) this.changed();
   }
 
-  private async reload(check = false): Promise<void> {
-    const collect = check ? this.deps.onCheck : this.deps.onRefresh;
+  private async reload(action: "reload" | "check" | "health" = "reload"): Promise<void> {
+    const collect = {
+      check: this.deps.onCheck,
+      health: this.deps.onHealth,
+      reload: this.deps.onRefresh,
+    }[action];
     if (this.refreshing || !collect) return;
     const generation = ++this.refreshGeneration;
     const navigation = this.navigationGeneration;
     this.refreshController = new AbortController();
-    this.refreshAction = check ? "check" : "reload";
+    this.refreshAction = action;
     this.refreshing = true;
     this.refreshError = undefined;
+    this.healthRefresh = undefined;
     this.collapse();
     this.changed();
     try {
       const data = await collect(this.refreshController.signal);
       if (this.disposed || generation !== this.refreshGeneration) return;
-      this.acceptSnapshot(data, check && navigation === this.navigationGeneration);
+      this.acceptSnapshot(data, action === "check" && navigation === this.navigationGeneration);
     } catch (error) {
       if (this.disposed || generation !== this.refreshGeneration) return;
       this.refreshError = errorText(error);
+      if (error instanceof CiHealthRefreshError) this.healthRefresh = error.healthRefresh;
     }
     if (!this.disposed && generation === this.refreshGeneration) {
       this.refreshing = false;
@@ -329,6 +358,7 @@ export class CiStatusDialog {
 
   private acceptSnapshot(data: CiStatusData, check: boolean): void {
     this.data = data;
+    this.healthRefresh = data.healthRefresh;
     this.files = diagnosticFiles(data);
     if (!this.files.some((entry) => entry.file === this.selectedFile))
       this.selectedFile = this.files[0]?.file;
@@ -399,10 +429,7 @@ export class CiStatusDialog {
       counts.unavailable ? t.fg("warning", `${counts.unavailable} routes unavailable`) : "",
       this.data.diagnostics.kind === "partial" ? t.fg("warning", "partial snapshot") : "",
       this.refreshing
-        ? t.fg(
-            "accent",
-            `${this.frame()} ${this.refreshAction === "check" ? "checking" : "reloading"}…`,
-          )
+        ? t.fg("accent", `${this.frame()} ${ACTION_LABELS[this.refreshAction].progress}…`)
         : "",
     ]
       .filter(Boolean)
@@ -417,6 +444,11 @@ export class CiStatusDialog {
     heading("Capabilities");
     this.addCapabilities(text);
     body.addChild(new Spacer(1));
+    if (this.healthRefresh) {
+      heading("Health action outcome");
+      for (const line of this.healthRefresh) text(`  ${line}`);
+      body.addChild(new Spacer(1));
+    }
     heading("Diagnostic files · tracked-file snapshot (not a workspace-wide check)");
     this.addProblems(body, width, text);
     body.addChild(new Spacer(1));
@@ -480,11 +512,7 @@ export class CiStatusDialog {
     ).replaceAll("\\", "/");
     const counts = problemCounts(entry);
     const status =
-      entry.status === "confirmed" && this.data.diagnostics.kind === "completed"
-        ? counts
-          ? ""
-          : "no errors or warnings (confirmed)"
-        : entry.status;
+      entry.status === "confirmed" && !counts ? "no errors or warnings (confirmed)" : entry.status;
     text(`${indicator} ${label}  ${[counts, status, entry.reason].filter(Boolean).join(" · ")}`);
     if (entry.file === this.selectedFile)
       this.expandedRows = body.render(width).length - this.selectedRow;
@@ -521,29 +549,10 @@ export class CiStatusDialog {
   }
 
   private addDiagnosticEvidence(text: (value: string) => void): void {
-    const observation = this.data.diagnostics;
+    const presentation = presentDiagnosticEvidence(this.data.diagnostics);
     const t = this.deps.theme;
-    if (observation.kind === "not-requested") return;
-    const evidence = observation.evidence;
-    text(
-      t.fg(
-        "dim",
-        `  ${evidence.confirmed}/${evidence.requested} confirmed tracked files · ${evidence.unconfirmed} unconfirmed · ${evidence.failed} failed · ${evidence.removed} removed`,
-      ),
-    );
-    if (observation.kind === "unavailable")
-      text(t.fg("warning", `  diagnostics unavailable — ${observation.reason}`));
-    else if (observation.kind === "partial")
-      text(t.fg("warning", `  diagnostic snapshot is stale or incomplete — ${observation.reason}`));
-    else if (evidence.confirmed === 0)
-      text(
-        t.fg(
-          "dim",
-          `  No confirmed tracked files; an empty result does not establish a clean workspace.${this.deps.onCheck ? ` Use ${this.checkShortcut()?.label ?? "the check action"} to check diagnostics.` : ""}`,
-        ),
-      );
-    else if (!observation.entries.length)
-      text(t.fg("success", `  ✓ no issues in ${evidence.confirmed} confirmed tracked files`));
+    if (presentation.counts) text(t.fg("dim", `  ${presentation.counts}`));
+    text(t.fg(presentation.tone, `  ${presentation.summary}`));
   }
 
   private addDetails(text: (value: string) => void): void {
@@ -558,7 +567,7 @@ export class CiStatusDialog {
       text(t.fg("error", `    Details unavailable: ${details.message}`));
       return;
     }
-    if (!details.current) text(t.fg("warning", "    Diagnostic details are stale"));
+    text(t.fg("dim", `    Details: ${details.evidenceLabel}`));
     if (!details.diagnostics.length)
       text(t.fg("dim", "    No error or warning messages in this snapshot"));
     for (const diagnostic of details.diagnostics.slice(0, MAX_INLINE_MESSAGES)) {
@@ -633,8 +642,17 @@ export class CiStatusDialog {
     ).find(({ input }) => !this.hasConfiguredAction(input));
   }
 
+  private healthShortcut() {
+    return (
+      [
+        { input: "h", label: "h" },
+        { input: "\x1b[17~", label: "F6" },
+      ] as const
+    ).find(({ input }) => !this.hasConfiguredAction(input));
+  }
+
   private refreshFailure(): string {
-    return `${this.refreshAction === "check" ? "Check" : "Reload"} failed: ${this.refreshError}`;
+    return `${ACTION_LABELS[this.refreshAction].name} failed: ${this.refreshError}`;
   }
 
   private controlHints(): string {
@@ -642,6 +660,7 @@ export class CiStatusDialog {
     return [
       `${this.keyLabel("tui.select.cancel")} close`,
       this.deps.onCheck ? `${checkKey?.label ?? "unbound"} check` : "",
+      this.deps.onHealth ? `${this.healthShortcut()?.label ?? "unbound"} Refresh health` : "",
       `${this.keyLabel("tui.select.confirm")} expand`,
       this.deps.onRefresh && !this.hasConfiguredAction("r") ? "r reload" : "",
       !this.hasConfiguredAction("a") ? "a collapse" : "",

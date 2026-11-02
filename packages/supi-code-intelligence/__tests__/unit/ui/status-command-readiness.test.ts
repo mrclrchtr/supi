@@ -76,7 +76,7 @@ describe("/supi-ci-status readiness evidence", () => {
 
     expect(getOutstandingDiagnosticSummary).not.toHaveBeenCalled();
     expect(rendered).toContain("routes may start lazily");
-    expect(rendered).toContain("diagnostics unavailable");
+    expect(rendered).toMatch(/diagnostics unavailable/i);
     expect(rendered).not.toContain("✓ no issues");
   });
 });

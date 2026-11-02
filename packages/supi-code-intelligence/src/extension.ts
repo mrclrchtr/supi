@@ -47,7 +47,7 @@ export default function codeIntelligenceExtension(
   );
   registerWorkspaceRecoveryHandler(pi, lspState);
 
-  registerCodeIntelligenceTools(pi, (cwd) => {
+  const resolveSession = (cwd: string) => {
     const session = getOrCreateSession?.(cwd) ?? app.getSession(cwd) ?? app.createSession(cwd);
     const lease = lspState.providerLease;
     if (lease?.cwd === cwd) {
@@ -56,17 +56,23 @@ export default function codeIntelligenceExtension(
     }
     session.setHomeDir(homeDir);
     return session;
-  });
+  };
+  registerCodeIntelligenceTools(pi, resolveSession);
 
-  registerCiStatusCommand(pi, homeDir, {
-    get: (cwd) =>
-      lspState.providerLease?.cwd === cwd
-        ? {
-            lspController: lspState.controller,
-            automaticPathPolicy: lspState.providerLease.automaticPathPolicy,
-          }
-        : { lspController: null, automaticPathPolicy: null },
-  });
+  registerCiStatusCommand(
+    pi,
+    homeDir,
+    {
+      get: (cwd) =>
+        lspState.providerLease?.cwd === cwd
+          ? {
+              lspController: lspState.controller,
+              automaticPathPolicy: lspState.providerLease.automaticPathPolicy,
+            }
+          : { lspController: null, automaticPathPolicy: null },
+    },
+    (ctx) => resolveSession(ctx.cwd),
+  );
   const lspFooter = registerLspFooterContribution(pi, lspState);
 
   pi.on("session_shutdown", () => {
