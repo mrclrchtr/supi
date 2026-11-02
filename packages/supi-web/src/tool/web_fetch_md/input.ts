@@ -5,7 +5,6 @@
 // execute binding, and a spec <-> execute cycle would risk undefined
 // bindings depending on module evaluation order.
 
-import { StringEnum } from "@earendil-works/pi-ai";
 import type { Static } from "typebox";
 import { Type } from "typebox";
 import { FETCH_TIMEOUT_MAX_MS } from "../../fetch.ts";
@@ -18,7 +17,8 @@ export type WebFetchOutputMode = (typeof WEB_FETCH_OUTPUT_MODES)[number];
 export const WEB_FETCH_MODES = ["direct", "firecrawl_fallback", "firecrawl"] as const;
 export type WebFetchMode = (typeof WEB_FETCH_MODES)[number];
 
-const OutputModeEnum = StringEnum(WEB_FETCH_OUTPUT_MODES, {
+const OutputModeEnum = Type.Enum(WEB_FETCH_OUTPUT_MODES, {
+  type: "string",
   default: "auto",
   description: "auto, inline, or file output",
 });
@@ -28,7 +28,8 @@ export const webFetchMdParameters = Type.Object(
     url: Type.String({ description: "Public http(s) URL" }),
     output_mode: Type.Optional(OutputModeEnum),
     fetch_mode: Type.Optional(
-      StringEnum(WEB_FETCH_MODES, {
+      Type.Enum(WEB_FETCH_MODES, {
+        type: "string",
         default: "direct",
         description:
           "direct fetches locally; firecrawl_fallback uses Firecrawl only after HTTP 403; firecrawl skips direct fetching for JS-heavy or poorly extracted pages. Firecrawl requires opt-in via /supi-settings and FIRECRAWL_API_KEY, shares the URL and may consume credits. Never use it for signed, login-protected, private, or paywalled URLs.",

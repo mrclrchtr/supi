@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { HEALTH_DIAGNOSTIC_MESSAGE_LIMIT } from "../../session/health-types.ts";
 
@@ -18,21 +17,24 @@ const evidence = object({
   documents: Type.Array(
     object({
       file: Type.String(),
-      status: StringEnum(["confirmed", "unconfirmed", "failed", "removed"]),
+      status: Type.Enum(["confirmed", "unconfirmed", "failed", "removed"], { type: "string" }),
     }),
   ),
 });
 const scopeStatus = object({
-  status: StringEnum(["included", "excluded", "no-config", "out-of-tree"]),
+  status: Type.Enum(["included", "excluded", "no-config", "out-of-tree"], { type: "string" }),
   basis: Type.Union([
-    StringEnum([
-      "fileNames",
-      "explicit",
-      "include-pattern",
-      "default-include",
-      "exclude-pattern",
-      "extension",
-    ]),
+    Type.Enum(
+      [
+        "fileNames",
+        "explicit",
+        "include-pattern",
+        "default-include",
+        "exclude-pattern",
+        "extension",
+      ],
+      { type: "string" },
+    ),
     Type.Null(),
   ]),
   configPath: nullableString,
@@ -46,7 +48,7 @@ const diagnosticEntry = object({
     Type.Array(
       object({
         line: Type.Integer({ description: "1-based line." }),
-        severity: StringEnum(["error", "warning"]),
+        severity: Type.Enum(["error", "warning"], { type: "string" }),
         message: Type.String(),
         source: Type.Optional(Type.String()),
       }),
@@ -63,7 +65,7 @@ const diagnostics = Type.Union([
     scopeStatus: Type.Optional(scopeStatus),
   }),
   object({
-    kind: StringEnum(["partial", "unavailable"]),
+    kind: Type.Enum(["partial", "unavailable"], { type: "string" }),
     scope,
     entries: Type.Array(diagnosticEntry),
     evidence,
@@ -72,8 +74,8 @@ const diagnostics = Type.Union([
   }),
 ]);
 const operation = object({
-  server: StringEnum(["advertised", "not-advertised", "unknown"]),
-  supi: StringEnum(["supported", "limited", "unsupported"]),
+  server: Type.Enum(["advertised", "not-advertised", "unknown"], { type: "string" }),
+  supi: Type.Enum(["supported", "limited", "unsupported"], { type: "string" }),
   reason: Type.Optional(Type.String()),
 });
 const support = object({
@@ -89,13 +91,12 @@ const server = object({
   name: Type.String(),
   root: Type.String(),
   fileTypes: Type.Array(Type.String()),
-  status: StringEnum(["running", "error", "unavailable"]),
+  status: Type.Enum(["running", "error", "unavailable"], { type: "string" }),
   statusReason: Type.Optional(
-    StringEnum([
-      "process-crashed",
-      "process-crash-recovery-pending",
-      "process-crash-recovery-exhausted",
-    ]),
+    Type.Enum(
+      ["process-crashed", "process-crash-recovery-pending", "process-crash-recovery-exhausted"],
+      { type: "string" },
+    ),
   ),
   ready: Type.Boolean(),
   operationSupport: Type.Optional(support),
@@ -110,7 +111,7 @@ const server = object({
   failureMessage: Type.Optional(Type.String()),
 });
 const stale = object({
-  scope: StringEnum(["file", "workspace"]),
+  scope: Type.Enum(["file", "workspace"], { type: "string" }),
   suspected: Type.Union([Type.Boolean(), Type.Null()]),
   matchedFileCount: Type.Integer(),
   warning: nullableString,
@@ -118,13 +119,11 @@ const stale = object({
 const recoveryEntry = object({
   name: Type.String(),
   root: Type.String(),
-  outcome: StringEnum([
-    "recovered",
-    "skipped-no-retained-file",
-    "recovery-failed",
-    "recovery-exhausted",
-  ]),
-  nextAction: Type.Optional(StringEnum(["use-exact-file", "refresh"])),
+  outcome: Type.Enum(
+    ["recovered", "skipped-no-retained-file", "recovery-failed", "recovery-exhausted"],
+    { type: "string" },
+  ),
+  nextAction: Type.Optional(Type.Enum(["use-exact-file", "refresh"], { type: "string" })),
   failureMessage: Type.Optional(Type.String()),
 });
 const crashRecovery = object({
@@ -142,7 +141,7 @@ const startupRetry = object({
     object({
       name: Type.String(),
       root: Type.String(),
-      outcome: StringEnum(["recovered", "retry-failed"]),
+      outcome: Type.Enum(["recovered", "retry-failed"], { type: "string" }),
       nextAction: Type.Optional(Type.Literal("refresh")),
       failureMessage: Type.Optional(Type.String()),
     }),
@@ -150,8 +149,11 @@ const startupRetry = object({
   omittedEntries: Type.Integer(),
 });
 const tracking = object({
-  status: StringEnum(["complete", "limited"]),
-  reason: Type.Union([StringEnum(["file-limit", "filesystem-error"]), Type.Null()]),
+  status: Type.Enum(["complete", "limited"], { type: "string" }),
+  reason: Type.Union([
+    Type.Enum(["file-limit", "filesystem-error"], { type: "string" }),
+    Type.Null(),
+  ]),
   observedFileCount: Type.Integer(),
   discovered: Type.Array(Type.String()),
   tracked: Type.Array(Type.String()),
@@ -163,10 +165,10 @@ const attemptFields = {
   attemptedAt: Type.Number(),
   elapsedMs: Type.Number(),
   requestedDiagnosticScope: scope,
-  operationScope: StringEnum(["file-runtime", "workspace-runtime"]),
+  operationScope: Type.Enum(["file-runtime", "workspace-runtime"], { type: "string" }),
   attemptedActiveClients: Type.Optional(Type.Integer()),
   restartedClients: Type.Optional(Type.Integer()),
-  fileReadiness: Type.Optional(StringEnum(["ready", "pending", "unavailable"])),
+  fileReadiness: Type.Optional(Type.Enum(["ready", "pending", "unavailable"], { type: "string" })),
   staleAssessment: Type.Optional(stale),
   diagnosticEvidence: Type.Optional(evidence),
   processCrashRecovery: Type.Optional(crashRecovery),
@@ -197,7 +199,7 @@ const attempt = Type.Union([
 const refresh = Type.Union([
   attempt,
   object({
-    kind: StringEnum(["not-requested", "not-attempted"]),
+    kind: Type.Enum(["not-requested", "not-attempted"], { type: "string" }),
     reason: Type.String(),
     lastAttempt: Type.Union([attempt, Type.Null()]),
   }),
@@ -206,12 +208,10 @@ const warningReport = object({
   hasWarnings: Type.Boolean(),
   warnings: Type.Array(
     object({
-      type: StringEnum([
-        "language-disabled",
-        "missing-server",
-        "structural-unavailable",
-        "configuration-error",
-      ]),
+      type: Type.Enum(
+        ["language-disabled", "missing-server", "structural-unavailable", "configuration-error"],
+        { type: "string" },
+      ),
       message: Type.String(),
       language: Type.Optional(Type.String()),
       detail: Type.Optional(Type.String()),
@@ -224,12 +224,12 @@ export const HealthOutputSchema = Type.Union([
   object({ kind: Type.Literal("invalid-input"), message: Type.String() }),
   object({
     kind: Type.Literal("completed"),
-    level: StringEnum(["summary", "detailed"]),
-    includedSections: Type.Array(StringEnum(["diagnostics", "servers"])),
+    level: Type.Enum(["summary", "detailed"], { type: "string" }),
+    includedSections: Type.Array(Type.Enum(["diagnostics", "servers"], { type: "string" })),
     semanticState: Type.Union([
       object({ kind: Type.Literal("ready") }),
       object({
-        kind: StringEnum(["pending", "inactive", "disabled", "unavailable"]),
+        kind: Type.Enum(["pending", "inactive", "disabled", "unavailable"], { type: "string" }),
         reason: Type.String(),
       }),
       Type.Null(),

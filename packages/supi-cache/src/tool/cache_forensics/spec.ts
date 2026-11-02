@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { DEFAULT_FINDINGS_LIMIT, MAX_FINDINGS_LIMIT } from "../../forensics/types.ts";
 import { makeCacheForensicsExecute } from "./execute.ts";
@@ -12,7 +11,8 @@ export const cacheForensicsSpec = {
   name: CACHE_FORENSICS_TOOL_NAME,
   label: CACHE_FORENSICS_TOOL_LABEL,
   parameters: Type.Object({
-    pattern: StringEnum(["hotspots", "breakdown", "correlate", "idle"], {
+    pattern: Type.Enum(["hotspots", "breakdown", "correlate", "idle"], {
+      type: "string",
       description:
         "Analysis pattern: breakdown=cause totals; hotspots=largest drops; correlate=preceding tool shapes; idle=drops after long gaps.",
     }),

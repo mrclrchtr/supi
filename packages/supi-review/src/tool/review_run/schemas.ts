@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { REVIEW_LIMITS } from "../../review-limits.ts";
 
@@ -18,7 +17,8 @@ export const reviewTaskSchema = Type.Object(
       description:
         "Self-contained review objective and criteria. Add known requirement-to-source/test locations as navigation hints, not proof of coverage; omit unknown mappings rather than investigating just to fill them.",
     }),
-    mode: StringEnum(["change", "state"] as const, {
+    mode: Type.Enum(["change", "state"] as const, {
+      type: "string",
       description:
         "Evidence view: change uses one non-empty before-and-after change; state uses only the frozen after state.",
     }),
@@ -94,10 +94,12 @@ export const reviewFindingSchema = Type.Object(
       description:
         "True only when the reviewed target should not be accepted as satisfying the Review Task until this is corrected.",
     }),
-    impact: StringEnum(["low", "medium", "high"] as const, {
+    impact: Type.Enum(["low", "medium", "high"] as const, {
+      type: "string",
       description: "Downside if unfixed, not the size of the correction.",
     }),
-    effort: StringEnum(["small", "medium", "large"] as const, {
+    effort: Type.Enum(["small", "medium", "large"] as const, {
+      type: "string",
       description: "Estimated correction size, not issue severity.",
     }),
     confidence: Type.Number({
@@ -148,7 +150,8 @@ export const reviewSubmissionSchema = Type.Object(
     }),
     criteriaCoverage: Type.Object(
       {
-        status: StringEnum(["complete", "incomplete"] as const, {
+        status: Type.Enum(["complete", "incomplete"] as const, {
+          type: "string",
           description:
             "complete when the supplied Review Criteria were sufficient (this includes a clean review); incomplete only when an identified Review Criteria source was actually unavailable.",
         }),

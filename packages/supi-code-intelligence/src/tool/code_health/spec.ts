@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import type { CodeIntelToolExecCtx } from "../../types/index.ts";
 import { ScopeParam } from "../schemas.ts";
@@ -23,13 +22,14 @@ export const codeHealthSpec = {
         }),
       ),
       include: Type.Optional(
-        Type.Array(StringEnum(["diagnostics", "servers"]), {
+        Type.Array(Type.Enum(["diagnostics", "servers"], { type: "string" }), {
           description: "Requested health-signal sections.",
           uniqueItems: true,
         }),
       ),
       level: Type.Optional(
-        StringEnum(["summary", "detailed"], {
+        Type.Enum(["summary", "detailed"], {
+          type: "string",
           description: "Detail level for the health report.",
         }),
       ),

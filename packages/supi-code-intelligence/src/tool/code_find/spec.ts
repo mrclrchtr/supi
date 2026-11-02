@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import type { CodeIntelToolExecCtx } from "../../types/index.ts";
 import { FindQueryParam, FindScopeParam, MaxResultsParam } from "../schemas.ts";
@@ -20,12 +19,14 @@ export const codeFindSpec = {
     {
       query: FindQueryParam,
       scope: Type.Optional(FindScopeParam),
-      mode: StringEnum(CODE_FIND_MODES, {
+      mode: Type.Enum(CODE_FIND_MODES, {
+        type: "string",
         description:
           "Required code-aware search mode. AST mode requires `kind`; semantic mode rejects `kind`.",
       }),
       kind: Type.Optional(
-        StringEnum(CODE_FIND_AST_KINDS, {
+        Type.Enum(CODE_FIND_AST_KINDS, {
+          type: "string",
           description: 'AST structure kind; required only for mode:"ast".',
         }),
       ),

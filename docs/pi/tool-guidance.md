@@ -145,9 +145,11 @@ Mechanics of `description`, `promptSnippet`, and `promptGuidelines`: installed P
 
 ## Parameters
 
-Schema basics (TypeBox `Type.Object`, `Type.Optional`, `StringEnum` from `@earendil-works/pi-ai` for Google compatibility): installed Pi `docs/extensions.md` § Tool Definition.
+Schema basics (TypeBox `Type.Object`, `Type.Optional`, and JSON Schema validation): installed Pi `docs/extensions.md` § Tool Definition and § Tool parameter schemas and TypeBox.
 
 SuPi rules:
+
+- Use `Type.Enum(values, { type: "string", ...options })` from `typebox` for string enums. This preserves the provider-compatible `{ type: "string", enum: [...] }` shape and TypeBox `Static` inference. The published `pi-ai` `StringEnum` returns a `pi-schema` schema; Pi's extension-only compatibility mapping does not apply to standalone TypeScript or tests.
 
 - Parameter schemas are paid model input when the provider sends the tool definition. Cache placement is provider-specific.
 - Let machine-readable constraints carry required or optional status, cardinality, numeric or string bounds, enums, patterns, and object shape. Add prose only when the consequence is not clear and can change a valid call.
@@ -246,7 +248,7 @@ SuPi additions:
 - [ ] Parameter prose does not restate required status, bounds, enums, patterns, or object shape unless a non-obvious consequence changes a valid call.
 - [ ] Shared parameter rules live once on the nearest common object; leaf descriptions contain only leaf-specific meaning.
 - [ ] The complete serialized schema was checked for repeated descriptions, and its wire shape has a test.
-- [ ] Important parameters have descriptions; string enums use `StringEnum`; schemas stay compact.
+- [ ] Important parameters have descriptions; string enums use TypeBox `Type.Enum` with `type: "string"`; schemas stay compact.
 - [ ] `prepareArguments()` is only a legacy compatibility shim.
 - [ ] `execute()` honors `signal`, streams progress when useful, and throws for real failures.
 - [ ] Long output is truncated with a clear truncation notice, or spilled to a file with path + preview.

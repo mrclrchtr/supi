@@ -1,12 +1,12 @@
-import { StringEnum } from "@earendil-works/pi-ai";
-import type { TSchema } from "typebox";
+import { type TSchema, Type } from "typebox";
 
 /** Build a provider-facing model enum from one immutable agent catalogue. */
 export function buildModelCatalogueEnum(catalogue: readonly string[]): TSchema {
   if (catalogue.length === 0) {
     throw new Error("Cannot build a model enum from an empty Consulting Agent catalogue.");
   }
-  return StringEnum([...catalogue] as [string, ...string[]], {
+  return Type.Enum([...catalogue] as [string, ...string[]], {
+    type: "string",
     description: "Model available in the current Consulting Agent catalogue.",
   });
 }

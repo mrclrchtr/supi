@@ -1,5 +1,4 @@
 // biome-ignore-all lint/style/noExcessiveLinesPerFile: the complete native contract is declared together for auditing
-import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import {
   ConfidenceSchema,
@@ -24,7 +23,9 @@ const Project = Type.Object(
   {
     id: Type.String(),
     manifestPath: Type.String(),
-    kind: StringEnum(["node-package", "python-project", "rust-package", "go-module"]),
+    kind: Type.Enum(["node-package", "python-project", "rust-package", "go-module"], {
+      type: "string",
+    }),
     directory: Type.String(),
     name: nullableString,
     nameField: nullableString,
@@ -45,21 +46,17 @@ const Relationship = Type.Object(
 );
 const Provenance = Type.Object(
   {
-    source: StringEnum([
-      "semantic",
-      "structural",
-      "filesystem",
-      "manifest",
-      "configuration",
-      "runtime",
-    ]),
+    source: Type.Enum(
+      ["semantic", "structural", "filesystem", "manifest", "configuration", "runtime"],
+      { type: "string" },
+    ),
     capability: Type.Optional(Type.String()),
     detail: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );
 const SourceListFields = {
-  status: StringEnum(["complete", "partial", "unavailable"]),
+  status: Type.Enum(["complete", "partial", "unavailable"], { type: "string" }),
   reason: nullableString,
   collectedCount: Type.Integer(),
   omittedCount: Type.Integer(),
@@ -70,7 +67,10 @@ const Observation = Type.Union([
     { additionalProperties: false },
   ),
   Type.Object(
-    { status: StringEnum(["partial", "unavailable", "withheld"]), reason: Type.String() },
+    {
+      status: Type.Enum(["partial", "unavailable", "withheld"], { type: "string" }),
+      reason: Type.String(),
+    },
     { additionalProperties: false },
   ),
 ]);
@@ -98,7 +98,7 @@ const ContextDefinitions = Type.Union([
     { additionalProperties: false },
   ),
   Type.Object(
-    { status: StringEnum(["unavailable", "withheld"]), reason: Type.String() },
+    { status: Type.Enum(["unavailable", "withheld"], { type: "string" }), reason: Type.String() },
     { additionalProperties: false },
   ),
 ]);
@@ -305,7 +305,7 @@ const Facts = Type.Object(
 const Section = Type.Object(
   {
     key: Type.String(),
-    status: StringEnum(["complete", "partial", "unavailable"]),
+    status: Type.Enum(["complete", "partial", "unavailable"], { type: "string" }),
     reason: nullableString,
     confidence: ConfidenceSchema,
     provenance: Type.Array(Provenance),
@@ -331,7 +331,7 @@ const GradleBase = {
   runtime: Type.Optional(
     Type.Object(
       {
-        kind: StringEnum(["distribution", "installation"]),
+        kind: Type.Enum(["distribution", "installation"], { type: "string" }),
         source: Type.String(),
         version: Type.String(),
       },
@@ -367,17 +367,12 @@ const Gradle = Type.Union([
   Type.Object(
     {
       ...GradleBase,
-      status: StringEnum([
-        "blocked",
-        "unavailable",
-        "unsupported",
-        "failed",
-        "interrupted",
-        "timeout",
-        "oversized",
-      ]),
+      status: Type.Enum(
+        ["blocked", "unavailable", "unsupported", "failed", "interrupted", "timeout", "oversized"],
+        { type: "string" },
+      ),
       gradleVersion: Type.Optional(Type.String()),
-      stage: StringEnum(["authorization", "prerequisites", "query", "unknown"]),
+      stage: Type.Enum(["authorization", "prerequisites", "query", "unknown"], { type: "string" }),
       reason: Type.String(),
     },
     { additionalProperties: false },
@@ -389,7 +384,7 @@ const Workspace = Type.Object(
     focus: Type.String(),
     directFiles: Type.Array(
       Type.Object(
-        { path: Type.String(), kind: StringEnum(["file", "symlink"]) },
+        { path: Type.String(), kind: Type.Enum(["file", "symlink"], { type: "string" }) },
         { additionalProperties: false },
       ),
     ),
@@ -463,7 +458,7 @@ const Workspace = Type.Object(
       {
         fileCount: Type.Integer(),
         symlinkCount: Type.Integer(),
-        source: StringEnum(["git", "filesystem"]),
+        source: Type.Enum(["git", "filesystem"], { type: "string" }),
         exclude: Type.Array(Type.String()),
         includeIgnored: Type.Boolean(),
         symlinks: Type.Literal("not-followed"),
@@ -476,8 +471,8 @@ const Workspace = Type.Object(
     ),
     collection: Type.Object(
       {
-        status: StringEnum(["complete", "partial"]),
-        stopReason: StringEnum(["complete", "entry-limit", "deadline"]),
+        status: Type.Enum(["complete", "partial"], { type: "string" }),
+        stopReason: Type.Enum(["complete", "entry-limit", "deadline"], { type: "string" }),
         prioritizedDirectory: nullableString,
         limits: Type.Object(
           { maxEntries: Type.Integer(), deadline: Type.Union([Type.Number(), Type.Null()]) },
@@ -544,7 +539,7 @@ const Common = {
         line: Type.Integer(),
         character: Type.Integer(),
         rank: Type.Integer(),
-        anchorKind: Type.Optional(StringEnum(["name", "declaration"])),
+        anchorKind: Type.Optional(Type.Enum(["name", "declaration"], { type: "string" })),
       },
       { additionalProperties: false, description: "One-based line and UTF-16 character." },
     ),
@@ -569,7 +564,7 @@ export const OrientationOutputSchema = Type.Union([
     {
       ...Common,
       kind: Type.Literal("completed"),
-      focusKind: StringEnum(["workspace", "directory", "module"]),
+      focusKind: Type.Enum(["workspace", "directory", "module"], { type: "string" }),
       focus: Type.Union([Type.String(), Type.Null()]),
       workspace: Workspace,
       snapshot: Type.Optional(Snapshot),
@@ -580,7 +575,7 @@ export const OrientationOutputSchema = Type.Union([
     {
       ...Common,
       kind: Type.Literal("completed"),
-      focusKind: StringEnum(["file", "symbol"]),
+      focusKind: Type.Enum(["file", "symbol"], { type: "string" }),
       focus: Type.Union([Type.String(), Type.Null()]),
     },
     { additionalProperties: false },

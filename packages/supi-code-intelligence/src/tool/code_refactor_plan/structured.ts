@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, Type } from "typebox";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
 import {
@@ -44,7 +43,7 @@ export const RefactorPlanOutputSchema = Type.Union([
     {
       kind: Type.Literal("completed"),
       planId: Type.String(),
-      operation: StringEnum([...PUBLIC_REFACTOR_OPERATION_NAMES]),
+      operation: Type.Enum([...PUBLIC_REFACTOR_OPERATION_NAMES], { type: "string" }),
       target: Type.Object(
         { file: Type.String(), line: Type.Integer(), character: Type.Integer() },
         { additionalProperties: false, description: "One-based line and UTF-16 character." },
@@ -54,7 +53,7 @@ export const RefactorPlanOutputSchema = Type.Union([
       edits: Type.Array(Edit),
       fileCount: Type.Integer({ minimum: 0 }),
       editCount: Type.Integer({ minimum: 0 }),
-      provenance: StringEnum(["semantic", "structural"]),
+      provenance: Type.Enum(["semantic", "structural"], { type: "string" }),
       nextAction: Type.Object(
         { tool: Type.Literal("code_refactor_apply"), planId: Type.String() },
         { additionalProperties: false },

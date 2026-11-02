@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, Type } from "typebox";
 import type { TargetWorkflowOutcome } from "../../session/target-workflow.ts";
 import {
@@ -12,13 +11,10 @@ import type { ResolveDetails } from "../result/types.ts";
 /** Codemode contract for resolution, including candidate selection and invalid input. */
 export const ResolveOutputSchema = Type.Object(
   {
-    kind: StringEnum([
-      "resolved",
-      "target-group",
-      "disambiguation",
-      "kind-mismatch",
-      "invalid-input",
-    ]),
+    kind: Type.Enum(
+      ["resolved", "target-group", "disambiguation", "kind-mismatch", "invalid-input"],
+      { type: "string" },
+    ),
     confidence: ConfidenceSchema,
     targets: Type.Array(NavigationTargetSchema),
     evidenceLists: Type.Array(EvidenceListSchema),
@@ -28,7 +24,9 @@ export const ResolveOutputSchema = Type.Object(
     file: Type.Optional(Type.String()),
     requestedKind: Type.Optional(Type.String()),
     unknownNestingCount: Type.Optional(Type.Integer()),
-    discoveryProvenance: Type.Optional(Type.Array(StringEnum(["semantic", "structural"]))),
+    discoveryProvenance: Type.Optional(
+      Type.Array(Type.Enum(["semantic", "structural"], { type: "string" })),
+    ),
     partialReason: Type.Optional(Type.Union([Type.String(), Type.Null()])),
     errorRanges: Type.Optional(Type.Array(RecoveryRangeSchema)),
   },

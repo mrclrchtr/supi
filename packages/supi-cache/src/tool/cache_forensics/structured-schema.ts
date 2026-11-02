@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, Type } from "typebox";
 
 const paramShapeSchema = Type.Union([
@@ -17,7 +16,11 @@ const paramShapeSchema = Type.Union([
 
 const causeSchema = Type.Union([
   Type.Object(
-    { type: StringEnum(["compaction", "branch_summary", "prompt_change", "unknown"]) },
+    {
+      type: Type.Enum(["compaction", "branch_summary", "prompt_change", "unknown"], {
+        type: "string",
+      }),
+    },
     { additionalProperties: false },
   ),
   Type.Object(
@@ -87,7 +90,7 @@ export const forensicsDataSchema = Type.Union([
   ),
   Type.Object(
     {
-      pattern: StringEnum(["hotspots", "correlate", "idle"]),
+      pattern: Type.Enum(["hotspots", "correlate", "idle"], { type: "string" }),
       ...scanFields,
       findings: Type.Array(findingSchema),
       ...findingLimitFields,
@@ -105,7 +108,7 @@ export const forensicsSpillSchema = Type.Object(
     totalBytes: Type.Number(),
     maxLines: Type.Number(),
     maxBytes: Type.Number(),
-    pattern: StringEnum(["hotspots", "breakdown", "correlate", "idle"]),
+    pattern: Type.Enum(["hotspots", "breakdown", "correlate", "idle"], { type: "string" }),
     since: Type.String(),
     minDrop: Type.Number(),
     maxSessions: Type.Number(),

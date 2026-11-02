@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
 import { Value } from "typebox/value";
 import { buildModelCatalogueEnum, isAvailableModel } from "../../catalogue.ts";
@@ -40,7 +39,8 @@ export function buildConsultingRunSchema(agent: string, catalogue: readonly stri
       new: Type.Optional(
         Type.Object(
           {
-            agent: StringEnum([agent], {
+            agent: Type.Enum([agent], {
+              type: "string",
               description: "The Consulting Agent that will perform this Consultation.",
             }),
             model: buildModelCatalogueEnum(catalogue),

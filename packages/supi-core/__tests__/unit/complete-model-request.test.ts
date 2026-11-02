@@ -8,7 +8,6 @@ import {
   type Model,
   type ModelsApiStreamOptions,
   type ProviderHeaders,
-  Type,
 } from "@earendil-works/pi-ai";
 import {
   type ExtensionContext,
@@ -16,6 +15,7 @@ import {
   ModelRuntime,
 } from "@earendil-works/pi-coding-agent";
 import { makeCtx } from "@mrclrchtr/supi-test-utils";
+import { Type } from "typebox";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type CompleteModelRequestOptions,

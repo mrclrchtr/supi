@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
 import { isReadOnlyCapabilitySet } from "../../capabilities.ts";
 import { resolveProfileDefinition } from "../../profile-catalogue.ts";
@@ -15,7 +14,8 @@ export function buildAgentRunSchema(catalogue: ProfileCatalogue): TSchema {
   const ids = catalogue.profileIds;
   const profileEnum =
     ids.length > 0
-      ? StringEnum(ids as unknown as readonly string[] & [string, ...string[]], {
+      ? Type.Enum(ids as unknown as readonly string[] & [string, ...string[]], {
+          type: "string",
           description: [
             "No inherited tools or dedicated web tools.",
             ...ids.map((id) => {
@@ -81,7 +81,8 @@ export function buildAgentRunSchema(catalogue: ProfileCatalogue): TSchema {
         description: "One to four independent Delegation Tasks or Follow-Ups.",
       }),
       mode: Type.Optional(
-        StringEnum(["background", "foreground"], {
+        Type.Enum(["background", "foreground"], {
+          type: "string",
           description:
             "Default: background for read-only tasks in TUI/RPC; foreground otherwise. Background rejects mutation-capable profiles and print/JSON modes.",
         }),

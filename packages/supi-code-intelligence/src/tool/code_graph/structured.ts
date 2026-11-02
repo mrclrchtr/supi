@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, Type } from "typebox";
 import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
@@ -14,14 +13,16 @@ import type { GraphResultAssembly } from "./result.ts";
 /** Codemode relation evidence; callees describe written expressions, not resolved identities. */
 export const GraphOutputSchema = Type.Object(
   {
-    kind: StringEnum(["completed", "invalid-input", "disambiguation", "kind-mismatch"]),
+    kind: Type.Enum(["completed", "invalid-input", "disambiguation", "kind-mismatch"], {
+      type: "string",
+    }),
     target: Type.Optional(Type.Object({ name: Type.String(), file: Type.String() })),
     sections: Type.Array(
       Type.Object(
         {
-          relation: StringEnum(["references", "callees", "implements"]),
-          source: StringEnum(["semantic", "structural"]),
-          status: StringEnum(["complete", "partial", "unavailable"]),
+          relation: Type.Enum(["references", "callees", "implements"], { type: "string" }),
+          source: Type.Enum(["semantic", "structural"], { type: "string" }),
+          status: Type.Enum(["complete", "partial", "unavailable"], { type: "string" }),
           message: Type.Union([Type.String(), Type.Null()]),
           items: Type.Array(
             Type.Object(
@@ -36,7 +37,7 @@ export const GraphOutputSchema = Type.Object(
           ),
           evidence: Type.Optional(EvidenceListSchema),
           externalCount: Type.Integer(),
-          depth: Type.Union([StringEnum(["direct", "deep"]), Type.Null()]),
+          depth: Type.Union([Type.Enum(["direct", "deep"], { type: "string" }), Type.Null()]),
           enclosingScope: Type.Union([
             Type.Object({
               name: Type.String(),

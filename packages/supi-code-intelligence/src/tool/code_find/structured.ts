@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, Type } from "typebox";
 import { toDisplayPath } from "../../analysis/search/paths.ts";
 import { ConfidenceSchema, EvidenceListSchema, RecoveryRangeSchema } from "../result/structured.ts";
@@ -13,8 +12,8 @@ const ScanPathSummary = Type.Object({
 /** Codemode search evidence, including scan-universe limits independently of match counts. */
 export const FindOutputSchema = Type.Object(
   {
-    kind: StringEnum(["completed", "invalid-input"]),
-    mode: Type.Optional(StringEnum(["semantic", "ast"])),
+    kind: Type.Enum(["completed", "invalid-input"], { type: "string" }),
+    mode: Type.Optional(Type.Enum(["semantic", "ast"], { type: "string" })),
     confidence: ConfidenceSchema,
     matches: Type.Array(
       Type.Object(
@@ -26,7 +25,7 @@ export const FindOutputSchema = Type.Object(
           character: Type.Integer(),
           endLine: Type.Optional(Type.Integer()),
           endCharacter: Type.Optional(Type.Integer()),
-          anchorKind: Type.Optional(StringEnum(["name", "declaration"])),
+          anchorKind: Type.Optional(Type.Enum(["name", "declaration"], { type: "string" })),
           container: Type.Optional(Type.Union([Type.String(), Type.Null()])),
         },
         { additionalProperties: false },

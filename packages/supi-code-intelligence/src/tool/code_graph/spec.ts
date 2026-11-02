@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import type { CodeIntelToolExecCtx } from "../../types/index.ts";
 import { GraphTargetParam, MaxResultsParam } from "../schemas.ts";
@@ -18,7 +17,7 @@ export const codeGraphSpec = {
     {
       target: GraphTargetParam,
       relations: Type.Optional(
-        Type.Array(StringEnum(["all", "references", "callees", "implements"]), {
+        Type.Array(Type.Enum(["all", "references", "callees", "implements"], { type: "string" }), {
           description:
             'Requested relations; defaults to ["references"]. "all" must be the only item.',
           minItems: 1,
@@ -27,7 +26,8 @@ export const codeGraphSpec = {
       ),
       maxResults: Type.Optional(MaxResultsParam),
       calleeDepth: Type.Optional(
-        StringEnum(["direct", "deep"], {
+        Type.Enum(["direct", "deep"], {
+          type: "string",
           description: "direct excludes nested scopes; deep includes them.",
         }),
       ),

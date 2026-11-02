@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, type TSchema, Type } from "typebox";
 import type { InspectObservation } from "../../session/inspect-types.ts";
 import { ConfidenceSchema, EvidenceListSchema, RecoveryRangeSchema } from "../result/structured.ts";
@@ -46,7 +45,7 @@ const DiagnosticSchema = Type.Object(
   { additionalProperties: false },
 );
 const ProvenanceSchema = Type.Object(
-  { source: StringEnum(["semantic", "structural"]), capability: Type.String() },
+  { source: Type.Enum(["semantic", "structural"], { type: "string" }), capability: Type.String() },
   { additionalProperties: false },
 );
 

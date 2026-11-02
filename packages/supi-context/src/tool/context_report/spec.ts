@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { contextReportOutputSchema } from "./result-schema.ts";
 
@@ -12,7 +11,8 @@ export const contextReportSpec = {
   outputSchema: contextReportOutputSchema,
   parameters: Type.Object({
     mode: Type.Optional(
-      StringEnum(["concise", "full"] as const, {
+      Type.Enum(["concise", "full"] as const, {
+        type: "string",
         description: "Omit for concise capacity data, or use full for focused attribution.",
       }),
     ),

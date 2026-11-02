@@ -1,4 +1,3 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
 import {
   PUBLIC_REFACTOR_OPERATION_NAMES,
@@ -46,7 +45,8 @@ const SymbolTargetParam = Type.Object(
     query: QueryParam,
     scope: Type.Optional(ScopeParam),
     symbolKind: Type.Optional(
-      StringEnum(TARGET_SYMBOL_KINDS, {
+      Type.Enum(TARGET_SYMBOL_KINDS, {
+        type: "string",
         description: "LSP SymbolKind filter; omit when uncertain.",
       }),
     ),

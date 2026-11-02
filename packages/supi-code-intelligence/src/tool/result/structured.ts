@@ -1,8 +1,9 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 
 /** Collection confidence, independent of result completeness. */
-export const ConfidenceSchema = StringEnum(["semantic", "structural", "heuristic", "unavailable"]);
+export const ConfidenceSchema = Type.Enum(["semantic", "structural", "heuristic", "unavailable"], {
+  type: "string",
+});
 
 /** Canonical evidence counts; null totals mean collection could not establish completeness. */
 export const EvidenceListSchema = Type.Object(
@@ -34,16 +35,18 @@ export const NavigationTargetSchema = Type.Object(
     file: Type.String(),
     line: Type.Integer(),
     character: Type.Integer(),
-    anchorKind: StringEnum(["name", "declaration"]),
+    anchorKind: Type.Enum(["name", "declaration"], { type: "string" }),
     container: Type.Optional(Type.Union([Type.String(), Type.Null()])),
     confidence: Type.Optional(ConfidenceSchema),
-    provenance: Type.Optional(Type.Array(StringEnum(["semantic", "structural"]))),
+    provenance: Type.Optional(
+      Type.Array(Type.Enum(["semantic", "structural"], { type: "string" })),
+    ),
     resolution: Type.Optional(
       Type.Object({
         requested: Type.Object({ line: Type.Integer(), character: Type.Integer() }),
         resolved: Type.Object({ line: Type.Integer(), character: Type.Integer() }),
         snapped: Type.Boolean(),
-        source: StringEnum(["semantic", "structural", "structural-identifier"]),
+        source: Type.Enum(["semantic", "structural", "structural-identifier"], { type: "string" }),
       }),
     ),
   },
