@@ -14,11 +14,16 @@ import {
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
+import { writeSupiConfig } from "@mrclrchtr/supi-core/config";
 import { expect, it, vi } from "vitest";
 import extension from "../../src/extension.ts";
 import { WEB_TOOL_SPECS } from "../../src/tool/tool-specs.ts";
 import { createFakeBx, useFakeBx, writeWebSearchSetting } from "../helpers/fake-bx.ts";
 import { expectStructuredContent } from "../helpers/structured-result.ts";
+
+vi.mock("node:dns/promises", () => ({
+  lookup: vi.fn(async () => [{ address: "93.184.216.34", family: 4 }]),
+}));
 
 const usage = {
   input: 0,
@@ -56,6 +61,50 @@ function librarySearchResponse(name: string | null): Response {
   });
 }
 
+function contextResponse(format: string | null, sourceUrl: string): Response {
+  // Match the real endpoint: JSON requires explicit format negotiation.
+  if (format !== "json") {
+    return new Response("# Fixture documentation", { headers: { "content-type": "text/plain" } });
+  }
+  return Response.json({
+    codeSnippets: [
+      {
+        codeTitle: "Example",
+        codeDescription: "",
+        codeLanguage: "javascript",
+        codeList: [{ language: "javascript", code: "const answer = 42" }],
+        codeId: sourceUrl,
+      },
+    ],
+    infoSnippets: [{ content: "Fixture guidance", breadcrumb: "Guide", pageId: sourceUrl }],
+  });
+}
+
+function firecrawlResponse(init?: RequestInit): Response {
+  expect(init?.headers).toMatchObject({ Authorization: "Bearer fixture-key" });
+  const target = JSON.parse(String(init?.body)).url;
+  if (target.endsWith("/provider-failure")) {
+    return Response.json({ success: false }, { status: 502 });
+  }
+  return Response.json({
+    success: true,
+    data: {
+      markdown: "# Recovered article",
+      warning: null,
+      metadata: { statusCode: 200, cacheState: "hit" },
+    },
+  });
+}
+
+function pageResponse(pathname: string, init?: RequestInit): Response {
+  if (pathname !== "/page") {
+    return new Response("Not Found", { status: 404, statusText: "Not Found" });
+  }
+  return new Response(init?.method === "HEAD" ? null : "# Page\n\nBody", {
+    headers: { "content-type": "text/markdown" },
+  });
+}
+
 function reply(
   model: Model<Api>,
   content: AssistantMessage["content"],
@@ -87,6 +136,7 @@ it("delivers actual web tool data through PI's default codemode and rejects thro
   const fake = createFakeBx();
   const results = new Map<string, unknown[]>();
   vi.stubEnv("CONTEXT7_API_KEY", undefined);
+  vi.stubEnv("FIRECRAWL_API_KEY", undefined);
   const source = {
     title: "Fixture source",
     url: "https://example.test/source",
@@ -94,6 +144,7 @@ it("delivers actual web tool data through PI's default codemode and rejects thro
   };
   useFakeBx(fake, JSON.stringify({ grounding: { generic: [source] } }));
   writeWebSearchSetting(fake.cwd, true);
+  writeSupiConfig({ section: "web", scope: "project", cwd: fake.cwd }, { firecrawlEnabled: true });
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: URL | string | Request, init?: RequestInit) => {
@@ -102,32 +153,16 @@ it("delivers actual web tool data through PI's default codemode and rejects thro
         return librarySearchResponse(url.searchParams.get("libraryName"));
       }
       if (url.pathname === "/api/v2/context") {
-        // Match the real endpoint: JSON requires explicit format negotiation.
-        if (url.searchParams.get("type") !== "json") {
-          return new Response("# Fixture documentation", {
-            headers: { "content-type": "text/plain" },
-          });
-        }
-        return Response.json({
-          codeSnippets: [
-            {
-              codeTitle: "Example",
-              codeDescription: "",
-              codeLanguage: "javascript",
-              codeList: [{ language: "javascript", code: "const answer = 42" }],
-              codeId: source.url,
-            },
-          ],
-          infoSnippets: [{ content: "Fixture guidance", breadcrumb: "Guide", pageId: source.url }],
-        });
+        return contextResponse(url.searchParams.get("type"), source.url);
+      }
+      if (url.origin === "https://api.firecrawl.dev") {
+        return firecrawlResponse(init);
+      }
+      if (url.origin === "https://example.com") {
+        return new Response("Forbidden", { status: 403 });
       }
       if (url.origin === "https://example.test") {
-        if (url.pathname !== "/page") {
-          return new Response("Not Found", { status: 404, statusText: "Not Found" });
-        }
-        return new Response(init?.method === "HEAD" ? null : "# Page\n\nBody", {
-          headers: { "content-type": "text/markdown" },
-        });
+        return pageResponse(url.pathname, init);
       }
       throw new Error(`Unexpected network request: ${url.origin}${url.pathname}`);
     }),
@@ -182,6 +217,7 @@ it("delivers actual web tool data through PI's default codemode and rejects thro
     // Context7 credentials must not be required for extension loading or registration.
     await session.bindExtensions({});
     vi.stubEnv("CONTEXT7_API_KEY", "ctx7sk-test-key");
+    vi.stubEnv("FIRECRAWL_API_KEY", "fixture-key");
     for (const spec of WEB_TOOL_SPECS) {
       const tool = session.getToolDefinition(spec.name);
       expect(tool?.parameters).toEqual(spec.parameters);
@@ -220,6 +256,8 @@ it("delivers actual web tool data through PI's default codemode and rejects thro
 
     const result = await runScript(`
       const page = await tools.web_fetch_md({ url: "https://example.test/page" });
+      const recovered = await tools.web_fetch_md({ url: "https://example.com/blocked", fetch_mode: "firecrawl_fallback" });
+      const rendered = await tools.web_fetch_md({ url: "https://example.com/dynamic", fetch_mode: "firecrawl" });
       const search = await tools.web_search({ query: "offline fixture" });
       const libraries = await tools.web_docs_search({ library_name: "fixture", query: "example" });
       const docs = await tools.web_docs_fetch({ library_id: libraries.results[0].id, query: "example", raw: true });
@@ -228,7 +266,8 @@ it("delivers actual web tool data through PI's default codemode and rejects thro
       return { page: page.markdown, source: search.sources[0].title,
         count: search.sourceCount, library: libraries.results[0].id, snippet: docs.snippets[0].content,
         guidance: docs.snippets[1].content, textDocs: textDocs.markdown, emptyCount: empty.count,
-        emptyResults: empty.results };
+        emptyResults: empty.results, recovered: recovered.markdown, retrieval: recovered.retrieval,
+        rendered: rendered.markdown };
     `);
     expect(result.isError).toBe(false);
     const text = result.content
@@ -243,6 +282,9 @@ it("delivers actual web tool data through PI's default codemode and rejects thro
     expect(text).toContain('"textDocs":"# Fixture documentation"');
     expect(text).toContain('"emptyCount":0,"emptyResults":[]');
     expect(text).toContain('"page":"# Page\\n\\nBody"');
+    expect(text).toContain('"recovered":"# Recovered article"');
+    expect(text).toContain('"rendered":"# Recovered article"');
+    expect(text).toContain('"retrieval":{"provider":"firecrawl","cacheState":"hit"}');
     for (const spec of WEB_TOOL_SPECS) {
       const events = results.get(spec.name) ?? [];
       expect(events.length).toBeGreaterThan(0);
@@ -254,6 +296,36 @@ it("delivers actual web tool data through PI's default codemode and rejects thro
         });
       }
     }
+
+    const providerFailure = await runScript(
+      'return await tools.web_fetch_md({ url: "https://example.com/provider-failure", fetch_mode: "firecrawl_fallback" });',
+    );
+    expect(providerFailure.isError).toBe(true);
+    expect(providerFailure.content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "text",
+          text: expect.stringContaining("Firecrawl failed: HTTP 502"),
+        }),
+      ]),
+    );
+
+    writeSupiConfig(
+      { section: "web", scope: "project", cwd: fake.cwd },
+      { firecrawlEnabled: false },
+    );
+    const disabled = await runScript(
+      'return await tools.web_fetch_md({ url: "https://example.com/dynamic", fetch_mode: "firecrawl" });',
+    );
+    expect(disabled.isError).toBe(true);
+    expect(disabled.content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "text",
+          text: expect.stringContaining("Firecrawl is disabled"),
+        }),
+      ]),
+    );
 
     const httpFailure = await runScript(
       'return await tools.web_fetch_md({ url: "https://example.test/missing" });',

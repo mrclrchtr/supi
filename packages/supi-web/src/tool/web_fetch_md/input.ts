@@ -14,6 +14,10 @@ export const WEB_FETCH_INLINE_MAX_CHARS = 15_000;
 export const WEB_FETCH_OUTPUT_MODES = ["auto", "inline", "file"] as const;
 export type WebFetchOutputMode = (typeof WEB_FETCH_OUTPUT_MODES)[number];
 
+/** Explicit retrieval routes; enabling Firecrawl never changes the default route. */
+export const WEB_FETCH_MODES = ["direct", "firecrawl_fallback", "firecrawl"] as const;
+export type WebFetchMode = (typeof WEB_FETCH_MODES)[number];
+
 const OutputModeEnum = StringEnum(WEB_FETCH_OUTPUT_MODES, {
   default: "auto",
   description: "auto, inline, or file output",
@@ -23,6 +27,13 @@ export const webFetchMdParameters = Type.Object(
   {
     url: Type.String({ description: "Public http(s) URL" }),
     output_mode: Type.Optional(OutputModeEnum),
+    fetch_mode: Type.Optional(
+      StringEnum(WEB_FETCH_MODES, {
+        default: "direct",
+        description:
+          "direct fetches locally; firecrawl_fallback uses Firecrawl only after HTTP 403; firecrawl skips direct fetching for JS-heavy or poorly extracted pages. Firecrawl requires opt-in via /supi-settings and FIRECRAWL_API_KEY, shares the URL and may consume credits. Never use it for signed, login-protected, private, or paywalled URLs.",
+      }),
+    ),
     abs_links: Type.Optional(
       Type.Boolean({
         description: "Absolutize HTML links/images; false preserves original destinations.",
@@ -31,7 +42,7 @@ export const webFetchMdParameters = Type.Object(
     ),
     timeout_ms: Type.Optional(
       Type.Integer({
-        description: "Fetch timeout (ms)",
+        description: "Timeout per direct request and for the complete Firecrawl attempt (ms)",
         default: 30_000,
         minimum: 0,
         maximum: FETCH_TIMEOUT_MAX_MS,

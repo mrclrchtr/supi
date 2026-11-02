@@ -1,7 +1,7 @@
 import type { WebToolPromptSurface } from "../tool-specs.ts";
 import { WEB_FETCH_INLINE_MAX_CHARS } from "./spec.ts";
 
-export const toolDescription = `Fetch a public http(s) URL as Markdown. Not for login or private pages. Use gh for GitHub URLs when available. output_mode auto returns up to ${WEB_FETCH_INLINE_MAX_CHARS.toLocaleString()} characters inline and otherwise returns a temporary-file path; file always returns a temporary-file path. Native Markdown is unchanged; HTML links are absolute by default.`;
+export const toolDescription = `Fetch public http(s) pages as best-effort Markdown, directly or via opt-in Firecrawl for JS-rendered pages. Not for login, private, or paywalled pages. Direct fetching is not network-isolated. Use gh for GitHub URLs when available. Auto returns up to ${WEB_FETCH_INLINE_MAX_CHARS.toLocaleString()} chars inline, otherwise a temp file. Native Markdown is unchanged; HTML links default to absolute.`;
 
 export const promptSnippet = "fetch a public URL as Markdown";
 

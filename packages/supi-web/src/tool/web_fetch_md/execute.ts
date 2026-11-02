@@ -1,8 +1,9 @@
 import type { AgentToolUpdateCallback, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { loadWebConfig } from "../../config.ts";
 import { htmlToMarkdown, wrapAsCodeBlock } from "../../convert.ts";
-import { fetchWithNegotiation, isValidHttpUrl } from "../../fetch.ts";
+import { isValidHttpUrl } from "../../fetch.ts";
 import { writeTempFile } from "../../temp-file.ts";
-import { limitModelVisibleOutput } from "../result.ts";
+import { fetchPage } from "./fetch.ts";
 import {
   WEB_FETCH_INLINE_MAX_CHARS,
   type WebFetchMdInput,
@@ -16,7 +17,7 @@ export async function runWebFetch(
   params: unknown,
   signal: AbortSignal | undefined,
   onUpdate: AgentToolUpdateCallback<Record<string, unknown>> | undefined,
-  _ctx: ExtensionContext,
+  ctx: ExtensionContext,
 ): Promise<WebFetchResult> {
   const input = (params ?? {}) as WebFetchMdInput;
   const url = String(input.url || "").trim();
@@ -33,22 +34,29 @@ export async function runWebFetch(
     details: { url, outputMode },
   });
 
-  const result = await fetchWithNegotiation(url, { timeoutMs, signal });
+  const result = await fetchPage(url, {
+    timeoutMs,
+    signal,
+    fetchMode: input.fetch_mode,
+    firecrawlEnabled: loadWebConfig(ctx.cwd).firecrawlEnabled,
+  });
   const markdown = await resolveMarkdown(result, absLinks);
   const lines = markdown.split("\n").length;
   const chars = markdown.length;
-  const base = { chars, lines, url: result.url, outputMode };
+  const base = {
+    chars,
+    lines,
+    url: result.url,
+    outputMode,
+    ...(result.retrieval ? { retrieval: result.retrieval } : {}),
+  };
 
   if (shouldReturnFile(outputMode, chars)) {
     const filePath = await writeTempFile(markdown, "web-fetch-md", ".md");
     return buildFileResult(base, filePath);
   }
 
-  const output = await limitModelVisibleOutput(markdown, {
-    tempPrefix: "web-fetch-md",
-    suffix: ".md",
-  });
-  return buildInlineResult(base, markdown, output);
+  return buildInlineResult(base, markdown);
 }
 
 function shouldReturnFile(outputMode: WebFetchOutputMode, chars: number): boolean {

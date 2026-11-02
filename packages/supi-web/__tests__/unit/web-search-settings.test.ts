@@ -3,7 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type SettingsModule, SUPI_SETTINGS_COLLECT_EVENT } from "@mrclrchtr/supi-core/settings";
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { loadWebConfig } from "../../src/config.ts";
 import { registerWebSettings } from "../../src/settings-registration.ts";
 
 type SettingsCollector = { add: (module: SettingsModule) => void };
@@ -27,6 +28,7 @@ describe("Web Search settings", () => {
   afterEach(() => {
     if (originalPath === undefined) delete process.env.PATH;
     else process.env.PATH = originalPath;
+    vi.unstubAllEnvs();
     for (const directory of tempDirectories.splice(0)) {
       rmSync(directory, { recursive: true, force: true });
     }
@@ -75,6 +77,61 @@ describe("Web Search settings", () => {
       editValue: "off",
       source: "global",
     });
+    expect(pi.setActiveTools).not.toHaveBeenCalled();
+  });
+
+  it("keeps Firecrawl off by default and respects scoped enable, disable, and reset", async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), "supi-web-home-"));
+    const cwd = mkdtempSync(join(tmpdir(), "supi-web-project-"));
+    tempDirectories.push(homeDir, cwd);
+    vi.stubEnv("FIRECRAWL_API_KEY", undefined);
+    const pi = createPiMock();
+    registerWebSettings(pi as never, homeDir);
+    const module = collectSettings(pi);
+    const firecrawlRow = async () =>
+      (await module.read({ scope: "project", cwd })).rows.find(
+        (row) => row.field.key === "firecrawlEnabled",
+      );
+    expect(await firecrawlRow()).toMatchObject({ editValue: "off", source: "default" });
+    expect(loadWebConfig(cwd, homeDir).firecrawlEnabled).toBe(false);
+
+    const enabled = await module.apply({
+      scope: "global",
+      cwd,
+      fieldKey: "firecrawlEnabled",
+      action: { kind: "set", value: "on" },
+    });
+    expect(enabled.notice).toMatchObject({ level: "warning" });
+    expect(enabled.notice?.message).toContain("FIRECRAWL_API_KEY");
+    expect(enabled.notice?.message).not.toContain("/reload");
+    expect(await firecrawlRow()).toMatchObject({ editValue: "on", source: "global" });
+    expect(loadWebConfig(cwd, homeDir).firecrawlEnabled).toBe(true);
+
+    const disabled = await module.apply({
+      scope: "project",
+      cwd,
+      fieldKey: "firecrawlEnabled",
+      action: { kind: "set", value: "off" },
+    });
+    expect(disabled.notice).toMatchObject({ level: "info" });
+    expect(await firecrawlRow()).toMatchObject({ editValue: "off", source: "project" });
+    expect(loadWebConfig(cwd, homeDir).firecrawlEnabled).toBe(false);
+
+    await module.apply({
+      scope: "project",
+      cwd,
+      fieldKey: "firecrawlEnabled",
+      action: { kind: "unset" },
+    });
+    expect(await firecrawlRow()).toMatchObject({ editValue: "on", source: "global" });
+    await module.apply({
+      scope: "global",
+      cwd,
+      fieldKey: "firecrawlEnabled",
+      action: { kind: "unset" },
+    });
+    expect(await firecrawlRow()).toMatchObject({ editValue: "off", source: "default" });
+    expect(loadWebConfig(cwd, homeDir).firecrawlEnabled).toBe(false);
     expect(pi.setActiveTools).not.toHaveBeenCalled();
   });
 

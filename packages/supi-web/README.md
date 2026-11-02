@@ -14,7 +14,7 @@ Adds web fetch, public web search, and Context7 documentation tools to the [Pi c
 
 After installation, keep asking Pi normal questions. The agent can:
 
-- **Read public web pages as clean Markdown** — extract the main article instead of returning navigation, scripts, styles, and raw HTML.
+- **Read public web pages as best-effort Markdown** — prefer main content, but results may include page clutter or omit content.
 - **Prefer source Markdown when available** — detect Markdown responses and common Markdown siblings before converting HTML.
 - **Handle plain-text and source files** — wrap them in fenced code blocks with a language hint when the URL provides one.
 - **Look up current library docs** — search Context7 for the right project and version, then retrieve documentation focused on the task at hand.
@@ -52,14 +52,14 @@ All four tools declare PI-native `outputSchema` contracts. Direct calls still re
 
 | Tool | Structured value |
 |---|---|
-| `web_fetch_md` | `mode: "inline"` with complete `markdown`, or `mode: "file"` with `filePath`; both include resolved `url`, `chars`, and `lines` |
+| `web_fetch_md` | `mode: "inline"` with the full returned `markdown`, or `mode: "file"` with `filePath`; both include source `url`, `chars`, and `lines` |
 | `web_search` | Complete `sources` (`title`, `url`, `excerpts`, optional `sourceDate`), `sourceCount`, and `excerptCount` |
 | `web_docs_search` | All `results` with IDs, names, complete descriptions/versions, scores, and snippet counts; `count` is the number returned by Context7 |
 | `web_docs_fetch` | `libraryId`, `chars`, `lines`, and either `format: "markdown"` with complete `markdown`, or `format: "snippets"` with SDK-normalized `snippets` (`title`, `content`, `source`) for `raw: true` |
 
 Inline/data results include `modelOutput.truncated` and, when text is truncated, `modelOutput.fullOutputPath`. These describe the **direct-call text**, not missing structured data. Library search also reports `modelOutput.omittedResults`: matches excluded by the table's top-10 row limit before line/byte truncation. Structured descriptions and version lists are not shortened. File-mode page fetches retain the existing disk delivery instead of duplicating the body in structured data.
 
-Results describe the evidence returned by the provider, not exhaustive coverage of the web or a library. Empty search arrays and empty snippet arrays are successful outcomes. Authentication, network, malformed web-search data, and cancellation failures still throw; codemode calls reject rather than returning a successful empty result. No tool currently returns a schema-defined failure or paginated result.
+Results describe the evidence returned by the provider, not exhaustive coverage of a page, the web, or a library. Empty search arrays and empty snippet arrays are successful outcomes. Authentication, network, malformed web-search data, and cancellation failures still throw; codemode calls reject rather than returning a successful empty result. No tool currently returns a schema-defined failure or paginated result.
 
 ```javascript
 const libraries = await tools.web_docs_search({
@@ -102,13 +102,13 @@ Uncaught failures stop the codemode script; `store()` writes are committed only 
 
 Install `bx` and configure it with the [Brave Search CLI instructions](https://github.com/brave/brave-search-cli). Start Pi from the shell where `command -v bx` finds the executable, then verify it with `bx --version`. `bx` handles its own credentials and configuration. Do not put credentials in Pi settings, prompts, or repository files.
 
-To enable or disable the tool, open `/supi-settings`, choose **Web Search**, and change **Web Search tool**. Run `/reload` after the change. The setting applies only when the extension starts or reloads. If `bx` was not available, install or configure it, make sure it is on `PATH`, and run `/reload`.
+To enable or disable the tool, open `/supi-settings`, choose **Web**, and change **Web Search tool**. Run `/reload` after the change. The setting applies only when the extension starts or reloads. If `bx` was not available, install or configure it, make sure it is on `PATH`, and run `/reload`.
 
 Search results are provider-reported source material. A source date can be a publication or modification date and is not a publication-date guarantee.
 
 ## How page fetching works
 
-`web_fetch_md` chooses the cleanest representation it can find:
+`web_fetch_md` tries these representations in order:
 
 1. Use Markdown returned directly by the server.
 2. Detect Markdown or plain text from the response content.
@@ -118,6 +118,41 @@ Search results are provider-reported source material. A source date can be a pub
 It follows redirects and, for HTML, removes scripts and styles while preserving headings, links, lists, code blocks, and tables.
 
 Native Markdown is returned unchanged, including relative links and code examples. For HTML conversion, `abs_links` defaults to `true`; set it to `false` to preserve original link and image destinations. Unsafe URL schemes are removed in either HTML mode.
+
+### Optional Firecrawl retrieval
+
+Direct fetching remains the default and needs no API key. To allow Firecrawl, open `/supi-settings`, choose **Web**, and enable **Firecrawl** in project or global scope. It is off by default. Changes apply to subsequent fetch calls without `/reload`; enabling it permits agent-selected retrieval, not automatic URL sharing or fallback.
+
+Export `FIRECRAWL_API_KEY` before starting Pi. The key stays in the environment, not settings. Enabling without a key saves the preference and shows a warning; direct fetching remains available.
+
+The agent can select one `fetch_mode`:
+
+| Mode | Behavior |
+|---|---|
+| `direct` (default) | Use the local negotiation and conversion pipeline; never contact Firecrawl |
+| `firecrawl_fallback` | Fetch directly, then use Firecrawl only after terminal HTTP 403 |
+| `firecrawl` | Skip direct fetching and use Firecrawl immediately, useful for JS-rendered pages or poor local extraction even after HTTP 200 |
+
+Both Firecrawl modes require the setting to be enabled. While disabled, explicit Firecrawl calls fail before DNS or HTTP requests.
+
+For a public page blocked with HTTP 403:
+
+```javascript
+const page = await tools.web_fetch_md({
+  url: "https://example.com/article",
+  fetch_mode: "firecrawl_fallback",
+  output_mode: "file",
+});
+return page;
+```
+
+For JS-rendered content, select `fetch_mode: "firecrawl"` instead. The key is read only when Firecrawl is actually needed and is not returned in results. Firecrawl receives the requested URL and may consume credits, including for cached results. The tool requests Markdown only, with no structured-extraction add-ons or client-side retries. Firecrawl manages its own retrieval pipeline.
+
+`firecrawl_fallback` runs only after the direct pipeline ends with HTTP 403—not for authentication errors (401), missing pages, rate limits, network failures, or cancellation. Neither mode retries Firecrawl failures through another provider. Both modes reject credential-bearing URLs, local/reserved hosts, and hosts resolving to non-public addresses before sharing them. Do not select Firecrawl for signed URLs or login-protected, private, or paywalled pages. These checks are not a sandbox or proof that a page is publicly accessible.
+
+Firecrawl results retain the requested source URL and include `retrieval.provider: "firecrawl"`, plus `cacheState` and `cachedAt` when supplied. Both inline/file responses disclose retrieval provenance. [Firecrawl caching](https://docs.firecrawl.dev/features/scrape#caching-and-freshness) allows cached content up to two days old by default; missing cache metadata does not establish freshness. Empty, unsuccessful, warning-bearing, and recognizable access-block responses are failures, not usable article content. A null or absent warning is accepted. Firecrawl can still return incomplete or noisy content, so inspect it before relying on it.
+
+`timeout_ms` applies to each direct HTTP request and to the complete Firecrawl attempt, including DNS validation and response reading; it is not a whole-tool deadline. The provider timeout is clamped to its supported 1–300 second range, while the local deadline still enforces shorter budgets. Cancellation is forwarded to Firecrawl. Native/Firecrawl Markdown remains unchanged, so `abs_links` applies only to local HTML conversion.
 
 ### Large pages
 
@@ -148,7 +183,7 @@ export CONTEXT7_API_KEY="ctx7sk-..."
 pi
 ```
 
-`web_fetch_md` does not use Context7 and needs no API key. Credentials are resolved when a documentation tool is called, not while the extension loads.
+`web_fetch_md` does not use Context7. Direct fetching needs no API key; optional Firecrawl retrieval uses `FIRECRAWL_API_KEY`. Credentials are resolved when needed, not while the extension loads.
 
 `raw: true` requests JSON and normalizes both provider code snippets and information snippets into `{ title, content, source }` objects. It does not expose the untouched REST envelope or provider ranking metadata. Default mode retains Context7's formatted text.
 
@@ -156,7 +191,8 @@ Requests make one attempt, forward cancellation, and add no SDK timeout. The exp
 
 ## Boundaries
 
-- `web_fetch_md` is for public `http://` and `https://` sources. It does not authenticate to login-protected, private, or paywalled pages.
-- It fetches HTTP responses and does not run a browser, page JavaScript, or interactive flows; client-rendered pages may expose little useful content.
+- `web_fetch_md` is intended for public `http://` and `https://` sources. It does not authenticate to login-protected, private, or paywalled pages.
+- Direct fetching is not network-isolated and does not enforce a public-address restriction. The private-target guard runs only before forwarding a URL to Firecrawl, in either Firecrawl mode.
+- Direct fetching does not run a browser, page JavaScript, or interactive flows; client-rendered pages may expose little useful content. Explicit Firecrawl selection delegates retrieval to that external service.
 - When the `gh` CLI is available, Pi is guided to use it instead for GitHub URLs.
 - Fetched pages and search excerpts are external, untrusted content. Treat them as source material, not as repository instructions.

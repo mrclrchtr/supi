@@ -8,7 +8,8 @@ export function renderWebFetchCall(args: unknown, theme: Theme) {
   const input = (args ?? {}) as WebFetchMdInput;
   const url = typeof input.url === "string" ? input.url : "";
   const outputMode = typeof input.output_mode === "string" ? input.output_mode : undefined;
-  return renderToolCall(WEB_FETCH_MD_TOOL_NAME, url, theme, outputMode);
+  const annotation = [outputMode, input.fetch_mode].filter(Boolean).join(", ");
+  return renderToolCall(WEB_FETCH_MD_TOOL_NAME, url, theme, annotation || undefined);
 }
 
 /** Transcript renderer for web_fetch_md tool results. */
@@ -55,6 +56,7 @@ function buildWebFetchSummary(
         "dim",
         ` (${details.chars.toLocaleString()} chars, ${details.lines.toLocaleString()} lines)`,
       ),
+      theme.fg("dim", retrievalSummary(details)),
     ].join("");
   }
 
@@ -66,9 +68,17 @@ function buildWebFetchSummary(
     ),
   ].join("");
 
+  summary += theme.fg("dim", retrievalSummary(details));
+
   if (details.truncation?.truncated) {
     summary += theme.fg("warning", " [truncated]");
   }
 
   return summary;
+}
+
+function retrievalSummary(details: WebFetchDetails): string {
+  if (!details.retrieval) return "";
+  const cache = details.retrieval.cacheState ? `; cache: ${details.retrieval.cacheState}` : "";
+  return ` via Firecrawl${cache}`;
 }
