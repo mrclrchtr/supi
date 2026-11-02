@@ -31,6 +31,7 @@ Reference material for agents that develop PI extensions in this repo. Docs here
 | `conventions/code-runtime-architecture.md` | Ownership split of the code stack: `supi-code-intelligence`, `supi-lsp`, `supi-tree-sitter`, `supi-code-runtime` | You work on the code-understanding stack |
 | [Code language capability baseline](conventions/code-language-baseline.md) | Approved, not-yet-qualified baseline for six language families: operations, source-form limits, C/C++ associations, and required Linux/macOS verification | You implement or verify language compatibility in the code-understanding stack |
 | [CI and release gates](conventions/ci-verification.md) | Fast PR checks, exhaustive pre-tag verification, immutable release candidates, manual retries, and Renovate grouping | You change CI jobs, releasing, workspace dependencies, or dependency-update policy |
+| [Extension Package changelogs](conventions/package-changelogs.md) | Manual package-note authoring, native Pi update notices, and artifact/release validation | You implement or maintain package changelog authoring and delivery |
 
 ## adr/ and agents/
 

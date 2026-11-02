@@ -101,6 +101,8 @@ Register a `SettingsModule` with `registerSettings()` from `@mrclrchtr/supi-core
 
 Use staging, not direct `pnpm pack` (which can emit `../` dependencies). Staging dereferences workspace symlinks, exports npm-compatible manifests (rewrites `workspace:`, strips dev dependencies, preserves bundles), runs `npm pack`, and validates paths/manifests and extraction.
 
+For Extension Package changelog authoring, inclusion, and release-version checks, follow [the package changelog convention](docs/conventions/package-changelogs.md). Package notes are hand-maintained on `main`; Release Please owns only the root changelog and existing version metadata.
+
 ```bash
 node scripts/publish.mjs packages/supi-lsp           # pack + verify
 node scripts/publish.mjs packages/supi-lsp --publish # pack + verify + publish

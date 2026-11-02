@@ -1,5 +1,15 @@
 #!/usr/bin/env node
-import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  appendFileSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 // Replace npm at the process boundary. Never call the real registry or publisher.
@@ -9,7 +19,9 @@ if (args[0] === "pack") {
   event.manifest = JSON.parse(readFileSync("package.json", "utf8"));
 }
 if (args[0] === "publish") {
-  event.manifest = JSON.parse(readFileSync(args[1], "utf8"));
+  event.manifest = JSON.parse(
+    execFileSync("tar", ["-xOf", args[1], "package/package.json"], { encoding: "utf8" }),
+  );
 }
 appendFileSync(process.env.TEST_NPM_LOG, `${JSON.stringify(event)}\n`);
 
@@ -35,7 +47,16 @@ switch (args[0]) {
   case "pack": {
     const filename = `${event.manifest.name.replace(/[@/]/g, "-")}-${event.manifest.version}.tgz`;
     const outDir = args[args.indexOf("--pack-destination") + 1];
-    writeFileSync(join(outDir, filename), JSON.stringify(event.manifest));
+    const archiveRoot = mkdtempSync(join(tmpdir(), "supi-npm-archive-"));
+    try {
+      mkdirSync(join(archiveRoot, "package"));
+      for (const file of ["package.json", "CHANGELOG.md"]) {
+        if (existsSync(file)) copyFileSync(file, join(archiveRoot, "package", file));
+      }
+      execFileSync("tar", ["-czf", join(outDir, filename), "-C", archiveRoot, "package"]);
+    } finally {
+      rmSync(archiveRoot, { recursive: true, force: true });
+    }
     console.log(JSON.stringify([{ filename }]));
     break;
   }

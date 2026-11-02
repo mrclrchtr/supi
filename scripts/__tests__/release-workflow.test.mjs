@@ -97,6 +97,18 @@ describe("verified-commit release creation", () => {
     expect(writes(result)).toEqual([]);
   });
 
+  it("rejects a future package changelog before creating tags", () => {
+    repo.updateJson("packages/a-app/package.json", { pi: { extensions: ["./extension.ts"] } });
+    writeFileSync(
+      join(repo.cwd, "packages/a-app/CHANGELOG.md"),
+      "## [6.4.0]\n\n- Future behavior.\n",
+    );
+    const result = repo.runScript("create-release.mjs", { responses: responses() });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("newer than package version 6.3.1");
+    expect(writes(result)).toEqual([]);
+  });
+
   it("never moves an existing tag to the candidate", () => {
     const api = responses();
     api[`GET ${root}/git/ref/tags/v6.3.1`] = response({ object: { type: "tag" } });

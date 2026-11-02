@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { validatePackageChangelog } from "./package-changelog.mjs";
 
 const VERSION_CORE = "(?:0|[1-9][0-9]*)";
 const PRERELEASE_ID = "(?:0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*)";
@@ -84,7 +85,10 @@ export function validateReleaseCheckout() {
     if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
     const path = join("packages", entry.name);
     const pkg = readPublicPackage(join(path, "package.json"), releaseVersion);
-    if (pkg) packages.set(path, pkg);
+    if (pkg) {
+      validatePackageChangelog(path, pkg, { release: true });
+      packages.set(path, pkg);
+    }
   }
   if (packages.size === 0) {
     throw invalidField("packages/", "at least one public package", 0);

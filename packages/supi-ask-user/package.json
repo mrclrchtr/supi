@@ -28,6 +28,7 @@
   ],
   "type": "module",
   "files": [
+    "CHANGELOG.md",
     "src/**/*.ts",
     "!__tests__"
   ],

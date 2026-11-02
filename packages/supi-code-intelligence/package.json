@@ -31,6 +31,7 @@
   ],
   "type": "module",
   "files": [
+    "CHANGELOG.md",
     "src/**/*.ts",
     "gradle-helper/lib/*.jar",
     "gradle-helper/licenses/**",

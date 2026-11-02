@@ -9,6 +9,7 @@ import { makeNestedPackageFixture } from "./helpers/pack-fixture.mjs";
 const SLOW_TIMEOUT = 120_000;
 
 import { packStaged } from "../pack-staged.mjs";
+import { verifyTarball } from "../verify-tarball.mjs";
 
 function extractJson(tarballPath, manifestPath) {
   const out = execFileSync("tar", ["-xOf", tarballPath, manifestPath], {
@@ -26,6 +27,21 @@ function listTarballEntries(tarballPath) {
 
 function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function makeChangelogTarball(parentDir, content, fields = {}) {
+  const packageDir = join(parentDir, "package");
+  mkdirSync(packageDir, { recursive: true });
+  writeJson(join(packageDir, "package.json"), {
+    name: "extension-fixture",
+    version: "1.0.0",
+    pi: { extensions: ["./src/extension.ts"] },
+    ...fields,
+  });
+  if (content !== undefined) writeFileSync(join(packageDir, "CHANGELOG.md"), content);
+  const archive = join(parentDir, "extension.tgz");
+  execFileSync("tar", ["-czf", archive, "-C", parentDir, "package"]);
+  return archive;
 }
 
 function makePackageWithBrokenBinLink(parentDir) {
@@ -90,6 +106,66 @@ describe("packStaged clean manifest", () => {
 
   afterEach(() => {
     if (outDir) rmSync(outDir, { recursive: true, force: true });
+  });
+
+  it("rejects an Extension Package tarball without its own changelog", () => {
+    expect(() => verifyTarball(makeChangelogTarball(outDir))).toThrow(/CHANGELOG\.md/);
+  });
+
+  it("allows prepared notes while packing but rejects them for publication", () => {
+    const archive = makeChangelogTarball(outDir, "## [1.1.0]\n\n- Upcoming improvement.\n");
+    expect(verifyTarball(archive)).toBe(true);
+    expect(() => verifyTarball(archive, { release: true })).toThrow(
+      "version 1.1.0 is newer than package version 1.0.0",
+    );
+  });
+
+  it.each([
+    ["no entries", "# Changelog\n", "at least one versioned entry"],
+    ["empty entry", "## [1.0.0]\n\n### Fixes\n<!-- pending -->\n", "empty entry"],
+    ["invalid heading", "## Unreleased\n\n- A fix.\n", "invalid version heading"],
+    ["partial version", "## [1.0]\n\n- A fix.\n", "invalid version heading"],
+    ["leading zero", "## [01.0.0]\n\n- A fix.\n", "invalid version heading"],
+    [
+      "duplicate version",
+      "## [1.0.0]\n\n- A fix.\n\n## [1.0.0]\n\n- Another fix.\n",
+      "duplicate version",
+    ],
+    [
+      "reversed versions",
+      "## [1.0.0]\n\n- A fix.\n\n## [2.0.0]\n\n- Another fix.\n",
+      "descending order",
+    ],
+  ])("rejects a shipped changelog with %s", (_name, content, error) => {
+    expect(() => verifyTarball(makeChangelogTarball(outDir, content))).toThrow(error);
+  });
+
+  it("does not publish stable-version notes in an earlier prerelease of the same version", () => {
+    const archive = makeChangelogTarball(outDir, "## [1.0.0]\n\n- Stable behavior.\n", {
+      version: "1.0.0-rc.1+build.2",
+    });
+    expect(verifyTarball(archive)).toBe(true);
+    expect(() => verifyTarball(archive, { release: true })).toThrow(
+      "newer than package version 1.0.0-rc.1+build.2",
+    );
+  });
+
+  it("retains skipped-release history and accepts an unchanged package's older last entry", () => {
+    const archive = makeChangelogTarball(
+      outDir,
+      "# Changelog\r\n\r\n## [1.0.0]\r\n\r\n- A fix.\r\n\r\n## 0.9.0\r\n\r\n- Earlier behavior.\r\n",
+      { version: "1.2.0" },
+    );
+    expect(verifyTarball(archive, { release: true })).toBe(true);
+  });
+
+  it("rejects a changelog symlink even when its target is inside the package", () => {
+    makeChangelogTarball(outDir);
+    writeFileSync(join(outDir, "package", "notes.md"), "## [1.0.0]\n\n- A fix.\n");
+    symlinkSync("notes.md", join(outDir, "package", "CHANGELOG.md"));
+    const archive = join(outDir, "extension.tgz");
+    execFileSync("tar", ["-czf", archive, "-C", outDir, "package"]);
+    expect(() => verifyTarball(archive)).toThrow("expected a readable regular file");
   });
 
   it("removes dangling bin symlinks before copying the package tree", {
@@ -160,6 +236,11 @@ describe("packStaged clean manifest", () => {
     const pkg = extractJson(tarball, "package/package.json");
     const entries = listTarballEntries(tarball);
     expectExplicitSurface(pkg, entries);
+    expect(verifyTarball(tarball)).toBe(true);
+    const notes = execFileSync("tar", ["-xOf", tarball, "package/CHANGELOG.md"], {
+      encoding: "utf8",
+    });
+    expect(notes).toBe(readFileSync("packages/supi-ask-user/CHANGELOG.md", "utf8"));
   });
 
   it("publishes library-only surface for packages/supi-core", {
@@ -177,6 +258,7 @@ describe("packStaged clean manifest", () => {
     expect(entries).toContain("package/src/api.ts");
     expect(entries).toContain("package/src/tui.ts");
     expect(entries).not.toContain("package/src/extension.ts");
+    expect(verifyTarball(tarball, { release: true })).toBe(true);
   });
 
   it("publishes explicit api and extension subpaths for packages/supi-web", {

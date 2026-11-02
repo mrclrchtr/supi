@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { packStaged } from "./pack-staged.mjs";
 import { validateReleaseCheckout } from "./release-validation.mjs";
+import { verifyTarball } from "./verify-tarball.mjs";
 
 // Validate the complete release before any registry check, pack, or publish.
 const pkgMap = validateReleaseCheckout();
@@ -106,6 +107,7 @@ async function publishAll() {
 
     console.log(`Packing ${name}@${version} from staged copy ...`);
     const tarballPath = await packStaged(resolve(path), { outDir: tarballDir });
+    verifyTarball(tarballPath, { release: true });
 
     console.log(`Publishing ${name}@${version} from ${tarballPath} ...`);
     execFileSync(

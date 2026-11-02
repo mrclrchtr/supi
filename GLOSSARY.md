@@ -46,6 +46,14 @@ _Avoid_: root stack, standard stack, release stack
 A SuPi package that can be installed into PI and registers extension behavior such as tools, commands, event handlers, settings, or UI.
 _Avoid_: plugin package, module
 
+**SuPi Release Notes**:
+The release-wide record of changes across SuPi, distinct from the update history of an individual Extension Package.
+_Avoid_: package changelog, Extension Package Changelog
+
+**Extension Package Changelog**:
+A curated versioned history of user-relevant changes delivered by one Extension Package, including effects of bundled capabilities. A shared SuPi version increase alone does not require a new entry.
+_Avoid_: SuPi Release Notes, dependency changelog
+
 **Installation Matrix**:
 A SuPi installer view with one row for each selectable Extension Package and separate project and global selection columns. A selected cell means a direct package declaration in that scope, not that the package's capabilities are active there.
 _Avoid_: scope chooser, tool activation checklist

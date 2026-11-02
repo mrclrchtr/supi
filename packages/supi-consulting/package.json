@@ -29,6 +29,7 @@
   ],
   "type": "module",
   "files": [
+    "CHANGELOG.md",
     "src/**/*.ts",
     "scripts/live-probe.ts",
     "README.md",

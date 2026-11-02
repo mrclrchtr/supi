@@ -1,5 +1,7 @@
-import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createReleaseFixture } from "./helpers/release-fixture.mjs";
 
@@ -88,6 +90,28 @@ describe("release identity validation", () => {
     expectBlocked(fixture.run(), ["packages/", "at least one public package", "actual 0"]);
   });
 
+  it.each([
+    [undefined, "expected a readable regular file"],
+    ["## Unreleased\n\n- A pending fix.\n", "invalid version heading"],
+    ["## [6.3.2]\n\n- A future fix.\n", "newer than package version 6.3.1"],
+  ])("rejects invalid Extension Package notes before npm access: %j", (content, error) => {
+    fixture.updateJson("packages/a-app/package.json", { pi: { extensions: ["./extension.ts"] } });
+    if (content !== undefined)
+      writeFileSync(join(fixture.cwd, "packages/a-app/CHANGELOG.md"), content);
+    expectBlocked(fixture.run({ RELEASE_SHA: fixture.commit() }), ["CHANGELOG.md", error]);
+  });
+
+  it("accepts older package notes when an unchanged package advances with the release", () => {
+    fixture.updateJson("packages/a-app/package.json", { pi: { extensions: ["./extension.ts"] } });
+    writeFileSync(
+      join(fixture.cwd, "packages/a-app/CHANGELOG.md"),
+      "## [6.3.0]\n\n- Last user-visible change.\n",
+    );
+    const result = fixture.run({ RELEASE_SHA: fixture.commit() }, { validateOnly: true });
+    expect(result.status, result.stderr).toBe(0);
+    expect(fixture.events()).toEqual([]);
+  });
+
   it("validates without npm access before workspace dependency setup", () => {
     const result = fixture.run({}, { validateOnly: true });
     expect(result.status, result.stderr).toBe(0);
@@ -96,7 +120,43 @@ describe("release identity validation", () => {
   });
 });
 
-describe("release publication", () => {
+describe("direct publication", () => {
+  it("allows future notes for development packing but blocks publishing until corrected", {
+    timeout: 15_000,
+  }, () => {
+    fixture.updateJson("packages/a-app/package.json", { pi: { extensions: ["./extension.ts"] } });
+    const changelog = join(fixture.cwd, "packages/a-app/CHANGELOG.md");
+    writeFileSync(changelog, "## [6.4.0]\n\n- Upcoming behavior.\n");
+    // A workspace-local symlink also exercises this CLI on Linux, where /tmp is deliberately refused.
+    const parent = mkdtempSync(join(process.cwd(), "node_modules", ".supi-direct-publish-"));
+    const packageDir = join(parent, "extension");
+    symlinkSync(join(fixture.cwd, "packages/a-app"), packageDir, "dir");
+    const run = (args) =>
+      spawnSync(
+        process.execPath,
+        [fileURLToPath(new URL("../publish.mjs", import.meta.url)), packageDir, ...args],
+        { env: fixture.env, encoding: "utf8", timeout: 10_000 },
+      );
+    try {
+      const development = run([]);
+      expect(development.status, development.stderr).toBe(0);
+      expect(fixture.events().map((event) => event.args[0])).toEqual(["pack"]);
+      rmSync(fixture.env.TEST_NPM_LOG);
+
+      expectBlocked(run(["--publish"]), ["CHANGELOG.md", "newer than package version 6.3.1"]);
+
+      writeFileSync(changelog, "## [6.3.0]\n\n- Last user-visible change.\n");
+      const publication = run(["--publish"]);
+      expect(publication.status, publication.stderr).toBe(0);
+      expect(fixture.events().map((event) => event.args[0])).toEqual(["pack", "publish"]);
+    } finally {
+      rmSync(parent, { recursive: true, force: true });
+    }
+  });
+});
+
+// These cases create and verify real archives across several subprocesses.
+describe("release publication", { timeout: 15_000 }, () => {
   it("checks all versions again when publication starts after validation", () => {
     const validation = fixture.run({}, { validateOnly: true });
     expect(validation.status, validation.stderr).toBe(0);

@@ -15,6 +15,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { sanitizeNpmEnv } from "./npm-env.mjs";
+import { validatePackageChangelog } from "./package-changelog.mjs";
 import { rewriteStagedManifests } from "./staged-manifests.mjs";
 
 function parseArgs(argv) {
@@ -341,6 +342,7 @@ export async function packStaged(packageDir, options = {}) {
   const dryRun = options.dryRun ?? false;
   const outDir = resolve(options.outDir ?? process.cwd());
   const pkg = assertPackageDir(packageDir);
+  validatePackageChangelog(packageDir, pkg);
   const stageRoot = mkdtempSync(join(tmpdir(), "supi-pack-"));
   const stageDir = join(stageRoot, basename(packageDir));
 

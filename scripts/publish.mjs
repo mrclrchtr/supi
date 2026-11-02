@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { sanitizeNpmEnv } from "./npm-env.mjs";
 import { packStaged } from "./pack-staged.mjs";
+import { validatePackageChangelog } from "./package-changelog.mjs";
 import { verifyTarball } from "./verify-tarball.mjs";
 
 function parseArgs(argv) {
@@ -62,6 +63,10 @@ function validatePackageDir(packageDir) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   validatePackageDir(args.packageDir);
+  if (args.publish) {
+    const manifest = JSON.parse(readFileSync(join(args.packageDir, "package.json"), "utf8"));
+    validatePackageChangelog(args.packageDir, manifest, { release: true });
+  }
 
   // Ensure output dir exists (packStaged requires it)
   const outDir = join(tmpdir(), "supi-publish");
@@ -70,7 +75,7 @@ async function main() {
   const tarballPath = await packStaged(args.packageDir, { outDir });
   console.log(`Packed: ${tarballPath}`);
 
-  verifyTarball(tarballPath);
+  verifyTarball(tarballPath, { release: args.publish });
   console.log("Verified: OK");
 
   if (args.publish) {
@@ -80,7 +85,9 @@ async function main() {
     });
     console.log("Published.");
   } else {
-    console.log("Ready to publish.");
+    console.log(
+      "Development package verified; publication additionally checks changelog versions.",
+    );
   }
 }
 

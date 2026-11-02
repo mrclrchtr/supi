@@ -2,8 +2,9 @@
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { validatePackageChangelog } from "./package-changelog.mjs";
 
 function parseArgs(argv) {
   if (argv.length !== 1) {
@@ -12,7 +13,8 @@ function parseArgs(argv) {
   return argv[0];
 }
 
-export function verifyTarball(tarballPath) {
+/** Verify the actual archive, optionally enforcing release-version bounds for package notes. */
+export function verifyTarball(tarballPath, { release = false } = {}) {
   // 1. Check for ../ entries
   const listing = execFileSync("tar", ["-tzf", tarballPath], { encoding: "utf8" });
   const entries = listing.trim().split("\n").filter(Boolean);
@@ -28,6 +30,7 @@ export function verifyTarball(tarballPath) {
 
   // 3. Check for workspace: protocol in any packed package.json
   const manifestEntries = entries.filter((e) => e.endsWith("/package.json"));
+  const manifests = [];
   const dirtyEntries = [];
 
   for (const entry of manifestEntries) {
@@ -37,7 +40,9 @@ export function verifyTarball(tarballPath) {
     if (content.includes("workspace:")) {
       dirtyEntries.push(entry);
     }
-    if (JSON.parse(content).name === "@mrclrchtr/supi-code-intelligence") {
+    const manifest = JSON.parse(content);
+    manifests.push({ entry, manifest });
+    if (manifest.name === "@mrclrchtr/supi-code-intelligence") {
       verifyGradleArtifacts(entry.slice(0, -"package.json".length), entries);
     }
   }
@@ -53,9 +58,14 @@ export function verifyTarball(tarballPath) {
   // 4. Check extraction succeeds
   const extractDir = mkdtempSync(join(tmpdir(), "supi-verify-"));
   try {
-    execFileSync("tar", ["-xzf", tarballPath, "-C", extractDir]);
-  } catch (err) {
-    throw new Error(`Tarball extraction failed: ${tarballPath}`, { cause: err });
+    try {
+      execFileSync("tar", ["-xzf", tarballPath, "-C", extractDir]);
+    } catch (err) {
+      throw new Error(`Tarball extraction failed: ${tarballPath}`, { cause: err });
+    }
+    for (const { entry, manifest } of manifests) {
+      validatePackageChangelog(join(extractDir, dirname(entry)), manifest, { release });
+    }
   } finally {
     rmSync(extractDir, { recursive: true, force: true });
   }
