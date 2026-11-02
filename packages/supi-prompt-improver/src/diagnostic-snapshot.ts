@@ -143,12 +143,14 @@ function captureResponseUsage(response: unknown, target: Record<string, unknown>
   target.usage = result;
 }
 
-function copyCost(cost: Record<string, unknown>): Record<string, number> {
-  const result: Record<string, number> = {};
+function copyCost(cost: Record<string, unknown>): Record<string, number | boolean> {
+  const result: Record<string, number | boolean> = {};
   for (const key of ["input", "output", "cacheRead", "cacheWrite", "total"]) {
     const value = readProperty(cost, key);
     if (typeof value === "number" && Number.isFinite(value)) result[key] = value;
   }
+  const totalFromProvider = readProperty(cost, "totalFromProvider");
+  if (typeof totalFromProvider === "boolean") result.totalFromProvider = totalFromProvider;
   return result;
 }
 

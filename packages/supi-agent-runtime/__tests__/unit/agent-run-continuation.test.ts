@@ -45,6 +45,7 @@ const usage = (value: number) => ({
     cacheRead: 0,
     cacheWrite: 0,
     total: value * 2,
+    totalFromProvider: true,
   },
 });
 
@@ -503,7 +504,12 @@ describe("Agent Run finite continuation", () => {
       usage: { input: 5 },
     });
     expect(onTurn).toHaveBeenCalledWith(
-      expect.objectContaining({ usage: expect.objectContaining({ input: 3 }) }),
+      expect.objectContaining({
+        usage: expect.objectContaining({
+          input: 3,
+          cost: expect.objectContaining({ totalFromProvider: true }),
+        }),
+      }),
     );
   });
 

@@ -134,6 +134,7 @@ const OBJECT_CAPTURE_KEYS = [
   "totalUsageUnits",
   "cost",
   "total",
+  "totalFromProvider",
   "contentShape",
   "namespace",
   "thoughtSignature",

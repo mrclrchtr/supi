@@ -45,6 +45,7 @@ import {
   type AgentRunUsageBaseline,
   collectAgentRunUsage,
   createAgentRunUsageBaseline,
+  isProviderReportedUsageDelta,
 } from "./usage.ts";
 
 /** Grace period for a provider abort before disposal continues. */
@@ -1349,6 +1350,7 @@ function subtractUsage(after: Usage | undefined, before: Usage | undefined): Usa
       cacheRead: nonNegative(after.cost.cacheRead - (before?.cost.cacheRead ?? 0)),
       cacheWrite: nonNegative(after.cost.cacheWrite - (before?.cost.cacheWrite ?? 0)),
       total: nonNegative(after.cost.total - (before?.cost.total ?? 0)),
+      totalFromProvider: isProviderReportedUsageDelta(after, before),
     },
     ...(cacheWrite1h === undefined ? {} : { cacheWrite1h }),
     ...(reasoning === undefined ? {} : { reasoning }),

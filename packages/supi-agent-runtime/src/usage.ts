@@ -5,7 +5,15 @@ function addOptional(first: number | undefined, second: number | undefined): num
   return first === undefined && second === undefined ? undefined : (first ?? 0) + (second ?? 0);
 }
 
-/** Add two PI Usage records while preserving optional reasoning/cache fields. */
+/** A usage delta is provider-reported only when all contributing snapshots are. */
+export function isProviderReportedUsageDelta(after: Usage, before: Usage | undefined): boolean {
+  return (
+    after.cost.totalFromProvider === true &&
+    (before === undefined || before.cost.totalFromProvider === true)
+  );
+}
+
+/** Add PI Usage records; the total is provider-reported only when both parts are. */
 export function addAgentRunUsage(first: Usage, second: Usage): Usage {
   const cacheWrite1h = addOptional(first.cacheWrite1h, second.cacheWrite1h);
   const reasoning = addOptional(first.reasoning, second.reasoning);
@@ -23,6 +31,8 @@ export function addAgentRunUsage(first: Usage, second: Usage): Usage {
       cacheRead: first.cost.cacheRead + second.cost.cacheRead,
       cacheWrite: first.cost.cacheWrite + second.cost.cacheWrite,
       total: first.cost.total + second.cost.total,
+      totalFromProvider:
+        first.cost.totalFromProvider === true && second.cost.totalFromProvider === true,
     },
   };
 }
@@ -272,6 +282,7 @@ function subtractUsage(after: Usage | undefined, before: Usage | undefined): Usa
       cacheRead: difference(after.cost.cacheRead, before?.cost.cacheRead),
       cacheWrite: difference(after.cost.cacheWrite, before?.cost.cacheWrite),
       total: difference(after.cost.total, before?.cost.total),
+      totalFromProvider: isProviderReportedUsageDelta(after, before),
     },
   };
   return usage.input || usage.output || usage.cacheRead || usage.cacheWrite || usage.cost.total
@@ -319,6 +330,9 @@ function normalizeUsage(value: unknown): Usage | undefined {
       cacheRead: numberOrZero(costRecord.cacheRead),
       cacheWrite: numberOrZero(costRecord.cacheWrite),
       total: numberOrZero(costRecord.total),
+      ...(typeof costRecord.totalFromProvider === "boolean"
+        ? { totalFromProvider: costRecord.totalFromProvider }
+        : {}),
     },
     ...(cacheWrite1h === undefined ? {} : { cacheWrite1h }),
     ...(reasoning === undefined ? {} : { reasoning }),
