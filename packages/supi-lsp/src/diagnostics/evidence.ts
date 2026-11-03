@@ -1,6 +1,6 @@
-/** Reason for a partial or unavailable single-file result when the push stays tentative. */
+/** Explain the lack of request-based confirmation when only ambient push evidence is available. */
 export const TENTATIVE_PUSH_UNAVAILABLE_REASON =
-  "A diagnostic publication is ambient evidence only; it may show issues, but an empty publication cannot confirm that the document is clean.";
+  "Only ambient push diagnostics are available for this file; completion of the diagnostic check cannot be confirmed. An empty publication cannot confirm that the document is clean.";
 
 /** A final evidence state for one tracked document. */
 export type DiagnosticEvidenceStatus = "confirmed" | "unconfirmed" | "failed" | "removed";

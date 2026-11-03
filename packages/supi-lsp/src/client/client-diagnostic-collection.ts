@@ -95,10 +95,17 @@ async function collectPushOnlyEvidence(
       ? partialCodeQuery(diagnostics, TENTATIVE_PUSH_UNAVAILABLE_REASON)
       : unavailableCodeQuery(TENTATIVE_PUSH_UNAVAILABLE_REASON);
   }
-  return incompleteDiagnosticResult(
-    options.cachedDiagnostics,
-    push === "released" ? "released" : "timed-out",
-  );
+  if (push === "released") {
+    return incompleteDiagnosticResult(options.cachedDiagnostics, "released");
+  }
+  return options.cachedDiagnostics
+    ? partialCodeQuery(
+        options.cachedDiagnostics,
+        `${TENTATIVE_PUSH_UNAVAILABLE_REASON} Retained cached diagnostics are partial evidence.`,
+      )
+    : unavailableCodeQuery(
+        `${TENTATIVE_PUSH_UNAVAILABLE_REASON} No current publication was observed.`,
+      );
 }
 
 /** Collect one request report without using an ambient push as confirmation. */

@@ -67,7 +67,7 @@ describe("push diagnostic quiet observation", () => {
     await vi.advanceTimersByTimeAsync(1);
     await expect(second).resolves.toMatchObject({
       kind: "unavailable",
-      reason: expect.stringContaining("ambient evidence"),
+      reason: expect.stringContaining("ambient push diagnostics"),
     });
   });
 

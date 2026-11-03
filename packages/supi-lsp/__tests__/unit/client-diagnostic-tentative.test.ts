@@ -150,7 +150,7 @@ describe("push publication observation (issue #351)", () => {
     await expect(pending).resolves.toEqual({
       kind: "partial",
       data: [makeDiagnostic("early")],
-      reason: expect.stringContaining("ambient evidence"),
+      reason: expect.stringContaining("ambient push diagnostics"),
     });
     // The tentative timeout must not add a close/open pair
     // may cancel the server's in-flight pipeline.
@@ -189,7 +189,7 @@ describe("push publication observation (issue #351)", () => {
     await expect(pending).resolves.toEqual({
       kind: "partial",
       data: [makeDiagnostic("early")],
-      reason: expect.stringContaining("ambient evidence"),
+      reason: expect.stringContaining("ambient push diagnostics"),
     });
     // The observation remains incomplete even when it contains diagnostics.
     expect(
@@ -254,7 +254,7 @@ describe("push publication observation (issue #351)", () => {
     await expect(first).resolves.toMatchObject({
       kind: "partial",
       data: [makeDiagnostic("early")],
-      reason: expect.stringContaining("ambient evidence"),
+      reason: expect.stringContaining("ambient push diagnostics"),
     });
     rpc.sendNotification.mockClear();
     publish(client, file.uri, [makeDiagnostic("early")]);

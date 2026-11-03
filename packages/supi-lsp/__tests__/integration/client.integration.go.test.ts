@@ -104,7 +104,7 @@ describe.skipIf(!HAS_GOPLS)("LspClient integration (gopls push default)", () => 
         `Expected observed ambient push diagnostics, got ${result.kind}: ${result.reason}`,
       );
     }
-    expect(result.reason).toContain("ambient evidence");
+    expect(result.reason).toContain("ambient push diagnostics");
     const typeErrors = result.data.filter((diagnostic: Diagnostic) => diagnostic.severity === 1);
     expect(typeErrors.length).toBeGreaterThan(0);
   }, 30_000);

@@ -161,6 +161,22 @@ Protocol support is separate from the configured mode. A server may support pull
 
 The LSP 3.18 specification adds `Diagnostic.message` markup content, guarded by the client capability `textDocument.diagnostic.markupMessageSupport`; SuPi's validator already accepts plaintext and markdown messages but does not advertise the capability. Other 3.18 features (snippet text edits, inline completion, folding-range refresh, multi-range formatting) are outside the diagnostic surface and are not implemented.
 
+### Texlab diagnostic verification
+
+Verified binary: **Texlab 5.26.0**. This separate verification does not revise the historical audit above or qualify other Texlab versions. The probe advertised pull support, opened a document with a syntax error, and then corrected and saved it.
+
+| Protocol check | Observed result |
+|---|---|
+| Static `diagnosticProvider` | Not advertised |
+| Dynamic `textDocument/diagnostic` registration | None observed |
+| Explicit `textDocument/diagnostic` request | JSON-RPC `-32601` (`method not found`) |
+| `publishDiagnostics` | Publications without a document version |
+| Syntax error → corrected document | Error publication followed by empty publications |
+
+Texlab supplies useful diagnostics through ambient push. SuPi shows observed errors as partial evidence and removes them after a correcting publication, but an empty publication does not confirm a completed clean check. `code_health` therefore keeps the file unconfirmed. A `push-settle` timeout ends the bounded observation window; it is not a failed diagnostic request or proof that Texlab is unresponsive. Longer waits, repeated publications, and restarts do not establish completion.
+
+The [installed Texlab integration test](__tests__/integration/client.integration.texlab.test.ts) covers routing, the absence of a diagnostic provider/request adapter, and unconfirmed coverage. It runs when `texlab` is installed. See [ADR 0022](../../docs/adr/0022-request-confirmed-lsp-agnostic-diagnostics.md) for the unchanged evidence policy.
+
 ### Diagnostic evidence policy
 
 See [`ADR 0022`](../../docs/adr/0022-request-confirmed-lsp-agnostic-diagnostics.md) for the decision record. SuPi uses one shared diagnostic engine with optional internal request adapters. It selects one source for each file:

@@ -86,7 +86,7 @@ describe.skipIf(!HAS_BASH_LSP)("LspClient integration (bash-language-server)", (
     } else if (diagnostics.kind === "partial") {
       expect(Array.isArray(diagnostics.data)).toBe(true);
     } else {
-      expect(diagnostics.reason).toContain("ambient evidence");
+      expect(diagnostics.reason).toContain("ambient push diagnostics");
     }
   }, 15_000);
 

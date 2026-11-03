@@ -60,7 +60,7 @@ describe("LSP single-file diagnostic freshness", () => {
 
     await expect(pending).resolves.toMatchObject({
       kind: "unavailable",
-      reason: expect.stringContaining("not confirmed"),
+      reason: expect.stringContaining("completion of the diagnostic check cannot be confirmed"),
     });
   });
 
@@ -98,7 +98,7 @@ describe("LSP single-file diagnostic freshness", () => {
     await expect(pending).resolves.toMatchObject({
       kind: "partial",
       data: [makeDiagnostic("current")],
-      reason: expect.stringContaining("ambient evidence"),
+      reason: expect.stringContaining("ambient push diagnostics"),
     });
     expect(rpc.sendNotification).not.toHaveBeenCalled();
   });
@@ -349,6 +349,9 @@ describe("LSP single-file diagnostic freshness", () => {
       data: [makeDiagnostic("cached")],
       reason: expect.stringContaining("cached diagnostics"),
     });
+    await expect(pending).resolves.toMatchObject({
+      reason: expect.stringContaining("Only ambient push diagnostics are available for this file"),
+    });
   });
 
   it("keeps a stale empty cache partial instead of confirming a clean result", async () => {
@@ -367,7 +370,11 @@ describe("LSP single-file diagnostic freshness", () => {
     await settleInputRead();
     await vi.runAllTimersAsync();
 
-    await expect(pending).resolves.toMatchObject({ kind: "partial", data: [] });
+    await expect(pending).resolves.toMatchObject({
+      kind: "partial",
+      data: [],
+      reason: expect.stringContaining("Only ambient push diagnostics are available for this file"),
+    });
   });
 
   it("completes a clean result from a full pull report", async () => {
@@ -460,7 +467,10 @@ describe("LSP single-file diagnostic freshness", () => {
     await settleInputRead();
     await vi.advanceTimersByTimeAsync(0);
 
-    await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
+    await expect(pending).resolves.toMatchObject({
+      kind: "unavailable",
+      reason: expect.not.stringContaining("Only ambient push diagnostics"),
+    });
   });
 
   it("rejects a closed document's versioned push and re-stamps a post-reopen push", () => {
@@ -505,7 +515,10 @@ describe("LSP single-file diagnostic freshness", () => {
     await settleInputRead();
     await vi.runAllTimersAsync();
 
-    await expect(pending).resolves.toMatchObject({ kind: "unavailable" });
+    await expect(pending).resolves.toMatchObject({
+      kind: "unavailable",
+      reason: expect.stringContaining("Only ambient push diagnostics are available for this file"),
+    });
     expect(rpc.sendNotification).not.toHaveBeenCalledWith(
       "textDocument/didClose",
       expect.anything(),
@@ -879,6 +892,7 @@ describe("LSP single-file diagnostic freshness", () => {
     await expect(pending).resolves.toMatchObject({
       kind: "partial",
       data: [makeDiagnostic("fresh-push")],
+      reason: expect.stringContaining("Fresh diagnostic requests failed"),
     });
     expect(client.getDiagnostics(file.filePath)).toEqual([makeDiagnostic("fresh-push")]);
   });

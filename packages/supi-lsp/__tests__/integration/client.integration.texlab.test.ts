@@ -100,6 +100,9 @@ describe.skipIf(!HAS_TEXLAB)("installed Texlab diagnostics integration", () => {
       expect(result.kind).not.toBe("completed");
       if (result.kind !== "completed") {
         expect(result.reason).toContain(
+          "Only ambient push diagnostics are available for this file",
+        );
+        expect(result.reason).toContain(
           "empty publication cannot confirm that the document is clean",
         );
       }

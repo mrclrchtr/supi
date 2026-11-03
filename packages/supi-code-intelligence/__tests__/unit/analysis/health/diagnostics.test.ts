@@ -183,7 +183,7 @@ describe("code_health diagnostic observations", () => {
         failed: 0,
         removed: 0,
       },
-      reason: expect.stringContaining("ambient evidence only"),
+      reason: expect.stringContaining("ambient push diagnostics"),
     });
   });
 
@@ -213,7 +213,7 @@ describe("code_health diagnostic observations", () => {
         removed: 0,
         documents: [{ file, status: "unconfirmed" }],
       },
-      reason: expect.stringContaining("ambient evidence"),
+      reason: expect.stringContaining("ambient push diagnostics"),
     });
   });
 

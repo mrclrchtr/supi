@@ -324,7 +324,7 @@ describe("code_inspect tool", () => {
     const result = (await executeInspect()) as { content: Array<{ text: string }> };
     const text = result.content[0]?.text ?? "";
     expect(text).toContain("Observed missing label.");
-    expect(text).toContain("Partial — A diagnostic publication is ambient evidence only");
+    expect(text).toContain("Partial — Only ambient push diagnostics are available for this file");
     expect(text).toContain("empty publication cannot confirm that the document is clean");
   });
 
