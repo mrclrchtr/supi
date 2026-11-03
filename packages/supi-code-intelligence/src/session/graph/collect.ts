@@ -115,7 +115,7 @@ async function collectCalleesRelation(options: CollectRelationOptions): Promise<
       kind: "unavailable",
       rel: "callees",
       message:
-        "Callees require a name anchor. Resolve an identifier coordinate with code_resolve and retry.",
+        "Callees require a name anchor. To inspect callees, retry code_graph with target.anchor at the symbol's identifier.",
     };
   }
   if (!options.provider?.calleesAt) {

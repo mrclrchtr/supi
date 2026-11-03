@@ -112,7 +112,7 @@ function buildInspectNextQueries(
       character: definition.character,
     });
     queries.push(
-      `Use code_resolve with target.anchor ${anchor}, then code_graph with the returned handle`,
+      `To explore this definition's relationships, call code_graph with target.anchor ${anchor}`,
     );
   } else if (!semanticReady) {
     queries.push(
