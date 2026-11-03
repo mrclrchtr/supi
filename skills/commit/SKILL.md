@@ -24,9 +24,11 @@ A **commit candidate** is the exact patch that will enter the commit. A **cohere
 
    **Done when:** the staged patch contains the complete intended change and no unrelated change.
 
-3. **Audit the candidate.** Inspect the full staged diff, check for possible secrets, and run `git diff --cached --check`. Let normal Git hooks run when creating the commit. Fix and retry only an obvious mechanical failure inside the task; otherwise stop and report the failure.
+3. **Audit the candidate and verify hooks.** Inspect the full staged diff, check for possible secrets, and run `git diff --cached --check`.
 
-   **Done when:** the diff audit passes and all hook results are known.
+   **Verify effective hooks.** Identify the hooks expected by the repository and use `git hook list --show-scope <event>` when supported. Git hooks may be registered through configuration rather than executable files in `.git/hooks`. If listing is unsupported, inspect `core.hooksPath` and the applicable hook files. Follow the repository's installation guidance only when the expected hooks are actually absent. If hook state remains unclear, stop and report the uncertainty rather than changing the hook setup.
+
+   **Done when:** the diff audit passes and expected hooks are verified as present.
 
 4. **Write the message.** Match recent commit history first. Honor explicit message requirements. Use a concise subject with the repository's normal type, scope, mood, length, and punctuation. Add a body only when it explains why, a trade-off, a constraint, a side effect, or a required follow-up. Add references to tickets if they exist; don't invent them.
 
@@ -44,6 +46,8 @@ A **commit candidate** is the exact patch that will enter the commit. A **cohere
 
    For an active Git operation, use its appropriate continuation path. When known Git facts show a clearly local follow-up to `HEAD`, the agent may amend. Ask when those facts are unclear; otherwise create a new commit.
 
-6. **Verify the result.** Inspect the new commit's hash, subject, stat, and `git status`. Report the commit and the checks that ran. Confirm that remaining changes are intentional. If the commit fails, leave the state available for inspection and report the failure without retrying blindly.
+   Let the real commit run normal Git hooks. Fix and retry only an obvious mechanical failure inside the task; otherwise stop and report the failure. Re-audit the candidate before retrying if a fix or hook changed it.
+
+6. **Verify the result.** Inspect the new commit's hash, subject, stat, and `git status`. Report the commit and the checks and hooks that actually ran, including their results. Hook registration alone does not prove execution or success. Confirm that remaining changes are intentional. If the commit fails, leave the state available for inspection and report the failure without retrying blindly.
 
    **Done when:** `HEAD` contains the intended patch, the message follows repository style, check results are reported, and remaining changes are understood.
