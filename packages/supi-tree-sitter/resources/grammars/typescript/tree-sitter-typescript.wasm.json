@@ -18,7 +18,11 @@
     {
       "id": "import-types-as-primary-types-v1",
       "file": "common/define-grammar.js"
+    },
+    {
+      "id": "import-type-generic-calls-v1",
+      "file": "common/define-grammar.js"
     }
   ],
-  "sha256": "db071e260bcfec92f4b11997516dec49393c5086775eb8f090217d38de300c0d"
+  "sha256": "86ba3af6f8214c90f32af1ea82214a0c1da87c9e2f5ea47c19577ba5b6c78bfb"
 }

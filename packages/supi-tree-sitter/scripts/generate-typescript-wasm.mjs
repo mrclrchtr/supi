@@ -22,6 +22,7 @@ const PATCH_FILE = "common/define-grammar.js";
 const PATCHES = [
   { id: "type-only-star-reexports-v1", file: PATCH_FILE },
   { id: "import-types-as-primary-types-v1", file: PATCH_FILE },
+  { id: "import-type-generic-calls-v1", file: PATCH_FILE },
 ];
 const DIALECTS = ["typescript", "tsx"];
 const USAGE = `Usage: node scripts/generate-typescript-wasm.mjs [--check]
@@ -152,6 +153,23 @@ export function patchTypescriptGrammar(directory) {
     "      primary_type: $ => choice(\n",
     `      primary_type: $ => choice(\n${importTypes}`,
     "primary-type",
+  );
+  // Keep both expression and import-type parses until the closing type arguments
+  // disambiguate generic calls from comparisons and ordinary dynamic imports.
+  const importTypeConflicts = [
+    "[$.call_expression, $._type_query_call_expression]",
+    "[$.call_expression, $._type_query_call_expression_in_type_annotation]",
+    "[$.member_expression, $._type_query_member_expression_in_type_annotation]",
+  ];
+  for (const conflict of importTypeConflicts) {
+    source = replaceRule(source, `      ${conflict},\n`, "", conflict);
+  }
+  const conflictsHeader = "    conflicts: ($, previous) => previous.concat([\n";
+  source = replaceRule(
+    source,
+    conflictsHeader,
+    `${conflictsHeader}${importTypeConflicts.map((conflict) => `      ${conflict},\n`).join("")}`,
+    "import-type conflicts",
   );
   writeFileSync(path, source);
 }

@@ -118,9 +118,7 @@ describe("workspace sentinels", () => {
       fs.chmodSync(blockedDir, 0o755);
     }
   });
-});
 
-describe("workspace sentinels", () => {
   it("does not include source files in the sentinel snapshot", () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-sentinels-source-separate-"));
     fs.writeFileSync(path.join(tmpDir, "package.json"), "{}\n");

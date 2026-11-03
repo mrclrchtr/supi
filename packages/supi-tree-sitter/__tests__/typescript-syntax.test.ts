@@ -45,6 +45,75 @@ describe("TypeScript syntax completeness", () => {
     },
   );
 
+  it.each(["ts", "tsx"])(
+    "retains import types in generic calls in %s without recovery",
+    async (extension) => {
+      const cwd = mkdtempSync(join(tmpdir(), "supi-typescript-syntax-"));
+      const file = `calls.${extension}`;
+      writeFileSync(
+        join(cwd, file),
+        [
+          'read<import("./api").Value>();',
+          'read<typeof import("./api")>();',
+          'read<import("./api").Value[]>();',
+        ].join("\n"),
+      );
+      const session = createTreeSitterSession(cwd);
+      try {
+        const result = await session.query(
+          file,
+          "(call_expression type_arguments: (type_arguments) @types)",
+        );
+        expect(result.kind).toBe("success");
+        if (result.kind !== "success") return;
+        expect(result.data.map((capture) => capture.text)).toEqual([
+          '<import("./api").Value>',
+          '<typeof import("./api")>',
+          '<import("./api").Value[]>',
+        ]);
+      } finally {
+        await session.dispose();
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.each(["ts", "tsx"])(
+    "preserves dynamic imports and comparison expressions in %s",
+    async (extension) => {
+      const cwd = mkdtempSync(join(tmpdir(), "supi-typescript-syntax-"));
+      const file = `expressions.${extension}`;
+      writeFileSync(
+        join(cwd, file),
+        [
+          'const loaded = import("./api");',
+          'const comparison = left < import("./api").value;',
+          'const typeComparison = left < typeof import("./api");',
+        ].join("\n"),
+      );
+      const session = createTreeSitterSession(cwd);
+      try {
+        const result = await session.query(
+          file,
+          "[(call_expression function: (import)) (binary_expression) (unary_expression)] @expression",
+        );
+        expect(result.kind).toBe("success");
+        if (result.kind !== "success") return;
+        expect(result.data.map(({ nodeType, text }) => ({ nodeType, text }))).toEqual([
+          { nodeType: "call_expression", text: 'import("./api")' },
+          { nodeType: "binary_expression", text: 'left < import("./api").value' },
+          { nodeType: "call_expression", text: 'import("./api")' },
+          { nodeType: "binary_expression", text: 'left < typeof import("./api")' },
+          { nodeType: "unary_expression", text: 'typeof import("./api")' },
+          { nodeType: "call_expression", text: 'import("./api")' },
+        ]);
+      } finally {
+        await session.dispose();
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    },
+  );
+
   it("still reports a type-only star re-export with its required source missing", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "supi-typescript-syntax-"));
     writeFileSync(join(cwd, "broken.ts"), "export type *;\n");
